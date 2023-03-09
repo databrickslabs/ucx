@@ -8,14 +8,14 @@
 # MAGIC 
 # MAGIC Assumptions:
 # MAGIC - The storage credential(s) and external location(s) of the parent external location needs to be created on the target UC beforehand.
-# MAGIC - The external location for all schemas is the same, formed of ```<storage location root>/<schema name>/<table name>```
+# MAGIC - The external location is taken from the overwritten storage_sub_directory column on information_schema.tables (previously it was formed by ```<storage location root>/<schema name>/<table name>```)
 # MAGIC - All tables are Delta
 
 # COMMAND ----------
 
 dbutils.widgets.removeAll()
 dbutils.widgets.text("storageLocation", "/mnt/externallocation", "Storage with source catalog info")
-dbutils.widgets.text("catalogName", "system", "information_schema catalog")
+dbutils.widgets.text("catalogName", "system_backup", "information_schema catalog")
 dbutils.widgets.text("rootExternalStorage", "abfss://externaltables@dspadottodrstaging.dfs.core.windows.net/root/", "Root of external tables' path")
 
 # COMMAND ----------
@@ -69,7 +69,6 @@ for catalog in catalog_df.collect():
 
 from pyspark.sql.functions import col, when, collect_list, upper
 
-
 #Get only user schemas
 schemas_df = spark.read.format("delta").load(f"{storage_location}/schemata").filter("schema_name<>'information_schema'")
 
@@ -97,7 +96,11 @@ for table in tables_df.collect():
     columns = return_schema(columns_df)
 
     #Create Table
-    spark.sql(f"CREATE OR REPLACE TABLE {catalog_name}.{table.table_schema}.{table.table_name}({columns}) COMMENT '{table.comment}' LOCATION '{root_externalstorage}{table.table_schema}/{table.table_name}'")
+    #Hard-coded path
+    #spark.sql(f"CREATE OR REPLACE TABLE {catalog_name}.{table.table_schema}.{table.table_name}({columns}) COMMENT '{table.comment}' LOCATION '{root_externalstorage}{table.table_schema}/{table.table_name}'")
+    
+    #Extracted path
+    spark.sql(f"CREATE OR REPLACE TABLE {catalog_name}.{table.table_schema}.{table.table_name}({columns}) COMMENT '{table.comment}' LOCATION '{table.storage_sub_directory}'")
     spark.sql(f"ALTER TABLE {catalog_name}.{table.table_schema}.{table.table_name} SET OWNER to `{table.table_owner}`")
 
 # COMMAND ----------
