@@ -54,11 +54,23 @@ catalog_df = spark.read.format("delta").load(f"{storage_location}/catalogs")
 #Change to this iteration when running on a remote UC
 for catalog in catalog_df.collect():     
     spark.sql(f"CREATE CATALOG {catalog.catalog_name} COMMENT '{catalog.comment}'")
-    spark.sql(f"ALTER CATALOG {catalog.catalog_name} SET OWNER to `{catalog.catalog_owner}`")
+    spark.sql(f"ALTER CATALOG {catalog.catalog_name} SET OWNER to `{catalog.catalog_owner}`") 
 
 #Local testing with different catalog name
 #spark.sql(f"CREATE CATALOG {catalog_name} COMMENT '{catalog_df.collect()[0].comment}'")
 #spark.sql(f"ALTER CATALOG {catalog.catalog_name} SET OWNER to `{catalog_df.collect()[0].catalog_owner}`")
+
+# COMMAND ----------
+
+# MAGIC %md
+# MAGIC #### Catalog ACLs
+
+# COMMAND ----------
+
+#Re-run grants from backed-up information_schema.catalog_privileges    
+catalog_grant_df = spark.read.format("delta").load(f"{storage_location}/catalog_privileges")
+for catalog_grant in catalog_grant_df.collect():   
+    #TODO: assemble GRANT statements (maybe make it re-usable for schemas and tables)
 
 # COMMAND ----------
 
@@ -79,7 +91,6 @@ spark.sql(f"DROP SCHEMA {catalog_name}.default")
 for schema in schemas_df.collect():    
     spark.sql(f"CREATE SCHEMA {catalog_name}.{schema.schema_name} COMMENT '{schema.comment}'")
     spark.sql(f"ALTER SCHEMA {catalog_name}.{schema.schema_name} SET OWNER to `{schema.schema_owner}`")
-
 
 # COMMAND ----------
 
