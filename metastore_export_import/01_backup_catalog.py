@@ -42,7 +42,7 @@ for table in table_list:
 
 # COMMAND ----------
 
-if get_external_location:
+if get_external_location == "True":
     table_location_columns = ["table_catalog","table_schema","table_name","table_location"]
     table_location_storage = "external_table_locations"
     location_list = []
