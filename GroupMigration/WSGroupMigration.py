@@ -1,7 +1,7 @@
 from os import getgrouplist
 import requests
 import json, math
-from pyspark.sql.functions import lit,col,column
+from pyspark.sql.functions import lit,col,column, collect_set
 from functools import reduce
 from pyspark.sql import DataFrame, session
 import concurrent.futures
@@ -45,6 +45,7 @@ class GroupMigration:
         self.dataObjectsPerm=[]
         self.folderList={}
         self.notebookList={}
+        self.fileList={}
         self.spark=spark
         self.userName=userName
         self.checkTableACL=checkTableACL
@@ -52,6 +53,7 @@ class GroupMigration:
         self.numThreads = numThreads
 
         self.lastInventoryRun = None
+        self.checkAllDB = True
         
         #Check if we should automatically generate list, and do it immediately.
         #Implementers Note: Could change this section to a lazy calculation by setting groupL to nil or some sentinel value and adding checks before use.
@@ -152,52 +154,57 @@ class GroupMigration:
             groupMembers={}
             groupEntitlements={}
             groupRoles={}
-            res=requests.get(f"{self.workspace_url}/api/2.0/preview/scim/v2/Groups", headers=self.headers)
+            res=requests.get(f"{self.workspace_url}/api/2.0/preview/scim/v2/Groups?attributes=id", headers=self.headers)
             resJson=res.json()
-            #print(groupList)
-
+            totalGroups=resJson['totalResults']
+            pages=totalGroups//100
             #normalize case
             groupFilterKeeplist = [x.casefold() for x in groupFilterKeeplist]
+            print(f"Total groups: {totalGroups}. Retrieving group details in chunks of 100")
+            for i in range(0,pages+1):
+              print(f"Retrieving the next 100 items from {str(i*100+1)}")
 
-            #Iterate over workspace groups, extracting useful info to vars above
-            for e in resJson['Resources']:
-                if not e['displayName'].casefold() in groupFilterKeeplist:
-                    continue
+              res=requests.get(f"{self.workspace_url}/api/2.0/preview/scim/v2/Groups?startIndex={str(i*100+1)}&count=100", headers=self.headers)
+              resJson=res.json()
+              #Iterate over workspace groups, extracting useful info to vars above
+              for e in resJson['Resources']:
+                  if not e['displayName'].casefold() in groupFilterKeeplist:
+                      continue
 
-                groupIdDict[e['id']]=e['displayName']
+                  groupIdDict[e['id']]=e['displayName']
 
-                #Get Group Members
-                members=[]
-                try:
-                    for mem in e['members']:
-                        members.append(list([mem['display'],mem['value']]))
-                except KeyError:
-                    pass
-                groupMembers[e['id']]=members
+                  #Get Group Members
+                  members=[]
+                  try:
+                      for mem in e['members']:
+                          members.append(list([mem['display'],mem['value']]))
+                  except KeyError:
+                      pass
+                  groupMembers[e['id']]=members
 
-                #Get entitlements
-                entms=[]
-                try:
-                    for ent in e['entitlements']:
-                        entms.append(ent['value'])
-                except:
-                    pass
+                  #Get entitlements
+                  entms=[]
+                  try:
+                      for ent in e['entitlements']:
+                          entms.append(ent['value'])
+                  except:
+                      pass
 
-                groupEntitlements[e['id']]=entms
-                
-                #Get Roles (AWS only)
-                if self.cloud=='AWS':
-                    entms=[]
-                    try:
-                        for ent in e['roles']:
-                            entms.append(ent['value'])
-                    except:
-                        continue
-                    if len(entms)==0:
-                        continue
-                    groupRoles[e['id']]=entms
-            
-            #Finally assign to self (Now that exception hasn't been thrown)
+                  groupEntitlements[e['id']]=entms
+                  
+                  #Get Roles (AWS only)
+                  if self.cloud=='AWS':
+                      entms=[]
+                      try:
+                          for ent in e['roles']:
+                              entms.append(ent['value'])
+                      except:
+                          continue
+                      if len(entms)==0:
+                          continue
+                      groupRoles[e['id']]=entms
+              
+              #Finally assign to self (Now that exception hasn't been thrown)
             self.groupIdDict = groupIdDict
             self.groupMembers = groupMembers
             self.groupEntitlements = groupEntitlements
@@ -707,6 +714,7 @@ class GroupMigration:
 
         self.folderList.clear()
         self.notebookList.clear()
+        self.fileList.clear()
         remaining_dirs = [path]
         depth=0
         while remaining_dirs:
@@ -718,7 +726,7 @@ class GroupMigration:
                     dir_path = futuresMap[future]
                     res = future.result()
                     if res:
-                        dir_path2, folders, notebooks = res
+                        dir_path2, folders, notebooks, files = res
                         if dir_path2 != dir_path:
                             print(f"ERROR: got WRONG RESULT from future: sent: {dir_path} recieved: {dir_path2}")
                             remaining_dirs.remove(dir_path2)
@@ -726,12 +734,14 @@ class GroupMigration:
                         else:
                             self.folderList.update(folders)
                             self.notebookList.update(notebooks)
+                            self.fileList.update(files)
                             remaining_dirs.extend(dir_path for dir_path in folders.values())
                     else:
                         print(f"ERROR: one of the futurue results was None: {dir_path}")
                     remaining_dirs.remove(dir_path)
             depth = depth + 1
-        return (self.folderList, self.notebookList)
+        
+        return (self.folderList, self.notebookList, self.fileList)
 
     def getSingleFolderList(self, path:str, depth:int) -> dict:
         MAX_RETRY = 5
@@ -742,6 +752,7 @@ class GroupMigration:
             #Give some time for the server to recover
             if retry_count > 0:
                 time.sleep(RETRY_DELAY)
+                print(f'[ERROR] retrying folder list for folder {path}.')
             if self.verbose:
                 print(f"[Verbose] Requesting file list for Depth {depth} Retry {retry_count} Path: {path}")
             retry_count = retry_count + 1
@@ -758,29 +769,32 @@ class GroupMigration:
 
                 subFolders = {}
                 notebooks = {}
+                files = {}
                 if len(resFolderJson)==0:
-                    return (path, subFolders, notebooks)
+                    return (path, subFolders, notebooks, files)
                 
                 for c in resFolderJson['objects']:
                     if c['object_type']=="DIRECTORY" and c['path'].startswith('/Repos') == False and c['path'].startswith('/Shared') == False and c['path'].endswith('/Trash') == False:
                         subFolders[c['object_id']] = c['path']
                     elif c['object_type']=="NOTEBOOK" and c['path'].startswith('/Repos') == False and c['path'].startswith('/Shared') == False:
                         notebooks[c['object_id']] = c['path']
-                return (path, subFolders, notebooks)
+                    elif c['object_type']=="FILE" and c['path'].startswith('/Repos') == False and c['path'].startswith('/Shared') == False:
+                        files[c['object_id']] = c['path']
+                return (path, subFolders, notebooks, files)
             
             except Exception as e:
-                # print(f'error in retriving path {path}. error: {e}.')
+                # print(f'error in retrieving path {path}. error: {e}.')
                 lastError = e
                 continue
-        print(f'[ERROR] retry limit ({MAX_RETRY}) limit exceeded while retriving path {path}. last err: {lastError}.')
-        return (path, {}, {})
+        print(f'[ERROR] retry limit ({MAX_RETRY}) limit exceeded while retrieving path {path}. last err: {lastError}.')
+        return (path, {}, {}, {})
 
     def getFoldersNotebookACL(self, rootPath = '/') -> list:
         print('Performing folders and notebook inventory ...')
         try:
             # Get folder list
             self.getRecursiveFolderList(rootPath)
-
+            
             # Collect folder IDs, ignoring suffix /Trash to avoid useless errors. /Repos and /Shared are ignored at the folder list level
             folder_ids = [folder_id for folder_id in self.folderList.keys() if not self.folderList[folder_id].endswith('/Trash')]
 
@@ -803,7 +817,7 @@ class GroupMigration:
                         try:
                             aclList=self.getACL(resFolderPermJson['access_control_list'])   
                         except Exception as e:
-                            print(f'error in retriving folder details: {e}')
+                            print(f'error in retrieving folder details: {e}')
                         if len(aclList) == 0:
                             continue
                         folder_results[folder_id] = aclList
@@ -829,14 +843,40 @@ class GroupMigration:
                         try:
                             aclList=self.getACL(resNotebookPermJson['access_control_list'])
                         except Exception as e:
-                            print(f'error in retriving notebook details: {e}')
+                            print(f'error in retrieving notebook details: {e}')
                         if len(aclList) == 0:
                             continue
                         notebook_results[notebook_id] = aclList
                     except Exception as e:
                         print(f'error in retrieving notebook permission: {e}')
+            
+            # Get file permissions in parallel
+            file_results = {}
+            with concurrent.futures.ThreadPoolExecutor(max_workers=self.numThreads) as executor:
+                file_futures = {executor.submit(requests.get, f"{self.workspace_url}/api/2.0/permissions/files/{file_id}", headers=self.headers): file_id for file_id in self.fileList.keys()}
+                print(f"Awaiting parallel permission requests for {len(file_futures)} files ...")
+                for future in concurrent.futures.as_completed(file_futures):
+                    file_id = file_futures[future]
+                    try:
+                        resFilePerm = future.result()
+                        if resFilePerm.status_code == 404:
+                            print(f'feature not enabled for this tier')
+                            continue
+                        if resFilePerm.status_code == 403:
+                            print('Error retrieving permission for ' + self.fileList[file_id] + ' ' + resFilePerm.json()['message'])
+                            continue
+                        resFilePermJson = resFilePerm.json()
+                        try:
+                            aclList=self.getACL(resFilePermJson['access_control_list'])
+                        except Exception as e:
+                            print(f'error in retrieving file details: {e}')
+                        if len(aclList) == 0:
+                            continue
+                        file_results[file_id] = aclList
+                    except Exception as e:
+                        print(f'error in retrieving file permission: {e}')
 
-            return folder_results, notebook_results
+            return folder_results, notebook_results, file_results
         except Exception as e:
             print(f'error in retrieving folder and notebook permissions: {e}')
             
@@ -933,7 +973,7 @@ class GroupMigration:
 
             return secretScopePerm
         except Exception as e:
-            print(f'error in retriving Secret Scope permission: {e}')
+            print(f'error in retrieving Secret Scope permission: {e}')
 
 
     def updateGroupEntitlements(self, groupEntitlements:dict, level:str):
@@ -1002,17 +1042,19 @@ class GroupMigration:
                   if level=="Workspace":
                     if acl['group_name'] in self.WorkspaceGroupNames:
                       gName="db-temp-"+acl['group_name']
+                      dataAcl.append({'group_name': gName, 'permission_level': acl['permission_level']})
                   elif level=="Account":
                     if acl['group_name'] in self.TempGroupNames:
                       gName=acl['group_name'][8:]
+                      #dataAcl.append({'group_name': gName, 'permission_level': acl['permission_level']})
                   else:
                     gName=acl['group_name']
-                  acl['group_name']=gName
-                  dataAcl.append(acl)
+                  #acl['group_name']=gName
+                  dataAcl.append(acl)                  
                 except KeyError:
                   dataAcl.append(acl)
                   continue  
-              dataAcl.append({"user_name": self.userName,"permission_level": "CAN_MANAGE"})
+              #dataAcl.append({"user_name": self.userName,"permission_level": "CAN_MANAGE"})
               data={"access_control_list":dataAcl}
               resAppPerm=requests.post(f"{self.workspace_url}/api/2.0/preview/sql/permissions/{object}/{object_id}", headers=self.headers, data=json.dumps(data))
         except Exception as e:
@@ -1037,98 +1079,119 @@ class GroupMigration:
             print(f'[Verbose] SQL: {queryString}')
         return self.spark.sql(queryString)
 
-    def getDataObjectsACL(self)-> list:
-      dbs = self.runVerboseSql("show databases").collect()
-      print(f'Got {len(dbs)} dbs to query')
-
-      aclList = []
-      aclFinalList = []
-      
+    def getGrantsOnObjects(self, database_name: str,object_type: str, object_key: str):
       try:
-        df=(self.spark.sql("SHOW GRANT ON CATALOG")
-                         .filter(col("ObjectType")=="CATALOG$")
-                         .withColumn("ObjectKey", lit(""))
-                         .withColumn("ObjectType", lit("CATALOG"))
-                         .filter(col("ActionType")!="OWN")
-           )
-        aclList=df.collect()
-        for db in dbs:
-          databaseName = db.databaseName
-          #databaseName = 'default'
+        if object_type in ["CATALOG", "ANY FILE", "ANONYMOUS FUNCTION"]: #without object key
+          grants_df = (
+            self.spark.sql(f"SHOW GRANT ON {object_type}")
+            .groupBy("ObjectType","ObjectKey","Principal").agg(collect_set("ActionType").alias("ActionTypes"))
+            .selectExpr("CAST(NULL AS STRING) AS Database","Principal","ActionTypes","ObjectType","ObjectKey","Now() AS ExportTimestamp")
+          )
+        else: 
+          grants_df = (
+            self.spark.sql(f"SHOW GRANT ON {object_type} {object_key}")
+            .filter(col("ObjectType") == f"{object_type}")
+            .groupBy("ObjectType","ObjectKey","Principal").agg(collect_set("ActionType").alias("ActionTypes"))
+            .selectExpr(f"'{database_name}' AS Database","Principal","ActionTypes","ObjectType","ObjectKey","Now() AS ExportTimestamp")
+          )  
+      except Exception as e:  
+        print(f'Error retrieving grants on object {object_key}. {e}')
+    
+      return grants_df
+    
+    def getDBACL(self, db: str):
+      try:
+        aclList=[]
+        dbdf=self.getGrantsOnObjects(db, "DATABASE", db)
+        if not self.checkAllDB:
+          userListCollect=dbdf.filter(col('ObjectType')=="DATABASE").select(col('Principal')).collect()
+          userList=[ p.Principal for p in userListCollect]
+          if not list(set(self.groupL) & set(userList)):
+            print(f'selected groups have no permission on database or catalog level. Skipping object level permission check for database {db}.')
+            return []
 
-          # append the database df to the list
-          df=(self.runVerboseSql("SHOW GRANT ON DATABASE {}".format(databaseName))
-                         .filter(col("ObjectType")=="DATABASE")
-                         .withColumn("ObjectKey", lit(databaseName))
-                         .withColumn("ObjectType", lit("DATABASE"))
-                         .filter(col("ActionType")!="OWN")
-             )
-          aclList+=df.collect()
-          tables = self.runVerboseSql("show tables in {}".format(databaseName)).filter(col("isTemporary") == False)
-          for table in tables.collect():
-            try:
-              #print(table)
-              #if table.tableName=='testtable': continue
-              dft=(self.runVerboseSql("show grant on table {}.`{}`".format(table.database, table.tableName))
-                             .filter(col("ObjectType")=="TABLE")
-                             .withColumn("ObjectKey", lit("`" + table.database + "`.`" + table.tableName + "`"))
-                             .withColumn("ObjectType", lit("TABLE"))
-                            )
-              aclList+=dft.collect()
-            except Exception as e:
-              print(f'error retriving acl for table {table.tableName}.')
-            #break
+        aclList+=dbdf.collect()
+        tables = self.runVerboseSql("show tables in spark_catalog.{}".format(db)).filter(col("isTemporary") == False)
+        for table in tables.collect():
+          try:
+            tbldf=self.getGrantsOnObjects(db, "TABLE", f"`{table.database}`.`{table.tableName}`")
+            aclList+=tbldf.collect()
+          except Exception as e:
+            print(f'error retrieving acl for table {table.tableName}. {e}')
+    
+        functions = self.runVerboseSql("show functions in {}".format(db)).filter(col("function").startswith('spark_catalog.'+db+"."))
+        for function in functions.collect():
+          try:
+            funcdf=self.getGrantsOnObjects(db, "FUNCTION", f"{function.function}")
+            aclList+=funcdf.collect()
+          except Exception as e:
+            print(f'error retrieving acl for function {function.function}. {e}')
+        #filter for required groups
+        return aclList
+        
+      except Exception as e:  
+        print(f'Error retrieving ACL for database {db}. {e}')
 
-          views = self.runVerboseSql("show views in {}".format(databaseName)).filter(col("isTemporary") == False)
-          for view in views.collect():
-            try:
-              
-              dft=(self.runVerboseSql("show grant on view {}.`{}`".format(view.namespace, view.viewName))
-                             .filter(col("ObjectType")=="TABLE")
-                             .withColumn("ObjectKey", lit("`" + view.namespace + "`.`" + view.viewName + "`"))
-                             .withColumn("ObjectType", lit("VIEW"))
-                            )
-              aclList+=dft.collect()
-            except Exception as e:
-              print(f'error retriving acl for view {view.viewName}.')
-            #break
-
-          functions = self.runVerboseSql("show functions in {}".format(databaseName)).filter(col("function").startswith('spark_catalog.'+databaseName+"."))
-          for function in functions.collect():
-            try:
-              
-              dft=(self.runVerboseSql("show grant on function {}".format( function.function))
-                             .filter(col("ObjectType")=="FUNCTION")
-                             .withColumn("ObjectKey", lit("`" + function.function + "`"))
-                             .withColumn("ObjectType", lit("FUNCTION"))
-                            )
-              aclList+=dft.collect()
-            except Exception as e:
-              print(f'error retriving acl for function {function.function}.')
-            #break
-
-        dft=(self.runVerboseSql("show grant on any file ")
-                       .withColumn("ObjectKey", lit("ANY FILE"))
-                       .withColumn("ObjectType", lit(""))
-                      )
-        aclList+=dft.collect()
-        aclFinalList=[acl for acl in aclList if acl[0] in self.groupL]
+    def getTableACLs(self)-> list:
+      # ANONYMOUS FUNCTION
+      common_df = self.getGrantsOnObjects(None, "ANONYMOUS FUNCTION", None)
+        # ANY FILE
+      common_df = common_df.unionAll(self.getGrantsOnObjects(None, "ANY FILE", None))
+      # CATALOG
+      common_df = common_df.unionAll(self.getGrantsOnObjects(None, "CATALOG", None))  
+      #check if any group is given permission at catalog level
+      userListCollect=common_df.filter(col('ObjectType')=="CATALOG$").select(col('Principal')).collect()
+      userList=[ p.Principal for p in userListCollect]
+      if list(set(self.groupL) & set(userList)):
+        print(f'some groups given permission at catalog level, running permission for all databases')
+        self.checkAllDB=True
+      database_names = []
+      dbs=self.spark.sql("show databases").collect()
+      totalDBs=len(database_names)
+      for db in dbs:
+        database_names.append(db.databaseName)
+      print(f'Got {len(database_names)} dbs to query')
+      #database_names=['aaron_binns','hsdb']
+      currentCount=0
+      try:
+        aclList = []
+        aclFinalList = []
+        with concurrent.futures.ThreadPoolExecutor(max_workers=self.numThreads) as executor:
+          future_db = [executor.submit(self.getDBACL, f"`{databaseName}`" ) for databaseName in database_names]
+          for future in concurrent.futures.as_completed(future_db):
+              result = future.result()
+              if result is not None:
+                aclList+=result
+              currentCount+=1
+              if currentCount % 100 ==0:print(f"Completed ACL for {currentCount} databases")
+        aclFinalList=[acl for acl in aclList if acl.Principal in self.groupL]
       except Exception as e:
-        print(f'Error retriving table acl object permission {e}')
+        print(f'Error retrieving table acl object permission {e}')
       return aclFinalList
+    
+    def generate_table_acls_command(self, action_types, object_type, object_key, groupName):
+      lines = []      
+      grant_privs = [ x for x in action_types if not x.startswith("DENIED_") ]
+      deny_privs = [ x[len("DENIED_"):] for x in action_types if x.startswith("DENIED_") ]
+      if grant_privs:
+        lines.append(f"GRANT {', '.join(grant_privs)} ON {object_type} {object_key} TO `{groupName}`;")
+      if deny_privs:
+        lines.append(f"DENY {', '.join(deny_privs)} ON {object_type} {object_key} TO `{groupName}`;")
+      return lines
     
     def updateDataObjectsPermission(self, aclList : list, level:str):
         try:
-            suffix=""
+            lines = []
             for acl in aclList: 
-                if acl.ObjectType!="DATABASE" and acl.ActionType=="USAGE": continue
-                if level=="Workspace":
-                  gName="db-temp-"+acl.Principal
-                elif level=="Account":
-                  gName=acl.Principal[8:]
-                aclQuery = "GRANT {} ON {} {} TO `{}`".format(acl.ActionType, acl.ObjectType, acl.ObjectKey, gName)
-                #print(aclQuery)
-                self.runVerboseSql(aclQuery)
+              #if acl.ObjectType!="DATABASE" and acl.ActionType=="USAGE": continue
+              if level=="Workspace":
+                gName="db-temp-"+acl.Principal
+              elif level=="Account":
+                gName=acl.Principal[8:]
+              lines.extend(self.generate_table_acls_command(acl.ActionTypes, acl.ObjectType, acl.ObjectKey, gName))              
+            for aclQuery in lines:
+              #print(aclQuery)
+              self.runVerboseSql(aclQuery)
         except Exception as e:
             print(f'Error setting permission, {e} ')
 
@@ -1167,12 +1230,12 @@ class GroupMigration:
         self.dashboardPerm=self.getAllDashboardACL() # 5 mins
         self.queryPerm=self.getAllQueriesACL()
         self.jobPerm=self.getAllJobACL() #33 mins
-        self.folderPerm, self.notebookPerm=self.getFoldersNotebookACL()
+        self.folderPerm, self.notebookPerm, self.filePerm=self.getFoldersNotebookACL()
 
         #These have yet to be parallelized:
         if self.checkTableACL==True:
           print('performing Tabel ACL object inventory')
-          self.dataObjectsPerm=self.getDataObjectsACL()
+          self.dataObjectsPerm=self.getTableACLs()
 
         print('performing alerts inventory')
         self.alertPerm=self.getAlertsACL()
@@ -1264,6 +1327,10 @@ class GroupMigration:
         print('Notebook  Permission:')
         print("{:<20} {:<100}".format('Notebook ID', 'Group Permission'))
         for key, value in self.notebookPerm.items():print("{:<20} {:<100}".format(key, str(value)))
+        print('File  Permission:')
+        print("{:<20} {:<100}".format('File ID', 'Group Permission'))
+        for key, value in self.filePerm.items():print("{:<20} {:<100}".format(key, str(value)))
+        
         if self.checkTableACL==True:
           print('TableACL  Permission:')
           for item in self.dataObjectsPerm:print(item)
@@ -1297,6 +1364,8 @@ class GroupMigration:
         self.updateGroupPermission('directories',self.folderPerm,level)
         print('applying notebooks permissions')
         self.updateGroupPermission('notebooks',self.notebookPerm,level)
+        print('applying files permissions')
+        self.updateGroupPermission('files',self.filePerm,level)
         print('applying repos permissions')
         self.updateGroupPermission('repos',self.repoPerm,level)
         print('applying token permissions')
