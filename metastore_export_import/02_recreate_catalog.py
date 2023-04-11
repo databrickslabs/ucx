@@ -116,4 +116,61 @@ for table in tables_df.collect():
 
 # COMMAND ----------
 
+# MAGIC %md
+# MAGIC #### Create managed tables
+# MAGIC 
+# MAGIC For this to work you'll have to:
+# MAGIC 
+# MAGIC 1) create a managed identity with Storage Blob Contributor permission to the storage account, or create IAM role with the same process used for the primary metastore storage.
+# MAGIC 2) create a storage credential on the secondary site using this managed identity/IAM role
+# MAGIC 3) create an external location pointing to the storage account/bucket used by the primary metastore
+# MAGIC 4) inform the primary storage location as a parameter
 
+# COMMAND ----------
+
+import requests
+
+#TODO: Move to secrets
+databricks_url = "<SECRET>"
+my_token = "<SECRET>"
+
+#TODO: move as parameter
+metastore_id = "<METASTORE ID>"
+
+header = {'Authorization': 'Bearer {}'.format(my_token)}
+
+endpoint = f"/api/2.0/unity-catalog/metastores/{metastore_id}"
+ 
+resp = requests.get(
+  databricks_url + endpoint,
+  headers=header
+)
+
+base_metastore_url=resp.json().get("storage_root")
+
+# COMMAND ----------
+
+#if Catalog uses its own storage, change base_metastore_url
+
+endpoint = f"/api/2.0/unity-catalog/catalogs/{catalog_name}"
+ 
+resp = requests.get(
+  databricks_url + endpoint,
+  headers=header
+)
+
+if (resp.json().get("storage_location")):
+    base_metastore_url = resp.json().get("storage_location")
+
+# COMMAND ----------
+
+#Get only managed tables
+tables_df = spark.read.format("delta").load(f"{storage_location}/tables").filter("table_schema<>'information_schema' and table_type='MANAGED'")
+
+for table in tables_df.collect():
+    columns_df = spark.read.format("delta").load(f"{storage_location}/columns").filter((col("table_schema") == table.table_schema) & (col("table_name") == table.table_name))
+    columns = return_schema(columns_df)
+
+    #Extracted path
+    spark.sql(f"CREATE OR REPLACE TABLE {catalog_name}.{table.table_schema}.{table.table_name} CLONE delta.`{base_metastore_url}{table.storage_sub_directory}`")
+    spark.sql(f"ALTER TABLE {catalog_name}.{table.table_schema}.{table.table_name} SET OWNER to `{table.table_owner}`")
