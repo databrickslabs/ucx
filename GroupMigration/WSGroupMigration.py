@@ -1,7 +1,8 @@
 from os import getgrouplist
 import requests
 import json, math
-from pyspark.sql.functions import lit,col,column, collect_set
+from pyspark.sql.functions import lit,col,column, collect_set, array_contains
+from pyspark.sql.types import StructField, StructType, StringType, MapType
 from functools import reduce
 from pyspark.sql import DataFrame, session
 import concurrent.futures
@@ -9,12 +10,12 @@ import time
 
 class GroupMigration:
 
-    def __init__(self, groupL : list, cloud : str, account_id : str, workspace_url : str, pat : str, spark : session.SparkSession, userName : str, checkTableACL : False, 
+    def __init__(self, groupL : list, cloud : str, inventoryTableName : str, workspace_url : str, pat : str, spark : session.SparkSession, userName : str, checkTableACL : False, 
                  numThreads : int = 32, autoGenerateList : bool = False, verbose : bool = False):
         self.groupL=groupL
         self.cloud=cloud    
         self.workspace_url = workspace_url.rstrip("/")
-        self.account_id=account_id
+        self.inventoryTableName=inventoryTableName
         self.token=pat
         self.headers={'Authorization': 'Bearer %s' % self.token}
         self.groupIdDict={} #map: group id => group name
@@ -22,6 +23,9 @@ class GroupMigration:
         self.accountGroups_lower={}
         self.groupMembers={} #map: group id => list[tuple[member name, memberid]]
         self.groupEntitlements={}
+        self.groupGroupList=[]
+        self.groupUserList=[]
+        self.groupSPList=[]
         self.groupWSGIdDict={} #map : temp group id => temp group name
         self.groupWSGNameDict={} #map : temp group name => temp group id
         self.groupRoles={}
@@ -39,6 +43,7 @@ class GroupMigration:
         self.dltPerm={}
         self.folderPerm={}
         self.notebookPerm={}
+        self.filePerm={}
         self.repoPerm={}
         self.tokenPerm={}
         self.secretScopePerm={}
@@ -53,7 +58,10 @@ class GroupMigration:
         self.numThreads = numThreads
 
         self.lastInventoryRun = None
-        self.checkAllDB = True
+        self.checkAllDB = False
+        print(f'Clearing inventory table {self.inventoryTableName}')
+        spark.sql(f"drop table if exists {self.inventoryTableName}")
+        spark.sql(f"drop table if exists {self.inventoryTableName+'TableACL'}")
         
         #Check if we should automatically generate list, and do it immediately.
         #Implementers Note: Could change this section to a lazy calculation by setting groupL to nil or some sentinel value and adding checks before use.
@@ -177,7 +185,7 @@ class GroupMigration:
                   members=[]
                   try:
                       for mem in e['members']:
-                          members.append(list([mem['display'],mem['value']]))
+                          members.append(list([mem['display'],mem['value'],mem['$ref']]))
                   except KeyError:
                       pass
                   groupMembers[e['id']]=members
@@ -217,6 +225,60 @@ class GroupMigration:
         except Exception as e:
             print(f'error in retrieving group objects : {e}')
         
+    #get list of users and service principals recursively for groups and nested groups
+    def getRecursiveGroupMember(self, groupM:dict):
+      
+      groupPrincipalList=[]
+      for key, value in groupM.items():
+        try:            
+          res=requests.get(f"{self.workspace_url}/api/2.0/preview/scim/v2/Groups/{key}", headers=self.headers)
+          resJson=res.json()
+          groupPrincipalList.append(resJson['displayName'])
+        except Exception as e:
+          print(f'error in retrieving group Names : {e}')
+      self.groupGroupList.extend(groupPrincipalList)
+      for key, value in groupM.items():
+        userList=[u[1] for u in value if u[2].startswith("User")]
+        spList=[u[1] for u in value if u[2].startswith("ServicePrincipal")]
+        
+        groupList=[u[1] for u in value if u[2].startswith("Group")]
+        userPrincipalList=[]
+        spPrincipalList=[]
+        try:
+          groupMembers={}
+          for g in groupList:
+            res=requests.get(f"{self.workspace_url}/api/2.0/preview/scim/v2/Groups/{g}", headers=self.headers)
+            resJson=res.json()
+            members=[]
+            try:
+              for mem in resJson['members']:
+                members.append(list([mem['display'],mem['value'],mem['$ref']]))
+            except KeyError:
+                pass
+            groupMembers[resJson['id']]=members
+        except Exception as e:
+          print(f'error in retrieving nested group members : {e}')
+        if len(groupMembers)>0:self.getRecursiveGroupMember(groupMembers)
+       
+        for userid in userList:
+          try:                
+            res=requests.get(f"{self.workspace_url}/api/2.0/preview/scim/v2/Users/{userid}", headers=self.headers)
+            resJson=res.json()
+            userPrincipalList.append(resJson['userName'])
+          except Exception as e:
+            print(f'error in retrieving user details : {e}')
+        
+        for spid in spList:
+          try:                
+            res=requests.get(f"{self.workspace_url}/api/2.0/preview/scim/v2/ServicePrincipals/{spid}", headers=self.headers)
+            resJson=res.json()
+            spPrincipalList.append(resJson['applicationId'])
+          except Exception as e:
+            print(f'error in retrieving SP details : {e}')
+        self.groupUserList.extend(userPrincipalList)
+        self.groupSPList.extend(spPrincipalList)
+        
+    
     #getACL[n] family of functions extract the ACL from the converted json response into a standard format, filtering by groupL
     def getACL(self, acls:dict)->list:
         aclList=[]
@@ -752,20 +814,21 @@ class GroupMigration:
             #Give some time for the server to recover
             if retry_count > 0:
                 time.sleep(RETRY_DELAY)
-                print(f'[ERROR] retrying folder list for folder {path}.')
+                #print(f'[ERROR] retrying folder list for folder {path}.')
             if self.verbose:
                 print(f"[Verbose] Requesting file list for Depth {depth} Retry {retry_count} Path: {path}")
             retry_count = retry_count + 1
             try:
                 data={'path':path}
                 resFolder=requests.get(f"{self.workspace_url}/api/2.0/workspace/list", headers=self.headers, data=json.dumps(data))
-                resFolderJson=resFolder.json()
                 if resFolder.status_code == 403:
                     print(f'[ERROR] status code 403 permission denied to read folder {path}.')
                     return (path, {}, {})
                 if resFolder.status_code != 200:
                     print(f'[ERROR] bad status code for folder {path}. code: {resFolder.status_code}')
                     continue
+                resFolderJson=resFolder.json()
+                
 
                 subFolders = {}
                 notebooks = {}
@@ -783,7 +846,6 @@ class GroupMigration:
                 return (path, subFolders, notebooks, files)
             
             except Exception as e:
-                # print(f'error in retrieving path {path}. error: {e}.')
                 lastError = e
                 continue
         print(f'[ERROR] retry limit ({MAX_RETRY}) limit exceeded while retrieving path {path}. last err: {lastError}.')
@@ -800,6 +862,7 @@ class GroupMigration:
 
             # Get folder permissions in parallel
             folder_results = {}
+            currentFolderCount=0
             with concurrent.futures.ThreadPoolExecutor(max_workers=self.numThreads) as executor:
                 folder_futures = {executor.submit(requests.get, f"{self.workspace_url}/api/2.0/permissions/directories/{folder_id}", headers=self.headers): folder_id for folder_id in folder_ids}
                 print(f"Awaiting parallel permission requests for {len(folder_futures)} folders ...")
@@ -807,6 +870,7 @@ class GroupMigration:
                     folder_id = folder_futures[future]
                     try:
                         resFolderPerm = future.result()
+                        currentFolderCount+=1
                         if resFolderPerm.status_code == 404:
                             print(f'feature not enabled for this tier')
                             continue
@@ -818,14 +882,18 @@ class GroupMigration:
                             aclList=self.getACL(resFolderPermJson['access_control_list'])   
                         except Exception as e:
                             print(f'error in retrieving folder details: {e}')
+                        if currentFolderCount % 1000 ==0:print(f"Completed ACL for {currentFolderCount} folders")
                         if len(aclList) == 0:
                             continue
                         folder_results[folder_id] = aclList
+                        
+                        
                     except Exception as e:
                         print(f'error in retrieving folder permission: {e}')
 
             # Get notebook permissions in parallel
             notebook_results = {}
+            currentNotebookCount=0
             with concurrent.futures.ThreadPoolExecutor(max_workers=self.numThreads) as executor:
                 notebook_futures = {executor.submit(requests.get, f"{self.workspace_url}/api/2.0/permissions/notebooks/{notebook_id}", headers=self.headers): notebook_id for notebook_id in self.notebookList.keys()}
                 print(f"Awaiting parallel permission requests for {len(notebook_futures)} notebooks ...")
@@ -833,6 +901,7 @@ class GroupMigration:
                     notebook_id = notebook_futures[future]
                     try:
                         resNotebookPerm = future.result()
+                        currentNotebookCount+=1
                         if resNotebookPerm.status_code == 404:
                             print(f'feature not enabled for this tier')
                             continue
@@ -844,14 +913,18 @@ class GroupMigration:
                             aclList=self.getACL(resNotebookPermJson['access_control_list'])
                         except Exception as e:
                             print(f'error in retrieving notebook details: {e}')
+                        if currentNotebookCount % 1000 ==0:print(f"Completed ACL for {currentNotebookCount} notebooks")
                         if len(aclList) == 0:
                             continue
                         notebook_results[notebook_id] = aclList
+                        
+                        
                     except Exception as e:
                         print(f'error in retrieving notebook permission: {e}')
             
             # Get file permissions in parallel
             file_results = {}
+            currentFileCount=0
             with concurrent.futures.ThreadPoolExecutor(max_workers=self.numThreads) as executor:
                 file_futures = {executor.submit(requests.get, f"{self.workspace_url}/api/2.0/permissions/files/{file_id}", headers=self.headers): file_id for file_id in self.fileList.keys()}
                 print(f"Awaiting parallel permission requests for {len(file_futures)} files ...")
@@ -859,6 +932,7 @@ class GroupMigration:
                     file_id = file_futures[future]
                     try:
                         resFilePerm = future.result()
+                        currentFileCount+=1
                         if resFilePerm.status_code == 404:
                             print(f'feature not enabled for this tier')
                             continue
@@ -870,9 +944,12 @@ class GroupMigration:
                             aclList=self.getACL(resFilePermJson['access_control_list'])
                         except Exception as e:
                             print(f'error in retrieving file details: {e}')
+                        if currentFileCount % 1000 ==0:print(f"Completed ACL for {currentFileCount} notebooks")
                         if len(aclList) == 0:
                             continue
                         file_results[file_id] = aclList
+                        
+                        
                     except Exception as e:
                         print(f'error in retrieving file permission: {e}')
 
@@ -940,7 +1017,8 @@ class GroupMigration:
             resSScope=requests.get(f"{self.workspace_url}/api/2.0/secrets/scopes/list", headers=self.headers)
             resSScopeJson=resSScope.json()
             if len(resSScopeJson)==0:
-                raise Exception('No secret scopes defined.')
+                print('No secret scopes defined.')
+                return {}
 
             secretScopePerm={}
             for c in resSScopeJson['scopes']:
@@ -1035,9 +1113,13 @@ class GroupMigration:
     def updateGroup2Permission(self, object:str, groupPermission : dict, level:str):
         try:
           for object_id,aclList in groupPermission.items(): 
+              addUser=True
               dataAcl=[]
               for acl in aclList:
                 try:
+                  if 'user_name' in acl.keys():
+                    if acl['user_name']==self.userName:
+                      addUser=False
                   gName=acl['group_name']
                   if level=="Workspace":
                     if acl['group_name'] in self.WorkspaceGroupNames:
@@ -1054,7 +1136,8 @@ class GroupMigration:
                 except KeyError:
                   dataAcl.append(acl)
                   continue  
-              #dataAcl.append({"user_name": self.userName,"permission_level": "CAN_MANAGE"})
+              if addUser:
+                dataAcl.append({"user_name": self.userName,"permission_level": "CAN_MANAGE"})
               data={"access_control_list":dataAcl}
               resAppPerm=requests.post(f"{self.workspace_url}/api/2.0/preview/sql/permissions/{object}/{object_id}", headers=self.headers, data=json.dumps(data))
         except Exception as e:
@@ -1085,17 +1168,18 @@ class GroupMigration:
           grants_df = (
             self.spark.sql(f"SHOW GRANT ON {object_type}")
             .groupBy("ObjectType","ObjectKey","Principal").agg(collect_set("ActionType").alias("ActionTypes"))
-            .selectExpr("CAST(NULL AS STRING) AS Database","Principal","ActionTypes","ObjectType","ObjectKey","Now() AS ExportTimestamp")
+            .selectExpr("CAST(NULL AS STRING) AS Database","Principal","ActionTypes","ObjectType","ObjectKey")
           )
         else: 
           grants_df = (
             self.spark.sql(f"SHOW GRANT ON {object_type} {object_key}")
             .filter(col("ObjectType") == f"{object_type}")
             .groupBy("ObjectType","ObjectKey","Principal").agg(collect_set("ActionType").alias("ActionTypes"))
-            .selectExpr(f"'{database_name}' AS Database","Principal","ActionTypes","ObjectType","ObjectKey","Now() AS ExportTimestamp")
+            .selectExpr(f"'{database_name}' AS Database","Principal","ActionTypes","ObjectType","ObjectKey")
           )  
       except Exception as e:  
         print(f'Error retrieving grants on object {object_key}. {e}')
+        return
     
       return grants_df
     
@@ -1104,10 +1188,11 @@ class GroupMigration:
         aclList=[]
         dbdf=self.getGrantsOnObjects(db, "DATABASE", db)
         if not self.checkAllDB:
-          userListCollect=dbdf.filter(col('ObjectType')=="DATABASE").select(col('Principal')).collect()
+          userListCollect=dbdf.filter(col('ObjectType')=="DATABASE").filter(array_contains(col('ActionTypes'),"USAGE")).select(col('Principal')).collect()
           userList=[ p.Principal for p in userListCollect]
-          if not list(set(self.groupL) & set(userList)):
-            print(f'selected groups have no permission on database or catalog level. Skipping object level permission check for database {db}.')
+          userList=list(set(userList))
+          if not self.checkPrincipalInGroupOrMember(userList, db):
+            #print(f'selected groups or members of the groups have no USAGE permission on database level. Skipping object level permission check for database {db}.')
             return []
 
         aclList+=dbdf.collect()
@@ -1132,7 +1217,30 @@ class GroupMigration:
       except Exception as e:  
         print(f'Error retrieving ACL for database {db}. {e}')
 
+    #check principal given usage permission is group or a member of the group (user or sp)
+    def checkPrincipalInGroupOrMember(self, principalList: str, name: str)->bool:      
+      for p in principalList:
+        if p in self.groupGroupList:
+          print(f'Group {p} is given USAGE permission for {name}.')
+          return True      
+      for p in principalList:
+        if p in self.groupUserList:
+          print(f'User {p} is given USAGE permission for {name}.')
+          return True
+      for p in principalList:
+        if p in self.groupSPList:
+          print(f'SP {p} is given USAGE permission for {name}.')
+          return True
+      return False
+        
+      
     def getTableACLs(self)-> list:
+
+      self.groupUserList=[]
+      self.groupSPList=[]
+      self.getRecursiveGroupMember(self.groupMembers)
+      self.groupUserList=list(set(self.groupUserList))
+      self.groupSPList=list(set(self.groupSPList))
       # ANONYMOUS FUNCTION
       common_df = self.getGrantsOnObjects(None, "ANONYMOUS FUNCTION", None)
         # ANY FILE
@@ -1140,10 +1248,11 @@ class GroupMigration:
       # CATALOG
       common_df = common_df.unionAll(self.getGrantsOnObjects(None, "CATALOG", None))  
       #check if any group is given permission at catalog level
-      userListCollect=common_df.filter(col('ObjectType')=="CATALOG$").select(col('Principal')).collect()
+      userListCollect=common_df.filter(col('ObjectType')=="CATALOG$").filter(array_contains(col('ActionTypes'),"USAGE")).select(col('Principal')).collect()
       userList=[ p.Principal for p in userListCollect]
-      if list(set(self.groupL) & set(userList)):
-        print(f'some groups given permission at catalog level, running permission for all databases')
+      userList=list(set(userList))
+      if self.checkPrincipalInGroupOrMember(userList, 'CATALOG'):
+        print(f'some groups or members of the group given permission at catalog level, running permission for all databases')
         self.checkAllDB=True
       database_names = []
       dbs=self.spark.sql("show databases").collect()
@@ -1414,7 +1523,64 @@ class GroupMigration:
                 pass
             else:
                 print(f"SUCCESS - Deleted group [{gID}] - {g}")
+    def persistInventory(self, mode: str):
+      try:
+        groupType=''
+        if mode=="Workspace":
+          print(f'Saving data for workspace groups in {self.inventoryTableName} table.')
+          groupType="WorkspaceLocal"
+        else:
+          print(f'Saving data for workspace temp groups in {self.inventoryTableName} table.')
+          groupType="WorkspaceTemp"
+        persistList=[]
+        persistList.append([groupType,'GroupListDict',self.groupIdDict])
+        persistList.append([groupType,'GroupMembers',self.groupMembers])
+        persistList.append([groupType,'GroupEntitlements',self.groupEntitlements])
+        persistList.append([groupType,'GroupRoles',self.groupRoles])
+        persistList.append([groupType,'Password',self.passwordPerm])
+        persistList.append([groupType,'Cluster',self.clusterPerm])
+        persistList.append([groupType,'ClusterPolicy',self.clusterPolicyPerm])
+        persistList.append([groupType,'Warehouse',self.warehousePerm])
+        persistList.append([groupType,'Dashboard',self.dashboardPerm])
+        persistList.append([groupType,'Query',self.queryPerm])
+        persistList.append([groupType,'Job',self.jobPerm])
+        persistList.append([groupType,'Folder',self.folderPerm])
+        persistList.append([groupType,'Notebook',self.notebookPerm])
+        persistList.append([groupType,'File',self.filePerm])
+        persistList.append([groupType,'Alert',self.alertPerm])
+        persistList.append([groupType,'Pool',self.instancePoolPerm])
+        persistList.append([groupType,'Experiment',self.expPerm])
+        persistList.append([groupType,'Model',self.modelPerm])
+        persistList.append([groupType,'DLT',self.dltPerm])
+        persistList.append([groupType,'Repo',self.repoPerm])
+        persistList.append([groupType,'Token',self.tokenPerm])
+        persistList.append([groupType,'Secret',self.secretScopePerm])
+        persistColumns = StructType([       \
+          StructField('GroupType', StringType(), True), \
+          StructField('WorkspaceObject', StringType(), True), \
+          StructField('Permission', MapType(StringType(),StringType()), True)])
+        #persistColumns=["GroupType", "WorkspaceObject","Permission"]
+        persistDF = self.spark.createDataFrame(data=persistList, schema = persistColumns)
+        #return persistDF
+        persistDF.write.format('delta').mode('append').saveAsTable(self.inventoryTableName)
 
+        if self.checkTableACL:
+          tableACLCol=StructType([       \
+          StructField('Database', StringType(), True), \
+          StructField('Principal', StringType(), True), \
+          StructField('ActionTypes', StringType(), True), \
+          StructField('ObjectType', StringType(), True), \
+          StructField('ObjectKey', StringType(), True) \
+          ])
+          
+          tableACLDF = self.spark.createDataFrame(data=self.dataObjectsPerm, schema = tableACLCol) \
+                        .withColumn('GroupType',lit(groupType))
+          tableACLDF.write.format('delta').mode('append').saveAsTable(self.inventoryTableName+'TableACL')
+        print(f'Saved data in {self.inventoryTableName} table.')
+          
+      except Exception as e:
+        print(f"Error creating delta table to store inventory  : {e}")
+    
     def deleteWorkspaceLocalGroups(self):
       try:
         self.setGroupListForMode("Workspace")
@@ -1455,6 +1621,7 @@ class GroupMigration:
           self.groupWSGIdDict[res.json()["id"]]="db-temp-"+g
           self.groupWSGNameDict["db-temp-"+g]=res.json()["id"]
         self.applyGroupPermission("Workspace")
+        self.persistInventory("Workspace")
       except Exception as e:
         print(f" Error creating backup groups , {e}")
     
@@ -1483,6 +1650,7 @@ class GroupMigration:
         for g in self.WorkspaceGroupNames:
           res=requests.put(f"{self.workspace_url}/api/2.0/preview/permissionassignments/principals/{self.accountGroups_lower[g.casefold()]}", headers=self.headers, data=json.dumps(data))
         self.applyGroupPermission("Account")
+        self.persistInventory("Account")
 
       except Exception as e:
         print(f" Error creating account level group, {e}")
