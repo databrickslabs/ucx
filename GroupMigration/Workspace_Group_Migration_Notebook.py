@@ -12,9 +12,10 @@
 # MAGIC  - Script performs inventory of all the ACL permission for the given workspace groups
 # MAGIC  - Create back up workspace group of same name but add prefix "db-temp-" and apply the same ACL on them
 # MAGIC  - Delete the original workspace groups
-# MAGIC  - Add account level groups to the workspace
+# MAGIC  - Add account level groups to the workspace 
 # MAGIC  - migrate the acl from temp workspace group to the new account level groups
 # MAGIC  - delete the temp workspace groups
+# MAGIC  - Save the details of the inventory in a delta table
 # MAGIC  
 # MAGIC **Scope of ACL** <br/>
 # MAGIC Following objects are covered as part of the ACL migration:
@@ -26,6 +27,7 @@
 # MAGIC - MLflow experiments
 # MAGIC - MLflow registered models
 # MAGIC - Notebooks
+# MAGIC - Files
 # MAGIC - Pools
 # MAGIC - Repos
 # MAGIC - Databricks SQL warehouses
@@ -60,8 +62,8 @@
 # MAGIC Import the module WSGroupMigration and initialize the class by passing following attributes:
 # MAGIC - list of workspace group to be migrated (make sure these are workspace groups and not account level groups)
 # MAGIC - if the workspace is AWS or Azure
-# MAGIC - account id of the account console
 # MAGIC - workspace url
+# MAGIC - name of the table to persist inventory data
 # MAGIC - pat token of the admin to the workspace
 # MAGIC - user name of the user whose pat token is generated 
 # MAGIC - confirm if Table ACL are used and access permission set for workspace groups
@@ -72,16 +74,17 @@ from WSGroupMigration import GroupMigration
 
 #If autoGenerateList=True then groupL will be ignored and all eliglbe groups will be migrated.
 autoGenerateList = False
-groupL=['analyst', 'dataengineer']
+groupL=[<>]
 
 #Find this in the account console
-account_id="ACCOUNT-ID"
+inventoryTableName="WorkspaceInventory"
 
 #Pull from your browser URL bar. Should start with "https://" and end with ".com" or ".net"
-workspace_url='https://DOMAIN'
+workspace_url='https://<DOMAIN>'
+
 
 #Personal Access Token. Create one in "User Settings"
-token='TOKEN'
+token='<TOKEN'
 
 #Should the migration Check the ACL on tables/views as well?
 checkTableACL=False
@@ -90,13 +93,13 @@ checkTableACL=False
 cloud='AWS'
 
 #Your databricks user email.
-userName='USER-EMAIL'
+userName='<UserMailID>'
 
 #Number of threads to issue Databricks API requests with. If you get a lot of errors during the inventory, lower this value.
 numThreads = 30
 
 #Initialize GroupMigration Class with values supplied above
-gm = GroupMigration( groupL = groupL , cloud=cloud , account_id = account_id, workspace_url = workspace_url, pat=token, spark=spark, userName=userName, checkTableACL = checkTableACL, autoGenerateList = autoGenerateList, numThreads=numThreads)
+gm = GroupMigration( groupL = groupL , cloud=cloud , inventoryTableName = inventoryTableName, workspace_url = workspace_url, pat=token, spark=spark, userName=userName, checkTableACL = checkTableACL, autoGenerateList = autoGenerateList, numThreads=numThreads)
 
 # COMMAND ----------
 
