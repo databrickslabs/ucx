@@ -8,6 +8,42 @@ from pyspark.sql import DataFrame, session
 import concurrent.futures
 import time
 
+import requests
+
+class SCIMClient:
+
+    def __init__(self, workspace_url : str, pat : str, groupL:list ):
+        self.token = pat
+        self.headers={'Authorization': 'Bearer %s' % self.token}
+        self.workspace_url = workspace_url.rstrip("/")
+        self.groupL = groupL
+
+    def listWorkspaceGroups(self):
+        res=requests.get(f"{self.workspace_url}/api/2.0/preview/scim/v2/Groups", headers=self.headers)
+        if res.status_code != 200:
+            raise Exception(f'Bad status code. Expected: 200. Got: {res.status_code}')
+        resJson=res.json()
+
+        allWsLocalGroups = {o["displayName"]:{"id": o["id"], "members": {m['display'] for m in o['members']}  } for o in resJson["Resources"] if o['meta']['resourceType'] == "WorkspaceGroup" and o['displayName'] in self.groupL and 'members' in o }
+        return(allWsLocalGroups)
+
+    def listAccountGroups(self):
+        res=requests.get(f"{self.workspace_url}/api/2.0/account/scim/v2/Groups", headers=self.headers)
+        if res.status_code != 200:
+            raise Exception(f'Bad status code. Expected: 200. Got: {res.status_code}')
+        resJson2=res.json()
+
+        allAccountGroups_lower = {r['displayName'] : {"id": r["id"], "members": {m['display'] for m in r['members']}} for r in resJson2['Resources'] if r['displayName'] in self.groupL}
+        return(allAccountGroups_lower)
+
+    def getWorkspaceGroup(self, id: str):
+        res=requests.get(f"{self.workspace_url}/api/2.0/preview/scim/v2/Groups/"+id, headers=self.headers)
+        if res.status_code != 200:
+            raise Exception(f'Bad status code. Expected: 200. Got: {res.status_code}')
+        resJson=res.json()
+
+        return(resJson)
+
 class GroupMigration:
 
     def __init__(self, groupL : list, cloud : str, inventoryTableName : str, workspace_url : str, pat : str, spark : session.SparkSession, userName : str, checkTableACL : False, 

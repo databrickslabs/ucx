@@ -1,11 +1,11 @@
 # Databricks notebook source
 # MAGIC %md
 # MAGIC # Workspace Group Migration
-# MAGIC 
+# MAGIC
 # MAGIC **Objective** <br/>
 # MAGIC Customers who have groups created at workspace level, when they integrate with Unity Catalog and want to enable identity federation for users, groups, service principals at account level, face problems for groups federation. While users and service principals are synched up with account level identities, groups are not. As a result, customers cannot add account level groups to workspace if a workspace group with same name exists, which limits tru identity federation.
 # MAGIC This notebook and the associated script is designed to help customer migrate workspace level groups to account level groups.
-# MAGIC 
+# MAGIC
 # MAGIC **How it works** <br/>
 # MAGIC The script essentially performs following major steps:
 # MAGIC  - Initiate the run by providing a list of workspace group to be migrated for a given workspace
@@ -44,7 +44,7 @@
 
 # MAGIC %md
 # MAGIC ## Pre-requisite
-# MAGIC 
+# MAGIC
 # MAGIC Before running the script, please make sure you have the following checks
 # MAGIC 1. Ensure you have equivalent account level group created for the workspace group to be migrated
 # MAGIC 2. create a PAT token for the workspace which has admin access
@@ -56,7 +56,7 @@
 
 # MAGIC %md
 # MAGIC ## How to Run
-# MAGIC 
+# MAGIC
 # MAGIC Run the script in the following sequence
 # MAGIC #### Step 1: Initialize the class
 # MAGIC Import the module WSGroupMigration and initialize the class by passing following attributes:
@@ -70,30 +70,35 @@
 
 # COMMAND ----------
 
+HOST = dbutils.notebook.entry_point.getDbutils().notebook().getContext().apiUrl().getOrElse(None)
+TOKEN = dbutils.notebook.entry_point.getDbutils().notebook().getContext().apiToken().getOrElse(None)
+
+# COMMAND ----------
+
 from WSGroupMigration import GroupMigration
 
 #If autoGenerateList=True then groupL will be ignored and all eliglbe groups will be migrated.
-autoGenerateList = False
-groupL=[<>]
+autoGenerateList = True
+groupL=['Group A', 'Group B']
 
 #Find this in the account console
 inventoryTableName="WorkspaceInventory"
 
 #Pull from your browser URL bar. Should start with "https://" and end with ".com" or ".net"
-workspace_url='https://<DOMAIN>'
+workspace_url=HOST
 
 
 #Personal Access Token. Create one in "User Settings"
-token='<TOKEN'
+token=TOKEN
 
 #Should the migration Check the ACL on tables/views as well?
-checkTableACL=False
+checkTableACL=True
 
 #What cloud provider? Acceptable values are "AWS" or anything other value.
 cloud='AWS'
 
 #Your databricks user email.
-userName='<UserMailID>'
+userName='amy.wang@databricks.com'
 
 #Number of threads to issue Databricks API requests with. If you get a lot of errors during the inventory, lower this value.
 numThreads = 30
@@ -103,10 +108,31 @@ gm = GroupMigration( groupL = groupL , cloud=cloud , inventoryTableName = invent
 
 # COMMAND ----------
 
-# MAGIC %md
-# MAGIC #### Step 2: Perform Dry run
-# MAGIC This steps performs a dry run to verify the current ACL on the supplied workspace groups and print outs the permission.
-# MAGIC Please verify if all the permissions are covered 
+client = SCIMClient(workspace_url=workspace_url, pat=token, groupL=['Group A', 'Group B'])
+print(client.listWorkspaceGroups())
+print( client.listAccountGroups() ) 
+
+# COMMAND ----------
+
+wg= client.listWorkspaceGroups()
+ag = client.listAccountGroups()
+
+for g in groupL:
+    print("-------------------------------------------------------")
+    if g in wg and g in ag:
+        wg_m = wg[g]['members']
+        ag_m = ag[g]['members']
+        if len(wg_m.difference(ag_m)) > 0:
+            print("Members missing in workspace group " + g + " " )
+            print(wg_m.difference(ag_m))
+        if len(ag_m.difference(wg_m)) > 0:
+            print("Members missing in account group " + g + " "  )
+            print(ag_m.difference(wg_m))
+    else:
+        if g in wg:
+            print("All members missing in account group " + g)
+        else:
+           print("All members missing in workspace group " + g)
 
 # COMMAND ----------
 
