@@ -844,7 +844,7 @@ class GroupMigration:
                     return (path, subFolders, notebooks, files)
                 
                 for c in resFolderJson['objects']:
-                    if c['object_type']=="DIRECTORY" and c['path'].startswith('/Repos') == False and c['path'].startswith('/Shared') == False and c['path'].endswith('/Trash') == False:
+                    if c['object_type']=="DIRECTORY" and c['path'].startswith('/Shared') == False and c['path'].endswith('/Trash') == False:
                         subFolders[c['object_id']] = c['path']
                     elif c['object_type']=="NOTEBOOK" and c['path'].startswith('/Repos') == False and c['path'].startswith('/Shared') == False:
                         notebooks[c['object_id']] = c['path']
