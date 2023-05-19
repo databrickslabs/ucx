@@ -76,6 +76,7 @@ TOKEN = dbutils.notebook.entry_point.getDbutils().notebook().getContext().apiTok
 # COMMAND ----------
 
 from WSGroupMigration import GroupMigration
+from WSGroupMigration import SCIMClient
 
 #If autoGenerateList=True then groupL will be ignored and all eliglbe groups will be migrated.
 autoGenerateList = True
@@ -108,12 +109,88 @@ gm = GroupMigration( groupL = groupL , cloud=cloud , inventoryTableName = invent
 
 # COMMAND ----------
 
-client = SCIMClient(workspace_url=workspace_url, pat=token, groupL=['Group A', 'Group B'])
-print(client.listWorkspaceGroups())
-print( client.listAccountGroups() ) 
+class SCIMClient:
+
+    def listMembers(groupInfo : str):
+        displayName = groupInfo["displayName"]
+        id          = groupInfo["id"]
+        if "members" in groupInfo:
+            members = {m['display'] for m in groupInfo["members"]}
+        else:
+            members = {""}
+        
+        return {"displayName" : displayName, "id" : id, "members" : members}
+
+    def __init__(self, workspace_url : str, pat : str, groupL:list ):
+        self.token = pat
+        self.headers={'Authorization': 'Bearer %s' % self.token}
+        self.workspace_url = workspace_url.rstrip("/")
+        self.groupL = groupL
+
+    def listWorkspaceGroups(self):
+        res=requests.get(f"{self.workspace_url}/api/2.0/preview/scim/v2/Groups", headers=self.headers)
+        if res.status_code != 200:
+            raise Exception(f'Bad status code. Expected: 200. Got: {res.status_code}')
+        resJson=res.json()
+
+        allWsLocalGroups = { listMembers(r) for r in resJson["Resources"] if r['meta']['resourceType'] == "WorkspaceGroup" and r['displayName'] in self.groupL }
+        return(allWsLocalGroups)
+
+    def listAccountGroups(self):
+        res=requests.get(f"{self.workspace_url}/api/2.0/account/scim/v2/Groups", headers=self.headers)
+        if res.status_code != 200:
+            raise Exception(f'Bad status code. Expected: 200. Got: {res.status_code}')
+        resJson=res.json()
+
+        allAccountGroups_lower = { listMembers(r) for r in resJson['Resources'] if r['displayName'] in self.groupL}
+        return(allAccountGroups_lower)
+
+    def getWorkspaceGroup(self, id: str):
+        res=requests.get(f"{self.workspace_url}/api/2.0/preview/scim/v2/Groups/"+id, headers=self.headers)
+        if res.status_code != 200:
+            raise Exception(f'Bad status code. Expected: 200. Got: {res.status_code}')
+        resJson=res.json()
+
+        return(resJson)
+
+
 
 # COMMAND ----------
 
+client = SCIMClient(workspace_url=workspace_url, pat=token, groupL=['Group A', 'Group B'])
+client.listWorkspaceGroups()
+
+
+# COMMAND ----------
+
+def listMembers(groupInfo):
+    displayName = groupInfo["displayName"]
+    groupId     = groupInfo["id"]
+    if "members" in groupInfo:
+        members = {m['display'] for m in groupInfo["members"]}
+    else:
+        members = dict()
+    
+    # return "displayName" : displayName, "id" : groupId, "members" : members}
+    return displayName
+
+
+import requests
+res=requests.get(f"{workspace_url}/api/2.0/preview/scim/v2/Groups", headers={'Authorization': 'Bearer %s' % TOKEN})
+if res.status_code != 200:
+    raise Exception(f'Bad status code. Expected: 200. Got: {res.status_code}')
+resJson=res.json()
+allWsLocalGroups = { listMembers(o) for o in resJson["Resources"] if o['meta']['resourceType'] == "WorkspaceGroup" and o['displayName'] in groupL }
+allWsLocalGroups
+
+# COMMAND ----------
+
+print(wg)
+print(ag)
+
+# COMMAND ----------
+
+client = SCIMClient()
 wg= client.listWorkspaceGroups()
 ag = client.listAccountGroups()
 
