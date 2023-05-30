@@ -104,96 +104,54 @@ userName='amy.wang@databricks.com'
 #Number of threads to issue Databricks API requests with. If you get a lot of errors during the inventory, lower this value.
 numThreads = 30
 
+#Load any existing cache
+def load_cache(filename):
+  try:
+    obj = json.load(open(filename))
+    print('loaded', filename)
+    return obj
+  except Exception:
+    return {}
+
+cache = load_cache('cache.json')
+
 #Initialize GroupMigration Class with values supplied above
 gm = GroupMigration( groupL = groupL , cloud=cloud , inventoryTableName = inventoryTableName, workspace_url = workspace_url, pat=token, spark=spark, userName=userName, checkTableACL = checkTableACL, autoGenerateList = autoGenerateList, numThreads=numThreads)
 
 # COMMAND ----------
 
-class SCIMClient:
+from WSGroupMigration import SCIMClient
 
-    def listMembers(groupInfo : str):
-        displayName = groupInfo["displayName"]
-        id          = groupInfo["id"]
-        if "members" in groupInfo:
-            members = {m['display'] for m in groupInfo["members"]}
-        else:
-            members = {""}
-        
-        return {"displayName" : displayName, "id" : id, "members" : members}
+groupL = gm.groupL if autoGenerateList else groupL
+client = SCIMClient(workspace_url=workspace_url, pat=token, groupL=groupL)
 
-    def __init__(self, workspace_url : str, pat : str, groupL:list ):
-        self.token = pat
-        self.headers={'Authorization': 'Bearer %s' % self.token}
-        self.workspace_url = workspace_url.rstrip("/")
-        self.groupL = groupL
-
-    def listWorkspaceGroups(self):
-        res=requests.get(f"{self.workspace_url}/api/2.0/preview/scim/v2/Groups", headers=self.headers)
-        if res.status_code != 200:
-            raise Exception(f'Bad status code. Expected: 200. Got: {res.status_code}')
-        resJson=res.json()
-
-        allWsLocalGroups = { listMembers(r) for r in resJson["Resources"] if r['meta']['resourceType'] == "WorkspaceGroup" and r['displayName'] in self.groupL }
-        return(allWsLocalGroups)
-
-    def listAccountGroups(self):
-        res=requests.get(f"{self.workspace_url}/api/2.0/account/scim/v2/Groups", headers=self.headers)
-        if res.status_code != 200:
-            raise Exception(f'Bad status code. Expected: 200. Got: {res.status_code}')
-        resJson=res.json()
-
-        allAccountGroups_lower = { listMembers(r) for r in resJson['Resources'] if r['displayName'] in self.groupL}
-        return(allAccountGroups_lower)
-
-    def getWorkspaceGroup(self, id: str):
-        res=requests.get(f"{self.workspace_url}/api/2.0/preview/scim/v2/Groups/"+id, headers=self.headers)
-        if res.status_code != 200:
-            raise Exception(f'Bad status code. Expected: 200. Got: {res.status_code}')
-        resJson=res.json()
-
-        return(resJson)
-
-
+allWsLocalGroups = client.listWorkspaceGroups()
+allAccountGroups_lower = client.listAccountGroups()
 
 # COMMAND ----------
 
-client = SCIMClient(workspace_url=workspace_url, pat=token, groupL=['Group A', 'Group B'])
-client.listWorkspaceGroups()
+print('allWsLocalGroups')
+# print(allWsLocalGroups)
+# for name,g in allWsLocalGroups.items():
+  # print(f"group {name}, size: {len(g['members'])}")
 
-
-# COMMAND ----------
-
-def listMembers(groupInfo):
-    displayName = groupInfo["displayName"]
-    groupId     = groupInfo["id"]
-    if "members" in groupInfo:
-        members = {m['display'] for m in groupInfo["members"]}
-    else:
-        members = dict()
-    
-    # return "displayName" : displayName, "id" : groupId, "members" : members}
-    return displayName
-
-
-import requests
-res=requests.get(f"{workspace_url}/api/2.0/preview/scim/v2/Groups", headers={'Authorization': 'Bearer %s' % TOKEN})
-if res.status_code != 200:
-    raise Exception(f'Bad status code. Expected: 200. Got: {res.status_code}')
-resJson=res.json()
-allWsLocalGroups = { listMembers(o) for o in resJson["Resources"] if o['meta']['resourceType'] == "WorkspaceGroup" and o['displayName'] in groupL }
-allWsLocalGroups
+# print('\nallAccountGroups_lower')
+# print(allAccountGroups_lower)
+for name, wg in allWsLocalGroups.items():
+  wgm = wg['members']
+  ag = allAccountGroups_lower.get(name, {})
+  agm = ag.get('members', set())
+  print(f"ws group {name:<50}, size: {len(wgm):<3}, account group found: {ag!={}}, size: {len(agm)}, size_equal: {len(agm)==len(wgm)}")
 
 # COMMAND ----------
 
-print(wg)
-print(ag)
+# wg= client.listWorkspaceGroups()
+# ag = client.listAccountGroups()
 
-# COMMAND ----------
+wg = allWsLocalGroups
+ag = allAccountGroups_lower
 
-client = SCIMClient()
-wg= client.listWorkspaceGroups()
-ag = client.listAccountGroups()
-
+# print(groupL)
 for g in groupL:
     print("-------------------------------------------------------")
     if g in wg and g in ag:
@@ -207,9 +165,9 @@ for g in groupL:
             print(ag_m.difference(wg_m))
     else:
         if g in wg:
-            print("All members missing in account group " + g)
+          print("All members missing in account group " + g)
         else:
-           print("All members missing in workspace group " + g)
+          print("All members missing in workspace group " + g)
 
 # COMMAND ----------
 
