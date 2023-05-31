@@ -79,8 +79,8 @@ from WSGroupMigration import GroupMigration, loadCache, removeCache
 
 #If autoGenerateList=True then groupL will be ignored and all eliglbe groups will be migrated.
 removeCacheFlag = True
-autoGenerateList = True
-groupL=['Group A', 'Group B']
+autoGenerateList = False
+groupL=[<>]
 
 #Find this in the account console
 inventoryTableName="WorkspaceInventory"
@@ -93,13 +93,13 @@ workspace_url=HOST
 token=TOKEN
 
 #Should the migration Check the ACL on tables/views as well?
-checkTableACL=True
+checkTableACL=False
 
 #What cloud provider? Acceptable values are "AWS" or anything other value.
 cloud='AWS'
 
 #Your databricks user email.
-userName='amy.wang@databricks.com'
+userName='<UserMailID>'
 
 #Number of threads to issue Databricks API requests with. If you get a lot of errors during the inventory, lower this value.
 numThreads = 30
