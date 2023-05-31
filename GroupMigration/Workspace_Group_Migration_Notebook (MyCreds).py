@@ -116,24 +116,43 @@ gm = GroupMigration( groupL = groupL , cloud=cloud , inventoryTableName = invent
 
 # COMMAND ----------
 
-# MAGIC %md
-# MAGIC #### Step 1: Do a inventory or list of members 
-# MAGIC This steps list all the members in account and workspace level group and find all the differences so you can reconcile any differences before migrating groups.
+allWsLocalGroups = gm.listWorkspaceGroups()
+allAccountGroups_lower = gm.listAccountGroups()
 
 # COMMAND ----------
 
-display(gm.groupSizeCheck())
+print('allWsLocalGroups')
+for name, wg in allWsLocalGroups.items():
+  wgm = wg['members']
+  ag = allAccountGroups_lower.get(name, {})
+  agm = ag.get('members', set())
+  print(f"ws group {name:<50}, size: {len(wgm):<3}, account group found: {ag!={}}, size: {len(agm)}, size_equal: {len(agm)==len(wgm)}")
 
 # COMMAND ----------
 
-gm.groupMembersCheck()
+# wg= client.listWorkspaceGroups()
+# ag = client.listAccountGroups()
 
-# COMMAND ----------
+wg = allWsLocalGroups
+ag = allAccountGroups_lower
 
-# MAGIC %md
-# MAGIC #### Step 2: Perform Dry run
-# MAGIC This steps performs a dry run to verify the current ACL on the supplied workspace groups and print outs the permission.
-# MAGIC Please verify if all the permissions are covered 
+# print(groupL)
+for g in groupL:
+    print("-------------------------------------------------------")
+    if g in wg and g in ag:
+        wg_m = wg[g]['members']
+        ag_m = ag[g]['members']
+        if len(wg_m.difference(ag_m)) > 0:
+            print("Members missing in workspace group " + g + " " )
+            print(wg_m.difference(ag_m))
+        if len(ag_m.difference(wg_m)) > 0:
+            print("Members missing in account group " + g + " "  )
+            print(ag_m.difference(wg_m))
+    else:
+        if g in wg:
+          print("All members missing in account group " + g)
+        else:
+          print("All members missing in workspace group " + g)
 
 # COMMAND ----------
 

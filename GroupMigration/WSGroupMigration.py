@@ -1,4 +1,4 @@
-from os import getgrouplist
+from os import getgrouplist, remove
 import requests
 import json, math
 from pyspark.sql.functions import lit,col,column, collect_set, array_contains
@@ -7,8 +7,9 @@ from functools import reduce
 from pyspark.sql import DataFrame, session
 import concurrent.futures
 import time
+import pandas as pd
 
-def load_cache(filename):
+def loadCache(filename):
   try:
     obj = json.load(open(filename))
     print('loaded', filename)
@@ -16,7 +17,7 @@ def load_cache(filename):
   except Exception:
     return {}
 
-def request_get_cached(cache_obj, key, **kwargs):
+def requestGetCached(cache_obj, key, **kwargs):
   if key in cache_obj:
     print('cache hit for:', key)
     return cache_obj.get(key)
@@ -28,7 +29,7 @@ def request_get_cached(cache_obj, key, **kwargs):
     cache_obj[key]=val
     return val
 
-def get_cached(cache_obj, key, new_val=None, new_func=None):
+def getCache(cache_obj, key, new_val=None, new_func=None):
   val = cache_obj.get(key)
   if key in cache_obj:
     print('cache hit for:', key)
@@ -42,41 +43,12 @@ def get_cached(cache_obj, key, new_val=None, new_func=None):
     print('new_val and new_func both missing for key:', key)
   return val
 
-class SCIMClient:
-
-    def __init__(self, workspace_url : str, pat : str, groupL:list ):
-        self.token = pat
-        self.headers={'Authorization': 'Bearer %s' % self.token}
-        self.workspace_url = workspace_url.rstrip("/")
-        self.groupL = groupL
-        self.cache_file = 'cache.json'
-        self.cache=load_cache(self.cache_file)
-
-    def save_cache(self, filename=''):
-        filename = filename or self.cache_file
-        json.dump(self.cache, open(filename, 'w'))
-
-    def listWorkspaceGroups(self, force=False):
-        print('listWorkspaceGroups start')
-        resJson = request_get_cached(self.cache, 'listWorkspaceGroups', url=f"{self.workspace_url}/api/2.0/preview/scim/v2/Groups", headers=self.headers)
-        self.save_cache()
-
-        allWsLocalGroups = {o["displayName"]:{"id": o["id"], "members": {m['display'] for m in o['members']}  } for o in resJson["Resources"] if o['meta']['resourceType'] == "WorkspaceGroup" and o['displayName'] in self.groupL and 'members' in o }
-        return(allWsLocalGroups)
-
-    def listAccountGroups(self, force=False):
-        print('listAccountGroups start')
-        resJson2 = request_get_cached(self.cache, 'listAccountGroups', url=f"{self.workspace_url}/api/2.0/account/scim/v2/Groups", headers=self.headers)
-        self.save_cache()
-
-        allAccountGroups_lower = {r['displayName'] : {"id": r["id"], "members": {m['display'] for m in r['members']} if r.get('members') else set()} for r in resJson2['Resources'] if r['displayName'] in self.groupL}
-        return(allAccountGroups_lower)
-
-    def getWorkspaceGroup(self, id: str):
-        # res=requests.get(f"{self.workspace_url}/api/2.0/preview/scim/v2/Groups/"+id, headers=self.headers)
-        resJson = request_get_cached(self.cache, 'listWorkspaceGroups-'+id, url=f"{self.workspace_url}/api/2.0/preview/scim/v2/Groups/"+id, headers=self.headers)
-
-        return(resJson)
+def removeCache(filename):
+  try:
+    remove(filename)
+    print('removed', filename)
+  except Exception:
+    return {}
 
 class GroupMigration:
 
@@ -126,6 +98,9 @@ class GroupMigration:
         self.checkTableACL=checkTableACL
         self.verbose = verbose
         self.numThreads = numThreads
+        self.cache_file = 'cache.json'
+        self.cache=loadCache(self.cache_file)
+
 
 
         self.lastInventoryRun = None
@@ -1740,3 +1715,73 @@ class GroupMigration:
 
       except Exception as e:
         print(f" Error creating account level group, {e}")
+    
+    def save_cache(self, filename=''):
+        filename = filename or self.cache_file
+        json.dump(self.cache, open(filename, 'w'))
+
+    def listMembers(self, json):
+        if 'members' in json:
+            return( {m['display'] for m in json['members']} )
+        else:
+            return({})
+
+    def listWorkspaceGroups(self, force=False):
+        print('listWorkspaceGroups start')
+        resJson = requestGetCached(self.cache, 'listWorkspaceGroups', url=f"{self.workspace_url}/api/2.0/preview/scim/v2/Groups", headers=self.headers)
+        self.save_cache()
+        
+        allWsLocalGroups = {o["displayName"]:{"id": o["id"], "members": self.listMembers(o) } for o in resJson["Resources"] if o['meta']['resourceType'] == "WorkspaceGroup" and o['displayName'] in self.groupL and 'members' in o }
+        return(allWsLocalGroups)
+
+    def listAccountGroups(self, force=False):
+        print('listAccountGroups start')
+        resJson = requestGetCached(self.cache, 'listAccountGroups', url=f"{self.workspace_url}/api/2.0/account/scim/v2/Groups", headers=self.headers)
+        self.save_cache()
+
+        allAccountGroups_lower = {o['displayName'] : {"id": o["id"], "members": self.listMembers(o) } for o in resJson['Resources'] if o['displayName'] in self.groupL}
+        return(allAccountGroups_lower)
+
+    def getWorkspaceGroup(self, id: str):
+        resJson = requestGetCached(self.cache, 'listWorkspaceGroups-'+id, url=f"{self.workspace_url}/api/2.0/preview/scim/v2/Groups/"+id, headers=self.headers)
+
+        return(resJson)
+    
+    def groupSizeCheck(self):
+        allWsLocalGroups = self.listWorkspaceGroups()
+        allAccountGroups_lower = self.listAccountGroups()
+
+        df = pd.DataFrame(columns = ['ws_group', 'ws_group_size', 'account_group_found', 'account_group_size', 'size_equal'])
+
+        for name, wg in allWsLocalGroups.items():
+            ag = allAccountGroups_lower.get(name, {})
+            agm = ag.get('members', set())
+            wgm = wg.get('members', set())
+            insert_row = {'ws_group': name, 'ws_group_size': len(wgm), 'account_group_found': ag!={}, 'account_group_size' : len(agm), 'size_equal' : len(agm)==len(wgm)}
+            df = pd.concat([df, pd.DataFrame([insert_row])])
+        
+        return(df)
+
+    def groupMembersCheck(self):
+        allWsLocalGroups = self.listWorkspaceGroups()
+        allAccountGroups_lower = self.listAccountGroups()
+
+        wg = allWsLocalGroups
+        ag = allAccountGroups_lower
+
+        for g in self.groupL:
+            print("-------------------------------------------------------")
+            if g in wg and g in ag:
+                wg_m = wg[g]['members']
+                ag_m = ag[g]['members']
+                if len(wg_m.difference(ag_m)) > 0:
+                    print("Members missing in workspace group " + g + " " )
+                    print(wg_m.difference(ag_m))
+                if len(ag_m.difference(wg_m)) > 0:
+                    print("Members missing in account group " + g + " "  )
+                    print(ag_m.difference(wg_m))
+            else:
+                if g in wg:
+                    print("All members missing in account group " + g)
+                else:
+                    print("All members missing in workspace group " + g)
