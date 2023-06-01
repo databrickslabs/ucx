@@ -7,19 +7,19 @@ from functools import reduce
 from pyspark.sql import DataFrame, session
 import concurrent.futures
 import time
-
+from typing import List
 
 class GroupMigration:
     def __init__(
         self,
-        groupL: list,
+        groupL: List[str],
         cloud: str,
         inventoryTableName: str,
         workspace_url: str,
         pat: str,
         spark: session.SparkSession,
         userName: str,
-        checkTableACL: False,
+        checkTableACL: bool = False,
         numThreads: int = 32,
         autoGenerateList: bool = False,
         verbose: bool = False,
@@ -1743,7 +1743,7 @@ class GroupMigration:
             lines.append(f"ALTER {object_type} {object_key} OWNER TO `{groupName}`;")
         return lines
 
-    def updateDataObjectsPermission(self, aclList: list, level: str):
+    def updateDataObjectsPermission(self, aclList: List, level: str):
         try:
             lines = []
             for acl in aclList:
