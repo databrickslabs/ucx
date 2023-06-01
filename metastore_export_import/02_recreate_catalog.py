@@ -97,7 +97,7 @@ for catalog_grant in catalog_grant_df.collect():
 
 # COMMAND ----------
 
-from pyspark.sql.functions import col, when, collect_list, upper
+from pyspark.sql.functions import col, collect_list, upper, when
 
 # Get only user schemas
 schemas_df = (

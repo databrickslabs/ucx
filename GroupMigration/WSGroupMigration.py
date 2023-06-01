@@ -1,13 +1,16 @@
-from os import getgrouplist
-import requests
-import json, math
-from pyspark.sql.functions import lit, col, column, collect_set, array_contains
-from pyspark.sql.types import StructField, StructType, StringType, MapType
-from functools import reduce
-from pyspark.sql import DataFrame, session
 import concurrent.futures
+import json
+import math
 import time
+from functools import reduce
+from os import getgrouplist
 from typing import List
+
+import requests
+from pyspark.sql import DataFrame, session
+from pyspark.sql.functions import array_contains, col, collect_set, column, lit
+from pyspark.sql.types import MapType, StringType, StructField, StructType
+
 
 class GroupMigration:
     def __init__(
