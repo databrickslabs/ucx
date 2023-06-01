@@ -16,9 +16,7 @@ from delta.tables import *
 # COMMAND ----------
 
 dbutils.widgets.removeAll()
-dbutils.widgets.text(
-    "storageLocation", "/mnt/externallocation", "Storage location for copy"
-)
+dbutils.widgets.text("storageLocation", "/mnt/externallocation", "Storage location for copy")
 dbutils.widgets.text("catalogName", "system", "information_schema catalog")
 dbutils.widgets.dropdown("getExternalLocations", "True", ["True", "False"])
 
@@ -33,12 +31,8 @@ table_list = spark.catalog.listTables(f"{catalog_name}.information_schema")
 # COMMAND ----------
 
 for table in table_list:
-    info_schema_table_df = spark.sql(
-        f"SELECT * FROM {table.catalog}.information_schema.{table.name}"
-    )
-    info_schema_table_df.write.format("delta").mode("overwrite").save(
-        f"{storage_location}/{table.name}"
-    )
+    info_schema_table_df = spark.sql(f"SELECT * FROM {table.catalog}.information_schema.{table.name}")
+    info_schema_table_df.write.format("delta").mode("overwrite").save(f"{storage_location}/{table.name}")
 
 # COMMAND ----------
 
@@ -59,15 +53,13 @@ if get_external_location:
     location_list = []
 
     # Need to filter out Unity Catalog data source that counts as external
-    describe_table_list = spark.read.table(
-        f"{catalog_name}.information_schema.tables"
-    ).filter("table_type=='EXTERNAL' AND data_source_format <> 'UNITY_CATALOG'")
+    describe_table_list = spark.read.table(f"{catalog_name}.information_schema.tables").filter(
+        "table_type=='EXTERNAL' AND data_source_format <> 'UNITY_CATALOG'"
+    )
 
     for d_table in describe_table_list.collect():
         d_location = (
-            spark.sql(
-                f"DESCRIBE EXTENDED {d_table.table_catalog}.{d_table.table_schema}.{d_table.table_name}"
-            )
+            spark.sql(f"DESCRIBE EXTENDED {d_table.table_catalog}.{d_table.table_schema}.{d_table.table_name}")
             .filter("col_name = 'Location'")
             .select("data_type")
             .head()[0]
@@ -81,9 +73,7 @@ if get_external_location:
             ]
         )
 
-    location_df = spark.createDataFrame(
-        data=location_list, schema=table_location_columns
-    )
+    location_df = spark.createDataFrame(data=location_list, schema=table_location_columns)
 
     # merge with information_schema.tables and save external locations to storage_sub_directory column (that as of 03/09 only holds Managed table information)
     table_df = DeltaTable.forPath(spark, f"{storage_location}/tables")
@@ -91,9 +81,7 @@ if get_external_location:
     table_df.alias("tables").merge(
         location_df.alias("locations"),
         "tables.table_catalog = locations.table_catalog and tables.table_schema = locations.table_schema and tables.table_name = locations.table_name",
-    ).whenMatchedUpdate(
-        set={"storage_sub_directory": "locations.table_location"}
-    ).execute()
+    ).whenMatchedUpdate(set={"storage_sub_directory": "locations.table_location"}).execute()
 
     display(table_df)
     # or create a separate table only for this

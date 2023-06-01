@@ -16,6 +16,9 @@ ruff = "^0.0.270"
 pyspark = "^3.4.0"
 delta-spark = "^2.4.0"
 
+[tool.black]
+line-length = 120
+
 [build-system]
 requires = ["poetry-core"]
 build-backend = "poetry.core.masonry.api"

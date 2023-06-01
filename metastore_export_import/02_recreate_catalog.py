@@ -14,9 +14,7 @@
 # COMMAND ----------
 
 dbutils.widgets.removeAll()
-dbutils.widgets.text(
-    "storageLocation", "/mnt/externallocation", "Storage with source catalog info"
-)
+dbutils.widgets.text("storageLocation", "/mnt/externallocation", "Storage with source catalog info")
 dbutils.widgets.text("catalogName", "system_backup", "information_schema catalog")
 dbutils.widgets.text(
     "rootExternalStorage",
@@ -38,11 +36,7 @@ import re
 
 
 def return_schema(df):
-    column_names = (
-        df.orderBy(df.ordinal_position.asc())
-        .select("column_name", upper("full_data_type"))
-        .collect()
-    )
+    column_names = df.orderBy(df.ordinal_position.asc()).select("column_name", upper("full_data_type")).collect()
     schema = ""
     for x, y in column_names:
         sql = f""" {x} {y},"""
@@ -67,9 +61,7 @@ catalog_df = spark.read.format("delta").load(f"{storage_location}/catalogs")
 # Change to this iteration when running on a remote UC
 for catalog in catalog_df.collect():
     spark.sql(f"CREATE CATALOG {catalog.catalog_name} COMMENT '{catalog.comment}'")
-    spark.sql(
-        f"ALTER CATALOG {catalog.catalog_name} SET OWNER to `{catalog.catalog_owner}`"
-    )
+    spark.sql(f"ALTER CATALOG {catalog.catalog_name} SET OWNER to `{catalog.catalog_owner}`")
 
 # Local testing with different catalog name
 # spark.sql(f"CREATE CATALOG {catalog_name} COMMENT '{catalog_df.collect()[0].comment}'")
@@ -83,9 +75,7 @@ for catalog in catalog_df.collect():
 # COMMAND ----------
 
 # Re-run grants from backed-up information_schema.catalog_privileges
-catalog_grant_df = spark.read.format("delta").load(
-    f"{storage_location}/catalog_privileges"
-)
+catalog_grant_df = spark.read.format("delta").load(f"{storage_location}/catalog_privileges")
 for catalog_grant in catalog_grant_df.collect():
     pass
     # TODO: assemble GRANT statements (maybe make it re-usable for schemas and tables)
@@ -100,23 +90,15 @@ for catalog_grant in catalog_grant_df.collect():
 from pyspark.sql.functions import col, collect_list, upper, when
 
 # Get only user schemas
-schemas_df = (
-    spark.read.format("delta")
-    .load(f"{storage_location}/schemata")
-    .filter("schema_name<>'information_schema'")
-)
+schemas_df = spark.read.format("delta").load(f"{storage_location}/schemata").filter("schema_name<>'information_schema'")
 
 # Drop the default schema
 spark.sql(f"DROP SCHEMA {catalog_name}.default")
 
 # Create all user schemas on the target catalog
 for schema in schemas_df.collect():
-    spark.sql(
-        f"CREATE SCHEMA {catalog_name}.{schema.schema_name} COMMENT '{schema.comment}'"
-    )
-    spark.sql(
-        f"ALTER SCHEMA {catalog_name}.{schema.schema_name} SET OWNER to `{schema.schema_owner}`"
-    )
+    spark.sql(f"CREATE SCHEMA {catalog_name}.{schema.schema_name} COMMENT '{schema.comment}'")
+    spark.sql(f"ALTER SCHEMA {catalog_name}.{schema.schema_name} SET OWNER to `{schema.schema_owner}`")
 
 # COMMAND ----------
 
@@ -136,10 +118,7 @@ for table in tables_df.collect():
     columns_df = (
         spark.read.format("delta")
         .load(f"{storage_location}/columns")
-        .filter(
-            (col("table_schema") == table.table_schema)
-            & (col("table_name") == table.table_name)
-        )
+        .filter((col("table_schema") == table.table_schema) & (col("table_name") == table.table_name))
     )
     columns = return_schema(columns_df)
 
@@ -151,9 +130,7 @@ for table in tables_df.collect():
     spark.sql(
         f"CREATE OR REPLACE TABLE {catalog_name}.{table.table_schema}.{table.table_name}({columns}) COMMENT '{table.comment}' LOCATION '{table.storage_sub_directory}'"
     )
-    spark.sql(
-        f"ALTER TABLE {catalog_name}.{table.table_schema}.{table.table_name} SET OWNER to `{table.table_owner}`"
-    )
+    spark.sql(f"ALTER TABLE {catalog_name}.{table.table_schema}.{table.table_name} SET OWNER to `{table.table_owner}`")
 
 # COMMAND ----------
 
@@ -210,10 +187,7 @@ for table in tables_df.collect():
     columns_df = (
         spark.read.format("delta")
         .load(f"{storage_location}/columns")
-        .filter(
-            (col("table_schema") == table.table_schema)
-            & (col("table_name") == table.table_name)
-        )
+        .filter((col("table_schema") == table.table_schema) & (col("table_name") == table.table_name))
     )
     columns = return_schema(columns_df)
 
@@ -221,6 +195,4 @@ for table in tables_df.collect():
     spark.sql(
         f"CREATE OR REPLACE TABLE {catalog_name}.{table.table_schema}.{table.table_name} CLONE delta.`{base_metastore_url}{table.storage_sub_directory}`"
     )
-    spark.sql(
-        f"ALTER TABLE {catalog_name}.{table.table_schema}.{table.table_name} SET OWNER to `{table.table_owner}`"
-    )
+    spark.sql(f"ALTER TABLE {catalog_name}.{table.table_schema}.{table.table_name} SET OWNER to `{table.table_owner}`")
