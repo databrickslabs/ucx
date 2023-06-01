@@ -8,13 +8,13 @@ packages = [{include = "uc_upgrade"}]
 
 [tool.poetry.dependencies]
 python = "^3.9"
-pyspark = "^3.4.0"
-delta-spark = "^2.4.0"
 
 [tool.poetry.group.dev.dependencies]
 black = "^23.3.0"
 isort = "^5.12.0"
 ruff = "^0.0.270"
+pyspark = "^3.4.0"
+delta-spark = "^2.4.0"
 
 [build-system]
 requires = ["poetry-core"]

@@ -81,7 +81,7 @@ files = [
 name = "delta-spark"
 version = "2.4.0"
 description = "Python APIs for using Delta Lake with Apache Spark"
-category = "main"
+category = "dev"
 optional = false
 python-versions = ">=3.6"
 files = [
@@ -97,7 +97,7 @@ pyspark = ">=3.4.0,<3.5.0"
 name = "importlib-metadata"
 version = "6.6.0"
 description = "Read metadata from Python packages"
-category = "main"
+category = "dev"
 optional = false
 python-versions = ">=3.7"
 files = [
@@ -187,7 +187,7 @@ test = ["appdirs (==1.4.4)", "covdefaults (>=2.3)", "pytest (>=7.3.1)", "pytest-
 name = "py4j"
 version = "0.10.9.7"
 description = "Enables Python programs to dynamically access arbitrary Java objects"
-category = "main"
+category = "dev"
 optional = false
 python-versions = "*"
 files = [
@@ -199,7 +199,7 @@ files = [
 name = "pyspark"
 version = "3.4.0"
 description = "Apache Spark Python API"
-category = "main"
+category = "dev"
 optional = false
 python-versions = ">=3.7"
 files = [
@@ -271,7 +271,7 @@ files = [
 name = "zipp"
 version = "3.15.0"
 description = "Backport of pathlib-compatible object wrapper for zip files"
-category = "main"
+category = "dev"
 optional = false
 python-versions = ">=3.7"
 files = [
@@ -286,4 +286,4 @@ testing = ["big-O", "flake8 (<5)", "jaraco.functools", "jaraco.itertools", "more
 [metadata]
 lock-version = "2.0"
 python-versions = "^3.9"
-content-hash = "0962bb1b721c941edce355ed711ceaf35ccb73b13a67f1d8791550f0c501d7e3"
+content-hash = "cc428e383aa81bf3e9052f90201a9f6d355f67ee1c20351e1d531a8ad8ca7c26"
