@@ -1,9 +1,9 @@
 # Databricks notebook source
 # MAGIC %md
 # MAGIC # External tables to UC managed tables
-# MAGIC 
+# MAGIC
 # MAGIC This notebook will migrate all external tables from a Hive metastore to a UC catalog.
-# MAGIC 
+# MAGIC
 # MAGIC **Important:**
 # MAGIC - This notebook needs to run on a cluster with spark.databricks.sql.initial.catalog.name set to hive_metastore or the base catalog where the external tables will be pulled for cloning
 # MAGIC - Optional: table descriptions can be written to a temporary Delta table for portability across workspaces.
@@ -27,7 +27,7 @@ storage_credential = "dspadotto-uc-work-sc"
 
 # MAGIC %md
 # MAGIC # PART I: Get all tables from Hive Metastore or original catalog
-# MAGIC 
+# MAGIC
 # MAGIC For this, the initial catalog name must be set to the desired source catalog
 
 # COMMAND ----------
@@ -37,11 +37,13 @@ storage_credential = "dspadotto-uc-work-sc"
 
 # COMMAND ----------
 
+
 def get_value(lst, idx, idy, default):
     try:
         return lst[idx][idy]
     except IndexError:
         return default
+
 
 # COMMAND ----------
 
@@ -61,27 +63,31 @@ for db in databases.collect():
     for table in tables:
         table_name = table.tableName
         try:
-            desc = spark.sql(f"DESCRIBE FORMATTED {db[0]}.{table_name}").filter("col_name = 'Location' OR col_name='Database' OR col_name='Table' OR col_name='Type'")
+            desc = spark.sql(f"DESCRIBE FORMATTED {db[0]}.{table_name}").filter(
+                "col_name = 'Location' OR col_name='Database' OR col_name='Table' OR col_name='Type'"
+            )
             for info in desc:
                 desc_all = desc.collect()
-                #catalog_name = get_value(desc_all, 0, 1, "NA")
+                # catalog_name = get_value(desc_all, 0, 1, "NA")
                 database_name = get_value(desc_all, 0, 1, "NA")
                 table_name = get_value(desc_all, 1, 1, "NA")
                 table_type = get_value(desc_all, 2, 1, "NA")
                 table_location = get_value(desc_all, 3, 1, "NA")
 
-                #print(f"{database_name}.{table_name} is {table_type} and is located at {table_location}")
+                # print(f"{database_name}.{table_name} is {table_type} and is located at {table_location}")
 
             descriptions.append((database_name, table_name, table_type, table_location))
-        #To handle missing external tables
+        # To handle missing external tables
         except:
             print(f"Error on {db[0]}.{table_name}.")
-            
+
 # Create DataFrame from the results
-source_catalog_tables = spark.createDataFrame(descriptions, ['database_name', 'table_name', 'table_type', 'table_location']).filter("table_type='EXTERNAL'")
+source_catalog_tables = spark.createDataFrame(
+    descriptions, ["database_name", "table_name", "table_type", "table_location"]
+).filter("table_type='EXTERNAL'")
 
 # Optional: Write the DataFrame to a Delta table
-#df.write.format("delta").mode("overwrite").save(delta_table_location)
+# df.write.format("delta").mode("overwrite").save(delta_table_location)
 
 # COMMAND ----------
 
@@ -92,7 +98,7 @@ source_catalog_tables = spark.createDataFrame(descriptions, ['database_name', 't
 
 # MAGIC %md
 # MAGIC ### Optional: Create all external locations and use a set credential
-# MAGIC 
+# MAGIC
 # MAGIC Here we're assuming that:
 # MAGIC - the same storage credential can access all external locations
 # MAGIC - one external location per table will be created - this can be generalized to different levels of folder
@@ -100,13 +106,13 @@ source_catalog_tables = spark.createDataFrame(descriptions, ['database_name', 't
 
 # COMMAND ----------
 
-#df_external_locations = source_catalog_tables.select('table_location').distinct()
+# df_external_locations = source_catalog_tables.select('table_location').distinct()
 
-#for el in df_external_locations.collect():
+# for el in df_external_locations.collect():
 #    try:
 #        spark.sql("CREATE EXTERNAL LOCATION IF NOT EXISTS `{}` URL '{}' WITH (STORAGE CREDENTIAL {})".format(el.table_location.split("/")[-1], el.table_location, storage_credential))
-#        print("CREATE EXTERNAL LOCATION IF NOT EXISTS `{}` URL '{}' WITH (STORAGE CREDENTIAL {})".format(el.table_location.split("/")[-1], el.table_location, storage_credential))    
-#    except Exception as e: 
+#        print("CREATE EXTERNAL LOCATION IF NOT EXISTS `{}` URL '{}' WITH (STORAGE CREDENTIAL {})".format(el.table_location.split("/")[-1], el.table_location, storage_credential))
+#    except Exception as e:
 #        print('Failure on creating external location for path {}: {}'.format(el.external_location, str(e)))
 
 # COMMAND ----------
@@ -116,21 +122,21 @@ source_catalog_tables = spark.createDataFrame(descriptions, ['database_name', 't
 
 # COMMAND ----------
 
-#Create all missing databases on destination catalog
+# Create all missing databases on destination catalog
 databases = source_catalog_tables.select(col("database_name")).distinct().collect()
 
 for database in databases:
-    spark.sql(f"CREATE DATABASE IF NOT EXISTS `{destination_catalog}`.{database[0]}")       
+    spark.sql(f"CREATE DATABASE IF NOT EXISTS `{destination_catalog}`.{database[0]}")
 
 # COMMAND ----------
 
-#Clone external tables into managed tables
+# Clone external tables into managed tables
 tables = source_catalog_tables.collect()
 
 for table in tables:
     print(f"Converting table {table[0]}.{table[1]}...")
-    spark.sql(f"CREATE OR REPLACE TABLE `{destination_catalog}`.{table[0]}.{table[1]} DEEP CLONE {source_catalog}.{table[0]}.{table[1]}")
+    spark.sql(
+        f"CREATE OR REPLACE TABLE `{destination_catalog}`.{table[0]}.{table[1]} DEEP CLONE {source_catalog}.{table[0]}.{table[1]}"
+    )
 
 # COMMAND ----------
-
-
