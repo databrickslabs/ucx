@@ -70,28 +70,17 @@
 
 # COMMAND ----------
 
-# in case if you'll do any changes in the source files, this will be applied
-%load_ext autoreload
-%autoreload 2
+# MAGIC %md ## Installing the package and it's dependencies
 
 # COMMAND ----------
 
-import sys
-from pathlib import Path
+from notebooks.common import install_uc_upgrade_package
 
-project_root = Path(".").absolute().parent
-print(f"appending the uc-upgrade library from {project_root}")
-sys.path.append(project_root)
+install_uc_upgrade_package()
 
 # COMMAND ----------
 
-try:
-  from uc_upgrade.group_migration import GroupMigration
-except Exception as e:
-  print("Unable to import the UC migration utilities package from source. Please check that you've imported the whole repository and not just copied one file.")
-  print("Also check that you have the Files in Repos activated, e.g. use DBR 11.X+")
-  print("Original exception:")
-  print(e)
+# MAGIC %md ## Main process entrypoint
 
 # COMMAND ----------
 
