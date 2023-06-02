@@ -1,11 +1,13 @@
 import sys
 from pathlib import Path
 from tempfile import NamedTemporaryFile
+
 from databricks.sdk.runtime import *
+
 
 def install_uc_upgrade_package():
     ipython = get_ipython()
-    
+
     print("Installing poetry for package management")
     ipython.run_line_magic("pip", f"install poetry -I")
     print("Poetry successfully installed")
