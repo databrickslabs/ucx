@@ -28,6 +28,7 @@ Recommended VM types are:
 
 ### Details of package installation
 
-Since the package itself is managed with poetry, to re-use it inside the notebooks we'll need to do the following:
+Since the package itself is managed with `poetry`, to re-use it inside the notebooks we're doing the following:
 
-1. Install package dependencies 
+1. Installing the package dependencies via poetry export
+2. Adding the package itself to the notebook via `sys.path`
