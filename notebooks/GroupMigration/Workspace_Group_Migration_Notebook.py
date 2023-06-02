@@ -68,9 +68,22 @@
 # MAGIC - user name of the user whose pat token is generated
 # MAGIC - confirm if Table ACL are used and access permission set for workspace groups
 
-# COMMAND ----------
+# COMMAND
+%load_ext autoreload # noqa
+%autoreload 2 # noqa
 
-from WSGroupMigration import GroupMigration
+# COMMAND
+
+from pathlib import Path
+import sys
+
+project_root = Path(".").absolute().parent
+print(f"appending the uc-upgrade library from {project_root}")
+sys.path.append(project_root)
+
+# COMMAND
+
+from uc_upgrade.group_migration import GroupMigration
 
 # If autoGenerateList=True then groupL will be ignored and all eliglbe groups will be migrated.
 autoGenerateList = False
