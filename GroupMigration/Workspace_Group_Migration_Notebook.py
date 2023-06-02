@@ -1,22 +1,22 @@
 # Databricks notebook source
 # MAGIC %md
 # MAGIC # Workspace Group Migration
-# MAGIC 
+# MAGIC
 # MAGIC **Objective** <br/>
 # MAGIC Customers who have groups created at workspace level, when they integrate with Unity Catalog and want to enable identity federation for users, groups, service principals at account level, face problems for groups federation. While users and service principals are synched up with account level identities, groups are not. As a result, customers cannot add account level groups to workspace if a workspace group with same name exists, which limits tru identity federation.
 # MAGIC This notebook and the associated script is designed to help customer migrate workspace level groups to account level groups.
-# MAGIC 
+# MAGIC
 # MAGIC **How it works** <br/>
 # MAGIC The script essentially performs following major steps:
 # MAGIC  - Initiate the run by providing a list of workspace group to be migrated for a given workspace
 # MAGIC  - Script performs inventory of all the ACL permission for the given workspace groups
 # MAGIC  - Create back up workspace group of same name but add prefix "db-temp-" and apply the same ACL on them
 # MAGIC  - Delete the original workspace groups
-# MAGIC  - Add account level groups to the workspace 
+# MAGIC  - Add account level groups to the workspace
 # MAGIC  - migrate the acl from temp workspace group to the new account level groups
 # MAGIC  - delete the temp workspace groups
 # MAGIC  - Save the details of the inventory in a delta table
-# MAGIC  
+# MAGIC
 # MAGIC **Scope of ACL** <br/>
 # MAGIC Following objects are covered as part of the ACL migration:
 # MAGIC - Clusters
@@ -32,7 +32,7 @@
 # MAGIC - Repos
 # MAGIC - Databricks SQL warehouses
 # MAGIC - Dashboard
-# MAGIC - Query 
+# MAGIC - Query
 # MAGIC - Alerts
 # MAGIC - Tokens
 # MAGIC - Password (for AWS)
@@ -44,7 +44,7 @@
 
 # MAGIC %md
 # MAGIC ## Pre-requisite
-# MAGIC 
+# MAGIC
 # MAGIC Before running the script, please make sure you have the following checks
 # MAGIC 1. Ensure you have equivalent account level group created for the workspace group to be migrated
 # MAGIC 2. create a PAT token for the workspace which has admin access
@@ -56,7 +56,7 @@
 
 # MAGIC %md
 # MAGIC ## How to Run
-# MAGIC 
+# MAGIC
 # MAGIC Run the script in the following sequence
 # MAGIC #### Step 1: Initialize the class
 # MAGIC Import the module WSGroupMigration and initialize the class by passing following attributes:
@@ -65,48 +65,62 @@
 # MAGIC - workspace url
 # MAGIC - name of the table to persist inventory data
 # MAGIC - pat token of the admin to the workspace
-# MAGIC - user name of the user whose pat token is generated 
+# MAGIC - user name of the user whose pat token is generated
 # MAGIC - confirm if Table ACL are used and access permission set for workspace groups
 
 # COMMAND ----------
 
 from WSGroupMigration import GroupMigration
 
-#If autoGenerateList=True then groupL will be ignored and all eliglbe groups will be migrated.
+# If autoGenerateList=True then groupL will be ignored and all eliglbe groups will be migrated.
 autoGenerateList = False
-groupL=[<>]
 
-#Find this in the account console
-inventoryTableName="WorkspaceInventory"
-
-#Pull from your browser URL bar. Should start with "https://" and end with ".com" or ".net"
-workspace_url='https://<DOMAIN>'
+# please provide groups here, e.g.
+groupL = ["groupA", "groupB"]
 
 
-#Personal Access Token. Create one in "User Settings"
-token='<TOKEN'
+# Find this in the account console
+inventoryTableName = "WorkspaceInventory"
 
-#Should the migration Check the ACL on tables/views as well?
-checkTableACL=False
+# Pull from your browser URL bar. Should start with "https://" and end with ".com" or ".net"
+workspace_url = "https://<DOMAIN>"
 
-#What cloud provider? Acceptable values are "AWS" or anything other value.
-cloud='AWS'
 
-#Your databricks user email.
-userName='<UserMailID>'
+# Personal Access Token. Create one in "User Settings"
+token = "<TOKEN"
 
-#Number of threads to issue Databricks API requests with. If you get a lot of errors during the inventory, lower this value.
+# Should the migration Check the ACL on tables/views as well?
+checkTableACL = False
+
+# What cloud provider? Acceptable values are "AWS" or anything other value.
+cloud = "AWS"
+
+# Your databricks user email.
+userName = "<UserMailID>"
+
+# Number of threads to issue Databricks API requests with. If you get a lot of errors during the inventory, lower this value.
 numThreads = 30
 
-#Initialize GroupMigration Class with values supplied above
-gm = GroupMigration( groupL = groupL , cloud=cloud , inventoryTableName = inventoryTableName, workspace_url = workspace_url, pat=token, spark=spark, userName=userName, checkTableACL = checkTableACL, autoGenerateList = autoGenerateList, numThreads=numThreads)
+# Initialize GroupMigration Class with values supplied above
+gm = GroupMigration(
+    groupL=groupL,
+    cloud=cloud,
+    inventoryTableName=inventoryTableName,
+    workspace_url=workspace_url,
+    pat=token,
+    spark=spark,
+    userName=userName,
+    checkTableACL=checkTableACL,
+    autoGenerateList=autoGenerateList,
+    numThreads=numThreads,
+)
 
 # COMMAND ----------
 
 # MAGIC %md
 # MAGIC #### Step 2: Perform Dry run
 # MAGIC This steps performs a dry run to verify the current ACL on the supplied workspace groups and print outs the permission.
-# MAGIC Please verify if all the permissions are covered 
+# MAGIC Please verify if all the permissions are covered
 
 # COMMAND ----------
 
