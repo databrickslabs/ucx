@@ -19,11 +19,11 @@ delta-spark = "^2.4.0"
 
 [tool.black]
 line-length = 120
-exclude = "notebooks"
+#exclude = "notebooks"
 
 [tool.isort]
 profile = "black"
-skip_glob = ["notebooks/*"]
+#skip_glob = ["notebooks/*"]
 
 [build-system]
 requires = ["poetry-core"]
