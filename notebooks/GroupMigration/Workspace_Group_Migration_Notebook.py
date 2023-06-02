@@ -74,6 +74,10 @@
 
 # COMMAND ----------
 
+from notebooks.common import install_uc_upgrade_package
+
+install_uc_upgrade_package()
+
 # COMMAND ----------
 
 # MAGIC %md ## Main process entrypoint
