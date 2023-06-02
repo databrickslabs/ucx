@@ -2,13 +2,11 @@ import concurrent.futures
 import json
 import math
 import time
-from functools import reduce
-from os import getgrouplist
 from typing import List
 
 import requests
-from pyspark.sql import DataFrame, session
-from pyspark.sql.functions import array_contains, col, collect_set, column, lit
+from pyspark.sql import session
+from pyspark.sql.functions import array_contains, col, collect_set, lit
 from pyspark.sql.types import MapType, StringType, StructField, StructType
 
 
@@ -228,7 +226,7 @@ class GroupMigration:
                 resJson = res.json()
                 # Iterate over workspace groups, extracting useful info to vars above
                 for e in resJson["Resources"]:
-                    if not e["displayName"].casefold() in groupFilterKeeplist:
+                    if e["displayName"].casefold() not in groupFilterKeeplist:
                         continue
 
                     groupIdDict[e["id"]] = e["displayName"]
@@ -347,7 +345,7 @@ class GroupMigration:
         aclList = []
         for acl in acls:
             try:
-                if acl["all_permissions"][0]["inherited"] == True:
+                if acl["all_permissions"][0]["inherited"] is True:
                     continue
                 aclList.append(
                     list(
@@ -670,7 +668,7 @@ class GroupMigration:
                     headers=self.headers,
                 )
                 if resAPerm.status_code == 404:
-                    print(f"feature not enabled for this tier")
+                    print("feature not enabled for this tier")
                     continue
                 resAPermJson = resAPerm.json()
                 aclList = resAPermJson["access_control_list"]
@@ -725,7 +723,7 @@ class GroupMigration:
                     headers=self.headers,
                 )
                 if resIPPerm.status_code == 404:
-                    print(f"feature not enabled for this tier")
+                    print("feature not enabled for this tier")
                     continue
                 resIPPermJson = resIPPerm.json()
                 aclList = self.getACL(resIPPermJson["access_control_list"])
@@ -752,7 +750,7 @@ class GroupMigration:
                 )
                 resJobJson = resJob.json()
 
-                if resJobJson["has_more"] == False and len(resJobJson) == 1:
+                if resJobJson["has_more"] is False and len(resJobJson) == 1:
                     print("Finished listing jobs")
                     break
 
@@ -778,7 +776,7 @@ class GroupMigration:
                 headers=self.headers,
             )
             if resJobPerm.status_code == 404:
-                print(f"feature not enabled for this tier")
+                print("feature not enabled for this tier")
                 return None
             resJobPermJson = resJobPerm.json()
             aclList = self.getACL(resJobPermJson["access_control_list"])
@@ -828,7 +826,7 @@ class GroupMigration:
                                 )
                     # resExpPerm=requests.get(f"{self.workspace_url}/api/2.0/permissions/experiments/{expID}", headers=self.headers)
                     if resExpPerm.status_code == 404:
-                        print(f"feature not enabled for this tier")
+                        print("feature not enabled for this tier")
                         continue
                     resExpPermJson = resExpPerm.json()
                     if resExpPerm.status_code != 200:
@@ -851,7 +849,6 @@ class GroupMigration:
     def getModelACL(self) -> dict:
         try:
             nextPageToken = ""
-            expPerm = {}
             while True:
                 data = {}
                 data = {"max_results": 20}
@@ -881,7 +878,7 @@ class GroupMigration:
                         headers=self.headers,
                     )
                     if resModelPerm.status_code == 404:
-                        print(f"feature not enabled for this tier")
+                        print("feature not enabled for this tier")
                         continue
                     resModelPermJson = resModelPerm.json()
                     aclList = self.getACL(resModelPermJson["access_control_list"])
@@ -922,7 +919,7 @@ class GroupMigration:
                         headers=self.headers,
                     )
                     if resDltPerm.status_code == 404:
-                        print(f"feature not enabled for this tier")
+                        print("feature not enabled for this tier")
                         continue
                     resDltPermJson = resDltPerm.json()
                     aclList = self.getACL(resDltPermJson["access_control_list"])
@@ -1012,20 +1009,20 @@ class GroupMigration:
                 for c in resFolderJson["objects"]:
                     if (
                         c["object_type"] == "DIRECTORY"
-                        and c["path"].startswith("/Shared") == False
-                        and c["path"].endswith("/Trash") == False
+                        and c["path"].startswith("/Shared") is False
+                        and c["path"].endswith("/Trash") is False
                     ):
                         subFolders[c["object_id"]] = c["path"]
                     elif (
                         c["object_type"] == "NOTEBOOK"
-                        and c["path"].startswith("/Repos") == False
-                        and c["path"].startswith("/Shared") == False
+                        and c["path"].startswith("/Repos") is False
+                        and c["path"].startswith("/Shared") is False
                     ):
                         notebooks[c["object_id"]] = c["path"]
                     elif (
                         c["object_type"] == "FILE"
-                        and c["path"].startswith("/Repos") == False
-                        and c["path"].startswith("/Shared") == False
+                        and c["path"].startswith("/Repos") is False
+                        and c["path"].startswith("/Shared") is False
                     ):
                         files[c["object_id"]] = c["path"]
                 return (path, subFolders, notebooks, files)
@@ -1066,7 +1063,7 @@ class GroupMigration:
                         resFolderPerm = future.result()
                         currentFolderCount += 1
                         if resFolderPerm.status_code == 404:
-                            print(f"feature not enabled for this tier")
+                            print("feature not enabled for this tier")
                             continue
                         if resFolderPerm.status_code == 403:
                             print(
@@ -1109,7 +1106,7 @@ class GroupMigration:
                         resNotebookPerm = future.result()
                         currentNotebookCount += 1
                         if resNotebookPerm.status_code == 404:
-                            print(f"feature not enabled for this tier")
+                            print("feature not enabled for this tier")
                             continue
                         if resNotebookPerm.status_code == 403:
                             print(
@@ -1152,7 +1149,7 @@ class GroupMigration:
                         resFilePerm = future.result()
                         currentFileCount += 1
                         if resFilePerm.status_code == 404:
-                            print(f"feature not enabled for this tier")
+                            print("feature not enabled for this tier")
                             continue
                         if resFilePerm.status_code == 403:
                             print(
@@ -1205,7 +1202,7 @@ class GroupMigration:
                         headers=self.headers,
                     )
                     if resRepoPerm.status_code == 404:
-                        print(f"feature not enabled for this tier")
+                        print("feature not enabled for this tier")
                         continue
                     resRepoPermJson = resRepoPerm.json()
                     aclList = self.getACL3(resRepoPermJson["access_control_list"])
@@ -1229,13 +1226,13 @@ class GroupMigration:
                 headers=self.headers,
             )
             if resTokenPerm.status_code == 404:
-                print(f"feature not enabled for this tier")
+                print("feature not enabled for this tier")
                 return {}
             resTokenPermJson = resTokenPerm.json()
             aclList = []
             for acl in resTokenPermJson["access_control_list"]:
                 try:
-                    if acl["all_permissions"][0]["inherited"] == True:
+                    if acl["all_permissions"][0]["inherited"] is True:
                         continue
                     aclList.append(
                         list(
@@ -1276,7 +1273,7 @@ class GroupMigration:
                 )
 
                 if resSSPerm.status_code == 404:
-                    print(f"feature not enabled for this tier")
+                    print("feature not enabled for this tier")
                     continue
                 if resSSPerm.status_code != 200:
                     print(
@@ -1285,7 +1282,7 @@ class GroupMigration:
                     continue
 
                 resSSPermJson = resSSPerm.json()
-                if not "items" in resSSPermJson:
+                if "items" not in resSSPermJson:
                     # print(f'ACL for Secret Scope  {scopeName} missing "items" key. Contents:\n{resSSPermJson}\nSkipping...')
                     # This seems to be expected behaviour if there are no ACLs, silently ignore
                     continue
@@ -1320,7 +1317,7 @@ class GroupMigration:
                     "schemas": ["urn:ietf:params:scim:api:messages:2.0:PatchOp"],
                     "Operations": [{"op": "add", "path": "entitlements", "value": entitlementList}],
                 }
-                resPatch = requests.patch(
+                requests.patch(
                     f"{self.workspace_url}/api/2.0/preview/scim/v2/Groups/{groupId}",
                     headers=self.headers,
                     data=json.dumps(entitlements),
@@ -1342,7 +1339,7 @@ class GroupMigration:
                     "schemas": ["urn:ietf:params:scim:api:messages:2.0:PatchOp"],
                     "Operations": [{"op": "add", "path": "roles", "value": roleList}],
                 }
-                resPatch = requests.patch(
+                requests.patch(
                     f"{self.workspace_url}/api/2.0/preview/scim/v2/Groups/{groupId}",
                     headers=self.headers,
                     data=json.dumps(instanceProfileRoles),
@@ -1352,7 +1349,6 @@ class GroupMigration:
 
     def updateGroupPermission(self, object: str, groupPermission: dict, level: str):
         try:
-            suffix = ""
             for object_id, aclList in groupPermission.items():
                 dataAcl = []
                 for acl in aclList:
@@ -1362,7 +1358,7 @@ class GroupMigration:
                         gName = acl[0][8:]
                     dataAcl.append({"group_name": gName, "permission_level": acl[1]})
                 data = {"access_control_list": dataAcl}
-                resAppPerm = requests.patch(
+                requests.patch(
                     f"{self.workspace_url}/api/2.0/preview/permissions/{object}/{object_id}",
                     headers=self.headers,
                     data=json.dumps(data),
@@ -1373,7 +1369,6 @@ class GroupMigration:
     def updateGroup2Permission(self, object: str, groupPermission: dict, level: str):
         try:
             for object_id, aclList in groupPermission.items():
-                addUser = True
                 dataAcl = []
                 for acl in aclList:
                     try:
@@ -1399,7 +1394,7 @@ class GroupMigration:
                         dataAcl.append(acl)
                         continue
                 data = {"access_control_list": dataAcl}
-                resAppPerm = requests.post(
+                requests.post(
                     f"{self.workspace_url}/api/2.0/preview/sql/permissions/{object}/{object_id}",
                     headers=self.headers,
                     data=json.dumps(data),
@@ -1409,9 +1404,7 @@ class GroupMigration:
 
     def updateSecretPermission(self, secretPermission: dict, level: str):
         try:
-            suffix = ""
             for object_id, aclList in secretPermission.items():
-                dataAcl = []
                 for acl in aclList:
                     if level == "Workspace":
                         gName = "db-temp-" + acl[0]
@@ -1422,7 +1415,7 @@ class GroupMigration:
                         "principal": gName,
                         "permission": acl[1],
                     }
-                    resAppPerm = requests.post(
+                    requests.post(
                         f"{self.workspace_url}/api/2.0/secrets/acls/put",
                         headers=self.headers,
                         data=json.dumps(data),
@@ -1493,7 +1486,7 @@ class GroupMigration:
                     return []
 
             tables = self.runVerboseSql("show tables in spark_catalog.{}".format(db)).filter(
-                col("isTemporary") == False
+                col("isTemporary") is False
             )
             for table in tables.collect():
                 try:
@@ -1558,12 +1551,12 @@ class GroupMigration:
         userList = list(set(userList))
         if self.checkPrincipalInGroupOrMember(userList, "CATALOG"):
             print(
-                f"some groups or members of the group given permission at catalog level, running permission for all databases"
+                "some groups or members of the group given permission at catalog level, running permission for all databases"
             )
             self.checkAllDB = True
         database_names = []
         dbs = self.spark.sql("show databases").collect()
-        totalDBs = len(database_names)
+        len(database_names)
         for db in dbs:
             database_names.append(db.databaseName)
         print(f"Got {len(database_names)} dbs to query")
@@ -1669,7 +1662,7 @@ class GroupMigration:
             ) = self.getFoldersNotebookACL()
 
             # These have yet to be parallelized:
-            if self.checkTableACL == True:
+            if self.checkTableACL is True:
                 print("performing Tabel ACL object inventory")
                 self.dataObjectsPerm = self.getTableACLs()
 
@@ -1789,7 +1782,7 @@ class GroupMigration:
         for key, value in self.filePerm.items():
             print("{:<20} {:<100}".format(key, str(value)))
 
-        if self.checkTableACL == True:
+        if self.checkTableACL is True:
             print("TableACL  Permission:")
             for item in self.dataObjectsPerm:
                 print(item)
@@ -1841,7 +1834,7 @@ class GroupMigration:
                 self.updateGroupPermission("authorization", self.passwordPerm, level)
                 print("applying instance profile permissions")
                 self.updateGroupRoles(level)
-            if self.checkTableACL == True:
+            if self.checkTableACL is True:
                 print("applying table acl object permissions")
                 self.updateDataObjectsPermission(self.dataObjectsPerm, level)
 
@@ -1869,11 +1862,11 @@ class GroupMigration:
             gID = self.groupNameDict[g]
             print(f"Attempting to delete group [{gID}] - {g}")
             try:
-                res = requests.delete(
+                requests.delete(
                     f"{self.workspace_url}/api/2.0/preview/scim/v2/Groups/{gID}",
                     headers=self.headers,
                 )
-            except Exception as deleteError:
+            except Exception:
                 print("ERROR - Failed to delete group [{gID}] - {g}. ErrorMessage: {deleteError}")
                 pass
             else:
@@ -2018,7 +2011,7 @@ class GroupMigration:
             self.printInventory()
             data = {"permissions": ["USER"]}
             for g in self.WorkspaceGroupNames:
-                res = requests.put(
+                requests.put(
                     f"{self.workspace_url}/api/2.0/preview/permissionassignments/principals/{self.accountGroups_lower[g.casefold()]}",
                     headers=self.headers,
                     data=json.dumps(data),

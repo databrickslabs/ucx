@@ -21,6 +21,11 @@ delta-spark = "^2.4.0"
 line-length = 120
 #exclude = "notebooks"
 
+[tool.ruff]
+line-length = 120
+extend-exclude = ["notebooks/*/*.py"]
+dummy-variable-rgx = "dbutils"
+
 [tool.isort]
 profile = "black"
 #skip_glob = ["notebooks/*"]
