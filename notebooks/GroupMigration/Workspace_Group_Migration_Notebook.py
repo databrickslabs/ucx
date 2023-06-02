@@ -74,8 +74,8 @@
 
 # COMMAND
 
-from pathlib import Path
 import sys
+from pathlib import Path
 
 project_root = Path(".").absolute().parent
 print(f"appending the uc-upgrade library from {project_root}")
