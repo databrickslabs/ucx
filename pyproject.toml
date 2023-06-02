@@ -4,7 +4,7 @@ version = "0.1.0"
 description = ""
 authors = ["Your Name <you@example.com>"]
 readme = "README.md"
-packages = [{include = "uc_upgrade"}]
+packages = [{ include = "uc_upgrade" }]
 
 [tool.poetry.dependencies]
 python = "^3.9"
@@ -18,6 +18,11 @@ delta-spark = "^2.4.0"
 
 [tool.black]
 line-length = 120
+exclude = "notebooks"
+
+[tool.isort]
+profile = "black"
+skip_glob = ["notebooks/*"]
 
 [build-system]
 requires = ["poetry-core"]
