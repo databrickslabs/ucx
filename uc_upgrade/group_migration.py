@@ -8,11 +8,17 @@ import requests
 from pyspark.sql import session
 from pyspark.sql.functions import array_contains, col, collect_set, lit
 from pyspark.sql.types import MapType, StringType, StructField, StructType
+
+from databricks.sdk import WorkspaceClient
+from databricks.sdk.core import DatabricksError
+
 import logging
 
 # Initialize logger
 logger = logging.getLogger(__name__)
 logging.basicConfig(level=logging.INFO)
+
+client = WorkspaceClient()
 
 
 class GroupMigration:
@@ -83,11 +89,19 @@ class GroupMigration:
 
         # Check if we should automatically generate list, and do it immediately.
         # Implementers Note: Could change this section to a lazy calculation by setting groupL to nil or some sentinel value and adding checks before use.
-        res = requests.get(f"{self.workspace_url}/api/2.0/preview/scim/v2/Me", headers=self.headers)
-        # logger.info(res.text)
-        if res.status_code == 403:
-            logger.error("token not valid.")
-            return
+
+        try: 
+            client.current_user.me()
+        except DatabricksError as e: 
+
+            error_message, = e.args 
+
+            if error_message == "Invalid access token.": 
+                logger.error("token not valid.")
+                return 
+            else: 
+                raise e 
+
         if autoGenerateList:
             logger.info(
                 "autoGenerateList parameter is set to TRUE. Ignoring groupL parameter and instead will automatically generate list of migraiton groups."

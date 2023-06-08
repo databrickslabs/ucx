@@ -26,6 +26,8 @@ Recommended VM types are:
 > Please note that you **don't** need to use `poetry` inside notebooks or in the Databricks workspace. 
 > It's only introduced to simplify local development.
 
+- This package uses the Databricks Python SDK for [Authentication](https://github.com/databricks/databricks-sdk-py#authentication) to your Databricks Workspace
+
 ### Details of package installation
 
 Since the package itself is managed with `poetry`, to re-use it inside the notebooks we're doing the following:
