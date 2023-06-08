@@ -1,6 +1,8 @@
-# UC Upgrade Utilities
+# UC Migration Toolkit
 
 This repo contains various functions and utilities for UC Upgrade.
+
+
 ## Latest working version and how-to
 
 Please note that current project statis is 🏗️ **WIP**, but we have a minimal set of already working utilities.
@@ -17,7 +19,7 @@ Recommended VM types are:
 **For now please switch to the `v0.0.1` tag in the GitHub to get the latest working version.**
 
 
-## Local setup
+## Local setup and development process
 
 - Install [poetry](https://python-poetry.org/)
 - Run `poetry install` in the project directory
@@ -26,9 +28,16 @@ Recommended VM types are:
 > Please note that you **don't** need to use `poetry` inside notebooks or in the Databricks workspace.
 > It's only introduced to simplify local development.
 
+Before running `git push`, don't forget to link your code with:
+
+```shell
+make lint
+```
+
 ### Details of package installation
 
 Since the package itself is managed with `poetry`, to re-use it inside the notebooks we're doing the following:
 
 1. Installing the package dependencies via poetry export
 2. Adding the package itself to the notebook via `sys.path`
+
