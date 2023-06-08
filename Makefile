@@ -1,11 +1,11 @@
 lint:
 	@echo "Linting the project code"
-	black .
-	isort .
-	ruff . --fix
+	poetry run black .
+	poetry run isort .
+	poetry run ruff . --fix
 
 verify:
 	@echo "Verifying the project code"
-	black . --check
-	isort . --check
-	ruff .
+	poetry run black . --check
+	poetry run isort . --check
+	poetry run ruff .
