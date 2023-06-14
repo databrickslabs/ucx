@@ -9,7 +9,7 @@ from pyspark.sql import session
 from pyspark.sql.functions import array_contains, col, collect_set, lit
 from pyspark.sql.types import MapType, StringType, StructField, StructType
 
-from databricks.sdk import WorkspaceClient
+from databricks.sdk import WorkspaceClient, AccountClient
 from databricks.sdk.core import DatabricksError
 
 import logging
@@ -18,7 +18,9 @@ import logging
 logger = logging.getLogger(__name__)
 logging.basicConfig(level=logging.INFO)
 
-client = WorkspaceClient()
+# TODO figure out how to authenticate to both level simultaneously 
+workspace_client = WorkspaceClient(profile='prady')
+account_client = AccountClient(profile='field-eng-account')
 
 
 class GroupMigration:
@@ -90,17 +92,10 @@ class GroupMigration:
         # Check if we should automatically generate list, and do it immediately.
         # Implementers Note: Could change this section to a lazy calculation by setting groupL to nil or some sentinel value and adding checks before use.
 
-        try: 
-            client.current_user.me()
-        except DatabricksError as e: 
 
-            error_message, = e.args 
+        assert workspace_client.current_user.me(), "Unable to authenitcate to Workspace"
 
-            if error_message == "Invalid access token.": 
-                logger.error("token not valid.")
-                return 
-            else: 
-                raise e 
+        # TODO add validation for authentication for account console 
 
         if autoGenerateList:
             logger.info(
@@ -127,22 +122,24 @@ class GroupMigration:
         # Get all workspace-local groups
         try:
             logger.info("Executing request to list workspace groups")
-            res = requests.get(
-                f"{self.workspace_url}/api/2.0/preview/scim/v2/Groups",
-                headers=self.headers,
-            )
-            if res.status_code != 200:
-                raise Exception(f"Bad status code. Expected: 200. Got: {res.status_code}")
 
-            resJson = res.json()
+            logger.debug("Getting workspace groups")
+            workspace_groups = workspace_client.groups.list()
+            logger.debug("Getting account groups")
+            account_groups = account_client.groups.list()
 
-            allWsLocalGroups = [
-                o["displayName"] for o in resJson["Resources"] if o["meta"]["resourceType"] == "WorkspaceGroup"
-            ]
+            self.account_groups = account_groups
 
+            logger.debug("Pruning local groups")
+            workspace_groups = set([g.display_name for g in workspace_groups])
+            account_groups = set([g.display_name for g in account_groups])
+            
             # Prune special groups.
             prune_groups = ["admins", "users"]
-            allWsLocalGroups = [g for g in allWsLocalGroups if g not in prune_groups]
+
+            local_workspace_groups = workspace_groups.difference(prune_groups).difference(account_groups)
+
+            allWsLocalGroups = list(local_workspace_groups)
             allWsLocalGroups_lower = [x.casefold() for x in allWsLocalGroups]
             allWsLocalGroups.sort()
             logger.info(
