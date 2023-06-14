@@ -1,5 +1,6 @@
 import concurrent.futures
 import json
+import logging
 import math
 import time
 from typing import List
@@ -9,7 +10,7 @@ from pyspark.sql import session
 from pyspark.sql.functions import array_contains, col, collect_set, lit
 from pyspark.sql.types import MapType, StringType, StructField, StructType
 
-from databricks.sdk import WorkspaceClient, AccountClient
+from databricks.sdk import WorkspaceClient
 from databricks.sdk.core import DatabricksError
 
 import logging
@@ -21,7 +22,6 @@ logging.basicConfig(level=logging.INFO)
 # TODO figure out how to authenticate to both level simultaneously 
 workspace_client = WorkspaceClient(profile='prady')
 account_client = AccountClient(profile='field-eng-account')
-
 
 class GroupMigration:
     def __init__(
@@ -99,7 +99,8 @@ class GroupMigration:
 
         if autoGenerateList:
             logger.info(
-                "autoGenerateList parameter is set to TRUE. Ignoring groupL parameter and instead will automatically generate list of migraiton groups."
+                "autoGenerateList parameter is set to TRUE. "
+                "Ignoring groupL parameter and instead will automatically generate list of migraiton groups."
             )
             self.groupL = self.findMigrationEligibleGroups()
 
@@ -111,7 +112,8 @@ class GroupMigration:
         self.WorkspaceGroupNames = self.groupL
 
         logger.info(
-            f"Successfully initialized GroupMigration class with {len(self.groupL)} workspace-local groups to migrate. Groups to migrate:"
+            f"Successfully initialized GroupMigration class "
+            f"with {len(self.groupL)} workspace-local groups to migrate. Groups to migrate:"
         )
         for i, group in enumerate(self.groupL, start=1):
             logger.info(f"{i}. {group}")
@@ -177,7 +179,8 @@ class GroupMigration:
 
             # logger.info count and membership of not_in_account_groups
             logger.info(
-                f"Unable to match {len(not_in_account_groups)} current workspace-local groups. No matching account level group with the same name found. These groups WILL NOT MIGRATE:"
+                f"Unable to match {len(not_in_account_groups)} current workspace-local groups. "
+                f"No matching account level group with the same name found. These groups WILL NOT MIGRATE:"
             )
             for i, group in enumerate(not_in_account_groups, start=1):
                 logger.info(f"{i}. {group} (WON'T MIGRATE)")
@@ -185,7 +188,8 @@ class GroupMigration:
             if len(migration_eligible) > 0:
                 # logger.info count and membership of intersection
                 logger.info(
-                    f"\nFound {len(migration_eligible)} current workspace-local groups to account level groups. These groups WILL BE MIGRATED."
+                    f"\nFound {len(migration_eligible)} current workspace-local groups to account level groups. "
+                    f"These groups WILL BE MIGRATED."
                 )
                 for i, group in enumerate(migration_eligible, start=1):
                     logger.info(f"{i}. {group} (WILL MIGRATE)")
@@ -194,7 +198,9 @@ class GroupMigration:
                 return migration_eligible
             else:
                 logger.info(
-                    "There are no migration eligible groups. All existing workspace-local groups do not exist at the account level.\nNO MIGRATION WILL BE PERFORMED."
+                    "There are no migration eligible groups. "
+                    "All existing workspace-local groups do not exist at the account level."
+                    "\nNO MIGRATION WILL BE PERFORMED."
                 )
                 return []
         except Exception as e:
@@ -261,7 +267,8 @@ class GroupMigration:
                     try:
                         for ent in e["entitlements"]:
                             entms.append(ent["value"])
-                    except:
+                    except Exception as e:
+                        # TBD: introduce warning with proper explanation
                         pass
 
                     groupEntitlements[e["id"]] = entms
@@ -272,7 +279,8 @@ class GroupMigration:
                         try:
                             for ent in e["roles"]:
                                 entms.append(ent["value"])
-                        except:
+                        except Exception:
+                            # TBD: introduce a proper warning
                             continue
                         if len(entms) == 0:
                             continue
@@ -356,7 +364,8 @@ class GroupMigration:
             self.groupUserList.extend(userPrincipalList)
             self.groupSPList.extend(spPrincipalList)
 
-    # getACL[n] family of functions extract the ACL from the converted json response into a standard format, filtering by groupL
+    # getACL[n] family of functions extract the ACL
+    # from the converted json response into a standard format, filtering by groupL
     def getACL(self, acls: dict) -> list:
         aclList = []
         for acl in acls:
@@ -397,10 +406,10 @@ class GroupMigration:
         aclList = []
         for acl in acls:
             try:
-                l = []
+                acls_items = []
                 for k, v in acl.items():
-                    l.append(v)
-                aclList.append(l)
+                    acls_items.append(v)
+                aclList.append(acls_items)
             except KeyError:
                 continue
         for acl in aclList:
@@ -840,7 +849,9 @@ class GroupMigration:
                                     f"{self.workspace_url}/api/2.0/permissions/experiments/{expID}",
                                     headers=self.headers,
                                 )
-                    # resExpPerm=requests.get(f"{self.workspace_url}/api/2.0/permissions/experiments/{expID}", headers=self.headers)
+                    # resExpPerm=requests.get(
+                    # f"{self.workspace_url}/api/2.0/permissions/experiments/{expID}", headers=self.headers
+                    # )
                     if resExpPerm.status_code == 404:
                         logger.error("feature not enabled for this tier")
                         continue
@@ -1046,7 +1057,9 @@ class GroupMigration:
             except Exception as e:
                 lastError = e
                 continue
-        logger.error(f"[ERROR] retry limit ({MAX_RETRY}) limit exceeded while retrieving path {path}. last err: {lastError}.")
+        logger.error(
+            f"[ERROR] retry limit ({MAX_RETRY}) limit exceeded while retrieving path {path}. last err: {lastError}."
+        )
         return (path, {}, {}, {})
 
     def getFoldersNotebookACL(self, rootPath="/") -> list:
@@ -1055,7 +1068,8 @@ class GroupMigration:
             # Get folder list
             self.getRecursiveFolderList(rootPath)
 
-            # Collect folder IDs, ignoring suffix /Trash to avoid useless errors. /Repos and /Shared are ignored at the folder list level
+            # Collect folder IDs, ignoring suffix /Trash to avoid useless errors.
+            # /Repos and /Shared are ignored at the folder list level
             folder_ids = [
                 folder_id for folder_id in self.folderList.keys() if not self.folderList[folder_id].endswith("/Trash")
             ]
@@ -1299,7 +1313,9 @@ class GroupMigration:
 
                 resSSPermJson = resSSPerm.json()
                 if "items" not in resSSPermJson:
-                    # logger.info(f'ACL for Secret Scope  {scopeName} missing "items" key. Contents:\n{resSSPermJson}\nSkipping...')
+                    # logger.info(
+                    # f'ACL for Secret Scope  {scopeName} missing "items" key. Contents:\n{resSSPermJson}\nSkipping...'
+                    # )
                     # This seems to be expected behaviour if there are no ACLs, silently ignore
                     continue
 
@@ -1498,7 +1514,10 @@ class GroupMigration:
                 userList = [p.Principal for p in userListCollect]
                 userList = list(set(userList))
                 if not self.checkPrincipalInGroupOrMember(userList, db):
-                    # logger.info(f'selected groups or members of the groups have no USAGE or OWN permission on database level. Skipping object level permission check for database {db}.')
+                    # logger.info(
+                    # f'selected groups or members of the groups have no USAGE or OWN permission on database level.'
+                    # 'Skipping object level permission check for database {db}.'
+                    # )
                     return []
 
             tables = self.runVerboseSql("show tables in spark_catalog.{}".format(db)).filter(
@@ -1567,7 +1586,8 @@ class GroupMigration:
         userList = list(set(userList))
         if self.checkPrincipalInGroupOrMember(userList, "CATALOG"):
             logger.info(
-                "some groups or members of the group given permission at catalog level, running permission for all databases"
+                "some groups or members of the group given "
+                "permission at catalog level, running permission for all databases"
             )
             self.checkAllDB = True
         database_names = []
