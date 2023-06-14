@@ -26,9 +26,10 @@ class GroupMigration:
         spark: session.SparkSession,
         userName: str,
         checkTableACL: bool = False,
-        numThreads: int = 32,
+        numThreads: int = 10,
         autoGenerateList: bool = False,
         verbose: bool = False,
+        freshInventory : bool = False
     ):
         self.groupL = groupL
         self.cloud = cloud
@@ -77,9 +78,16 @@ class GroupMigration:
 
         self.lastInventoryRun = None
         self.checkAllDB = False
-        logger.info(f"Clearing inventory table {self.inventoryTableName}")
-        spark.sql(f"drop table if exists {self.inventoryTableName}")
-        spark.sql(f"drop table if exists {self.inventoryTableName+'TableACL'}")
+        if freshInventory:
+          logger.info(f'Clearing inventory table {self.inventoryTableName}')
+          spark.sql(f"drop table if exists {self.inventoryTableName}")
+          spark.sql(f"drop table if exists {self.inventoryTableName+'TableACL'}")
+          createSQL=f"create table {self.inventoryTableName} (GroupType string, WorkspaceObject string, Permission MAP<string, string>)"
+          spark.sql(createSQL)
+          createSQL=f"create table {self.inventoryTableName}TableACL (Database string, Principal string, ActionTypes string, ObjectType string, ObjectKey string)"
+          spark.sql(createSQL)
+          logger.info(f'recreated tables...')
+        
 
         # Check if we should automatically generate list, and do it immediately.
         # Implementers Note: Could change this section to a lazy calculation
@@ -212,82 +220,75 @@ class GroupMigration:
         except Exception as e:
             logger.error(f"error in retrieving group objects : {e}")
 
-    def getGroupObjects(self, groupFilterKeeplist) -> list:
+    def getGroupObjects(self, groupFilterKeeplist)->list:
         try:
-            groupIdDict = {}
-            groupMembers = {}
-            groupEntitlements = {}
-            groupRoles = {}
-            res = requests.get(
-                f"{self.workspace_url}/api/2.0/preview/scim/v2/Groups?attributes=id",
-                headers=self.headers,
-            )
-            resJson = res.json()
-            totalGroups = resJson["totalResults"]
-            pages = totalGroups // 100
-            # normalize case
+            groupIdDict={}
+            groupMembers={}
+            groupEntitlements={}
+            groupRoles={}
+            res=requests.get(f"{self.workspace_url}/api/2.0/preview/scim/v2/Groups?attributes=id", headers=self.headers)
+            resJson=res.json()
+            totalGroups=resJson['totalResults']
+            pages=totalGroups//100
+            #normalize case
             groupFilterKeeplist = [x.casefold() for x in groupFilterKeeplist]
             logger.info(f"Total groups: {totalGroups}. Retrieving group details in chunks of 100")
-            for i in range(0, pages + 1):
-                logger.info(f"Retrieving the next 100 items from {str(i*100+1)}")
+            for i in range(0,pages+1):
+              logger.info(f"Retrieving the next 100 items from {str(i*100+1)}")
 
-                res = requests.get(
-                    f"{self.workspace_url}/api/2.0/preview/scim/v2/Groups?startIndex={str(i*100+1)}&count=100",
-                    headers=self.headers,
-                )
-                resJson = res.json()
-                # Iterate over workspace groups, extracting useful info to vars above
-                for e in resJson["Resources"]:
-                    if e["displayName"].casefold() not in groupFilterKeeplist:
-                        continue
+              res=requests.get(f"{self.workspace_url}/api/2.0/preview/scim/v2/Groups?startIndex={str(i*100+1)}&count=100", headers=self.headers)
+              resJson=res.json()
+              #Iterate over workspace groups, extracting useful info to vars above
+              for e in resJson['Resources']:
+                  if not e['displayName'].casefold() in groupFilterKeeplist:
+                      continue
 
-                    groupIdDict[e["id"]] = e["displayName"]
+                  groupIdDict[e['id']]=e['displayName']
 
-                    # Get Group Members
-                    members = []
-                    try:
-                        for mem in e["members"]:
-                            members.append(list([mem["display"], mem["value"], mem["$ref"]]))
-                    except KeyError:
-                        pass
-                    groupMembers[e["id"]] = members
+                  #Get Group Members
+                  members=[]
+                  try:
+                      for mem in e['members']:
+                          members.append(list([mem['display'],mem['value'],mem['$ref']]))
+                  except KeyError:
+                      pass
+                  groupMembers[e['id']]=members
 
-                    # Get entitlements
-                    entms = []
-                    try:
-                        for ent in e["entitlements"]:
-                            entms.append(ent["value"])
-                    except Exception as e:
-                        # TBD: introduce warning with proper explanation
-                        pass
+                  #Get entitlements
+                  entms=[]
+                  try:
+                      for ent in e['entitlements']:
+                          entms.append(ent['value'])
+                  except:
+                      pass
 
-                    groupEntitlements[e["id"]] = entms
-
-                    # Get Roles (AWS only)
-                    if self.cloud == "AWS":
-                        entms = []
-                        try:
-                            for ent in e["roles"]:
-                                entms.append(ent["value"])
-                        except Exception:
-                            # TBD: introduce a proper warning
-                            continue
-                        if len(entms) == 0:
-                            continue
-                        groupRoles[e["id"]] = entms
-
-                # Finally assign to self (Now that exception hasn't been thrown)
-            self.groupIdDict = groupIdDict
-            self.groupMembers = groupMembers
-            self.groupEntitlements = groupEntitlements
-            self.groupRoles = groupRoles
-            # Create reverse of groupIdDict
-            self.groupNameDict = {}
-            for k, v in self.groupIdDict.items():
-                self.groupNameDict[v] = k
-
+                  groupEntitlements[e['id']]=entms
+                  
+                  #Get Roles (AWS only)
+                  if self.cloud=='AWS':
+                      entms=[]
+                      try:
+                          for ent in e['roles']:
+                              entms.append(ent['value'])
+                      except:
+                          continue
+                      if len(entms)==0:
+                          continue
+                      groupRoles[e['id']]=entms
+              
+              #Finally assign to self (Now that exception hasn't been thrown)
+            #self.groupIdDict = groupIdDict
+            #self.groupMembers = groupMembers
+            #self.groupEntitlements = groupEntitlements
+            #self.groupRoles = groupRoles
+            #Create reverse of groupIdDict
+            groupNameDict = {}
+            for k,v in groupIdDict.items():
+                groupNameDict[v]=k
+            return groupIdDict, groupMembers, groupEntitlements, groupRoles, groupNameDict
+            
         except Exception as e:
-            logger.error(f"error in retrieving group objects : {e}")
+            logger.error(f'error in retrieving group objects : {e}')
 
     # get list of users and service principals recursively for groups and nested groups
     def getRecursiveGroupMember(self, groupM: dict):
@@ -1644,74 +1645,252 @@ class GroupMigration:
         except Exception as e:
             logger.error(f"Error setting permission, {e} ")
 
-    def setGroupListForMode(self, mode: str):
-        logger.info(f"Retrieving group metadata for mode: {mode}")
-        if mode == "Workspace":
-            self.groupL = self.WorkspaceGroupNames
-            self.getGroupObjects(self.groupL)
-        elif mode == "Account":
-            self.groupL = self.TempGroupNames
-            self.getGroupObjects(self.groupL)
+    def setGroupListForMode(self, mode : str) :
+        logger.info(f'Retrieving group metadata for mode: {mode}')
+        if mode=="Workspace":
+          self.groupL=self.WorkspaceGroupNames
+          self.groupIdDict, self.groupMembers, self.groupEntitlements, self.groupRoles, self.groupNameDict = self.getGroupObjects(self.groupL)
+        elif mode=="Account":
+          self.groupL=self.TempGroupNames   
+          self.groupIdDict, self.groupMembers, self.groupEntitlements, self.groupRoles, self.groupNameDict = self.getGroupObjects(self.groupL)        
         else:
             raise ValueError(f"mode {mode} not supported. Valid values are 'Workspace' and 'Account'")
 
     def clearInventoryCache(self):
         self.lastInventoryRun = None
+    def isObjectInventoryPresent(self, mode: str, objectType: str, tableACL : bool = False):
+      try:
+        groupType=''
+        if mode=="Workspace":
+          #print(f'Saving data for workspace groups for {objectType} in {self.inventoryTableName} table.')
+          groupType="WorkspaceLocal"
+        else:
+          #print(f'Saving data for workspace temp groups for {objectType} in {self.inventoryTableName} table.')
+          groupType="WorkspaceTemp"
+        if tableACL:
+          checkSQL=f"select count(*) from {self.inventoryTableName}TableACL where groupType='{groupType}' "
+          logger.info(checkSQL)
+        else:
+          checkSQL=f"select count(*) from {self.inventoryTableName} where groupType='{groupType}' and WorkspaceObject='{objectType}'"
+        if self.spark.sql(checkSQL).collect()[0][0] > 0:
+          return True
+        else:
+          return False
 
-    def performInventory(self, mode: str, force: bool = False):
-        # check if all this should already be cached
-        if self.lastInventoryRun == mode and not force:
+      except Exception as e:
+        logger.error(f"Error doing inventory check  : {e}")
+    #retrives the permission for a object type from delta table
+    # seperate logic for workspace object and table acl if used   
+    def getObjectInventory(self, mode: str, objectType: str, tableACL : bool = False):
+      try:
+        groupType=''
+        if mode=="Workspace":
+          groupType="WorkspaceLocal"
+        else:
+          groupType="WorkspaceTemp"
+        if tableACL:
+          checkPermSQL=f"select Database, Principal, ActionTypes, ObjectType, ObjectKey from {self.inventoryTableName} where groupType='{groupType}'"
+          perm = self.spark.sql(checkPermSQL).collect()
+          return perm
+        else:
+          checkPermSQL=f"select Permission from {self.inventoryTableName} where groupType='{groupType}' and WorkspaceObject='{objectType}'"
+          perm = self.spark.sql(checkPermSQL).collect()[0][0]
+          return perm
+      except Exception as e:
+        logger.error(f"Error retrieving  inventory for {objectType}  : {e}")
+    #performs inventory of the objects
+    #if objectType is All, do inventory for all
+    #if objectType is specific , do inventory for that object alone
+    #if force is set to True do fresh inventory ireespective of data present in inventory table or not
+    #if force is set to false and data is present in inventory table, retrive data
+    def performInventory(self, mode : str, force : bool = False, objectType : str='All'):
+        #check if all this should already be cached
+      #if self.lastInventoryRun == mode:
+      #    self.setGroupListForMode(mode)
+      #    print(f'Skipping inventory for mode = {mode} since already performed.')
+      #    return
+
+      logger.info(f'Performing inventory of workspace object permissions. Filtering results by group list for mode: {mode}.')
+      try:
+        #checks if only valid ObjectType is passed, else thorw msg and return
+        if objectType not in ["All","Group","Password","Cluster","ClusterPolicy","Warehouse","Dashboard","Query","Job","Folder","TableACL","Alert","Pool","Experiment","Model","DLT","Repo","Token","Secret"]:
+          logger.info("Enter valid object types from  All,Group,Password,Cluster,ClusterPolicy,Warehouse,Dashboard,Query,Job,Folder,TableACL,Alert,Pool,Experiment,Model,DLT,Repo,Token,Secret")
+          return
+        if objectType=="Group" or objectType=="All":
+          logger.info('performing Groups inventory')
+          if force or not self.isObjectInventoryPresent(mode, 'GroupDict'):
             self.setGroupListForMode(mode)
-            logger.info(f"Skipping inventory for mode = {mode} since already performed.")
-            return
+            self.persistInventory(mode, "GroupDict", self.groupIdDict)
+            self.persistInventory(mode, "GroupMember", self.groupMembers)
+            self.persistInventory(mode, "GroupEntitlement", self.groupEntitlements)
+            self.persistInventory(mode, "GroupRole", self.groupRoles)
+            self.persistInventory(mode, "GroupName", self.groupNameDict)
 
-        logger.info(
-            f"Performing inventory of workspace object permissions. Filtering results by group list for mode: {mode}."
-        )
-        try:
-            self.setGroupListForMode(mode)
-            if self.cloud == "AWS":
-                logger.info("performing password inventory")
-                self.passwordPerm = self.getPasswordACL()
-
-            # These are parallel
+          else:
+            self.groupIdDict = self.getObjectInventory(mode, 'GroupDict')
+            self.groupMembers = self.getObjectInventory(mode, 'GroupMember')
+            self.groupEntitlements = self.getObjectInventory(mode, 'GroupEntitlement')
+            self.groupRoles = self.getObjectInventory(mode, 'GroupRole')
+            self.groupNameDict = self.getObjectInventory(mode, 'GroupName')
+        if self.cloud=="AWS":
+          if objectType=="Password" or objectType=="All":
+            logger.info('performing password inventory')
+            if force or not self.isObjectInventoryPresent(mode, 'Password'):
+              self.passwordPerm= self.getPasswordACL()
+              self.persistInventory(mode, "Password", self.passwordPerm)
+            else:
+              self.passwordPerm = self.getObjectInventory(mode, 'Password')
+        #These are parallel
+        #self.clusterPerm = self.getAllClustersACL()
+        if objectType=="Cluster" or objectType=="All":
+          logger.info('performing cluster inventory')
+          if force or not self.isObjectInventoryPresent(mode, 'Cluster'):
             self.clusterPerm = self.getAllClustersACL()
+            self.persistInventory(mode, "Cluster", self.clusterPerm)
+          else:
+            self.clusterPerm = self.getObjectInventory(mode, 'Cluster')
+        
+        #self.clusterPolicyPerm = self.getAllClusterPolicyACL()
+        if objectType=="ClusterPolicy" or objectType=="All":
+          logger.info('performing cluster policy inventory')
+          if force or not self.isObjectInventoryPresent(mode, 'ClusterPolicy'):
             self.clusterPolicyPerm = self.getAllClusterPolicyACL()
+            self.persistInventory(mode, "ClusterPolicy", self.clusterPolicyPerm)
+          else:
+            self.clusterPolicyPerm = self.getObjectInventory(mode, 'ClusterPolicy')
+        #self.warehousePerm = self.getAllWarehouseACL()
+        if objectType=="Warehouse" or objectType=="All":
+          logger.info('performing warehouse inventory')
+          if force or not self.isObjectInventoryPresent(mode, 'Warehouse'):
             self.warehousePerm = self.getAllWarehouseACL()
-            self.dashboardPerm = self.getAllDashboardACL()  # 5 mins
-            self.queryPerm = self.getAllQueriesACL()
-            self.jobPerm = self.getAllJobACL()  # 33 mins
-            (
-                self.folderPerm,
-                self.notebookPerm,
-                self.filePerm,
-            ) = self.getFoldersNotebookACL()
+            self.persistInventory(mode, "Warehouse", self.warehousePerm)
+          else:
+            self.warehousePerm = self.getObjectInventory(mode, 'Warehouse')
+        #self.dashboardPerm=self.getAllDashboardACL() # 5 mins
+        if objectType=="Dashboard" or objectType=="All":
+          logger.info('performing dashboards inventory')
+          if force or not self.isObjectInventoryPresent(mode, 'Dashboard'):
+            self.dashboardPerm=self.getAllDashboardACL()
+            self.persistInventory(mode, "Dashboard", self.dashboardPerm)
+          else:
+            self.dashboardPerm = self.getObjectInventory(mode, 'Dashboard')
+        #self.queryPerm=self.getAllQueriesACL()
+        if objectType=="Query" or objectType=="All":
+          logger.info('performing query inventory')
+          if force or not self.isObjectInventoryPresent(mode, 'Query'):
+            self.queryPerm=self.getAllQueriesACL()
+            self.persistInventory(mode, "Query", self.queryPerm)
+          else:
+            self.queryPerm = self.getObjectInventory(mode, 'Query')
+        #self.jobPerm=self.getAllJobACL() #33 mins
+        if objectType=="Job" or objectType=="All":
+          logger.info('performing job inventory')
+          if force or not self.isObjectInventoryPresent(mode, 'Job'):
+            self.jobPerm=self.getAllJobACL()
+            self.persistInventory(mode, "Job", self.jobPerm)
+          else:
+            self.jobPerm = self.getObjectInventory(mode, 'Job')
+        #self.folderPerm, self.notebookPerm, self.filePerm=self.getFoldersNotebookACL()
+        if objectType=="Folder" or objectType=="All":
+          logger.info('performing folders,notebooks, files inventory')
+          if force or not self.isObjectInventoryPresent(mode, 'Folder'):
+            self.folderPerm, self.notebookPerm, self.filePerm=self.getFoldersNotebookACL()
+            self.persistInventory(mode, "Folder", self.folderPerm)
+            self.persistInventory(mode, "Notebook", self.notebookPerm)
+            self.persistInventory(mode, "File", self.filePerm)
+          else:
+            self.folderPerm = self.getObjectInventory(mode, 'Folder')
+            self.notebookPerm = self.getObjectInventory(mode, 'Notebook')
+            self.filePerm = self.getObjectInventory(mode, 'File')
 
-            # These have yet to be parallelized:
-            if self.checkTableACL is True:
-                logger.info("performing Tabel ACL object inventory")
-                self.dataObjectsPerm = self.getTableACLs()
+        #These have yet to be parallelized:
+        if self.checkTableACL==True:
+          
+          #self.dataObjectsPerm=self.getTableACLs()
+          if objectType=="TableACL" or objectType=="All":
+            logger.info('performing Tabel ACL object inventory')
+            if force or not self.isObjectInventoryPresent(mode, 'TableACL', True):
+              self.dataObjectsPerm=self.getTableACLs()
+              self.persistInventory(mode, "TableACL", self.dataObjectsPerm, True)
+            else:
+              self.dataObjectsPerm = self.getObjectInventory(mode, 'TableACL')
 
-            logger.info("performing alerts inventory")
-            self.alertPerm = self.getAlertsACL()
-            logger.info("performing instance pools inventory")
-            self.instancePoolPerm = self.getPoolACL()
-            logger.info("performing experiments inventory")
-            self.expPerm = self.getExperimentACL()
-            logger.info("performing registered models inventory")
-            self.modelPerm = self.getModelACL()
-            logger.info("performing DLT inventory")
-            self.dltPerm = self.getDLTACL()
-            logger.info("performing repos inventory")
-            self.repoPerm = self.getRepoACL()
-            logger.info("performing token inventory")
-            self.tokenPerm = self.getTokenACL()
-            logger.info("performing secret scope inventory")
-            self.secretScopePerm = self.getSecretScoppeACL()
-
-            self.lastInventoryRun = mode
-        except Exception as e:
-            logger.info(f" Error creating group inventory, {e}")
+        
+        #self.alertPerm=self.getAlertsACL()
+        if objectType=="Alert" or objectType=="All":
+          logger.info('performing alerts inventory')
+          if force or not self.isObjectInventoryPresent(mode, 'Alert'):
+            self.alertPerm=self.getAlertsACL()
+            self.persistInventory(mode, "Alert", self.alertPerm)
+          else:
+            self.alertPerm = self.getObjectInventory(mode, 'Alert')
+        
+        #self.instancePoolPerm=self.getPoolACL()
+        if objectType=="Pool" or objectType=="All":
+          logger.info('performing instance pools inventory')
+          if force or not self.isObjectInventoryPresent(mode, 'Pool'):
+            self.instancePoolPerm=self.getPoolACL()
+            self.persistInventory(mode, "Pool", self.instancePoolPerm)
+          else:
+            self.instancePoolPerm = self.getObjectInventory(mode, 'Pool')
+        
+        #self.expPerm=self.getExperimentACL()
+        if objectType=="Experiment" or objectType=="All":
+          logger.info('performing experiments inventory')
+          if force or not self.isObjectInventoryPresent(mode, 'Experiment'):
+            self.expPerm=self.getExperimentACL()
+            self.persistInventory(mode, "Experiment", self.expPerm)
+          else:
+            self.expPerm = self.getObjectInventory(mode, 'Experiment')
+        
+        #self.modelPerm=self.getModelACL()
+        if objectType=="Model" or objectType=="All":
+          logger.info('performing registered models inventory')
+          if force or not self.isObjectInventoryPresent(mode, 'Model'):
+            self.modelPerm=self.getModelACL()
+            self.persistInventory(mode, "Model", self.modelPerm)
+          else:
+            self.modelPerm = self.getObjectInventory(mode, 'Model')
+        
+        #self.dltPerm=self.getDLTACL()
+        if objectType=="DLT" or objectType=="All":
+          logger.info('performing DLT inventory')
+          if force or not self.isObjectInventoryPresent(mode, 'DLT'):
+            self.dltPerm=self.getDLTACL()
+            self.persistInventory(mode, "DLT", self.dltPerm)
+          else:
+            self.dltPerm = self.getObjectInventory(mode, 'DLT')
+        
+        #self.repoPerm=self.getRepoACL()
+        if objectType=="Repo" or objectType=="All":
+          logger.info('performing repos inventory')
+          if force or not self.isObjectInventoryPresent(mode, 'Repo'):
+            self.repoPerm=self.getRepoACL()
+            self.persistInventory(mode, "Repo", self.repoPerm)
+          else:
+            self.repoPerm = self.getObjectInventory(mode, 'Repo')
+        
+        #self.tokenPerm=self.getTokenACL()
+        if objectType=="Token" or objectType=="All":
+          logger.info('performing token inventory')
+          if force or not self.isObjectInventoryPresent(mode, 'Token'):
+            self.tokenPerm=self.getTokenACL()
+            self.persistInventory(mode, "Token", self.tokenPerm)
+          else:
+            self.tokenPerm = self.getObjectInventory(mode, 'Token')
+        
+        #self.secretScopePerm=self.getSecretScoppeACL()
+        if objectType=="Secret" or objectType=="All":
+          logger.info('performing secret scope inventory')
+          if force or not self.isObjectInventoryPresent(mode, 'Secret'):
+            self.secretScopePerm=self.getSecretScoppeACL()
+            self.persistInventory(mode, "Secret", self.secretScopePerm)
+          else:
+            self.secretScopePerm = self.getObjectInventory(mode, 'Secret')
+        
+        self.lastInventoryRun = mode
+      except Exception as e:
+        logger.error(f" Error creating group inventory, {e}")
 
     def printInventory(self, printMembers: bool = False):
         logger.info("Displaying Inventory Results -- ACLs of selected groups:")
@@ -1898,69 +2077,46 @@ class GroupMigration:
             else:
                 logger.info(f"SUCCESS - Deleted group [{gID}] - {g}")
 
-    def persistInventory(self, mode: str):
-        try:
-            groupType = ""
-            if mode == "Workspace":
-                logger.info(f"Saving data for workspace groups in {self.inventoryTableName} table.")
-                groupType = "WorkspaceLocal"
-            else:
-                logger.info(f"Saving data for workspace temp groups in {self.inventoryTableName} table.")
-                groupType = "WorkspaceTemp"
-            persistList = []
-            persistList.append([groupType, "GroupListDict", self.groupIdDict])
-            persistList.append([groupType, "GroupMembers", self.groupMembers])
-            persistList.append([groupType, "GroupEntitlements", self.groupEntitlements])
-            persistList.append([groupType, "GroupRoles", self.groupRoles])
-            persistList.append([groupType, "Password", self.passwordPerm])
-            persistList.append([groupType, "Cluster", self.clusterPerm])
-            persistList.append([groupType, "ClusterPolicy", self.clusterPolicyPerm])
-            persistList.append([groupType, "Warehouse", self.warehousePerm])
-            persistList.append([groupType, "Dashboard", self.dashboardPerm])
-            persistList.append([groupType, "Query", self.queryPerm])
-            persistList.append([groupType, "Job", self.jobPerm])
-            persistList.append([groupType, "Folder", self.folderPerm])
-            persistList.append([groupType, "Notebook", self.notebookPerm])
-            persistList.append([groupType, "File", self.filePerm])
-            persistList.append([groupType, "Alert", self.alertPerm])
-            persistList.append([groupType, "Pool", self.instancePoolPerm])
-            persistList.append([groupType, "Experiment", self.expPerm])
-            persistList.append([groupType, "Model", self.modelPerm])
-            persistList.append([groupType, "DLT", self.dltPerm])
-            persistList.append([groupType, "Repo", self.repoPerm])
-            persistList.append([groupType, "Token", self.tokenPerm])
-            persistList.append([groupType, "Secret", self.secretScopePerm])
-            persistColumns = StructType(
-                [
-                    StructField("GroupType", StringType(), True),
-                    StructField("WorkspaceObject", StringType(), True),
-                    StructField("Permission", MapType(StringType(), StringType()), True),
-                ]
-            )
-            # persistColumns=["GroupType", "WorkspaceObject","Permission"]
-            persistDF = self.spark.createDataFrame(data=persistList, schema=persistColumns)
-            # return persistDF
-            persistDF.write.format("delta").mode("append").saveAsTable(self.inventoryTableName)
-
-            if self.checkTableACL:
-                tableACLCol = StructType(
-                    [
-                        StructField("Database", StringType(), True),
-                        StructField("Principal", StringType(), True),
-                        StructField("ActionTypes", StringType(), True),
-                        StructField("ObjectType", StringType(), True),
-                        StructField("ObjectKey", StringType(), True),
-                    ]
-                )
-
-                tableACLDF = self.spark.createDataFrame(data=self.dataObjectsPerm, schema=tableACLCol).withColumn(
-                    "GroupType", lit(groupType)
-                )
-                tableACLDF.write.format("delta").mode("append").saveAsTable(self.inventoryTableName + "TableACL")
-            logger.info(f"Saved data in {self.inventoryTableName} table.")
-
-        except Exception as e:
-            logger.error(f"Error creating delta table to store inventory  : {e}")
+    def persistInventory(self, mode: str, objectType: str, objectPerm: dict, tableACL : bool = False):
+      try:
+        groupType=''
+        if mode=="Workspace":
+          logger.info(f'Saving data for workspace groups for {objectType} in {self.inventoryTableName} table.')
+          groupType="WorkspaceLocal"
+        else:
+          logger.info(f'Saving data for workspace temp groups for {objectType} in {self.inventoryTableName} table.')
+          groupType="WorkspaceTemp"
+        
+        persistList=[]
+        if tableACL:
+          deleteSQL=f"delete from {self.inventoryTableName}TableACL where groupType='{groupType}' ;"
+          self.spark.sql(deleteSQL)
+          tableACLCol=StructType([       \
+          StructField('Database', StringType(), True), \
+          StructField('Principal', StringType(), True), \
+          StructField('ActionTypes', StringType(), True), \
+          StructField('ObjectType', StringType(), True), \
+          StructField('ObjectKey', StringType(), True) \
+          ])
+          
+          tableACLDF = self.spark.createDataFrame(data=objectPerm, schema = tableACLCol) \
+                        .withColumn('GroupType',lit(groupType))
+          tableACLDF.write.format('delta').mode('append').saveAsTable(self.inventoryTableName+'TableACL')
+          logger.info(f'Saved data in {self.inventoryTableName}TableACL table for {objectType}')
+        else:
+          deleteSQL=f"delete from {self.inventoryTableName} where GroupType='{groupType}' and WorkspaceObject='{objectType}';"
+          self.spark.sql(deleteSQL)
+          persistList.append([groupType,objectType,objectPerm])
+          persistColumns = StructType([       \
+          StructField('GroupType', StringType(), True), \
+          StructField('WorkspaceObject', StringType(), True), \
+          StructField('Permission', MapType(StringType(),StringType()), True)])
+          persistDF = self.spark.createDataFrame(data=persistList, schema = persistColumns)
+          #return persistDF
+          persistDF.write.format('delta').mode('append').saveAsTable(self.inventoryTableName)
+          logger.info(f'Saved data in {self.inventoryTableName} table for {objectType}')
+      except Exception as e:
+        logger.error(f"Error creating delta table to store inventory  : {e}")
 
     def deleteWorkspaceLocalGroups(self):
         try:
@@ -2007,7 +2163,7 @@ class GroupMigration:
                 self.groupWSGIdDict[res.json()["id"]] = "db-temp-" + g
                 self.groupWSGNameDict["db-temp-" + g] = res.json()["id"]
             self.applyGroupPermission("Workspace")
-            self.persistInventory("Workspace")
+            #self.persistInventory("Workspace")
         except Exception as e:
             logger.error(f" Error creating backup groups , {e}")
 
@@ -2043,7 +2199,7 @@ class GroupMigration:
                     data=json.dumps(data),
                 )
             self.applyGroupPermission("Account")
-            self.persistInventory("Account")
+            #self.persistInventory("Account")
 
         except Exception as e:
             logger.error(f" Error creating account level group, {e}")
