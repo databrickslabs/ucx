@@ -171,13 +171,13 @@ files = [
 
 [[package]]
 name = "databricks-sdk"
-version = "0.1.9"
+version = "0.1.10"
 description = "Databricks SDK for Python (Experimental)"
 optional = false
 python-versions = ">=3.7"
 files = [
-    {file = "databricks-sdk-0.1.9.tar.gz", hash = "sha256:ecfc3379704d4c56a6973a58039a4493f6386278095bc5a3111681ffcdcc2cbc"},
-    {file = "databricks_sdk-0.1.9-py3-none-any.whl", hash = "sha256:186497c6c9647500b650ef7696d6fd09a41e0eda004f2014f1c862b2739668bc"},
+    {file = "databricks-sdk-0.1.10.tar.gz", hash = "sha256:f9dbd42a2ca813ad33559bff24f544954865df79041b62e5ce1bb9dc608e894d"},
+    {file = "databricks_sdk-0.1.10-py3-none-any.whl", hash = "sha256:3fb8c57ef28b098fa84d5993e59d944bfcb7095f805528d9e07807eee48385aa"},
 ]
 
 [package.dependencies]
@@ -430,4 +430,4 @@ testing = ["big-O", "flake8 (<5)", "jaraco.functools", "jaraco.itertools", "more
 [metadata]
 lock-version = "2.0"
 python-versions = "^3.9"
-content-hash = "96f8fd88b7d6705c9dc38efeecc3f2bdd59b4af846ce5335d49a70ce9228c502"
+content-hash = "183f9880cb254fabd23b70e636ecb6cd55995c6673bba2d47b6707759a434e0f"
