@@ -70,24 +70,32 @@
 
 # COMMAND ----------
 
-HOST = dbutils.notebook.entry_point.getDbutils().notebook().getContext().apiUrl().getOrElse(None)
-TOKEN = dbutils.notebook.entry_point.getDbutils().notebook().getContext().apiToken().getOrElse(None)
+# MAGIC %pip install tqdm
+# MAGIC %pip install databricks_cli
 
 # COMMAND ----------
 
-from WSGroupMigration import GroupMigration, loadCache, removeCache
+HOST = dbutils.notebook.entry_point.getDbutils().notebook().getContext().apiUrl().getOrElse(None)
+TOKEN = dbutils.notebook.entry_point.getDbutils().notebook().getContext().apiToken().getOrElse(None)
+
+%load_ext autoreload
+%autoreload 2
+
+# COMMAND ----------
+
+from WSGroupMigration import GroupMigration, loadCache, removeCache, requestGetCached
 
 #If autoGenerateList=True then groupL will be ignored and all eliglbe groups will be migrated.
-removeCacheFlag = True
-autoGenerateList = False
-groupL=[<>]
+removeCacheFlag = False
+autoGenerateList = True
+# groupL=[<>]
+groupL = [""]
 
 #Find this in the account console
 inventoryTableName="WorkspaceInventory"
 
 #Pull from your browser URL bar. Should start with "https://" and end with ".com" or ".net"
 workspace_url=HOST
-
 
 #Personal Access Token. Create one in "User Settings"
 token=TOKEN
@@ -99,20 +107,21 @@ checkTableACL=False
 cloud='AWS'
 
 #Your databricks user email.
-userName='<UserMailID>'
+# userName='<UserMailID>'
+userName='amy.wang@databricks.com'
 
 #Number of threads to issue Databricks API requests with. If you get a lot of errors during the inventory, lower this value.
 numThreads = 30
 
 #Remove cache.json
 if removeCacheFlag:
+    ### Removing this cache will relist all members in each group
     removeCache('cache.json')
-
-#Load any existing cache
-cache = loadCache('cache.json')
+    ### Removing this cache will relist all groups that is going to be migrated
+    removeCache('cacheGroupL.json')
 
 #Initialize GroupMigration Class with values supplied above
-gm = GroupMigration( groupL = groupL , cloud=cloud , inventoryTableName = inventoryTableName, workspace_url = workspace_url, pat=token, spark=spark, userName=userName, checkTableACL = checkTableACL, autoGenerateList = autoGenerateList, numThreads=numThreads)
+gm = GroupMigration( groupL = groupL , cloud=cloud , inventoryTableName = inventoryTableName, workspace_url = workspace_url, pat=token, spark=spark, userName=userName, checkTableACL = checkTableACL, autoGenerateList = autoGenerateList, numThreads=numThreads, loadDeltaCache = True)
 
 # COMMAND ----------
 
@@ -122,11 +131,12 @@ gm = GroupMigration( groupL = groupL , cloud=cloud , inventoryTableName = invent
 
 # COMMAND ----------
 
-display(gm.groupSizeCheck())
+df = gm.groupSizeCheck()
+df.display()
 
 # COMMAND ----------
 
-gm.groupMembersCheck()
+df.filter(df.ws_group_size > df.account_group_size).display()
 
 # COMMAND ----------
 
@@ -137,7 +147,106 @@ gm.groupMembersCheck()
 
 # COMMAND ----------
 
-gm.dryRun("Workspace")
+# Comment out line of object to omit from inventory listing
+objListTemp = [
+'Password',
+'Cluster',
+'ClusterPolicy',
+'Warehouse',
+'Dashboard',
+'Query',
+'Pool',
+'Experiment',
+'Model',
+'DLT',
+'Repo',
+'Token',
+'Secret',
+'Job',
+'Folder',
+'Alert'
+]
+
+# TODO: (Lower Priority) Break out Folders so we skip Personal Folder
+gm.dryRun("Workspace", objList=objListTemp)
+
+# gm.persistInventory("Workspace")
+
+# COMMAND ----------
+
+gm.persistInventory("Workspace")
+
+# COMMAND ----------
+
+# MAGIC %sql
+# MAGIC describe formatted workspaceinventory
+
+# COMMAND ----------
+
+# DBTITLE 1,List all Number of Assets that is associated with each Group
+gm.migrationLoadPerGroup().display()
+
+# COMMAND ----------
+
+'''
+Legal, Brand
+'''
+subGroupL = ['ACL:Databricks:GEN2:CAPI', "ACL:Databricks:GEN2:Proofit"]
+# subGroupL = ["ACL:Databricks:GEN2:Legal"]
+gm.groupL = subGroupL
+gm.migrationLoadPerGroup.filter(gm.migrationLoadPerGroup.GroupName.isin(subGroupL)).display()
+
+# COMMAND ----------
+
+''' keep parent-child folder relations
+before
+access_function_engineer (ws)
+  - DATA (ws) -> DATA(ac)
+
+after
+access_function_engineer (ws)
+  - DATA-tmp(ws) created and added
+  - DATA (ws) - removed
+  - DATA (ac) - pushed to ws and added
+  - DATA-tmp(ws) removed
+
+after TF change later
+access_function_engineer-ac (ac) - create new parent group done on Grammarly Side
+  - DATA (ac) - added
+
+
+Ideal world
+before
+DATA (ws) - holding all the permisssions
+DATA (ac)
+
+after option 1 (add feature to rename groups)
+DATA (ws) -> DATA-qa (ws)  - holding all the permisssions
+make DATA (ac) a child of DATA-qa(ws)
+
+after option 2 (add feature to migrate groups to ac)
+DATA (ws) -> replaced by DATA (ac) with all the permissions from specific ws
+
+if we create access_function_engineer (ac) - conflict with prod access_function_engineer (ws)
+
+
+
+workspace-prod
+- access_function_engineer (ac) - entitlement - create_cluster 
+  - DATA (ac)
+
+
+workspace-preprod
+- access_function_engineer (ac) - entitlement - create_instance_pool 
+  - DATA (ac)
+
+
+workspace-qa
+
+
+'''
+
+# gm.allWsLocalGroups['access_function_analyst']
 
 # COMMAND ----------
 
@@ -150,7 +259,37 @@ gm.dryRun("Workspace")
 
 # COMMAND ----------
 
-gm.createBackupGroup()
+## TODO: if fail to create temp - auto delete and retry
+gm.createBackupGroupApplyPerm()
+
+# COMMAND ----------
+
+# # "dashboards"
+
+# level = "Workspace"
+# applyPermList = []
+# for object_id,aclList in gm.dashboardPerm.items():
+#   dataAcl=[]
+#   for acl in aclList:
+#     key = acl[0]
+#     if key == 'group_name':
+#       gName = acl[1]
+#       permission_level = acl[2]
+#     elif key == 'user_name':
+#       gName = acl[1]
+#       permission_level = acl[2]
+#     elif key == 'service_principal_name':
+#       gName = acl[1]
+#       permission_level = acl[2]
+  
+#     if gName in gm.groupL:
+#       dataAcl.insert(0,{key: "db-temp-"+gName, 'permission_level': permission_level})
+    
+#     dataAcl.insert(0,{key: gName, 'permission_level': permission_level})          
+
+#   if any([str(dataAcl).count(group) > 0 for group in gm.groupL]):
+#     data={"access_control_list":dataAcl}
+#   print(data)
 
 # COMMAND ----------
 
@@ -175,7 +314,8 @@ gm.dryRun("Account")
 
 # COMMAND ----------
 
-gm.deleteWorkspaceLocalGroups()
+# gm.deleteWorkspaceLocalGroups() # debug why it try to delete Admin group
+gm.bulkTryDelete(subGroupL)
 
 # COMMAND ----------
 
@@ -189,7 +329,21 @@ gm.deleteWorkspaceLocalGroups()
 
 # COMMAND ----------
 
+# MAGIC %reload_ext autoreload
+
+# COMMAND ----------
+
+gm.groupL = subGroupL
+
+# COMMAND ----------
+
+## Don't add tmpgroups arbitrarily to access function engineer.
+## Check that we are only added subgroupL and not groupL
 gm.createAccountGroup()
+
+# COMMAND ----------
+
+# gm.applyGroupPermission("Account")
 
 # COMMAND ----------
 

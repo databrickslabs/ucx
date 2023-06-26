@@ -2,7 +2,7 @@ from os import getgrouplist, remove
 import requests
 import json, math
 from pyspark.sql.functions import lit,col,column, collect_set, array_contains
-from pyspark.sql.types import StructField, StructType, StringType, MapType
+from pyspark.sql.types import StructField, StructType, StringType, MapType, IntegerType, BooleanType, ArrayType
 from functools import reduce
 from pyspark.sql import DataFrame, session
 import pyspark.sql.functions as F
@@ -10,6 +10,24 @@ import concurrent.futures
 import time
 import pandas as pd
 from delta.tables import *
+from tqdm import tqdm
+import requests
+import json
+# from base64 import b64encode
+import base64
+from requests.auth import HTTPBasicAuth
+import pandas as pd
+from pandas.io.json import json_normalize
+
+### This does not support preview API calls which needs to go back to regular post/get calls with the package requests as seen above
+from databricks_cli.sdk.api_client import *
+from databricks_cli.sdk import JobsService, ClusterService, GroupsService, WorkspaceService, DbfsService, ManagedLibraryService, InstancePoolService
+from databricks_cli.workspace.api import WorkspaceApi
+from databricks_cli.secrets.api import SecretApi
+from databricks_cli.dbfs.api import DbfsApi
+from databricks_cli.dbfs.dbfs_path import DbfsPath
+
+
 
 def loadCache(filename):
   try:
@@ -57,7 +75,7 @@ def fixListv2(perm):
 class GroupMigration:
 
     def __init__(self, groupL : list, cloud : str, inventoryTableName : str, workspace_url : str, pat : str, spark : session.SparkSession, userName : str, checkTableACL : False,
-                 numThreads : int = 32, autoGenerateList : bool = False, verbose : bool = False):
+                 numThreads : int = 32, autoGenerateList : bool = False, verbose : bool = False, loadDeltaCache: bool = True):
         self.groupL=groupL
         self.cloud=cloud
         self.workspace_url = workspace_url.rstrip("/")
@@ -109,37 +127,47 @@ class GroupMigration:
 
         self.lastInventoryRun = None
         self.checkAllDB = False
-        
+
+        # Create API, Job, Workspace, and DBFS Client
+        self.client = ApiClient(token = self.token,
+                          host = self.workspace_url)
+        self.jobsService = JobsService(self.client)
+        self.workspaceApi = WorkspaceApi(self.client)
+        self.dbfsApi = DbfsApi(self.client)
+        self.clusterService = ClusterService(self.client)
+        self.groupsService = GroupsService(self.client)
+
         print(DeltaTable.isDeltaTable(spark, identifier = self.spark.conf.get("spark.sql.warehouse.dir") + "/" +self.inventoryTableName.lower()))
-        if DeltaTable.isDeltaTable(spark, identifier = self.spark.conf.get("spark.sql.warehouse.dir") + "/" + self.inventoryTableName.lower()):
-          print(f'Loading cache from table {self.inventoryTableName}')
-          inventory = self.spark.table(self.inventoryTableName)
-          self.folderPerm = fixList(inventory.filter(inventory.WorkspaceObject == "Folder").toPandas()['Permission'][0])
-          self.notebookPerm = fixList(inventory.filter(inventory.WorkspaceObject == "Notebook").toPandas()['Permission'][0])
-          self.filePerm = fixList(inventory.filter(inventory.WorkspaceObject == "File").toPandas()['Permission'][0])
-          self.repoPerm = fixList(inventory.filter(inventory.WorkspaceObject == "Repo").toPandas()['Permission'][0])
-          self.passwordPerm = fixList(inventory.filter(inventory.WorkspaceObject == "Password").toPandas()['Permission'][0])
-          self.jobPerm = fixList(inventory.filter(inventory.WorkspaceObject == "Job").toPandas()['Permission'][0])
-          self.queryPerm = fixList(inventory.filter(inventory.WorkspaceObject == "Query").toPandas()['Permission'][0])
-          self.warehousePerm = fixList(inventory.filter(inventory.WorkspaceObject == "Warehouse").toPandas()['Permission'][0])
-          self.alertPerm = fixList(inventory.filter(inventory.WorkspaceObject == "Alert").toPandas()['Permission'][0])
-          self.clusterPerm = fixList(inventory.filter(inventory.WorkspaceObject == "Cluster").toPandas()['Permission'][0])
-          self.dashboardPerm = fixList(inventory.filter(inventory.WorkspaceObject == "Dashboard").toPandas()['Permission'][0])
-          self.clusterPolicyPerm = fixList(inventory.filter(inventory.WorkspaceObject == "ClusterPolicy").toPandas()['Permission'][0])
-          self.dltPerm = fixList(inventory.filter(inventory.WorkspaceObject == "DLT").toPandas()['Permission'][0])
-          self.modelPerm = fixList(inventory.filter(inventory.WorkspaceObject == "Model").toPandas()['Permission'][0])
-          self.instancePoolPerm = fixList(inventory.filter(inventory.WorkspaceObject == "Pool").toPandas()['Permission'][0])
-          self.tokenPerm = fixList(inventory.filter(inventory.WorkspaceObject == "Token").toPandas()['Permission'][0])
-          self.secretScopePerm = fixList(inventory.filter(inventory.WorkspaceObject == "Secret").toPandas()['Permission'][0])
-          self.expPerm = fixList(inventory.filter(inventory.WorkspaceObject == "Experiment").toPandas()['Permission'][0])
+        if loadDeltaCache:
+          if DeltaTable.isDeltaTable(spark, identifier = self.spark.conf.get("spark.sql.warehouse.dir") + "/" + self.inventoryTableName.lower()):
+            print(f'Loading cache from table {self.inventoryTableName}')
+            inventory = self.spark.table(self.inventoryTableName)
+            self.folderPerm = fixList(inventory.filter(inventory.WorkspaceObject == "Folder").toPandas()['Permission'][0])
+            self.notebookPerm = fixList(inventory.filter(inventory.WorkspaceObject == "Notebook").toPandas()['Permission'][0])
+            self.filePerm = fixList(inventory.filter(inventory.WorkspaceObject == "File").toPandas()['Permission'][0])
+            self.repoPerm = fixList(inventory.filter(inventory.WorkspaceObject == "Repo").toPandas()['Permission'][0])
+            self.passwordPerm = fixList(inventory.filter(inventory.WorkspaceObject == "Password").toPandas()['Permission'][0])
+            self.jobPerm = fixList(inventory.filter(inventory.WorkspaceObject == "Job").toPandas()['Permission'][0])
+            self.queryPerm = fixList(inventory.filter(inventory.WorkspaceObject == "Query").toPandas()['Permission'][0])
+            self.warehousePerm = fixList(inventory.filter(inventory.WorkspaceObject == "Warehouse").toPandas()['Permission'][0])
+            self.alertPerm = fixList(inventory.filter(inventory.WorkspaceObject == "Alert").toPandas()['Permission'][0])
+            self.clusterPerm = fixList(inventory.filter(inventory.WorkspaceObject == "Cluster").toPandas()['Permission'][0])
+            self.dashboardPerm = fixList(inventory.filter(inventory.WorkspaceObject == "Dashboard").toPandas()['Permission'][0])
+            self.clusterPolicyPerm = fixList(inventory.filter(inventory.WorkspaceObject == "ClusterPolicy").toPandas()['Permission'][0])
+            self.dltPerm = fixList(inventory.filter(inventory.WorkspaceObject == "DLT").toPandas()['Permission'][0])
+            self.modelPerm = fixList(inventory.filter(inventory.WorkspaceObject == "Model").toPandas()['Permission'][0])
+            self.instancePoolPerm = fixList(inventory.filter(inventory.WorkspaceObject == "Pool").toPandas()['Permission'][0])
+            self.tokenPerm = fixList(inventory.filter(inventory.WorkspaceObject == "Token").toPandas()['Permission'][0])
+            self.secretScopePerm = fixList(inventory.filter(inventory.WorkspaceObject == "Secret").toPandas()['Permission'][0])
+            self.expPerm = fixList(inventory.filter(inventory.WorkspaceObject == "Experiment").toPandas()['Permission'][0])
 
-          self.groupIdDict = inventory.filter(inventory.WorkspaceObject == "GroupListDict").toPandas()['Permission'][0]
-          self.groupMembers = fixList(inventory.filter(inventory.WorkspaceObject == "GroupMembers").toPandas()['Permission'][0])
-          self.groupEntitlements = fixListv2(inventory.filter(inventory.WorkspaceObject == "GroupEntitlements").toPandas()['Permission'][0])
-          self.groupRoles = fixListv2(inventory.filter(inventory.WorkspaceObject == "GroupRoles").toPandas()['Permission'][0])
+            self.groupIdDict = inventory.filter(inventory.WorkspaceObject == "GroupListDict").toPandas()['Permission'][0]
+            self.groupMembers = fixList(inventory.filter(inventory.WorkspaceObject == "GroupMembers").toPandas()['Permission'][0])
+            self.groupEntitlements = fixListv2(inventory.filter(inventory.WorkspaceObject == "GroupEntitlements").toPandas()['Permission'][0])
+            self.groupRoles = fixListv2(inventory.filter(inventory.WorkspaceObject == "GroupRoles").toPandas()['Permission'][0])
 
-          for k,v in self.groupIdDict.items():
-              self.groupNameDict[v]=k
+            for k,v in self.groupIdDict.items():
+                self.groupNameDict[v]=k
         # print(f'Clearing inventory table {self.inventoryTableName}')
         # spark.sql(f"drop table if exists {self.inventoryTableName}")
         # spark.sql(f"drop table if exists {self.inventoryTableName+'TableACL'}")
@@ -252,66 +280,13 @@ class GroupMigration:
 
     def getGroupObjects(self, groupFilterKeeplist)->list:
         try:
-            groupIdDict={}
-            groupMembers={}
-            groupEntitlements={}
-            groupRoles={}
-            res=requests.get(f"{self.workspace_url}/api/2.0/preview/scim/v2/Groups?attributes=id", headers=self.headers)
-            resJson=res.json()
-            totalGroups=resJson['totalResults']
-            pages=totalGroups//100
-            #normalize case
-            groupFilterKeeplist = [x.casefold() for x in groupFilterKeeplist]
-            print(f"Total groups: {totalGroups}. Retrieving group details in chunks of 100")
-            for i in range(0,pages+1):
-              print(f"Retrieving the next 100 items from {str(i*100+1)}")
+            self.groupIdDict = {y['id']:x for x,y in self.allWsLocalGroups.items() if x in groupFilterKeeplist}
+            self.groupNameDict = {x:y['id'] for x,y in self.allWsLocalGroups.items() if x in groupFilterKeeplist}
+            self.groupMembers = {y['id']:y['members_full']  for x,y in self.allWsLocalGroups.items() if x in groupFilterKeeplist}
+            self.groupEntitlements =  {y['id']:y['entitlements']  for x,y in self.allWsLocalGroups.items() if x in groupFilterKeeplist}
+            self.groupRoles = {y['id']:y['roles']  for x,y in self.allWsLocalGroups.items() if x in groupFilterKeeplist}
 
-              res=requests.get(f"{self.workspace_url}/api/2.0/preview/scim/v2/Groups?startIndex={str(i*100+1)}&count=100", headers=self.headers)
-              resJson=res.json()
-              #Iterate over workspace groups, extracting useful info to vars above
-              for e in resJson['Resources']:
-                  if not e['displayName'].casefold() in groupFilterKeeplist:
-                      continue
-
-                  groupIdDict[e['id']]=e['displayName']
-
-                  #Get Group Members
-                  members=[]
-                  try:
-                      for mem in e['members']:
-                          members.append(list([mem['display'],mem['value'],mem['$ref']]))
-                  except KeyError:
-                      pass
-                  groupMembers[e['id']]=members
-
-                  #Get entitlements
-                  entms=[]
-                  try:
-                      for ent in e['entitlements']:
-                          entms.append(ent['value'])
-                  except:
-                      pass
-
-                  groupEntitlements[e['id']]=entms
-
-                  #Get Roles (AWS only)
-                  if self.cloud=='AWS':
-                      entms=[]
-                      try:
-                          for ent in e['roles']:
-                              entms.append(ent['value'])
-                      except:
-                          continue
-                      if len(entms)==0:
-                          continue
-                      groupRoles[e['id']]=entms
-
-              #Finally assign to self (Now that exception hasn't been thrown)
-            self.groupIdDict = groupIdDict
-            self.groupMembers = groupMembers
-            self.groupEntitlements = groupEntitlements
-            self.groupRoles = groupRoles
-            #Create reverse of groupIdDict
+            #Finally assign to self (Now that exception hasn't been thrown)
             self.groupNameDict = {}
             for k,v in self.groupIdDict.items():
                 self.groupNameDict[v]=k
@@ -526,7 +501,7 @@ class GroupMigration:
                         try:
                             result = future.result()
                             if len(result) > 0:
-                                dashboardPerm[dashboard_id] = result
+                              dashboardPerm[dashboard_id] = result
                         except Exception as e:
                             print(f'Error in retrieving dashboard permission for dashboard {dashboard_id}: {e}')
             return dashboardPerm
@@ -554,14 +529,24 @@ class GroupMigration:
                 resDPermJson = resDPerm.json()
                 aclList = resDPermJson['access_control_list']
                 dashboard_acl = []
-                if len(aclList) > 0:
-                    for acl in aclList:
-                        try:
-                            if acl['group_name'] in self.groupL:
-                                dashboard_acl = aclList
-                                break
-                        except KeyError:
-                            continue
+                # if len(aclList) > 0:
+                #   for acl in aclList:
+                #     try:
+                #       dashboard_acl = aclList
+                #       break
+                #     except KeyError:
+                #       continue
+                for acl in aclList:
+                  key = 'group_name'
+                  gname = acl.get(key)
+                  if gname is None:
+                    key = 'user_name'
+                    gname = acl.get(key)
+                  if gname is None:
+                    key = 'service_principal_name'
+                    gname = acl.get(key)
+                  perm = acl.get('permission_level')
+                  dashboard_acl.append([key, gname, perm])
                 return dashboard_acl
             except KeyError:
                 retry_count += 1
@@ -1150,63 +1135,107 @@ class GroupMigration:
 
     def updateGroupEntitlements(self, groupEntitlements:dict, level:str):
         try:
-            for group_id, etl in groupEntitlements.items():
-                entitlementList=[]
-                if level=="Workspace":
-                  groupId=self.groupWSGNameDict["db-temp-"+self.groupIdDict[group_id]]
-                else:  #Account, aka temp group, must discard db-temp- (8 chars)
-                  groupId=self.accountGroups_lower[self.groupIdDict[group_id][8:].casefold()]
-                #print(groupId)
-                for e in etl:
-                    entitlementList.append({"value":e})
-                entitlements = {
-                                "schemas": ["urn:ietf:params:scim:api:messages:2.0:PatchOp"],
-                                "Operations": [{"op": "add",
-                                            "path": "entitlements",
-                                            "value": entitlementList}]
-                            }
-                resPatch=requests.patch(f'{self.workspace_url}/api/2.0/preview/scim/v2/Groups/{groupId}', headers=self.headers, data=json.dumps(entitlements))
-        except Exception as e:
-            print(f'error applying entitiement for group id: {group_id}.')
+          groupids = [self.groupNameDict[groupname] for groupname in self.groupL ]
+          groupEntitlements = {gid:groupEntitlements[gid] for gid in groupids }
 
-    def updateGroupRoles(self, level:str):
-        try:
-            for group_id, roles in self.groupRoles.items():
-                roleList=[]
-                if level=="Workspace":
-                  groupId=self.groupWSGNameDict["db-temp-"+self.groupIdDict[group_id]]
-                else:  #Account, aka temp group, must discard db-temp- (8 chars)
-                  groupId=self.accountGroups_lower[self.groupIdDict[group_id][8:].casefold()]
-                for e in roles:
-                    roleList.append({"value":e})
-                instanceProfileRoles = {
-                                "schemas": ["urn:ietf:params:scim:api:messages:2.0:PatchOp"],
-                                "Operations": [{"op": "add",
-                                            "path": "roles",
-                                            "value": roleList}]
-                            }
-                resPatch=requests.patch(f'{self.workspace_url}/api/2.0/preview/scim/v2/Groups/{groupId}', headers=self.headers, data=json.dumps(instanceProfileRoles))
+          for group_id, etl in groupEntitlements.items():
+            entitlementList=[]
+            if level=="Workspace":
+              groupId=self.groupWSGNameDict["db-temp-"+self.groupIdDict[group_id]]
+            else:  #Account, aka temp group, must discard db-temp- (8 chars)
+              # groupId=self.accountGroups_lower[self.groupIdDict[group_id][8:].casefold()]
+              groupId=self.accountGroups_lower[self.groupIdDict[group_id].casefold()]
+            for e in etl:
+              entitlementList.append({"value":e})
+            entitlements = {
+                            "schemas": ["urn:ietf:params:scim:api:messages:2.0:PatchOp"],
+                            "Operations": [{"op": "add",
+                                        "path": "entitlements",
+                                        "value": entitlementList}]
+                        }
+            resPatch=requests.patch(f'{self.workspace_url}/api/2.0/preview/scim/v2/Groups/{groupId}', headers=self.headers, data=json.dumps(entitlements))
         except Exception as e:
-            print(f'error applying role for group id: {group_id}.')
+            print(f'error applying entitlement for group id: {group_id}.')
+
+    # def updateGroupRoles(self, level:str):
+    #     try:
+    #         for group_id, roles in self.groupRoles.items():
+    #             roleList=[]
+    #             if level=="Workspace":
+    #               groupId=self.groupWSGNameDict["db-temp-"+self.groupIdDict[group_id]]
+    #             else:  #Account, aka temp group, must discard db-temp- (8 chars)
+    #               groupId=self.accountGroups_lower[self.groupIdDict[group_id][8:].casefold()]
+    #             for e in roles:
+    #                 roleList.append({"value":e})
+    #             instanceProfileRoles = {
+    #                             "schemas": ["urn:ietf:params:scim:api:messages:2.0:PatchOp"],
+    #                             "Operations": [{"op": "add",
+    #                                         "path": "roles",
+    #                                         "value": roleList}]
+    #                         }
+    #             resPatch=requests.patch(f'{self.workspace_url}/api/2.0/preview/scim/v2/Groups/{groupId}', headers=self.headers, data=json.dumps(instanceProfileRoles))
+    #     except Exception as e:
+    #         print(f'error applying role for group id: {group_id}.')
+    def updateGroupRoles(self, level:str):
+      try:
+        if level == "Workspace":
+          for gName in self.groupL:
+            groupIdOrig = self.groupNameDict[gName]
+            groupIdMigr = self.groupWSGNameDict["db-temp-"+gName]
+
+            roleList=[]
+            for e in self.groupRoles[groupIdOrig]:
+              roleList.append({"value":e})
+            instanceProfileRoles = {
+                        "schemas": ["urn:ietf:params:scim:api:messages:2.0:PatchOp"],
+                        "Operations": [{"op": "add",
+                                    "path": "roles",
+                                    "value": roleList}]
+                        }
+            resPatch=requests.patch(f'{self.workspace_url}/api/2.0/preview/scim/v2/Groups/{groupIdMigr}', headers=self.headers, data=json.dumps(instanceProfileRoles))
+        else:  #Account, aka temp group, must discard db-temp- (8 chars)
+          for gName in self.groupL:
+            groupIdOrig = self.groupNameDict[gName]
+            groupIdTemp = self.groupWSGNameDict["db-temp-"+gName]
+            groupIdAcc = self.accountGroups_lower[gName.casefold()]
+
+            roleList=[]
+            for e in self.groupRoles[groupIdOrig]:
+              roleList.append({"value":e})
+
+            instanceProfileRoles = {
+                        "schemas": ["urn:ietf:params:scim:api:messages:2.0:PatchOp"],
+                        "Operations": [{"op": "add",
+                                    "path": "roles",
+                                    "value": roleList}]
+                        }
+            resPatch=requests.patch(f'{self.workspace_url}/api/2.0/preview/scim/v2/Groups/{groupIdAcc}', headers=self.headers, data=json.dumps(instanceProfileRoles))
+      except Exception as e:
+        print(f'error applying role for group name: {gName}.')
 
     def updateGroupPermission(self, object:str, groupPermission : dict, level:str):
         try:
           suffix=""
-          for object_id,aclList in groupPermission.items():
-              dataAcl=[]
-              for  acl in aclList:
-                  if level=="Workspace":
-                    gName="db-temp-"+acl[0]
-                  elif level=="Account":
-                    gName=acl[0][8:]
-                  dataAcl.append({"group_name":gName,"permission_level":acl[1]})
-              data={"access_control_list":dataAcl}
-              resAppPerm=requests.patch(f"{self.workspace_url}/api/2.0/preview/permissions/{object}/{object_id}", headers=self.headers, data=json.dumps(data))
+          if len(groupPermission.items()) > 0:
+            for object_id,aclList in tqdm(groupPermission.items()):
+                dataAcl=[]
+                for  acl in aclList:
+                  if acl[0] in self.groupL:
+                    if level=="Workspace":
+                      gName="db-temp-"+acl[0]
+                    elif level=="Account":
+                      gName=acl[0][8:]
+                    dataAcl.append({"group_name":gName,"permission_level":acl[1]})
+                if len(dataAcl) > 0 :
+                  data={"access_control_list":dataAcl}
+                  resAppPerm=requests.patch(f"{self.workspace_url}/api/2.0/preview/permissions/{object}/{object_id}", headers=self.headers, data=json.dumps(data))
+                else:
+                  continue
         except Exception as e:
             print(f'Error setting permission for {object} {object_id}. {e} ')
     def updateGroup2Permission(self, object:str, groupPermission : dict, level:str):
         try:
-          for object_id,aclList in groupPermission.items():
+          for object_id,aclList in tqdm(groupPermission.items()):
               addUser=True
               dataAcl=[]
               for acl in aclList:
@@ -1231,6 +1260,35 @@ class GroupMigration:
               resAppPerm=requests.post(f"{self.workspace_url}/api/2.0/preview/sql/permissions/{object}/{object_id}", headers=self.headers, data=json.dumps(data))
         except Exception as e:
             print(f'Error setting permission for {object} {object_id}. {e} ')
+    
+    def updateGroup3Permission(self, object:str, groupPermission : dict, level:str):
+      try:
+        for object_id,aclList in tqdm(groupPermission.items()):
+          addUser=True
+          dataAcl=[]
+          for acl in aclList:
+            key = acl[0]
+            if key == 'group_name':
+              gName = acl[1]
+              permission_level = acl[2]
+            elif key == 'user_name':
+              gName = acl[1]
+              permission_level = acl[2]
+            elif key == 'service_principal_name':
+              gName = acl[1]
+              permission_level = acl[2]
+    
+            if gName in self.groupL:
+              dataAcl.insert(0,{key: "db-temp-"+gName, 'permission_level': permission_level})
+
+            dataAcl.insert(0,{key: gName, 'permission_level': permission_level})
+            
+            if any([str(dataAcl).count(group) > 0 for group in self.groupL]):
+              data={"access_control_list":dataAcl}
+              resAppPerm=requests.post(f"{self.workspace_url}/api/2.0/preview/sql/permissions/dashboards/{object_id}", headers=self.headers, data=json.dumps(data))
+      except Exception as e:
+        print(f'Error setting permission for {object} {object_id}. {e} ')
+
     def updateSecretPermission(self, secretPermission : dict, level:str):
         try:
             suffix=""
@@ -1693,7 +1751,7 @@ class GroupMigration:
         print('applying secret scope permissions')
         self.updateSecretPermission(self.secretScopePerm,level)
         print('applying dashboard permissions')
-        self.updateGroup2Permission('dashboards',self.dashboardPerm,level)
+        self.updateGroup3Permission('dashboards',self.dashboardPerm,level)
         print('applying query permissions')
         self.updateGroup2Permission('queries',self.queryPerm,level)
         print('applying alerts permissions')
@@ -1814,57 +1872,53 @@ class GroupMigration:
       except Exception as e:
         print(f"Error deleting temp groups : {e}")
 
-    def createBackupGroup(self):
+    def createBackupGroup(self, groupName):
       try:
-        if self.validateWSGroup()==0: return
-        self.performInventory('Workspace')
-        # self.printInventory()
-
-        for g in self.groupL:
-          memberList=[]
-          if self.groupNameDict[g] in self.groupMembers:
-            for mem in self.groupMembers[self.groupNameDict[g]]:
-              memberList.append({"value":mem[1]})
+        memberList = []
+        if groupName in self.groupNameDict:
+          for mem in self.groupMembers[ self.groupNameDict[groupName] ]:
+            memberList.append({"value":mem[1]})
+          
+          print(f'Attempting to create group with name "db-temp-"{groupName} with {len(memberList)} members.')
           data={
                   "schemas": [ "urn:ietf:params:scim:schemas:core:2.0:Group" ],
-                  "displayName": "db-temp-"+g,
+                  "displayName": "db-temp-"+groupName,
                   "members": memberList
               }
+          
           res=requests.post(f"{self.workspace_url}/api/2.0/preview/scim/v2/Groups", headers=self.headers, data=json.dumps(data))
-          if res.status_code == 409:
-            print(f'group with name "db-temp-"{g} already present, please delete and try again.')
-            continue
-          self.groupWSGIdDict[res.json()["id"]]="db-temp-"+g
-          self.groupWSGNameDict["db-temp-"+g]=res.json()["id"]
-        self.applyGroupPermission("Workspace")
-        self.persistInventory("Workspace")
+          return(res)
+        else:
+          print(f'Group {groupName} does not exist in saved groupNameDict.' )
       except Exception as e:
         print(f" Error creating backup groups , {e}")
 
-    def createBackupGroupTemp(self):
+    def findParentGroup(self, gName:str):
+      parentGroups = []
+      for x,y in self.allWsLocalGroups.items():
+        if gName in y['members']:
+          parentGroups.append(x)
+      return(parentGroups)
+    
+    def createBackupGroupApplyPerm(self):
       try:
-        # if self.validateWSGroup()==0: return
-        # self.performInventory('Workspace')
-        # self.printInventory()
-
         for g in self.groupL:
-          memberList=[]
-          if self.groupNameDict[g] in self.groupMembers:
-            for mem in self.groupMembers[self.groupNameDict[g]]:
-              memberList.append({"value":mem[1]})
-          data={
-                  "schemas": [ "urn:ietf:params:scim:schemas:core:2.0:Group" ],
-                  "displayName": "db-temp-"+g,
-                  "members": memberList
-              }
-          res=requests.post(f"{self.workspace_url}/api/2.0/preview/scim/v2/Groups", headers=self.headers, data=json.dumps(data))
+          res = self.createBackupGroup(g)
           if res.status_code == 409:
-            print(f'group with name "db-temp-"{g} already present, please delete and try again.')
-            continue
+            print(f'group with name "db-temp-"{g} already present, deleting "db-temp-"{g} and trying again.')
+            # self.bulkTryDelete(deleteList = ["db-temp-"+g])
+            # res = self.createBackupGroup(g)
+
           self.groupWSGIdDict[res.json()["id"]]="db-temp-"+g
           self.groupWSGNameDict["db-temp-"+g]=res.json()["id"]
+
+          # Add temp group back under parent group
+          parentGroups = self.findParentGroup(g)
+          for name in parentGroups:
+            print(f"Adding db-temp-{g} to {name}...")
+            self.groupsService.add_to_group(parent_name=name, group_name="db-temp-"+g)
+
         self.applyGroupPermission("Workspace")
-        # self.persistInventory("Workspace")
       except Exception as e:
         print(f" Error creating backup groups , {e}")
 
@@ -1885,15 +1939,24 @@ class GroupMigration:
 
     def createAccountGroup(self):
       try:
-        if self.validateAccountGroup()==1: return
-        if self.validateTempWSGroup()==0: return
-        self.performInventory('Account')
+        # if self.validateAccountGroup()==1: return
+        # if self.validateTempWSGroup()==0: return
+        # self.performInventory('Account')
         # self.printInventory()
         data={
                   "permissions": ["USER"]
               }
-        for g in self.WorkspaceGroupNames:
-          res=requests.put(f"{self.workspace_url}/api/2.0/preview/permissionassignments/principals/{self.accountGroups_lower[g.casefold()]}", headers=self.headers, data=json.dumps(data))
+        # for g in self.WorkspaceGroupNames:
+        #   res=requests.put(f"{self.workspace_url}/api/2.0/preview/permissionassignments/principals/{self.accountGroups_lower[g.casefold()]}", headers=self.headers, data=json.dumps(data))
+
+        for g in self.groupL:
+          ### Fix id for access function id vs parent group id
+          res=requests.put(f"{self.workspace_url}/api/2.0/preview/permissionassignments/principals/972194935311560", headers=self.headers, data=json.dumps(data))
+          parentGroups = self.findParentGroup(g)
+          for name in parentGroups:
+            print(f"Adding db-temp-{g} to {name}...")
+            self.groupsService.add_to_group(parent_name=name, group_name=g)
+
         self.applyGroupPermission("Account")
         self.persistInventory("Account")
 
@@ -1915,15 +1978,15 @@ class GroupMigration:
 
     def listRoles(self, json):
         if 'roles' in json:
-            return( {m['value'] for m in json['roles']} )
+            return( [m['value'] for m in json['roles']] )
         else:
-            return({})
+            return([])
 
     def listEntitlements(self, json):
         if 'entitlements' in json:
-            return( {m['value'] for m in json['entitlements']} )
+            return( [m['value'] for m in json['entitlements']] )
         else:
-            return({})
+            return([])
 
     def listWorkspaceGroups(self, force=False):
         print('listWorkspaceGroups start')
@@ -1931,6 +1994,8 @@ class GroupMigration:
         self.save_cache(self.cache, self.cache_file)
         
         allWsLocalGroups = {o["displayName"]:{"id": o["id"], "members": self.listMembers( o, full=False),  "members_full": self.listMembers(o, full=True), "roles": self.listRoles(o), "entitlements": self.listEntitlements(o) } for o in resJson["Resources"] if o['meta']['resourceType'] == "WorkspaceGroup" and o['displayName'] }
+
+        self.allWsLocalGroups = allWsLocalGroups
         return(allWsLocalGroups)
 
     def listAccountGroups(self, force=False):
@@ -1939,6 +2004,8 @@ class GroupMigration:
         self.save_cache(self.cache, self.cache_file)
 
         allAccountGroups_lower = {o['displayName'] : {"id": o["id"], "members": self.listMembers(o, full=False), "members_full": self.listMembers(o,full=True), "roles": self.listRoles(o), "entitlements": self.listEntitlements(o)  } for o in resJson['Resources'] if o['displayName'] }
+
+        self.allAccountGroups_lower = allAccountGroups_lower
         return(allAccountGroups_lower)
 
     def getWorkspaceGroup(self, id: str):
@@ -1947,9 +2014,19 @@ class GroupMigration:
         return(resJson)
     
     def groupSizeCheck(self):
-      self.allWsLocalGroups = self.listWorkspaceGroups()
-      self.allAccountGroups_lower = self.listAccountGroups()
+      self.listWorkspaceGroups()
+      self.listAccountGroups()
 
+      schema = StructType([       \
+          StructField('ws_group', StringType(), True), \
+          StructField('ws_group_size', IntegerType(), True), \
+          StructField('account_group_found', BooleanType(), True), \
+          StructField('account_group_size', IntegerType(), True), \
+          StructField('size_equal', BooleanType(), True), \
+          StructField('ws_group_members', ArrayType(StringType()), True), \
+          StructField('ac_group_members', ArrayType(StringType()), True), \
+          StructField('ws_group_missing', ArrayType(StringType()), True), \
+          StructField('ac_group_missing', ArrayType(StringType()), True)])    
 
       groupsTable = pd.DataFrame(columns = ['ws_group', 'ws_group_size', 'account_group_found', 'account_group_size', 'size_equal', 'ws_group_members', 'ac_group_members'])
 
@@ -1957,11 +2034,12 @@ class GroupMigration:
           ag = self.allAccountGroups_lower.get(name, {})
           agm = ag.get('members', set())
           wgm = wg.get('members', set())
-          insert_row = {'ws_group': name, 'ws_group_size': len(wgm), 'account_group_found': ag!={}, 'account_group_size' : len(agm), 'size_equal' : len(agm)==len(wgm), 'ws_group_members': wgm , 'ac_group_members': agm , 'ws_group_missing' : set(agm).difference(set(wgm)), 'ac_group_missing': set(wgm).difference(set(agm))}
+          insert_row = {'ws_group': name, 'ws_group_size': len(wgm), 'account_group_found': ag!={}, 'account_group_size' : len(agm), 'size_equal' : len(agm)==len(wgm), 'ws_group_members': list(wgm) , 'ac_group_members': list(agm) , 'ws_group_missing' : list( set(agm).difference(set(wgm))), 'ac_group_missing': list(set(wgm).difference(set(agm))) }
           groupsTable = pd.concat([groupsTable, pd.DataFrame([insert_row])])
       
-      self.groupsTable = groupsTable
-      return(groupsTable)
+      self.groupsTable = self.spark.createDataFrame(data = groupsTable, schema = schema)
+
+      return(self.groupsTable)
 
     def groupMembersCheck(self, groupName: str):
       groupsTable = self.groupsTable
@@ -1984,6 +2062,6 @@ class GroupMigration:
         res["GroupName"] = group
         migrationLoadPerGroup = pd.concat([migrationLoadPerGroup, pd.DataFrame([res])])
 
-      self.migrationLoadPerGroup = migrationLoadPerGroup.sort_values("TotalObjects", ascending=False)
+      self.migrationLoadPerGroup = self.spark.createDataFrame(migrationLoadPerGroup.sort_values("TotalObjects", ascending=False))
       
       return(self.migrationLoadPerGroup)
