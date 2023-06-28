@@ -309,12 +309,12 @@ files = [
 
 [[package]]
 name = "pyspark"
-version = "3.4.0"
+version = "3.4.1"
 description = "Apache Spark Python API"
 optional = false
 python-versions = ">=3.7"
 files = [
-    {file = "pyspark-3.4.0.tar.gz", hash = "sha256:167a23e11854adb37f8602de6fcc3a4f96fd5f1e323b9bb83325f38408c5aafd"},
+    {file = "pyspark-3.4.1.tar.gz", hash = "sha256:72cd66ab8cf61a75854e5a753f75bea35ee075c3a96f9de4e2a66d02ec7fc652"},
 ]
 
 [package.dependencies]
@@ -430,4 +430,4 @@ testing = ["big-O", "flake8 (<5)", "jaraco.functools", "jaraco.itertools", "more
 [metadata]
 lock-version = "2.0"
 python-versions = "^3.9"
-content-hash = "e2224e3ae4de01f56485dc08dd359790523c81ba06dc5bb0138b6c3c9681190b"
+content-hash = "3df99ed0ba2ab0c64cd57edda8478adde6829b6e0e9bf3fc63ece29480b580aa"
