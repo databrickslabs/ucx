@@ -8,7 +8,7 @@ packages = [{ include = "uc_upgrade" }]
 
 [tool.poetry.dependencies]
 python = "^3.9"
-databricks-sdk = "^0.1.11"
+databricks-sdk = "^0.1.12"
 
 [tool.poetry.group.dev.dependencies]
 black = "^23.3.0"
