@@ -2,7 +2,7 @@ import sys
 from pathlib import Path
 from tempfile import NamedTemporaryFile
 
-from databricks.sdk.runtime import *  # noqa: F403
+#from databricks.sdk.runtime import *  # noqa: F403
 
 
 def install_uc_upgrade_package():

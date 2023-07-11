@@ -1669,7 +1669,7 @@ class GroupMigration:
           groupType="WorkspaceTemp"
         if tableACL:
           checkSQL=f"select count(*) from {self.inventoryTableName}TableACL where groupType='{groupType}' "
-          logger.info(checkSQL)
+          #logger.info(checkSQL)
         else:
           checkSQL=f"select count(*) from {self.inventoryTableName} where groupType='{groupType}' and WorkspaceObject='{objectType}'"
         if self.spark.sql(checkSQL).collect()[0][0] > 0:
@@ -1719,6 +1719,7 @@ class GroupMigration:
         if objectType=="Group" or objectType=="All":
           logger.info('performing Groups inventory')
           if force or not self.isObjectInventoryPresent(mode, 'GroupDict'):
+            logger.info('performing fresh inventory')
             self.setGroupListForMode(mode)
             self.persistInventory(mode, "GroupDict", self.groupIdDict)
             self.persistInventory(mode, "GroupMember", self.groupMembers)
@@ -1727,6 +1728,7 @@ class GroupMigration:
             self.persistInventory(mode, "GroupName", self.groupNameDict)
 
           else:
+            logger.info('retrieving inventory from table')
             self.groupIdDict = self.getObjectInventory(mode, 'GroupDict')
             self.groupMembers = self.fixList(self.getObjectInventory(mode, 'GroupMember'))
             self.groupEntitlements = self.fixListv2(self.getObjectInventory(mode, 'GroupEntitlement'))
@@ -1736,69 +1738,85 @@ class GroupMigration:
           if objectType=="Password" or objectType=="All":
             logger.info('performing password inventory')
             if force or not self.isObjectInventoryPresent(mode, 'Password'):
+              logger.info('performing fresh inventory')
               self.passwordPerm= self.getPasswordACL()
               self.persistInventory(mode, "Password", self.passwordPerm)
             else:
+              logger.info('retrieving inventory from table')
               self.passwordPerm = self.fixList(self.getObjectInventory(mode, 'Password'))
         #These are parallel
         #self.clusterPerm = self.getAllClustersACL()
         if objectType=="Cluster" or objectType=="All":
           logger.info('performing cluster inventory')
           if force or not self.isObjectInventoryPresent(mode, 'Cluster'):
+            logger.info('performing fresh inventory')
             self.clusterPerm = self.getAllClustersACL()
             self.persistInventory(mode, "Cluster", self.clusterPerm)
           else:
+            logger.info('retrieving inventory from table')
             self.clusterPerm = self.fixList(self.getObjectInventory(mode, 'Cluster'))
         
         #self.clusterPolicyPerm = self.getAllClusterPolicyACL()
         if objectType=="ClusterPolicy" or objectType=="All":
           logger.info('performing cluster policy inventory')
           if force or not self.isObjectInventoryPresent(mode, 'ClusterPolicy'):
+            logger.info('performing fresh inventory')
             self.clusterPolicyPerm = self.getAllClusterPolicyACL()
             self.persistInventory(mode, "ClusterPolicy", self.clusterPolicyPerm)
           else:
+            logger.info('retrieving inventory from table')
             self.clusterPolicyPerm = self.fixList(self.getObjectInventory(mode, 'ClusterPolicy'))
         #self.warehousePerm = self.getAllWarehouseACL()
         if objectType=="Warehouse" or objectType=="All":
           logger.info('performing warehouse inventory')
           if force or not self.isObjectInventoryPresent(mode, 'Warehouse'):
+            logger.info('performing fresh inventory')
             self.warehousePerm = self.getAllWarehouseACL()
             self.persistInventory(mode, "Warehouse", self.warehousePerm)
           else:
+            logger.info('retrieving inventory from table')
             self.warehousePerm = self.fixList(self.getObjectInventory(mode, 'Warehouse'))
         #self.dashboardPerm=self.getAllDashboardACL() # 5 mins
         if objectType=="Dashboard" or objectType=="All":
           logger.info('performing dashboards inventory')
           if force or not self.isObjectInventoryPresent(mode, 'Dashboard'):
+            logger.info('performing fresh inventory')
             self.dashboardPerm=self.getAllDashboardACL()
             self.persistInventory(mode, "Dashboard", self.dashboardPerm)
           else:
+            logger.info('retrieving inventory from table')
             self.dashboardPerm = self.fixListv3(self.getObjectInventory(mode, 'Dashboard'))
         #self.queryPerm=self.getAllQueriesACL()
         if objectType=="Query" or objectType=="All":
           logger.info('performing query inventory')
           if force or not self.isObjectInventoryPresent(mode, 'Query'):
+            logger.info('performing fresh inventory')
             self.queryPerm=self.getAllQueriesACL()
             self.persistInventory(mode, "Query", self.queryPerm)
           else:
+            logger.info('retrieving inventory from table')
             self.queryPerm = self.fixListv3(self.getObjectInventory(mode, 'Query'))
         #self.jobPerm=self.getAllJobACL() #33 mins
         if objectType=="Job" or objectType=="All":
           logger.info('performing job inventory')
           if force or not self.isObjectInventoryPresent(mode, 'Job'):
+            logger.info('performing fresh inventory')
             self.jobPerm=self.getAllJobACL()
             self.persistInventory(mode, "Job", self.jobPerm)
           else:
+            logger.info('retrieving inventory from table')
             self.jobPerm = self.fixList(self.getObjectInventory(mode, 'Job'))
         #self.folderPerm, self.notebookPerm, self.filePerm=self.getFoldersNotebookACL()
         if objectType=="Folder" or objectType=="All":
           logger.info('performing folders,notebooks, files inventory')
           if force or not self.isObjectInventoryPresent(mode, 'Folder'):
+            logger.info('performing fresh inventory')
             self.folderPerm, self.notebookPerm, self.filePerm=self.getFoldersNotebookACL()
             self.persistInventory(mode, "Folder", self.folderPerm)
             self.persistInventory(mode, "Notebook", self.notebookPerm)
             self.persistInventory(mode, "File", self.filePerm)
           else:
+            logger.info('retrieving inventory from table')
             self.folderPerm = self.fixList(self.getObjectInventory(mode, 'Folder'))
             self.notebookPerm = self.fixList(self.getObjectInventory(mode, 'Notebook'))
             self.filePerm = self.fixList(self.getObjectInventory(mode, 'File'))
@@ -1810,9 +1828,11 @@ class GroupMigration:
           if objectType=="TableACL" or objectType=="All":
             logger.info('performing Tabel ACL object inventory')
             if force or not self.isObjectInventoryPresent(mode, 'TableACL', True):
+              logger.info('performing fresh inventory')
               self.dataObjectsPerm=self.getTableACLs()
               self.persistInventory(mode, "TableACL", self.dataObjectsPerm, True)
             else:
+              logger.info('retrieving inventory from table')
               self.dataObjectsPerm = self.getObjectInventory(mode, 'TableACL', True)
 
         
@@ -1820,78 +1840,94 @@ class GroupMigration:
         if objectType=="Alert" or objectType=="All":
           logger.info('performing alerts inventory')
           if force or not self.isObjectInventoryPresent(mode, 'Alert'):
+            logger.info('performing fresh inventory')
             self.alertPerm=self.getAlertsACL()
             self.persistInventory(mode, "Alert", self.alertPerm)
           else:
+            logger.info('retrieving inventory from table')
             self.alertPerm = self.fixListv3(self.getObjectInventory(mode, 'Alert'))
         
         #self.instancePoolPerm=self.getPoolACL()
         if objectType=="Pool" or objectType=="All":
           logger.info('performing instance pools inventory')
           if force or not self.isObjectInventoryPresent(mode, 'Pool'):
+            logger.info('performing fresh inventory')
             self.instancePoolPerm=self.getPoolACL()
             self.persistInventory(mode, "Pool", self.instancePoolPerm)
           else:
+            logger.info('retrieving inventory from table')
             self.instancePoolPerm = self.fixList(self.getObjectInventory(mode, 'Pool'))
         
         #self.expPerm=self.getExperimentACL()
         if objectType=="Experiment" or objectType=="All":
           logger.info('performing experiments inventory')
           if force or not self.isObjectInventoryPresent(mode, 'Experiment'):
+            logger.info('performing fresh inventory')
             self.expPerm=self.getExperimentACL()
             self.persistInventory(mode, "Experiment", self.expPerm)
           else:
+            logger.info('retrieving inventory from table')
             self.expPerm = self.fixList(self.getObjectInventory(mode, 'Experiment'))
         
         #self.modelPerm=self.getModelACL()
         if objectType=="Model" or objectType=="All":
           logger.info('performing registered models inventory')
           if force or not self.isObjectInventoryPresent(mode, 'Model'):
+            logger.info('performing fresh inventory')
             self.modelPerm=self.getModelACL()
             self.persistInventory(mode, "Model", self.modelPerm)
           else:
+            logger.info('retrieving inventory from table')
             self.modelPerm = self.fixList(self.getObjectInventory(mode, 'Model'))
         
         #self.dltPerm=self.getDLTACL()
         if objectType=="DLT" or objectType=="All":
           logger.info('performing DLT inventory')
           if force or not self.isObjectInventoryPresent(mode, 'DLT'):
+            logger.info('performing fresh inventory')
             self.dltPerm=self.getDLTACL()
             self.persistInventory(mode, "DLT", self.dltPerm)
           else:
+            logger.info('retrieving inventory from table')
             self.dltPerm = self.fixList(self.getObjectInventory(mode, 'DLT'))
         
         #self.repoPerm=self.getRepoACL()
         if objectType=="Repo" or objectType=="All":
           logger.info('performing repos inventory')
           if force or not self.isObjectInventoryPresent(mode, 'Repo'):
+            logger.info('performing fresh inventory')
             self.repoPerm=self.getRepoACL()
             self.persistInventory(mode, "Repo", self.repoPerm)
           else:
+            logger.info('retrieving inventory from table')
             self.repoPerm = self.fixList(self.getObjectInventory(mode, 'Repo'))
         
         #self.tokenPerm=self.getTokenACL()
         if objectType=="Token" or objectType=="All":
           logger.info('performing token inventory')
           if force or not self.isObjectInventoryPresent(mode, 'Token'):
+            logger.info('performing fresh inventory')
             self.tokenPerm=self.getTokenACL()
             self.persistInventory(mode, "Token", self.tokenPerm)
           else:
+            logger.info('retrieving inventory from table')
             self.tokenPerm = self.fixList(self.getObjectInventory(mode, 'Token'))
         
         #self.secretScopePerm=self.getSecretScoppeACL()
         if objectType=="Secret" or objectType=="All":
           logger.info('performing secret scope inventory')
           if force or not self.isObjectInventoryPresent(mode, 'Secret'):
+            logger.info('performing fresh inventory')
             self.secretScopePerm=self.getSecretScoppeACL()
             self.persistInventory(mode, "Secret", self.secretScopePerm)
           else:
+            logger.info('retrieving inventory from table')
             self.secretScopePerm = self.fixList(self.getObjectInventory(mode, 'Secret'))
         
         self.lastInventoryRun = mode
       except Exception as e:
         logger.error(f" Error creating group inventory, {e}")
-    def fixList(perm):
+    def fixList(self, perm: str):
         for mem in perm:
             if perm[mem] == '[]':
               perm[mem] = []
@@ -1899,7 +1935,7 @@ class GroupMigration:
                 perm[mem] = [x.split(', ') for x in  perm[mem].replace('[[', '').replace(']]', '').split("], [") ]
         return perm
 
-    def fixListv2(perm):
+    def fixListv2(self, perm: str):
         for mem in perm:
             if perm[mem] == '[]':
                 perm[mem] = []
@@ -1907,7 +1943,7 @@ class GroupMigration:
                 perm[mem] = perm[mem].replace('[', '').replace(']', '').split(", ")
         return perm
 
-    def fixListv3(perm):    
+    def fixListv3(self, perm: str):    
         for mem in perm:
             if perm[mem] == '[]':
                 perm[mem] = []
