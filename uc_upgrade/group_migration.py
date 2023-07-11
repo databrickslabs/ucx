@@ -1866,7 +1866,6 @@ class GroupMigration:
 
             # These have yet to be parallelized:
             if self.checkTableACL == True:
-
                 # self.dataObjectsPerm=self.getTableACLs()
                 if objectType == "TableACL" or objectType == "All":
                     logger.info("performing Tabel ACL object inventory")
@@ -2098,7 +2097,6 @@ class GroupMigration:
                 logger.info(item)
 
     def dryRun(self, mode: str = "Workspace", printMembers: bool = False):
-
         self.performInventory(mode)
         self.printInventory(printMembers)
 
