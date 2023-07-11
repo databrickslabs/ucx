@@ -1728,9 +1728,9 @@ class GroupMigration:
 
           else:
             self.groupIdDict = self.getObjectInventory(mode, 'GroupDict')
-            self.groupMembers = fixList(self.getObjectInventory(mode, 'GroupMember'))
-            self.groupEntitlements = fixListv2(self.getObjectInventory(mode, 'GroupEntitlement'))
-            self.groupRoles = fixListv2(self.getObjectInventory(mode, 'GroupRole'))
+            self.groupMembers = self.fixList(self.getObjectInventory(mode, 'GroupMember'))
+            self.groupEntitlements = self.fixListv2(self.getObjectInventory(mode, 'GroupEntitlement'))
+            self.groupRoles = self.fixListv2(self.getObjectInventory(mode, 'GroupRole'))
             self.groupNameDict = self.getObjectInventory(mode, 'GroupName')
         if self.cloud=="AWS":
           if objectType=="Password" or objectType=="All":
@@ -1739,7 +1739,7 @@ class GroupMigration:
               self.passwordPerm= self.getPasswordACL()
               self.persistInventory(mode, "Password", self.passwordPerm)
             else:
-              self.passwordPerm = fixList(self.getObjectInventory(mode, 'Password'))
+              self.passwordPerm = self.fixList(self.getObjectInventory(mode, 'Password'))
         #These are parallel
         #self.clusterPerm = self.getAllClustersACL()
         if objectType=="Cluster" or objectType=="All":
@@ -1748,7 +1748,7 @@ class GroupMigration:
             self.clusterPerm = self.getAllClustersACL()
             self.persistInventory(mode, "Cluster", self.clusterPerm)
           else:
-            self.clusterPerm = fixList(self.getObjectInventory(mode, 'Cluster'))
+            self.clusterPerm = self.fixList(self.getObjectInventory(mode, 'Cluster'))
         
         #self.clusterPolicyPerm = self.getAllClusterPolicyACL()
         if objectType=="ClusterPolicy" or objectType=="All":
@@ -1757,7 +1757,7 @@ class GroupMigration:
             self.clusterPolicyPerm = self.getAllClusterPolicyACL()
             self.persistInventory(mode, "ClusterPolicy", self.clusterPolicyPerm)
           else:
-            self.clusterPolicyPerm = fixList(self.getObjectInventory(mode, 'ClusterPolicy'))
+            self.clusterPolicyPerm = self.fixList(self.getObjectInventory(mode, 'ClusterPolicy'))
         #self.warehousePerm = self.getAllWarehouseACL()
         if objectType=="Warehouse" or objectType=="All":
           logger.info('performing warehouse inventory')
@@ -1765,7 +1765,7 @@ class GroupMigration:
             self.warehousePerm = self.getAllWarehouseACL()
             self.persistInventory(mode, "Warehouse", self.warehousePerm)
           else:
-            self.warehousePerm = fixList(self.getObjectInventory(mode, 'Warehouse'))
+            self.warehousePerm = self.fixList(self.getObjectInventory(mode, 'Warehouse'))
         #self.dashboardPerm=self.getAllDashboardACL() # 5 mins
         if objectType=="Dashboard" or objectType=="All":
           logger.info('performing dashboards inventory')
@@ -1773,7 +1773,7 @@ class GroupMigration:
             self.dashboardPerm=self.getAllDashboardACL()
             self.persistInventory(mode, "Dashboard", self.dashboardPerm)
           else:
-            self.dashboardPerm = fixListv3(self.getObjectInventory(mode, 'Dashboard'))
+            self.dashboardPerm = self.fixListv3(self.getObjectInventory(mode, 'Dashboard'))
         #self.queryPerm=self.getAllQueriesACL()
         if objectType=="Query" or objectType=="All":
           logger.info('performing query inventory')
@@ -1781,7 +1781,7 @@ class GroupMigration:
             self.queryPerm=self.getAllQueriesACL()
             self.persistInventory(mode, "Query", self.queryPerm)
           else:
-            self.queryPerm = fixListv3(self.getObjectInventory(mode, 'Query'))
+            self.queryPerm = self.fixListv3(self.getObjectInventory(mode, 'Query'))
         #self.jobPerm=self.getAllJobACL() #33 mins
         if objectType=="Job" or objectType=="All":
           logger.info('performing job inventory')
@@ -1789,7 +1789,7 @@ class GroupMigration:
             self.jobPerm=self.getAllJobACL()
             self.persistInventory(mode, "Job", self.jobPerm)
           else:
-            self.jobPerm = fixList(self.getObjectInventory(mode, 'Job'))
+            self.jobPerm = self.fixList(self.getObjectInventory(mode, 'Job'))
         #self.folderPerm, self.notebookPerm, self.filePerm=self.getFoldersNotebookACL()
         if objectType=="Folder" or objectType=="All":
           logger.info('performing folders,notebooks, files inventory')
@@ -1799,9 +1799,9 @@ class GroupMigration:
             self.persistInventory(mode, "Notebook", self.notebookPerm)
             self.persistInventory(mode, "File", self.filePerm)
           else:
-            self.folderPerm = fixList(self.getObjectInventory(mode, 'Folder'))
-            self.notebookPerm = fixList(self.getObjectInventory(mode, 'Notebook'))
-            self.filePerm = fixList(self.getObjectInventory(mode, 'File'))
+            self.folderPerm = self.fixList(self.getObjectInventory(mode, 'Folder'))
+            self.notebookPerm = self.fixList(self.getObjectInventory(mode, 'Notebook'))
+            self.filePerm = self.fixList(self.getObjectInventory(mode, 'File'))
 
         #These have yet to be parallelized:
         if self.checkTableACL==True:
@@ -1823,7 +1823,7 @@ class GroupMigration:
             self.alertPerm=self.getAlertsACL()
             self.persistInventory(mode, "Alert", self.alertPerm)
           else:
-            self.alertPerm = fixListv3(self.getObjectInventory(mode, 'Alert'))
+            self.alertPerm = self.fixListv3(self.getObjectInventory(mode, 'Alert'))
         
         #self.instancePoolPerm=self.getPoolACL()
         if objectType=="Pool" or objectType=="All":
@@ -1832,7 +1832,7 @@ class GroupMigration:
             self.instancePoolPerm=self.getPoolACL()
             self.persistInventory(mode, "Pool", self.instancePoolPerm)
           else:
-            self.instancePoolPerm = fixList(self.getObjectInventory(mode, 'Pool'))
+            self.instancePoolPerm = self.fixList(self.getObjectInventory(mode, 'Pool'))
         
         #self.expPerm=self.getExperimentACL()
         if objectType=="Experiment" or objectType=="All":
@@ -1841,7 +1841,7 @@ class GroupMigration:
             self.expPerm=self.getExperimentACL()
             self.persistInventory(mode, "Experiment", self.expPerm)
           else:
-            self.expPerm = fixList(self.getObjectInventory(mode, 'Experiment'))
+            self.expPerm = self.fixList(self.getObjectInventory(mode, 'Experiment'))
         
         #self.modelPerm=self.getModelACL()
         if objectType=="Model" or objectType=="All":
@@ -1850,7 +1850,7 @@ class GroupMigration:
             self.modelPerm=self.getModelACL()
             self.persistInventory(mode, "Model", self.modelPerm)
           else:
-            self.modelPerm = fixList(self.getObjectInventory(mode, 'Model'))
+            self.modelPerm = self.fixList(self.getObjectInventory(mode, 'Model'))
         
         #self.dltPerm=self.getDLTACL()
         if objectType=="DLT" or objectType=="All":
@@ -1859,7 +1859,7 @@ class GroupMigration:
             self.dltPerm=self.getDLTACL()
             self.persistInventory(mode, "DLT", self.dltPerm)
           else:
-            self.dltPerm = fixList(self.getObjectInventory(mode, 'DLT'))
+            self.dltPerm = self.fixList(self.getObjectInventory(mode, 'DLT'))
         
         #self.repoPerm=self.getRepoACL()
         if objectType=="Repo" or objectType=="All":
@@ -1868,7 +1868,7 @@ class GroupMigration:
             self.repoPerm=self.getRepoACL()
             self.persistInventory(mode, "Repo", self.repoPerm)
           else:
-            self.repoPerm = fixList(self.getObjectInventory(mode, 'Repo'))
+            self.repoPerm = self.fixList(self.getObjectInventory(mode, 'Repo'))
         
         #self.tokenPerm=self.getTokenACL()
         if objectType=="Token" or objectType=="All":
@@ -1877,7 +1877,7 @@ class GroupMigration:
             self.tokenPerm=self.getTokenACL()
             self.persistInventory(mode, "Token", self.tokenPerm)
           else:
-            self.tokenPerm = fixList(self.getObjectInventory(mode, 'Token'))
+            self.tokenPerm = self.fixList(self.getObjectInventory(mode, 'Token'))
         
         #self.secretScopePerm=self.getSecretScoppeACL()
         if objectType=="Secret" or objectType=="All":
@@ -1886,7 +1886,7 @@ class GroupMigration:
             self.secretScopePerm=self.getSecretScoppeACL()
             self.persistInventory(mode, "Secret", self.secretScopePerm)
           else:
-            self.secretScopePerm = fixList(self.getObjectInventory(mode, 'Secret'))
+            self.secretScopePerm = self.fixList(self.getObjectInventory(mode, 'Secret'))
         
         self.lastInventoryRun = mode
       except Exception as e:
