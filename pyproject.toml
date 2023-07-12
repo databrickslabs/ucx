@@ -11,7 +11,7 @@ python = "^3.9"
 databricks-sdk = "^0.1.12"
 
 [tool.poetry.group.dev.dependencies]
-black = "^23.3.0"
+black = "^23.7.0"
 isort = "^5.12.0"
 ruff = "^0.0.277"
 pyspark = "^3.4.1"
