@@ -6,7 +6,7 @@ from tempfile import NamedTemporaryFile
 
 
 def install_uc_upgrade_package():
-    ipython = get_ipython()  # noqa: F405
+    ipython = get_ipython()  # noqa: F405, F821
 
     print("Installing poetry for package management")
     ipython.run_line_magic("pip", "install poetry -I")
@@ -19,7 +19,7 @@ def install_uc_upgrade_package():
         print("Saved the requirements to a provided file, installing them with pip")
         ipython.run_line_magic("pip", f"install -r {requirements_file.name} -I")
         print("Requirements installed successfully, restarting Python interpreter")
-        dbutils.library.restartPython()  # noqa: F405
+        dbutils.library.restartPython()  # noqa: F405, F821
         print("Python interpreter restarted successfully")
 
     print("Reloading the path-based modules")

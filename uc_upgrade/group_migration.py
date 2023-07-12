@@ -82,11 +82,13 @@ class GroupMigration:
             logger.info(f"Clearing inventory table {self.inventoryTableName}")
             spark.sql(f"drop table if exists {self.inventoryTableName}")
             spark.sql(f"drop table if exists {self.inventoryTableName+'TableACL'}")
-            createSQL = f"create table {self.inventoryTableName} (GroupType string, WorkspaceObject string, Permission MAP<string, string>)"
+            createSQL = f"create table {self.inventoryTableName} (GroupType string, WorkspaceObject string, \
+                        Permission MAP<string, string>)" 
             spark.sql(createSQL)
-            createSQL = f"create table {self.inventoryTableName}TableACL (GroupType string, Database string, Principal string, ActionTypes string, ObjectType string, ObjectKey string)"
+            createSQL = f"create table {self.inventoryTableName}TableACL (GroupType string, Database string, Principal \
+                        string, ActionTypes string, ObjectType string, ObjectKey string)"
             spark.sql(createSQL)
-            logger.info(f"recreated tables...")
+            logger.info("recreated tables...")
 
         # Check if we should automatically generate list, and do it immediately.
         # Implementers Note: Could change this section to a lazy calculation
@@ -244,7 +246,7 @@ class GroupMigration:
                 resJson = res.json()
                 # Iterate over workspace groups, extracting useful info to vars above
                 for e in resJson["Resources"]:
-                    if not e["displayName"].casefold() in groupFilterKeeplist:
+                    if e["displayName"].casefold() not in groupFilterKeeplist:
                         continue
 
                     groupIdDict[e["id"]] = e["displayName"]
@@ -263,7 +265,7 @@ class GroupMigration:
                     try:
                         for ent in e["entitlements"]:
                             entms.append(ent["value"])
-                    except:
+                    except:  # noqa: E722
                         pass
 
                     groupEntitlements[e["id"]] = entms
@@ -274,7 +276,7 @@ class GroupMigration:
                         try:
                             for ent in e["roles"]:
                                 entms.append(ent["value"])
-                        except:
+                        except:  # noqa: E722
                             continue
                         if len(entms) == 0:
                             continue
@@ -1516,7 +1518,7 @@ class GroupMigration:
                     return []
 
             tables = self.runVerboseSql("show tables in spark_catalog.{}".format(db)).filter(
-                col("isTemporary") == False
+                col("isTemporary") is False
             )
             for table in tables.collect():
                 try:
@@ -1688,7 +1690,8 @@ class GroupMigration:
                 checkSQL = f"select count(*) from {self.inventoryTableName}TableACL where groupType='{groupType}' "
                 # logger.info(checkSQL)
             else:
-                checkSQL = f"select count(*) from {self.inventoryTableName} where groupType='{groupType}' and WorkspaceObject='{objectType}'"
+                checkSQL = f"select count(*) from {self.inventoryTableName} where groupType='{groupType}' \
+                            and WorkspaceObject='{objectType}'"
             if self.spark.sql(checkSQL).collect()[0][0] > 0:
                 return True
             else:
@@ -1707,11 +1710,13 @@ class GroupMigration:
             else:
                 groupType = "WorkspaceTemp"
             if tableACL:
-                checkPermSQL = f"select Database, Principal, ActionTypes, ObjectType, ObjectKey from {self.inventoryTableName}TableACL where groupType='{groupType}'"
+                checkPermSQL = f"select Database, Principal, ActionTypes, ObjectType, ObjectKey from \
+                            {self.inventoryTableName}TableACL where groupType='{groupType}'"
                 perm = self.spark.sql(checkPermSQL).collect()
                 return perm
             else:
-                checkPermSQL = f"select Permission from {self.inventoryTableName} where groupType='{groupType}' and WorkspaceObject='{objectType}'"
+                checkPermSQL = f"select Permission from {self.inventoryTableName} where groupType='{groupType}' and \
+                            WorkspaceObject='{objectType}'"
                 perm = self.spark.sql(checkPermSQL).collect()[0][0]
                 return perm
         except Exception as e:
@@ -1756,7 +1761,8 @@ class GroupMigration:
                 "Secret",
             ]:
                 logger.info(
-                    "Enter valid object types from  All,Group,Password,Cluster,ClusterPolicy,Warehouse,Dashboard,Query,Job,Folder,TableACL,Alert,Pool,Experiment,Model,DLT,Repo,Token,Secret"
+                    "Enter valid object types from  All,Group,Password,Cluster,ClusterPolicy,Warehouse,Dashboard,Query,\
+                        Job,Folder,TableACL,Alert,Pool,Experiment,Model,DLT,Repo,Token,Secret"
                 )
                 return
             if objectType == "Group" or objectType == "All":
@@ -1865,7 +1871,7 @@ class GroupMigration:
                     self.filePerm = self.fixList(self.getObjectInventory(mode, "File"))
 
             # These have yet to be parallelized:
-            if self.checkTableACL == True:
+            if self.checkTableACL is True:
                 # self.dataObjectsPerm=self.getTableACLs()
                 if objectType == "TableACL" or objectType == "All":
                     logger.info("performing Tabel ACL object inventory")
@@ -2213,7 +2219,8 @@ class GroupMigration:
                 tableACLDF.write.format("delta").mode("append").saveAsTable(self.inventoryTableName + "TableACL")
                 logger.info(f"Saved data in {self.inventoryTableName}TableACL table for {objectType}")
             else:
-                deleteSQL = f"delete from {self.inventoryTableName} where GroupType='{groupType}' and WorkspaceObject='{objectType}';"
+                deleteSQL = f"delete from {self.inventoryTableName} where GroupType='{groupType}' and \
+                            WorkspaceObject='{objectType}';"
                 self.spark.sql(deleteSQL)
                 persistList.append([groupType, objectType, objectPerm])
                 persistColumns = StructType(
