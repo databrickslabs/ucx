@@ -21,12 +21,7 @@ from pandas.io.json import json_normalize
 
 ### This does not support preview API calls which needs to go back to regular post/get calls with the package requests as seen above
 from databricks_cli.sdk.api_client import *
-from databricks_cli.sdk import JobsService, ClusterService, GroupsService, WorkspaceService, DbfsService, ManagedLibraryService, InstancePoolService
-from databricks_cli.workspace.api import WorkspaceApi
-from databricks_cli.secrets.api import SecretApi
-from databricks_cli.dbfs.api import DbfsApi
-from databricks_cli.dbfs.dbfs_path import DbfsPath
-
+from databricks_cli.sdk import JobsService, ClusterService, GroupsService
 
 
 def loadCache(filename):
@@ -124,7 +119,8 @@ class GroupMigration:
         self.cache=loadCache(self.cache_file)
         self.cacheGroupL_file = 'cacheGroupL.json'
         self.cacheGroupL=loadCache(self.cacheGroupL_file)
-
+        self.migrationLoadPerGroupDF = None
+        self.allWsLocalGroups = {}
         self.lastInventoryRun = None
         self.checkAllDB = False
 
@@ -132,16 +128,16 @@ class GroupMigration:
         self.client = ApiClient(token = self.token,
                           host = self.workspace_url)
         self.jobsService = JobsService(self.client)
-        self.workspaceApi = WorkspaceApi(self.client)
-        self.dbfsApi = DbfsApi(self.client)
         self.clusterService = ClusterService(self.client)
         self.groupsService = GroupsService(self.client)
 
-        print(DeltaTable.isDeltaTable(spark, identifier = self.spark.conf.get("spark.sql.warehouse.dir") + "/" +self.inventoryTableName.lower()))
         if loadDeltaCache:
           if DeltaTable.isDeltaTable(spark, identifier = self.spark.conf.get("spark.sql.warehouse.dir") + "/" + self.inventoryTableName.lower()):
             print(f'Loading cache from table {self.inventoryTableName}')
             inventory = self.spark.table(self.inventoryTableName)
+            self.groupWSGIdDict = inventory.filter( (inventory.GroupType == "WorkspaceTemp") & (inventory.WorkspaceObject == "GroupListDict")).toPandas()['Permission'][0]
+            
+            inventory = inventory.filter(inventory.GroupType == "WorkspaceLocal")
             self.folderPerm = fixList(inventory.filter(inventory.WorkspaceObject == "Folder").toPandas()['Permission'][0])
             self.notebookPerm = fixList(inventory.filter(inventory.WorkspaceObject == "Notebook").toPandas()['Permission'][0])
             self.filePerm = fixList(inventory.filter(inventory.WorkspaceObject == "File").toPandas()['Permission'][0])
@@ -177,7 +173,6 @@ class GroupMigration:
         #Check if we should automatically generate list, and do it immediately.
         #Implementers Note: Could change this section to a lazy calculation by setting groupL to nil or some sentinel value and adding checks before use.
         res=requests.get(f"{self.workspace_url}/api/2.0/preview/scim/v2/Me", headers=self.headers)
-        #print(res.text)
         if res.status_code == 403:
             print("token not valid.")
             return
@@ -226,7 +221,6 @@ class GroupMigration:
         except Exception as e:
             print(f'ERROR in retrieving workspace group list: {e}')
             raise
-
         #Now match against account groups.
         try:
             print("\nExecuting request to list account groups")
@@ -528,6 +522,7 @@ class GroupMigration:
             try:
                 resDPermJson = resDPerm.json()
                 aclList = resDPermJson['access_control_list']
+                if len(aclList)==0:continue
                 dashboard_acl = []
                 # if len(aclList) > 0:
                 #   for acl in aclList:
@@ -538,7 +533,7 @@ class GroupMigration:
                 #       continue
                 for acl in aclList:
                   key = 'group_name'
-                  gname = acl.get(key)
+                  gname = acl.get(key)                  
                   if gname is None:
                     key = 'user_name'
                     gname = acl.get(key)
@@ -547,7 +542,10 @@ class GroupMigration:
                     gname = acl.get(key)
                   perm = acl.get('permission_level')
                   dashboard_acl.append([key, gname, perm])
-                return dashboard_acl
+                if any([ x[1] in self.groupL for x in dashboard_acl ]):
+                  return dashboard_acl
+                else:
+                  return []
             except KeyError:
                 retry_count += 1
                 continue
@@ -604,14 +602,23 @@ class GroupMigration:
                 aclList = resQPermJson['access_control_list']
                 query_acl = []
                 if len(aclList) > 0:
-                    for acl in aclList:
-                        try:
-                            if acl['group_name'] in self.groupL:
-                                query_acl = aclList
-                                break
-                        except KeyError:
-                            continue
-                return query_acl
+                  for acl in aclList:
+                  # if acl['group_name'] in self.groupL:
+                  #     query_acl = aclList
+                    key = 'group_name'
+                    gname = acl.get(key)
+                    if gname is None:
+                      key = 'user_name'
+                      gname = acl.get(key)
+                    if gname is None:
+                      key = 'service_principal_name'
+                      gname = acl.get(key)
+                    perm = acl.get('permission_level')
+                    query_acl.append([key, gname, perm])
+                  if any([ x[1] in self.groupL for x in query_acl ]):
+                    return query_acl
+                  else:
+                    return []
             except KeyError:
                 retry_count += 1
                 continue
@@ -632,6 +639,24 @@ class GroupMigration:
                 resAPermJson=resAPerm.json()
                 aclList=resAPermJson['access_control_list']
                 if len(aclList)==0:continue
+                alerts_acl = []
+                #       continue
+                for acl in aclList:
+                  key = 'group_name'
+                  gname = acl.get(key)                  
+                  if gname is None:
+                    key = 'user_name'
+                    gname = acl.get(key)
+                  if gname is None:
+                    key = 'service_principal_name'
+                    gname = acl.get(key)
+                  perm = acl.get('permission_level')
+                  alerts_acl.append([key, gname, perm])
+                if any([ x[1] in self.groupL for x in alerts_acl ]):
+                  return alerts_acl
+                else:
+                  return []
+
                 for acl in aclList:
                   try:
                     if acl['group_name'] in self.groupL:
@@ -1196,7 +1221,6 @@ class GroupMigration:
         else:  #Account, aka temp group, must discard db-temp- (8 chars)
           for gName in self.groupL:
             groupIdOrig = self.groupNameDict[gName]
-            groupIdTemp = self.groupWSGNameDict["db-temp-"+gName]
             groupIdAcc = self.accountGroups_lower[gName.casefold()]
 
             roleList=[]
@@ -1224,15 +1248,18 @@ class GroupMigration:
                     if level=="Workspace":
                       gName="db-temp-"+acl[0]
                     elif level=="Account":
-                      gName=acl[0][8:]
+                      gName=acl[0]
                     dataAcl.append({"group_name":gName,"permission_level":acl[1]})
                 if len(dataAcl) > 0 :
                   data={"access_control_list":dataAcl}
                   resAppPerm=requests.patch(f"{self.workspace_url}/api/2.0/preview/permissions/{object}/{object_id}", headers=self.headers, data=json.dumps(data))
+                  if(resAppPerm.status_code!=200):
+                    print(f'Error setting permission for {object} {object_id}')
                 else:
                   continue
         except Exception as e:
             print(f'Error setting permission for {object} {object_id}. {e} ')
+
     def updateGroup2Permission(self, object:str, groupPermission : dict, level:str):
         try:
           for object_id,aclList in tqdm(groupPermission.items()):
@@ -1244,7 +1271,7 @@ class GroupMigration:
                   if gName=="ADMIN"  and acl['permission_level']!='CAN_MANAGE':
                     dataAcl.append({'group_name': gName, 'permission_level': "CAN_MANAGE"})
                   if level=="Workspace":
-                    if acl['group_name'] in self.WorkspaceGroupNames:
+                    if acl['group_name'] in self.groupL:
                       gName="db-temp-"+acl['group_name']
                       dataAcl.append({'group_name': gName, 'permission_level': acl['permission_level']})
                   elif level=="Account":
@@ -1261,31 +1288,31 @@ class GroupMigration:
         except Exception as e:
             print(f'Error setting permission for {object} {object_id}. {e} ')
     
-    def updateGroup3Permission(self, object:str, groupPermission : dict, level:str):
+    def updateGroup3Permission(self, object:str, groupPermission:dict, level:str):
       try:
         for object_id,aclList in tqdm(groupPermission.items()):
           addUser=True
           dataAcl=[]
+          setPerm = False
           for acl in aclList:
-            key = acl[0]
-            if key == 'group_name':
-              gName = acl[1]
-              permission_level = acl[2]
-            elif key == 'user_name':
-              gName = acl[1]
-              permission_level = acl[2]
-            elif key == 'service_principal_name':
-              gName = acl[1]
-              permission_level = acl[2]
-    
-            if gName in self.groupL:
-              dataAcl.insert(0,{key: "db-temp-"+gName, 'permission_level': permission_level})
-
-            dataAcl.insert(0,{key: gName, 'permission_level': permission_level})
+            gType,gName,permLevel = acl[0], acl[1], acl[2]
             
-            if any([str(dataAcl).count(group) > 0 for group in self.groupL]):
-              data={"access_control_list":dataAcl}
-              resAppPerm=requests.post(f"{self.workspace_url}/api/2.0/preview/sql/permissions/dashboards/{object_id}", headers=self.headers, data=json.dumps(data))
+            # If group is set to be migrated append gName with tempGName
+            if gName in self.groupL:
+              setPerm = True
+              dataAcl.append({gType: gName, 'permission_level': permLevel})
+              dataAcl.append({gType: 'db-temp-' + gName, 'permission_level': permLevel})
+            elif gName=='admins' and permLevel!='CAN_MANAGE':
+              dataAcl.append({'group_name': 'Admins', 'permission_level': "CAN_MANAGE"})
+            else:
+              dataAcl.append({gType: gName, 'permission_level': permLevel})
+          
+          if setPerm:
+            data={'access_control_list':dataAcl}
+            resAppPerm=requests.post(f"{self.workspace_url}/api/2.0/preview/sql/permissions/{object}/{object_id}", headers=self.headers, data=json.dumps(data))
+            if(resAppPerm.status_code!=200):
+              print(f'Error setting permission for {object} {object_id}')
+              print(resAppPerm.content)
       except Exception as e:
         print(f'Error setting permission for {object} {object_id}. {e} ')
 
@@ -1468,7 +1495,7 @@ class GroupMigration:
     def setGroupListForMode(self, mode : str) :
         print(f'Retrieving group metadata for mode: {mode}')
         if mode=="Workspace":
-          self.groupL=self.WorkspaceGroupNames
+          # self.groupL=self.WorkspaceGroupNames
           self.getGroupObjects(self.groupL)
         elif mode=="Account":
           self.groupL=self.TempGroupNames
@@ -1753,9 +1780,9 @@ class GroupMigration:
         print('applying dashboard permissions')
         self.updateGroup3Permission('dashboards',self.dashboardPerm,level)
         print('applying query permissions')
-        self.updateGroup2Permission('queries',self.queryPerm,level)
+        self.updateGroup3Permission('queries',self.queryPerm,level)
         print('applying alerts permissions')
-        self.updateGroup2Permission('alerts',self.alertPerm,level)
+        self.updateGroup3Permission('alerts',self.alertPerm,level)
         if self.cloud=="AWS":
           print('applying password permissions')
           self.updateGroupPermission('authorization',self.passwordPerm,level)
@@ -1795,98 +1822,116 @@ class GroupMigration:
     def persistInventory(self, mode: str):
       try:
         groupType=''
-        if mode=="Workspace":
-          print(f'Saving data for workspace groups in {self.inventoryTableName} table.')
-          groupType="WorkspaceLocal"
-        else:
-          print(f'Saving data for workspace temp groups in {self.inventoryTableName} table.')
-          groupType="WorkspaceTemp"
-        persistList=[]
-        persistList.append([groupType,'GroupListDict',self.groupIdDict])
-        persistList.append([groupType,'GroupMembers',self.groupMembers])
-        persistList.append([groupType,'GroupEntitlements',self.groupEntitlements])
-        persistList.append([groupType,'GroupRoles',self.groupRoles])
-        persistList.append([groupType,'Password',self.passwordPerm])
-        persistList.append([groupType,'Cluster',self.clusterPerm])
-        persistList.append([groupType,'ClusterPolicy',self.clusterPolicyPerm])
-        persistList.append([groupType,'Warehouse',self.warehousePerm])
-        persistList.append([groupType,'Dashboard',self.dashboardPerm])
-        persistList.append([groupType,'Query',self.queryPerm])
-        persistList.append([groupType,'Job',self.jobPerm])
-        persistList.append([groupType,'Folder',self.folderPerm])
-        persistList.append([groupType,'Notebook',self.notebookPerm])
-        persistList.append([groupType,'File',self.filePerm])
-        persistList.append([groupType,'Alert',self.alertPerm])
-        persistList.append([groupType,'Pool',self.instancePoolPerm])
-        persistList.append([groupType,'Experiment',self.expPerm])
-        persistList.append([groupType,'Model',self.modelPerm])
-        persistList.append([groupType,'DLT',self.dltPerm])
-        persistList.append([groupType,'Repo',self.repoPerm])
-        persistList.append([groupType,'Token',self.tokenPerm])
-        persistList.append([groupType,'Secret',self.secretScopePerm])
         persistColumns = StructType([       \
           StructField('GroupType', StringType(), True), \
           StructField('WorkspaceObject', StringType(), True), \
           StructField('Permission', MapType(StringType(),StringType()), True)])        
-
-        persistDF = self.spark.createDataFrame(data=persistList, schema = persistColumns)
-
         DeltaTable.createIfNotExists(self.spark).tableName(self.inventoryTableName)\
-          .addColumns(persistColumns)\
-          .execute()
-
+            .addColumns(persistColumns)\
+            .execute()
         targetDF = DeltaTable.forName(self.spark, self.inventoryTableName)
-        targetDF.alias("t").merge(persistDF.alias("s"), "t.WorkspaceObject == s.WorkspaceObject").whenMatchedUpdateAll().whenNotMatchedInsertAll().execute()
 
-        if self.checkTableACL:
-          tableACLCol=StructType([       \
-          StructField('Database', StringType(), True), \
-          StructField('Principal', StringType(), True), \
-          StructField('ActionTypes', StringType(), True), \
-          StructField('ObjectType', StringType(), True), \
-          StructField('ObjectKey', StringType(), True) \
-          ])
+        if mode=="Workspace":
+          print(f'Saving data for workspace groups in {self.inventoryTableName} table.')
+          groupType="WorkspaceLocal"
+          persistList=[]
+          persistList.append([groupType,'GroupListDict',self.groupIdDict])
+          persistList.append([groupType,'GroupMembers',self.groupMembers])
+          persistList.append([groupType,'GroupEntitlements',self.groupEntitlements])
+          persistList.append([groupType,'GroupRoles',self.groupRoles])
+          persistList.append([groupType,'Password',self.passwordPerm])
+          persistList.append([groupType,'Cluster',self.clusterPerm])
+          persistList.append([groupType,'ClusterPolicy',self.clusterPolicyPerm])
+          persistList.append([groupType,'Warehouse',self.warehousePerm])
+          persistList.append([groupType,'Dashboard',self.dashboardPerm])
+          persistList.append([groupType,'Query',self.queryPerm])
+          persistList.append([groupType,'Job',self.jobPerm])
+          persistList.append([groupType,'Folder',self.folderPerm])
+          persistList.append([groupType,'Notebook',self.notebookPerm])
+          persistList.append([groupType,'File',self.filePerm])
+          persistList.append([groupType,'Alert',self.alertPerm])
+          persistList.append([groupType,'Pool',self.instancePoolPerm])
+          persistList.append([groupType,'Experiment',self.expPerm])
+          persistList.append([groupType,'Model',self.modelPerm])
+          persistList.append([groupType,'DLT',self.dltPerm])
+          persistList.append([groupType,'Repo',self.repoPerm])
+          persistList.append([groupType,'Token',self.tokenPerm])
+          persistList.append([groupType,'Secret',self.secretScopePerm])
+          persistDF = self.spark.createDataFrame(data=persistList, schema = persistColumns)
 
-          tableACLDF = self.spark.createDataFrame(data=self.dataObjectsPerm, schema = tableACLCol) \
-                        .withColumn('GroupType',lit(groupType))
-          targetDF.alias("t").merge(tableACLDF.alias("s"), "t.WorkspaceObject == s.WorkspaceObject").whenMatchedUpdateAll().whenNotMatchedInsertAll().execute()
-        print(f'Saved data in {self.inventoryTableName} table.')
+          targetDF.alias("t").merge(persistDF.alias("s"), "t.WorkspaceObject == s.WorkspaceObject and t.GroupType = s.GroupType").whenMatchedUpdateAll().whenNotMatchedInsertAll().execute()
+
+          if self.checkTableACL:
+            tableACLCol=StructType([       \
+            StructField('Database', StringType(), True), \
+            StructField('Principal', StringType(), True), \
+            StructField('ActionTypes', StringType(), True), \
+            StructField('ObjectType', StringType(), True), \
+            StructField('ObjectKey', StringType(), True) \
+            ])
+
+            tableACLDF = self.spark.createDataFrame(data=self.dataObjectsPerm, schema = tableACLCol) \
+                          .withColumn('GroupType',lit(groupType))
+            targetDF.alias("t").merge(tableACLDF.alias("s"), "t.WorkspaceObject == s.WorkspaceObject and t.GroupType = s.GroupType").whenMatchedUpdateAll().whenNotMatchedInsertAll().execute()
+          print(f'Saved data in {self.inventoryTableName} table.')
+
+        else:
+          print(f'Saving data for workspace temp groups in {self.inventoryTableName} table.')
+          groupType="WorkspaceTemp"
+          persistList=[]
+          persistList.append([groupType,'GroupListDict',self.groupWSGIdDict])      
+          persistDF = self.spark.createDataFrame(data=persistList, schema = persistColumns)
+          targetDF.alias("t")\
+            .merge(persistDF.alias("s"), "t.WorkspaceObject == s.WorkspaceObject and t.GroupType = s.GroupType")\
+            .whenMatchedUpdateAll()\
+            .whenNotMatchedInsertAll()\
+            .execute()
 
       except Exception as e:
         print(f"Error creating delta table to store inventory  : {e}")
 
     def deleteWorkspaceLocalGroups(self):
       try:
-        self.setGroupListForMode("Workspace")
-        if self.validateTempWSGroup() == 0:
-            print("temp group validation failed, aborting deletion")
-            return;
+        # self.setGroupListForMode("Workspace")
+        # if self.validateTempWSGroup() == 0:
+        #     print("temp group validation failed, aborting deletion")
+        #     return;
         self.bulkTryDelete(self.groupL)
       except Exception as e:
         print(f"Error deleting groups : {e}")
 
+    # def deleteTempGroups(self):
+    #   self.setGroupListForMode("Account")
+    #   try:
+    #     self.bulkTryDelete(self.groupL)
+    #   except Exception as e:
+    #     print(f"Error deleting temp groups : {e}")
+
     def deleteTempGroups(self):
-      self.setGroupListForMode("Account")
+      # self.setGroupListForMode("Account")
       try:
-        self.bulkTryDelete(self.groupL)
+        self.bulkTryDelete(["db-temp-" + g for g in self.groupL])
       except Exception as e:
         print(f"Error deleting temp groups : {e}")
+
 
     def createBackupGroup(self, groupName):
       try:
         memberList = []
         if groupName in self.groupNameDict:
           for mem in self.groupMembers[ self.groupNameDict[groupName] ]:
-            memberList.append({"value":mem[1]})
-          
+            if(len(mem) > 1) : memberList.append({"value":mem[1]})
+
           print(f'Attempting to create group with name "db-temp-"{groupName} with {len(memberList)} members.')
+
           data={
                   "schemas": [ "urn:ietf:params:scim:schemas:core:2.0:Group" ],
                   "displayName": "db-temp-"+groupName,
                   "members": memberList
               }
-          
           res=requests.post(f"{self.workspace_url}/api/2.0/preview/scim/v2/Groups", headers=self.headers, data=json.dumps(data))
+          if(res.status_code == 409):
+              print(f'Group with name "db-temp-"{groupName} already exist')
           return(res)
         else:
           print(f'Group {groupName} does not exist in saved groupNameDict.' )
@@ -1900,17 +1945,31 @@ class GroupMigration:
           parentGroups.append(x)
       return(parentGroups)
     
+    def listAllTempGroups(self):
+      data = {"filter" : f"displayName sw db-temp-"}
+      res=requests.get(f"{self.workspace_url}/api/2.0/preview/scim/v2/Groups", headers=self.headers, params = data)
+      for g in res.json()['Resources']:
+        gname = g['displayName']
+        gid = g['id']
+        self.groupWSGIdDict[gid] = gname
+        self.groupWSGNameDict[gname] = gid
+
     def createBackupGroupApplyPerm(self):
       try:
         for g in self.groupL:
           res = self.createBackupGroup(g)
           if res.status_code == 409:
-            print(f'group with name "db-temp-"{g} already present, deleting "db-temp-"{g} and trying again.')
-            # self.bulkTryDelete(deleteList = ["db-temp-"+g])
-            # res = self.createBackupGroup(g)
+            # group already present
+            data = {"filter" : f"displayName eq db-temp-{g}"}
+            res=requests.get(f"{self.workspace_url}/api/2.0/preview/scim/v2/Groups", headers=self.headers, params = data)
 
-          self.groupWSGIdDict[res.json()["id"]]="db-temp-"+g
-          self.groupWSGNameDict["db-temp-"+g]=res.json()["id"]
+            gid = res.json()['Resources'][0]['id']
+            self.groupWSGIdDict[gid]="db-temp-"+g
+            self.groupWSGNameDict["db-temp-"+g]=gid
+
+          else:
+            self.groupWSGIdDict[res.json()["id"]]="db-temp-"+g
+            self.groupWSGNameDict["db-temp-"+g]=res.json()["id"]
 
           # Add temp group back under parent group
           parentGroups = self.findParentGroup(g)
@@ -1929,7 +1988,7 @@ class GroupMigration:
         res=requests.get(f"{self.workspace_url}/api/2.0/account/scim/v2/Groups", headers=self.headers)
         for grp in res.json()['Resources']:
           self.accountGroups_lower[grp['displayName'].casefold()]=grp['id']
-        for g in self.WorkspaceGroupNames:
+        for g in self.groupL:
           if g.casefold() not in self.accountGroups_lower:
             print(f"group {g} is not present in account level, please add correct group and try again")
             return 1
@@ -1941,20 +2000,17 @@ class GroupMigration:
       try:
         # if self.validateAccountGroup()==1: return
         # if self.validateTempWSGroup()==0: return
-        # self.performInventory('Account')
-        # self.printInventory()
         data={
                   "permissions": ["USER"]
               }
-        # for g in self.WorkspaceGroupNames:
-        #   res=requests.put(f"{self.workspace_url}/api/2.0/preview/permissionassignments/principals/{self.accountGroups_lower[g.casefold()]}", headers=self.headers, data=json.dumps(data))
-
+          
         for g in self.groupL:
-          ### Fix id for access function id vs parent group id
-          res=requests.put(f"{self.workspace_url}/api/2.0/preview/permissionassignments/principals/972194935311560", headers=self.headers, data=json.dumps(data))
+          print(f"Adding Account group {g} to workspace...")       
+          res=requests.put(f"{self.workspace_url}/api/2.0/preview/permissionassignments/principals/{self.accountGroups_lower[g.casefold()]}", headers=self.headers, data=json.dumps(data))
+          if res.status_code!=200: print(res.content)
           parentGroups = self.findParentGroup(g)
           for name in parentGroups:
-            print(f"Adding db-temp-{g} to {name}...")
+            print(f"Adding {g} to {name}...")
             self.groupsService.add_to_group(parent_name=name, group_name=g)
 
         self.applyGroupPermission("Account")
@@ -1996,7 +2052,6 @@ class GroupMigration:
         allWsLocalGroups = {o["displayName"]:{"id": o["id"], "members": self.listMembers( o, full=False),  "members_full": self.listMembers(o, full=True), "roles": self.listRoles(o), "entitlements": self.listEntitlements(o) } for o in resJson["Resources"] if o['meta']['resourceType'] == "WorkspaceGroup" and o['displayName'] }
 
         self.allWsLocalGroups = allWsLocalGroups
-        return(allWsLocalGroups)
 
     def listAccountGroups(self, force=False):
         print('listAccountGroups start')
@@ -2050,18 +2105,19 @@ class GroupMigration:
       print(groupsTable[groupsTable['ws_group'] == groupName]["ac_group_missing"][0])
     
     def migrationLoadPerGroup(self):
-      columnNames = [ 'GroupName', 'Folder', 'Notebook', 'File', 'Repo', 'Password', 'Job', 'Query', 'Warehouse', 'Alert', 'Cluster', 'Dashboard', 'ClusterPolicy', 'DLT', 'Model', 'Pool', 'Token', 'Secret', 'Experiment']
-      columnValues = [self.folderPerm, self.notebookPerm, self.filePerm, self.repoPerm, self.passwordPerm, self.jobPerm, self.queryPerm, self.warehousePerm, self.alertPerm, self.clusterPerm, self.dashboardPerm, self.clusterPolicyPerm, self.dltPerm, self.modelPerm, self.instancePoolPerm, self.tokenPerm, self.secretScopePerm, self.expPerm]
+      if self.migrationLoadPerGroupDF is None:
+        columnNames = [ 'GroupName', 'Folder', 'Notebook', 'File', 'Repo', 'Password', 'Job', 'Query', 'Warehouse', 'Alert', 'Cluster', 'Dashboard', 'ClusterPolicy', 'DLT', 'Model', 'Pool', 'Token', 'Secret', 'Experiment']
+        columnValues = [self.folderPerm, self.notebookPerm, self.filePerm, self.repoPerm, self.passwordPerm, self.jobPerm, self.queryPerm, self.warehousePerm, self.alertPerm, self.clusterPerm, self.dashboardPerm, self.clusterPolicyPerm, self.dltPerm, self.modelPerm, self.instancePoolPerm, self.tokenPerm, self.secretScopePerm, self.expPerm]
       
-      migrationLoadPerGroup = pd.DataFrame(columns = columnNames)
+        migrationLoadPerGroup = pd.DataFrame(columns = columnNames)
       
-      for group in self.groupL:
-        insert_row = [ str(x).count(group) for x in columnValues]
-        res = {columnNames[i+1]: insert_row[i] for i in range(len(insert_row))}
-        res["TotalObjects"] = sum(insert_row)
-        res["GroupName"] = group
-        migrationLoadPerGroup = pd.concat([migrationLoadPerGroup, pd.DataFrame([res])])
+        for group in self.groupL:
+          insert_row = [ str(x).count(group) for x in columnValues]
+          res = {columnNames[i+1]: insert_row[i] for i in range(len(insert_row))}
+          res["TotalObjects"] = sum(insert_row)
+          res["GroupName"] = group
+          migrationLoadPerGroup = pd.concat([migrationLoadPerGroup, pd.DataFrame([res])])
 
-      self.migrationLoadPerGroup = self.spark.createDataFrame(migrationLoadPerGroup.sort_values("TotalObjects", ascending=False))
-      
-      return(self.migrationLoadPerGroup)
+        self.migrationLoadPerGroupDF = self.spark.createDataFrame(migrationLoadPerGroup.sort_values("TotalObjects", ascending=False))
+        
+      return(self.migrationLoadPerGroupDF)
