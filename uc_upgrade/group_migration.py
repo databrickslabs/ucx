@@ -83,7 +83,7 @@ class GroupMigration:
             spark.sql(f"drop table if exists {self.inventoryTableName}")
             spark.sql(f"drop table if exists {self.inventoryTableName+'TableACL'}")
             createSQL = f"create table {self.inventoryTableName} (GroupType string, WorkspaceObject string, \
-                        Permission MAP<string, string>)" 
+                        Permission MAP<string, string>)"
             spark.sql(createSQL)
             createSQL = f"create table {self.inventoryTableName}TableACL (GroupType string, Database string, Principal \
                         string, ActionTypes string, ObjectType string, ObjectKey string)"
