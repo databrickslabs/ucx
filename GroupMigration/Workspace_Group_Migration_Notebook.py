@@ -70,11 +70,6 @@
 
 # COMMAND ----------
 
-# MAGIC %pip install tqdm
-# MAGIC %pip install databricks_cli
-
-# COMMAND ----------
-
 HOST = dbutils.notebook.entry_point.getDbutils().notebook().getContext().apiUrl().getOrElse(None)
 TOKEN = dbutils.notebook.entry_point.getDbutils().notebook().getContext().apiToken().getOrElse(None)
 
@@ -88,7 +83,6 @@ from WSGroupMigration import GroupMigration, loadCache, removeCache, requestGetC
 #If autoGenerateList=True then groupL will be ignored and all eliglbe groups will be migrated.
 removeCacheFlag = False
 autoGenerateList = True
-# groupL=[<>]
 groupL = [""]
 
 #Find this in the account console
@@ -108,7 +102,6 @@ cloud='AWS'
 
 #Your databricks user email.
 # userName='<UserMailID>'
-userName='amy.wang@databricks.com'
 
 #Number of threads to issue Databricks API requests with. If you get a lot of errors during the inventory, lower this value.
 numThreads = 30
@@ -122,6 +115,7 @@ if removeCacheFlag:
 
 #Initialize GroupMigration Class with values supplied above
 gm = GroupMigration( groupL = groupL , cloud=cloud , inventoryTableName = inventoryTableName, workspace_url = workspace_url, pat=token, spark=spark, userName=userName, checkTableACL = checkTableACL, autoGenerateList = autoGenerateList, numThreads=numThreads, loadDeltaCache = True)
+gm.listWorkspaceGroups()
 
 # COMMAND ----------
 
@@ -131,11 +125,13 @@ gm = GroupMigration( groupL = groupL , cloud=cloud , inventoryTableName = invent
 
 # COMMAND ----------
 
+# DBTITLE 1,Print Members List for Workspace and Account Level Group
 df = gm.groupSizeCheck()
 df.display()
 
 # COMMAND ----------
 
+# DBTITLE 1,Print the Workspace Groups Larger than Account Level Group 
 df.filter(df.ws_group_size > df.account_group_size).display()
 
 # COMMAND ----------
@@ -153,8 +149,6 @@ objListTemp = [
 'Cluster',
 'ClusterPolicy',
 'Warehouse',
-'Dashboard',
-'Query',
 'Pool',
 'Experiment',
 'Model',
@@ -164,89 +158,39 @@ objListTemp = [
 'Secret',
 'Job',
 'Folder',
+'Dashboard',
+'Query',
 'Alert'
 ]
 
-# TODO: (Lower Priority) Break out Folders so we skip Personal Folder
+## TODO: (Lower Priority) Break out Folders so we skip Personal Folder
+## This will do a inventory list of all requested object, if detected there is already Perm it skip
 gm.dryRun("Workspace", objList=objListTemp)
 
-# gm.persistInventory("Workspace")
-
-# COMMAND ----------
+## However you can force rerun of perms by calling individual runs
+# gm.dashboardPerm = gm.getAllDashboardACL()
+# gm.queryPerm = gm.getAllQueriesACL()
+# gm.clusterPerm = gm.getAllClustersACL()
+# gm.alertPerm = gm.getAlertsACL()
+# gm.jobPerm = gm.getAllJobACL()
+# gm.expPerm = gm.getExperimentACL()
+# gm.secretScopePerm = gm.getSecretScoppeACL()
 
 gm.persistInventory("Workspace")
 
 # COMMAND ----------
 
-# MAGIC %sql
-# MAGIC describe formatted workspaceinventory
-
-# COMMAND ----------
-
 # DBTITLE 1,List all Number of Assets that is associated with each Group
-gm.migrationLoadPerGroup().display()
+migratedGroupL = sorted([y[8:] for x,y in gm.groupWSGIdDict.items()])
+gm.migrationLoadPerGroup().filter(~gm.migrationLoadPerGroupDF.GroupName.isin(migratedGroupL)).display()
 
 # COMMAND ----------
 
-'''
-Legal, Brand
-'''
-subGroupL = ['ACL:Databricks:GEN2:CAPI', "ACL:Databricks:GEN2:Proofit"]
-# subGroupL = ["ACL:Databricks:GEN2:Legal"]
+# DBTITLE 1,Set Groups or SubGroups to be Migrated (Optional)
+# subGroupL = set(gm.groupL).difference(set(migratedGroupL)).difference(set(['ACL:Databricks:GEN2:Data', 'ACL:Databricks:GEN2:DataPlatform', 'dashboard', 'tableau']))
+subGroupL = ['ACL:Databricks:GEN2:Data', 'ACL:Databricks:GEN2:DataPlatform', 'dashboard', 'tableau']
+gm.migrationLoadPerGroupDF.filter(gm.migrationLoadPerGroupDF.GroupName.isin(subGroupL)).sort("GroupName").display()
 gm.groupL = subGroupL
-gm.migrationLoadPerGroup.filter(gm.migrationLoadPerGroup.GroupName.isin(subGroupL)).display()
-
-# COMMAND ----------
-
-''' keep parent-child folder relations
-before
-access_function_engineer (ws)
-  - DATA (ws) -> DATA(ac)
-
-after
-access_function_engineer (ws)
-  - DATA-tmp(ws) created and added
-  - DATA (ws) - removed
-  - DATA (ac) - pushed to ws and added
-  - DATA-tmp(ws) removed
-
-after TF change later
-access_function_engineer-ac (ac) - create new parent group done on Grammarly Side
-  - DATA (ac) - added
-
-
-Ideal world
-before
-DATA (ws) - holding all the permisssions
-DATA (ac)
-
-after option 1 (add feature to rename groups)
-DATA (ws) -> DATA-qa (ws)  - holding all the permisssions
-make DATA (ac) a child of DATA-qa(ws)
-
-after option 2 (add feature to migrate groups to ac)
-DATA (ws) -> replaced by DATA (ac) with all the permissions from specific ws
-
-if we create access_function_engineer (ac) - conflict with prod access_function_engineer (ws)
-
-
-
-workspace-prod
-- access_function_engineer (ac) - entitlement - create_cluster 
-  - DATA (ac)
-
-
-workspace-preprod
-- access_function_engineer (ac) - entitlement - create_instance_pool 
-  - DATA (ac)
-
-
-workspace-qa
-
-
-'''
-
-# gm.allWsLocalGroups['access_function_analyst']
 
 # COMMAND ----------
 
@@ -259,37 +203,20 @@ workspace-qa
 
 # COMMAND ----------
 
-## TODO: if fail to create temp - auto delete and retry
+# Will attempt to create temp group, if group already exists then it will use existing group
 gm.createBackupGroupApplyPerm()
 
 # COMMAND ----------
 
-# # "dashboards"
+# MAGIC %md
+# MAGIC #### Step 4: Delete original workspace group
+# MAGIC This steps deletes the original workspace group.
+# MAGIC - Verify original workspace groups are deleted in the workspace admin console
+# MAGIC - end user permissions shouldnt be impacted as ACL permission from temp workspace group should be in effect
 
-# level = "Workspace"
-# applyPermList = []
-# for object_id,aclList in gm.dashboardPerm.items():
-#   dataAcl=[]
-#   for acl in aclList:
-#     key = acl[0]
-#     if key == 'group_name':
-#       gName = acl[1]
-#       permission_level = acl[2]
-#     elif key == 'user_name':
-#       gName = acl[1]
-#       permission_level = acl[2]
-#     elif key == 'service_principal_name':
-#       gName = acl[1]
-#       permission_level = acl[2]
-  
-#     if gName in gm.groupL:
-#       dataAcl.insert(0,{key: "db-temp-"+gName, 'permission_level': permission_level})
-    
-#     dataAcl.insert(0,{key: gName, 'permission_level': permission_level})          
+# COMMAND ----------
 
-#   if any([str(dataAcl).count(group) > 0 for group in gm.groupL]):
-#     data={"access_control_list":dataAcl}
-#   print(data)
+gm.bulkTryDelete(gm.groupL)
 
 # COMMAND ----------
 
@@ -302,20 +229,8 @@ gm.createBackupGroupApplyPerm()
 
 # COMMAND ----------
 
-gm.dryRun("Account")
-
-# COMMAND ----------
-
-# MAGIC %md
-# MAGIC #### Step 4: Delete original workspace group
-# MAGIC This steps deletes the original workspace group.
-# MAGIC - Verify original workspace groups are deleted in the workspace admin console
-# MAGIC - end user permissions shouldnt be impacted as ACL permission from temp workspace group should be in effect
-
-# COMMAND ----------
-
-# gm.deleteWorkspaceLocalGroups() # debug why it try to delete Admin group
-gm.bulkTryDelete(subGroupL)
+print(gm.validateAccountGroup()==0)
+print(gm.validateTempWSGroup()==1)
 
 # COMMAND ----------
 
@@ -329,21 +244,7 @@ gm.bulkTryDelete(subGroupL)
 
 # COMMAND ----------
 
-# MAGIC %reload_ext autoreload
-
-# COMMAND ----------
-
-gm.groupL = subGroupL
-
-# COMMAND ----------
-
-## Don't add tmpgroups arbitrarily to access function engineer.
-## Check that we are only added subgroupL and not groupL
 gm.createAccountGroup()
-
-# COMMAND ----------
-
-# gm.applyGroupPermission("Account")
 
 # COMMAND ----------
 
@@ -355,7 +256,7 @@ gm.createAccountGroup()
 
 # COMMAND ----------
 
-gm.deleteTempGroups()
+gm.bulkTryDelete(["db-temp-"+g for g in gm.groupL])
 
 # COMMAND ----------
 
