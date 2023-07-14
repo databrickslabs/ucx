@@ -57,7 +57,10 @@
 # MAGIC %md
 # MAGIC ## How to Run
 # MAGIC
-# MAGIC Run the script in the following sequence
+
+# COMMAND ----------
+
+# MAGIC %md
 # MAGIC #### Step 1: Initialize the class
 # MAGIC Import the module WSGroupMigration and initialize the class by passing following attributes:
 # MAGIC - list of workspace group to be migrated (make sure these are workspace groups and not account level groups)
@@ -67,20 +70,6 @@
 # MAGIC - pat token of the admin to the workspace
 # MAGIC - user name of the user whose pat token is generated
 # MAGIC - confirm if Table ACL are used and access permission set for workspace groups
-
-# COMMAND ----------
-
-# MAGIC %md ## Installing the package and it's dependencies
-
-# COMMAND ----------
-
-from notebooks.common import install_uc_upgrade_package
-
-install_uc_upgrade_package()
-
-# COMMAND ----------
-
-# MAGIC %md ## Main process entrypoint
 
 # COMMAND ----------
 
@@ -98,6 +87,9 @@ groupL = ["groupA", "groupB"]
 
 # Find this in the account console
 inventoryTableName = "WorkspaceInventory"
+# the script will create two table
+# WorkspaceInventory - to store all the ACL permission
+# WorkspaceInventoryTableACL - to store the table acl permission specifically
 
 # Pull from your browser URL bar. Should start with "https://" and end with ".com" or ".net"
 workspace_url = "https://<DOMAIN>"
@@ -107,7 +99,7 @@ workspace_url = "https://<DOMAIN>"
 token = "<TOKEN>"
 
 # Should the migration Check the ACL on tables/views as well?
-checkTableACL = True
+checkTableACL = False
 
 # What cloud provider? Acceptable values are "AWS" or anything other value.
 cloud = "AWS"
@@ -156,17 +148,34 @@ gm.dryRun("Workspace")
 # MAGIC %md
 # MAGIC #### Adhoc Step: Selective Inventory
 # MAGIC This is a adhoc step for troubleshooting purpose. Once dryRun is complete and data stored in tables, if the acl of any object is changed in the workspace
+<<<<<<< Updated upstream
 # MAGIC Ex new notebook permission added, User can force a fresh inventory of the selected object instead of doing a full cleanup and dryRun to save time
 # MAGIC Call gm.performInventory with 3 parameters:
 # MAGIC  - mode: Workpace("workspace local group") or Account ("for workspace back up group")
 # MAGIC  - force: setting to True will force fresh inventory capture and updates to the tables
 # MAGIC  - objectType: select the list of object for which to do the fresh inventory, options are
 # MAGIC
+=======
+# MAGIC Ex new notebook permission added, User can force a fresh inventory of the selected object instead of doing a full cleanup and running the dryRun
+# MAGIC To save time call gm.performInventory with 3 parameters:
+# MAGIC  - mode: Workpace("for workspace local group") or Account ("for workspace back up group")
+# MAGIC  - force: setting to True will force fresh inventory capture and updates to the tables 
+# MAGIC  - objectType: select the list of object for which to do the fresh inventory, options are 
+# MAGIC  
+>>>>>>> Stashed changes
 # MAGIC  "Group"(will do members, group list, entitlement, roles), "Password","Cluster","ClusterPolicy","Warehouse","Dashboard","Query","Job","Folder"(Will do folders, notebook and files),"TableACL","Alert","Pool","Experiment","Model","DLT","Repo","Token","Secret"
+# MAGIC  Ex: gm.performInventory('Workspace',force=True,objectType='Cluster') will do:
+# MAGIC  - fresh inventory of all cluster objects and updated the data the inventory table
+# MAGIC  - run printInventory() to verify all the permission again (including clusters).
 
 # COMMAND ----------
 
+<<<<<<< Updated upstream
 gm.performInventory("Workspace", force=True, objectType="Folder")
+=======
+gm.performInventory('Workspace',force=True,objectType='Cluster')
+gm.printInventory()
+>>>>>>> Stashed changes
 
 # COMMAND ----------
 
