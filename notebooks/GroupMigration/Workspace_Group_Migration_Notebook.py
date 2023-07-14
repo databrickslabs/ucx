@@ -148,21 +148,12 @@ gm.dryRun("Workspace")
 # MAGIC %md
 # MAGIC #### Adhoc Step: Selective Inventory
 # MAGIC This is a adhoc step for troubleshooting purpose. Once dryRun is complete and data stored in tables, if the acl of any object is changed in the workspace
-<<<<<<< Updated upstream
-# MAGIC Ex new notebook permission added, User can force a fresh inventory of the selected object instead of doing a full cleanup and dryRun to save time
-# MAGIC Call gm.performInventory with 3 parameters:
-# MAGIC  - mode: Workpace("workspace local group") or Account ("for workspace back up group")
-# MAGIC  - force: setting to True will force fresh inventory capture and updates to the tables
-# MAGIC  - objectType: select the list of object for which to do the fresh inventory, options are
-# MAGIC
-=======
 # MAGIC Ex new notebook permission added, User can force a fresh inventory of the selected object instead of doing a full cleanup and running the dryRun
 # MAGIC To save time call gm.performInventory with 3 parameters:
 # MAGIC  - mode: Workpace("for workspace local group") or Account ("for workspace back up group")
-# MAGIC  - force: setting to True will force fresh inventory capture and updates to the tables 
-# MAGIC  - objectType: select the list of object for which to do the fresh inventory, options are 
-# MAGIC  
->>>>>>> Stashed changes
+# MAGIC  - force: setting to True will force fresh inventory capture and updates to the tables
+# MAGIC  - objectType: select the list of object for which to do the fresh inventory, options are
+# MAGIC
 # MAGIC  "Group"(will do members, group list, entitlement, roles), "Password","Cluster","ClusterPolicy","Warehouse","Dashboard","Query","Job","Folder"(Will do folders, notebook and files),"TableACL","Alert","Pool","Experiment","Model","DLT","Repo","Token","Secret"
 # MAGIC  Ex: gm.performInventory('Workspace',force=True,objectType='Cluster') will do:
 # MAGIC  - fresh inventory of all cluster objects and updated the data the inventory table
@@ -170,12 +161,8 @@ gm.dryRun("Workspace")
 
 # COMMAND ----------
 
-<<<<<<< Updated upstream
-gm.performInventory("Workspace", force=True, objectType="Folder")
-=======
-gm.performInventory('Workspace',force=True,objectType='Cluster')
+gm.performInventory("Workspace", force=True, objectType="Cluster")
 gm.printInventory()
->>>>>>> Stashed changes
 
 # COMMAND ----------
 
