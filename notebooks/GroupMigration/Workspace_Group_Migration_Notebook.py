@@ -57,7 +57,10 @@
 # MAGIC %md
 # MAGIC ## How to Run
 # MAGIC
-# MAGIC Run the script in the following sequence
+
+# COMMAND ----------
+
+# MAGIC %md
 # MAGIC #### Step 1: Initialize the class
 # MAGIC Import the module WSGroupMigration and initialize the class by passing following attributes:
 # MAGIC - list of workspace group to be migrated (make sure these are workspace groups and not account level groups)
@@ -70,36 +73,30 @@
 
 # COMMAND ----------
 
-# MAGIC %md ## Installing the package and it's dependencies
-
-# COMMAND ----------
-
-from notebooks.common import install_uc_upgrade_package
-
-install_uc_upgrade_package()
-
-# COMMAND ----------
-
-# MAGIC %md ## Main process entrypoint
+from uc_upgrade.group_migration import GroupMigration
 
 # COMMAND ----------
 
 # If autoGenerateList=True then groupL will be ignored and all eliglbe groups will be migrated.
 autoGenerateList = False
 
-# please provide groups here, e.g.
+# please provide groups here, e.g. analyst.
+# please provide group names and not ids
 groupL = ["groupA", "groupB"]
 
 
 # Find this in the account console
 inventoryTableName = "WorkspaceInventory"
+# the script will create two table
+# WorkspaceInventory - to store all the ACL permission
+# WorkspaceInventoryTableACL - to store the table acl permission specifically
 
 # Pull from your browser URL bar. Should start with "https://" and end with ".com" or ".net"
 workspace_url = "https://<DOMAIN>"
 
 
 # Personal Access Token. Create one in "User Settings"
-token = "<TOKEN"
+token = "<TOKEN>"
 
 # Should the migration Check the ACL on tables/views as well?
 checkTableACL = False
@@ -111,8 +108,13 @@ cloud = "AWS"
 userName = "<UserMailID>"
 
 # Number of threads to issue Databricks API requests with. If you get a lot of errors during the inventory, lower this value.
-numThreads = 30
+numThreads = 10
 
+# The notebook will populate data in the WorkspaceInventory and WorkspaceInventoryTableACL(If applicable).
+# if the notebook is run second time, it will retrieve the data from the table if already captured.
+# Users have the option to do a fresh inventory in which case it will recreate the tables and start again.
+# default set to False
+freshInventory = False
 # Initialize GroupMigration Class with values supplied above
 gm = GroupMigration(
     groupL=groupL,
@@ -125,6 +127,7 @@ gm = GroupMigration(
     checkTableACL=checkTableACL,
     autoGenerateList=autoGenerateList,
     numThreads=numThreads,
+    freshInventory=freshInventory,
 )
 
 # COMMAND ----------
@@ -133,10 +136,33 @@ gm = GroupMigration(
 # MAGIC #### Step 2: Perform Dry run
 # MAGIC This steps performs a dry run to verify the current ACL on the supplied workspace groups and print outs the permission.
 # MAGIC Please verify if all the permissions are covered
+# MAGIC If the inventory was run previously and stored in the table for either Workspace or Account then it will use the same and save time, else it will do a fresh inventory
+# MAGIC If the inventory data in the table is present for only few workspace objects , the dryRun will do the fresh inventory of objects not present in the table
 
 # COMMAND ----------
 
 gm.dryRun("Workspace")
+
+# COMMAND ----------
+
+# MAGIC %md
+# MAGIC #### Adhoc Step: Selective Inventory
+# MAGIC This is a adhoc step for troubleshooting purpose. Once dryRun is complete and data stored in tables, if the acl of any object is changed in the workspace
+# MAGIC Ex new notebook permission added, User can force a fresh inventory of the selected object instead of doing a full cleanup and running the dryRun
+# MAGIC To save time call gm.performInventory with 3 parameters:
+# MAGIC  - mode: Workpace("for workspace local group") or Account ("for workspace back up group")
+# MAGIC  - force: setting to True will force fresh inventory capture and updates to the tables
+# MAGIC  - objectType: select the list of object for which to do the fresh inventory, options are
+# MAGIC
+# MAGIC  "Group"(will do members, group list, entitlement, roles), "Password","Cluster","ClusterPolicy","Warehouse","Dashboard","Query","Job","Folder"(Will do folders, notebook and files),"TableACL","Alert","Pool","Experiment","Model","DLT","Repo","Token","Secret"
+# MAGIC  Ex: gm.performInventory('Workspace',force=True,objectType='Cluster') will do:
+# MAGIC  - fresh inventory of all cluster objects and updated the data the inventory table
+# MAGIC  - run printInventory() to verify all the permission again (including clusters).
+
+# COMMAND ----------
+
+gm.performInventory("Workspace", force=True, objectType="Cluster")
+gm.printInventory()
 
 # COMMAND ----------
 
@@ -159,6 +185,8 @@ gm.createBackupGroup()
 # MAGIC - Verify the temp group permissions are as seen in the initial dry run
 # MAGIC - check randomly if all the ACL are applied correctly
 # MAGIC - there should be one temp group for every workspace group (Ex: db-temp-analysts and analysts with same ACLs)
+# MAGIC - Similar to dryRun("workspace"), this will also capture inventory for first run and store it in tables, subsequent times inventory will be retrived from the table to save time.
+# MAGIC - if inventory table contains partial workspace objects(ex cluster acl is missing), it will do fresh inventory for the missing object and update table
 
 # COMMAND ----------
 
