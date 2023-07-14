@@ -267,8 +267,8 @@ class GroupMigration:
                             entms.append(ent["value"])
                     except:  # noqa: E722
                         pass
-                    
-                    if len(entms)>0:
+
+                    if len(entms) > 0:
                         groupEntitlements[e["id"]] = entms
 
                     # Get Roles (AWS only)
@@ -1408,12 +1408,7 @@ class GroupMigration:
                         if level == "Workspace":
                             if acl["group_name"] in self.WorkspaceGroupNames:
                                 gName = "db-temp-" + acl["group_name"]
-                                dataAcl.append(
-                                    {
-                                        "group_name": gName,
-                                        "permission_level": acl["permission_level"]
-                                    }
-                                )
+                                dataAcl.append({"group_name": gName, "permission_level": acl["permission_level"]})
                         elif level == "Account":
                             if acl["group_name"] in self.TempGroupNames:
                                 gName = acl["group_name"][8:]
@@ -1427,7 +1422,7 @@ class GroupMigration:
                 requests.post(
                     f"{self.workspace_url}/api/2.0/preview/sql/permissions/{object}/{object_id}",
                     headers=self.headers,
-                    data=json.dumps(data)
+                    data=json.dumps(data),
                 )
         except Exception as e:
             logger.error(f"Error setting permission for {object} {object_id}. {e} ")
@@ -1440,12 +1435,8 @@ class GroupMigration:
                         gName = "db-temp-" + acl[0]
                     elif level == "Account":
                         gName = acl[0][8:]
-                    data = {
-                        "scope": object_id,
-                        "principal": gName,
-                        "permission": acl[1]
-                    }
-                    res=requests.post(
+                    data = {"scope": object_id, "principal": gName, "permission": acl[1]}
+                    requests.post(
                         f"{self.workspace_url}/api/2.0/secrets/acls/put",
                         headers=self.headers,
                         data=json.dumps(data),
@@ -1519,7 +1510,7 @@ class GroupMigration:
                     return []
 
             tables = self.runVerboseSql("show tables in spark_catalog.{}".format(db)).filter(
-                col("isTemporary") == False
+                col("isTemporary") == False  # noqa: E712
             )
             for table in tables.collect():
                 try:
@@ -1713,7 +1704,13 @@ class GroupMigration:
             if tableACL:
                 checkPermSQL = f"select Database, Principal, ActionTypes, ObjectType, ObjectKey from \
                             {self.inventoryTableName}TableACL where groupType='{groupType}'"
-                perm = self.spark.sql(checkPermSQL).withColumn("ActionTypes",regexp_replace(col('ActionTypes'),'\[','')).withColumn("ActionTypes",regexp_replace(col('ActionTypes'),'\]','')).withColumn("ActionTypes",split(col('ActionTypes'),',')).collect()
+                perm = (
+                    self.spark.sql(checkPermSQL)
+                    .withColumn("ActionTypes", regexp_replace(col("ActionTypes"), "\[", ""))
+                    .withColumn("ActionTypes", regexp_replace(col("ActionTypes"), "\]", ""))
+                    .withColumn("ActionTypes", split(col("ActionTypes"), ","))
+                    .collect()
+                )
                 return perm
             else:
                 checkPermSQL = f"select Permission from {self.inventoryTableName} where groupType='{groupType}' and \
