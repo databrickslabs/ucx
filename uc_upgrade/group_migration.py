@@ -7,7 +7,7 @@ from typing import List
 
 import requests
 from pyspark.sql import session
-from pyspark.sql.functions import array_contains, col, collect_set, lit
+from pyspark.sql.functions import array_contains, col, collect_set, lit, regexp_replace, split
 from pyspark.sql.types import MapType, StringType, StructField, StructType
 
 # Initialize logger
@@ -267,8 +267,9 @@ class GroupMigration:
                             entms.append(ent["value"])
                     except:  # noqa: E722
                         pass
-
-                    groupEntitlements[e["id"]] = entms
+                    
+                    if len(entms)>0:
+                        groupEntitlements[e["id"]] = entms
 
                     # Get Roles (AWS only)
                     if self.cloud == "AWS":
@@ -1374,7 +1375,7 @@ class GroupMigration:
                     data=json.dumps(instanceProfileRoles),
                 )
         except Exception as e:
-            logger.error(f"error applying role for group id: {group_id}.")
+            logger.error(f"error applying role for group id: {group_id}.{e}")
 
     def updateGroupPermission(self, object: str, groupPermission: dict, level: str):
         try:
@@ -1410,7 +1411,7 @@ class GroupMigration:
                                 dataAcl.append(
                                     {
                                         "group_name": gName,
-                                        "permission_level": acl["permission_level"],
+                                        "permission_level": acl["permission_level"]
                                     }
                                 )
                         elif level == "Account":
@@ -1426,7 +1427,7 @@ class GroupMigration:
                 requests.post(
                     f"{self.workspace_url}/api/2.0/preview/sql/permissions/{object}/{object_id}",
                     headers=self.headers,
-                    data=json.dumps(data),
+                    data=json.dumps(data)
                 )
         except Exception as e:
             logger.error(f"Error setting permission for {object} {object_id}. {e} ")
@@ -1442,9 +1443,9 @@ class GroupMigration:
                     data = {
                         "scope": object_id,
                         "principal": gName,
-                        "permission": acl[1],
+                        "permission": acl[1]
                     }
-                    requests.post(
+                    res=requests.post(
                         f"{self.workspace_url}/api/2.0/secrets/acls/put",
                         headers=self.headers,
                         data=json.dumps(data),
@@ -1518,7 +1519,7 @@ class GroupMigration:
                     return []
 
             tables = self.runVerboseSql("show tables in spark_catalog.{}".format(db)).filter(
-                col("isTemporary") is False
+                col("isTemporary") == False
             )
             for table in tables.collect():
                 try:
@@ -1712,7 +1713,7 @@ class GroupMigration:
             if tableACL:
                 checkPermSQL = f"select Database, Principal, ActionTypes, ObjectType, ObjectKey from \
                             {self.inventoryTableName}TableACL where groupType='{groupType}'"
-                perm = self.spark.sql(checkPermSQL).collect()
+                perm = self.spark.sql(checkPermSQL).withColumn("ActionTypes",regexp_replace(col('ActionTypes'),'\[','')).withColumn("ActionTypes",regexp_replace(col('ActionTypes'),'\]','')).withColumn("ActionTypes",split(col('ActionTypes'),',')).collect()
                 return perm
             else:
                 checkPermSQL = f"select Permission from {self.inventoryTableName} where groupType='{groupType}' and \
@@ -1999,7 +2000,7 @@ class GroupMigration:
                 ss = [
                     x.replace("=", ",").split(",") for x in perm[mem].replace("[{", "").replace("}]", "").split("}, {")
                 ]
-                perm[mem] = [{s[0]: s[1], s[2]: s[3]} for s in ss]
+                perm[mem] = [{s[0].strip(): s[1].strip(), s[2].strip(): s[3].strip()} for s in ss]
         return perm
 
     def printInventory(self, printMembers: bool = False):
@@ -2137,6 +2138,7 @@ class GroupMigration:
             logger.info("applying token permissions")
             self.updateGroupPermission("authorization", self.tokenPerm, level)
             logger.info("applying secret scope permissions")
+            self.updateSecretPermission(self.secretScopePerm, level)
             self.updateSecretPermission(self.secretScopePerm, level)
             logger.info("applying dashboard permissions")
             self.updateGroup2Permission("dashboards", self.dashboardPerm, level)
@@ -2278,7 +2280,7 @@ class GroupMigration:
                 )
                 if res.status_code == 409:
                     logger.info(f'group with name "db-temp-"{g} already present, please delete and try again.')
-                    continue
+                    return
                 self.groupWSGIdDict[res.json()["id"]] = "db-temp-" + g
                 self.groupWSGNameDict["db-temp-" + g] = res.json()["id"]
             self.applyGroupPermission("Workspace")
