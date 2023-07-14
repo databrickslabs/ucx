@@ -7,7 +7,14 @@ from typing import List
 
 import requests
 from pyspark.sql import session
-from pyspark.sql.functions import array_contains, col, collect_set, lit, regexp_replace, split
+from pyspark.sql.functions import (
+    array_contains,
+    col,
+    collect_set,
+    lit,
+    regexp_replace,
+    split,
+)
 from pyspark.sql.types import MapType, StringType, StructField, StructType
 
 # Initialize logger
