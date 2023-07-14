@@ -92,7 +92,7 @@ from uc_upgrade.group_migration import GroupMigration
 autoGenerateList = False
 
 # please provide groups here, e.g. analyst.
-#please provide group names and not ids
+# please provide group names and not ids
 groupL = ["groupA", "groupB"]
 
 
@@ -121,7 +121,7 @@ numThreads = 10
 # The notebook will populate data in the WorkspaceInventory and WorkspaceInventoryTableACL(If applicable).
 # if the notebook is run second time, it will retrieve the data from the table if already captured.
 # Users have the option to do a fresh inventory in which case it will recreate the tables and start again.
-#default set to False
+# default set to False
 freshInventory = False
 # Initialize GroupMigration Class with values supplied above
 gm = GroupMigration(
@@ -135,7 +135,7 @@ gm = GroupMigration(
     checkTableACL=checkTableACL,
     autoGenerateList=autoGenerateList,
     numThreads=numThreads,
-    freshInventory=freshInventory
+    freshInventory=freshInventory,
 )
 
 # COMMAND ----------
@@ -159,14 +159,14 @@ gm.dryRun("Workspace")
 # MAGIC Ex new notebook permission added, User can force a fresh inventory of the selected object instead of doing a full cleanup and dryRun to save time
 # MAGIC Call gm.performInventory with 3 parameters:
 # MAGIC  - mode: Workpace("workspace local group") or Account ("for workspace back up group")
-# MAGIC  - force: setting to True will force fresh inventory capture and updates to the tables 
-# MAGIC  - objectType: select the list of object for which to do the fresh inventory, options are 
-# MAGIC  
+# MAGIC  - force: setting to True will force fresh inventory capture and updates to the tables
+# MAGIC  - objectType: select the list of object for which to do the fresh inventory, options are
+# MAGIC
 # MAGIC  "Group"(will do members, group list, entitlement, roles), "Password","Cluster","ClusterPolicy","Warehouse","Dashboard","Query","Job","Folder"(Will do folders, notebook and files),"TableACL","Alert","Pool","Experiment","Model","DLT","Repo","Token","Secret"
 
 # COMMAND ----------
 
-gm.performInventory('Workspace',force=True,objectType='Folder')
+gm.performInventory("Workspace", force=True, objectType="Folder")
 
 # COMMAND ----------
 
