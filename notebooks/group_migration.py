@@ -43,34 +43,17 @@
 # COMMAND ----------
 
 # MAGIC %md
-# MAGIC ## Pre-requisite
+# MAGIC ## Pre-requisites
 # MAGIC
 # MAGIC Before running the script, please make sure you have the following checks
-# MAGIC 1. Ensure you have equivalent account level group created for the workspace group to be migrated
-# MAGIC 2. create a PAT token for the workspace which has admin access
-# MAGIC 3. Ensure SCIM integration at workspace group is disabled
-# MAGIC 4. Ensure no jobs or process is running the workspace using an user/service principal which is member of the workspace group
-# MAGIC 5. Confirm if Table ACL is defined in the workspace and ACL defined for groups, if not Table ACL check can be skipped as it takes time to capture ACL for tables if the list is huge
+# MAGIC 1. Ensure you have equivalent account level groups created for all workspace groups to be migrated
+# MAGIC 2. Ensure no jobs or process is running the workspace using an user/service principal which is member of the workspace group
+# MAGIC 3. Confirm if Table ACL is defined in the workspace and ACL defined for groups, if not Table ACL check can be skipped as it takes time to capture ACL for tables if the list is huge
 
 # COMMAND ----------
 
-# MAGIC %md
-# MAGIC ## How to Run
-# MAGIC
-# MAGIC Run the script in the following sequence
-# MAGIC #### Step 1: Initialize the class
-# MAGIC Import the module WSGroupMigration and initialize the class by passing following attributes:
-# MAGIC - list of workspace group to be migrated (make sure these are workspace groups and not account level groups)
-# MAGIC - if the workspace is AWS or Azure
-# MAGIC - workspace url
-# MAGIC - name of the table to persist inventory data
-# MAGIC - pat token of the admin to the workspace
-# MAGIC - user name of the user whose pat token is generated
-# MAGIC - confirm if Table ACL are used and access permission set for workspace groups
-
-# COMMAND ----------
-
-# MAGIC %md ## Installing the package and it's dependencies
+# MAGIC %md 
+# MAGIC ### Installing the package and it's dependencies
 
 # COMMAND ----------
 
@@ -80,9 +63,11 @@ install_uc_upgrade_package()
 
 # COMMAND ----------
 
-# MAGIC %md ## Main process entrypoint
+# MAGIC %md 
+# MAGIC ### Imports
 
 # COMMAND ----------
+
 from databricks.sdk.runtime import dbutils  # noqa: F405
 
 from uc_upgrade.config import (  # noqa: E402
@@ -94,6 +79,12 @@ from uc_upgrade.config import (  # noqa: E402
 )
 from uc_upgrade.toolkits.group_migration import GroupMigrationToolkit  # noqa: E402
 
+# COMMAND ----------
+
+# MAGIC %md ### Configuration
+
+# COMMAND ----------
+
 migration_config = MigrationConfig(
     inventory_table_name=InventoryTableName(
         catalog="main", database="default", table="uc_migration_permission_inventory"
@@ -101,18 +92,18 @@ migration_config = MigrationConfig(
     migrate_table_acls=False,
     auth_config=AuthConfig(
         account=AccountAuthConfig(
-            # we recommend you to use Databricks Secrets to store the credentials!
-            host="https://account-console-host",
-            password=dbutils.secrets.get("scope", "password"),
-            username=dbutils.secrets.get("scope", "username"),
-            # however you can also pass the credentials directly
-            # host="https://account-console-host", password="accountAdminPassword", username="accountAdminUsername"
+            # we recommend you to use Databricks Secrets to store the credentials
+            # host="https://account-console-host",
+            # password=dbutils.secrets.get("scope", "password"),
+            # username=dbutils.secrets.get("scope", "username"),
+            # however, you can also pass the credentials directly
+            host="https://account-console-host", password="accountAdminPassword", username="accountAdminUsername"
         ),
     ),
     group_listing_config=GroupListingConfig(
         # you can provide the group list below
         # it's expected to be a list of strings with displayName values
-        groups=["some_workspace_group_name"],
+        groups=["some_group_name"],
         # alternatively, you can automatically fetch the groups from the workspace
         # auto=True,
     ),
@@ -120,35 +111,134 @@ migration_config = MigrationConfig(
 
 toolkit = GroupMigrationToolkit(migration_config)
 
-# if group_listing_config.auto is True the groups will be fetched from the workspace
-# if group_listing_config.auto is False, then the groups will be fetched from the group_listing_config.groups
-# in both cases, group existence will be verified on the account level
+# COMMAND ----------
+
+# MAGIC %md
+# MAGIC
+# MAGIC ## Migration process
+
+# COMMAND ----------
+
+# MAGIC %md 
+# MAGIC
+# MAGIC ### Step 1 - Validate or fetch the groups
+# MAGIC
+# MAGIC
+# MAGIC - If `group_listing_config.auto` is `True` the groups will be fetched from the workspace.
+# MAGIC - If `group_listing_config.auto` is `False`, then the groups will be fetched from the `group_listing_config.groups` property.
+# MAGIC
+# MAGIC **In both cases, group existence will be verified on the workspace and account level.**
+
+# COMMAND ----------
 
 toolkit.validate_groups()
 
+# COMMAND ----------
 
-# this step will clean up the inventory table if it already exists
+# MAGIC %md 
+# MAGIC
+# MAGIC ### Step 2 - Cleanup the inventory table
+# MAGIC
+# MAGIC This step will clean up the inventory table if it already exists. 
+# MAGIC
+# MAGIC It uses the property `inventory_table` from migration config.
+
+# COMMAND ----------
+
 toolkit.cleanup_inventory_table()
 
-# this step will save all the permissions for the workspace groups in the inventory table
+# COMMAND ----------
+
+# MAGIC %md
+# MAGIC
+# MAGIC ### Step 3 - Inventorize the permissions
+# MAGIC
+# MAGIC This step will save all the permissions for the workspace groups in the inventory table.
+# MAGIC
+# MAGIC **Please note that depending on the property `with_table_acls` from config it will either collect the table ACLs, or skip them.**
+
+# COMMAND ----------
+
 toolkit.inventorize_permissions()
 
-# this step will create backup groups for the workspace groups.
-# if group already exists, it will update its properties to the recent status
+# COMMAND ----------
+
+# MAGIC %md
+# MAGIC
+# MAGIC ### Step 4 - Create or update backup groups
+# MAGIC
+# MAGIC This step will create backup groups for the workspace groups.
+# MAGIC
+# MAGIC Each backup group will have the same name, but with prefix, configured via the optional `backup_group_prefix` property.
+# MAGIC
+# MAGIC **Please note that if backup group already exists, it will update its properties to the recent status**.
+
+# COMMAND ----------
+
 toolkit.create_or_update_backup_groups()
 
+# COMMAND ----------
 
-# this step will apply group permissions to the backup groups
+# MAGIC %md
+# MAGIC
+# MAGIC ### Step 5 - apply permissions to the backup groups
+# MAGIC
+# MAGIC This step will apply permissions from the inventory table to the backup groups.
+
+# COMMAND ----------
+
 toolkit.apply_backup_group_permissions()
 
-# this step will delete the workspace groups and then replace them with account groups
+# COMMAND ----------
+
+# MAGIC %md
+# MAGIC
+# MAGIC ### Step 6 - Replace workspace groups with account groups
+# MAGIC
+# MAGIC <html></br></html>
+# MAGIC
+# MAGIC - This step will delete the workspace groups and replace them with account-level groups.
+# MAGIC - Please note that existing users shall not be affected by this change, since their permissions are granted by the backup groups we've created earlier.
+# MAGIC
+# MAGIC **Please note that currently we don't provide a capability to reverse this step.**
+# MAGIC
+
+# COMMAND ----------
+
 toolkit.replace_workspace_groups_with_account_groups()
 
-# this step will apply group permissions to the account groups
+# COMMAND ----------
+
+# MAGIC %md
+# MAGIC
+# MAGIC ### Step 7 - Apply group permissions to the account groups
+# MAGIC
+# MAGIC This step will apply the permissions from the inventory table to the account groups.
+
+# COMMAND ----------
+
 toolkit.apply_account_group_permissions()
 
-# this step will delete the backup groups
+# COMMAND ----------
+
+# MAGIC %md 
+# MAGIC
+# MAGIC ### Step 8 - Delete the backup groups
+# MAGIC
+# MAGIC This step will delete the backup groups.
+
+# COMMAND ----------
+
 toolkit.delete_backup_groups()
 
-# this step will clean up the inventory table
+# COMMAND ----------
+
+# MAGIC %md 
+# MAGIC
+# MAGIC ### Step 9 - Cleanup the inventory table
+# MAGIC
+# MAGIC This step will drop the inventory table.
+
+# COMMAND ----------
+
 toolkit.cleanup_inventory_table()
