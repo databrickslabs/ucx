@@ -22,8 +22,10 @@ class CustomFormatter(logging.Formatter):
         timestamp = time.strftime("%Y-%m-%d %H:%M:%S", time.gmtime(record.created))
         log_level = record.levelname
         function_name = record.funcName
-        return f"[{timestamp}][{log_level}][{record.threadName}]" \
-               f"[{self._notebook_path}][{function_name}] {record.getMessage()}"
+        return (
+            f"[{timestamp}][{log_level}][{record.threadName}]"
+            f"[{self._notebook_path}][{function_name}] {record.getMessage()}"
+        )
 
 
 class LoggerProvider:

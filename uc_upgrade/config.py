@@ -3,6 +3,16 @@ from typing import List, Optional
 
 
 @dataclass
+class InventoryTableName:
+    catalog: str
+    database: str
+    table: str
+
+    def __repr__(self):
+        return f"{self.catalog}.{self.database}.{self.table}"
+
+
+@dataclass
 class GroupListingConfig:
     groups: Optional[List[str]] = None
     auto: Optional[bool] = True
@@ -19,18 +29,17 @@ class AccountAuthConfig:
     host: str
     password: str
     username: str
-    cloud: str
 
 
 @dataclass
 class AuthConfig:
-    workspace: Optional[WorkspaceAuthConfig]
     account: AccountAuthConfig
+    workspace: Optional[WorkspaceAuthConfig] = None
 
 
 @dataclass
 class MigrationConfig:
-    inventory_table_name: str
+    inventory_table_name: InventoryTableName
     migrate_table_acls: bool
     auth_config: AuthConfig
     group_listing_config: GroupListingConfig

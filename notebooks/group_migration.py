@@ -83,128 +83,71 @@ install_uc_upgrade_package()
 # MAGIC %md ## Main process entrypoint
 
 # COMMAND ----------
+from databricks.sdk.runtime import dbutils  # noqa: F405
+from uc_upgrade.toolkits.group_migration import GroupMigrationToolkit  # noqa: E402
+from uc_upgrade.config import (
+    MigrationConfig,
+    AuthConfig,
+    InventoryTableName,
+    AccountAuthConfig,
+    GroupListingConfig,
+)  # noqa: E402
 
-# If autoGenerateList=True then groupL will be ignored and all eliglbe groups will be migrated.
-autoGenerateList = False
-
-# please provide groups here, e.g.
-groupL = ["groupA", "groupB"]
-
-
-# Find this in the account console
-inventoryTableName = "WorkspaceInventory"
-
-# Pull from your browser URL bar. Should start with "https://" and end with ".com" or ".net"
-workspace_url = "https://<DOMAIN>"
-
-
-# Personal Access Token. Create one in "User Settings"
-token = "<TOKEN"
-
-# Should the migration Check the ACL on tables/views as well?
-checkTableACL = False
-
-# What cloud provider? Acceptable values are "AWS" or anything other value.
-cloud = "AWS"
-
-# Your databricks user email.
-userName = "<UserMailID>"
-
-# Number of threads to issue Databricks API requests with. If you get a lot of errors during the inventory, lower this value.
-numThreads = 30
-
-# Initialize GroupMigrationToolkit Class with values supplied above
-gm = GroupMigration(
-    groupL=groupL,
-    cloud=cloud,
-    inventoryTableName=inventoryTableName,
-    workspace_url=workspace_url,
-    pat=token,
-    spark=spark,
-    userName=userName,
-    checkTableACL=checkTableACL,
-    autoGenerateList=autoGenerateList,
-    numThreads=numThreads,
+migration_config = MigrationConfig(
+    inventory_table_name=InventoryTableName(
+        catalog="main", database="default", table="uc_migration_permission_inventory"
+    ),
+    migrate_table_acls=False,
+    auth_config=AuthConfig(
+        account=AccountAuthConfig(
+            # we recommend you to use Databricks Secrets to store the credentials!
+            host="https://account-console-host",
+            password=dbutils.secrets.get("scope", "password"),
+            username=dbutils.secrets.get("scope", "username"),
+            # however you can also pass the credentials directly
+            # host="https://account-console-host", password="accountAdminPassword", username="accountAdminUsername"
+        ),
+    ),
+    group_listing_config=GroupListingConfig(
+        # you can provide the group list below
+        # it's expected to be a list of strings with displayName values
+        groups=["some_workspace_group_name"],
+        # alternatively, you can automatically fetch the groups from the workspace
+        # auto=True,
+    ),
 )
 
-# COMMAND ----------
+toolkit = GroupMigrationToolkit(migration_config)
 
-# MAGIC %md
-# MAGIC #### Step 2: Perform Dry run
-# MAGIC This steps performs a dry run to verify the current ACL on the supplied workspace groups and print outs the permission.
-# MAGIC Please verify if all the permissions are covered
+# if group_listing_config.auto is True the groups will be fetched from the workspace
+# if group_listing_config.auto is False, then the groups will be fetched from the group_listing_config.groups
+# in both cases, group existence will be verified on the account level
 
-# COMMAND ----------
+toolkit.validate_groups()
 
-gm.dryRun("Workspace")
 
-# COMMAND ----------
+# this step will clean up the inventory table if it already exists
+toolkit.cleanup_inventory_table()
 
-# MAGIC %md
-# MAGIC #### Step 3: Create Back up group
-# MAGIC This steps creates the back up groups, applies the ACL on the new temp group from the original workspace group.
-# MAGIC - Verify the temp groups are created in the workspace admin console
-# MAGIC - check randomly if all the ACL are applied correctly
-# MAGIC - there should be one temp group for every workspace group (Ex: db-temp-analysts and analysts with same ACLs)
+# this step will save all the permissions for the workspace groups in the inventory table
+toolkit.inventorize_permissions()
 
-# COMMAND ----------
+# this step will create backup groups for the workspace groups.
+# if group already exists, it will update its properties to the recent status
+toolkit.create_or_update_backup_groups()
 
-gm.createBackupGroup()
 
-# COMMAND ----------
+# this step will apply group permissions to the backup groups
+toolkit.apply_backup_group_permissions()
 
-# MAGIC %md
-# MAGIC #### Step 3 Verification: Verify backup groups
-# MAGIC This steps runs the permission inventory, tracking the new temp groups
-# MAGIC - Verify the temp group permissions are as seen in the initial dry run
-# MAGIC - check randomly if all the ACL are applied correctly
-# MAGIC - there should be one temp group for every workspace group (Ex: db-temp-analysts and analysts with same ACLs)
+# this step will delete the workspace groups and then replace them with account groups
+toolkit.replace_workspace_groups_with_account_groups()
 
-# COMMAND ----------
+# this step will apply group permissions to the account groups
+toolkit.apply_account_group_permissions()
 
-gm.dryRun("Account")
+# this step will delete the backup groups
+toolkit.delete_backup_groups()
 
-# COMMAND ----------
-
-# MAGIC %md
-# MAGIC #### Step 4: Delete original workspace group
-# MAGIC This steps deletes the original workspace group.
-# MAGIC - Verify original workspace groups are deleted in the workspace admin console
-# MAGIC - end user permissions shouldnt be impacted as ACL permission from temp workspace group should be in effect
-
-# COMMAND ----------
-
-gm.deleteWorkspaceLocalGroups()
-
-# COMMAND ----------
-
-# MAGIC %md
-# MAGIC #### Step 5: Create account level groups
-# MAGIC This steps adds the account level groups to the workspace and applies the same ACL from the back workspace group to the account level group.
-# MAGIC - Ensure account level groups are created upfront before
-# MAGIC - verify account level groups are added to the workspace now
-# MAGIC - check randomly if all the ACL are applied correctly to the account level groups
-# MAGIC - there should be one temp group and account level group present (Ex: db-temp-analysts and analysts (account level group) with same ACLs)
-
-# COMMAND ----------
-
-gm.createAccountGroup()
-
-# COMMAND ----------
-
-# MAGIC %md
-# MAGIC #### Step 6: Delete temp workspace group
-# MAGIC This steps deletes the temp workspace group.
-# MAGIC - Verify temp workspace groups are deleted in the workspace admin console
-# MAGIC - end user permissions shouldnt be impacted as ACL permission from account level group should be in effect
-
-# COMMAND ----------
-
-gm.deleteTempGroups()
-
-# COMMAND ----------
-
-# MAGIC %md
-# MAGIC #### Complete
-# MAGIC - Repeat the steps for other workspace group in the same workspace
-# MAGIC - Repeat the steps for other workspace that require migration
+# this step will clean up the inventory table
+toolkit.cleanup_inventory_table()

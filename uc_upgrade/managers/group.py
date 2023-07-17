@@ -15,10 +15,10 @@ class GroupManager:
         self.ws_client = ClientProvider().get_workspace_client(config)
         self.acc_client = ClientProvider().get_account_client(config)
 
-    def _pre_init_groups(self):
+    def validate_groups(self):
         if self.config.group_listing_config.groups:
             self.logger.info("Using the provided group listing")
-            self.verify_groups()
+            self._verify_groups()
         else:
             self.config.group_listing_config.groups = self._find_eligible_groups()
 
@@ -54,13 +54,13 @@ class GroupManager:
         found_group = self._get_account_group(group_name, attributes="id")
         assert found_group, f"Group {group_name} not found"
 
-    def verify_groups(self):
+    def _verify_groups(self):
         for group_name in self.config.group_listing_config.groups:
             self._verify_group_exists_in_ws(group_name)
             self._verify_group_exists_in_acc(group_name)
 
     def _get_ws_group(
-            self, group_name, attributes: Optional[str] = None, excluded_attributes: Optional[str] = None
+        self, group_name, attributes: Optional[str] = None, excluded_attributes: Optional[str] = None
     ) -> Optional[Group]:
         groups = list(
             self.ws_client.groups.list(
