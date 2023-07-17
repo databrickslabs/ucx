@@ -49,7 +49,7 @@ class ClientProvider:
 
         current_user_option = list(
             client.users.list(
-                filter=f'userName eq "{config.auth_config.account.username}"', attributes="userName, roles"
+                filter=f'userName eq "{config.auth_config.account.username}"', attributes="userName,roles"
             )
         )
 
@@ -59,6 +59,10 @@ class ClientProvider:
             )
 
         current_user = current_user_option[0]
+
+        if not current_user.roles:
+            raise RuntimeError(f"Current user {current_user.user_name} has no roles, therefore is not an account admin")
+
         is_admin = any([role.value == "account_admin" for role in current_user.roles])
         if not is_admin:
             raise RuntimeError(f"Current user {current_user.user_name} is not an account admin")
