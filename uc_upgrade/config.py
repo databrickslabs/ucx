@@ -1,27 +1,37 @@
-# represents classes and utilities relevant for the configuration patterns.
-from __future__ import annotations
-
 from dataclasses import dataclass
+from typing import List, Optional
+
+
+@dataclass
+class GroupListingConfig:
+    groups: Optional[List[str]] = None
+    auto: Optional[bool] = True
+
+
+@dataclass
+class WorkspaceAuthConfig:
+    token: Optional[str]
+    host: Optional[str]
+
+
+@dataclass
+class AccountAuthConfig:
+    host: str
+    password: str
+    username: str
+    cloud: str
 
 
 @dataclass
 class AuthConfig:
-    token: str
-    workspace_host: str
-    account_console_host: str
-
-    @classmethod
-    def from_string(cls, token: str):
-        pass
+    workspace: Optional[WorkspaceAuthConfig]
+    account: AccountAuthConfig
 
 
 @dataclass
 class MigrationConfig:
-    pass
-
-
-@dataclass
-class Config:
-    # main configuration class, responsible for combining various parts of the task
-    auth: AuthConfig
-    migration: MigrationConfig
+    inventory_table_name: str
+    migrate_table_acls: bool
+    auth_config: AuthConfig
+    group_listing_config: GroupListingConfig
+    num_threads: Optional[int] = 16

@@ -113,7 +113,7 @@ userName = "<UserMailID>"
 # Number of threads to issue Databricks API requests with. If you get a lot of errors during the inventory, lower this value.
 numThreads = 30
 
-# Initialize GroupMigration Class with values supplied above
+# Initialize GroupMigrationToolkit Class with values supplied above
 gm = GroupMigration(
     groupL=groupL,
     cloud=cloud,

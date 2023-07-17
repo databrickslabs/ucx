@@ -1,46 +1,32 @@
 import concurrent.futures
 import json
-import logging
 import math
 import time
 from typing import List
 
 import requests
-from databricks.sdk import AccountClient, WorkspaceClient
-from pyspark.sql import session
+from pyspark.sql import SparkSession
 from pyspark.sql.functions import array_contains, col, collect_set, lit
 from pyspark.sql.types import MapType, StringType, StructField, StructType
 
-# Initialize logger
-logger = logging.getLogger(__name__)
-logging.basicConfig(level=logging.INFO)
-
-# TODO figure out how to authenticate to both level simultaneously
-workspace_client = WorkspaceClient()
-account_client = AccountClient()
+from uc_upgrade.config import MigrationConfig
+from uc_upgrade.managers.group import GroupManager
+from uc_upgrade.providers.logger import LoggerProvider
 
 
-class GroupMigration:
-    def __init__(
-        self,
-        groupL: List[str],
-        cloud: str,
-        inventoryTableName: str,
-        workspace_url: str,
-        pat: str,
-        spark: session.SparkSession,
-        userName: str,
-        checkTableACL: bool = False,
-        numThreads: int = 32,
-        autoGenerateList: bool = False,
-        verbose: bool = False,
-    ):
-        self.groupL = groupL
-        self.cloud = cloud
-        self.workspace_url = workspace_url.rstrip("/")
-        self.inventoryTableName = inventoryTableName
-        self.token = pat
-        self.headers = {"Authorization": "Bearer %s" % self.token}
+class GroupMigrationToolkit:
+    def __init__(self, config: MigrationConfig):
+        # initializing config and clients
+        # please note the order of operations here,
+        # the group manager IS INTENDED to change properties in the self.config object
+        self.config = config
+        self.group_manager = GroupManager(self.config)
+        self.logger = LoggerProvider.get_logger()
+
+        # initializing runtime utilities
+        self.logger = LoggerProvider.get_logger()
+        self.spark = SparkSession.builder.getOrCreate()
+
         self.groupIdDict = {}  # map: group id => group name
         self.groupNameDict = {}  # map: group name => group id
         self.accountGroups_lower = {}
@@ -74,62 +60,26 @@ class GroupMigration:
         self.folderList = {}
         self.notebookList = {}
         self.fileList = {}
-        self.spark = spark
-        self.userName = userName
-        self.checkTableACL = checkTableACL
-        self.verbose = verbose
-        self.numThreads = numThreads
 
-        self.lastInventoryRun = None
-        self.checkAllDB = False
-        logger.info(f"Clearing inventory table {self.inventoryTableName}")
-        spark.sql(f"drop table if exists {self.inventoryTableName}")
-        spark.sql(f"drop table if exists {self.inventoryTableName+'TableACL'}")
-
-        # Check if we should automatically generate list, and do it immediately.
-        # Implementers Note: Could change this section to a lazy calculation by setting
-        # groupL to nil or some sentinel value and adding checks before use.
-
-        assert workspace_client.current_user.me(), "Unable to authenitcate to Workspace"
-
-        # TODO add validation for authentication for account console
-
-        if autoGenerateList:
-            logger.info(
-                "autoGenerateList parameter is set to TRUE. "
-                "Ignoring groupL parameter and instead will automatically generate list of migraiton groups."
-            )
-            self.groupL = self.findMigrationEligibleGroups()
-
-        # Finish setting some params that depend on groupL
-        if len(self.groupL) == 0:
-            raise Exception("Migration group list (groupL) is empty!")
-
-        self.TempGroupNames = ["db-temp-" + g for g in self.groupL]
-        self.WorkspaceGroupNames = self.groupL
-
-        logger.info(
-            f"Successfully initialized GroupMigration class "
-            f"with {len(self.groupL)} workspace-local groups to migrate. Groups to migrate:"
-        )
-        for i, group in enumerate(self.groupL, start=1):
-            logger.info(f"{i}. {group}")
-        logger.info(f"Done listing {len(self.groupL)} groups to migrate.")
+    def cleanup_inventory_table(self):
+        self.self.logger.info("Cleaning up inventory table")
+        self.spark.sql("DROP TABLE IF EXISTS {}".format(self.config.inventory_table_name))
+        self.self.logger.info("Inventory table cleaned up")
 
     def findMigrationEligibleGroups(self):
-        logger.info("Begin automatic generation of all migration eligible groups.")
+        self.logger.info("Begin automatic generation of all migration eligible groups.")
         # Get all workspace-local groups
         try:
-            logger.info("Executing request to list workspace groups")
+            self.logger.info("Executing request to list workspace groups")
 
-            logger.debug("Getting workspace groups")
+            self.logger.debug("Getting workspace groups")
             workspace_groups = workspace_client.groups.list()
-            logger.debug("Getting account groups")
+            self.logger.debug("Getting account groups")
             account_groups = account_client.groups.list()
 
             self.account_groups = account_groups
 
-            logger.debug("Pruning local groups")
+            self.logger.debug("Pruning local groups")
             workspace_groups = set([g.display_name for g in workspace_groups])
             account_groups = set([g.display_name for g in account_groups])
 
@@ -141,18 +91,18 @@ class GroupMigration:
             allWsLocalGroups = list(local_workspace_groups)
             allWsLocalGroups_lower = [x.casefold() for x in allWsLocalGroups]
             allWsLocalGroups.sort()
-            logger.info(
+            self.logger.info(
                 f"\nFound {len(allWsLocalGroups)} workspace local groups. Listing (alphabetical order): \n"
-                + "\n".join(f"{i+1}. {name}" for i, name in enumerate(allWsLocalGroups))
+                + "\n".join(f"{i + 1}. {name}" for i, name in enumerate(allWsLocalGroups))
             )
 
         except Exception as e:
-            logger.error(f"ERROR in retrieving workspace group list: {e}")
+            self.logger.error(f"ERROR in retrieving workspace group list: {e}")
             raise
 
         # Now match against account groups.
         try:
-            logger.info("\nExecuting request to list account groups")
+            self.logger.info("\nExecuting request to list account groups")
             res = requests.get(
                 f"{self.workspace_url}/api/2.0/account/scim/v2/Groups",
                 headers=self.headers,
@@ -174,34 +124,34 @@ class GroupMigration:
             ]
             not_in_account_groups.sort()
 
-            # logger.info count and membership of not_in_account_groups
-            logger.info(
+            # self.logger.info count and membership of not_in_account_groups
+            self.logger.info(
                 f"Unable to match {len(not_in_account_groups)} current workspace-local groups. "
                 f"No matching account level group with the same name found. These groups WILL NOT MIGRATE:"
             )
             for i, group in enumerate(not_in_account_groups, start=1):
-                logger.info(f"{i}. {group} (WON'T MIGRATE)")
+                self.logger.info(f"{i}. {group} (WON'T MIGRATE)")
 
             if len(migration_eligible) > 0:
-                # logger.info count and membership of intersection
-                logger.info(
+                # self.logger.info count and membership of intersection
+                self.logger.info(
                     f"\nFound {len(migration_eligible)} current workspace-local groups to account level groups. "
                     f"These groups WILL BE MIGRATED."
                 )
                 for i, group in enumerate(migration_eligible, start=1):
-                    logger.info(f"{i}. {group} (WILL MIGRATE)")
-                logger.info("")
+                    self.logger.info(f"{i}. {group} (WILL MIGRATE)")
+                self.logger.info("")
 
                 return migration_eligible
             else:
-                logger.info(
+                self.logger.info(
                     "There are no migration eligible groups. "
                     "All existing workspace-local groups do not exist at the account level."
                     "\nNO MIGRATION WILL BE PERFORMED."
                 )
                 return []
         except Exception as e:
-            logger.error(f"ERROR in retrieving account group list : {e}")
+            self.logger.error(f"ERROR in retrieving account group list : {e}")
             raise
 
     def validateWSGroup(self) -> list:
@@ -213,11 +163,11 @@ class GroupMigration:
             resJson = res.json()
             for e in resJson["Resources"]:
                 if e["meta"]["resourceType"] == "Group" and e["displayName"] in self.groupL:
-                    logger.info(f"{e['displayName']} is a Account level group, please provide workspace group")
+                    self.logger.info(f"{e['displayName']} is a Account level group, please provide workspace group")
                     return 0
             return 1
         except Exception as e:
-            logger.error(f"error in retrieving group objects : {e}")
+            self.logger.error(f"error in retrieving group objects : {e}")
 
     def getGroupObjects(self, groupFilterKeeplist) -> list:
         try:
@@ -234,12 +184,12 @@ class GroupMigration:
             pages = totalGroups // 100
             # normalize case
             groupFilterKeeplist = [x.casefold() for x in groupFilterKeeplist]
-            logger.info(f"Total groups: {totalGroups}. Retrieving group details in chunks of 100")
+            self.logger.info(f"Total groups: {totalGroups}. Retrieving group details in chunks of 100")
             for i in range(0, pages + 1):
-                logger.info(f"Retrieving the next 100 items from {str(i*100+1)}")
+                self.logger.info(f"Retrieving the next 100 items from {str(i * 100 + 1)}")
 
                 res = requests.get(
-                    f"{self.workspace_url}/api/2.0/preview/scim/v2/Groups?startIndex={str(i*100+1)}&count=100",
+                    f"{self.workspace_url}/api/2.0/preview/scim/v2/Groups?startIndex={str(i * 100 + 1)}&count=100",
                     headers=self.headers,
                 )
                 resJson = res.json()
@@ -294,7 +244,7 @@ class GroupMigration:
                 self.groupNameDict[v] = k
 
         except Exception as e:
-            logger.error(f"error in retrieving group objects : {e}")
+            self.logger.error(f"error in retrieving group objects : {e}")
 
     # get list of users and service principals recursively for groups and nested groups
     def getRecursiveGroupMember(self, groupM: dict):
@@ -308,7 +258,7 @@ class GroupMigration:
                 resJson = res.json()
                 groupPrincipalList.append(resJson["displayName"])
             except Exception as e:
-                logger.info(f"error in retrieving group Names : {e}")
+                self.logger.info(f"error in retrieving group Names : {e}")
         self.groupGroupList.extend(groupPrincipalList)
         for key, value in groupM.items():
             userList = [u[1] for u in value if u[2].startswith("User")]
@@ -333,7 +283,7 @@ class GroupMigration:
                         pass
                     groupMembers[resJson["id"]] = members
             except Exception as e:
-                logger.error(f"error in retrieving nested group members : {e}")
+                self.logger.error(f"error in retrieving nested group members : {e}")
             if len(groupMembers) > 0:
                 self.getRecursiveGroupMember(groupMembers)
 
@@ -346,7 +296,7 @@ class GroupMigration:
                     resJson = res.json()
                     userPrincipalList.append(resJson["userName"])
                 except Exception as e:
-                    logger.error(f"error in retrieving user details : {e}")
+                    self.logger.error(f"error in retrieving user details : {e}")
 
             for spid in spList:
                 try:
@@ -357,7 +307,7 @@ class GroupMigration:
                     resJson = res.json()
                     spPrincipalList.append(resJson["applicationId"])
                 except Exception as e:
-                    logger.error(f"error in retrieving SP details : {e}")
+                    self.logger.error(f"error in retrieving SP details : {e}")
             self.groupUserList.extend(userPrincipalList)
             self.groupSPList.extend(spPrincipalList)
 
@@ -416,13 +366,13 @@ class GroupMigration:
 
     def getSingleClusterACL(self, clusterId):
         if self.verbose:
-            logger.info(f"[Verbose] Getting cluster permissions for cluster {clusterId}")
+            self.logger.info(f"[Verbose] Getting cluster permissions for cluster {clusterId}")
         resCPerm = requests.get(
             f"{self.workspace_url}/api/2.0/preview/permissions/clusters/{clusterId}",
             headers=self.headers,
         )
         if resCPerm.status_code == 404:
-            logger.error(f"Error: cluster ACL not enabled for the cluster: {clusterId}")
+            self.logger.error(f"Error: cluster ACL not enabled for the cluster: {clusterId}")
             return None
         resCPermJson = resCPerm.json()
         aclList = self.getACL(resCPermJson["access_control_list"])
@@ -431,14 +381,14 @@ class GroupMigration:
         return (clusterId, aclList)
 
     def getAllClustersACL(self) -> dict:
-        logger.info("Performing cluster inventory...")
+        self.logger.info("Performing cluster inventory...")
         try:
             resC = requests.get(f"{self.workspace_url}/api/2.0/clusters/list", headers=self.headers)
             resCJson = resC.json()
             clusterPerm = {}
             if len(resCJson) == 0:
                 return {}
-            logger.info(f"Scanning permissions of {len(resCJson['clusters'])} clusters.")
+            self.logger.info(f"Scanning permissions of {len(resCJson['clusters'])} clusters.")
             with concurrent.futures.ThreadPoolExecutor(max_workers=self.numThreads) as executor:
                 future_to_cluster = [
                     executor.submit(self.getSingleClusterACL, c["cluster_id"]) for c in resCJson["clusters"]
@@ -449,17 +399,17 @@ class GroupMigration:
                         clusterPerm[result[0]] = result[1]
             return clusterPerm
         except Exception as e:
-            logger.error(f"error in retrieving cluster permission: {e}")
+            self.logger.error(f"error in retrieving cluster permission: {e}")
 
     def getSingleClusterPolicyACL(self, policyId):
         if self.verbose:
-            logger.info(f"[Verbose] Getting policy permissions for {policyId}")
+            self.logger.info(f"[Verbose] Getting policy permissions for {policyId}")
         resCPPerm = requests.get(
             f"{self.workspace_url}/api/2.0/preview/permissions/cluster-policies/{policyId}",
             headers=self.headers,
         )
         if resCPPerm.status_code == 404:
-            logger.error(f"Error: cluster policy feature is not enabled for policy: {policyId}")
+            self.logger.error(f"Error: cluster policy feature is not enabled for policy: {policyId}")
             return None
         resCPPermJson = resCPPerm.json()
         aclList = self.getACL(resCPPermJson["access_control_list"])
@@ -468,7 +418,7 @@ class GroupMigration:
         return (policyId, aclList)
 
     def getAllClusterPolicyACL(self) -> dict:
-        logger.info("Performing cluster policy inventory...")
+        self.logger.info("Performing cluster policy inventory...")
         try:
             resCP = requests.get(
                 f"{self.workspace_url}/api/2.0/policies/clusters/list",
@@ -476,9 +426,9 @@ class GroupMigration:
             )
             resCPJson = resCP.json()
             if resCPJson["total_count"] == 0:
-                logger.info("No cluster policies defined.")
+                self.logger.info("No cluster policies defined.")
                 return {}
-            logger.info(f"Scanning permissions of {len(resCPJson['policies'])} cluster policies.")
+            self.logger.info(f"Scanning permissions of {len(resCPJson['policies'])} cluster policies.")
             clusterPolicyPerm = {}
             with concurrent.futures.ThreadPoolExecutor(max_workers=self.numThreads) as executor:
                 future_to_cluster = [
@@ -490,17 +440,17 @@ class GroupMigration:
                         clusterPolicyPerm[result[0]] = result[1]
             return clusterPolicyPerm
         except Exception as e:
-            logger.error(f"Error in retrieving cluster policy permission: {e}")
+            self.logger.error(f"Error in retrieving cluster policy permission: {e}")
 
     def getSingleWarehouseACL(self, warehouseId):
         if self.verbose:
-            logger.info(f"[Verbose] Getting warehouse permissions for warehouse {warehouseId}")
+            self.logger.info(f"[Verbose] Getting warehouse permissions for warehouse {warehouseId}")
         resWPerm = requests.get(
             f"{self.workspace_url}/api/2.0/preview/permissions/sql/warehouses/{warehouseId}",
             headers=self.headers,
         )
         if resWPerm.status_code == 404:
-            logger.error(f"Error: warehouse ACL not enabled for the warehouse: {warehouseId}")
+            self.logger.error(f"Error: warehouse ACL not enabled for the warehouse: {warehouseId}")
             return None
         resWPermJson = resWPerm.json()
         aclList = self.getACL(resWPermJson["access_control_list"])
@@ -509,14 +459,14 @@ class GroupMigration:
         return (warehouseId, aclList)
 
     def getAllWarehouseACL(self) -> dict:
-        logger.info("Performing warehouse inventory ...")
+        self.logger.info("Performing warehouse inventory ...")
         try:
             resW = requests.get(f"{self.workspace_url}/api/2.0/sql/warehouses", headers=self.headers)
             resWJson = resW.json()
             warehousePerm = {}
             if len(resWJson) == 0:
                 return {}
-            logger.info(f"Scanning permissions of {len(resWJson['warehouses'])} warehouses.")
+            self.logger.info(f"Scanning permissions of {len(resWJson['warehouses'])} warehouses.")
             with concurrent.futures.ThreadPoolExecutor(max_workers=self.numThreads) as executor:
                 future_to_warehouse = [
                     executor.submit(self.getSingleWarehouseACL, w["id"]) for w in resWJson["warehouses"]
@@ -527,10 +477,10 @@ class GroupMigration:
                         warehousePerm[result[0]] = result[1]
             return warehousePerm
         except Exception as e:
-            logger.error(f"error in retrieving warehouse permission: {e}")
+            self.logger.error(f"error in retrieving warehouse permission: {e}")
 
     def getAllDashboardACL(self, verbose=False) -> dict:
-        logger.info("Performing dashboard inventory ...")
+        self.logger.info("Performing dashboard inventory ...")
         try:
             resD = requests.get(
                 f"{self.workspace_url}/api/2.0/preview/sql/dashboards",
@@ -542,7 +492,7 @@ class GroupMigration:
             dashboardPerm = {}
             for pg in range(1, pages + 1):
                 if self.verbose:
-                    logger.info(f"[Verbose] Requesting dashboard page {pg}...")
+                    self.logger.info(f"[Verbose] Requesting dashboard page {pg}...")
                 resD = requests.get(
                     f"{self.workspace_url}/api/2.0/preview/sql/dashboards?page={str(pg)}",
                     headers=self.headers,
@@ -561,11 +511,11 @@ class GroupMigration:
                             if len(result) > 0:
                                 dashboardPerm[dashboard_id] = result
                         except Exception as e:
-                            logger.error(f"Error in retrieving dashboard permission for dashboard {dashboard_id}: {e}")
+                            self.logger.error(f"Error in retrieving dashboard permission for dashboard {dashboard_id}: {e}")
             return dashboardPerm
 
         except Exception as e:
-            logger.error(f"Error in retrieving dashboard permission: {e}")
+            self.logger.error(f"Error in retrieving dashboard permission: {e}")
             raise e
 
     # this request sometimes fails so we wrap in retry loop
@@ -577,7 +527,7 @@ class GroupMigration:
             if retry_count > 0:
                 time.sleep(RETRY_DELAY)
             if self.verbose:
-                logger.info(f"[Verbose] Requesting dashboard id {dashboardId}. retry_count={retry_count}")
+                self.logger.info(f"[Verbose] Requesting dashboard id {dashboardId}. retry_count={retry_count}")
             resDPerm = requests.get(
                 f"{self.workspace_url}/api/2.0/preview/sql/permissions/dashboards/{dashboardId}",
                 headers=self.headers,
@@ -601,11 +551,11 @@ class GroupMigration:
             except KeyError:
                 retry_count += 1
                 continue
-        logger.error(f"ERROR: Retry limit of {RETRY_LIMIT} exceeded requesting dashboard id {dashboardId}")
+        self.logger.error(f"ERROR: Retry limit of {RETRY_LIMIT} exceeded requesting dashboard id {dashboardId}")
         return []  # if retry limit exceeded, return empty list
 
     def getAllQueriesACL(self, verbose=False) -> dict:
-        logger.info("Performing query inventory ...")
+        self.logger.info("Performing query inventory ...")
         try:
             resQ = requests.get(
                 f"{self.workspace_url}/api/2.0/preview/sql/queries",
@@ -617,7 +567,7 @@ class GroupMigration:
             queryPerm = {}
             for pg in range(1, pages + 1):
                 if self.verbose:
-                    logger.info(f"[Verbose] Requesting query page {pg}...")
+                    self.logger.info(f"[Verbose] Requesting query page {pg}...")
                 resQ = requests.get(
                     f"{self.workspace_url}/api/2.0/preview/sql/queries?page={str(pg)}",
                     headers=self.headers,
@@ -635,11 +585,11 @@ class GroupMigration:
                             if len(result) > 0:
                                 queryPerm[query_id] = result
                         except Exception as e:
-                            logger.error(f"Error in retrieving query permission for query {query_id}: {e}")
+                            self.logger.error(f"Error in retrieving query permission for query {query_id}: {e}")
             return queryPerm
 
         except Exception as e:
-            logger.error(f"Error in retrieving query permission: {e}")
+            self.logger.error(f"Error in retrieving query permission: {e}")
             raise e
 
     # this request sometimes fails so we wrap in retry loop
@@ -651,7 +601,7 @@ class GroupMigration:
             if retry_count > 0:
                 time.sleep(RETRY_DELAY)
             if self.verbose:
-                logger.info(f"[Verbose] Requesting query id {queryId}. retry_count={retry_count}")
+                self.logger.info(f"[Verbose] Requesting query id {queryId}. retry_count={retry_count}")
             resQPerm = requests.get(
                 f"{self.workspace_url}/api/2.0/preview/sql/permissions/queries/{queryId}",
                 headers=self.headers,
@@ -675,7 +625,7 @@ class GroupMigration:
             except KeyError:
                 retry_count += 1
                 continue
-        logger.error(f"ERROR: Retry limit of {RETRY_LIMIT} exceeded requesting query id {queryId}")
+        self.logger.error(f"ERROR: Retry limit of {RETRY_LIMIT} exceeded requesting query id {queryId}")
         return []  # if retry limit exceeded, return empty list
 
     def getAlertsACL(self) -> dict:
@@ -690,7 +640,7 @@ class GroupMigration:
                     headers=self.headers,
                 )
                 if resAPerm.status_code == 404:
-                    logger.error("feature not enabled for this tier")
+                    self.logger.error("feature not enabled for this tier")
                     continue
                 resAPermJson = resAPerm.json()
                 aclList = resAPermJson["access_control_list"]
@@ -706,7 +656,7 @@ class GroupMigration:
             return alertPerm
 
         except Exception as e:
-            logger.error(f"error in retrieving alerts permission: {e}")
+            self.logger.error(f"error in retrieving alerts permission: {e}")
 
     def getPasswordACL(self) -> dict:
         try:
@@ -718,14 +668,14 @@ class GroupMigration:
             )
             resPJson = resP.json()
             if len(resPJson) < 3:
-                logger.info("No password acls defined.")
+                self.logger.info("No password acls defined.")
                 return {}
 
             passwordPerm = {}
             passwordPerm["passwords"] = self.getACL(resPJson["access_control_list"])
             return passwordPerm
         except Exception as e:
-            logger.error(f"error in retrieving password  permission: {e}")
+            self.logger.error(f"error in retrieving password  permission: {e}")
 
     def getPoolACL(self) -> dict:
         try:
@@ -735,7 +685,7 @@ class GroupMigration:
             )
             resIPJson = resIP.json()
             if len(resIPJson) == 0:
-                logger.info("No Instance Pools defined.")
+                self.logger.info("No Instance Pools defined.")
                 return {}
             instancePoolPerm = {}
             for c in resIPJson["instance_pools"]:
@@ -745,7 +695,7 @@ class GroupMigration:
                     headers=self.headers,
                 )
                 if resIPPerm.status_code == 404:
-                    logger.info("feature not enabled for this tier")
+                    self.logger.info("feature not enabled for this tier")
                     continue
                 resIPPermJson = resIPPerm.json()
                 aclList = self.getACL(resIPPermJson["access_control_list"])
@@ -754,10 +704,10 @@ class GroupMigration:
                 instancePoolPerm[instancePID] = aclList
             return instancePoolPerm
         except Exception as e:
-            logger.error(f"error in retrieving Instance Pool permission: {e}")
+            self.logger.error(f"error in retrieving Instance Pool permission: {e}")
 
     def getAllJobACL(self) -> dict:
-        logger.info("Running job ACL inventory ...")
+        self.logger.info("Running job ACL inventory ...")
         try:
             jobPerm = {}
             offset = 0
@@ -765,7 +715,7 @@ class GroupMigration:
             while True:
                 # Query next page
                 if self.verbose:
-                    logger.info(f"[Verbose] Retrieving jobs page offset={offset}, limit={limit}")
+                    self.logger.info(f"[Verbose] Retrieving jobs page offset={offset}, limit={limit}")
                 resJob = requests.get(
                     f"{self.workspace_url}/api/2.1/jobs/list?limit={str(limit)}&offset={str(offset)}",
                     headers=self.headers,
@@ -773,7 +723,7 @@ class GroupMigration:
                 resJobJson = resJob.json()
 
                 if resJobJson["has_more"] is False and len(resJobJson) == 1:
-                    logger.info("Finished listing jobs")
+                    self.logger.info("Finished listing jobs")
                     break
 
                 # Grab job IDs and parallel map over them to get all ACLs
@@ -789,7 +739,7 @@ class GroupMigration:
                 offset += limit
             return jobPerm
         except Exception as e:
-            logger.error(f"error in retrieving job permissions: {e}")
+            self.logger.error(f"error in retrieving job permissions: {e}")
 
     def getSingleJobACL(self, jobID):
         try:
@@ -798,7 +748,7 @@ class GroupMigration:
                 headers=self.headers,
             )
             if resJobPerm.status_code == 404:
-                logger.error("feature not enabled for this tier")
+                self.logger.error("feature not enabled for this tier")
                 return None
             resJobPermJson = resJobPerm.json()
             aclList = self.getACL(resJobPermJson["access_control_list"])
@@ -806,7 +756,7 @@ class GroupMigration:
                 return None
             return (jobID, aclList)
         except Exception as e:
-            logger.error(f"error in retrieving permission for job {jobID}: {e}")
+            self.logger.error(f"error in retrieving permission for job {jobID}: {e}")
             return None
 
     def getExperimentACL(self) -> dict:
@@ -826,22 +776,22 @@ class GroupMigration:
                 )
                 resExpJson = resExp.json()
                 if len(resExpJson) == 0:
-                    logger.info("No experiments available")
+                    self.logger.info("No experiments available")
                     return {}
                 for c in resExpJson["experiments"]:
                     expID = c["experiment_id"]
-                    # logger.info(c)
+                    # self.logger.info(c)
 
                     for k in c["tags"]:
                         if k["key"] == "mlflow.experimentType":
                             if k["value"] == "NOTEBOOK":
-                                # logger.info('notebook')
+                                # self.logger.info('notebook')
                                 resExpPerm = requests.get(
                                     f"{self.workspace_url}/api/2.0/permissions/notebooks/{expID}",
                                     headers=self.headers,
                                 )
                             else:
-                                # logger.info('experiment')
+                                # self.logger.info('experiment')
                                 resExpPerm = requests.get(
                                     f"{self.workspace_url}/api/2.0/permissions/experiments/{expID}",
                                     headers=self.headers,
@@ -850,11 +800,11 @@ class GroupMigration:
                     # f"{self.workspace_url}/api/2.0/permissions/experiments/{expID}", headers=self.headers
                     # )
                     if resExpPerm.status_code == 404:
-                        logger.error("feature not enabled for this tier")
+                        self.logger.error("feature not enabled for this tier")
                         continue
                     resExpPermJson = resExpPerm.json()
                     if resExpPerm.status_code != 200:
-                        logger.error(f"unable to get permission for experiment {expID}")
+                        self.logger.error(f"unable to get permission for experiment {expID}")
                         continue
                     aclList = self.getACL(resExpPermJson["access_control_list"])
                     if len(aclList) == 0:
@@ -868,7 +818,7 @@ class GroupMigration:
                     break
             return expPerm
         except Exception as e:
-            logger.error(f"error in retrieving experiment permission: {e}")
+            self.logger.error(f"error in retrieving experiment permission: {e}")
 
     def getModelACL(self) -> dict:
         try:
@@ -885,7 +835,7 @@ class GroupMigration:
                 )
                 resModelJson = resModel.json()
                 if len(resModelJson) == 0:
-                    logger.info("No models available")
+                    self.logger.info("No models available")
                     return {}
                 modelPerm = {}
                 for c in resModelJson["registered_models"]:
@@ -902,7 +852,7 @@ class GroupMigration:
                         headers=self.headers,
                     )
                     if resModelPerm.status_code == 404:
-                        logger.error("feature not enabled for this tier")
+                        self.logger.error("feature not enabled for this tier")
                         continue
                     resModelPermJson = resModelPerm.json()
                     aclList = self.getACL(resModelPermJson["access_control_list"])
@@ -916,7 +866,7 @@ class GroupMigration:
                     break
             return modelPerm
         except Exception as e:
-            logger.error(f"error in retrieving model permission: {e}")
+            self.logger.error(f"error in retrieving model permission: {e}")
 
     def getDLTACL(self) -> dict:
         try:
@@ -934,7 +884,7 @@ class GroupMigration:
                 )
                 resDltJson = resDlt.json()
                 if len(resDltJson) == 0:
-                    logger.info("No dlt pipelines available")
+                    self.logger.info("No dlt pipelines available")
                     return {}
                 for c in resDltJson["statuses"]:
                     dltID = c["pipeline_id"]
@@ -943,7 +893,7 @@ class GroupMigration:
                         headers=self.headers,
                     )
                     if resDltPerm.status_code == 404:
-                        logger.error("feature not enabled for this tier")
+                        self.logger.error("feature not enabled for this tier")
                         continue
                     resDltPermJson = resDltPerm.json()
                     aclList = self.getACL(resDltPermJson["access_control_list"])
@@ -958,10 +908,10 @@ class GroupMigration:
 
             return dltPerm
         except Exception as e:
-            logger.error(f"error in retrieving dlt pipelines permission: {e}")
+            self.logger.error(f"error in retrieving dlt pipelines permission: {e}")
 
     def getRecursiveFolderList(self, path: str) -> dict:
-        logger.info(f"Getting directory structure starting with root path: {path} ...")
+        self.logger.info(f"Getting directory structure starting with root path: {path} ...")
 
         self.folderList.clear()
         self.notebookList.clear()
@@ -970,7 +920,7 @@ class GroupMigration:
         depth = 0
         while remaining_dirs:
             if self.verbose:
-                logger.info(f"[Verbose] Requesting file list for Depth {depth} Path: {path}")
+                self.logger.info(f"[Verbose] Requesting file list for Depth {depth} Path: {path}")
             with concurrent.futures.ThreadPoolExecutor(max_workers=self.numThreads) as executor:
                 futuresMap = {
                     executor.submit(self.getSingleFolderList, dir_path, depth): dir_path for dir_path in remaining_dirs
@@ -981,7 +931,7 @@ class GroupMigration:
                     if res:
                         dir_path2, folders, notebooks, files = res
                         if dir_path2 != dir_path:
-                            logger.error(f"ERROR: got WRONG RESULT from future: sent: {dir_path} recieved: {dir_path2}")
+                            self.logger.error(f"ERROR: got WRONG RESULT from future: sent: {dir_path} recieved: {dir_path2}")
                             remaining_dirs.remove(dir_path2)
                             # todo: what??
                         else:
@@ -990,7 +940,7 @@ class GroupMigration:
                             self.fileList.update(files)
                             remaining_dirs.extend(dir_path for dir_path in folders.values())
                     else:
-                        logger.error(f"ERROR: one of the futurue results was None: {dir_path}")
+                        self.logger.error(f"ERROR: one of the futurue results was None: {dir_path}")
                     remaining_dirs.remove(dir_path)
             depth = depth + 1
 
@@ -1005,9 +955,9 @@ class GroupMigration:
             # Give some time for the server to recover
             if retry_count > 0:
                 time.sleep(RETRY_DELAY)
-                # logger.info(f'[ERROR] retrying folder list for folder {path}.')
+                # self.logger.info(f'[ERROR] retrying folder list for folder {path}.')
             if self.verbose:
-                logger.info(f"[Verbose] Requesting file list for Depth {depth} Retry {retry_count} Path: {path}")
+                self.logger.info(f"[Verbose] Requesting file list for Depth {depth} Retry {retry_count} Path: {path}")
             retry_count = retry_count + 1
             try:
                 data = {"path": path}
@@ -1017,10 +967,10 @@ class GroupMigration:
                     data=json.dumps(data),
                 )
                 if resFolder.status_code == 403:
-                    logger.error(f"[ERROR] status code 403 permission denied to read folder {path}.")
+                    self.logger.error(f"[ERROR] status code 403 permission denied to read folder {path}.")
                     return (path, {}, {})
                 if resFolder.status_code != 200:
-                    logger.error(f"[ERROR] bad status code for folder {path}. code: {resFolder.status_code}")
+                    self.logger.error(f"[ERROR] bad status code for folder {path}. code: {resFolder.status_code}")
                     continue
                 resFolderJson = resFolder.json()
 
@@ -1054,13 +1004,13 @@ class GroupMigration:
             except Exception as e:
                 lastError = e
                 continue
-        logger.error(
+        self.logger.error(
             f"[ERROR] retry limit ({MAX_RETRY}) limit exceeded while retrieving path {path}. last err: {lastError}."
         )
         return (path, {}, {}, {})
 
     def getFoldersNotebookACL(self, rootPath="/") -> list:
-        logger.info("Performing folders and notebook inventory ...")
+        self.logger.info("Performing folders and notebook inventory ...")
         try:
             # Get folder list
             self.getRecursiveFolderList(rootPath)
@@ -1083,17 +1033,17 @@ class GroupMigration:
                     ): folder_id
                     for folder_id in folder_ids
                 }
-                logger.info(f"Awaiting parallel permission requests for {len(folder_futures)} folders ...")
+                self.logger.info(f"Awaiting parallel permission requests for {len(folder_futures)} folders ...")
                 for future in concurrent.futures.as_completed(folder_futures):
                     folder_id = folder_futures[future]
                     try:
                         resFolderPerm = future.result()
                         currentFolderCount += 1
                         if resFolderPerm.status_code == 404:
-                            logger.error("feature not enabled for this tier")
+                            self.logger.error("feature not enabled for this tier")
                             continue
                         if resFolderPerm.status_code == 403:
-                            logger.error(
+                            self.logger.error(
                                 "Error retrieving permission for "
                                 + self.folderList[folder_id]
                                 + " "
@@ -1104,15 +1054,15 @@ class GroupMigration:
                         try:
                             aclList = self.getACL(resFolderPermJson["access_control_list"])
                         except Exception as e:
-                            logger.error(f"error in retrieving folder details: {e}")
+                            self.logger.error(f"error in retrieving folder details: {e}")
                         if currentFolderCount % 1000 == 0:
-                            logger.info(f"Completed ACL for {currentFolderCount} folders")
+                            self.logger.info(f"Completed ACL for {currentFolderCount} folders")
                         if len(aclList) == 0:
                             continue
                         folder_results[folder_id] = aclList
 
                     except Exception as e:
-                        logger.error(f"error in retrieving folder permission: {e}")
+                        self.logger.error(f"error in retrieving folder permission: {e}")
 
             # Get notebook permissions in parallel
             notebook_results = {}
@@ -1126,17 +1076,17 @@ class GroupMigration:
                     ): notebook_id
                     for notebook_id in self.notebookList.keys()
                 }
-                logger.info(f"Awaiting parallel permission requests for {len(notebook_futures)} notebooks ...")
+                self.logger.info(f"Awaiting parallel permission requests for {len(notebook_futures)} notebooks ...")
                 for future in concurrent.futures.as_completed(notebook_futures):
                     notebook_id = notebook_futures[future]
                     try:
                         resNotebookPerm = future.result()
                         currentNotebookCount += 1
                         if resNotebookPerm.status_code == 404:
-                            logger.error("feature not enabled for this tier")
+                            self.logger.error("feature not enabled for this tier")
                             continue
                         if resNotebookPerm.status_code == 403:
-                            logger.error(
+                            self.logger.error(
                                 "Error retrieving permission for "
                                 + self.notebookList[notebook_id]
                                 + " "
@@ -1147,15 +1097,15 @@ class GroupMigration:
                         try:
                             aclList = self.getACL(resNotebookPermJson["access_control_list"])
                         except Exception as e:
-                            logger.error(f"error in retrieving notebook details: {e}")
+                            self.logger.error(f"error in retrieving notebook details: {e}")
                         if currentNotebookCount % 1000 == 0:
-                            logger.info(f"Completed ACL for {currentNotebookCount} notebooks")
+                            self.logger.info(f"Completed ACL for {currentNotebookCount} notebooks")
                         if len(aclList) == 0:
                             continue
                         notebook_results[notebook_id] = aclList
 
                     except Exception as e:
-                        logger.error(f"error in retrieving notebook permission: {e}")
+                        self.logger.error(f"error in retrieving notebook permission: {e}")
 
             # Get file permissions in parallel
             file_results = {}
@@ -1169,17 +1119,17 @@ class GroupMigration:
                     ): file_id
                     for file_id in self.fileList.keys()
                 }
-                logger.info(f"Awaiting parallel permission requests for {len(file_futures)} files ...")
+                self.logger.info(f"Awaiting parallel permission requests for {len(file_futures)} files ...")
                 for future in concurrent.futures.as_completed(file_futures):
                     file_id = file_futures[future]
                     try:
                         resFilePerm = future.result()
                         currentFileCount += 1
                         if resFilePerm.status_code == 404:
-                            logger.error("feature not enabled for this tier")
+                            self.logger.error("feature not enabled for this tier")
                             continue
                         if resFilePerm.status_code == 403:
-                            logger.error(
+                            self.logger.error(
                                 "Error retrieving permission for "
                                 + self.fileList[file_id]
                                 + " "
@@ -1190,19 +1140,19 @@ class GroupMigration:
                         try:
                             aclList = self.getACL(resFilePermJson["access_control_list"])
                         except Exception as e:
-                            logger.error(f"error in retrieving file details: {e}")
+                            self.logger.error(f"error in retrieving file details: {e}")
                         if currentFileCount % 1000 == 0:
-                            logger.info(f"Completed ACL for {currentFileCount} notebooks")
+                            self.logger.info(f"Completed ACL for {currentFileCount} notebooks")
                         if len(aclList) == 0:
                             continue
                         file_results[file_id] = aclList
 
                     except Exception as e:
-                        logger.error(f"error in retrieving file permission: {e}")
+                        self.logger.error(f"error in retrieving file permission: {e}")
 
             return folder_results, notebook_results, file_results
         except Exception as e:
-            logger.error(f"error in retrieving folder and notebook permissions: {e}")
+            self.logger.error(f"error in retrieving folder and notebook permissions: {e}")
 
     def getRepoACL(self) -> dict:
         try:
@@ -1220,7 +1170,7 @@ class GroupMigration:
                 )
                 resRepoJson = resRepo.json()
                 if len(resRepoJson) == 0:
-                    logger.info("No repos available")
+                    self.logger.info("No repos available")
                     return {}
                 for c in resRepoJson["repos"]:
                     repoID = c["id"]
@@ -1229,7 +1179,7 @@ class GroupMigration:
                         headers=self.headers,
                     )
                     if resRepoPerm.status_code == 404:
-                        logger.error("feature not enabled for this tier")
+                        self.logger.error("feature not enabled for this tier")
                         continue
                     resRepoPermJson = resRepoPerm.json()
                     aclList = self.getACL3(resRepoPermJson["access_control_list"])
@@ -1243,7 +1193,7 @@ class GroupMigration:
 
             return repoPerm
         except Exception as e:
-            logger.error(f"error in retrieving repos permission: {e}")
+            self.logger.error(f"error in retrieving repos permission: {e}")
 
     def getTokenACL(self) -> dict:
         try:
@@ -1253,7 +1203,7 @@ class GroupMigration:
                 headers=self.headers,
             )
             if resTokenPerm.status_code == 404:
-                logger.error("feature not enabled for this tier")
+                self.logger.error("feature not enabled for this tier")
                 return {}
             resTokenPermJson = resTokenPerm.json()
             aclList = []
@@ -1275,7 +1225,7 @@ class GroupMigration:
             tokenPerm["tokens"] = aclList
             return tokenPerm
         except Exception as e:
-            logger.error(f"error in retrieving Token permission: {e}")
+            self.logger.error(f"error in retrieving Token permission: {e}")
             return {}
 
     def getSecretScoppeACL(self) -> dict:
@@ -1286,7 +1236,7 @@ class GroupMigration:
             )
             resSScopeJson = resSScope.json()
             if len(resSScopeJson) == 0:
-                logger.info("No secret scopes defined.")
+                self.logger.info("No secret scopes defined.")
                 return {}
 
             secretScopePerm = {}
@@ -1300,17 +1250,17 @@ class GroupMigration:
                 )
 
                 if resSSPerm.status_code == 404:
-                    logger.error("feature not enabled for this tier")
+                    self.logger.error("feature not enabled for this tier")
                     continue
                 if resSSPerm.status_code != 200:
-                    logger.error(
+                    self.logger.error(
                         f"Error retrieving ACL for Secret Scope: {scopeName}. HTTP Status Code {resSSPerm.status_code}"
                     )
                     continue
 
                 resSSPermJson = resSSPerm.json()
                 if "items" not in resSSPermJson:
-                    # logger.info(
+                    # self.logger.info(
                     # f'ACL for Secret Scope  {scopeName} missing "items" key. Contents:\n{resSSPermJson}\nSkipping...'
                     # )
                     # This seems to be expected behaviour if there are no ACLs, silently ignore
@@ -1329,7 +1279,7 @@ class GroupMigration:
 
             return secretScopePerm
         except Exception as e:
-            logger.error(f"error in retrieving Secret Scope permission: {e}")
+            self.logger.error(f"error in retrieving Secret Scope permission: {e}")
 
     def updateGroupEntitlements(self, groupEntitlements: dict, level: str):
         try:
@@ -1339,7 +1289,7 @@ class GroupMigration:
                     groupId = self.groupWSGNameDict["db-temp-" + self.groupIdDict[group_id]]
                 else:  # Account, aka temp group, must discard db-temp- (8 chars)
                     groupId = self.accountGroups_lower[self.groupIdDict[group_id][8:].casefold()]
-                # logger.info(groupId)
+                # self.logger.info(groupId)
                 for e in etl:
                     entitlementList.append({"value": e})
                 entitlements = {
@@ -1352,7 +1302,7 @@ class GroupMigration:
                     data=json.dumps(entitlements),
                 )
         except Exception as e:
-            logger.error(f"error applying entitiement for group id: {group_id}.")
+            self.logger.error(f"error applying entitiement for group id: {group_id}.")
 
     def updateGroupRoles(self, level: str):
         try:
@@ -1374,7 +1324,7 @@ class GroupMigration:
                     data=json.dumps(instanceProfileRoles),
                 )
         except Exception as e:
-            logger.error(f"error applying role for group id: {group_id}.")
+            self.logger.error(f"error applying role for group id: {group_id}.")
 
     def updateGroupPermission(self, object: str, groupPermission: dict, level: str):
         try:
@@ -1393,7 +1343,7 @@ class GroupMigration:
                     data=json.dumps(data),
                 )
         except Exception as e:
-            logger.error(f"Error setting permission for {object} {object_id}. {e} ")
+            self.logger.error(f"Error setting permission for {object} {object_id}. {e} ")
 
     def updateGroup2Permission(self, object: str, groupPermission: dict, level: str):
         try:
@@ -1429,7 +1379,7 @@ class GroupMigration:
                     data=json.dumps(data),
                 )
         except Exception as e:
-            logger.error(f"Error setting permission for {object} {object_id}. {e} ")
+            self.logger.error(f"Error setting permission for {object} {object_id}. {e} ")
 
     def updateSecretPermission(self, secretPermission: dict, level: str):
         try:
@@ -1450,11 +1400,11 @@ class GroupMigration:
                         data=json.dumps(data),
                     )
         except Exception as e:
-            logger.error(f"Error setting permission for scope {object_id}. {e} ")
+            self.logger.error(f"Error setting permission for scope {object_id}. {e} ")
 
     def runVerboseSql(self, queryString):
         if self.verbose:
-            logger.info(f"[Verbose] SQL: {queryString}")
+            self.logger.info(f"[Verbose] SQL: {queryString}")
         return self.spark.sql(queryString)
 
     def getGrantsOnObjects(self, database_name: str, object_type: str, object_key: str):
@@ -1491,7 +1441,7 @@ class GroupMigration:
                     )
                 )
         except Exception as e:
-            logger.error(f"Error retrieving grants on object {object_key}. {e}")
+            self.logger.error(f"Error retrieving grants on object {object_key}. {e}")
             return
 
         return grants_df
@@ -1511,7 +1461,7 @@ class GroupMigration:
                 userList = [p.Principal for p in userListCollect]
                 userList = list(set(userList))
                 if not self.checkPrincipalInGroupOrMember(userList, db):
-                    # logger.info(
+                    # self.logger.info(
                     # f'selected groups or members of the groups have no USAGE or OWN permission on database level.'
                     # 'Skipping object level permission check for database {db}.'
                     # )
@@ -1525,7 +1475,7 @@ class GroupMigration:
                     tbldf = self.getGrantsOnObjects(db, "TABLE", f"`{table.database}`.`{table.tableName}`")
                     aclList += tbldf.collect()
                 except Exception as e:
-                    logger.error(f"error retrieving acl for table {table.tableName}. {e}")
+                    self.logger.error(f"error retrieving acl for table {table.tableName}. {e}")
 
             functions = self.runVerboseSql("show functions in {}".format(db)).filter(
                 col("function").startswith("spark_catalog." + db + ".")
@@ -1535,26 +1485,26 @@ class GroupMigration:
                     funcdf = self.getGrantsOnObjects(db, "FUNCTION", f"{function.function}")
                     aclList += funcdf.collect()
                 except Exception as e:
-                    logger.error(f"error retrieving acl for function {function.function}. {e}")
+                    self.logger.error(f"error retrieving acl for function {function.function}. {e}")
             # filter for required groups
             return aclList
 
         except Exception as e:
-            logger.info(f"Error retrieving ACL for database {db}. {e}")
+            self.logger.info(f"Error retrieving ACL for database {db}. {e}")
 
     # check principal given usage permission is group or a member of the group (user or sp)
     def checkPrincipalInGroupOrMember(self, principalList: str, name: str) -> bool:
         for p in principalList:
             if p in self.groupGroupList:
-                logger.info(f"Group {p} is given USAGE or OWN permission for {name}.")
+                self.logger.info(f"Group {p} is given USAGE or OWN permission for {name}.")
                 return True
         for p in principalList:
             if p in self.groupUserList:
-                logger.info(f"User {p} is given USAGE or OWN permission for {name}.")
+                self.logger.info(f"User {p} is given USAGE or OWN permission for {name}.")
                 return True
         for p in principalList:
             if p in self.groupSPList:
-                logger.info(f"SP {p} is given USAGE or OWN permission for {name}.")
+                self.logger.info(f"SP {p} is given USAGE or OWN permission for {name}.")
                 return True
         return False
 
@@ -1582,7 +1532,7 @@ class GroupMigration:
         userList = [p.Principal for p in userListCollect]
         userList = list(set(userList))
         if self.checkPrincipalInGroupOrMember(userList, "CATALOG"):
-            logger.info(
+            self.logger.info(
                 "some groups or members of the group given "
                 "permission at catalog level, running permission for all databases"
             )
@@ -1592,7 +1542,7 @@ class GroupMigration:
         len(database_names)
         for db in dbs:
             database_names.append(db.databaseName)
-        logger.info(f"Got {len(database_names)} dbs to query")
+        self.logger.info(f"Got {len(database_names)} dbs to query")
         # database_names=['aaron_binns','hsdb']
         currentCount = 0
         try:
@@ -1606,10 +1556,10 @@ class GroupMigration:
                         aclList += result
                     currentCount += 1
                     if currentCount % 100 == 0:
-                        logger.info(f"Completed ACL for {currentCount} databases")
+                        self.logger.info(f"Completed ACL for {currentCount} databases")
             aclFinalList = [acl for acl in aclList if acl.Principal in self.groupL]
         except Exception as e:
-            logger.error(f"Error retrieving table acl object permission {e}")
+            self.logger.error(f"Error retrieving table acl object permission {e}")
         return aclFinalList
 
     def generate_table_acls_command(self, action_types, object_type, object_key, groupName):
@@ -1646,13 +1596,13 @@ class GroupMigration:
                     )
                 # lines.extend(self.generate_table_acls_command(acl.ActionTypes, acl.ObjectType, acl.ObjectKey, gName))
             for aclQuery in lines:
-                # logger.info(aclQuery)
+                # self.logger.info(aclQuery)
                 self.runVerboseSql(aclQuery)
         except Exception as e:
-            logger.error(f"Error setting permission, {e} ")
+            self.logger.error(f"Error setting permission, {e} ")
 
     def setGroupListForMode(self, mode: str):
-        logger.info(f"Retrieving group metadata for mode: {mode}")
+        self.logger.info(f"Retrieving group metadata for mode: {mode}")
         if mode == "Workspace":
             self.groupL = self.WorkspaceGroupNames
             self.getGroupObjects(self.groupL)
@@ -1669,16 +1619,16 @@ class GroupMigration:
         # check if all this should already be cached
         if self.lastInventoryRun == mode and not force:
             self.setGroupListForMode(mode)
-            logger.info(f"Skipping inventory for mode = {mode} since already performed.")
+            self.logger.info(f"Skipping inventory for mode = {mode} since already performed.")
             return
 
-        logger.info(
+        self.logger.info(
             f"Performing inventory of workspace object permissions. Filtering results by group list for mode: {mode}."
         )
         try:
             self.setGroupListForMode(mode)
             if self.cloud == "AWS":
-                logger.info("performing password inventory")
+                self.logger.info("performing password inventory")
                 self.passwordPerm = self.getPasswordACL()
 
             # These are parallel
@@ -1696,129 +1646,129 @@ class GroupMigration:
 
             # These have yet to be parallelized:
             if self.checkTableACL is True:
-                logger.info("performing Tabel ACL object inventory")
+                self.logger.info("performing Tabel ACL object inventory")
                 self.dataObjectsPerm = self.getTableACLs()
 
-            logger.info("performing alerts inventory")
+            self.logger.info("performing alerts inventory")
             self.alertPerm = self.getAlertsACL()
-            logger.info("performing instance pools inventory")
+            self.logger.info("performing instance pools inventory")
             self.instancePoolPerm = self.getPoolACL()
-            logger.info("performing experiments inventory")
+            self.logger.info("performing experiments inventory")
             self.expPerm = self.getExperimentACL()
-            logger.info("performing registered models inventory")
+            self.logger.info("performing registered models inventory")
             self.modelPerm = self.getModelACL()
-            logger.info("performing DLT inventory")
+            self.logger.info("performing DLT inventory")
             self.dltPerm = self.getDLTACL()
-            logger.info("performing repos inventory")
+            self.logger.info("performing repos inventory")
             self.repoPerm = self.getRepoACL()
-            logger.info("performing token inventory")
+            self.logger.info("performing token inventory")
             self.tokenPerm = self.getTokenACL()
-            logger.info("performing secret scope inventory")
+            self.logger.info("performing secret scope inventory")
             self.secretScopePerm = self.getSecretScoppeACL()
 
             self.lastInventoryRun = mode
         except Exception as e:
-            logger.info(f" Error creating group inventory, {e}")
+            self.logger.info(f" Error creating group inventory, {e}")
 
     def printInventory(self, printMembers: bool = False):
-        logger.info("Displaying Inventory Results -- ACLs of selected groups:")
-        logger.info("Group List:")
-        logger.info("{:<20} {:<10}".format("Group ID", "Group Name"))
+        self.logger.info("Displaying Inventory Results -- ACLs of selected groups:")
+        self.logger.info("Group List:")
+        self.logger.info("{:<20} {:<10}".format("Group ID", "Group Name"))
         for key, value in self.groupIdDict.items():
-            logger.info("{:<20} {:<10}".format(key, value))
+            self.logger.info("{:<20} {:<10}".format(key, value))
 
         if printMembers:
-            logger.info("Group Members:")
-            logger.info("{:<20} {:<100}".format("Group ID", "Group Member"))
+            self.logger.info("Group Members:")
+            self.logger.info("{:<20} {:<100}".format("Group ID", "Group Member"))
             for key, value in self.groupMembers.items():
-                logger.info("{:<20} {:<100}".format(key, str(value)))
+                self.logger.info("{:<20} {:<100}".format(key, str(value)))
 
-        logger.info("Group Entitlements:")
-        logger.info("{:<20} {:<100}".format("Group ID", "Group Entitlements"))
+        self.logger.info("Group Entitlements:")
+        self.logger.info("{:<20} {:<100}".format("Group ID", "Group Entitlements"))
         for key, value in self.groupEntitlements.items():
-            logger.info("{:<20} {:<100}".format(key, str(value)))
+            self.logger.info("{:<20} {:<100}".format(key, str(value)))
         if self.cloud == "AWS":
-            logger.info("Group Roles:")
-            logger.info("{:<20} {:<100}".format("Group ID", "Group Roles"))
+            self.logger.info("Group Roles:")
+            self.logger.info("{:<20} {:<100}".format("Group ID", "Group Roles"))
             for key, value in self.groupRoles.items():
-                logger.info("{:<20} {:<100}".format(key, str(value)))
-            logger.info("Group Passwords:")
-            logger.info("{:<20} {:<100}".format("Password", "Group Names"))
+                self.logger.info("{:<20} {:<100}".format(key, str(value)))
+            self.logger.info("Group Passwords:")
+            self.logger.info("{:<20} {:<100}".format("Password", "Group Names"))
             for key, value in self.passwordPerm.items():
-                logger.info("{:<20} {:<100}".format(key, str(value)))
-        logger.info("Cluster Permission:")
-        logger.info("{:<20} {:<100}".format("Cluster ID", "Group Permission"))
+                self.logger.info("{:<20} {:<100}".format(key, str(value)))
+        self.logger.info("Cluster Permission:")
+        self.logger.info("{:<20} {:<100}".format("Cluster ID", "Group Permission"))
         for key, value in self.clusterPerm.items():
-            logger.info("{:<20} {:<100}".format(key, str(value)))
-        logger.info("Cluster Policy Permission:")
-        logger.info("{:<20} {:<100}".format("Cluster Policy ID", "Group Permission"))
+            self.logger.info("{:<20} {:<100}".format(key, str(value)))
+        self.logger.info("Cluster Policy Permission:")
+        self.logger.info("{:<20} {:<100}".format("Cluster Policy ID", "Group Permission"))
         for key, value in self.clusterPolicyPerm.items():
-            logger.info("{:<20} {:<100}".format(key, str(value)))
-        logger.info("Warehouse Permission:")
-        logger.info("{:<20} {:<100}".format("SQL Warehouse ID", "Group Permission"))
+            self.logger.info("{:<20} {:<100}".format(key, str(value)))
+        self.logger.info("Warehouse Permission:")
+        self.logger.info("{:<20} {:<100}".format("SQL Warehouse ID", "Group Permission"))
         for key, value in self.warehousePerm.items():
-            logger.info("{:<20} {:<100}".format(key, str(value)))
-        logger.info("Dashboard Permission:")
-        logger.info("{:<20} {:<100}".format("Dashboard ID", "Group Permission"))
+            self.logger.info("{:<20} {:<100}".format(key, str(value)))
+        self.logger.info("Dashboard Permission:")
+        self.logger.info("{:<20} {:<100}".format("Dashboard ID", "Group Permission"))
         for key, value in self.dashboardPerm.items():
-            logger.info("{:<20} {:<100}".format(key, str(value)))
-        logger.info("Query Permission:")
-        logger.info("{:<20} {:<100}".format("Query ID", "Group Permission"))
+            self.logger.info("{:<20} {:<100}".format(key, str(value)))
+        self.logger.info("Query Permission:")
+        self.logger.info("{:<20} {:<100}".format("Query ID", "Group Permission"))
         for key, value in self.queryPerm.items():
-            logger.info("{:<20} {:<100}".format(key, str(value)))
-        logger.info("Alerts Permission:")
-        logger.info("{:<20} {:<100}".format("Alerts ID", "Group Permission"))
+            self.logger.info("{:<20} {:<100}".format(key, str(value)))
+        self.logger.info("Alerts Permission:")
+        self.logger.info("{:<20} {:<100}".format("Alerts ID", "Group Permission"))
         for key, value in self.alertPerm.items():
-            logger.info("{:<20} {:<100}".format(key, str(value)))
-        logger.info("Instance Pool Permission:")
-        logger.info("{:<20} {:<100}".format("InstancePool ID", "Group Permission"))
+            self.logger.info("{:<20} {:<100}".format(key, str(value)))
+        self.logger.info("Instance Pool Permission:")
+        self.logger.info("{:<20} {:<100}".format("InstancePool ID", "Group Permission"))
         for key, value in self.instancePoolPerm.items():
-            logger.info("{:<20} {:<100}".format(key, str(value)))
-        logger.info("Jobs Permission:")
-        logger.info("{:<20} {:<100}".format("Job ID", "Group Permission"))
+            self.logger.info("{:<20} {:<100}".format(key, str(value)))
+        self.logger.info("Jobs Permission:")
+        self.logger.info("{:<20} {:<100}".format("Job ID", "Group Permission"))
         for key, value in self.jobPerm.items():
-            logger.info("{:<20} {:<100}".format(key, str(value)))
-        logger.info("Experiments Permission:")
-        logger.info("{:<20} {:<100}".format("Experiment ID", "Group Permission"))
+            self.logger.info("{:<20} {:<100}".format(key, str(value)))
+        self.logger.info("Experiments Permission:")
+        self.logger.info("{:<20} {:<100}".format("Experiment ID", "Group Permission"))
         for key, value in self.expPerm.items():
-            logger.info("{:<20} {:<100}".format(key, str(value)))
-        logger.info("Models Permission:")
-        logger.info("{:<20} {:<100}".format("Model ID", "Group Permission"))
+            self.logger.info("{:<20} {:<100}".format(key, str(value)))
+        self.logger.info("Models Permission:")
+        self.logger.info("{:<20} {:<100}".format("Model ID", "Group Permission"))
         for key, value in self.modelPerm.items():
-            logger.info("{:<20} {:<100}".format(key, str(value)))
-        logger.info("Delta Live Tables Permission:")
-        logger.info("{:<20} {:<100}".format("Pipeline ID", "Group Permission"))
+            self.logger.info("{:<20} {:<100}".format(key, str(value)))
+        self.logger.info("Delta Live Tables Permission:")
+        self.logger.info("{:<20} {:<100}".format("Pipeline ID", "Group Permission"))
         for key, value in self.dltPerm.items():
-            logger.info("{:<20} {:<100}".format(key, str(value)))
-        logger.info("Repos Permission:")
-        logger.info("{:<20} {:<100}".format("Repo ID", "Group Permission"))
+            self.logger.info("{:<20} {:<100}".format(key, str(value)))
+        self.logger.info("Repos Permission:")
+        self.logger.info("{:<20} {:<100}".format("Repo ID", "Group Permission"))
         for key, value in self.repoPerm.items():
-            logger.info("{:<20} {:<100}".format(key, str(value)))
-        logger.info("Tokens Permission:")
-        logger.info("{:<20} {:<100}".format("Token ID", "Group Permission"))
+            self.logger.info("{:<20} {:<100}".format(key, str(value)))
+        self.logger.info("Tokens Permission:")
+        self.logger.info("{:<20} {:<100}".format("Token ID", "Group Permission"))
         for key, value in self.tokenPerm.items():
-            logger.info("{:<20} {:<100}".format(key, str(value)))
-        logger.info("Secret Scopes Permission:")
-        logger.info("{:<20} {:<100}".format("SecretScope ID", "Group Permission"))
+            self.logger.info("{:<20} {:<100}".format(key, str(value)))
+        self.logger.info("Secret Scopes Permission:")
+        self.logger.info("{:<20} {:<100}".format("SecretScope ID", "Group Permission"))
         for key, value in self.secretScopePerm.items():
-            logger.info("{:<20} {:<100}".format(key, str(value)))
-        logger.info("Folder  Permission:")
-        logger.info("{:<20} {:<100}".format("Folder ID", "Group Permission"))
+            self.logger.info("{:<20} {:<100}".format(key, str(value)))
+        self.logger.info("Folder  Permission:")
+        self.logger.info("{:<20} {:<100}".format("Folder ID", "Group Permission"))
         for key, value in self.folderPerm.items():
-            logger.info("{:<20} {:<100}".format(key, str(value)))
-        logger.info("Notebook  Permission:")
-        logger.info("{:<20} {:<100}".format("Notebook ID", "Group Permission"))
+            self.logger.info("{:<20} {:<100}".format(key, str(value)))
+        self.logger.info("Notebook  Permission:")
+        self.logger.info("{:<20} {:<100}".format("Notebook ID", "Group Permission"))
         for key, value in self.notebookPerm.items():
-            logger.info("{:<20} {:<100}".format(key, str(value)))
-        logger.info("File  Permission:")
-        logger.info("{:<20} {:<100}".format("File ID", "Group Permission"))
+            self.logger.info("{:<20} {:<100}".format(key, str(value)))
+        self.logger.info("File  Permission:")
+        self.logger.info("{:<20} {:<100}".format("File ID", "Group Permission"))
         for key, value in self.filePerm.items():
-            logger.info("{:<20} {:<100}".format(key, str(value)))
+            self.logger.info("{:<20} {:<100}".format(key, str(value)))
 
         if self.checkTableACL is True:
-            logger.info("TableACL  Permission:")
+            self.logger.info("TableACL  Permission:")
             for item in self.dataObjectsPerm:
-                logger.info(item)
+                self.logger.info(item)
 
     def dryRun(self, mode: str = "Workspace", printMembers: bool = False):
         self.performInventory(mode)
@@ -1826,53 +1776,53 @@ class GroupMigration:
 
     def applyGroupPermission(self, level: str):
         try:
-            logger.info("applying group entitlement permissions")
+            self.logger.info("applying group entitlement permissions")
             self.updateGroupEntitlements(self.groupEntitlements, level)
-            logger.info("applying cluster permissions")
+            self.logger.info("applying cluster permissions")
             self.updateGroupPermission("clusters", self.clusterPerm, level)
-            logger.info("applying cluster policy permissions")
+            self.logger.info("applying cluster policy permissions")
             self.updateGroupPermission("cluster-policies", self.clusterPolicyPerm, level)
-            logger.info("applying warehouse permissions")
+            self.logger.info("applying warehouse permissions")
             self.updateGroupPermission("sql/warehouses", self.warehousePerm, level)
-            logger.info("applying instance pool permissions")
+            self.logger.info("applying instance pool permissions")
             self.updateGroupPermission("instance-pools", self.instancePoolPerm, level)
-            logger.info("applying jobs permissions")
+            self.logger.info("applying jobs permissions")
             self.updateGroupPermission("jobs", self.jobPerm, level)
-            logger.info("applying experiments permissions")
+            self.logger.info("applying experiments permissions")
             self.updateGroupPermission("experiments", self.expPerm, level)
-            logger.info("applying model permissions")
+            self.logger.info("applying model permissions")
             self.updateGroupPermission("registered-models", self.modelPerm, level)
-            logger.info("applying DLT permissions")
+            self.logger.info("applying DLT permissions")
             self.updateGroupPermission("pipelines", self.dltPerm, level)
-            logger.info("applying folders permissions")
+            self.logger.info("applying folders permissions")
             self.updateGroupPermission("directories", self.folderPerm, level)
-            logger.info("applying notebooks permissions")
+            self.logger.info("applying notebooks permissions")
             self.updateGroupPermission("notebooks", self.notebookPerm, level)
-            logger.info("applying files permissions")
+            self.logger.info("applying files permissions")
             self.updateGroupPermission("files", self.filePerm, level)
-            logger.info("applying repos permissions")
+            self.logger.info("applying repos permissions")
             self.updateGroupPermission("repos", self.repoPerm, level)
-            logger.info("applying token permissions")
+            self.logger.info("applying token permissions")
             self.updateGroupPermission("authorization", self.tokenPerm, level)
-            logger.info("applying secret scope permissions")
+            self.logger.info("applying secret scope permissions")
             self.updateSecretPermission(self.secretScopePerm, level)
-            logger.info("applying dashboard permissions")
+            self.logger.info("applying dashboard permissions")
             self.updateGroup2Permission("dashboards", self.dashboardPerm, level)
-            logger.info("applying query permissions")
+            self.logger.info("applying query permissions")
             self.updateGroup2Permission("queries", self.queryPerm, level)
-            logger.info("applying alerts permissions")
+            self.logger.info("applying alerts permissions")
             self.updateGroup2Permission("alerts", self.alertPerm, level)
             if self.cloud == "AWS":
-                logger.info("applying password permissions")
+                self.logger.info("applying password permissions")
                 self.updateGroupPermission("authorization", self.passwordPerm, level)
-                logger.info("applying instance profile permissions")
+                self.logger.info("applying instance profile permissions")
                 self.updateGroupRoles(level)
             if self.checkTableACL is True:
-                logger.info("applying table acl object permissions")
+                self.logger.info("applying table acl object permissions")
                 self.updateDataObjectsPermission(self.dataObjectsPerm, level)
 
         except Exception as e:
-            logger.error(f" Error applying group permission, {e}")
+            self.logger.error(f" Error applying group permission, {e}")
 
     def validateTempWSGroup(self) -> list:
         try:
@@ -1884,35 +1834,35 @@ class GroupMigration:
             WSGGroup = [e["displayName"] for e in resJson["Resources"] if e["meta"]["resourceType"] == "WorkspaceGroup"]
             for g in self.groupL:
                 if "db-temp-" + g not in WSGGroup:
-                    logger.info(f"temp workspace group db-temp-{g} not present, please check")
+                    self.logger.info(f"temp workspace group db-temp-{g} not present, please check")
                     return 0
             return 1
         except Exception as e:
-            logger.info(f"error validating WS group objects : {e}")
+            self.logger.info(f"error validating WS group objects : {e}")
 
     def bulkTryDelete(self, deleteList):
         for g in deleteList:
             gID = self.groupNameDict[g]
-            logger.info(f"Attempting to delete group [{gID}] - {g}")
+            self.logger.info(f"Attempting to delete group [{gID}] - {g}")
             try:
                 requests.delete(
                     f"{self.workspace_url}/api/2.0/preview/scim/v2/Groups/{gID}",
                     headers=self.headers,
                 )
             except Exception:
-                logger.error("ERROR - Failed to delete group [{gID}] - {g}. ErrorMessage: {deleteError}")
+                self.logger.error("ERROR - Failed to delete group [{gID}] - {g}. ErrorMessage: {deleteError}")
                 pass
             else:
-                logger.info(f"SUCCESS - Deleted group [{gID}] - {g}")
+                self.logger.info(f"SUCCESS - Deleted group [{gID}] - {g}")
 
     def persistInventory(self, mode: str):
         try:
             groupType = ""
             if mode == "Workspace":
-                logger.info(f"Saving data for workspace groups in {self.inventoryTableName} table.")
+                self.logger.info(f"Saving data for workspace groups in {self.inventoryTableName} table.")
                 groupType = "WorkspaceLocal"
             else:
-                logger.info(f"Saving data for workspace temp groups in {self.inventoryTableName} table.")
+                self.logger.info(f"Saving data for workspace temp groups in {self.inventoryTableName} table.")
                 groupType = "WorkspaceTemp"
             persistList = []
             persistList.append([groupType, "GroupListDict", self.groupIdDict])
@@ -1964,27 +1914,27 @@ class GroupMigration:
                     "GroupType", lit(groupType)
                 )
                 tableACLDF.write.format("delta").mode("append").saveAsTable(self.inventoryTableName + "TableACL")
-            logger.info(f"Saved data in {self.inventoryTableName} table.")
+            self.logger.info(f"Saved data in {self.inventoryTableName} table.")
 
         except Exception as e:
-            logger.error(f"Error creating delta table to store inventory  : {e}")
+            self.logger.error(f"Error creating delta table to store inventory  : {e}")
 
     def deleteWorkspaceLocalGroups(self):
         try:
             self.setGroupListForMode("Workspace")
             if self.validateTempWSGroup() == 0:
-                logger.info("temp group validation failed, aborting deletion")
+                self.logger.info("temp group validation failed, aborting deletion")
                 return
             self.bulkTryDelete(self.groupL)
         except Exception as e:
-            logger.error(f"Error deleting groups : {e}")
+            self.logger.error(f"Error deleting groups : {e}")
 
     def deleteTempGroups(self):
         self.setGroupListForMode("Account")
         try:
             self.bulkTryDelete(self.groupL)
         except Exception as e:
-            logger.error(f"Error deleting temp groups : {e}")
+            self.logger.error(f"Error deleting temp groups : {e}")
 
     def createBackupGroup(self):
         try:
@@ -2009,14 +1959,14 @@ class GroupMigration:
                     data=json.dumps(data),
                 )
                 if res.status_code == 409:
-                    logger.info(f'group with name "db-temp-"{g} already present, please delete and try again.')
+                    self.logger.info(f'group with name "db-temp-"{g} already present, please delete and try again.')
                     continue
                 self.groupWSGIdDict[res.json()["id"]] = "db-temp-" + g
                 self.groupWSGNameDict["db-temp-" + g] = res.json()["id"]
             self.applyGroupPermission("Workspace")
             self.persistInventory("Workspace")
         except Exception as e:
-            logger.error(f" Error creating backup groups , {e}")
+            self.logger.error(f" Error creating backup groups , {e}")
 
     def validateAccountGroup(self):
         try:
@@ -2028,11 +1978,11 @@ class GroupMigration:
                 self.accountGroups_lower[grp["displayName"].casefold()] = grp["id"]
             for g in self.WorkspaceGroupNames:
                 if g.casefold() not in self.accountGroups_lower:
-                    logger.info(f"group {g} is not present in account level, please add correct group and try again")
+                    self.logger.info(f"group {g} is not present in account level, please add correct group and try again")
                     return 1
             return 0
         except Exception as e:
-            logger.error(f" Error validating account level group, {e}")
+            self.logger.error(f" Error validating account level group, {e}")
 
     def createAccountGroup(self):
         try:
@@ -2053,4 +2003,4 @@ class GroupMigration:
             self.persistInventory("Account")
 
         except Exception as e:
-            logger.error(f" Error creating account level group, {e}")
+            self.logger.error(f" Error creating account level group, {e}")

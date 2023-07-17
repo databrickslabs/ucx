@@ -29,11 +29,13 @@ def install_uc_upgrade_package():
 
     project_root = Path(".").absolute().parent
     print(f"appending the uc-upgrade library from {project_root}")
-    sys.path.append(project_root)
+    sys.path.append(str(project_root))
 
     print("Verifying that package can be properly loaded")
     try:
-        from uc_upgrade.group_migration import GroupMigration  # noqa: F401
+        from uc_upgrade.toolkits.group_migration import (  # noqa: F401
+            GroupMigrationToolkit,
+        )
 
         print("Successfully loaded the uc-upgrade package")
     except Exception as e:
