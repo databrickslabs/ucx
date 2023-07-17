@@ -6,22 +6,19 @@ import time
 from typing import List
 
 import requests
+from databricks.sdk import AccountClient, WorkspaceClient
 from pyspark.sql import session
 from pyspark.sql.functions import array_contains, col, collect_set, lit
 from pyspark.sql.types import MapType, StringType, StructField, StructType
-
-from databricks.sdk import WorkspaceClient
-from databricks.sdk.core import DatabricksError
-
-import logging
 
 # Initialize logger
 logger = logging.getLogger(__name__)
 logging.basicConfig(level=logging.INFO)
 
-# TODO figure out how to authenticate to both level simultaneously 
-workspace_client = WorkspaceClient(profile='prady')
-account_client = AccountClient(profile='field-eng-account')
+# TODO figure out how to authenticate to both level simultaneously
+workspace_client = WorkspaceClient()
+account_client = AccountClient()
+
 
 class GroupMigration:
     def __init__(
@@ -90,12 +87,12 @@ class GroupMigration:
         spark.sql(f"drop table if exists {self.inventoryTableName+'TableACL'}")
 
         # Check if we should automatically generate list, and do it immediately.
-        # Implementers Note: Could change this section to a lazy calculation by setting groupL to nil or some sentinel value and adding checks before use.
-
+        # Implementers Note: Could change this section to a lazy calculation by setting
+        # groupL to nil or some sentinel value and adding checks before use.
 
         assert workspace_client.current_user.me(), "Unable to authenitcate to Workspace"
 
-        # TODO add validation for authentication for account console 
+        # TODO add validation for authentication for account console
 
         if autoGenerateList:
             logger.info(
@@ -135,7 +132,7 @@ class GroupMigration:
             logger.debug("Pruning local groups")
             workspace_groups = set([g.display_name for g in workspace_groups])
             account_groups = set([g.display_name for g in account_groups])
-            
+
             # Prune special groups.
             prune_groups = ["admins", "users"]
 
