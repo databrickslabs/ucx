@@ -3,7 +3,7 @@ from typing import List, Optional
 
 
 @dataclass
-class InventoryTableName:
+class InventoryTable:
     catalog: str
     database: str
     table: str
@@ -26,6 +26,7 @@ class WorkspaceAuthConfig:
 
 @dataclass
 class AccountAuthConfig:
+    account_id: str
     host: str
     password: str
     username: str
@@ -39,8 +40,8 @@ class AuthConfig:
 
 @dataclass
 class MigrationConfig:
-    inventory_table_name: InventoryTableName
-    migrate_table_acls: bool
+    inventory_table: InventoryTable
+    with_table_acls: bool
     auth_config: AuthConfig
     group_listing_config: GroupListingConfig
-    num_threads: Optional[int] = 16
+    backup_group_prefix: Optional[str] = "db-temp-"

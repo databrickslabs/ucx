@@ -11,7 +11,7 @@ class ClientProvider:
     logger = LoggerProvider.get_logger()
 
     @classmethod
-    def get_workspace_client(cls, config: MigrationConfig) -> WorkspaceClient:
+    def _get_workspace_client(cls, config: MigrationConfig) -> WorkspaceClient:
         cls.logger.info("Initializing the workspace client")
         if config.auth_config.workspace:
             cls.logger.info("Using the provided workspace client credentials")
@@ -29,6 +29,38 @@ class ClientProvider:
             return WorkspaceClient(host=workspace_url, token=token)
 
     @classmethod
-    def get_account_client(cls, config: MigrationConfig) -> AccountClient:
+    def get_workspace_client(cls, config: MigrationConfig) -> WorkspaceClient:
+        client = cls._get_workspace_client(config)
+        assert client.current_user.me(), "Cannot authenticate with the workspace client"
+        _me = client.current_user.me()
+        is_workspace_admin = any([g.display == "admins" for g in _me.groups])
+        if not is_workspace_admin:
+            raise RuntimeError("Current user is not a workspace admin")
+        return client
+
+    @classmethod
+    def _get_account_client(cls, config: MigrationConfig) -> AccountClient:
         cls.logger.info("Initializing the account client")
         return AccountClient(**asdict(config.auth_config.account))
+
+    @classmethod
+    def get_account_client(cls, config: MigrationConfig) -> AccountClient:
+        client = cls._get_account_client(config)
+
+        current_user_option = list(
+            client.users.list(
+                filter=f'userName eq "{config.auth_config.account.username}"', attributes="userName, roles"
+            )
+        )
+
+        if not current_user_option:
+            raise RuntimeError(
+                f"Cannot find current user {config.auth_config.account.username} across the account users"
+            )
+
+        current_user = current_user_option[0]
+        is_admin = any([role.value == "account_admin" for role in current_user.roles])
+        if not is_admin:
+            raise RuntimeError(f"Current user {current_user.user_name} is not an account admin")
+
+        return client

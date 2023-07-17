@@ -55,7 +55,7 @@ class GroupMigrationToolkit:
     #
     # def cleanup_inventory_table(self):
     #     self.self.logger.info("Cleaning up inventory table")
-    #     self.spark.sql("DROP TABLE IF EXISTS {}".format(self.config.inventory_table_name))
+    #     self.spark.sql("DROP TABLE IF EXISTS {}".format(self.config.inventory_table))
     #     self.self.logger.info("Inventory table cleaned up")
     #
     # def findMigrationEligibleGroups(self):
@@ -2014,8 +2014,8 @@ class GroupMigrationToolkit:
         self.logger.info("Group validation finished")
 
     def cleanup_inventory_table(self):
-        self.logger.info(f"Deleting the inventory table {self.config.inventory_table_name}")
-        self.spark.sql(f"DROP TABLE IF EXISTS {self.config.inventory_table_name}")
+        self.logger.info(f"Deleting the inventory table {self.config.inventory_table}")
+        self.spark.sql(f"DROP TABLE IF EXISTS {self.config.inventory_table}")
         self.logger.info("Table successfully deleted")
 
     def inventorize_permissions(self):

@@ -74,7 +74,7 @@ from uc_upgrade.config import (  # noqa: E402
     AccountAuthConfig,
     AuthConfig,
     GroupListingConfig,
-    InventoryTableName,
+    InventoryTable,
     MigrationConfig,
 )
 from uc_upgrade.toolkits.group_migration import GroupMigrationToolkit  # noqa: E402
@@ -86,18 +86,19 @@ from uc_upgrade.toolkits.group_migration import GroupMigrationToolkit  # noqa: E
 # COMMAND ----------
 
 migration_config = MigrationConfig(
-    inventory_table_name=InventoryTableName(
+    inventory_table=InventoryTable(
         catalog="main", database="default", table="uc_migration_permission_inventory"
     ),
-    migrate_table_acls=False,
+    with_table_acls=False,
     auth_config=AuthConfig(
         account=AccountAuthConfig(
             # we recommend you to use Databricks Secrets to store the credentials
             # host="https://account-console-host",
+            # account_id=dbutils.secrets.get("scope", "account_id"),
             # password=dbutils.secrets.get("scope", "password"),
             # username=dbutils.secrets.get("scope", "username"),
             # however, you can also pass the credentials directly
-            host="https://account-console-host", password="accountAdminPassword", username="accountAdminUsername"
+            host="https://account-console-host", password="accountAdminPassword", username="accountAdminUsername", account_id="account_id"
         ),
     ),
     group_listing_config=GroupListingConfig(

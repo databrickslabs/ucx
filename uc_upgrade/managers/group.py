@@ -9,6 +9,8 @@ from uc_upgrade.providers.logger import LoggerProvider
 
 
 class GroupManager:
+    SYSTEM_GROUPS = ["users", "admins", "account-users"]
+
     def __init__(self, config: MigrationConfig):
         self.config = config
         self.logger = LoggerProvider.get_logger()
@@ -24,7 +26,7 @@ class GroupManager:
 
     def list_workspace_groups(self):
         self.logger.info("Listing all groups in workspace, this may take a while")
-        ws_groups = list(self.ws_client.groups.list(attributes="displayName"))
+        ws_groups = list(self.ws_client.groups.list(attributes="displayName", filter=self._display_name_filter))
         self.logger.info("Workspace group listing complete")
         return ws_groups
 
@@ -56,15 +58,23 @@ class GroupManager:
 
     def _verify_groups(self):
         for group_name in self.config.group_listing_config.groups:
+            if group_name in self.SYSTEM_GROUPS:
+                raise RuntimeError("Cannot migrate system groups {self.SYSTEM_GROUPS}")
             self._verify_group_exists_in_ws(group_name)
             self._verify_group_exists_in_acc(group_name)
+
+    @property
+    def _display_name_filter(self):
+        return " and ".join([f'displayName ne "{group}"' for group in self.SYSTEM_GROUPS])
 
     def _get_ws_group(
         self, group_name, attributes: Optional[str] = None, excluded_attributes: Optional[str] = None
     ) -> Optional[Group]:
         groups = list(
             self.ws_client.groups.list(
-                filter=f'displayName eq "{group_name}"', attributes=attributes, excluded_attributes=excluded_attributes
+                filter=f'displayName eq "{group_name}"' + self._display_name_filter,
+                attributes=attributes,
+                excluded_attributes=excluded_attributes,
             )
         )
         if len(groups) == 0:
@@ -73,7 +83,7 @@ class GroupManager:
             return groups[0]
 
     def _get_account_group(self, group_name, attributes: Optional[str] = None) -> Optional[Group]:
-        groups = list(self.ws_client.groups.list(filter=f'displayName eq "{group_name}"', attributes=attributes))
+        groups = list(self.acc_client.groups.list(filter=f'displayName eq "{group_name}"', attributes=attributes))
         if len(groups) == 0:
             return None
         else:
@@ -99,7 +109,7 @@ class GroupManager:
 
     def create_or_update_temporary_groups(self, dry_run: bool):
         for group_name in self.config.group_listing_config.groups:
-            temp_group_name = f"temp_{group_name}"
+            temp_group_name = f"{self.config.backup_group_prefix}{group_name}"
             logging.info(f"Preparing temporary group for {group_name} -> {temp_group_name}")
             group = self._get_ws_group(group_name, excluded_attributes="id, externalId")
 
