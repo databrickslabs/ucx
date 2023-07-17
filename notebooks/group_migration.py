@@ -84,14 +84,15 @@ install_uc_upgrade_package()
 
 # COMMAND ----------
 from databricks.sdk.runtime import dbutils  # noqa: F405
-from uc_upgrade.toolkits.group_migration import GroupMigrationToolkit  # noqa: E402
-from uc_upgrade.config import (
-    MigrationConfig,
-    AuthConfig,
-    InventoryTableName,
+
+from uc_upgrade.config import (  # noqa: E402
     AccountAuthConfig,
+    AuthConfig,
     GroupListingConfig,
-)  # noqa: E402
+    InventoryTableName,
+    MigrationConfig,
+)
+from uc_upgrade.toolkits.group_migration import GroupMigrationToolkit  # noqa: E402
 
 migration_config = MigrationConfig(
     inventory_table_name=InventoryTableName(

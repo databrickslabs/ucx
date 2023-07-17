@@ -19,11 +19,11 @@ delta-spark = "^2.4.0"
 
 [tool.black]
 line-length = 120
-#exclude = "notebooks"
+exclude = "notebooks"
 
 [tool.ruff]
 line-length = 120
-extend-exclude = ["notebooks/*/*.py"]
+extend-exclude = ["notebooks/*.py"]
 
 [tool.isort]
 profile = "black"

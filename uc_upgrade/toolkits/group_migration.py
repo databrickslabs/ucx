@@ -1,13 +1,4 @@
-import concurrent.futures
-import json
-import math
-import time
-from typing import List
-
-import requests
 from pyspark.sql import SparkSession
-from pyspark.sql.functions import array_contains, col, collect_set, lit
-from pyspark.sql.types import MapType, StringType, StructField, StructType
 
 from uc_upgrade.config import MigrationConfig
 from uc_upgrade.managers.group import GroupManager
@@ -512,7 +503,8 @@ class GroupMigrationToolkit:
     #                         if len(result) > 0:
     #                             dashboardPerm[dashboard_id] = result
     #                     except Exception as e:
-    #                         self.logger.error(f"Error in retrieving dashboard permission for dashboard {dashboard_id}: {e}")
+    #                         self.logger.error(f"Error in retrieving dashboard"
+    #                                           f" permission for dashboard {dashboard_id}: {e}")
     #         return dashboardPerm
     #
     #     except Exception as e:
@@ -924,7 +916,8 @@ class GroupMigrationToolkit:
     #             self.logger.info(f"[Verbose] Requesting file list for Depth {depth} Path: {path}")
     #         with concurrent.futures.ThreadPoolExecutor(max_workers=self.numThreads) as executor:
     #             futuresMap = {
-    #                 executor.submit(self.getSingleFolderList, dir_path, depth): dir_path for dir_path in remaining_dirs
+    #                 executor.submit(self.getSingleFolderList,
+    #                 dir_path, depth): dir_path for dir_path in remaining_dirs
     #             }
     #             for future in concurrent.futures.as_completed(futuresMap):
     #                 dir_path = futuresMap[future]
@@ -932,7 +925,8 @@ class GroupMigrationToolkit:
     #                 if res:
     #                     dir_path2, folders, notebooks, files = res
     #                     if dir_path2 != dir_path:
-    #                         self.logger.error(f"ERROR: got WRONG RESULT from future: sent: {dir_path} recieved: {dir_path2}")
+    #                         self.logger.error(f"ERROR: got WRONG RESULT from "
+    #                                           f"future: sent: {dir_path} recieved: {dir_path2}")
     #                         remaining_dirs.remove(dir_path2)
     #                         # todo: what??
     #                     else:
@@ -1255,14 +1249,16 @@ class GroupMigrationToolkit:
     #                 continue
     #             if resSSPerm.status_code != 200:
     #                 self.logger.error(
-    #                     f"Error retrieving ACL for Secret Scope: {scopeName}. HTTP Status Code {resSSPerm.status_code}"
+    #                     f"Error retrieving ACL for Secret Scope: " \
+    #                     f"{scopeName}. HTTP Status Code {resSSPerm.status_code}"
     #                 )
     #                 continue
     #
     #             resSSPermJson = resSSPerm.json()
     #             if "items" not in resSSPermJson:
     #                 # self.logger.info(
-    #                 # f'ACL for Secret Scope  {scopeName} missing "items" key. Contents:\n{resSSPermJson}\nSkipping...'
+    #                 f'ACL for Secret Scope
+    # {scopeName} missing "items" key. Contents:\n{resSSPermJson}\nSkipping...'
     #                 # )
     #                 # This seems to be expected behaviour if there are no ACLs, silently ignore
     #                 continue
@@ -1595,7 +1591,9 @@ class GroupMigrationToolkit:
     #                 lines.extend(
     #                     self.generate_table_acls_command(acl.ActionTypes, acl.ObjectType, acl.ObjectKey, gName)
     #                 )
-    #             # lines.extend(self.generate_table_acls_command(acl.ActionTypes, acl.ObjectType, acl.ObjectKey, gName))
+    #             # lines.extend(
+    #             self.generate_table_acls_command(acl.ActionTypes, acl.ObjectType, acl.ObjectKey, gName)
+    #             )
     #         for aclQuery in lines:
     #             # self.logger.info(aclQuery)
     #             self.runVerboseSql(aclQuery)
@@ -1832,7 +1830,10 @@ class GroupMigrationToolkit:
     #             headers=self.headers,
     #         )
     #         resJson = res.json()
-    #         WSGGroup = [e["displayName"] for e in resJson["Resources"] if e["meta"]["resourceType"] == "WorkspaceGroup"]
+    #         WSGGroup = [e["displayName"]
+    #           for e in resJson["Resources"]
+    #           if e["meta"]["resourceType"] == "WorkspaceGroup"
+    #         ]
     #         for g in self.groupL:
     #             if "db-temp-" + g not in WSGGroup:
     #                 self.logger.info(f"temp workspace group db-temp-{g} not present, please check")
@@ -1979,7 +1980,8 @@ class GroupMigrationToolkit:
     #             self.accountGroups_lower[grp["displayName"].casefold()] = grp["id"]
     #         for g in self.WorkspaceGroupNames:
     #             if g.casefold() not in self.accountGroups_lower:
-    #                 self.logger.info(f"group {g} is not present in account level, please add correct group and try again")
+    #                 self.logger.info(f"group {g} is not present "
+    #                                  f"in account level, please add correct group and try again")
     #                 return 1
     #         return 0
     #     except Exception as e:
@@ -1996,7 +1998,8 @@ class GroupMigrationToolkit:
     #         data = {"permissions": ["USER"]}
     #         for g in self.WorkspaceGroupNames:
     #             requests.put(
-    #                 f"{self.workspace_url}/api/2.0/preview/permissionassignments/principals/{self.accountGroups_lower[g.casefold()]}",
+    #                 f"{self.workspace_url}/api/2.0/preview/" \
+    #                 f"permissionassignments/principals/{self.accountGroups_lower[g.casefold()]}",
     #                 headers=self.headers,
     #                 data=json.dumps(data),
     #             )
@@ -2013,7 +2016,7 @@ class GroupMigrationToolkit:
     def cleanup_inventory_table(self):
         self.logger.info(f"Deleting the inventory table {self.config.inventory_table_name}")
         self.spark.sql(f"DROP TABLE IF EXISTS {self.config.inventory_table_name}")
-        self.logger.info(f"Table successfully deleted")
+        self.logger.info("Table successfully deleted")
 
     def inventorize_permissions(self):
         pass
