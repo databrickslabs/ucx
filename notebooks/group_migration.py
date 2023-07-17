@@ -93,12 +93,15 @@ migration_config = MigrationConfig(
     auth_config=AuthConfig(
         account=AccountAuthConfig(
             # we recommend you to use Databricks Secrets to store the credentials
-            # host="https://account-console-host",
-            # account_id=dbutils.secrets.get("scope", "account_id"),
-            # password=dbutils.secrets.get("scope", "password"),
-            # username=dbutils.secrets.get("scope", "username"),
+            host="https://account-console-host",
+            username=dbutils.secrets.get("scope", "username"),
+            password=dbutils.secrets.get("scope", "password"),
+            account_id=dbutils.secrets.get("scope", "account_id"),
             # however, you can also pass the credentials directly
-            host="https://account-console-host", password="accountAdminPassword", username="accountAdminUsername", account_id="account_id"
+            # host="https://account-console-host",
+            # username="accountAdminUsername",
+            # password="accountAdminPassword",
+            # account_id="account_id"
         ),
     ),
     group_listing_config=GroupListingConfig(
