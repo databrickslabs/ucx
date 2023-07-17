@@ -20,7 +20,7 @@ delta-spark = "^2.4.0"
 
 [tool.black]
 line-length = 120
-exclude = "notebooks"
+extend-exclude = "notebooks"
 
 [tool.ruff]
 line-length = 120
