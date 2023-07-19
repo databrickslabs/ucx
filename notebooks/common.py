@@ -1,5 +1,6 @@
-import sys
 from pathlib import Path
+import importlib.util
+import sys
 
 
 def install_uc_migration_toolkit():
@@ -20,22 +21,20 @@ def install_uc_migration_toolkit():
     ipython.run_line_magic("autoreload", 2)
     print("Path-based modules successfully reloaded")
 
+    print("adding module to the system path")
+    module_name = "uc_migration_toolkit"
+    module_path = Path(f"../src/{module_name}/__init__.py").resolve().absolute()
+    spec = importlib.util.spec_from_file_location(module_name, module_path)
 
-def add_project_source_to_path():
-    project_root = (Path("..").resolve() / "src").absolute()
-    print(f"appending the library from {project_root}")
-    sys.path.append(str(project_root))
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+    # Optional; only necessary if you want to be able to import the module
+    # by name later.
+    sys.modules[module_name] = module
 
-    print("Verifying that package can be properly loaded")
     try:
-        from uc_migration_toolkit.toolkits.group_migration import GroupMigrationToolkit  # noqa: F401
-        print(sys.path)
-        print("Successfully loaded the uc-migration-toolkit package")
-    except Exception as e:
-        print(
-            "Unable to import the UC migration utilities package from source. "
-            "Please check that you've imported the whole repository and not just copied one file."
-        )
-        print("Also check that you have the Files in Repos activated, e.g. use DBR 11.X+")
-        print("Original exception:")
+        import uc_migration_toolkit
+        from uc_migration_toolkit.config import MigrationConfig
+    except ImportError as e:
+        print("Failed to import uc_migration_toolkit")
         raise e
