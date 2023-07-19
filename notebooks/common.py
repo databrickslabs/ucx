@@ -5,7 +5,7 @@ import tempfile
 from pathlib import Path
 
 
-def install_uc_migration_toolkit(parent_folder_path):
+def install_uc_migration_toolkit(parent_folder_path: Path = Path("..")):
     # Save the original working directory
     original_cwd = Path.cwd()
     ipython = get_ipython()  # noqa: F821
