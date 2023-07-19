@@ -2,7 +2,7 @@ import sys
 from pathlib import Path
 
 
-def install_uc_upgrade_package():
+def install_uc_migration_toolkit():
     # these libraries are preinstalled on DBR
     import tomli  # noqa: F401
     from databricks.sdk.runtime import dbutils  # noqa: F401
