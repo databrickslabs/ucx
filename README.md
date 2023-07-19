@@ -21,7 +21,11 @@ Recommended VM types are:
 **For now please switch to the `v0.0.1` tag in the GitHub to get the latest working version.**
 
 
-## Local setup and development process
+## Development
+
+This section describes setup and development process for the project.
+
+### Local setup 
 
 - Install [hatch](https://github.com/pypa/hatch):
 ```shell
@@ -44,11 +48,20 @@ hatch run python -c "import sys; print(sys.executable)"
 
 - You're good to go! 🎉
 
-> Please note that you **don't** need to use `hatch` inside notebooks or in the Databricks workspace.
-> It's only introduced to simplify local development.
 
+### Development process
 
-Before running `git push`, don't forget to lint your code with:
+Please note that you **don't** need to use `hatch` inside notebooks or in the Databricks workspace.
+It's only introduced to simplify local development.
+
+Write your code in the IDE. Please keep all relevant files under the `src/uc_migration_toolkit` directory.
+
+Don't forget to test your code via:
+```shell
+hatch run test
+```
+
+Please note that all commits go through the CI process, and it verifies linting. You can run linting locally via:
 
 ```shell
 hatch run lint:fmt
