@@ -20,6 +20,8 @@ def install_uc_migration_toolkit():
     ipython.run_line_magic("autoreload", 2)
     print("Path-based modules successfully reloaded")
 
+
+def add_project_source_to_path():
     project_root = (Path("..").resolve() / "src").absolute()
     print(f"appending the library from {project_root}")
     sys.path.append(str(project_root))
