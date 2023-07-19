@@ -57,7 +57,7 @@
 
 # COMMAND ----------
 
-from notebooks.common import install_uc_migration_toolkit
+from common import install_uc_migration_toolkit
 
 install_uc_migration_toolkit()
 

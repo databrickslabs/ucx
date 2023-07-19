@@ -11,7 +11,7 @@ def install_uc_migration_toolkit():
     ipython = get_ipython()  # noqa: F821
 
     project_file = Path("../pyproject.toml").absolute()
-    dependency_string = " ".join(f"'{d}'" for d in tomli.loads(project_file.read_bytes())['project']['dependencies'])
+    dependency_string = " ".join(f"'{d}'" for d in tomli.loads(project_file.read_text())['project']['dependencies'])
     ipython.run_line_magic("pip", f"install {dependency_string}")
     dbutils.library.restartPython()
 
