@@ -4,24 +4,17 @@ from databricks.sdk import AccountClient, WorkspaceClient
 
 from uc_migration_toolkit.config import MigrationConfig
 from uc_migration_toolkit.providers.logger import LoggerMixin
-from uc_migration_toolkit.utils import get_dbutils
 
 
 class ClientProvider(LoggerMixin):
     def _get_workspace_client(self, config: MigrationConfig) -> WorkspaceClient:
         self.logger.info("Initializing the workspace client")
-        dbutils = get_dbutils()
         if config.auth_config.workspace:
             self.logger.info("Using the provided workspace client credentials")
             return WorkspaceClient(host=config.auth_config.workspace.host, token=config.auth_config.workspace.token)
         else:
             self.logger.info("Using the current notebook workspace client credentials")
-            workspace_url = dbutils.notebook.entry_point.getDbutils().notebook().getContext().apiUrl().getOrElse(None)
-            token = dbutils.notebook.entry_point.getDbutils().notebook().getContext().apiToken().getOrElse(None)
-            if not workspace_url or not token:
-                msg = "Cannot pickup credentials from the current notebook"
-                raise RuntimeError(msg)
-            return WorkspaceClient(host=workspace_url, token=token)
+            return WorkspaceClient()
 
     def get_workspace_client(self, config: MigrationConfig) -> WorkspaceClient:
         client = self._get_workspace_client(
