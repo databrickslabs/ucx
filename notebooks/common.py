@@ -16,11 +16,6 @@ def install_uc_migration_toolkit():
     ipython.run_line_magic("pip", f"install {dependency_string}")
     dbutils.library.restartPython()
 
-    print("Reloading the path-based modules")
-    ipython.run_line_magic("load_ext", "autoreload")
-    ipython.run_line_magic("autoreload", 2)
-    print("Path-based modules successfully reloaded")
-
     print("adding module to the system path")
     module_name = "uc_migration_toolkit"
     module_path = Path(f"../src/{module_name}/__init__.py").resolve().absolute()
