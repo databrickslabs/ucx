@@ -1,11 +1,11 @@
 import sys
 from pathlib import Path
-from uc_migration_toolkit.utils import get_dbutils
 
 
 def install_uc_upgrade_package():
-    # this library is preinstalled on DBR
+    # these libraries are preinstalled on DBR
     import tomli  # noqa: F401
+    from databricks.sdk.runtime import dbutils  # noqa: F401
 
     # this function is provided in Databricks runtime
     ipython = get_ipython()  # noqa: F821
@@ -13,7 +13,7 @@ def install_uc_upgrade_package():
     project_file = Path("../pyproject.toml").absolute()
     dependency_string = " ".join(f"'{d}'" for d in tomli.loads(project_file.read_bytes())['project']['dependencies'])
     ipython.run_line_magic("pip", f"install {dependency_string}")
-    get_dbutils().library.restartPython()
+    dbutils.library.restartPython()
 
     print("Reloading the path-based modules")
     ipython.run_line_magic("load_ext", "autoreload")
@@ -28,7 +28,7 @@ def install_uc_upgrade_package():
     try:
         from uc_migration_toolkit.toolkits.group_migration import GroupMigrationToolkit  # noqa: F401
 
-        print("Successfully loaded the uc-upgrade package")
+        print("Successfully loaded the uc-migration-toolkit package")
     except Exception as e:
         print(
             "Unable to import the UC migration utilities package from source. "
