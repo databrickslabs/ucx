@@ -35,3 +35,7 @@ jobs:
       - name: Verify linting
         run: |
           hatch run lint:verify
+
+      - name: Run tests
+        run: |
+          hatch run test

@@ -8,12 +8,12 @@ from uc_migration_toolkit.providers.client import ClientProvider
 from uc_migration_toolkit.providers.logger import LoggerProvider
 
 
-class GroupManager:
+class GroupManager(LoggerProvider):
     SYSTEM_GROUPS: typing.ClassVar[list[str]] = ["users", "admins", "account-users"]
 
     def __init__(self, config: MigrationConfig):
+        super().__init__()
         self.config = config
-        self.logger = LoggerProvider.get_logger()
         self.ws_client = ClientProvider().get_workspace_client(config)
         self.acc_client = ClientProvider().get_account_client(config)
 

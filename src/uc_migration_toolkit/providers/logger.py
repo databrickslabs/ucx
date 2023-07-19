@@ -3,7 +3,7 @@ import logging
 import sys
 import time
 
-from databricks.sdk.runtime import *  # noqa: F403
+from uc_migration_toolkit.utils import get_dbutils
 
 
 class CustomFormatter(logging.Formatter):
@@ -14,7 +14,7 @@ class CustomFormatter(logging.Formatter):
     @staticmethod
     def _get_notebook_path() -> str:
         notebook_path = (
-            dbutils.notebook.entry_point.getDbutils().notebook().getContext().notebookPath().get().lower()  # noqa: F405
+            get_dbutils().notebook.entry_point.getDbutils().notebook().getContext().notebookPath().get().lower()
         )
         return notebook_path
 
@@ -31,7 +31,7 @@ class CustomFormatter(logging.Formatter):
 class LoggerProvider:
     @staticmethod
     @functools.lru_cache(maxsize=10_000)
-    def get_logger() -> logging.Logger:
+    def _get_logger() -> logging.Logger:
         # Create a logger and set the custom formatter
         base_logger = logging.getLogger("uc-migration-toolkit")
         base_logger.setLevel(logging.DEBUG)
@@ -49,3 +49,6 @@ class LoggerProvider:
             base_logger.addHandler(stream_handler)
 
         return base_logger
+
+    def __init__(self):
+        self.logger = self._get_logger()

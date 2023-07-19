@@ -5,17 +5,16 @@ from uc_migration_toolkit.managers.group import GroupManager
 from uc_migration_toolkit.providers.logger import LoggerProvider
 
 
-class GroupMigrationToolkit:
+class GroupMigrationToolkit(LoggerProvider):
     def __init__(self, config: MigrationConfig):
         # initializing config and clients
-        # please note the order of operations here,
-        # the group manager IS INTENDED to change properties in the self.config object
+        # please note the order of operations here
+        super().__init__()
         self.config = config
+        # the group manager IS INTENDED to change properties in the self.config object
         self.group_manager = GroupManager(self.config)
-        self.logger = LoggerProvider.get_logger()
 
         # initializing runtime utilities
-        self.logger = LoggerProvider.get_logger()
         self.spark = SparkSession.builder.getOrCreate()
 
     #
