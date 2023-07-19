@@ -10,6 +10,9 @@ def install_uc_migration_toolkit(parent_folder_path):
     original_cwd = Path.cwd()
     ipython = get_ipython()  # noqa: F821
     from databricks.sdk.runtime import dbutils  # noqa: F821, E402
+
+    ipython.run_cell_magic("pip", f"install hatch")
+
     # Create a temporary directory with the prefix 'hatch-build'
     with tempfile.TemporaryDirectory(prefix='hatch-build') as temp_dir:
         temp_path = Path(temp_dir)
