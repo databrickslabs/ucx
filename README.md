@@ -42,10 +42,13 @@ hatch run pip install -e '.[dev]'
 hatch run python -c "import sys; print(sys.executable)"
 ```
 
+- You're good to go! 🎉
+
 > Please note that you **don't** need to use `hatch` inside notebooks or in the Databricks workspace.
 > It's only introduced to simplify local development.
 
-Before running `git push`, don't forget to link your code with:
+
+Before running `git push`, don't forget to lint your code with:
 
 ```shell
 hatch run lint:fmt
