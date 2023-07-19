@@ -1,4 +1,3 @@
-# ruff: noqa: E501
 # Databricks notebook source
 # MAGIC %md
 # MAGIC # Workspace Group Migration
