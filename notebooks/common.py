@@ -17,15 +17,12 @@ def install_uc_migration_toolkit():
     dbutils.library.restartPython()
 
     print("adding module to the system path")
-    module_name = "uc_migration_toolkit"
-    module_path = Path(f"../src/{module_name}/__init__.py").resolve().absolute()
-    spec = importlib.util.spec_from_file_location(module_name, module_path)
+    module_src_path = Path(f"../src")
+    module_root_path = (module_src_path / "uc_migration_toolkit")
+    module_init_path = (module_src_path / "uc_migration_toolkit/__init__.py")
 
-    module = importlib.util.module_from_spec(spec)
-    spec.loader.exec_module(module)
-    # Optional; only necessary if you want to be able to import the module
-    # by name later.
-    sys.modules[module_name] = module
+    for _path in [module_src_path, module_root_path, module_init_path]:
+        sys.path.append(str(_path))
 
     try:
         import uc_migration_toolkit
