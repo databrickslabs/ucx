@@ -5,10 +5,10 @@ from databricks.sdk.service.iam import Group
 
 from uc_migration_toolkit.config import MigrationConfig
 from uc_migration_toolkit.providers.client import ClientProvider
-from uc_migration_toolkit.providers.logger import LoggerProvider
+from uc_migration_toolkit.providers.logger import LoggerMixin
 
 
-class GroupManager(LoggerProvider):
+class GroupManager(LoggerMixin):
     SYSTEM_GROUPS: typing.ClassVar[list[str]] = ["users", "admins", "account-users"]
 
     def __init__(self, config: MigrationConfig):

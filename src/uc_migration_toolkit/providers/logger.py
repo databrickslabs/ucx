@@ -28,7 +28,7 @@ class CustomFormatter(logging.Formatter):
         )
 
 
-class LoggerProvider:
+class LoggerMixin:
     @staticmethod
     @functools.lru_cache(maxsize=10_000)
     def _get_logger() -> logging.Logger:

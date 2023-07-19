@@ -3,11 +3,11 @@ from dataclasses import asdict
 from databricks.sdk import AccountClient, WorkspaceClient
 
 from uc_migration_toolkit.config import MigrationConfig
-from uc_migration_toolkit.providers.logger import LoggerProvider
+from uc_migration_toolkit.providers.logger import LoggerMixin
 from uc_migration_toolkit.utils import get_dbutils
 
 
-class ClientProvider(LoggerProvider):
+class ClientProvider(LoggerMixin):
     def _get_workspace_client(self, config: MigrationConfig) -> WorkspaceClient:
         self.logger.info("Initializing the workspace client")
         dbutils = get_dbutils()
