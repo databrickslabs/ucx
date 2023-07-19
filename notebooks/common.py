@@ -29,6 +29,7 @@ def add_project_source_to_path():
     print("Verifying that package can be properly loaded")
     try:
         from uc_migration_toolkit.toolkits.group_migration import GroupMigrationToolkit  # noqa: F401
+        print(sys.path)
         print("Successfully loaded the uc-migration-toolkit package")
     except Exception as e:
         print(
