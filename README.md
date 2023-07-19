@@ -1,21 +1,44 @@
 # UC Migration Toolkit
 
-[![PyPI - Version](https://img.shields.io/pypi/v/uc-migration-toolkit.svg)](https://pypi.org/project/uc-migration-toolkit)
-[![PyPI - Python Version](https://img.shields.io/pypi/pyversions/uc-migration-toolkit.svg)](https://pypi.org/project/uc-migration-toolkit)
+This repo contains various functions and utilities for UC Upgrade.
 
------
 
-**Table of Contents**
+## Latest working version and how-to
 
-- [Installation](#installation)
-- [License](#license)
+Please note that current project statis is 🏗️ **WIP**, but we have a minimal set of already working utilities.
+To run the notebooks please use latest LTS Databricks Runtime (non-ML), without Photon, in a single-user cluster mode.
 
-## Installation
+> If you have Table ACL Clusters or SQL Warehouse where ACL have been defined, you should create a TableACL cluster to run this notebook.
 
-```console
-pip install uc-migration-toolkit
+Please note that script is executed **only** on the driver node, therefore you'll need to use a Single Node Cluster with sufficient amount of cores (e.g. 16 cores).
+
+Recommended VM types are:
+
+- Azure: `Standard_F16`
+- AWS: `c4.4xlarge`
+- GCP: `c2-standard-16`
+
+**For now please switch to the `v0.0.1` tag in the GitHub to get the latest working version.**
+
+
+## Local setup and development process
+
+- Install [hatch](https://github.com/pypa/hatch):
+```shell
+pip install hatch
 ```
 
-## License
+- Pin your IDE to use the newly created virtual environment
 
-`uc-migration-toolkit` is distributed under the terms of the [MIT](https://spdx.org/licenses/MIT.html) license.
+```shell
+hatch run python -c "import sys; print(sys.executable)"
+```
+
+> Please note that you **don't** need to use `hatch` inside notebooks or in the Databricks workspace.
+> It's only introduced to simplify local development.
+
+Before running `git push`, don't forget to link your code with:
+
+```shell
+hatch run lint:fmt
+```
