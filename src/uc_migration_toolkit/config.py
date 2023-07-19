@@ -14,14 +14,14 @@ class InventoryTable:
 
 @dataclass
 class GroupListingConfig:
-    groups: Optional[List[str]] = None
-    auto: Optional[bool] = True
+    groups: list[str] | None = None
+    auto: bool | None = True
 
 
 @dataclass
 class WorkspaceAuthConfig:
-    token: Optional[str]
-    host: Optional[str]
+    token: str | None
+    host: str | None
 
 
 @dataclass
@@ -35,7 +35,7 @@ class AccountAuthConfig:
 @dataclass
 class AuthConfig:
     account: AccountAuthConfig
-    workspace: Optional[WorkspaceAuthConfig] = None
+    workspace: WorkspaceAuthConfig | None = None
 
 
 @dataclass
@@ -44,4 +44,4 @@ class MigrationConfig:
     with_table_acls: bool
     auth_config: AuthConfig
     group_listing_config: GroupListingConfig
-    backup_group_prefix: Optional[str] = "db-temp-"
+    backup_group_prefix: str | None = "db-temp-"

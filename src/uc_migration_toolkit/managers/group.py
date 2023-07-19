@@ -2,10 +2,9 @@ import logging
 from typing import List, Optional
 
 from databricks.sdk.service.iam import Group
-
-from uc_upgrade.config import MigrationConfig
-from uc_upgrade.providers.client import ClientProvider
-from uc_upgrade.providers.logger import LoggerProvider
+from uc_migration_toolkit.config import MigrationConfig
+from uc_migration_toolkit.providers.client import ClientProvider
+from uc_migration_toolkit.providers.logger import LoggerProvider
 
 
 class GroupManager:
@@ -36,7 +35,7 @@ class GroupManager:
         self.logger.info("Account group listing complete")
         return acc_groups
 
-    async def _find_eligible_groups(self) -> List[str]:
+    async def _find_eligible_groups(self) -> list[str]:
         self.logger.info("Finding eligible groups automatically")
         ws_groups = self.list_workspace_groups()
         acc_groups = self.list_account_groups()
@@ -59,7 +58,8 @@ class GroupManager:
     def _verify_groups(self):
         for group_name in self.config.group_listing_config.groups:
             if group_name in self.SYSTEM_GROUPS:
-                raise RuntimeError("Cannot migrate system groups {self.SYSTEM_GROUPS}")
+                msg = "Cannot migrate system groups {self.SYSTEM_GROUPS}"
+                raise RuntimeError(msg)
             self._verify_group_exists_in_ws(group_name)
             self._verify_group_exists_in_acc(group_name)
 
@@ -68,8 +68,8 @@ class GroupManager:
         return " and ".join([f'displayName ne "{group}"' for group in self.SYSTEM_GROUPS])
 
     def _get_ws_group(
-        self, group_name, attributes: Optional[str] = None, excluded_attributes: Optional[str] = None
-    ) -> Optional[Group]:
+        self, group_name, attributes: str | None = None, excluded_attributes: str | None = None
+    ) -> Group | None:
         groups = list(
             self.ws_client.groups.list(
                 filter=f'displayName eq "{group_name}"' + self._display_name_filter,
@@ -82,7 +82,7 @@ class GroupManager:
         else:
             return groups[0]
 
-    def _get_account_group(self, group_name, attributes: Optional[str] = None) -> Optional[Group]:
+    def _get_account_group(self, group_name, attributes: str | None = None) -> Group | None:
         groups = list(self.acc_client.groups.list(filter=f'displayName eq "{group_name}"', attributes=attributes))
         if len(groups) == 0:
             return None
@@ -90,7 +90,7 @@ class GroupManager:
             return groups[0]
 
     @staticmethod
-    def _get_clean_group_info(group: Group, cleanup_keys: Optional[List[str]] = None) -> dict:
+    def _get_clean_group_info(group: Group, cleanup_keys: list[str] | None = None) -> dict:
         """
         Returns a dictionary with group information, excluding some keys
         :param group: Group object from SDK

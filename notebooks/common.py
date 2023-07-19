@@ -6,21 +6,9 @@ from databricks.sdk.runtime import *  # noqa: F403
 
 
 def install_uc_upgrade_package():
-    ipython = get_ipython()  # noqa: F405, F821
+    ipython = get_ipython()  # noqa: F405
 
-    print("Installing poetry for package management")
-    ipython.run_line_magic("pip", "install poetry -I")
-    print("Poetry successfully installed")
-    print("Installing the uc-upgrade package and it's dependencies")
-
-    with NamedTemporaryFile(suffix="-uc-upgrade-requirements.txt") as requirements_file:
-        print(f"Writing requirements to file {requirements_file.name}")
-        ipython.run_cell_magic("sh", "", f"poetry export --output={requirements_file.name} --without-hashes")
-        print("Saved the requirements to a provided file, installing them with pip")
-        ipython.run_line_magic("pip", f"install -r {requirements_file.name} -I")
-        print("Requirements installed successfully, restarting Python interpreter")
-        dbutils.library.restartPython()  # noqa: F405, F821
-        print("Python interpreter restarted successfully")
+    ipython.run_line_magic("pip", "install '..[dev]' -I")
 
     print("Reloading the path-based modules")
     ipython.run_line_magic("load_ext", "autoreload")
@@ -28,12 +16,12 @@ def install_uc_upgrade_package():
     print("Path-based modules successfully reloaded")
 
     project_root = Path(".").absolute().parent
-    print(f"appending the uc-upgrade library from {project_root}")
+    print(f"appending the library from {project_root}")
     sys.path.append(str(project_root))
 
     print("Verifying that package can be properly loaded")
     try:
-        from uc_upgrade.toolkits.group_migration import (  # noqa: F401
+        from uc_migration_toolkit.toolkits.group_migration import (  # noqa: F401
             GroupMigrationToolkit,
         )
 

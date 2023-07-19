@@ -52,7 +52,7 @@
 
 # COMMAND ----------
 
-# MAGIC %md 
+# MAGIC %md
 # MAGIC ### Installing the package and it's dependencies
 
 # COMMAND ----------
@@ -63,21 +63,20 @@ install_uc_upgrade_package()
 
 # COMMAND ----------
 
-# MAGIC %md 
+# MAGIC %md
 # MAGIC ### Imports
 
 # COMMAND ----------
 
-from databricks.sdk.runtime import dbutils  # noqa: F405
-
-from uc_upgrade.config import (  # noqa: E402
+from databricks.sdk.runtime import dbutils  # noqa: F401
+from uc_migration_toolkit.config import (  # noqa: E402
     AccountAuthConfig,
     AuthConfig,
     GroupListingConfig,
     InventoryTable,
     MigrationConfig,
 )
-from uc_upgrade.toolkits.group_migration import GroupMigrationToolkit  # noqa: E402
+from uc_migration_toolkit.toolkits.group_migration import GroupMigrationToolkit  # noqa: E402
 
 # COMMAND ----------
 
@@ -86,9 +85,7 @@ from uc_upgrade.toolkits.group_migration import GroupMigrationToolkit  # noqa: E
 # COMMAND ----------
 
 migration_config = MigrationConfig(
-    inventory_table=InventoryTable(
-        catalog="main", database="default", table="uc_migration_permission_inventory"
-    ),
+    inventory_table=InventoryTable(catalog="main", database="default", table="uc_migration_permission_inventory"),
     with_table_acls=False,
     auth_config=AuthConfig(
         account=AccountAuthConfig(
@@ -123,7 +120,7 @@ toolkit = GroupMigrationToolkit(migration_config)
 
 # COMMAND ----------
 
-# MAGIC %md 
+# MAGIC %md
 # MAGIC
 # MAGIC ### Step 1 - Validate or fetch the groups
 # MAGIC
@@ -139,11 +136,11 @@ toolkit.validate_groups()
 
 # COMMAND ----------
 
-# MAGIC %md 
+# MAGIC %md
 # MAGIC
 # MAGIC ### Step 2 - Cleanup the inventory table
 # MAGIC
-# MAGIC This step will clean up the inventory table if it already exists. 
+# MAGIC This step will clean up the inventory table if it already exists.
 # MAGIC
 # MAGIC It uses the property `inventory_table` from migration config.
 
@@ -225,7 +222,7 @@ toolkit.apply_account_group_permissions()
 
 # COMMAND ----------
 
-# MAGIC %md 
+# MAGIC %md
 # MAGIC
 # MAGIC ### Step 8 - Delete the backup groups
 # MAGIC
@@ -237,7 +234,7 @@ toolkit.delete_backup_groups()
 
 # COMMAND ----------
 
-# MAGIC %md 
+# MAGIC %md
 # MAGIC
 # MAGIC ### Step 9 - Cleanup the inventory table
 # MAGIC
