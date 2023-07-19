@@ -1,9 +1,10 @@
 from dataclasses import asdict
 
 from databricks.sdk import AccountClient, WorkspaceClient
-from uc_migration_toolkit.utils import get_dbutils
+
 from uc_migration_toolkit.config import MigrationConfig
 from uc_migration_toolkit.providers.logger import LoggerProvider
+from uc_migration_toolkit.utils import get_dbutils
 
 
 class ClientProvider:
@@ -18,12 +19,8 @@ class ClientProvider:
             return WorkspaceClient(host=config.auth_config.workspace.host, token=config.auth_config.workspace.token)
         else:
             cls.logger.info("Using the current notebook workspace client credentials")
-            workspace_url = (
-                dbutils.notebook.entry_point.getDbutils().notebook().getContext().apiUrl().getOrElse(None)
-            )
-            token = (
-                dbutils.notebook.entry_point.getDbutils().notebook().getContext().apiToken().getOrElse(None)
-            )
+            workspace_url = dbutils.notebook.entry_point.getDbutils().notebook().getContext().apiUrl().getOrElse(None)
+            token = dbutils.notebook.entry_point.getDbutils().notebook().getContext().apiToken().getOrElse(None)
             if not workspace_url or not token:
                 msg = "Cannot pickup credentials from the current notebook"
                 raise RuntimeError(msg)
@@ -57,9 +54,7 @@ class ClientProvider:
 
         if not current_user_option:
             msg = f"Cannot find current user {config.auth_config.account.username} across the account users"
-            raise RuntimeError(
-                msg
-            )
+            raise RuntimeError(msg)
 
         current_user = current_user_option[0]
 

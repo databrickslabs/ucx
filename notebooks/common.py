@@ -1,12 +1,9 @@
 import sys
 from pathlib import Path
-from tempfile import NamedTemporaryFile
-
-from databricks.sdk.runtime import *  # noqa: F403
 
 
 def install_uc_upgrade_package():
-    ipython = get_ipython()  # noqa: F405
+    ipython = get_ipython()  # noqa: F821
 
     ipython.run_line_magic("pip", "install '..[dev]' -I")
 
@@ -21,9 +18,7 @@ def install_uc_upgrade_package():
 
     print("Verifying that package can be properly loaded")
     try:
-        from uc_migration_toolkit.toolkits.group_migration import (  # noqa: F401
-            GroupMigrationToolkit,
-        )
+        from uc_migration_toolkit.toolkits.group_migration import GroupMigrationToolkit  # noqa: F401
 
         print("Successfully loaded the uc-upgrade package")
     except Exception as e:

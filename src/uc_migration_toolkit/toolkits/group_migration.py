@@ -1,4 +1,5 @@
 from pyspark.sql import SparkSession
+
 from uc_migration_toolkit.config import MigrationConfig
 from uc_migration_toolkit.managers.group import GroupManager
 from uc_migration_toolkit.providers.logger import LoggerProvider

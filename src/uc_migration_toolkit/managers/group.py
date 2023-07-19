@@ -1,14 +1,15 @@
 import logging
-from typing import List, Optional
+import typing
 
 from databricks.sdk.service.iam import Group
+
 from uc_migration_toolkit.config import MigrationConfig
 from uc_migration_toolkit.providers.client import ClientProvider
 from uc_migration_toolkit.providers.logger import LoggerProvider
 
 
 class GroupManager:
-    SYSTEM_GROUPS = ["users", "admins", "account-users"]
+    SYSTEM_GROUPS: typing.ClassVar[list[str]] = ["users", "admins", "account-users"]
 
     def __init__(self, config: MigrationConfig):
         self.config = config
@@ -107,7 +108,7 @@ class GroupManager:
 
         return group_info
 
-    def create_or_update_temporary_groups(self, dry_run: bool):
+    def create_or_update_temporary_groups(self):
         for group_name in self.config.group_listing_config.groups:
             temp_group_name = f"{self.config.backup_group_prefix}{group_name}"
             logging.info(f"Preparing temporary group for {group_name} -> {temp_group_name}")
@@ -120,9 +121,7 @@ class GroupManager:
                 logging.info(f"Temporary group {temp_group_name} already exists, updating it from original group")
                 group.as_dict()
                 logging.info(f"Updating temporary group {temp_group_name} from the source group {group_name}")
-                if not dry_run:
-                    self.ws_client.groups.update(temp_group.id, self._get_clean_group_info(group))
+                self.ws_client.groups.update(temp_group.id, self._get_clean_group_info(group))
             else:
                 logging.info("Temporary group is not yet created, creating it")
-                if not dry_run:
-                    self.ws_client.groups.create(temp_group_name, self._get_clean_group_info(group))
+                self.ws_client.groups.create(temp_group_name, self._get_clean_group_info(group))

@@ -1,4 +1,5 @@
 # Databricks notebook source
+# ruff: noqa: E501
 # MAGIC %md
 # MAGIC # Workspace Group Migration
 # MAGIC
@@ -68,7 +69,8 @@ install_uc_upgrade_package()
 
 # COMMAND ----------
 
-from databricks.sdk.runtime import dbutils  # noqa: F401
+from databricks.sdk.runtime import dbutils  # noqa: E402
+
 from uc_migration_toolkit.config import (  # noqa: E402
     AccountAuthConfig,
     AuthConfig,

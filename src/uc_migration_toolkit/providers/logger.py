@@ -18,7 +18,7 @@ class CustomFormatter(logging.Formatter):
         )
         return notebook_path
 
-    def format(self, record: logging.LogRecord):
+    def format(self, record: logging.LogRecord):  # noqa: A003
         timestamp = time.strftime("%Y-%m-%d %H:%M:%S", time.gmtime(record.created))
         log_level = record.levelname
         function_name = record.funcName

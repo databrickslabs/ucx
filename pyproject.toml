@@ -60,25 +60,25 @@ python = ["3.7", "3.8", "3.9", "3.10", "3.11"]
 detached = true
 dependencies = [
     "black>=23.1.0",
-    "mypy>=1.0.0",
     "ruff>=0.0.243",
+    "isort>=2.5.0"
 ]
 [tool.hatch.envs.lint.scripts]
-typing = "mypy --install-types --non-interactive {args:src/uc_migration_toolkit tests}"
-style = [
-    "ruff {args:.}",
-    "black --check --diff {args:.}",
-]
 fmt = [
-    "black {args:.}",
-    "ruff --fix {args:.}",
-    "style",
+    "black .",
+    "ruff --fix .",
+    "isort ."
 ]
-all = [
-    "style",
-    "typing",
+verify = [
+    "black --check .",
+    "ruff .",
+    "isort . --check-only"
 ]
 
+[tool.isort]
+skip_glob = [
+    "notebooks/*.py"
+]
 [tool.black]
 target-version = ["py310"]
 line-length = 120
@@ -121,12 +121,12 @@ ignore = [
     "FBT003",
     # Ignore checks for possible passwords
     "S105", "S106", "S107",
+    # Allow print statements
+    "T201",
+    # Allow asserts
+    "S101",
     # Ignore complexity
     "C901", "PLR0911", "PLR0912", "PLR0913", "PLR0915",
-]
-unfixable = [
-    # Don't touch unused imports
-    "F401",
 ]
 
 [tool.ruff.isort]
