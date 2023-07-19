@@ -27,8 +27,16 @@ Recommended VM types are:
 ```shell
 pip install hatch
 ```
+- Create environment:
+```shell
+hatch env create
+```
+- Install dev dependencies:
+```shell
+hatch run pip install -e '.[dev]'
+```
 
-- Pin your IDE to use the newly created virtual environment
+- Pin your IDE to use the newly created virtual environment. You can get the python path with:
 
 ```shell
 hatch run python -c "import sys; print(sys.executable)"
