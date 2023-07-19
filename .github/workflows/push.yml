@@ -6,6 +6,9 @@ on:
   push:
     branches: [main]
 
+env:
+  HATCH_VERSION: 1.7.0
+
 jobs:
   ci:
     strategy:
@@ -14,7 +17,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
-        uses: actions/checkout@v2
+        uses: actions/checkout@v3
 
       - name: Unshallow
         run: git fetch --prune --unshallow
@@ -22,10 +25,12 @@ jobs:
       - name: Install Python
         uses: actions/setup-python@v4
         with:
+          cache: 'pip'
+          cache-dependency-path: '**/pyproject.toml'
           python-version: ${{ matrix.pyVersion }}
 
       - name: Install hatch
-        run: pip install hatch==1.7.0
+        run: pip install hatch==$HATCH_VERSION
 
       - name: Verify linting
         run: |
