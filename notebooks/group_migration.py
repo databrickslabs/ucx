@@ -57,10 +57,9 @@
 
 # COMMAND ----------
 
-from common import install_uc_migration_toolkit, add_project_source_to_path
+from common import install_uc_migration_toolkit
 
 install_uc_migration_toolkit()
-add_project_source_to_path()
 # COMMAND ----------
 
 # MAGIC %md
