@@ -23,7 +23,7 @@ def test_e2e(mocker: MockerFixture):
     )
 
     mocker.patch.object(provider, "set_ws_client")
-    mocker.patch.object(provider, "_ws_client")
+    ws_client_mock = mocker.patch.object(provider, "_ws_client")
     mocker.patch.object(SparkMixin, "_initialize_spark")
 
     toolkit = GroupMigrationToolkit(config)

@@ -15,26 +15,26 @@ class GroupManager:
         self.config = config_provider.config.groups
 
     def validate_groups(self):
-        logger.info("Starting the selected validation")
+        logger.info("Starting the groups validation")
         if self.config.selected:
             logger.info("Using the provided group listing")
             self._verify_groups()
         else:
-            logger.info("No group listing provided, finding eligible selected automatically")
+            logger.info("No group listing provided, finding eligible groups automatically")
             self.config.selected = self._find_eligible_groups()
         logger.info("Groups validation complete")
 
     def list_workspace_groups(self):
-        logger.info("Listing all selected in workspace, this may take a while")
+        logger.info("Listing all groups in the workspace, this may take a while")
         ws_groups = list(provider.ws.groups.list(attributes="displayName,meta", filter=self._display_name_filter))
         logger.info("Workspace group listing complete")
         return ws_groups
 
     def _find_eligible_groups(self) -> list[str]:
-        logger.info("Finding eligible selected automatically")
+        logger.info("Finding eligible groups automatically")
         listed_groups = self.list_workspace_groups()
         eligible_groups = [g for g in listed_groups if g.meta.resource_type == "WorkspaceGroup"]
-        logger.info(f"Found {len(eligible_groups)} eligible selected")
+        logger.info(f"Found {len(eligible_groups)} eligible groups")
         return eligible_groups
 
     def _verify_group_exists_in_ws(self, group_name: str) -> Group:
@@ -46,7 +46,7 @@ class GroupManager:
     def _verify_groups(self):
         for group_name in self.config.selected:
             if group_name in self.SYSTEM_GROUPS:
-                msg = "Cannot migrate system selected {self.SYSTEM_GROUPS}"
+                msg = f"Cannot migrate system group {self.SYSTEM_GROUPS}"
                 raise RuntimeError(msg)
             group = self._verify_group_exists_in_ws(group_name)
             self._verify_group_is_workspace_level(group)
@@ -60,7 +60,7 @@ class GroupManager:
     ) -> Group | None:
         filter_string = f'displayName eq "{group_name}" and ' + self._display_name_filter
         groups = list(
-            provider.ws.selected.list(
+            provider.ws.groups.list(
                 filter=filter_string,
                 attributes=",".join(attributes) if attributes else None,
                 excluded_attributes=",".join(excluded_attributes) if excluded_attributes else None,
@@ -102,10 +102,10 @@ class GroupManager:
                 logging.info(f"Temporary group {temp_group_name} already exists, updating it from original group")
                 group.as_dict()
                 logging.info(f"Updating temporary group {temp_group_name} from the source group {group_name}")
-                provider.ws.selected.update(temp_group.id, self._get_clean_group_info(group))
+                provider.ws.groups.update(temp_group.id, self._get_clean_group_info(group))
             else:
                 logging.info("Temporary group is not yet created, creating it")
-                provider.ws.selected.create(temp_group_name, self._get_clean_group_info(group))
+                provider.ws.groups.create(temp_group_name, self._get_clean_group_info(group))
 
     @staticmethod
     def _verify_group_is_workspace_level(group: Group):
