@@ -21,18 +21,18 @@ def test_e2e(mocker: MockerFixture):
         groups=GroupsConfig(auto=True),
         with_table_acls=False,
     )
-    with (
-        mocker.patch.object(provider, "set_ws_client"),
-        mocker.patch.object(provider, "_ws_client"),
-        mocker.patch.object(SparkMixin, "_initialize_spark"),
-    ):
-        toolkit = GroupMigrationToolkit(config)
-        toolkit.validate_groups()
-        toolkit.cleanup_inventory_table()
-        toolkit.inventorize_permissions()
-        toolkit.create_or_update_backup_groups()
-        toolkit.apply_backup_group_permissions()
-        toolkit.replace_workspace_groups_with_account_groups()
-        toolkit.apply_account_group_permissions()
-        toolkit.delete_backup_groups()
-        toolkit.cleanup_inventory_table()
+
+    mocker.patch.object(provider, "set_ws_client"),
+    mocker.patch.object(provider, "_ws_client"),
+    mocker.patch.object(SparkMixin, "_initialize_spark"),
+
+    toolkit = GroupMigrationToolkit(config)
+    toolkit.validate_groups()
+    toolkit.cleanup_inventory_table()
+    toolkit.inventorize_permissions()
+    toolkit.create_or_update_backup_groups()
+    toolkit.apply_backup_group_permissions()
+    toolkit.replace_workspace_groups_with_account_groups()
+    toolkit.apply_account_group_permissions()
+    toolkit.delete_backup_groups()
+    toolkit.cleanup_inventory_table()

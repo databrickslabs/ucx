@@ -1,6 +1,5 @@
 import functools
 
-from databricks.connect import DatabricksSession
 from pyspark.sql import SparkSession
 
 from uc_migration_toolkit.providers.logger import logger
@@ -20,6 +19,8 @@ class SparkMixin:
             return locals()["spark"]
         else:
             logger.info("Using DB Connect")
+            from databricks.connect import DatabricksSession
+
             spark = DatabricksSession.builder.getOrCreate()
             return spark
 
