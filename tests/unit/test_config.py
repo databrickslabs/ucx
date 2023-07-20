@@ -5,6 +5,7 @@ from pathlib import Path
 
 import pytest
 import yaml
+from pydantic import RootModel
 
 from uc_migration_toolkit.cli.utils import get_migration_config
 from uc_migration_toolkit.config import (
@@ -13,7 +14,6 @@ from uc_migration_toolkit.config import (
     InventoryTable,
     MigrationConfig,
 )
-from pydantic import RootModel
 
 
 def test_initialization():
