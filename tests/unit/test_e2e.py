@@ -22,9 +22,9 @@ def test_e2e(mocker: MockerFixture):
         with_table_acls=False,
     )
 
-    mocker.patch.object(provider, "set_ws_client"),
-    mocker.patch.object(provider, "_ws_client"),
-    mocker.patch.object(SparkMixin, "_initialize_spark"),
+    mocker.patch.object(provider, "set_ws_client")
+    mocker.patch.object(provider, "_ws_client")
+    mocker.patch.object(SparkMixin, "_initialize_spark")
 
     toolkit = GroupMigrationToolkit(config)
     toolkit.validate_groups()

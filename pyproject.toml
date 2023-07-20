@@ -101,6 +101,11 @@ skip_glob = [
 ]
 profile = "black"
 
+[tool.pytest.ini_options]
+filterwarnings = [
+    "ignore:::.*pyspark.broadcast*"
+]
+
 [tool.black]
 target-version = ["py310"]
 line-length = 120
