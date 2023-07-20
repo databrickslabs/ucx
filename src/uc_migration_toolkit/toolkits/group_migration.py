@@ -30,24 +30,24 @@ class GroupMigrationToolkit:
         self.permissions_manager.inventorize_permissions()
 
     def create_or_update_backup_groups(self):
-        logger.info("Creating backup groups, updating the existing ones if necessary")
-        logger.info("Backup groups were created")
+        logger.info("Creating backup selected, updating the existing ones if necessary")
+        logger.info("Backup selected were created")
 
     def apply_backup_group_permissions(self):
-        logger.info("Applying the permissions to the backup groups")
+        logger.info("Applying the permissions to the backup selected")
         logger.info("Permissions were applied")
 
     def replace_workspace_groups_with_account_groups(self):
-        logger.info("Replacing the workspace groups with account-level groups")
+        logger.info("Replacing the workspace selected with account-level selected")
         logger.info("Replacement went successfully")
 
     def apply_account_group_permissions(self):
-        logger.info("Applying workspace-level permissions to the account-level groups")
-        logger.info("Permissions were successfully applied to the account-level groups")
+        logger.info("Applying workspace-level permissions to the account-level selected")
+        logger.info("Permissions were successfully applied to the account-level selected")
 
     def delete_backup_groups(self):
-        logger.info("Deleting the workspace groups")
-        logger.info("Backup groups were successfully deleted")
+        logger.info("Deleting the workspace selected")
+        logger.info("Backup selected were successfully deleted")
 
     #
     #     self.groupIdDict = {}  # map: group id => group name
@@ -90,23 +90,23 @@ class GroupMigrationToolkit:
     #     self.self.logger.info("Inventory name cleaned up")
     #
     # def findMigrationEligibleGroups(self):
-    #     self.logger.info("Begin automatic generation of all migration eligible groups.")
-    #     # Get all workspace-local groups
+    #     self.logger.info("Begin automatic generation of all migration eligible selected.")
+    #     # Get all workspace-local selected
     #     try:
-    #         self.logger.info("Executing request to list workspace groups")
+    #         self.logger.info("Executing request to list workspace selected")
     #
-    #         self.logger.debug("Getting workspace groups")
-    #         workspace_groups = workspace_client.groups.list()
-    #         self.logger.debug("Getting account groups")
-    #         account_groups = account_client.groups.list()
+    #         self.logger.debug("Getting workspace selected")
+    #         workspace_groups = workspace_client.selected.list()
+    #         self.logger.debug("Getting account selected")
+    #         account_groups = account_client.selected.list()
     #
     #         self.account_groups = account_groups
     #
-    #         self.logger.debug("Pruning local groups")
+    #         self.logger.debug("Pruning local selected")
     #         workspace_groups = set([g.display_name for g in workspace_groups])
     #         account_groups = set([g.display_name for g in account_groups])
     #
-    #         # Prune special groups.
+    #         # Prune special selected.
     #         prune_groups = ["admins", "users"]
     #
     #         local_workspace_groups = workspace_groups.difference(prune_groups).difference(account_groups)
@@ -115,7 +115,7 @@ class GroupMigrationToolkit:
     #         allWsLocalGroups_lower = [x.casefold() for x in allWsLocalGroups]
     #         allWsLocalGroups.sort()
     #         self.logger.info(
-    #             f"\nFound {len(allWsLocalGroups)} workspace local groups. Listing (alphabetical order): \n"
+    #             f"\nFound {len(allWsLocalGroups)} workspace local selected. Listing (alphabetical order): \n"
     #             + "\n".join(f"{i + 1}. {name}" for i, name in enumerate(allWsLocalGroups))
     #         )
     #
@@ -123,9 +123,9 @@ class GroupMigrationToolkit:
     #         self.logger.error(f"ERROR in retrieving workspace group list: {e}")
     #         raise
     #
-    #     # Now match against account groups.
+    #     # Now match against account selected.
     #     try:
-    #         self.logger.info("\nExecuting request to list account groups")
+    #         self.logger.info("\nExecuting request to list account selected")
     #         res = requests.get(
     #             f"{self.workspace_url}/api/2.0/account/scim/v2/Groups",
     #             headers=self.headers,
@@ -149,8 +149,8 @@ class GroupMigrationToolkit:
     #
     #         # self.logger.info count and membership of not_in_account_groups
     #         self.logger.info(
-    #             f"Unable to match {len(not_in_account_groups)} current workspace-local groups. "
-    #             f"No matching account level group with the same name found. These groups WILL NOT MIGRATE:"
+    #             f"Unable to match {len(not_in_account_groups)} current workspace-local selected. "
+    #             f"No matching account level group with the same name found. These selected WILL NOT MIGRATE:"
     #         )
     #         for i, group in enumerate(not_in_account_groups, start=1):
     #             self.logger.info(f"{i}. {group} (WON'InventoryObject MIGRATE)")
@@ -158,8 +158,8 @@ class GroupMigrationToolkit:
     #         if len(migration_eligible) > 0:
     #             # self.logger.info count and membership of intersection
     #             self.logger.info(
-    #                 f"\nFound {len(migration_eligible)} current workspace-local groups to account level groups. "
-    #                 f"These groups WILL BE MIGRATED."
+    #                 f"\nFound {len(migration_eligible)} current workspace-local selected to account level selected. "
+    #                 f"These selected WILL BE MIGRATED."
     #             )
     #             for i, group in enumerate(migration_eligible, start=1):
     #                 self.logger.info(f"{i}. {group} (WILL MIGRATE)")
@@ -168,8 +168,8 @@ class GroupMigrationToolkit:
     #             return migration_eligible
     #         else:
     #             self.logger.info(
-    #                 "There are no migration eligible groups. "
-    #                 "All existing workspace-local groups do not exist at the account level."
+    #                 "There are no migration eligible selected. "
+    #                 "All existing workspace-local selected do not exist at the account level."
     #                 "\nNO MIGRATION WILL BE PERFORMED."
     #             )
     #             return []
@@ -207,7 +207,7 @@ class GroupMigrationToolkit:
     #         pages = totalGroups // 100
     #         # normalize case
     #         groupFilterKeeplist = [x.casefold() for x in groupFilterKeeplist]
-    #         self.logger.info(f"Total groups: {totalGroups}. Retrieving group details in chunks of 100")
+    #         self.logger.info(f"Total selected: {totalGroups}. Retrieving group details in chunks of 100")
     #         for i in range(0, pages + 1):
     #             self.logger.info(f"Retrieving the next 100 items from {str(i * 100 + 1)}")
     #
@@ -216,7 +216,7 @@ class GroupMigrationToolkit:
     #                 headers=self.headers,
     #             )
     #             resJson = res.json()
-    #             # Iterate over workspace groups, extracting useful info to vars above
+    #             # Iterate over workspace selected, extracting useful info to vars above
     #             for e in resJson["Resources"]:
     #                 if e["displayName"].casefold() not in groupFilterKeeplist:
     #                     continue
@@ -269,7 +269,7 @@ class GroupMigrationToolkit:
     #     except Exception as e:
     #         self.logger.error(f"error in retrieving group objects : {e}")
     #
-    # # get list of users and service principals recursively for groups and nested groups
+    # # get list of users and service principals recursively for selected and nested selected
     # def getRecursiveGroupMember(self, groupM: dict):
     #     groupPrincipalList = []
     #     for key, value in groupM.items():
@@ -1490,7 +1490,8 @@ class GroupMigrationToolkit:
     #             userList = list(set(userList))
     #             if not self.checkPrincipalInGroupOrMember(userList, db):
     #                 # self.logger.info(
-    #                 # f'selected groups or members of the groups have no USAGE or OWN permission on database level.'
+    #                 # f'selected selected or members of the
+    #                 selected have no USAGE or OWN permission on database level.'
     #                 # 'Skipping object level permission check for database {db}.'
     #                 # )
     #                 return []
@@ -1514,7 +1515,7 @@ class GroupMigrationToolkit:
     #                 aclList += funcdf.collect()
     #             except Exception as e:
     #                 self.logger.error(f"error retrieving acl for function {function.function}. {e}")
-    #         # filter for required groups
+    #         # filter for required selected
     #         return aclList
     #
     #     except Exception as e:
@@ -1561,7 +1562,7 @@ class GroupMigrationToolkit:
     #     userList = list(set(userList))
     #     if self.checkPrincipalInGroupOrMember(userList, "CATALOG"):
     #         self.logger.info(
-    #             "some groups or members of the group given "
+    #             "some selected or members of the group given "
     #             "permission at catalog level, running permission for all databases"
     #         )
     #         self.checkAllDB = True
@@ -1701,7 +1702,7 @@ class GroupMigrationToolkit:
     #         self.logger.info(f" Error creating group inventory, {e}")
     #
     # def printInventory(self, printMembers: bool = False):
-    #     self.logger.info("Displaying Inventory Results -- ACLs of selected groups:")
+    #     self.logger.info("Displaying Inventory Results -- ACLs of selected selected:")
     #     self.logger.info("Group List:")
     #     self.logger.info("{:<20} {:<10}".format("Group ID", "Group Name"))
     #     for key, value in self.groupIdDict.items():
@@ -1892,10 +1893,10 @@ class GroupMigrationToolkit:
     #     try:
     #         groupType = ""
     #         if mode == "Workspace":
-    #             self.logger.info(f"Saving data for workspace groups in {self.inventoryTableName} name.")
+    #             self.logger.info(f"Saving data for workspace selected in {self.inventoryTableName} name.")
     #             groupType = "WorkspaceLocal"
     #         else:
-    #             self.logger.info(f"Saving data for workspace temp groups in {self.inventoryTableName} name.")
+    #             self.logger.info(f"Saving data for workspace temp selected in {self.inventoryTableName} name.")
     #             groupType = "WorkspaceTemp"
     #         persistList = []
     #         persistList.append([groupType, "GroupListDict", self.groupIdDict])
@@ -1960,14 +1961,14 @@ class GroupMigrationToolkit:
     #             return
     #         self.bulkTryDelete(self.groupL)
     #     except Exception as e:
-    #         self.logger.error(f"Error deleting groups : {e}")
+    #         self.logger.error(f"Error deleting selected : {e}")
     #
     # def deleteTempGroups(self):
     #     self.setGroupListForMode("Account")
     #     try:
     #         self.bulkTryDelete(self.groupL)
     #     except Exception as e:
-    #         self.logger.error(f"Error deleting temp groups : {e}")
+    #         self.logger.error(f"Error deleting temp selected : {e}")
     #
     # def createBackupGroup(self):
     #     try:
@@ -1999,7 +2000,7 @@ class GroupMigrationToolkit:
     #         self.applyGroupPermission("Workspace")
     #         self.persistInventory("Workspace")
     #     except Exception as e:
-    #         self.logger.error(f" Error creating backup groups , {e}")
+    #         self.logger.error(f" Error creating backup selected , {e}")
     #
     # def validateAccountGroup(self):
     #     try:

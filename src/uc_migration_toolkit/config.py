@@ -17,9 +17,17 @@ class InventoryTable:
 
 @dataclass
 class GroupsConfig:
+    selected: list[str] | None = None
+    auto: bool | None = None
     backup_group_prefix: str | None = "db-temp-"
-    groups: list[str] | None = None
-    auto: bool | None = True
+
+    def __post_init__(self):
+        if not self.selected and self.auto is None:
+            msg = "Either selected or auto must be set"
+            raise ValueError(msg)
+        if self.selected and self.auto is False:
+            msg = "No selected groups provided, but auto-collection is disabled"
+            raise ValueError(msg)
 
 
 @dataclass
@@ -58,4 +66,5 @@ class MigrationConfig:
 
     def __post_init__(self):
         if self.with_table_acls:
-            raise NotImplementedError("Table ACLS are not yet implemented")
+            msg = "Table ACLS are not yet implemented"
+            raise NotImplementedError(msg)

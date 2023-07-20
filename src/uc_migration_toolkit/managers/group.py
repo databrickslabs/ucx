@@ -15,25 +15,26 @@ class GroupManager:
         self.config = config_provider.config.groups
 
     def validate_groups(self):
-        logger.info("Starting the groups validation")
-        if self.config.groups:
+        logger.info("Starting the selected validation")
+        if self.config.selected:
             logger.info("Using the provided group listing")
             self._verify_groups()
         else:
-            self.config.groups = self._find_eligible_groups()
+            logger.info("No group listing provided, finding eligible selected automatically")
+            self.config.selected = self._find_eligible_groups()
         logger.info("Groups validation complete")
 
     def list_workspace_groups(self):
-        logger.info("Listing all groups in workspace, this may take a while")
-        ws_groups = list(provider.ws.groups.list(attributes="displayName", filter=self._display_name_filter))
+        logger.info("Listing all selected in workspace, this may take a while")
+        ws_groups = list(provider.ws.groups.list(attributes="displayName,meta", filter=self._display_name_filter))
         logger.info("Workspace group listing complete")
         return ws_groups
 
-    async def _find_eligible_groups(self) -> list[str]:
-        logger.info("Finding eligible groups automatically")
+    def _find_eligible_groups(self) -> list[str]:
+        logger.info("Finding eligible selected automatically")
         listed_groups = self.list_workspace_groups()
         eligible_groups = [g for g in listed_groups if g.meta.resource_type == "WorkspaceGroup"]
-        logger.info(f"Found {len(eligible_groups)} eligible groups")
+        logger.info(f"Found {len(eligible_groups)} eligible selected")
         return eligible_groups
 
     def _verify_group_exists_in_ws(self, group_name: str) -> Group:
@@ -43,9 +44,9 @@ class GroupManager:
         return found_group
 
     def _verify_groups(self):
-        for group_name in self.config.groups:
+        for group_name in self.config.selected:
             if group_name in self.SYSTEM_GROUPS:
-                msg = "Cannot migrate system groups {self.SYSTEM_GROUPS}"
+                msg = "Cannot migrate system selected {self.SYSTEM_GROUPS}"
                 raise RuntimeError(msg)
             group = self._verify_group_exists_in_ws(group_name)
             self._verify_group_is_workspace_level(group)
@@ -59,7 +60,7 @@ class GroupManager:
     ) -> Group | None:
         filter_string = f'displayName eq "{group_name}" and ' + self._display_name_filter
         groups = list(
-            provider.ws.groups.list(
+            provider.ws.selected.list(
                 filter=filter_string,
                 attributes=",".join(attributes) if attributes else None,
                 excluded_attributes=",".join(excluded_attributes) if excluded_attributes else None,
@@ -89,7 +90,7 @@ class GroupManager:
         return group_info
 
     def create_or_update_temporary_groups(self):
-        for group_name in self.config.groups:
+        for group_name in self.config.selected:
             temp_group_name = f"{self.config.backup_group_prefix}{group_name}"
             logging.info(f"Preparing temporary group for {group_name} -> {temp_group_name}")
             group = self._get_ws_group(group_name, excluded_attributes=["id", "externalId"])
@@ -101,10 +102,10 @@ class GroupManager:
                 logging.info(f"Temporary group {temp_group_name} already exists, updating it from original group")
                 group.as_dict()
                 logging.info(f"Updating temporary group {temp_group_name} from the source group {group_name}")
-                provider.ws.groups.update(temp_group.id, self._get_clean_group_info(group))
+                provider.ws.selected.update(temp_group.id, self._get_clean_group_info(group))
             else:
                 logging.info("Temporary group is not yet created, creating it")
-                provider.ws.groups.create(temp_group_name, self._get_clean_group_info(group))
+                provider.ws.selected.create(temp_group_name, self._get_clean_group_info(group))
 
     @staticmethod
     def _verify_group_is_workspace_level(group: Group):

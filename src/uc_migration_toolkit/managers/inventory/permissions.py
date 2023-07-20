@@ -1,4 +1,3 @@
-
 from uc_migration_toolkit.managers.inventory.inventorizer import StandardInventorizer
 from uc_migration_toolkit.managers.inventory.table import InventoryTableManager
 from uc_migration_toolkit.managers.inventory.types import (
