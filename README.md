@@ -42,49 +42,49 @@ To deliver this migration, the following steps are performed:
 
 Compute infrastructure:
 
-- [] Clusters
-- [] Cluster policies +
-- [] Pools +
-- [] Instance Profile (for AWS) +
+- [ ] Clusters
+- [ ] Cluster policies +
+- [ ] Pools +
+- [ ] Instance Profile (for AWS) +
 
 Workflows:
 
-- [] Delta Live Tables
-- [] Jobs
+- [ ] Delta Live Tables
+- [ ] Jobs
 
 ML:
 
-- [] MLflow experiments
-- [] MLflow registry
-- [] Legacy Mlflow model endpoints (?)
+- [ ] MLflow experiments
+- [ ] MLflow registry
+- [ ] Legacy Mlflow model endpoints (?)
 
 SQL:
 
-- [] Databricks SQL warehouses
-- [] Dashboard
-- [] Queries
-- [] Alerts
+- [ ] Databricks SQL warehouses
+- [ ] Dashboard
+- [ ] Queries
+- [ ] Alerts
 
 Security:
 
-- [] Tokens
-- [] Passwords (for AWS)
-- [] Secrets
+- [ ] Tokens
+- [ ] Passwords (for AWS)
+- [ ] Secrets
 
 Workspace:
 
-- [] Notebooks in the Workspace FS
-- [] Directories in the Workspace FS
-- [] Files in the Workspace FS
+- [ ] Notebooks in the Workspace FS
+- [ ] Directories in the Workspace FS
+- [ ] Files in the Workspace FS
 
 Repos:
 
-- [] User-level Repos
-- [] Org-level Repos
+- [ ] User-level Repos
+- [ ] Org-level Repos
 
 Data access:
 
-- [] Table ACLS
+- [ ] Table ACLS
 
 ## Development
 
