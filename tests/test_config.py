@@ -1,9 +1,16 @@
-from uc_migration_toolkit.config import GroupsConfig, InventoryTable, MigrationConfig
+from functools import partial
+
+import pytest
+
+from uc_migration_toolkit.config import GroupsConfig, InventoryTable, MigrationConfig, InventoryConfig
 
 
 def test_initialization():
-    MigrationConfig(
-        with_table_acls=False,
-        inventory_table=InventoryTable(catalog="test_catalog", database="test_database", name="test_table"),
-        groups=GroupsConfig(auto=True),
-    )
+    mc = partial(MigrationConfig,
+                 inventory=InventoryConfig(table=InventoryTable(catalog="catalog", database="database", name="name")),
+                 groups=GroupsConfig())
+
+    with pytest.raises(NotImplementedError):
+        mc(with_table_acls=True)
+
+    mc(with_table_acls=False)

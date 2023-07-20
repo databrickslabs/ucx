@@ -8,7 +8,7 @@ inventory:
 with_table_acls: False
 
 groups:
-  groups: [ "test-group" ]
+  auto: True
 
 rate_limit:
   num_threads: 8

@@ -55,3 +55,7 @@ class MigrationConfig:
     groups: GroupsConfig
     auth: AuthConfig | None = None
     rate_limit: RateLimitConfig | None = Field(default_factory=lambda: RateLimitConfig())
+
+    def __post_init__(self):
+        if self.with_table_acls:
+            raise NotImplementedError("Table ACLS are not yet implemented")

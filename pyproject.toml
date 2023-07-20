@@ -149,15 +149,13 @@ ban-relative-imports = "all"
 "tests/**/*" = ["PLR2004", "S101", "TID252"]
 
 [tool.coverage.run]
-source_pkgs = ["uc_migration_toolkit"]
+source = ["uc_migration_toolkit"]
 branch = true
 parallel = true
 omit = [
     "src/uc_migration_toolkit/__about__.py",
 ]
 
-[tool.coverage.paths]
-uc_migration_toolkit = ["src/uc_migration_toolkit", "*/uc-migration-toolkit/src/uc_migration_toolkit"]
 
 [tool.coverage.report]
 exclude_lines = [
