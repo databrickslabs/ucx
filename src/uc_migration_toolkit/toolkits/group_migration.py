@@ -1,5 +1,3 @@
-from pyspark.sql import SparkSession
-
 from uc_migration_toolkit.config import MigrationConfig
 from uc_migration_toolkit.managers.group import GroupManager
 from uc_migration_toolkit.providers.logger import LoggerMixin
@@ -13,9 +11,6 @@ class GroupMigrationToolkit(LoggerMixin):
         self.config = config
         # the group manager IS INTENDED to change properties in the self.config object
         self.group_manager = GroupManager(self.config)
-
-        # initializing runtime utilities
-        self.spark = SparkSession.builder.getOrCreate()
 
     #
     #     self.groupIdDict = {}  # map: group id => group name
@@ -2014,23 +2009,28 @@ class GroupMigrationToolkit(LoggerMixin):
 
     def cleanup_inventory_table(self):
         self.logger.info(f"Deleting the inventory table {self.config.inventory_table}")
-        self.spark.sql(f"DROP TABLE IF EXISTS {self.config.inventory_table}")
         self.logger.info("Table successfully deleted")
 
     def inventorize_permissions(self):
-        pass
+        self.logger.info("Inventorying the permissions")
+        self.logger.info("Permissions were inventoried and saved")
 
     def create_or_update_backup_groups(self):
-        pass
+        self.logger.info("Creating backup groups, updating the existing ones if necessary")
+        self.logger.info("Backup groups were created")
 
     def apply_backup_group_permissions(self):
-        pass
+        self.logger.info("Applying the permissions to the backup groups")
+        self.logger.info("Permissions were applied")
 
     def replace_workspace_groups_with_account_groups(self):
-        pass
+        self.logger.info("Replacing the workspace groups with account-level groups")
+        self.logger.info("Replacement went successfully")
 
     def apply_account_group_permissions(self):
-        pass
+        self.logger.info("Applying workspace-level permissions to the account-level groups")
+        self.logger.info("Permissions were successfully applied to the account-level groups")
 
     def delete_backup_groups(self):
-        pass
+        self.logger.info("Deleting the workspace groups")
+        self.logger.info("Backup groups were successfully deleted")

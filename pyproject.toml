@@ -22,12 +22,18 @@ classifiers = [
 ]
 dependencies = [
     "databricks-sdk>=0.2.1, <=0.3.0",
+    "typer[all]>=0.9.0,<0.10.0",
+    "pyhocon>=0.3.60,<0.4.0",
+    "pydantic>=2.0.3, <3.0.0",
 ]
 
 [project.optional-dependencies]
 dev = [
     "pyspark>=3.4,<=3.5"
 ]
+
+[project.scripts]
+ucx = "uc_migration_toolkit.__main__:entrypoint"
 
 [project.urls]
 Issues = "https://github.com/unknown/uc-migration-toolkit/issues"
@@ -40,18 +46,12 @@ path = "src/uc_migration_toolkit/__about__.py"
 dependencies = [
     "coverage[toml]>=6.5",
     "pytest",
+    "pytest-cov>=4.0.0,<5.0.0"
 ]
 [tool.hatch.envs.default.scripts]
 test = "pytest {args:tests}"
-test-cov = "coverage run -m pytest {args:tests}"
-cov-report = [
-    "- coverage combine",
-    "coverage report",
-]
-cov = [
-    "test-cov",
-    "cov-report",
-]
+test-cov = "pytest --cov uc_migration_toolkit {args:tests}"
+test-cov-report = "pytest {args:tests} --cov uc_migration_toolkit --cov-report=html"
 
 [[tool.hatch.envs.all.matrix]]
 python = ["3.7", "3.8", "3.9", "3.10", "3.11"]
@@ -79,6 +79,8 @@ verify = [
 skip_glob = [
     "notebooks/*.py"
 ]
+profile = "black"
+
 [tool.black]
 target-version = ["py310"]
 line-length = 120
@@ -144,7 +146,7 @@ ban-relative-imports = "all"
 "tests/**/*" = ["PLR2004", "S101", "TID252"]
 
 [tool.coverage.run]
-source_pkgs = ["uc_migration_toolkit", "tests"]
+source_pkgs = ["uc_migration_toolkit"]
 branch = true
 parallel = true
 omit = [
@@ -153,7 +155,6 @@ omit = [
 
 [tool.coverage.paths]
 uc_migration_toolkit = ["src/uc_migration_toolkit", "*/uc-migration-toolkit/src/uc_migration_toolkit"]
-tests = ["tests", "*/uc-migration-toolkit/tests"]
 
 [tool.coverage.report]
 exclude_lines = [

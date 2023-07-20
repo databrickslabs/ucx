@@ -1,4 +1,4 @@
-from dataclasses import dataclass
+from pydantic.dataclasses import dataclass
 
 
 @dataclass
@@ -33,7 +33,7 @@ class AccountAuthConfig:
 
 @dataclass
 class AuthConfig:
-    account: AccountAuthConfig
+    account: AccountAuthConfig | None = None
     workspace: WorkspaceAuthConfig | None = None
 
 
@@ -41,6 +41,6 @@ class AuthConfig:
 class MigrationConfig:
     inventory_table: InventoryTable
     with_table_acls: bool
-    auth_config: AuthConfig
     group_listing_config: GroupListingConfig
+    auth_config: AuthConfig | None = None
     backup_group_prefix: str | None = "db-temp-"

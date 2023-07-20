@@ -12,11 +12,14 @@ class CustomFormatter(logging.Formatter):
         self._notebook_path = self._get_notebook_path()
 
     @staticmethod
-    def _get_notebook_path() -> str:
-        notebook_path = (
-            get_dbutils().notebook.entry_point.getDbutils().notebook().getContext().notebookPath().get().lower()
-        )
-        return notebook_path
+    def _get_notebook_path() -> str | None:
+        try:
+            notebook_path = (
+                get_dbutils().notebook.entry_point.getDbutils().notebook().getContext().notebookPath().get().lower()
+            )
+            return notebook_path
+        except ValueError:
+            return None
 
     def format(self, record: logging.LogRecord):  # noqa: A003
         timestamp = time.strftime("%Y-%m-%d %H:%M:%S", time.gmtime(record.created))
@@ -24,7 +27,8 @@ class CustomFormatter(logging.Formatter):
         function_name = record.funcName
         return (
             f"[{timestamp}][{log_level}][{record.threadName}]"
-            f"[{self._notebook_path}][{function_name}] {record.getMessage()}"
+            f"{f'[{self._notebook_path}]' if self._notebook_path else ''}"
+            f"[{function_name}] {record.getMessage()}"
         )
 
 

@@ -15,7 +15,6 @@ class GroupManager(LoggerMixin):
         super().__init__()
         self.config = config
         self.ws_client = ClientProvider().get_workspace_client(config)
-        self.acc_client = ClientProvider().get_account_client(config)
 
     def validate_groups(self):
         if self.config.group_listing_config.groups:
@@ -30,31 +29,17 @@ class GroupManager(LoggerMixin):
         self.logger.info("Workspace group listing complete")
         return ws_groups
 
-    def list_account_groups(self):
-        self.logger.info("Listing all groups in account, this may take a while")
-        acc_groups = list(self.acc_client.groups.list(attributes="displayName"))
-        self.logger.info("Account group listing complete")
-        return acc_groups
-
     async def _find_eligible_groups(self) -> list[str]:
         self.logger.info("Finding eligible groups automatically")
-        ws_groups = self.list_workspace_groups()
-        acc_groups = self.list_account_groups()
-        self.logger.info("Filtering out only groups that exist both in workspace and on the account level")
-        eligible_groups = [
-            group.display_name for group in ws_groups if group.id in [acc_group.id for acc_group in acc_groups]
-        ]
+        listed_groups = self.list_workspace_groups()
+        eligible_groups = [g for g in listed_groups if g.meta.resource_type == "WorkspaceGroup"]
+        self.logger.info(f"Found {len(eligible_groups)} eligible groups")
         return eligible_groups
 
     def _verify_group_exists_in_ws(self, group_name: str):
         self.logger.info(f"Verifying group {group_name} exists in workspace")
         found_group = self._get_ws_group(group_name, attributes="id")
-        assert found_group, f"Group {group_name} not found on the workspace level"
-
-    def _verify_group_exists_in_acc(self, group_name: str):
-        self.logger.info(f"Verifying group {group_name} exists in account")
-        found_group = self._get_account_group(group_name, attributes="id")
-        assert found_group, f"Group {group_name} not found"
+        assert not found_group, f"Group {group_name} doesn't exist on the workspace level"
 
     def _verify_groups(self):
         for group_name in self.config.group_listing_config.groups:
@@ -62,7 +47,6 @@ class GroupManager(LoggerMixin):
                 msg = "Cannot migrate system groups {self.SYSTEM_GROUPS}"
                 raise RuntimeError(msg)
             self._verify_group_exists_in_ws(group_name)
-            self._verify_group_exists_in_acc(group_name)
 
     @property
     def _display_name_filter(self):
@@ -78,13 +62,6 @@ class GroupManager(LoggerMixin):
                 excluded_attributes=excluded_attributes,
             )
         )
-        if len(groups) == 0:
-            return None
-        else:
-            return groups[0]
-
-    def _get_account_group(self, group_name, attributes: str | None = None) -> Group | None:
-        groups = list(self.acc_client.groups.list(filter=f'displayName eq "{group_name}"', attributes=attributes))
         if len(groups) == 0:
             return None
         else:
