@@ -1,10 +1,14 @@
-inventory_table:
-  catalog: main
-  database: default
-  table: uc_migration_inventory
+inventory:
+  table:
+    catalog: main
+    database: default
+    name: uc_migration_inventory
 
 
 with_table_acls: False
 
-group_listing_config:
+groups:
   groups: [ "test-group" ]
+
+rate_limit:
+  num_threads: 8

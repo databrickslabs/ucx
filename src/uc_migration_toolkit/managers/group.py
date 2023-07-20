@@ -3,47 +3,47 @@ import typing
 
 from databricks.sdk.service.iam import Group
 
-from uc_migration_toolkit.config import MigrationConfig
-from uc_migration_toolkit.providers.client import ClientMixin
+from uc_migration_toolkit.providers.client import provider
+from uc_migration_toolkit.providers.config import provider as config_provider
+from uc_migration_toolkit.providers.logger import logger
 
 
-class GroupManager(ClientMixin):
+class GroupManager:
     SYSTEM_GROUPS: typing.ClassVar[list[str]] = ["users", "admins", "account-users"]
 
-    def __init__(self, config: MigrationConfig):
-        super().__init__(config)
-        self.config = config
+    def __init__(self):
+        self.config = config_provider.config.groups
 
     def validate_groups(self):
-        self.logger.info("Starting the groups validation")
-        if self.config.group_listing_config.groups:
-            self.logger.info("Using the provided group listing")
+        logger.info("Starting the groups validation")
+        if self.config.groups:
+            logger.info("Using the provided group listing")
             self._verify_groups()
         else:
-            self.config.group_listing_config.groups = self._find_eligible_groups()
-        self.logger.info("Groups validation complete")
+            self.config.groups = self._find_eligible_groups()
+        logger.info("Groups validation complete")
 
     def list_workspace_groups(self):
-        self.logger.info("Listing all groups in workspace, this may take a while")
-        ws_groups = list(self.ws_client.groups.list(attributes="displayName", filter=self._display_name_filter))
-        self.logger.info("Workspace group listing complete")
+        logger.info("Listing all groups in workspace, this may take a while")
+        ws_groups = list(provider.ws.groups.list(attributes="displayName", filter=self._display_name_filter))
+        logger.info("Workspace group listing complete")
         return ws_groups
 
     async def _find_eligible_groups(self) -> list[str]:
-        self.logger.info("Finding eligible groups automatically")
+        logger.info("Finding eligible groups automatically")
         listed_groups = self.list_workspace_groups()
         eligible_groups = [g for g in listed_groups if g.meta.resource_type == "WorkspaceGroup"]
-        self.logger.info(f"Found {len(eligible_groups)} eligible groups")
+        logger.info(f"Found {len(eligible_groups)} eligible groups")
         return eligible_groups
 
     def _verify_group_exists_in_ws(self, group_name: str) -> Group:
-        self.logger.info(f"Verifying group {group_name} exists in workspace")
+        logger.info(f"Verifying group {group_name} exists in workspace")
         found_group = self._get_ws_group(group_name, attributes=["id", "displayName", "meta"])
         assert found_group, f"Group {group_name} doesn't exist on the workspace level"
         return found_group
 
     def _verify_groups(self):
-        for group_name in self.config.group_listing_config.groups:
+        for group_name in self.config.groups:
             if group_name in self.SYSTEM_GROUPS:
                 msg = "Cannot migrate system groups {self.SYSTEM_GROUPS}"
                 raise RuntimeError(msg)
@@ -59,7 +59,7 @@ class GroupManager(ClientMixin):
     ) -> Group | None:
         filter_string = f'displayName eq "{group_name}" and ' + self._display_name_filter
         groups = list(
-            self.ws_client.groups.list(
+            provider.ws.groups.list(
                 filter=filter_string,
                 attributes=",".join(attributes) if attributes else None,
                 excluded_attributes=",".join(excluded_attributes) if excluded_attributes else None,
@@ -89,7 +89,7 @@ class GroupManager(ClientMixin):
         return group_info
 
     def create_or_update_temporary_groups(self):
-        for group_name in self.config.group_listing_config.groups:
+        for group_name in self.config.groups:
             temp_group_name = f"{self.config.backup_group_prefix}{group_name}"
             logging.info(f"Preparing temporary group for {group_name} -> {temp_group_name}")
             group = self._get_ws_group(group_name, excluded_attributes=["id", "externalId"])
@@ -101,10 +101,10 @@ class GroupManager(ClientMixin):
                 logging.info(f"Temporary group {temp_group_name} already exists, updating it from original group")
                 group.as_dict()
                 logging.info(f"Updating temporary group {temp_group_name} from the source group {group_name}")
-                self.ws_client.groups.update(temp_group.id, self._get_clean_group_info(group))
+                provider.ws.groups.update(temp_group.id, self._get_clean_group_info(group))
             else:
                 logging.info("Temporary group is not yet created, creating it")
-                self.ws_client.groups.create(temp_group_name, self._get_clean_group_info(group))
+                provider.ws.groups.create(temp_group_name, self._get_clean_group_info(group))
 
     @staticmethod
     def _verify_group_is_workspace_level(group: Group):

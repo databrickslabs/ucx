@@ -1,3 +1,4 @@
+from pydantic import Field
 from pydantic.dataclasses import dataclass
 
 
@@ -5,14 +6,18 @@ from pydantic.dataclasses import dataclass
 class InventoryTable:
     catalog: str
     database: str
-    table: str
+    name: str
 
     def __repr__(self):
-        return f"{self.catalog}.{self.database}.{self.table}"
+        return f"{self.catalog}.{self.database}.{self.name}"
+
+    def to_spark(self):
+        return f"{self.catalog}.{self.database}.{self.name}"
 
 
 @dataclass
-class GroupListingConfig:
+class GroupsConfig:
+    backup_group_prefix: str | None = "db-temp-"
     groups: list[str] | None = None
     auto: bool | None = True
 
@@ -24,23 +29,29 @@ class WorkspaceAuthConfig:
 
 
 @dataclass
-class AccountAuthConfig:
-    account_id: str
-    host: str
-    password: str
-    username: str
+class AuthConfig:
+    workspace: WorkspaceAuthConfig | None = None
+
+    class Config:
+        frozen = True
 
 
 @dataclass
-class AuthConfig:
-    account: AccountAuthConfig | None = None
-    workspace: WorkspaceAuthConfig | None = None
+class InventoryConfig:
+    table: InventoryTable
+
+
+@dataclass
+class RateLimitConfig:
+    num_threads: int | None = 4
+    max_requests_per_period: int | None = 100
+    period_in_seconds: int | None = 1
 
 
 @dataclass
 class MigrationConfig:
-    inventory_table: InventoryTable
+    inventory: InventoryConfig
     with_table_acls: bool
-    group_listing_config: GroupListingConfig
-    auth_config: AuthConfig | None = None
-    backup_group_prefix: str | None = "db-temp-"
+    groups: GroupsConfig
+    auth: AuthConfig | None = None
+    rate_limit: RateLimitConfig | None = Field(default_factory=lambda: RateLimitConfig())

@@ -1,49 +1,53 @@
 from uc_migration_toolkit.config import MigrationConfig
 from uc_migration_toolkit.managers.group import GroupManager
-from uc_migration_toolkit.managers.inventory import InventoryManager
-from uc_migration_toolkit.managers.permissions import PermissionManager
-from uc_migration_toolkit.providers.logger import LoggerMixin
+from uc_migration_toolkit.managers.inventory.permissions import PermissionManager
+from uc_migration_toolkit.managers.inventory.table import InventoryTableManager
+from uc_migration_toolkit.providers.client import provider
+from uc_migration_toolkit.providers.config import provider as config_provider
+from uc_migration_toolkit.providers.logger import logger
 
 
-class GroupMigrationToolkit(LoggerMixin):
+class GroupMigrationToolkit:
     def __init__(self, config: MigrationConfig):
-        # initializing config and clients
+        # please note the order of configs here
+        config_provider.set_config(config)
+        provider.set_ws_client()
+
         # please note the order of operations here
-        super().__init__()
-        self.config = config
         # the group manager IS INTENDED to change properties in the self.config object
-        self.group_manager = GroupManager(self.config)
-        self.inventory_manager = InventoryManager(self.config.inventory_table)
-        self.permissions_manager = PermissionManager(self.config)
+        # therefore it always should go first
+        self.group_manager = GroupManager()
+        self.table_manager = InventoryTableManager()
+        self.permissions_manager = PermissionManager(self.table_manager)
 
     def validate_groups(self):
         self.group_manager.validate_groups()
 
     def cleanup_inventory_table(self):
-        self.inventory_manager.cleanup()
+        self.table_manager.cleanup()
 
     def inventorize_permissions(self):
         self.permissions_manager.inventorize_permissions()
 
     def create_or_update_backup_groups(self):
-        self.logger.info("Creating backup groups, updating the existing ones if necessary")
-        self.logger.info("Backup groups were created")
+        logger.info("Creating backup groups, updating the existing ones if necessary")
+        logger.info("Backup groups were created")
 
     def apply_backup_group_permissions(self):
-        self.logger.info("Applying the permissions to the backup groups")
-        self.logger.info("Permissions were applied")
+        logger.info("Applying the permissions to the backup groups")
+        logger.info("Permissions were applied")
 
     def replace_workspace_groups_with_account_groups(self):
-        self.logger.info("Replacing the workspace groups with account-level groups")
-        self.logger.info("Replacement went successfully")
+        logger.info("Replacing the workspace groups with account-level groups")
+        logger.info("Replacement went successfully")
 
     def apply_account_group_permissions(self):
-        self.logger.info("Applying workspace-level permissions to the account-level groups")
-        self.logger.info("Permissions were successfully applied to the account-level groups")
+        logger.info("Applying workspace-level permissions to the account-level groups")
+        logger.info("Permissions were successfully applied to the account-level groups")
 
     def delete_backup_groups(self):
-        self.logger.info("Deleting the workspace groups")
-        self.logger.info("Backup groups were successfully deleted")
+        logger.info("Deleting the workspace groups")
+        logger.info("Backup groups were successfully deleted")
 
     #
     #     self.groupIdDict = {}  # map: group id => group name
@@ -81,9 +85,9 @@ class GroupMigrationToolkit(LoggerMixin):
     #     self.fileList = {}
     #
     # def cleanup_inventory_table(self):
-    #     self.self.logger.info("Cleaning up inventory table")
+    #     self.self.logger.info("Cleaning up inventory name")
     #     self.spark.sql("DROP TABLE IF EXISTS {}".format(self.config.inventory_table))
-    #     self.self.logger.info("Inventory table cleaned up")
+    #     self.self.logger.info("Inventory name cleaned up")
     #
     # def findMigrationEligibleGroups(self):
     #     self.logger.info("Begin automatic generation of all migration eligible groups.")
@@ -149,7 +153,7 @@ class GroupMigrationToolkit(LoggerMixin):
     #             f"No matching account level group with the same name found. These groups WILL NOT MIGRATE:"
     #         )
     #         for i, group in enumerate(not_in_account_groups, start=1):
-    #             self.logger.info(f"{i}. {group} (WON'T MIGRATE)")
+    #             self.logger.info(f"{i}. {group} (WON'InventoryObject MIGRATE)")
     #
     #         if len(migration_eligible) > 0:
     #             # self.logger.info count and membership of intersection
@@ -385,13 +389,13 @@ class GroupMigrationToolkit(LoggerMixin):
     #
     # def getSingleClusterACL(self, clusterId):
     #     if self.verbose:
-    #         self.logger.info(f"[Verbose] Getting cluster permissions for cluster {clusterId}")
+    #         self.logger.info(f"[Verbose] Getting CLUSTER permissions for CLUSTER {clusterId}")
     #     resCPerm = requests.get(
     #         f"{self.workspace_url}/api/2.0/preview/permissions/clusters/{clusterId}",
     #         headers=self.headers,
     #     )
     #     if resCPerm.status_code == 404:
-    #         self.logger.error(f"Error: cluster ACL not enabled for the cluster: {clusterId}")
+    #         self.logger.error(f"Error: CLUSTER ACL not enabled for the CLUSTER: {clusterId}")
     #         return None
     #     resCPermJson = resCPerm.json()
     #     aclList = self.getACL(resCPermJson["access_control_list"])
@@ -400,7 +404,7 @@ class GroupMigrationToolkit(LoggerMixin):
     #     return (clusterId, aclList)
     #
     # def getAllClustersACL(self) -> dict:
-    #     self.logger.info("Performing cluster inventory...")
+    #     self.logger.info("Performing CLUSTER inventory...")
     #     try:
     #         resC = requests.get(f"{self.workspace_url}/api/2.0/clusters/list", headers=self.headers)
     #         resCJson = resC.json()
@@ -418,17 +422,17 @@ class GroupMigrationToolkit(LoggerMixin):
     #                     clusterPerm[result[0]] = result[1]
     #         return clusterPerm
     #     except Exception as e:
-    #         self.logger.error(f"error in retrieving cluster permission: {e}")
+    #         self.logger.error(f"error in retrieving CLUSTER permission: {e}")
     #
     # def getSingleClusterPolicyACL(self, policyId):
     #     if self.verbose:
     #         self.logger.info(f"[Verbose] Getting policy permissions for {policyId}")
     #     resCPPerm = requests.get(
-    #         f"{self.workspace_url}/api/2.0/preview/permissions/cluster-policies/{policyId}",
+    #         f"{self.workspace_url}/api/2.0/preview/permissions/CLUSTER-policies/{policyId}",
     #         headers=self.headers,
     #     )
     #     if resCPPerm.status_code == 404:
-    #         self.logger.error(f"Error: cluster policy feature is not enabled for policy: {policyId}")
+    #         self.logger.error(f"Error: CLUSTER policy feature is not enabled for policy: {policyId}")
     #         return None
     #     resCPPermJson = resCPPerm.json()
     #     aclList = self.getACL(resCPPermJson["access_control_list"])
@@ -437,7 +441,7 @@ class GroupMigrationToolkit(LoggerMixin):
     #     return (policyId, aclList)
     #
     # def getAllClusterPolicyACL(self) -> dict:
-    #     self.logger.info("Performing cluster policy inventory...")
+    #     self.logger.info("Performing CLUSTER policy inventory...")
     #     try:
     #         resCP = requests.get(
     #             f"{self.workspace_url}/api/2.0/policies/clusters/list",
@@ -445,9 +449,9 @@ class GroupMigrationToolkit(LoggerMixin):
     #         )
     #         resCPJson = resCP.json()
     #         if resCPJson["total_count"] == 0:
-    #             self.logger.info("No cluster policies defined.")
+    #             self.logger.info("No CLUSTER policies defined.")
     #             return {}
-    #         self.logger.info(f"Scanning permissions of {len(resCPJson['policies'])} cluster policies.")
+    #         self.logger.info(f"Scanning permissions of {len(resCPJson['policies'])} CLUSTER policies.")
     #         clusterPolicyPerm = {}
     #         with concurrent.futures.ThreadPoolExecutor(max_workers=self.numThreads) as executor:
     #             future_to_cluster = [
@@ -459,7 +463,7 @@ class GroupMigrationToolkit(LoggerMixin):
     #                     clusterPolicyPerm[result[0]] = result[1]
     #         return clusterPolicyPerm
     #     except Exception as e:
-    #         self.logger.error(f"Error in retrieving cluster policy permission: {e}")
+    #         self.logger.error(f"Error in retrieving CLUSTER policy permission: {e}")
     #
     # def getSingleWarehouseACL(self, warehouseId):
     #     if self.verbose:
@@ -1004,19 +1008,19 @@ class GroupMigrationToolkit(LoggerMixin):
     #
     #             for c in resFolderJson["objects"]:
     #                 if (
-    #                     c["object_type"] == "DIRECTORY"
+    #                     c["_request_object_type"] == "DIRECTORY"
     #                     and c["path"].startswith("/Shared") is False
     #                     and c["path"].endswith("/Trash") is False
     #                 ):
     #                     subFolders[c["object_id"]] = c["path"]
     #                 elif (
-    #                     c["object_type"] == "NOTEBOOK"
+    #                     c["_request_object_type"] == "NOTEBOOK"
     #                     and c["path"].startswith("/Repos") is False
     #                     and c["path"].startswith("/Shared") is False
     #                 ):
     #                     notebooks[c["object_id"]] = c["path"]
     #                 elif (
-    #                     c["object_type"] == "FILE"
+    #                     c["_request_object_type"] == "FILE"
     #                     and c["path"].startswith("/Repos") is False
     #                     and c["path"].startswith("/Shared") is False
     #                 ):
@@ -1431,15 +1435,15 @@ class GroupMigrationToolkit(LoggerMixin):
     #         self.logger.info(f"[Verbose] SQL: {queryString}")
     #     return self.spark.sql(queryString)
     #
-    # def getGrantsOnObjects(self, database_name: str, object_type: str, object_key: str):
+    # def getGrantsOnObjects(self, database_name: str, _request_object_type: str, object_key: str):
     #     try:
-    #         if object_type in [
+    #         if _request_object_type in [
     #             "CATALOG",
     #             "ANY FILE",
     #             "ANONYMOUS FUNCTION",
     #         ]:  # without object key
     #             grants_df = (
-    #                 self.spark.sql(f"SHOW GRANT ON {object_type}")
+    #                 self.spark.sql(f"SHOW GRANT ON {_request_object_type}")
     #                 .groupBy("ObjectType", "ObjectKey", "Principal")
     #                 .agg(collect_set("ActionType").alias("ActionTypes"))
     #                 .selectExpr(
@@ -1452,8 +1456,8 @@ class GroupMigrationToolkit(LoggerMixin):
     #             )
     #         else:
     #             grants_df = (
-    #                 self.spark.sql(f"SHOW GRANT ON {object_type} {object_key}")
-    #                 .filter(col("ObjectType") == f"{object_type}")
+    #                 self.spark.sql(f"SHOW GRANT ON {_request_object_type} {object_key}")
+    #                 .filter(col("ObjectType") == f"{_request_object_type}")
     #                 .groupBy("ObjectType", "ObjectKey", "Principal")
     #                 .agg(collect_set("ActionType").alias("ActionTypes"))
     #                 .selectExpr(
@@ -1494,12 +1498,12 @@ class GroupMigrationToolkit(LoggerMixin):
     #         tables = self.runVerboseSql("show tables in spark_catalog.{}".format(db)).filter(
     #             col("isTemporary") is False
     #         )
-    #         for table in tables.collect():
+    #         for name in tables.collect():
     #             try:
-    #                 tbldf = self.getGrantsOnObjects(db, "TABLE", f"`{table.database}`.`{table.tableName}`")
+    #                 tbldf = self.getGrantsOnObjects(db, "TABLE", f"`{name.database}`.`{name.tableName}`")
     #                 aclList += tbldf.collect()
     #             except Exception as e:
-    #                 self.logger.error(f"error retrieving acl for table {table.tableName}. {e}")
+    #                 self.logger.error(f"error retrieving acl for name {name.tableName}. {e}")
     #
     #         functions = self.runVerboseSql("show functions in {}".format(db)).filter(
     #             col("function").startswith("spark_catalog." + db + ".")
@@ -1583,19 +1587,19 @@ class GroupMigrationToolkit(LoggerMixin):
     #                     self.logger.info(f"Completed ACL for {currentCount} databases")
     #         aclFinalList = [acl for acl in aclList if acl.Principal in self.groupL]
     #     except Exception as e:
-    #         self.logger.error(f"Error retrieving table acl object permission {e}")
+    #         self.logger.error(f"Error retrieving name acl object permission {e}")
     #     return aclFinalList
     #
-    # def generate_table_acls_command(self, action_types, object_type, object_key, groupName):
+    # def generate_table_acls_command(self, action_types, _request_object_type, object_key, groupName):
     #     lines = []
     #     grant_privs = [x for x in action_types if not x.startswith("DENIED_") and x != "OWN"]
     #     deny_privs = [x[len("DENIED_") :] for x in action_types if x.startswith("DENIED_") and x != "OWN"]
     #     if grant_privs:
-    #         lines.append(f"GRANT {', '.join(grant_privs)} ON {object_type} {object_key} TO `{groupName}`;")
+    #         lines.append(f"GRANT {', '.join(grant_privs)} ON {_request_object_type} {object_key} TO `{groupName}`;")
     #     if deny_privs:
-    #         lines.append(f"DENY {', '.join(deny_privs)} ON {object_type} {object_key} TO `{groupName}`;")
+    #         lines.append(f"DENY {', '.join(deny_privs)} ON {_request_object_type} {object_key} TO `{groupName}`;")
     #     if "OWN" in action_types:
-    #         lines.append(f"ALTER {object_type} {object_key} OWNER TO `{groupName}`;")
+    #         lines.append(f"ALTER {_request_object_type} {object_key} OWNER TO `{groupName}`;")
     #     return lines
     #
     # def updateDataObjectsPermission(self, aclList: List, level: str):
@@ -1804,10 +1808,10 @@ class GroupMigrationToolkit(LoggerMixin):
     #     try:
     #         self.logger.info("applying group entitlement permissions")
     #         self.updateGroupEntitlements(self.groupEntitlements, level)
-    #         self.logger.info("applying cluster permissions")
+    #         self.logger.info("applying CLUSTER permissions")
     #         self.updateGroupPermission("clusters", self.clusterPerm, level)
-    #         self.logger.info("applying cluster policy permissions")
-    #         self.updateGroupPermission("cluster-policies", self.clusterPolicyPerm, level)
+    #         self.logger.info("applying CLUSTER policy permissions")
+    #         self.updateGroupPermission("CLUSTER-policies", self.clusterPolicyPerm, level)
     #         self.logger.info("applying warehouse permissions")
     #         self.updateGroupPermission("sql/warehouses", self.warehousePerm, level)
     #         self.logger.info("applying instance pool permissions")
@@ -1844,7 +1848,7 @@ class GroupMigrationToolkit(LoggerMixin):
     #             self.logger.info("applying instance profile permissions")
     #             self.updateGroupRoles(level)
     #         if self.checkTableACL is True:
-    #             self.logger.info("applying table acl object permissions")
+    #             self.logger.info("applying name acl object permissions")
     #             self.updateDataObjectsPermission(self.dataObjectsPerm, level)
     #
     #     except Exception as e:
@@ -1888,10 +1892,10 @@ class GroupMigrationToolkit(LoggerMixin):
     #     try:
     #         groupType = ""
     #         if mode == "Workspace":
-    #             self.logger.info(f"Saving data for workspace groups in {self.inventoryTableName} table.")
+    #             self.logger.info(f"Saving data for workspace groups in {self.inventoryTableName} name.")
     #             groupType = "WorkspaceLocal"
     #         else:
-    #             self.logger.info(f"Saving data for workspace temp groups in {self.inventoryTableName} table.")
+    #             self.logger.info(f"Saving data for workspace temp groups in {self.inventoryTableName} name.")
     #             groupType = "WorkspaceTemp"
     #         persistList = []
     #         persistList.append([groupType, "GroupListDict", self.groupIdDict])
@@ -1943,10 +1947,10 @@ class GroupMigrationToolkit(LoggerMixin):
     #                 "GroupType", lit(groupType)
     #             )
     #             tableACLDF.write.format("delta").mode("append").saveAsTable(self.inventoryTableName + "TableACL")
-    #         self.logger.info(f"Saved data in {self.inventoryTableName} table.")
+    #         self.logger.info(f"Saved data in {self.inventoryTableName} name.")
     #
     #     except Exception as e:
-    #         self.logger.error(f"Error creating delta table to store inventory  : {e}")
+    #         self.logger.error(f"Error creating delta name to store inventory  : {e}")
     #
     # def deleteWorkspaceLocalGroups(self):
     #     try:
