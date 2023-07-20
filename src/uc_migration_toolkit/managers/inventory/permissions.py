@@ -31,6 +31,9 @@ class PermissionManager:
         for inventorizer in self.get_inventorizers():
             inventorizer.preload()
             collected = inventorizer.inventorize()
-            self.inventory_table_manager.save(collected)
+            if collected:
+                self.inventory_table_manager.save(collected)
+            else:
+                logger.warning(f"No objects of type {inventorizer.logical_object_type} were found")
 
         logger.info("Permissions were inventoried and saved")

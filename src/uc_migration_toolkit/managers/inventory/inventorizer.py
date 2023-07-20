@@ -41,6 +41,10 @@ class StandardInventorizer(Generic[InventoryObject]):
         self._permissions_function = permissions_function if permissions_function else provider.ws.permissions.get
         self._objects: list[InventoryObject] = []
 
+    @property
+    def logical_object_type(self) -> LogicalObjectType:
+        return self._logical_object_type
+
     def preload(self):
         logger.info(f"Listing objects with type {self._request_object_type}...")
         self._objects = list(self._listing_function())
