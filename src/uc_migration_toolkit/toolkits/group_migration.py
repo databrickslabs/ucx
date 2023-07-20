@@ -1,5 +1,7 @@
 from uc_migration_toolkit.config import MigrationConfig
 from uc_migration_toolkit.managers.group import GroupManager
+from uc_migration_toolkit.managers.inventory import InventoryManager
+from uc_migration_toolkit.managers.permissions import PermissionManager
 from uc_migration_toolkit.providers.logger import LoggerMixin
 
 
@@ -11,6 +13,37 @@ class GroupMigrationToolkit(LoggerMixin):
         self.config = config
         # the group manager IS INTENDED to change properties in the self.config object
         self.group_manager = GroupManager(self.config)
+        self.inventory_manager = InventoryManager(self.config.inventory_table)
+        self.permissions_manager = PermissionManager(self.config)
+
+    def validate_groups(self):
+        self.group_manager.validate_groups()
+
+    def cleanup_inventory_table(self):
+        self.inventory_manager.cleanup()
+
+    def inventorize_permissions(self):
+        self.permissions_manager.inventorize_permissions()
+
+    def create_or_update_backup_groups(self):
+        self.logger.info("Creating backup groups, updating the existing ones if necessary")
+        self.logger.info("Backup groups were created")
+
+    def apply_backup_group_permissions(self):
+        self.logger.info("Applying the permissions to the backup groups")
+        self.logger.info("Permissions were applied")
+
+    def replace_workspace_groups_with_account_groups(self):
+        self.logger.info("Replacing the workspace groups with account-level groups")
+        self.logger.info("Replacement went successfully")
+
+    def apply_account_group_permissions(self):
+        self.logger.info("Applying workspace-level permissions to the account-level groups")
+        self.logger.info("Permissions were successfully applied to the account-level groups")
+
+    def delete_backup_groups(self):
+        self.logger.info("Deleting the workspace groups")
+        self.logger.info("Backup groups were successfully deleted")
 
     #
     #     self.groupIdDict = {}  # map: group id => group name
@@ -2002,35 +2035,3 @@ class GroupMigrationToolkit(LoggerMixin):
     #
     #     except Exception as e:
     #         self.logger.error(f" Error creating account level group, {e}")
-    def validate_groups(self):
-        self.logger.info("Starting the groups validation")
-        self.group_manager.validate_groups()
-        self.logger.info("Group validation finished")
-
-    def cleanup_inventory_table(self):
-        self.logger.info(f"Deleting the inventory table {self.config.inventory_table}")
-        self.logger.info("Table successfully deleted")
-
-    def inventorize_permissions(self):
-        self.logger.info("Inventorying the permissions")
-        self.logger.info("Permissions were inventoried and saved")
-
-    def create_or_update_backup_groups(self):
-        self.logger.info("Creating backup groups, updating the existing ones if necessary")
-        self.logger.info("Backup groups were created")
-
-    def apply_backup_group_permissions(self):
-        self.logger.info("Applying the permissions to the backup groups")
-        self.logger.info("Permissions were applied")
-
-    def replace_workspace_groups_with_account_groups(self):
-        self.logger.info("Replacing the workspace groups with account-level groups")
-        self.logger.info("Replacement went successfully")
-
-    def apply_account_group_permissions(self):
-        self.logger.info("Applying workspace-level permissions to the account-level groups")
-        self.logger.info("Permissions were successfully applied to the account-level groups")
-
-    def delete_backup_groups(self):
-        self.logger.info("Deleting the workspace groups")
-        self.logger.info("Backup groups were successfully deleted")

@@ -1,10 +1,10 @@
 inventory_table:
   catalog: main
   database: default
-  table: inventory
+  table: uc_migration_inventory
 
 
 with_table_acls: False
 
 group_listing_config:
-  groups: [ "test-group-1" ]
+  groups: [ "test-group" ]
