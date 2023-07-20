@@ -1,9 +1,9 @@
-from enum import StrEnum
+from enum import Enum
 
 from pydantic import BaseModel
 
 
-class RequestObjectType(StrEnum):
+class RequestObjectType(str, Enum):
     AUTHORIZATION = "authorization"  # tokens and passwords are here too!
     CLUSTERS = "clusters"
     CLUSTER_POLICIES = "CLUSTER-policies"
@@ -21,14 +21,14 @@ class RequestObjectType(StrEnum):
     TOKENS = "tokens"
 
 
-class SqlRequestObjectType(StrEnum):
+class SqlRequestObjectType(str, Enum):
     ALERTS = "alerts"
     DASHBOARDS = "dashboards"
     DATA_SOURCES = "data-sources"
     QUERIES = "queries"
 
 
-class LogicalObjectType(StrEnum):
+class LogicalObjectType(str, Enum):
     CLUSTER = "CLUSTER"
 
 
