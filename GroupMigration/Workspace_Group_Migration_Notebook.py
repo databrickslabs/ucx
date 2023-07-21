@@ -143,6 +143,11 @@ df.filter(df.ws_group_size > df.account_group_size).display()
 
 # COMMAND ----------
 
+gm.setGroupListForMode("Workspace")
+gm.groupIdDict.values()
+
+# COMMAND ----------
+
 # Comment out line of object to omit from inventory listing
 objListTemp = [
 'Password',
@@ -188,7 +193,7 @@ gm.migrationLoadPerGroup().filter(~gm.migrationLoadPerGroupDF.GroupName.isin(mig
 
 # DBTITLE 1,Set Groups or SubGroups to be Migrated (Optional)
 # subGroupL = set(gm.groupL).difference(set(migratedGroupL)).difference(set(['ACL:Databricks:GEN2:Data', 'ACL:Databricks:GEN2:DataPlatform', 'dashboard', 'tableau']))
-subGroupL = ['ACL:Databricks:GEN2:Data', 'ACL:Databricks:GEN2:DataPlatform', 'dashboard', 'tableau']
+subGroupL = gm.groupL
 gm.migrationLoadPerGroupDF.filter(gm.migrationLoadPerGroupDF.GroupName.isin(subGroupL)).sort("GroupName").display()
 gm.groupL = subGroupL
 

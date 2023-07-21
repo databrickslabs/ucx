@@ -1651,10 +1651,10 @@ class GroupMigration:
 
       print(f'Performing inventory of workspace object permissions. Filtering results by group list for mode: {mode}.')
       try:
-        if self.groupMembers == {} :
-          self.setGroupListForMode(mode)
-          print(f'Skipping inventory for mode = {mode} since already performed.')
-          return
+        # if self.groupMembers == {} :
+        #   self.setGroupListForMode(mode)
+        #   print(f'Skipping inventory for mode = {mode} since already performed.')
+        #   return
         for obj in objList :
           self.performInventoryOnObject(obj)
 
@@ -1892,10 +1892,10 @@ class GroupMigration:
 
     def deleteWorkspaceLocalGroups(self):
       try:
-        # self.setGroupListForMode("Workspace")
-        # if self.validateTempWSGroup() == 0:
-        #     print("temp group validation failed, aborting deletion")
-        #     return;
+        self.setGroupListForMode("Workspace")
+        if self.validateTempWSGroup() == 0:
+            print("temp group validation failed, aborting deletion")
+            return;
         self.bulkTryDelete(self.groupL)
       except Exception as e:
         print(f"Error deleting groups : {e}")
