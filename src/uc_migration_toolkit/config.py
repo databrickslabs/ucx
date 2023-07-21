@@ -12,7 +12,7 @@ class InventoryTable:
         return f"{self.catalog}.{self.database}.{self.name}"
 
     def to_spark(self):
-        return f"{self.catalog}.{self.database}.{self.name}"
+        return self.__repr__()
 
 
 @dataclass

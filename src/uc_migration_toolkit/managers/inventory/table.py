@@ -13,12 +13,12 @@ class InventoryTableManager(SparkMixin):
 
     def cleanup(self):
         logger.info(f"Cleaning up inventory name {self.config.table}")
-        self.spark.sql(f"DROP TABLE IF EXISTS {self.config.table}")
+        self.spark.sql(f"DROP TABLE IF EXISTS {self.config.table.to_spark()}")
         logger.info("Inventory name cleanup complete")
 
     def save(self, items: list[PermissionsInventoryItem]):
         logger.info(f"Saving {len(items)} items to inventory table {self.config.table}")
-        serialized_items = pd.DataFrame([item.model_dump() for item in items])
+        serialized_items = pd.DataFrame([item.model_dump(mode="json") for item in items])
         df = self.spark.createDataFrame(serialized_items)
         df.write.mode("append").format("delta").saveAsTable(self.config.table.to_spark())
         logger.info("Upsert complete")

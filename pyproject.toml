@@ -65,7 +65,8 @@ test-cov-report = "pytest {args:tests} --cov uc_migration_toolkit --cov-report=h
 [tool.hatch.envs.unit]
 dependencies = [
     "uc-migration-toolkit[test]",
-    "pyspark>=3.4.0,<=3.5.0"
+    "pyspark>=3.4.0,<=3.5.0",
+    "delta-spark>=2.4.0,<3.0.0"
 ]
 [tool.hatch.envs.unit.scripts]
 test = "pytest tests/unit {args:tests} "

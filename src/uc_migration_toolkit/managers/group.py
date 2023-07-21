@@ -97,15 +97,15 @@ class GroupManager:
 
             assert group, f"Group {group_name} not found"
             temp_group = self._get_ws_group(temp_group_name, attributes=["id"])
+            cleaned_info = self._get_clean_group_info(group)
 
             if temp_group:
                 logging.info(f"Temporary group {temp_group_name} already exists, updating it from original group")
-                group.as_dict()
                 logging.info(f"Updating temporary group {temp_group_name} from the source group {group_name}")
-                provider.ws.groups.update(temp_group.id, self._get_clean_group_info(group))
+                provider.ws.groups.update(temp_group.id, cleaned_info)
             else:
                 logging.info("Temporary group is not yet created, creating it")
-                provider.ws.groups.create(temp_group_name, self._get_clean_group_info(group))
+                provider.ws.groups.create(temp_group_name, cleaned_info)
 
     @staticmethod
     def _verify_group_is_workspace_level(group: Group):
