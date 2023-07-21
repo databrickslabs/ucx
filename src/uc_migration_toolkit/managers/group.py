@@ -1,4 +1,5 @@
 import typing
+from dataclasses import dataclass
 
 from databricks.sdk.service.iam import Group
 
@@ -7,11 +8,18 @@ from uc_migration_toolkit.providers.config import provider as config_provider
 from uc_migration_toolkit.providers.logger import logger
 
 
+@dataclass
+class GroupPair:
+    source: Group
+    backup: Group
+
+
 class GroupManager:
-    SYSTEM_GROUPS: typing.ClassVar[list[str]] = ["users", "admins", "account-users"]
+    SYSTEM_GROUPS: typing.ClassVar[list[str]] = ["users", "admins", "account users"]
 
     def __init__(self):
         self.config = config_provider.config.groups
+        self._group_pairs: list[GroupPair] = []
 
     def validate_groups(self):
         logger.info("Starting the groups validation")
@@ -34,7 +42,7 @@ class GroupManager:
         listed_groups = self.list_workspace_groups()
         eligible_groups = [g for g in listed_groups if g.meta.resource_type == "WorkspaceGroup"]
         logger.info(f"Found {len(eligible_groups)} eligible groups")
-        return eligible_groups
+        return [g.display_name for g in eligible_groups]
 
     def _verify_group_exists_in_ws(self, group_name: str) -> Group:
         logger.info(f"Verifying group {group_name} exists in workspace")
@@ -93,29 +101,57 @@ class GroupManager:
         logger.info(f"In total, {len(self.config.selected)} group(s) to be created or updated")
 
         for group_name in self.config.selected:
-            temp_group_name = f"{self.config.backup_group_prefix}{group_name}"
-            logger.info(f"Preparing backup group for {group_name} -> {temp_group_name}")
+            backup_group_name = f"{self.config.backup_group_prefix}{group_name}"
+            logger.info(f"Preparing backup group for {group_name} -> {backup_group_name}")
             group = self._get_ws_group(group_name, excluded_attributes=["id", "externalId"])
 
             group_object = Group.from_dict(self._get_clean_group_info(group))
-            group_object.display_name = temp_group_name
+            group_object.display_name = backup_group_name
 
             assert group, f"Group {group_name} not found"
-            temp_group = self._get_ws_group(temp_group_name, attributes=["id"])
+            backup_group = self._get_ws_group(backup_group_name, attributes=["id"])
 
-            logger.info(f"Checking if backup group {temp_group_name} already exists")
+            logger.info(f"Checking if backup group {backup_group_name} already exists")
 
-            if temp_group:
-                logger.info(f"Updating backup group {temp_group_name} from the source group {group_name}")
-                group_object.id = temp_group.id
+            if backup_group:
+                logger.info(f"Updating backup group {backup_group_name} from the source group {group_name}")
+                group_object.id = backup_group.id
                 provider.ws.groups.update(id=group_object.id, request=group_object)
-                logger.info(f"Backup group {temp_group_name} successfully updated")
+                logger.info(f"Backup group {backup_group_name} successfully updated")
             else:
                 logger.info("Backup group is not yet created, creating it")
-                provider.ws.groups.create(request=group_object)
-                logger.info(f"Backup group {temp_group_name} successfully created")
+                backup_group = provider.ws.groups.create(request=group_object)
+                logger.info(f"Backup group {backup_group_name} successfully created")
+            self._group_pairs.append(GroupPair(source=group, backup=backup_group))
 
         logger.info("Backup groups were successfully created or updated")
+
+    def _load_group_pairs(self) -> list[GroupPair]:
+        # loading backup groups
+        filter_string = f'displayName sw "{self.config.backup_group_prefix}" and ' + self._display_name_filter
+        backup_groups = list(
+            filter(
+                lambda g: g.meta.resource_type == "WorkspaceGroup",
+                provider.ws.groups.list(attributes="displayName,id", filter=filter_string),
+            )
+        )
+        source_groups = [
+            self._get_ws_group(g.display_name.replace(self.config.backup_group_prefix, "")) for g in backup_groups
+        ]
+        return [
+            GroupPair(source=source, backup=backup) for source, backup in zip(source_groups, backup_groups, strict=True)
+        ]
+
+    @property
+    def group_pairs(self) -> list[GroupPair]:
+        if not self._group_pairs:
+            # this is for cases when create_or_update_backup_groups wasn't called
+            logger.info("Group pairs are not defined, accessing them from the workspace")
+            pairs = self._load_group_pairs()
+            self._group_pairs = pairs
+            return pairs
+        else:
+            return self._group_pairs
 
     @staticmethod
     def _verify_group_is_workspace_level(group: Group):

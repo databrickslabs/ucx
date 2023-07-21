@@ -1,3 +1,4 @@
+from uc_migration_toolkit.managers.group import GroupPair
 from uc_migration_toolkit.managers.inventory.inventorizer import StandardInventorizer
 from uc_migration_toolkit.managers.inventory.table import InventoryTableManager
 from uc_migration_toolkit.managers.inventory.types import (
@@ -26,7 +27,7 @@ class PermissionManager:
         ]
 
     def inventorize_permissions(self):
-        logger.info("Inventorying the permissions")
+        logger.info("Inventorizing the permissions")
 
         for inventorizer in self.get_inventorizers():
             inventorizer.preload()
@@ -36,12 +37,15 @@ class PermissionManager:
             else:
                 logger.warning(f"No objects of type {inventorizer.logical_object_type} were found")
 
-        logger.info("Permissions were inventoried and saved")
+        logger.info("Permissions were inventorized and saved")
 
-    def apply_backup_group_permissions(self):
-        logger.info("Applying the permissions to the backup selected")
+    def apply_backup_group_permissions(self, pairs: list[GroupPair]):
+        logger.info("Applying the permissions to the backup groups")
+        permissions_on_source = self.inventory_table_manager.load_for_groups(groups=[p.source for p in pairs])
+        for item in permissions_on_source:
+            print(item)
         logger.info("Permissions were applied")
 
     def apply_account_group_permissions(self):
-        logger.info("Applying workspace-level permissions to the account-level selected")
-        logger.info("Permissions were successfully applied to the account-level selected")
+        logger.info("Applying workspace-level permissions to the account-level groups")
+        logger.info("Permissions were successfully applied to the account-level groups")

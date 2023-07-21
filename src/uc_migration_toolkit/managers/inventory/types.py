@@ -1,5 +1,8 @@
 import enum
+import json
 
+import pandas as pd
+from databricks.sdk.service.iam import ObjectPermissions
 from pydantic import BaseModel
 
 
@@ -60,3 +63,17 @@ class PermissionsInventoryItem(BaseModel):
     logical_object_type: LogicalObjectType
     request_object_type: RequestObjectType | SqlRequestObjectType
     object_permissions: dict
+
+    @property
+    def typed_object_permissions(self) -> ObjectPermissions:
+        return ObjectPermissions.from_dict(self.object_permissions)
+
+    @staticmethod
+    def from_pandas(source: pd.DataFrame) -> list["PermissionsInventoryItem"]:
+        items = source.to_dict(orient="records")
+
+        for item in items:
+            item["object_permissions"] = json.loads(item["plain_permissions"])
+            item.pop("plain_permissions")
+
+        return [PermissionsInventoryItem(**item) for item in items]

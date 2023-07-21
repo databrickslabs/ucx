@@ -32,7 +32,7 @@ class GroupMigrationToolkit:
         self.group_manager.create_or_update_backup_groups()
 
     def apply_backup_group_permissions(self):
-        self.permissions_manager.apply_backup_group_permissions()
+        self.permissions_manager.apply_backup_group_permissions(self.group_manager.group_pairs)
 
     def replace_workspace_groups_with_account_groups(self):
         self.group_manager.replace_workspace_groups_with_account_groups()

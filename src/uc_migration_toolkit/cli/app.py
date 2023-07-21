@@ -16,10 +16,10 @@ def migrate_groups(config_file: Annotated[Path, typer.Argument(help="Path to con
     toolkit = GroupMigrationToolkit(config)
 
     toolkit.validate_groups()
-    # toolkit.cleanup_inventory_table()
-    # toolkit.inventorize_permissions()
+    toolkit.cleanup_inventory_table()
+    toolkit.inventorize_permissions()
     toolkit.create_or_update_backup_groups()
-    # toolkit.apply_backup_group_permissions()
+    toolkit.apply_backup_group_permissions()
     # toolkit.replace_workspace_groups_with_account_groups()
     # toolkit.apply_account_group_permissions()
     # toolkit.delete_backup_groups()
