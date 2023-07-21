@@ -104,7 +104,8 @@ profile = "black"
 
 [tool.pytest.ini_options]
 filterwarnings = [
-    "ignore:::.*pyspark.broadcast*"
+    "ignore:::.*pyspark.broadcast*",
+    "ingore:::.*pyspark.sql.pandas.utils*"
 ]
 
 [tool.black]

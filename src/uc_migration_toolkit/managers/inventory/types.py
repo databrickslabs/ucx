@@ -1,9 +1,23 @@
-from enum import Enum
+import enum
 
 from pydantic import BaseModel
 
 
-class RequestObjectType(str, Enum):
+class StrEnum(str, enum.Enum):  # re-exported for compatability with older python versions
+    def __new__(cls, value, *args, **kwargs):
+        if not isinstance(value, str | enum.auto):
+            msg = f"Values of StrEnums must be strings: {value!r} is a {type(value)}"
+            raise TypeError(msg)
+        return super().__new__(cls, value, *args, **kwargs)
+
+    def __str__(self):
+        return str(self.value)
+
+    def _generate_next_value_(name, *_):  # noqa: N805
+        return name
+
+
+class RequestObjectType(StrEnum):
     AUTHORIZATION = "authorization"  # tokens and passwords are here too!
     CLUSTERS = "clusters"
     CLUSTER_POLICIES = "CLUSTER-policies"
@@ -20,16 +34,25 @@ class RequestObjectType(str, Enum):
     SQL_WAREHOUSES = "sql-warehouses"
     TOKENS = "tokens"
 
+    def __repr__(self):
+        return self.value
 
-class SqlRequestObjectType(str, Enum):
+
+class SqlRequestObjectType(StrEnum):
     ALERTS = "alerts"
     DASHBOARDS = "dashboards"
     DATA_SOURCES = "data-sources"
     QUERIES = "queries"
 
+    def __repr__(self):
+        return self.value
 
-class LogicalObjectType(str, Enum):
+
+class LogicalObjectType(StrEnum):
     CLUSTER = "CLUSTER"
+
+    def __repr__(self):
+        return self.value
 
 
 class PermissionsInventoryItem(BaseModel):
