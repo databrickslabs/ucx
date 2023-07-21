@@ -80,12 +80,12 @@ class StandardInventorizer(Generic[InventoryObject]):
 
         @sleep_and_retry
         @limits(calls=self._config.max_requests_per_period, period=self._config.period_in_seconds)
-        def process_singe_object(_object: InventoryObject):
-            self._process_single_object(_object)
+        def process_single_object_with_rate_limit(_object: InventoryObject) -> PermissionsInventoryItem:
+            return self._process_single_object(_object)
 
-        with ThreadPoolExecutor(self._config.num_threads) as executor:
+        with ThreadPoolExecutor(config_provider.config.num_threads) as executor:
             for _object in self._objects:
-                future = executor.submit(self._process_single_object, _object)
+                future = executor.submit(process_single_object_with_rate_limit, _object)
                 future.add_done_callback(progress_report)
                 futures.append(future)
 

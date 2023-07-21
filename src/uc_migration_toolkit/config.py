@@ -51,7 +51,6 @@ class InventoryConfig:
 
 @dataclass
 class RateLimitConfig:
-    num_threads: int | None = 4
     max_requests_per_period: int | None = 100
     period_in_seconds: int | None = 1
 
@@ -63,6 +62,7 @@ class MigrationConfig:
     groups: GroupsConfig
     auth: AuthConfig | None = None
     rate_limit: RateLimitConfig | None = Field(default_factory=lambda: RateLimitConfig())
+    num_threads: int | None = 4
 
     def __post_init__(self):
         if self.with_table_acls:

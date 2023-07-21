@@ -42,7 +42,7 @@ class ClientProvider:
         return retry_strategy
 
     def _adjust_session(self, client: WorkspaceClient):
-        pool_size = config_provider.config.rate_limit.num_threads
+        pool_size = config_provider.config.num_threads
         logger.debug(f"Adjusting the session to fully utilize the pool size of {pool_size}")
         _existing_session = client.api_client._session
         _session = requests.Session()

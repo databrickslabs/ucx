@@ -29,7 +29,7 @@ class GroupMigrationToolkit:
         self.permissions_manager.inventorize_permissions()
 
     def create_or_update_backup_groups(self):
-        self.group_manager.create_or_update_temporary_groups()
+        self.group_manager.create_or_update_backup_groups()
 
     def apply_backup_group_permissions(self):
         self.permissions_manager.apply_backup_group_permissions()

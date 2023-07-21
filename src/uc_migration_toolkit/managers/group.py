@@ -1,4 +1,3 @@
-import logging
 import typing
 
 from databricks.sdk.service.iam import Group
@@ -89,23 +88,34 @@ class GroupManager:
 
         return group_info
 
-    def create_or_update_temporary_groups(self):
+    def create_or_update_backup_groups(self):
+        logger.info("Creating or updating the backup groups")
+        logger.info(f"In total, {len(self.config.selected)} group(s) to be created or updated")
+
         for group_name in self.config.selected:
             temp_group_name = f"{self.config.backup_group_prefix}{group_name}"
-            logging.info(f"Preparing temporary group for {group_name} -> {temp_group_name}")
+            logger.info(f"Preparing backup group for {group_name} -> {temp_group_name}")
             group = self._get_ws_group(group_name, excluded_attributes=["id", "externalId"])
+
+            group_object = Group.from_dict(self._get_clean_group_info(group))
+            group_object.display_name = temp_group_name
 
             assert group, f"Group {group_name} not found"
             temp_group = self._get_ws_group(temp_group_name, attributes=["id"])
-            cleaned_info = self._get_clean_group_info(group)
+
+            logger.info(f"Checking if backup group {temp_group_name} already exists")
 
             if temp_group:
-                logging.info(f"Temporary group {temp_group_name} already exists, updating it from original group")
-                logging.info(f"Updating temporary group {temp_group_name} from the source group {group_name}")
-                provider.ws.groups.update(temp_group.id, cleaned_info)
+                logger.info(f"Updating backup group {temp_group_name} from the source group {group_name}")
+                group_object.id = temp_group.id
+                provider.ws.groups.update(id=group_object.id, request=group_object)
+                logger.info(f"Backup group {temp_group_name} successfully updated")
             else:
-                logging.info("Temporary group is not yet created, creating it")
-                provider.ws.groups.create(temp_group_name, cleaned_info)
+                logger.info("Backup group is not yet created, creating it")
+                provider.ws.groups.create(request=group_object)
+                logger.info(f"Backup group {temp_group_name} successfully created")
+
+        logger.info("Backup groups were successfully created or updated")
 
     @staticmethod
     def _verify_group_is_workspace_level(group: Group):
@@ -117,5 +127,5 @@ class GroupManager:
         logger.info("Replacement went successfully")
 
     def delete_backup_groups(self):
-        logger.info("Deleting the workspace selected")
-        logger.info("Backup selected were successfully deleted")
+        logger.info("Deleting the workspace-level backup groups")
+        logger.info("Backup groups were successfully deleted")
