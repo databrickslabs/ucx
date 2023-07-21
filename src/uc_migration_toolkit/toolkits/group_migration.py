@@ -4,7 +4,6 @@ from uc_migration_toolkit.managers.inventory.permissions import PermissionManage
 from uc_migration_toolkit.managers.inventory.table import InventoryTableManager
 from uc_migration_toolkit.providers.client import provider
 from uc_migration_toolkit.providers.config import provider as config_provider
-from uc_migration_toolkit.providers.logger import logger
 
 
 class GroupMigrationToolkit:
@@ -30,24 +29,19 @@ class GroupMigrationToolkit:
         self.permissions_manager.inventorize_permissions()
 
     def create_or_update_backup_groups(self):
-        logger.info("Creating backup selected, updating the existing ones if necessary")
-        logger.info("Backup selected were created")
+        self.group_manager.create_or_update_temporary_groups()
 
     def apply_backup_group_permissions(self):
-        logger.info("Applying the permissions to the backup selected")
-        logger.info("Permissions were applied")
+        self.permissions_manager.apply_backup_group_permissions()
 
     def replace_workspace_groups_with_account_groups(self):
-        logger.info("Replacing the workspace selected with account-level selected")
-        logger.info("Replacement went successfully")
+        self.group_manager.replace_workspace_groups_with_account_groups()
 
     def apply_account_group_permissions(self):
-        logger.info("Applying workspace-level permissions to the account-level selected")
-        logger.info("Permissions were successfully applied to the account-level selected")
+        self.permissions_manager.apply_account_group_permissions()
 
     def delete_backup_groups(self):
-        logger.info("Deleting the workspace selected")
-        logger.info("Backup selected were successfully deleted")
+        self.group_manager.delete_backup_groups()
 
     #
     #     self.groupIdDict = {}  # map: group id => group name

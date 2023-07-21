@@ -37,3 +37,11 @@ class PermissionManager:
                 logger.warning(f"No objects of type {inventorizer.logical_object_type} were found")
 
         logger.info("Permissions were inventoried and saved")
+
+    def apply_backup_group_permissions(self):
+        logger.info("Applying the permissions to the backup selected")
+        logger.info("Permissions were applied")
+
+    def apply_account_group_permissions(self):
+        logger.info("Applying workspace-level permissions to the account-level selected")
+        logger.info("Permissions were successfully applied to the account-level selected")

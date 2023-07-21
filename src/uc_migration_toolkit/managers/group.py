@@ -111,3 +111,11 @@ class GroupManager:
     def _verify_group_is_workspace_level(group: Group):
         error_message = f"Group {group.display_name} is not a workspace level group"
         assert group.meta.resource_type == "WorkspaceGroup", error_message
+
+    def replace_workspace_groups_with_account_groups(self):
+        logger.info("Replacing the workspace groups with account-level selected")
+        logger.info("Replacement went successfully")
+
+    def delete_backup_groups(self):
+        logger.info("Deleting the workspace selected")
+        logger.info("Backup selected were successfully deleted")
