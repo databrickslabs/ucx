@@ -1,6 +1,12 @@
 from databricks.sdk.service.compute import ClusterDetails
-from databricks.sdk.service.iam import Group, ResourceMeta, ObjectPermissions, AccessControlResponse, Permission, \
-    PermissionLevel
+from databricks.sdk.service.iam import (
+    AccessControlResponse,
+    Group,
+    ObjectPermissions,
+    Permission,
+    PermissionLevel,
+    ResourceMeta,
+)
 from pytest_mock import MockerFixture
 
 from uc_migration_toolkit.config import (
@@ -20,7 +26,6 @@ def test_e2e(mocker: MockerFixture, spark):
         groups=GroupsConfig(auto=True),
         with_table_acls=False,
     )
-
 
     test_table_name = "default.ucx_inventory"
     # mock spark ops
@@ -49,18 +54,36 @@ def test_e2e(mocker: MockerFixture, spark):
     ]
 
     ws_client_mock.permissions.get.side_effect = [
-        ObjectPermissions(object_type="cluster", object_id="1", access_control_list=[
-            AccessControlResponse(group_name="group1", all_permissions=[
-                Permission(inherited=False, permission_level=PermissionLevel.CAN_MANAGE)])
-        ]),
-        ObjectPermissions(object_type="cluster", object_id="2", access_control_list=[
-            AccessControlResponse(group_name="group1", all_permissions=[
-                Permission(inherited=False, permission_level=PermissionLevel.CAN_MANAGE)])
-        ]),
-        ObjectPermissions(object_type="cluster", object_id="3", access_control_list=[
-            AccessControlResponse(group_name="group1", all_permissions=[
-                Permission(inherited=False, permission_level=PermissionLevel.CAN_MANAGE)])
-        ]),
+        ObjectPermissions(
+            object_type="cluster",
+            object_id="1",
+            access_control_list=[
+                AccessControlResponse(
+                    group_name="group1",
+                    all_permissions=[Permission(inherited=False, permission_level=PermissionLevel.CAN_MANAGE)],
+                )
+            ],
+        ),
+        ObjectPermissions(
+            object_type="cluster",
+            object_id="2",
+            access_control_list=[
+                AccessControlResponse(
+                    group_name="group1",
+                    all_permissions=[Permission(inherited=False, permission_level=PermissionLevel.CAN_MANAGE)],
+                )
+            ],
+        ),
+        ObjectPermissions(
+            object_type="cluster",
+            object_id="3",
+            access_control_list=[
+                AccessControlResponse(
+                    group_name="group1",
+                    all_permissions=[Permission(inherited=False, permission_level=PermissionLevel.CAN_MANAGE)],
+                )
+            ],
+        ),
     ]
 
     toolkit = GroupMigrationToolkit(config)
