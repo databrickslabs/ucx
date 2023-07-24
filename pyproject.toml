@@ -69,9 +69,9 @@ dependencies = [
     "delta-spark>=2.4.0,<3.0.0"
 ]
 [tool.hatch.envs.unit.scripts]
-test = "pytest tests/unit {args:tests} "
-test-cov = "pytest tests/unit --cov uc_migration_toolkit  {args:tests}"
-test-cov-report = "pytest tests/unit {args:tests} --cov uc_migration_toolkit --cov-report=html"
+test = "pytest tests/unit"
+test-cov = "pytest tests/unit --cov uc_migration_toolkit"
+test-cov-report = "pytest tests/unit --cov uc_migration_toolkit --cov-report=html"
 
 
 [[tool.hatch.envs.all.matrix]]

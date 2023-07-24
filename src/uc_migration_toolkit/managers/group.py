@@ -66,7 +66,7 @@ class GroupManager:
         return " and ".join([f'displayName ne "{group}"' for group in self.SYSTEM_GROUPS])
 
     def _get_ws_group(
-        self, group_name, attributes: list[str] | None = None, excluded_attributes: list[str] | None = None
+            self, group_name, attributes: list[str] | None = None, excluded_attributes: list[str] | None = None
     ) -> Group | None:
         filter_string = f'displayName eq "{group_name}" and ' + self._display_name_filter
         groups = list(
