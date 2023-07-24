@@ -65,7 +65,7 @@ class PermissionManager:
         return next((p.destination.display_name for p in pairs if p.source.display_name == source_name), None)
 
     def prepare_new_permission_request(
-            self, item: PermissionsInventoryItem, pairs: GroupPairs
+        self, item: PermissionsInventoryItem, pairs: GroupPairs
     ) -> PermissionRequestPayload:
         new_acls: list[AccessControlRequest] = []
 
