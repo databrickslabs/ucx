@@ -107,6 +107,7 @@ filterwarnings = [
     "ignore:::.*pyspark.broadcast*",
     "ignore:::.*pyspark.sql.pandas.utils*"
 ]
+log_cli = true
 
 [tool.black]
 target-version = ["py310"]

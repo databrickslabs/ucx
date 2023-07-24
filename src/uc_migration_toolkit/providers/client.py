@@ -43,7 +43,7 @@ class ClientProvider:
 
     def _adjust_session(self, client: WorkspaceClient):
         pool_size = config_provider.config.num_threads
-        logger.debug(f"Adjusting the session to fully utilize the {pool_size} threads")
+        logger.debug(f"Adjusting the session to fully utilize {pool_size} threads")
         _existing_session = client.api_client._session
         _session = requests.Session()
         _session.auth = _existing_session.auth

@@ -79,9 +79,9 @@ class InventoryTableManager(SparkMixin):
         return self.spark.table(self.config.table.to_spark())
 
     def cleanup(self):
-        logger.info(f"Cleaning up inventory name {self.config.table}")
+        logger.info(f"Cleaning up inventory table {self.config.table}")
         self.spark.sql(f"DROP TABLE IF EXISTS {self.config.table.to_spark()}")
-        logger.info("Inventory name cleanup complete")
+        logger.info("Inventory table cleanup complete")
 
     def save(self, items: list[PermissionsInventoryItem]):
         logger.info(f"Saving {len(items)} items to inventory table {self.config.table}")
@@ -98,14 +98,19 @@ class InventoryTableManager(SparkMixin):
 
     def load_for_groups(self, groups: list[Group]) -> list[PermissionsInventoryItem]:
         logger.info(f"Scanning inventory table {self.config.table} for {len(groups)} groups")
-
+        group_names = [g.display_name for g in groups]
+        group_names_sql_argument = ".".join([f'"{name}"' for name in group_names])
         df = (
-            self._table.withColumn(
-                "groups",
-                F.expr("array_distinct(transform(object_permissions.access_control_list, item -> item.group_name))"),
+            self._table.where(
+                f"""
+            size(
+                array_intersect(
+                  array_distinct(transform(object_permissions.access_control_list, item -> item.group_name))
+                  , array({group_names_sql_argument})
+                )
+            ) > 0
+            """
             )
-            .where(F.array_intersect(F.col("groups"), F.array([F.lit(g.display_name) for g in groups])).isNotNull())
-            .drop("groups")
             .withColumn("plain_permissions", F.to_json("object_permissions"))
             .drop("object_permissions")
             .toPandas()

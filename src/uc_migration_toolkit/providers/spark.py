@@ -1,7 +1,11 @@
 import functools
+import os
+import time
 
+from databricks.sdk.service.compute import State
 from pyspark.sql import SparkSession
 
+from uc_migration_toolkit.providers.client import provider
 from uc_migration_toolkit.providers.logger import logger
 
 
@@ -21,6 +25,21 @@ class SparkMixin:
             logger.info("Using DB Connect")
             from databricks.connect import DatabricksSession
 
+            if "DATABRICKS_CLUSTER_ID" not in os.environ:
+                msg = "DATABRICKS_CLUSTER_ID environment variable is not set, cannot use DB Connect"
+                raise RuntimeError(msg)
+            cluster_id = os.environ["DATABRICKS_CLUSTER_ID"]
+            logger.info(f"Using cluster {cluster_id}")
+            cluster_info = provider.ws.clusters.get(cluster_id)
+
+            if not cluster_info.state == State.RUNNING:
+                logger.info("Cluster is not running, starting it")
+                provider.ws.clusters.start(cluster_id)
+                time.sleep(2)
+
+            logger.info("Waiting for the cluster to be ready")
+            provider.ws.clusters.wait_get_cluster_running(os.environ["DATABRICKS_CLUSTER_ID"])
+            logger.info("Cluster is ready, creating the DBConnect session")
             spark = DatabricksSession.builder.getOrCreate()
             return spark
 

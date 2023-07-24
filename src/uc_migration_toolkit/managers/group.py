@@ -11,7 +11,10 @@ from uc_migration_toolkit.providers.logger import logger
 @dataclass
 class GroupPair:
     source: Group
-    backup: Group
+    destination: Group
+
+
+GroupPairs = list[GroupPair]
 
 
 class GroupManager:
@@ -19,7 +22,7 @@ class GroupManager:
 
     def __init__(self):
         self.config = config_provider.config.groups
-        self._group_pairs: list[GroupPair] = []
+        self._group_pairs: GroupPairs = GroupPairs()
 
     def validate_groups(self):
         logger.info("Starting the groups validation")
@@ -109,7 +112,7 @@ class GroupManager:
             group_object.display_name = backup_group_name
 
             assert group, f"Group {group_name} not found"
-            backup_group = self._get_ws_group(backup_group_name, attributes=["id"])
+            backup_group = self._get_ws_group(backup_group_name, attributes=["id", "displayName", "meta"])
 
             logger.info(f"Checking if backup group {backup_group_name} already exists")
 
@@ -122,28 +125,32 @@ class GroupManager:
                 logger.info("Backup group is not yet created, creating it")
                 backup_group = provider.ws.groups.create(request=group_object)
                 logger.info(f"Backup group {backup_group_name} successfully created")
-            self._group_pairs.append(GroupPair(source=group, backup=backup_group))
+
+            self._group_pairs.append(GroupPair(source=group, destination=backup_group))
 
         logger.info("Backup groups were successfully created or updated")
 
-    def _load_group_pairs(self) -> list[GroupPair]:
+    def _load_group_pairs(self) -> GroupPairs:
         # loading backup groups
         filter_string = f'displayName sw "{self.config.backup_group_prefix}" and ' + self._display_name_filter
         backup_groups = list(
             filter(
                 lambda g: g.meta.resource_type == "WorkspaceGroup",
-                provider.ws.groups.list(attributes="displayName,id", filter=filter_string),
+                provider.ws.groups.list(attributes="displayName,id,meta", filter=filter_string),
             )
         )
         source_groups = [
             self._get_ws_group(g.display_name.replace(self.config.backup_group_prefix, "")) for g in backup_groups
         ]
-        return [
-            GroupPair(source=source, backup=backup) for source, backup in zip(source_groups, backup_groups, strict=True)
+
+        pairs = [
+            GroupPair(source=source, destination=backup)
+            for source, backup in zip(source_groups, backup_groups, strict=True)
         ]
+        return pairs
 
     @property
-    def group_pairs(self) -> list[GroupPair]:
+    def group_pairs(self) -> GroupPairs:
         if not self._group_pairs:
             # this is for cases when create_or_update_backup_groups wasn't called
             logger.info("Group pairs are not defined, accessing them from the workspace")
