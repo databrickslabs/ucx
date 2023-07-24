@@ -40,12 +40,17 @@ To deliver this migration, the following steps are performed:
 
 ## Permissions that we inventorize
 
+Group-level:
+
+- [ ] Entitlements
+- [ ] Roles
+
 Compute infrastructure:
 
 - [ ] Clusters
-- [ ] Cluster policies +
-- [ ] Pools +
-- [ ] Instance Profile (for AWS) +
+- [ ] Cluster policies
+- [ ] Pools
+- [ ] Instance Profile (for AWS)
 
 Workflows:
 

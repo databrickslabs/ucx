@@ -66,7 +66,7 @@ class GroupManager:
         return " and ".join([f'displayName ne "{group}"' for group in self.SYSTEM_GROUPS])
 
     def _get_ws_group(
-        self, group_name, attributes: list[str] | None = None, excluded_attributes: list[str] | None = None
+            self, group_name, attributes: list[str] | None = None, excluded_attributes: list[str] | None = None
     ) -> Group | None:
         filter_string = f'displayName eq "{group_name}" and ' + self._display_name_filter
         groups = list(
@@ -166,8 +166,9 @@ class GroupManager:
         assert group.meta.resource_type == "WorkspaceGroup", error_message
 
     def replace_workspace_groups_with_account_groups(self):
-        logger.info("Replacing the workspace groups with account-level selected")
-        logger.info("Replacement went successfully")
+        logger.info("Replacing the workspace groups with account-level groups")
+        logger.info(f"In total, {len(self.config.selected)} group(s) to be replaced")
+        logger.info("Workspace groups were successfully replaced with account-level groups")
 
     def delete_backup_groups(self):
         logger.info("Deleting the workspace-level backup groups")
