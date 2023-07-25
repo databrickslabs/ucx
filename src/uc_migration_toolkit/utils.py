@@ -56,7 +56,7 @@ class ThreadedExecution(Generic[ExecutableResult]):
         return progress_reporter.progress_report
 
     def run(self) -> list[ExecutableResult]:
-        logger.info("Starting threaded execution")
+        logger.trace("Starting threaded execution")
 
         @sleep_and_retry
         @limits(calls=self._rate_limit.max_requests_per_period, period=self._rate_limit.period_in_seconds)
@@ -72,7 +72,7 @@ class ThreadedExecution(Generic[ExecutableResult]):
 
             results = concurrent.futures.wait(self._futures, return_when=ALL_COMPLETED)
 
-        logger.info("Collecting the results from threaded execution")
+        logger.trace("Collecting the results from threaded execution")
         collected = [future.result() for future in results.done]
         return collected
 

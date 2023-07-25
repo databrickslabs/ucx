@@ -2,22 +2,21 @@ import json
 import os
 import random
 import uuid
-from dataclasses import dataclass
 from functools import partial
-from pathlib import Path
 
 import pytest
 from _pytest.fixtures import SubRequest
-from databricks.sdk import AccountClient, WorkspaceClient
-from databricks.sdk.service.compute import ClusterDetails
-from databricks.sdk.service.iam import (
-    AccessControlRequest,
-    ComplexValue,
-    Group,
-    PermissionLevel,
-    User,
+from databricks.sdk import AccountClient
+from databricks.sdk.service.compute import ClusterDetails, CreateInstancePoolResponse
+from databricks.sdk.service.iam import PermissionLevel
+from utils import (
+    EnvironmentInfo,
+    InstanceProfile,
+    _cleanup_groups,
+    _create_groups,
+    _set_random_permissions,
+    initialize_env,
 )
-from dotenv import load_dotenv
 
 from uc_migration_toolkit.config import (
     AuthConfig,
@@ -28,81 +27,18 @@ from uc_migration_toolkit.config import (
 from uc_migration_toolkit.managers.inventory.types import RequestObjectType
 from uc_migration_toolkit.providers.client import ImprovedWorkspaceClient, provider
 from uc_migration_toolkit.providers.logger import logger
-from uc_migration_toolkit.utils import (
-    Request,
-    ThreadedExecution,
-    WorkspaceLevelEntitlement,
-)
-
-
-def initialize_env() -> None:
-    principal_env = Path(__file__).parent.parent.parent / ".env.principal"
-
-    if principal_env.exists():
-        logger.debug("Using credentials provided in .env.principal")
-        load_dotenv(dotenv_path=principal_env)
-    else:
-        logger.debug(f"No .env.principal found at {principal_env.absolute()}, using environment variables")
-
+from uc_migration_toolkit.utils import Request, ThreadedExecution
 
 initialize_env()
 
 NUM_TEST_GROUPS = os.environ.get("NUM_TEST_GROUPS", 5)
-
 NUM_TEST_INSTANCE_PROFILES = os.environ.get("NUM_TEST_INSTANCE_PROFILES", 3)
 NUM_TEST_CLUSTERS = os.environ.get("NUM_TEST_CLUSTERS", 3)
-
+NUM_TEST_INSTANCE_POOLS = os.environ.get("NUM_TEST_INSTANCE_POOLS", 3)
 NUM_THREADS = os.environ.get("NUM_TEST_THREADS", 20)
 DB_CONNECT_CLUSTER_NAME = os.environ.get("DB_CONNECT_CLUSTER_NAME", "ucx-integration-testing")
 UCX_TESTING_PREFIX = os.environ.get("UCX_TESTING_PREFIX", "ucx")
-
 Threader = partial(ThreadedExecution, num_threads=NUM_THREADS, rate_limit=RateLimitConfig())
-
-
-@dataclass
-class InstanceProfile:
-    instance_profile_arn: str
-    iam_role_arn: str
-
-
-@dataclass
-class EnvironmentInfo:
-    test_uid: str
-    groups: list[tuple[Group, Group]]
-
-
-def generate_group_by_id(
-    _ws: WorkspaceClient, _acc: AccountClient, group_name: str, users_sample: list[User]
-) -> tuple[Group, Group]:
-    entities = [ComplexValue(display=user.display_name, value=user.id) for user in users_sample]
-    logger.debug(f"Creating group with name {group_name}")
-
-    def get_random_entitlements():
-        chosen: list[WorkspaceLevelEntitlement] = random.choices(
-            list(WorkspaceLevelEntitlement),
-            k=random.randint(1, 3),
-        )
-        entitlements = [ComplexValue(display=None, primary=None, type=None, value=value) for value in chosen]
-        return entitlements
-
-    ws_group = _ws.groups.create(display_name=group_name, members=entities, entitlements=get_random_entitlements())
-    acc_group = _acc.groups.create(display_name=group_name, members=entities)
-    return ws_group, acc_group
-
-
-def _create_groups(_ws: ImprovedWorkspaceClient, _acc: AccountClient, prefix: str) -> list[tuple[Group, Group]]:
-    logger.debug("Listing users to create sample groups")
-    test_users = list(_ws.users.list(filter="displayName sw 'test-user-'", attributes="id, userName, displayName"))
-    logger.debug(f"Total of test users {len(test_users)}")
-    user_samples: dict[str, list[User]] = {
-        f"{prefix}-test-group-{gid}": random.choices(test_users, k=random.randint(1, 40))
-        for gid in range(NUM_TEST_GROUPS)
-    }
-    executables = [
-        partial(generate_group_by_id, _ws, _acc, group_name, users_sample)
-        for group_name, users_sample in user_samples.items()
-    ]
-    return Threader(executables).run()
 
 
 @pytest.fixture(scope="session")
@@ -165,23 +101,7 @@ def env(ws: ImprovedWorkspaceClient, acc: AccountClient, request: SubRequest) ->
     # prepare environment
     test_uid = f"{UCX_TESTING_PREFIX}_{str(uuid.uuid4())[:8]}"
     logger.debug(f"Creating environment with uid {test_uid}")
-    groups = _create_groups(ws, acc, test_uid)
-
-    def _cleanup_groups(_ws: WorkspaceClient, _acc: AccountClient, _groups: tuple[Group, Group]):
-        ws_g, acc_g = _groups
-        logger.debug(f"Deleting groups {ws_g.display_name} [ws-level] and {acc_g.display_name} [acc-level]")
-
-        try:
-            ws.groups.delete(ws_g.id)
-        except Exception as e:
-            logger.warning(f"Cannot delete ws-level group {ws_g.display_name}, skipping it. Original exception {e}")
-
-        try:
-            g = next(iter(acc.groups.list(filter=f"displayName eq '{acc_g.display_name}'")), None)
-            if g:
-                acc.groups.delete(g.id)
-        except Exception as e:
-            logger.warning(f"Cannot delete acc-level group {acc_g.display_name}, skipping it. Original exception {e}")
+    groups = _create_groups(ws, acc, test_uid, NUM_TEST_GROUPS, Threader)
 
     def post_cleanup():
         print("\n")
@@ -248,6 +168,31 @@ def instance_profiles(env: EnvironmentInfo, ws: ImprovedWorkspaceClient) -> list
 
 
 @pytest.fixture(scope="session", autouse=True)
+def instance_pools(env: EnvironmentInfo, ws: ImprovedWorkspaceClient) -> list[CreateInstancePoolResponse]:
+    logger.debug("Creating test instance pools")
+
+    test_instance_pools: list[CreateInstancePoolResponse] = [
+        ws.instance_pools.create(instance_pool_name=f"{env.test_uid}-test-{i}", node_type_id="i3.xlarge")
+        for i in range(NUM_TEST_INSTANCE_POOLS)
+    ]
+
+    _set_random_permissions(
+        test_instance_pools,
+        "instance_pool_id",
+        RequestObjectType.INSTANCE_POOLS,
+        env,
+        ws,
+        permission_levels=[PermissionLevel.CAN_ATTACH_TO, PermissionLevel.CAN_MANAGE],
+    )
+
+    yield test_instance_pools
+
+    logger.debug("Deleting test instance pools")
+    executables = [partial(ws.instance_pools.delete, p.instance_pool_id) for p in test_instance_pools]
+    Threader(executables).run()
+
+
+@pytest.fixture(scope="session", autouse=True)
 def clusters(env: EnvironmentInfo, ws: ImprovedWorkspaceClient) -> list[ClusterDetails]:
     logger.debug("Creating test clusters")
 
@@ -262,28 +207,14 @@ def clusters(env: EnvironmentInfo, ws: ImprovedWorkspaceClient) -> list[ClusterD
         for i in range(NUM_TEST_CLUSTERS)
     ]
 
-    for cluster in test_clusters:
-
-        def get_random_ws_group() -> Group:
-            return random.choice([g[0] for g in env.groups])
-
-        def get_random_permission_level() -> PermissionLevel:
-            return random.choice(
-                [PermissionLevel.CAN_MANAGE, PermissionLevel.CAN_RESTART, PermissionLevel.CAN_ATTACH_TO]
-            )
-
-        acl_req = [
-            AccessControlRequest(
-                group_name=get_random_ws_group().display_name, permission_level=get_random_permission_level()
-            )
-            for _ in range(3)
-        ]
-
-        ws.permissions.set(
-            request_object_type=RequestObjectType.CLUSTERS,
-            request_object_id=cluster.cluster_id,
-            access_control_list=acl_req,
-        )
+    _set_random_permissions(
+        test_clusters,
+        "cluster_id",
+        RequestObjectType.CLUSTERS,
+        env,
+        ws,
+        permission_levels=[PermissionLevel.CAN_ATTACH_TO, PermissionLevel.CAN_MANAGE, PermissionLevel.CAN_RESTART],
+    )
 
     yield test_clusters
 

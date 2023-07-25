@@ -40,6 +40,8 @@ class SqlRequestObjectType(StrEnum):
 
 class LogicalObjectType(StrEnum):
     CLUSTER = "CLUSTER"
+    INSTANCE_POOL = "INSTANCE_POOL"
+    CLUSTER_POLICY = "CLUSTER_POLICY"
 
     def __repr__(self):
         return self.value

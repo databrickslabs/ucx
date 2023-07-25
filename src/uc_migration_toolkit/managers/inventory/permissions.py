@@ -45,7 +45,13 @@ class PermissionManager:
                 request_object_type=RequestObjectType.CLUSTERS,
                 listing_function=provider.ws.clusters.list,
                 id_attribute="cluster_id",
-            )
+            ),
+            StandardInventorizer(
+                logical_object_type=LogicalObjectType.INSTANCE_POOL,
+                request_object_type=RequestObjectType.INSTANCE_POOLS,
+                listing_function=provider.ws.instance_pools.list,
+                id_attribute="instance_pool_id",
+            ),
         ]
 
     def inventorize_permissions(self):

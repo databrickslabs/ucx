@@ -49,14 +49,13 @@ To deliver this migration, the following steps are performed:
 Group-level:
 
 - [x] Entitlements (One of `workspace-access`, `databricks-sql-access`, `allow-cluster-create`, `allow-instance-pool-create`)
-- [x] Roles (AWS Only, represents Instance Profile Access)
+- [x] Roles (AWS Only, represents Instance Profile)
 
 Compute infrastructure:
 
 - [x] Clusters
-- [ ] Cluster policies
-- [ ] Pools
-- [ ] Instance Profile (for AWS)
+- [x] Cluster policies
+- [x] Pools
 
 Workflows:
 
