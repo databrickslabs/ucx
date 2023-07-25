@@ -7,7 +7,11 @@ from functools import partial
 import pytest
 from _pytest.fixtures import SubRequest
 from databricks.sdk import AccountClient
-from databricks.sdk.service.compute import ClusterDetails, CreateInstancePoolResponse
+from databricks.sdk.service.compute import (
+    ClusterDetails,
+    CreateInstancePoolResponse,
+    CreatePolicyResponse,
+)
 from databricks.sdk.service.iam import PermissionLevel
 from utils import (
     EnvironmentInfo,
@@ -35,6 +39,8 @@ NUM_TEST_GROUPS = os.environ.get("NUM_TEST_GROUPS", 5)
 NUM_TEST_INSTANCE_PROFILES = os.environ.get("NUM_TEST_INSTANCE_PROFILES", 3)
 NUM_TEST_CLUSTERS = os.environ.get("NUM_TEST_CLUSTERS", 3)
 NUM_TEST_INSTANCE_POOLS = os.environ.get("NUM_TEST_INSTANCE_POOLS", 3)
+NUM_TEST_CLUSTER_POLICIES = os.environ.get("NUM_TEST_CLUSTER_POLICIES", 3)
+
 NUM_THREADS = os.environ.get("NUM_TEST_THREADS", 20)
 DB_CONNECT_CLUSTER_NAME = os.environ.get("DB_CONNECT_CLUSTER_NAME", "ucx-integration-testing")
 UCX_TESTING_PREFIX = os.environ.get("UCX_TESTING_PREFIX", "ucx")
@@ -189,6 +195,41 @@ def instance_pools(env: EnvironmentInfo, ws: ImprovedWorkspaceClient) -> list[Cr
 
     logger.debug("Deleting test instance pools")
     executables = [partial(ws.instance_pools.delete, p.instance_pool_id) for p in test_instance_pools]
+    Threader(executables).run()
+
+
+@pytest.fixture(scope="session", autouse=True)
+def cluster_policies(env: EnvironmentInfo, ws: ImprovedWorkspaceClient) -> list[CreatePolicyResponse]:
+    logger.debug("Creating test cluster policies")
+
+    test_cluster_policies: list[CreatePolicyResponse] = [
+        ws.cluster_policies.create(
+            name=f"{env.test_uid}-test-{i}",
+            definition="""
+        {
+          "spark_version": {
+                "type": "unlimited",
+                "defaultValue": "auto:latest-lts"
+            }
+        }
+        """,
+        )
+        for i in range(NUM_TEST_CLUSTER_POLICIES)
+    ]
+
+    _set_random_permissions(
+        test_cluster_policies,
+        "policy_id",
+        RequestObjectType.CLUSTER_POLICIES,
+        env,
+        ws,
+        permission_levels=[PermissionLevel.CAN_USE],
+    )
+
+    yield test_cluster_policies
+
+    logger.debug("Deleting test instance pools")
+    executables = [partial(ws.cluster_policies.delete, p.policy_id) for p in test_cluster_policies]
     Threader(executables).run()
 
 

@@ -1,7 +1,11 @@
 from typing import Literal
 
 import pytest
-from databricks.sdk.service.compute import ClusterDetails, CreateInstancePoolResponse
+from databricks.sdk.service.compute import (
+    ClusterDetails,
+    CreateInstancePoolResponse,
+    CreatePolicyResponse,
+)
 from pyspark.errors import AnalysisException
 from utils import EnvironmentInfo
 
@@ -75,6 +79,7 @@ def test_e2e(
     ws: ImprovedWorkspaceClient,
     clusters: list[ClusterDetails],
     instance_pools: list[CreateInstancePoolResponse],
+    cluster_policies: list[CreatePolicyResponse],
 ):
     logger.debug(f"Test environment: {env.test_uid}")
 
@@ -118,6 +123,7 @@ def test_e2e(
     _verify_group_permissions(
         instance_pools, "instance_pool_id", RequestObjectType.INSTANCE_POOLS, ws, toolkit, "backup"
     )
+    _verify_group_permissions(cluster_policies, "policy_id", RequestObjectType.CLUSTER_POLICIES, ws, toolkit, "backup")
     toolkit.replace_workspace_groups_with_account_groups()
 
     new_groups = list(ws.groups.list(filter=f"displayName sw '{env.test_uid}'", attributes="displayName,meta"))
@@ -130,6 +136,7 @@ def test_e2e(
     _verify_group_permissions(
         instance_pools, "instance_pool_id", RequestObjectType.INSTANCE_POOLS, ws, toolkit, "account"
     )
+    _verify_group_permissions(cluster_policies, "policy_id", RequestObjectType.CLUSTER_POLICIES, ws, toolkit, "account")
     toolkit.delete_backup_groups()
 
     backup_groups = list(
