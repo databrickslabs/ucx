@@ -159,10 +159,12 @@ def env(ws: ImprovedWorkspaceClient, acc: AccountClient, request: SubRequest) ->
     def _cleanup_groups(_ws: WorkspaceClient, _acc: AccountClient, _groups: tuple[Group, Group]):
         ws_g, acc_g = _groups
         logger.info(f"Deleting groups {ws_g.display_name} [ws-level] and {acc_g.display_name} [acc-level]")
+
         try:
             ws.groups.delete(ws_g.id)
         except Exception as e:
             logger.warning(f"Cannot delete ws-level group, skipping it. Original exception {e}")
+
         try:
             g = next(iter(acc.groups.list(filter=f"displayName eq '{acc_g.display_name}'")), None)
             if g:

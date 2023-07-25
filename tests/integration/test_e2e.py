@@ -65,6 +65,23 @@ def test_e2e(
     logger.info("Permissions were inventorized properly")
 
     toolkit.apply_permissions_to_backup_groups()
+
+    logger.info("Verifying that the permissions were applied to backup groups")
+    for cluster in clusters:
+        cluster_permissions = ws.permissions.get(RequestObjectType.CLUSTERS, cluster.cluster_id)
+        for migration_info in toolkit.group_manager.migration_groups_provider.groups:
+            backup_permissions = [
+                p for p in cluster_permissions.access_control_list if p.group_name == migration_info.backup.display_name
+            ]
+            source_permissions = [
+                p
+                for p in cluster_permissions.access_control_list
+                if p.group_name == migration_info.workspace.display_name
+            ]
+            assert len(backup_permissions) == len(
+                source_permissions
+            ), f"Backup permissions were not applied correctly for cluster {cluster.cluster_id}"
+
     toolkit.replace_workspace_groups_with_account_groups()
     toolkit.apply_permissions_to_account_groups()
     toolkit.delete_backup_groups()
