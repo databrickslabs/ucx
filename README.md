@@ -28,18 +28,19 @@ During the UC adoption, it's critical to move the groups (group objects) from th
 
 To deliver this migration, the following steps are performed:
 
-- Local group objects are fetched from the workspace (or provided via configuration file)
-- Groups are verified against the account level (existence, etc.)
-- Workspace local group permissions are inventorized and saved into a Delta Table
-- Backup groups are created on the workspace level
-- Backup groups are entitled with permissions from the inventory table
-- Workspace-level groups are deleted
-- Account-level groups are created
-- Account-level groups are entitled with permissions from the inventory table
-- Backup groups are deleted
-- Inventory table is cleaned up
 
-## Permissions that we inventorize
+| Step description                                                                                                                                                                                                                                                                                       | Relevant API method                                      |
+|--------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|----------------------------------------------------------|
+| A set of groups to be migrated is identified (either via `groups.selected` config property, or automatically).<br/>Group existence is verified against the account level.<br/>**If there is no group on the account level, an error is thrown.**<br/>Backup groups are created on the workspace level. | `toolkit.prepare_groups_in_environment()`                |
+| Inventory table is cleaned up.                                                                                                                                                                                                                                                                         | `toolkit.cleanup_inventory_table()`                      |
+| Workspace local group permissions are inventorized and saved into a Delta Table.                                                                                                                                                                                                                       | `toolkit.inventorize_permissions()`                      |
+| Backup groups are entitled with permissions from the inventory table.                                                                                                                                                                                                                                  | `toolkit.apply_permissions_to_backup_groups()`           |
+| Workspace-level groups are deleted.  Account-level groups are granted with access to the workspace.<br/>Workspace-level entitlements are synced from backup groups to newly added account-level groups.                                                                                                | `toolkit.replace_workspace_groups_with_account_groups()` |
+| Account-level groups are entitled with workspace-level permissions from the inventory table.                                                                                                                                                                                                           | `toolkit.apply_permissions_to_account_groups()`          |
+| Backup groups are deleted                                                                                                                                                                                                                                                                              | `toolkit.delete_backup_groups()`                         |
+| Inventory table is cleaned up. This step is optional.                                                                                                                                                                                                                                                  | `toolkit.cleanup_inventory_table()`                      |
+
+## Permissions and entitlements that we inventorize
 
 Group-level:
 
@@ -115,7 +116,7 @@ hatch env create
 - Install dev dependencies:
 
 ```shell
-hatch run pip install -e '.[dev]'
+hatch run pip install -e '.[dbconnect]'
 ```
 
 - Pin your IDE to use the newly created virtual environment. You can get the python path with:
