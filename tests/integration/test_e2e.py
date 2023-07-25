@@ -1,3 +1,5 @@
+from typing import Literal
+
 import pytest
 from conftest import EnvironmentInfo
 from databricks.sdk.service.compute import ClusterDetails
@@ -13,6 +15,43 @@ from uc_migration_toolkit.managers.inventory.types import RequestObjectType
 from uc_migration_toolkit.providers.client import ImprovedWorkspaceClient
 from uc_migration_toolkit.providers.logger import logger
 from uc_migration_toolkit.toolkits.group_migration import GroupMigrationToolkit
+
+
+def _verify_group_permissions(
+    clusters: list[ClusterDetails],
+    ws: ImprovedWorkspaceClient,
+    toolkit: GroupMigrationToolkit,
+    target: Literal["backup", "account"],
+):
+    logger.info("Verifying that the permissions were applied to backup groups")
+    for cluster in clusters:
+        cluster_permissions = ws.permissions.get(RequestObjectType.CLUSTERS, cluster.cluster_id)
+        for migration_info in toolkit.group_manager.migration_groups_provider.groups:
+            target_permissions = sorted(
+                [
+                    p
+                    for p in cluster_permissions.access_control_list
+                    if p.group_name == getattr(migration_info, target).display_name
+                ],
+                key=lambda p: p.group_name,
+            )
+
+            source_permissions = sorted(
+                [
+                    p
+                    for p in cluster_permissions.access_control_list
+                    if p.group_name == migration_info.workspace.display_name
+                ],
+                key=lambda p: p.group_name,
+            )
+
+            assert len(target_permissions) == len(
+                source_permissions
+            ), f"Target permissions were not applied correctly for cluster {cluster.cluster_id}"
+
+            assert (
+                [t.all_permissions for t in target_permissions] == [s.all_permissions for s in source_permissions]
+            ), f"Target permissions were not applied correctly for cluster {cluster.cluster_id}"
 
 
 def test_e2e(
@@ -66,23 +105,23 @@ def test_e2e(
 
     toolkit.apply_permissions_to_backup_groups()
 
-    logger.info("Verifying that the permissions were applied to backup groups")
-    for cluster in clusters:
-        cluster_permissions = ws.permissions.get(RequestObjectType.CLUSTERS, cluster.cluster_id)
-        for migration_info in toolkit.group_manager.migration_groups_provider.groups:
-            backup_permissions = [
-                p for p in cluster_permissions.access_control_list if p.group_name == migration_info.backup.display_name
-            ]
-            source_permissions = [
-                p
-                for p in cluster_permissions.access_control_list
-                if p.group_name == migration_info.workspace.display_name
-            ]
-            assert len(backup_permissions) == len(
-                source_permissions
-            ), f"Backup permissions were not applied correctly for cluster {cluster.cluster_id}"
-
+    _verify_group_permissions(clusters, ws, toolkit, "backup")
     toolkit.replace_workspace_groups_with_account_groups()
+
+    new_groups = list(ws.groups.list(filter=f"displayName sw '{env.test_uid}'", attributes="displayName,meta"))
+    assert len(new_groups) == len(toolkit.group_manager.migration_groups_provider.groups)
+    assert all(g.meta.resource_type == "Group" for g in new_groups)
+
     toolkit.apply_permissions_to_account_groups()
+    _verify_group_permissions(clusters, ws, toolkit, "account")
+
     toolkit.delete_backup_groups()
+
+    backup_groups = list(
+        ws.groups.list(
+            filter=f"displayName sw '{config.groups.backup_group_prefix}{env.test_uid}'", attributes="displayName,meta"
+        )
+    )
+    assert len(backup_groups) == 0
+
     toolkit.cleanup_inventory_table()
