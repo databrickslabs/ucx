@@ -1,11 +1,6 @@
 from typing import Literal
 
 import pytest
-from databricks.sdk.service.compute import (
-    ClusterDetails,
-    CreateInstancePoolResponse,
-    CreatePolicyResponse,
-)
 from pyspark.errors import AnalysisException
 from utils import EnvironmentInfo
 
@@ -77,9 +72,7 @@ def test_e2e(
     env: EnvironmentInfo,
     inventory_table: InventoryTable,
     ws: ImprovedWorkspaceClient,
-    clusters: list[ClusterDetails],
-    instance_pools: list[CreateInstancePoolResponse],
-    cluster_policies: list[CreatePolicyResponse],
+    verifiable_objects: list[tuple[list, str, RequestObjectType]],
 ):
     logger.debug(f"Test environment: {env.test_uid}")
 
@@ -119,11 +112,9 @@ def test_e2e(
 
     toolkit.apply_permissions_to_backup_groups()
 
-    _verify_group_permissions(clusters, "cluster_id", RequestObjectType.CLUSTERS, ws, toolkit, "backup")
-    _verify_group_permissions(
-        instance_pools, "instance_pool_id", RequestObjectType.INSTANCE_POOLS, ws, toolkit, "backup"
-    )
-    _verify_group_permissions(cluster_policies, "policy_id", RequestObjectType.CLUSTER_POLICIES, ws, toolkit, "backup")
+    for _objects, id_attribute, request_object_type in verifiable_objects:
+        _verify_group_permissions(_objects, id_attribute, request_object_type, ws, toolkit, "backup")
+
     toolkit.replace_workspace_groups_with_account_groups()
 
     new_groups = list(ws.groups.list(filter=f"displayName sw '{env.test_uid}'", attributes="displayName,meta"))
@@ -132,11 +123,10 @@ def test_e2e(
     _verify_roles_and_entitlements(toolkit.group_manager.migration_groups_provider.groups, ws, "account")
 
     toolkit.apply_permissions_to_account_groups()
-    _verify_group_permissions(clusters, "cluster_id", RequestObjectType.CLUSTERS, ws, toolkit, "account")
-    _verify_group_permissions(
-        instance_pools, "instance_pool_id", RequestObjectType.INSTANCE_POOLS, ws, toolkit, "account"
-    )
-    _verify_group_permissions(cluster_policies, "policy_id", RequestObjectType.CLUSTER_POLICIES, ws, toolkit, "account")
+
+    for _objects, id_attribute, request_object_type in verifiable_objects:
+        _verify_group_permissions(_objects, id_attribute, request_object_type, ws, toolkit, "account")
+
     toolkit.delete_backup_groups()
 
     backup_groups = list(

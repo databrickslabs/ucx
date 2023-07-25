@@ -58,6 +58,12 @@ class PermissionManager:
                 listing_function=provider.ws.cluster_policies.list,
                 id_attribute="policy_id",
             ),
+            StandardInventorizer(
+                logical_object_type=LogicalObjectType.PIPELINE,
+                request_object_type=RequestObjectType.PIPELINES,
+                listing_function=provider.ws.pipelines.list_pipelines,
+                id_attribute="pipeline_id",
+            ),
         ]
 
     def inventorize_permissions(self):
@@ -81,7 +87,6 @@ class PermissionManager:
     ) -> PermissionRequestPayload:
         new_acls: list[AccessControlRequest] = []
 
-        logger.info("Attempting to build the new ACLs, verifying if there are any relevant groups")
         for acl in item.typed_object_permissions.access_control_list:
             if acl.group_name in [g.workspace.display_name for g in migration_groups_provider.groups]:
                 migration_info = migration_groups_provider.get_by_workspace_group_name(acl.group_name)
@@ -129,12 +134,17 @@ class PermissionManager:
         permissions_on_source = self.inventory_table_manager.load_for_groups(
             groups=[g.workspace for g in migration_groups_provider.groups]
         )
-        applicable_permissions = filter(
-            lambda item: item is not None,
-            [
-                self._prepare_new_permission_request(item, migration_groups_provider, destination=destination)
-                for item in permissions_on_source
-            ],
+        applicable_permissions = list(
+            filter(
+                lambda item: item is not None,
+                [
+                    self._prepare_new_permission_request(item, migration_groups_provider, destination=destination)
+                    for item in permissions_on_source
+                ],
+            )
         )
-        self._apply_permissions_in_parallel(requests=list(applicable_permissions))
+
+        logger.info(f"Applying {len(applicable_permissions)} permissions")
+
+        self._apply_permissions_in_parallel(requests=applicable_permissions)
         logger.info("All permissions were applied")

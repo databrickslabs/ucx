@@ -118,7 +118,7 @@ def _set_random_permissions(
             for _ in range(num_acls)
         ]
 
-        ws.permissions.set(
+        ws.permissions.update(
             request_object_type=request_object_type,
             request_object_id=getattr(_object, id_attribute),
             access_control_list=acl_req,
