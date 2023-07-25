@@ -11,10 +11,6 @@ class GroupMigrationToolkit:
         # please note the order of configs here
         config_provider.set_config(config)
         provider.set_ws_client(config.auth)
-
-        # please note the order of operations here
-        # the group manager IS INTENDED to change properties in the self.config object
-        # therefore it always should go first
         self.group_manager = GroupManager()
         self.table_manager = InventoryTableManager()
         self.permissions_manager = PermissionManager(self.table_manager)
