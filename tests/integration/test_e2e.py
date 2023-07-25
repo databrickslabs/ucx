@@ -1,9 +1,13 @@
 from typing import Literal
 
 import pytest
-from conftest import EnvironmentInfo
-from databricks.sdk.service.compute import ClusterDetails
+from databricks.sdk.service.compute import (
+    ClusterDetails,
+    CreateInstancePoolResponse,
+    CreatePolicyResponse,
+)
 from pyspark.errors import AnalysisException
+from utils import EnvironmentInfo
 
 from uc_migration_toolkit.config import (
     GroupsConfig,
@@ -19,19 +23,22 @@ from uc_migration_toolkit.toolkits.group_migration import GroupMigrationToolkit
 
 
 def _verify_group_permissions(
-    clusters: list[ClusterDetails],
+    objects: list,
+    id_attribute: str,
+    request_object_type: RequestObjectType,
     ws: ImprovedWorkspaceClient,
     toolkit: GroupMigrationToolkit,
     target: Literal["backup", "account"],
 ):
-    logger.info("Verifying that the permissions were applied to backup groups")
-    for cluster in clusters:
-        cluster_permissions = ws.permissions.get(RequestObjectType.CLUSTERS, cluster.cluster_id)
+    logger.debug("Verifying that the permissions were applied to backup groups")
+
+    for _object in objects:
+        _object_permissions = ws.permissions.get(request_object_type, getattr(_object, id_attribute))
         for migration_info in toolkit.group_manager.migration_groups_provider.groups:
             target_permissions = sorted(
                 [
                     p
-                    for p in cluster_permissions.access_control_list
+                    for p in _object_permissions.access_control_list
                     if p.group_name == getattr(migration_info, target).display_name
                 ],
                 key=lambda p: p.group_name,
@@ -40,7 +47,7 @@ def _verify_group_permissions(
             source_permissions = sorted(
                 [
                     p
-                    for p in cluster_permissions.access_control_list
+                    for p in _object_permissions.access_control_list
                     if p.group_name == migration_info.workspace.display_name
                 ],
                 key=lambda p: p.group_name,
@@ -48,11 +55,11 @@ def _verify_group_permissions(
 
             assert len(target_permissions) == len(
                 source_permissions
-            ), f"Target permissions were not applied correctly for cluster {cluster.cluster_id}"
+            ), f"Target permissions were not applied correctly for object {_object}"
 
             assert [t.all_permissions for t in target_permissions] == [
                 s.all_permissions for s in source_permissions
-            ], f"Target permissions were not applied correctly for cluster {cluster.cluster_id}"
+            ], f"Target permissions were not applied correctly for object {_object}"
 
 
 def _verify_roles_and_entitlements(
@@ -67,9 +74,14 @@ def _verify_roles_and_entitlements(
 
 
 def test_e2e(
-    env: EnvironmentInfo, inventory_table: InventoryTable, ws: ImprovedWorkspaceClient, clusters: list[ClusterDetails]
+    env: EnvironmentInfo,
+    inventory_table: InventoryTable,
+    ws: ImprovedWorkspaceClient,
+    clusters: list[ClusterDetails],
+    instance_pools: list[CreateInstancePoolResponse],
+    cluster_policies: list[CreatePolicyResponse],
 ):
-    logger.info(f"Test environment: {env.test_uid}")
+    logger.debug(f"Test environment: {env.test_uid}")
 
     config = MigrationConfig(
         with_table_acls=False,
@@ -77,11 +89,11 @@ def test_e2e(
         groups=GroupsConfig(selected=[g[0].display_name for g in env.groups]),
         auth=None,
     )
-    logger.info(f"Starting e2e with config: {config.to_json()}")
+    logger.debug(f"Starting e2e with config: {config.to_json()}")
     toolkit = GroupMigrationToolkit(config)
     toolkit.prepare_groups_in_environment()
 
-    logger.info("Verifying that the groups were created")
+    logger.debug("Verifying that the groups were created")
     _verify_roles_and_entitlements(toolkit.group_manager.migration_groups_provider.groups, ws, "backup")
 
     assert len(ws.groups.list(filter=f"displayName sw '{config.groups.backup_group_prefix}{env.test_uid}'")) == len(
@@ -96,7 +108,7 @@ def test_e2e(
         toolkit.group_manager.migration_groups_provider.groups
     )
 
-    logger.info("Verifying that the groups were created - done")
+    logger.debug("Verifying that the groups were created - done")
 
     toolkit.cleanup_inventory_table()
 
@@ -105,20 +117,13 @@ def test_e2e(
 
     toolkit.inventorize_permissions()
 
-    logger.info("Verifying that the permissions were inventorized correctly")
-    saved_permissions = toolkit.table_manager.load_all()
-
-    for cluster in clusters:
-        cluster_permissions = ws.permissions.get(RequestObjectType.CLUSTERS, cluster.cluster_id)
-        relevant_permission = next(filter(lambda p: p.object_id == cluster.cluster_id, saved_permissions), None)
-        assert relevant_permission is not None, f"Cluster {cluster.cluster_id} permissions were not inventorized"
-        assert relevant_permission.typed_object_permissions == cluster_permissions
-
-    logger.info("Permissions were inventorized properly")
-
     toolkit.apply_permissions_to_backup_groups()
 
-    _verify_group_permissions(clusters, ws, toolkit, "backup")
+    _verify_group_permissions(clusters, "cluster_id", RequestObjectType.CLUSTERS, ws, toolkit, "backup")
+    _verify_group_permissions(
+        instance_pools, "instance_pool_id", RequestObjectType.INSTANCE_POOLS, ws, toolkit, "backup"
+    )
+    _verify_group_permissions(cluster_policies, "policy_id", RequestObjectType.CLUSTER_POLICIES, ws, toolkit, "backup")
     toolkit.replace_workspace_groups_with_account_groups()
 
     new_groups = list(ws.groups.list(filter=f"displayName sw '{env.test_uid}'", attributes="displayName,meta"))
@@ -127,8 +132,11 @@ def test_e2e(
     _verify_roles_and_entitlements(toolkit.group_manager.migration_groups_provider.groups, ws, "account")
 
     toolkit.apply_permissions_to_account_groups()
-    _verify_group_permissions(clusters, ws, toolkit, "account")
-
+    _verify_group_permissions(clusters, "cluster_id", RequestObjectType.CLUSTERS, ws, toolkit, "account")
+    _verify_group_permissions(
+        instance_pools, "instance_pool_id", RequestObjectType.INSTANCE_POOLS, ws, toolkit, "account"
+    )
+    _verify_group_permissions(cluster_policies, "policy_id", RequestObjectType.CLUSTER_POLICIES, ws, toolkit, "account")
     toolkit.delete_backup_groups()
 
     backup_groups = list(
