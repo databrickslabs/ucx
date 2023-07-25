@@ -1,0 +1,14 @@
+inventory:
+  table:
+    catalog: main
+    database: default
+    name: uc_migration_inventory
+
+
+with_table_acls: False
+
+groups:
+  selected: [ "analyst" ]
+
+num_threads: 80
+
