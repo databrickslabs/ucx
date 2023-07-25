@@ -196,6 +196,7 @@ def env(ws: ImprovedWorkspaceClient, acc: AccountClient, request: SubRequest) ->
 
         all_cleanups = cleanups + temp_cleanups + new_ws_groups_cleanups
         Threader(all_cleanups).run()
+        logger.info(f"Finished cleanup for the environment {test_uid}")
 
     request.addfinalizer(post_cleanup)
     yield EnvironmentInfo(test_uid=test_uid, groups=groups)

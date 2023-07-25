@@ -67,4 +67,5 @@ def test_e2e(
     toolkit.apply_permissions_to_backup_groups()
     toolkit.replace_workspace_groups_with_account_groups()
     toolkit.apply_permissions_to_account_groups()
-    # toolkit.delete_backup_groups()
+    toolkit.delete_backup_groups()
+    toolkit.cleanup_inventory_table()
