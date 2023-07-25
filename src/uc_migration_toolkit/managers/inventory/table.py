@@ -92,9 +92,13 @@ class InventoryTableManager(SparkMixin):
 
     def load_all(self) -> list[PermissionsInventoryItem]:
         logger.info(f"Loading inventory table {self.config.table}")
-        df = self._table.toPandas()
+        df = (
+            self._table.withColumn("plain_permissions", F.to_json("object_permissions"))
+            .drop("object_permissions")
+            .toPandas()
+        )
         logger.info("Successfully loaded the inventory table")
-        return [PermissionsInventoryItem(**item) for item in df.to_dict(orient="records")]
+        return PermissionsInventoryItem.from_pandas(df)
 
     def load_for_groups(self, groups: list[Group]) -> list[PermissionsInventoryItem]:
         logger.info(f"Scanning inventory table {self.config.table} for {len(groups)} groups")

@@ -1,9 +1,10 @@
 from dataclasses import dataclass
 from functools import partial
+from typing import Literal
 
-from databricks.sdk.service.iam import AccessControlRequest
+from databricks.sdk.service.iam import AccessControlRequest, Group
 
-from uc_migration_toolkit.managers.group import GroupPairs
+from uc_migration_toolkit.managers.group import MigrationGroupsProvider
 from uc_migration_toolkit.managers.inventory.inventorizer import StandardInventorizer
 from uc_migration_toolkit.managers.inventory.table import InventoryTableManager
 from uc_migration_toolkit.managers.inventory.types import (
@@ -61,29 +62,25 @@ class PermissionManager:
         logger.info("Permissions were inventorized and saved")
 
     @staticmethod
-    def get_destination_by_source(source_name: str, pairs: GroupPairs) -> str | None:
-        return next((p.destination.display_name for p in pairs if p.source.display_name == source_name), None)
-
-    def prepare_new_permission_request(
-        self, item: PermissionsInventoryItem, pairs: GroupPairs
+    def _prepare_new_permission_request(
+        item: PermissionsInventoryItem,
+        migration_groups_provider: MigrationGroupsProvider,
+        destination: Literal["backup", "account"],
     ) -> PermissionRequestPayload:
         new_acls: list[AccessControlRequest] = []
 
         logger.info("Attempting to build the new ACLs, verifying if there are any relevant groups")
         for acl in item.typed_object_permissions.access_control_list:
-            if acl.group_name in [p.source.display_name for p in pairs]:
-                destination = self.get_destination_by_source(acl.group_name, pairs)
-                if not destination:
-                    msg = f"Destination group for {acl.group_name} was not found"
-                    raise RuntimeError(msg)
-
-                logger.info(f"Found permissions relevant for group {acl.group_name} (target group: {destination})")
+            if acl.group_name in [g.workspace.display_name for g in migration_groups_provider.groups]:
+                migration_info = migration_groups_provider.get_by_workspace_group_name(acl.group_name)
+                assert migration_info is not None, f"Group {acl.group_name} is not in the migration groups provider"
+                destination_group: Group = getattr(migration_info, destination)
                 for permission in acl.all_permissions:
                     if permission.inherited:
                         continue
                     new_acls.append(
                         AccessControlRequest(
-                            group_name=destination,
+                            group_name=destination_group.display_name,
                             permission_level=permission.permission_level,
                         )
                     )
@@ -98,8 +95,7 @@ class PermissionManager:
             )
 
     @staticmethod
-    def apply_permissions_in_parallel(requests: list[PermissionRequestPayload]):
-        logger.info("Applying the permissions in parallel")
+    def _apply_permissions_in_parallel(requests: list[PermissionRequestPayload]):
         executables = [
             partial(
                 provider.ws.permissions.update,
@@ -111,18 +107,22 @@ class PermissionManager:
         ]
         execution = ThreadedExecution[None](executables)
         execution.run()
-        logger.info("All permissions were applied")
 
-    def apply_backup_group_permissions(self, pairs: GroupPairs):
-        logger.info("Applying the permissions to the backup groups")
-        permissions_on_source = self.inventory_table_manager.load_for_groups(groups=[p.source for p in pairs])
+    def apply_group_permissions(
+        self, migration_groups_provider: MigrationGroupsProvider, destination: Literal["backup", "account"]
+    ):
+        logger.info(f"Applying the permissions to {destination} groups")
+        logger.info(f"Total groups to apply permissions: {len(migration_groups_provider.groups)}")
+
+        permissions_on_source = self.inventory_table_manager.load_for_groups(
+            groups=[g.workspace for g in migration_groups_provider.groups]
+        )
         applicable_permissions = filter(
             lambda item: item is not None,
-            [self.prepare_new_permission_request(item, pairs) for item in permissions_on_source],
+            [
+                self._prepare_new_permission_request(item, migration_groups_provider, destination=destination)
+                for item in permissions_on_source
+            ],
         )
-        self.apply_permissions_in_parallel(requests=list(applicable_permissions))
-        logger.info("Permissions were applied")
-
-    def apply_account_group_permissions(self):
-        logger.info("Applying workspace-level permissions to the account-level groups")
-        logger.info("Permissions were successfully applied to the account-level groups")
+        self._apply_permissions_in_parallel(requests=list(applicable_permissions))
+        logger.info("All permissions were applied")

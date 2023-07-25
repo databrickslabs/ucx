@@ -19,40 +19,16 @@ class ImprovedWorkspaceClient(WorkspaceClient):
         self.api_client.do("put", request_string, data=json.dumps({"permissions": permissions}))
 
     def list_account_level_groups(
-        self, query_filter: str, attributes: list[str] | None = None, excluded_attributes: list[str] | None = None
+        self, filter: str, attributes: str | None = None, excluded_attributes: str | None = None  # noqa: A002
     ) -> list[Group]:
-        query = {
-            "filter": f"{query_filter}",
-            "attributes": ",".join(attributes) if attributes else None,
-            "excludedAttributes": ",".join(excluded_attributes) if excluded_attributes else None,
-        }
+        query = {"filter": filter, "attributes": attributes, "excludedAttributes": excluded_attributes}
         response = self.api_client.do("get", "/api/2.0/account/scim/v2/Groups", query=query)
         return [Group.from_dict(v) for v in response.get("Resources", [])]
 
-    def reflect_account_group_to_workspace(self, account_group_name: str) -> Group:
-        logger.info(f"Reflecting account group {account_group_name} to workspace")
-
-        potentially_exists = list(
-            self.groups.list(filter=f"displayName eq '{account_group_name}'", attributes="id,meta,displayName")
-        )
-        assert len(potentially_exists) <= 1, f"Group {account_group_name} is not unique"
-
-        if potentially_exists:
-            logger.info(f"Group {account_group_name} already exists on the workspace level, verifying its type")
-            assert (
-                potentially_exists[0].meta.resource_type != "WorkspaceGroup"
-            ), "Group is an existing workspace-level group"
-            logger.info("Group is an existing account-level group, skipping its creation")
-            return potentially_exists[0]
-
-        found_group = self.list_account_level_groups(
-            query_filter=f"displayName eq '{account_group_name}'", attributes=["id", "displayName"]
-        )
-        assert found_group, f"Group {account_group_name} doesn't exist on the account level"
-
-        self.assign_permissions(principal_id=found_group[0].id, permissions=["USER"])
-        logger.info(f"Group {account_group_name} successfully reflected to workspace")
-        return found_group[0]
+    def reflect_account_group_to_workspace(self, acc_group: Group) -> None:
+        logger.info(f"Reflecting group {acc_group.display_name} to workspace")
+        self.assign_permissions(principal_id=acc_group.id, permissions=["USER"])
+        logger.info(f"Group {acc_group.display_name} successfully reflected to workspace")
 
 
 class ClientProvider:

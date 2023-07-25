@@ -19,8 +19,8 @@ class GroupMigrationToolkit:
         self.table_manager = InventoryTableManager()
         self.permissions_manager = PermissionManager(self.table_manager)
 
-    def validate_groups(self):
-        self.group_manager.validate_groups()
+    def prepare_groups_in_environment(self):
+        self.group_manager.prepare_groups_in_environment()
 
     def cleanup_inventory_table(self):
         self.table_manager.cleanup()
@@ -28,17 +28,18 @@ class GroupMigrationToolkit:
     def inventorize_permissions(self):
         self.permissions_manager.inventorize_permissions()
 
-    def create_or_update_backup_groups(self):
-        self.group_manager.create_or_update_backup_groups()
-
-    def apply_backup_group_permissions(self):
-        self.permissions_manager.apply_backup_group_permissions(self.group_manager.group_pairs)
+    def apply_permissions_to_backup_groups(self):
+        self.permissions_manager.apply_group_permissions(
+            self.group_manager.migration_groups_provider, destination="backup"
+        )
 
     def replace_workspace_groups_with_account_groups(self):
         self.group_manager.replace_workspace_groups_with_account_groups()
 
-    def apply_account_group_permissions(self):
-        self.permissions_manager.apply_account_group_permissions()
+    def apply_permissions_to_account_groups(self):
+        self.permissions_manager.apply_group_permissions(
+            self.group_manager.migration_groups_provider, destination="account"
+        )
 
     def delete_backup_groups(self):
         self.group_manager.delete_backup_groups()

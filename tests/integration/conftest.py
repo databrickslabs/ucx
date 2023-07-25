@@ -49,6 +49,7 @@ initialize_env()
 NUM_TEST_GROUPS = os.environ.get("NUM_TEST_GROUPS", 5)
 NUM_THREADS = os.environ.get("NUM_TEST_THREADS", 20)
 DB_CONNECT_CLUSTER_NAME = os.environ.get("DB_CONNECT_CLUSTER_NAME", "ucx-integration-testing")
+UCX_TESTING_PREFIX = os.environ.get("UCX_TESTING_PREFIX", "ucx")
 
 Threader = partial(ThreadedExecution, num_threads=NUM_THREADS, rate_limit=RateLimitConfig())
 
@@ -151,7 +152,7 @@ class EnvironmentInfo:
 @pytest.fixture(scope="session", autouse=True)
 def env(ws: ImprovedWorkspaceClient, acc: AccountClient, request: SubRequest) -> EnvironmentInfo:
     # prepare environment
-    test_uid = str(uuid.uuid4())[:8]
+    test_uid = f"{UCX_TESTING_PREFIX}_{str(uuid.uuid4())[:8]}"
     logger.info(f"Creating environment with uid {test_uid}")
     groups = _create_groups(ws, acc, test_uid)
 
@@ -163,7 +164,9 @@ def env(ws: ImprovedWorkspaceClient, acc: AccountClient, request: SubRequest) ->
         except Exception as e:
             logger.warning(f"Cannot delete ws-level group, skipping it. Original exception {e}")
         try:
-            acc.groups.delete(acc_g.id)
+            g = next(iter(acc.groups.list(filter=f"displayName eq '{acc_g.display_name}'")), None)
+            if g:
+                acc.groups.delete(g.id)
         except Exception as e:
             logger.warning(f"Cannot delete acc-level group, skipping it. Original exception {e}")
 
@@ -172,11 +175,23 @@ def env(ws: ImprovedWorkspaceClient, acc: AccountClient, request: SubRequest) ->
         logger.info("Cleaning up the environment")
         logger.info("Deleting test groups")
         cleanups = [partial(_cleanup_groups, ws, acc, g) for g in groups]
+
+        def error_silencer(func):
+            def _wrapped(*args, **kwargs):
+                try:
+                    func(*args, **kwargs)
+                except Exception as e:
+                    logger.warning(f"Cannot delete temp group, skipping it. Original exception {e}")
+
+            return _wrapped
+
+        silent_delete = error_silencer(ws.groups.delete)
+
         temp_cleanups = [
-            partial(ws.groups.delete, g.id) for g in ws.groups.list(filter=f"displayName sw 'db-temp-{test_uid}'")
+            partial(silent_delete, g.id) for g in ws.groups.list(filter=f"displayName sw 'db-temp-{test_uid}'")
         ]
         new_ws_groups_cleanups = [
-            partial(ws.groups.delete, g.id) for g in ws.groups.list(filter=f"displayName sw '{test_uid}'")
+            partial(silent_delete, g.id) for g in ws.groups.list(filter=f"displayName sw '{test_uid}'")
         ]
 
         all_cleanups = cleanups + temp_cleanups + new_ws_groups_cleanups
@@ -243,5 +258,8 @@ def inventory_table(env: EnvironmentInfo) -> InventoryTable:
     yield table
 
     logger.info(f"Cleaning up inventory table {table}")
-    provider.ws.tables.delete(table.to_spark(), if_exists=True)
-    logger.info(f"Inventory table {table} deleted")
+    try:
+        provider.ws.tables.delete(table.to_spark())
+        logger.info(f"Inventory table {table} deleted")
+    except Exception as e:
+        logger.warning(f"Cannot delete inventory table, skipping it. Original exception {e}")
