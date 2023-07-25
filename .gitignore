@@ -93,8 +93,9 @@ celerybeat.pid
 *.sage.py
 
 # Environments
-.env
+.env.admin
 .venv
+.env.*
 env/
 venv/
 ENV/
@@ -135,3 +136,6 @@ cython_debug/
 # ruff
 .ruff_cache
 /scratch
+
+# dev files and scratches
+dev/cleanup.py

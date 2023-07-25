@@ -29,18 +29,20 @@ class SparkMixin:
                 msg = "DATABRICKS_CLUSTER_ID environment variable is not set, cannot use DB Connect"
                 raise RuntimeError(msg)
             cluster_id = os.environ["DATABRICKS_CLUSTER_ID"]
-            logger.info(f"Using cluster {cluster_id}")
             cluster_info = provider.ws.clusters.get(cluster_id)
 
-            if not cluster_info.state == State.RUNNING:
+            logger.info(f"Using cluster {cluster_id} with name {cluster_info.cluster_name}")
+
+            if cluster_info.state not in [State.RUNNING, State.PENDING, State.RESTARTING]:
                 logger.info("Cluster is not running, starting it")
                 provider.ws.clusters.start(cluster_id)
                 time.sleep(2)
 
-            logger.info("Waiting for the cluster to be ready")
-            provider.ws.clusters.wait_get_cluster_running(os.environ["DATABRICKS_CLUSTER_ID"])
+            logger.info("Waiting for the cluster to get running")
+            provider.ws.clusters.wait_get_cluster_running(cluster_id)
             logger.info("Cluster is ready, creating the DBConnect session")
-            spark = DatabricksSession.builder.getOrCreate()
+            provider.ws.config.cluster_id = cluster_id
+            spark = DatabricksSession.builder.sdkConfig(provider.ws.config).getOrCreate()
             return spark
 
     @property

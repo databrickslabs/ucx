@@ -99,7 +99,7 @@ class InventoryTableManager(SparkMixin):
     def load_for_groups(self, groups: list[Group]) -> list[PermissionsInventoryItem]:
         logger.info(f"Scanning inventory table {self.config.table} for {len(groups)} groups")
         group_names = [g.display_name for g in groups]
-        group_names_sql_argument = ".".join([f'"{name}"' for name in group_names])
+        group_names_sql_argument = ",".join([f'"{name}"' for name in group_names])
         df = (
             self._table.where(
                 f"""

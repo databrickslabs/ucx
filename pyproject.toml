@@ -29,6 +29,7 @@ dependencies = [
     "PyYAML>=6.0.0,<7.0.0",
     "ratelimit>=2.2.1,<3.0.0",
     "pandas>=2.0.3,<3.0.0",
+    "python-dotenv>=1.0.0,<=2.0.0"
 ]
 
 [project.optional-dependencies]
@@ -103,11 +104,13 @@ skip_glob = [
 profile = "black"
 
 [tool.pytest.ini_options]
+addopts = "-s -p no:warnings"
+log_cli = true
 filterwarnings = [
     "ignore:::.*pyspark.broadcast*",
     "ignore:::.*pyspark.sql.pandas.utils*"
 ]
-log_cli = true
+
 
 [tool.black]
 target-version = ["py310"]
@@ -154,6 +157,8 @@ ignore = [
     "T201",
     # Allow asserts
     "S101",
+    # Allow standard random generators
+    "S311",
     # Ignore complexity
     "C901", "PLR0911", "PLR0912", "PLR0913", "PLR0915",
 ]

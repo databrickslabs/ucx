@@ -10,7 +10,7 @@ class GroupMigrationToolkit:
     def __init__(self, config: MigrationConfig):
         # please note the order of configs here
         config_provider.set_config(config)
-        provider.set_ws_client()
+        provider.set_ws_client(config.auth)
 
         # please note the order of operations here
         # the group manager IS INTENDED to change properties in the self.config object

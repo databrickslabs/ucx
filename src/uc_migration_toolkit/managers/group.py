@@ -1,11 +1,13 @@
 import typing
 from dataclasses import dataclass
+from functools import partial
 
 from databricks.sdk.service.iam import Group
 
 from uc_migration_toolkit.providers.client import provider
 from uc_migration_toolkit.providers.config import provider as config_provider
 from uc_migration_toolkit.providers.logger import logger
+from uc_migration_toolkit.utils import ThreadedExecution
 
 
 @dataclass
@@ -66,7 +68,7 @@ class GroupManager:
         return " and ".join([f'displayName ne "{group}"' for group in self.SYSTEM_GROUPS])
 
     def _get_ws_group(
-            self, group_name, attributes: list[str] | None = None, excluded_attributes: list[str] | None = None
+        self, group_name, attributes: list[str] | None = None, excluded_attributes: list[str] | None = None
     ) -> Group | None:
         filter_string = f'displayName eq "{group_name}" and ' + self._display_name_filter
         groups = list(
@@ -103,7 +105,7 @@ class GroupManager:
         logger.info("Creating or updating the backup groups")
         logger.info(f"In total, {len(self.config.selected)} group(s) to be created or updated")
 
-        for group_name in self.config.selected:
+        def _create_or_update_backup_group(group_name: str) -> GroupPair:
             backup_group_name = f"{self.config.backup_group_prefix}{group_name}"
             logger.info(f"Preparing backup group for {group_name} -> {backup_group_name}")
             group = self._get_ws_group(group_name, excluded_attributes=["id", "externalId"])
@@ -126,7 +128,10 @@ class GroupManager:
                 backup_group = provider.ws.groups.create(request=group_object)
                 logger.info(f"Backup group {backup_group_name} successfully created")
 
-            self._group_pairs.append(GroupPair(source=group, destination=backup_group))
+            return GroupPair(source=group, destination=backup_group)
+
+        executables = [partial(_create_or_update_backup_group, group_name) for group_name in self.config.selected]
+        self._group_pairs = ThreadedExecution[GroupPair](executables).run()
 
         logger.info("Backup groups were successfully created or updated")
 
@@ -168,8 +173,44 @@ class GroupManager:
     def replace_workspace_groups_with_account_groups(self):
         logger.info("Replacing the workspace groups with account-level groups")
         logger.info(f"In total, {len(self.config.selected)} group(s) to be replaced")
+
+        def replace_group(group_name: str):
+            ws_group = self._get_ws_group(group_name)
+
+            if ws_group:
+                logger.info(f"Deleting the workspace-level group {ws_group.display_name} with id {ws_group.id}")
+                provider.ws.groups.delete(ws_group.id)
+                logger.info(f"Workspace-level group {ws_group.display_name} with id {ws_group.id} was deleted")
+            else:
+                logger.warning(f"Workspace-level group {group_name} does not exist, skipping")
+
+            group_info = provider.ws.reflect_account_group_to_workspace(group_name)
+            backup_group_name = f"{self.config.backup_group_prefix}{group_name}"
+            logger.info(f"Updating group roles and entitlements from backup group {backup_group_name} to {group_name}")
+            backup_group = self._get_ws_group(backup_group_name)
+            new_group_object = Group.from_dict(
+                self._get_clean_group_info(backup_group, cleanup_keys=["id", "externalId", "displayName", "meta"])
+            )
+            new_group_object.id = group_info.id
+            new_group_object.display_name = group_name
+            provider.ws.groups.update(id=new_group_object.id, request=new_group_object)
+
+        executables = [partial(replace_group, group_name) for group_name in self.config.selected]
+        ThreadedExecution(executables).run()
         logger.info("Workspace groups were successfully replaced with account-level groups")
 
     def delete_backup_groups(self):
         logger.info("Deleting the workspace-level backup groups")
+        logger.info(f"In total, {len(self.config.selected)} group(s) to be deleted")
+        for group_name in self.config.selected:
+            temp_group_name = f"{self.config.backup_group_prefix}{group_name}"
+            logger.info(f"Deleting backup group {temp_group_name}")
+            group = self._get_ws_group(temp_group_name, attributes=["id", "displayName"])
+
+            if not group:
+                logger.info(f"Group {temp_group_name} does not exist, skipping")
+                continue
+
+            provider.ws.groups.delete(id=group.id)
+
         logger.info("Backup groups were successfully deleted")

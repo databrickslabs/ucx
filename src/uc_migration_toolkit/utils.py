@@ -1,11 +1,13 @@
 import concurrent
 import datetime as dt
+import enum
 from collections.abc import Callable
 from concurrent.futures import ALL_COMPLETED, ThreadPoolExecutor
 from typing import Generic, TypeVar
 
 from ratelimit import limits, sleep_and_retry
 
+from uc_migration_toolkit.config import RateLimitConfig
 from uc_migration_toolkit.providers.config import provider as config_provider
 from uc_migration_toolkit.providers.logger import logger
 
@@ -33,7 +35,15 @@ class ProgressReporter:
 
 
 class ThreadedExecution(Generic[ExecutableResult]):
-    def __init__(self, executables: list[ExecutableFunction], done_callback: Callable[..., None] | None = None):
+    def __init__(
+        self,
+        executables: list[ExecutableFunction],
+        num_threads: int | None = None,
+        rate_limit: RateLimitConfig | None = None,
+        done_callback: Callable[..., None] | None = None,
+    ):
+        self._num_threads = num_threads if num_threads else config_provider.config.num_threads
+        self._rate_limit = rate_limit if rate_limit else config_provider.config.rate_limit
         self._executables = executables
         self._futures = []
         self._done_callback = (
@@ -49,14 +59,11 @@ class ThreadedExecution(Generic[ExecutableResult]):
         logger.info("Starting threaded execution")
 
         @sleep_and_retry
-        @limits(
-            calls=config_provider.config.rate_limit.max_requests_per_period,
-            period=config_provider.config.rate_limit.period_in_seconds,
-        )
+        @limits(calls=self._rate_limit.max_requests_per_period, period=self._rate_limit.period_in_seconds)
         def rate_limited_wrapper(func: ExecutableFunction) -> ExecutableResult:
             return func()
 
-        with ThreadPoolExecutor(config_provider.config.num_threads) as executor:
+        with ThreadPoolExecutor(self._num_threads) as executor:
             for executable in self._executables:
                 future = executor.submit(rate_limited_wrapper, executable)
                 if self._done_callback:
@@ -68,3 +75,32 @@ class ThreadedExecution(Generic[ExecutableResult]):
         logger.info("Collecting the results from threaded execution")
         collected = [future.result() for future in results.done]
         return collected
+
+
+class Request:
+    def __init__(self, req: dict):
+        self.request = req
+
+    def as_dict(self) -> dict:
+        return self.request
+
+
+class StrEnum(str, enum.Enum):  # re-exported for compatability with older python versions
+    def __new__(cls, value, *args, **kwargs):
+        if not isinstance(value, str | enum.auto):
+            msg = f"Values of StrEnums must be strings: {value!r} is a {type(value)}"
+            raise TypeError(msg)
+        return super().__new__(cls, value, *args, **kwargs)
+
+    def __str__(self):
+        return str(self.value)
+
+    def _generate_next_value_(name, *_):  # noqa: N805
+        return name
+
+
+class WorkspaceLevelEntitlement(StrEnum):
+    WORKSPACE_ACCESS = "workspace-access"
+    DATABRICKS_SQL_ACCESS = "databricks-sql-access"
+    ALLOW_CLUSTER_CREATE = "allow-cluster-create"
+    ALLOW_INSTANCE_POOL_CREATE = "allow-instance-pool-create"

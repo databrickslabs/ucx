@@ -20,6 +20,7 @@ Recommended VM types are:
 - GCP: `c2-standard-16`
 
 **For now please switch to the `v0.0.1` tag in the GitHub to get the latest working version.**
+**All instructions below are currently in WIP mode.**
 
 ## Group migration
 
@@ -42,8 +43,8 @@ To deliver this migration, the following steps are performed:
 
 Group-level:
 
-- [ ] Entitlements
-- [ ] Roles
+- [ ] Entitlements (One of `workspace-access`, `databricks-sql-access`, `allow-cluster-create`, `allow-instance-pool-create`)
+- [ ] Roles (on AWS - access to Instance Profiles)
 
 Compute infrastructure:
 

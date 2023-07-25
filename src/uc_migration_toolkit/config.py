@@ -1,4 +1,4 @@
-from pydantic import Field
+from pydantic import Field, RootModel
 from pydantic.dataclasses import dataclass
 
 
@@ -32,8 +32,10 @@ class GroupsConfig:
 
 @dataclass
 class WorkspaceAuthConfig:
-    token: str | None
-    host: str | None
+    token: str | None = None
+    host: str | None = None
+    client_id: str | None = None
+    client_secret: str | None = None
 
 
 @dataclass
@@ -68,3 +70,6 @@ class MigrationConfig:
         if self.with_table_acls:
             msg = "Table ACLS are not yet implemented"
             raise NotImplementedError(msg)
+
+    def to_json(self) -> str:
+        return RootModel[MigrationConfig](self).model_dump_json(indent=4)

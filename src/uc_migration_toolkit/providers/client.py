@@ -1,20 +1,66 @@
+import json
 from dataclasses import asdict
 
 import requests
 from databricks.sdk import WorkspaceClient
+from databricks.sdk.service.iam import Group
 from requests.adapters import HTTPAdapter
 from urllib3 import Retry
 
+from uc_migration_toolkit.config import AuthConfig
 from uc_migration_toolkit.providers.config import provider as config_provider
 from uc_migration_toolkit.providers.logger import logger
 
 
+class ImprovedWorkspaceClient(WorkspaceClient):
+    def assign_permissions(self, principal_id: str, permissions: list[str]):
+        request_string = f"/api/2.0/preview/permissionassignments/principals/{principal_id}"
+
+        self.api_client.do("put", request_string, data=json.dumps({"permissions": permissions}))
+
+    def list_account_level_groups(
+        self, query_filter: str, attributes: list[str] | None = None, excluded_attributes: list[str] | None = None
+    ) -> list[Group]:
+        query = {
+            "filter": f"{query_filter}",
+            "attributes": ",".join(attributes) if attributes else None,
+            "excludedAttributes": ",".join(excluded_attributes) if excluded_attributes else None,
+        }
+        response = self.api_client.do("get", "/api/2.0/account/scim/v2/Groups", query=query)
+        return [Group.from_dict(v) for v in response.get("Resources", [])]
+
+    def reflect_account_group_to_workspace(self, account_group_name: str) -> Group:
+        logger.info(f"Reflecting account group {account_group_name} to workspace")
+
+        potentially_exists = list(
+            self.groups.list(filter=f"displayName eq '{account_group_name}'", attributes="id,meta,displayName")
+        )
+        assert len(potentially_exists) <= 1, f"Group {account_group_name} is not unique"
+
+        if potentially_exists:
+            logger.info(f"Group {account_group_name} already exists on the workspace level, verifying its type")
+            assert (
+                potentially_exists[0].meta.resource_type != "WorkspaceGroup"
+            ), "Group is an existing workspace-level group"
+            logger.info("Group is an existing account-level group, skipping its creation")
+            return potentially_exists[0]
+
+        found_group = self.list_account_level_groups(
+            query_filter=f"displayName eq '{account_group_name}'", attributes=["id", "displayName"]
+        )
+        assert found_group, f"Group {account_group_name} doesn't exist on the account level"
+
+        self.assign_permissions(principal_id=found_group[0].id, permissions=["USER"])
+        logger.info(f"Group {account_group_name} successfully reflected to workspace")
+        return found_group[0]
+
+
 class ClientProvider:
     def __init__(self):
-        self._ws_client = None
+        self._ws_client: ImprovedWorkspaceClient | None = None
 
     @staticmethod
-    def _verify_ws_client(w: WorkspaceClient):
+    def _verify_ws_client(w: ImprovedWorkspaceClient):
         assert w.current_user.me(), "Cannot authenticate with the workspace client"
         _me = w.current_user.me()
         is_workspace_admin = any(g.display == "admins" for g in _me.groups)
@@ -41,8 +87,8 @@ class ClientProvider:
         )
         return retry_strategy
 
-    def _adjust_session(self, client: WorkspaceClient):
-        pool_size = config_provider.config.num_threads
+    def _adjust_session(self, client: ImprovedWorkspaceClient, pool_size: int | None = None):
+        pool_size = pool_size if pool_size else config_provider.config.num_threads
         logger.debug(f"Adjusting the session to fully utilize {pool_size} threads")
         _existing_session = client.api_client._session
         _session = requests.Session()
@@ -51,22 +97,25 @@ class ClientProvider:
         client.api_client._session = _session
         logger.debug("Session adjusted")
 
-    def set_ws_client(self):
-        auth_config = config_provider.config.auth
+    def set_ws_client(self, auth_config: AuthConfig | None = None, pool_size: int | None = None):
+        if self._ws_client:
+            logger.warning("Workspace client already initialized, skipping")
+            return
+
         logger.info("Initializing the workspace client")
         if auth_config and auth_config.workspace:
             logger.info("Using the provided workspace client credentials")
-            _client = WorkspaceClient(**asdict(auth_config.workspace))
+            _client = ImprovedWorkspaceClient(**asdict(auth_config.workspace))
         else:
             logger.info("Trying standard workspace auth mechanisms")
-            _client = WorkspaceClient()
+            _client = ImprovedWorkspaceClient()
 
         self._verify_ws_client(_client)
-        self._adjust_session(_client)
+        self._adjust_session(_client, pool_size)
         self._ws_client = _client
 
     @property
-    def ws(self) -> WorkspaceClient:
+    def ws(self) -> ImprovedWorkspaceClient:
         assert self._ws_client, "Workspace client not initialized"
         return self._ws_client
 
