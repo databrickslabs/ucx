@@ -1,3 +1,4 @@
+import json
 import os
 import random
 import uuid
@@ -38,15 +39,19 @@ def initialize_env() -> None:
     principal_env = Path(__file__).parent.parent.parent / ".env.principal"
 
     if principal_env.exists():
-        logger.info("Using credentials provided in .env.principal")
+        logger.debug("Using credentials provided in .env.principal")
         load_dotenv(dotenv_path=principal_env)
     else:
-        logger.info(f"No .env.principal found at {principal_env.absolute()}, using environment variables")
+        logger.debug(f"No .env.principal found at {principal_env.absolute()}, using environment variables")
 
 
 initialize_env()
 
 NUM_TEST_GROUPS = os.environ.get("NUM_TEST_GROUPS", 5)
+
+NUM_TEST_INSTANCE_PROFILES = os.environ.get("NUM_TEST_INSTANCE_PROFILES", 3)
+NUM_TEST_CLUSTERS = os.environ.get("NUM_TEST_CLUSTERS", 3)
+
 NUM_THREADS = os.environ.get("NUM_TEST_THREADS", 20)
 DB_CONNECT_CLUSTER_NAME = os.environ.get("DB_CONNECT_CLUSTER_NAME", "ucx-integration-testing")
 UCX_TESTING_PREFIX = os.environ.get("UCX_TESTING_PREFIX", "ucx")
@@ -54,11 +59,23 @@ UCX_TESTING_PREFIX = os.environ.get("UCX_TESTING_PREFIX", "ucx")
 Threader = partial(ThreadedExecution, num_threads=NUM_THREADS, rate_limit=RateLimitConfig())
 
 
+@dataclass
+class InstanceProfile:
+    instance_profile_arn: str
+    iam_role_arn: str
+
+
+@dataclass
+class EnvironmentInfo:
+    test_uid: str
+    groups: list[tuple[Group, Group]]
+
+
 def generate_group_by_id(
     _ws: WorkspaceClient, _acc: AccountClient, group_name: str, users_sample: list[User]
 ) -> tuple[Group, Group]:
     entities = [ComplexValue(display=user.display_name, value=user.id) for user in users_sample]
-    logger.info(f"Creating group with name {group_name}")
+    logger.debug(f"Creating group with name {group_name}")
 
     def get_random_entitlements():
         chosen: list[WorkspaceLevelEntitlement] = random.choices(
@@ -74,9 +91,9 @@ def generate_group_by_id(
 
 
 def _create_groups(_ws: ImprovedWorkspaceClient, _acc: AccountClient, prefix: str) -> list[tuple[Group, Group]]:
-    logger.info("Listing users to create sample groups")
+    logger.debug("Listing users to create sample groups")
     test_users = list(_ws.users.list(filter="displayName sw 'test-user-'", attributes="id, userName, displayName"))
-    logger.info(f"Total of test users {len(test_users)}")
+    logger.debug(f"Total of test users {len(test_users)}")
     user_samples: dict[str, list[User]] = {
         f"{prefix}-test-group-{gid}": random.choices(test_users, k=random.randint(1, 40))
         for gid in range(NUM_TEST_GROUPS)
@@ -117,9 +134,9 @@ def dbconnect(ws: ImprovedWorkspaceClient):
     dbc_cluster = next(filter(lambda c: c.cluster_name == DB_CONNECT_CLUSTER_NAME, ws.clusters.list()), None)
 
     if dbc_cluster:
-        logger.info(f"Integration testing cluster {DB_CONNECT_CLUSTER_NAME} already exists, skipping it's creation")
+        logger.debug(f"Integration testing cluster {DB_CONNECT_CLUSTER_NAME} already exists, skipping it's creation")
     else:
-        logger.info("Creating a cluster for integration testing")
+        logger.debug("Creating a cluster for integration testing")
         request = {
             "cluster_name": DB_CONNECT_CLUSTER_NAME,
             "spark_version": "13.2.x-scala2.12",
@@ -137,45 +154,39 @@ def dbconnect(ws: ImprovedWorkspaceClient):
 
         dbc_cluster = ws.clusters.create(spark_version="13.2.x-scala2.12", request=Request(request))
 
-        logger.info(f"Cluster {dbc_cluster.cluster_id} created")
+        logger.debug(f"Cluster {dbc_cluster.cluster_id} created")
 
     os.environ["DATABRICKS_CLUSTER_ID"] = dbc_cluster.cluster_id
     yield
-
-
-@dataclass
-class EnvironmentInfo:
-    test_uid: str
-    groups: list[tuple[Group, Group]]
 
 
 @pytest.fixture(scope="session", autouse=True)
 def env(ws: ImprovedWorkspaceClient, acc: AccountClient, request: SubRequest) -> EnvironmentInfo:
     # prepare environment
     test_uid = f"{UCX_TESTING_PREFIX}_{str(uuid.uuid4())[:8]}"
-    logger.info(f"Creating environment with uid {test_uid}")
+    logger.debug(f"Creating environment with uid {test_uid}")
     groups = _create_groups(ws, acc, test_uid)
 
     def _cleanup_groups(_ws: WorkspaceClient, _acc: AccountClient, _groups: tuple[Group, Group]):
         ws_g, acc_g = _groups
-        logger.info(f"Deleting groups {ws_g.display_name} [ws-level] and {acc_g.display_name} [acc-level]")
+        logger.debug(f"Deleting groups {ws_g.display_name} [ws-level] and {acc_g.display_name} [acc-level]")
 
         try:
             ws.groups.delete(ws_g.id)
         except Exception as e:
-            logger.warning(f"Cannot delete ws-level group, skipping it. Original exception {e}")
+            logger.warning(f"Cannot delete ws-level group {ws_g.display_name}, skipping it. Original exception {e}")
 
         try:
             g = next(iter(acc.groups.list(filter=f"displayName eq '{acc_g.display_name}'")), None)
             if g:
                 acc.groups.delete(g.id)
         except Exception as e:
-            logger.warning(f"Cannot delete acc-level group, skipping it. Original exception {e}")
+            logger.warning(f"Cannot delete acc-level group {acc_g.display_name}, skipping it. Original exception {e}")
 
     def post_cleanup():
         print("\n")
-        logger.info("Cleaning up the environment")
-        logger.info("Deleting test groups")
+        logger.debug("Cleaning up the environment")
+        logger.debug("Deleting test groups")
         cleanups = [partial(_cleanup_groups, ws, acc, g) for g in groups]
 
         def error_silencer(func):
@@ -198,15 +209,47 @@ def env(ws: ImprovedWorkspaceClient, acc: AccountClient, request: SubRequest) ->
 
         all_cleanups = cleanups + temp_cleanups + new_ws_groups_cleanups
         Threader(all_cleanups).run()
-        logger.info(f"Finished cleanup for the environment {test_uid}")
+        logger.debug(f"Finished cleanup for the environment {test_uid}")
 
     request.addfinalizer(post_cleanup)
     yield EnvironmentInfo(test_uid=test_uid, groups=groups)
 
 
 @pytest.fixture(scope="session", autouse=True)
+def instance_profiles(env: EnvironmentInfo, ws: ImprovedWorkspaceClient) -> list[InstanceProfile]:
+    logger.debug("Adding test instance profiles")
+    profiles: list[InstanceProfile] = []
+
+    for i in range(NUM_TEST_INSTANCE_PROFILES):
+        profile_arn = f"arn:aws:iam::123456789:instance-profile/{env.test_uid}-test-{i}"
+        iam_role_arn = f"arn:aws:iam::123456789:role/{env.test_uid}-test-{i}"
+        ws.instance_profiles.add(instance_profile_arn=profile_arn, iam_role_arn=iam_role_arn, skip_validation=True)
+        profiles.append(InstanceProfile(instance_profile_arn=profile_arn, iam_role_arn=iam_role_arn))
+
+    for ws_group, _ in env.groups:
+        roles = {
+            "schemas": ["urn:ietf:params:scim:api:messages:2.0:PatchOp"],
+            "Operations": [
+                {
+                    "op": "add",
+                    "path": "roles",
+                    "value": [{"value": p.instance_profile_arn} for p in random.choices(profiles, k=2)],
+                }
+            ],
+        }
+        provider.ws.api_client.do("PATCH", f"/api/2.0/preview/scim/v2/Groups/{ws_group.id}", data=json.dumps(roles))
+
+    yield profiles
+
+    logger.debug("Deleting test instance profiles")
+    for profile in profiles:
+        ws.instance_profiles.remove(profile.instance_profile_arn)
+    logger.debug("Test instance profiles deleted")
+
+
+@pytest.fixture(scope="session", autouse=True)
 def clusters(env: EnvironmentInfo, ws: ImprovedWorkspaceClient) -> list[ClusterDetails]:
-    logger.info("Creating test clusters")
+    logger.debug("Creating test clusters")
 
     test_clusters = [
         ws.clusters.create(
@@ -216,7 +259,7 @@ def clusters(env: EnvironmentInfo, ws: ImprovedWorkspaceClient) -> list[ClusterD
             cluster_name=f"{env.test_uid}-test-{i}",
             num_workers=1,
         )
-        for i in range(3)
+        for i in range(NUM_TEST_CLUSTERS)
     ]
 
     for cluster in test_clusters:
@@ -244,10 +287,10 @@ def clusters(env: EnvironmentInfo, ws: ImprovedWorkspaceClient) -> list[ClusterD
 
     yield test_clusters
 
-    logger.info("Deleting test clusters")
+    logger.debug("Deleting test clusters")
     executables = [partial(ws.clusters.permanent_delete, c.cluster_id) for c in test_clusters]
     Threader(executables).run()
-    logger.info("Test clusters deleted")
+    logger.debug("Test clusters deleted")
 
 
 @pytest.fixture()
@@ -260,9 +303,9 @@ def inventory_table(env: EnvironmentInfo) -> InventoryTable:
 
     yield table
 
-    logger.info(f"Cleaning up inventory table {table}")
+    logger.debug(f"Cleaning up inventory table {table}")
     try:
         provider.ws.tables.delete(table.to_spark())
-        logger.info(f"Inventory table {table} deleted")
+        logger.debug(f"Inventory table {table} deleted")
     except Exception as e:
         logger.warning(f"Cannot delete inventory table, skipping it. Original exception {e}")

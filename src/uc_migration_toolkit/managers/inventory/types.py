@@ -10,7 +10,7 @@ from uc_migration_toolkit.utils import StrEnum
 class RequestObjectType(StrEnum):
     AUTHORIZATION = "authorization"  # tokens and passwords are here too!
     CLUSTERS = "clusters"
-    CLUSTER_POLICIES = "CLUSTER-policies"
+    CLUSTER_POLICIES = "cluster-policies"
     DIRECTORIES = "directories"
     EXPERIMENTS = "experiments"
     FILES = "files"

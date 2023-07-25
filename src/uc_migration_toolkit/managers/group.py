@@ -78,7 +78,7 @@ class GroupManager:
     def _get_group(group_name, level: GroupLevel) -> Group | None:
         method = provider.ws.groups.list if level == GroupLevel.WORKSPACE else provider.ws.list_account_level_groups
         query_filter = f"displayName eq '{group_name}'"
-        attributes = ",".join(["id", "displayName", "meta", "entitlements"])
+        attributes = ",".join(["id", "displayName", "meta", "entitlements", "roles"])
 
         group = next(
             iter(method(filter=query_filter, attributes=attributes)),
@@ -93,18 +93,16 @@ class GroupManager:
 
         if backup_group:
             logger.info(f"Backup group {backup_group_name} already exists, updating it")
-            provider.ws.groups.update(
-                backup_group.id, request=Group.from_dict(self._get_clean_group_info(source_group))
-            )
-            logger.info(f"Backup group {backup_group_name} successfully updated")
-            return backup_group
         else:
             logger.info(f"Creating backup group {backup_group_name}")
             new_group_payload = self._get_clean_group_info(source_group)
             new_group_payload["displayName"] = backup_group_name
             backup_group = provider.ws.groups.create(request=Group.from_dict(new_group_payload))
             logger.info(f"Backup group {backup_group_name} successfully created")
-            return backup_group
+
+        self._apply_roles_and_entitlements(source_group, backup_group)
+
+        return backup_group
 
     def _set_migration_groups(self, groups_names: list[str]):
         def get_group_info(name: str):
@@ -140,25 +138,41 @@ class GroupManager:
         logger.info("Updating group-level entitlements for account-level group from backup group")
 
         # tbd: raise this as an issue for SDK team
-
-        if backup_group.entitlements:
-            entitlements = {
-                "schemas": ["urn:ietf:params:scim:api:messages:2.0:PatchOp"],
-                "Operations": [
-                    {
-                        "op": "add",
-                        "path": "entitlements",
-                        "value": [{"value": e.value} for e in backup_group.entitlements],
-                    }
-                ],
-            }
-            provider.ws.api_client.do(
-                "PATCH", f"/api/2.0/preview/scim/v2/Groups/{acc_group.id}", data=json.dumps(entitlements)
-            )
-        else:
-            logger.info(f"No entitlements to update from backup group {backup_group.display_name}")
-
+        self._apply_roles_and_entitlements(backup_group, acc_group)
         logger.info("Updated group-level entitlements and roles for account-level group from backup group")
+
+    @staticmethod
+    def _apply_roles_and_entitlements(source: Group, destination: Group):
+        op_schema = "urn:ietf:params:scim:api:messages:2.0:PatchOp"
+        schemas = [op_schema, op_schema]
+        entitlements = (
+            {
+                "op": "add",
+                "path": "entitlements",
+                "value": [{"value": e.value} for e in source.entitlements],
+            }
+            if source.entitlements
+            else {}
+        )
+
+        roles = (
+            {
+                "op": "add",
+                "path": "roles",
+                "value": [{"value": r.value} for r in source.roles],
+            }
+            if source.roles
+            else {}
+        )
+
+        operations = [entitlements, roles]
+        request = {
+            "schemas": schemas,
+            "Operations": operations,
+        }
+        provider.ws.api_client.do(
+            "PATCH", f"/api/2.0/preview/scim/v2/Groups/{destination.id}", data=json.dumps(request)
+        )
 
     # please keep the public methods below this line
 

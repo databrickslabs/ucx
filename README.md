@@ -49,9 +49,7 @@ To deliver this migration, the following steps are performed:
 Group-level:
 
 - [x] Entitlements (One of `workspace-access`, `databricks-sql-access`, `allow-cluster-create`, `allow-instance-pool-create`)
-
-> Please note that we don't need to copy group-level `roles` property, since it's only responsible for Instance Profiles on AWS.
-> We cover instance profiles as a part of the general migration pattern.
+- [x] Roles (AWS Only, represents Instance Profile Access)
 
 Compute infrastructure:
 

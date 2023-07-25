@@ -11,6 +11,7 @@ from uc_migration_toolkit.config import (
     InventoryTable,
     MigrationConfig,
 )
+from uc_migration_toolkit.managers.group import MigrationGroupInfo
 from uc_migration_toolkit.managers.inventory.types import RequestObjectType
 from uc_migration_toolkit.providers.client import ImprovedWorkspaceClient
 from uc_migration_toolkit.providers.logger import logger
@@ -54,6 +55,17 @@ def _verify_group_permissions(
             ], f"Target permissions were not applied correctly for cluster {cluster.cluster_id}"
 
 
+def _verify_roles_and_entitlements(
+    groups: list[MigrationGroupInfo], ws: ImprovedWorkspaceClient, target: Literal["backup", "account"]
+):
+    for migration_info in groups:
+        workspace_group = migration_info.workspace
+        target_group = ws.groups.get(getattr(migration_info, target).id)
+
+        assert workspace_group.roles == target_group.roles
+        assert workspace_group.entitlements == target_group.entitlements
+
+
 def test_e2e(
     env: EnvironmentInfo, inventory_table: InventoryTable, ws: ImprovedWorkspaceClient, clusters: list[ClusterDetails]
 ):
@@ -70,6 +82,7 @@ def test_e2e(
     toolkit.prepare_groups_in_environment()
 
     logger.info("Verifying that the groups were created")
+    _verify_roles_and_entitlements(toolkit.group_manager.migration_groups_provider.groups, ws, "backup")
 
     assert len(ws.groups.list(filter=f"displayName sw '{config.groups.backup_group_prefix}{env.test_uid}'")) == len(
         toolkit.group_manager.migration_groups_provider.groups
@@ -111,6 +124,7 @@ def test_e2e(
     new_groups = list(ws.groups.list(filter=f"displayName sw '{env.test_uid}'", attributes="displayName,meta"))
     assert len(new_groups) == len(toolkit.group_manager.migration_groups_provider.groups)
     assert all(g.meta.resource_type == "Group" for g in new_groups)
+    _verify_roles_and_entitlements(toolkit.group_manager.migration_groups_provider.groups, ws, "account")
 
     toolkit.apply_permissions_to_account_groups()
     _verify_group_permissions(clusters, ws, toolkit, "account")

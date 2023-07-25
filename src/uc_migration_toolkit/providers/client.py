@@ -46,20 +46,14 @@ class ClientProvider:
 
     @staticmethod
     def __get_retry_strategy():
-        # Since urllib3 v1.26.0, Retry.DEFAULT_METHOD_WHITELIST is deprecated in favor of
-        # Retry.DEFAULT_ALLOWED_METHODS. We need to support both versions.
-        if "DEFAULT_ALLOWED_METHODS" in dir(Retry):
-            retry_kwargs = {"allowed_methods": {"POST"} | set(Retry.DEFAULT_ALLOWED_METHODS)}
-        else:
-            retry_kwargs = {'method_whitelist': {"POST"} | set(Retry.DEFAULT_METHOD_WHITELIST)}  # noqa
-
         retry_strategy = Retry(
-            total=6,
-            backoff_factor=1,
+            total=10,
+            backoff_factor=0.5,
             status_forcelist=[429],
             respect_retry_after_header=True,
             raise_on_status=False,  # return original response when retries have been exhausted
-            **retry_kwargs,
+            # adjusted from the default values
+            allowed_methods=["HEAD", "GET", "PUT", "DELETE", "OPTIONS", "TRACE", "PATCH", "POST"],
         )
         return retry_strategy
 
