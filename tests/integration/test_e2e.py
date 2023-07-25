@@ -49,9 +49,9 @@ def _verify_group_permissions(
                 source_permissions
             ), f"Target permissions were not applied correctly for cluster {cluster.cluster_id}"
 
-            assert (
-                [t.all_permissions for t in target_permissions] == [s.all_permissions for s in source_permissions]
-            ), f"Target permissions were not applied correctly for cluster {cluster.cluster_id}"
+            assert [t.all_permissions for t in target_permissions] == [
+                s.all_permissions for s in source_permissions
+            ], f"Target permissions were not applied correctly for cluster {cluster.cluster_id}"
 
 
 def test_e2e(
