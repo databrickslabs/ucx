@@ -5,6 +5,7 @@ This repo contains various functions and utilities for UC Upgrade.
 ## Latest working version and how-to
 
 Please note that current project statis is 🏗️ **WIP**, but we have a minimal set of already working utilities.
+
 To run the notebooks please use latest LTS Databricks Runtime (non-ML), without Photon, in a single-user cluster mode.
 
 > If you have Table ACL Clusters or SQL Warehouse where ACL have been defined, you should create a TableACL cluster to
@@ -24,7 +25,7 @@ Recommended VM types are:
 
 ## Group migration
 
-During the UC adoption, it's critical to move the groups (group objects) from the workspace to account level.
+During the UC adoption, it's critical to move the groups from the workspace to account level.
 
 To deliver this migration, the following steps are performed:
 
@@ -41,6 +42,9 @@ To deliver this migration, the following steps are performed:
 | Inventory table is cleaned up. This step is optional.                                                                                                                                                                                                                                                  | `toolkit.cleanup_inventory_table()`                      |
 
 ## Permissions and entitlements that we inventorize
+
+> Please note that inherited permissions will not be inventorized / migrated.
+> We only cover direct permissions.
 
 Group-level:
 
