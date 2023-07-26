@@ -20,7 +20,8 @@ Recommended VM types are:
 - AWS: `c4.4xlarge`
 - GCP: `c2-standard-16`
 
-**For now please switch to the `v0.0.1` tag in the GitHub to get the latest working version.**
+**For now please switch to the `v0.0.2` tag in the GitHub to get the latest working version.**
+
 **All instructions below are currently in WIP mode.**
 
 ## Group migration
@@ -56,6 +57,7 @@ Compute infrastructure:
 - [x] Clusters
 - [x] Cluster policies
 - [x] Pools
+- [x] Databricks SQL warehouses
 
 Workflows:
 
@@ -69,7 +71,6 @@ ML:
 
 SQL:
 
-- [ ] Databricks SQL warehouses
 - [ ] Dashboard
 - [ ] Queries
 - [ ] Alerts

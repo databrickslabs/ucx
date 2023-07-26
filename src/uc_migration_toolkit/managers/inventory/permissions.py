@@ -83,6 +83,12 @@ class PermissionManager:
                 listing_function=CustomListing.list_models,
                 id_attribute="id",
             ),
+            StandardInventorizer(
+                logical_object_type=LogicalObjectType.WAREHOUSE,
+                request_object_type=RequestObjectType.SQL_WAREHOUSES,
+                listing_function=provider.ws.warehouses.list,
+                id_attribute="id",
+            ),
         ]
 
     def inventorize_permissions(self):
