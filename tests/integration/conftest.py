@@ -13,6 +13,7 @@ from databricks.sdk.service.compute import (
     CreatePolicyResponse,
 )
 from databricks.sdk.service.iam import PermissionLevel
+from databricks.sdk.service.jobs import CreateResponse
 from databricks.sdk.service.pipelines import (
     CreatePipelineResponse,
     NotebookLibrary,
@@ -23,6 +24,8 @@ from utils import (
     InstanceProfile,
     _cleanup_groups,
     _create_groups,
+    _get_basic_job_cluster,
+    _get_basic_task,
     _set_random_permissions,
     initialize_env,
 )
@@ -46,6 +49,7 @@ NUM_TEST_CLUSTERS = os.environ.get("NUM_TEST_CLUSTERS", 3)
 NUM_TEST_INSTANCE_POOLS = os.environ.get("NUM_TEST_INSTANCE_POOLS", 3)
 NUM_TEST_CLUSTER_POLICIES = os.environ.get("NUM_TEST_CLUSTER_POLICIES", 3)
 NUM_TEST_PIPELINES = os.environ.get("NUM_TEST_PIPELINES", 3)
+NUM_TEST_JOBS = os.environ.get("NUM_TEST_JOBS", 3)
 
 NUM_THREADS = os.environ.get("NUM_TEST_THREADS", 20)
 DB_CONNECT_CLUSTER_NAME = os.environ.get("DB_CONNECT_CLUSTER_NAME", "ucx-integration-testing")
@@ -235,6 +239,33 @@ def pipelines(env: EnvironmentInfo, ws: ImprovedWorkspaceClient) -> list[CreateP
 
 
 @pytest.fixture(scope="session", autouse=True)
+def jobs(env: EnvironmentInfo, ws: ImprovedWorkspaceClient) -> list[CreateResponse]:
+    logger.debug("Creating test jobs")
+
+    test_jobs: list[CreateResponse] = [
+        ws.jobs.create(
+            name=f"{env.test_uid}-test-{i}", job_clusters=[_get_basic_job_cluster()], tasks=[_get_basic_task()]
+        )
+        for i in range(NUM_TEST_JOBS)
+    ]
+
+    _set_random_permissions(
+        test_jobs,
+        "job_id",
+        RequestObjectType.JOBS,
+        env,
+        ws,
+        permission_levels=[PermissionLevel.CAN_VIEW, PermissionLevel.CAN_MANAGE_RUN, PermissionLevel.CAN_MANAGE],
+    )
+
+    yield test_jobs
+
+    logger.debug("Deleting test jobs")
+    executables = [partial(ws.jobs.delete, j.job_id) for j in test_jobs]
+    Threader(executables).run()
+
+
+@pytest.fixture(scope="session", autouse=True)
 def cluster_policies(env: EnvironmentInfo, ws: ImprovedWorkspaceClient) -> list[CreatePolicyResponse]:
     logger.debug("Creating test cluster policies")
 
@@ -302,12 +333,15 @@ def clusters(env: EnvironmentInfo, ws: ImprovedWorkspaceClient) -> list[ClusterD
 
 
 @pytest.fixture(scope="session", autouse=True)
-def verifiable_objects(clusters, instance_pools, cluster_policies, pipelines) -> tuple[list, str, RequestObjectType]:
+def verifiable_objects(
+    clusters, instance_pools, cluster_policies, pipelines, jobs
+) -> tuple[list, str, RequestObjectType]:
     _verifiable_objects = [
         (clusters, "cluster_id", RequestObjectType.CLUSTERS),
         (instance_pools, "instance_pool_id", RequestObjectType.INSTANCE_POOLS),
         (cluster_policies, "policy_id", RequestObjectType.CLUSTER_POLICIES),
         (pipelines, "pipeline_id", RequestObjectType.PIPELINES),
+        (jobs, "job_id", RequestObjectType.JOBS),
     ]
     yield _verifiable_objects
 

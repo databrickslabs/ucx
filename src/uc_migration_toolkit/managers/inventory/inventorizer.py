@@ -52,7 +52,7 @@ class StandardInventorizer(Generic[InventoryObject]):
             self._request_object_type, _object.__getattribute__(self._id_attribute)
         )
         inventory_item = PermissionsInventoryItem(
-            object_id=_object.__getattribute__(self._id_attribute),
+            object_id=str(_object.__getattribute__(self._id_attribute)),
             logical_object_type=self._logical_object_type,
             request_object_type=self._request_object_type,
             object_permissions=permissions.as_dict(),

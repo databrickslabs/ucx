@@ -64,6 +64,12 @@ class PermissionManager:
                 listing_function=provider.ws.pipelines.list_pipelines,
                 id_attribute="pipeline_id",
             ),
+            StandardInventorizer(
+                logical_object_type=LogicalObjectType.JOB,
+                request_object_type=RequestObjectType.JOBS,
+                listing_function=provider.ws.jobs.list,
+                id_attribute="job_id",
+            ),
         ]
 
     def inventorize_permissions(self):
