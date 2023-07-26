@@ -22,6 +22,10 @@ from databricks.sdk.service.pipelines import (
     NotebookLibrary,
     PipelineLibrary,
 )
+from databricks.sdk.service.sql import (
+    CreateWarehouseRequestWarehouseType,
+    GetWarehouseResponse,
+)
 from utils import (
     EnvironmentInfo,
     InstanceProfile,
@@ -55,6 +59,7 @@ NUM_TEST_PIPELINES = os.environ.get("NUM_TEST_PIPELINES", 3)
 NUM_TEST_JOBS = os.environ.get("NUM_TEST_JOBS", 3)
 NUM_TEST_EXPERIMENTS = os.environ.get("NUM_TEST_EXPERIMENTS", 3)
 NUM_TEST_MODELS = os.environ.get("NUM_TEST_MODELS", 3)
+NUM_TEST_WAREHOUSES = os.environ.get("NUM_TEST_WAREHOUSES", 3)
 
 NUM_THREADS = os.environ.get("NUM_TEST_THREADS", 20)
 DB_CONNECT_CLUSTER_NAME = os.environ.get("DB_CONNECT_CLUSTER_NAME", "ucx-integration-testing")
@@ -402,8 +407,40 @@ def models(ws: ImprovedWorkspaceClient, env: EnvironmentInfo) -> list[ModelDatab
 
 
 @pytest.fixture(scope="session", autouse=True)
+def warehouses(ws: ImprovedWorkspaceClient, env: EnvironmentInfo) -> list[GetWarehouseResponse]:
+    logger.debug("Creating warehouses")
+
+    test_warehouses: list[GetWarehouseResponse] = [
+        ws.warehouses.create(
+            name=f"{env.test_uid}-test-{i}",
+            cluster_size="2X-Small",
+            warehouse_type=CreateWarehouseRequestWarehouseType.PRO,
+            max_num_clusters=1,
+            enable_serverless_compute=False,
+        )
+        for i in range(NUM_TEST_WAREHOUSES)
+    ]
+
+    _set_random_permissions(
+        test_warehouses,
+        "id",
+        RequestObjectType.SQL_WAREHOUSES,
+        env,
+        ws,
+        permission_levels=[PermissionLevel.CAN_USE, PermissionLevel.CAN_MANAGE],
+    )
+
+    yield test_warehouses
+
+    logger.debug("Deleting test warehouses")
+    executables = [partial(provider.ws.warehouses.delete, w.id) for w in test_warehouses]
+    Threader(executables).run()
+    logger.debug("Test warehouses deleted")
+
+
+@pytest.fixture(scope="session", autouse=True)
 def verifiable_objects(
-    clusters, instance_pools, cluster_policies, pipelines, jobs, experiments, models
+    clusters, instance_pools, cluster_policies, pipelines, jobs, experiments, models, warehouses
 ) -> tuple[list, str, RequestObjectType]:
     _verifiable_objects = [
         (clusters, "cluster_id", RequestObjectType.CLUSTERS),
@@ -413,6 +450,7 @@ def verifiable_objects(
         (jobs, "job_id", RequestObjectType.JOBS),
         (experiments, "experiment_id", RequestObjectType.EXPERIMENTS),
         (models, "id", RequestObjectType.REGISTERED_MODELS),
+        (warehouses, "id", RequestObjectType.SQL_WAREHOUSES),
     ]
     yield _verifiable_objects
 

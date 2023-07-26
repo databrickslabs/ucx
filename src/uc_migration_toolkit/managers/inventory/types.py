@@ -21,7 +21,7 @@ class RequestObjectType(StrEnum):
     REGISTERED_MODELS = "registered-models"
     REPOS = "repos"
     SERVING_ENDPOINTS = "serving-endpoints"
-    SQL_WAREHOUSES = "sql/warehouses"
+    SQL_WAREHOUSES = "sql/warehouses"  # / is not a typo, it's the real object type
     TOKENS = "tokens"
 
     def __repr__(self):
