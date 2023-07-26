@@ -104,7 +104,7 @@ skip_glob = [
 profile = "black"
 
 [tool.pytest.ini_options]
-addopts = "-s -p no:warnings"
+addopts = "-s -p no:warnings -vv"
 log_cli = true
 filterwarnings = [
     "ignore:::.*pyspark.broadcast*",

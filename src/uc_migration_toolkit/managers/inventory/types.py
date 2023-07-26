@@ -22,7 +22,6 @@ class RequestObjectType(StrEnum):
     REPOS = "repos"
     SERVING_ENDPOINTS = "serving-endpoints"
     SQL_WAREHOUSES = "sql/warehouses"  # / is not a typo, it's the real object type
-    TOKENS = "tokens"
 
     def __repr__(self):
         return self.value
@@ -39,6 +38,8 @@ class SqlRequestObjectType(StrEnum):
 
 
 class LogicalObjectType(StrEnum):
+    PASSWORD = "PASSWORD"
+    TOKEN = "TOKEN"
     WAREHOUSE = "WAREHOUSE"
     MODEL = "MODEL"
     EXPERIMENT = "EXPERIMENT"

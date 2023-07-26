@@ -1,8 +1,10 @@
+from abc import ABC, abstractmethod
 from collections.abc import Callable, Iterator
 from functools import partial
 from typing import Generic, TypeVar
 
-from databricks.sdk.service.iam import ObjectPermissions
+from databricks.sdk.core import DatabricksError
+from databricks.sdk.service.iam import AccessControlResponse, ObjectPermissions
 
 from uc_migration_toolkit.managers.inventory.types import (
     LogicalObjectType,
@@ -17,7 +19,17 @@ from uc_migration_toolkit.utils import ThreadedExecution
 InventoryObject = TypeVar("InventoryObject")
 
 
-class StandardInventorizer(Generic[InventoryObject]):
+class BaseInventorizer(ABC, Generic[InventoryObject]):
+    @abstractmethod
+    def preload(self):
+        """Any preloading activities should happen here"""
+
+    @abstractmethod
+    def inventorize(self) -> list[PermissionsInventoryItem]:
+        """Any inventorization activities should happen here"""
+
+
+class StandardInventorizer(BaseInventorizer[InventoryObject]):
     """
     Standard means that it can collect using the default listing/permissions function without any additional logic.
     """
@@ -66,3 +78,59 @@ class StandardInventorizer(Generic[InventoryObject]):
         collected = threaded_execution.run()
         logger.info(f"Permissions fetched for {len(collected)} objects of type {self._request_object_type}")
         return collected
+
+
+class TokensAndPasswordsInventorizer(BaseInventorizer[InventoryObject]):
+    def __init__(self):
+        self._tokens_acl = []
+        self._passwords_acl = []
+
+    @staticmethod
+    def _preload_tokens():
+        try:
+            return provider.ws.get_tokens().get("access_control_list", [])
+        except DatabricksError as e:
+            logger.warning("Cannot load token permissions due to error:")
+            logger.warning(e)
+            return []
+
+    @staticmethod
+    def _preload_passwords():
+        try:
+            return provider.ws.get_passwords().get("access_control_list", [])
+        except DatabricksError as e:
+            logger.error("Cannot load password permissions due to error:")
+            logger.error(e)
+            return []
+
+    def preload(self):
+        self._tokens_acl = [AccessControlResponse.from_dict(acl) for acl in self._preload_tokens()]
+        self._passwords_acl = [AccessControlResponse.from_dict(acl) for acl in self._preload_passwords()]
+
+    def inventorize(self) -> list[PermissionsInventoryItem]:
+        results = []
+
+        if self._passwords_acl:
+            results.append(
+                PermissionsInventoryItem(
+                    object_id="passwords",
+                    logical_object_type=LogicalObjectType.PASSWORD,
+                    request_object_type=RequestObjectType.AUTHORIZATION,
+                    object_permissions=ObjectPermissions(
+                        object_id="passwords", object_type="authorization", access_control_list=self._passwords_acl
+                    ).as_dict(),
+                )
+            )
+
+        if self._tokens_acl:
+            results.append(
+                PermissionsInventoryItem(
+                    object_id="tokens",
+                    logical_object_type=LogicalObjectType.TOKEN,
+                    request_object_type=RequestObjectType.AUTHORIZATION,
+                    object_permissions=ObjectPermissions(
+                        object_id="tokens", object_type="authorization", access_control_list=self._tokens_acl
+                    ).as_dict(),
+                )
+            )
+        return results

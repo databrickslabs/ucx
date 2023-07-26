@@ -1,6 +1,12 @@
 from typing import Literal
 
 import pytest
+from databricks.sdk.service.iam import (
+    AccessControlRequest,
+    AccessControlResponse,
+    ObjectPermissions,
+    Permission,
+)
 from pyspark.errors import AnalysisException
 from utils import EnvironmentInfo
 
@@ -18,7 +24,7 @@ from uc_migration_toolkit.toolkits.group_migration import GroupMigrationToolkit
 
 
 def _verify_group_permissions(
-    objects: list,
+    objects: list | None,
     id_attribute: str,
     request_object_type: RequestObjectType,
     ws: ImprovedWorkspaceClient,
@@ -27,34 +33,63 @@ def _verify_group_permissions(
 ):
     logger.debug(f"Verifying that the permissions of object {request_object_type} were applied to {target} groups")
 
-    for _object in objects:
-        _object_permissions = ws.permissions.get(request_object_type, getattr(_object, id_attribute))
-        for migration_info in toolkit.group_manager.migration_groups_provider.groups:
-            target_permissions = sorted(
-                [
-                    p
-                    for p in _object_permissions.access_control_list
-                    if p.group_name == getattr(migration_info, target).display_name
-                ],
-                key=lambda p: p.group_name,
+    if id_attribute not in ("tokens", "passwords"):
+        for _object in objects:
+            _object_permissions: ObjectPermissions = ws.permissions.get(
+                request_object_type, getattr(_object, id_attribute)
             )
+            for migration_info in toolkit.group_manager.migration_groups_provider.groups:
+                target_permissions = sorted(
+                    [
+                        p
+                        for p in _object_permissions.access_control_list
+                        if p.group_name == getattr(migration_info, target).display_name
+                    ],
+                    key=lambda p: p.group_name,
+                )
 
-            source_permissions = sorted(
-                [
-                    p
-                    for p in _object_permissions.access_control_list
-                    if p.group_name == migration_info.workspace.display_name
+                source_permissions = sorted(
+                    [
+                        p
+                        for p in _object_permissions.access_control_list
+                        if p.group_name == migration_info.workspace.display_name
+                    ],
+                    key=lambda p: p.group_name,
+                )
+
+                assert len(target_permissions) == len(
+                    source_permissions
+                ), f"Target permissions were not applied correctly for object {_object}"
+
+                assert [t.all_permissions for t in target_permissions] == [
+                    s.all_permissions for s in source_permissions
+                ], f"Target permissions were not applied correctly for object {_object}"
+    else:
+        _typed_objects: list[AccessControlRequest] = objects
+        ws_permissions = [
+            AccessControlResponse(
+                all_permissions=[
+                    Permission(permission_level=o.permission_level, inherited=False, inherited_from_object=None)
                 ],
-                key=lambda p: p.group_name,
+                group_name=o.group_name,
             )
+            for o in _typed_objects
+        ]
 
-            assert len(target_permissions) == len(
-                source_permissions
-            ), f"Target permissions were not applied correctly for object {_object}"
+        target_permissions = list(
+            filter(
+                lambda p: p.group_name
+                in [getattr(g, target).display_name for g in toolkit.group_manager.migration_groups_provider.groups],
+                ws.permissions.get(
+                    request_object_type=request_object_type, request_object_id=id_attribute
+                ).access_control_list,
+            )
+        )
 
-            assert [t.all_permissions for t in target_permissions] == [
-                s.all_permissions for s in source_permissions
-            ], f"Target permissions were not applied correctly for object {_object}"
+        sorted_ws = sorted(ws_permissions, key=lambda p: p.group_name)
+        sorted_target = sorted(target_permissions, key=lambda p: p.group_name)
+
+        assert [p.all_permissions for p in sorted_ws] == [p.all_permissions for p in sorted_target]
 
 
 def _verify_roles_and_entitlements(

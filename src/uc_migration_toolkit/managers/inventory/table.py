@@ -84,6 +84,7 @@ class InventoryTableManager(SparkMixin):
         logger.info("Inventory table cleanup complete")
 
     def save(self, items: list[PermissionsInventoryItem]):
+        # TODO: update instead of append
         logger.info(f"Saving {len(items)} items to inventory table {self.config.table}")
         serialized_items = pd.DataFrame([item.model_dump(mode="json") for item in items])
         df = self.spark.createDataFrame(serialized_items, schema=self._table_schema)

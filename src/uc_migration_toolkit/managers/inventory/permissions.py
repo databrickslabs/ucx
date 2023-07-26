@@ -5,7 +5,10 @@ from typing import Literal
 from databricks.sdk.service.iam import AccessControlRequest, Group
 
 from uc_migration_toolkit.managers.group import MigrationGroupsProvider
-from uc_migration_toolkit.managers.inventory.inventorizer import StandardInventorizer
+from uc_migration_toolkit.managers.inventory.inventorizer import (
+    StandardInventorizer,
+    TokensAndPasswordsInventorizer,
+)
 from uc_migration_toolkit.managers.inventory.listing import CustomListing
 from uc_migration_toolkit.managers.inventory.table import InventoryTableManager
 from uc_migration_toolkit.managers.inventory.types import (
@@ -41,6 +44,7 @@ class PermissionManager:
     @staticmethod
     def get_inventorizers():
         return [
+            TokensAndPasswordsInventorizer(),
             StandardInventorizer(
                 logical_object_type=LogicalObjectType.CLUSTER,
                 request_object_type=RequestObjectType.CLUSTERS,
