@@ -39,6 +39,7 @@ class SqlRequestObjectType(StrEnum):
 
 
 class LogicalObjectType(StrEnum):
+    MODEL = "MODEL"
     EXPERIMENT = "EXPERIMENT"
     JOB = "JOB"
     PIPELINE = "PIPELINE"
