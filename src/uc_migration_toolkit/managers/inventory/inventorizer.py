@@ -48,11 +48,10 @@ class StandardInventorizer(Generic[InventoryObject]):
         logger.info(f"Object metadata prepared for {len(self._objects)} objects.")
 
     def _process_single_object(self, _object: InventoryObject) -> PermissionsInventoryItem:
-        permissions = self._permissions_function(
-            self._request_object_type, _object.__getattribute__(self._id_attribute)
-        )
+        object_id = str(getattr(_object, self._id_attribute))
+        permissions = self._permissions_function(self._request_object_type, object_id)
         inventory_item = PermissionsInventoryItem(
-            object_id=str(_object.__getattribute__(self._id_attribute)),
+            object_id=object_id,
             logical_object_type=self._logical_object_type,
             request_object_type=self._request_object_type,
             object_permissions=permissions.as_dict(),

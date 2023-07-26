@@ -6,6 +6,7 @@ from databricks.sdk.service.iam import AccessControlRequest, Group
 
 from uc_migration_toolkit.managers.group import MigrationGroupsProvider
 from uc_migration_toolkit.managers.inventory.inventorizer import StandardInventorizer
+from uc_migration_toolkit.managers.inventory.listing import CustomListing
 from uc_migration_toolkit.managers.inventory.table import InventoryTableManager
 from uc_migration_toolkit.managers.inventory.types import (
     LogicalObjectType,
@@ -69,6 +70,18 @@ class PermissionManager:
                 request_object_type=RequestObjectType.JOBS,
                 listing_function=provider.ws.jobs.list,
                 id_attribute="job_id",
+            ),
+            StandardInventorizer(
+                logical_object_type=LogicalObjectType.EXPERIMENT,
+                request_object_type=RequestObjectType.EXPERIMENTS,
+                listing_function=provider.ws.experiments.list_experiments,
+                id_attribute="experiment_id",
+            ),
+            StandardInventorizer(
+                logical_object_type=LogicalObjectType.MODEL,
+                request_object_type=RequestObjectType.REGISTERED_MODELS,
+                listing_function=CustomListing.list_models,
+                id_attribute="id",
             ),
         ]
 

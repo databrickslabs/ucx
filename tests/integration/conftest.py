@@ -7,6 +7,7 @@ from functools import partial
 import pytest
 from _pytest.fixtures import SubRequest
 from databricks.sdk import AccountClient
+from databricks.sdk.core import DatabricksError
 from databricks.sdk.service.compute import (
     ClusterDetails,
     CreateInstancePoolResponse,
@@ -14,6 +15,8 @@ from databricks.sdk.service.compute import (
 )
 from databricks.sdk.service.iam import PermissionLevel
 from databricks.sdk.service.jobs import CreateResponse
+from databricks.sdk.service.ml import CreateExperimentResponse, ModelDatabricks
+from databricks.sdk.service.ml import PermissionLevel as ModelPermissionLevel
 from databricks.sdk.service.pipelines import (
     CreatePipelineResponse,
     NotebookLibrary,
@@ -50,6 +53,8 @@ NUM_TEST_INSTANCE_POOLS = os.environ.get("NUM_TEST_INSTANCE_POOLS", 3)
 NUM_TEST_CLUSTER_POLICIES = os.environ.get("NUM_TEST_CLUSTER_POLICIES", 3)
 NUM_TEST_PIPELINES = os.environ.get("NUM_TEST_PIPELINES", 3)
 NUM_TEST_JOBS = os.environ.get("NUM_TEST_JOBS", 3)
+NUM_TEST_EXPERIMENTS = os.environ.get("NUM_TEST_EXPERIMENTS", 3)
+NUM_TEST_MODELS = os.environ.get("NUM_TEST_MODELS", 3)
 
 NUM_THREADS = os.environ.get("NUM_TEST_THREADS", 20)
 DB_CONNECT_CLUSTER_NAME = os.environ.get("DB_CONNECT_CLUSTER_NAME", "ucx-integration-testing")
@@ -333,8 +338,72 @@ def clusters(env: EnvironmentInfo, ws: ImprovedWorkspaceClient) -> list[ClusterD
 
 
 @pytest.fixture(scope="session", autouse=True)
+def experiments(ws: ImprovedWorkspaceClient, env: EnvironmentInfo) -> list[CreateExperimentResponse]:
+    logger.debug("Creating test experiments")
+
+    try:
+        ws.workspace.mkdirs("/experiments")
+    except DatabricksError:
+        pass
+
+    test_experiments = [
+        ws.experiments.create_experiment(name=f"/experiments/{env.test_uid}-test-{i}")
+        for i in range(NUM_TEST_EXPERIMENTS)
+    ]
+
+    _set_random_permissions(
+        test_experiments,
+        "experiment_id",
+        RequestObjectType.EXPERIMENTS,
+        env,
+        ws,
+        permission_levels=[PermissionLevel.CAN_MANAGE, PermissionLevel.CAN_READ, PermissionLevel.CAN_EDIT],
+    )
+
+    yield test_experiments
+
+    logger.debug("Deleting test experiments")
+    executables = [partial(ws.experiments.delete_experiment, e.experiment_id) for e in test_experiments]
+    Threader(executables).run()
+    logger.debug("Test experiments deleted")
+
+
+@pytest.fixture(scope="session", autouse=True)
+def models(ws: ImprovedWorkspaceClient, env: EnvironmentInfo) -> list[ModelDatabricks]:
+    logger.debug("Creating models")
+
+    test_models: list[ModelDatabricks] = [
+        ws.model_registry.get_model(
+            ws.model_registry.create_model(f"{env.test_uid}-test-{i}").registered_model.name
+        ).registered_model_databricks
+        for i in range(NUM_TEST_MODELS)
+    ]
+
+    _set_random_permissions(
+        test_models,
+        "id",
+        RequestObjectType.REGISTERED_MODELS,
+        env,
+        ws,
+        permission_levels=[
+            ModelPermissionLevel.CAN_READ,
+            ModelPermissionLevel.CAN_MANAGE,
+            ModelPermissionLevel.CAN_MANAGE_PRODUCTION_VERSIONS,
+            ModelPermissionLevel.CAN_MANAGE_STAGING_VERSIONS,
+        ],
+    )
+
+    yield test_models
+
+    logger.debug("Deleting test models")
+    executables = [partial(provider.ws.model_registry.delete_model, m.name) for m in test_models]
+    Threader(executables).run()
+    logger.debug("Test models deleted")
+
+
+@pytest.fixture(scope="session", autouse=True)
 def verifiable_objects(
-    clusters, instance_pools, cluster_policies, pipelines, jobs
+    clusters, instance_pools, cluster_policies, pipelines, jobs, experiments, models
 ) -> tuple[list, str, RequestObjectType]:
     _verifiable_objects = [
         (clusters, "cluster_id", RequestObjectType.CLUSTERS),
@@ -342,6 +411,8 @@ def verifiable_objects(
         (cluster_policies, "policy_id", RequestObjectType.CLUSTER_POLICIES),
         (pipelines, "pipeline_id", RequestObjectType.PIPELINES),
         (jobs, "job_id", RequestObjectType.JOBS),
+        (experiments, "experiment_id", RequestObjectType.EXPERIMENTS),
+        (models, "id", RequestObjectType.REGISTERED_MODELS),
     ]
     yield _verifiable_objects
 

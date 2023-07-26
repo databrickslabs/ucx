@@ -25,7 +25,7 @@ def _verify_group_permissions(
     toolkit: GroupMigrationToolkit,
     target: Literal["backup", "account"],
 ):
-    logger.debug("Verifying that the permissions were applied to backup groups")
+    logger.debug(f"Verifying that the permissions of object {request_object_type} were applied to {target} groups")
 
     for _object in objects:
         _object_permissions = ws.permissions.get(request_object_type, getattr(_object, id_attribute))

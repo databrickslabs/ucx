@@ -64,9 +64,8 @@ Workflows:
 
 ML:
 
-- [ ] MLflow experiments
-- [ ] MLflow registry
-- [ ] Legacy Mlflow model endpoints (?)
+- [x] MLflow experiments
+- [x] MLflow registry
 
 SQL:
 
