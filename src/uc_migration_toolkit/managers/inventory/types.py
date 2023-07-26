@@ -39,6 +39,8 @@ class SqlRequestObjectType(StrEnum):
 
 
 class LogicalObjectType(StrEnum):
+    JOB = "JOB"
+    PIPELINE = "PIPELINE"
     CLUSTER = "CLUSTER"
     INSTANCE_POOL = "INSTANCE_POOL"
     CLUSTER_POLICY = "CLUSTER_POLICY"

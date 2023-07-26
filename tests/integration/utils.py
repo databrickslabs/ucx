@@ -5,6 +5,7 @@ from pathlib import Path
 from typing import Any
 
 from databricks.sdk import AccountClient, WorkspaceClient
+from databricks.sdk.service.compute import ClusterSpec, DataSecurityMode
 from databricks.sdk.service.iam import (
     AccessControlRequest,
     ComplexValue,
@@ -12,6 +13,7 @@ from databricks.sdk.service.iam import (
     PermissionLevel,
     User,
 )
+from databricks.sdk.service.jobs import JobCluster, PythonWheelTask, Task
 from dotenv import load_dotenv
 
 from uc_migration_toolkit.managers.inventory.types import RequestObjectType
@@ -118,8 +120,33 @@ def _set_random_permissions(
             for _ in range(num_acls)
         ]
 
-        ws.permissions.set(
+        ws.permissions.update(
             request_object_type=request_object_type,
             request_object_id=getattr(_object, id_attribute),
             access_control_list=acl_req,
         )
+
+
+def _get_basic_job_cluster() -> JobCluster:
+    return JobCluster(
+        job_cluster_key="default",
+        new_cluster=ClusterSpec(
+            spark_version="13.2.x-scala2.12",
+            node_type_id="i3.xlarge",
+            driver_node_type_id="i3.xlarge",
+            num_workers=0,
+            spark_conf={"spark.master": "local[*, 4]", "spark.databricks.cluster.profile": "singleNode"},
+            custom_tags={
+                "ResourceClass": "SingleNode",
+            },
+            data_security_mode=DataSecurityMode.SINGLE_USER,
+        ),
+    )
+
+
+def _get_basic_task() -> Task:
+    return Task(
+        task_key="test",
+        python_wheel_task=PythonWheelTask(entry_point="main", package_name="some-pkg"),
+        job_cluster_key="default",
+    )
