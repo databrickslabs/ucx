@@ -60,7 +60,7 @@ Compute infrastructure:
 Workflows:
 
 - [x] Delta Live Tables
-- [ ] Jobs
+- [x] Jobs
 
 ML:
 
