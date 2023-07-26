@@ -69,7 +69,7 @@ ML:
 
 SQL:
 
-- [ ] Databricks SQL warehouses
+- [x] Databricks SQL warehouses
 - [ ] Dashboard
 - [ ] Queries
 - [ ] Alerts
