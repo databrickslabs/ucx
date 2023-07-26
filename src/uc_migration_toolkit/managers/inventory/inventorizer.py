@@ -49,7 +49,7 @@ class StandardInventorizer(Generic[InventoryObject]):
 
     def _process_single_object(self, _object: InventoryObject) -> PermissionsInventoryItem:
         permissions = self._permissions_function(
-            self._request_object_type, _object.__getattribute__(self._id_attribute)
+            self._request_object_type, getattr(_object, self._id_attribute)
         )
         inventory_item = PermissionsInventoryItem(
             object_id=str(_object.__getattribute__(self._id_attribute)),
