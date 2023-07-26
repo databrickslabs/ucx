@@ -70,6 +70,12 @@ class PermissionManager:
                 listing_function=provider.ws.jobs.list,
                 id_attribute="job_id",
             ),
+            StandardInventorizer(
+                logical_object_type=LogicalObjectType.EXPERIMENT,
+                request_object_type=RequestObjectType.EXPERIMENTS,
+                listing_function=provider.ws.experiments.list_experiments,
+                id_attribute="experiment_id",
+            ),
         ]
 
     def inventorize_permissions(self):
