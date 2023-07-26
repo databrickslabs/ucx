@@ -57,6 +57,7 @@ Compute infrastructure:
 - [x] Clusters
 - [x] Cluster policies
 - [x] Pools
+- [x] Databricks SQL warehouses
 
 Workflows:
 
@@ -70,7 +71,6 @@ ML:
 
 SQL:
 
-- [x] Databricks SQL warehouses
 - [ ] Dashboard
 - [ ] Queries
 - [ ] Alerts
