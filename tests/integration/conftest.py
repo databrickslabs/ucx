@@ -13,7 +13,7 @@ from databricks.sdk.service.compute import (
     CreateInstancePoolResponse,
     CreatePolicyResponse,
 )
-from databricks.sdk.service.iam import PermissionLevel
+from databricks.sdk.service.iam import AccessControlRequest, PermissionLevel
 from databricks.sdk.service.jobs import CreateResponse
 from databricks.sdk.service.ml import CreateExperimentResponse, ModelDatabricks
 from databricks.sdk.service.ml import PermissionLevel as ModelPermissionLevel
@@ -26,6 +26,7 @@ from databricks.sdk.service.sql import (
     CreateWarehouseRequestWarehouseType,
     GetWarehouseResponse,
 )
+from databricks.sdk.service.workspace import AclPermission, SecretScope
 from utils import (
     EnvironmentInfo,
     InstanceProfile,
@@ -50,18 +51,20 @@ from uc_migration_toolkit.utils import Request, ThreadedExecution
 
 initialize_env()
 
-NUM_TEST_GROUPS = os.environ.get("NUM_TEST_GROUPS", 5)
-NUM_TEST_INSTANCE_PROFILES = os.environ.get("NUM_TEST_INSTANCE_PROFILES", 3)
-NUM_TEST_CLUSTERS = os.environ.get("NUM_TEST_CLUSTERS", 3)
-NUM_TEST_INSTANCE_POOLS = os.environ.get("NUM_TEST_INSTANCE_POOLS", 3)
-NUM_TEST_CLUSTER_POLICIES = os.environ.get("NUM_TEST_CLUSTER_POLICIES", 3)
-NUM_TEST_PIPELINES = os.environ.get("NUM_TEST_PIPELINES", 3)
-NUM_TEST_JOBS = os.environ.get("NUM_TEST_JOBS", 3)
-NUM_TEST_EXPERIMENTS = os.environ.get("NUM_TEST_EXPERIMENTS", 3)
-NUM_TEST_MODELS = os.environ.get("NUM_TEST_MODELS", 3)
-NUM_TEST_WAREHOUSES = os.environ.get("NUM_TEST_WAREHOUSES", 3)
+NUM_TEST_GROUPS = int(os.environ.get("NUM_TEST_GROUPS", 5))
+NUM_TEST_INSTANCE_PROFILES = int(os.environ.get("NUM_TEST_INSTANCE_PROFILES", 3))
+NUM_TEST_CLUSTERS = int(os.environ.get("NUM_TEST_CLUSTERS", 3))
+NUM_TEST_INSTANCE_POOLS = int(os.environ.get("NUM_TEST_INSTANCE_POOLS", 3))
+NUM_TEST_CLUSTER_POLICIES = int(os.environ.get("NUM_TEST_CLUSTER_POLICIES", 3))
+NUM_TEST_PIPELINES = int(os.environ.get("NUM_TEST_PIPELINES", 3))
+NUM_TEST_JOBS = int(os.environ.get("NUM_TEST_JOBS", 3))
+NUM_TEST_EXPERIMENTS = int(os.environ.get("NUM_TEST_EXPERIMENTS", 3))
+NUM_TEST_MODELS = int(os.environ.get("NUM_TEST_MODELS", 3))
+NUM_TEST_WAREHOUSES = int(os.environ.get("NUM_TEST_WAREHOUSES", 3))
+NUM_TEST_TOKENS = int(os.environ.get("NUM_TEST_TOKENS", 3))
+NUM_TEST_SECRET_SCOPES = int(os.environ.get("NUM_TEST_SECRET_SCOPES", 3))
 
-NUM_THREADS = os.environ.get("NUM_TEST_THREADS", 20)
+NUM_THREADS = int(os.environ.get("NUM_TEST_THREADS", 20))
 DB_CONNECT_CLUSTER_NAME = os.environ.get("DB_CONNECT_CLUSTER_NAME", "ucx-integration-testing")
 UCX_TESTING_PREFIX = os.environ.get("UCX_TESTING_PREFIX", "ucx")
 Threader = partial(ThreadedExecution, num_threads=NUM_THREADS, rate_limit=RateLimitConfig())
@@ -220,7 +223,7 @@ def instance_pools(env: EnvironmentInfo, ws: ImprovedWorkspaceClient) -> list[Cr
 
 @pytest.fixture(scope="session", autouse=True)
 def pipelines(env: EnvironmentInfo, ws: ImprovedWorkspaceClient) -> list[CreatePipelineResponse]:
-    logger.debug("Creating test instance pools")
+    logger.debug("Creating test DLT pipelines")
 
     test_pipelines: list[CreatePipelineResponse] = [
         ws.pipelines.create(
@@ -314,8 +317,9 @@ def cluster_policies(env: EnvironmentInfo, ws: ImprovedWorkspaceClient) -> list[
 def clusters(env: EnvironmentInfo, ws: ImprovedWorkspaceClient) -> list[ClusterDetails]:
     logger.debug("Creating test clusters")
 
-    test_clusters = [
-        ws.clusters.create(
+    creators = [
+        partial(
+            ws.clusters.create,
             spark_version="13.2.x-scala2.12",
             instance_pool_id=os.environ["TEST_POOL_ID"],
             driver_instance_pool_id=os.environ["TEST_POOL_ID"],
@@ -324,6 +328,8 @@ def clusters(env: EnvironmentInfo, ws: ImprovedWorkspaceClient) -> list[ClusterD
         )
         for i in range(NUM_TEST_CLUSTERS)
     ]
+
+    test_clusters = Threader(creators).run()
 
     _set_random_permissions(
         test_clusters,
@@ -351,10 +357,12 @@ def experiments(ws: ImprovedWorkspaceClient, env: EnvironmentInfo) -> list[Creat
     except DatabricksError:
         pass
 
-    test_experiments = [
-        ws.experiments.create_experiment(name=f"/experiments/{env.test_uid}-test-{i}")
-        for i in range(NUM_TEST_EXPERIMENTS)
-    ]
+    test_experiments = Threader(
+        [
+            partial(ws.experiments.create_experiment, name=f"/experiments/{env.test_uid}-test-{i}")
+            for i in range(NUM_TEST_EXPERIMENTS)
+        ]
+    ).run()
 
     _set_random_permissions(
         test_experiments,
@@ -410,8 +418,9 @@ def models(ws: ImprovedWorkspaceClient, env: EnvironmentInfo) -> list[ModelDatab
 def warehouses(ws: ImprovedWorkspaceClient, env: EnvironmentInfo) -> list[GetWarehouseResponse]:
     logger.debug("Creating warehouses")
 
-    test_warehouses: list[GetWarehouseResponse] = [
-        ws.warehouses.create(
+    creators = [
+        partial(
+            ws.warehouses.create,
             name=f"{env.test_uid}-test-{i}",
             cluster_size="2X-Small",
             warehouse_type=CreateWarehouseRequestWarehouseType.PRO,
@@ -420,6 +429,8 @@ def warehouses(ws: ImprovedWorkspaceClient, env: EnvironmentInfo) -> list[GetWar
         )
         for i in range(NUM_TEST_WAREHOUSES)
     ]
+
+    test_warehouses: list[GetWarehouseResponse] = Threader(creators).run()
 
     _set_random_permissions(
         test_warehouses,
@@ -439,10 +450,51 @@ def warehouses(ws: ImprovedWorkspaceClient, env: EnvironmentInfo) -> list[GetWar
 
 
 @pytest.fixture(scope="session", autouse=True)
+def tokens(ws: ImprovedWorkspaceClient, env: EnvironmentInfo) -> list[AccessControlRequest]:
+    logger.debug("Adding token-level permissions to groups")
+
+    token_permissions = [
+        AccessControlRequest(group_name=ws_group.display_name, permission_level=PermissionLevel.CAN_USE)
+        for ws_group, _ in random.sample(env.groups, k=NUM_TEST_TOKENS)
+    ]
+
+    ws.permissions.update(
+        request_object_type=RequestObjectType.AUTHORIZATION,
+        request_object_id="tokens",
+        access_control_list=token_permissions,
+    )
+
+    yield token_permissions
+
+
+@pytest.fixture(scope="session", autouse=True)
+def secret_scopes(ws: ImprovedWorkspaceClient, env: EnvironmentInfo) -> list[SecretScope]:
+    logger.debug("Creating test secret scopes")
+
+    for i in range(NUM_TEST_SECRET_SCOPES):
+        ws.secrets.create_scope(f"{env.test_uid}-test-{i}")
+
+    test_secret_scopes = [s for s in ws.secrets.list_scopes() if s.name.startswith(env.test_uid)]
+
+    for scope in test_secret_scopes:
+        random_permission = random.choice(list(AclPermission))
+        random_ws_group, _ = random.choice(env.groups)
+        ws.secrets.put_acl(scope.name, random_ws_group.display_name, random_permission)
+
+    yield test_secret_scopes
+
+    logger.debug("Deleting test secret scopes")
+    executables = [partial(ws.secrets.delete_scope, s.name) for s in test_secret_scopes]
+    Threader(executables).run()
+
+
+@pytest.fixture(scope="session", autouse=True)
 def verifiable_objects(
-    clusters, instance_pools, cluster_policies, pipelines, jobs, experiments, models, warehouses
-) -> tuple[list, str, RequestObjectType]:
+    clusters, instance_pools, cluster_policies, pipelines, jobs, experiments, models, warehouses, tokens, secret_scopes
+) -> list[tuple[list, str, RequestObjectType | None]]:
     _verifiable_objects = [
+        (secret_scopes, "secret_scopes", None),
+        (tokens, "tokens", RequestObjectType.AUTHORIZATION),
         (clusters, "cluster_id", RequestObjectType.CLUSTERS),
         (instance_pools, "instance_pool_id", RequestObjectType.INSTANCE_POOLS),
         (cluster_policies, "policy_id", RequestObjectType.CLUSTER_POLICIES),

@@ -77,9 +77,9 @@ SQL:
 
 Security:
 
-- [ ] Tokens
-- [ ] Passwords (for AWS)
-- [ ] Secrets
+- [x] Tokens (token permissions are set on the workspace level. It basically says "this group can use tokens or not")
+- [x] Passwords (only for AWS, it defines which groups can log in with passwords)
+- [x] Secrets
 
 Workspace:
 

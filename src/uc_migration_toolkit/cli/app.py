@@ -14,13 +14,12 @@ def migrate_groups(config_file: Annotated[Path, typer.Argument(help="Path to con
 
     config = get_migration_config(config_file)
     toolkit = GroupMigrationToolkit(config)
+    toolkit.prepare_groups_in_environment()
 
-    toolkit.validate_groups()
     toolkit.cleanup_inventory_table()
     toolkit.inventorize_permissions()
-    toolkit.create_or_update_backup_groups()
-    toolkit.apply_backup_group_permissions()
+    toolkit.apply_permissions_to_backup_groups()
     toolkit.replace_workspace_groups_with_account_groups()
-    # toolkit.apply_account_group_permissions()
-    # toolkit.delete_backup_groups()
-    # toolkit.cleanup_inventory_table()
+    toolkit.apply_permissions_to_account_groups()
+    toolkit.delete_backup_groups()
+    toolkit.cleanup_inventory_table()

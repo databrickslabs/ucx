@@ -30,6 +30,12 @@ class ImprovedWorkspaceClient(WorkspaceClient):
         self.assign_permissions(principal_id=acc_group.id, permissions=["USER"])
         logger.info(f"Group {acc_group.display_name} successfully reflected to workspace")
 
+    def get_tokens(self):
+        return self.api_client.do("GET", "/api/2.0/preview/permissions/authorization/tokens")
+
+    def get_passwords(self):
+        return self.api_client.do("GET", "/api/2.0/preview/permissions/authorization/passwords")
+
 
 class ClientProvider:
     def __init__(self):

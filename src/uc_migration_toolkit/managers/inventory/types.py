@@ -2,7 +2,10 @@ import json
 
 import pandas as pd
 from databricks.sdk.service.iam import ObjectPermissions
+from databricks.sdk.service.workspace import AclItem as SdkAclItem
+from databricks.sdk.service.workspace import AclPermission as SdkAclPermission
 from pydantic import BaseModel
+from pydantic.tools import parse_obj_as
 
 from uc_migration_toolkit.utils import StrEnum
 
@@ -22,7 +25,6 @@ class RequestObjectType(StrEnum):
     REPOS = "repos"
     SERVING_ENDPOINTS = "serving-endpoints"
     SQL_WAREHOUSES = "sql/warehouses"  # / is not a typo, it's the real object type
-    TOKENS = "tokens"
 
     def __repr__(self):
         return self.value
@@ -39,6 +41,9 @@ class SqlRequestObjectType(StrEnum):
 
 
 class LogicalObjectType(StrEnum):
+    SECRET_SCOPE = "SECRET_SCOPE"
+    PASSWORD = "PASSWORD"
+    TOKEN = "TOKEN"
     WAREHOUSE = "WAREHOUSE"
     MODEL = "MODEL"
     EXPERIMENT = "EXPERIMENT"
@@ -52,22 +57,51 @@ class LogicalObjectType(StrEnum):
         return self.value
 
 
+class AclPermission(StrEnum):
+    READ = "READ"
+    WRITE = "WRITE"
+    MANAGE = "MANAGE"
+
+
+class AclItem(BaseModel):
+    principal: str
+    permission: AclPermission
+
+
+class AclItemsContainer(BaseModel):
+    acls: list[AclItem]
+
+    @staticmethod
+    def from_sdk(source: list[SdkAclItem]) -> "AclItemsContainer":
+        _typed_acls = [
+            AclItem(principal=acl.principal, permission=AclPermission(acl.permission.value)) for acl in source
+        ]
+        return AclItemsContainer(acls=_typed_acls)
+
+    def to_sdk(self) -> list[SdkAclItem]:
+        return [
+            SdkAclItem(principal=acl.principal, permission=SdkAclPermission(acl.permission.value)) for acl in self.acls
+        ]
+
+
 class PermissionsInventoryItem(BaseModel):
     object_id: str
     logical_object_type: LogicalObjectType
-    request_object_type: RequestObjectType | SqlRequestObjectType
-    object_permissions: dict
+    request_object_type: RequestObjectType | SqlRequestObjectType | None
+    raw_object_permissions: str
 
     @property
-    def typed_object_permissions(self) -> ObjectPermissions:
-        return ObjectPermissions.from_dict(self.object_permissions)
+    def object_permissions(self) -> dict:
+        return json.loads(self.raw_object_permissions)
+
+    @property
+    def typed_object_permissions(self) -> ObjectPermissions | AclItemsContainer:
+        if self.logical_object_type == LogicalObjectType.SECRET_SCOPE:
+            return parse_obj_as(AclItemsContainer, self.object_permissions)
+        else:
+            return ObjectPermissions.from_dict(self.object_permissions)
 
     @staticmethod
     def from_pandas(source: pd.DataFrame) -> list["PermissionsInventoryItem"]:
         items = source.to_dict(orient="records")
-
-        for item in items:
-            item["object_permissions"] = json.loads(item["plain_permissions"])
-            item.pop("plain_permissions")
-
         return [PermissionsInventoryItem(**item) for item in items]
