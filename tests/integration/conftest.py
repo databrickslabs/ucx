@@ -26,6 +26,7 @@ from databricks.sdk.service.sql import (
     CreateWarehouseRequestWarehouseType,
     GetWarehouseResponse,
 )
+from databricks.sdk.service.workspace import AclPermission, SecretScope
 from utils import (
     EnvironmentInfo,
     InstanceProfile,
@@ -50,19 +51,20 @@ from uc_migration_toolkit.utils import Request, ThreadedExecution
 
 initialize_env()
 
-NUM_TEST_GROUPS = os.environ.get("NUM_TEST_GROUPS", 5)
-NUM_TEST_INSTANCE_PROFILES = os.environ.get("NUM_TEST_INSTANCE_PROFILES", 3)
-NUM_TEST_CLUSTERS = os.environ.get("NUM_TEST_CLUSTERS", 3)
-NUM_TEST_INSTANCE_POOLS = os.environ.get("NUM_TEST_INSTANCE_POOLS", 3)
-NUM_TEST_CLUSTER_POLICIES = os.environ.get("NUM_TEST_CLUSTER_POLICIES", 3)
-NUM_TEST_PIPELINES = os.environ.get("NUM_TEST_PIPELINES", 3)
-NUM_TEST_JOBS = os.environ.get("NUM_TEST_JOBS", 3)
-NUM_TEST_EXPERIMENTS = os.environ.get("NUM_TEST_EXPERIMENTS", 3)
-NUM_TEST_MODELS = os.environ.get("NUM_TEST_MODELS", 3)
-NUM_TEST_WAREHOUSES = os.environ.get("NUM_TEST_WAREHOUSES", 3)
-NUM_TEST_TOKENS = os.environ.get("NUM_TEST_TOKENS", 3)
+NUM_TEST_GROUPS = int(os.environ.get("NUM_TEST_GROUPS", 5))
+NUM_TEST_INSTANCE_PROFILES = int(os.environ.get("NUM_TEST_INSTANCE_PROFILES", 3))
+NUM_TEST_CLUSTERS = int(os.environ.get("NUM_TEST_CLUSTERS", 3))
+NUM_TEST_INSTANCE_POOLS = int(os.environ.get("NUM_TEST_INSTANCE_POOLS", 3))
+NUM_TEST_CLUSTER_POLICIES = int(os.environ.get("NUM_TEST_CLUSTER_POLICIES", 3))
+NUM_TEST_PIPELINES = int(os.environ.get("NUM_TEST_PIPELINES", 3))
+NUM_TEST_JOBS = int(os.environ.get("NUM_TEST_JOBS", 3))
+NUM_TEST_EXPERIMENTS = int(os.environ.get("NUM_TEST_EXPERIMENTS", 3))
+NUM_TEST_MODELS = int(os.environ.get("NUM_TEST_MODELS", 3))
+NUM_TEST_WAREHOUSES = int(os.environ.get("NUM_TEST_WAREHOUSES", 3))
+NUM_TEST_TOKENS = int(os.environ.get("NUM_TEST_TOKENS", 3))
+NUM_TEST_SECRET_SCOPES = int(os.environ.get("NUM_TEST_SECRET_SCOPES", 3))
 
-NUM_THREADS = os.environ.get("NUM_TEST_THREADS", 20)
+NUM_THREADS = int(os.environ.get("NUM_TEST_THREADS", 20))
 DB_CONNECT_CLUSTER_NAME = os.environ.get("DB_CONNECT_CLUSTER_NAME", "ucx-integration-testing")
 UCX_TESTING_PREFIX = os.environ.get("UCX_TESTING_PREFIX", "ucx")
 Threader = partial(ThreadedExecution, num_threads=NUM_THREADS, rate_limit=RateLimitConfig())
@@ -221,7 +223,7 @@ def instance_pools(env: EnvironmentInfo, ws: ImprovedWorkspaceClient) -> list[Cr
 
 @pytest.fixture(scope="session", autouse=True)
 def pipelines(env: EnvironmentInfo, ws: ImprovedWorkspaceClient) -> list[CreatePipelineResponse]:
-    logger.debug("Creating test instance pools")
+    logger.debug("Creating test DLT pipelines")
 
     test_pipelines: list[CreatePipelineResponse] = [
         ws.pipelines.create(
@@ -466,10 +468,32 @@ def tokens(ws: ImprovedWorkspaceClient, env: EnvironmentInfo) -> list[AccessCont
 
 
 @pytest.fixture(scope="session", autouse=True)
+def secret_scopes(ws: ImprovedWorkspaceClient, env: EnvironmentInfo) -> list[SecretScope]:
+    logger.debug("Creating test secret scopes")
+
+    for i in range(NUM_TEST_SECRET_SCOPES):
+        ws.secrets.create_scope(f"{env.test_uid}-test-{i}")
+
+    test_secret_scopes = [s for s in ws.secrets.list_scopes() if s.name.startswith(env.test_uid)]
+
+    for scope in test_secret_scopes:
+        random_permission = random.choice(list(AclPermission))
+        random_ws_group, _ = random.choice(env.groups)
+        ws.secrets.put_acl(scope.name, random_ws_group.display_name, random_permission)
+
+    yield test_secret_scopes
+
+    logger.debug("Deleting test secret scopes")
+    executables = [partial(ws.secrets.delete_scope, s.name) for s in test_secret_scopes]
+    Threader(executables).run()
+
+
+@pytest.fixture(scope="session", autouse=True)
 def verifiable_objects(
-    clusters, instance_pools, cluster_policies, pipelines, jobs, experiments, models, warehouses, tokens
-) -> tuple[list, str, RequestObjectType]:
+    clusters, instance_pools, cluster_policies, pipelines, jobs, experiments, models, warehouses, tokens, secret_scopes
+) -> list[tuple[list, str, RequestObjectType | None]]:
     _verifiable_objects = [
+        (secret_scopes, "secret_scopes", None),
         (tokens, "tokens", RequestObjectType.AUTHORIZATION),
         (clusters, "cluster_id", RequestObjectType.CLUSTERS),
         (instance_pools, "instance_pool_id", RequestObjectType.INSTANCE_POOLS),

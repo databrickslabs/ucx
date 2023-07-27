@@ -1,3 +1,4 @@
+import json
 from abc import ABC, abstractmethod
 from collections.abc import Callable, Iterator
 from functools import partial
@@ -5,8 +6,10 @@ from typing import Generic, TypeVar
 
 from databricks.sdk.core import DatabricksError
 from databricks.sdk.service.iam import AccessControlResponse, ObjectPermissions
+from databricks.sdk.service.workspace import AclItem, SecretScope
 
 from uc_migration_toolkit.managers.inventory.types import (
+    AclItemsContainer,
     LogicalObjectType,
     PermissionsInventoryItem,
     RequestObjectType,
@@ -66,7 +69,7 @@ class StandardInventorizer(BaseInventorizer[InventoryObject]):
             object_id=object_id,
             logical_object_type=self._logical_object_type,
             request_object_type=self._request_object_type,
-            object_permissions=permissions.as_dict(),
+            raw_object_permissions=json.dumps(permissions.as_dict()),
         )
         return inventory_item
 
@@ -116,9 +119,11 @@ class TokensAndPasswordsInventorizer(BaseInventorizer[InventoryObject]):
                     object_id="passwords",
                     logical_object_type=LogicalObjectType.PASSWORD,
                     request_object_type=RequestObjectType.AUTHORIZATION,
-                    object_permissions=ObjectPermissions(
-                        object_id="passwords", object_type="authorization", access_control_list=self._passwords_acl
-                    ).as_dict(),
+                    raw_object_permissions=json.dumps(
+                        ObjectPermissions(
+                            object_id="passwords", object_type="authorization", access_control_list=self._passwords_acl
+                        ).as_dict()
+                    ),
                 )
             )
 
@@ -128,9 +133,40 @@ class TokensAndPasswordsInventorizer(BaseInventorizer[InventoryObject]):
                     object_id="tokens",
                     logical_object_type=LogicalObjectType.TOKEN,
                     request_object_type=RequestObjectType.AUTHORIZATION,
-                    object_permissions=ObjectPermissions(
-                        object_id="tokens", object_type="authorization", access_control_list=self._tokens_acl
-                    ).as_dict(),
+                    raw_object_permissions=json.dumps(
+                        ObjectPermissions(
+                            object_id="tokens", object_type="authorization", access_control_list=self._tokens_acl
+                        ).as_dict()
+                    ),
                 )
             )
         return results
+
+
+class SecretScopeInventorizer(BaseInventorizer[InventoryObject]):
+    def __init__(self):
+        self._scopes = provider.ws.secrets.list_scopes()
+
+    @staticmethod
+    def _get_acls_for_scope(scope: SecretScope) -> Iterator[AclItem]:
+        return provider.ws.secrets.list_acls(scope.name)
+
+    def _prepare_permissions_inventory_item(self, scope: SecretScope) -> PermissionsInventoryItem:
+        acls = self._get_acls_for_scope(scope)
+        acls_container = AclItemsContainer.from_sdk(list(acls))
+
+        return PermissionsInventoryItem(
+            object_id=scope.name,
+            logical_object_type=LogicalObjectType.SECRET_SCOPE,
+            request_object_type=None,
+            raw_object_permissions=json.dumps(acls_container.model_dump(mode="json")),
+        )
+
+    def inventorize(self) -> list[PermissionsInventoryItem]:
+        executables = [partial(self._prepare_permissions_inventory_item, scope) for scope in self._scopes]
+        results = ThreadedExecution[PermissionsInventoryItem](executables).run()
+        logger.info(f"Permissions fetched for {len(results)} objects of type {LogicalObjectType.SECRET_SCOPE}")
+        return results
+
+    def preload(self):
+        pass

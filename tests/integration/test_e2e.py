@@ -1,12 +1,15 @@
 from typing import Literal
 
 import pytest
+from databricks.sdk.core import DatabricksError
 from databricks.sdk.service.iam import (
     AccessControlRequest,
     AccessControlResponse,
+    Group,
     ObjectPermissions,
     Permission,
 )
+from databricks.sdk.service.workspace import AclItem, SecretScope
 from pyspark.errors import AnalysisException
 from utils import EnvironmentInfo
 
@@ -26,14 +29,65 @@ from uc_migration_toolkit.toolkits.group_migration import GroupMigrationToolkit
 def _verify_group_permissions(
     objects: list | None,
     id_attribute: str,
-    request_object_type: RequestObjectType,
+    request_object_type: RequestObjectType | None,
     ws: ImprovedWorkspaceClient,
     toolkit: GroupMigrationToolkit,
     target: Literal["backup", "account"],
 ):
     logger.debug(f"Verifying that the permissions of object {request_object_type} were applied to {target} groups")
 
-    if id_attribute not in ("tokens", "passwords"):
+    if id_attribute == "secret_scopes":
+        _scopes: list[SecretScope] = objects
+        comparison_base = [
+            getattr(mi, "workspace" if target == "backup" else "backup")
+            for mi in toolkit.group_manager.migration_groups_provider.groups
+        ]
+
+        comparison_target = [getattr(mi, target) for mi in toolkit.group_manager.migration_groups_provider.groups]
+
+        def _safe_get_acls(_scope: SecretScope, _group: Group) -> AclItem | None:
+            try:
+                return ws.secrets.get_acl(scope=_scope.name, principal=_group.display_name)
+            except DatabricksError:
+                return None
+
+        for scope in _scopes:
+            for base_group, target_group in zip(comparison_base, comparison_target, strict=True):
+                base_acl = _safe_get_acls(scope, base_group)
+                target_acl = _safe_get_acls(scope, target_group)
+
+                if not base_acl:
+                    assert not target_acl
+                else:
+                    assert base_acl.permission == target_acl.permission
+
+    elif id_attribute in ("tokens", "passwords"):
+        _typed_objects: list[AccessControlRequest] = objects
+        ws_permissions = [
+            AccessControlResponse(
+                all_permissions=[
+                    Permission(permission_level=o.permission_level, inherited=False, inherited_from_object=None)
+                ],
+                group_name=o.group_name,
+            )
+            for o in _typed_objects
+        ]
+
+        target_permissions = list(
+            filter(
+                lambda p: p.group_name
+                in [getattr(g, target).display_name for g in toolkit.group_manager.migration_groups_provider.groups],
+                ws.permissions.get(
+                    request_object_type=request_object_type, request_object_id=id_attribute
+                ).access_control_list,
+            )
+        )
+
+        sorted_ws = sorted(ws_permissions, key=lambda p: p.group_name)
+        sorted_target = sorted(target_permissions, key=lambda p: p.group_name)
+
+        assert [p.all_permissions for p in sorted_ws] == [p.all_permissions for p in sorted_target]
+    else:
         for _object in objects:
             _object_permissions: ObjectPermissions = ws.permissions.get(
                 request_object_type, getattr(_object, id_attribute)
@@ -64,32 +118,6 @@ def _verify_group_permissions(
                 assert [t.all_permissions for t in target_permissions] == [
                     s.all_permissions for s in source_permissions
                 ], f"Target permissions were not applied correctly for object {_object}"
-    else:
-        _typed_objects: list[AccessControlRequest] = objects
-        ws_permissions = [
-            AccessControlResponse(
-                all_permissions=[
-                    Permission(permission_level=o.permission_level, inherited=False, inherited_from_object=None)
-                ],
-                group_name=o.group_name,
-            )
-            for o in _typed_objects
-        ]
-
-        target_permissions = list(
-            filter(
-                lambda p: p.group_name
-                in [getattr(g, target).display_name for g in toolkit.group_manager.migration_groups_provider.groups],
-                ws.permissions.get(
-                    request_object_type=request_object_type, request_object_id=id_attribute
-                ).access_control_list,
-            )
-        )
-
-        sorted_ws = sorted(ws_permissions, key=lambda p: p.group_name)
-        sorted_target = sorted(target_permissions, key=lambda p: p.group_name)
-
-        assert [p.all_permissions for p in sorted_ws] == [p.all_permissions for p in sorted_target]
 
 
 def _verify_roles_and_entitlements(
@@ -107,7 +135,7 @@ def test_e2e(
     env: EnvironmentInfo,
     inventory_table: InventoryTable,
     ws: ImprovedWorkspaceClient,
-    verifiable_objects: list[tuple[list, str, RequestObjectType]],
+    verifiable_objects: list[tuple[list, str, RequestObjectType | None]],
 ):
     logger.debug(f"Test environment: {env.test_uid}")
 

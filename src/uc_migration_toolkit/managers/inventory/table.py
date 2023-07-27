@@ -1,16 +1,14 @@
 import pandas as pd
-import pyspark.sql.functions as F  # noqa: N812
-from databricks.sdk.service.iam import Group
+from databricks.sdk.service.iam import ObjectPermissions
 from pyspark.sql import DataFrame
-from pyspark.sql.types import (
-    ArrayType,
-    BooleanType,
-    StringType,
-    StructField,
-    StructType,
-)
+from pyspark.sql.types import StringType, StructField, StructType
 
-from uc_migration_toolkit.managers.inventory.types import PermissionsInventoryItem
+from uc_migration_toolkit.managers.inventory.types import (
+    AclItemsContainer,
+    LogicalObjectType,
+    PermissionsInventoryItem,
+    RequestObjectType,
+)
 from uc_migration_toolkit.providers.config import provider as config_provider
 from uc_migration_toolkit.providers.logger import logger
 from uc_migration_toolkit.providers.spark import SparkMixin
@@ -28,48 +26,7 @@ class InventoryTableManager(SparkMixin):
                 StructField("object_id", StringType(), True),
                 StructField("logical_object_type", StringType(), True),
                 StructField("request_object_type", StringType(), True),
-                StructField(
-                    "object_permissions",
-                    StructType(
-                        [
-                            StructField(
-                                "access_control_list",
-                                ArrayType(
-                                    StructType(
-                                        [
-                                            StructField(
-                                                "all_permissions",
-                                                ArrayType(
-                                                    StructType(
-                                                        [
-                                                            StructField("inherited", BooleanType(), True),
-                                                            StructField(
-                                                                "inherited_from_object",
-                                                                ArrayType(StringType(), True),
-                                                                True,
-                                                            ),
-                                                            StructField("permission_level", StringType(), True),
-                                                        ]
-                                                    ),
-                                                    True,
-                                                ),
-                                                True,
-                                            ),
-                                            StructField("group_name", StringType(), True),
-                                            StructField("service_principal_name", StringType(), True),
-                                            StructField("user_name", StringType(), True),
-                                        ]
-                                    ),
-                                    True,
-                                ),
-                                True,
-                            ),
-                            StructField("object_id", StringType(), True),
-                            StructField("object_type", StringType(), True),
-                        ]
-                    ),
-                    True,
-                ),
+                StructField("raw_object_permissions", StringType(), True),
             ]
         )
 
@@ -93,35 +50,30 @@ class InventoryTableManager(SparkMixin):
 
     def load_all(self) -> list[PermissionsInventoryItem]:
         logger.info(f"Loading inventory table {self.config.table}")
-        df = (
-            self._table.withColumn("plain_permissions", F.to_json("object_permissions"))
-            .drop("object_permissions")
-            .toPandas()
-        )
+        df = self._table.toPandas()
+
         logger.info("Successfully loaded the inventory table")
         return PermissionsInventoryItem.from_pandas(df)
 
-    def load_for_groups(self, groups: list[Group]) -> list[PermissionsInventoryItem]:
-        logger.info(f"Scanning inventory table {self.config.table} for {len(groups)} groups")
-        group_names = [g.display_name for g in groups]
-        group_names_sql_argument = ",".join([f'"{name}"' for name in group_names])
-        df = (
-            self._table.where(
-                f"""
-            size(
-                array_intersect(
-                  array_distinct(transform(object_permissions.access_control_list, item -> item.group_name))
-                  , array({group_names_sql_argument})
-                )
-            ) > 0
-            """
-            )
-            .withColumn("plain_permissions", F.to_json("object_permissions"))
-            .drop("object_permissions")
-            .toPandas()
-        )
+    @staticmethod
+    def _is_item_relevant_to_groups(item: PermissionsInventoryItem, groups: list[str]) -> bool:
+        if item.logical_object_type == LogicalObjectType.SECRET_SCOPE:
+            _acl_container: AclItemsContainer = item.typed_object_permissions
+            return any(acl_item.principal in groups for acl_item in _acl_container.acls)
 
-        logger.info(
-            f"Successfully scanned the inventory table, loaded {len(df)} relevant objects for {len(groups)} groups"
-        )
-        return PermissionsInventoryItem.from_pandas(df)
+        elif isinstance(item.request_object_type, RequestObjectType):
+            _ops: ObjectPermissions = item.typed_object_permissions
+            mentioned_groups = [acl.group_name for acl in _ops.access_control_list]
+            return any(g in mentioned_groups for g in groups)
+
+        else:
+            msg = f"Logical object type {item.logical_object_type} is not supported"
+            raise NotImplementedError(msg)
+
+    def load_for_groups(self, groups: list[str]) -> list[PermissionsInventoryItem]:
+        logger.info(f"Loading inventory table {self.config.table} and filtering it to relevant groups")
+        df = self._table.toPandas()
+        all_items = PermissionsInventoryItem.from_pandas(df)
+        filtered_items = [item for item in all_items if self._is_item_relevant_to_groups(item, groups)]
+        logger.info(f"Found {len(filtered_items)} items relevant to the groups among {len(all_items)} items")
+        return filtered_items

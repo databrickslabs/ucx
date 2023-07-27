@@ -1,17 +1,21 @@
+from copy import deepcopy
 from dataclasses import dataclass
 from functools import partial
 from typing import Literal
 
-from databricks.sdk.service.iam import AccessControlRequest, Group
+from databricks.sdk.service.iam import AccessControlRequest, Group, ObjectPermissions
+from databricks.sdk.service.workspace import AclItem as SdkAclItem
 
 from uc_migration_toolkit.managers.group import MigrationGroupsProvider
 from uc_migration_toolkit.managers.inventory.inventorizer import (
+    SecretScopeInventorizer,
     StandardInventorizer,
     TokensAndPasswordsInventorizer,
 )
 from uc_migration_toolkit.managers.inventory.listing import CustomListing
 from uc_migration_toolkit.managers.inventory.table import InventoryTableManager
 from uc_migration_toolkit.managers.inventory.types import (
+    AclItemsContainer,
     LogicalObjectType,
     PermissionsInventoryItem,
     RequestObjectType,
@@ -24,16 +28,16 @@ from uc_migration_toolkit.utils import ThreadedExecution
 
 @dataclass
 class PermissionRequestPayload:
-    request_object_type: RequestObjectType
+    logical_object_type: LogicalObjectType
+    request_object_type: RequestObjectType | None
     object_id: str
     access_control_list: list[AccessControlRequest]
 
-    def as_dict(self):
-        return {
-            "request_object_type": self.request_object_type,
-            "object_id": self.object_id,
-            "access_control_list": self.access_control_list,
-        }
+
+@dataclass
+class SecretsPermissionRequestPayload:
+    object_id: str
+    access_control_list: list[SdkAclItem]
 
 
 class PermissionManager:
@@ -93,6 +97,7 @@ class PermissionManager:
                 listing_function=provider.ws.warehouses.list,
                 id_attribute="id",
             ),
+            SecretScopeInventorizer(),
         ]
 
     def inventorize_permissions(self):
@@ -109,48 +114,110 @@ class PermissionManager:
         logger.info("Permissions were inventorized and saved")
 
     @staticmethod
-    def _prepare_new_permission_request(
+    def __prepare_request_for_permissions_api(
         item: PermissionsInventoryItem,
         migration_groups_provider: MigrationGroupsProvider,
         destination: Literal["backup", "account"],
     ) -> PermissionRequestPayload:
-        new_acls: list[AccessControlRequest] = []
+        _existing_permissions: ObjectPermissions = item.typed_object_permissions
+        _acl = _existing_permissions.access_control_list
+        acl_requests = []
 
-        for acl in item.typed_object_permissions.access_control_list:
-            if acl.group_name in [g.workspace.display_name for g in migration_groups_provider.groups]:
-                migration_info = migration_groups_provider.get_by_workspace_group_name(acl.group_name)
-                assert migration_info is not None, f"Group {acl.group_name} is not in the migration groups provider"
+        for _item in _acl:
+            if _item.group_name in [g.workspace.display_name for g in migration_groups_provider.groups]:
+                migration_info = migration_groups_provider.get_by_workspace_group_name(_item.group_name)
+                assert migration_info is not None, f"Group {_item.group_name} is not in the migration groups provider"
                 destination_group: Group = getattr(migration_info, destination)
-                for permission in acl.all_permissions:
-                    if permission.inherited:
-                        continue
-                    new_acls.append(
-                        AccessControlRequest(
-                            group_name=destination_group.display_name,
-                            permission_level=permission.permission_level,
-                        )
+                _item.group_name = destination_group.display_name
+                _reqs = [
+                    AccessControlRequest(
+                        group_name=_item.group_name,
+                        service_principal_name=_item.service_principal_name,
+                        user_name=_item.user_name,
+                        permission_level=p.permission_level,
                     )
-            else:
-                continue
+                    for p in _item.all_permissions
+                    if not p.inherited
+                ]
+                acl_requests.extend(_reqs)
 
-        if new_acls:
-            return PermissionRequestPayload(
-                request_object_type=item.request_object_type,
-                object_id=item.object_id,
-                access_control_list=new_acls,
+        return PermissionRequestPayload(
+            logical_object_type=item.logical_object_type,
+            request_object_type=item.request_object_type,
+            object_id=item.object_id,
+            access_control_list=acl_requests,
+        )
+
+    @staticmethod
+    def _prepare_permission_request_for_secrets_api(
+        item: PermissionsInventoryItem,
+        migration_groups_provider: MigrationGroupsProvider,
+        destination: Literal["backup", "account"],
+    ) -> SecretsPermissionRequestPayload:
+        _existing_acl_container: AclItemsContainer = item.typed_object_permissions
+        _final_acls = []
+
+        logger.debug("Preparing the permissions for the secrets API")
+
+        for _existing_acl in _existing_acl_container.acls:
+            _new_acl = deepcopy(_existing_acl)
+
+            if _existing_acl.principal in [g.workspace.display_name for g in migration_groups_provider.groups]:
+                migration_info = migration_groups_provider.get_by_workspace_group_name(_existing_acl.principal)
+                assert (
+                    migration_info is not None
+                ), f"Group {_existing_acl.principal} is not in the migration groups provider"
+                destination_group: Group = getattr(migration_info, destination)
+                _new_acl.principal = destination_group.display_name
+                _final_acls.append(_new_acl)
+
+        _typed_acl_container = AclItemsContainer(acls=_final_acls)
+
+        return SecretsPermissionRequestPayload(
+            object_id=item.object_id,
+            access_control_list=_typed_acl_container.to_sdk(),
+        )
+
+    def _prepare_new_permission_request(
+        self,
+        item: PermissionsInventoryItem,
+        migration_groups_provider: MigrationGroupsProvider,
+        destination: Literal["backup", "account"],
+    ) -> PermissionRequestPayload | SecretsPermissionRequestPayload:
+        if isinstance(item.request_object_type, RequestObjectType) and isinstance(
+            item.typed_object_permissions, ObjectPermissions
+        ):
+            return self.__prepare_request_for_permissions_api(item, migration_groups_provider, destination)
+        elif item.logical_object_type == LogicalObjectType.SECRET_SCOPE:
+            return self._prepare_permission_request_for_secrets_api(item, migration_groups_provider, destination)
+        else:
+            logger.warning(
+                f"Unsupported permissions payload for object {item.object_id} "
+                f"with logical type {item.logical_object_type}"
             )
 
     @staticmethod
-    def _apply_permissions_in_parallel(requests: list[PermissionRequestPayload]):
-        executables = [
-            partial(
-                provider.ws.permissions.update,
-                request_object_type=payload.request_object_type,
-                request_object_id=payload.object_id,
-                access_control_list=payload.access_control_list,
+    def _permission_applicator(request_payload: PermissionRequestPayload | SecretsPermissionRequestPayload):
+        if isinstance(request_payload, PermissionRequestPayload):
+            provider.ws.permissions.update(
+                request_object_type=request_payload.request_object_type,
+                request_object_id=request_payload.object_id,
+                access_control_list=request_payload.access_control_list,
             )
-            for payload in requests
-        ]
+        elif isinstance(request_payload, SecretsPermissionRequestPayload):
+            for _acl_item in request_payload.access_control_list:
+                # this request will create OR update the ACL for the given principal
+                # it means that the access_control_list should only keep records required for update
+                provider.ws.secrets.put_acl(
+                    scope=request_payload.object_id, principal=_acl_item.principal, permission=_acl_item.permission
+                )
+        else:
+            logger.warning(f"Unsupported logical object type {request_payload}")
+
+    def _apply_permissions_in_parallel(
+        self, requests: list[PermissionRequestPayload | SecretsPermissionRequestPayload]
+    ):
+        executables = [partial(self._permission_applicator, payload) for payload in requests]
         execution = ThreadedExecution[None](executables)
         execution.run()
 
@@ -161,17 +228,12 @@ class PermissionManager:
         logger.info(f"Total groups to apply permissions: {len(migration_groups_provider.groups)}")
 
         permissions_on_source = self.inventory_table_manager.load_for_groups(
-            groups=[g.workspace for g in migration_groups_provider.groups]
+            groups=[g.workspace.display_name for g in migration_groups_provider.groups]
         )
-        applicable_permissions = list(
-            filter(
-                lambda item: item is not None,
-                [
-                    self._prepare_new_permission_request(item, migration_groups_provider, destination=destination)
-                    for item in permissions_on_source
-                ],
-            )
-        )
+        applicable_permissions = [
+            self._prepare_new_permission_request(item, migration_groups_provider, destination=destination)
+            for item in permissions_on_source
+        ]
 
         logger.info(f"Applying {len(applicable_permissions)} permissions")
 

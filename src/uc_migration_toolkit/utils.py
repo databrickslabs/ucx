@@ -1,6 +1,7 @@
 import concurrent
 import datetime as dt
 import enum
+import json
 from collections.abc import Callable
 from concurrent.futures import ALL_COMPLETED, ThreadPoolExecutor
 from typing import Generic, TypeVar
@@ -104,3 +105,11 @@ class WorkspaceLevelEntitlement(StrEnum):
     DATABRICKS_SQL_ACCESS = "databricks-sql-access"
     ALLOW_CLUSTER_CREATE = "allow-cluster-create"
     ALLOW_INSTANCE_POOL_CREATE = "allow-instance-pool-create"
+
+
+# TODO: using this because SDK doesn't know how to properly write enums, highlight this to the SDK team
+class EnumEncoder(json.JSONEncoder):
+    def default(self, obj):
+        if isinstance(obj, enum.Enum):
+            return obj.name
+        return json.JSONEncoder.default(self, obj)
