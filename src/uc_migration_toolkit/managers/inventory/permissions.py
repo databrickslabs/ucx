@@ -11,6 +11,7 @@ from uc_migration_toolkit.managers.inventory.inventorizer import (
     SecretScopeInventorizer,
     StandardInventorizer,
     TokensAndPasswordsInventorizer,
+    WorkspaceInventorizer,
 )
 from uc_migration_toolkit.managers.inventory.listing import CustomListing
 from uc_migration_toolkit.managers.inventory.table import InventoryTableManager
@@ -98,6 +99,7 @@ class PermissionManager:
                 id_attribute="id",
             ),
             SecretScopeInventorizer(),
+            WorkspaceInventorizer(),
         ]
 
     def inventorize_permissions(self):
