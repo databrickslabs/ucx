@@ -83,9 +83,10 @@ Security:
 
 Workspace:
 
-- [ ] Notebooks
-- [ ] Directories
-- [ ] Repos
+- [x] Notebooks
+- [x] Directories
+- [x] Repos
+- [x] Files
 
 Data access:
 
