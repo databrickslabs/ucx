@@ -1,4 +1,3 @@
-import itertools
 import random
 import time
 from copy import deepcopy
@@ -234,10 +233,18 @@ class PermissionManager:
             access_control_list=request_payload.access_control_list,
         )
 
-    def _apply_standard_permissions_in_parallel(
+    def applicator(self, request_payload: PermissionRequestPayload | SecretsPermissionRequestPayload):
+        if isinstance(request_payload, PermissionRequestPayload):
+            self._standard_permissions_applicator(request_payload)
+        elif isinstance(request_payload, SecretsPermissionRequestPayload):
+            self._scope_permissions_applicator(request_payload)
+        else:
+            logger.warning(f"Unsupported payload type {type(request_payload)}")
+
+    def _apply_permissions_in_parallel(
         self, requests: list[PermissionRequestPayload | SecretsPermissionRequestPayload]
     ):
-        executables = [partial(self._standard_permissions_applicator, payload) for payload in requests]
+        executables = [partial(self.applicator, payload) for payload in requests]
         execution = ThreadedExecution[None](executables)
         execution.run()
 
@@ -256,22 +263,5 @@ class PermissionManager:
         ]
         logger.info(f"Applying {len(permission_payloads)} permissions")
 
-        generic_requests = [p for p in permission_payloads if not isinstance(p, SecretsPermissionRequestPayload)]
-
-        scope_requests = [p for p in permission_payloads if isinstance(p, SecretsPermissionRequestPayload)]
-
-        self._apply_standard_permissions_in_parallel(requests=generic_requests)
-        self._apply_scope_permissions(scope_requests=scope_requests)
+        self._apply_permissions_in_parallel(requests=permission_payloads)
         logger.info("All permissions were applied")
-
-    def _apply_scope_permissions(self, scope_requests: list[SecretsPermissionRequestPayload]):
-        """
-        Secret scope requests work really poor with parallel updates, therefore here we just apply them in sequence
-        :param scope_requests:
-        :return:
-        """
-        chunked_by_scope = itertools.groupby(scope_requests, lambda x: x.object_id)
-        for scope, requests in chunked_by_scope:
-            logger.debug(f"Applying permissions for scope {scope}")
-            for req in requests:
-                self._scope_permissions_applicator(req)
