@@ -1,4 +1,6 @@
 import itertools
+import random
+import time
 from copy import deepcopy
 from dataclasses import dataclass
 from functools import partial
@@ -210,16 +212,19 @@ class PermissionManager:
             provider.ws.secrets.put_acl(
                 scope=request_payload.object_id, principal=_acl_item.principal, permission=_acl_item.permission
             )
-            logger.info(f"Applied new permissions for scope {request_payload.object_id}: {_acl_item}")
+            logger.debug(f"Applied new permissions for scope {request_payload.object_id}: {_acl_item}")
             # in-flight check for the applied permissions
-            applied_acls = safe_get_acls(
-                provider.ws, scope_name=request_payload.object_id, group_name=_acl_item.principal
-            )
-            assert applied_acls, f"Failed to apply permissions for {_acl_item.principal}"
-            assert applied_acls.permission == _acl_item.permission, (
-                f"Failed to apply permissions for {_acl_item.principal}. "
-                f"Expected: {_acl_item.permission}. Actual: {applied_acls.permission}"
-            )
+            # the api might be inconsistent, therefore we need to check that the permissions were applied
+            for _ in range(3):
+                time.sleep(random.random() * 2)
+                applied_acls = safe_get_acls(
+                    provider.ws, scope_name=request_payload.object_id, group_name=_acl_item.principal
+                )
+                assert applied_acls, f"Failed to apply permissions for {_acl_item.principal}"
+                assert applied_acls.permission == _acl_item.permission, (
+                    f"Failed to apply permissions for {_acl_item.principal}. "
+                    f"Expected: {_acl_item.permission}. Actual: {applied_acls.permission}"
+                )
 
     @staticmethod
     def _standard_permissions_applicator(request_payload: PermissionRequestPayload):
@@ -267,6 +272,6 @@ class PermissionManager:
         """
         chunked_by_scope = itertools.groupby(scope_requests, lambda x: x.object_id)
         for scope, requests in chunked_by_scope:
-            logger.info(f"Applying permissions for scope {scope}")
+            logger.debug(f"Applying permissions for scope {scope}")
             for req in requests:
                 self._scope_permissions_applicator(req)

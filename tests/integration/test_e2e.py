@@ -33,8 +33,10 @@ def _verify_group_permissions(
     toolkit: GroupMigrationToolkit,
     target: Literal["backup", "account"],
 ):
-    logger.debug(f"Verifying that the permissions of object "
-                 f"{request_object_type or id_attribute} were applied to {target} groups")
+    logger.debug(
+        f"Verifying that the permissions of object "
+        f"{request_object_type or id_attribute} were applied to {target} groups"
+    )
 
     if id_attribute == "workspace_objects":
         _workspace_objects: WorkspaceObjects = objects
@@ -73,13 +75,14 @@ def _verify_group_permissions(
                 base_acl = safe_get_acls(ws, scope.name, base_group.display_name)
                 target_acl = safe_get_acls(ws, scope.name, target_group.display_name)
 
-                # TODO: for some reason, permissions were not correctly
-                #  set for account-level group from the backup group
-                # check the permissions_applicator method for debugging.
-                if not base_acl:
-                    assert not target_acl
-                else:
-                    assert base_acl.permission == target_acl.permission
+                if base_acl:
+                    if not target_acl:
+                        msg = "Target ACL is empty, while base ACL is not"
+                        raise AssertionError(msg)
+
+                    assert (
+                        base_acl.permission == target_acl.permission
+                    ), f"Target permissions were not applied correctly for scope {scope.name}"
 
     elif id_attribute in ("tokens", "passwords"):
         _typed_objects: list[AccessControlRequest] = objects
