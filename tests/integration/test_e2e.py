@@ -1,17 +1,15 @@
 from typing import Literal
 
 import pytest
-from databricks.sdk.core import DatabricksError
 from databricks.sdk.service.iam import (
     AccessControlRequest,
     AccessControlResponse,
-    Group,
     ObjectPermissions,
     Permission,
 )
-from databricks.sdk.service.workspace import AclItem, SecretScope
+from databricks.sdk.service.workspace import SecretScope
 from pyspark.errors import AnalysisException
-from utils import EnvironmentInfo
+from utils import EnvironmentInfo, WorkspaceObjects
 
 from uc_migration_toolkit.config import (
     GroupsConfig,
@@ -24,19 +22,46 @@ from uc_migration_toolkit.managers.inventory.types import RequestObjectType
 from uc_migration_toolkit.providers.client import ImprovedWorkspaceClient
 from uc_migration_toolkit.providers.logger import logger
 from uc_migration_toolkit.toolkits.group_migration import GroupMigrationToolkit
+from uc_migration_toolkit.utils import safe_get_acls
 
 
 def _verify_group_permissions(
-    objects: list | None,
+    objects: list | WorkspaceObjects | None,
     id_attribute: str,
     request_object_type: RequestObjectType | None,
     ws: ImprovedWorkspaceClient,
     toolkit: GroupMigrationToolkit,
     target: Literal["backup", "account"],
 ):
-    logger.debug(f"Verifying that the permissions of object {request_object_type} were applied to {target} groups")
+    logger.debug(
+        f"Verifying that the permissions of object "
+        f"{request_object_type or id_attribute} were applied to {target} groups"
+    )
 
-    if id_attribute == "secret_scopes":
+    if id_attribute == "workspace_objects":
+        _workspace_objects: WorkspaceObjects = objects
+
+        # list of groups that source the permissions
+        comparison_base = [
+            getattr(mi, "workspace" if target == "backup" else "backup")
+            for mi in toolkit.group_manager.migration_groups_provider.groups
+        ]
+        # list of groups that are the target of the permissions
+        comparison_target = [getattr(mi, target) for mi in toolkit.group_manager.migration_groups_provider.groups]
+
+        root_permissions = ws.permissions.get(
+            request_object_type=RequestObjectType.DIRECTORIES, request_object_id=_workspace_objects.root_dir.object_id
+        )
+        base_group_names = [g.display_name for g in comparison_base]
+        target_group_names = [g.display_name for g in comparison_target]
+
+        base_acls = [a for a in root_permissions.access_control_list if a.group_name in base_group_names]
+
+        target_acls = [a for a in root_permissions.access_control_list if a.group_name in target_group_names]
+
+        assert len(base_acls) == len(target_acls)
+
+    elif id_attribute == "secret_scopes":
         _scopes: list[SecretScope] = objects
         comparison_base = [
             getattr(mi, "workspace" if target == "backup" else "backup")
@@ -45,21 +70,19 @@ def _verify_group_permissions(
 
         comparison_target = [getattr(mi, target) for mi in toolkit.group_manager.migration_groups_provider.groups]
 
-        def _safe_get_acls(_scope: SecretScope, _group: Group) -> AclItem | None:
-            try:
-                return ws.secrets.get_acl(scope=_scope.name, principal=_group.display_name)
-            except DatabricksError:
-                return None
-
         for scope in _scopes:
             for base_group, target_group in zip(comparison_base, comparison_target, strict=True):
-                base_acl = _safe_get_acls(scope, base_group)
-                target_acl = _safe_get_acls(scope, target_group)
+                base_acl = safe_get_acls(ws, scope.name, base_group.display_name)
+                target_acl = safe_get_acls(ws, scope.name, target_group.display_name)
 
-                if not base_acl:
-                    assert not target_acl
-                else:
-                    assert base_acl.permission == target_acl.permission
+                if base_acl:
+                    if not target_acl:
+                        msg = "Target ACL is empty, while base ACL is not"
+                        raise AssertionError(msg)
+
+                    assert (
+                        base_acl.permission == target_acl.permission
+                    ), f"Target permissions were not applied correctly for scope {scope.name}"
 
     elif id_attribute in ("tokens", "passwords"):
         _typed_objects: list[AccessControlRequest] = objects

@@ -1,3 +1,4 @@
+import io
 import json
 import os
 import random
@@ -26,10 +27,16 @@ from databricks.sdk.service.sql import (
     CreateWarehouseRequestWarehouseType,
     GetWarehouseResponse,
 )
-from databricks.sdk.service.workspace import AclPermission, SecretScope
+from databricks.sdk.service.workspace import (
+    AclPermission,
+    ObjectInfo,
+    ObjectType,
+    SecretScope,
+)
 from utils import (
     EnvironmentInfo,
     InstanceProfile,
+    WorkspaceObjects,
     _cleanup_groups,
     _create_groups,
     _get_basic_job_cluster,
@@ -62,7 +69,7 @@ NUM_TEST_EXPERIMENTS = int(os.environ.get("NUM_TEST_EXPERIMENTS", 3))
 NUM_TEST_MODELS = int(os.environ.get("NUM_TEST_MODELS", 3))
 NUM_TEST_WAREHOUSES = int(os.environ.get("NUM_TEST_WAREHOUSES", 3))
 NUM_TEST_TOKENS = int(os.environ.get("NUM_TEST_TOKENS", 3))
-NUM_TEST_SECRET_SCOPES = int(os.environ.get("NUM_TEST_SECRET_SCOPES", 3))
+NUM_TEST_SECRET_SCOPES = int(os.environ.get("NUM_TEST_SECRET_SCOPES", 10))
 
 NUM_THREADS = int(os.environ.get("NUM_TEST_THREADS", 20))
 DB_CONNECT_CLUSTER_NAME = os.environ.get("DB_CONNECT_CLUSTER_NAME", "ucx-integration-testing")
@@ -489,10 +496,73 @@ def secret_scopes(ws: ImprovedWorkspaceClient, env: EnvironmentInfo) -> list[Sec
 
 
 @pytest.fixture(scope="session", autouse=True)
+def workspace_objects(ws: ImprovedWorkspaceClient, env: EnvironmentInfo) -> WorkspaceObjects:
+    logger.info(f"Creating test workspace objects under /{env.test_uid}")
+    ws.workspace.mkdirs(f"/{env.test_uid}")
+
+    base_dirs = []
+
+    for ws_group, _ in env.groups:
+        _path = f"/{env.test_uid}/{ws_group.display_name}"
+        ws.workspace.mkdirs(_path)
+        object_info = ws.workspace.get_status(_path)
+        base_dirs.append(object_info)
+
+        ws.permissions.set(
+            request_object_type=RequestObjectType.DIRECTORIES,
+            request_object_id=object_info.object_id,
+            access_control_list=[
+                AccessControlRequest(group_name=ws_group.display_name, permission_level=PermissionLevel.CAN_MANAGE)
+            ],
+        )
+
+    notebooks = []
+
+    for nb_idx in range(3):
+        random_group = random.choice([g[0] for g in env.groups])
+        _nb_path = f"/{env.test_uid}/{random_group.display_name}/nb-{nb_idx}.py"
+        ws.workspace.upload(path=_nb_path, content=io.BytesIO(b"print(1)"))
+        _nb_obj = ws.workspace.get_status(_nb_path)
+        notebooks.append(_nb_obj)
+        ws.permissions.set(
+            request_object_type=RequestObjectType.NOTEBOOKS,
+            request_object_id=_nb_obj.object_id,
+            access_control_list=[
+                AccessControlRequest(group_name=random_group.display_name, permission_level=PermissionLevel.CAN_EDIT)
+            ],
+        )
+
+    yield WorkspaceObjects(
+        root_dir=ObjectInfo(
+            path=f"/{env.test_uid}",
+            object_type=ObjectType.DIRECTORY,
+            object_id=ws.workspace.get_status(f"/{env.test_uid}").object_id,
+        ),
+        directories=base_dirs,
+        notebooks=notebooks,
+    )
+
+    logger.debug("Deleting test workspace objects")
+    ws.workspace.delete(f"/{env.test_uid}", recursive=True)
+    logger.debug("Test workspace objects deleted")
+
+
+@pytest.fixture(scope="session", autouse=True)
 def verifiable_objects(
-    clusters, instance_pools, cluster_policies, pipelines, jobs, experiments, models, warehouses, tokens, secret_scopes
+    clusters,
+    instance_pools,
+    cluster_policies,
+    pipelines,
+    jobs,
+    experiments,
+    models,
+    warehouses,
+    tokens,
+    secret_scopes,
+    workspace_objects,
 ) -> list[tuple[list, str, RequestObjectType | None]]:
     _verifiable_objects = [
+        (workspace_objects, "workspace_objects", None),
         (secret_scopes, "secret_scopes", None),
         (tokens, "tokens", RequestObjectType.AUTHORIZATION),
         (clusters, "cluster_id", RequestObjectType.CLUSTERS),

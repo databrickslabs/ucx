@@ -1,14 +1,15 @@
 import concurrent
 import datetime as dt
 import enum
-import json
 from collections.abc import Callable
 from concurrent.futures import ALL_COMPLETED, ThreadPoolExecutor
 from typing import Generic, TypeVar
 
+from databricks.sdk.service.workspace import AclItem
 from ratelimit import limits, sleep_and_retry
 
 from uc_migration_toolkit.config import RateLimitConfig
+from uc_migration_toolkit.providers.client import ImprovedWorkspaceClient
 from uc_migration_toolkit.providers.config import provider as config_provider
 from uc_migration_toolkit.providers.logger import logger
 
@@ -107,9 +108,8 @@ class WorkspaceLevelEntitlement(StrEnum):
     ALLOW_INSTANCE_POOL_CREATE = "allow-instance-pool-create"
 
 
-# TODO: using this because SDK doesn't know how to properly write enums, highlight this to the SDK team
-class EnumEncoder(json.JSONEncoder):
-    def default(self, obj):
-        if isinstance(obj, enum.Enum):
-            return obj.name
-        return json.JSONEncoder.default(self, obj)
+def safe_get_acls(ws: ImprovedWorkspaceClient, scope_name: str, group_name: str) -> AclItem | None:
+    all_acls = ws.secrets.list_acls(scope=scope_name)
+    for acl in all_acls:
+        if acl.principal == group_name:
+            return acl

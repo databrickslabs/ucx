@@ -83,14 +83,10 @@ Security:
 
 Workspace:
 
-- [ ] Notebooks in the Workspace FS
-- [ ] Directories in the Workspace FS
-- [ ] Files in the Workspace FS
-
-Repos:
-
-- [ ] User-level Repos
-- [ ] Org-level Repos
+- [x] Notebooks
+- [x] Directories
+- [x] Repos
+- [x] Files
 
 Data access:
 

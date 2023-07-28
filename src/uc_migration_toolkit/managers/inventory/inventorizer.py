@@ -6,8 +6,14 @@ from typing import Generic, TypeVar
 
 from databricks.sdk.core import DatabricksError
 from databricks.sdk.service.iam import AccessControlResponse, ObjectPermissions
-from databricks.sdk.service.workspace import AclItem, SecretScope
+from databricks.sdk.service.workspace import (
+    AclItem,
+    ObjectInfo,
+    ObjectType,
+    SecretScope,
+)
 
+from uc_migration_toolkit.managers.inventory.listing import WorkspaceListing
 from uc_migration_toolkit.managers.inventory.types import (
     AclItemsContainer,
     LogicalObjectType,
@@ -170,3 +176,70 @@ class SecretScopeInventorizer(BaseInventorizer[InventoryObject]):
 
     def preload(self):
         pass
+
+
+class WorkspaceInventorizer(BaseInventorizer[InventoryObject]):
+    def __init__(self):
+        self.listing = WorkspaceListing(
+            provider.ws,
+            num_threads=config_provider.config.num_threads,
+            with_directories=False,
+            rate_limit=config_provider.config.rate_limit,
+        )
+
+    def preload(self):
+        pass
+
+    @staticmethod
+    def __convert_object_type_to_request_type(_object: ObjectInfo) -> RequestObjectType | None:
+        match _object.object_type:
+            case ObjectType.NOTEBOOK:
+                return RequestObjectType.NOTEBOOKS
+            case ObjectType.DIRECTORY:
+                return RequestObjectType.DIRECTORIES
+            case ObjectType.LIBRARY:
+                return None
+            case ObjectType.REPO:
+                return RequestObjectType.REPOS
+            case ObjectType.FILE:
+                return RequestObjectType.FILES
+            # silent handler for experiments - they'll be inventorized by the experiments manager
+            case None:
+                return None
+
+    @staticmethod
+    def __convert_request_object_type_to_logical_type(request_object_type: RequestObjectType) -> LogicalObjectType:
+        match request_object_type:
+            case RequestObjectType.NOTEBOOKS:
+                return LogicalObjectType.NOTEBOOK
+            case RequestObjectType.DIRECTORIES:
+                return LogicalObjectType.DIRECTORY
+            case RequestObjectType.REPOS:
+                return LogicalObjectType.REPO
+            case RequestObjectType.FILES:
+                return LogicalObjectType.FILE
+
+    def _convert_result_to_permission_item(self, _object: ObjectInfo) -> PermissionsInventoryItem | None:
+        request_object_type = self.__convert_object_type_to_request_type(_object)
+        if not request_object_type:
+            return
+        else:
+            permissions = provider.ws.permissions.get(
+                request_object_type=request_object_type, request_object_id=_object.object_id
+            )
+
+            inventory_item = PermissionsInventoryItem(
+                object_id=str(_object.object_id),
+                logical_object_type=self.__convert_request_object_type_to_logical_type(request_object_type),
+                request_object_type=request_object_type,
+                raw_object_permissions=json.dumps(permissions.as_dict()),
+            )
+            return inventory_item
+
+    def inventorize(self) -> list[PermissionsInventoryItem]:
+        self.listing.walk("/")
+        executables = [partial(self._convert_result_to_permission_item, _object) for _object in self.listing.results]
+        results = ThreadedExecution[PermissionsInventoryItem | None](executables).run()
+        results = [result for result in results if result]
+        logger.info(f"Permissions fetched for {len(results)} workspace objects")
+        return results

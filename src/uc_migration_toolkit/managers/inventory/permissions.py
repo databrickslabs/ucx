@@ -1,3 +1,5 @@
+import random
+import time
 from copy import deepcopy
 from dataclasses import dataclass
 from functools import partial
@@ -5,12 +7,14 @@ from typing import Literal
 
 from databricks.sdk.service.iam import AccessControlRequest, Group, ObjectPermissions
 from databricks.sdk.service.workspace import AclItem as SdkAclItem
+from tenacity import retry, stop_after_attempt, wait_fixed, wait_random
 
 from uc_migration_toolkit.managers.group import MigrationGroupsProvider
 from uc_migration_toolkit.managers.inventory.inventorizer import (
     SecretScopeInventorizer,
     StandardInventorizer,
     TokensAndPasswordsInventorizer,
+    WorkspaceInventorizer,
 )
 from uc_migration_toolkit.managers.inventory.listing import CustomListing
 from uc_migration_toolkit.managers.inventory.table import InventoryTableManager
@@ -23,7 +27,7 @@ from uc_migration_toolkit.managers.inventory.types import (
 from uc_migration_toolkit.providers.client import provider
 from uc_migration_toolkit.providers.config import provider as config_provider
 from uc_migration_toolkit.providers.logger import logger
-from uc_migration_toolkit.utils import ThreadedExecution
+from uc_migration_toolkit.utils import ThreadedExecution, safe_get_acls
 
 
 @dataclass
@@ -98,6 +102,7 @@ class PermissionManager:
                 id_attribute="id",
             ),
             SecretScopeInventorizer(),
+            WorkspaceInventorizer(),
         ]
 
     def inventorize_permissions(self):
@@ -197,27 +202,49 @@ class PermissionManager:
             )
 
     @staticmethod
-    def _permission_applicator(request_payload: PermissionRequestPayload | SecretsPermissionRequestPayload):
-        if isinstance(request_payload, PermissionRequestPayload):
-            provider.ws.permissions.update(
-                request_object_type=request_payload.request_object_type,
-                request_object_id=request_payload.object_id,
-                access_control_list=request_payload.access_control_list,
+    @retry(wait=wait_fixed(1) + wait_random(0, 2), stop=stop_after_attempt(5))
+    def _scope_permissions_applicator(request_payload: SecretsPermissionRequestPayload):
+        # TODO: rewrite and generalize this
+        for _acl_item in request_payload.access_control_list:
+            # this request will create OR update the ACL for the given principal
+            # it means that the access_control_list should only keep records required for update
+            provider.ws.secrets.put_acl(
+                scope=request_payload.object_id, principal=_acl_item.principal, permission=_acl_item.permission
             )
-        elif isinstance(request_payload, SecretsPermissionRequestPayload):
-            for _acl_item in request_payload.access_control_list:
-                # this request will create OR update the ACL for the given principal
-                # it means that the access_control_list should only keep records required for update
-                provider.ws.secrets.put_acl(
-                    scope=request_payload.object_id, principal=_acl_item.principal, permission=_acl_item.permission
+            logger.debug(f"Applied new permissions for scope {request_payload.object_id}: {_acl_item}")
+            # in-flight check for the applied permissions
+            # the api might be inconsistent, therefore we need to check that the permissions were applied
+            for _ in range(3):
+                time.sleep(random.random() * 2)
+                applied_acls = safe_get_acls(
+                    provider.ws, scope_name=request_payload.object_id, group_name=_acl_item.principal
                 )
+                assert applied_acls, f"Failed to apply permissions for {_acl_item.principal}"
+                assert applied_acls.permission == _acl_item.permission, (
+                    f"Failed to apply permissions for {_acl_item.principal}. "
+                    f"Expected: {_acl_item.permission}. Actual: {applied_acls.permission}"
+                )
+
+    @staticmethod
+    def _standard_permissions_applicator(request_payload: PermissionRequestPayload):
+        provider.ws.permissions.update(
+            request_object_type=request_payload.request_object_type,
+            request_object_id=request_payload.object_id,
+            access_control_list=request_payload.access_control_list,
+        )
+
+    def applicator(self, request_payload: PermissionRequestPayload | SecretsPermissionRequestPayload):
+        if isinstance(request_payload, PermissionRequestPayload):
+            self._standard_permissions_applicator(request_payload)
+        elif isinstance(request_payload, SecretsPermissionRequestPayload):
+            self._scope_permissions_applicator(request_payload)
         else:
-            logger.warning(f"Unsupported logical object type {request_payload}")
+            logger.warning(f"Unsupported payload type {type(request_payload)}")
 
     def _apply_permissions_in_parallel(
         self, requests: list[PermissionRequestPayload | SecretsPermissionRequestPayload]
     ):
-        executables = [partial(self._permission_applicator, payload) for payload in requests]
+        executables = [partial(self.applicator, payload) for payload in requests]
         execution = ThreadedExecution[None](executables)
         execution.run()
 
@@ -230,12 +257,11 @@ class PermissionManager:
         permissions_on_source = self.inventory_table_manager.load_for_groups(
             groups=[g.workspace.display_name for g in migration_groups_provider.groups]
         )
-        applicable_permissions = [
+        permission_payloads: list[PermissionRequestPayload | SecretsPermissionRequestPayload] = [
             self._prepare_new_permission_request(item, migration_groups_provider, destination=destination)
             for item in permissions_on_source
         ]
+        logger.info(f"Applying {len(permission_payloads)} permissions")
 
-        logger.info(f"Applying {len(applicable_permissions)} permissions")
-
-        self._apply_permissions_in_parallel(requests=applicable_permissions)
+        self._apply_permissions_in_parallel(requests=permission_payloads)
         logger.info("All permissions were applied")

@@ -14,6 +14,7 @@ from databricks.sdk.service.iam import (
     User,
 )
 from databricks.sdk.service.jobs import JobCluster, PythonWheelTask, Task
+from databricks.sdk.service.workspace import ObjectInfo
 from dotenv import load_dotenv
 
 from uc_migration_toolkit.managers.inventory.types import RequestObjectType
@@ -150,3 +151,12 @@ def _get_basic_task() -> Task:
         python_wheel_task=PythonWheelTask(entry_point="main", package_name="some-pkg"),
         job_cluster_key="default",
     )
+
+
+@dataclass
+class WorkspaceObjects:
+    root_dir: ObjectInfo
+    notebooks: list[ObjectInfo]
+    directories: list[ObjectInfo]
+    # files: list[ObjectInfo]
+    # repos: list[ObjectInfo]
