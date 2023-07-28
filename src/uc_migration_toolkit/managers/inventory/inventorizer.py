@@ -201,6 +201,11 @@ class WorkspaceInventorizer(BaseInventorizer[InventoryObject]):
                 return None
             case ObjectType.REPO:
                 return RequestObjectType.REPOS
+            case ObjectType.FILE:
+                return RequestObjectType.FILES
+            # silent handler for experiments - they'll be inventorized by the experiments manager
+            case None:
+                return None
 
     @staticmethod
     def __convert_request_object_type_to_logical_type(request_object_type: RequestObjectType) -> LogicalObjectType:
@@ -211,18 +216,22 @@ class WorkspaceInventorizer(BaseInventorizer[InventoryObject]):
                 return LogicalObjectType.DIRECTORY
             case RequestObjectType.REPOS:
                 return LogicalObjectType.REPO
+            case RequestObjectType.FILES:
+                return LogicalObjectType.FILE
 
     def _convert_result_to_permission_item(self, _object: ObjectInfo) -> PermissionsInventoryItem | None:
         request_object_type = self.__convert_object_type_to_request_type(_object)
         if not request_object_type:
             return
         else:
-            permissions = provider.ws.permissions.get(_object.object_type, _object.object_id)
+            permissions = provider.ws.permissions.get(
+                request_object_type=request_object_type, request_object_id=_object.object_id
+            )
 
             inventory_item = PermissionsInventoryItem(
                 object_id=str(_object.object_id),
                 logical_object_type=self.__convert_request_object_type_to_logical_type(request_object_type),
-                request_object_type=_object.object_type,
+                request_object_type=request_object_type,
                 raw_object_permissions=json.dumps(permissions.as_dict()),
             )
             return inventory_item

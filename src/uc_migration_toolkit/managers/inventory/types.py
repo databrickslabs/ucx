@@ -41,6 +41,7 @@ class SqlRequestObjectType(StrEnum):
 
 
 class LogicalObjectType(StrEnum):
+    FILE = "FILE"
     REPO = "REPO"
     DIRECTORY = "DIRECTORY"
     NOTEBOOK = "NOTEBOOK"

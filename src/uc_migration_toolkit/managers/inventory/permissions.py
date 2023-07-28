@@ -1,3 +1,4 @@
+import itertools
 from copy import deepcopy
 from dataclasses import dataclass
 from functools import partial
@@ -5,6 +6,7 @@ from typing import Literal
 
 from databricks.sdk.service.iam import AccessControlRequest, Group, ObjectPermissions
 from databricks.sdk.service.workspace import AclItem as SdkAclItem
+from tenacity import retry, stop_after_attempt, wait_fixed, wait_random
 
 from uc_migration_toolkit.managers.group import MigrationGroupsProvider
 from uc_migration_toolkit.managers.inventory.inventorizer import (
@@ -24,7 +26,7 @@ from uc_migration_toolkit.managers.inventory.types import (
 from uc_migration_toolkit.providers.client import provider
 from uc_migration_toolkit.providers.config import provider as config_provider
 from uc_migration_toolkit.providers.logger import logger
-from uc_migration_toolkit.utils import ThreadedExecution
+from uc_migration_toolkit.utils import ThreadedExecution, safe_get_acls
 
 
 @dataclass
@@ -199,27 +201,38 @@ class PermissionManager:
             )
 
     @staticmethod
-    def _permission_applicator(request_payload: PermissionRequestPayload | SecretsPermissionRequestPayload):
-        if isinstance(request_payload, PermissionRequestPayload):
-            provider.ws.permissions.update(
-                request_object_type=request_payload.request_object_type,
-                request_object_id=request_payload.object_id,
-                access_control_list=request_payload.access_control_list,
+    @retry(wait=wait_fixed(1) + wait_random(0, 2), stop=stop_after_attempt(5))
+    def _scope_permissions_applicator(request_payload: SecretsPermissionRequestPayload):
+        # TODO: rewrite and generalize this
+        for _acl_item in request_payload.access_control_list:
+            # this request will create OR update the ACL for the given principal
+            # it means that the access_control_list should only keep records required for update
+            provider.ws.secrets.put_acl(
+                scope=request_payload.object_id, principal=_acl_item.principal, permission=_acl_item.permission
             )
-        elif isinstance(request_payload, SecretsPermissionRequestPayload):
-            for _acl_item in request_payload.access_control_list:
-                # this request will create OR update the ACL for the given principal
-                # it means that the access_control_list should only keep records required for update
-                provider.ws.secrets.put_acl(
-                    scope=request_payload.object_id, principal=_acl_item.principal, permission=_acl_item.permission
-                )
-        else:
-            logger.warning(f"Unsupported logical object type {request_payload}")
+            logger.info(f"Applied new permissions for scope {request_payload.object_id}: {_acl_item}")
+            # in-flight check for the applied permissions
+            applied_acls = safe_get_acls(
+                provider.ws, scope_name=request_payload.object_id, group_name=_acl_item.principal
+            )
+            assert applied_acls, f"Failed to apply permissions for {_acl_item.principal}"
+            assert applied_acls.permission == _acl_item.permission, (
+                f"Failed to apply permissions for {_acl_item.principal}. "
+                f"Expected: {_acl_item.permission}. Actual: {applied_acls.permission}"
+            )
 
-    def _apply_permissions_in_parallel(
+    @staticmethod
+    def _standard_permissions_applicator(request_payload: PermissionRequestPayload):
+        provider.ws.permissions.update(
+            request_object_type=request_payload.request_object_type,
+            request_object_id=request_payload.object_id,
+            access_control_list=request_payload.access_control_list,
+        )
+
+    def _apply_standard_permissions_in_parallel(
         self, requests: list[PermissionRequestPayload | SecretsPermissionRequestPayload]
     ):
-        executables = [partial(self._permission_applicator, payload) for payload in requests]
+        executables = [partial(self._standard_permissions_applicator, payload) for payload in requests]
         execution = ThreadedExecution[None](executables)
         execution.run()
 
@@ -232,12 +245,28 @@ class PermissionManager:
         permissions_on_source = self.inventory_table_manager.load_for_groups(
             groups=[g.workspace.display_name for g in migration_groups_provider.groups]
         )
-        applicable_permissions = [
+        permission_payloads: list[PermissionRequestPayload | SecretsPermissionRequestPayload] = [
             self._prepare_new_permission_request(item, migration_groups_provider, destination=destination)
             for item in permissions_on_source
         ]
+        logger.info(f"Applying {len(permission_payloads)} permissions")
 
-        logger.info(f"Applying {len(applicable_permissions)} permissions")
+        generic_requests = [p for p in permission_payloads if not isinstance(p, SecretsPermissionRequestPayload)]
 
-        self._apply_permissions_in_parallel(requests=applicable_permissions)
+        scope_requests = [p for p in permission_payloads if isinstance(p, SecretsPermissionRequestPayload)]
+
+        self._apply_standard_permissions_in_parallel(requests=generic_requests)
+        self._apply_scope_permissions(scope_requests=scope_requests)
         logger.info("All permissions were applied")
+
+    def _apply_scope_permissions(self, scope_requests: list[SecretsPermissionRequestPayload]):
+        """
+        Secret scope requests work really poor with parallel updates, therefore here we just apply them in sequence
+        :param scope_requests:
+        :return:
+        """
+        chunked_by_scope = itertools.groupby(scope_requests, lambda x: x.object_id)
+        for scope, requests in chunked_by_scope:
+            logger.info(f"Applying permissions for scope {scope}")
+            for req in requests:
+                self._scope_permissions_applicator(req)

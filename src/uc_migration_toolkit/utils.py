@@ -6,6 +6,8 @@ from collections.abc import Callable
 from concurrent.futures import ALL_COMPLETED, ThreadPoolExecutor
 from typing import Generic, TypeVar
 
+from databricks.sdk.core import DatabricksError
+from databricks.sdk.service.workspace import AclItem
 from ratelimit import limits, sleep_and_retry
 
 from uc_migration_toolkit.config import RateLimitConfig
@@ -113,3 +115,10 @@ class EnumEncoder(json.JSONEncoder):
         if isinstance(obj, enum.Enum):
             return obj.name
         return json.JSONEncoder.default(self, obj)
+
+
+def safe_get_acls(ws, scope_name: str, group_name: str) -> AclItem | None:
+    try:
+        return ws.secrets.get_acl(scope=scope_name, principal=group_name)
+    except DatabricksError:
+        return None
