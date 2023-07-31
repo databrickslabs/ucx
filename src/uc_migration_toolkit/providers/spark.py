@@ -1,4 +1,3 @@
-import functools
 import os
 import time
 
@@ -17,10 +16,10 @@ class SparkMixin:
     @staticmethod
     def _initialize_spark() -> SparkSession:
         logger.info("Initializing Spark session")
-        if "spark" in locals():
-            logger.info("Using the Spark session from runtime")
-            return locals()["spark"]
-        else:
+        try:
+            from databricks.sdk.runtime import spark
+            return spark
+        except ValueError:
             logger.info("Using DB Connect")
             from databricks.connect import DatabricksSession
 
