@@ -14,7 +14,7 @@ def migrate_groups(config_file: Annotated[Path, typer.Argument(help="Path to con
 
     config = get_migration_config(config_file)
     toolkit = GroupMigrationToolkit(config)
-    toolkit.prepare_groups_in_environment()
+    toolkit.prepare_environment()
 
     toolkit.cleanup_inventory_table()
     toolkit.inventorize_permissions()

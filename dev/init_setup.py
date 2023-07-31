@@ -5,11 +5,10 @@ from databricks.sdk import WorkspaceClient
 from databricks.sdk.service.iam import ComplexValue
 from dotenv import load_dotenv
 
-from uc_migration_toolkit.config import RateLimitConfig
 from uc_migration_toolkit.providers.logger import logger
 from uc_migration_toolkit.utils import ThreadedExecution
 
-Threader = partial(ThreadedExecution, num_threads=40, rate_limit=RateLimitConfig())
+Threader = partial(ThreadedExecution, num_threads=40)
 
 
 def _create_user(_ws: WorkspaceClient, uid: str):

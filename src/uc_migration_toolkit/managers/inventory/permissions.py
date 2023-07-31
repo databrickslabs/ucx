@@ -9,23 +9,18 @@ from databricks.sdk.service.iam import AccessControlRequest, Group, ObjectPermis
 from databricks.sdk.service.workspace import AclItem as SdkAclItem
 from tenacity import retry, stop_after_attempt, wait_fixed, wait_random
 
-from uc_migration_toolkit.managers.group import MigrationGroupsProvider
-from uc_migration_toolkit.managers.inventory.inventorizer import (
-    SecretScopeInventorizer,
-    StandardInventorizer,
-    TokensAndPasswordsInventorizer,
-    WorkspaceInventorizer,
-)
-from uc_migration_toolkit.managers.inventory.listing import CustomListing
+from uc_migration_toolkit.managers.inventory.inventorizer import BaseInventorizer
 from uc_migration_toolkit.managers.inventory.table import InventoryTableManager
 from uc_migration_toolkit.managers.inventory.types import (
     AclItemsContainer,
     LogicalObjectType,
     PermissionsInventoryItem,
     RequestObjectType,
+    RolesAndEntitlements,
 )
 from uc_migration_toolkit.providers.client import provider
 from uc_migration_toolkit.providers.config import provider as config_provider
+from uc_migration_toolkit.providers.groups_info import MigrationGroupsProvider
 from uc_migration_toolkit.providers.logger import logger
 from uc_migration_toolkit.utils import ThreadedExecution, safe_get_acls
 
@@ -44,77 +39,37 @@ class SecretsPermissionRequestPayload:
     access_control_list: list[SdkAclItem]
 
 
+@dataclass
+class RolesAndEntitlementsRequestPayload:
+    payload: RolesAndEntitlements
+    group_id: str
+
+
+AnyRequestPayload = PermissionRequestPayload | SecretsPermissionRequestPayload | RolesAndEntitlementsRequestPayload
+
+
 class PermissionManager:
     def __init__(self, inventory_table_manager: InventoryTableManager):
         self.config = config_provider.config
         self.inventory_table_manager = inventory_table_manager
+        self._inventorizers = []
 
-    @staticmethod
-    def get_inventorizers():
-        return [
-            TokensAndPasswordsInventorizer(),
-            StandardInventorizer(
-                logical_object_type=LogicalObjectType.CLUSTER,
-                request_object_type=RequestObjectType.CLUSTERS,
-                listing_function=provider.ws.clusters.list,
-                id_attribute="cluster_id",
-            ),
-            StandardInventorizer(
-                logical_object_type=LogicalObjectType.INSTANCE_POOL,
-                request_object_type=RequestObjectType.INSTANCE_POOLS,
-                listing_function=provider.ws.instance_pools.list,
-                id_attribute="instance_pool_id",
-            ),
-            StandardInventorizer(
-                logical_object_type=LogicalObjectType.CLUSTER_POLICY,
-                request_object_type=RequestObjectType.CLUSTER_POLICIES,
-                listing_function=provider.ws.cluster_policies.list,
-                id_attribute="policy_id",
-            ),
-            StandardInventorizer(
-                logical_object_type=LogicalObjectType.PIPELINE,
-                request_object_type=RequestObjectType.PIPELINES,
-                listing_function=provider.ws.pipelines.list_pipelines,
-                id_attribute="pipeline_id",
-            ),
-            StandardInventorizer(
-                logical_object_type=LogicalObjectType.JOB,
-                request_object_type=RequestObjectType.JOBS,
-                listing_function=provider.ws.jobs.list,
-                id_attribute="job_id",
-            ),
-            StandardInventorizer(
-                logical_object_type=LogicalObjectType.EXPERIMENT,
-                request_object_type=RequestObjectType.EXPERIMENTS,
-                listing_function=provider.ws.experiments.list_experiments,
-                id_attribute="experiment_id",
-            ),
-            StandardInventorizer(
-                logical_object_type=LogicalObjectType.MODEL,
-                request_object_type=RequestObjectType.REGISTERED_MODELS,
-                listing_function=CustomListing.list_models,
-                id_attribute="id",
-            ),
-            StandardInventorizer(
-                logical_object_type=LogicalObjectType.WAREHOUSE,
-                request_object_type=RequestObjectType.SQL_WAREHOUSES,
-                listing_function=provider.ws.warehouses.list,
-                id_attribute="id",
-            ),
-            SecretScopeInventorizer(),
-            WorkspaceInventorizer(),
-        ]
+    @property
+    def inventorizers(self) -> list[BaseInventorizer]:
+        return self._inventorizers
+
+    def set_inventorizers(self, value: list[BaseInventorizer]):
+        self._inventorizers = value
 
     def inventorize_permissions(self):
-        logger.info("Inventorizing the permissions")
-
-        for inventorizer in self.get_inventorizers():
+        for inventorizer in self.inventorizers:
+            logger.info(f"Inventorizing the permissions for objects of type(s) {inventorizer.logical_object_types}")
             inventorizer.preload()
             collected = inventorizer.inventorize()
             if collected:
                 self.inventory_table_manager.save(collected)
             else:
-                logger.warning(f"No objects of type {inventorizer.logical_object_type} were found")
+                logger.warning(f"No objects of type {inventorizer.logical_object_types} were found")
 
         logger.info("Permissions were inventorized and saved")
 
@@ -183,18 +138,29 @@ class PermissionManager:
             access_control_list=_typed_acl_container.to_sdk(),
         )
 
+    @staticmethod
+    def __prepare_request_for_roles_and_entitlements(
+        item: PermissionsInventoryItem, migration_groups_provider: MigrationGroupsProvider, destination
+    ) -> RolesAndEntitlementsRequestPayload:
+        migration_info = migration_groups_provider.get_by_workspace_group_name(item.object_id)
+        assert migration_info is not None, f"Group {item.object_id} is not in the migration groups provider"
+        destination_group: Group = getattr(migration_info, destination)
+        return RolesAndEntitlementsRequestPayload(payload=item.typed_object_permissions, group_id=destination_group.id)
+
     def _prepare_new_permission_request(
         self,
         item: PermissionsInventoryItem,
         migration_groups_provider: MigrationGroupsProvider,
         destination: Literal["backup", "account"],
-    ) -> PermissionRequestPayload | SecretsPermissionRequestPayload:
+    ) -> AnyRequestPayload:
         if isinstance(item.request_object_type, RequestObjectType) and isinstance(
             item.typed_object_permissions, ObjectPermissions
         ):
             return self.__prepare_request_for_permissions_api(item, migration_groups_provider, destination)
         elif item.logical_object_type == LogicalObjectType.SECRET_SCOPE:
             return self._prepare_permission_request_for_secrets_api(item, migration_groups_provider, destination)
+        elif item.logical_object_type in [LogicalObjectType.ROLES, LogicalObjectType.ENTITLEMENTS]:
+            return self.__prepare_request_for_roles_and_entitlements(item, migration_groups_provider, destination)
         else:
             logger.warning(
                 f"Unsupported permissions payload for object {item.object_id} "
@@ -204,7 +170,6 @@ class PermissionManager:
     @staticmethod
     @retry(wait=wait_fixed(1) + wait_random(0, 2), stop=stop_after_attempt(5))
     def _scope_permissions_applicator(request_payload: SecretsPermissionRequestPayload):
-        # TODO: rewrite and generalize this
         for _acl_item in request_payload.access_control_list:
             # this request will create OR update the ACL for the given principal
             # it means that the access_control_list should only keep records required for update
@@ -233,8 +198,14 @@ class PermissionManager:
             access_control_list=request_payload.access_control_list,
         )
 
-    def applicator(self, request_payload: PermissionRequestPayload | SecretsPermissionRequestPayload):
-        if isinstance(request_payload, PermissionRequestPayload):
+    def applicator(self, request_payload: AnyRequestPayload):
+        if isinstance(request_payload, RolesAndEntitlementsRequestPayload):
+            provider.ws.apply_roles_and_entitlements(
+                group_id=request_payload.group_id,
+                roles=request_payload.payload.roles,
+                entitlements=request_payload.payload.entitlements,
+            )
+        elif isinstance(request_payload, PermissionRequestPayload):
             self._standard_permissions_applicator(request_payload)
         elif isinstance(request_payload, SecretsPermissionRequestPayload):
             self._scope_permissions_applicator(request_payload)
@@ -242,7 +213,8 @@ class PermissionManager:
             logger.warning(f"Unsupported payload type {type(request_payload)}")
 
     def _apply_permissions_in_parallel(
-        self, requests: list[PermissionRequestPayload | SecretsPermissionRequestPayload]
+        self,
+        requests: list[AnyRequestPayload],
     ):
         executables = [partial(self.applicator, payload) for payload in requests]
         execution = ThreadedExecution[None](executables)
@@ -257,7 +229,7 @@ class PermissionManager:
         permissions_on_source = self.inventory_table_manager.load_for_groups(
             groups=[g.workspace.display_name for g in migration_groups_provider.groups]
         )
-        permission_payloads: list[PermissionRequestPayload | SecretsPermissionRequestPayload] = [
+        permission_payloads: list[AnyRequestPayload] = [
             self._prepare_new_permission_request(item, migration_groups_provider, destination=destination)
             for item in permissions_on_source
         ]

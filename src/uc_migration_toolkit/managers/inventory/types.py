@@ -7,7 +7,7 @@ from databricks.sdk.service.workspace import AclPermission as SdkAclPermission
 from pydantic import BaseModel
 from pydantic.tools import parse_obj_as
 
-from uc_migration_toolkit.utils import StrEnum
+from uc_migration_toolkit.generic import StrEnum
 
 
 class RequestObjectType(StrEnum):
@@ -41,6 +41,8 @@ class SqlRequestObjectType(StrEnum):
 
 
 class LogicalObjectType(StrEnum):
+    ENTITLEMENTS = "ENTITLEMENTS"
+    ROLES = "ROLES"
     FILE = "FILE"
     REPO = "REPO"
     DIRECTORY = "DIRECTORY"
@@ -88,6 +90,11 @@ class AclItemsContainer(BaseModel):
         ]
 
 
+class RolesAndEntitlements(BaseModel):
+    roles: list
+    entitlements: list
+
+
 class PermissionsInventoryItem(BaseModel):
     object_id: str
     logical_object_type: LogicalObjectType
@@ -99,9 +106,11 @@ class PermissionsInventoryItem(BaseModel):
         return json.loads(self.raw_object_permissions)
 
     @property
-    def typed_object_permissions(self) -> ObjectPermissions | AclItemsContainer:
+    def typed_object_permissions(self) -> ObjectPermissions | AclItemsContainer | RolesAndEntitlements:
         if self.logical_object_type == LogicalObjectType.SECRET_SCOPE:
             return parse_obj_as(AclItemsContainer, self.object_permissions)
+        elif self.logical_object_type in [LogicalObjectType.ROLES, LogicalObjectType.ENTITLEMENTS]:
+            return parse_obj_as(RolesAndEntitlements, self.object_permissions)
         else:
             return ObjectPermissions.from_dict(self.object_permissions)
 

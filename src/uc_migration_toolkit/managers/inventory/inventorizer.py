@@ -5,7 +5,7 @@ from functools import partial
 from typing import Generic, TypeVar
 
 from databricks.sdk.core import DatabricksError
-from databricks.sdk.service.iam import AccessControlResponse, ObjectPermissions
+from databricks.sdk.service.iam import AccessControlResponse, Group, ObjectPermissions
 from databricks.sdk.service.workspace import (
     AclItem,
     ObjectInfo,
@@ -13,7 +13,10 @@ from databricks.sdk.service.workspace import (
     SecretScope,
 )
 
-from uc_migration_toolkit.managers.inventory.listing import WorkspaceListing
+from uc_migration_toolkit.managers.inventory.listing import (
+    CustomListing,
+    WorkspaceListing,
+)
 from uc_migration_toolkit.managers.inventory.types import (
     AclItemsContainer,
     LogicalObjectType,
@@ -22,6 +25,7 @@ from uc_migration_toolkit.managers.inventory.types import (
 )
 from uc_migration_toolkit.providers.client import provider
 from uc_migration_toolkit.providers.config import provider as config_provider
+from uc_migration_toolkit.providers.groups_info import MigrationGroupsProvider
 from uc_migration_toolkit.providers.logger import logger
 from uc_migration_toolkit.utils import ThreadedExecution
 
@@ -29,6 +33,11 @@ InventoryObject = TypeVar("InventoryObject")
 
 
 class BaseInventorizer(ABC, Generic[InventoryObject]):
+    @property
+    @abstractmethod
+    def logical_object_types(self) -> list[LogicalObjectType]:
+        """Logical object types that this inventorizer can handle"""
+
     @abstractmethod
     def preload(self):
         """Any preloading activities should happen here"""
@@ -43,6 +52,10 @@ class StandardInventorizer(BaseInventorizer[InventoryObject]):
     Standard means that it can collect using the default listing/permissions function without any additional logic.
     """
 
+    @property
+    def logical_object_types(self) -> list[LogicalObjectType]:
+        return [self._logical_object_type]
+
     def __init__(
         self,
         logical_object_type: LogicalObjectType,
@@ -51,12 +64,11 @@ class StandardInventorizer(BaseInventorizer[InventoryObject]):
         id_attribute: str,
         permissions_function: Callable[..., ObjectPermissions] | None = None,
     ):
-        self._config = config_provider.config.rate_limit
         self._logical_object_type = logical_object_type
         self._request_object_type = request_object_type
         self._listing_function = listing_function
         self._id_attribute = id_attribute
-        self._permissions_function = permissions_function if permissions_function else provider.ws.permissions.get
+        self._permissions_function = permissions_function if permissions_function else provider.ws.get_permissions
         self._objects: list[InventoryObject] = []
 
     @property
@@ -90,6 +102,10 @@ class StandardInventorizer(BaseInventorizer[InventoryObject]):
 
 
 class TokensAndPasswordsInventorizer(BaseInventorizer[InventoryObject]):
+    @property
+    def logical_object_types(self) -> list[LogicalObjectType]:
+        return [LogicalObjectType.TOKEN, LogicalObjectType.PASSWORD]
+
     def __init__(self):
         self._tokens_acl = []
         self._passwords_acl = []
@@ -150,6 +166,10 @@ class TokensAndPasswordsInventorizer(BaseInventorizer[InventoryObject]):
 
 
 class SecretScopeInventorizer(BaseInventorizer[InventoryObject]):
+    @property
+    def logical_object_types(self) -> list[LogicalObjectType]:
+        return [LogicalObjectType.SECRET_SCOPE]
+
     def __init__(self):
         self._scopes = provider.ws.secrets.list_scopes()
 
@@ -179,12 +199,15 @@ class SecretScopeInventorizer(BaseInventorizer[InventoryObject]):
 
 
 class WorkspaceInventorizer(BaseInventorizer[InventoryObject]):
+    @property
+    def logical_object_types(self) -> list[LogicalObjectType]:
+        return [LogicalObjectType.NOTEBOOK, LogicalObjectType.DIRECTORY, LogicalObjectType.REPO, LogicalObjectType.FILE]
+
     def __init__(self):
         self.listing = WorkspaceListing(
             provider.ws,
             num_threads=config_provider.config.num_threads,
             with_directories=False,
-            rate_limit=config_provider.config.rate_limit,
         )
 
     def preload(self):
@@ -243,3 +266,95 @@ class WorkspaceInventorizer(BaseInventorizer[InventoryObject]):
         results = [result for result in results if result]
         logger.info(f"Permissions fetched for {len(results)} workspace objects")
         return results
+
+
+class RolesAndEntitlementsInventorizer(BaseInventorizer[InventoryObject]):
+    @property
+    def logical_object_types(self) -> list[LogicalObjectType]:
+        return [LogicalObjectType.ROLES, LogicalObjectType.ENTITLEMENTS]
+
+    def __init__(self, migration_provider: MigrationGroupsProvider):
+        self._migration_provider = migration_provider
+        self._group_info: list[Group] = []
+
+    def preload(self):
+        logger.info("Please note that group roles and entitlements will be ONLY inventorized for migration groups")
+        self._group_info: list[Group] = [
+            provider.ws.groups.get(id=g.workspace.id) for g in self._migration_provider.groups
+        ]
+        logger.info("Group roles and entitlements preload completed")
+
+    def inventorize(self) -> list[PermissionsInventoryItem]:
+        _items = []
+
+        for group in self._group_info:
+            roles = [r.as_dict() for r in group.roles]
+            entitlements = [e.as_dict() for e in group.entitlements]
+            inventory_item = PermissionsInventoryItem(
+                object_id=group.display_name,
+                logical_object_type=LogicalObjectType.ROLES,
+                request_object_type=None,
+                raw_object_permissions=json.dumps({"roles": roles, "entitlements": entitlements}),
+            )
+            _items.append(inventory_item)
+
+        return _items
+
+
+class Inventorizers:
+    @staticmethod
+    def provide(migration_provider: MigrationGroupsProvider):
+        return [
+            RolesAndEntitlementsInventorizer(migration_provider),
+            TokensAndPasswordsInventorizer(),
+            StandardInventorizer(
+                logical_object_type=LogicalObjectType.CLUSTER,
+                request_object_type=RequestObjectType.CLUSTERS,
+                listing_function=provider.ws.clusters.list,
+                id_attribute="cluster_id",
+            ),
+            StandardInventorizer(
+                logical_object_type=LogicalObjectType.INSTANCE_POOL,
+                request_object_type=RequestObjectType.INSTANCE_POOLS,
+                listing_function=provider.ws.instance_pools.list,
+                id_attribute="instance_pool_id",
+            ),
+            StandardInventorizer(
+                logical_object_type=LogicalObjectType.CLUSTER_POLICY,
+                request_object_type=RequestObjectType.CLUSTER_POLICIES,
+                listing_function=provider.ws.cluster_policies.list,
+                id_attribute="policy_id",
+            ),
+            StandardInventorizer(
+                logical_object_type=LogicalObjectType.PIPELINE,
+                request_object_type=RequestObjectType.PIPELINES,
+                listing_function=provider.ws.pipelines.list_pipelines,
+                id_attribute="pipeline_id",
+            ),
+            StandardInventorizer(
+                logical_object_type=LogicalObjectType.JOB,
+                request_object_type=RequestObjectType.JOBS,
+                listing_function=provider.ws.jobs.list,
+                id_attribute="job_id",
+            ),
+            StandardInventorizer(
+                logical_object_type=LogicalObjectType.EXPERIMENT,
+                request_object_type=RequestObjectType.EXPERIMENTS,
+                listing_function=provider.ws.experiments.list_experiments,
+                id_attribute="experiment_id",
+            ),
+            StandardInventorizer(
+                logical_object_type=LogicalObjectType.MODEL,
+                request_object_type=RequestObjectType.REGISTERED_MODELS,
+                listing_function=CustomListing.list_models,
+                id_attribute="id",
+            ),
+            StandardInventorizer(
+                logical_object_type=LogicalObjectType.WAREHOUSE,
+                request_object_type=RequestObjectType.SQL_WAREHOUSES,
+                listing_function=provider.ws.warehouses.list,
+                id_attribute="id",
+            ),
+            SecretScopeInventorizer(),
+            WorkspaceInventorizer(),
+        ]

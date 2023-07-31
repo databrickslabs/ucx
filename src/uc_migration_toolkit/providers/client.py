@@ -1,23 +1,39 @@
 import json
+from collections.abc import Iterator
 from dataclasses import asdict
 
 import requests
 from databricks.sdk import WorkspaceClient
-from databricks.sdk.service.iam import Group
+from databricks.sdk.service.iam import AccessControlRequest, Group
+from databricks.sdk.service.workspace import ObjectType
+from ratelimit import limits, sleep_and_retry
 from requests.adapters import HTTPAdapter
 from urllib3 import Retry
 
 from uc_migration_toolkit.config import AuthConfig
+from uc_migration_toolkit.managers.inventory.types import RequestObjectType
 from uc_migration_toolkit.providers.config import provider as config_provider
 from uc_migration_toolkit.providers.logger import logger
 
 
 class ImprovedWorkspaceClient(WorkspaceClient):
+    # to this class we add rate-limited methods to make calls to various APIs
+    # source info - https://docs.databricks.com/resources/limits.html
+
+    @sleep_and_retry
+    @limits(calls=5, period=1)  # assumption
     def assign_permissions(self, principal_id: str, permissions: list[str]):
         request_string = f"/api/2.0/preview/permissionassignments/principals/{principal_id}"
-
         self.api_client.do("put", request_string, data=json.dumps({"permissions": permissions}))
 
+    @sleep_and_retry
+    @limits(calls=10, period=1)  # assumption
+    def patch_workspace_group(self, group_id: str, payload: dict):
+        path = f"/api/2.0/preview/scim/v2/Groups/{group_id}"
+        self.api_client.do("PATCH", path, data=json.dumps(payload))
+
+    @sleep_and_retry
+    @limits(calls=100, period=1)  # assumption
     def list_account_level_groups(
         self, filter: str, attributes: str | None = None, excluded_attributes: str | None = None  # noqa: A002
     ) -> list[Group]:
@@ -30,11 +46,70 @@ class ImprovedWorkspaceClient(WorkspaceClient):
         self.assign_permissions(principal_id=acc_group.id, permissions=["USER"])
         logger.info(f"Group {acc_group.display_name} successfully reflected to workspace")
 
+    @sleep_and_retry
+    @limits(calls=100, period=1)  # assumption
     def get_tokens(self):
         return self.api_client.do("GET", "/api/2.0/preview/permissions/authorization/tokens")
 
+    @sleep_and_retry
+    @limits(calls=100, period=1)  # assumption
     def get_passwords(self):
         return self.api_client.do("GET", "/api/2.0/preview/permissions/authorization/passwords")
+
+    @sleep_and_retry
+    @limits(calls=45, period=1)  # safety value, can be 50 actually
+    def list_workspace(self, path: str) -> Iterator[ObjectType]:
+        return self.workspace.list(path=path, recursive=False)
+
+    @sleep_and_retry
+    @limits(calls=100, period=1)
+    def get_permissions(self, request_object_type: RequestObjectType, request_object_id: str):
+        return self.permissions.get(request_object_type=request_object_type, request_object_id=request_object_id)
+
+    @sleep_and_retry
+    @limits(calls=30, period=1)
+    def update_permissions(
+        self,
+        request_object_type: RequestObjectType,
+        request_object_id: str,
+        access_control_list: list[AccessControlRequest],
+    ):
+        return self.permissions.update(
+            request_object_type=request_object_type,
+            request_object_id=request_object_id,
+            access_control_list=access_control_list,
+        )
+
+    def apply_roles_and_entitlements(self, group_id: str, roles: list, entitlements: list):
+        op_schema = "urn:ietf:params:scim:api:messages:2.0:PatchOp"
+        schemas = [op_schema, op_schema]
+
+        entitlements_payload = (
+            {
+                "op": "add",
+                "path": "entitlements",
+                "value": entitlements,
+            }
+            if entitlements
+            else {}
+        )
+
+        roles_payload = (
+            {
+                "op": "add",
+                "path": "roles",
+                "value": roles,
+            }
+            if roles
+            else {}
+        )
+
+        operations = [entitlements_payload, roles_payload]
+        request = {
+            "schemas": schemas,
+            "Operations": operations,
+        }
+        self.patch_workspace_group(group_id, request)
 
 
 class ClientProvider:
@@ -53,8 +128,8 @@ class ClientProvider:
     @staticmethod
     def __get_retry_strategy():
         retry_strategy = Retry(
-            total=10,
-            backoff_factor=0.5,
+            total=20,
+            backoff_factor=1,
             status_forcelist=[429],
             respect_retry_after_header=True,
             raise_on_status=False,  # return original response when retries have been exhausted

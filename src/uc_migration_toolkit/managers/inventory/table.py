@@ -66,6 +66,9 @@ class InventoryTableManager(SparkMixin):
             mentioned_groups = [acl.group_name for acl in _ops.access_control_list]
             return any(g in mentioned_groups for g in groups)
 
+        elif item.logical_object_type in [LogicalObjectType.ENTITLEMENTS, LogicalObjectType.ROLES]:
+            return any(g in item.object_id for g in groups)
+
         else:
             msg = f"Logical object type {item.logical_object_type} is not supported"
             raise NotImplementedError(msg)
