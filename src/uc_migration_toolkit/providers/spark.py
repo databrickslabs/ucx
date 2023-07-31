@@ -15,7 +15,6 @@ class SparkMixin:
         self._spark = self._initialize_spark()
 
     @staticmethod
-    @functools.lru_cache(maxsize=10_000)
     def _initialize_spark() -> SparkSession:
         logger.info("Initializing Spark session")
         if "spark" in locals():
