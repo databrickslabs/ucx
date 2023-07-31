@@ -51,12 +51,11 @@ class StandardInventorizer(BaseInventorizer[InventoryObject]):
         id_attribute: str,
         permissions_function: Callable[..., ObjectPermissions] | None = None,
     ):
-        self._config = config_provider.config.rate_limit
         self._logical_object_type = logical_object_type
         self._request_object_type = request_object_type
         self._listing_function = listing_function
         self._id_attribute = id_attribute
-        self._permissions_function = permissions_function if permissions_function else provider.ws.permissions.get
+        self._permissions_function = permissions_function if permissions_function else provider.ws.get_permissions
         self._objects: list[InventoryObject] = []
 
     @property
@@ -184,7 +183,6 @@ class WorkspaceInventorizer(BaseInventorizer[InventoryObject]):
             provider.ws,
             num_threads=config_provider.config.num_threads,
             with_directories=False,
-            rate_limit=config_provider.config.rate_limit,
         )
 
     def preload(self):

@@ -45,12 +45,7 @@ from utils import (
     initialize_env,
 )
 
-from uc_migration_toolkit.config import (
-    AuthConfig,
-    InventoryTable,
-    RateLimitConfig,
-    WorkspaceAuthConfig,
-)
+from uc_migration_toolkit.config import AuthConfig, InventoryTable, WorkspaceAuthConfig
 from uc_migration_toolkit.managers.inventory.types import RequestObjectType
 from uc_migration_toolkit.providers.client import ImprovedWorkspaceClient, provider
 from uc_migration_toolkit.providers.logger import logger
@@ -74,7 +69,7 @@ NUM_TEST_SECRET_SCOPES = int(os.environ.get("NUM_TEST_SECRET_SCOPES", 10))
 NUM_THREADS = int(os.environ.get("NUM_TEST_THREADS", 20))
 DB_CONNECT_CLUSTER_NAME = os.environ.get("DB_CONNECT_CLUSTER_NAME", "ucx-integration-testing")
 UCX_TESTING_PREFIX = os.environ.get("UCX_TESTING_PREFIX", "ucx")
-Threader = partial(ThreadedExecution, num_threads=NUM_THREADS, rate_limit=RateLimitConfig())
+Threader = partial(ThreadedExecution, num_threads=NUM_THREADS)
 
 
 @pytest.fixture(scope="session")

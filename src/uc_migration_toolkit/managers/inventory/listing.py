@@ -1,14 +1,12 @@
 import datetime as dt
 from collections.abc import Iterator
-from concurrent.futures import ALL_COMPLETED, ThreadPoolExecutor, wait
+from concurrent.futures import FIRST_COMPLETED, ThreadPoolExecutor, wait
+from itertools import groupby
 
 from databricks.sdk.service.ml import ModelDatabricks
-from databricks.sdk.service.workspace import ObjectType
-from ratelimit import limits, sleep_and_retry
+from databricks.sdk.service.workspace import ObjectInfo, ObjectType
 
-from uc_migration_toolkit.config import RateLimitConfig
 from uc_migration_toolkit.providers.client import ImprovedWorkspaceClient, provider
-from uc_migration_toolkit.providers.config import provider as config_provider
 from uc_migration_toolkit.providers.logger import logger
 
 
@@ -31,7 +29,6 @@ class WorkspaceListing:
         num_threads: int,
         *,
         with_directories: bool = True,
-        rate_limit: RateLimitConfig | None = None,
     ):
         self.start_time = None
         self._ws = ws
@@ -39,41 +36,63 @@ class WorkspaceListing:
         self._num_threads = num_threads
         self._with_directories = with_directories
         self._counter = 0
-        self._rate_limit = rate_limit if rate_limit else config_provider.config.rate_limit
-
-        @sleep_and_retry
-        @limits(calls=self._rate_limit.max_requests_per_period, period=self._rate_limit.period_in_seconds)
-        def _rate_limited_listing(path: str) -> Iterator[ObjectType]:
-            return self._ws.workspace.list(path=path, recursive=False)
-
-        self._rate_limited_listing = _rate_limited_listing
 
     def _progress_report(self, _):
         self._counter += 1
         measuring_time = dt.datetime.now()
         delta_from_start = measuring_time - self.start_time
         rps = self._counter / delta_from_start.total_seconds()
+        directory_count = len([r for r in self.results if r.object_type == ObjectType.DIRECTORY])
+        other_count = len([r for r in self.results if r.object_type != ObjectType.DIRECTORY])
         if self._counter % 10 == 0:
             logger.info(
                 f"Made {self._counter} workspace listing calls, "
-                f"collected {len(self.results)} objects, rps: {rps:.3f}/sec"
+                f"collected {len(self.results)} objects ({directory_count} dirs and {other_count} other objects),"
+                f" rps: {rps:.3f}/sec"
             )
 
-    def _walk(self, _path: str):
-        futures = []
-        with ThreadPoolExecutor(self._num_threads) as executor:
-            for _obj in self._rate_limited_listing(_path):
-                if _obj.object_type == ObjectType.DIRECTORY:
-                    if self._with_directories:
-                        self.results.append(_obj)
-                    future = executor.submit(self._walk, _obj.path)
-                    future.add_done_callback(self._progress_report)
-                    futures.append(future)
-                else:
-                    self.results.append(_obj)
-            wait(futures, return_when=ALL_COMPLETED)
+    def _list_and_analyze(self, obj: ObjectInfo) -> (list[ObjectInfo], list[ObjectInfo]):
+        directories = []
+        others = []
+        grouped_iterator = groupby(
+            self._ws.list_workspace(obj.path), key=lambda x: x.object_type == ObjectType.DIRECTORY
+        )
+        for is_directory, objects in grouped_iterator:
+            if is_directory:
+                directories.extend(list(objects))
+            else:
+                others.extend(list(objects))
 
-    def walk(self, path: str):
+        logger.debug(f"Listed {obj.path}, found {len(directories)} sub-directories and {len(others)} other objects")
+        return directories, others
+
+    def walk(self, start_path="/"):
         self.start_time = dt.datetime.now()
-        self._walk(path)
-        self._progress_report(None)  # report the final progress
+        logger.info(f"Recursive WorkspaceFS listing started at {self.start_time}")
+        root_object = self._ws.workspace.get_status(start_path)
+        self.results.append(root_object)
+
+        with ThreadPoolExecutor(self._num_threads) as executor:
+            initial_future = executor.submit(self._list_and_analyze, root_object)
+            initial_future.add_done_callback(self._progress_report)
+            futures_to_objects = {initial_future: root_object}
+            while futures_to_objects:
+                futures_done, futures_not_done = wait(futures_to_objects, return_when=FIRST_COMPLETED)
+
+                for future in futures_done:
+                    futures_to_objects.pop(future)
+                    directories, others = future.result()
+                    self.results.extend(directories)
+                    self.results.extend(others)
+
+                    if directories:
+                        new_futures = {}
+                        for directory in directories:
+                            new_future = executor.submit(self._list_and_analyze, directory)
+                            new_future.add_done_callback(self._progress_report)
+                            new_futures[new_future] = directory
+                        futures_to_objects.update(new_futures)
+
+            logger.info(f"Recursive WorkspaceFS listing finished at {dt.datetime.now()}")
+            logger.info(f"Total time: {dt.datetime.now() - self.start_time}")
+            self._progress_report(None)

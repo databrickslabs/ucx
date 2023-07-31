@@ -1,4 +1,4 @@
-from pydantic import Field, RootModel
+from pydantic import RootModel
 from pydantic.dataclasses import dataclass
 
 
@@ -52,18 +52,11 @@ class InventoryConfig:
 
 
 @dataclass
-class RateLimitConfig:
-    max_requests_per_period: int | None = 100
-    period_in_seconds: int | None = 1
-
-
-@dataclass
 class MigrationConfig:
     inventory: InventoryConfig
     with_table_acls: bool
     groups: GroupsConfig
     auth: AuthConfig | None = None
-    rate_limit: RateLimitConfig | None = Field(default_factory=lambda: RateLimitConfig())
     num_threads: int | None = 4
 
     def __post_init__(self):

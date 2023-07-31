@@ -7,7 +7,7 @@ from databricks.sdk.service.workspace import AclPermission as SdkAclPermission
 from pydantic import BaseModel
 from pydantic.tools import parse_obj_as
 
-from uc_migration_toolkit.utils import StrEnum
+from uc_migration_toolkit.generic import StrEnum
 
 
 class RequestObjectType(StrEnum):
@@ -41,6 +41,8 @@ class SqlRequestObjectType(StrEnum):
 
 
 class LogicalObjectType(StrEnum):
+    ENTITLEMENTS = "ENTITLEMENTS"
+    ROLES = "ROLES"
     FILE = "FILE"
     REPO = "REPO"
     DIRECTORY = "DIRECTORY"

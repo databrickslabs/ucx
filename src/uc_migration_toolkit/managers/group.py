@@ -1,14 +1,14 @@
-import json
 import typing
 from dataclasses import dataclass
 from functools import partial
 
 from databricks.sdk.service.iam import Group
 
+from uc_migration_toolkit.generic import StrEnum
 from uc_migration_toolkit.providers.client import provider
 from uc_migration_toolkit.providers.config import provider as config_provider
 from uc_migration_toolkit.providers.logger import logger
-from uc_migration_toolkit.utils import StrEnum, ThreadedExecution
+from uc_migration_toolkit.utils import ThreadedExecution
 
 
 @dataclass
@@ -170,9 +170,7 @@ class GroupManager:
             "schemas": schemas,
             "Operations": operations,
         }
-        provider.ws.api_client.do(
-            "PATCH", f"/api/2.0/preview/scim/v2/Groups/{destination.id}", data=json.dumps(request)
-        )
+        provider.ws.patch_workspace_group(destination.id, request)
 
     # please keep the public methods below this line
 
