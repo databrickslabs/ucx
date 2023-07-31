@@ -1,10 +1,10 @@
 # Databricks notebook source
-# MAGIC %md 
+# MAGIC %md
 # MAGIC
 # MAGIC # UC Migration Toolkit for Groups
 # MAGIC
 # MAGIC
-# MAGIC This notebook provides toolkit for group migration (workspace to account). 
+# MAGIC This notebook provides toolkit for group migration (workspace to account).
 # MAGIC
 # MAGIC
 # MAGIC - Tested on: DBR 13.2, Single Node cluster, UC enabled (Single-User mode).
@@ -42,28 +42,24 @@ from uc_migration_toolkit.config import MigrationConfig, InventoryConfig, Groups
 
 # COMMAND ----------
 
-# MAGIC %md 
+# MAGIC %md
 # MAGIC
 # MAGIC ## Configuration
 
 # COMMAND ----------
 
 config = MigrationConfig(
-        with_table_acls=False,
-        inventory=InventoryConfig(table=InventoryTable(
-            catalog="main",
-            database="default",
-            name="ucx_migration_inventory"
-        )),
-        groups=GroupsConfig(auto=True),
-        auth=None,
-        log_level="TRACE",
+    with_table_acls=False,
+    inventory=InventoryConfig(table=InventoryTable(catalog="main", database="default", name="ucx_migration_inventory")),
+    groups=GroupsConfig(auto=True),
+    auth=None,
+    log_level="TRACE",
 )
 toolkit = GroupMigrationToolkit(config)
 
 # COMMAND ----------
 
-# MAGIC %md 
+# MAGIC %md
 # MAGIC
 # MAGIC ## Prepare environment
 # MAGIC
@@ -98,11 +94,11 @@ toolkit.cleanup_inventory_table()
 
 # COMMAND ----------
 
-# MAGIC %md 
+# MAGIC %md
 # MAGIC
 # MAGIC ## Inventorize the permissions
 # MAGIC
-# MAGIC Please check `README.md` for supported permissions. 
+# MAGIC Please check `README.md` for supported permissions.
 # MAGIC
 # MAGIC Most of the permissions are inventorized in parallel, therefore be prepared that logs might be quite verbose.
 
@@ -112,7 +108,7 @@ toolkit.inventorize_permissions()
 
 # COMMAND ----------
 
-# MAGIC %md 
+# MAGIC %md
 # MAGIC
 # MAGIC ## Apply the inventorized permissions to backup groups
 
@@ -122,7 +118,7 @@ toolkit.apply_permissions_to_backup_groups()
 
 # COMMAND ----------
 
-# MAGIC %md 
+# MAGIC %md
 # MAGIC
 # MAGIC ## Replace workspace-level groups with account-level groups
 # MAGIC
@@ -134,7 +130,7 @@ toolkit.replace_workspace_groups_with_account_groups()
 
 # COMMAND ----------
 
-# MAGIC %md 
+# MAGIC %md
 # MAGIC
 # MAGIC ## Apply the inventorized permissions to account-level groups
 
@@ -144,7 +140,7 @@ toolkit.apply_permissions_to_account_groups()
 
 # COMMAND ----------
 
-# MAGIC %md 
+# MAGIC %md
 # MAGIC
 # MAGIC ## Delete the backup groups
 
@@ -154,7 +150,7 @@ toolkit.delete_backup_groups()
 
 # COMMAND ----------
 
-# MAGIC %md 
+# MAGIC %md
 # MAGIC
 # MAGIC ## Cleanup the inventory table
 

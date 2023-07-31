@@ -4,7 +4,6 @@ def pip_install_dependencies():
     from databricks.sdk.runtime import dbutils
     from pathlib import Path
 
-
     # this function is provided in Databricks runtime
     ipython = get_ipython()  # noqa: F821
 
@@ -13,10 +12,12 @@ def pip_install_dependencies():
     ipython.run_line_magic("pip", f"install {dependency_string}")
     dbutils.library.restartPython()
 
+
 def update_module_imports():
     import importlib.util
     import sys
     from pathlib import Path
+
     print("adding uc_migration_toolkit to the system path")
     module_name = "uc_migration_toolkit"
     module_path = Path(f"../src/{module_name}/__init__.py").resolve().absolute()

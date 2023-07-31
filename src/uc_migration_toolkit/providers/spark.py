@@ -18,6 +18,7 @@ class SparkMixin:
         logger.info("Initializing Spark session")
         try:
             from databricks.sdk.runtime import spark
+
             return spark
         except ValueError:
             logger.info("Using DB Connect")
@@ -25,7 +26,7 @@ class SparkMixin:
 
             if "DATABRICKS_CLUSTER_ID" not in os.environ:
                 msg = "DATABRICKS_CLUSTER_ID environment variable is not set, cannot use DB Connect"
-                raise RuntimeError(msg)
+                raise RuntimeError(msg) from None
             cluster_id = os.environ["DATABRICKS_CLUSTER_ID"]
             cluster_info = provider.ws.clusters.get(cluster_id)
 
