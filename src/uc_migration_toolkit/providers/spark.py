@@ -1,4 +1,3 @@
-import functools
 import os
 import time
 
@@ -15,19 +14,19 @@ class SparkMixin:
         self._spark = self._initialize_spark()
 
     @staticmethod
-    @functools.lru_cache(maxsize=10_000)
     def _initialize_spark() -> SparkSession:
         logger.info("Initializing Spark session")
-        if "spark" in locals():
-            logger.info("Using the Spark session from runtime")
-            return locals()["spark"]
-        else:
+        try:
+            from databricks.sdk.runtime import spark
+
+            return spark
+        except ValueError:
             logger.info("Using DB Connect")
             from databricks.connect import DatabricksSession
 
             if "DATABRICKS_CLUSTER_ID" not in os.environ:
                 msg = "DATABRICKS_CLUSTER_ID environment variable is not set, cannot use DB Connect"
-                raise RuntimeError(msg)
+                raise RuntimeError(msg) from None
             cluster_id = os.environ["DATABRICKS_CLUSTER_ID"]
             cluster_info = provider.ws.clusters.get(cluster_id)
 
