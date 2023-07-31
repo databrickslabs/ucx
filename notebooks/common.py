@@ -17,7 +17,7 @@ def update_module_imports():
     import importlib.util
     import sys
     from pathlib import Path
-    print("adding module to the system path")
+    print("adding uc_migration_toolkit to the system path")
     module_name = "uc_migration_toolkit"
     module_path = Path(f"../src/{module_name}/__init__.py").resolve().absolute()
     spec = importlib.util.spec_from_file_location(module_name, module_path)

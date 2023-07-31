@@ -1,4 +1,9 @@
 # Databricks notebook source
+# MAGIC %reload_ext autoreload
+# MAGIC %autoreload 2
+
+# COMMAND ----------
+
 from common import pip_install_dependencies, update_module_imports
 
 # COMMAND ----------
@@ -30,15 +35,3 @@ config = MigrationConfig(
         log_level="TRACE",
 )
 toolkit = GroupMigrationToolkit(config)
-
-# COMMAND ----------
-
-from uc_migration_toolkit.providers.spark import SparkMixin
-
-# COMMAND ----------
-
-SparkMixin._initialize_spark()
-
-# COMMAND ----------
-
-
