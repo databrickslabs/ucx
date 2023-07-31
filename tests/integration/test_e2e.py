@@ -231,3 +231,8 @@ def test_e2e(
     assert len(backup_groups) == 0
 
     toolkit.cleanup_inventory_table()
+
+
+def test_fixtures():
+    # fake test to verify the fixtures
+    assert 1 == 1  # noqa: PLR0133
