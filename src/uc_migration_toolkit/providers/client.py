@@ -57,7 +57,7 @@ class ImprovedWorkspaceClient(WorkspaceClient):
         return self.api_client.do("GET", "/api/2.0/preview/permissions/authorization/passwords")
 
     @sleep_and_retry
-    @limits(calls=50, period=1)
+    @limits(calls=45, period=1)  # safety value, can be 50 actually
     def list_workspace(self, path: str) -> Iterator[ObjectType]:
         return self.workspace.list(path=path, recursive=False)
 
@@ -97,8 +97,8 @@ class ClientProvider:
     @staticmethod
     def __get_retry_strategy():
         retry_strategy = Retry(
-            total=10,
-            backoff_factor=0.5,
+            total=20,
+            backoff_factor=1,
             status_forcelist=[429],
             respect_retry_after_header=True,
             raise_on_status=False,  # return original response when retries have been exhausted
