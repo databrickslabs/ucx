@@ -1,5 +1,4 @@
 import typing
-from dataclasses import dataclass
 from functools import partial
 
 from databricks.sdk.service.iam import Group
@@ -7,35 +6,17 @@ from databricks.sdk.service.iam import Group
 from uc_migration_toolkit.generic import StrEnum
 from uc_migration_toolkit.providers.client import provider
 from uc_migration_toolkit.providers.config import provider as config_provider
+from uc_migration_toolkit.providers.groups_info import (
+    MigrationGroupInfo,
+    MigrationGroupsProvider,
+)
 from uc_migration_toolkit.providers.logger import logger
 from uc_migration_toolkit.utils import ThreadedExecution
-
-
-@dataclass
-class MigrationGroupInfo:
-    workspace: Group
-    backup: Group
-    account: Group
 
 
 class GroupLevel(StrEnum):
     WORKSPACE = "workspace"
     ACCOUNT = "account"
-
-
-class MigrationGroupsProvider:
-    def __init__(self):
-        self.groups: list[MigrationGroupInfo] = []
-
-    def add(self, group: MigrationGroupInfo):
-        self.groups.append(group)
-
-    def get_by_workspace_group_name(self, workspace_group_name: str) -> MigrationGroupInfo | None:
-        found = [g for g in self.groups if g.workspace.display_name == workspace_group_name]
-        if len(found) == 0:
-            return None
-        else:
-            return found[0]
 
 
 class GroupManager:
@@ -100,8 +81,6 @@ class GroupManager:
             backup_group = provider.ws.groups.create(request=Group.from_dict(new_group_payload))
             logger.info(f"Backup group {backup_group_name} successfully created")
 
-        self._apply_roles_and_entitlements(source_group, backup_group)
-
         return backup_group
 
     def _set_migration_groups(self, groups_names: list[str]):
@@ -124,7 +103,6 @@ class GroupManager:
     def _replace_group(self, migration_info: MigrationGroupInfo):
         ws_group = migration_info.workspace
         acc_group = migration_info.account
-        backup_group = migration_info.backup
 
         if self._get_group(ws_group.display_name, GroupLevel.WORKSPACE):
             logger.info(f"Deleting the workspace-level group {ws_group.display_name} with id {ws_group.id}")
@@ -134,43 +112,6 @@ class GroupManager:
             logger.warning(f"Workspace-level group {ws_group.display_name} does not exist, skipping")
 
         provider.ws.reflect_account_group_to_workspace(acc_group)
-
-        logger.info("Updating group-level entitlements for account-level group from backup group")
-
-        # tbd: raise this as an issue for SDK team
-        self._apply_roles_and_entitlements(backup_group, acc_group)
-        logger.info("Updated group-level entitlements and roles for account-level group from backup group")
-
-    @staticmethod
-    def _apply_roles_and_entitlements(source: Group, destination: Group):
-        op_schema = "urn:ietf:params:scim:api:messages:2.0:PatchOp"
-        schemas = [op_schema, op_schema]
-        entitlements = (
-            {
-                "op": "add",
-                "path": "entitlements",
-                "value": [{"value": e.value} for e in source.entitlements],
-            }
-            if source.entitlements
-            else {}
-        )
-
-        roles = (
-            {
-                "op": "add",
-                "path": "roles",
-                "value": [{"value": r.value} for r in source.roles],
-            }
-            if source.roles
-            else {}
-        )
-
-        operations = [entitlements, roles]
-        request = {
-            "schemas": schemas,
-            "Operations": operations,
-        }
-        provider.ws.patch_workspace_group(destination.id, request)
 
     # please keep the public methods below this line
 

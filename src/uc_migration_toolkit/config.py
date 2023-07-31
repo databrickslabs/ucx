@@ -58,6 +58,7 @@ class MigrationConfig:
     groups: GroupsConfig
     auth: AuthConfig | None = None
     num_threads: int | None = 4
+    log_level: str | None = "INFO"
 
     def __post_init__(self):
         if self.with_table_acls:
