@@ -13,7 +13,7 @@ jobs:
   ci:
     strategy:
       matrix:
-        pyVersion: [ '3.10' ]
+        pyVersion: [ '3.9','3.10', '3.11' ]
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
