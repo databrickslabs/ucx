@@ -73,7 +73,7 @@ class GroupManager:
         backup_group = self._get_group(backup_group_name, GroupLevel.WORKSPACE)
 
         if backup_group:
-            logger.info(f"Backup group {backup_group_name} already exists, updating it")
+            logger.info(f"Backup group {backup_group_name} already exists, no action required")
         else:
             logger.info(f"Creating backup group {backup_group_name}")
             new_group_payload = self._get_clean_group_info(source_group)
