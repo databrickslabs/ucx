@@ -51,8 +51,12 @@ from uc_migration_toolkit.config import MigrationConfig, InventoryConfig, Groups
 config = MigrationConfig(
     with_table_acls=False,
     inventory=InventoryConfig(table=InventoryTable(catalog="main", database="default", name="ucx_migration_inventory")),
-    groups=GroupsConfig(auto=True),
-    auth=None,
+    groups=GroupsConfig(
+        # use this option to select specific groups manually
+        selected=["groupA", "groupB"],
+        # use this option to select all groups automatically
+        # auto=True
+    ),
     log_level="TRACE",
 )
 toolkit = GroupMigrationToolkit(config)
