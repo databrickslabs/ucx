@@ -77,7 +77,7 @@ test-cov-report = "pytest tests/unit --cov uc_migration_toolkit --cov-report=htm
 
 
 [[tool.hatch.envs.all.matrix]]
-python = ["3.7", "3.8", "3.9", "3.10", "3.11"]
+python = [ "3.9", "3.10", "3.11"]
 
 [tool.hatch.envs.lint]
 detached = true
