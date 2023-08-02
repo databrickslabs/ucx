@@ -82,34 +82,33 @@ class ImprovedWorkspaceClient(WorkspaceClient):
 
     def apply_roles_and_entitlements(self, group_id: str, roles: list, entitlements: list):
         op_schema = "urn:ietf:params:scim:api:messages:2.0:PatchOp"
-        schemas = [op_schema, op_schema]
+        schemas = []
+        operations = []
 
-        entitlements_payload = (
-            {
+        if entitlements:
+            schemas.append(op_schema)
+            entitlements_payload = {
                 "op": "add",
                 "path": "entitlements",
                 "value": entitlements,
             }
-            if entitlements
-            else {}
-        )
+            operations.append(entitlements_payload)
 
-        roles_payload = (
-            {
+        if roles:
+            schemas.append(op_schema)
+            roles_payload = {
                 "op": "add",
                 "path": "roles",
                 "value": roles,
             }
-            if roles
-            else {}
-        )
+            operations.append(roles_payload)
 
-        operations = [entitlements_payload, roles_payload]
-        request = {
-            "schemas": schemas,
-            "Operations": operations,
-        }
-        self.patch_workspace_group(group_id, request)
+        if operations:
+            request = {
+                "schemas": schemas,
+                "Operations": operations,
+            }
+            self.patch_workspace_group(group_id, request)
 
 
 class ClientProvider:
