@@ -39,19 +39,13 @@ class ThreadedExecution(Generic[ExecutableResult]):
         self,
         executables: list[ExecutableFunction],
         num_threads: int | None = None,
-        done_callback: Callable[..., None] | None = None,
+        progress_reporter: ProgressReporter | None = None,
     ):
         self._num_threads = num_threads if num_threads else config_provider.config.num_threads
         self._executables = executables
         self._futures = []
-        self._done_callback = (
-            done_callback if done_callback else self._prepare_default_done_callback(len(self._executables))
-        )
-
-    @staticmethod
-    def _prepare_default_done_callback(total_executables: int):
-        progress_reporter = ProgressReporter(total_executables)
-        return progress_reporter.progress_report
+        _reporter = ProgressReporter(len(executables)) if not progress_reporter else progress_reporter
+        self._done_callback = _reporter.progress_report
 
     def run(self) -> list[ExecutableResult]:
         logger.trace("Starting threaded execution")
