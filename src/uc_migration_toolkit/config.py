@@ -36,6 +36,7 @@ class WorkspaceAuthConfig:
     host: str | None = None
     client_id: str | None = None
     client_secret: str | None = None
+    profile: str | None = None
 
 
 @dataclass

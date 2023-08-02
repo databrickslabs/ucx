@@ -178,17 +178,19 @@ def instance_profiles(env: EnvironmentInfo, ws: ImprovedWorkspaceClient) -> list
         profiles.append(InstanceProfile(instance_profile_arn=profile_arn, iam_role_arn=iam_role_arn))
 
     for ws_group, _ in env.groups:
-        roles = {
-            "schemas": ["urn:ietf:params:scim:api:messages:2.0:PatchOp"],
-            "Operations": [
-                {
-                    "op": "add",
-                    "path": "roles",
-                    "value": [{"value": p.instance_profile_arn} for p in random.choices(profiles, k=2)],
-                }
-            ],
-        }
-        provider.ws.api_client.do("PATCH", f"/api/2.0/preview/scim/v2/Groups/{ws_group.id}", data=json.dumps(roles))
+        if random.choice([True, False]):
+            # randomize to apply roles randomly
+            roles = {
+                "schemas": ["urn:ietf:params:scim:api:messages:2.0:PatchOp"],
+                "Operations": [
+                    {
+                        "op": "add",
+                        "path": "roles",
+                        "value": [{"value": p.instance_profile_arn} for p in random.choices(profiles, k=2)],
+                    }
+                ],
+            }
+            provider.ws.api_client.do("PATCH", f"/api/2.0/preview/scim/v2/Groups/{ws_group.id}", data=json.dumps(roles))
 
     yield profiles
 
@@ -517,6 +519,9 @@ def workspace_objects(ws: ImprovedWorkspaceClient, env: EnvironmentInfo) -> Work
         random_group = random.choice([g[0] for g in env.groups])
         _nb_path = f"/{env.test_uid}/{random_group.display_name}/nb-{nb_idx}.py"
         ws.workspace.upload(path=_nb_path, content=io.BytesIO(b"print(1)"))
+        # TODO: add a proper test for this
+        # if random.choice([True, False]):
+        #     ws.experiments.create_experiment(name=_nb_path)  # create experiment to test nb-based experiments
         _nb_obj = ws.workspace.get_status(_nb_path)
         notebooks.append(_nb_obj)
         ws.permissions.set(
