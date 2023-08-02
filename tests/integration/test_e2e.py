@@ -192,6 +192,13 @@ def test_e2e(
         toolkit.group_manager.migration_groups_provider.groups
     )
 
+    for _info in toolkit.group_manager.migration_groups_provider.groups:
+        _ws = ws.groups.get(id=_info.workspace.id)
+        _backup = ws.groups.get(id=_info.backup.id)
+        _ws_members = sorted([m.value for m in _ws.members])
+        _backup_members = sorted([m.value for m in _backup.members])
+        assert _ws_members == _backup_members
+
     logger.debug("Verifying that the groups were created - done")
 
     toolkit.cleanup_inventory_table()
@@ -231,8 +238,3 @@ def test_e2e(
     assert len(backup_groups) == 0
 
     toolkit.cleanup_inventory_table()
-
-
-def test_fixtures():
-    # fake test to verify the fixtures
-    assert 1 == 1  # noqa: PLR0133

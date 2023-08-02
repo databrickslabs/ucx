@@ -59,7 +59,7 @@ class GroupManager:
     def _get_group(group_name, level: GroupLevel) -> Group | None:
         method = provider.ws.groups.list if level == GroupLevel.WORKSPACE else provider.ws.list_account_level_groups
         query_filter = f"displayName eq '{group_name}'"
-        attributes = ",".join(["id", "displayName", "meta", "entitlements", "roles"])
+        attributes = ",".join(["id", "displayName", "meta", "entitlements", "roles", "members"])
 
         group = next(
             iter(method(filter=query_filter, attributes=attributes)),

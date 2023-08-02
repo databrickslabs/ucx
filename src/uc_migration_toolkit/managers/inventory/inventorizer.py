@@ -345,7 +345,7 @@ class Inventorizers:
             StandardInventorizer(
                 logical_object_type=LogicalObjectType.EXPERIMENT,
                 request_object_type=RequestObjectType.EXPERIMENTS,
-                listing_function=provider.ws.experiments.list_experiments,
+                listing_function=CustomListing.list_experiments,
                 id_attribute="experiment_id",
             ),
             StandardInventorizer(

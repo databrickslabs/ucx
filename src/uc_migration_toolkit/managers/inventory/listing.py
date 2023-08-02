@@ -21,6 +21,13 @@ class CustomListing:
             model_with_id = provider.ws.model_registry.get_model(model.name).registered_model_databricks
             yield model_with_id
 
+    @staticmethod
+    def list_experiments() -> Iterator[ModelDatabricks]:
+        for experiment in provider.ws.experiments.list_experiments():
+            nb_tag = [t for t in experiment.tags if t.key == "mlflow.experimentType" and t.value == "NOTEBOOK"]
+            if not nb_tag:
+                yield experiment
+
 
 class WorkspaceListing:
     def __init__(
