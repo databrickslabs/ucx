@@ -27,7 +27,7 @@ from uc_migration_toolkit.providers.client import provider
 from uc_migration_toolkit.providers.config import provider as config_provider
 from uc_migration_toolkit.providers.groups_info import MigrationGroupsProvider
 from uc_migration_toolkit.providers.logger import logger
-from uc_migration_toolkit.utils import ThreadedExecution
+from uc_migration_toolkit.utils import ProgressReporter, ThreadedExecution
 
 InventoryObject = TypeVar("InventoryObject")
 
@@ -56,6 +56,16 @@ class StandardInventorizer(BaseInventorizer[InventoryObject]):
     def logical_object_types(self) -> list[LogicalObjectType]:
         return [self._logical_object_type]
 
+    @staticmethod
+    def safe_get_permissions(request_object_type: RequestObjectType, object_id: str) -> ObjectPermissions | None:
+        try:
+            permissions = provider.ws.get_permissions(request_object_type, object_id)
+            return permissions
+        except DatabricksError as e:
+            if e.error_code in ["RESOURCE_DOES_NOT_EXIST", "RESOURCE_NOT_FOUND", "PERMISSION_DENIED"]:
+                logger.warning(f"Could not get permissions for {request_object_type} {object_id} due to {e.error_code}")
+                return None
+
     def __init__(
         self,
         logical_object_type: LogicalObjectType,
@@ -68,7 +78,7 @@ class StandardInventorizer(BaseInventorizer[InventoryObject]):
         self._request_object_type = request_object_type
         self._listing_function = listing_function
         self._id_attribute = id_attribute
-        self._permissions_function = permissions_function if permissions_function else provider.ws.get_permissions
+        self._permissions_function = permissions_function if permissions_function else self.safe_get_permissions
         self._objects: list[InventoryObject] = []
 
     @property
@@ -80,23 +90,24 @@ class StandardInventorizer(BaseInventorizer[InventoryObject]):
         self._objects = list(self._listing_function())
         logger.info(f"Object metadata prepared for {len(self._objects)} objects.")
 
-    def _process_single_object(self, _object: InventoryObject) -> PermissionsInventoryItem:
+    def _process_single_object(self, _object: InventoryObject) -> PermissionsInventoryItem | None:
         object_id = str(getattr(_object, self._id_attribute))
         permissions = self._permissions_function(self._request_object_type, object_id)
-        inventory_item = PermissionsInventoryItem(
-            object_id=object_id,
-            logical_object_type=self._logical_object_type,
-            request_object_type=self._request_object_type,
-            raw_object_permissions=json.dumps(permissions.as_dict()),
-        )
-        return inventory_item
+        if permissions:
+            inventory_item = PermissionsInventoryItem(
+                object_id=object_id,
+                logical_object_type=self._logical_object_type,
+                request_object_type=self._request_object_type,
+                raw_object_permissions=json.dumps(permissions.as_dict()),
+            )
+            return inventory_item
 
     def inventorize(self):
         logger.info(f"Fetching permissions for {len(self._objects)} objects...")
 
         executables = [partial(self._process_single_object, _object) for _object in self._objects]
         threaded_execution = ThreadedExecution[PermissionsInventoryItem](executables)
-        collected = threaded_execution.run()
+        collected = [item for item in threaded_execution.run() if item is not None]
         logger.info(f"Permissions fetched for {len(collected)} objects of type {self._request_object_type}")
         return collected
 
@@ -203,12 +214,13 @@ class WorkspaceInventorizer(BaseInventorizer[InventoryObject]):
     def logical_object_types(self) -> list[LogicalObjectType]:
         return [LogicalObjectType.NOTEBOOK, LogicalObjectType.DIRECTORY, LogicalObjectType.REPO, LogicalObjectType.FILE]
 
-    def __init__(self):
+    def __init__(self, start_path: str | None = "/"):
         self.listing = WorkspaceListing(
             provider.ws,
             num_threads=config_provider.config.num_threads,
             with_directories=False,
         )
+        self._start_path = start_path
 
     def preload(self):
         pass
@@ -247,23 +259,36 @@ class WorkspaceInventorizer(BaseInventorizer[InventoryObject]):
         if not request_object_type:
             return
         else:
-            permissions = provider.ws.permissions.get(
-                request_object_type=request_object_type, request_object_id=_object.object_id
-            )
+            try:
+                permissions = provider.ws.get_permissions(
+                    request_object_type=request_object_type, request_object_id=_object.object_id
+                )
+            except DatabricksError as e:
+                if e.error_code in ["PERMISSION_DENIED", "RESOURCE_NOT_FOUND"]:
+                    logger.warning(f"Cannot load permissions for {_object.path} due to error {e.error_code}")
+                    return
+                else:
+                    raise e
 
-            inventory_item = PermissionsInventoryItem(
-                object_id=str(_object.object_id),
-                logical_object_type=self.__convert_request_object_type_to_logical_type(request_object_type),
-                request_object_type=request_object_type,
-                raw_object_permissions=json.dumps(permissions.as_dict()),
-            )
-            return inventory_item
+            if permissions:
+                inventory_item = PermissionsInventoryItem(
+                    object_id=str(_object.object_id),
+                    logical_object_type=self.__convert_request_object_type_to_logical_type(request_object_type),
+                    request_object_type=request_object_type,
+                    raw_object_permissions=json.dumps(permissions.as_dict()),
+                )
+                return inventory_item
 
     def inventorize(self) -> list[PermissionsInventoryItem]:
-        self.listing.walk("/")
+        self.listing.walk(self._start_path)
         executables = [partial(self._convert_result_to_permission_item, _object) for _object in self.listing.results]
-        results = ThreadedExecution[PermissionsInventoryItem | None](executables).run()
-        results = [result for result in results if result]
+        results = ThreadedExecution[PermissionsInventoryItem | None](
+            executables,
+            progress_reporter=ProgressReporter(
+                len(executables), "Fetching permissions for workspace objects - processed: "
+            ),
+        ).run()
+        results = [result for result in results if result]  # empty filter
         logger.info(f"Permissions fetched for {len(results)} workspace objects")
         return results
 

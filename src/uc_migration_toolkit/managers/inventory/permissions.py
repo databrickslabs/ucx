@@ -192,7 +192,7 @@ class PermissionManager:
 
     @staticmethod
     def _standard_permissions_applicator(request_payload: PermissionRequestPayload):
-        provider.ws.permissions.update(
+        provider.ws.update_permissions(
             request_object_type=request_payload.request_object_type,
             request_object_id=request_payload.object_id,
             access_control_list=request_payload.access_control_list,
@@ -236,4 +236,4 @@ class PermissionManager:
         logger.info(f"Applying {len(permission_payloads)} permissions")
 
         self._apply_permissions_in_parallel(requests=permission_payloads)
-        logger.info("All permissions were applied")
+        logger.info(f"All permissions were applied for {destination} groups")
