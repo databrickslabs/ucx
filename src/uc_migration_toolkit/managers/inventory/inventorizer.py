@@ -65,6 +65,8 @@ class StandardInventorizer(BaseInventorizer[InventoryObject]):
             if e.error_code in ["RESOURCE_DOES_NOT_EXIST", "RESOURCE_NOT_FOUND", "PERMISSION_DENIED"]:
                 logger.warning(f"Could not get permissions for {request_object_type} {object_id} due to {e.error_code}")
                 return None
+            else:
+                raise e
 
     def __init__(
         self,
