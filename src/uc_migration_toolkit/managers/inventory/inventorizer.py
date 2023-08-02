@@ -288,8 +288,13 @@ class RolesAndEntitlementsInventorizer(BaseInventorizer[InventoryObject]):
         _items = []
 
         for group in self._group_info:
-            roles = [r.as_dict() for r in group.roles]
-            entitlements = [e.as_dict() for e in group.entitlements]
+            # add safe-getters
+            group_roles = group.roles if group.roles else []
+            group_entitlements = group.entitlements if group.entitlements else []
+
+            roles = [r.as_dict() for r in group_roles]
+            entitlements = [e.as_dict() for e in group_entitlements]
+
             inventory_item = PermissionsInventoryItem(
                 object_id=group.display_name,
                 logical_object_type=LogicalObjectType.ROLES,
