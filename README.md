@@ -113,7 +113,7 @@ hatch env create
 - Install dev dependencies:
 
 ```shell
-hatch run pip install -e '.[dbconnect]'
+hatch run pip install -e '.[test,dbconnect]'
 ```
 
 - Pin your IDE to use the newly created virtual environment. You can get the python path with:
