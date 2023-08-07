@@ -55,9 +55,6 @@ Source = "https://github.com/databricks/UC-Upgrade"
 path = "src/uc_migration_toolkit/__about__.py"
 
 [tool.hatch.envs.default]
-dependencies = [
-    "uc-migration-toolkit[test]",
-]
 
 [tool.hatch.envs.default.scripts]
 test = "pytest {args:tests}"
