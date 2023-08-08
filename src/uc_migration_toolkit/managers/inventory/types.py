@@ -2,6 +2,7 @@ import json
 
 import pandas as pd
 from databricks.sdk.service.iam import ObjectPermissions
+from databricks.sdk.service.sql import GetResponse, ObjectTypePlural
 from databricks.sdk.service.workspace import AclItem as SdkAclItem
 from databricks.sdk.service.workspace import AclPermission as SdkAclPermission
 from pydantic import BaseModel
@@ -30,17 +31,10 @@ class RequestObjectType(StrEnum):
         return self.value
 
 
-class SqlRequestObjectType(StrEnum):
-    ALERTS = "alerts"
-    DASHBOARDS = "dashboards"
-    DATA_SOURCES = "data-sources"
-    QUERIES = "queries"
-
-    def __repr__(self):
-        return self.value
-
-
 class LogicalObjectType(StrEnum):
+    ALERT = "ALERT"
+    DASHBOARD = "DASHBOARD"
+    QUERY = "QUERY"
     ENTITLEMENTS = "ENTITLEMENTS"
     ROLES = "ROLES"
     FILE = "FILE"
@@ -98,7 +92,7 @@ class RolesAndEntitlements(BaseModel):
 class PermissionsInventoryItem(BaseModel):
     object_id: str
     logical_object_type: LogicalObjectType
-    request_object_type: RequestObjectType | SqlRequestObjectType | None
+    request_object_type: RequestObjectType | ObjectTypePlural | None
     raw_object_permissions: str
 
     @property
@@ -106,11 +100,17 @@ class PermissionsInventoryItem(BaseModel):
         return json.loads(self.raw_object_permissions)
 
     @property
-    def typed_object_permissions(self) -> ObjectPermissions | AclItemsContainer | RolesAndEntitlements:
+    def typed_object_permissions(self) -> ObjectPermissions | AclItemsContainer | RolesAndEntitlements | GetResponse:
         if self.logical_object_type == LogicalObjectType.SECRET_SCOPE:
             return parse_obj_as(AclItemsContainer, self.object_permissions)
         elif self.logical_object_type in [LogicalObjectType.ROLES, LogicalObjectType.ENTITLEMENTS]:
             return parse_obj_as(RolesAndEntitlements, self.object_permissions)
+        elif self.logical_object_type in [
+            LogicalObjectType.ALERT,
+            LogicalObjectType.DASHBOARD,
+            LogicalObjectType.QUERY,
+        ]:
+            return GetResponse.from_dict(self.object_permissions)
         else:
             return ObjectPermissions.from_dict(self.object_permissions)
 

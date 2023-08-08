@@ -6,6 +6,7 @@ from functools import partial
 from typing import Literal
 
 from databricks.sdk.service.iam import AccessControlRequest, Group, ObjectPermissions
+from databricks.sdk.service.sql import AccessControl, GetResponse, ObjectTypePlural
 from databricks.sdk.service.workspace import AclItem as SdkAclItem
 from tenacity import retry, stop_after_attempt, wait_fixed, wait_random
 
@@ -45,7 +46,19 @@ class RolesAndEntitlementsRequestPayload:
     group_id: str
 
 
-AnyRequestPayload = PermissionRequestPayload | SecretsPermissionRequestPayload | RolesAndEntitlementsRequestPayload
+@dataclass
+class DBSQLRequestPayload:
+    object_type: ObjectTypePlural
+    object_id: str
+    access_control_list: list[AccessControl]
+
+
+AnyRequestPayload = (
+    PermissionRequestPayload
+    | SecretsPermissionRequestPayload
+    | RolesAndEntitlementsRequestPayload
+    | DBSQLRequestPayload
+)
 
 
 class PermissionManager:
@@ -147,6 +160,34 @@ class PermissionManager:
         destination_group: Group = getattr(migration_info, destination)
         return RolesAndEntitlementsRequestPayload(payload=item.typed_object_permissions, group_id=destination_group.id)
 
+    @staticmethod
+    def __prepare_request_for_dbsql_api(
+        item: PermissionsInventoryItem, migration_groups_provider, destination
+    ) -> DBSQLRequestPayload:
+        _final_acls = []
+        permissions_container: GetResponse = item.typed_object_permissions
+        existing_acls: list[AccessControl] = permissions_container.access_control_list
+
+        # IMPORTANT - DBSQL ACLs will perform COMPLETE REWRITE when set_permissions API is called.
+        # Therefore, we should provide BOTH existing and the adjusted ACLs in the request.
+        for _existing_acl in existing_acls:
+            if _existing_acl.group_name in [g.workspace.display_name for g in migration_groups_provider.groups]:
+                # Adjust the ACLs for the migration
+                migration_info = migration_groups_provider.get_by_workspace_group_name(_existing_acl.group_name)
+                assert (
+                    migration_info is not None
+                ), f"Group {_existing_acl.group_name} is not in the migration groups provider"
+                destination_group: Group = getattr(migration_info, destination)
+                _existing_acl.group_name = destination_group.display_name
+                _final_acls.append(_existing_acl)
+            else:
+                # Keep the existing ACLs
+                _final_acls.append(_existing_acl)
+
+        return DBSQLRequestPayload(
+            object_type=item.request_object_type, object_id=item.object_id, access_control_list=_final_acls
+        )
+
     def _prepare_new_permission_request(
         self,
         item: PermissionsInventoryItem,
@@ -161,6 +202,12 @@ class PermissionManager:
             return self._prepare_permission_request_for_secrets_api(item, migration_groups_provider, destination)
         elif item.logical_object_type in [LogicalObjectType.ROLES, LogicalObjectType.ENTITLEMENTS]:
             return self.__prepare_request_for_roles_and_entitlements(item, migration_groups_provider, destination)
+        elif item.logical_object_type in [
+            LogicalObjectType.ALERT,
+            LogicalObjectType.DASHBOARD,
+            LogicalObjectType.QUERY,
+        ]:
+            return self.__prepare_request_for_dbsql_api(item, migration_groups_provider, destination)
         else:
             logger.warning(
                 f"Unsupported permissions payload for object {item.object_id} "
@@ -198,6 +245,14 @@ class PermissionManager:
             access_control_list=request_payload.access_control_list,
         )
 
+    @staticmethod
+    def _dbsql_permissions_applicator(request_payload: DBSQLRequestPayload):
+        provider.ws.set_dbsql_permissions(
+            object_type=request_payload.object_type,
+            request_object_id=request_payload.object_id,
+            access_control_list=request_payload.access_control_list,
+        )
+
     def applicator(self, request_payload: AnyRequestPayload):
         if isinstance(request_payload, RolesAndEntitlementsRequestPayload):
             provider.ws.apply_roles_and_entitlements(
@@ -209,6 +264,8 @@ class PermissionManager:
             self._standard_permissions_applicator(request_payload)
         elif isinstance(request_payload, SecretsPermissionRequestPayload):
             self._scope_permissions_applicator(request_payload)
+        elif isinstance(request_payload, DBSQLRequestPayload):
+            self._dbsql_permissions_applicator(request_payload)
         else:
             logger.warning(f"Unsupported payload type {type(request_payload)}")
 

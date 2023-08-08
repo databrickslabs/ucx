@@ -1,5 +1,6 @@
 import pandas as pd
 from databricks.sdk.service.iam import ObjectPermissions
+from databricks.sdk.service.sql import GetResponse
 from pyspark.sql import DataFrame
 from pyspark.sql.types import StringType, StructField, StructType
 
@@ -68,6 +69,15 @@ class InventoryTableManager(SparkMixin):
 
         elif item.logical_object_type in [LogicalObjectType.ENTITLEMENTS, LogicalObjectType.ROLES]:
             return any(g in item.object_id for g in groups)
+
+        elif item.logical_object_type in [
+            LogicalObjectType.ALERT,
+            LogicalObjectType.DASHBOARD,
+            LogicalObjectType.QUERY,
+        ]:
+            _ops: GetResponse = item.typed_object_permissions
+            mentioned_groups = [acl.group_name for acl in _ops.access_control_list]
+            return any(g in mentioned_groups for g in groups)
 
         else:
             msg = f"Logical object type {item.logical_object_type} is not supported"

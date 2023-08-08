@@ -7,9 +7,10 @@ from databricks.sdk.service.iam import (
     ObjectPermissions,
     Permission,
 )
+from databricks.sdk.service.sql import AccessControl
 from databricks.sdk.service.workspace import SecretScope
 from pyspark.errors import AnalysisException
-from utils import EnvironmentInfo, WorkspaceObjects
+from utils import DBSQLObject, EnvironmentInfo, WorkspaceObjects
 
 from uc_migration_toolkit.config import (
     GroupsConfig,
@@ -17,6 +18,7 @@ from uc_migration_toolkit.config import (
     InventoryTable,
     MigrationConfig,
 )
+from uc_migration_toolkit.managers.inventory.inventorizer import DBSQLInventorizer
 from uc_migration_toolkit.managers.inventory.types import RequestObjectType
 from uc_migration_toolkit.providers.client import ImprovedWorkspaceClient
 from uc_migration_toolkit.providers.groups_info import MigrationGroupsProvider
@@ -38,7 +40,28 @@ def _verify_group_permissions(
         f"{request_object_type or id_attribute} were applied to {target} groups"
     )
 
-    if id_attribute == "workspace_objects":
+    if id_attribute == "dbsql_objects":
+        _dbsql_objects: list[DBSQLObject] = objects
+
+        # list of groups that source the permissions
+        comparison_base = [
+            getattr(mi, "workspace" if target == "backup" else "backup")
+            for mi in toolkit.group_manager.migration_groups_provider.groups
+        ]
+        # list of groups that are the target of the permissions
+        comparison_target = [getattr(mi, target) for mi in toolkit.group_manager.migration_groups_provider.groups]
+
+        for _obj in _dbsql_objects:
+            obj_acl: list[AccessControl] = ws.get_dbsql_permissions(
+                object_type=DBSQLInventorizer.get_object_type(_obj), request_object_id=_obj.id
+            ).access_control_list
+
+            base_acls = [a for a in obj_acl if a.group_name in [g.display_name for g in comparison_base]]
+            target_acls = [a for a in obj_acl if a.group_name in [g.display_name for g in comparison_target]]
+
+            assert len(base_acls) == len(target_acls)
+
+    elif id_attribute == "workspace_objects":
         _workspace_objects: WorkspaceObjects = objects
 
         # list of groups that source the permissions

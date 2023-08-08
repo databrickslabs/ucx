@@ -24,8 +24,12 @@ from databricks.sdk.service.pipelines import (
     PipelineLibrary,
 )
 from databricks.sdk.service.sql import (
+    Alert,
+    AlertOptions,
     CreateWarehouseRequestWarehouseType,
+    Dashboard,
     GetWarehouseResponse,
+    Query,
 )
 from databricks.sdk.service.workspace import (
     AclPermission,
@@ -34,6 +38,7 @@ from databricks.sdk.service.workspace import (
     SecretScope,
 )
 from utils import (
+    DBSQLObject,
     EnvironmentInfo,
     InstanceProfile,
     WorkspaceObjects,
@@ -41,6 +46,7 @@ from utils import (
     _create_groups,
     _get_basic_job_cluster,
     _get_basic_task,
+    _set_random_dbsql_permissions,
     _set_random_permissions,
     initialize_env,
 )
@@ -65,10 +71,12 @@ NUM_TEST_MODELS = int(os.environ.get("NUM_TEST_MODELS", 3))
 NUM_TEST_WAREHOUSES = int(os.environ.get("NUM_TEST_WAREHOUSES", 3))
 NUM_TEST_TOKENS = int(os.environ.get("NUM_TEST_TOKENS", 3))
 NUM_TEST_SECRET_SCOPES = int(os.environ.get("NUM_TEST_SECRET_SCOPES", 10))
+NUM_TEST_DBSQL_OBJECTS = int(os.environ.get("NUM_TEST_DBSQL_OBJECTS", 3))
 
 NUM_THREADS = int(os.environ.get("NUM_TEST_THREADS", 20))
 DB_CONNECT_CLUSTER_NAME = os.environ.get("DB_CONNECT_CLUSTER_NAME", "ucx-integration-testing")
 UCX_TESTING_PREFIX = os.environ.get("UCX_TESTING_PREFIX", "ucx")
+
 Threader = partial(ThreadedExecution, num_threads=NUM_THREADS)
 
 
@@ -85,7 +93,7 @@ def ws() -> ImprovedWorkspaceClient:
     yield provider.ws
 
 
-@pytest.fixture(scope="session", autouse=True)
+@pytest.fixture(scope="session")
 def acc() -> AccountClient:
     acc_client = AccountClient(
         host=os.environ["DATABRICKS_ACC_HOST"],
@@ -127,7 +135,7 @@ def dbconnect(ws: ImprovedWorkspaceClient):
     yield
 
 
-@pytest.fixture(scope="session", autouse=True)
+@pytest.fixture(scope="session")
 def env(ws: ImprovedWorkspaceClient, acc: AccountClient, request: SubRequest) -> EnvironmentInfo:
     # prepare environment
     test_uid = f"{UCX_TESTING_PREFIX}_{str(uuid.uuid4())[:8]}"
@@ -166,7 +174,7 @@ def env(ws: ImprovedWorkspaceClient, acc: AccountClient, request: SubRequest) ->
     yield EnvironmentInfo(test_uid=test_uid, groups=groups)
 
 
-@pytest.fixture(scope="session", autouse=True)
+@pytest.fixture(scope="session")
 def instance_profiles(env: EnvironmentInfo, ws: ImprovedWorkspaceClient) -> list[InstanceProfile]:
     logger.debug("Adding test instance profiles")
     profiles: list[InstanceProfile] = []
@@ -200,7 +208,7 @@ def instance_profiles(env: EnvironmentInfo, ws: ImprovedWorkspaceClient) -> list
     logger.debug("Test instance profiles deleted")
 
 
-@pytest.fixture(scope="session", autouse=True)
+@pytest.fixture(scope="session")
 def instance_pools(env: EnvironmentInfo, ws: ImprovedWorkspaceClient) -> list[CreateInstancePoolResponse]:
     logger.debug("Creating test instance pools")
 
@@ -225,7 +233,7 @@ def instance_pools(env: EnvironmentInfo, ws: ImprovedWorkspaceClient) -> list[Cr
     Threader(executables).run()
 
 
-@pytest.fixture(scope="session", autouse=True)
+@pytest.fixture(scope="session")
 def pipelines(env: EnvironmentInfo, ws: ImprovedWorkspaceClient) -> list[CreatePipelineResponse]:
     logger.debug("Creating test DLT pipelines")
 
@@ -255,7 +263,7 @@ def pipelines(env: EnvironmentInfo, ws: ImprovedWorkspaceClient) -> list[CreateP
     Threader(executables).run()
 
 
-@pytest.fixture(scope="session", autouse=True)
+@pytest.fixture(scope="session")
 def jobs(env: EnvironmentInfo, ws: ImprovedWorkspaceClient) -> list[CreateResponse]:
     logger.debug("Creating test jobs")
 
@@ -282,7 +290,7 @@ def jobs(env: EnvironmentInfo, ws: ImprovedWorkspaceClient) -> list[CreateRespon
     Threader(executables).run()
 
 
-@pytest.fixture(scope="session", autouse=True)
+@pytest.fixture(scope="session")
 def cluster_policies(env: EnvironmentInfo, ws: ImprovedWorkspaceClient) -> list[CreatePolicyResponse]:
     logger.debug("Creating test cluster policies")
 
@@ -317,7 +325,7 @@ def cluster_policies(env: EnvironmentInfo, ws: ImprovedWorkspaceClient) -> list[
     Threader(executables).run()
 
 
-@pytest.fixture(scope="session", autouse=True)
+@pytest.fixture(scope="session")
 def clusters(env: EnvironmentInfo, ws: ImprovedWorkspaceClient) -> list[ClusterDetails]:
     logger.debug("Creating test clusters")
 
@@ -352,7 +360,7 @@ def clusters(env: EnvironmentInfo, ws: ImprovedWorkspaceClient) -> list[ClusterD
     logger.debug("Test clusters deleted")
 
 
-@pytest.fixture(scope="session", autouse=True)
+@pytest.fixture(scope="session")
 def experiments(ws: ImprovedWorkspaceClient, env: EnvironmentInfo) -> list[CreateExperimentResponse]:
     logger.debug("Creating test experiments")
 
@@ -385,7 +393,7 @@ def experiments(ws: ImprovedWorkspaceClient, env: EnvironmentInfo) -> list[Creat
     logger.debug("Test experiments deleted")
 
 
-@pytest.fixture(scope="session", autouse=True)
+@pytest.fixture(scope="session")
 def models(ws: ImprovedWorkspaceClient, env: EnvironmentInfo) -> list[ModelDatabricks]:
     logger.debug("Creating models")
 
@@ -418,7 +426,7 @@ def models(ws: ImprovedWorkspaceClient, env: EnvironmentInfo) -> list[ModelDatab
     logger.debug("Test models deleted")
 
 
-@pytest.fixture(scope="session", autouse=True)
+@pytest.fixture(scope="session")
 def warehouses(ws: ImprovedWorkspaceClient, env: EnvironmentInfo) -> list[GetWarehouseResponse]:
     logger.debug("Creating warehouses")
 
@@ -453,7 +461,7 @@ def warehouses(ws: ImprovedWorkspaceClient, env: EnvironmentInfo) -> list[GetWar
     logger.debug("Test warehouses deleted")
 
 
-@pytest.fixture(scope="session", autouse=True)
+@pytest.fixture(scope="session")
 def tokens(ws: ImprovedWorkspaceClient, env: EnvironmentInfo) -> list[AccessControlRequest]:
     logger.debug("Adding token-level permissions to groups")
 
@@ -471,7 +479,7 @@ def tokens(ws: ImprovedWorkspaceClient, env: EnvironmentInfo) -> list[AccessCont
     yield token_permissions
 
 
-@pytest.fixture(scope="session", autouse=True)
+@pytest.fixture(scope="session")
 def secret_scopes(ws: ImprovedWorkspaceClient, env: EnvironmentInfo) -> list[SecretScope]:
     logger.debug("Creating test secret scopes")
 
@@ -492,7 +500,39 @@ def secret_scopes(ws: ImprovedWorkspaceClient, env: EnvironmentInfo) -> list[Sec
     Threader(executables).run()
 
 
-@pytest.fixture(scope="session", autouse=True)
+@pytest.fixture(scope="session")
+def dbsql_objects(ws: ImprovedWorkspaceClient, env: EnvironmentInfo) -> list[DBSQLObject]:
+    logger.debug("Creating test DBSQL objects")
+
+    _objs = []
+
+    for i in range(NUM_TEST_DBSQL_OBJECTS):
+        logger.debug(f"Creating test DBSQL objects with index {i}")
+        _q = ws.queries.create(name=f"ucx_{env.test_uid}-test-{i}", query="SELECT 1 as a")
+        _a = ws.alerts.create(
+            name=f"ucx_{env.test_uid}-test-{i}", options=AlertOptions(column="a", op=">", value=1.0), query_id=_q.id
+        )
+        _d = ws.dashboards.create(name=f"ucx_{env.test_uid}-test-{i}")
+
+        _objs.append(_q)
+        _objs.append(_a)
+        _objs.append(_d)
+
+    _set_random_dbsql_permissions(_objs, env, ws)
+
+    yield _objs
+
+    logger.debug("Deleting test DBSQL objects")
+    for _o in _objs:
+        if isinstance(_o, Query):
+            ws.queries.delete(_o.id)
+        elif isinstance(_o, Alert):
+            ws.alerts.delete(_o.id)
+        elif isinstance(_o, Dashboard):
+            ws.dashboards.delete(_o.id)
+
+
+@pytest.fixture(scope="session")
 def workspace_objects(ws: ImprovedWorkspaceClient, env: EnvironmentInfo) -> WorkspaceObjects:
     logger.info(f"Creating test workspace objects under /{env.test_uid}")
     ws.workspace.mkdirs(f"/{env.test_uid}")
@@ -547,7 +587,7 @@ def workspace_objects(ws: ImprovedWorkspaceClient, env: EnvironmentInfo) -> Work
     logger.debug("Test workspace objects deleted")
 
 
-@pytest.fixture(scope="session", autouse=True)
+@pytest.fixture(scope="session")
 def verifiable_objects(
     clusters,
     instance_pools,
@@ -560,6 +600,7 @@ def verifiable_objects(
     tokens,
     secret_scopes,
     workspace_objects,
+    dbsql_objects,
 ) -> list[tuple[list, str, RequestObjectType | None]]:
     _verifiable_objects = [
         (workspace_objects, "workspace_objects", None),
@@ -573,6 +614,7 @@ def verifiable_objects(
         (experiments, "experiment_id", RequestObjectType.EXPERIMENTS),
         (models, "id", RequestObjectType.REGISTERED_MODELS),
         (warehouses, "id", RequestObjectType.SQL_WAREHOUSES),
+        (dbsql_objects, "dbsql_objects", None),
     ]
     yield _verifiable_objects
 

@@ -4,6 +4,7 @@ from functools import partial
 from pathlib import Path
 from typing import Any
 
+import tenacity
 from databricks.sdk import AccountClient, WorkspaceClient
 from databricks.sdk.service.compute import ClusterSpec, DataSecurityMode
 from databricks.sdk.service.iam import (
@@ -14,13 +15,20 @@ from databricks.sdk.service.iam import (
     User,
 )
 from databricks.sdk.service.jobs import JobCluster, PythonWheelTask, Task
+from databricks.sdk.service.sql import AccessControl, Alert, Dashboard
+from databricks.sdk.service.sql import PermissionLevel as SQLPermissionLevel
+from databricks.sdk.service.sql import Query
 from databricks.sdk.service.workspace import ObjectInfo
 from dotenv import load_dotenv
+from tenacity import stop_after_attempt, wait_fixed, wait_random
 
+from uc_migration_toolkit.managers.inventory.inventorizer import DBSQLInventorizer
 from uc_migration_toolkit.managers.inventory.types import RequestObjectType
 from uc_migration_toolkit.providers.client import ImprovedWorkspaceClient
 from uc_migration_toolkit.providers.logger import logger
 from uc_migration_toolkit.utils import WorkspaceLevelEntitlement
+
+DBSQLObject = Alert | Query | Dashboard
 
 
 def initialize_env() -> None:
@@ -126,6 +134,43 @@ def _set_random_permissions(
             request_object_id=getattr(_object, id_attribute),
             access_control_list=acl_req,
         )
+
+
+def _set_random_dbsql_permissions(
+    objects: list[DBSQLObject],
+    env: EnvironmentInfo,
+    ws: ImprovedWorkspaceClient,
+    num_acls: int | None = 3,
+):
+    def get_random_ws_group() -> Group:
+        return random.choice([g[0] for g in env.groups])
+
+    def get_random_permission_level() -> SQLPermissionLevel:
+        return random.choice(list(SQLPermissionLevel))
+
+    @tenacity.retry(wait=wait_fixed(1) + wait_random(0, 2), stop=stop_after_attempt(5))
+    def set_permissions_with_retry(_object: DBSQLObject, acl: list[AccessControl]):
+        """
+        Retry since sometimes ACL API cannot find relevant groups
+        :param _object:
+        :param acl:
+        :return:
+        """
+        try:
+            ws.dbsql_permissions.set(
+                object_type=DBSQLInventorizer.get_object_type(_object), object_id=_object.id, access_control_list=acl
+            )
+        except Exception as e:
+            logger.warning(f"Cannot set permissions for {_object.id}, retrying. Original exception {e}")
+            raise e
+
+    for _object in objects:
+        _type = DBSQLInventorizer.get_object_type(_object)
+        acl_req = [
+            AccessControl(group_name=get_random_ws_group().display_name, permission_level=get_random_permission_level())
+            for _ in range(num_acls)
+        ]
+        set_permissions_with_retry(_object, acl_req)
 
 
 def _get_basic_job_cluster() -> JobCluster:

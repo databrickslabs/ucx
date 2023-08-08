@@ -5,6 +5,7 @@ from dataclasses import asdict
 import requests
 from databricks.sdk import WorkspaceClient
 from databricks.sdk.service.iam import AccessControlRequest, Group
+from databricks.sdk.service.sql import AccessControl, GetResponse, ObjectTypePlural
 from databricks.sdk.service.workspace import ObjectType
 from ratelimit import limits, sleep_and_retry
 from requests.adapters import HTTPAdapter
@@ -65,6 +66,30 @@ class ImprovedWorkspaceClient(WorkspaceClient):
     @limits(calls=100, period=1)
     def get_permissions(self, request_object_type: RequestObjectType, request_object_id: str):
         return self.permissions.get(request_object_type=request_object_type, request_object_id=request_object_id)
+
+    @sleep_and_retry
+    @limits(calls=100, period=1)
+    def get_dbsql_permissions(self, object_type: ObjectTypePlural, request_object_id: str) -> GetResponse:
+        return self.dbsql_permissions.get(object_type=object_type, object_id=request_object_id)
+
+    @sleep_and_retry
+    @limits(calls=30, period=1)
+    def set_dbsql_permissions(
+        self, object_type: ObjectTypePlural, request_object_id: str, access_control_list: list[AccessControl]
+    ):
+        """
+        Please note that this operation will COMPLETELY REWRITE the ACLs.
+        Therefore, a full set of ACLs must be provided.
+        :param object_type:
+        :param request_object_id:
+        :param access_control_list:
+        :return:
+        """
+        return self.dbsql_permissions.set(
+            object_type=object_type,
+            request_object_id=request_object_id,
+            access_control_list=access_control_list,
+        )
 
     @sleep_and_retry
     @limits(calls=30, period=1)

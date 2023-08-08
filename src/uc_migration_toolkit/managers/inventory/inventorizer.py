@@ -6,6 +6,13 @@ from typing import Generic, TypeVar
 
 from databricks.sdk.core import DatabricksError
 from databricks.sdk.service.iam import AccessControlResponse, Group, ObjectPermissions
+from databricks.sdk.service.sql import (
+    Alert,
+    Dashboard,
+    GetResponse,
+    ObjectTypePlural,
+    Query,
+)
 from databricks.sdk.service.workspace import (
     AclItem,
     ObjectInfo,
@@ -331,6 +338,87 @@ class RolesAndEntitlementsInventorizer(BaseInventorizer[InventoryObject]):
             _items.append(inventory_item)
 
         return _items
+
+
+class DBSQLInventorizer(BaseInventorizer[InventoryObject]):
+    def __init__(self):
+        self._alerts: list[Alert] = []
+        self._dashboards: list[Dashboard] = []
+        self._queries: list[Query] = []
+
+    @property
+    def logical_object_types(self) -> list[LogicalObjectType]:
+        return [LogicalObjectType.ALERT, LogicalObjectType.DASHBOARD, LogicalObjectType.QUERY]
+
+    @staticmethod
+    def safe_get_dbsql_permissions(object_type: ObjectTypePlural, request_object_id: str) -> GetResponse | None:
+        try:
+            permissions = provider.ws.get_dbsql_permissions(
+                object_type=object_type, request_object_id=request_object_id
+            )
+            return permissions
+        except DatabricksError as e:
+            if e.error_code in ["RESOURCE_DOES_NOT_EXIST", "RESOURCE_NOT_FOUND", "PERMISSION_DENIED"]:
+                logger.warning(f"Could not get permissions for {object_type} {request_object_id} due to {e.error_code}")
+                return None
+            else:
+                raise e
+
+    def preload(self):
+        logger.info("Listing DBSQL Alerts...")
+        self._alerts = list(provider.ws.alerts.list())
+        logger.info(f"Finished listing of DBSQL Alerts, found {len(self._alerts)} objects")
+
+        logger.info("Listing DBSQL Dashboards")
+        self._dashboards = list(provider.ws.dashboards.list())
+        logger.info(f"Finished listing of DBSQL Dashboards, found {len(self._dashboards)} objects")
+
+        logger.info("Listing DBSQL Queries")
+        self._queries = list(provider.ws.queries.list())
+        logger.info(f"Finished listing of DBSQL Queries, found {len(self._queries)} queries")
+
+    @staticmethod
+    def get_object_type(_obj: Alert | Dashboard | Query) -> ObjectTypePlural:
+        if isinstance(_obj, Alert):
+            return ObjectTypePlural.ALERTS
+        elif isinstance(_obj, Dashboard):
+            return ObjectTypePlural.DASHBOARDS
+        elif isinstance(_obj, Query):
+            return ObjectTypePlural.QUERIES
+        else:
+            msg = f"Unknown object type {_obj}"
+            raise ValueError(msg)
+
+    def _get_object_permissions(self, _obj: Alert | Dashboard | Query) -> PermissionsInventoryItem | None:
+        if isinstance(_obj, Alert):
+            logical_object_type = LogicalObjectType.ALERT
+        elif isinstance(_obj, Dashboard):
+            logical_object_type = LogicalObjectType.DASHBOARD
+        elif isinstance(_obj, Query):
+            logical_object_type = LogicalObjectType.QUERY
+        else:
+            msg = f"Unknown object type {_obj}"
+            raise ValueError(msg)
+
+        request_object_type = self.get_object_type(_obj)
+        permissions = self.safe_get_dbsql_permissions(object_type=request_object_type, request_object_id=_obj.id)
+        if permissions:
+            return PermissionsInventoryItem(
+                object_id=_obj.id,
+                logical_object_type=logical_object_type,
+                request_object_type=request_object_type,
+                raw_object_permissions=json.dumps(permissions.as_dict()),
+            )
+
+    def inventorize(self) -> list[PermissionsInventoryItem]:
+        logger.info("DBSQL inventorization started")
+        logger.info("Collecting permissions for DBSQL objects")
+        dbsql_objects = self._alerts + self._dashboards + self._queries
+        executables = [partial(self._get_object_permissions, _obj) for _obj in dbsql_objects]
+        results = ThreadedExecution[PermissionsInventoryItem](executables).run()
+        non_empty_results = [result for result in results if result]
+        logger.info(f"DBSQL inventorization completed. {len(non_empty_results)} objects inventorized")
+        return non_empty_results
 
 
 class Inventorizers:
