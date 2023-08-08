@@ -1,22 +1,19 @@
 import json
 from collections.abc import Iterator
-from dataclasses import asdict
 
-import requests
 from databricks.sdk import WorkspaceClient
 from databricks.sdk.service.iam import AccessControlRequest, Group
 from databricks.sdk.service.workspace import ObjectType
 from ratelimit import limits, sleep_and_retry
-from requests.adapters import HTTPAdapter
-from urllib3 import Retry
 
-from uc_migration_toolkit.config import AuthConfig
 from uc_migration_toolkit.managers.inventory.types import RequestObjectType
-from uc_migration_toolkit.providers.config import provider as config_provider
 from uc_migration_toolkit.providers.logger import logger
 
 
 class ImprovedWorkspaceClient(WorkspaceClient):
+    # ***
+    # *** CAUTION: DO NOT ADD ANY METHODS THAT WON'T END UP IN THE SDK ***
+    # ***
     # to this class we add rate-limited methods to make calls to various APIs
     # source info - https://docs.databricks.com/resources/limits.html
 
@@ -109,65 +106,3 @@ class ImprovedWorkspaceClient(WorkspaceClient):
                 "Operations": operations,
             }
             self.patch_workspace_group(group_id, request)
-
-
-class ClientProvider:
-    def __init__(self):
-        self._ws_client: ImprovedWorkspaceClient | None = None
-
-    @staticmethod
-    def _verify_ws_client(w: ImprovedWorkspaceClient):
-        assert w.current_user.me(), "Cannot authenticate with the workspace client"
-        _me = w.current_user.me()
-        is_workspace_admin = any(g.display == "admins" for g in _me.groups)
-        if not is_workspace_admin:
-            msg = "Current user is not a workspace admin"
-            raise RuntimeError(msg)
-
-    @staticmethod
-    def __get_retry_strategy():
-        retry_strategy = Retry(
-            total=20,
-            backoff_factor=1,
-            status_forcelist=[429],
-            respect_retry_after_header=True,
-            raise_on_status=False,  # return original response when retries have been exhausted
-            # adjusted from the default values
-            allowed_methods=["HEAD", "GET", "PUT", "DELETE", "OPTIONS", "TRACE", "PATCH", "POST"],
-        )
-        return retry_strategy
-
-    def _adjust_session(self, client: ImprovedWorkspaceClient, pool_size: int | None = None):
-        pool_size = pool_size if pool_size else config_provider.config.num_threads
-        logger.debug(f"Adjusting the session to fully utilize {pool_size} threads")
-        _existing_session = client.api_client._session
-        _session = requests.Session()
-        _session.auth = _existing_session.auth
-        _session.mount("https://", HTTPAdapter(max_retries=self.__get_retry_strategy(), pool_maxsize=pool_size))
-        client.api_client._session = _session
-        logger.debug("Session adjusted")
-
-    def set_ws_client(self, auth_config: AuthConfig | None = None, pool_size: int | None = None):
-        if self._ws_client:
-            logger.warning("Workspace client already initialized, skipping")
-            return
-
-        logger.info("Initializing the workspace client")
-        if auth_config and auth_config.workspace:
-            logger.info("Using the provided workspace client credentials")
-            _client = ImprovedWorkspaceClient(**asdict(auth_config.workspace))
-        else:
-            logger.info("Trying standard workspace auth mechanisms")
-            _client = ImprovedWorkspaceClient()
-
-        self._verify_ws_client(_client)
-        self._adjust_session(_client, pool_size)
-        self._ws_client = _client
-
-    @property
-    def ws(self) -> ImprovedWorkspaceClient:
-        assert self._ws_client, "Workspace client not initialized"
-        return self._ws_client
-
-
-provider = ClientProvider()

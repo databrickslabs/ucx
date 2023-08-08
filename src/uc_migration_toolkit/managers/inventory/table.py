@@ -1,23 +1,24 @@
 import pandas as pd
+from databricks.sdk import WorkspaceClient
 from databricks.sdk.service.iam import ObjectPermissions
 from pyspark.sql import DataFrame
 from pyspark.sql.types import StringType, StructField, StructType
 
+from uc_migration_toolkit.config import InventoryConfig
 from uc_migration_toolkit.managers.inventory.types import (
     AclItemsContainer,
     LogicalObjectType,
     PermissionsInventoryItem,
     RequestObjectType,
 )
-from uc_migration_toolkit.providers.config import provider as config_provider
 from uc_migration_toolkit.providers.logger import logger
 from uc_migration_toolkit.providers.spark import SparkMixin
 
 
 class InventoryTableManager(SparkMixin):
-    def __init__(self):
-        super().__init__()
-        self.config = config_provider.config.inventory
+    def __init__(self, config: InventoryConfig, ws: WorkspaceClient):
+        super().__init__(ws)
+        self.config = config
 
     @property
     def _table_schema(self) -> StructType:

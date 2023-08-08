@@ -3,9 +3,9 @@ from functools import partial
 
 from databricks.sdk.service.iam import Group
 
+from uc_migration_toolkit.config import GroupsConfig
 from uc_migration_toolkit.generic import StrEnum
-from uc_migration_toolkit.providers.client import provider
-from uc_migration_toolkit.providers.config import provider as config_provider
+from uc_migration_toolkit.providers.client import ImprovedWorkspaceClient
 from uc_migration_toolkit.providers.groups_info import (
     MigrationGroupInfo,
     MigrationGroupsProvider,
@@ -22,17 +22,17 @@ class GroupLevel(StrEnum):
 class GroupManager:
     SYSTEM_GROUPS: typing.ClassVar[list[str]] = ["users", "admins", "account users"]
 
-    def __init__(self):
-        self.config = config_provider.config.groups
+    def __init__(self, ws: ImprovedWorkspaceClient, groups: GroupsConfig):
+        self._ws = ws
+        self.config = groups
         self._migration_groups_provider: MigrationGroupsProvider = MigrationGroupsProvider()
 
     # please keep the internal methods below this line
 
-    @staticmethod
-    def _find_eligible_groups() -> list[str]:
+    def _find_eligible_groups(self) -> list[str]:
         logger.info("Finding eligible groups automatically")
         _display_name_filter = " and ".join([f'displayName ne "{group}"' for group in GroupManager.SYSTEM_GROUPS])
-        ws_groups = list(provider.ws.groups.list(attributes="displayName,meta", filter=_display_name_filter))
+        ws_groups = list(self._ws.groups.list(attributes="displayName,meta", filter=_display_name_filter))
         eligible_groups = [g for g in ws_groups if g.meta.resource_type == "WorkspaceGroup"]
         logger.info(f"Found {len(eligible_groups)} eligible groups")
         return [g.display_name for g in eligible_groups]
@@ -55,9 +55,8 @@ class GroupManager:
 
         return group_info
 
-    @staticmethod
-    def _get_group(group_name, level: GroupLevel) -> Group | None:
-        method = provider.ws.groups.list if level == GroupLevel.WORKSPACE else provider.ws.list_account_level_groups
+    def _get_group(self, group_name, level: GroupLevel) -> Group | None:
+        method = self._ws.groups.list if level == GroupLevel.WORKSPACE else self._ws.list_account_level_groups
         query_filter = f"displayName eq '{group_name}'"
         attributes = ",".join(["id", "displayName", "meta", "entitlements", "roles", "members"])
 
@@ -78,7 +77,7 @@ class GroupManager:
             logger.info(f"Creating backup group {backup_group_name}")
             new_group_payload = self._get_clean_group_info(source_group)
             new_group_payload["displayName"] = backup_group_name
-            backup_group = provider.ws.groups.create(request=Group.from_dict(new_group_payload))
+            backup_group = self._ws.groups.create(request=Group.from_dict(new_group_payload))
             logger.info(f"Backup group {backup_group_name} successfully created")
 
         return backup_group
@@ -106,12 +105,12 @@ class GroupManager:
 
         if self._get_group(ws_group.display_name, GroupLevel.WORKSPACE):
             logger.info(f"Deleting the workspace-level group {ws_group.display_name} with id {ws_group.id}")
-            provider.ws.groups.delete(ws_group.id)
+            self._ws.groups.delete(ws_group.id)
             logger.info(f"Workspace-level group {ws_group.display_name} with id {ws_group.id} was deleted")
         else:
             logger.warning(f"Workspace-level group {ws_group.display_name} does not exist, skipping")
 
-        provider.ws.reflect_account_group_to_workspace(acc_group)
+        self._ws.reflect_account_group_to_workspace(acc_group)
 
     # please keep the public methods below this line
 
@@ -152,7 +151,7 @@ class GroupManager:
 
         for migration_info in self.migration_groups_provider.groups:
             try:
-                provider.ws.groups.delete(id=migration_info.backup.id)
+                self._ws.groups.delete(id=migration_info.backup.id)
             except Exception as e:
                 logger.warning(
                     f"Failed to delete backup group {migration_info.backup.display_name} "

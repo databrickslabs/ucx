@@ -1,32 +1,11 @@
 import datetime as dt
-from collections.abc import Iterator
 from concurrent.futures import FIRST_COMPLETED, ThreadPoolExecutor, wait
 from itertools import groupby
 
-from databricks.sdk.service.ml import ModelDatabricks
 from databricks.sdk.service.workspace import ObjectInfo, ObjectType
 
-from uc_migration_toolkit.providers.client import ImprovedWorkspaceClient, provider
+from uc_migration_toolkit.providers.client import ImprovedWorkspaceClient
 from uc_migration_toolkit.providers.logger import logger
-
-
-class CustomListing:
-    """
-    Provides utility functions for custom listing operations
-    """
-
-    @staticmethod
-    def list_models() -> Iterator[ModelDatabricks]:
-        for model in provider.ws.model_registry.list_models():
-            model_with_id = provider.ws.model_registry.get_model(model.name).registered_model_databricks
-            yield model_with_id
-
-    @staticmethod
-    def list_experiments() -> Iterator[ModelDatabricks]:
-        for experiment in provider.ws.experiments.list_experiments():
-            nb_tag = [t for t in experiment.tags if t.key == "mlflow.experimentType" and t.value == "NOTEBOOK"]
-            if not nb_tag:
-                yield experiment
 
 
 class WorkspaceListing:
