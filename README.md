@@ -71,9 +71,9 @@ ML:
 
 SQL:
 
-- [ ] Dashboard
-- [ ] Queries
-- [ ] Alerts
+- [x] Dashboard
+- [x] Queries
+- [x] Alerts
 
 Security:
 
