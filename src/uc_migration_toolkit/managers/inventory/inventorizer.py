@@ -4,8 +4,10 @@ from collections.abc import Callable, Iterator
 from functools import partial
 from typing import Generic, TypeVar
 
+from databricks.sdk import WorkspaceClient
 from databricks.sdk.core import DatabricksError
 from databricks.sdk.service.iam import AccessControlResponse, Group, ObjectPermissions
+from databricks.sdk.service.ml import ModelDatabricks
 from databricks.sdk.service.workspace import (
     AclItem,
     ObjectInfo,
@@ -13,18 +15,14 @@ from databricks.sdk.service.workspace import (
     SecretScope,
 )
 
-from uc_migration_toolkit.managers.inventory.listing import (
-    CustomListing,
-    WorkspaceListing,
-)
+from uc_migration_toolkit.managers.inventory.listing import WorkspaceListing
 from uc_migration_toolkit.managers.inventory.types import (
     AclItemsContainer,
     LogicalObjectType,
     PermissionsInventoryItem,
     RequestObjectType,
 )
-from uc_migration_toolkit.providers.client import provider
-from uc_migration_toolkit.providers.config import provider as config_provider
+from uc_migration_toolkit.providers.client import ImprovedWorkspaceClient
 from uc_migration_toolkit.providers.groups_info import MigrationGroupsProvider
 from uc_migration_toolkit.providers.logger import logger
 from uc_migration_toolkit.utils import ProgressReporter, ThreadedExecution
@@ -56,10 +54,26 @@ class StandardInventorizer(BaseInventorizer[InventoryObject]):
     def logical_object_types(self) -> list[LogicalObjectType]:
         return [self._logical_object_type]
 
-    @staticmethod
-    def safe_get_permissions(request_object_type: RequestObjectType, object_id: str) -> ObjectPermissions | None:
+    def __init__(
+        self,
+        ws: ImprovedWorkspaceClient,
+        logical_object_type: LogicalObjectType,
+        request_object_type: RequestObjectType,
+        listing_function: Callable[..., Iterator[InventoryObject]],
+        id_attribute: str,
+        permissions_function: Callable[..., ObjectPermissions] | None = None,
+    ):
+        self._ws = ws
+        self._logical_object_type = logical_object_type
+        self._request_object_type = request_object_type
+        self._listing_function = listing_function
+        self._id_attribute = id_attribute
+        self._permissions_function = permissions_function if permissions_function else self._safe_get_permissions
+        self._objects: list[InventoryObject] = []
+
+    def _safe_get_permissions(self, request_object_type: RequestObjectType, object_id: str) -> ObjectPermissions | None:
         try:
-            permissions = provider.ws.get_permissions(request_object_type, object_id)
+            permissions = self._ws.get_permissions(request_object_type, object_id)
             return permissions
         except DatabricksError as e:
             if e.error_code in ["RESOURCE_DOES_NOT_EXIST", "RESOURCE_NOT_FOUND", "PERMISSION_DENIED"]:
@@ -67,21 +81,6 @@ class StandardInventorizer(BaseInventorizer[InventoryObject]):
                 return None
             else:
                 raise e
-
-    def __init__(
-        self,
-        logical_object_type: LogicalObjectType,
-        request_object_type: RequestObjectType,
-        listing_function: Callable[..., Iterator[InventoryObject]],
-        id_attribute: str,
-        permissions_function: Callable[..., ObjectPermissions] | None = None,
-    ):
-        self._logical_object_type = logical_object_type
-        self._request_object_type = request_object_type
-        self._listing_function = listing_function
-        self._id_attribute = id_attribute
-        self._permissions_function = permissions_function if permissions_function else self.safe_get_permissions
-        self._objects: list[InventoryObject] = []
 
     @property
     def logical_object_type(self) -> LogicalObjectType:
@@ -119,23 +118,22 @@ class TokensAndPasswordsInventorizer(BaseInventorizer[InventoryObject]):
     def logical_object_types(self) -> list[LogicalObjectType]:
         return [LogicalObjectType.TOKEN, LogicalObjectType.PASSWORD]
 
-    def __init__(self):
+    def __init__(self, ws: ImprovedWorkspaceClient):
+        self._ws = ws
         self._tokens_acl = []
         self._passwords_acl = []
 
-    @staticmethod
-    def _preload_tokens():
+    def _preload_tokens(self):
         try:
-            return provider.ws.get_tokens().get("access_control_list", [])
+            return self._ws.get_tokens().get("access_control_list", [])
         except DatabricksError as e:
             logger.warning("Cannot load token permissions due to error:")
             logger.warning(e)
             return []
 
-    @staticmethod
-    def _preload_passwords():
+    def _preload_passwords(self):
         try:
-            return provider.ws.get_passwords().get("access_control_list", [])
+            return self._ws.get_passwords().get("access_control_list", [])
         except DatabricksError as e:
             logger.error("Cannot load password permissions due to error:")
             logger.error(e)
@@ -183,12 +181,12 @@ class SecretScopeInventorizer(BaseInventorizer[InventoryObject]):
     def logical_object_types(self) -> list[LogicalObjectType]:
         return [LogicalObjectType.SECRET_SCOPE]
 
-    def __init__(self):
-        self._scopes = provider.ws.secrets.list_scopes()
+    def __init__(self, ws: ImprovedWorkspaceClient):
+        self._ws = ws
+        self._scopes = ws.secrets.list_scopes()
 
-    @staticmethod
-    def _get_acls_for_scope(scope: SecretScope) -> Iterator[AclItem]:
-        return provider.ws.secrets.list_acls(scope.name)
+    def _get_acls_for_scope(self, scope: SecretScope) -> Iterator[AclItem]:
+        return self._ws.secrets.list_acls(scope.name)
 
     def _prepare_permissions_inventory_item(self, scope: SecretScope) -> PermissionsInventoryItem:
         acls = self._get_acls_for_scope(scope)
@@ -216,10 +214,11 @@ class WorkspaceInventorizer(BaseInventorizer[InventoryObject]):
     def logical_object_types(self) -> list[LogicalObjectType]:
         return [LogicalObjectType.NOTEBOOK, LogicalObjectType.DIRECTORY, LogicalObjectType.REPO, LogicalObjectType.FILE]
 
-    def __init__(self, start_path: str | None = "/"):
+    def __init__(self, ws: ImprovedWorkspaceClient, num_threads=20, start_path: str | None = "/"):
+        self._ws = ws
         self.listing = WorkspaceListing(
-            provider.ws,
-            num_threads=config_provider.config.num_threads,
+            ws,
+            num_threads=num_threads,
             with_directories=False,
         )
         self._start_path = start_path
@@ -262,7 +261,7 @@ class WorkspaceInventorizer(BaseInventorizer[InventoryObject]):
             return
         else:
             try:
-                permissions = provider.ws.get_permissions(
+                permissions = self._ws.get_permissions(
                     request_object_type=request_object_type, request_object_id=_object.object_id
                 )
             except DatabricksError as e:
@@ -300,14 +299,15 @@ class RolesAndEntitlementsInventorizer(BaseInventorizer[InventoryObject]):
     def logical_object_types(self) -> list[LogicalObjectType]:
         return [LogicalObjectType.ROLES, LogicalObjectType.ENTITLEMENTS]
 
-    def __init__(self, migration_provider: MigrationGroupsProvider):
+    def __init__(self, ws: ImprovedWorkspaceClient, migration_provider: MigrationGroupsProvider):
+        self._ws = ws
         self._migration_provider = migration_provider
         self._group_info: list[Group] = []
 
     def preload(self):
         logger.info("Please note that group roles and entitlements will be ONLY inventorized for migration groups")
         self._group_info: list[Group] = [
-            provider.ws.groups.get(id=g.workspace.id) for g in self._migration_provider.groups
+            self._ws.groups.get(id=g.workspace.id) for g in self._migration_provider.groups
         ]
         logger.info("Group roles and entitlements preload completed")
 
@@ -333,60 +333,87 @@ class RolesAndEntitlementsInventorizer(BaseInventorizer[InventoryObject]):
         return _items
 
 
+def models_listing(ws: WorkspaceClient):
+    def inner() -> Iterator[ModelDatabricks]:
+        for model in ws.model_registry.list_models():
+            model_with_id = ws.model_registry.get_model(model.name).registered_model_databricks
+            yield model_with_id
+
+    return inner
+
+
+def experiments_listing(ws: WorkspaceClient):
+    def inner() -> Iterator[ModelDatabricks]:
+        for experiment in ws.experiments.list_experiments():
+            nb_tag = [t for t in experiment.tags if t.key == "mlflow.experimentType" and t.value == "NOTEBOOK"]
+            if not nb_tag:
+                yield experiment
+
+    return inner
+
+
 class Inventorizers:
     @staticmethod
-    def provide(migration_provider: MigrationGroupsProvider):
+    def provide(ws: ImprovedWorkspaceClient, migration_provider: MigrationGroupsProvider, num_threads: int):
         return [
-            RolesAndEntitlementsInventorizer(migration_provider),
-            TokensAndPasswordsInventorizer(),
+            RolesAndEntitlementsInventorizer(ws, migration_provider),
+            TokensAndPasswordsInventorizer(ws),
             StandardInventorizer(
+                ws,
                 logical_object_type=LogicalObjectType.CLUSTER,
                 request_object_type=RequestObjectType.CLUSTERS,
-                listing_function=provider.ws.clusters.list,
+                listing_function=ws.clusters.list,
                 id_attribute="cluster_id",
             ),
             StandardInventorizer(
+                ws,
                 logical_object_type=LogicalObjectType.INSTANCE_POOL,
                 request_object_type=RequestObjectType.INSTANCE_POOLS,
-                listing_function=provider.ws.instance_pools.list,
+                listing_function=ws.instance_pools.list,
                 id_attribute="instance_pool_id",
             ),
             StandardInventorizer(
+                ws,
                 logical_object_type=LogicalObjectType.CLUSTER_POLICY,
                 request_object_type=RequestObjectType.CLUSTER_POLICIES,
-                listing_function=provider.ws.cluster_policies.list,
+                listing_function=ws.cluster_policies.list,
                 id_attribute="policy_id",
             ),
             StandardInventorizer(
+                ws,
                 logical_object_type=LogicalObjectType.PIPELINE,
                 request_object_type=RequestObjectType.PIPELINES,
-                listing_function=provider.ws.pipelines.list_pipelines,
+                listing_function=ws.pipelines.list_pipelines,
                 id_attribute="pipeline_id",
             ),
             StandardInventorizer(
+                ws,
                 logical_object_type=LogicalObjectType.JOB,
                 request_object_type=RequestObjectType.JOBS,
-                listing_function=provider.ws.jobs.list,
+                listing_function=ws.jobs.list,
                 id_attribute="job_id",
             ),
             StandardInventorizer(
+                ws,
                 logical_object_type=LogicalObjectType.EXPERIMENT,
                 request_object_type=RequestObjectType.EXPERIMENTS,
-                listing_function=CustomListing.list_experiments,
+                listing_function=experiments_listing(ws),
                 id_attribute="experiment_id",
             ),
             StandardInventorizer(
+                ws,
                 logical_object_type=LogicalObjectType.MODEL,
                 request_object_type=RequestObjectType.REGISTERED_MODELS,
-                listing_function=CustomListing.list_models,
+                listing_function=models_listing(ws),
                 id_attribute="id",
             ),
             StandardInventorizer(
+                ws,
                 logical_object_type=LogicalObjectType.WAREHOUSE,
                 request_object_type=RequestObjectType.SQL_WAREHOUSES,
-                listing_function=provider.ws.warehouses.list,
+                listing_function=ws.warehouses.list,
                 id_attribute="id",
             ),
-            SecretScopeInventorizer(),
-            WorkspaceInventorizer(),
+            SecretScopeInventorizer(ws),
+            WorkspaceInventorizer(ws, num_threads=num_threads),
         ]

@@ -8,7 +8,6 @@ from databricks.sdk.service.workspace import AclItem
 
 from uc_migration_toolkit.generic import StrEnum
 from uc_migration_toolkit.providers.client import ImprovedWorkspaceClient
-from uc_migration_toolkit.providers.config import provider as config_provider
 from uc_migration_toolkit.providers.logger import logger
 
 ExecutableResult = TypeVar("ExecutableResult")
@@ -38,10 +37,10 @@ class ThreadedExecution(Generic[ExecutableResult]):
     def __init__(
         self,
         executables: list[ExecutableFunction],
-        num_threads: int | None = None,
+        num_threads: int | None = 4,
         progress_reporter: ProgressReporter | None = None,
     ):
-        self._num_threads = num_threads if num_threads else config_provider.config.num_threads
+        self._num_threads = num_threads
         self._executables = executables
         self._futures = []
         _reporter = ProgressReporter(len(executables)) if not progress_reporter else progress_reporter

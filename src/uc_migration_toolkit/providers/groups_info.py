@@ -10,6 +10,7 @@ class MigrationGroupInfo:
     account: Group
 
 
+# TODO: this is not a provider, this is a container, e.g. State or Cache
 class MigrationGroupsProvider:
     def __init__(self):
         self.groups: list[MigrationGroupInfo] = []

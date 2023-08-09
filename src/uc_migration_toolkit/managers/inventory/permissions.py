@@ -18,8 +18,7 @@ from uc_migration_toolkit.managers.inventory.types import (
     RequestObjectType,
     RolesAndEntitlements,
 )
-from uc_migration_toolkit.providers.client import provider
-from uc_migration_toolkit.providers.config import provider as config_provider
+from uc_migration_toolkit.providers.client import ImprovedWorkspaceClient
 from uc_migration_toolkit.providers.groups_info import MigrationGroupsProvider
 from uc_migration_toolkit.providers.logger import logger
 from uc_migration_toolkit.utils import ThreadedExecution, safe_get_acls
@@ -49,8 +48,8 @@ AnyRequestPayload = PermissionRequestPayload | SecretsPermissionRequestPayload |
 
 
 class PermissionManager:
-    def __init__(self, inventory_table_manager: InventoryTableManager):
-        self.config = config_provider.config
+    def __init__(self, ws: ImprovedWorkspaceClient, inventory_table_manager: InventoryTableManager):
+        self._ws = ws
         self.inventory_table_manager = inventory_table_manager
         self._inventorizers = []
 
@@ -167,13 +166,12 @@ class PermissionManager:
                 f"with logical type {item.logical_object_type}"
             )
 
-    @staticmethod
     @retry(wait=wait_fixed(1) + wait_random(0, 2), stop=stop_after_attempt(5))
-    def _scope_permissions_applicator(request_payload: SecretsPermissionRequestPayload):
+    def _scope_permissions_applicator(self, request_payload: SecretsPermissionRequestPayload):
         for _acl_item in request_payload.access_control_list:
             # this request will create OR update the ACL for the given principal
             # it means that the access_control_list should only keep records required for update
-            provider.ws.secrets.put_acl(
+            self._ws.secrets.put_acl(
                 scope=request_payload.object_id, principal=_acl_item.principal, permission=_acl_item.permission
             )
             logger.debug(f"Applied new permissions for scope {request_payload.object_id}: {_acl_item}")
@@ -182,7 +180,7 @@ class PermissionManager:
             for _ in range(3):
                 time.sleep(random.random() * 2)
                 applied_acls = safe_get_acls(
-                    provider.ws, scope_name=request_payload.object_id, group_name=_acl_item.principal
+                    self._ws, scope_name=request_payload.object_id, group_name=_acl_item.principal
                 )
                 assert applied_acls, f"Failed to apply permissions for {_acl_item.principal}"
                 assert applied_acls.permission == _acl_item.permission, (
@@ -190,9 +188,8 @@ class PermissionManager:
                     f"Expected: {_acl_item.permission}. Actual: {applied_acls.permission}"
                 )
 
-    @staticmethod
-    def _standard_permissions_applicator(request_payload: PermissionRequestPayload):
-        provider.ws.update_permissions(
+    def _standard_permissions_applicator(self, request_payload: PermissionRequestPayload):
+        self._ws.update_permissions(
             request_object_type=request_payload.request_object_type,
             request_object_id=request_payload.object_id,
             access_control_list=request_payload.access_control_list,
@@ -200,7 +197,7 @@ class PermissionManager:
 
     def applicator(self, request_payload: AnyRequestPayload):
         if isinstance(request_payload, RolesAndEntitlementsRequestPayload):
-            provider.ws.apply_roles_and_entitlements(
+            self._ws.apply_roles_and_entitlements(
                 group_id=request_payload.group_id,
                 roles=request_payload.payload.roles,
                 entitlements=request_payload.payload.entitlements,

@@ -1,3 +1,4 @@
+from databricks.sdk.core import Config
 from pydantic import RootModel
 from pydantic.dataclasses import dataclass
 
@@ -31,25 +32,26 @@ class GroupsConfig:
 
 
 @dataclass
-class WorkspaceAuthConfig:
-    token: str | None = None
-    host: str | None = None
-    client_id: str | None = None
-    client_secret: str | None = None
-    profile: str | None = None
-
-
-@dataclass
-class AuthConfig:
-    workspace: WorkspaceAuthConfig | None = None
-
-    class Config:
-        frozen = True
-
-
-@dataclass
 class InventoryConfig:
     table: InventoryTable
+
+
+@dataclass
+class ConnectConfig:
+    # Keep all the fields in sync with databricks.sdk.core.Config
+    host: str | None = None
+    account_id: str | None = None
+    token: str | None = None
+    client_id: str | None = None
+    client_secret: str | None = None
+    azure_client_id: str | None = None
+    azure_tenant_id: str | None = None
+    azure_client_secret: str | None = None
+    azure_environment: str | None = None
+    cluster_id: str | None = None
+    profile: str | None = None
+    debug_headers: bool = False
+    rate_limit: int | None = None
 
 
 @dataclass
@@ -57,7 +59,7 @@ class MigrationConfig:
     inventory: InventoryConfig
     with_table_acls: bool
     groups: GroupsConfig
-    auth: AuthConfig | None = None
+    connect: ConnectConfig | None = None
     num_threads: int | None = 4
     log_level: str | None = "INFO"
 
@@ -65,6 +67,27 @@ class MigrationConfig:
         if self.with_table_acls:
             msg = "Table ACLS are not yet implemented"
             raise NotImplementedError(msg)
+
+    def to_databricks_config(self) -> Config:
+        connect = self.connect
+        if connect is None:
+            # default empty config
+            connect = ConnectConfig()
+        return Config(
+            host=connect.host,
+            account_id=connect.account_id,
+            token=connect.token,
+            client_id=connect.client_id,
+            client_secret=connect.client_secret,
+            azure_client_id=connect.azure_client_id,
+            azure_tenant_id=connect.azure_tenant_id,
+            azure_client_secret=connect.azure_client_secret,
+            azure_environment=connect.azure_environment,
+            cluster_id=connect.cluster_id,
+            profile=connect.profile,
+            debug_headers=connect.debug_headers,
+            rate_limit=connect.rate_limit,
+        )
 
     def to_json(self) -> str:
         return RootModel[MigrationConfig](self).model_dump_json(indent=4)

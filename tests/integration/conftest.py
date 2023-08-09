@@ -8,7 +8,7 @@ from functools import partial
 import pytest
 from _pytest.fixtures import SubRequest
 from databricks.sdk import AccountClient
-from databricks.sdk.core import DatabricksError
+from databricks.sdk.core import Config, DatabricksError
 from databricks.sdk.service.compute import (
     ClusterDetails,
     CreateInstancePoolResponse,
@@ -45,9 +45,9 @@ from utils import (
     initialize_env,
 )
 
-from uc_migration_toolkit.config import AuthConfig, InventoryTable, WorkspaceAuthConfig
+from uc_migration_toolkit.config import InventoryTable
 from uc_migration_toolkit.managers.inventory.types import RequestObjectType
-from uc_migration_toolkit.providers.client import ImprovedWorkspaceClient, provider
+from uc_migration_toolkit.providers.client import ImprovedWorkspaceClient
 from uc_migration_toolkit.providers.logger import logger
 from uc_migration_toolkit.utils import Request, ThreadedExecution
 
@@ -74,26 +74,25 @@ Threader = partial(ThreadedExecution, num_threads=NUM_THREADS)
 
 @pytest.fixture(scope="session")
 def ws() -> ImprovedWorkspaceClient:
-    auth_config = AuthConfig(
-        workspace=WorkspaceAuthConfig(
-            host=os.environ["DATABRICKS_WS_HOST"],
-            client_id=os.environ["DATABRICKS_COMMON_CLIENT_ID"],
-            client_secret=os.environ["DATABRICKS_COMMON_CLIENT_SECRET"],
-        )
-    )
-    provider.set_ws_client(auth_config, pool_size=NUM_THREADS)
-    yield provider.ws
+    # Use variables from Unified Auth
+    # See https://databricks-sdk-py.readthedocs.io/en/latest/authentication.html
+    return ImprovedWorkspaceClient()
 
 
 @pytest.fixture(scope="session", autouse=True)
-def acc() -> AccountClient:
-    acc_client = AccountClient(
-        host=os.environ["DATABRICKS_ACC_HOST"],
-        client_id=os.environ["DATABRICKS_COMMON_CLIENT_ID"],
-        client_secret=os.environ["DATABRICKS_COMMON_CLIENT_SECRET"],
-        account_id=os.environ["DATABRICKS_ACC_ACCOUNT_ID"],
-    )
-    yield acc_client
+def acc(ws) -> AccountClient:
+    # TODO: move to SDK
+    def account_host(cfg: Config) -> str:
+        if cfg.is_azure:
+            return "https://accounts.azuredatabricks.net"
+        elif cfg.is_gcp:
+            return "https://accounts.gcp.databricks.com/"
+        else:
+            return "https://accounts.cloud.databricks.com"
+
+    # Use variables from Unified Auth
+    # See https://databricks-sdk-py.readthedocs.io/en/latest/authentication.html
+    return AccountClient(host=account_host(ws.config))
 
 
 @pytest.fixture(scope="session", autouse=True)
@@ -190,7 +189,7 @@ def instance_profiles(env: EnvironmentInfo, ws: ImprovedWorkspaceClient) -> list
                     }
                 ],
             }
-            provider.ws.api_client.do("PATCH", f"/api/2.0/preview/scim/v2/Groups/{ws_group.id}", data=json.dumps(roles))
+            ws.api_client.do("PATCH", f"/api/2.0/preview/scim/v2/Groups/{ws_group.id}", data=json.dumps(roles))
 
     yield profiles
 
@@ -413,7 +412,7 @@ def models(ws: ImprovedWorkspaceClient, env: EnvironmentInfo) -> list[ModelDatab
     yield test_models
 
     logger.debug("Deleting test models")
-    executables = [partial(provider.ws.model_registry.delete_model, m.name) for m in test_models]
+    executables = [partial(ws.model_registry.delete_model, m.name) for m in test_models]
     Threader(executables).run()
     logger.debug("Test models deleted")
 
@@ -448,7 +447,7 @@ def warehouses(ws: ImprovedWorkspaceClient, env: EnvironmentInfo) -> list[GetWar
     yield test_warehouses
 
     logger.debug("Deleting test warehouses")
-    executables = [partial(provider.ws.warehouses.delete, w.id) for w in test_warehouses]
+    executables = [partial(ws.warehouses.delete, w.id) for w in test_warehouses]
     Threader(executables).run()
     logger.debug("Test warehouses deleted")
 
@@ -578,7 +577,7 @@ def verifiable_objects(
 
 
 @pytest.fixture()
-def inventory_table(env: EnvironmentInfo) -> InventoryTable:
+def inventory_table(env: EnvironmentInfo, ws: ImprovedWorkspaceClient) -> InventoryTable:
     table = InventoryTable(
         catalog="main",
         database="default",
@@ -589,7 +588,7 @@ def inventory_table(env: EnvironmentInfo) -> InventoryTable:
 
     logger.debug(f"Cleaning up inventory table {table}")
     try:
-        provider.ws.tables.delete(table.to_spark())
+        ws.tables.delete(table.to_spark())
         logger.debug(f"Inventory table {table} deleted")
     except Exception as e:
         logger.warning(f"Cannot delete inventory table, skipping it. Original exception {e}")
