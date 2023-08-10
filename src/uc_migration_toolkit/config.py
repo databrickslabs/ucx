@@ -31,6 +31,7 @@ class GroupsConfig:
             raise ValueError(msg)
 
 
+# TODO: replace with databricks.sdk.core.Config
 @dataclass
 class InventoryConfig:
     table: InventoryTable
@@ -50,8 +51,25 @@ class ConnectConfig:
     azure_environment: str | None = None
     cluster_id: str | None = None
     profile: str | None = None
-    debug_headers: bool = False
+    debug_headers: bool | None = False
     rate_limit: int | None = None
+
+    @staticmethod
+    def from_databricks_config(cfg: Config) -> "ConnectConfig":
+        return ConnectConfig(
+            host=cfg.host,
+            token=cfg.token,
+            client_id=cfg.client_id,
+            client_secret=cfg.client_secret,
+            azure_client_id=cfg.azure_client_id,
+            azure_tenant_id=cfg.azure_tenant_id,
+            azure_client_secret=cfg.azure_client_secret,
+            azure_environment=cfg.azure_environment,
+            cluster_id=cfg.cluster_id,
+            profile=cfg.profile,
+            debug_headers=cfg.debug_headers,
+            rate_limit=cfg.rate_limit,
+        )
 
 
 @dataclass

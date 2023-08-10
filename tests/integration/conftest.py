@@ -1,10 +1,14 @@
 import io
 import json
+import logging
 import os
+import pathlib
 import random
+import sys
 import uuid
 from functools import partial
 
+import databricks.sdk.core
 import pytest
 from _pytest.fixtures import SubRequest
 from databricks.sdk import AccountClient
@@ -51,6 +55,8 @@ from uc_migration_toolkit.providers.client import ImprovedWorkspaceClient
 from uc_migration_toolkit.providers.logger import logger
 from uc_migration_toolkit.utils import Request, ThreadedExecution
 
+logging.getLogger("databricks.sdk").setLevel(logging.DEBUG)
+
 initialize_env()
 
 NUM_TEST_GROUPS = int(os.environ.get("NUM_TEST_GROUPS", 5))
@@ -72,14 +78,45 @@ UCX_TESTING_PREFIX = os.environ.get("UCX_TESTING_PREFIX", "ucx")
 Threader = partial(ThreadedExecution, num_threads=NUM_THREADS)
 
 
+def account_host(self: databricks.sdk.core.Config) -> str:
+    if self.is_azure:
+        return "https://accounts.azuredatabricks.net"
+    elif self.is_gcp:
+        return "https://accounts.gcp.databricks.com/"
+    else:
+        return "https://accounts.cloud.databricks.com"
+
+
+def _load_debug_env_if_runs_from_ide(key) -> bool:
+    if not _is_in_debug():
+        return False
+    conf_file = pathlib.Path.home() / ".databricks/debug-env.json"
+    with conf_file.open("r") as f:
+        conf = json.load(f)
+        if key not in conf:
+            msg = f"{key} not found in ~/.databricks/debug-env.json"
+            raise KeyError(msg)
+        for k, v in conf[key].items():
+            os.environ[k] = v
+    return True
+
+
+def _is_in_debug() -> bool:
+    return os.path.basename(sys.argv[0]) in [
+        "_jb_pytest_runner.py",
+        "testlauncher.py",
+    ]
+
+
 @pytest.fixture(scope="session")
 def ws() -> ImprovedWorkspaceClient:
     # Use variables from Unified Auth
     # See https://databricks-sdk-py.readthedocs.io/en/latest/authentication.html
+    _load_debug_env_if_runs_from_ide("ucws")
     return ImprovedWorkspaceClient()
 
 
-@pytest.fixture(scope="session", autouse=True)
+@pytest.fixture(scope="session")
 def acc(ws) -> AccountClient:
     # TODO: move to SDK
     def account_host(cfg: Config) -> str:
@@ -95,7 +132,7 @@ def acc(ws) -> AccountClient:
     return AccountClient(host=account_host(ws.config))
 
 
-@pytest.fixture(scope="session", autouse=True)
+@pytest.fixture(scope="session")
 def dbconnect(ws: ImprovedWorkspaceClient):
     dbc_cluster = next(filter(lambda c: c.cluster_name == DB_CONNECT_CLUSTER_NAME, ws.clusters.list()), None)
 
@@ -103,11 +140,12 @@ def dbconnect(ws: ImprovedWorkspaceClient):
         logger.debug(f"Integration testing cluster {DB_CONNECT_CLUSTER_NAME} already exists, skipping it's creation")
     else:
         logger.debug("Creating a cluster for integration testing")
+        spark_version = ws.clusters.select_spark_version(latest=True)
         request = {
             "cluster_name": DB_CONNECT_CLUSTER_NAME,
-            "spark_version": "13.2.x-scala2.12",
-            "instance_pool_id": os.environ["TEST_POOL_ID"],
-            "driver_instance_pool_id": os.environ["TEST_POOL_ID"],
+            "spark_version": spark_version,
+            "instance_pool_id": os.environ["TEST_INSTANCE_POOL_ID"],
+            "driver_instance_pool_id": os.environ["TEST_INSTANCE_POOL_ID"],
             "num_workers": 0,
             "spark_conf": {"spark.master": "local[*, 4]", "spark.databricks.cluster.profile": "singleNode"},
             "custom_tags": {
@@ -118,15 +156,16 @@ def dbconnect(ws: ImprovedWorkspaceClient):
             "runtime_engine": "PHOTON",
         }
 
-        dbc_cluster = ws.clusters.create(spark_version="13.2.x-scala2.12", request=Request(request))
+        dbc_cluster = ws.clusters.create(spark_version=spark_version, request=Request(request))
 
         logger.debug(f"Cluster {dbc_cluster.cluster_id} created")
 
-    os.environ["DATABRICKS_CLUSTER_ID"] = dbc_cluster.cluster_id
+    # TODO: pre-create the cluster in the test infra
+    ws.config.cluster_id = dbc_cluster.cluster_id
     yield
 
 
-@pytest.fixture(scope="session", autouse=True)
+@pytest.fixture(scope="session")
 def env(ws: ImprovedWorkspaceClient, acc: AccountClient, request: SubRequest) -> EnvironmentInfo:
     # prepare environment
     test_uid = f"{UCX_TESTING_PREFIX}_{str(uuid.uuid4())[:8]}"
@@ -151,7 +190,9 @@ def env(ws: ImprovedWorkspaceClient, acc: AccountClient, request: SubRequest) ->
         silent_delete = error_silencer(ws.groups.delete)
 
         temp_cleanups = [
-            partial(silent_delete, g.id) for g in ws.groups.list(filter=f"displayName sw 'db-temp-{test_uid}'")
+            # TODO: this is too heavy for SCIM API, refactor to ID lookup
+            partial(silent_delete, g.id)
+            for g in ws.groups.list(filter=f"displayName sw 'db-temp-{test_uid}'")
         ]
         new_ws_groups_cleanups = [
             partial(silent_delete, g.id) for g in ws.groups.list(filter=f"displayName sw '{test_uid}'")
@@ -165,7 +206,7 @@ def env(ws: ImprovedWorkspaceClient, acc: AccountClient, request: SubRequest) ->
     yield EnvironmentInfo(test_uid=test_uid, groups=groups)
 
 
-@pytest.fixture(scope="session", autouse=True)
+@pytest.fixture(scope="session")
 def instance_profiles(env: EnvironmentInfo, ws: ImprovedWorkspaceClient) -> list[InstanceProfile]:
     logger.debug("Adding test instance profiles")
     profiles: list[InstanceProfile] = []
@@ -199,7 +240,7 @@ def instance_profiles(env: EnvironmentInfo, ws: ImprovedWorkspaceClient) -> list
     logger.debug("Test instance profiles deleted")
 
 
-@pytest.fixture(scope="session", autouse=True)
+@pytest.fixture(scope="session")
 def instance_pools(env: EnvironmentInfo, ws: ImprovedWorkspaceClient) -> list[CreateInstancePoolResponse]:
     logger.debug("Creating test instance pools")
 
@@ -224,7 +265,7 @@ def instance_pools(env: EnvironmentInfo, ws: ImprovedWorkspaceClient) -> list[Cr
     Threader(executables).run()
 
 
-@pytest.fixture(scope="session", autouse=True)
+@pytest.fixture(scope="session")
 def pipelines(env: EnvironmentInfo, ws: ImprovedWorkspaceClient) -> list[CreatePipelineResponse]:
     logger.debug("Creating test DLT pipelines")
 
@@ -254,7 +295,7 @@ def pipelines(env: EnvironmentInfo, ws: ImprovedWorkspaceClient) -> list[CreateP
     Threader(executables).run()
 
 
-@pytest.fixture(scope="session", autouse=True)
+@pytest.fixture(scope="session")
 def jobs(env: EnvironmentInfo, ws: ImprovedWorkspaceClient) -> list[CreateResponse]:
     logger.debug("Creating test jobs")
 
@@ -281,7 +322,7 @@ def jobs(env: EnvironmentInfo, ws: ImprovedWorkspaceClient) -> list[CreateRespon
     Threader(executables).run()
 
 
-@pytest.fixture(scope="session", autouse=True)
+@pytest.fixture(scope="session")
 def cluster_policies(env: EnvironmentInfo, ws: ImprovedWorkspaceClient) -> list[CreatePolicyResponse]:
     logger.debug("Creating test cluster policies")
 
@@ -316,16 +357,16 @@ def cluster_policies(env: EnvironmentInfo, ws: ImprovedWorkspaceClient) -> list[
     Threader(executables).run()
 
 
-@pytest.fixture(scope="session", autouse=True)
+@pytest.fixture(scope="session")
 def clusters(env: EnvironmentInfo, ws: ImprovedWorkspaceClient) -> list[ClusterDetails]:
     logger.debug("Creating test clusters")
 
     creators = [
         partial(
             ws.clusters.create,
-            spark_version="13.2.x-scala2.12",
-            instance_pool_id=os.environ["TEST_POOL_ID"],
-            driver_instance_pool_id=os.environ["TEST_POOL_ID"],
+            spark_version=ws.clusters.select_spark_version(latest=True),
+            instance_pool_id=os.environ["TEST_INSTANCE_POOL_ID"],
+            driver_instance_pool_id=os.environ["TEST_INSTANCE_POOL_ID"],
             cluster_name=f"{env.test_uid}-test-{i}",
             num_workers=1,
         )
@@ -351,7 +392,7 @@ def clusters(env: EnvironmentInfo, ws: ImprovedWorkspaceClient) -> list[ClusterD
     logger.debug("Test clusters deleted")
 
 
-@pytest.fixture(scope="session", autouse=True)
+@pytest.fixture(scope="session")
 def experiments(ws: ImprovedWorkspaceClient, env: EnvironmentInfo) -> list[CreateExperimentResponse]:
     logger.debug("Creating test experiments")
 
@@ -384,7 +425,7 @@ def experiments(ws: ImprovedWorkspaceClient, env: EnvironmentInfo) -> list[Creat
     logger.debug("Test experiments deleted")
 
 
-@pytest.fixture(scope="session", autouse=True)
+@pytest.fixture(scope="session")
 def models(ws: ImprovedWorkspaceClient, env: EnvironmentInfo) -> list[ModelDatabricks]:
     logger.debug("Creating models")
 
@@ -417,7 +458,7 @@ def models(ws: ImprovedWorkspaceClient, env: EnvironmentInfo) -> list[ModelDatab
     logger.debug("Test models deleted")
 
 
-@pytest.fixture(scope="session", autouse=True)
+@pytest.fixture(scope="session")
 def warehouses(ws: ImprovedWorkspaceClient, env: EnvironmentInfo) -> list[GetWarehouseResponse]:
     logger.debug("Creating warehouses")
 
@@ -452,7 +493,7 @@ def warehouses(ws: ImprovedWorkspaceClient, env: EnvironmentInfo) -> list[GetWar
     logger.debug("Test warehouses deleted")
 
 
-@pytest.fixture(scope="session", autouse=True)
+@pytest.fixture(scope="session")
 def tokens(ws: ImprovedWorkspaceClient, env: EnvironmentInfo) -> list[AccessControlRequest]:
     logger.debug("Adding token-level permissions to groups")
 
@@ -470,7 +511,7 @@ def tokens(ws: ImprovedWorkspaceClient, env: EnvironmentInfo) -> list[AccessCont
     yield token_permissions
 
 
-@pytest.fixture(scope="session", autouse=True)
+@pytest.fixture(scope="session")
 def secret_scopes(ws: ImprovedWorkspaceClient, env: EnvironmentInfo) -> list[SecretScope]:
     logger.debug("Creating test secret scopes")
 
@@ -491,7 +532,7 @@ def secret_scopes(ws: ImprovedWorkspaceClient, env: EnvironmentInfo) -> list[Sec
     Threader(executables).run()
 
 
-@pytest.fixture(scope="session", autouse=True)
+@pytest.fixture(scope="session")
 def workspace_objects(ws: ImprovedWorkspaceClient, env: EnvironmentInfo) -> WorkspaceObjects:
     logger.info(f"Creating test workspace objects under /{env.test_uid}")
     ws.workspace.mkdirs(f"/{env.test_uid}")
@@ -546,7 +587,7 @@ def workspace_objects(ws: ImprovedWorkspaceClient, env: EnvironmentInfo) -> Work
     logger.debug("Test workspace objects deleted")
 
 
-@pytest.fixture(scope="session", autouse=True)
+@pytest.fixture(scope="session")
 def verifiable_objects(
     clusters,
     instance_pools,
@@ -577,7 +618,7 @@ def verifiable_objects(
 
 
 @pytest.fixture()
-def inventory_table(env: EnvironmentInfo, ws: ImprovedWorkspaceClient) -> InventoryTable:
+def inventory_table(env: EnvironmentInfo, ws: ImprovedWorkspaceClient, dbconnect) -> InventoryTable:
     table = InventoryTable(
         catalog="main",
         database="default",

@@ -15,7 +15,7 @@ class SparkMixin:
             from databricks.sdk.runtime import spark
 
             return spark
-        except ValueError:
+        except ImportError:
             logger.info("Using DB Connect")
             from databricks.connect import DatabricksSession
 
