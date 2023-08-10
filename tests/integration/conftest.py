@@ -52,7 +52,7 @@ from .utils import (
     _create_groups,
     _get_basic_job_cluster,
     _get_basic_task,
-    _set_random_permissions
+    _set_random_permissions,
 )
 
 logging.getLogger("databricks.sdk").setLevel(logging.INFO)

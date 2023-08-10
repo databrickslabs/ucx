@@ -2,6 +2,7 @@ import pytest
 from pyspark.errors import AnalysisException
 
 from uc_migration_toolkit.config import (
+    ConnectConfig,
     GroupsConfig,
     InventoryConfig,
     InventoryTable,
@@ -25,6 +26,7 @@ def test_jobs(
     logger.debug(f"Test environment: {env.test_uid}")
 
     config = MigrationConfig(
+        connect=ConnectConfig.from_databricks_config(ws.config),
         with_table_acls=False,
         inventory=InventoryConfig(table=inventory_table),
         groups=GroupsConfig(selected=[g[0].display_name for g in env.groups]),

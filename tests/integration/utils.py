@@ -1,7 +1,6 @@
 import random
 from dataclasses import dataclass
 from functools import partial
-from pathlib import Path
 from typing import Any
 
 from databricks.sdk import AccountClient, WorkspaceClient
@@ -15,12 +14,12 @@ from databricks.sdk.service.iam import (
 )
 from databricks.sdk.service.jobs import JobCluster, PythonWheelTask, Task
 from databricks.sdk.service.workspace import ObjectInfo
-from dotenv import load_dotenv
 
 from uc_migration_toolkit.managers.inventory.types import RequestObjectType
 from uc_migration_toolkit.providers.client import ImprovedWorkspaceClient
 from uc_migration_toolkit.providers.logger import logger
 from uc_migration_toolkit.utils import WorkspaceLevelEntitlement
+
 
 @dataclass
 class InstanceProfile:
