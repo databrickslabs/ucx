@@ -9,7 +9,6 @@ from databricks.sdk.service.iam import (
 )
 from databricks.sdk.service.workspace import SecretScope
 from pyspark.errors import AnalysisException
-from utils import EnvironmentInfo, WorkspaceObjects
 
 from uc_migration_toolkit.config import (
     ConnectConfig,
@@ -24,6 +23,8 @@ from uc_migration_toolkit.providers.groups_info import MigrationGroupsProvider
 from uc_migration_toolkit.providers.logger import logger
 from uc_migration_toolkit.toolkits.group_migration import GroupMigrationToolkit
 from uc_migration_toolkit.utils import safe_get_acls
+
+from .utils import EnvironmentInfo, WorkspaceObjects
 
 
 def _verify_group_permissions(

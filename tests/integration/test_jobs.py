@@ -1,7 +1,5 @@
 import pytest
-from integration.test_e2e import _verify_group_permissions, _verify_roles_and_entitlements
 from pyspark.errors import AnalysisException
-from utils import EnvironmentInfo
 
 from uc_migration_toolkit.config import (
     GroupsConfig,
@@ -13,6 +11,9 @@ from uc_migration_toolkit.managers.inventory.types import RequestObjectType
 from uc_migration_toolkit.providers.client import ImprovedWorkspaceClient
 from uc_migration_toolkit.providers.logger import logger
 from uc_migration_toolkit.toolkits.group_migration import GroupMigrationToolkit
+
+from .test_e2e import _verify_group_permissions, _verify_roles_and_entitlements
+from .utils import EnvironmentInfo
 
 
 def test_jobs(

@@ -37,7 +37,14 @@ from databricks.sdk.service.workspace import (
     ObjectType,
     SecretScope,
 )
-from utils import (
+
+from uc_migration_toolkit.config import InventoryTable
+from uc_migration_toolkit.managers.inventory.types import RequestObjectType
+from uc_migration_toolkit.providers.client import ImprovedWorkspaceClient
+from uc_migration_toolkit.providers.logger import logger
+from uc_migration_toolkit.utils import Request, ThreadedExecution
+
+from .utils import (
     EnvironmentInfo,
     InstanceProfile,
     WorkspaceObjects,
@@ -49,13 +56,7 @@ from utils import (
     initialize_env,
 )
 
-from uc_migration_toolkit.config import InventoryTable
-from uc_migration_toolkit.managers.inventory.types import RequestObjectType
-from uc_migration_toolkit.providers.client import ImprovedWorkspaceClient
-from uc_migration_toolkit.providers.logger import logger
-from uc_migration_toolkit.utils import Request, ThreadedExecution
-
-logging.getLogger("databricks.sdk").setLevel(logging.DEBUG)
+logging.getLogger("databricks.sdk").setLevel(logging.INFO)
 
 initialize_env()
 
@@ -133,36 +134,35 @@ def acc(ws) -> AccountClient:
 
 
 @pytest.fixture(scope="session")
-def dbconnect(ws: ImprovedWorkspaceClient):
+def dbconnect_cluster_id(ws: ImprovedWorkspaceClient) -> str:
     dbc_cluster = next(filter(lambda c: c.cluster_name == DB_CONNECT_CLUSTER_NAME, ws.clusters.list()), None)
 
     if dbc_cluster:
         logger.debug(f"Integration testing cluster {DB_CONNECT_CLUSTER_NAME} already exists, skipping it's creation")
-    else:
-        logger.debug("Creating a cluster for integration testing")
-        spark_version = ws.clusters.select_spark_version(latest=True)
-        request = {
-            "cluster_name": DB_CONNECT_CLUSTER_NAME,
-            "spark_version": spark_version,
-            "instance_pool_id": os.environ["TEST_INSTANCE_POOL_ID"],
-            "driver_instance_pool_id": os.environ["TEST_INSTANCE_POOL_ID"],
-            "num_workers": 0,
-            "spark_conf": {"spark.master": "local[*, 4]", "spark.databricks.cluster.profile": "singleNode"},
-            "custom_tags": {
-                "ResourceClass": "SingleNode",
-            },
-            "data_security_mode": "SINGLE_USER",
-            "autotermination_minutes": 180,
-            "runtime_engine": "PHOTON",
-        }
+        return dbc_cluster.cluster_id
 
-        dbc_cluster = ws.clusters.create(spark_version=spark_version, request=Request(request))
+    logger.debug("Creating a cluster for integration testing")
+    spark_version = ws.clusters.select_spark_version(latest=True)
+    request = {
+        "cluster_name": DB_CONNECT_CLUSTER_NAME,
+        "spark_version": spark_version,
+        "instance_pool_id": os.environ["TEST_INSTANCE_POOL_ID"],
+        "driver_instance_pool_id": os.environ["TEST_INSTANCE_POOL_ID"],
+        "num_workers": 0,
+        "spark_conf": {"spark.master": "local[*, 4]", "spark.databricks.cluster.profile": "singleNode"},
+        "custom_tags": {
+            "ResourceClass": "SingleNode",
+        },
+        "data_security_mode": "SINGLE_USER",
+        "autotermination_minutes": 180,
+        "runtime_engine": "PHOTON",
+    }
 
-        logger.debug(f"Cluster {dbc_cluster.cluster_id} created")
+    dbc_cluster = ws.clusters.create(spark_version=spark_version, request=Request(request))
+    logger.debug(f"Cluster {dbc_cluster.cluster_id} created")
 
     # TODO: pre-create the cluster in the test infra
-    ws.config.cluster_id = dbc_cluster.cluster_id
-    yield
+    return dbc_cluster.cluster_id
 
 
 @pytest.fixture(scope="session")
@@ -618,7 +618,8 @@ def verifiable_objects(
 
 
 @pytest.fixture()
-def inventory_table(env: EnvironmentInfo, ws: ImprovedWorkspaceClient, dbconnect) -> InventoryTable:
+def inventory_table(env: EnvironmentInfo, ws: ImprovedWorkspaceClient, dbconnect_cluster_id: str) -> InventoryTable:
+    ws.config.cluster_id = dbconnect_cluster_id
     table = InventoryTable(
         catalog="main",
         database="default",
