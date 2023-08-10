@@ -9,9 +9,9 @@ from databricks.sdk.service.iam import (
 )
 from databricks.sdk.service.workspace import SecretScope
 from pyspark.errors import AnalysisException
-from utils import EnvironmentInfo, WorkspaceObjects
 
 from uc_migration_toolkit.config import (
+    ConnectConfig,
     GroupsConfig,
     InventoryConfig,
     InventoryTable,
@@ -23,6 +23,8 @@ from uc_migration_toolkit.providers.groups_info import MigrationGroupsProvider
 from uc_migration_toolkit.providers.logger import logger
 from uc_migration_toolkit.toolkits.group_migration import GroupMigrationToolkit
 from uc_migration_toolkit.utils import safe_get_acls
+
+from .utils import EnvironmentInfo, WorkspaceObjects
 
 
 def _verify_group_permissions(
@@ -168,13 +170,13 @@ def test_e2e(
     logger.debug(f"Test environment: {env.test_uid}")
 
     config = MigrationConfig(
+        connect=ConnectConfig.from_databricks_config(ws.config),
         with_table_acls=False,
         inventory=InventoryConfig(table=inventory_table),
         groups=GroupsConfig(selected=[g[0].display_name for g in env.groups]),
         auth=None,
         log_level="TRACE",
     )
-    logger.debug(f"Starting e2e with config: {config.to_json()}")
     toolkit = GroupMigrationToolkit(config)
     toolkit.prepare_environment()
 

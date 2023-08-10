@@ -86,7 +86,7 @@ dependencies = [
 [tool.hatch.envs.lint.scripts]
 fmt = [
     "black .",
-    "ruff --fix .",
+    "ruff  . --fix",
     "isort ."
 ]
 verify = [
