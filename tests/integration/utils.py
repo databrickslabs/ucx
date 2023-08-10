@@ -22,17 +22,6 @@ from uc_migration_toolkit.providers.client import ImprovedWorkspaceClient
 from uc_migration_toolkit.providers.logger import logger
 from uc_migration_toolkit.utils import WorkspaceLevelEntitlement
 
-
-def initialize_env() -> None:
-    principal_env = Path(__file__).parent.parent.parent / ".env.principal"
-
-    if principal_env.exists():
-        logger.debug("Using credentials provided in .env.principal")
-        load_dotenv(dotenv_path=principal_env)
-    else:
-        logger.debug(f"No .env.principal found at {principal_env.absolute()}, using environment variables")
-
-
 @dataclass
 class InstanceProfile:
     instance_profile_arn: str

@@ -52,13 +52,10 @@ from .utils import (
     _create_groups,
     _get_basic_job_cluster,
     _get_basic_task,
-    _set_random_permissions,
-    initialize_env,
+    _set_random_permissions
 )
 
 logging.getLogger("databricks.sdk").setLevel(logging.INFO)
-
-initialize_env()
 
 NUM_TEST_GROUPS = int(os.environ.get("NUM_TEST_GROUPS", 5))
 NUM_TEST_INSTANCE_PROFILES = int(os.environ.get("NUM_TEST_INSTANCE_PROFILES", 3))

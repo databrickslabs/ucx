@@ -31,7 +31,6 @@ def test_jobs(
         auth=None,
         log_level="TRACE",
     )
-    logger.debug(f"Starting e2e with config: {config.to_json()}")
     toolkit = GroupMigrationToolkit(config)
     toolkit.prepare_environment()
 
