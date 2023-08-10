@@ -1,6 +1,7 @@
 from databricks.sdk.core import Config
 from pydantic import RootModel
 from pydantic.dataclasses import dataclass
+
 from uc_migration_toolkit.__about__ import __version__
 
 
@@ -105,7 +106,7 @@ class MigrationConfig:
             profile=connect.profile,
             debug_headers=connect.debug_headers,
             rate_limit=connect.rate_limit,
-            product='ucx',
+            product="ucx",
             product_version=__version__,
         )
 
