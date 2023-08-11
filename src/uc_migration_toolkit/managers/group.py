@@ -58,11 +58,13 @@ class GroupManager:
             logger.info(f"Backup group {backup_group_name} already exists, no action required")
         else:
             logger.info(f"Creating backup group {backup_group_name}")
-            backup_group = self._ws.groups.create(display_name=backup_group_name,
-                                                  meta=source_group.meta,
-                                                  entitlements=source_group.entitlements,
-                                                  roles=source_group.roles,
-                                                  members=source_group.members)
+            backup_group = self._ws.groups.create(
+                display_name=backup_group_name,
+                meta=source_group.meta,
+                entitlements=source_group.entitlements,
+                roles=source_group.roles,
+                members=source_group.members,
+            )
             logger.info(f"Backup group {backup_group_name} successfully created")
 
         return backup_group

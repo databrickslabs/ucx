@@ -126,7 +126,9 @@ class TokensAndPasswordsInventorizer(BaseInventorizer[InventoryObject]):
     def _preload_tokens(self):
         try:
             # TODO: rewrite with self._ws.token_management.get_token_permissions().access_control_list
-            return self._ws.api_client.do("GET", "/api/2.0/preview/permissions/authorization/tokens").get('access_control_list', [])
+            return self._ws.api_client.do("GET", "/api/2.0/preview/permissions/authorization/tokens").get(
+                "access_control_list", []
+            )
         except DatabricksError as e:
             logger.warning("Cannot load token permissions due to error:")
             logger.warning(e)
@@ -135,7 +137,9 @@ class TokensAndPasswordsInventorizer(BaseInventorizer[InventoryObject]):
     def _preload_passwords(self):
         try:
             # TODO: rewrite with return self._ws.users.get_password_permissions().access_control_list
-            return self._ws.api_client.do("GET", "/api/2.0/preview/permissions/authorization/passwords").get('access_control_list', [])
+            return self._ws.api_client.do("GET", "/api/2.0/preview/permissions/authorization/passwords").get(
+                "access_control_list", []
+            )
         except DatabricksError as e:
             logger.error("Cannot load password permissions due to error:")
             logger.error(e)
