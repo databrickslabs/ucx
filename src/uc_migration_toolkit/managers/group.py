@@ -56,6 +56,7 @@ class GroupManager:
         return group_info
 
     def _get_group(self, group_name, level: GroupLevel) -> Group | None:
+        # TODO: calling this can cause issues for SCIM backend, cache groups instead
         method = self._ws.groups.list if level == GroupLevel.WORKSPACE else self._ws.list_account_level_groups
         query_filter = f"displayName eq '{group_name}'"
         attributes = ",".join(["id", "displayName", "meta", "entitlements", "roles", "members"])
@@ -77,7 +78,7 @@ class GroupManager:
             logger.info(f"Creating backup group {backup_group_name}")
             new_group_payload = self._get_clean_group_info(source_group)
             new_group_payload["displayName"] = backup_group_name
-            backup_group = self._ws.groups.create(request=Group.from_dict(new_group_payload))
+            backup_group = self._ws.groups.create(**new_group_payload)
             logger.info(f"Backup group {backup_group_name} successfully created")
 
         return backup_group
