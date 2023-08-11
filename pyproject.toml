@@ -21,7 +21,7 @@ classifiers = [
     "Programming Language :: Python :: Implementation :: PyPy",
 ]
 dependencies = [
-    "databricks-sdk>=0.2.1, <0.3.0",
+    "databricks-sdk>=0.2.1",
     "typer[all]>=0.9.0,<0.10.0",
     "pyhocon>=0.3.60,<0.4.0",
     "pydantic>=2.0.3, <3.0.0",
@@ -54,6 +54,16 @@ Source = "https://github.com/databricks/UC-Upgrade"
 [tool.hatch.version]
 path = "src/uc_migration_toolkit/__about__.py"
 
+[tool.hatch.envs.integration]
+dependencies = [
+    "uc-migration-toolkit[test]",
+    "uc-migration-toolkit[dbconnect]",
+    "delta-spark>=2.4.0,<3.0.0"
+]
+
+[tool.hatch.envs.integration.scripts]
+test = "pytest tests/integration --cov uc_migration_toolkit --cov uc_migration_toolkit --cov-report=html"
+
 [tool.hatch.envs.default]
 
 [tool.hatch.envs.default.scripts]
@@ -67,11 +77,9 @@ dependencies = [
     "pyspark>=3.4.0,<=3.5.0",
     "delta-spark>=2.4.0,<3.0.0"
 ]
-[tool.hatch.envs.unit.scripts]
-test = "pytest tests/unit"
-test-cov = "pytest tests/unit --cov uc_migration_toolkit"
-test-cov-report = "pytest tests/unit --cov uc_migration_toolkit --cov-report=html"
 
+[tool.hatch.envs.unit.scripts]
+test = "pytest tests/unit --cov uc_migration_toolkit --cov-report=html"
 
 [[tool.hatch.envs.all.matrix]]
 python = [ "3.9", "3.10", "3.11"]
