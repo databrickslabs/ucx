@@ -17,6 +17,8 @@ from databricks.sdk.service.compute import (
     ClusterDetails,
     CreateInstancePoolResponse,
     CreatePolicyResponse,
+    DataSecurityMode,
+    RuntimeEngine,
 )
 from databricks.sdk.service.iam import AccessControlRequest, PermissionLevel
 from databricks.sdk.service.jobs import CreateResponse
@@ -42,7 +44,7 @@ from uc_migration_toolkit.config import InventoryTable
 from uc_migration_toolkit.managers.inventory.types import RequestObjectType
 from uc_migration_toolkit.providers.client import ImprovedWorkspaceClient
 from uc_migration_toolkit.providers.logger import logger
-from uc_migration_toolkit.utils import Request, ThreadedExecution
+from uc_migration_toolkit.utils import ThreadedExecution
 
 from .utils import (
     EnvironmentInfo,
@@ -139,23 +141,18 @@ def dbconnect_cluster_id(ws: ImprovedWorkspaceClient) -> str:
         return dbc_cluster.cluster_id
 
     logger.debug("Creating a cluster for integration testing")
-    spark_version = ws.clusters.select_spark_version(latest=True)
-    request = {
-        "cluster_name": DB_CONNECT_CLUSTER_NAME,
-        "spark_version": spark_version,
-        "instance_pool_id": os.environ["TEST_INSTANCE_POOL_ID"],
-        "driver_instance_pool_id": os.environ["TEST_INSTANCE_POOL_ID"],
-        "num_workers": 0,
-        "spark_conf": {"spark.master": "local[*, 4]", "spark.databricks.cluster.profile": "singleNode"},
-        "custom_tags": {
-            "ResourceClass": "SingleNode",
-        },
-        "data_security_mode": "SINGLE_USER",
-        "autotermination_minutes": 180,
-        "runtime_engine": "PHOTON",
-    }
-
-    dbc_cluster = ws.clusters.create(spark_version=spark_version, request=Request(request))
+    dbc_cluster = ws.clusters.create(
+        spark_version=ws.clusters.select_spark_version(latest=True),
+        cluster_name=DB_CONNECT_CLUSTER_NAME,
+        instance_pool_id=os.environ["TEST_INSTANCE_POOL_ID"],
+        driver_node_type_id=os.environ["TEST_INSTANCE_POOL_ID"],
+        num_workers=0,
+        spark_conf={"spark.master": "local[*, 4]", "spark.databricks.cluster.profile": "singleNode"},
+        custom_tags={"ResourceClass": "SingleNode"},
+        data_security_mode=DataSecurityMode.SINGLE_USER,
+        autotermination_minutes=60,
+        runtime_engine=RuntimeEngine.PHOTON,
+    )
     logger.debug(f"Cluster {dbc_cluster.cluster_id} created")
 
     # TODO: pre-create the cluster in the test infra
