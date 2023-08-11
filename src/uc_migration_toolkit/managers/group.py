@@ -37,24 +37,6 @@ class GroupManager:
         logger.info(f"Found {len(eligible_groups)} eligible groups")
         return [g.display_name for g in eligible_groups]
 
-    @staticmethod
-    def _get_clean_group_info(group: Group, cleanup_keys: list[str] | None = None) -> dict:
-        """
-        Returns a dictionary with group information, excluding some keys
-        :param group: Group object from SDK
-        :param cleanup_keys: default (with None) ["id", "externalId", "displayName"]
-        :return: dictionary with group information
-        """
-
-        cleanup_keys = cleanup_keys or ["id", "externalId", "displayName"]
-        group_info = group.as_dict()
-
-        for key in cleanup_keys:
-            if key in group_info:
-                group_info.pop(key)
-
-        return group_info
-
     def _get_group(self, group_name, level: GroupLevel) -> Group | None:
         # TODO: calling this can cause issues for SCIM backend, cache groups instead
         method = self._ws.groups.list if level == GroupLevel.WORKSPACE else self._ws.list_account_level_groups
@@ -76,9 +58,13 @@ class GroupManager:
             logger.info(f"Backup group {backup_group_name} already exists, no action required")
         else:
             logger.info(f"Creating backup group {backup_group_name}")
-            new_group_payload = self._get_clean_group_info(source_group)
-            new_group_payload["displayName"] = backup_group_name
-            backup_group = self._ws.groups.create(**new_group_payload)
+            backup_group = self._ws.groups.create(
+                display_name=backup_group_name,
+                meta=source_group.meta,
+                entitlements=source_group.entitlements,
+                roles=source_group.roles,
+                members=source_group.members,
+            )
             logger.info(f"Backup group {backup_group_name} successfully created")
 
         return backup_group
