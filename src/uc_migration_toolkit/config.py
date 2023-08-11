@@ -2,6 +2,8 @@ from databricks.sdk.core import Config
 from pydantic import RootModel
 from pydantic.dataclasses import dataclass
 
+from uc_migration_toolkit.__about__ import __version__
+
 
 @dataclass
 class InventoryTable:
@@ -31,7 +33,6 @@ class GroupsConfig:
             raise ValueError(msg)
 
 
-# TODO: replace with databricks.sdk.core.Config
 @dataclass
 class InventoryConfig:
     table: InventoryTable
@@ -105,6 +106,8 @@ class MigrationConfig:
             profile=connect.profile,
             debug_headers=connect.debug_headers,
             rate_limit=connect.rate_limit,
+            product="ucx",
+            product_version=__version__,
         )
 
     def to_json(self) -> str:
