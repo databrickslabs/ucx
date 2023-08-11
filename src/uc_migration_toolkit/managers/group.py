@@ -77,8 +77,7 @@ class GroupManager:
         else:
             logger.info(f"Creating backup group {backup_group_name}")
             new_group_payload = self._get_clean_group_info(source_group)
-            new_group_payload["displayName"] = backup_group_name
-            backup_group = self._ws.groups.create(**new_group_payload)
+            backup_group = self._ws.groups.create(display_name=backup_group_name, **new_group_payload)
             logger.info(f"Backup group {backup_group_name} successfully created")
 
         return backup_group
