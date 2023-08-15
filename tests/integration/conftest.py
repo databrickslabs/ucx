@@ -115,9 +115,10 @@ def random():
 
     def inner(k=16) -> str:
         charset = string.ascii_uppercase + string.ascii_lowercase + string.digits
-        return ''.join(random.choices(charset, k=int(k)))
+        return "".join(random.choices(charset, k=int(k)))
 
     return inner
+
 
 @pytest.fixture(scope="session")
 def ws() -> ImprovedWorkspaceClient:
