@@ -19,7 +19,7 @@ from uc_migration_toolkit.managers.inventory.types import (
     RolesAndEntitlements,
 )
 from uc_migration_toolkit.providers.client import ImprovedWorkspaceClient
-from uc_migration_toolkit.providers.groups_info import MigrationGroupsProvider
+from uc_migration_toolkit.providers.groups_info import GroupMigrationState
 from uc_migration_toolkit.providers.logger import logger
 from uc_migration_toolkit.utils import ThreadedExecution, safe_get_acls
 
@@ -47,6 +47,7 @@ class RolesAndEntitlementsRequestPayload:
 AnyRequestPayload = PermissionRequestPayload | SecretsPermissionRequestPayload | RolesAndEntitlementsRequestPayload
 
 
+# TODO: this class has too many @staticmethod and they must not be such. write a unit test for this logic.
 class PermissionManager:
     def __init__(self, ws: ImprovedWorkspaceClient, inventory_table_manager: InventoryTableManager):
         self._ws = ws
@@ -75,7 +76,7 @@ class PermissionManager:
     @staticmethod
     def __prepare_request_for_permissions_api(
         item: PermissionsInventoryItem,
-        migration_groups_provider: MigrationGroupsProvider,
+        migration_state: GroupMigrationState,
         destination: Literal["backup", "account"],
     ) -> PermissionRequestPayload:
         _existing_permissions: ObjectPermissions = item.typed_object_permissions
@@ -83,8 +84,11 @@ class PermissionManager:
         acl_requests = []
 
         for _item in _acl:
-            if _item.group_name in [g.workspace.display_name for g in migration_groups_provider.groups]:
-                migration_info = migration_groups_provider.get_by_workspace_group_name(_item.group_name)
+            # TODO: we have a double iteration over migration_state.groups
+            #  (also by migration_state.get_by_workspace_group_name).
+            #  Has to be be fixed by iterating just on .groups
+            if _item.group_name in [g.workspace.display_name for g in migration_state.groups]:
+                migration_info = migration_state.get_by_workspace_group_name(_item.group_name)
                 assert migration_info is not None, f"Group {_item.group_name} is not in the migration groups provider"
                 destination_group: Group = getattr(migration_info, destination)
                 _item.group_name = destination_group.display_name
@@ -110,7 +114,7 @@ class PermissionManager:
     @staticmethod
     def _prepare_permission_request_for_secrets_api(
         item: PermissionsInventoryItem,
-        migration_groups_provider: MigrationGroupsProvider,
+        migration_state: GroupMigrationState,
         destination: Literal["backup", "account"],
     ) -> SecretsPermissionRequestPayload:
         _existing_acl_container: AclItemsContainer = item.typed_object_permissions
@@ -121,8 +125,8 @@ class PermissionManager:
         for _existing_acl in _existing_acl_container.acls:
             _new_acl = deepcopy(_existing_acl)
 
-            if _existing_acl.principal in [g.workspace.display_name for g in migration_groups_provider.groups]:
-                migration_info = migration_groups_provider.get_by_workspace_group_name(_existing_acl.principal)
+            if _existing_acl.principal in [g.workspace.display_name for g in migration_state.groups]:
+                migration_info = migration_state.get_by_workspace_group_name(_existing_acl.principal)
                 assert (
                     migration_info is not None
                 ), f"Group {_existing_acl.principal} is not in the migration groups provider"
@@ -139,9 +143,10 @@ class PermissionManager:
 
     @staticmethod
     def __prepare_request_for_roles_and_entitlements(
-        item: PermissionsInventoryItem, migration_groups_provider: MigrationGroupsProvider, destination
+        item: PermissionsInventoryItem, migration_state: GroupMigrationState, destination
     ) -> RolesAndEntitlementsRequestPayload:
-        migration_info = migration_groups_provider.get_by_workspace_group_name(item.object_id)
+        # TODO: potential BUG - why does item.object_id hold a group name and not ID?
+        migration_info = migration_state.get_by_workspace_group_name(item.object_id)
         assert migration_info is not None, f"Group {item.object_id} is not in the migration groups provider"
         destination_group: Group = getattr(migration_info, destination)
         return RolesAndEntitlementsRequestPayload(payload=item.typed_object_permissions, group_id=destination_group.id)
@@ -149,17 +154,17 @@ class PermissionManager:
     def _prepare_new_permission_request(
         self,
         item: PermissionsInventoryItem,
-        migration_groups_provider: MigrationGroupsProvider,
+        migration_state: GroupMigrationState,
         destination: Literal["backup", "account"],
     ) -> AnyRequestPayload:
         if isinstance(item.request_object_type, RequestObjectType) and isinstance(
             item.typed_object_permissions, ObjectPermissions
         ):
-            return self.__prepare_request_for_permissions_api(item, migration_groups_provider, destination)
+            return self.__prepare_request_for_permissions_api(item, migration_state, destination)
         elif item.logical_object_type == LogicalObjectType.SECRET_SCOPE:
-            return self._prepare_permission_request_for_secrets_api(item, migration_groups_provider, destination)
+            return self._prepare_permission_request_for_secrets_api(item, migration_state, destination)
         elif item.logical_object_type in [LogicalObjectType.ROLES, LogicalObjectType.ENTITLEMENTS]:
-            return self.__prepare_request_for_roles_and_entitlements(item, migration_groups_provider, destination)
+            return self.__prepare_request_for_roles_and_entitlements(item, migration_state, destination)
         else:
             logger.warning(
                 f"Unsupported permissions payload for object {item.object_id} "
@@ -217,17 +222,15 @@ class PermissionManager:
         execution = ThreadedExecution[None](executables)
         execution.run()
 
-    def apply_group_permissions(
-        self, migration_groups_provider: MigrationGroupsProvider, destination: Literal["backup", "account"]
-    ):
+    def apply_group_permissions(self, migration_state: GroupMigrationState, destination: Literal["backup", "account"]):
         logger.info(f"Applying the permissions to {destination} groups")
-        logger.info(f"Total groups to apply permissions: {len(migration_groups_provider.groups)}")
+        logger.info(f"Total groups to apply permissions: {len(migration_state.groups)}")
 
         permissions_on_source = self.inventory_table_manager.load_for_groups(
-            groups=[g.workspace.display_name for g in migration_groups_provider.groups]
+            groups=[g.workspace.display_name for g in migration_state.groups]
         )
         permission_payloads: list[AnyRequestPayload] = [
-            self._prepare_new_permission_request(item, migration_groups_provider, destination=destination)
+            self._prepare_new_permission_request(item, migration_state, destination=destination)
             for item in permissions_on_source
         ]
         logger.info(f"Applying {len(permission_payloads)} permissions")
