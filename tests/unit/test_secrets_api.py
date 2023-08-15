@@ -6,8 +6,8 @@ from uc_migration_toolkit.managers.inventory.types import (
     PermissionsInventoryItem,
 )
 from uc_migration_toolkit.providers.groups_info import (
+    GroupMigrationState,
     MigrationGroupInfo,
-    MigrationGroupsProvider,
 )
 
 
@@ -23,8 +23,8 @@ def test_secrets_api():
         ]}""",
     )
 
-    groups_provider = MigrationGroupsProvider()
-    groups_provider.groups = [
+    migration_state = GroupMigrationState()
+    migration_state.groups = [
         MigrationGroupInfo(
             account=Group(display_name="g1"),
             workspace=Group(display_name="g1"),
@@ -32,12 +32,12 @@ def test_secrets_api():
         )
     ]
 
-    apply_backup = PermissionManager._prepare_permission_request_for_secrets_api(item, groups_provider, "backup")
+    apply_backup = PermissionManager._prepare_permission_request_for_secrets_api(item, migration_state, "backup")
 
     assert len(apply_backup.access_control_list) == 1
     assert apply_backup.access_control_list[0].principal == "some-prefix-g1"
 
-    apply_account = PermissionManager._prepare_permission_request_for_secrets_api(item, groups_provider, "account")
+    apply_account = PermissionManager._prepare_permission_request_for_secrets_api(item, migration_state, "account")
 
     assert len(apply_account.access_control_list) == 1
     assert apply_account.access_control_list[0].principal == "g1"

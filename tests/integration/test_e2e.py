@@ -19,7 +19,7 @@ from uc_migration_toolkit.config import (
 )
 from uc_migration_toolkit.managers.inventory.types import RequestObjectType
 from uc_migration_toolkit.providers.client import ImprovedWorkspaceClient
-from uc_migration_toolkit.providers.groups_info import MigrationGroupsProvider
+from uc_migration_toolkit.providers.groups_info import GroupMigrationState
 from uc_migration_toolkit.providers.logger import logger
 from uc_migration_toolkit.toolkits.group_migration import GroupMigrationToolkit
 from uc_migration_toolkit.utils import safe_get_acls
@@ -146,11 +146,11 @@ def _verify_group_permissions(
 
 
 def _verify_roles_and_entitlements(
-    migration_provider: MigrationGroupsProvider,
+    migration_state: GroupMigrationState,
     ws: ImprovedWorkspaceClient,
     target: Literal["backup", "account"],
 ):
-    for el in migration_provider.groups:
+    for el in migration_state.groups:
         comparison_base = getattr(el, "workspace" if target == "backup" else "backup")
         comparison_target = getattr(el, target)
 

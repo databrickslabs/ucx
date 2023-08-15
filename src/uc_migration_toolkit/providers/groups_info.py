@@ -10,8 +10,9 @@ class MigrationGroupInfo:
     account: Group
 
 
-# TODO: this is not a provider, this is a container, e.g. State or Cache
-class MigrationGroupsProvider:
+class GroupMigrationState:
+    """Holds migration state of workspace-to-account groups"""
+
     def __init__(self):
         self.groups: list[MigrationGroupInfo] = []
 

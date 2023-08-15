@@ -7,8 +7,8 @@ from uc_migration_toolkit.config import GroupsConfig
 from uc_migration_toolkit.generic import StrEnum
 from uc_migration_toolkit.providers.client import ImprovedWorkspaceClient
 from uc_migration_toolkit.providers.groups_info import (
+    GroupMigrationState,
     MigrationGroupInfo,
-    MigrationGroupsProvider,
 )
 from uc_migration_toolkit.providers.logger import logger
 from uc_migration_toolkit.utils import ThreadedExecution
@@ -25,7 +25,7 @@ class GroupManager:
     def __init__(self, ws: ImprovedWorkspaceClient, groups: GroupsConfig):
         self._ws = ws
         self.config = groups
-        self._migration_groups_provider: MigrationGroupsProvider = MigrationGroupsProvider()
+        self._migration_state: GroupMigrationState = GroupMigrationState()
 
     # please keep the internal methods below this line
 
@@ -81,10 +81,10 @@ class GroupManager:
         executables = [partial(get_group_info, group_name) for group_name in groups_names]
 
         collected_groups = ThreadedExecution[MigrationGroupInfo](executables).run()
+        for g in collected_groups:
+            self._migration_state.add(g)
 
-        self._migration_groups_provider.groups = collected_groups
-
-        logger.info(f"Prepared {len(self._migration_groups_provider.groups)} groups for migration")
+        logger.info(f"Prepared {len(collected_groups)} groups for migration")
 
     def _replace_group(self, migration_info: MigrationGroupInfo):
         ws_group = migration_info.workspace
@@ -118,9 +118,9 @@ class GroupManager:
         logger.info("Environment prepared successfully")
 
     @property
-    def migration_groups_provider(self) -> MigrationGroupsProvider:
-        assert len(self._migration_groups_provider.groups) > 0, "Migration groups were not loaded or initialized"
-        return self._migration_groups_provider
+    def migration_groups_provider(self) -> GroupMigrationState:
+        assert len(self._migration_state.groups) > 0, "Migration groups were not loaded or initialized"
+        return self._migration_state
 
     def replace_workspace_groups_with_account_groups(self):
         logger.info("Replacing the workspace groups with account-level groups")

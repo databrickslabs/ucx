@@ -23,7 +23,7 @@ from uc_migration_toolkit.managers.inventory.types import (
     RequestObjectType,
 )
 from uc_migration_toolkit.providers.client import ImprovedWorkspaceClient
-from uc_migration_toolkit.providers.groups_info import MigrationGroupsProvider
+from uc_migration_toolkit.providers.groups_info import GroupMigrationState
 from uc_migration_toolkit.providers.logger import logger
 from uc_migration_toolkit.utils import ProgressReporter, ThreadedExecution
 
@@ -305,15 +305,17 @@ class RolesAndEntitlementsInventorizer(BaseInventorizer[InventoryObject]):
     def logical_object_types(self) -> list[LogicalObjectType]:
         return [LogicalObjectType.ROLES, LogicalObjectType.ENTITLEMENTS]
 
-    def __init__(self, ws: ImprovedWorkspaceClient, migration_provider: MigrationGroupsProvider):
+    def __init__(self, ws: ImprovedWorkspaceClient, migration_state: GroupMigrationState):
         self._ws = ws
-        self._migration_provider = migration_provider
+        self._migration_state = migration_state
         self._group_info: list[Group] = []
 
     def preload(self):
         logger.info("Please note that group roles and entitlements will be ONLY inventorized for migration groups")
         self._group_info: list[Group] = [
-            self._ws.groups.get(id=g.workspace.id) for g in self._migration_provider.groups
+            # TODO: why do we load group twice from platform? this really looks unnecessary
+            self._ws.groups.get(id=g.workspace.id)
+            for g in self._migration_state.groups
         ]
         logger.info("Group roles and entitlements preload completed")
 
@@ -360,9 +362,9 @@ def experiments_listing(ws: WorkspaceClient):
 
 class Inventorizers:
     @staticmethod
-    def provide(ws: ImprovedWorkspaceClient, migration_provider: MigrationGroupsProvider, num_threads: int):
+    def provide(ws: ImprovedWorkspaceClient, migration_state: GroupMigrationState, num_threads: int):
         return [
-            RolesAndEntitlementsInventorizer(ws, migration_provider),
+            RolesAndEntitlementsInventorizer(ws, migration_state),
             TokensAndPasswordsInventorizer(ws),
             StandardInventorizer(
                 ws,
