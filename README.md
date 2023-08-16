@@ -92,6 +92,33 @@ Data access:
 
 - [ ] Table ACLS
 
+# Contributing
+
+The following principles hold:
+
+- this project has to use Databricks SDK for Python.
+- anything that doesn't fit into WorkspaceClient has to get through a "mixin" process to get to the SDK itself eventually.
+- you can see the example for mixins based on the `StatementExecutionExt`.
+
+Code organization:
+
+- components that require API interaction must be split from the components doing business logic on a class level.
+- the amount of logic in the API-calling components should be kept to a minimum.
+- prefer injecting business logic components into API-calling components.
+- all business logic has to be covered with unit tests. It should be easier without any API calls to mock. 
+
+Integration tests:
+
+- all new code has to be covered by integration tests.
+- integration tests should use predefined test fixtures provided in the environment variables.
+- tests that require their own unique fixture setup must limit the wall clock time of fixture initialization to under one second.
+- each integration test must be debuggable in IntelliJ IDEA (Community Edition) with the Python plugin (community edition).
+
+IDE setup:
+
+- The only supported IDE for developing this project is based on IntelliJ. This means that both PyCharm (commercial) and IntelliJ IDEA (Community Edition) with Python plugin (community edition) are supported.
+- VSCode is not currently supported, as debugging a single integration test from it is impossible. This may change in the future.
+
 ## Development
 
 This section describes setup and development process for the project.
