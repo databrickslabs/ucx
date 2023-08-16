@@ -31,7 +31,7 @@ class _RowCreator(tuple):
 
 class Row(tuple):
     def as_dict(self) -> dict[str, any]:
-        return dict(zip(self.__columns__, self))
+        return dict(zip(self.__columns__, self, strict=True))
 
     def __getattr__(self, col):
         idx = self.__columns__.index(col)
@@ -42,7 +42,7 @@ class Row(tuple):
         return self.__getattr__(col)
 
     def __repr__(self):
-        return f"Row({', '.join(f'{k}={v}' for (k, v) in zip(self.__columns__, self))})"
+        return f"Row({', '.join(f'{k}={v}' for (k, v) in zip(self.__columns__, self, strict=True))})"
 
 
 class StatementExecutionExt(StatementExecutionAPI):
@@ -61,7 +61,7 @@ class StatementExecutionExt(StatementExecutionAPI):
             # ColumnInfoTypeName.INTERVAL: not_supported(ColumnInfoTypeName.INTERVAL),
             ColumnInfoTypeName.LONG: int,
             ColumnInfoTypeName.MAP: json.loads,
-            ColumnInfoTypeName.NULL: lambda x: None,
+            ColumnInfoTypeName.NULL: lambda _: None,
             ColumnInfoTypeName.SHORT: int,
             ColumnInfoTypeName.STRING: str,
             ColumnInfoTypeName.STRUCT: json.loads,
