@@ -4,6 +4,7 @@ import logging
 import os
 import pathlib
 import random
+import string
 import sys
 import uuid
 from functools import partial
@@ -108,6 +109,17 @@ def _is_in_debug() -> bool:
     ]
 
 
+@pytest.fixture
+def make_random():
+    import random
+
+    def inner(k=16) -> str:
+        charset = string.ascii_uppercase + string.ascii_lowercase + string.digits
+        return "".join(random.choices(charset, k=int(k)))
+
+    return inner
+
+
 @pytest.fixture(scope="session")
 def ws() -> ImprovedWorkspaceClient:
     # Use variables from Unified Auth
@@ -134,6 +146,7 @@ def acc(ws) -> AccountClient:
 
 @pytest.fixture(scope="session")
 def dbconnect_cluster_id(ws: ImprovedWorkspaceClient) -> str:
+    # TODO: will use predeclared DATABRICKS_CLUSTER_ID env variable
     dbc_cluster = next(filter(lambda c: c.cluster_name == DB_CONNECT_CLUSTER_NAME, ws.clusters.list()), None)
 
     if dbc_cluster:
