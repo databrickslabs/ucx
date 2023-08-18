@@ -1,19 +1,13 @@
-import logging
 import os
 from functools import partial
 
 import pytest
-from databricks.sdk import WorkspaceClient
-from databricks.sdk.service import compute
 from databricks.sdk.service.iam import ComplexValue
 
 from uc_migration_toolkit.providers.client import ImprovedWorkspaceClient
 from uc_migration_toolkit.providers.logger import logger
 from uc_migration_toolkit.providers.mixins.sql import StatementExecutionExt
-
-from uc_migration_toolkit.tacl.grants import GrantsCrawler
 from uc_migration_toolkit.toolkits.table_acls import TaclToolkit
-
 
 # _LOG.setLevel("DEBUG")
 
@@ -33,7 +27,7 @@ def sql_fetch_all(ws: ImprovedWorkspaceClient):
 
 
 @pytest.fixture
-def make_group(ws: ImprovedWorkspaceClient, random):
+def make_group(ws: ImprovedWorkspaceClient, make_random):
     cleanup = []
 
     def inner(
@@ -43,7 +37,7 @@ def make_group(ws: ImprovedWorkspaceClient, random):
         roles: list[ComplexValue] | None = None,
     ):
         group = ws.groups.create(
-            display_name=f"ucx_G{random(4)}",
+            display_name=f"ucx_G{make_random(4)}",
             entitlements=entitlements,
             external_id=external_id,
             members=members,
@@ -67,11 +61,11 @@ def test_group_fixture(make_group):
 
 
 @pytest.fixture
-def make_catalog(sql_exec, random):
+def make_catalog(sql_exec, make_random):
     cleanup = []
 
     def inner():
-        name = f"ucx_C{random(4)}".lower()
+        name = f"ucx_C{make_random(4)}".lower()
         sql_exec(f"CREATE CATALOG {name}")
         cleanup.append(name)
         return name
@@ -90,11 +84,11 @@ def test_catalog_fixture(make_catalog):
 
 
 @pytest.fixture
-def make_schema(sql_exec, random):
+def make_schema(sql_exec, make_random):
     cleanup = []
 
     def inner(catalog="hive_metastore"):
-        name = f"{catalog}.ucx_S{random(4)}".lower()
+        name = f"{catalog}.ucx_S{make_random(4)}".lower()
         sql_exec(f"CREATE SCHEMA {name}")
         cleanup.append(name)
         return name
@@ -113,19 +107,21 @@ def test_schema_fixture(make_schema):
 
 
 @pytest.fixture
-def make_table(sql_exec, make_schema, random):
+def make_table(sql_exec, make_schema, make_random):
     cleanup = []
 
-    def inner(*,
-              catalog="hive_metastore",
-              schema: str | None = None,
-              ctas: str | None = None,
-              non_detla: bool = False,
-              external: bool = False,
-              view: bool = False):
+    def inner(
+        *,
+        catalog="hive_metastore",
+        schema: str | None = None,
+        ctas: str | None = None,
+        non_detla: bool = False,
+        external: bool = False,
+        view: bool = False,
+    ):
         if schema is None:
             schema = make_schema(catalog=catalog)
-        name = f"{schema}.ucx_T{random(4)}".lower()
+        name = f"{schema}.ucx_T{make_random(4)}".lower()
         ddl = f'CREATE {"VIEW" if view else "TABLE"} {name}'
         if ctas is not None:
             # temporary (if not view)
@@ -163,7 +159,7 @@ def test_table_fixture(make_table):
     logger.info(f"Created new managed table in new schema: {make_table()}")
     logger.info(f'Created new managed table in default schema: {make_table(schema="default")}')
     logger.info(f"Created new external table in new schema: {make_table(external=True)}")
-    logger.info(f'Created new external JSON table in new schema: {make_table(non_detla=True)}')
+    logger.info(f"Created new external JSON table in new schema: {make_table(non_detla=True)}")
     logger.info(f'Created new tmp table in new schema: {make_table(ctas="SELECT 2+2 AS four")}')
     logger.info(f'Created new view in new schema: {make_table(view=True, ctas="SELECT 2+2 AS four")}')
 
@@ -171,37 +167,41 @@ def test_table_fixture(make_table):
 def test_describe_all_tables(ws: ImprovedWorkspaceClient, make_catalog, make_schema, make_table):
     warehouse_id = os.environ["TEST_DEFAULT_WAREHOUSE_ID"]
 
-    logger.info('setting up fixtures')
-    schema = make_schema(catalog='hive_metastore')
+    logger.info("setting up fixtures")
+    schema = make_schema(catalog="hive_metastore")
     managed_table = make_table(schema=schema)
     external_table = make_table(schema=schema, external=True)
-    tmp_table = make_table(schema=schema, ctas='SELECT 2+2 AS four')
-    view = make_table(schema=schema, ctas='SELECT 2+2 AS four', view=True)
+    tmp_table = make_table(schema=schema, ctas="SELECT 2+2 AS four")
+    view = make_table(schema=schema, ctas="SELECT 2+2 AS four", view=True)
     non_delta = make_table(schema=schema, non_detla=True)
 
-    logger.info(f'managed_table={managed_table}, '
-                f'external_table={external_table}, '
-                f'tmp_table={tmp_table}, '
-                f'view={view}')
+    logger.info(
+        f"managed_table={managed_table}, "
+        f"external_table={external_table}, "
+        f"tmp_table={tmp_table}, "
+        f"view={view}"
+    )
 
     inventory_schema = make_schema(catalog=make_catalog())
     inventory_catalog, inventory_schema = inventory_schema.split(".")
     tak = TaclToolkit(ws, warehouse_id, inventory_catalog, inventory_schema)
 
-    all = {}
-    for t in tak.database_snapshot(schema.split('.')[1]):
-        all[t.key] = t
+    all_tables = {}
+    for t in tak.database_snapshot(schema.split(".")[1]):
+        all_tables[t.key] = t
 
-    assert len(all) == 5
-    assert all[non_delta].format == 'json'
-    assert all[managed_table].object_type == 'MANAGED'
-    assert all[tmp_table].object_type == 'MANAGED'
-    assert all[external_table].object_type == 'EXTERNAL'
-    assert all[view].object_type == 'VIEW'
-    assert all[view].view_text == 'SELECT 2+2 AS four'
+    assert len(all_tables) == 5
+    assert all_tables[non_delta].format == "json"
+    assert all_tables[managed_table].object_type == "MANAGED"
+    assert all_tables[tmp_table].object_type == "MANAGED"
+    assert all_tables[external_table].object_type == "EXTERNAL"
+    assert all_tables[view].object_type == "VIEW"
+    assert all_tables[view].view_text == "SELECT 2+2 AS four"
 
 
-def test_all_grants_in_database(ws: ImprovedWorkspaceClient, sql_exec, make_catalog, make_schema, make_table, make_group):
+def test_all_grants_in_database(
+    ws: ImprovedWorkspaceClient, sql_exec, make_catalog, make_schema, make_table, make_group
+):
     warehouse_id = os.environ["TEST_DEFAULT_WAREHOUSE_ID"]
 
     group_a = make_group()
@@ -218,12 +218,11 @@ def test_all_grants_in_database(ws: ImprovedWorkspaceClient, sql_exec, make_cata
     inventory_catalog, inventory_schema = inventory_schema.split(".")
     tak = TaclToolkit(ws, warehouse_id, inventory_catalog, inventory_schema)
 
-    all = {}
-    for grant in tak.grants_snapshot(schema.split('.')[1]):
+    all_grants = {}
+    for grant in tak.grants_snapshot(schema.split(".")[1]):
         logger.info(f"grant:\n{grant}\n  hive: {grant.hive_grant_sql()}\n  uc: {grant.uc_grant_sql()}")
-        all[f'{grant.principal}.{grant.object_key}'] = grant.action_type
+        all_grants[f"{grant.principal}.{grant.object_key}"] = grant.action_type
 
-    assert len(all) >= 2, 'must have at least two grants'
-    assert all[f'{group_a.display_name}.{table}'] == 'SELECT'
-    assert all[f'{group_b.display_name}.{schema}'] == 'MODIFY'
-
+    assert len(all_grants) >= 2, "must have at least two grants"
+    assert all_grants[f"{group_a.display_name}.{table}"] == "SELECT"
+    assert all_grants[f"{group_b.display_name}.{schema}"] == "MODIFY"

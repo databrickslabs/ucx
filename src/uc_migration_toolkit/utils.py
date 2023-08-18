@@ -48,7 +48,7 @@ class ThreadedExecution(Generic[ExecutableResult]):
 
     @classmethod
     def gather(cls, name: str, tasks: list[ExecutableFunction]) -> list[ExecutableResult]:
-        reporter = ProgressReporter(len(tasks), f'{name}: ')
+        reporter = ProgressReporter(len(tasks), f"{name}: ")
         return cls(tasks, num_threads=4, progress_reporter=reporter).run()
 
     def run(self) -> list[ExecutableResult]:

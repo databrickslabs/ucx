@@ -1,6 +1,7 @@
 from databricks.sdk import WorkspaceClient
-from uc_migration_toolkit.tacl.grants import Grant, GrantsCrawler
-from uc_migration_toolkit.tacl.tables import Table, TablesCrawler
+
+from uc_migration_toolkit.tacl.grants import GrantsCrawler
+from uc_migration_toolkit.tacl.tables import TablesCrawler
 
 
 class TaclToolkit:
@@ -9,8 +10,7 @@ class TaclToolkit:
         self._gc = GrantsCrawler(self._tc)
 
     def database_snapshot(self, schema):
-        return self._tc.snapshot('hive_metastore', schema)
+        return self._tc.snapshot("hive_metastore", schema)
 
     def grants_snapshot(self, schema):
-        return self._gc.snapshot('hive_metastore', schema)
-
+        return self._gc.snapshot("hive_metastore", schema)

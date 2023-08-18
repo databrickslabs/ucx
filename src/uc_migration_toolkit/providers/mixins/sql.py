@@ -16,6 +16,12 @@ from databricks.sdk.service.sql import (
     StatementStatus,
 )
 
+MAX_SLEEP_PER_ATTEMPT = 10
+
+MAX_PLATFORM_TIMEOUT = 50
+
+MIN_PLATFORM_TIMEOUT = 5
+
 _LOG = logging.getLogger("databricks.sdk")
 
 
@@ -91,7 +97,7 @@ class StatementExecutionExt(StatementExecutionAPI):
         # The wait_timeout field must be 0 seconds (disables wait),
         # or between 5 seconds and 50 seconds.
         wait_timeout = None
-        if 5 <= timeout.total_seconds() <= 50:
+        if MIN_PLATFORM_TIMEOUT <= timeout.total_seconds() <= MAX_PLATFORM_TIMEOUT:
             # set server-side timeout
             wait_timeout = f"{timeout.total_seconds()}s"
 
@@ -127,9 +133,9 @@ class StatementExecutionExt(StatementExecutionAPI):
             status_message = f"current status: {res.status.state.value}"
             self._raise_if_needed(res.status)
             sleep = attempt
-            if sleep > 10:
+            if sleep > MAX_SLEEP_PER_ATTEMPT:
                 # sleep 10s max per attempt
-                sleep = 10
+                sleep = MAX_SLEEP_PER_ATTEMPT
             _LOG.debug(f"SQL statement {res.statement_id}: {status_message} (sleeping ~{sleep}s)")
             time.sleep(sleep + random.random())
             attempt += 1

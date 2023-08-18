@@ -110,7 +110,7 @@ def _is_in_debug() -> bool:
 
 
 @pytest.fixture
-def random():
+def make_random():
     import random
 
     def inner(k=16) -> str:

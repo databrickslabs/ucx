@@ -157,8 +157,8 @@ ignore = [
     "B027",
     # Allow boolean positional values in function calls, like `dict.get(... True)`
     "FBT003",
-    # Ignore checks for possible passwords
-    "S105", "S106", "S107",
+    # Ignore checks for possible passwords and SQL statement construction
+    "S105", "S106", "S107", "S608",
     # Allow print statements
     "T201",
     # Allow asserts
