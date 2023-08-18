@@ -5,10 +5,7 @@ from databricks.labs.ucx.managers.inventory.types import (
     LogicalObjectType,
     PermissionsInventoryItem,
 )
-from databricks.labs.ucx.providers import (
-    GroupMigrationState,
-    MigrationGroupInfo,
-)
+from databricks.labs.ucx.providers import GroupMigrationState, MigrationGroupInfo
 
 
 def test_secrets_api():

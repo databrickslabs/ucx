@@ -18,8 +18,8 @@ from databricks.labs.ucx.config import (
     MigrationConfig,
 )
 from databricks.labs.ucx.managers.inventory.types import RequestObjectType
-from databricks.labs.ucx.providers.client import ImprovedWorkspaceClient
 from databricks.labs.ucx.providers import GroupMigrationState
+from databricks.labs.ucx.providers.client import ImprovedWorkspaceClient
 from databricks.labs.ucx.providers.logger import logger
 from databricks.labs.ucx.toolkits import GroupMigrationToolkit
 from databricks.labs.ucx.utils import safe_get_acls
