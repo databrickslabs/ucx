@@ -191,7 +191,7 @@ def test_describe_all_tables(ws: ImprovedWorkspaceClient, make_catalog, make_sch
         all_tables[t.key] = t
 
     assert len(all_tables) == 5
-    assert all_tables[non_delta].format == "json"
+    assert all_tables[non_delta].table_format == "json"
     assert all_tables[managed_table].object_type == "MANAGED"
     assert all_tables[tmp_table].object_type == "MANAGED"
     assert all_tables[external_table].object_type == "EXTERNAL"

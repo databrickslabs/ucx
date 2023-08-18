@@ -15,16 +15,16 @@ class Table:
     database: str
     name: str
     object_type: str
-    format: str
+    table_format: str
 
     location: str = None
     view_text: str = None
 
     @property
     def is_delta(self) -> bool:
-        if self.format is None:
+        if self.table_format is None:
             return False
-        return self.format.upper() == "DELTA"
+        return self.table_format.upper() == "DELTA"
 
     @property
     def key(self) -> str:
@@ -48,7 +48,7 @@ class Table:
 
     def _sql_managed(self, catalog):
         if not self.is_delta:
-            msg = f"{self.key} is not DELTA: {self.format}"
+            msg = f"{self.key} is not DELTA: {self.table_format}"
             raise ValueError(msg)
         return (
             f"CREATE TABLE IF NOT EXISTS {catalog}.{self.database}.{self.name}"
@@ -107,7 +107,7 @@ class TablesCrawler(CrawlerBase):
             database=database,
             name=table,
             object_type=describe["Type"],
-            format=describe.get("Provider", "").upper(),
+            table_format=describe.get("Provider", "").upper(),
             location=describe.get("Location", None),
             view_text=describe.get("View Text", None),
         )
