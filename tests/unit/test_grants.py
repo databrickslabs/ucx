@@ -1,6 +1,6 @@
 import pytest
 
-from uc_migration_toolkit.tacl.grants import Grant
+from databricks.labs.ucx.tacl.grants import Grant
 
 
 def test_type_and_key_table():

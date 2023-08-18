@@ -1,17 +1,17 @@
 import pytest
 from pyspark.errors import AnalysisException
 
-from uc_migration_toolkit.config import (
+from databricks.labs.ucx.config import (
     ConnectConfig,
     GroupsConfig,
     InventoryConfig,
     InventoryTable,
     MigrationConfig,
 )
-from uc_migration_toolkit.managers.inventory.types import RequestObjectType
-from uc_migration_toolkit.providers.client import ImprovedWorkspaceClient
-from uc_migration_toolkit.providers.logger import logger
-from uc_migration_toolkit.toolkits.group_migration import GroupMigrationToolkit
+from databricks.labs.ucx.managers.inventory.types import RequestObjectType
+from databricks.labs.ucx.providers.client import ImprovedWorkspaceClient
+from databricks.labs.ucx.providers.logger import logger
+from databricks.labs.ucx.toolkits import GroupMigrationToolkit
 
 from .test_e2e import _verify_group_permissions, _verify_roles_and_entitlements
 from .utils import EnvironmentInfo

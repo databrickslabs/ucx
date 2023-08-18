@@ -41,11 +41,11 @@ from databricks.sdk.service.workspace import (
     SecretScope,
 )
 
-from uc_migration_toolkit.config import InventoryTable
-from uc_migration_toolkit.managers.inventory.types import RequestObjectType
-from uc_migration_toolkit.providers.client import ImprovedWorkspaceClient
-from uc_migration_toolkit.providers.logger import logger
-from uc_migration_toolkit.utils import ThreadedExecution
+from databricks.labs.ucx.config import InventoryTable
+from databricks.labs.ucx.managers.inventory.types import RequestObjectType
+from databricks.labs.ucx.providers.client import ImprovedWorkspaceClient
+from databricks.labs.ucx.providers.logger import logger
+from databricks.labs.ucx.utils import ThreadedExecution
 
 from .utils import (
     EnvironmentInfo,

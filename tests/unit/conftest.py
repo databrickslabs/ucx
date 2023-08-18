@@ -6,7 +6,7 @@ import pytest
 from delta import configure_spark_with_delta_pip
 from pyspark.sql import SparkSession
 
-from uc_migration_toolkit.providers.logger import logger
+from databricks.labs.ucx.providers.logger import logger
 
 
 @pytest.fixture(scope="session")

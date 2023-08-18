@@ -23,7 +23,7 @@
 
 # COMMAND ----------
 
-from common import pip_install_dependencies, update_module_imports
+from common import pip_install_dependencies
 
 # COMMAND ----------
 
@@ -37,8 +37,8 @@ update_module_imports()
 
 # COMMAND ----------
 
-from uc_migration_toolkit.toolkits.group_migration import GroupMigrationToolkit
-from uc_migration_toolkit.config import MigrationConfig, InventoryConfig, GroupsConfig, InventoryTable
+from databricks.labs.ucx.toolkits import GroupMigrationToolkit
+from databricks.labs.ucx.config import MigrationConfig, InventoryConfig, GroupsConfig, InventoryTable
 
 # COMMAND ----------
 

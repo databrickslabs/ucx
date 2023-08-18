@@ -3,14 +3,15 @@ requires = ["hatchling"]
 build-backend = "hatchling.build"
 
 [project]
-name = "uc-migration-toolkit"
+name = "databricks-labs-ucx"
 dynamic = ["version"]
 description = ''
 readme = "README.md"
 requires-python = ">=3.10.6" # latest available in DBR 13.2
 keywords = []
 authors = [
-    { name = "renardeinside", email = "polarpersonal@gmail.com" },
+    { name = "Ivan Trusov", email = "ivan.trusov@databricks.com" },
+    { name = "Serge Smertin", email = "serge.smertin@databricks.com" },
 ]
 classifiers = [
     "Development Status :: 3 - Alpha",
@@ -45,14 +46,14 @@ test = [
 ]
 
 [project.scripts]
-ucx = "uc_migration_toolkit.__main__:entrypoint"
+ucx = "databricks.labs.ucx.__main__:entrypoint"
 
 [project.urls]
 Issues = "https://github.com/databricks/UC-Upgrade/issues"
 Source = "https://github.com/databricks/UC-Upgrade"
 
 [tool.hatch.version]
-path = "src/uc_migration_toolkit/__about__.py"
+path = "databricks/labs/ucx/__about__.py"
 
 [tool.hatch.envs.integration]
 dependencies = [
@@ -62,14 +63,14 @@ dependencies = [
 ]
 
 [tool.hatch.envs.integration.scripts]
-test = "pytest tests/integration --cov uc_migration_toolkit --cov uc_migration_toolkit --cov-report=html"
+test = "pytest tests/integration --cov databricks --cov databricks --cov-report=html"
 
 [tool.hatch.envs.default]
 
 [tool.hatch.envs.default.scripts]
 test = "pytest {args:tests}"
-test-cov = "pytest --cov uc_migration_toolkit {args:tests}"
-test-cov-report = "pytest {args:tests} --cov uc_migration_toolkit --cov-report=html"
+test-cov = "pytest --cov databricks {args:tests}"
+test-cov-report = "pytest {args:tests} --cov databricks --cov-report=html"
 
 [tool.hatch.envs.unit]
 dependencies = [
@@ -79,7 +80,7 @@ dependencies = [
 ]
 
 [tool.hatch.envs.unit.scripts]
-test = "pytest tests/unit --cov uc_migration_toolkit --cov-report=html"
+test = "pytest tests/unit --cov databricks --cov-report=html"
 
 [[tool.hatch.envs.all.matrix]]
 python = [ "3.9", "3.10", "3.11"]
@@ -174,7 +175,7 @@ extend-exclude = [
 ]
 
 [tool.ruff.isort]
-known-first-party = ["uc_migration_toolkit"]
+known-first-party = ["databricks"]
 
 [tool.ruff.flake8-tidy-imports]
 ban-relative-imports = "all"
@@ -184,13 +185,9 @@ ban-relative-imports = "all"
 "tests/**/*" = ["PLR2004", "S101", "TID252"]
 
 [tool.coverage.run]
-source = ["uc_migration_toolkit"]
+source = ["databricks"]
 branch = true
 parallel = true
-omit = [
-    "src/uc_migration_toolkit/__about__.py",
-]
-
 
 [tool.coverage.report]
 exclude_lines = [

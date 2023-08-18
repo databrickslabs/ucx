@@ -4,10 +4,10 @@ from functools import partial
 import pytest
 from databricks.sdk.service.iam import ComplexValue
 
-from uc_migration_toolkit.providers.client import ImprovedWorkspaceClient
-from uc_migration_toolkit.providers.logger import logger
-from uc_migration_toolkit.providers.mixins.sql import StatementExecutionExt
-from uc_migration_toolkit.toolkits.table_acls import TaclToolkit
+from databricks.labs.ucx.providers.client import ImprovedWorkspaceClient
+from databricks.labs.ucx.providers.logger import logger
+from databricks.labs.ucx.providers.mixins.sql import StatementExecutionExt
+from databricks.labs.ucx.toolkits import TaclToolkit
 
 # _LOG.setLevel("DEBUG")
 

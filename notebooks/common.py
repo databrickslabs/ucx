@@ -19,8 +19,8 @@ def update_module_imports():
     from pathlib import Path
 
     print("adding uc_migration_toolkit to the system path")
-    module_name = "uc_migration_toolkit"
-    module_path = Path(f"../src/{module_name}/__init__.py").resolve().absolute()
+    module_name = "databricks-labs-ucx"
+    module_path = Path(f"../databricks/labs/ucx/__init__.py").resolve().absolute()
     spec = importlib.util.spec_from_file_location(module_name, module_path)
 
     module = importlib.util.module_from_spec(spec)
@@ -28,11 +28,9 @@ def update_module_imports():
     # Optional; only necessary if you want to be able to import the module
     # by name later.
     sys.modules[module_name] = module
-    # Make it visible in the global namespace
-    global uc_migration_toolkit
 
     try:
-        import uc_migration_toolkit
+        from databricks.labs import ucx
     except ImportError as e:
-        print("Failed to import uc_migration_toolkit")
+        print("Failed to import databricks.labs.ucx")
         raise e

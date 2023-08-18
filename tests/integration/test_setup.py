@@ -4,8 +4,8 @@ import pytest
 from databricks.sdk import WorkspaceClient
 from databricks.sdk.service.iam import ComplexValue
 
-from uc_migration_toolkit.providers.logger import logger
-from uc_migration_toolkit.utils import ThreadedExecution
+from databricks.labs.ucx.providers.logger import logger
+from databricks.labs.ucx.utils import ThreadedExecution
 
 Threader = partial(ThreadedExecution, num_threads=40)
 

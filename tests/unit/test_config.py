@@ -7,8 +7,8 @@ import pytest
 import yaml
 from pydantic import RootModel
 
-from uc_migration_toolkit.cli.utils import get_migration_config
-from uc_migration_toolkit.config import (
+from databricks.labs.ucx.cli.utils import get_migration_config
+from databricks.labs.ucx.config import (
     GroupsConfig,
     InventoryConfig,
     InventoryTable,

@@ -1,6 +1,6 @@
 import pytest
 
-from uc_migration_toolkit.tacl.tables import Table
+from databricks.labs.ucx.tacl.tables import Table
 
 
 def test_is_delta_true():

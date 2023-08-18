@@ -1,0 +1,9 @@
+from databricks.labs.ucx.cli.app import app
+
+
+def entrypoint():
+    app()
+
+
+if __name__ == "__main__":
+    entrypoint()
