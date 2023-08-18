@@ -23,7 +23,7 @@ class Table:
     @property
     def is_delta(self) -> bool:
         if self.format is None: return False
-        return self.format.lower() == 'delta'
+        return self.format.upper() == 'DELTA'
 
     @property
     def key(self) -> str:
@@ -31,27 +31,35 @@ class Table:
 
     @property
     def kind(self) -> str:
-        return 'VIEW' if self.view_text != '' else 'TABLE'
+        return 'VIEW' if self.view_text is not None else 'TABLE'
 
     def _sql_alter(self, catalog):
-        return f'ALTER {self.kind} hive_metastore.{self.database}.{self.name} SET' \
+        return f'ALTER {self.kind} {self.key} SET' \
                f" TBLPROPERTIES ('upgraded_to' = '{catalog}.{self.database}.{self.name}');"
 
     def _sql_external(self, catalog):
         return f'CREATE TABLE IF NOT EXISTS {catalog}.{self.database}.{self.name}' \
-               f' LIKE hive_metastore.{self.database}.{self.name} COPY LOCATION;' \
+               f' LIKE {self.key} COPY LOCATION;' \
                + self._sql_alter(catalog)
 
     def _sql_managed(self, catalog):
         if not self.is_delta:
             raise ValueError(f'{self.key} is not DELTA: {self.format}')
         return f'CREATE TABLE IF NOT EXISTS {catalog}.{self.database}.{self.name}' \
-               f' DEEP CLONE hive_metastore.{self.database}.{self.name};' \
+               f' DEEP CLONE {self.key};' \
                + self._sql_alter(catalog)
 
     def _sql_view(self, catalog):
         return f'CREATE VIEW IF NOT EXISTS {catalog}.{self.database}.{self.name}' \
                f' AS {self.view_text};'
+
+    def uc_create_sql(self, catalog):
+        if self.kind == 'VIEW':
+            return self._sql_view(catalog)
+        elif self.location is not None:
+            return self._sql_external(catalog)
+        else:
+            return self._sql_managed(catalog)
 
 
 class TablesCrawler(CrawlerBase):
@@ -93,9 +101,9 @@ class TablesCrawler(CrawlerBase):
             database=database,
             name=table,
             object_type=describe["Type"],
-            format=describe.get("Provider", ''),
-            location=describe.get("Location", ''),
-            view_text=describe.get("View Text", ''),
+            format=describe.get("Provider", '').upper(),
+            location=describe.get("Location", None),
+            view_text=describe.get("View Text", None),
         )
 
 

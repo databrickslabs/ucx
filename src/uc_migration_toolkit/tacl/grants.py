@@ -11,7 +11,7 @@ from uc_migration_toolkit.utils import ThreadedExecution
 class Grant:
     principal: str
     action_type: str
-    catalog: str = None,
+    catalog: str
     database: str = None
     table: str = None
     view: str = None
