@@ -69,6 +69,15 @@ class Table:
 
 class TablesCrawler(CrawlerBase):
     def __init__(self, ws: WorkspaceClient, warehouse_id, catalog, schema):
+        """
+        Initializes a TablesCrawler instance.
+
+        Args:
+            ws (WorkspaceClient): The WorkspaceClient instance.
+            warehouse_id: The warehouse ID.
+            catalog (str): The catalog name for the inventory persistence.
+            schema: The schema name for the inventory persistence.
+        """
         super().__init__(ws, warehouse_id, catalog, schema, "tables")
         self._warehouse_id = warehouse_id
         self._ws = ws
@@ -77,17 +86,33 @@ class TablesCrawler(CrawlerBase):
         yield from self._fetch("SHOW DATABASES")
 
     def snapshot(self, catalog: str, database: str) -> list[Table]:
+        """
+        Takes a snapshot of tables in the specified catalog and database.
+
+        Args:
+            catalog (str): The catalog name.
+            database (str): The database name.
+
+        Returns:
+            list[Table]: A list of Table objects representing the snapshot of tables.
+        """
         return self._snapshot(
             Table, partial(self._try_load, catalog, database), partial(self._crawl, catalog, database)
         )
 
     def _try_load(self, catalog: str, database: str):
+        """Tries to load table information from the database or throws TABLE_OR_VIEW_NOT_FOUND error"""
         for row in self._fetch(
             f'SELECT * FROM {self._full_name} WHERE catalog = "{catalog}" AND database = "{database}"'
         ):
             yield Table(*row)
 
     def _crawl(self, catalog: str, database: str) -> list[Table]:
+        """Crawls and lists tables within the specified catalog and database.
+
+        After performing initial scan of all tables, starts making parallel
+        DESCRIBE TABLE EXTENDED queries for every table.
+        """
         catalog = self._valid(catalog)
         database = self._valid(database)
         logger.debug(f"[{catalog}.{database}] listing tables")
@@ -97,6 +122,10 @@ class TablesCrawler(CrawlerBase):
         return ThreadedExecution.gather("listing tables", tasks)
 
     def _describe(self, catalog: str, database: str, table: str) -> Table:
+        """Fetches metadata like table type, data format, external table location,
+        and the text of a view if specified for a specific table within the given
+        catalog and database.
+        """
         describe = {}
         full_name = f"{catalog}.{database}.{table}"
         logger.debug(f"[{full_name}] fetching table metadata")
