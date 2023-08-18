@@ -35,17 +35,42 @@ class CrawlerBase:
     def _snapshot(self, klass, fetcher, loader) -> list[any]:
         while True:
             try:
-                logger.debug(f'[{self._full_name}] fetching inventory')
+                logger.debug(f'[{self._full_name}] fetching {self._table} inventory')
                 return list(fetcher())
             except RuntimeError as e:
                 if 'TABLE_OR_VIEW_NOT_FOUND' not in str(e):
                     raise e
-                logger.debug(f'[{self._catalog}.{self._schema}.tables] inventory not found, crawling')
+                logger.debug(f'[{self._full_name}] {self._table} inventory not found, crawling')
                 self._append_records(klass, loader())
 
+    @staticmethod
+    def _row_to_sql(row, fields):
+        data = []
+        for f in fields:
+            value = getattr(row, f.name)
+            if value is None:
+                data.append(f"NULL")
+            elif f.type == bool:
+                data.append('TRUE' if value else 'FALSE')
+            elif f.type == str:
+                data.append(f"'{value}'")
+            else:
+                raise ValueError(f'unknown type: {f.type}')
+        return ', '.join(data)
+
+    @staticmethod
+    def _field_type(f):
+        if f.type == bool:
+            return 'BOOLEAN'
+        elif f.type == str:
+            return 'STRING'
+        else:
+            raise ValueError(f'unknown type: {f.type}')
+
     def _append_records(self, klass, records: Iterator[any]):
-        field_names = [f.name for f in dataclasses.fields(klass)]
-        vals = '), ('.join(', '.join(f"'{getattr(r, c)}'" for c in field_names) for r in records)
+        fields = dataclasses.fields(klass)
+        field_names = [f.name for f in fields]
+        vals = '), ('.join(self._row_to_sql(r, fields) for r in records)
         sql = f'INSERT INTO {self._full_name} ({", ".join(field_names)}) VALUES ({vals})'
         while True:
             try:
@@ -56,6 +81,6 @@ class CrawlerBase:
                 if 'TABLE_OR_VIEW_NOT_FOUND' not in str(e):
                     raise e
                 logger.debug(f'[{self._full_name}] not found. creating')
-                schema = ', '.join(f'{f.name} STRING' for f in dataclasses.fields(klass))
+                schema = ', '.join(f'{f.name} {self._field_type(f)}' for f in fields)
                 ddl = f'CREATE TABLE {self._full_name} ({schema}) USING DELTA'
                 self._exec(ddl)

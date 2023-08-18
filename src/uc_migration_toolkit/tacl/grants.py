@@ -40,6 +40,11 @@ class Grant:
             return "ANONYMOUS FUNCTION", ""
         raise ValueError(f'invalid grant keys')
 
+    @property
+    def object_key(self) -> str:
+        _, key = self._this_type_and_key()
+        return key.lower()
+
     def _this_type_and_key(self):
         return self.type_and_key(catalog=self.catalog,
                                  database=self.database,
@@ -64,7 +69,7 @@ class Grant:
             return f'GRANT {action_type} ON {object_type} {object_key} TO {self.principal}'
         return inner
 
-    def uc_sql(self):
+    def uc_grant_sql(self):
         """Get SQL translated SQL statement for granting similar permissions in UC.
 
         If there's no UC equivalent, returns None. This can also be the case for missing mapping.

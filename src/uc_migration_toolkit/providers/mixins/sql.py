@@ -161,12 +161,20 @@ class StatementExecutionExt(StatementExecutionAPI):
             col_conv.append(conv)
         row_factory = type("Row", (Row,), {"__columns__": col_names})
         result_data = execute_response.result
+        if result_data is None:
+            return []
         while True:
             for data in result_data.data_array:
                 # enumerate() + iterator + tuple constructor makes it more performant
                 # on larger humber of records for Python, even though it's less
                 # readable code.
-                yield row_factory(col_conv[i](value) for i, value in enumerate(data))
+                row = []
+                for i, value in enumerate(data):
+                    if value is None:
+                        row.append(None)
+                    else:
+                        row.append(col_conv[i](value))
+                yield row_factory(row)
             if result_data.next_chunk_index is None:
                 return
             # TODO: replace once ES-828324 is fixed

@@ -43,7 +43,7 @@ def make_group(ws: ImprovedWorkspaceClient, random):
         roles: list[ComplexValue] | None = None,
     ):
         group = ws.groups.create(
-            display_name=f"ucx_{random(10)}",
+            display_name=f"ucx_G{random(4)}",
             entitlements=entitlements,
             external_id=external_id,
             members=members,
@@ -71,7 +71,7 @@ def make_catalog(sql_exec, random):
     cleanup = []
 
     def inner():
-        name = f"ucx_{random(10)}"
+        name = f"ucx_C{random(4)}".lower()
         sql_exec(f"CREATE CATALOG {name}")
         cleanup.append(name)
         return name
@@ -94,7 +94,7 @@ def make_schema(sql_exec, random):
     cleanup = []
 
     def inner(catalog="hive_metastore"):
-        name = f"{catalog}.ucx_{random(10)}"
+        name = f"{catalog}.ucx_S{random(4)}".lower()
         sql_exec(f"CREATE SCHEMA {name}")
         cleanup.append(name)
         return name
@@ -125,7 +125,7 @@ def make_table(sql_exec, make_schema, random):
               view: bool = False):
         if schema is None:
             schema = make_schema(catalog=catalog)
-        name = f"{schema}.ucx_{random(10)}".lower()
+        name = f"{schema}.ucx_T{random(4)}".lower()
         ddl = f'CREATE {"VIEW" if view else "TABLE"} {name}'
         if ctas is not None:
             # temporary (if not view)
@@ -171,6 +171,7 @@ def test_table_fixture(make_table):
 def test_describe_all_tables(ws: ImprovedWorkspaceClient, make_catalog, make_schema, make_table):
     warehouse_id = os.environ["TEST_DEFAULT_WAREHOUSE_ID"]
 
+    logger.info('setting up fixtures')
     schema = make_schema(catalog='hive_metastore')
     managed_table = make_table(schema=schema)
     external_table = make_table(schema=schema, external=True)
@@ -188,7 +189,7 @@ def test_describe_all_tables(ws: ImprovedWorkspaceClient, make_catalog, make_sch
     tak = TaclToolkit(ws, warehouse_id, inventory_catalog, inventory_schema)
 
     all = {}
-    for t in tak.database_snapshot(schema):
+    for t in tak.database_snapshot(schema.split('.')[1]):
         all[t.key] = t
 
     assert len(all) == 5
@@ -218,11 +219,11 @@ def test_all_grants_in_database(ws: ImprovedWorkspaceClient, sql_exec, make_cata
     tak = TaclToolkit(ws, warehouse_id, inventory_catalog, inventory_schema)
 
     all = {}
-    key = lambda k: k.lower().replace('`', '')
-    for g in tak.grants_snapshot(schema):
-        all[key(f'{g.principal}.{g.object_key}')] = g.action_type
+    for grant in tak.grants_snapshot(schema.split('.')[1]):
+        logger.info(f"grant:\n{grant}\n  hive: {grant.hive_grant_sql()}\n  uc: {grant.uc_grant_sql()}")
+        all[f'{grant.principal}.{grant.object_key}'] = grant.action_type
 
     assert len(all) >= 2, 'must have at least two grants'
-    assert all[key(f'{group_a.display_name}.{table}')] == 'SELECT'
-    assert all[key(f'{group_b.display_name}.{schema}')] == 'MODIFY'
+    assert all[f'{group_a.display_name}.{table}'] == 'SELECT'
+    assert all[f'{group_b.display_name}.{schema}'] == 'MODIFY'
 

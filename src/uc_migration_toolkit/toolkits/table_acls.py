@@ -11,3 +11,6 @@ class TaclToolkit:
     def database_snapshot(self, schema):
         return self._tc.snapshot('hive_metastore', schema)
 
+    def grants_snapshot(self, schema):
+        return self._gc.snapshot('hive_metastore', schema)
+

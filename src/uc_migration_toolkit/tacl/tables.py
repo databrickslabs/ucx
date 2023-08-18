@@ -15,9 +15,10 @@ class Table:
     database: str
     name: str
     object_type: str
-    location: str
-    view_text: str
     format: str
+
+    location: str = None
+    view_text: str = None
 
     @property
     def is_delta(self) -> bool:
@@ -26,11 +27,11 @@ class Table:
 
     @property
     def key(self) -> str:
-        return f'{self.database}.{self.name}'.lower()
+        return f'{self.catalog}.{self.database}.{self.name}'.lower()
 
     @property
     def kind(self) -> str:
-        return 'VIEW' if self.view_text is not None else 'TABLE'
+        return 'VIEW' if self.view_text != '' else 'TABLE'
 
     def _sql_alter(self, catalog):
         return f'ALTER {self.kind} hive_metastore.{self.database}.{self.name} SET' \

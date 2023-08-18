@@ -53,4 +53,4 @@ def test_hive_sql():
      "GRANT USE SCHEMA ON DATABASE hive_metastore.mydb TO me"),
 ])
 def test_uc_sql(grant, query):
-    assert grant.uc_sql() == query
+    assert grant.uc_grant_sql() == query
