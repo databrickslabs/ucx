@@ -122,7 +122,7 @@ class GrantsCrawler(CrawlerBase):
             else:
                 tasks.append(partial(fn, table=table.name))
         return [grant
-                for grants in ThreadedExecution.gather('listing tables', tasks)
+                for grants in ThreadedExecution.gather('listing grants', tasks)
                 for grant in grants]
 
     def _grants(self, *, catalog: str = False, database: str = None, table: str = None, view: str = None,
