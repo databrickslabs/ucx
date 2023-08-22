@@ -23,3 +23,15 @@ def migrate_groups(config_file: Annotated[Path, typer.Argument(help="Path to con
     toolkit.apply_permissions_to_account_groups()
     toolkit.delete_backup_groups()
     toolkit.cleanup_inventory_table()
+
+
+@app.command()
+def generate_assessment_report():
+    from uc_migration_toolkit.toolkits.assessment import AssessmentToolkit
+    from databricks.sdk import WorkspaceClient
+
+    ws = WorkspaceClient()
+    toolkit = AssessmentToolkit(ws)
+    report = toolkit.generate_report()
+    print(report)
+
