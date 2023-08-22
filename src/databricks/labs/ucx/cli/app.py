@@ -9,10 +9,10 @@ app = Typer(name="UC Migration Toolkit", pretty_exceptions_show_locals=True)
 
 @app.command()
 def migrate_groups(config_file: Annotated[Path, typer.Argument(help="Path to config file")] = "migration_config.yml"):
-    from databricks.labs.ucx.config import MigrationConfig
+    from databricks.labs.ucx.cli.utils import get_migration_config
     from databricks.labs.ucx.toolkits.group_migration import GroupMigrationToolkit
 
-    config = MigrationConfig.from_file(config_file)
+    config = get_migration_config(config_file)
     toolkit = GroupMigrationToolkit(config)
     toolkit.prepare_environment()
 
@@ -27,15 +27,11 @@ def migrate_groups(config_file: Annotated[Path, typer.Argument(help="Path to con
 
 @app.command()
 def generate_assessment_report():
+    from uc_migration_toolkit.toolkits.assessment import AssessmentToolkit
     from databricks.sdk import WorkspaceClient
-
-    from databricks.labs.ucx.toolkits.assessment import AssessmentToolkit
 
     ws = WorkspaceClient()
     toolkit = AssessmentToolkit(ws)
     report = toolkit.generate_report()
     print(report)
 
-
-if __name__ == "__main__":
-    app()
