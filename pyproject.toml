@@ -3,7 +3,8 @@ requires = ["hatchling"]
 build-backend = "hatchling.build"
 
 [tool.hatch.build]
-include = ["databricks"]
+sources = ["src"]
+include = ["src"]
 
 [project]
 name = "databricks-labs-ucx"
@@ -56,7 +57,7 @@ Issues = "https://github.com/databricks/UC-Upgrade/issues"
 Source = "https://github.com/databricks/UC-Upgrade"
 
 [tool.hatch.version]
-path = "databricks/labs/ucx/__about__.py"
+path = "src/databricks/labs/ucx/__about__.py"
 
 [tool.hatch.envs.unit]
 dependencies = [
@@ -66,8 +67,8 @@ dependencies = [
 ]
 
 [tool.hatch.envs.unit.scripts]
-test = "pytest --cov databricks/labs tests/unit"
-test-cov-report = "pytest --cov databricks/labs tests/unit --cov-report=html"
+test = "pytest --cov src tests/unit"
+test-cov-report = "pytest --cov src tests/unit --cov-report=html"
 
 [tool.hatch.envs.integration]
 dependencies = [
@@ -77,7 +78,7 @@ dependencies = [
 ]
 
 [tool.hatch.envs.integration.scripts]
-test = "pytest --cov databricks/labs tests/integration"
+test = "pytest --cov src tests/integration"
 
 [tool.hatch.envs.lint]
 detached = true

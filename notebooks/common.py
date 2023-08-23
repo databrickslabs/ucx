@@ -15,20 +15,14 @@ def pip_install_dependencies():
 
 
 def update_module_imports():
-    import importlib.util
-    import sys
     from pathlib import Path
 
     print("adding databricks.labs.ucx to the system path")
-    module_name = "databricks-labs-ucx"
-    module_path = Path(f"../databricks/labs/ucx/__init__.py").resolve().absolute()
-    spec = importlib.util.spec_from_file_location(module_name, module_path)
+    module_path = str(Path(f"../src/databricks").resolve().absolute())
+    __import__("pkgutil").extend_path(module_path, 'databricks')
 
-    module = importlib.util.module_from_spec(spec)
-    spec.loader.exec_module(module)
-    # Optional; only necessary if you want to be able to import the module
-    # by name later.
-    sys.modules[module_name] = module
+    import databricks
+    databricks.__path__.append(module_path)
 
     try:
         from databricks.labs.ucx.__about__ import __version__
