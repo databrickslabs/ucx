@@ -10,12 +10,12 @@ from databricks.sdk.service.workspace import AclItem as SdkAclItem
 from tenacity import retry, stop_after_attempt, wait_fixed, wait_random
 
 from databricks.labs.ucx.inventory.inventorizer import BaseInventorizer
-from databricks.labs.ucx.inventory.table import WorkspaceInventory, WorkspacePermissions
-from databricks.labs.ucx.inventory.types import (
-    AclItemsContainer,
+from databricks.labs.ucx.inventory.types import AclItemsContainer, RolesAndEntitlements
+from databricks.labs.ucx.inventory.workspace import (
     LogicalObjectType,
     RequestObjectType,
-    RolesAndEntitlements,
+    WorkspaceInventory,
+    WorkspacePermissions,
 )
 from databricks.labs.ucx.providers.client import ImprovedWorkspaceClient
 from databricks.labs.ucx.providers.groups_info import GroupMigrationState

@@ -1,4 +1,5 @@
 import dataclasses
+import enum
 from collections.abc import Iterator
 from functools import partial
 
@@ -121,6 +122,8 @@ class CrawlerBase:
                 data.append("NULL")
             elif f.type == bool:
                 data.append("TRUE" if value else "FALSE")
+            elif issubclass(f.type, enum.Enum):
+                data.append(f"'{value.value}'")
             elif f.type == str:
                 data.append(f"'{value}'")
             else:
@@ -132,6 +135,8 @@ class CrawlerBase:
     def _field_type(f):
         if f.type == bool:
             return "BOOLEAN"
+        elif issubclass(f.type, enum.Enum):
+            return "STRING"
         elif f.type == str:
             return "STRING"
         else:

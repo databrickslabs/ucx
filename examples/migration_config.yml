@@ -1,8 +1,6 @@
 inventory:
-  table:
-    catalog: main
-    database: default
-    name: uc_migration_inventory
+  catalog: main
+  database: default
 
 
 with_table_acls: False

@@ -62,7 +62,7 @@ class ConnectConfig:
             debug_headers=cfg.debug_headers,
             rate_limit=cfg.rate_limit,
             max_connection_pools=cfg.max_connection_pools,
-            max_connections_per_pool=cfg.max_connections_per_pool
+            max_connections_per_pool=cfg.max_connections_per_pool,
         )
 
 

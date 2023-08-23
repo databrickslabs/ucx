@@ -7,7 +7,7 @@ from databricks.labs.ucx.config import (
     InventoryConfig,
     MigrationConfig,
 )
-from databricks.labs.ucx.inventory.types import RequestObjectType
+from databricks.labs.ucx.inventory.workspace import RequestObjectType
 from databricks.labs.ucx.providers.client import ImprovedWorkspaceClient
 from databricks.labs.ucx.providers.logger import logger
 from databricks.labs.ucx.toolkits.group_migration import GroupMigrationToolkit

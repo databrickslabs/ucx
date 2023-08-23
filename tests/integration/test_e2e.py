@@ -1,6 +1,5 @@
 from typing import Literal
 
-import pytest
 from databricks.sdk.service.iam import (
     AccessControlRequest,
     AccessControlResponse,
@@ -8,7 +7,6 @@ from databricks.sdk.service.iam import (
     Permission,
 )
 from databricks.sdk.service.workspace import SecretScope
-from pyspark.errors import AnalysisException
 
 from databricks.labs.ucx.config import (
     ConnectConfig,
@@ -16,7 +14,7 @@ from databricks.labs.ucx.config import (
     InventoryConfig,
     MigrationConfig,
 )
-from databricks.labs.ucx.inventory.types import RequestObjectType
+from databricks.labs.ucx.inventory.workspace import RequestObjectType
 from databricks.labs.ucx.providers.client import ImprovedWorkspaceClient
 from databricks.labs.ucx.providers.groups_info import GroupMigrationState
 from databricks.labs.ucx.providers.logger import logger
@@ -203,9 +201,6 @@ def test_e2e(
     logger.debug("Verifying that the groups were created - done")
 
     toolkit.cleanup_inventory_table()
-
-    with pytest.raises(AnalysisException):
-        toolkit._workspace_inventory.load_all()
 
     toolkit.inventorize_permissions()
 

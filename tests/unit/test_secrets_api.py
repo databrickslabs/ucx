@@ -1,10 +1,8 @@
 from databricks.sdk.service.iam import Group
 
 from databricks.labs.ucx.inventory.permissions import PermissionManager
-from databricks.labs.ucx.inventory.types import (
-    LogicalObjectType,
-)
 from databricks.labs.ucx.inventory.table import WorkspacePermissions
+from databricks.labs.ucx.inventory.workspace import LogicalObjectType
 from databricks.labs.ucx.providers.groups_info import (
     GroupMigrationState,
     MigrationGroupInfo,

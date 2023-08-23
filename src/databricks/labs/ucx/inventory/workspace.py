@@ -1,25 +1,76 @@
 import json
+from collections.abc import Iterator
 from dataclasses import dataclass
-from typing import Iterator
+
 from databricks.sdk import WorkspaceClient
 from databricks.sdk.service.iam import ObjectPermissions
 from pydantic.v1 import parse_obj_as
 
 from databricks.labs.ucx.config import InventoryConfig
-from databricks.labs.ucx.inventory.types import (
-    AclItemsContainer,
-    LogicalObjectType,
-    RequestObjectType, SqlRequestObjectType, RolesAndEntitlements,
-)
+from databricks.labs.ucx.generic import StrEnum
+from databricks.labs.ucx.inventory.types import AclItemsContainer, RolesAndEntitlements
 from databricks.labs.ucx.providers.logger import logger
 from databricks.labs.ucx.tacl._internal import CrawlerBase
+
+
+class LogicalObjectType(StrEnum):
+    ENTITLEMENTS = "ENTITLEMENTS"
+    ROLES = "ROLES"
+    FILE = "FILE"
+    REPO = "REPO"
+    DIRECTORY = "DIRECTORY"
+    NOTEBOOK = "NOTEBOOK"
+    SECRET_SCOPE = "SECRET_SCOPE"
+    PASSWORD = "PASSWORD"
+    TOKEN = "TOKEN"
+    WAREHOUSE = "WAREHOUSE"
+    MODEL = "MODEL"
+    EXPERIMENT = "EXPERIMENT"
+    JOB = "JOB"
+    PIPELINE = "PIPELINE"
+    CLUSTER = "CLUSTER"
+    INSTANCE_POOL = "INSTANCE_POOL"
+    CLUSTER_POLICY = "CLUSTER_POLICY"
+
+    def __repr__(self):
+        return self.value
+
+
+class RequestObjectType(StrEnum):
+    AUTHORIZATION = "authorization"  # tokens and passwords are here too!
+    CLUSTERS = "clusters"
+    CLUSTER_POLICIES = "cluster-policies"
+    DIRECTORIES = "directories"
+    EXPERIMENTS = "experiments"
+    FILES = "files"
+    INSTANCE_POOLS = "instance-pools"
+    JOBS = "jobs"
+    NOTEBOOKS = "notebooks"
+    PIPELINES = "pipelines"
+    REGISTERED_MODELS = "registered-models"
+    REPOS = "repos"
+    SERVING_ENDPOINTS = "serving-endpoints"
+    SQL_WAREHOUSES = "sql/warehouses"  # / is not a typo, it's the real object type
+
+    def __repr__(self):
+        return self.value
+
+
+class SqlRequestObjectType(StrEnum):
+    ALERTS = "alerts"
+    DASHBOARDS = "dashboards"
+    DATA_SOURCES = "data-sources"
+    QUERIES = "queries"
+
+    def __repr__(self):
+        return self.value
 
 
 @dataclass
 class WorkspacePermissions:
     object_id: str
     logical_object_type: LogicalObjectType
-    request_object_type: RequestObjectType | SqlRequestObjectType | None
+    request_object_type: StrEnum
     raw_object_permissions: str
 
     @property
@@ -27,7 +78,9 @@ class WorkspacePermissions:
         return json.loads(self.raw_object_permissions)
 
     @property
-    def typed_object_permissions(self) -> ObjectPermissions | AclItemsContainer | RolesAndEntitlements:
+    def typed_object_permissions(
+        self,
+    ) -> ObjectPermissions | AclItemsContainer | RolesAndEntitlements:  # TODO: make them separate top-level fields
         if self.logical_object_type == LogicalObjectType.SECRET_SCOPE:
             return parse_obj_as(AclItemsContainer, self.object_permissions)
         elif self.logical_object_type in [LogicalObjectType.ROLES, LogicalObjectType.ENTITLEMENTS]:
@@ -38,7 +91,7 @@ class WorkspacePermissions:
 
 class WorkspaceInventory(CrawlerBase):
     def __init__(self, config: InventoryConfig, ws: WorkspaceClient):
-        super().__init__(ws, config.warehouse_id, config.catalog, config.database, 'workspace_objects')
+        super().__init__(ws, config.warehouse_id, config.catalog, config.database, "workspace_objects")
         self.config = config
 
     def cleanup(self):

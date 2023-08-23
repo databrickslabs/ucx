@@ -6,7 +6,7 @@ from databricks.sdk.service.iam import AccessControlRequest, Group
 from databricks.sdk.service.workspace import ObjectType
 from ratelimit import limits, sleep_and_retry
 
-from databricks.labs.ucx.inventory.types import RequestObjectType
+from databricks.labs.ucx.inventory.workspace import RequestObjectType
 from databricks.labs.ucx.providers.logger import logger
 
 

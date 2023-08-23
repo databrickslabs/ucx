@@ -5,59 +5,6 @@ from pydantic import BaseModel
 from databricks.labs.ucx.generic import StrEnum
 
 
-class RequestObjectType(StrEnum):
-    AUTHORIZATION = "authorization"  # tokens and passwords are here too!
-    CLUSTERS = "clusters"
-    CLUSTER_POLICIES = "cluster-policies"
-    DIRECTORIES = "directories"
-    EXPERIMENTS = "experiments"
-    FILES = "files"
-    INSTANCE_POOLS = "instance-pools"
-    JOBS = "jobs"
-    NOTEBOOKS = "notebooks"
-    PIPELINES = "pipelines"
-    REGISTERED_MODELS = "registered-models"
-    REPOS = "repos"
-    SERVING_ENDPOINTS = "serving-endpoints"
-    SQL_WAREHOUSES = "sql/warehouses"  # / is not a typo, it's the real object type
-
-    def __repr__(self):
-        return self.value
-
-
-class SqlRequestObjectType(StrEnum):
-    ALERTS = "alerts"
-    DASHBOARDS = "dashboards"
-    DATA_SOURCES = "data-sources"
-    QUERIES = "queries"
-
-    def __repr__(self):
-        return self.value
-
-
-class LogicalObjectType(StrEnum):
-    ENTITLEMENTS = "ENTITLEMENTS"
-    ROLES = "ROLES"
-    FILE = "FILE"
-    REPO = "REPO"
-    DIRECTORY = "DIRECTORY"
-    NOTEBOOK = "NOTEBOOK"
-    SECRET_SCOPE = "SECRET_SCOPE"
-    PASSWORD = "PASSWORD"
-    TOKEN = "TOKEN"
-    WAREHOUSE = "WAREHOUSE"
-    MODEL = "MODEL"
-    EXPERIMENT = "EXPERIMENT"
-    JOB = "JOB"
-    PIPELINE = "PIPELINE"
-    CLUSTER = "CLUSTER"
-    INSTANCE_POOL = "INSTANCE_POOL"
-    CLUSTER_POLICY = "CLUSTER_POLICY"
-
-    def __repr__(self):
-        return self.value
-
-
 class AclPermission(StrEnum):
     READ = "READ"
     WRITE = "WRITE"
@@ -88,4 +35,3 @@ class AclItemsContainer(BaseModel):
 class RolesAndEntitlements(BaseModel):
     roles: list
     entitlements: list
-

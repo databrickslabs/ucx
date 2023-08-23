@@ -16,12 +16,12 @@ from databricks.sdk.service.workspace import (
 )
 
 from databricks.labs.ucx.inventory.listing import WorkspaceListing
-from databricks.labs.ucx.inventory.types import (
-    AclItemsContainer,
+from databricks.labs.ucx.inventory.types import AclItemsContainer
+from databricks.labs.ucx.inventory.workspace import (
     LogicalObjectType,
     RequestObjectType,
+    WorkspacePermissions,
 )
-from databricks.labs.ucx.inventory.table import WorkspacePermissions
 from databricks.labs.ucx.providers.client import ImprovedWorkspaceClient
 from databricks.labs.ucx.providers.groups_info import GroupMigrationState
 from databricks.labs.ucx.providers.logger import logger

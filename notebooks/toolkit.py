@@ -36,7 +36,7 @@ update_module_imports()
 # COMMAND ----------
 
 from databricks.labs.ucx.toolkits.group_migration import GroupMigrationToolkit
-from databricks.labs.ucx.config import MigrationConfig, InventoryConfig, GroupsConfig, InventoryTable
+from databricks.labs.ucx.config import MigrationConfig, InventoryConfig, GroupsConfig
 
 # COMMAND ----------
 
@@ -46,9 +46,16 @@ from databricks.labs.ucx.config import MigrationConfig, InventoryConfig, GroupsC
 
 # COMMAND ----------
 
+from databricks.sdk import WorkspaceClient
+
+w = WorkspaceClient()
+warehouses = w.warehouses.list()
+if len(warehouses) == 0:
+    raise ValueError("You have to create a SQL warehouse")
+
 config = MigrationConfig(
     with_table_acls=False,
-    inventory=InventoryConfig(table=InventoryTable(catalog="main", database="default", name="ucx_migration_inventory")),
+    inventory=InventoryConfig(catalog="main", database="default", warehouse_id=warehouses[0].warehouse_id),
     groups=GroupsConfig(
         # use this option to select specific groups manually
         selected=["groupA", "groupB"],
