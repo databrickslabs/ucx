@@ -2,9 +2,9 @@ import sys
 
 from databricks.labs.ucx.config import MigrationConfig
 from databricks.labs.ucx.managers.group import GroupManager
-from databricks.labs.ucx.managers.inventory import PermissionManager
-from databricks.labs.ucx.managers.inventory.inventorizer import Inventorizers
-from databricks.labs.ucx.managers.inventory.table import InventoryTableManager
+from databricks.labs.ucx.inventory import PermissionManager
+from databricks.labs.ucx.inventory.inventorizer import Inventorizers
+from databricks.labs.ucx.inventory.table import InventoryTableManager
 from databricks.labs.ucx.providers.client import ImprovedWorkspaceClient
 from databricks.labs.ucx.providers.logger import logger
 

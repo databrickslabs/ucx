@@ -15,7 +15,7 @@ from databricks.sdk.service.iam import (
 from databricks.sdk.service.jobs import JobCluster, PythonWheelTask, Task
 from databricks.sdk.service.workspace import ObjectInfo
 
-from databricks.labs.ucx.managers.inventory.types import RequestObjectType
+from databricks.labs.ucx.inventory.types import RequestObjectType
 from databricks.labs.ucx.providers.client import ImprovedWorkspaceClient
 from databricks.labs.ucx.providers.logger import logger
 from databricks.labs.ucx.utils import WorkspaceLevelEntitlement

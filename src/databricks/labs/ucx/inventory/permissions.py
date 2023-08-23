@@ -9,9 +9,9 @@ from databricks.sdk.service.iam import AccessControlRequest, Group, ObjectPermis
 from databricks.sdk.service.workspace import AclItem as SdkAclItem
 from tenacity import retry, stop_after_attempt, wait_fixed, wait_random
 
-from databricks.labs.ucx.managers.inventory.inventorizer import BaseInventorizer
-from databricks.labs.ucx.managers.inventory.table import InventoryTableManager
-from databricks.labs.ucx.managers.inventory.types import (
+from databricks.labs.ucx.inventory.inventorizer import BaseInventorizer
+from databricks.labs.ucx.inventory.table import InventoryTableManager
+from databricks.labs.ucx.inventory.types import (
     AclItemsContainer,
     LogicalObjectType,
     PermissionsInventoryItem,

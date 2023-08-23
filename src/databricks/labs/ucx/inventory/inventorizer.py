@@ -15,8 +15,8 @@ from databricks.sdk.service.workspace import (
     SecretScope,
 )
 
-from databricks.labs.ucx.managers.inventory.listing import WorkspaceListing
-from databricks.labs.ucx.managers.inventory.types import (
+from databricks.labs.ucx.inventory.listing import WorkspaceListing
+from databricks.labs.ucx.inventory.types import (
     AclItemsContainer,
     LogicalObjectType,
     PermissionsInventoryItem,

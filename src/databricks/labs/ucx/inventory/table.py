@@ -5,7 +5,7 @@ from pyspark.sql import DataFrame
 from pyspark.sql.types import StringType, StructField, StructType
 
 from databricks.labs.ucx.config import InventoryConfig
-from databricks.labs.ucx.managers.inventory.types import (
+from databricks.labs.ucx.inventory.types import (
     AclItemsContainer,
     LogicalObjectType,
     PermissionsInventoryItem,
