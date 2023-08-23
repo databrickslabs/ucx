@@ -39,9 +39,6 @@ dependencies = [
 ]
 
 [project.optional-dependencies]
-dbconnect = [
-    "databricks-connect>=13.2.0,<=14.0.0"
-]
 test = [
     "coverage[toml]>=6.5",
     "pytest",
@@ -62,8 +59,6 @@ path = "src/databricks/labs/ucx/__about__.py"
 [tool.hatch.envs.unit]
 dependencies = [
     "databricks-labs-ucx[test]",
-    "pyspark>=3.4.0,<=3.5.0",
-    "delta-spark>=2.4.0,<3.0.0"
 ]
 
 [tool.hatch.envs.unit.scripts]
@@ -73,8 +68,6 @@ test-cov-report = "pytest --cov src tests/unit --cov-report=html"
 [tool.hatch.envs.integration]
 dependencies = [
     "databricks-labs-ucx[test]",
-    "databricks-labs-ucx[dbconnect]",
-    "delta-spark>=2.4.0,<3.0.0"
 ]
 
 [tool.hatch.envs.integration.scripts]

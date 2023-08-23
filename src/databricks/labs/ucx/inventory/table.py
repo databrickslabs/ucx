@@ -1,63 +1,62 @@
-import pandas as pd
+import json
+from dataclasses import dataclass
+from typing import Iterator
 from databricks.sdk import WorkspaceClient
 from databricks.sdk.service.iam import ObjectPermissions
-from pyspark.sql import DataFrame
-from pyspark.sql.types import StringType, StructField, StructType
+from pydantic.v1 import parse_obj_as
 
 from databricks.labs.ucx.config import InventoryConfig
 from databricks.labs.ucx.inventory.types import (
     AclItemsContainer,
     LogicalObjectType,
-    PermissionsInventoryItem,
-    RequestObjectType,
+    RequestObjectType, SqlRequestObjectType, RolesAndEntitlements,
 )
 from databricks.labs.ucx.providers.logger import logger
-from databricks.labs.ucx.providers.spark import SparkMixin
+from databricks.labs.ucx.tacl._internal import CrawlerBase
 
 
-class InventoryTableManager(SparkMixin):
+@dataclass
+class WorkspacePermissions:
+    object_id: str
+    logical_object_type: LogicalObjectType
+    request_object_type: RequestObjectType | SqlRequestObjectType | None
+    raw_object_permissions: str
+
+    @property
+    def object_permissions(self) -> dict:
+        return json.loads(self.raw_object_permissions)
+
+    @property
+    def typed_object_permissions(self) -> ObjectPermissions | AclItemsContainer | RolesAndEntitlements:
+        if self.logical_object_type == LogicalObjectType.SECRET_SCOPE:
+            return parse_obj_as(AclItemsContainer, self.object_permissions)
+        elif self.logical_object_type in [LogicalObjectType.ROLES, LogicalObjectType.ENTITLEMENTS]:
+            return parse_obj_as(RolesAndEntitlements, self.object_permissions)
+        else:
+            return ObjectPermissions.from_dict(self.object_permissions)
+
+
+class WorkspaceInventory(CrawlerBase):
     def __init__(self, config: InventoryConfig, ws: WorkspaceClient):
-        super().__init__(ws)
+        super().__init__(ws, config.warehouse_id, config.catalog, config.database, 'workspace_objects')
         self.config = config
 
-    @property
-    def _table_schema(self) -> StructType:
-        return StructType(
-            [
-                StructField("object_id", StringType(), True),
-                StructField("logical_object_type", StringType(), True),
-                StructField("request_object_type", StringType(), True),
-                StructField("raw_object_permissions", StringType(), True),
-            ]
-        )
-
-    @property
-    def _table(self) -> DataFrame:
-        assert self.config.table, "Inventory table name is not set"
-        return self.spark.table(self.config.table.to_spark())
-
     def cleanup(self):
-        logger.info(f"Cleaning up inventory table {self.config.table}")
-        self.spark.sql(f"DROP TABLE IF EXISTS {self.config.table.to_spark()}")
+        logger.info(f"Cleaning up inventory table {self._full_name}")
+        self._exec(f"DROP TABLE IF EXISTS {self._full_name}")
         logger.info("Inventory table cleanup complete")
 
-    def save(self, items: list[PermissionsInventoryItem]):
-        # TODO: update instead of append
-        logger.info(f"Saving {len(items)} items to inventory table {self.config.table}")
-        serialized_items = pd.DataFrame([item.model_dump(mode="json") for item in items])
-        df = self.spark.createDataFrame(serialized_items, schema=self._table_schema)
-        df.write.mode("append").format("delta").saveAsTable(self.config.table.to_spark())
-        logger.info("Successfully saved the items to inventory table")
+    def save(self, items: list[WorkspacePermissions]):
+        logger.info(f"Saving {len(items)} items to {self._full_name}")
+        self._append_records(WorkspacePermissions, items)
 
-    def load_all(self) -> list[PermissionsInventoryItem]:
-        logger.info(f"Loading inventory table {self.config.table}")
-        df = self._table.toPandas()
-
-        logger.info("Successfully loaded the inventory table")
-        return PermissionsInventoryItem.from_pandas(df)
+    def load_all(self) -> Iterator[WorkspacePermissions]:
+        logger.info(f"Loading inventory table {self._full_name}")
+        for row in self._fetch(f"SELECT * FROM {self._full_name}"):
+            yield WorkspacePermissions(*row)
 
     @staticmethod
-    def _is_item_relevant_to_groups(item: PermissionsInventoryItem, groups: list[str]) -> bool:
+    def _is_item_relevant_to_groups(item: WorkspacePermissions, groups: list[str]) -> bool:
         if item.logical_object_type == LogicalObjectType.SECRET_SCOPE:
             _acl_container: AclItemsContainer = item.typed_object_permissions
             return any(acl_item.principal in groups for acl_item in _acl_container.acls)
@@ -74,10 +73,9 @@ class InventoryTableManager(SparkMixin):
             msg = f"Logical object type {item.logical_object_type} is not supported"
             raise NotImplementedError(msg)
 
-    def load_for_groups(self, groups: list[str]) -> list[PermissionsInventoryItem]:
-        logger.info(f"Loading inventory table {self.config.table} and filtering it to relevant groups")
-        df = self._table.toPandas()
-        all_items = PermissionsInventoryItem.from_pandas(df)
+    def load_for_groups(self, groups: list[str]) -> list[WorkspacePermissions]:
+        logger.info(f"Loading inventory table {self._full_name} and filtering it to relevant groups")
+        all_items = list(self.load_all())
         filtered_items = [item for item in all_items if self._is_item_relevant_to_groups(item, groups)]
         logger.info(f"Found {len(filtered_items)} items relevant to the groups among {len(all_items)} items")
         return filtered_items

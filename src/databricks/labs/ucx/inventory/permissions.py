@@ -10,11 +10,10 @@ from databricks.sdk.service.workspace import AclItem as SdkAclItem
 from tenacity import retry, stop_after_attempt, wait_fixed, wait_random
 
 from databricks.labs.ucx.inventory.inventorizer import BaseInventorizer
-from databricks.labs.ucx.inventory.table import InventoryTableManager
+from databricks.labs.ucx.inventory.table import WorkspaceInventory, WorkspacePermissions
 from databricks.labs.ucx.inventory.types import (
     AclItemsContainer,
     LogicalObjectType,
-    PermissionsInventoryItem,
     RequestObjectType,
     RolesAndEntitlements,
 )
@@ -49,9 +48,9 @@ AnyRequestPayload = PermissionRequestPayload | SecretsPermissionRequestPayload |
 
 # TODO: this class has too many @staticmethod and they must not be such. write a unit test for this logic.
 class PermissionManager:
-    def __init__(self, ws: ImprovedWorkspaceClient, inventory_table_manager: InventoryTableManager):
+    def __init__(self, ws: ImprovedWorkspaceClient, workspace_inventory: WorkspaceInventory):
         self._ws = ws
-        self.inventory_table_manager = inventory_table_manager
+        self._workspace_inventory = workspace_inventory
         self._inventorizers = []
 
     @property
@@ -67,7 +66,7 @@ class PermissionManager:
             inventorizer.preload()
             collected = inventorizer.inventorize()
             if collected:
-                self.inventory_table_manager.save(collected)
+                self._workspace_inventory.save(collected)
             else:
                 logger.warning(f"No objects of type {inventorizer.logical_object_types} were found")
 
@@ -75,7 +74,7 @@ class PermissionManager:
 
     @staticmethod
     def __prepare_request_for_permissions_api(
-        item: PermissionsInventoryItem,
+        item: WorkspacePermissions,
         migration_state: GroupMigrationState,
         destination: Literal["backup", "account"],
     ) -> PermissionRequestPayload:
@@ -113,7 +112,7 @@ class PermissionManager:
 
     @staticmethod
     def _prepare_permission_request_for_secrets_api(
-        item: PermissionsInventoryItem,
+        item: WorkspacePermissions,
         migration_state: GroupMigrationState,
         destination: Literal["backup", "account"],
     ) -> SecretsPermissionRequestPayload:
@@ -143,7 +142,7 @@ class PermissionManager:
 
     @staticmethod
     def __prepare_request_for_roles_and_entitlements(
-        item: PermissionsInventoryItem, migration_state: GroupMigrationState, destination
+        item: WorkspacePermissions, migration_state: GroupMigrationState, destination
     ) -> RolesAndEntitlementsRequestPayload:
         # TODO: potential BUG - why does item.object_id hold a group name and not ID?
         migration_info = migration_state.get_by_workspace_group_name(item.object_id)
@@ -153,7 +152,7 @@ class PermissionManager:
 
     def _prepare_new_permission_request(
         self,
-        item: PermissionsInventoryItem,
+        item: WorkspacePermissions,
         migration_state: GroupMigrationState,
         destination: Literal["backup", "account"],
     ) -> AnyRequestPayload:
@@ -226,7 +225,7 @@ class PermissionManager:
         logger.info(f"Applying the permissions to {destination} groups")
         logger.info(f"Total groups to apply permissions: {len(migration_state.groups)}")
 
-        permissions_on_source = self.inventory_table_manager.load_for_groups(
+        permissions_on_source = self._workspace_inventory.load_for_groups(
             groups=[g.workspace.display_name for g in migration_state.groups]
         )
         permission_payloads: list[AnyRequestPayload] = [

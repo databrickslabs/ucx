@@ -6,19 +6,6 @@ from databricks.labs.ucx.__about__ import __version__
 
 
 @dataclass
-class InventoryTable:
-    catalog: str
-    database: str
-    name: str
-
-    def __repr__(self):
-        return f"{self.catalog}.{self.database}.{self.name}"
-
-    def to_spark(self):
-        return self.__repr__()
-
-
-@dataclass
 class GroupsConfig:
     selected: list[str] | None = None
     auto: bool | None = None
@@ -35,7 +22,9 @@ class GroupsConfig:
 
 @dataclass
 class InventoryConfig:
-    table: InventoryTable
+    catalog: str
+    database: str
+    warehouse_id: str
 
 
 @dataclass
@@ -54,6 +43,8 @@ class ConnectConfig:
     profile: str | None = None
     debug_headers: bool | None = False
     rate_limit: int | None = None
+    max_connection_pools: int | None = None
+    max_connections_per_pool: int | None = None
 
     @staticmethod
     def from_databricks_config(cfg: Config) -> "ConnectConfig":
@@ -70,6 +61,8 @@ class ConnectConfig:
             profile=cfg.profile,
             debug_headers=cfg.debug_headers,
             rate_limit=cfg.rate_limit,
+            max_connection_pools=cfg.max_connection_pools,
+            max_connections_per_pool=cfg.max_connections_per_pool
         )
 
 
@@ -106,6 +99,8 @@ class MigrationConfig:
             profile=connect.profile,
             debug_headers=connect.debug_headers,
             rate_limit=connect.rate_limit,
+            max_connection_pools=connect.max_connection_pools,
+            max_connections_per_pool=connect.max_connections_per_pool,
             product="ucx",
             product_version=__version__,
         )

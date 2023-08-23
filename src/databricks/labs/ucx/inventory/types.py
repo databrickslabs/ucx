@@ -1,11 +1,6 @@
-import json
-
-import pandas as pd
-from databricks.sdk.service.iam import ObjectPermissions
 from databricks.sdk.service.workspace import AclItem as SdkAclItem
 from databricks.sdk.service.workspace import AclPermission as SdkAclPermission
 from pydantic import BaseModel
-from pydantic.tools import parse_obj_as
 
 from databricks.labs.ucx.generic import StrEnum
 
@@ -94,27 +89,3 @@ class RolesAndEntitlements(BaseModel):
     roles: list
     entitlements: list
 
-
-class PermissionsInventoryItem(BaseModel):
-    object_id: str
-    logical_object_type: LogicalObjectType
-    request_object_type: RequestObjectType | SqlRequestObjectType | None
-    raw_object_permissions: str
-
-    @property
-    def object_permissions(self) -> dict:
-        return json.loads(self.raw_object_permissions)
-
-    @property
-    def typed_object_permissions(self) -> ObjectPermissions | AclItemsContainer | RolesAndEntitlements:
-        if self.logical_object_type == LogicalObjectType.SECRET_SCOPE:
-            return parse_obj_as(AclItemsContainer, self.object_permissions)
-        elif self.logical_object_type in [LogicalObjectType.ROLES, LogicalObjectType.ENTITLEMENTS]:
-            return parse_obj_as(RolesAndEntitlements, self.object_permissions)
-        else:
-            return ObjectPermissions.from_dict(self.object_permissions)
-
-    @staticmethod
-    def from_pandas(source: pd.DataFrame) -> list["PermissionsInventoryItem"]:
-        items = source.to_dict(orient="records")
-        return [PermissionsInventoryItem(**item) for item in items]

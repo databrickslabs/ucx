@@ -3,7 +3,7 @@ import sys
 from databricks.labs.ucx.config import MigrationConfig
 from databricks.labs.ucx.inventory.inventorizer import Inventorizers
 from databricks.labs.ucx.inventory.permissions import PermissionManager
-from databricks.labs.ucx.inventory.table import InventoryTableManager
+from databricks.labs.ucx.inventory.table import WorkspaceInventory
 from databricks.labs.ucx.managers.group import GroupManager
 from databricks.labs.ucx.providers.client import ImprovedWorkspaceClient
 from databricks.labs.ucx.providers.logger import logger
@@ -16,15 +16,13 @@ class GroupMigrationToolkit:
         databricks_config = config.to_databricks_config()
         self._configure_logger(config.log_level)
 
-        # integrate with connection pool settings properly
-        # https://github.com/databricks/databricks-sdk-py/pull/276
         self._ws = ImprovedWorkspaceClient(config=databricks_config)
         self._ws.api_client._session.adapters["https://"].max_retries.total = 20
         self._verify_ws_client(self._ws)
 
         self.group_manager = GroupManager(self._ws, config.groups)
-        self.table_manager = InventoryTableManager(config.inventory, self._ws)
-        self.permissions_manager = PermissionManager(self._ws, self.table_manager)
+        self._workspace_inventory = WorkspaceInventory(config.inventory, self._ws)
+        self.permissions_manager = PermissionManager(self._ws, self._workspace_inventory)
 
     @staticmethod
     def _verify_ws_client(w: ImprovedWorkspaceClient):
@@ -45,7 +43,7 @@ class GroupMigrationToolkit:
         self.permissions_manager.set_inventorizers(inventorizers)
 
     def cleanup_inventory_table(self):
-        self.table_manager.cleanup()
+        self._workspace_inventory.cleanup()
 
     def inventorize_permissions(self):
         self.permissions_manager.inventorize_permissions()

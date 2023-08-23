@@ -41,7 +41,7 @@ from databricks.sdk.service.workspace import (
     SecretScope,
 )
 
-from databricks.labs.ucx.config import InventoryTable
+from databricks.labs.ucx.config import InventoryConfig
 from databricks.labs.ucx.inventory.types import RequestObjectType
 from databricks.labs.ucx.providers.client import ImprovedWorkspaceClient
 from databricks.labs.ucx.providers.logger import logger
@@ -625,19 +625,9 @@ def verifiable_objects(
 
 
 @pytest.fixture()
-def inventory_table(env: EnvironmentInfo, ws: ImprovedWorkspaceClient, dbconnect_cluster_id: str) -> InventoryTable:
-    ws.config.cluster_id = dbconnect_cluster_id
-    table = InventoryTable(
-        catalog="main",
-        database="default",
-        name=f"test_inventory_{env.test_uid}",
-    )
-
-    yield table
-
-    logger.debug(f"Cleaning up inventory table {table}")
-    try:
-        ws.tables.delete(table.to_spark())
-        logger.debug(f"Inventory table {table} deleted")
-    except Exception as e:
-        logger.warning(f"Cannot delete inventory table, skipping it. Original exception {e}")
+def inventory_config(ws: ImprovedWorkspaceClient, make_catalog, make_schema) -> InventoryConfig:
+    warehouse_id = os.environ["TEST_DEFAULT_WAREHOUSE_ID"]
+    return InventoryConfig(
+        catalog=make_catalog(),
+        database=make_schema(),
+        warehouse_id=warehouse_id)

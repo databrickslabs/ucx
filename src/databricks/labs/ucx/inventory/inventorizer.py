@@ -19,9 +19,9 @@ from databricks.labs.ucx.inventory.listing import WorkspaceListing
 from databricks.labs.ucx.inventory.types import (
     AclItemsContainer,
     LogicalObjectType,
-    PermissionsInventoryItem,
     RequestObjectType,
 )
+from databricks.labs.ucx.inventory.table import WorkspacePermissions
 from databricks.labs.ucx.providers.client import ImprovedWorkspaceClient
 from databricks.labs.ucx.providers.groups_info import GroupMigrationState
 from databricks.labs.ucx.providers.logger import logger
@@ -41,7 +41,7 @@ class BaseInventorizer(ABC, Generic[InventoryObject]):
         """Any preloading activities should happen here"""
 
     @abstractmethod
-    def inventorize(self) -> list[PermissionsInventoryItem]:
+    def inventorize(self) -> list[WorkspacePermissions]:
         """Any inventorization activities should happen here"""
 
 
@@ -91,11 +91,11 @@ class StandardInventorizer(BaseInventorizer[InventoryObject]):
         self._objects = list(self._listing_function())
         logger.info(f"Object metadata prepared for {len(self._objects)} objects.")
 
-    def _process_single_object(self, _object: InventoryObject) -> PermissionsInventoryItem | None:
+    def _process_single_object(self, _object: InventoryObject) -> WorkspacePermissions | None:
         object_id = str(getattr(_object, self._id_attribute))
         permissions = self._permissions_function(self._request_object_type, object_id)
         if permissions:
-            inventory_item = PermissionsInventoryItem(
+            inventory_item = WorkspacePermissions(
                 object_id=object_id,
                 logical_object_type=self._logical_object_type,
                 request_object_type=self._request_object_type,
@@ -107,7 +107,7 @@ class StandardInventorizer(BaseInventorizer[InventoryObject]):
         logger.info(f"Fetching permissions for {len(self._objects)} objects...")
 
         executables = [partial(self._process_single_object, _object) for _object in self._objects]
-        threaded_execution = ThreadedExecution[PermissionsInventoryItem](executables)
+        threaded_execution = ThreadedExecution[WorkspacePermissions](executables)
         collected = [item for item in threaded_execution.run() if item is not None]
         logger.info(f"Permissions fetched for {len(collected)} objects of type {self._request_object_type}")
         return collected
@@ -149,12 +149,12 @@ class TokensAndPasswordsInventorizer(BaseInventorizer[InventoryObject]):
         self._tokens_acl = [AccessControlResponse.from_dict(acl) for acl in self._preload_tokens()]
         self._passwords_acl = [AccessControlResponse.from_dict(acl) for acl in self._preload_passwords()]
 
-    def inventorize(self) -> list[PermissionsInventoryItem]:
+    def inventorize(self) -> list[WorkspacePermissions]:
         results = []
 
         if self._passwords_acl:
             results.append(
-                PermissionsInventoryItem(
+                WorkspacePermissions(
                     object_id="passwords",
                     logical_object_type=LogicalObjectType.PASSWORD,
                     request_object_type=RequestObjectType.AUTHORIZATION,
@@ -168,7 +168,7 @@ class TokensAndPasswordsInventorizer(BaseInventorizer[InventoryObject]):
 
         if self._tokens_acl:
             results.append(
-                PermissionsInventoryItem(
+                WorkspacePermissions(
                     object_id="tokens",
                     logical_object_type=LogicalObjectType.TOKEN,
                     request_object_type=RequestObjectType.AUTHORIZATION,
@@ -194,20 +194,20 @@ class SecretScopeInventorizer(BaseInventorizer[InventoryObject]):
     def _get_acls_for_scope(self, scope: SecretScope) -> Iterator[AclItem]:
         return self._ws.secrets.list_acls(scope.name)
 
-    def _prepare_permissions_inventory_item(self, scope: SecretScope) -> PermissionsInventoryItem:
+    def _prepare_permissions_inventory_item(self, scope: SecretScope) -> WorkspacePermissions:
         acls = self._get_acls_for_scope(scope)
         acls_container = AclItemsContainer.from_sdk(list(acls))
 
-        return PermissionsInventoryItem(
+        return WorkspacePermissions(
             object_id=scope.name,
             logical_object_type=LogicalObjectType.SECRET_SCOPE,
             request_object_type=None,
             raw_object_permissions=json.dumps(acls_container.model_dump(mode="json")),
         )
 
-    def inventorize(self) -> list[PermissionsInventoryItem]:
+    def inventorize(self) -> list[WorkspacePermissions]:
         executables = [partial(self._prepare_permissions_inventory_item, scope) for scope in self._scopes]
-        results = ThreadedExecution[PermissionsInventoryItem](executables).run()
+        results = ThreadedExecution[WorkspacePermissions](executables).run()
         logger.info(f"Permissions fetched for {len(results)} objects of type {LogicalObjectType.SECRET_SCOPE}")
         return results
 
@@ -261,7 +261,7 @@ class WorkspaceInventorizer(BaseInventorizer[InventoryObject]):
             case RequestObjectType.FILES:
                 return LogicalObjectType.FILE
 
-    def _convert_result_to_permission_item(self, _object: ObjectInfo) -> PermissionsInventoryItem | None:
+    def _convert_result_to_permission_item(self, _object: ObjectInfo) -> WorkspacePermissions | None:
         request_object_type = self.__convert_object_type_to_request_type(_object)
         if not request_object_type:
             return
@@ -278,7 +278,7 @@ class WorkspaceInventorizer(BaseInventorizer[InventoryObject]):
                     raise e
 
             if permissions:
-                inventory_item = PermissionsInventoryItem(
+                inventory_item = WorkspacePermissions(
                     object_id=str(_object.object_id),
                     logical_object_type=self.__convert_request_object_type_to_logical_type(request_object_type),
                     request_object_type=request_object_type,
@@ -286,10 +286,10 @@ class WorkspaceInventorizer(BaseInventorizer[InventoryObject]):
                 )
                 return inventory_item
 
-    def inventorize(self) -> list[PermissionsInventoryItem]:
+    def inventorize(self) -> list[WorkspacePermissions]:
         self.listing.walk(self._start_path)
         executables = [partial(self._convert_result_to_permission_item, _object) for _object in self.listing.results]
-        results = ThreadedExecution[PermissionsInventoryItem | None](
+        results = ThreadedExecution[WorkspacePermissions | None](
             executables,
             progress_reporter=ProgressReporter(
                 len(executables), "Fetching permissions for workspace objects - processed: "
@@ -319,7 +319,7 @@ class RolesAndEntitlementsInventorizer(BaseInventorizer[InventoryObject]):
         ]
         logger.info("Group roles and entitlements preload completed")
 
-    def inventorize(self) -> list[PermissionsInventoryItem]:
+    def inventorize(self) -> list[WorkspacePermissions]:
         _items = []
 
         for group in self._group_info:
@@ -330,7 +330,7 @@ class RolesAndEntitlementsInventorizer(BaseInventorizer[InventoryObject]):
             roles = [r.as_dict() for r in group_roles]
             entitlements = [e.as_dict() for e in group_entitlements]
 
-            inventory_item = PermissionsInventoryItem(
+            inventory_item = WorkspacePermissions(
                 object_id=group.display_name,
                 logical_object_type=LogicalObjectType.ROLES,
                 request_object_type=None,

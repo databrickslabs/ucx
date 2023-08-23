@@ -5,7 +5,6 @@ from databricks.labs.ucx.config import (
     ConnectConfig,
     GroupsConfig,
     InventoryConfig,
-    InventoryTable,
     MigrationConfig,
 )
 from databricks.labs.ucx.inventory.types import RequestObjectType
@@ -19,7 +18,7 @@ from .utils import EnvironmentInfo
 
 def test_jobs(
     env: EnvironmentInfo,
-    inventory_table: InventoryTable,
+    inventory_config: InventoryConfig,
     ws: ImprovedWorkspaceClient,
     jobs,
 ):
@@ -28,7 +27,7 @@ def test_jobs(
     config = MigrationConfig(
         connect=ConnectConfig.from_databricks_config(ws.config),
         with_table_acls=False,
-        inventory=InventoryConfig(table=inventory_table),
+        inventory=inventory_config,
         groups=GroupsConfig(selected=[g[0].display_name for g in env.groups]),
         auth=None,
         log_level="TRACE",
@@ -62,7 +61,7 @@ def test_jobs(
     toolkit.cleanup_inventory_table()
 
     with pytest.raises(AnalysisException):
-        toolkit.table_manager.spark.catalog.getTable(toolkit.table_manager.config.table.to_spark())
+        toolkit._workspace_inventory.spark.catalog.getTable(toolkit._workspace_inventory.config.table.to_spark())
 
     toolkit.inventorize_permissions()
 
