@@ -67,8 +67,8 @@ dependencies = [
 ]
 
 [tool.hatch.envs.unit.scripts]
-test = "pytest --cov databricks tests/unit"
-test-cov-report = "pytest --cov databricks tests/unit --cov-report=html"
+test = "pytest --cov src tests/unit"
+test-cov-report = "pytest --cov src tests/unit --cov-report=html"
 
 [tool.hatch.envs.integration]
 dependencies = [
@@ -78,7 +78,7 @@ dependencies = [
 ]
 
 [tool.hatch.envs.integration.scripts]
-test = "pytest tests/integration --cov databricks"
+test = "pytest --cov src tests/integration"
 
 [tool.hatch.envs.lint]
 detached = true
@@ -170,7 +170,7 @@ extend-exclude = [
 ]
 
 [tool.ruff.isort]
-known-first-party = ["databricks"]
+known-first-party = ["databricks.labs.ucx"]
 
 [tool.ruff.flake8-tidy-imports]
 ban-relative-imports = "all"
@@ -180,7 +180,6 @@ ban-relative-imports = "all"
 "tests/**/*" = ["PLR2004", "S101", "TID252"]
 
 [tool.coverage.run]
-source = ["src/databricks"]
 branch = true
 parallel = true
 

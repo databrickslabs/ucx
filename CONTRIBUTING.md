@@ -64,11 +64,7 @@ It's only introduced to simplify local development.
 
 Write your code in the IDE. Please keep all relevant files under the `src/uc_migration_toolkit` directory.
 
-Don't forget to test your code via:
-
-```shell
-hatch run test
-```
+Don't forget to test your code via `hatch run unit:test` and `hatch run integration:test`.
 
 Please note that all commits go through the CI process, and it verifies linting. You can run linting locally via:
 
