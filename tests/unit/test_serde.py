@@ -2,7 +2,7 @@ from databricks.sdk.service.workspace import AclItem as SdkAclItem
 from databricks.sdk.service.workspace import AclPermission as SdkAclPermission
 from pydantic.tools import parse_obj_as
 
-from uc_migration_toolkit.managers.inventory.types import AclItemsContainer
+from databricks.labs.ucx.inventory.types import AclItemsContainer
 
 
 def test_acl_items_container_serde():

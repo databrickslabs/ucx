@@ -10,19 +10,19 @@ from databricks.sdk.service.iam import (
 from databricks.sdk.service.workspace import SecretScope
 from pyspark.errors import AnalysisException
 
-from uc_migration_toolkit.config import (
+from databricks.labs.ucx.config import (
     ConnectConfig,
     GroupsConfig,
     InventoryConfig,
     InventoryTable,
     MigrationConfig,
 )
-from uc_migration_toolkit.managers.inventory.types import RequestObjectType
-from uc_migration_toolkit.providers.client import ImprovedWorkspaceClient
-from uc_migration_toolkit.providers.groups_info import GroupMigrationState
-from uc_migration_toolkit.providers.logger import logger
-from uc_migration_toolkit.toolkits.group_migration import GroupMigrationToolkit
-from uc_migration_toolkit.utils import safe_get_acls
+from databricks.labs.ucx.inventory.types import RequestObjectType
+from databricks.labs.ucx.providers.client import ImprovedWorkspaceClient
+from databricks.labs.ucx.providers.groups_info import GroupMigrationState
+from databricks.labs.ucx.providers.logger import logger
+from databricks.labs.ucx.toolkits.group_migration import GroupMigrationToolkit
+from databricks.labs.ucx.utils import safe_get_acls
 
 from .utils import EnvironmentInfo, WorkspaceObjects
 
