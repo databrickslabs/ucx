@@ -1,8 +1,6 @@
 import typing
 from functools import partial
 
-from databricks.sdk.service.iam import Group
-
 from databricks.labs.ucx.config import GroupsConfig
 from databricks.labs.ucx.generic import StrEnum
 from databricks.labs.ucx.providers.client import ImprovedWorkspaceClient
@@ -12,6 +10,7 @@ from databricks.labs.ucx.providers.groups_info import (
 )
 from databricks.labs.ucx.providers.logger import logger
 from databricks.labs.ucx.utils import ThreadedExecution
+from databricks.sdk.service.iam import Group
 
 
 class GroupLevel(StrEnum):

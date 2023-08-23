@@ -4,17 +4,6 @@ from collections.abc import Callable, Iterator
 from functools import partial
 from typing import Generic, TypeVar
 
-from databricks.sdk import WorkspaceClient
-from databricks.sdk.core import DatabricksError
-from databricks.sdk.service.iam import AccessControlResponse, Group, ObjectPermissions
-from databricks.sdk.service.ml import ModelDatabricks
-from databricks.sdk.service.workspace import (
-    AclItem,
-    ObjectInfo,
-    ObjectType,
-    SecretScope,
-)
-
 from databricks.labs.ucx.inventory.listing import WorkspaceListing
 from databricks.labs.ucx.inventory.types import (
     AclItemsContainer,
@@ -26,6 +15,16 @@ from databricks.labs.ucx.providers.client import ImprovedWorkspaceClient
 from databricks.labs.ucx.providers.groups_info import GroupMigrationState
 from databricks.labs.ucx.providers.logger import logger
 from databricks.labs.ucx.utils import ProgressReporter, ThreadedExecution
+from databricks.sdk import WorkspaceClient
+from databricks.sdk.core import DatabricksError
+from databricks.sdk.service.iam import AccessControlResponse, Group, ObjectPermissions
+from databricks.sdk.service.ml import ModelDatabricks
+from databricks.sdk.service.workspace import (
+    AclItem,
+    ObjectInfo,
+    ObjectType,
+    SecretScope,
+)
 
 InventoryObject = TypeVar("InventoryObject")
 

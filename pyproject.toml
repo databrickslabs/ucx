@@ -4,6 +4,7 @@ build-backend = "hatchling.build"
 
 [tool.hatch.build]
 sources = ["src"]
+include = ["src"]
 
 [project]
 name = "databricks-labs-ucx"
@@ -58,23 +59,6 @@ Source = "https://github.com/databricks/UC-Upgrade"
 [tool.hatch.version]
 path = "src/databricks/labs/ucx/__about__.py"
 
-[tool.hatch.envs.integration]
-dependencies = [
-    "databricks-labs-ucx[test]",
-    "databricks-labs-ucx[dbconnect]",
-    "delta-spark>=2.4.0,<3.0.0"
-]
-
-[tool.hatch.envs.integration.scripts]
-test = "pytest tests/integration --cov databricks --cov databricks --cov-report=html"
-
-[tool.hatch.envs.default]
-
-[tool.hatch.envs.default.scripts]
-test = "pytest {args:tests}"
-test-cov = "pytest --cov databricks {args:tests}"
-test-cov-report = "pytest {args:tests} --cov databricks --cov-report=html"
-
 [tool.hatch.envs.unit]
 dependencies = [
     "databricks-labs-ucx[test]",
@@ -83,7 +67,18 @@ dependencies = [
 ]
 
 [tool.hatch.envs.unit.scripts]
-test = "pytest tests/unit --cov databricks --cov-report=html"
+test = "pytest --cov databricks tests/unit"
+test-cov-report = "pytest --cov databricks tests/unit --cov-report=html"
+
+[tool.hatch.envs.integration]
+dependencies = [
+    "databricks-labs-ucx[test]",
+    "databricks-labs-ucx[dbconnect]",
+    "delta-spark>=2.4.0,<3.0.0"
+]
+
+[tool.hatch.envs.integration.scripts]
+test = "pytest tests/integration --cov databricks"
 
 [tool.hatch.envs.lint]
 detached = true
@@ -111,13 +106,12 @@ skip_glob = [
 profile = "black"
 
 [tool.pytest.ini_options]
-addopts = "-s -p no:warnings -vv"
+addopts = "-s -p no:warnings -vv --cache-clear"
 log_cli = true
 filterwarnings = [
     "ignore:::.*pyspark.broadcast*",
     "ignore:::.*pyspark.sql.pandas.utils*"
 ]
-
 
 [tool.black]
 target-version = ["py310"]
@@ -169,7 +163,6 @@ ignore = [
     # Ignore complexity
     "C901", "PLR0911", "PLR0912", "PLR0913", "PLR0915",
 ]
-
 extend-exclude = [
     "notebooks/*.py"
 ]
@@ -185,7 +178,7 @@ ban-relative-imports = "all"
 "tests/**/*" = ["PLR2004", "S101", "TID252"]
 
 [tool.coverage.run]
-source = ["src"]
+source = ["src/databricks"]
 branch = true
 parallel = true
 

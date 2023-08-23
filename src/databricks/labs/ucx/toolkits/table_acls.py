@@ -1,7 +1,6 @@
-from databricks.sdk import WorkspaceClient
-
 from databricks.labs.ucx.tacl.grants import GrantsCrawler
 from databricks.labs.ucx.tacl.tables import TablesCrawler
+from databricks.sdk import WorkspaceClient
 
 
 class TaclToolkit:

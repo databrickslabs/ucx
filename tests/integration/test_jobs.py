@@ -11,7 +11,7 @@ from databricks.labs.ucx.config import (
 from databricks.labs.ucx.inventory.types import RequestObjectType
 from databricks.labs.ucx.providers.client import ImprovedWorkspaceClient
 from databricks.labs.ucx.providers.logger import logger
-from databricks.labs.ucx.toolkits import GroupMigrationToolkit
+from databricks.labs.ucx.toolkits.group_migration import GroupMigrationToolkit
 
 from .test_e2e import _verify_group_permissions, _verify_roles_and_entitlements
 from .utils import EnvironmentInfo

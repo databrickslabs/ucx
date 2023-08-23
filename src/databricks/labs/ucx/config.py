@@ -1,8 +1,8 @@
-from databricks.sdk.core import Config
 from pydantic import RootModel
 from pydantic.dataclasses import dataclass
 
 from databricks.labs.ucx.__about__ import __version__
+from databricks.sdk.core import Config
 
 
 @dataclass

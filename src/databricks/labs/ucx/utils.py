@@ -4,11 +4,10 @@ from collections.abc import Callable
 from concurrent.futures import ALL_COMPLETED, ThreadPoolExecutor
 from typing import Generic, TypeVar
 
-from databricks.sdk.service.workspace import AclItem
-
 from databricks.labs.ucx.generic import StrEnum
 from databricks.labs.ucx.providers.client import ImprovedWorkspaceClient
 from databricks.labs.ucx.providers.logger import logger
+from databricks.sdk.service.workspace import AclItem
 
 ExecutableResult = TypeVar("ExecutableResult")
 ExecutableFunction = Callable[..., ExecutableResult]
