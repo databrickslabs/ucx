@@ -4,11 +4,10 @@ from dataclasses import dataclass
 
 from databricks.sdk import WorkspaceClient
 from databricks.sdk.service.iam import ObjectPermissions
-from pydantic.v1 import parse_obj_as
+from databricks.sdk.service.workspace import AclItem
 
 from databricks.labs.ucx.config import InventoryConfig
 from databricks.labs.ucx.generic import StrEnum
-from databricks.labs.ucx.inventory.types import AclItemsContainer, RolesAndEntitlements
 from databricks.labs.ucx.providers.logger import logger
 from databricks.labs.ucx.tacl._internal import CrawlerBase
 
@@ -52,11 +51,7 @@ class RequestObjectType(StrEnum):
     SERVING_ENDPOINTS = "serving-endpoints"
     SQL_WAREHOUSES = "sql/warehouses"  # / is not a typo, it's the real object type
 
-    def __repr__(self):
-        return self.value
-
-
-class SqlRequestObjectType(StrEnum):
+    # SQL object types
     ALERTS = "alerts"
     DASHBOARDS = "dashboards"
     DATA_SOURCES = "data-sources"
@@ -65,28 +60,62 @@ class SqlRequestObjectType(StrEnum):
     def __repr__(self):
         return self.value
 
+@dataclass
+class RolesAndEntitlements:
+    roles: list[str]
+    entitlements: list[str]
 
 @dataclass
 class WorkspacePermissions:
     object_id: str
     logical_object_type: LogicalObjectType
-    request_object_type: StrEnum
+    request_object_type: RequestObjectType
     raw_object_permissions: str
 
     @property
-    def object_permissions(self) -> dict:
+    def _object_permissions(self) -> dict:
         return json.loads(self.raw_object_permissions)
 
     @property
-    def typed_object_permissions(
-        self,
-    ) -> ObjectPermissions | AclItemsContainer | RolesAndEntitlements:  # TODO: make them separate top-level fields
-        if self.logical_object_type == LogicalObjectType.SECRET_SCOPE:
-            return parse_obj_as(AclItemsContainer, self.object_permissions)
-        elif self.logical_object_type in [LogicalObjectType.ROLES, LogicalObjectType.ENTITLEMENTS]:
-            return parse_obj_as(RolesAndEntitlements, self.object_permissions)
-        else:
-            return ObjectPermissions.from_dict(self.object_permissions)
+    def object_permissions(self) -> ObjectPermissions:
+        return ObjectPermissions.from_dict(self._object_permissions)
+
+    @property
+    def roles_and_entitlements(self) -> RolesAndEntitlements | None:
+        if self.logical_object_type not in [LogicalObjectType.ROLES, LogicalObjectType.ENTITLEMENTS]:
+            return None
+        x = self._object_permissions
+        return RolesAndEntitlements(roles=x.get('roles', []), entitlements=x.get('entitlements', []))
+
+    @property
+    def secret_scope_acls(self) -> list[AclItem]:
+        if self.logical_object_type != LogicalObjectType.SECRET_SCOPE:
+            return []
+        return [AclItem.from_dict(i) for i in self._object_permissions]
+
+    def _principals_from_secret_scopes(self) -> Iterator[str]:
+        for i in self.secret_scope_acls:
+            yield i.principal
+
+    def _principals_from_roles(self) -> Iterator[str]:
+        if self.logical_object_type not in [LogicalObjectType.ENTITLEMENTS, LogicalObjectType.ROLES]:
+            return
+        yield self.object_id
+
+    def _principals_from_generic_permissions(self) -> Iterator[str]:
+        for x in self.object_permissions.access_control_list:
+            # TODO: this does not allow for user-level access
+            yield x.group_name
+
+    def is_relevant_to_groups(self, groups: list[str]) -> bool:
+        check = {g: True for g in groups}
+        for it in [self._principals_from_secret_scopes(),
+                   self._principals_from_roles(),
+                   self._principals_from_generic_permissions()]:
+            for principal in it:
+                if check.get(principal, False):
+                    return True
+        return False
 
 
 class WorkspaceInventory(CrawlerBase):
@@ -105,30 +134,16 @@ class WorkspaceInventory(CrawlerBase):
 
     def load_all(self) -> Iterator[WorkspacePermissions]:
         logger.info(f"Loading inventory table {self._full_name}")
-        for row in self._fetch(f"SELECT * FROM {self._full_name}"):
-            yield WorkspacePermissions(*row)
-
-    @staticmethod
-    def _is_item_relevant_to_groups(item: WorkspacePermissions, groups: list[str]) -> bool:
-        if item.logical_object_type == LogicalObjectType.SECRET_SCOPE:
-            _acl_container: AclItemsContainer = item.typed_object_permissions
-            return any(acl_item.principal in groups for acl_item in _acl_container.acls)
-
-        elif isinstance(item.request_object_type, RequestObjectType):
-            _ops: ObjectPermissions = item.typed_object_permissions
-            mentioned_groups = [acl.group_name for acl in _ops.access_control_list]
-            return any(g in mentioned_groups for g in groups)
-
-        elif item.logical_object_type in [LogicalObjectType.ENTITLEMENTS, LogicalObjectType.ROLES]:
-            return any(g in item.object_id for g in groups)
-
-        else:
-            msg = f"Logical object type {item.logical_object_type} is not supported"
-            raise NotImplementedError(msg)
+        for (object_id, logical_type, request_type, raw) in self._fetch(f"SELECT * FROM {self._full_name}"):
+            yield WorkspacePermissions(
+                object_id=object_id,
+                logical_object_type=LogicalObjectType(logical_type),
+                request_object_type=RequestObjectType(request_type) if request_type else None,
+                raw_object_permissions=raw)
 
     def load_for_groups(self, groups: list[str]) -> list[WorkspacePermissions]:
         logger.info(f"Loading inventory table {self._full_name} and filtering it to relevant groups")
         all_items = list(self.load_all())
-        filtered_items = [item for item in all_items if self._is_item_relevant_to_groups(item, groups)]
+        filtered_items = [item for item in all_items if item.is_relevant_to_groups(groups)]
         logger.info(f"Found {len(filtered_items)} items relevant to the groups among {len(all_items)} items")
         return filtered_items

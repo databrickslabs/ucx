@@ -1,7 +1,7 @@
 import random
 import time
 from copy import deepcopy
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from functools import partial
 from typing import Literal
 
@@ -10,12 +10,11 @@ from databricks.sdk.service.workspace import AclItem as SdkAclItem
 from tenacity import retry, stop_after_attempt, wait_fixed, wait_random
 
 from databricks.labs.ucx.inventory.inventorizer import BaseInventorizer
-from databricks.labs.ucx.inventory.types import AclItemsContainer, RolesAndEntitlements
 from databricks.labs.ucx.inventory.workspace import (
     LogicalObjectType,
     RequestObjectType,
     WorkspaceInventory,
-    WorkspacePermissions,
+    WorkspacePermissions, RolesAndEntitlements,
 )
 from databricks.labs.ucx.providers.client import ImprovedWorkspaceClient
 from databricks.labs.ucx.providers.groups_info import GroupMigrationState
@@ -78,7 +77,7 @@ class PermissionManager:
         migration_state: GroupMigrationState,
         destination: Literal["backup", "account"],
     ) -> PermissionRequestPayload:
-        _existing_permissions: ObjectPermissions = item.typed_object_permissions
+        _existing_permissions: ObjectPermissions = item.object_permissions
         _acl = _existing_permissions.access_control_list
         acl_requests = []
 
@@ -116,12 +115,11 @@ class PermissionManager:
         migration_state: GroupMigrationState,
         destination: Literal["backup", "account"],
     ) -> SecretsPermissionRequestPayload:
-        _existing_acl_container: AclItemsContainer = item.typed_object_permissions
         _final_acls = []
 
         logger.debug("Preparing the permissions for the secrets API")
 
-        for _existing_acl in _existing_acl_container.acls:
+        for _existing_acl in item.secret_scope_acls:
             _new_acl = deepcopy(_existing_acl)
 
             if _existing_acl.principal in [g.workspace.display_name for g in migration_state.groups]:
@@ -130,14 +128,12 @@ class PermissionManager:
                     migration_info is not None
                 ), f"Group {_existing_acl.principal} is not in the migration groups provider"
                 destination_group: Group = getattr(migration_info, destination)
-                _new_acl.principal = destination_group.display_name
+                _new_acl = replace(_existing_acl, principal=destination_group.display_name)
                 _final_acls.append(_new_acl)
-
-        _typed_acl_container = AclItemsContainer(acls=_final_acls)
 
         return SecretsPermissionRequestPayload(
             object_id=item.object_id,
-            access_control_list=_typed_acl_container.to_sdk(),
+            access_control_list=_final_acls,
         )
 
     @staticmethod
@@ -148,7 +144,7 @@ class PermissionManager:
         migration_info = migration_state.get_by_workspace_group_name(item.object_id)
         assert migration_info is not None, f"Group {item.object_id} is not in the migration groups provider"
         destination_group: Group = getattr(migration_info, destination)
-        return RolesAndEntitlementsRequestPayload(payload=item.typed_object_permissions, group_id=destination_group.id)
+        return RolesAndEntitlementsRequestPayload(payload=item.roles_and_entitlements, group_id=destination_group.id)
 
     def _prepare_new_permission_request(
         self,
@@ -156,8 +152,9 @@ class PermissionManager:
         migration_state: GroupMigrationState,
         destination: Literal["backup", "account"],
     ) -> AnyRequestPayload:
+        # TODO: move this and other relevant methods to WorkspacePermissions
         if isinstance(item.request_object_type, RequestObjectType) and isinstance(
-            item.typed_object_permissions, ObjectPermissions
+            item.object_permissions, ObjectPermissions
         ):
             return self.__prepare_request_for_permissions_api(item, migration_state, destination)
         elif item.logical_object_type == LogicalObjectType.SECRET_SCOPE:

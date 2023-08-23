@@ -76,7 +76,7 @@ def _verify_group_permissions(
 
                 if base_acl:
                     if not target_acl:
-                        msg = "Target ACL is empty, while base ACL is not"
+                        msg = f"Target ACL on {target_group} is empty, while base ACL on {base_group} is not"
                         raise AssertionError(msg)
 
                     assert (

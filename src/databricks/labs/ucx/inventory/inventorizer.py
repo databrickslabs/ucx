@@ -16,7 +16,6 @@ from databricks.sdk.service.workspace import (
 )
 
 from databricks.labs.ucx.inventory.listing import WorkspaceListing
-from databricks.labs.ucx.inventory.types import AclItemsContainer
 from databricks.labs.ucx.inventory.workspace import (
     LogicalObjectType,
     RequestObjectType,
@@ -196,13 +195,11 @@ class SecretScopeInventorizer(BaseInventorizer[InventoryObject]):
 
     def _prepare_permissions_inventory_item(self, scope: SecretScope) -> WorkspacePermissions:
         acls = self._get_acls_for_scope(scope)
-        acls_container = AclItemsContainer.from_sdk(list(acls))
-
         return WorkspacePermissions(
             object_id=scope.name,
             logical_object_type=LogicalObjectType.SECRET_SCOPE,
             request_object_type=None,
-            raw_object_permissions=json.dumps(acls_container.model_dump(mode="json")),
+            raw_object_permissions=json.dumps([i.as_dict() for i in acls]),
         )
 
     def inventorize(self) -> list[WorkspacePermissions]:

@@ -78,12 +78,9 @@ class ImprovedWorkspaceClient(WorkspaceClient):
 
     def apply_roles_and_entitlements(self, group_id: str, roles: list, entitlements: list):
         # TODO: move to other places, this won't be in SDK
-        op_schema = "urn:ietf:params:scim:api:messages:2.0:PatchOp"
-        schemas = []
         operations = []
 
         if entitlements:
-            schemas.append(op_schema)
             entitlements_payload = {
                 "op": "add",
                 "path": "entitlements",
@@ -92,7 +89,6 @@ class ImprovedWorkspaceClient(WorkspaceClient):
             operations.append(entitlements_payload)
 
         if roles:
-            schemas.append(op_schema)
             roles_payload = {
                 "op": "add",
                 "path": "roles",
@@ -102,7 +98,7 @@ class ImprovedWorkspaceClient(WorkspaceClient):
 
         if operations:
             request = {
-                "schemas": schemas,
+                "schemas": ["urn:ietf:params:scim:api:messages:2.0:PatchOp"],
                 "Operations": operations,
             }
             self.patch_workspace_group(group_id, request)
