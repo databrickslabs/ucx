@@ -9,6 +9,7 @@ def pip_install_dependencies():
 
     project_file = Path("../pyproject.toml").absolute()
     dependency_string = " ".join(f"'{d}'" for d in tomli.loads(project_file.read_text())["project"]["dependencies"])
+    # TODO: switch to wheel
     ipython.run_line_magic("pip", f"install {dependency_string}")
     dbutils.library.restartPython()
 
@@ -18,7 +19,7 @@ def update_module_imports():
     import sys
     from pathlib import Path
 
-    print("adding uc_migration_toolkit to the system path")
+    print("adding databricks.labs.ucx to the system path")
     module_name = "databricks-labs-ucx"
     module_path = Path(f"../databricks/labs/ucx/__init__.py").resolve().absolute()
     spec = importlib.util.spec_from_file_location(module_name, module_path)
@@ -30,7 +31,8 @@ def update_module_imports():
     sys.modules[module_name] = module
 
     try:
-        from databricks.labs import ucx
+        from databricks.labs.ucx.__about__ import __version__
+        print(f'Running UCX v{__version__}')
     except ImportError as e:
         print("Failed to import databricks.labs.ucx")
         raise e
