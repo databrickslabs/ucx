@@ -22,10 +22,12 @@ def update_module_imports():
     __import__("pkgutil").extend_path(module_path, 'databricks')
 
     import databricks
+
     databricks.__path__.append(module_path)
 
     try:
         from databricks.labs.ucx.__about__ import __version__
+
         print(f'Running UCX v{__version__}')
     except ImportError as e:
         print("Failed to import databricks.labs.ucx")
