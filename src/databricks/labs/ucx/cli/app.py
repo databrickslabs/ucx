@@ -35,3 +35,6 @@ def generate_assessment_report():
     report = toolkit.generate_report()
     print(report)
 
+
+if __name__ == "__main__":
+    app()
