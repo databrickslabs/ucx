@@ -2,10 +2,11 @@ from collections.abc import Iterator
 from dataclasses import dataclass
 from functools import partial
 
+from databricks.sdk import WorkspaceClient
+
 from databricks.labs.ucx.providers.logger import logger
 from databricks.labs.ucx.tacl._internal import CrawlerBase
 from databricks.labs.ucx.utils import ThreadedExecution
-from databricks.sdk import WorkspaceClient
 
 
 @dataclass

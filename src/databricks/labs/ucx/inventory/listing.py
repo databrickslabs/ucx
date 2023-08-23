@@ -2,9 +2,10 @@ import datetime as dt
 from concurrent.futures import FIRST_COMPLETED, ThreadPoolExecutor, wait
 from itertools import groupby
 
+from databricks.sdk.service.workspace import ObjectInfo, ObjectType
+
 from databricks.labs.ucx.providers.client import ImprovedWorkspaceClient
 from databricks.labs.ucx.providers.logger import logger
-from databricks.sdk.service.workspace import ObjectInfo, ObjectType
 
 
 class WorkspaceListing:

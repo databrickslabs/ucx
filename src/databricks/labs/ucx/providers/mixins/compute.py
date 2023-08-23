@@ -111,7 +111,7 @@ class CommandExecutor:
         for line in lines:
             pos = 0
             for char in line:
-                if char == " " or char == "\t":
+                if char in (" ", "\t"):
                     pos += 1
                 else:
                     break

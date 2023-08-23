@@ -2,12 +2,12 @@ import os
 from functools import partial
 
 import pytest
+from databricks.sdk.service.iam import ComplexValue
 
 from databricks.labs.ucx.providers.client import ImprovedWorkspaceClient
 from databricks.labs.ucx.providers.logger import logger
 from databricks.labs.ucx.providers.mixins.sql import StatementExecutionExt
 from databricks.labs.ucx.toolkits.table_acls import TaclToolkit
-from databricks.sdk.service.iam import ComplexValue
 
 # _LOG.setLevel("DEBUG")
 

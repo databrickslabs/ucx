@@ -1,12 +1,13 @@
+import shlex
 import shutil
 import subprocess
 import sys
 from pathlib import Path
 
 import pytest
+from databricks.sdk.service.workspace import ImportFormat
 
 from databricks.labs.ucx.providers.mixins.compute import CommandExecutor
-from databricks.sdk.service.workspace import ImportFormat
 
 
 @pytest.fixture
@@ -19,8 +20,12 @@ def fresh_wheel_file(tmp_path) -> Path:
     build_root = tmp_path / fresh_wheel_file.__name__
     shutil.copytree(project_root, build_root)
     try:
+        command = [sys.executable, "-m", "pip", "wheel", "."]
         completed_process = subprocess.run(
-            [sys.executable, "-m", "pip", "wheel", "."], capture_output=True, cwd=build_root
+            [shlex.quote(arg) for arg in command],
+            capture_output=True,
+            cwd=build_root,
+            check=True,
         )
         if completed_process.returncode != 0:
             raise RuntimeError(completed_process.stderr)
@@ -36,7 +41,7 @@ def fresh_wheel_file(tmp_path) -> Path:
 
         return wheel_file
     except subprocess.CalledProcessError as e:
-        raise RuntimeError(e.stderr)
+        raise RuntimeError(e.stderr) from None
 
 
 def test_this_wheel_installs(ws, fresh_wheel_file, make_random):

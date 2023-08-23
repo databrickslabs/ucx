@@ -5,6 +5,8 @@ from dataclasses import dataclass
 from functools import partial
 from typing import Literal
 
+from databricks.sdk.service.iam import AccessControlRequest, Group, ObjectPermissions
+from databricks.sdk.service.workspace import AclItem as SdkAclItem
 from tenacity import retry, stop_after_attempt, wait_fixed, wait_random
 
 from databricks.labs.ucx.inventory.inventorizer import BaseInventorizer
@@ -20,8 +22,6 @@ from databricks.labs.ucx.providers.client import ImprovedWorkspaceClient
 from databricks.labs.ucx.providers.groups_info import GroupMigrationState
 from databricks.labs.ucx.providers.logger import logger
 from databricks.labs.ucx.utils import ThreadedExecution, safe_get_acls
-from databricks.sdk.service.iam import AccessControlRequest, Group, ObjectPermissions
-from databricks.sdk.service.workspace import AclItem as SdkAclItem
 
 
 @dataclass

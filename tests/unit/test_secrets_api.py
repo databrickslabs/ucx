@@ -1,10 +1,14 @@
+from databricks.sdk.service.iam import Group
+
 from databricks.labs.ucx.inventory.permissions import PermissionManager
 from databricks.labs.ucx.inventory.types import (
     LogicalObjectType,
     PermissionsInventoryItem,
 )
-from databricks.labs.ucx.providers.groups_info import GroupMigrationState, MigrationGroupInfo
-from databricks.sdk.service.iam import Group
+from databricks.labs.ucx.providers.groups_info import (
+    GroupMigrationState,
+    MigrationGroupInfo,
+)
 
 
 def test_secrets_api():

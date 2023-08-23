@@ -1,6 +1,13 @@
 from typing import Literal
 
 import pytest
+from databricks.sdk.service.iam import (
+    AccessControlRequest,
+    AccessControlResponse,
+    ObjectPermissions,
+    Permission,
+)
+from databricks.sdk.service.workspace import SecretScope
 from pyspark.errors import AnalysisException
 
 from databricks.labs.ucx.config import (
@@ -16,13 +23,6 @@ from databricks.labs.ucx.providers.groups_info import GroupMigrationState
 from databricks.labs.ucx.providers.logger import logger
 from databricks.labs.ucx.toolkits.group_migration import GroupMigrationToolkit
 from databricks.labs.ucx.utils import safe_get_acls
-from databricks.sdk.service.iam import (
-    AccessControlRequest,
-    AccessControlResponse,
-    ObjectPermissions,
-    Permission,
-)
-from databricks.sdk.service.workspace import SecretScope
 
 from .utils import EnvironmentInfo, WorkspaceObjects
 

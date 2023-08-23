@@ -9,15 +9,9 @@ import sys
 import uuid
 from functools import partial
 
+import databricks.sdk.core
 import pytest
 from _pytest.fixtures import SubRequest
-
-import databricks.sdk.core
-from databricks.labs.ucx.config import InventoryTable
-from databricks.labs.ucx.inventory.types import RequestObjectType
-from databricks.labs.ucx.providers.client import ImprovedWorkspaceClient
-from databricks.labs.ucx.providers.logger import logger
-from databricks.labs.ucx.utils import ThreadedExecution
 from databricks.sdk import AccountClient
 from databricks.sdk.core import Config, DatabricksError
 from databricks.sdk.service.compute import (
@@ -46,6 +40,12 @@ from databricks.sdk.service.workspace import (
     ObjectType,
     SecretScope,
 )
+
+from databricks.labs.ucx.config import InventoryTable
+from databricks.labs.ucx.inventory.types import RequestObjectType
+from databricks.labs.ucx.providers.client import ImprovedWorkspaceClient
+from databricks.labs.ucx.providers.logger import logger
+from databricks.labs.ucx.utils import ThreadedExecution
 
 from .utils import (
     EnvironmentInfo,

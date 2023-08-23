@@ -1,4 +1,6 @@
 import pandas as pd
+from databricks.sdk import WorkspaceClient
+from databricks.sdk.service.iam import ObjectPermissions
 from pyspark.sql import DataFrame
 from pyspark.sql.types import StringType, StructField, StructType
 
@@ -11,8 +13,6 @@ from databricks.labs.ucx.inventory.types import (
 )
 from databricks.labs.ucx.providers.logger import logger
 from databricks.labs.ucx.providers.spark import SparkMixin
-from databricks.sdk import WorkspaceClient
-from databricks.sdk.service.iam import ObjectPermissions
 
 
 class InventoryTableManager(SparkMixin):

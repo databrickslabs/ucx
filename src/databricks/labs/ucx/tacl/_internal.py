@@ -2,9 +2,10 @@ import dataclasses
 from collections.abc import Iterator
 from functools import partial
 
+from databricks.sdk import WorkspaceClient
+
 from databricks.labs.ucx.providers.logger import logger
 from databricks.labs.ucx.providers.mixins.sql import StatementExecutionExt
-from databricks.sdk import WorkspaceClient
 
 
 class CrawlerBase:
