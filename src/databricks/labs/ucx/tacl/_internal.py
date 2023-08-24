@@ -1,4 +1,5 @@
 import dataclasses
+from abc import abstractmethod
 from collections.abc import Iterator
 from functools import partial
 
@@ -8,8 +9,34 @@ from databricks.labs.ucx.providers.logger import logger
 from databricks.labs.ucx.providers.mixins.sql import StatementExecutionExt
 
 
+class SqlBackend:
+    @abstractmethod
+    def execute(self, sql):
+        pass
+
+    @abstractmethod
+    def fetch(self, sql) -> Iterator[any]:
+        pass
+
+
+class ExecBackend(SqlBackend):
+    def __init__(self, ws: WorkspaceClient, warehouse_id):
+        sql = StatementExecutionExt(ws.api_client)
+        self.execute = partial(sql.execute, warehouse_id)
+        self.fetch = partial(sql.execute_fetch_all, warehouse_id)
+
+
+class RuntimeBackend(SqlBackend):
+    def __init__(self):
+        from pyspark.sql.session import SparkSession
+
+        spark = SparkSession.builder.getOrCreate()
+        self.execute = spark.sql
+        self.fetch = lambda sql: spark.sql(sql).collect()
+
+
 class CrawlerBase:
-    def __init__(self, ws: WorkspaceClient, warehouse_id, catalog, schema, table):
+    def __init__(self, backend: SqlBackend, catalog: str, schema: str, table: str):
         """
         Initializes a CrawlerBase instance.
 
@@ -20,12 +47,12 @@ class CrawlerBase:
             schema: The schema name for the inventory persistence.
             table: The table name for the inventory persistence.
         """
-        sql = StatementExecutionExt(ws.api_client)
         self._catalog = self._valid(catalog)
         self._schema = self._valid(schema)
         self._table = self._valid(table)
-        self._exec = partial(sql.execute, warehouse_id)
-        self._fetch = partial(sql.execute_fetch_all, warehouse_id)
+        self._backend = backend
+        self._exec = backend.execute
+        self._fetch = backend.fetch
 
     @property
     def _full_name(self) -> str:
@@ -106,7 +133,7 @@ class CrawlerBase:
             try:
                 logger.debug(f"[{self._full_name}] fetching {self._table} inventory")
                 return list(fetcher())
-            except RuntimeError as e:
+            except Exception as e:
                 if "TABLE_OR_VIEW_NOT_FOUND" not in str(e):
                     raise e
                 logger.debug(f"[{self._full_name}] {self._table} inventory not found, crawling")
@@ -173,7 +200,7 @@ class CrawlerBase:
                 logger.debug(f"[{self._full_name}] appending records")
                 self._exec(sql)
                 return
-            except RuntimeError as e:
+            except Exception as e:
                 if "TABLE_OR_VIEW_NOT_FOUND" not in str(e):
                     raise e
                 logger.debug(f"[{self._full_name}] not found. creating")
