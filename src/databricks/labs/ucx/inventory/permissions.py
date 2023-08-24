@@ -9,7 +9,7 @@ from databricks.sdk.service.iam import AccessControlRequest, Group, ObjectPermis
 from databricks.sdk.service.workspace import AclItem as SdkAclItem
 from tenacity import retry, stop_after_attempt, wait_fixed, wait_random
 
-from databricks.labs.ucx.inventory.inventorizer import BaseInventorizer
+from databricks.labs.ucx.inventory.inventorizer import BaseInventorizer, Crawlers
 from databricks.labs.ucx.inventory.workspace import (
     LogicalObjectType,
     RequestObjectType,
@@ -52,23 +52,9 @@ class PermissionManager:
         self._workspace_inventory = workspace_inventory
         self._inventorizers = []
 
-    @property
-    def inventorizers(self) -> list[BaseInventorizer]:
-        return self._inventorizers
-
-    def set_inventorizers(self, value: list[BaseInventorizer]):
-        self._inventorizers = value
-
-    def inventorize_permissions(self):
-        for inventorizer in self.inventorizers:
-            logger.info(f"Inventorizing the permissions for objects of type(s) {inventorizer.logical_object_types}")
-            inventorizer.preload()
-            collected = inventorizer.inventorize()
-            if collected:
-                self._workspace_inventory.save(collected)
-            else:
-                logger.warning(f"No objects of type {inventorizer.logical_object_types} were found")
-
+    def inventorize_permissions(self, inventorizers: Crawlers):
+        for inv in inventorizers.all():
+            inv.save(self._workspace_inventory)
         logger.info("Permissions were inventorized and saved")
 
     @staticmethod

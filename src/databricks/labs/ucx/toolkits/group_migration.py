@@ -1,7 +1,7 @@
 import sys
 
 from databricks.labs.ucx.config import MigrationConfig
-from databricks.labs.ucx.inventory.inventorizer import Inventorizers
+from databricks.labs.ucx.inventory.inventorizer import Crawlers
 from databricks.labs.ucx.inventory.permissions import PermissionManager
 from databricks.labs.ucx.inventory.workspace import WorkspaceInventory
 from databricks.labs.ucx.managers.group import GroupManager
@@ -23,6 +23,7 @@ class GroupMigrationToolkit:
         self.group_manager = GroupManager(self._ws, config.groups)
         self._workspace_inventory = WorkspaceInventory(config.inventory, self._ws)
         self.permissions_manager = PermissionManager(self._ws, self._workspace_inventory)
+        self._crawlers = Crawlers(self._ws, self.group_manager.migration_groups_provider, self._num_threads)
 
     @staticmethod
     def _verify_ws_client(w: ImprovedWorkspaceClient):
@@ -39,14 +40,12 @@ class GroupMigrationToolkit:
 
     def prepare_environment(self):
         self.group_manager.prepare_groups_in_environment()
-        inventorizers = Inventorizers.provide(self._ws, self.group_manager.migration_groups_provider, self._num_threads)
-        self.permissions_manager.set_inventorizers(inventorizers)
 
     def cleanup_inventory_table(self):
         self._workspace_inventory.cleanup()
 
     def inventorize_permissions(self):
-        self.permissions_manager.inventorize_permissions()
+        self.permissions_manager.inventorize_permissions(self._crawlers)
 
     def apply_permissions_to_backup_groups(self):
         self.permissions_manager.apply_group_permissions(

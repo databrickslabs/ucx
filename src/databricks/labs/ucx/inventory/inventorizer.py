@@ -19,7 +19,7 @@ from databricks.labs.ucx.inventory.listing import WorkspaceListing
 from databricks.labs.ucx.inventory.workspace import (
     LogicalObjectType,
     RequestObjectType,
-    WorkspacePermissions,
+    WorkspacePermissions, WorkspaceInventory,
 )
 from databricks.labs.ucx.providers.client import ImprovedWorkspaceClient
 from databricks.labs.ucx.providers.groups_info import GroupMigrationState
@@ -36,12 +36,18 @@ class BaseInventorizer(ABC, Generic[InventoryObject]):
         """Logical object types that this inventorizer can handle"""
 
     @abstractmethod
-    def preload(self):
+    def _preload(self):
         """Any preloading activities should happen here"""
 
     @abstractmethod
     def inventorize(self) -> list[WorkspacePermissions]:
         """Any inventorization activities should happen here"""
+
+    def save(self, inventory: WorkspaceInventory):
+        self._preload()
+        collected = self.inventorize()
+        if collected:
+            inventory.save(collected)
 
 
 class StandardInventorizer(BaseInventorizer[InventoryObject]):
@@ -85,7 +91,7 @@ class StandardInventorizer(BaseInventorizer[InventoryObject]):
     def logical_object_type(self) -> LogicalObjectType:
         return self._logical_object_type
 
-    def preload(self):
+    def _preload(self):
         logger.info(f"Listing objects with type {self._request_object_type}...")
         self._objects = list(self._listing_function())
         logger.info(f"Object metadata prepared for {len(self._objects)} objects.")
@@ -144,7 +150,7 @@ class TokensAndPasswordsInventorizer(BaseInventorizer[InventoryObject]):
             logger.error(e)
             return []
 
-    def preload(self):
+    def _preload(self):
         self._tokens_acl = [AccessControlResponse.from_dict(acl) for acl in self._preload_tokens()]
         self._passwords_acl = [AccessControlResponse.from_dict(acl) for acl in self._preload_passwords()]
 
@@ -208,7 +214,7 @@ class SecretScopeInventorizer(BaseInventorizer[InventoryObject]):
         logger.info(f"Permissions fetched for {len(results)} objects of type {LogicalObjectType.SECRET_SCOPE}")
         return results
 
-    def preload(self):
+    def _preload(self):
         pass
 
 
@@ -226,7 +232,7 @@ class WorkspaceInventorizer(BaseInventorizer[InventoryObject]):
         )
         self._start_path = start_path
 
-    def preload(self):
+    def _preload(self):
         pass
 
     @staticmethod
@@ -307,7 +313,7 @@ class RolesAndEntitlementsInventorizer(BaseInventorizer[InventoryObject]):
         self._migration_state = migration_state
         self._group_info: list[Group] = []
 
-    def preload(self):
+    def _preload(self):
         logger.info("Please note that group roles and entitlements will be ONLY inventorized for migration groups")
         self._group_info: list[Group] = [
             # TODO: why do we load group twice from platform? this really looks unnecessary
@@ -357,68 +363,80 @@ def experiments_listing(ws: WorkspaceClient):
     return inner
 
 
-class Inventorizers:
-    @staticmethod
-    def provide(ws: ImprovedWorkspaceClient, migration_state: GroupMigrationState, num_threads: int):
+class Crawlers:
+    def __init__(self, ws: ImprovedWorkspaceClient, migration_state: GroupMigrationState, num_threads: int):
+        self.roles_and_entitlements = RolesAndEntitlementsInventorizer(ws, migration_state)
+        self.tokens_and_passwords = TokensAndPasswordsInventorizer(ws)
+        self.clusters = StandardInventorizer(
+            ws,
+            logical_object_type=LogicalObjectType.CLUSTER,
+            request_object_type=RequestObjectType.CLUSTERS,
+            listing_function=ws.clusters.list,
+            id_attribute="cluster_id",
+        )
+        self.instance_pools = StandardInventorizer(
+            ws,
+            logical_object_type=LogicalObjectType.INSTANCE_POOL,
+            request_object_type=RequestObjectType.INSTANCE_POOLS,
+            listing_function=ws.instance_pools.list,
+            id_attribute="instance_pool_id",
+        )
+        self.cluster_policies = StandardInventorizer(
+            ws,
+            logical_object_type=LogicalObjectType.CLUSTER_POLICY,
+            request_object_type=RequestObjectType.CLUSTER_POLICIES,
+            listing_function=ws.cluster_policies.list,
+            id_attribute="policy_id",
+        ),
+        self.pipelines = StandardInventorizer(
+            ws,
+            logical_object_type=LogicalObjectType.PIPELINE,
+            request_object_type=RequestObjectType.PIPELINES,
+            listing_function=ws.pipelines.list_pipelines,
+            id_attribute="pipeline_id",
+        )
+        self.jobs = StandardInventorizer(
+            ws,
+            logical_object_type=LogicalObjectType.JOB,
+            request_object_type=RequestObjectType.JOBS,
+            listing_function=ws.jobs.list,
+            id_attribute="job_id",
+        )
+        self.experiements = StandardInventorizer(
+            ws,
+            logical_object_type=LogicalObjectType.EXPERIMENT,
+            request_object_type=RequestObjectType.EXPERIMENTS,
+            listing_function=experiments_listing(ws),
+            id_attribute="experiment_id",
+        )
+        self.models = StandardInventorizer(
+            ws,
+            logical_object_type=LogicalObjectType.MODEL,
+            request_object_type=RequestObjectType.REGISTERED_MODELS,
+            listing_function=models_listing(ws),
+            id_attribute="id",
+        )
+        self.warehouses = StandardInventorizer(
+            ws,
+            logical_object_type=LogicalObjectType.WAREHOUSE,
+            request_object_type=RequestObjectType.SQL_WAREHOUSES,
+            listing_function=ws.warehouses.list,
+            id_attribute="id",
+        ),
+        self.secret_scopes = SecretScopeInventorizer(ws)
+        self.workspace = WorkspaceInventorizer(ws, num_threads=num_threads)
+
+    def all(self):
         return [
-            RolesAndEntitlementsInventorizer(ws, migration_state),
-            TokensAndPasswordsInventorizer(ws),
-            StandardInventorizer(
-                ws,
-                logical_object_type=LogicalObjectType.CLUSTER,
-                request_object_type=RequestObjectType.CLUSTERS,
-                listing_function=ws.clusters.list,
-                id_attribute="cluster_id",
-            ),
-            StandardInventorizer(
-                ws,
-                logical_object_type=LogicalObjectType.INSTANCE_POOL,
-                request_object_type=RequestObjectType.INSTANCE_POOLS,
-                listing_function=ws.instance_pools.list,
-                id_attribute="instance_pool_id",
-            ),
-            StandardInventorizer(
-                ws,
-                logical_object_type=LogicalObjectType.CLUSTER_POLICY,
-                request_object_type=RequestObjectType.CLUSTER_POLICIES,
-                listing_function=ws.cluster_policies.list,
-                id_attribute="policy_id",
-            ),
-            StandardInventorizer(
-                ws,
-                logical_object_type=LogicalObjectType.PIPELINE,
-                request_object_type=RequestObjectType.PIPELINES,
-                listing_function=ws.pipelines.list_pipelines,
-                id_attribute="pipeline_id",
-            ),
-            StandardInventorizer(
-                ws,
-                logical_object_type=LogicalObjectType.JOB,
-                request_object_type=RequestObjectType.JOBS,
-                listing_function=ws.jobs.list,
-                id_attribute="job_id",
-            ),
-            StandardInventorizer(
-                ws,
-                logical_object_type=LogicalObjectType.EXPERIMENT,
-                request_object_type=RequestObjectType.EXPERIMENTS,
-                listing_function=experiments_listing(ws),
-                id_attribute="experiment_id",
-            ),
-            StandardInventorizer(
-                ws,
-                logical_object_type=LogicalObjectType.MODEL,
-                request_object_type=RequestObjectType.REGISTERED_MODELS,
-                listing_function=models_listing(ws),
-                id_attribute="id",
-            ),
-            StandardInventorizer(
-                ws,
-                logical_object_type=LogicalObjectType.WAREHOUSE,
-                request_object_type=RequestObjectType.SQL_WAREHOUSES,
-                listing_function=ws.warehouses.list,
-                id_attribute="id",
-            ),
-            SecretScopeInventorizer(ws),
-            WorkspaceInventorizer(ws, num_threads=num_threads),
-        ]
+            self.workspace,
+            self.secret_scopes,
+            self.warehouses,
+            self.models,
+            self.experiements,
+            self.jobs,
+            self.pipelines,
+            self.cluster_policies,
+            self.instance_pools,
+            self.clusters,
+            self.tokens_and_passwords,
+            self.roles_and_entitlements]

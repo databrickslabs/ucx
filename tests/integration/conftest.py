@@ -22,7 +22,7 @@ from databricks.sdk.service.compute import (
 from databricks.sdk.service.iam import (
     AccessControlRequest,
     ComplexValue,
-    PermissionLevel,
+    PermissionLevel, Group,
 )
 from databricks.sdk.service.jobs import CreateResponse
 from databricks.sdk.service.ml import CreateExperimentResponse, ModelDatabricks
@@ -160,6 +160,26 @@ def sql_fetch_all(ws: ImprovedWorkspaceClient):
     statement_execution = StatementExecutionExt(ws.api_client)
     return partial(statement_execution.execute_fetch_all, warehouse_id)
 
+
+@pytest.fixture
+def make_account_group(acc: AccountClient, make_random):
+    cleanup = []
+
+    def inner(members: list[ComplexValue] | None = None) -> Group:
+        group = ws.groups.create(
+            display_name=f"ucx_AG{make_random(4)}",
+            members=members,
+        )
+        logger.debug(f"created account group fixture: {group.display_name} ({group.id})")
+        cleanup.append(group)
+        return group
+
+    yield inner
+
+    logger.debug(f"clearing {len(cleanup)} account group fixtures")
+    for group in cleanup:
+        logger.debug(f"removing account group fixture: {group.display_name} ({group.id})")
+        ws.groups.delete(group.id)
 
 @pytest.fixture
 def make_group(ws: ImprovedWorkspaceClient, make_random):
