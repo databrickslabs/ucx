@@ -34,7 +34,7 @@ def fresh_wheel_file(tmp_path) -> Path:
             raise RuntimeError(msg)
         if len(found_wheels) > 1:
             conflicts = ", ".join(str(whl) for whl in found_wheels)
-            msg = f'more than one wheel match: {conflicts}'
+            msg = f"more than one wheel match: {conflicts}"
             raise RuntimeError(msg)
         wheel_file = found_wheels[0]
 
