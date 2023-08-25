@@ -1,6 +1,9 @@
-from databricks.labs.ucx.inventory.listing import WorkspaceListing
-from databricks.sdk.service.workspace import ObjectInfo, ObjectType
 from unittest.mock import Mock
+
+from databricks.sdk.service.workspace import ObjectInfo, ObjectType
+
+from databricks.labs.ucx.inventory.listing import WorkspaceListing
+
 
 # Helper to compare an unordered list of objects
 def compare(s, t):
@@ -66,7 +69,7 @@ def test_walk_with_nested_folders_should_return_nested_objects():
     nested_folder = ObjectInfo(path="/rootPath/nested_folder", object_type=ObjectType.DIRECTORY)
     nested_notebook = ObjectInfo(path="/rootPath/nested_folder/notebook", object_type=ObjectType.NOTEBOOK)
 
-    def my_side_effect(*args, **kwargs):
+    def my_side_effect(*args):
         if args[0] == "/rootPath":
             return [file, nested_folder]
         elif args[0] == "/rootPath/nested_folder":
@@ -95,7 +98,7 @@ def test_walk_with_three_level_nested_folders_returns_three_levels():
         path="/rootPath/nested_folder/second_nested_folder/notebook2", object_type=ObjectType.NOTEBOOK
     )
 
-    def my_side_effect(*args, **kwargs):
+    def my_side_effect(*args):
         if args[0] == "/rootPath":
             return [file, nested_folder]
         elif args[0] == "/rootPath/nested_folder":
