@@ -33,7 +33,8 @@ def fresh_wheel_file(tmp_path) -> Path:
             msg = f"cannot find {wheel_name}-*.whl"
             raise RuntimeError(msg)
         if len(found_wheels) > 1:
-            msg = f'more than one wheel match: {", ".join(found_wheels)}'
+            conflicts = ", ".join(str(whl) for whl in found_wheels)
+            msg = f'more than one wheel match: {conflicts}'
             raise RuntimeError(msg)
         wheel_file = found_wheels[0]
 
@@ -63,9 +64,9 @@ def test_this_wheel_installs(ws, wsfs_wheel):
     commands.install_notebook_library(f"/Workspace{wsfs_wheel}")
     installed_version = commands.run(
         """
-    from databricks.labs.ucx.__about__ import __version__
-    print(__version__)
-    """
+        from databricks.labs.ucx.__about__ import __version__
+        print(__version__)
+        """
     )
 
     assert installed_version is not None
@@ -75,12 +76,12 @@ def test_sql_backend_works(ws, wsfs_wheel):
     commands = CommandExecutor(ws)
 
     commands.install_notebook_library(f"/Workspace{wsfs_wheel}")
-    installed_version = commands.run(
+    database_names = commands.run(
         """
-    from databricks.labs.ucx.tacl._internal import SqlBackend
-    backend = SqlBackend()
-    print(list(backend.fetch("SHOW DATABASES")))
-    """
+        from databricks.labs.ucx.tacl._internal import RuntimeBackend
+        backend = RuntimeBackend()
+        return backend.fetch("SHOW DATABASES")
+        """
     )
 
-    assert installed_version is not None
+    assert len(database_names) > 0
