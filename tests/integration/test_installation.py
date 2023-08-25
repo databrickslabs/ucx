@@ -69,6 +69,7 @@ def test_this_wheel_installs(ws, wsfs_wheel):
         """
     )
 
+
     assert installed_version is not None
 
 
