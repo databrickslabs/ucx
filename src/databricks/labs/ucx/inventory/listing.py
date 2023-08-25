@@ -52,26 +52,6 @@ class WorkspaceListing:
         logger.debug(f"Listed {obj.path}, found {len(directories)} sub-directories and {len(others)} other objects")
         return directories, others
 
-    def walk_non_threaded(self, start_path="/"):
-        self.start_time = dt.datetime.now()
-        logger.info(f"Recursive WorkspaceFS listing started at {self.start_time}")
-        root_object = self._ws.workspace.get_status(start_path)
-        self.results.append(root_object)
-        directories, others = self._list_and_analyze(root_object)
-        self._progress_report(None)
-
-        self.results.extend(directories)
-        self.results.extend(others)
-
-        if directories:
-            for directory in directories:
-                directories, others = self._list_and_analyze(directory)
-                self._progress_report(None)
-
-        logger.info(f"Recursive WorkspaceFS listing finished at {dt.datetime.now()}")
-        logger.info(f"Total time taken for workspace listing: {dt.datetime.now() - self.start_time}")
-        self._progress_report(None)
-
     def walk(self, start_path="/"):
         self.start_time = dt.datetime.now()
         logger.info(f"Recursive WorkspaceFS listing started at {self.start_time}")

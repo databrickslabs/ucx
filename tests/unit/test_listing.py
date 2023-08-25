@@ -2,6 +2,15 @@ from databricks.labs.ucx.inventory.listing import WorkspaceListing
 from databricks.sdk.service.workspace import ObjectInfo, ObjectType
 from unittest.mock import Mock
 
+#Helper to compare an unordered list of objects
+def compare(s, t):
+    t = list(t)   # make a mutable copy
+    try:
+        for elem in s:
+            t.remove(elem)
+    except ValueError:
+        return False
+    return not t
 
 def test_list_and_analyze_should_separate_folders_and_other_objects():
     rootobj = ObjectInfo(path="/rootPath")
@@ -16,19 +25,82 @@ def test_list_and_analyze_should_separate_folders_and_other_objects():
     listing = WorkspaceListing(client, 1)
     directories, others = listing._list_and_analyze(rootobj)
 
-    assert others == [file, notebook]
-    assert directories == [directory]
+    assert compare(others,[file, notebook])
+    assert compare(directories,[directory])
 
-def test_crawl():
+
+def test_walk_with_an_empty_folder_should_return_it():
     rootobj = ObjectInfo(path="/rootPath")
 
-    file = ObjectInfo(path="/rootPath/file1", object_type=ObjectType.FILE)
-    directory = ObjectInfo(path="/rootPath/directory", object_type=ObjectType.DIRECTORY)
-    notebook = ObjectInfo(path="/rootPath/notebook", object_type=ObjectType.NOTEBOOK)
-
     client = Mock()
-    client.list_workspace.return_value = [file, directory, notebook]
+    client.list_workspace.return_value = []
     client.workspace.get_status.return_value = rootobj
 
     listing = WorkspaceListing(client, 1)
-    listing.walk_non_threaded("/rootPath")
+    listing.walk("/rootPath")
+
+    assert len(listing.results) == 1
+    assert listing.results == [rootobj]
+
+def test_walk_with_two_files_should_return_rootpath_and_two_files():
+    rootobj = ObjectInfo(path="/rootPath")
+    file = ObjectInfo(path="/rootPath/file1", object_type=ObjectType.FILE)
+    notebook = ObjectInfo(path="/rootPath/notebook", object_type=ObjectType.NOTEBOOK)
+
+    client = Mock()
+    client.list_workspace.return_value = [file, notebook]
+    client.workspace.get_status.return_value = rootobj
+
+    listing = WorkspaceListing(client, 1)
+    listing.walk("/rootPath")
+
+    assert len(listing.results) == 3
+    assert compare(listing.results,[rootobj, file, notebook])
+
+def test_walk_with_nested_folders_should_return_nested_objects():
+    rootobj = ObjectInfo(path="/rootPath")
+    file = ObjectInfo(path="/rootPath/file1", object_type=ObjectType.FILE)
+    nested_folder = ObjectInfo(path="/rootPath/nested_folder", object_type=ObjectType.DIRECTORY)
+    nested_notebook = ObjectInfo(path="/rootPath/nested_folder/notebook", object_type=ObjectType.NOTEBOOK)
+
+    def my_side_effect(*args, **kwargs):
+        if args[0] == "/rootPath":
+            return [file, nested_folder]
+        elif args[0] == "/rootPath/nested_folder":
+            return [nested_notebook]
+
+    client = Mock()
+    client.list_workspace.side_effect = my_side_effect
+    client.workspace.get_status.return_value = rootobj
+
+    listing = WorkspaceListing(client, 1)
+    listing.walk("/rootPath")
+
+    assert len(listing.results) == 4
+    assert compare(listing.results, [rootobj, file, nested_folder, nested_notebook])
+
+
+def test_walk_with_three_level_nested_folders_returns_three_levels():
+    rootobj = ObjectInfo(path="/rootPath")
+    file = ObjectInfo(path="/rootPath/file1", object_type=ObjectType.FILE)
+    nested_folder = ObjectInfo(path="/rootPath/nested_folder", object_type=ObjectType.DIRECTORY)
+    nested_notebook = ObjectInfo(path="/rootPath/nested_folder/notebook", object_type=ObjectType.NOTEBOOK)
+    second_nested_folder = ObjectInfo(path="/rootPath/nested_folder/second_nested_folder", object_type=ObjectType.DIRECTORY)
+    second_nested_notebook = ObjectInfo(path="/rootPath/nested_folder/second_nested_folder/notebook2", object_type=ObjectType.NOTEBOOK)
+
+    def my_side_effect(*args, **kwargs):
+        if args[0] == "/rootPath":
+            return [file, nested_folder]
+        elif args[0] == "/rootPath/nested_folder":
+            return [nested_notebook, second_nested_folder]
+        elif args[0] == "/rootPath/nested_folder/second_nested_folder":
+            return [second_nested_notebook]
+
+    client = Mock()
+    client.list_workspace.side_effect = my_side_effect
+    client.workspace.get_status.return_value = rootobj
+    listing = WorkspaceListing(client, 2)
+    listing.walk("/rootPath")
+
+    assert len(listing.results) == 6
+    assert compare(listing.results, [rootobj, file, nested_folder, nested_notebook, second_nested_folder, second_nested_notebook])
