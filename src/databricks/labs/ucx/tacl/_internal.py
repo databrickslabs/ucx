@@ -1,7 +1,7 @@
 import dataclasses
-from abc import abstractmethod
+import os
+from abc import ABC, abstractmethod
 from collections.abc import Iterator
-from functools import partial
 
 from databricks.sdk import WorkspaceClient
 
@@ -9,30 +9,42 @@ from databricks.labs.ucx.providers.logger import logger
 from databricks.labs.ucx.providers.mixins.sql import StatementExecutionExt
 
 
-class SqlBackend:
+class SqlBackend(ABC):
     @abstractmethod
     def execute(self, sql):
-        pass
+        raise NotImplementedError
 
     @abstractmethod
     def fetch(self, sql) -> Iterator[any]:
-        pass
+        raise NotImplementedError
 
 
-class ExecBackend(SqlBackend):
+class StatementExecutionBackend(SqlBackend):
     def __init__(self, ws: WorkspaceClient, warehouse_id):
-        sql = StatementExecutionExt(ws.api_client)
-        self.execute = partial(sql.execute, warehouse_id)
-        self.fetch = partial(sql.execute_fetch_all, warehouse_id)
+        self._sql = StatementExecutionExt(ws.api_client)
+        self._warehouse_id = warehouse_id
+
+    def execute(self, sql):
+        self._sql.execute(self._warehouse_id, sql)
+
+    def fetch(self, sql) -> Iterator[any]:
+        return self._sql.execute_fetch_all(self._warehouse_id, sql)
 
 
 class RuntimeBackend(SqlBackend):
     def __init__(self):
         from pyspark.sql.session import SparkSession
 
-        spark = SparkSession.builder.getOrCreate()
-        self.execute = spark.sql
-        self.fetch = lambda sql: spark.sql(sql).collect()
+        if "DATABRICKS_RUNTIME_VERSION" not in os.environ:
+            msg = "Not in the Databricks Runtime"
+            raise RuntimeError(msg)
+        self._spark = SparkSession.builder.getOrCreate()
+
+    def execute(self, sql):
+        self._spark.sql(sql)
+
+    def fetch(self, sql) -> Iterator[any]:
+        return self._spark.sql(sql).collect()
 
 
 class CrawlerBase:
@@ -41,8 +53,8 @@ class CrawlerBase:
         Initializes a CrawlerBase instance.
 
         Args:
-            ws (WorkspaceClient): The WorkspaceClient instance.
-            warehouse_id: The warehouse ID.
+            backend (SqlBackend): The backend that executes SQL queries:
+                Statement Execution API or Databricks Runtime.
             catalog (str): The catalog name for the inventory persistence.
             schema: The schema name for the inventory persistence.
             table: The table name for the inventory persistence.
@@ -51,8 +63,8 @@ class CrawlerBase:
         self._schema = self._valid(schema)
         self._table = self._valid(table)
         self._backend = backend
-        self._exec = backend.execute
         self._fetch = backend.fetch
+        self._exec = backend.execute
 
     @property
     def _full_name(self) -> str:

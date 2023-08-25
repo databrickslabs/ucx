@@ -1,4 +1,3 @@
-import shlex
 import shutil
 import subprocess
 import sys
@@ -20,9 +19,8 @@ def fresh_wheel_file(tmp_path) -> Path:
     build_root = tmp_path / fresh_wheel_file.__name__
     shutil.copytree(project_root, build_root)
     try:
-        command = [sys.executable, "-m", "pip", "wheel", "."]
         completed_process = subprocess.run(
-            [shlex.quote(arg) for arg in command],
+            [sys.executable, "-m", "pip", "wheel", "."],
             capture_output=True,
             cwd=build_root,
             check=True,
@@ -44,7 +42,8 @@ def fresh_wheel_file(tmp_path) -> Path:
         raise RuntimeError(e.stderr) from None
 
 
-def test_this_wheel_installs(ws, fresh_wheel_file, make_random):
+@pytest.fixture
+def wsfs_wheel(ws, fresh_wheel_file, make_random):
     my_user = ws.current_user.me().user_name
     workspace_location = f"/Users/{my_user}/wheels/{make_random(10)}"
     ws.workspace.mkdirs(workspace_location)
@@ -53,6 +52,12 @@ def test_this_wheel_installs(ws, fresh_wheel_file, make_random):
     with fresh_wheel_file.open("rb") as f:
         ws.workspace.upload(wsfs_wheel, f, format=ImportFormat.AUTO)
 
+    yield wsfs_wheel
+
+    ws.workspace.delete(workspace_location, recursive=True)
+
+
+def test_this_wheel_installs(ws, wsfs_wheel):
     commands = CommandExecutor(ws)
 
     commands.install_notebook_library(f"/Workspace{wsfs_wheel}")
@@ -60,6 +65,21 @@ def test_this_wheel_installs(ws, fresh_wheel_file, make_random):
         """
     from databricks.labs.ucx.__about__ import __version__
     print(__version__)
+    """
+    )
+
+    assert installed_version is not None
+
+
+def test_sql_backend_works(ws, wsfs_wheel):
+    commands = CommandExecutor(ws)
+
+    commands.install_notebook_library(f"/Workspace{wsfs_wheel}")
+    installed_version = commands.run(
+        """
+    from databricks.labs.ucx.tacl._internal import SqlBackend
+    backend = SqlBackend()
+    print(list(backend.fetch("SHOW DATABASES")))
     """
     )
 

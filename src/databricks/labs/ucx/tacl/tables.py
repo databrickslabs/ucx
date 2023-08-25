@@ -2,10 +2,8 @@ from collections.abc import Iterator
 from dataclasses import dataclass
 from functools import partial
 
-from databricks.sdk import WorkspaceClient
-
 from databricks.labs.ucx.providers.logger import logger
-from databricks.labs.ucx.tacl._internal import CrawlerBase
+from databricks.labs.ucx.tacl._internal import CrawlerBase, SqlBackend
 from databricks.labs.ucx.utils import ThreadedExecution
 
 
@@ -68,7 +66,7 @@ class Table:
 
 
 class TablesCrawler(CrawlerBase):
-    def __init__(self, ws: WorkspaceClient, warehouse_id, catalog, schema):
+    def __init__(self, backend: SqlBackend, catalog, schema):
         """
         Initializes a TablesCrawler instance.
 
@@ -78,9 +76,7 @@ class TablesCrawler(CrawlerBase):
             catalog (str): The catalog name for the inventory persistence.
             schema: The schema name for the inventory persistence.
         """
-        super().__init__(ws, warehouse_id, catalog, schema, "tables")
-        self._warehouse_id = warehouse_id
-        self._ws = ws
+        super().__init__(backend, catalog, schema, "tables")
 
     def _all_databases(self) -> Iterator[str]:
         yield from self._fetch("SHOW DATABASES")
