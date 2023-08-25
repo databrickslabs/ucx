@@ -2,15 +2,16 @@ from databricks.labs.ucx.inventory.listing import WorkspaceListing
 from databricks.sdk.service.workspace import ObjectInfo, ObjectType
 from unittest.mock import Mock
 
-#Helper to compare an unordered list of objects
+# Helper to compare an unordered list of objects
 def compare(s, t):
-    t = list(t)   # make a mutable copy
+    t = list(t)  # make a mutable copy
     try:
         for elem in s:
             t.remove(elem)
     except ValueError:
         return False
     return not t
+
 
 def test_list_and_analyze_should_separate_folders_and_other_objects():
     rootobj = ObjectInfo(path="/rootPath")
@@ -25,8 +26,8 @@ def test_list_and_analyze_should_separate_folders_and_other_objects():
     listing = WorkspaceListing(client, 1)
     directories, others = listing._list_and_analyze(rootobj)
 
-    assert compare(others,[file, notebook])
-    assert compare(directories,[directory])
+    assert compare(others, [file, notebook])
+    assert compare(directories, [directory])
 
 
 def test_walk_with_an_empty_folder_should_return_it():
@@ -42,6 +43,7 @@ def test_walk_with_an_empty_folder_should_return_it():
     assert len(listing.results) == 1
     assert listing.results == [rootobj]
 
+
 def test_walk_with_two_files_should_return_rootpath_and_two_files():
     rootobj = ObjectInfo(path="/rootPath")
     file = ObjectInfo(path="/rootPath/file1", object_type=ObjectType.FILE)
@@ -55,7 +57,8 @@ def test_walk_with_two_files_should_return_rootpath_and_two_files():
     listing.walk("/rootPath")
 
     assert len(listing.results) == 3
-    assert compare(listing.results,[rootobj, file, notebook])
+    assert compare(listing.results, [rootobj, file, notebook])
+
 
 def test_walk_with_nested_folders_should_return_nested_objects():
     rootobj = ObjectInfo(path="/rootPath")
@@ -85,8 +88,12 @@ def test_walk_with_three_level_nested_folders_returns_three_levels():
     file = ObjectInfo(path="/rootPath/file1", object_type=ObjectType.FILE)
     nested_folder = ObjectInfo(path="/rootPath/nested_folder", object_type=ObjectType.DIRECTORY)
     nested_notebook = ObjectInfo(path="/rootPath/nested_folder/notebook", object_type=ObjectType.NOTEBOOK)
-    second_nested_folder = ObjectInfo(path="/rootPath/nested_folder/second_nested_folder", object_type=ObjectType.DIRECTORY)
-    second_nested_notebook = ObjectInfo(path="/rootPath/nested_folder/second_nested_folder/notebook2", object_type=ObjectType.NOTEBOOK)
+    second_nested_folder = ObjectInfo(
+        path="/rootPath/nested_folder/second_nested_folder", object_type=ObjectType.DIRECTORY
+    )
+    second_nested_notebook = ObjectInfo(
+        path="/rootPath/nested_folder/second_nested_folder/notebook2", object_type=ObjectType.NOTEBOOK
+    )
 
     def my_side_effect(*args, **kwargs):
         if args[0] == "/rootPath":
@@ -103,4 +110,6 @@ def test_walk_with_three_level_nested_folders_returns_three_levels():
     listing.walk("/rootPath")
 
     assert len(listing.results) == 6
-    assert compare(listing.results, [rootobj, file, nested_folder, nested_notebook, second_nested_folder, second_nested_notebook])
+    assert compare(
+        listing.results, [rootobj, file, nested_folder, nested_notebook, second_nested_folder, second_nested_notebook]
+    )
