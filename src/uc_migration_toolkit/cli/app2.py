@@ -1,3 +1,5 @@
+import os, time
+from databricks.sdk.service import jobs
 from pathlib import Path
 from typing import Annotated
 
@@ -44,9 +46,34 @@ def generate_assessment_report2():
     ws = WorkspaceClient()
     for cluster in ws.clusters.list():
         print(cluster.cluster_name)
+    # mounts=ws.dbutils.fs.mounts()
+    # for mount in mounts:
+    #     print(mount)
+    # ws.dbfs.mkdirs("/tmp/uc_assessment/")
+    # notebook_path = f"{os.getcwd()}/../toolkits/assessment/Step_0_HMS_Inventory.py"
+    notebook_path = "/tmp/uc_assessment/Step_0_HMS_Inventory.py"
+    # print(os.listdir(f"{os.getcwd()}/../toolkits/assessment"))
+    # print(notebook_source)
+    # for item in ws.dbfs.list("dbfs:/tmp/uc_assessment/"):
+    #     print(item)
+    # ws.dbfs.mkdirs("dbfs:/tmp/uc_assessment/")
+    # ws.dbfs.copy(f"{os.getcwd()}/../toolkits/assessment/Step_0_HMS_Inventory.py","dbfs:/tmp/uc_assessment/Step_0_HMS_Inventory.py")
+    for item in ws.dbfs.list("/tmp/uc_assessment/"):
+        print(item)
+    # cluster_id = \
+    #     ws.clusters.ensure_cluster_is_running(os.environ["DATABRICKS_CLUSTER_ID"]) \
+    #     and os.environ["DATABRICKS_CLUSTER_ID"]
+    cluster_id = "0825-124924-sbf1334d"
 
+    run = ws.jobs.submit(run_name=f'sdk-{time.time_ns()}',
+                         tasks=[
+                             jobs.SubmitTask(existing_cluster_id=cluster_id,
+                                                notebook_task=jobs.NotebookTask(notebook_path=notebook_path),
+                                                task_key=f'sdk-{time.time_ns()}')
+                         ]).result()
 
-
+    # cleanup
+    ws.jobs.delete_run(run_id=run.run_id)
 
 
 if __name__ == "__main__":
