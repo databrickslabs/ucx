@@ -36,5 +36,18 @@ def generate_assessment_report():
     print(report)
 
 
+@app.command()
+def generate_assessment_report2():
+    from uc_migration_toolkit.toolkits.assessment import AssessmentToolkit
+    from databricks.sdk import WorkspaceClient
+
+    ws = WorkspaceClient()
+    for cluster in ws.clusters.list():
+        print(cluster.cluster_name)
+
+
+
+
+
 if __name__ == "__main__":
     app()

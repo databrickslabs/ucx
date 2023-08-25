@@ -27,3 +27,12 @@ class AssessmentToolkit:
         print(f"Schemas with no access: {schema_denied_count}")
         print(report)
         print(tables[:3])
+
+
+    def generate_table_list(self):
+        print("Generating Table List")
+    # TODO: Return list of tables with properties
+    def generate_mount_list(self):
+        return None
+    # TODO: Return list of mounts with properties
+
