@@ -184,7 +184,7 @@ def test_describe_all_tables(ws: ImprovedWorkspaceClient, make_catalog, make_sch
 
     inventory_schema = make_schema(catalog=make_catalog())
     inventory_catalog, inventory_schema = inventory_schema.split(".")
-    tak = TaclToolkit(ws, warehouse_id, inventory_catalog, inventory_schema)
+    tak = TaclToolkit(ws, inventory_catalog, inventory_schema, warehouse_id)
 
     all_tables = {}
     for t in tak.database_snapshot(schema.split(".")[1]):
@@ -216,7 +216,7 @@ def test_all_grants_in_database(
 
     inventory_schema = make_schema(catalog=make_catalog())
     inventory_catalog, inventory_schema = inventory_schema.split(".")
-    tak = TaclToolkit(ws, warehouse_id, inventory_catalog, inventory_schema)
+    tak = TaclToolkit(ws, inventory_catalog, inventory_schema, warehouse_id)
 
     all_grants = {}
     for grant in tak.grants_snapshot(schema.split(".")[1]):

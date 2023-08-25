@@ -1,12 +1,17 @@
 from databricks.sdk import WorkspaceClient
 
+from databricks.labs.ucx.tacl._internal import (
+    RuntimeBackend,
+    SqlBackend,
+    StatementExecutionBackend,
+)
 from databricks.labs.ucx.tacl.grants import GrantsCrawler
 from databricks.labs.ucx.tacl.tables import TablesCrawler
 
 
 class TaclToolkit:
-    def __init__(self, ws: WorkspaceClient, warehouse_id, inventory_catalog, inventory_schema):
-        self._tc = TablesCrawler(ws, warehouse_id, inventory_catalog, inventory_schema)
+    def __init__(self, ws: WorkspaceClient, inventory_catalog, inventory_schema, warehouse_id=None):
+        self._tc = TablesCrawler(self._backend(ws, warehouse_id), inventory_catalog, inventory_schema)
         self._gc = GrantsCrawler(self._tc)
 
     def database_snapshot(self, schema):
@@ -14,3 +19,9 @@ class TaclToolkit:
 
     def grants_snapshot(self, schema):
         return self._gc.snapshot("hive_metastore", schema)
+
+    @staticmethod
+    def _backend(ws: WorkspaceClient, warehouse_id: str | None = None) -> SqlBackend:
+        if warehouse_id is None:
+            return RuntimeBackend()
+        return StatementExecutionBackend(ws, warehouse_id)

@@ -1,6 +1,9 @@
+import ast
 import html
+import json
 import logging
 import re
+import sys
 import threading
 
 from databricks.sdk import WorkspaceClient
@@ -15,6 +18,38 @@ _execution_error_re = re.compile(r"ExecutionError: ([\s\S]*)\n(StatusCode=[0-9]*
 _error_message_re = re.compile(r"ErrorMessage=(.+)\n")
 _ascii_escape_re = re.compile(r"(\x9B|\x1B\[)[0-?]*[ -/]*[@-~]")
 _LOG = logging.getLogger("databricks.sdk")
+
+
+class _ReturnToPrintJsonTransformer(ast.NodeTransformer):
+    def __init__(self) -> None:
+        self._has_json_import = False
+        self.has_return = False
+
+    def apply(self, node: ast.AST) -> ast.AST:
+        node = self.visit(node)
+        if self.has_return and not self._has_json_import:
+            new_import = ast.parse("import json").body[0]
+            node.body.insert(0, new_import)
+        return node
+
+    def visit_Import(self, node: ast.Import) -> ast.Import:  # noqa: N802
+        for name in node.names:
+            if "json" != ast.unparse(name):
+                continue
+            self._has_json_import = True
+            break
+        return node
+
+    def visit_Return(self, node):  # noqa: N802
+        value = node.value
+        if not value:
+            # Remove the original return statement
+            return None
+        return_expr = ast.unparse(value)
+        replaced_code = f"print(json.dumps({return_expr}))"
+        print_call = ast.parse(replaced_code).body[0]
+        self.has_return = True
+        return print_call
 
 
 class CommandExecutor:
@@ -34,20 +69,33 @@ class CommandExecutor:
 
     def run(self, code):
         code = self._trim_leading_whitespace(code)
+
+        # perform AST transformations for very repetitive tasks, like JSON serialization
+        code_tree = ast.parse(code)
+        json_serialize_transform = _ReturnToPrintJsonTransformer()
+        new_tree = json_serialize_transform.apply(code_tree)
+        code = ast.unparse(new_tree)
+
         ctx = self._running_command_context()
         result = self._commands.execute(
             cluster_id=self._cluster_id, language=compute.Language.PYTHON, context_id=ctx.id, command=code
         ).result()
+
+        results = result.results
         if result.status == compute.CommandStatus.FINISHED:
-            self._raise_if_failed(result.results)
-            return result.results.data
+            self._raise_if_failed(results)
+            if results.result_type == compute.ResultType.TEXT and json_serialize_transform.has_return:
+                # parse json from converted return statement
+                return json.loads(results.data)
+            return results.data
         else:
-            raise Exception(result.results.summary)
+            # there might be an opportunity to convert builtin exceptions
+            raise Exception(results.summary)
 
     def install_notebook_library(self, library):
         return self.run(
             f"""
-        %pip install {library}
+        get_ipython().run_line_magic('pip', 'install {library}')
         dbutils.library.restartPython()
         """
         )
@@ -79,7 +127,7 @@ class CommandExecutor:
         if not self._is_failed(results):
             return
         if results.cause:
-            _LOG.debug(f'{_ascii_escape_re.sub("", results.cause)}')
+            sys.stderr.write(_ascii_escape_re.sub("", results.cause))
 
         summary = _tag_re.sub("", results.summary)
         summary = html.unescape(summary)
