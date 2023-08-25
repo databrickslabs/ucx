@@ -39,6 +39,7 @@ class Table:
         )
 
     def _sql_external(self, catalog):
+        # TODO: https://github.com/databricks/ucx/issues/106
         return (
             f"CREATE TABLE IF NOT EXISTS {catalog}.{self.database}.{self.name}"
             f" LIKE {self.key} COPY LOCATION;" + self._sql_alter(catalog)
