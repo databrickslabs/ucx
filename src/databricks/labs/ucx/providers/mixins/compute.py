@@ -79,7 +79,7 @@ class CommandExecutor:
 
         ctx = self._running_command_context()
         result = self._commands.execute(
-            cluster_id=self._cluster_id, language=compute.Language.PYTHON, context_id=ctx.id, command=code
+            cluster_id=self._cluster_id, language=self._language, context_id=ctx.id, command=code
         ).result()
 
         results = result.results
