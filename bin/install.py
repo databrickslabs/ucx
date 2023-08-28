@@ -14,12 +14,12 @@ INSTALL_NOTEBOOK = """
 # MAGIC %md
 # MAGIC # UCX - The UC Migration Toolkit
 # MAGIC
-# MAGIC This notebook installs `ucx` as a Wheel package locally.
-# MAGIC and restart the Python interpreter.
+# MAGIC This notebook installs `ucx` as a wheel package locally
+# MAGIC and then restarts the Python interpreter.
 
 # COMMAND ----------
 
-# MAGIC %pip install {remote_wheel_file}
+# MAGIC %pip install /Workspace{remote_wheel_file}
 dbutils.library.restartPython()
 
 """
