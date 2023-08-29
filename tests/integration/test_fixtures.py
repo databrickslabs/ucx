@@ -5,11 +5,9 @@ from databricks.sdk.service.workspace import AclPermission
 
 from databricks.labs.ucx.providers.mixins.fixtures import *  # noqa: F403
 
-load_debug_env_if_runs_from_ide("ucws")
+load_debug_env_if_runs_from_ide("ucws")  # noqa: F405
 
 logger = logging.getLogger(__name__)
-
-logging.getLogger("databricks").setLevel("DEBUG")
 
 
 def test_user(make_user):

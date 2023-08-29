@@ -34,7 +34,7 @@ def test_jobs(
         inventory=InventoryConfig(table=inventory_table),
         groups=GroupsConfig(selected=[g[0].display_name for g in env.groups]),
         auth=None,
-        log_level="TRACE",
+        log_level="DEBUG",
     )
     toolkit = GroupMigrationToolkit(config)
     toolkit.prepare_environment()
