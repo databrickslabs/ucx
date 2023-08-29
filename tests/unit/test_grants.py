@@ -38,25 +38,35 @@ def test_type_and_key_invalid():
         Grant.type_and_key()
 
 
+def test_object_key():
+    grant = Grant(principal="user", action_type="SELECT", catalog="hive_metastore", database="mydb", table="mytable")
+    assert grant.object_key == "hive_metastore.mydb.mytable"
+
+
 def test_hive_sql():
     grant = Grant(principal="user", action_type="SELECT", catalog="hive_metastore", database="mydb", table="mytable")
     assert grant.hive_grant_sql() == "GRANT SELECT ON TABLE hive_metastore.mydb.mytable TO user"
+
+
+def test_hive_revoke_sql():
+    grant = Grant(principal="user", action_type="SELECT", catalog="hive_metastore", database="mydb", table="mytable")
+    assert grant.hive_revoke_sql() == "REVOKE SELECT ON TABLE hive_metastore.mydb.mytable TO user"
 
 
 @pytest.mark.parametrize(
     "grant,query",
     [
         (
-            Grant("user", "READ_METADATA", catalog="hive_metastore", database="mydb", table="mytable"),
-            "GRANT BROWSE ON TABLE hive_metastore.mydb.mytable TO user",
+                Grant("user", "READ_METADATA", catalog="hive_metastore", database="mydb", table="mytable"),
+                "GRANT BROWSE ON TABLE hive_metastore.mydb.mytable TO user",
         ),
         (
-            Grant("me", "OWN", catalog="hive_metastore", database="mydb", table="mytable"),
-            "ALTER TABLE hive_metastore.mydb.mytable OWNER TO me",
+                Grant("me", "OWN", catalog="hive_metastore", database="mydb", table="mytable"),
+                "ALTER TABLE hive_metastore.mydb.mytable OWNER TO me",
         ),
         (
-            Grant("me", "USAGE", catalog="hive_metastore", database="mydb"),
-            "GRANT USE SCHEMA ON DATABASE hive_metastore.mydb TO me",
+                Grant("me", "USAGE", catalog="hive_metastore", database="mydb"),
+                "GRANT USE SCHEMA ON DATABASE hive_metastore.mydb TO me",
         ),
     ],
 )
