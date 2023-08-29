@@ -75,7 +75,7 @@ def build_wheel():
             "stderr": subprocess.DEVNULL,
         }
     subprocess.run(
-        ["python3", "-m", "pip", "wheel", "--no-deps", "--wheel-dir", tmp_dir.name, ".."], **streams, check=True
+        [sys.executable, "-m", "pip", "wheel", "--no-deps", "--wheel-dir", tmp_dir.name, ".."], **streams, check=True
     )
     return tmp_dir.name
 
