@@ -1,3 +1,4 @@
+import logging
 import typing
 from functools import partial
 
@@ -10,8 +11,9 @@ from databricks.labs.ucx.providers.groups_info import (
     GroupMigrationState,
     MigrationGroupInfo,
 )
-from databricks.labs.ucx.providers.logger import logger
 from databricks.labs.ucx.utils import ThreadedExecution
+
+logger = logging.getLogger(__name__)
 
 
 class GroupLevel(StrEnum):

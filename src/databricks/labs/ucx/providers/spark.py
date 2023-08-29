@@ -1,7 +1,9 @@
+import logging
+
 from databricks.sdk import WorkspaceClient
 from pyspark.sql import SparkSession
 
-from databricks.labs.ucx.providers.logger import logger
+logger = logging.getLogger(__name__)
 
 
 class SparkMixin:

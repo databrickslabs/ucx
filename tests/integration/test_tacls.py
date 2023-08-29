@@ -1,8 +1,10 @@
+import logging
 import os
 
 from databricks.labs.ucx.providers.client import ImprovedWorkspaceClient
-from databricks.labs.ucx.providers.logger import logger
 from databricks.labs.ucx.toolkits.table_acls import TaclToolkit
+
+logger = logging.getLogger(__name__)
 
 
 def test_describe_all_tables(ws: ImprovedWorkspaceClient, make_catalog, make_schema, make_table):

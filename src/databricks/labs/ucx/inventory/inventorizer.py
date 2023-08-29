@@ -1,4 +1,5 @@
 import json
+import logging
 from abc import ABC, abstractmethod
 from collections.abc import Callable, Iterator
 from functools import partial
@@ -24,10 +25,10 @@ from databricks.labs.ucx.inventory.types import (
 )
 from databricks.labs.ucx.providers.client import ImprovedWorkspaceClient
 from databricks.labs.ucx.providers.groups_info import GroupMigrationState
-from databricks.labs.ucx.providers.logger import logger
 from databricks.labs.ucx.utils import ProgressReporter, ThreadedExecution
 
 InventoryObject = TypeVar("InventoryObject")
+logger = logging.getLogger(__name__)
 
 
 class BaseInventorizer(ABC, Generic[InventoryObject]):

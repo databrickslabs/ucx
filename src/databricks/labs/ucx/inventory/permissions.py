@@ -1,3 +1,4 @@
+import logging
 import random
 import time
 from copy import deepcopy
@@ -20,8 +21,9 @@ from databricks.labs.ucx.inventory.types import (
 )
 from databricks.labs.ucx.providers.client import ImprovedWorkspaceClient
 from databricks.labs.ucx.providers.groups_info import GroupMigrationState
-from databricks.labs.ucx.providers.logger import logger
 from databricks.labs.ucx.utils import ThreadedExecution, safe_get_acls
+
+logger = logging.getLogger(__name__)
 
 
 @dataclass

@@ -1,11 +1,13 @@
 import datetime as dt
+import logging
 from concurrent.futures import FIRST_COMPLETED, ThreadPoolExecutor, wait
 from itertools import groupby
 
 from databricks.sdk.service.workspace import ObjectInfo, ObjectType
 
 from databricks.labs.ucx.providers.client import ImprovedWorkspaceClient
-from databricks.labs.ucx.providers.logger import logger
+
+logger = logging.getLogger(__name__)
 
 
 class WorkspaceListing:

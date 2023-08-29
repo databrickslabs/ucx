@@ -1,10 +1,12 @@
+import logging
 from collections.abc import Iterator
 from dataclasses import dataclass
 from functools import partial
 
-from databricks.labs.ucx.providers.logger import logger
 from databricks.labs.ucx.tacl._internal import CrawlerBase, SqlBackend
 from databricks.labs.ucx.utils import ThreadedExecution
+
+logger = logging.getLogger(__name__)
 
 
 @dataclass
