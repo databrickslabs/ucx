@@ -12,7 +12,7 @@ from functools import partial
 import databricks.sdk.core
 import pytest
 from _pytest.fixtures import SubRequest
-from databricks.sdk import AccountClient
+from databricks.sdk import AccountClient, WorkspaceClient
 from databricks.sdk.core import Config, DatabricksError
 from databricks.sdk.service.compute import (
     ClusterDetails,

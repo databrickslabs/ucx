@@ -3,12 +3,12 @@ import logging
 import typing
 from functools import partial
 
+from databricks.sdk import WorkspaceClient
 from databricks.sdk.service.iam import Group
 from ratelimit import limits, sleep_and_retry
 
 from databricks.labs.ucx.config import GroupsConfig
 from databricks.labs.ucx.generic import StrEnum
-from databricks.labs.ucx.providers.client import ImprovedWorkspaceClient
 from databricks.labs.ucx.providers.groups_info import (
     GroupMigrationState,
     MigrationGroupInfo,
@@ -26,7 +26,7 @@ class GroupLevel(StrEnum):
 class GroupManager:
     SYSTEM_GROUPS: typing.ClassVar[list[str]] = ["users", "admins", "account users"]
 
-    def __init__(self, ws: ImprovedWorkspaceClient, groups: GroupsConfig):
+    def __init__(self, ws: WorkspaceClient, groups: GroupsConfig):
         self._ws = ws
         self.config = groups
         self._migration_state: GroupMigrationState = GroupMigrationState()
