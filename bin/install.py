@@ -8,6 +8,7 @@ import subprocess
 import tempfile
 
 from databricks.sdk import WorkspaceClient
+from databricks.sdk.core import DatabricksError
 from databricks.sdk.service.workspace import ImportFormat
 
 from databricks.labs.ucx.logger import _install
@@ -48,10 +49,10 @@ if args.debug:
     logging.getLogger("databricks").setLevel("DEBUG")
 
 
-def delete_local_dir(dir):
+def delete_local_dir(dir_name):
     """Helper to delete a directory"""
     try:
-        shutil.rmtree(dir)
+        shutil.rmtree(dir_name)
     except OSError as e:
         logger.error(f"Error: {e.filename} - {e.strerror}.")
 
@@ -64,7 +65,7 @@ def folder_exists(folder_base, ws):
             folder_files.append(f.path)
         logger.debug(f"Folder files: {folder_files}")
         return True
-    except:
+    except DatabricksError:
         return False
 
 
