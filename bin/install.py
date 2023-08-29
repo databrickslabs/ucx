@@ -1,18 +1,17 @@
-import os
-import sys
-from io import BytesIO
-import logging
-import shutil
 import argparse
+import logging
+import os
+import shutil
 import subprocess
+import sys
 import tempfile
+from io import BytesIO
 
 from databricks.sdk import WorkspaceClient
 from databricks.sdk.core import DatabricksError
 from databricks.sdk.service.workspace import ImportFormat
 
 from databricks.labs.ucx.logger import _install
-
 
 INSTALL_NOTEBOOK = """
 # Databricks notebook source
@@ -34,14 +33,10 @@ _install()
 logger = logging.getLogger(__name__)
 
 # parse command line parameters
-parser = argparse.ArgumentParser(prog="ucx",
-                                 description="Builds and installs ucx.")
-parser.add_argument("--folder", "-f", default="ucx",
-                    help="name of folder in workspace, default: ucx")
-parser.add_argument("--quiet", action="store_true",
-                    help="suppress extraneous information")
-parser.add_argument("--debug", action="store_true",
-                    help="enable debug mode")
+parser = argparse.ArgumentParser(prog="ucx", description="Builds and installs ucx.")
+parser.add_argument("--folder", "-f", default="ucx", help="name of folder in workspace, default: ucx")
+parser.add_argument("--quiet", action="store_true", help="suppress extraneous information")
+parser.add_argument("--debug", action="store_true", help="enable debug mode")
 args = parser.parse_args()
 
 # adjust logging levels as needed
@@ -79,13 +74,9 @@ def build_wheel():
             "stdout": subprocess.DEVNULL,
             "stderr": subprocess.DEVNULL,
         }
-    subprocess.run([
-        "python3", "-m", "pip",
-        "wheel", "--no-deps",
-        "--wheel-dir", tmp_dir.name,
-        ".."],
-        **streams,
-        check=True)
+    subprocess.run(
+        ["python3", "-m", "pip", "wheel", "--no-deps", "--wheel-dir", tmp_dir.name, ".."], **streams, check=True
+    )
     return tmp_dir.name
 
 
@@ -98,17 +89,9 @@ def upload_artifacts(folder_base, local_wheel_file, wheel_file_name, ws):
     logger.info("Uploading...")
     ws.workspace.mkdirs(folder_base)
     with open(local_wheel_file, "rb") as fh:
-        ws.workspace.upload(
-            path=remote_wheel_file,
-            content=fh.read(),
-            format=ImportFormat.AUTO
-        )
-    buf = BytesIO(INSTALL_NOTEBOOK.format(
-        remote_wheel_file=remote_wheel_file).encode())
-    ws.workspace.upload(
-        path=remote_notebook_file,
-        content=buf
-    )
+        ws.workspace.upload(path=remote_wheel_file, content=fh.read(), format=ImportFormat.AUTO)
+    buf = BytesIO(INSTALL_NOTEBOOK.format(remote_wheel_file=remote_wheel_file).encode())
+    ws.workspace.upload(path=remote_notebook_file, content=buf)
 
 
 def main():
@@ -116,15 +99,14 @@ def main():
     ws = WorkspaceClient()
     folder_base = f"/Users/{ws.current_user.me().user_name}/{args.folder}"
     if folder_exists(folder_base, ws):
-        logger.error(
-            f"ERROR: Remote folder '{folder_base}' already exists, aborting!")
+        logger.error(f"ERROR: Remote folder '{folder_base}' already exists, aborting!")
         sys.exit(-1)
     # build wheel in temp directory
     tmp_dir = build_wheel()
     # get wheel name as first file in the temp directory
     files = os.listdir(tmp_dir)
     wheel_file_name = files[0]
-    local_wheel_file = tmp_dir + '/' + wheel_file_name
+    local_wheel_file = tmp_dir + "/" + wheel_file_name
     logger.info(f"Wheel file: {wheel_file_name}")
     # upload wheel and starer notebook to workspace
     upload_artifacts(folder_base, local_wheel_file, wheel_file_name, ws)
