@@ -15,6 +15,7 @@ from databricks.sdk.service.workspace import (
     ObjectType,
     SecretScope,
 )
+from ratelimit import limits, sleep_and_retry
 
 from databricks.labs.ucx.inventory.listing import WorkspaceListing
 from databricks.labs.ucx.inventory.types import (
@@ -23,7 +24,6 @@ from databricks.labs.ucx.inventory.types import (
     PermissionsInventoryItem,
     RequestObjectType,
 )
-from databricks.labs.ucx.providers.client import ImprovedWorkspaceClient
 from databricks.labs.ucx.providers.groups_info import GroupMigrationState
 from databricks.labs.ucx.utils import ProgressReporter, ThreadedExecution
 
@@ -57,7 +57,7 @@ class StandardInventorizer(BaseInventorizer[InventoryObject]):
 
     def __init__(
         self,
-        ws: ImprovedWorkspaceClient,
+        ws: WorkspaceClient,
         logical_object_type: LogicalObjectType,
         request_object_type: RequestObjectType,
         listing_function: Callable[..., Iterator[InventoryObject]],
@@ -72,9 +72,14 @@ class StandardInventorizer(BaseInventorizer[InventoryObject]):
         self._permissions_function = permissions_function if permissions_function else self._safe_get_permissions
         self._objects: list[InventoryObject] = []
 
+    @sleep_and_retry
+    @limits(calls=100, period=1)
+    def _get_permissions(self, request_object_type: RequestObjectType, request_object_id: str):
+        return self._ws.permissions.get(request_object_type=request_object_type, request_object_id=request_object_id)
+
     def _safe_get_permissions(self, request_object_type: RequestObjectType, object_id: str) -> ObjectPermissions | None:
         try:
-            permissions = self._ws.get_permissions(request_object_type, object_id)
+            permissions = self._get_permissions(request_object_type, object_id)
             return permissions
         except DatabricksError as e:
             if e.error_code in ["RESOURCE_DOES_NOT_EXIST", "RESOURCE_NOT_FOUND", "PERMISSION_DENIED"]:
@@ -119,7 +124,7 @@ class TokensAndPasswordsInventorizer(BaseInventorizer[InventoryObject]):
     def logical_object_types(self) -> list[LogicalObjectType]:
         return [LogicalObjectType.TOKEN, LogicalObjectType.PASSWORD]
 
-    def __init__(self, ws: ImprovedWorkspaceClient):
+    def __init__(self, ws: WorkspaceClient):
         self._ws = ws
         self._tokens_acl = []
         self._passwords_acl = []
@@ -188,7 +193,7 @@ class SecretScopeInventorizer(BaseInventorizer[InventoryObject]):
     def logical_object_types(self) -> list[LogicalObjectType]:
         return [LogicalObjectType.SECRET_SCOPE]
 
-    def __init__(self, ws: ImprovedWorkspaceClient):
+    def __init__(self, ws: WorkspaceClient):
         self._ws = ws
         self._scopes = ws.secrets.list_scopes()
 
@@ -221,7 +226,7 @@ class WorkspaceInventorizer(BaseInventorizer[InventoryObject]):
     def logical_object_types(self) -> list[LogicalObjectType]:
         return [LogicalObjectType.NOTEBOOK, LogicalObjectType.DIRECTORY, LogicalObjectType.REPO, LogicalObjectType.FILE]
 
-    def __init__(self, ws: ImprovedWorkspaceClient, num_threads=20, start_path: str | None = "/"):
+    def __init__(self, ws: WorkspaceClient, num_threads=20, start_path: str | None = "/"):
         self._ws = ws
         self.listing = WorkspaceListing(
             ws,
@@ -262,13 +267,18 @@ class WorkspaceInventorizer(BaseInventorizer[InventoryObject]):
             case RequestObjectType.FILES:
                 return LogicalObjectType.FILE
 
+    @sleep_and_retry
+    @limits(calls=100, period=1)
+    def _get_permissions(self, request_object_type: RequestObjectType, request_object_id: str):
+        return self._ws.permissions.get(request_object_type=request_object_type, request_object_id=request_object_id)
+
     def _convert_result_to_permission_item(self, _object: ObjectInfo) -> PermissionsInventoryItem | None:
         request_object_type = self.__convert_object_type_to_request_type(_object)
         if not request_object_type:
             return
         else:
             try:
-                permissions = self._ws.get_permissions(
+                permissions = self._get_permissions(
                     request_object_type=request_object_type, request_object_id=_object.object_id
                 )
             except DatabricksError as e:
@@ -306,7 +316,7 @@ class RolesAndEntitlementsInventorizer(BaseInventorizer[InventoryObject]):
     def logical_object_types(self) -> list[LogicalObjectType]:
         return [LogicalObjectType.ROLES, LogicalObjectType.ENTITLEMENTS]
 
-    def __init__(self, ws: ImprovedWorkspaceClient, migration_state: GroupMigrationState):
+    def __init__(self, ws: WorkspaceClient, migration_state: GroupMigrationState):
         self._ws = ws
         self._migration_state = migration_state
         self._group_info: list[Group] = []
@@ -363,7 +373,7 @@ def experiments_listing(ws: WorkspaceClient):
 
 class Inventorizers:
     @staticmethod
-    def provide(ws: ImprovedWorkspaceClient, migration_state: GroupMigrationState, num_threads: int):
+    def provide(ws: WorkspaceClient, migration_state: GroupMigrationState, num_threads: int):
         return [
             RolesAndEntitlementsInventorizer(ws, migration_state),
             TokensAndPasswordsInventorizer(ws),

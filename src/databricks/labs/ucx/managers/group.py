@@ -1,12 +1,14 @@
+import json
 import logging
 import typing
 from functools import partial
 
+from databricks.sdk import WorkspaceClient
 from databricks.sdk.service.iam import Group
+from ratelimit import limits, sleep_and_retry
 
 from databricks.labs.ucx.config import GroupsConfig
 from databricks.labs.ucx.generic import StrEnum
-from databricks.labs.ucx.providers.client import ImprovedWorkspaceClient
 from databricks.labs.ucx.providers.groups_info import (
     GroupMigrationState,
     MigrationGroupInfo,
@@ -24,7 +26,7 @@ class GroupLevel(StrEnum):
 class GroupManager:
     SYSTEM_GROUPS: typing.ClassVar[list[str]] = ["users", "admins", "account users"]
 
-    def __init__(self, ws: ImprovedWorkspaceClient, groups: GroupsConfig):
+    def __init__(self, ws: WorkspaceClient, groups: GroupsConfig):
         self._ws = ws
         self.config = groups
         self._migration_state: GroupMigrationState = GroupMigrationState()
@@ -39,9 +41,18 @@ class GroupManager:
         logger.info(f"Found {len(eligible_groups)} eligible groups")
         return [g.display_name for g in eligible_groups]
 
+    @sleep_and_retry
+    @limits(calls=100, period=1)  # assumption
+    def _list_account_level_groups(
+        self, filter: str, attributes: str | None = None, excluded_attributes: str | None = None  # noqa: A002
+    ) -> list[Group]:
+        query = {"filter": filter, "attributes": attributes, "excludedAttributes": excluded_attributes}
+        response = self._ws.api_client.do("GET", "/api/2.0/account/scim/v2/Groups", query=query)
+        return [Group.from_dict(v) for v in response.get("Resources", [])]
+
     def _get_group(self, group_name, level: GroupLevel) -> Group | None:
         # TODO: calling this can cause issues for SCIM backend, cache groups instead
-        method = self._ws.groups.list if level == GroupLevel.WORKSPACE else self._ws.list_account_level_groups
+        method = self._ws.groups.list if level == GroupLevel.WORKSPACE else self._list_account_level_groups
         query_filter = f"displayName eq '{group_name}'"
         attributes = ",".join(["id", "displayName", "meta", "entitlements", "roles", "members"])
 
@@ -99,7 +110,20 @@ class GroupManager:
         else:
             logger.warning(f"Workspace-level group {ws_group.display_name} does not exist, skipping")
 
-        self._ws.reflect_account_group_to_workspace(acc_group)
+        self._reflect_account_group_to_workspace(acc_group)
+
+    @sleep_and_retry
+    @limits(calls=5, period=1)  # assumption
+    def _reflect_account_group_to_workspace(self, acc_group: Group) -> None:
+        logger.info(f"Reflecting group {acc_group.display_name} to workspace")
+
+        # TODO: add OpenAPI spec for it
+        principal_id = acc_group.id
+        permissions = ["USER"]
+        path = f"/api/2.0/preview/permissionassignments/principals/{principal_id}"
+        self._ws.api_client.do("PUT", path, data=json.dumps({"permissions": permissions}))
+
+        logger.info(f"Group {acc_group.display_name} successfully reflected to workspace")
 
     # please keep the public methods below this line
 

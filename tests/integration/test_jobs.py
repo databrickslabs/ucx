@@ -1,6 +1,7 @@
 import logging
 
 import pytest
+from databricks.sdk import WorkspaceClient
 from pyspark.errors import AnalysisException
 
 from databricks.labs.ucx.config import (
@@ -11,7 +12,6 @@ from databricks.labs.ucx.config import (
     MigrationConfig,
 )
 from databricks.labs.ucx.inventory.types import RequestObjectType
-from databricks.labs.ucx.providers.client import ImprovedWorkspaceClient
 from databricks.labs.ucx.toolkits.group_migration import GroupMigrationToolkit
 
 from .test_e2e import _verify_group_permissions, _verify_roles_and_entitlements
@@ -23,7 +23,7 @@ logger = logging.getLogger(__name__)
 def test_jobs(
     env: EnvironmentInfo,
     inventory_table: InventoryTable,
-    ws: ImprovedWorkspaceClient,
+    ws: WorkspaceClient,
     jobs,
 ):
     logger.debug(f"Test environment: {env.test_uid}")
@@ -49,7 +49,7 @@ def test_jobs(
         toolkit.group_manager.migration_groups_provider.groups
     )
 
-    assert len(ws.list_account_level_groups(filter=f"displayName sw '{env.test_uid}'")) == len(
+    assert len(toolkit.group_manager._list_account_level_groups(filter=f"displayName sw '{env.test_uid}'")) == len(
         toolkit.group_manager.migration_groups_provider.groups
     )
 

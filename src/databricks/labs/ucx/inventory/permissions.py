@@ -1,3 +1,4 @@
+import json
 import logging
 import random
 import time
@@ -6,8 +7,10 @@ from dataclasses import dataclass
 from functools import partial
 from typing import Literal
 
+from databricks.sdk import WorkspaceClient
 from databricks.sdk.service.iam import AccessControlRequest, Group, ObjectPermissions
 from databricks.sdk.service.workspace import AclItem as SdkAclItem
+from ratelimit import limits, sleep_and_retry
 from tenacity import retry, stop_after_attempt, wait_fixed, wait_random
 
 from databricks.labs.ucx.inventory.inventorizer import BaseInventorizer
@@ -19,7 +22,6 @@ from databricks.labs.ucx.inventory.types import (
     RequestObjectType,
     RolesAndEntitlements,
 )
-from databricks.labs.ucx.providers.client import ImprovedWorkspaceClient
 from databricks.labs.ucx.providers.groups_info import GroupMigrationState
 from databricks.labs.ucx.utils import ThreadedExecution, safe_get_acls
 
@@ -51,7 +53,7 @@ AnyRequestPayload = PermissionRequestPayload | SecretsPermissionRequestPayload |
 
 # TODO: this class has too many @staticmethod and they must not be such. write a unit test for this logic.
 class PermissionManager:
-    def __init__(self, ws: ImprovedWorkspaceClient, inventory_table_manager: InventoryTableManager):
+    def __init__(self, ws: WorkspaceClient, inventory_table_manager: InventoryTableManager):
         self._ws = ws
         self.inventory_table_manager = inventory_table_manager
         self._inventorizers = []
@@ -195,8 +197,22 @@ class PermissionManager:
                     f"Expected: {_acl_item.permission}. Actual: {applied_acls.permission}"
                 )
 
+    @sleep_and_retry
+    @limits(calls=30, period=1)
+    def _update_permissions(
+        self,
+        request_object_type: RequestObjectType,
+        request_object_id: str,
+        access_control_list: list[AccessControlRequest],
+    ):
+        return self._ws.permissions.update(
+            request_object_type=request_object_type,
+            request_object_id=request_object_id,
+            access_control_list=access_control_list,
+        )
+
     def _standard_permissions_applicator(self, request_payload: PermissionRequestPayload):
-        self._ws.update_permissions(
+        self._update_permissions(
             request_object_type=request_payload.request_object_type,
             request_object_id=request_payload.object_id,
             access_control_list=request_payload.access_control_list,
@@ -204,7 +220,7 @@ class PermissionManager:
 
     def applicator(self, request_payload: AnyRequestPayload):
         if isinstance(request_payload, RolesAndEntitlementsRequestPayload):
-            self._ws.apply_roles_and_entitlements(
+            self._apply_roles_and_entitlements(
                 group_id=request_payload.group_id,
                 roles=request_payload.payload.roles,
                 entitlements=request_payload.payload.entitlements,
@@ -215,6 +231,49 @@ class PermissionManager:
             self._scope_permissions_applicator(request_payload)
         else:
             logger.warning(f"Unsupported payload type {type(request_payload)}")
+
+    @sleep_and_retry
+    @limits(calls=10, period=1)  # assumption
+    def _apply_roles_and_entitlements(self, group_id: str, roles: list, entitlements: list):
+        # TODO: move to other places, this won't be in SDK
+        op_schema = "urn:ietf:params:scim:api:messages:2.0:PatchOp"
+        schemas = []
+        operations = []
+
+        if entitlements:
+            schemas.append(op_schema)
+            entitlements_payload = {
+                "op": "add",
+                "path": "entitlements",
+                "value": entitlements,
+            }
+            operations.append(entitlements_payload)
+
+        if roles:
+            schemas.append(op_schema)
+            roles_payload = {
+                "op": "add",
+                "path": "roles",
+                "value": roles,
+            }
+            operations.append(roles_payload)
+
+        if operations:
+            request = {
+                "schemas": schemas,
+                "Operations": operations,
+            }
+            self._patch_workspace_group(group_id, request)
+
+    def _patch_workspace_group(self, group_id: str, payload: dict):
+        # TODO: replace usages
+        # self.groups.patch(group_id,
+        #                   schemas=[PatchSchema.URN_IETF_PARAMS_SCIM_API_MESSAGES_2_0_PATCH_OP],
+        #                   operations=[
+        #                       Patch(op=PatchOp.ADD, path='..', value='...')
+        #                   ])
+        path = f"/api/2.0/preview/scim/v2/Groups/{group_id}"
+        self._ws.api_client.do("PATCH", path, data=json.dumps(payload))
 
     def _apply_permissions_in_parallel(
         self,

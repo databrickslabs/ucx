@@ -17,7 +17,6 @@ from databricks.sdk.service.jobs import JobCluster, PythonWheelTask, Task
 from databricks.sdk.service.workspace import ObjectInfo
 
 from databricks.labs.ucx.inventory.types import RequestObjectType
-from databricks.labs.ucx.providers.client import ImprovedWorkspaceClient
 from databricks.labs.ucx.utils import WorkspaceLevelEntitlement
 
 logger = logging.getLogger(__name__)
@@ -55,7 +54,7 @@ def generate_group_by_id(
 
 
 def _create_groups(
-    _ws: ImprovedWorkspaceClient, _acc: AccountClient, prefix: str, num_test_groups: int, threader: callable
+    _ws: WorkspaceClient, _acc: AccountClient, prefix: str, num_test_groups: int, threader: callable
 ) -> list[tuple[Group, Group]]:
     logger.debug("Listing users to create sample groups")
     test_users = list(_ws.users.list(filter="displayName sw 'test-user-'", attributes="id, userName, displayName"))
@@ -93,7 +92,7 @@ def _set_random_permissions(
     id_attribute: str,
     request_object_type: RequestObjectType,
     env: EnvironmentInfo,
-    ws: ImprovedWorkspaceClient,
+    ws: WorkspaceClient,
     permission_levels: list[PermissionLevel],
     num_acls: int | None = 3,
 ):

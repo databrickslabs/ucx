@@ -1,11 +1,12 @@
 import logging
 
+from databricks.sdk import WorkspaceClient
+
 from databricks.labs.ucx.config import MigrationConfig
 from databricks.labs.ucx.inventory.inventorizer import Inventorizers
 from databricks.labs.ucx.inventory.permissions import PermissionManager
 from databricks.labs.ucx.inventory.table import InventoryTableManager
 from databricks.labs.ucx.managers.group import GroupManager
-from databricks.labs.ucx.providers.client import ImprovedWorkspaceClient
 
 
 class GroupMigrationToolkit:
@@ -17,7 +18,7 @@ class GroupMigrationToolkit:
 
         # integrate with connection pool settings properly
         # https://github.com/databricks/databricks-sdk-py/pull/276
-        self._ws = ImprovedWorkspaceClient(config=databricks_config)
+        self._ws = WorkspaceClient(config=databricks_config)
         self._ws.api_client._session.adapters["https://"].max_retries.total = 20
         self._verify_ws_client(self._ws)
 
@@ -26,7 +27,7 @@ class GroupMigrationToolkit:
         self.permissions_manager = PermissionManager(self._ws, self.table_manager)
 
     @staticmethod
-    def _verify_ws_client(w: ImprovedWorkspaceClient):
+    def _verify_ws_client(w: WorkspaceClient):
         _me = w.current_user.me()
         is_workspace_admin = any(g.display == "admins" for g in _me.groups)
         if not is_workspace_admin:
