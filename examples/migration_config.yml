@@ -5,7 +5,7 @@ inventory:
     name: uc_migration_inventory
 
 
-with_table_acls: False
+warehouse_id: None
 
 groups:
   selected: [ "analyst" ]

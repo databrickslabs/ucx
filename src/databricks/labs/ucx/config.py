@@ -76,16 +76,11 @@ class ConnectConfig:
 @dataclass
 class MigrationConfig:
     inventory: InventoryConfig
-    with_table_acls: bool
     groups: GroupsConfig
     connect: ConnectConfig | None = None
     num_threads: int | None = 4
     log_level: str | None = "INFO"
-
-    def __post_init__(self):
-        if self.with_table_acls:
-            msg = "Table ACLS are not yet implemented"
-            raise NotImplementedError(msg)
+    warehouse_id: str | None = None
 
     def to_databricks_config(self) -> Config:
         connect = self.connect

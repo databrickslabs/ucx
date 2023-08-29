@@ -22,11 +22,7 @@ def test_initialization():
         inventory=InventoryConfig(table=InventoryTable(catalog="catalog", database="database", name="name")),
         groups=GroupsConfig(auto=True),
     )
-
-    with pytest.raises(NotImplementedError):
-        mc(with_table_acls=True)
-
-    mc(with_table_acls=False)
+    mc()
 
 
 # path context manager
@@ -58,7 +54,7 @@ def test_reader(tmp_path: Path):
             groups=GroupsConfig(auto=True),
         )
 
-        config: MigrationConfig = mc(with_table_acls=False)
+        config: MigrationConfig = mc()
         config_file = tmp_path / "config.yml"
 
         with config_file.open("w") as writable:
