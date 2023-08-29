@@ -1,3 +1,4 @@
+import logging
 import random
 from dataclasses import dataclass
 from functools import partial
@@ -17,8 +18,9 @@ from databricks.sdk.service.workspace import ObjectInfo
 
 from databricks.labs.ucx.inventory.types import RequestObjectType
 from databricks.labs.ucx.providers.client import ImprovedWorkspaceClient
-from databricks.labs.ucx.providers.logger import logger
 from databricks.labs.ucx.utils import WorkspaceLevelEntitlement
+
+logger = logging.getLogger(__name__)
 
 
 @dataclass

@@ -20,6 +20,12 @@ Integration tests:
 - tests that require their own unique fixture setup must limit the wall clock time of fixture initialization to under one second.
 - each integration test must be debuggable in IntelliJ IDEA (Community Edition) with the Python plugin (community edition).
 
+Logging:
+
+- get current logger via `import logging; logger = logging.getLogger(__name__)`. It can be done at the to of the module as well.
+- enable debug logging via `import logging; logging.getLogger("databricks").setLevel("DEBUG")`
+- enable debug logging only for UCX via `import logging; logging.getLogger("databricks.labs.ucx").setLevel("DEBUG")`
+
 IDE setup:
 
 - The only supported IDE for developing this project is based on IntelliJ. This means that both PyCharm (commercial) and IntelliJ IDEA (Community Edition) with Python plugin (community edition) are supported.

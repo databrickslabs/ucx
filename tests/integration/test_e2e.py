@@ -1,3 +1,4 @@
+import logging
 from typing import Literal
 
 import pytest
@@ -20,11 +21,12 @@ from databricks.labs.ucx.config import (
 from databricks.labs.ucx.inventory.types import RequestObjectType
 from databricks.labs.ucx.providers.client import ImprovedWorkspaceClient
 from databricks.labs.ucx.providers.groups_info import GroupMigrationState
-from databricks.labs.ucx.providers.logger import logger
 from databricks.labs.ucx.toolkits.group_migration import GroupMigrationToolkit
 from databricks.labs.ucx.utils import safe_get_acls
 
 from .utils import EnvironmentInfo, WorkspaceObjects
+
+logger = logging.getLogger(__name__)
 
 
 def _verify_group_permissions(

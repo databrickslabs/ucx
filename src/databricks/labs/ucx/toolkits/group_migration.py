@@ -1,4 +1,4 @@
-import sys
+import logging
 
 from databricks.labs.ucx.config import MigrationConfig
 from databricks.labs.ucx.inventory.inventorizer import Inventorizers
@@ -6,7 +6,6 @@ from databricks.labs.ucx.inventory.permissions import PermissionManager
 from databricks.labs.ucx.inventory.table import InventoryTableManager
 from databricks.labs.ucx.managers.group import GroupManager
 from databricks.labs.ucx.providers.client import ImprovedWorkspaceClient
-from databricks.labs.ucx.providers.logger import logger
 
 
 class GroupMigrationToolkit:
@@ -36,8 +35,8 @@ class GroupMigrationToolkit:
 
     @staticmethod
     def _configure_logger(level: str):
-        logger.remove()  # TODO: why removing loggers?
-        logger.add(sys.stderr, level=level)
+        ucx_logger = logging.getLogger("databricks.labs.ucx")
+        ucx_logger.setLevel(level)
 
     def prepare_environment(self):
         self.group_manager.prepare_groups_in_environment()

@@ -1,5 +1,6 @@
 import concurrent
 import datetime as dt
+import logging
 from collections.abc import Callable
 from concurrent.futures import ALL_COMPLETED, ThreadPoolExecutor
 from typing import Generic, TypeVar
@@ -8,10 +9,10 @@ from databricks.sdk.service.workspace import AclItem
 
 from databricks.labs.ucx.generic import StrEnum
 from databricks.labs.ucx.providers.client import ImprovedWorkspaceClient
-from databricks.labs.ucx.providers.logger import logger
 
 ExecutableResult = TypeVar("ExecutableResult")
 ExecutableFunction = Callable[..., ExecutableResult]
+logger = logging.getLogger(__name__)
 
 
 class ProgressReporter:
@@ -52,7 +53,7 @@ class ThreadedExecution(Generic[ExecutableResult]):
         return cls(tasks, num_threads=4, progress_reporter=reporter).run()
 
     def run(self) -> list[ExecutableResult]:
-        logger.trace(f"Starting {len(self._executables)} tasks in {self._num_threads} threads")
+        logger.debug(f"Starting {len(self._executables)} tasks in {self._num_threads} threads")
 
         with ThreadPoolExecutor(self._num_threads) as executor:
             for executable in self._executables:
@@ -64,7 +65,7 @@ class ThreadedExecution(Generic[ExecutableResult]):
 
             results = concurrent.futures.wait(self._futures, return_when=ALL_COMPLETED)
 
-        logger.trace("Collecting the results from threaded execution")
+        logger.debug("Collecting the results from threaded execution")
         collected = [future.result() for future in results.done]
         return collected
 

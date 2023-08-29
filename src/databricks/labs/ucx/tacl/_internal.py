@@ -1,12 +1,14 @@
 import dataclasses
+import logging
 import os
 from abc import ABC, abstractmethod
 from collections.abc import Iterator
 
 from databricks.sdk import WorkspaceClient
 
-from databricks.labs.ucx.providers.logger import logger
 from databricks.labs.ucx.providers.mixins.sql import StatementExecutionExt
+
+logger = logging.getLogger(__name__)
 
 
 class SqlBackend(ABC):

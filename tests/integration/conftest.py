@@ -46,7 +46,6 @@ from databricks.sdk.service.workspace import (
 from databricks.labs.ucx.config import InventoryTable
 from databricks.labs.ucx.inventory.types import RequestObjectType
 from databricks.labs.ucx.providers.client import ImprovedWorkspaceClient
-from databricks.labs.ucx.providers.logger import logger
 from databricks.labs.ucx.providers.mixins.sql import StatementExecutionExt
 from databricks.labs.ucx.utils import ThreadedExecution
 
@@ -61,7 +60,10 @@ from .utils import (
     _set_random_permissions,
 )
 
-logging.getLogger("databricks.sdk").setLevel(logging.INFO)
+logging.getLogger("tests").setLevel("DEBUG")
+logging.getLogger("databricks.labs.ucx").setLevel("DEBUG")
+
+logger = logging.getLogger(__name__)
 
 NUM_TEST_GROUPS = int(os.environ.get("NUM_TEST_GROUPS", 5))
 NUM_TEST_INSTANCE_PROFILES = int(os.environ.get("NUM_TEST_INSTANCE_PROFILES", 3))

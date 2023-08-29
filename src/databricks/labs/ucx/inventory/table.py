@@ -1,3 +1,5 @@
+import logging
+
 import pandas as pd
 from databricks.sdk import WorkspaceClient
 from databricks.sdk.service.iam import ObjectPermissions
@@ -11,8 +13,9 @@ from databricks.labs.ucx.inventory.types import (
     PermissionsInventoryItem,
     RequestObjectType,
 )
-from databricks.labs.ucx.providers.logger import logger
 from databricks.labs.ucx.providers.spark import SparkMixin
+
+logger = logging.getLogger(__name__)
 
 
 class InventoryTableManager(SparkMixin):
