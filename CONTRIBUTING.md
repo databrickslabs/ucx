@@ -19,12 +19,17 @@ Integration tests:
 - integration tests should use predefined test fixtures provided in the environment variables.
 - tests that require their own unique fixture setup must limit the wall clock time of fixture initialization to under one second.
 - each integration test must be debuggable in IntelliJ IDEA (Community Edition) with the Python plugin (community edition).
+- please reuse the extensive set of [fixtures](https://docs.pytest.org/en/latest/explanation/fixtures.html#about-fixtures), that create an object and cleanup after the test finished executing. 
+- All the fixtures follow the same pattern: named `make_*`, which is a function, that could be called multiple times to create multiple objects.
 
-Logging:
+```python
+from databricks.sdk.service.workspace import AclPermission
+from databricks.labs.ucx.providers.mixins.fixtures import *  # noqa: F403
 
-- get current logger via `import logging; logger = logging.getLogger(__name__)`. It can be done at the to of the module as well.
-- enable debug logging via `import logging; logging.getLogger("databricks").setLevel("DEBUG")`
-- enable debug logging only for UCX via `import logging; logging.getLogger("databricks.labs.ucx").setLevel("DEBUG")`
+def test_secret_scope_acl(make_secret_scope, make_secret_scope_acl, make_group):
+    scope_name = make_secret_scope()
+    make_secret_scope_acl(scope=scope_name, principal=make_group().display_name, permission=AclPermission.WRITE)
+```
 
 IDE setup:
 
