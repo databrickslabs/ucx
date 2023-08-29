@@ -1,3 +1,5 @@
+import logging
+import os
 import shutil
 import subprocess
 import sys
@@ -7,7 +9,9 @@ import pytest
 from databricks.sdk.service.workspace import ImportFormat
 
 from databricks.labs.ucx.providers.mixins.compute import CommandExecutor
+from databricks.labs.ucx.inventory.tacl_job import crawl_tacl
 
+logging.getLogger("databricks.labs.ucx").setLevel("DEBUG")
 
 @pytest.fixture
 def fresh_wheel_file(tmp_path) -> Path:
@@ -85,3 +89,24 @@ def test_sql_backend_works(ws, wsfs_wheel):
     )
 
     assert len(database_names) > 0
+
+def test_wheel_job(ws, wsfs_wheel, sql_exec, make_catalog, make_schema, make_table, make_group):
+    commands = CommandExecutor(ws)
+    commands.install_notebook_library(f"/Workspace{wsfs_wheel}")
+
+    cluster_id = os.environ["DATABRICKS_CLUSTER_ID"]
+
+    group_a = make_group()
+    group_b = make_group()
+    schema = make_schema()
+    table = make_table(schema=schema, external=True)
+
+    #sql_exec(f"GRANT USAGE ON SCHEMA default TO {group_a.display_name}")
+    #sql_exec(f"GRANT USAGE ON SCHEMA default TO {group_b.display_name}")
+    #sql_exec(f"GRANT SELECT ON TABLE {table} TO {group_a.display_name}")
+    #sql_exec(f"GRANT MODIFY ON SCHEMA {schema} TO {group_b.display_name}")
+
+    inventory_schema = make_schema(catalog=make_catalog())
+    inventory_catalog, inventory_schema = inventory_schema.split(".")
+
+    crawl_tacl(cluster_id, ws, inventory_catalog, inventory_schema)

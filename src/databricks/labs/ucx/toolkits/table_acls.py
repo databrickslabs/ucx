@@ -1,3 +1,4 @@
+import logging
 from databricks.sdk import WorkspaceClient
 
 from databricks.labs.ucx.tacl._internal import (
@@ -8,6 +9,7 @@ from databricks.labs.ucx.tacl._internal import (
 from databricks.labs.ucx.tacl.grants import GrantsCrawler
 from databricks.labs.ucx.tacl.tables import TablesCrawler
 
+logging.getLogger("databricks.labs.ucx").setLevel("DEBUG")
 
 class TaclToolkit:
     def __init__(self, ws: WorkspaceClient, inventory_catalog, inventory_schema, warehouse_id=None):
@@ -25,3 +27,8 @@ class TaclToolkit:
         if warehouse_id is None:
             return RuntimeBackend()
         return StatementExecutionBackend(ws, warehouse_id)
+
+
+def run(ws, inventory_catalog, inventory_schema, warehouse_id=None):
+    tak = TaclToolkit(ws, inventory_catalog, inventory_schema, warehouse_id)
+    tak.grants_snapshot("default")
