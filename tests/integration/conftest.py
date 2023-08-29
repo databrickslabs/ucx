@@ -2,7 +2,10 @@ import io
 import json
 import logging
 import os
+import pathlib
 import random
+import string
+import sys
 import uuid
 from functools import partial
 
@@ -38,7 +41,6 @@ from databricks.sdk.service.workspace import (
 
 from databricks.labs.ucx.config import InventoryTable
 from databricks.labs.ucx.inventory.types import RequestObjectType
-from databricks.labs.ucx.providers.client import ImprovedWorkspaceClient
 from databricks.labs.ucx.providers.mixins.fixtures import *  # noqa: F403
 from databricks.labs.ucx.providers.mixins.sql import StatementExecutionExt
 from databricks.labs.ucx.utils import ThreadedExecution
@@ -88,13 +90,6 @@ def account_host(self: databricks.sdk.core.Config) -> str:
 
 
 @pytest.fixture(scope="session")
-def ws() -> ImprovedWorkspaceClient:
-    # Use variables from Unified Auth
-    # See https://databricks-sdk-py.readthedocs.io/en/latest/authentication.html
-    return ImprovedWorkspaceClient()
-
-
-@pytest.fixture(scope="session")
 def acc(ws) -> AccountClient:
     # TODO: move to SDK
     def account_host(cfg: Config) -> str:
@@ -111,14 +106,14 @@ def acc(ws) -> AccountClient:
 
 
 @pytest.fixture
-def sql_exec(ws: ImprovedWorkspaceClient):
+def sql_exec(ws: WorkspaceClient):
     warehouse_id = os.environ["TEST_DEFAULT_WAREHOUSE_ID"]
     statement_execution = StatementExecutionExt(ws.api_client)
     return partial(statement_execution.execute, warehouse_id)
 
 
 @pytest.fixture
-def sql_fetch_all(ws: ImprovedWorkspaceClient):
+def sql_fetch_all(ws: WorkspaceClient):
     warehouse_id = os.environ["TEST_DEFAULT_WAREHOUSE_ID"]
     statement_execution = StatementExecutionExt(ws.api_client)
     return partial(statement_execution.execute_fetch_all, warehouse_id)
@@ -229,7 +224,7 @@ def test_table_fixture(make_table):
 
 
 @pytest.fixture(scope="session")
-def env(ws: ImprovedWorkspaceClient, acc: AccountClient, request: SubRequest) -> EnvironmentInfo:
+def env(ws: WorkspaceClient, acc: AccountClient, request: SubRequest) -> EnvironmentInfo:
     # prepare environment
     test_uid = f"{UCX_TESTING_PREFIX}_{str(uuid.uuid4())[:8]}"
     logger.debug(f"Creating environment with uid {test_uid}")
@@ -270,7 +265,7 @@ def env(ws: ImprovedWorkspaceClient, acc: AccountClient, request: SubRequest) ->
 
 
 @pytest.fixture(scope="session")
-def instance_profiles(env: EnvironmentInfo, ws: ImprovedWorkspaceClient) -> list[InstanceProfile]:
+def instance_profiles(env: EnvironmentInfo, ws: WorkspaceClient) -> list[InstanceProfile]:
     logger.debug("Adding test instance profiles")
     profiles: list[InstanceProfile] = []
 
@@ -304,7 +299,7 @@ def instance_profiles(env: EnvironmentInfo, ws: ImprovedWorkspaceClient) -> list
 
 
 @pytest.fixture(scope="session")
-def instance_pools(env: EnvironmentInfo, ws: ImprovedWorkspaceClient) -> list[CreateInstancePoolResponse]:
+def instance_pools(env: EnvironmentInfo, ws: WorkspaceClient) -> list[CreateInstancePoolResponse]:
     logger.debug("Creating test instance pools")
 
     test_instance_pools: list[CreateInstancePoolResponse] = [
@@ -329,7 +324,7 @@ def instance_pools(env: EnvironmentInfo, ws: ImprovedWorkspaceClient) -> list[Cr
 
 
 @pytest.fixture(scope="session")
-def pipelines(env: EnvironmentInfo, ws: ImprovedWorkspaceClient) -> list[CreatePipelineResponse]:
+def pipelines(env: EnvironmentInfo, ws: WorkspaceClient) -> list[CreatePipelineResponse]:
     logger.debug("Creating test DLT pipelines")
 
     test_pipelines: list[CreatePipelineResponse] = [
@@ -359,7 +354,7 @@ def pipelines(env: EnvironmentInfo, ws: ImprovedWorkspaceClient) -> list[CreateP
 
 
 @pytest.fixture(scope="session")
-def jobs(env: EnvironmentInfo, ws: ImprovedWorkspaceClient) -> list[CreateResponse]:
+def jobs(env: EnvironmentInfo, ws: WorkspaceClient) -> list[CreateResponse]:
     logger.debug("Creating test jobs")
 
     test_jobs: list[CreateResponse] = [
@@ -386,7 +381,7 @@ def jobs(env: EnvironmentInfo, ws: ImprovedWorkspaceClient) -> list[CreateRespon
 
 
 @pytest.fixture(scope="session")
-def cluster_policies(env: EnvironmentInfo, ws: ImprovedWorkspaceClient) -> list[CreatePolicyResponse]:
+def cluster_policies(env: EnvironmentInfo, ws: WorkspaceClient) -> list[CreatePolicyResponse]:
     logger.debug("Creating test cluster policies")
 
     test_cluster_policies: list[CreatePolicyResponse] = [
@@ -421,7 +416,7 @@ def cluster_policies(env: EnvironmentInfo, ws: ImprovedWorkspaceClient) -> list[
 
 
 @pytest.fixture(scope="session")
-def clusters(env: EnvironmentInfo, ws: ImprovedWorkspaceClient) -> list[ClusterDetails]:
+def clusters(env: EnvironmentInfo, ws: WorkspaceClient) -> list[ClusterDetails]:
     logger.debug("Creating test clusters")
 
     creators = [
@@ -456,7 +451,7 @@ def clusters(env: EnvironmentInfo, ws: ImprovedWorkspaceClient) -> list[ClusterD
 
 
 @pytest.fixture(scope="session")
-def experiments(ws: ImprovedWorkspaceClient, env: EnvironmentInfo) -> list[CreateExperimentResponse]:
+def experiments(ws: WorkspaceClient, env: EnvironmentInfo) -> list[CreateExperimentResponse]:
     logger.debug("Creating test experiments")
 
     try:
@@ -489,7 +484,7 @@ def experiments(ws: ImprovedWorkspaceClient, env: EnvironmentInfo) -> list[Creat
 
 
 @pytest.fixture(scope="session")
-def models(ws: ImprovedWorkspaceClient, env: EnvironmentInfo) -> list[ModelDatabricks]:
+def models(ws: WorkspaceClient, env: EnvironmentInfo) -> list[ModelDatabricks]:
     logger.debug("Creating models")
 
     test_models: list[ModelDatabricks] = [
@@ -522,7 +517,7 @@ def models(ws: ImprovedWorkspaceClient, env: EnvironmentInfo) -> list[ModelDatab
 
 
 @pytest.fixture(scope="session")
-def warehouses(ws: ImprovedWorkspaceClient, env: EnvironmentInfo) -> list[GetWarehouseResponse]:
+def warehouses(ws: WorkspaceClient, env: EnvironmentInfo) -> list[GetWarehouseResponse]:
     logger.debug("Creating warehouses")
 
     creators = [
@@ -557,7 +552,7 @@ def warehouses(ws: ImprovedWorkspaceClient, env: EnvironmentInfo) -> list[GetWar
 
 
 @pytest.fixture(scope="session")
-def tokens(ws: ImprovedWorkspaceClient, env: EnvironmentInfo) -> list[AccessControlRequest]:
+def tokens(ws: WorkspaceClient, env: EnvironmentInfo) -> list[AccessControlRequest]:
     logger.debug("Adding token-level permissions to groups")
 
     token_permissions = [
@@ -575,7 +570,7 @@ def tokens(ws: ImprovedWorkspaceClient, env: EnvironmentInfo) -> list[AccessCont
 
 
 @pytest.fixture(scope="session")
-def secret_scopes(ws: ImprovedWorkspaceClient, env: EnvironmentInfo) -> list[SecretScope]:
+def secret_scopes(ws: WorkspaceClient, env: EnvironmentInfo) -> list[SecretScope]:
     logger.debug("Creating test secret scopes")
 
     for i in range(NUM_TEST_SECRET_SCOPES):
@@ -596,7 +591,7 @@ def secret_scopes(ws: ImprovedWorkspaceClient, env: EnvironmentInfo) -> list[Sec
 
 
 @pytest.fixture(scope="session")
-def workspace_objects(ws: ImprovedWorkspaceClient, env: EnvironmentInfo) -> WorkspaceObjects:
+def workspace_objects(ws: WorkspaceClient, env: EnvironmentInfo) -> WorkspaceObjects:
     logger.info(f"Creating test workspace objects under /{env.test_uid}")
     ws.workspace.mkdirs(f"/{env.test_uid}")
 
@@ -681,7 +676,7 @@ def verifiable_objects(
 
 
 @pytest.fixture()
-def inventory_table(env: EnvironmentInfo, ws: ImprovedWorkspaceClient, make_catalog, make_schema) -> InventoryTable:
+def inventory_table(env: EnvironmentInfo, ws: WorkspaceClient, make_catalog, make_schema) -> InventoryTable:
     catalog, schema = make_schema(make_catalog()).split(".")
     table = InventoryTable(
         catalog=catalog,

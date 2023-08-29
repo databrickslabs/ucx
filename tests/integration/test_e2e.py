@@ -19,7 +19,7 @@ from databricks.labs.ucx.config import (
     MigrationConfig,
 )
 from databricks.labs.ucx.inventory.types import RequestObjectType
-from databricks.labs.ucx.providers.client import ImprovedWorkspaceClient
+from databricks.labs.ucx.providers.client import WorkspaceClient
 from databricks.labs.ucx.providers.groups_info import GroupMigrationState
 from databricks.labs.ucx.toolkits.group_migration import GroupMigrationToolkit
 from databricks.labs.ucx.utils import safe_get_acls
@@ -33,7 +33,7 @@ def _verify_group_permissions(
     objects: list | WorkspaceObjects | None,
     id_attribute: str,
     request_object_type: RequestObjectType | None,
-    ws: ImprovedWorkspaceClient,
+    ws: WorkspaceClient,
     toolkit: GroupMigrationToolkit,
     target: Literal["backup", "account"],
 ):
@@ -149,7 +149,7 @@ def _verify_group_permissions(
 
 def _verify_roles_and_entitlements(
     migration_state: GroupMigrationState,
-    ws: ImprovedWorkspaceClient,
+    ws: WorkspaceClient,
     target: Literal["backup", "account"],
 ):
     for el in migration_state.groups:
@@ -166,7 +166,7 @@ def _verify_roles_and_entitlements(
 def test_e2e(
     env: EnvironmentInfo,
     inventory_table: InventoryTable,
-    ws: ImprovedWorkspaceClient,
+    ws: WorkspaceClient,
     verifiable_objects: list[tuple[list, str, RequestObjectType | None]],
 ):
     logger.debug(f"Test environment: {env.test_uid}")
@@ -192,7 +192,7 @@ def test_e2e(
         toolkit.group_manager.migration_groups_provider.groups
     )
 
-    assert len(ws.list_account_level_groups(filter=f"displayName sw '{env.test_uid}'")) == len(
+    assert len(toolkit.group_manager._list_account_level_groups(filter=f"displayName sw '{env.test_uid}'")) == len(
         toolkit.group_manager.migration_groups_provider.groups
     )
 

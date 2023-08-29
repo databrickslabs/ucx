@@ -1,11 +1,12 @@
 import datetime as dt
 import logging
+from collections.abc import Iterator
 from concurrent.futures import FIRST_COMPLETED, ThreadPoolExecutor, wait
 from itertools import groupby
 
+from databricks.sdk import WorkspaceClient
 from databricks.sdk.service.workspace import ObjectInfo, ObjectType
-
-from databricks.labs.ucx.providers.client import ImprovedWorkspaceClient
+from ratelimit import limits, sleep_and_retry
 
 logger = logging.getLogger(__name__)
 
@@ -13,7 +14,7 @@ logger = logging.getLogger(__name__)
 class WorkspaceListing:
     def __init__(
         self,
-        ws: ImprovedWorkspaceClient,
+        ws: WorkspaceClient,
         num_threads: int,
         *,
         with_directories: bool = True,
@@ -39,12 +40,16 @@ class WorkspaceListing:
                 f" rps: {rps:.3f}/sec"
             )
 
+    @sleep_and_retry
+    @limits(calls=45, period=1)  # safety value, can be 50 actually
+    def _list_workspace(self, path: str) -> Iterator[ObjectType]:
+        # TODO: remove, use SDK
+        return self._ws.workspace.list(path=path, recursive=False)
+
     def _list_and_analyze(self, obj: ObjectInfo) -> (list[ObjectInfo], list[ObjectInfo]):
         directories = []
         others = []
-        grouped_iterator = groupby(
-            self._ws.list_workspace(obj.path), key=lambda x: x.object_type == ObjectType.DIRECTORY
-        )
+        grouped_iterator = groupby(self._list_workspace(obj.path), key=lambda x: x.object_type == ObjectType.DIRECTORY)
         for is_directory, objects in grouped_iterator:
             if is_directory:
                 directories.extend(list(objects))
