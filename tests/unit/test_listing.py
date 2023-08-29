@@ -24,7 +24,7 @@ def test_list_and_analyze_should_separate_folders_and_other_objects():
     notebook = ObjectInfo(path="/rootPath/notebook", object_type=ObjectType.NOTEBOOK)
 
     client = Mock()
-    client.list_workspace.return_value = [file, directory, notebook]
+    client.workspace.list.return_value = [file, directory, notebook]
 
     listing = WorkspaceListing(client, 1)
     directories, others = listing._list_and_analyze(rootobj)
@@ -37,7 +37,7 @@ def test_walk_with_an_empty_folder_should_return_it():
     rootobj = ObjectInfo(path="/rootPath")
 
     client = Mock()
-    client.list_workspace.return_value = []
+    client.workspace.list.return_value = []
     client.workspace.get_status.return_value = rootobj
 
     listing = WorkspaceListing(client, 1)
@@ -53,7 +53,7 @@ def test_walk_with_two_files_should_return_rootpath_and_two_files():
     notebook = ObjectInfo(path="/rootPath/notebook", object_type=ObjectType.NOTEBOOK)
 
     client = Mock()
-    client.list_workspace.return_value = [file, notebook]
+    client.workspace.list.return_value = [file, notebook]
     client.workspace.get_status.return_value = rootobj
 
     listing = WorkspaceListing(client, 1)
@@ -69,14 +69,14 @@ def test_walk_with_nested_folders_should_return_nested_objects():
     nested_folder = ObjectInfo(path="/rootPath/nested_folder", object_type=ObjectType.DIRECTORY)
     nested_notebook = ObjectInfo(path="/rootPath/nested_folder/notebook", object_type=ObjectType.NOTEBOOK)
 
-    def my_side_effect(*args):
-        if args[0] == "/rootPath":
+    def my_side_effect(path, **kwargs):  # noqa: ARG001
+        if path == "/rootPath":
             return [file, nested_folder]
-        elif args[0] == "/rootPath/nested_folder":
+        elif path == "/rootPath/nested_folder":
             return [nested_notebook]
 
     client = Mock()
-    client.list_workspace.side_effect = my_side_effect
+    client.workspace.list.side_effect = my_side_effect
     client.workspace.get_status.return_value = rootobj
 
     listing = WorkspaceListing(client, 1)
@@ -98,16 +98,16 @@ def test_walk_with_three_level_nested_folders_returns_three_levels():
         path="/rootPath/nested_folder/second_nested_folder/notebook2", object_type=ObjectType.NOTEBOOK
     )
 
-    def my_side_effect(*args):
-        if args[0] == "/rootPath":
+    def my_side_effect(path, **kwargs):  # noqa: ARG001
+        if path == "/rootPath":
             return [file, nested_folder]
-        elif args[0] == "/rootPath/nested_folder":
+        elif path == "/rootPath/nested_folder":
             return [nested_notebook, second_nested_folder]
-        elif args[0] == "/rootPath/nested_folder/second_nested_folder":
+        elif path == "/rootPath/nested_folder/second_nested_folder":
             return [second_nested_notebook]
 
     client = Mock()
-    client.list_workspace.side_effect = my_side_effect
+    client.workspace.list.side_effect = my_side_effect
     client.workspace.get_status.return_value = rootobj
     listing = WorkspaceListing(client, 2)
     listing.walk("/rootPath")
