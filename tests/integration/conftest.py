@@ -2,10 +2,7 @@ import io
 import json
 import logging
 import os
-import pathlib
 import random
-import string
-import sys
 import uuid
 from functools import partial
 
@@ -19,11 +16,7 @@ from databricks.sdk.service.compute import (
     CreateInstancePoolResponse,
     CreatePolicyResponse,
 )
-from databricks.sdk.service.iam import (
-    AccessControlRequest,
-    ComplexValue,
-    PermissionLevel,
-)
+from databricks.sdk.service.iam import AccessControlRequest, PermissionLevel
 from databricks.sdk.service.jobs import CreateResponse
 from databricks.sdk.service.ml import CreateExperimentResponse, ModelDatabricks
 from databricks.sdk.service.ml import PermissionLevel as ModelPermissionLevel
@@ -46,6 +39,7 @@ from databricks.sdk.service.workspace import (
 from databricks.labs.ucx.config import InventoryTable
 from databricks.labs.ucx.inventory.types import RequestObjectType
 from databricks.labs.ucx.providers.client import ImprovedWorkspaceClient
+from databricks.labs.ucx.providers.mixins.fixtures import *  # noqa: F403
 from databricks.labs.ucx.providers.mixins.sql import StatementExecutionExt
 from databricks.labs.ucx.utils import ThreadedExecution
 
@@ -79,9 +73,9 @@ NUM_TEST_TOKENS = int(os.environ.get("NUM_TEST_TOKENS", 3))
 NUM_TEST_SECRET_SCOPES = int(os.environ.get("NUM_TEST_SECRET_SCOPES", 10))
 
 NUM_THREADS = int(os.environ.get("NUM_TEST_THREADS", 20))
-DB_CONNECT_CLUSTER_NAME = os.environ.get("DB_CONNECT_CLUSTER_NAME", "ucx-integration-testing")
 UCX_TESTING_PREFIX = os.environ.get("UCX_TESTING_PREFIX", "ucx")
 Threader = partial(ThreadedExecution, num_threads=NUM_THREADS)
+load_debug_env_if_runs_from_ide("ucws")  # noqa: F405
 
 
 def account_host(self: databricks.sdk.core.Config) -> str:
@@ -93,43 +87,10 @@ def account_host(self: databricks.sdk.core.Config) -> str:
         return "https://accounts.cloud.databricks.com"
 
 
-def _load_debug_env_if_runs_from_ide(key) -> bool:
-    if not _is_in_debug():
-        return False
-    conf_file = pathlib.Path.home() / ".databricks/debug-env.json"
-    with conf_file.open("r") as f:
-        conf = json.load(f)
-        if key not in conf:
-            msg = f"{key} not found in ~/.databricks/debug-env.json"
-            raise KeyError(msg)
-        for k, v in conf[key].items():
-            os.environ[k] = v
-    return True
-
-
-def _is_in_debug() -> bool:
-    return os.path.basename(sys.argv[0]) in [
-        "_jb_pytest_runner.py",
-        "testlauncher.py",
-    ]
-
-
-@pytest.fixture
-def make_random():
-    import random
-
-    def inner(k=16) -> str:
-        charset = string.ascii_uppercase + string.ascii_lowercase + string.digits
-        return "".join(random.choices(charset, k=int(k)))
-
-    return inner
-
-
 @pytest.fixture(scope="session")
 def ws() -> ImprovedWorkspaceClient:
     # Use variables from Unified Auth
     # See https://databricks-sdk-py.readthedocs.io/en/latest/authentication.html
-    _load_debug_env_if_runs_from_ide("ucws")
     return ImprovedWorkspaceClient()
 
 
@@ -161,40 +122,6 @@ def sql_fetch_all(ws: ImprovedWorkspaceClient):
     warehouse_id = os.environ["TEST_DEFAULT_WAREHOUSE_ID"]
     statement_execution = StatementExecutionExt(ws.api_client)
     return partial(statement_execution.execute_fetch_all, warehouse_id)
-
-
-@pytest.fixture
-def make_group(ws: ImprovedWorkspaceClient, make_random):
-    cleanup = []
-
-    def inner(
-        entitlements: list[ComplexValue] | None = None,
-        external_id: str | None = None,
-        members: list[ComplexValue] | None = None,
-        roles: list[ComplexValue] | None = None,
-    ):
-        group = ws.groups.create(
-            display_name=f"ucx_G{make_random(4)}",
-            entitlements=entitlements,
-            external_id=external_id,
-            members=members,
-            roles=roles,
-        )
-        logger.debug(f"created group fixture: {group.display_name} ({group.id})")
-        cleanup.append(group)
-        return group
-
-    yield inner
-
-    logger.debug(f"clearing {len(cleanup)} group fixtures")
-    for group in cleanup:
-        logger.debug(f"removing group fixture: {group.display_name} ({group.id})")
-        ws.groups.delete(group.id)
-
-
-def test_group_fixture(make_group):
-    logger.info(f"Created new group: {make_group()}")
-    logger.info(f"Created new group: {make_group()}")
 
 
 @pytest.fixture
