@@ -84,14 +84,17 @@ def upload_artifacts(folder_base, local_wheel_file, wheel_file_name, ws):
     """Helper to upload artifacts into a workspace folder"""
     remote_wheel_file = f"{folder_base}/{wheel_file_name}"
     remote_notebook_file = f"{folder_base}/install_ucx.py"
+    remote_configuration_file = f"{folder_base}/ucx_config.yaml"
     logger.info(f"Remote wheel file: {remote_wheel_file}")
     logger.info(f"Remote notebook file: {remote_notebook_file}")
+    logger.info(f"Remote configuration file: {remote_configuration_file}")
     logger.info("Uploading...")
     ws.workspace.mkdirs(folder_base)
     with open(local_wheel_file, "rb") as fh:
         ws.workspace.upload(path=remote_wheel_file, content=fh.read(), format=ImportFormat.AUTO)
     buf = BytesIO(INSTALL_NOTEBOOK.format(remote_wheel_file=remote_wheel_file).encode())
     ws.workspace.upload(path=remote_notebook_file, content=buf)
+    ws.workspace.upload(path=remote_configuration_file, content=buf)
 
 
 def main():
@@ -108,7 +111,7 @@ def main():
     wheel_file_name = files[0]
     local_wheel_file = tmp_dir + "/" + wheel_file_name
     logger.info(f"Wheel file: {wheel_file_name}")
-    # upload wheel and starer notebook to workspace
+    # upload wheel, config and starter notebook to workspace
     upload_artifacts(folder_base, local_wheel_file, wheel_file_name, ws)
     # cleanup
     delete_local_dir(tmp_dir)
