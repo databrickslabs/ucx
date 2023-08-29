@@ -85,7 +85,7 @@ def test_snapshot_appends_incorrect_type():
         return []
 
     with pytest.raises(ValueError):
-        cb._snapshot(Bar, fetcher=fetcher, loader=lambda: [Bar(first="first", second= True, third=3.14)])
+        cb._snapshot(Bar, fetcher=fetcher, loader=lambda: [Bar(first="first", second=True, third=3.14)])
 
 
 def test_snapshot_appends_to_new_table():

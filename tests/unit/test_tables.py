@@ -1,7 +1,7 @@
 import pytest
 
-from databricks.labs.ucx.tacl.tables import Table, TablesCrawler
 from databricks.labs.ucx.tacl._internal import SqlBackend
+from databricks.labs.ucx.tacl.tables import Table, TablesCrawler
 
 
 def test_is_delta_true():
@@ -38,42 +38,44 @@ def test_kind_view():
 
 def test_sql_managed_non_delta():
     with pytest.raises(ValueError):
-        Table(catalog="catalog", database="db", name="table", object_type="type", table_format="PARQUET")._sql_managed("catalog")
+        Table(catalog="catalog", database="db", name="table", object_type="type", table_format="PARQUET")._sql_managed(
+            "catalog"
+        )
 
 
 @pytest.mark.parametrize(
     "table,query",
     [
         (
-                Table(catalog="catalog", database="db", name="managed_table", object_type="..", table_format="DELTA"),
-                "CREATE TABLE IF NOT EXISTS new_catalog.db.managed_table DEEP CLONE "
-                "catalog.db.managed_table;ALTER TABLE catalog.db.managed_table SET "
-                "TBLPROPERTIES ('upgraded_to' = 'new_catalog.db.managed_table');",
+            Table(catalog="catalog", database="db", name="managed_table", object_type="..", table_format="DELTA"),
+            "CREATE TABLE IF NOT EXISTS new_catalog.db.managed_table DEEP CLONE "
+            "catalog.db.managed_table;ALTER TABLE catalog.db.managed_table SET "
+            "TBLPROPERTIES ('upgraded_to' = 'new_catalog.db.managed_table');",
         ),
         (
-                Table(
-                    catalog="catalog",
-                    database="db",
-                    name="view",
-                    object_type="..",
-                    table_format="DELTA",
-                    view_text="SELECT * FROM table",
-                ),
-                "CREATE VIEW IF NOT EXISTS new_catalog.db.view AS SELECT * FROM table;",
+            Table(
+                catalog="catalog",
+                database="db",
+                name="view",
+                object_type="..",
+                table_format="DELTA",
+                view_text="SELECT * FROM table",
+            ),
+            "CREATE VIEW IF NOT EXISTS new_catalog.db.view AS SELECT * FROM table;",
         ),
         (
-                Table(
-                    catalog="catalog",
-                    database="db",
-                    name="external_table",
-                    object_type="..",
-                    table_format="DELTA",
-                    location="s3a://foo/bar",
-                ),
-                "CREATE TABLE IF NOT EXISTS new_catalog.db.external_table LIKE "
-                "catalog.db.external_table COPY LOCATION;ALTER TABLE "
-                "catalog.db.external_table SET TBLPROPERTIES ('upgraded_to' = "
-                "'new_catalog.db.external_table');",
+            Table(
+                catalog="catalog",
+                database="db",
+                name="external_table",
+                object_type="..",
+                table_format="DELTA",
+                location="s3a://foo/bar",
+            ),
+            "CREATE TABLE IF NOT EXISTS new_catalog.db.external_table LIKE "
+            "catalog.db.external_table COPY LOCATION;ALTER TABLE "
+            "catalog.db.external_table SET TBLPROPERTIES ('upgraded_to' = "
+            "'new_catalog.db.external_table');",
         ),
     ],
 )

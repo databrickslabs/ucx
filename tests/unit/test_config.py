@@ -3,7 +3,6 @@ from contextlib import contextmanager
 from functools import partial
 from pathlib import Path
 
-import pytest
 import yaml
 from pydantic import RootModel
 
