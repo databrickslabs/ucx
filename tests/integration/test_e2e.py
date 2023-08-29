@@ -2,6 +2,7 @@ import logging
 from typing import Literal
 
 import pytest
+from databricks.sdk import WorkspaceClient
 from databricks.sdk.service.iam import (
     AccessControlRequest,
     AccessControlResponse,
@@ -19,7 +20,6 @@ from databricks.labs.ucx.config import (
     MigrationConfig,
 )
 from databricks.labs.ucx.inventory.types import RequestObjectType
-from databricks.labs.ucx.providers.client import WorkspaceClient
 from databricks.labs.ucx.providers.groups_info import GroupMigrationState
 from databricks.labs.ucx.toolkits.group_migration import GroupMigrationToolkit
 from databricks.labs.ucx.utils import safe_get_acls

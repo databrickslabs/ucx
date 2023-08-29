@@ -1,6 +1,7 @@
 import logging
 
 import pytest
+from databricks.sdk import WorkspaceClient
 from pyspark.errors import AnalysisException
 
 from databricks.labs.ucx.config import (
@@ -11,7 +12,6 @@ from databricks.labs.ucx.config import (
     MigrationConfig,
 )
 from databricks.labs.ucx.inventory.types import RequestObjectType
-from databricks.labs.ucx.providers.client import WorkspaceClient
 from databricks.labs.ucx.toolkits.group_migration import GroupMigrationToolkit
 
 from .test_e2e import _verify_group_permissions, _verify_roles_and_entitlements

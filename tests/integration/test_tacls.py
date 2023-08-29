@@ -1,7 +1,8 @@
 import logging
 import os
 
-from databricks.labs.ucx.providers.client import WorkspaceClient
+from databricks.sdk import WorkspaceClient
+
 from databricks.labs.ucx.toolkits.table_acls import TaclToolkit
 
 logger = logging.getLogger(__name__)
