@@ -50,6 +50,7 @@ test = [
 
 [project.scripts]
 ucx = "databricks.labs.ucx.__main__:entrypoint"
+tacl_job = "databricks.labs.ucx.inventory.tacl_job:main"
 
 [project.urls]
 Issues = "https://github.com/databricks/UC-Upgrade/issues"
