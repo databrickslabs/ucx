@@ -78,7 +78,7 @@ class PermissionManager:
         logger.info("Permissions were inventorized and saved")
 
     @staticmethod
-    def __prepare_request_for_permissions_api(
+    def _prepare_request_for_permissions_api(
         item: PermissionsInventoryItem,
         migration_state: GroupMigrationState,
         destination: Literal["backup", "account"],
@@ -164,7 +164,7 @@ class PermissionManager:
         if isinstance(item.request_object_type, RequestObjectType) and isinstance(
             item.typed_object_permissions, ObjectPermissions
         ):
-            return self.__prepare_request_for_permissions_api(item, migration_state, destination)
+            return self._prepare_request_for_permissions_api(item, migration_state, destination)
         elif item.logical_object_type == LogicalObjectType.SECRET_SCOPE:
             return self._prepare_permission_request_for_secrets_api(item, migration_state, destination)
         elif item.logical_object_type in [LogicalObjectType.ROLES, LogicalObjectType.ENTITLEMENTS]:
