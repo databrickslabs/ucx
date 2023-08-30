@@ -3,24 +3,25 @@ import logging
 import time
 
 import databricks.sdk.service.jobs as j
+from databricks.sdk import WorkspaceClient
 
 # logger = logging.getLogger(__name__)
 logging.getLogger("databricks.labs.ucx").setLevel("DEBUG")
 
 
 def crawl_tacl(cluster_id, ws, inventory_catalog, inventory_schema):
-    # w = WorkspaceClient()
+    w = WorkspaceClient()
 
     logging.info("Crawler started")
 
     # trigger one-time-run job and get waiter object
-    waiter = ws.jobs.submit(
+    waiter = w.jobs.submit(
         run_name=f"sdk-{time.time_ns()}",
         tasks=[
             j.SubmitTask(
                 existing_cluster_id=cluster_id,
                 python_wheel_task=j.PythonWheelTask(
-                    "crawler", package_name="databricks-labs-ucx", parameters=[ws, inventory_catalog, inventory_schema]
+                    "crawler", package_name="databricks-labs-ucx", parameters=[inventory_catalog, inventory_schema]
                 ),
                 task_key=f"sdk-{time.time_ns()}",
             )
