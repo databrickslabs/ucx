@@ -1,39 +1,26 @@
-import datetime
-import logging
-import time
-
-import databricks.sdk.service.jobs as j
 from databricks.sdk import WorkspaceClient
-
-# logger = logging.getLogger(__name__)
-logging.getLogger("databricks.labs.ucx").setLevel("DEBUG")
+from databricks.sdk.service import compute, jobs
 
 
-def crawl_tacl(cluster_id, ws, inventory_catalog, inventory_schema):
-    w = WorkspaceClient()
+def create_tacl_job(cluster_id, wsfs_wheel):
+    ws = WorkspaceClient()
 
-    logging.info("Crawler started")
-
-    # trigger one-time-run job and get waiter object
-    waiter = w.jobs.submit(
-        run_name=f"sdk-{time.time_ns()}",
+    created_job = ws.jobs.create(
         tasks=[
-            j.SubmitTask(
-                existing_cluster_id=cluster_id,
-                python_wheel_task=j.PythonWheelTask(
-                    "crawler", package_name="databricks-labs-ucx", parameters=[inventory_catalog, inventory_schema]
+            jobs.Task(
+                task_key='crawl',
+                python_wheel_task=jobs.PythonWheelTask(
+                    package_name='databricks.labs.ucx.toolkits.table_acls',
+                    entry_point='main',
+                    parameters=['inventory_catalog', 'inventory_schema'],
                 ),
-                task_key=f"sdk-{time.time_ns()}",
+                libraries=[compute.Library(whl=f"/Workspace{wsfs_wheel}")],
+                new_cluster=compute.ClusterSpec(
+                    node_type_id=ws.clusters.select_node_type(local_disk=True),
+                    spark_version=ws.clusters.select_spark_version(latest=True),
+                    num_workers=0,
+                ),
             )
         ],
+        name='[UCX] Crawl Tables',
     )
-
-    logging.info(f"starting to poll: {waiter.run_id}")
-
-    def print_status(run: j.Run):
-        statuses = [f"{t.task_key}: {t.state.life_cycle_state}" for t in run.tasks]
-        logging.info(f'workflow intermediate status: {", ".join(statuses)}')
-
-    run = waiter.result(timeout=datetime.timedelta(minutes=15), callback=print_status)
-
-    logging.info(f"job finished: {run.run_page_url}")
