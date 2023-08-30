@@ -146,7 +146,7 @@ class PermissionManager:
         )
 
     @staticmethod
-    def __prepare_request_for_roles_and_entitlements(
+    def _prepare_request_for_roles_and_entitlements(
         item: PermissionsInventoryItem, migration_state: GroupMigrationState, destination
     ) -> RolesAndEntitlementsRequestPayload:
         # TODO: potential BUG - why does item.object_id hold a group name and not ID?
@@ -168,7 +168,7 @@ class PermissionManager:
         elif item.logical_object_type == LogicalObjectType.SECRET_SCOPE:
             return self._prepare_permission_request_for_secrets_api(item, migration_state, destination)
         elif item.logical_object_type in [LogicalObjectType.ROLES, LogicalObjectType.ENTITLEMENTS]:
-            return self.__prepare_request_for_roles_and_entitlements(item, migration_state, destination)
+            return self._prepare_request_for_roles_and_entitlements(item, migration_state, destination)
         else:
             logger.warning(
                 f"Unsupported permissions payload for object {item.object_id} "
