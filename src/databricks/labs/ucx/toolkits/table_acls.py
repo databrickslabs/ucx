@@ -31,6 +31,9 @@ class TaclToolkit:
         return StatementExecutionBackend(ws, warehouse_id)
 
 
-def run(ws, inventory_catalog, inventory_schema, warehouse_id=None):
+def main(inventory_catalog, inventory_schema, warehouse_id=None):
+    ws = WorkspaceClient
     tak = TaclToolkit(ws, inventory_catalog, inventory_schema, warehouse_id)
     tak.grants_snapshot("default")
+    # TODO check if inventory tables are populated
+    # TODO implement all databases
