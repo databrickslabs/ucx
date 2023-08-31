@@ -55,7 +55,7 @@ config = MigrationConfig(
         # use this option to select all groups automatically
         # auto=True
     ),
-    log_level="TRACE",
+    log_level="DEBUG",
 )
 toolkit = GroupMigrationToolkit(config)
 
