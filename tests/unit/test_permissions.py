@@ -15,6 +15,7 @@ from databricks.labs.ucx.inventory.types import (
     LogicalObjectType,
     PermissionsInventoryItem,
     RequestObjectType,
+    RolesAndEntitlements,
 )
 from databricks.labs.ucx.providers.groups_info import (
     GroupMigrationState,
@@ -295,10 +296,14 @@ def test_update_permissions(workspace_client):
     assert output == ObjectPermissions(object_id="cluster1")
 
 
-def test_standard_permissions_applicator(workspace_client):
+def test_standard_permissions_applicator(workspace_client, mocker):
+    standard_perm = mocker.patch("databricks.labs.ucx.inventory.permissions.PermissionManager._update_permissions")
     perm_obj = PermissionManager(workspace_client, None)
     perm_obj._standard_permissions_applicator(
         PermissionRequestPayload(None, RequestObjectType.CLUSTERS, "clusterid1", None)
+    )
+    standard_perm.assert_called_with(
+        request_object_type=RequestObjectType.CLUSTERS, request_object_id="clusterid1", access_control_list=None
     )
 
 
@@ -329,6 +334,10 @@ def test_patch_workspace_group(workspace_client):
     }
     perm_obj = PermissionManager(workspace_client, None)
     perm_obj._patch_workspace_group("group1", payload)
+    workspace_client.api_client.do.assert_called_with(
+        "PATCH", "/api/2.0/preview/scim/v2/Groups/group1", data=json.dumps(payload)
+    )
+
     payload = {
         "schemas": "urn:ietf:params:scim:api:messages:2.0:PatchOp",
         "Operations": {
@@ -339,3 +348,76 @@ def test_patch_workspace_group(workspace_client):
     }
     perm_obj = PermissionManager(workspace_client, None)
     perm_obj._patch_workspace_group("group2", payload)
+    workspace_client.api_client.do.assert_called_with(
+        "PATCH", "/api/2.0/preview/scim/v2/Groups/group2", data=json.dumps(payload)
+    )
+
+
+def test_apply_roles_and_entitlements(workspace_client, mocker):
+    entitlements = [{"value": "workspace-access"}]
+    roles = [{"value": "arn:aws:iam::123456789:instance-profile/test-uc-role"}]
+    perm_obj = PermissionManager(workspace_client, None)
+    roles_perm = mocker.patch("databricks.labs.ucx.inventory.permissions.PermissionManager._patch_workspace_group")
+    perm_obj._apply_roles_and_entitlements("group1", roles, entitlements)
+    payload = {
+        "schemas": ["urn:ietf:params:scim:api:messages:2.0:PatchOp", "urn:ietf:params:scim:api:messages:2.0:PatchOp"],
+        "Operations": [
+            {
+                "op": "add",
+                "path": "entitlements",
+                "value": [{"value": "workspace-access"}],
+            },
+            {
+                "op": "add",
+                "path": "roles",
+                "value": [{"value": "arn:aws:iam::123456789:instance-profile/test-uc-role"}],
+            },
+        ],
+    }
+    roles_perm.assert_called_with("group1", payload)
+
+
+def test_applicator_roles(workspace_client, mocker):
+    roles_payload = RolesAndEntitlementsRequestPayload(
+        payload=RolesAndEntitlements(
+            roles=[{"value": "arn:aws:iam::123456789:instance-profile/test-uc-role"}],
+            entitlements=[{"value": "workspace-access"}],
+        ),
+        group_id="group1",
+    )
+    perm_obj = PermissionManager(workspace_client, None)
+    roles_perm = mocker.patch(
+        "databricks.labs.ucx.inventory.permissions.PermissionManager._apply_roles_and_entitlements"
+    )
+    perm_obj.applicator(roles_payload)
+    roles_perm.assert_called_with(
+        group_id="group1",
+        roles=[{"value": "arn:aws:iam::123456789:instance-profile/test-uc-role"}],
+        entitlements=[{"value": "workspace-access"}],
+    )
+
+
+def test_applicator_scope(workspace_client, mocker):
+    secret_payload = SecretsPermissionRequestPayload(
+        object_id="scope-1",
+        access_control_list=[
+            AclItem(principal="group1", permission="READ"),
+            AclItem(principal="group2", permission="MANAGE"),
+        ],
+    )
+    perm_obj = PermissionManager(workspace_client, None)
+    roles_perm = mocker.patch(
+        "databricks.labs.ucx.inventory.permissions.PermissionManager._scope_permissions_applicator"
+    )
+    perm_obj.applicator(secret_payload)
+    roles_perm.assert_called_with(secret_payload)
+
+
+def test_applicator_standard_permission(workspace_client, mocker):
+    standard_payload = PermissionRequestPayload(None, RequestObjectType.CLUSTERS, "clusterid1", None)
+    perm_obj = PermissionManager(workspace_client, None)
+    roles_perm = mocker.patch(
+        "databricks.labs.ucx.inventory.permissions.PermissionManager._standard_permissions_applicator"
+    )
+    perm_obj.applicator(standard_payload)
+    roles_perm.assert_called_with(standard_payload)
