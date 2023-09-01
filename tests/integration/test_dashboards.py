@@ -1,11 +1,13 @@
 import logging
 import os
 
+from databricks.sdk import WorkspaceClient
 from databricks.sdk.service.sql import AccessControl, ObjectTypePlural, PermissionLevel
 
 from databricks.labs.ucx.providers.mixins.redash import (
-    DashboardsExt,
-    Position,
+    QueryVisualizationsExt,
+    DashboardWidgetsAPI,
+    WidgetPosition,
     WidgetOptions, VizColumn,
 )
 
@@ -13,43 +15,27 @@ from databricks.labs.ucx.providers.mixins.redash import (
 logging.getLogger("databricks").setLevel("DEBUG")
 
 
-def test_dash2(ws):
-    da = DashboardsExt(ws.api_client)
-    x = da.create(name="foobar")
+def test_creating_widgets(ws: WorkspaceClient):
+    dashboard_widgets_api = DashboardWidgetsAPI(ws.api_client)
+    query_visualizations_api = QueryVisualizationsExt(ws.api_client)
+
+    x = ws.dashboards.create(name='test dashboard')
     ws.dbsql_permissions.set(
         ObjectTypePlural.DASHBOARDS,
         x.id,
         access_control_list=[AccessControl(group_name="users", permission_level=PermissionLevel.CAN_MANAGE)],
     )
-    da.add_widget(
-        x.id,
-        WidgetOptions(
-            title="abc",
-            description="aaa",
-            position=Position(
-                col=0,
-                row=0,
-                sizeX=3,
-                sizeY=3,
-            ),
-        ),
-        text="this is some markdown",
-    )
 
-    da.add_widget(
-        x.id,
-        WidgetOptions(
-            title="abc",
-            description="aaa",
-            position=Position(
-                col=0,
-                row=3,
-                sizeX=3,
-                sizeY=3,
-            ),
-        ),
-        text="and this as well",
-    )
+    dashboard_widgets_api.create(x.id, WidgetOptions(
+        title='first widget',
+        description='description of the widget',
+        position=WidgetPosition(col=0, row=0, size_x=3, size_y=3)
+    ), text='this is _some_ **markdown**', width=1)
+
+    dashboard_widgets_api.create(x.id, WidgetOptions(
+        title='second',
+        position=WidgetPosition(col=0, row=3, size_x=3, size_y=3)
+    ), text='another text', width=1)
 
     data_sources = {x.warehouse_id: x.id for x in ws.data_sources.list()}
     warehouse_id = os.environ["TEST_DEFAULT_WAREHOUSE_ID"]
@@ -59,25 +45,11 @@ def test_dash2(ws):
         description="abc",
         name="this is a test query",
         query="SHOW DATABASES",
+        run_as_role='viewer'
     )
 
-    viz = da.add_table_viz(query.id, 'ABC', [VizColumn(name='databaseName', title='DB')])
-
-    da.add_widget(
-        x.id,
-        WidgetOptions(
-            title="XXX",
-            position=Position(
-                col=3,
-                row=0,
-                sizeX=3,
-                sizeY=6,
-            ),
-        ),
-        visualization_id=viz.id,
-    )
-
-    print(x)
+    y = query_visualizations_api.create_table(query.id, 'ABC Viz', [VizColumn(name='databaseName', title='DB')])
+    print(y)
 
 
 def test_dash(ws):
