@@ -70,11 +70,12 @@ class CommandExecutor:
     def run(self, code):
         code = self._trim_leading_whitespace(code)
 
-        # perform AST transformations for very repetitive tasks, like JSON serialization
-        code_tree = ast.parse(code)
-        json_serialize_transform = _ReturnToPrintJsonTransformer()
-        new_tree = json_serialize_transform.apply(code_tree)
-        code = ast.unparse(new_tree)
+        if self._language == Language.PYTHON:
+            # perform AST transformations for very repetitive tasks, like JSON serialization
+            code_tree = ast.parse(code)
+            json_serialize_transform = _ReturnToPrintJsonTransformer()
+            new_tree = json_serialize_transform.apply(code_tree)
+            code = ast.unparse(new_tree)
 
         ctx = self._running_command_context()
         result = self._commands.execute(
@@ -84,7 +85,11 @@ class CommandExecutor:
         results = result.results
         if result.status == compute.CommandStatus.FINISHED:
             self._raise_if_failed(results)
-            if results.result_type == compute.ResultType.TEXT and json_serialize_transform.has_return:
+            if (
+                self._language == Language.PYTHON
+                and results.result_type == compute.ResultType.TEXT
+                and json_serialize_transform.has_return
+            ):
                 # parse json from converted return statement
                 return json.loads(results.data)
             return results.data
@@ -95,9 +100,9 @@ class CommandExecutor:
     def install_notebook_library(self, library):
         return self.run(
             f"""
-        get_ipython().run_line_magic('pip', 'install {library}')
-        dbutils.library.restartPython()
-        """
+            get_ipython().run_line_magic('pip', 'install {library}')
+            dbutils.library.restartPython()
+            """
         )
 
     def _running_command_context(self) -> compute.ContextStatusResponse:
