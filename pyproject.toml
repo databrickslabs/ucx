@@ -182,7 +182,7 @@ branch = true
 parallel = true
 
 [tool.coverage.report]
-omit = ["src/databricks/labs/ucx/providers/mixins"]
+omit = ["src/databricks/labs/ucx/providers/mixins/*"]
 exclude_lines = [
     "no cov",
     "if __name__ == .__main__.:",
