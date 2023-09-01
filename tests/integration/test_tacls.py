@@ -5,7 +5,7 @@ from databricks.sdk import WorkspaceClient
 
 from databricks.labs.ucx.toolkits.table_acls import TaclToolkit
 
-logger = logging.getLogger(__name__)
+logging.getLogger('databricks.sdk').setLevel('DEBUG')
 
 
 def test_describe_all_tables(ws: WorkspaceClient, make_catalog, make_schema, make_table):
@@ -46,8 +46,8 @@ def test_describe_all_tables(ws: WorkspaceClient, make_catalog, make_schema, mak
 def test_all_grants_in_database(ws: WorkspaceClient, sql_exec, make_catalog, make_schema, make_table, make_group):
     warehouse_id = os.environ["TEST_DEFAULT_WAREHOUSE_ID"]
 
-    group_a = make_group()
-    group_b = make_group()
+    group_a = make_group(display_name='testgroup')
+    group_b = make_group(display_name='sdk_35wh')
     schema = make_schema()
     table = make_table(schema=schema, external=True)
 

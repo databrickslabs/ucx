@@ -8,11 +8,10 @@ from pathlib import Path
 import pytest
 from databricks.sdk.service.workspace import ImportFormat
 
-from databricks.labs.ucx.inventory.tacl_job import crawl_tacl
 from databricks.labs.ucx.providers.mixins.compute import CommandExecutor
 
-import logging
 logging.getLogger('databricks.sdk').setLevel('DEBUG')
+
 
 @pytest.fixture
 def fresh_wheel_file(tmp_path) -> Path:
@@ -47,7 +46,6 @@ def fresh_wheel_file(tmp_path) -> Path:
     except subprocess.CalledProcessError as e:
         raise RuntimeError(e.stderr) from None
 
-
 @pytest.fixture
 def wsfs_wheel(ws, fresh_wheel_file, make_random):
     my_user = ws.current_user.me().user_name
@@ -61,6 +59,20 @@ def wsfs_wheel(ws, fresh_wheel_file, make_random):
     yield wsfs_wheel
 
     ws.workspace.delete(workspace_location, recursive=True)
+
+@pytest.fixture
+def dbfs_wheel(ws, fresh_wheel_file, make_random):
+    my_user = ws.current_user.me().user_name
+    workspace_location = f"/FileStore/jars/{make_random(10)}"
+    ws.workspace.mkdirs(workspace_location)
+
+    dbfs_wheel = f"{workspace_location}/{fresh_wheel_file.name}"
+    with fresh_wheel_file.open("rb") as f:
+        ws.dbfs.upload(dbfs_wheel, f)
+
+    yield dbfs_wheel
+
+    ws.dbfs.delete(workspace_location, recursive=True)
 
 
 def test_this_wheel_installs(ws, wsfs_wheel):
@@ -93,7 +105,6 @@ def test_sql_backend_works(ws, wsfs_wheel):
 
 
 def test_wheel_job(ws, wsfs_wheel, sql_exec, make_catalog, make_schema, make_table, make_group):
-    logging.debug('print')
     commands = CommandExecutor(ws)
     commands.install_notebook_library(f"/Workspace{wsfs_wheel}")
 
@@ -102,4 +113,53 @@ def test_wheel_job(ws, wsfs_wheel, sql_exec, make_catalog, make_schema, make_tab
     inventory_schema = make_schema(catalog=make_catalog())
     inventory_catalog, inventory_schema = inventory_schema.split(".")
 
-    crawl_tacl(cluster_id, ws, inventory_catalog, inventory_schema)
+    crawl_tacl(cluster_id, ws, inventory_catalog, inventory_schema, wsfs_wheel)
+
+
+from databricks.sdk.service.jobs import Task
+from databricks.sdk.service.compute import ClusterSpec
+from dataclasses import dataclass
+from typing import Optional
+
+@dataclass
+class TaskExt(Task):
+    new_cluster: Optional['jobs.ClusterSpec'] = None
+
+
+@dataclass
+class ClusterSpecExt(ClusterSpec):
+    libraries: Optional['List[compute.Library]'] = None
+
+
+
+
+
+
+def test_job_creation(ws, wsfs_wheel):
+    logging.getLogger('databricks').setLevel('DEBUG')
+
+    from databricks.sdk.service import jobs, compute
+    #notebook_path = f'{os.path.dirname(wsfs_wheel)}/wrapper.py'
+    #ws.workspace.upload(notebook_path, io.BytesIO(b'from databricks.labs.ucx.toolkits.table_acls import main; main()'))
+    created_job = ws.jobs.create(
+        tasks=[
+            Task(
+                task_key='crawl',
+                python_wheel_task=jobs.PythonWheelTask(
+                    package_name='databricks.labs.ucx.toolkits.table_acls',
+                    entry_point='main',
+                    parameters=['inventory_catalog', 'inventory_schema'],
+                ),
+                libraries=[compute.Library(whl=f"dbfs:{wsfs_wheel}")],
+                new_cluster=compute.ClusterSpec(
+                    node_type_id=ws.clusters.select_node_type(local_disk=True),
+                    spark_version=ws.clusters.select_spark_version(latest=True),
+                    num_workers=1,
+                    ),
+                )
+        ],
+        name='[UCX] Crawl Tables',
+    )
+    ws.jobs.run_now(created_job.job_id).result()
+    print(created_job)
+

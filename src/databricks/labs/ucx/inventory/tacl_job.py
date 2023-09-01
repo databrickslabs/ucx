@@ -2,7 +2,7 @@ from databricks.sdk import WorkspaceClient
 from databricks.sdk.service import compute, jobs
 
 
-def create_tacl_job(cluster_id, wsfs_wheel):
+def create_tacl_job(wsfs_wheel):
     ws = WorkspaceClient()
 
     created_job = ws.jobs.create(
