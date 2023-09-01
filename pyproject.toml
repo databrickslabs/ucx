@@ -66,8 +66,8 @@ dependencies = [
 ]
 
 [tool.hatch.envs.unit.scripts]
-test = "pytest --cov src tests/unit/test_permissions.py"
-test-cov-report = "pytest --cov src tests/unit/test_permissions.py --cov-report=html"
+test = "pytest --cov src tests/unit"
+test-cov-report = "pytest --cov src tests/unit --cov-report=html"
 
 [tool.hatch.envs.integration]
 dependencies = [
