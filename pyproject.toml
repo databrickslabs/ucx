@@ -7,7 +7,7 @@ sources = ["src"]
 include = ["src"]
 
 [project]
-name = "databricks-labs-ucx"
+name = "databricks_labs_ucx"
 dynamic = ["version"]
 description = ''
 readme = "README.md"
@@ -50,6 +50,9 @@ test = [
 
 [project.scripts]
 ucx = "databricks.labs.ucx.__main__:entrypoint"
+
+[project.entry-points.dbr]
+tacl = "databricks.labs.ucx.toolkits.table_acls:main"
 
 [project.urls]
 Issues = "https://github.com/databricks/UC-Upgrade/issues"
