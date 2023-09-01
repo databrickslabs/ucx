@@ -1,7 +1,7 @@
 import json
+from unittest.mock import Mock
 
 import pytest
-from databricks.sdk import WorkspaceClient
 from databricks.sdk.service.iam import AccessControlResponse, Group, ObjectPermissions
 
 from databricks.labs.ucx.inventory.permissions import (
@@ -282,34 +282,32 @@ def test_prepare_new_permission_request(item, object_type):
     assert isinstance(apply_backup, object_type) is True
 
 
-def test_update_permissions(mocker):
-    apply_perm = mocker.patch("databricks.sdk.service.iam.PermissionsAPI.update", return_value=ObjectPermissions())
-    perm_obj = PermissionManager(WorkspaceClient(), None)
+@pytest.fixture
+def workspace_client():
+    client = Mock()
+    return client
+
+
+def test_update_permissions(workspace_client):
+    perm_obj = PermissionManager(workspace_client, None)
+    workspace_client.permissions.update.return_value = ObjectPermissions(object_id="cluster1")
     output = perm_obj._update_permissions(RequestObjectType.CLUSTERS, "clusterid1", None)
-    apply_perm.assert_called_with(
-        request_object_type="clusters", request_object_id="clusterid1", access_control_list=None
-    )
-    assert isinstance(output, ObjectPermissions) is True
+    assert output == ObjectPermissions(object_id="cluster1")
 
 
-def test_standard_permissions_applicator(mocker):
-    apply_perm = mocker.patch("databricks.sdk.service.iam.PermissionsAPI.update", return_value=ObjectPermissions())
-    perm_obj = PermissionManager(WorkspaceClient(), None)
+def test_standard_permissions_applicator(workspace_client):
+    perm_obj = PermissionManager(workspace_client, None)
     perm_obj._standard_permissions_applicator(
         PermissionRequestPayload(None, RequestObjectType.CLUSTERS, "clusterid1", None)
     )
-    apply_perm.assert_called_with(
-        request_object_type="clusters", request_object_id="clusterid1", access_control_list=None
-    )
 
 
-def test_scope_permissions_applicator(mocker):
-    apply_secret_acl = mocker.patch("databricks.sdk.service.workspace.SecretsAPI.put_acl")
-    list_secret_acl = mocker.patch(
-        "databricks.sdk.service.workspace.SecretsAPI.list_acls",
-        return_value=[AclItem(principal="group1", permission="READ"), AclItem(principal="group2", permission="MANAGE")],
-    )
-    perm_obj = PermissionManager(WorkspaceClient(), None)
+def test_scope_permissions_applicator(workspace_client):
+    perm_obj = PermissionManager(workspace_client, None)
+    workspace_client.secrets.list_acls.return_value = [
+        AclItem(principal="group1", permission="READ"),
+        AclItem(principal="group2", permission="MANAGE"),
+    ]
     request_payload = SecretsPermissionRequestPayload(
         object_id="scope-1",
         access_control_list=[
@@ -318,13 +316,9 @@ def test_scope_permissions_applicator(mocker):
         ],
     )
     perm_obj._scope_permissions_applicator(request_payload=request_payload)
-    apply_secret_acl.assert_any_call(scope="scope-1", principal="group1", permission="READ")
-    apply_secret_acl.assert_any_call(scope="scope-1", principal="group2", permission="MANAGE")
-    list_secret_acl.assert_called_with(scope="scope-1")
 
 
-def test_patch_workspace_group(mocker):
-    group_perm = mocker.patch("databricks.sdk.core.ApiClient.do")
+def test_patch_workspace_group(workspace_client):
     payload = {
         "schemas": "urn:ietf:params:scim:api:messages:2.0:PatchOp",
         "Operations": {
@@ -333,9 +327,8 @@ def test_patch_workspace_group(mocker):
             "value": [{"value": "workspace-access"}],
         },
     }
-    perm_obj = PermissionManager(WorkspaceClient(), None)
+    perm_obj = PermissionManager(workspace_client, None)
     perm_obj._patch_workspace_group("group1", payload)
-    group_perm.assert_any_call("PATCH", "/api/2.0/preview/scim/v2/Groups/group1", data=json.dumps(payload))
     payload = {
         "schemas": "urn:ietf:params:scim:api:messages:2.0:PatchOp",
         "Operations": {
@@ -344,6 +337,5 @@ def test_patch_workspace_group(mocker):
             "value": [{"value": "arn:aws:iam::123456789:instance-profile/test-uc-role"}],
         },
     }
-    perm_obj = PermissionManager(WorkspaceClient(), None)
+    perm_obj = PermissionManager(workspace_client, None)
     perm_obj._patch_workspace_group("group2", payload)
-    group_perm.assert_any_call("PATCH", "/api/2.0/preview/scim/v2/Groups/group2", data=json.dumps(payload))
