@@ -6,6 +6,7 @@ from databricks.labs.ucx.providers.groups_info import MigrationGroupInfo
 
 from databricks.sdk.service.iam import Group, ResourceMeta
 
+
 def test_account_groups_should_not_be_considered():
     client = Mock()
     users_group = Group(display_name="analysts", meta=ResourceMeta(resource_type='WorkspaceGroup'))
@@ -15,6 +16,7 @@ def test_account_groups_should_not_be_considered():
     group_conf = GroupsConfig(selected=[""])
 
     assert GroupManager(client, group_conf)._find_eligible_groups() == [users_group.display_name]
+
 
 def test_if_only_account_groups_it_should_return_empty_value():
     client = Mock()
@@ -26,28 +28,43 @@ def test_if_only_account_groups_it_should_return_empty_value():
 
     assert GroupManager(client, group_conf)._find_eligible_groups() == []
 
+
 def test_backup_group_should_be_created_with_name_defined_in_conf():
     client = Mock()
 
     analysts_group = Group(display_name="analysts", meta=ResourceMeta(resource_type='WorkspaceGroup'))
     client.groups.list.return_value = []
 
-    analysts_group_backup = Group(display_name="dbr_backup_analysts_group_backup", meta=ResourceMeta(resource_type='WorkspaceGroup'))
+    analysts_group_backup = Group(
+        display_name="dbr_backup_analysts_group_backup", meta=ResourceMeta(resource_type='WorkspaceGroup')
+    )
     client.groups.create.return_value = analysts_group_backup
 
-    group_conf = GroupsConfig(selected=[""], backup_group_prefix = "dbr_backup_")
+    group_conf = GroupsConfig(selected=[""], backup_group_prefix="dbr_backup_")
 
-    assert GroupManager(client, group_conf)._get_or_create_backup_group("analysts", analysts_group) == analysts_group_backup
+    assert (
+        GroupManager(client, group_conf)._get_or_create_backup_group("analysts", analysts_group)
+        == analysts_group_backup
+    )
+
 
 def test_backup_group_should_not_be_created_if_already_exists():
     client = Mock()
 
-    analysts_group_backup = Group(display_name="dbr_backup_analysts_group_backup", meta=ResourceMeta(resource_type='WorkspaceGroup'))
+    analysts_group_backup = Group(
+        display_name="dbr_backup_analysts_group_backup", meta=ResourceMeta(resource_type='WorkspaceGroup')
+    )
     client.groups.list.return_value = [analysts_group_backup]
 
     group_conf = GroupsConfig(selected=[""], backup_group_prefix="dbr_backup_")
 
-    assert GroupManager(client, group_conf)._get_or_create_backup_group("dbr_backup_analysts_group_backup", analysts_group_backup) == analysts_group_backup
+    assert (
+        GroupManager(client, group_conf)._get_or_create_backup_group(
+            "dbr_backup_analysts_group_backup", analysts_group_backup
+        )
+        == analysts_group_backup
+    )
+
 
 def test_prepare_groups_in_environment_with_one_group_in_conf():
     client = Mock()
@@ -70,6 +87,7 @@ def test_prepare_groups_in_environment_with_one_group_in_conf():
 
     group_info = MigrationGroupInfo(workspace=de_group, account=de_group, backup=backup_de_group)
     assert manager._migration_state.groups == [group_info]
+
 
 def test_prepare_groups_in_environment_with_no_groups_in_conf():
     client = Mock()
@@ -94,6 +112,7 @@ def test_prepare_groups_in_environment_with_no_groups_in_conf():
 
     group_info = MigrationGroupInfo(workspace=de_group, account=de_group, backup=backup_de_group)
     assert manager._migration_state.groups == [group_info]
+
 
 def test_replace_workspace_groups_with_account_groups():
     raise NotImplementedError
