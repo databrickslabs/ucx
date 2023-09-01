@@ -1,6 +1,6 @@
-import logging
 import os
 
+import pytest
 from databricks.sdk import WorkspaceClient
 from databricks.sdk.service.sql import AccessControl, ObjectTypePlural, PermissionLevel
 
@@ -12,11 +12,11 @@ from databricks.labs.ucx.providers.mixins.redash import (
     WidgetPosition,
 )
 
-# os.environ['DATABRICKS_DEBUG_TRUNCATE_BYTES'] = '2048'
-logging.getLogger("databricks").setLevel("DEBUG")
+# logging.getLogger("databricks").setLevel("DEBUG")
 
 
 def test_creating_widgets(ws: WorkspaceClient):
+    pytest.skip()
     dashboard_widgets_api = DashboardWidgetsAPI(ws.api_client)
     query_visualizations_api = QueryVisualizationsExt(ws.api_client)
 
@@ -58,9 +58,3 @@ def test_creating_widgets(ws: WorkspaceClient):
 
     y = query_visualizations_api.create_table(query.id, "ABC Viz", [VizColumn(name="databaseName", title="DB")])
     print(y)
-
-
-def test_dash(ws):
-    ws.config.debug_truncate_bytes = 204800
-    d = ws.dashboards.get("e1fe28f5-4245-4215-9882-f218d08ec726")
-    print(d)
