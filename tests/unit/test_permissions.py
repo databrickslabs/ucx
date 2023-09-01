@@ -322,28 +322,28 @@ def test_scope_permissions_applicator(mocker):
     apply_secret_acl.assert_any_call(scope="scope-1", principal="group2", permission="MANAGE")
     list_secret_acl.assert_called_with(scope="scope-1")
 
+
 def test_patch_workspace_group(mocker):
     group_perm = mocker.patch("databricks.sdk.core.ApiClient.do")
-    payload={
-                "schemas": "urn:ietf:params:scim:api:messages:2.0:PatchOp",
-                "Operations": {
-                "op": "add",
-                "path": "entitlements",
-                "value": [{"value": "workspace-access"}],
-            },
-            }
+    payload = {
+        "schemas": "urn:ietf:params:scim:api:messages:2.0:PatchOp",
+        "Operations": {
+            "op": "add",
+            "path": "entitlements",
+            "value": [{"value": "workspace-access"}],
+        },
+    }
     perm_obj = PermissionManager(WorkspaceClient(), None)
-    perm_obj._patch_workspace_group("group1",payload)
+    perm_obj._patch_workspace_group("group1", payload)
     group_perm.assert_any_call("PATCH", "/api/2.0/preview/scim/v2/Groups/group1", data=json.dumps(payload))
-    payload={
-                "schemas": "urn:ietf:params:scim:api:messages:2.0:PatchOp",
-                "Operations": {
-                "op": "add",
-                "path": "roles",
-                "value": [{"value": "arn:aws:iam::123456789:instance-profile/test-uc-role"}],
-            },
-            }
+    payload = {
+        "schemas": "urn:ietf:params:scim:api:messages:2.0:PatchOp",
+        "Operations": {
+            "op": "add",
+            "path": "roles",
+            "value": [{"value": "arn:aws:iam::123456789:instance-profile/test-uc-role"}],
+        },
+    }
     perm_obj = PermissionManager(WorkspaceClient(), None)
-    perm_obj._patch_workspace_group("group2",payload)
+    perm_obj._patch_workspace_group("group2", payload)
     group_perm.assert_any_call("PATCH", "/api/2.0/preview/scim/v2/Groups/group2", data=json.dumps(payload))
-    
