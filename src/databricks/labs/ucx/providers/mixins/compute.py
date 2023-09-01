@@ -85,7 +85,11 @@ class CommandExecutor:
         results = result.results
         if result.status == compute.CommandStatus.FINISHED:
             self._raise_if_failed(results)
-            if self._language == Language.PYTHON and results.result_type == compute.ResultType.TEXT and json_serialize_transform.has_return:
+            if (
+                self._language == Language.PYTHON
+                and results.result_type == compute.ResultType.TEXT
+                and json_serialize_transform.has_return
+            ):
                 # parse json from converted return statement
                 return json.loads(results.data)
             return results.data
