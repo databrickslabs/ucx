@@ -1,10 +1,10 @@
 from unittest.mock import Mock
 
-from databricks.labs.ucx.managers.group import GroupManager
-from databricks.labs.ucx.config import GroupsConfig
-from databricks.labs.ucx.providers.groups_info import MigrationGroupInfo
-
 from databricks.sdk.service.iam import Group, ResourceMeta
+
+from databricks.labs.ucx.config import GroupsConfig
+from databricks.labs.ucx.managers.group import GroupManager
+from databricks.labs.ucx.providers.groups_info import MigrationGroupInfo
 
 
 def test_account_groups_should_not_be_considered():
