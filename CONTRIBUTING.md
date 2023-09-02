@@ -133,14 +133,17 @@ make lint test
 
 Here are the example steps to submit your first contribution:
 
-1. `git checkout -b FEATURENAME`
-2. .. do the work
-3. `make fmt`
-4. `make lint`
-5. .. fix if any
-6. `make test`
+1. `git checkout main` (or `gcm` if you're using [ohmyzsh](https://ohmyz.sh/)).
+2. `git pull` (or `gl` if you're using [ohmyzsh](https://ohmyz.sh/)).
+3. `git checkout -b FEATURENAME` (or `gcb FEATURENAME` if you're using [ohmyzsh](https://ohmyz.sh/)).
+4. .. do the work
+5. `make fmt`
+6. `make lint`
 7. .. fix if any
-8. `git commit -a`
-9. `git push origin FEATURENAME`
-10. go to GitHub UI and create PR. Alternatively, `gh pr create` (if you have [GitHub CLI](https://cli.github.com/) installed).
-11. announce PR for the review
+8. `make test`
+9. .. fix if any
+10. `git commit -a`. Make sure to enter meaningful commit message title. 
+11. `git push origin FEATURENAME`
+12. go to GitHub UI and create PR. Alternatively, `gh pr create` (if you have [GitHub CLI](https://cli.github.com/) installed). 
+    Make sure to use meaningful pull request title, because it'll appear in the release notes.
+13. announce PR for the review
