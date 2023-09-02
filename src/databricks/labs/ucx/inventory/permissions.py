@@ -11,7 +11,6 @@ from databricks.sdk import WorkspaceClient
 from databricks.sdk.service.iam import AccessControlRequest, Group, ObjectPermissions
 from databricks.sdk.service.workspace import AclItem as SdkAclItem
 from ratelimit import limits, sleep_and_retry
-from tenacity import retry, stop_after_attempt, wait_fixed, wait_random
 
 from databricks.labs.ucx.inventory.inventorizer import BaseInventorizer
 from databricks.labs.ucx.inventory.table import InventoryTableManager
@@ -23,7 +22,7 @@ from databricks.labs.ucx.inventory.types import (
     RolesAndEntitlements,
 )
 from databricks.labs.ucx.providers.groups_info import GroupMigrationState
-from databricks.labs.ucx.utils import ThreadedExecution, safe_get_acls
+from databricks.labs.ucx.utils import ThreadedExecution, safe_get_scope_acls
 
 logger = logging.getLogger(__name__)
 
@@ -175,7 +174,8 @@ class PermissionManager:
                 f"with logical type {item.logical_object_type}"
             )
 
-    @retry(wait=wait_fixed(1) + wait_random(0, 2), stop=stop_after_attempt(5))
+    @sleep_and_retry
+    @limits(calls=20, period=1)
     def _scope_permissions_applicator(self, request_payload: SecretsPermissionRequestPayload):
         for _acl_item in request_payload.access_control_list:
             # this request will create OR update the ACL for the given principal
@@ -189,7 +189,7 @@ class PermissionManager:
             # the api might be inconsistent, therefore we need to check that the permissions were applied
             for _ in range(3):
                 time.sleep(random.random() * 2)
-                applied_acls = safe_get_acls(
+                applied_acls = safe_get_scope_acls(
                     self._ws, scope_name=request_payload.object_id, group_name=_acl_item.principal
                 )
                 assert applied_acls, f"Failed to apply permissions for {_acl_item.principal}"

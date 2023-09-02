@@ -22,7 +22,7 @@ from databricks.labs.ucx.config import (
 from databricks.labs.ucx.inventory.types import RequestObjectType
 from databricks.labs.ucx.providers.groups_info import GroupMigrationState
 from databricks.labs.ucx.toolkits.group_migration import GroupMigrationToolkit
-from databricks.labs.ucx.utils import safe_get_acls
+from databricks.labs.ucx.utils import safe_get_scope_acls
 
 from .utils import EnvironmentInfo, WorkspaceObjects
 
@@ -76,8 +76,8 @@ def _verify_group_permissions(
 
         for scope in _scopes:
             for base_group, target_group in zip(comparison_base, comparison_target, strict=True):
-                base_acl = safe_get_acls(ws, scope.name, base_group.display_name)
-                target_acl = safe_get_acls(ws, scope.name, target_group.display_name)
+                base_acl = safe_get_scope_acls(ws, scope.name, base_group.display_name)
+                target_acl = safe_get_scope_acls(ws, scope.name, target_group.display_name)
 
                 if base_acl:
                     if not target_acl:
