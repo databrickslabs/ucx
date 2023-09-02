@@ -176,7 +176,6 @@ def test_e2e(
         with_table_acls=False,
         inventory=InventoryConfig(table=inventory_table),
         groups=GroupsConfig(selected=[g[0].display_name for g in env.groups]),
-        auth=None,
         log_level="DEBUG",
     )
     toolkit = GroupMigrationToolkit(config)

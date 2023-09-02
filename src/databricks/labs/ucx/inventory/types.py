@@ -131,6 +131,8 @@ class PermissionsInventoryItem:
         return cls(
             object_id=raw["object_id"],
             logical_object_type=LogicalObjectType(raw["logical_object_type"]),
-            request_object_type=RequestObjectType(raw["request_object_type"]) if "request_object_type" in raw else None,
+            request_object_type=RequestObjectType(raw["request_object_type"])
+            if raw.get("request_object_type", None) is not None
+            else None,
             raw_object_permissions=raw.get("raw_object_permissions", None),
         )
