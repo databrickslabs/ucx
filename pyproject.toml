@@ -27,13 +27,12 @@ classifiers = [
 ]
 dependencies = [
     "databricks-sdk~=0.7.0",
-    "typer[all]>=0.9.0,<0.10.0",
-    "pyhocon>=0.3.60,<0.4.0",
-    "pydantic>=2.0.3, <3.0.0",
     "PyYAML>=6.0.0,<7.0.0",
-    "ratelimit>=2.2.1,<3.0.0",
+
+    # TODO: remove later
+    "typer[all]>=0.9.0,<0.10.0",
     "pandas>=2.0.3,<3.0.0",
-    "python-dotenv>=1.0.0,<=2.0.0",
+    "ratelimit>=2.2.1,<3.0.0",
     "tenacity>=8.2.2,<9.0.0",
 ]
 

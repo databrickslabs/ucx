@@ -184,6 +184,7 @@ class PermissionManager:
                 scope=request_payload.object_id, principal=_acl_item.principal, permission=_acl_item.permission
             )
             logger.debug(f"Applied new permissions for scope {request_payload.object_id}: {_acl_item}")
+            # TODO: add mixin to SDK
             # in-flight check for the applied permissions
             # the api might be inconsistent, therefore we need to check that the permissions were applied
             for _ in range(3):

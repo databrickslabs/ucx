@@ -208,7 +208,7 @@ class SecretScopeInventorizer(BaseInventorizer[InventoryObject]):
             object_id=scope.name,
             logical_object_type=LogicalObjectType.SECRET_SCOPE,
             request_object_type=None,
-            raw_object_permissions=json.dumps(acls_container.model_dump(mode="json")),
+            raw_object_permissions=json.dumps(acls_container.as_dict()),
         )
 
     def inventorize(self) -> list[PermissionsInventoryItem]:
