@@ -5,9 +5,7 @@ from pathlib import Path
 
 import pytest
 import yaml
-from pydantic import RootModel
 
-from databricks.labs.ucx.cli.utils import get_migration_config
 from databricks.labs.ucx.config import (
     GroupsConfig,
     InventoryConfig,
@@ -61,8 +59,9 @@ def test_reader(tmp_path: Path):
         config: MigrationConfig = mc(with_table_acls=False)
         config_file = tmp_path / "config.yml"
 
+        as_dict = config.as_dict()
         with config_file.open("w") as writable:
-            yaml.safe_dump(RootModel[MigrationConfig](config).model_dump(), writable)
+            yaml.safe_dump(as_dict, writable)
 
-        loaded = get_migration_config(config_file)
+        loaded = MigrationConfig.from_file(config_file)
         assert loaded == config
