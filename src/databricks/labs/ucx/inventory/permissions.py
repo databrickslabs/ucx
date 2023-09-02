@@ -22,7 +22,10 @@ from databricks.labs.ucx.inventory.types import (
     RolesAndEntitlements,
 )
 from databricks.labs.ucx.providers.groups_info import GroupMigrationState
-from databricks.labs.ucx.utils import ThreadedExecution, safe_get_scope_acls
+from databricks.labs.ucx.utils import (
+    ThreadedExecution,
+    safe_get_scope_acls_for_principal,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -189,7 +192,7 @@ class PermissionManager:
             # the api might be inconsistent, therefore we need to check that the permissions were applied
             for _ in range(3):
                 time.sleep(random.random() * 2)
-                applied_acls = safe_get_scope_acls(
+                applied_acls = safe_get_scope_acls_for_principal(
                     self._ws, scope_name=request_payload.object_id, group_name=_acl_item.principal
                 )
                 assert applied_acls, f"Failed to apply permissions for {_acl_item.principal}"

@@ -85,7 +85,7 @@ class WorkspaceLevelEntitlement(StrEnum):
     ALLOW_INSTANCE_POOL_CREATE = "allow-instance-pool-create"
 
 
-def safe_get_scope_acls(ws: WorkspaceClient, scope_name: str, group_name: str) -> AclItem | None:
+def safe_get_scope_acls_for_principal(ws: WorkspaceClient, scope_name: str, group_name: str) -> AclItem | None:
     all_acls = ws.secrets.list_acls(scope=scope_name)
     for acl in all_acls:
         if acl.principal == group_name:
