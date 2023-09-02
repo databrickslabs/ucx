@@ -8,6 +8,28 @@ Imagine the `WorkspaceClient` as the main control center and the "mixin" process
 You can find an example of how mixins are used with `StatementExecutionExt`. There's a specific example of how to make something 
 work with the WorkspaceClient using `StatementExecutionExt`. This example can help you understand how mixins work in practice.
 
+Favoring standard libraries over external dependencies, especially in specific contexts like Databricks, is a best practice in software 
+development. There are several reasons why this approach is encouraged. Standard libraries are typically well-vetted, thoroughly tested,
+and maintained by the official maintainers of the programming language or platform. This ensures a higher level of stability and reliability. 
+External dependencies, especially lesser-known or unmaintained ones, can introduce bugs, security vulnerabilities, or compatibility issues 
+that can be challenging to resolve. Adding external dependencies increases the complexity of your codebase. Each dependency may have its own 
+set of dependencies, potentially leading to a complex web of dependencies that can be difficult to manage. This complexity can lead to 
+maintenance challenges, increased risk, and longer build times. External dependencies can pose security risks. If a library or package has 
+known security vulnerabilities and is widely used, it becomes an attractive target for attackers. Minimizing external dependencies reduces 
+the potential attack surface and makes it easier to keep your code secure. Relying on standard libraries enhances code portability. It ensures 
+your code can run on different platforms and environments without being tightly coupled to specific external dependencies. This is particularly 
+important in settings like Databricks, where you may need to run your code on different clusters or setups. External dependencies may have their 
+versioning schemes and compatibility issues. When using standard libraries, you have more control over versioning and can avoid conflicts between 
+different dependencies in your project. Fewer external dependencies mean faster build and deployment times. Downloading, installing, and managing 
+external packages can slow down these processes, especially in large-scale projects or distributed computing environments like Databricks.
+External dependencies can be abandoned or go unmaintained over time. This can lead to situations where your project relies on outdated or 
+unsupported code. When you depend on standard libraries, you have confidence that the core functionality you rely on will continue to be maintained
+and improved. 
+
+While minimizing external dependencies is essential, exceptions can be made case-by-case. There are situations where external dependencies are 
+justified, such as when a well-established and actively maintained library provides significant benefits, like time savings, performance improvements, 
+or specialized functionality unavailable in standard libraries.
+
 ## Code Organization
 
 When writing code, divide it into two main parts: **Components for API Interaction** and **Components for Business Logic**.
