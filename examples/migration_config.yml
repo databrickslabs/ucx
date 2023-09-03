@@ -4,6 +4,8 @@ inventory:
     database: default
     name: uc_migration_inventory
 
+tacl:
+  databases: [ "default" ]
 
 warehouse_id: None
 

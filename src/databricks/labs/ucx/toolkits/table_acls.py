@@ -1,3 +1,4 @@
+import argparse
 import logging
 
 from databricks.sdk import WorkspaceClient
@@ -11,6 +12,7 @@ from databricks.labs.ucx.tacl.grants import GrantsCrawler
 from databricks.labs.ucx.tacl.tables import TablesCrawler
 
 logging.getLogger("databricks.labs.ucx").setLevel("DEBUG")
+
 
 
 class TaclToolkit:
@@ -31,9 +33,25 @@ class TaclToolkit:
         return StatementExecutionBackend(ws, warehouse_id)
 
 
-def main(inventory_catalog, inventory_schema, warehouse_id=None):
+def main():
+
+    parser=argparse.ArgumentParser()
+
+    parser.add_argument("--inventory_catalog")
+    parser.add_argument("--inventory_schema")
+    parser.add_argument("--databases", required=False, default="default")
+    parser.add_argument("--warehouse_id", required=False, default=None)
+
+    args=parser.parse_args()
+
+    inventory_catalog = args.inventory_catalog
+    inventory_schema = args.inventory_schema
+    warehouse_id = args.warehouse_id
+    databases = args.databases.split(",")
+
     ws = WorkspaceClient
     tak = TaclToolkit(ws, inventory_catalog, inventory_schema, warehouse_id)
-    tak.grants_snapshot("default")
-    # TODO check if inventory tables are populated
-    # TODO implement all databases
+
+    for database in databases:
+        #tak.database_snapshot(database.split(".")[1])
+        tak.grants_snapshot(database)

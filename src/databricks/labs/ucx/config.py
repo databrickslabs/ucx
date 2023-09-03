@@ -107,3 +107,8 @@ class MigrationConfig:
 
     def to_json(self) -> str:
         return RootModel[MigrationConfig](self).model_dump_json(indent=4)
+
+
+@dataclass
+class TaclConfig:
+    selected: list[str] | None = ["default"]

@@ -8,10 +8,10 @@ from databricks.labs.ucx.toolkits.table_acls import TaclToolkit
 logging.getLogger('databricks.sdk').setLevel('DEBUG')
 
 
-def test_describe_all_tables(ws: WorkspaceClient, make_catalog, make_schema, make_table):
+def test_describe_all_tables(ws: WorkspaceClient, make_catalog, make_schema, make_table, sql_fetch_all):
     warehouse_id = os.environ["TEST_DEFAULT_WAREHOUSE_ID"]
 
-    logger.info("setting up fixtures")
+    logging.info("setting up fixtures")
     schema = make_schema(catalog="hive_metastore")
     managed_table = make_table(schema=schema)
     external_table = make_table(schema=schema, external=True)
@@ -19,7 +19,7 @@ def test_describe_all_tables(ws: WorkspaceClient, make_catalog, make_schema, mak
     view = make_table(schema=schema, ctas="SELECT 2+2 AS four", view=True)
     non_delta = make_table(schema=schema, non_detla=True)
 
-    logger.info(
+    logging.info(
         f"managed_table={managed_table}, "
         f"external_table={external_table}, "
         f"tmp_table={tmp_table}, "
@@ -30,9 +30,18 @@ def test_describe_all_tables(ws: WorkspaceClient, make_catalog, make_schema, mak
     inventory_catalog, inventory_schema = inventory_schema.split(".")
     tak = TaclToolkit(ws, inventory_catalog, inventory_schema, warehouse_id)
 
+
+
+    tacl_tables = f"{inventory_catalog}.{inventory_schema}.tables"
+
     all_tables = {}
     for t in tak.database_snapshot(schema.split(".")[1]):
         all_tables[t.key] = t
+
+    tables = sql_fetch_all(f"SELECT * FROM {tacl_tables}")
+
+    for i in tables:
+        print(i)
 
     assert len(all_tables) == 5
     assert all_tables[non_delta].table_format == "JSON"
@@ -43,7 +52,7 @@ def test_describe_all_tables(ws: WorkspaceClient, make_catalog, make_schema, mak
     assert all_tables[view].view_text == "SELECT 2+2 AS four"
 
 
-def test_all_grants_in_database(ws: WorkspaceClient, sql_exec, make_catalog, make_schema, make_table, make_group):
+def test_all_grants_in_database(ws: WorkspaceClient, sql_exec, sql_fetch_all, make_catalog, make_schema, make_table, make_group):
     warehouse_id = os.environ["TEST_DEFAULT_WAREHOUSE_ID"]
 
     group_a = make_group(display_name='testgroup')
@@ -60,10 +69,16 @@ def test_all_grants_in_database(ws: WorkspaceClient, sql_exec, make_catalog, mak
     inventory_catalog, inventory_schema = inventory_schema.split(".")
     tak = TaclToolkit(ws, inventory_catalog, inventory_schema, warehouse_id)
 
+    tacl_grants = f"{inventory_catalog}.{inventory_schema}.grants"
+
+    print(schema.split(".")[1])
+
     all_grants = {}
     for grant in tak.grants_snapshot(schema.split(".")[1]):
-        logger.info(f"grant:\n{grant}\n  hive: {grant.hive_grant_sql()}\n  uc: {grant.uc_grant_sql()}")
+        logging.info(f"grant:\n{grant}\n  hive: {grant.hive_grant_sql()}\n  uc: {grant.uc_grant_sql()}")
         all_grants[f"{grant.principal}.{grant.object_key}"] = grant.action_type
+
+    grants = sql_fetch_all(f"SELECT * FROM {tacl_grants}")
 
     assert len(all_grants) >= 2, "must have at least two grants"
     assert all_grants[f"{group_a.display_name}.{table}"] == "SELECT"

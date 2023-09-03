@@ -1,5 +1,4 @@
 import logging
-import os
 import shutil
 import subprocess
 import sys
@@ -7,8 +6,8 @@ from pathlib import Path
 
 import pytest
 from databricks.sdk.service.workspace import ImportFormat
-
 from databricks.labs.ucx.providers.mixins.compute import CommandExecutor
+from databricks.labs.ucx.inventory.tacl_job import create_tacl_job
 
 logging.getLogger('databricks.sdk').setLevel('DEBUG')
 
@@ -46,6 +45,7 @@ def fresh_wheel_file(tmp_path) -> Path:
     except subprocess.CalledProcessError as e:
         raise RuntimeError(e.stderr) from None
 
+
 @pytest.fixture
 def wsfs_wheel(ws, fresh_wheel_file, make_random):
     my_user = ws.current_user.me().user_name
@@ -63,16 +63,17 @@ def wsfs_wheel(ws, fresh_wheel_file, make_random):
 @pytest.fixture
 def dbfs_wheel(ws, fresh_wheel_file, make_random):
     my_user = ws.current_user.me().user_name
-    workspace_location = f"/FileStore/jars/{make_random(10)}"
-    ws.workspace.mkdirs(workspace_location)
+    dbfs_location = f"/FileStore/jars/{make_random(10)}"
+    ws.workspace.mkdirs(dbfs_location)
 
-    dbfs_wheel = f"{workspace_location}/{fresh_wheel_file.name}"
+    dbfs_wheel = f"{dbfs_location}/{fresh_wheel_file.name}"
     with fresh_wheel_file.open("rb") as f:
         ws.dbfs.upload(dbfs_wheel, f)
 
     yield dbfs_wheel
 
-    ws.dbfs.delete(workspace_location, recursive=True)
+    ws.dbfs.delete(dbfs_location, recursive=True)
+    ws.workspace.delete(dbfs_location)
 
 
 def test_this_wheel_installs(ws, wsfs_wheel):
@@ -104,62 +105,66 @@ def test_sql_backend_works(ws, wsfs_wheel):
     assert len(database_names) > 0
 
 
-def test_wheel_job(ws, wsfs_wheel, sql_exec, make_catalog, make_schema, make_table, make_group):
-    commands = CommandExecutor(ws)
-    commands.install_notebook_library(f"/Workspace{wsfs_wheel}")
+def test_job_creation(ws, dbfs_wheel, sql_exec, sql_fetch_all, make_catalog, make_schema, make_table, make_group):
 
-    cluster_id = os.environ["DATABRICKS_CLUSTER_ID"]
+    group_a = make_group(display_name='sdk_group_a')
+    group_b = make_group(display_name='sdk_group_b')
+    schema_a = make_schema()
+    schema_b = make_schema()
+    managed_table = make_table(schema=schema_a)
+    tmp_table = make_table(schema=schema_b, ctas="SELECT 2+2 AS four")
+    view = make_table(schema=schema_a, ctas="SELECT 2+2 AS four", view=True)
+
+    logging.info(
+        f"managed_table={managed_table}, "
+        f"tmp_table={tmp_table}, "
+        f"view={view}"
+    )
+
+    sql_exec(f"GRANT USAGE ON SCHEMA default TO {group_a.display_name}")
+    sql_exec(f"GRANT USAGE ON SCHEMA default TO {group_b.display_name}")
+    sql_exec(f"GRANT SELECT ON TABLE {managed_table} TO {group_a.display_name}")
+    sql_exec(f"GRANT SELECT ON TABLE {tmp_table} TO {group_b.display_name}")
+    sql_exec(f"GRANT SELECT ON TABLE {view} TO {group_a.display_name}")
+    sql_exec(f"GRANT MODIFY ON SCHEMA {schema_b} TO {group_b.display_name}")
 
     inventory_schema = make_schema(catalog=make_catalog())
     inventory_catalog, inventory_schema = inventory_schema.split(".")
 
-    crawl_tacl(cluster_id, ws, inventory_catalog, inventory_schema, wsfs_wheel)
+    created_job = create_tacl_job(ws, dbfs_wheel)
+
+    databases = [schema_a.split(".")[1], schema_b.split(".")[1]]
+
+    ws.jobs.run_now(created_job.job_id, python_named_params={"inventory_catalog": inventory_catalog,
+                                                             "inventory_schema": inventory_schema,
+                                                             "databases": ",".join(databases)}).result()
+
+    tacl_tables = f"{inventory_catalog}.{inventory_schema}.tables"
+    tacl_grants = f"{inventory_catalog}.{inventory_schema}.grants"
+
+    tables = sql_fetch_all(f"SELECT * FROM {tacl_tables}")
+    grants = sql_fetch_all(f"SELECT * FROM {tacl_grants}")
+
+    all_tables = {}
+    for t in tables:
+        print(t.as_dict())
+        all_tables[t.as_dict()["name"]] = t.as_dict()
+
+    all_grants = {}
+    for grant in grants:
+        print(grant.as_dict())
+        all_grants[grant.as_dict()["principal"]] = grant
 
 
-from databricks.sdk.service.jobs import Task
-from databricks.sdk.service.compute import ClusterSpec
-from dataclasses import dataclass
-from typing import Optional
-
-@dataclass
-class TaskExt(Task):
-    new_cluster: Optional['jobs.ClusterSpec'] = None
-
-
-@dataclass
-class ClusterSpecExt(ClusterSpec):
-    libraries: Optional['List[compute.Library]'] = None
-
-
-
-
-
-
-def test_job_creation(ws, wsfs_wheel):
-    logging.getLogger('databricks').setLevel('DEBUG')
-
-    from databricks.sdk.service import jobs, compute
-    #notebook_path = f'{os.path.dirname(wsfs_wheel)}/wrapper.py'
-    #ws.workspace.upload(notebook_path, io.BytesIO(b'from databricks.labs.ucx.toolkits.table_acls import main; main()'))
-    created_job = ws.jobs.create(
-        tasks=[
-            Task(
-                task_key='crawl',
-                python_wheel_task=jobs.PythonWheelTask(
-                    package_name='databricks.labs.ucx.toolkits.table_acls',
-                    entry_point='main',
-                    parameters=['inventory_catalog', 'inventory_schema'],
-                ),
-                libraries=[compute.Library(whl=f"dbfs:{wsfs_wheel}")],
-                new_cluster=compute.ClusterSpec(
-                    node_type_id=ws.clusters.select_node_type(local_disk=True),
-                    spark_version=ws.clusters.select_spark_version(latest=True),
-                    num_workers=1,
-                    ),
-                )
-        ],
-        name='[UCX] Crawl Tables',
-    )
-    ws.jobs.run_now(created_job.job_id).result()
-    print(created_job)
-
+    print(all_grants)
+    print(all_tables)
+    assert len(all_tables) == 3
+    assert all_tables[managed_table].object_type == "MANAGED"
+    assert all_tables[tmp_table].object_type == "MANAGED"
+    assert all_tables[view].object_type == "VIEW"
+    assert all_tables[view].view_text == "SELECT 2+2 AS four"
+    assert len(all_grants) >= 2, "must have at least two grants"
+    #assert all_grants[f"{group_a.display_name}.{managed_table}"] == "SELECT"
+    #assert all_grants[f"{group_a.display_name}.{view}"] == "SELECT"
+    #assert all_grants[f"{group_b.display_name}.{tmp_table}"] == "SELECT"
+    #assert all_grants[f"{group_b.display_name}.{schema_b}"] == "MODIFY"
