@@ -28,6 +28,24 @@ dbutils.library.restartPython()
 
 """
 
+CONFIG_FILE = """
+inventory:
+  table:
+    catalog: main
+    database: default
+    name: uc_migration_inventory
+
+tacl:
+  databases: [ "default" ]
+
+warehouse_id: None
+
+groups:
+  selected: [ "analyst" ]
+
+num_threads: 80
+"""
+
 # install logging backend
 _install()
 logger = logging.getLogger(__name__)
@@ -83,6 +101,7 @@ def build_wheel():
 def upload_artifacts(folder_base, local_wheel_file, wheel_file_name, ws):
     """Helper to upload artifacts into a workspace folder"""
     remote_wheel_file = f"{folder_base}/{wheel_file_name}"
+    remote_dbfs_wheel_file = f"/FileStore/jars/{folder_base}/{wheel_file_name}"
     remote_notebook_file = f"{folder_base}/install_ucx.py"
     remote_configuration_file = f"{folder_base}/ucx_config.yaml"
     logger.info(f"Remote wheel file: {remote_wheel_file}")
@@ -93,8 +112,11 @@ def upload_artifacts(folder_base, local_wheel_file, wheel_file_name, ws):
     with open(local_wheel_file, "rb") as fh:
         ws.workspace.upload(path=remote_wheel_file, content=fh.read(), format=ImportFormat.AUTO)
     buf = BytesIO(INSTALL_NOTEBOOK.format(remote_wheel_file=remote_wheel_file).encode())
+    configs = BytesIO(CONFIG_FILE.format(remote_wheel_file=remote_wheel_file).encode())
     ws.workspace.upload(path=remote_notebook_file, content=buf)
-    ws.workspace.upload(path=remote_configuration_file, content=buf)
+    ws.workspace.upload(path=remote_configuration_file, content=configs)
+    with open(local_wheel_file, "rb") as fh:
+        ws.dbfs.upload(path=remote_dbfs_wheel_file, content=fh.read(), format=ImportFormat.AUTO)
 
 
 def main():
