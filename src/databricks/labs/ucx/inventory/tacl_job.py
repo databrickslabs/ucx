@@ -1,13 +1,15 @@
 import logging
-from databricks.sdk.service import compute, jobs
-import yaml
 
-from databricks.labs.ucx.config import InventoryConfig, TaclConfig
+from databricks.sdk.service import compute, jobs
+from databricks.labs.ucx.config import MigrationConfig
 
 logger = logging.getLogger(__name__)
 
 
 def create_tacl_job(ws, dbfs_wheel, config_file):
+
+    config = MigrationConfig.from_file(config_file)
+
 
     created_job = ws.jobs.create(
         tasks=[

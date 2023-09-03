@@ -91,23 +91,22 @@ class ConnectConfig:
 
 
 @dataclass
+class TaclConfig:
+    databases: list[str]
+
+    @classmethod
+    def from_dict(cls, raw: dict):
+        return cls(**raw)
+
+
+@dataclass
 class MigrationConfig:
     inventory: InventoryConfig
     groups: GroupsConfig
+    tacl: TaclConfig
     connect: ConnectConfig | None = None
     num_threads: int | None = 4
     log_level: str | None = "INFO"
-<<<<<<< HEAD
-    warehouse_id: str | None = None
-=======
-
-    def __post_init__(self):
-        if self.connect is None:
-            self.connect = ConnectConfig()
-        if self.with_table_acls:
-            msg = "Table ACLS are not yet implemented"
-            raise NotImplementedError(msg)
->>>>>>> main
 
     def as_dict(self) -> dict:
         from dataclasses import fields, is_dataclass
@@ -129,8 +128,8 @@ class MigrationConfig:
     def from_dict(cls, raw: dict) -> "MigrationConfig":
         return cls(
             inventory=InventoryConfig.from_dict(raw.get("inventory", {})),
-            with_table_acls=raw.get("with_table_acls", False),
             groups=GroupsConfig.from_dict(raw.get("groups", {})),
+            tacl=TaclConfig.from_dict(raw.get("tacl", {})),
             connect=ConnectConfig.from_dict(raw.get("connect", {})),
             num_threads=raw.get("num_threads", 4),
             log_level=raw.get("log_level", "INFO"),
@@ -165,14 +164,3 @@ class MigrationConfig:
             product="ucx",
             product_version=__version__,
         )
-<<<<<<< HEAD
-
-    def to_json(self) -> str:
-        return RootModel[MigrationConfig](self).model_dump_json(indent=4)
-
-
-@dataclass
-class TaclConfig:
-    selected: list[str] | None = ["default"]
-=======
->>>>>>> main
