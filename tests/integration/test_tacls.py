@@ -51,10 +51,10 @@ def test_all_grants_in_database(ws: WorkspaceClient, sql_exec, make_catalog, mak
     schema = make_schema()
     table = make_table(schema=schema, external=True)
 
-    sql_exec(f"GRANT USAGE ON SCHEMA default TO {group_a.display_name}")
-    sql_exec(f"GRANT USAGE ON SCHEMA default TO {group_b.display_name}")
-    sql_exec(f"GRANT SELECT ON TABLE {table} TO {group_a.display_name}")
-    sql_exec(f"GRANT MODIFY ON SCHEMA {schema} TO {group_b.display_name}")
+    sql_exec(f"GRANT USAGE ON SCHEMA default TO `{group_a.display_name}`")
+    sql_exec(f"GRANT USAGE ON SCHEMA default TO `{group_b.display_name}`")
+    sql_exec(f"GRANT SELECT ON TABLE {table} TO `{group_a.display_name}`")
+    sql_exec(f"GRANT MODIFY ON SCHEMA {schema} TO `{group_b.display_name}`")
 
     inventory_schema = make_schema(catalog=make_catalog())
     inventory_catalog, inventory_schema = inventory_schema.split(".")
