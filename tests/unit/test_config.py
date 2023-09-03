@@ -50,7 +50,7 @@ def test_reader(tmp_path: Path):
             MigrationConfig,
             inventory=InventoryConfig(table=InventoryTable(catalog="catalog", database="database", name="name")),
             groups=GroupsConfig(auto=True),
-            tacl=TaclConfig(databases=["default"])
+            #tacl=TaclConfig(databases=["default"])
         )
 
         config: MigrationConfig = mc()

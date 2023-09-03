@@ -6,10 +6,10 @@ from databricks.labs.ucx.config import MigrationConfig
 logger = logging.getLogger(__name__)
 
 
-def create_tacl_job(ws, dbfs_wheel, config_file):
+def create_tacl_job(ws, dbfs_wheel, config_file=None):
 
-    config = MigrationConfig.from_file(config_file)
-
+    if config_file:
+        configs = MigrationConfig.from_file(config_file)
 
     created_job = ws.jobs.create(
         tasks=[

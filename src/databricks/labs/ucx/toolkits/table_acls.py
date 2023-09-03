@@ -14,7 +14,6 @@ from databricks.labs.ucx.tacl.tables import TablesCrawler
 logging.getLogger("databricks.labs.ucx").setLevel("DEBUG")
 
 
-
 class TaclToolkit:
     def __init__(self, ws: WorkspaceClient, inventory_catalog, inventory_schema, warehouse_id=None):
         self._tc = TablesCrawler(self._backend(ws, warehouse_id), inventory_catalog, inventory_schema)
@@ -53,5 +52,4 @@ def main():
     tak = TaclToolkit(ws, inventory_catalog, inventory_schema, warehouse_id)
 
     for database in databases:
-        #tak.database_snapshot(database.split(".")[1])
         tak.grants_snapshot(database)

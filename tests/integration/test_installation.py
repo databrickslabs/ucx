@@ -147,17 +147,12 @@ def test_job_creation(ws, dbfs_wheel, sql_exec, sql_fetch_all, make_catalog, mak
 
     all_tables = {}
     for t in tables:
-        print(t.as_dict())
         all_tables[t.as_dict()["name"]] = t.as_dict()
 
     all_grants = {}
     for grant in grants:
-        print(grant.as_dict())
         all_grants[grant.as_dict()["principal"]] = grant
 
-
-    print(all_grants)
-    print(all_tables)
     assert len(all_tables) == 3
     assert all_tables[managed_table].object_type == "MANAGED"
     assert all_tables[tmp_table].object_type == "MANAGED"
