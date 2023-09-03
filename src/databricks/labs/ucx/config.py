@@ -1,6 +1,7 @@
+from dataclasses import dataclass
+from pathlib import Path
+
 from databricks.sdk.core import Config
-from pydantic import RootModel
-from pydantic.dataclasses import dataclass
 
 from databricks.labs.ucx.__about__ import __version__
 
@@ -17,6 +18,10 @@ class InventoryTable:
     def to_spark(self):
         return self.__repr__()
 
+    @classmethod
+    def from_dict(cls, raw: dict):
+        return cls(**raw)
+
 
 @dataclass
 class GroupsConfig:
@@ -32,10 +37,18 @@ class GroupsConfig:
             msg = "No selected groups provided, but auto-collection is disabled"
             raise ValueError(msg)
 
+    @classmethod
+    def from_dict(cls, raw: dict):
+        return cls(**raw)
+
 
 @dataclass
 class InventoryConfig:
     table: InventoryTable
+
+    @classmethod
+    def from_dict(cls, raw: dict):
+        return cls(table=InventoryTable.from_dict(raw.get("table")))
 
 
 @dataclass
@@ -72,6 +85,10 @@ class ConnectConfig:
             rate_limit=cfg.rate_limit,
         )
 
+    @classmethod
+    def from_dict(cls, raw: dict):
+        return cls(**raw)
+
 
 @dataclass
 class MigrationConfig:
@@ -80,7 +97,51 @@ class MigrationConfig:
     connect: ConnectConfig | None = None
     num_threads: int | None = 4
     log_level: str | None = "INFO"
+<<<<<<< HEAD
     warehouse_id: str | None = None
+=======
+
+    def __post_init__(self):
+        if self.connect is None:
+            self.connect = ConnectConfig()
+        if self.with_table_acls:
+            msg = "Table ACLS are not yet implemented"
+            raise NotImplementedError(msg)
+>>>>>>> main
+
+    def as_dict(self) -> dict:
+        from dataclasses import fields, is_dataclass
+
+        def inner(x):
+            if is_dataclass(x):
+                result = []
+                for f in fields(x):
+                    value = inner(getattr(x, f.name))
+                    if not value:
+                        continue
+                    result.append((f.name, value))
+                return dict(result)
+            return x
+
+        return inner(self)
+
+    @classmethod
+    def from_dict(cls, raw: dict) -> "MigrationConfig":
+        return cls(
+            inventory=InventoryConfig.from_dict(raw.get("inventory", {})),
+            with_table_acls=raw.get("with_table_acls", False),
+            groups=GroupsConfig.from_dict(raw.get("groups", {})),
+            connect=ConnectConfig.from_dict(raw.get("connect", {})),
+            num_threads=raw.get("num_threads", 4),
+            log_level=raw.get("log_level", "INFO"),
+        )
+
+    @classmethod
+    def from_file(cls, config_file: Path) -> "MigrationConfig":
+        from yaml import safe_load
+
+        raw = safe_load(config_file.read_text())
+        return MigrationConfig.from_dict({} if not raw else raw)
 
     def to_databricks_config(self) -> Config:
         connect = self.connect
@@ -104,6 +165,7 @@ class MigrationConfig:
             product="ucx",
             product_version=__version__,
         )
+<<<<<<< HEAD
 
     def to_json(self) -> str:
         return RootModel[MigrationConfig](self).model_dump_json(indent=4)
@@ -112,3 +174,5 @@ class MigrationConfig:
 @dataclass
 class TaclConfig:
     selected: list[str] | None = ["default"]
+=======
+>>>>>>> main
