@@ -3,6 +3,7 @@ from dataclasses import asdict, dataclass
 
 import pandas as pd
 from databricks.sdk.service.iam import ObjectPermissions
+from databricks.sdk.service.sql import GetResponse as SqlPermissions
 from databricks.sdk.service.sql import ObjectTypePlural as SqlRequestObjectType
 from databricks.sdk.service.workspace import AclItem as SdkAclItem
 from databricks.sdk.service.workspace import AclPermission as SdkAclPermission
@@ -116,11 +117,17 @@ class PermissionsInventoryItem:
         return json.loads(self.raw_object_permissions)
 
     @property
-    def typed_object_permissions(self) -> ObjectPermissions | AclItemsContainer | RolesAndEntitlements:
+    def typed_object_permissions(self) -> ObjectPermissions | AclItemsContainer | RolesAndEntitlements | SqlPermissions:
         if self.logical_object_type == LogicalObjectType.SECRET_SCOPE:
             return AclItemsContainer.from_dict(self.object_permissions)
         elif self.logical_object_type in [LogicalObjectType.ROLES, LogicalObjectType.ENTITLEMENTS]:
             return RolesAndEntitlements(**self.object_permissions)
+        elif self.logical_object_type in [
+            LogicalObjectType.ALERT,
+            LogicalObjectType.DASHBOARD,
+            LogicalObjectType.QUERY,
+        ]:
+            return SqlPermissions.from_dict(self.object_permissions)
         else:
             return ObjectPermissions.from_dict(self.object_permissions)
 

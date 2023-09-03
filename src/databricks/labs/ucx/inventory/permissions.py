@@ -9,6 +9,8 @@ from typing import Literal
 
 from databricks.sdk import WorkspaceClient
 from databricks.sdk.service.iam import AccessControlRequest, Group, ObjectPermissions
+from databricks.sdk.service.sql import GetResponse as SqlPermissions
+from databricks.sdk.service.sql import ObjectTypePlural as SqlRequestObjectType
 from databricks.sdk.service.workspace import AclItem as SdkAclItem
 from ratelimit import limits, sleep_and_retry
 from tenacity import retry, stop_after_attempt, wait_fixed, wait_random
@@ -48,7 +50,19 @@ class RolesAndEntitlementsRequestPayload:
     group_id: str
 
 
-AnyRequestPayload = PermissionRequestPayload | SecretsPermissionRequestPayload | RolesAndEntitlementsRequestPayload
+@dataclass
+class SqlObjectRequestPayload:
+    object_id: str
+    request_object_type: SqlRequestObjectType
+    access_control_list: list
+
+
+AnyRequestPayload = (
+    PermissionRequestPayload
+    | SecretsPermissionRequestPayload
+    | RolesAndEntitlementsRequestPayload
+    | SqlObjectRequestPayload
+)
 
 
 # TODO: this class has too many @staticmethod and they must not be such. write a unit test for this logic.
@@ -155,6 +169,13 @@ class PermissionManager:
         destination_group: Group = getattr(migration_info, destination)
         return RolesAndEntitlementsRequestPayload(payload=item.typed_object_permissions, group_id=destination_group.id)
 
+    def _prepare_request_for_sql_object(
+        self, item: PermissionsInventoryItem, migration_state: GroupMigrationState, destination
+    ) -> SqlObjectRequestPayload:
+        _permissions: SqlPermissions = item.typed_object_permissions
+        # TODO: apply conversion logic
+        raise NotImplementedError()
+
     def _prepare_new_permission_request(
         self,
         item: PermissionsInventoryItem,
@@ -169,6 +190,12 @@ class PermissionManager:
             return self._prepare_permission_request_for_secrets_api(item, migration_state, destination)
         elif item.logical_object_type in [LogicalObjectType.ROLES, LogicalObjectType.ENTITLEMENTS]:
             return self._prepare_request_for_roles_and_entitlements(item, migration_state, destination)
+        elif item.logical_object_type in [
+            LogicalObjectType.ALERT,
+            LogicalObjectType.DASHBOARD,
+            LogicalObjectType.QUERY,
+        ]:
+            return self._prepare_request_for_sql_object(item, migration_state, destination)
         else:
             logger.warning(
                 f"Unsupported permissions payload for object {item.object_id} "
@@ -219,6 +246,13 @@ class PermissionManager:
             access_control_list=request_payload.access_control_list,
         )
 
+    def _sql_permissions_applicator(self, request_payload: SqlObjectRequestPayload):
+        self._ws.dbsql_permissions.set(
+            object_type=request_payload.request_object_type,
+            object_id=request_payload.object_id,
+            access_control_list=request_payload.access_control_list,
+        )
+
     def applicator(self, request_payload: AnyRequestPayload):
         if isinstance(request_payload, RolesAndEntitlementsRequestPayload):
             self._apply_roles_and_entitlements(
@@ -230,6 +264,8 @@ class PermissionManager:
             self._standard_permissions_applicator(request_payload)
         elif isinstance(request_payload, SecretsPermissionRequestPayload):
             self._scope_permissions_applicator(request_payload)
+        elif isinstance(request_payload, SqlObjectRequestPayload):
+            self._sql_permissions_applicator(request_payload)
         else:
             logger.warning(f"Unsupported payload type {type(request_payload)}")
 
