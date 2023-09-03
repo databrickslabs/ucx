@@ -3,12 +3,17 @@ import logging
 from abc import ABC, abstractmethod
 from collections.abc import Callable, Iterator
 from functools import partial
+from itertools import chain
 from typing import Generic, TypeVar
 
 from databricks.sdk import WorkspaceClient
 from databricks.sdk.core import DatabricksError
 from databricks.sdk.service.iam import AccessControlResponse, Group, ObjectPermissions
 from databricks.sdk.service.ml import ModelDatabricks
+from databricks.sdk.service.sql import Alert, Dashboard
+from databricks.sdk.service.sql import GetResponse as SqlPermissions
+from databricks.sdk.service.sql import ObjectTypePlural as SqlRequestObjectType
+from databricks.sdk.service.sql import Query
 from databricks.sdk.service.workspace import (
     AclItem,
     ObjectInfo,
@@ -369,6 +374,75 @@ def experiments_listing(ws: WorkspaceClient):
                 yield experiment
 
     return inner
+
+
+class DBSQLInventorizer(BaseInventorizer[InventoryObject]):
+    def __init__(self, ws: WorkspaceClient):
+        self._ws = ws
+        self._queries: Iterator[Query] = iter([])
+        self._dashboards: Iterator[Dashboard] = iter([])
+        self._alerts: Iterator[Alert] = iter([])
+
+    @property
+    def logical_object_types(self) -> list[LogicalObjectType]:
+        return [LogicalObjectType.ALERT, LogicalObjectType.DASHBOARD, LogicalObjectType.QUERY]
+
+    def preload(self):
+        self._queries = self._ws.queries.list()
+        self._dashboards = self._ws.dashboards.list()
+        self._alerts = self._ws.alerts.list()
+
+    @sleep_and_retry
+    @limits(calls=100, period=1)
+    def _get_dbsql_permissions(
+        self, request_object_type: SqlRequestObjectType, request_object_id: str
+    ) -> SqlPermissions:
+        return self._ws.dbsql_permissions.get(object_type=request_object_type, object_id=request_object_id)
+
+    def _safe_get_dbsql_permissions(
+        self, request_object_type: SqlRequestObjectType, object_id: str
+    ) -> SqlPermissions | None:
+        try:
+            permissions = self._get_dbsql_permissions(request_object_type, object_id)
+            return permissions
+        except DatabricksError as e:
+            if e.error_code in ["RESOURCE_DOES_NOT_EXIST", "RESOURCE_NOT_FOUND", "PERMISSION_DENIED"]:
+                logger.warning(f"Could not get permissions for {request_object_type} {object_id} due to {e.error_code}")
+                return None
+            else:
+                raise e
+
+    def _prepare_permission_item(self, _obj: Alert | Dashboard | Query) -> PermissionsInventoryItem | None:
+        if isinstance(_obj, Alert):
+            logical_type = LogicalObjectType.ALERT
+            request_type = SqlRequestObjectType.ALERTS
+        elif isinstance(_obj, Dashboard):
+            logical_type = LogicalObjectType.DASHBOARD
+            request_type = SqlRequestObjectType.DASHBOARDS
+        elif isinstance(_obj, Query):
+            logical_type = LogicalObjectType.QUERY
+            request_type = SqlRequestObjectType.QUERIES
+        else:
+            logger.warning(f"Unexpected object type {_obj}")
+            return
+
+        _permissions = self._safe_get_dbsql_permissions(request_object_type=request_type, object_id=_obj.id)
+
+        if _permissions:
+            _item = PermissionsInventoryItem(
+                object_id=_obj.id,
+                logical_object_type=logical_type,
+                request_object_type=request_type,
+                raw_object_permissions=json.dumps(_permissions.as_dict()),
+            )
+
+    def inventorize(self) -> list[PermissionsInventoryItem]:
+        chained_objects = chain(self._queries, self._alerts, self._dashboards)
+        executables = [partial(self._prepare_permission_item, _object) for _object in chained_objects]
+        results = ThreadedExecution[PermissionsInventoryItem | None](executables).run()
+        results = [result for result in results if result]  # empty filter
+        logger.info(f"Permissions fetched for {len(results)} DBSQL Objects")
+        return results
 
 
 class Inventorizers:

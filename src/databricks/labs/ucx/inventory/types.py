@@ -3,6 +3,7 @@ from dataclasses import asdict, dataclass
 
 import pandas as pd
 from databricks.sdk.service.iam import ObjectPermissions
+from databricks.sdk.service.sql import ObjectTypePlural as SqlRequestObjectType
 from databricks.sdk.service.workspace import AclItem as SdkAclItem
 from databricks.sdk.service.workspace import AclPermission as SdkAclPermission
 
@@ -47,6 +48,11 @@ class LogicalObjectType(StrEnum):
     CLUSTER = "CLUSTER"
     INSTANCE_POOL = "INSTANCE_POOL"
     CLUSTER_POLICY = "CLUSTER_POLICY"
+
+    # DBSQL Objects
+    ALERT = "ALERT"
+    DASHBOARD = "DASHBOARD"
+    QUERY = "QUERY"
 
     def __repr__(self):
         return self.value
@@ -102,7 +108,7 @@ class RolesAndEntitlements:
 class PermissionsInventoryItem:
     object_id: str
     logical_object_type: LogicalObjectType
-    request_object_type: RequestObjectType | None
+    request_object_type: RequestObjectType | SqlRequestObjectType | None
     raw_object_permissions: str
 
     @property
