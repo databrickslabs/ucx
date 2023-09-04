@@ -6,10 +6,11 @@ from pathlib import Path
 
 import pytest
 from databricks.sdk.service.workspace import ImportFormat
-from databricks.labs.ucx.providers.mixins.compute import CommandExecutor
-from databricks.labs.ucx.inventory.tacl_job import create_tacl_job
 
-logging.getLogger('databricks.sdk').setLevel('DEBUG')
+from databricks.labs.ucx.inventory.tacl_job import create_tacl_job
+from databricks.labs.ucx.providers.mixins.compute import CommandExecutor
+
+logging.getLogger("databricks.sdk").setLevel("DEBUG")
 
 
 @pytest.fixture
@@ -60,9 +61,10 @@ def wsfs_wheel(ws, fresh_wheel_file, make_random):
 
     ws.workspace.delete(workspace_location, recursive=True)
 
+
 @pytest.fixture
 def dbfs_wheel(ws, fresh_wheel_file, make_random):
-    my_user = ws.current_user.me().user_name
+    ws.current_user.me().user_name
     dbfs_location = f"/FileStore/jars/{make_random(10)}"
     ws.workspace.mkdirs(dbfs_location)
 
@@ -106,20 +108,15 @@ def test_sql_backend_works(ws, wsfs_wheel):
 
 
 def test_job_creation(ws, dbfs_wheel, sql_exec, sql_fetch_all, make_catalog, make_schema, make_table, make_group):
-
-    group_a = make_group(display_name='sdk_group_a')
-    group_b = make_group(display_name='sdk_group_b')
+    group_a = make_group(display_name="sdk_group_a")
+    group_b = make_group(display_name="sdk_group_b")
     schema_a = make_schema()
     schema_b = make_schema()
     managed_table = make_table(schema=schema_a)
     tmp_table = make_table(schema=schema_b, ctas="SELECT 2+2 AS four")
     view = make_table(schema=schema_a, ctas="SELECT 2+2 AS four", view=True)
 
-    logging.info(
-        f"managed_table={managed_table}, "
-        f"tmp_table={tmp_table}, "
-        f"view={view}"
-    )
+    logging.info(f"managed_table={managed_table}, tmp_table={tmp_table}, view={view}")
 
     sql_exec(f"GRANT USAGE ON SCHEMA default TO {group_a.display_name}")
     sql_exec(f"GRANT USAGE ON SCHEMA default TO {group_b.display_name}")
@@ -135,9 +132,14 @@ def test_job_creation(ws, dbfs_wheel, sql_exec, sql_fetch_all, make_catalog, mak
 
     databases = [schema_a.split(".")[1], schema_b.split(".")[1]]
 
-    ws.jobs.run_now(created_job.job_id, python_named_params={"inventory_catalog": inventory_catalog,
-                                                             "inventory_schema": inventory_schema,
-                                                             "databases": ",".join(databases)}).result()
+    ws.jobs.run_now(
+        created_job.job_id,
+        python_named_params={
+            "inventory_catalog": inventory_catalog,
+            "inventory_schema": inventory_schema,
+            "databases": ",".join(databases),
+        },
+    ).result()
 
     tacl_tables = f"{inventory_catalog}.{inventory_schema}.tables"
     tacl_grants = f"{inventory_catalog}.{inventory_schema}.grants"
@@ -159,7 +161,7 @@ def test_job_creation(ws, dbfs_wheel, sql_exec, sql_fetch_all, make_catalog, mak
     assert all_tables[view].object_type == "VIEW"
     assert all_tables[view].view_text == "SELECT 2+2 AS four"
     assert len(all_grants) >= 2, "must have at least two grants"
-    #assert all_grants[f"{group_a.display_name}.{managed_table}"] == "SELECT"
-    #assert all_grants[f"{group_a.display_name}.{view}"] == "SELECT"
-    #assert all_grants[f"{group_b.display_name}.{tmp_table}"] == "SELECT"
-    #assert all_grants[f"{group_b.display_name}.{schema_b}"] == "MODIFY"
+    # assert all_grants[f"{group_a.display_name}.{managed_table}"] == "SELECT"
+    # assert all_grants[f"{group_a.display_name}.{view}"] == "SELECT"
+    # assert all_grants[f"{group_b.display_name}.{tmp_table}"] == "SELECT"
+    # assert all_grants[f"{group_b.display_name}.{schema_b}"] == "MODIFY"

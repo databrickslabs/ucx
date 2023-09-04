@@ -33,15 +33,14 @@ class TaclToolkit:
 
 
 def main():
-
-    parser=argparse.ArgumentParser()
+    parser = argparse.ArgumentParser()
 
     parser.add_argument("--inventory_catalog")
     parser.add_argument("--inventory_schema")
     parser.add_argument("--databases", required=False, default="default")
     parser.add_argument("--warehouse_id", required=False, default=None)
 
-    args=parser.parse_args()
+    args = parser.parse_args()
 
     inventory_catalog = args.inventory_catalog
     inventory_schema = args.inventory_schema

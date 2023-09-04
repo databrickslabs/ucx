@@ -5,10 +5,10 @@ from databricks.sdk import WorkspaceClient
 
 from databricks.labs.ucx.toolkits.table_acls import TaclToolkit
 
-logging.getLogger('databricks.sdk').setLevel('DEBUG')
+logging.getLogger("databricks.sdk").setLevel("DEBUG")
 
 
-def test_describe_all_tables(ws: WorkspaceClient, make_catalog, make_schema, make_table, sql_fetch_all):
+def test_describe_all_tables(ws: WorkspaceClient, make_catalog, make_schema, make_table):
     warehouse_id = os.environ["TEST_DEFAULT_WAREHOUSE_ID"]
 
     logging.info("setting up fixtures")
@@ -43,11 +43,11 @@ def test_describe_all_tables(ws: WorkspaceClient, make_catalog, make_schema, mak
     assert all_tables[view].view_text == "SELECT 2+2 AS four"
 
 
-def test_all_grants_in_database(ws: WorkspaceClient, sql_exec, sql_fetch_all, make_catalog, make_schema, make_table, make_group):
+def test_all_grants_in_database(ws: WorkspaceClient, sql_exec, make_catalog, make_schema, make_table, make_group):
     warehouse_id = os.environ["TEST_DEFAULT_WAREHOUSE_ID"]
 
-    group_a = make_group(display_name='testgroup')
-    group_b = make_group(display_name='sdk_35wh')
+    group_a = make_group(display_name="testgroup")
+    group_b = make_group(display_name="sdk_35wh")
     schema = make_schema()
     table = make_table(schema=schema, external=True)
 
