@@ -1,11 +1,14 @@
 import logging
 import shutil
 import tempfile
+from collections.abc import Iterator
 from pathlib import Path
 
 import pytest
 from delta import configure_spark_with_delta_pip
 from pyspark.sql import SparkSession
+
+from databricks.labs.ucx.tacl._internal import SqlBackend
 
 logger = logging.getLogger(__name__)
 
@@ -35,3 +38,37 @@ def spark() -> SparkSession:
     spark.stop()
     if Path(warehouse_dir).exists():
         shutil.rmtree(warehouse_dir)
+
+
+class MockBackend(SqlBackend):
+    def __init__(self, *, fails_on_first: dict | None = None, rows: dict | None = None):
+        self._fails_on_first = fails_on_first
+        if not rows:
+            rows = {}
+        self._rows = rows
+        self.queries = []
+
+    def _sql(self, sql):
+        logger.debug(f"Mock backend.sql() received SQL: {sql}")
+        seen_before = sql in self.queries
+        self.queries.append(sql)
+        if not seen_before and self._fails_on_first is not None:
+            for match, failure in self._fails_on_first.items():
+                if match in sql:
+                    raise RuntimeError(failure)
+
+    def execute(self, sql):
+        self._sql(sql)
+
+    def fetch(self, sql) -> Iterator[any]:
+        self._sql(sql)
+        first = sql.upper().split(" ")[0]
+        rows = []
+        if first in self._rows:
+            rows = self._rows[first]
+        return iter(rows)
+
+
+@pytest.fixture
+def mock_backend():
+    return MockBackend()
