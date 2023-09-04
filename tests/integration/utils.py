@@ -1,23 +1,19 @@
 import logging
 import random
 from dataclasses import dataclass
-from functools import partial
 from typing import Any
 
-from databricks.sdk import AccountClient, WorkspaceClient
+from databricks.sdk import WorkspaceClient
 from databricks.sdk.service.compute import ClusterSpec, DataSecurityMode
 from databricks.sdk.service.iam import (
     AccessControlRequest,
-    ComplexValue,
     Group,
     PermissionLevel,
-    User,
 )
 from databricks.sdk.service.jobs import JobCluster, PythonWheelTask, Task
 from databricks.sdk.service.workspace import ObjectInfo
 
 from databricks.labs.ucx.inventory.types import RequestObjectType
-from databricks.labs.ucx.utils import WorkspaceLevelEntitlement
 
 logger = logging.getLogger(__name__)
 
@@ -32,59 +28,6 @@ class InstanceProfile:
 class EnvironmentInfo:
     test_uid: str
     groups: list[tuple[Group, Group]]
-
-
-def generate_group_by_id(
-    _ws: WorkspaceClient, _acc: AccountClient, group_name: str, users_sample: list[User]
-) -> tuple[Group, Group]:
-    entities = [ComplexValue(display=user.display_name, value=user.id) for user in users_sample]
-    logger.debug(f"Creating group with name {group_name}")
-
-    def get_random_entitlements():
-        chosen: list[WorkspaceLevelEntitlement] = random.choices(
-            list(WorkspaceLevelEntitlement),
-            k=random.randint(1, 3),
-        )
-        entitlements = [ComplexValue(display=None, primary=None, type=None, value=value) for value in chosen]
-        return entitlements
-
-    ws_group = _ws.groups.create(display_name=group_name, members=entities, entitlements=get_random_entitlements())
-    acc_group = _acc.groups.create(display_name=group_name, members=entities)
-    return ws_group, acc_group
-
-
-def _create_groups(
-    _ws: WorkspaceClient, _acc: AccountClient, prefix: str, num_test_groups: int, threader: callable
-) -> list[tuple[Group, Group]]:
-    logger.debug("Listing users to create sample groups")
-    test_users = list(_ws.users.list(filter="displayName sw 'test-user-'", attributes="id, userName, displayName"))
-    logger.debug(f"Total of test users {len(test_users)}")
-    user_samples: dict[str, list[User]] = {
-        f"{prefix}-test-group-{gid}": random.choices(test_users, k=random.randint(1, 40))
-        for gid in range(num_test_groups)
-    }
-    executables = [
-        partial(generate_group_by_id, _ws, _acc, group_name, users_sample)
-        for group_name, users_sample in user_samples.items()
-    ]
-    return threader(executables).run()
-
-
-def _cleanup_groups(_ws: WorkspaceClient, _acc: AccountClient, _groups: tuple[Group, Group]):
-    ws_g, acc_g = _groups
-    logger.debug(f"Deleting groups {ws_g.display_name} [ws-level] and {acc_g.display_name} [acc-level]")
-
-    try:
-        _ws.groups.delete(ws_g.id)
-    except Exception as e:
-        logger.warning(f"Cannot delete ws-level group {ws_g.display_name}, skipping it. Original exception {e}")
-
-    try:
-        g = next(iter(_acc.groups.list(filter=f"displayName eq '{acc_g.display_name}'")), None)
-        if g:
-            _acc.groups.delete(g.id)
-    except Exception as e:
-        logger.warning(f"Cannot delete acc-level group {acc_g.display_name}, skipping it. Original exception {e}")
 
 
 def _set_random_permissions(

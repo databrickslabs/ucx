@@ -8,7 +8,7 @@ import sys
 from typing import BinaryIO
 
 import pytest
-from databricks.sdk import WorkspaceClient
+from databricks.sdk import AccountClient, WorkspaceClient
 from databricks.sdk.core import DatabricksError
 from databricks.sdk.service import compute, iam, jobs, pipelines, workspace
 
@@ -53,6 +53,13 @@ def ws() -> WorkspaceClient:
     # Use variables from Unified Auth
     # See https://databricks-sdk-py.readthedocs.io/en/latest/authentication.html
     return WorkspaceClient()
+
+
+@pytest.fixture(scope="session")
+def acc() -> AccountClient:
+    # Use variables from Unified Auth
+    # See https://databricks-sdk-py.readthedocs.io/en/latest/authentication.html
+    return AccountClient()
 
 
 @pytest.fixture
@@ -125,19 +132,35 @@ def _scim_values(ids: list[str]) -> list[iam.ComplexValue]:
     return [iam.ComplexValue(value=x) for x in ids]
 
 
-@pytest.fixture
-def make_group(ws, make_random):
+def _make_group(name, interface, make_random):
     def create(
-        *, members: list[str] | None = None, roles: list[str] | None = None, display_name: str | None = None, **kwargs
+        *,
+        members: list[str] | None = None,
+        roles: list[str] | None = None,
+        entitlements: list[str] | None = None,
+        display_name: str | None = None,
+        **kwargs,
     ):
         kwargs["display_name"] = f"sdk-{make_random(4)}" if display_name is None else display_name
         if members is not None:
             kwargs["members"] = _scim_values(members)
         if roles is not None:
             kwargs["roles"] = _scim_values(roles)
-        return ws.groups.create(**kwargs)
+        if entitlements is not None:
+            kwargs["entitlements"] = _scim_values(entitlements)
+        return interface.create(**kwargs)
 
-    yield from factory("workspace group", create, lambda item: ws.groups.delete(item.id))
+    yield from factory(name, create, lambda item: interface.delete(item.id))
+
+
+@pytest.fixture
+def make_group(ws, make_random):
+    yield from _make_group("workspace group", ws.groups, make_random)
+
+
+@pytest.fixture
+def make_acc_group(acc, make_random):
+    yield from _make_group("account group", acc.groups, make_random)
 
 
 @pytest.fixture
