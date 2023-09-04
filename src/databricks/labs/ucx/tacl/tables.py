@@ -84,40 +84,42 @@ class TablesCrawler(CrawlerBase):
     def _all_databases(self) -> Iterator[str]:
         yield from self._fetch("SHOW DATABASES")
 
-    def snapshot(self, catalog: str, database: str) -> list[Table]:
+    def snapshot(self, catalog: str, databases: list) -> list[Table]:
         """
         Takes a snapshot of tables in the specified catalog and database.
 
         Args:
             catalog (str): The catalog name.
-            database (str): The database name.
+            databases (list): The list of names of databases.
 
         Returns:
             list[Table]: A list of Table objects representing the snapshot of tables.
         """
+
         return self._snapshot(
-            Table, partial(self._try_load, catalog, database), partial(self._crawl, catalog, database)
+            Table, partial(self._try_load, catalog), partial(self._crawl, catalog, databases)
         )
 
-    def _try_load(self, catalog: str, database: str):
+    def _try_load(self, catalog: str):
         """Tries to load table information from the database or throws TABLE_OR_VIEW_NOT_FOUND error"""
         for row in self._fetch(
-            f'SELECT * FROM {self._full_name} WHERE catalog = "{catalog}" AND database = "{database}"'
+            f'SELECT * FROM {self._full_name} WHERE catalog = "{catalog}"'
         ):
             yield Table(*row)
 
-    def _crawl(self, catalog: str, database: str) -> list[Table]:
+    def _crawl(self, catalog: str, databases: list) -> list[Table]:
         """Crawls and lists tables within the specified catalog and database.
 
         After performing initial scan of all tables, starts making parallel
         DESCRIBE TABLE EXTENDED queries for every table.
         """
-        catalog = self._valid(catalog)
-        database = self._valid(database)
-        logger.debug(f"[{catalog}.{database}] listing tables")
         tasks = []
-        for _, table, _is_tmp in self._fetch(f"SHOW TABLES FROM {catalog}.{database}"):
-            tasks.append(partial(self._describe, catalog, database, table))
+        for database in databases:
+            catalog = self._valid(catalog)
+            database = self._valid(database)
+            logger.debug(f"[{catalog}.{database}] listing tables")
+            for _, table, _is_tmp in self._fetch(f"SHOW TABLES FROM {catalog}.{database}"):
+                tasks.append(partial(self._describe, catalog, database, table))
         return ThreadedExecution.gather("listing tables", tasks)
 
     def _describe(self, catalog: str, database: str, table: str) -> Table:

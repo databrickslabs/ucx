@@ -118,24 +118,24 @@ class GrantsCrawler(CrawlerBase):
         super().__init__(tc._backend, tc._catalog, tc._schema, "grants")
         self._tc = tc
 
-    def snapshot(self, catalog: str, database: str) -> list[Grant]:
+    def snapshot(self, catalog: str, databases: list) -> list[Grant]:
         return self._snapshot(
-            Grant, partial(self._try_load, catalog, database), partial(self._crawl, catalog, database)
+            Grant, partial(self._try_load, catalog), partial(self._crawl, catalog, databases)
         )
 
-    def _try_load(self, catalog: str, database: str):
+    def _try_load(self, catalog: str):
         for row in self._fetch(
-            f'SELECT * FROM {self._full_name} WHERE catalog = "{catalog}" AND database = "{database}"'
+            f'SELECT * FROM {self._full_name} WHERE catalog = "{catalog}"'
         ):
             yield Grant(*row)
 
-    def _crawl(self, catalog: str, database: str) -> list[Grant]:
+    def _crawl(self, catalog: str, databases: list) -> list[Grant]:
         """
         Crawls and lists grants for tables and views within the specified catalog and database.
 
         Args:
             catalog (str): The catalog name.
-            database (str): The database name.
+            list[databases]: List of names of databases.
 
         Returns:
             list[Grant]: A list of Grant objects representing the listed grants.
@@ -157,9 +157,13 @@ class GrantsCrawler(CrawlerBase):
         list[Grant]: A list of Grant objects representing the grants found in the specified catalog and database.
         """
         catalog = self._valid(catalog)
-        database = self._valid(database)
-        tasks = [partial(self._grants, catalog=catalog), partial(self._grants, catalog=catalog, database=database)]
-        for table in self._tc.snapshot(catalog, database):
+        tasks = [partial(self._grants, catalog=catalog)]
+        table_snapshot = self._tc.snapshot(catalog, databases)
+        print(table_snapshot)
+        for database in databases:
+            tasks.append(partial(self._grants, catalog=catalog, database=database))
+        for table in table_snapshot:
+            database = table.database
             fn = partial(self._grants, catalog=catalog, database=database)
             if table.kind == "VIEW":
                 tasks.append(partial(fn, view=table.name))
