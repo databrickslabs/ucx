@@ -22,9 +22,8 @@ from databricks.labs.ucx.inventory.inventorizer import (
     StandardInventorizer,
     TokensAndPasswordsInventorizer,
     WorkspaceInventorizer,
-    experiments_listing,
-    models_listing,
 )
+from databricks.labs.ucx.inventory.listing import experiments_listing, models_listing
 from databricks.labs.ucx.providers.groups_info import (
     GroupMigrationState,
     MigrationGroupInfo,

@@ -1,10 +1,11 @@
 import datetime as dt
 import logging
-from collections.abc import Iterator
 from concurrent.futures import FIRST_COMPLETED, ThreadPoolExecutor, wait
 from itertools import groupby
+from collections.abc import Iterator
 
 from databricks.sdk import WorkspaceClient
+from databricks.sdk.service.ml import ModelDatabricks
 from databricks.sdk.service.workspace import ObjectInfo, ObjectType
 from ratelimit import limits, sleep_and_retry
 
@@ -89,3 +90,22 @@ class WorkspaceListing:
             logger.info(f"Recursive WorkspaceFS listing finished at {dt.datetime.now()}")
             logger.info(f"Total time taken for workspace listing: {dt.datetime.now() - self.start_time}")
             self._progress_report(None)
+
+
+def models_listing(ws: WorkspaceClient):
+    def inner() -> Iterator[ModelDatabricks]:
+        for model in ws.model_registry.list_models():
+            model_with_id = ws.model_registry.get_model(model.name).registered_model_databricks
+            yield model_with_id
+
+    return inner
+
+
+def experiments_listing(ws: WorkspaceClient):
+    def inner() -> Iterator[ModelDatabricks]:
+        for experiment in ws.experiments.list_experiments():
+            nb_tag = [t for t in experiment.tags if t.key == "mlflow.experimentType" and t.value == "NOTEBOOK"]
+            if not nb_tag:
+                yield experiment
+
+    return inner
