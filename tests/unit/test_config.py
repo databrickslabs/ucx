@@ -10,7 +10,7 @@ from databricks.labs.ucx.config import (
     InventoryConfig,
     InventoryTable,
     MigrationConfig,
-    TaclConfig
+    TaclConfig,
 )
 
 
@@ -19,6 +19,7 @@ def test_initialization():
         MigrationConfig,
         inventory=InventoryConfig(table=InventoryTable(catalog="catalog", database="database", name="name")),
         groups=GroupsConfig(auto=True),
+        tacl=TaclConfig(databases=["default"]),
     )
     mc()
 
@@ -50,7 +51,7 @@ def test_reader(tmp_path: Path):
             MigrationConfig,
             inventory=InventoryConfig(table=InventoryTable(catalog="catalog", database="database", name="name")),
             groups=GroupsConfig(auto=True),
-            #tacl=TaclConfig(databases=["default"])
+            tacl=TaclConfig(databases=["default"]),
         )
 
         config: MigrationConfig = mc()
