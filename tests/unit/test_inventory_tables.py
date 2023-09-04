@@ -14,6 +14,7 @@ from databricks.labs.ucx.inventory.types import (
     RequestObjectType,
 )
 
+
 @pytest.fixture
 def workspace_client():
     client = Mock()
