@@ -440,7 +440,7 @@ class DBSQLInventorizer(BaseInventorizer[InventoryObject]):
         chained_objects = chain(self._queries, self._alerts, self._dashboards)
         executables = [partial(self._prepare_permission_item, _object) for _object in chained_objects]
         results = ThreadedExecution[PermissionsInventoryItem | None](executables).run()
-        results = [result for result in results if result]  # empty filter
+        results = [result for result in results if result is not None]
         logger.info(f"Permissions fetched for {len(results)} DBSQL Objects")
         return results
 
