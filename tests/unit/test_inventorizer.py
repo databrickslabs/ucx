@@ -259,8 +259,8 @@ def test_experiments_listing(workspace_client):
     unfiltered_tags = [ExperimentTag(key="foo", value="bar")]
     all_tags = filtered_tags + unfiltered_tags
     workspace_client.experiments.list_experiments.return_value = [experiment]
+
     # first test without tags (means `None`)
-    # FIX: Bug in function, does not handle None tags!
     f = experiments_listing(workspace_client)
     experiments = list(f())
     assert len(experiments) == 0
