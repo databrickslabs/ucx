@@ -72,7 +72,7 @@ def test_prepare_groups_in_environment_with_one_group_in_conf():
     de_group = Group(display_name="de", meta=ResourceMeta(resource_type="WorkspaceGroup"))
     backup_de_group = Group(display_name="dbr_backup_de", meta=ResourceMeta(resource_type="WorkspaceGroup"))
 
-    def my_side_effect(filter, **kwargs):  # noqa: ARG001
+    def my_side_effect(**kwargs):  # noqa: ARG001
         if filter == "displayName eq 'de'":
             return [de_group]
         elif filter == "displayName eq 'dbr_backup_de'":
