@@ -5,7 +5,7 @@ from databricks.sdk import WorkspaceClient
 
 from databricks.labs.ucx.toolkits.table_acls import TaclToolkit
 
-logging.getLogger("databricks.sdk").setLevel("DEBUG")
+logger = logging.getLogger(__name__)
 
 
 def test_describe_all_tables_in_databases(ws: WorkspaceClient, make_catalog, make_schema, make_table):

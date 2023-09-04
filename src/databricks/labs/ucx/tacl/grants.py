@@ -119,14 +119,10 @@ class GrantsCrawler(CrawlerBase):
         self._tc = tc
 
     def snapshot(self, catalog: str, databases: list) -> list[Grant]:
-        return self._snapshot(
-            Grant, partial(self._try_load, catalog), partial(self._crawl, catalog, databases)
-        )
+        return self._snapshot(Grant, partial(self._try_load, catalog), partial(self._crawl, catalog, databases))
 
     def _try_load(self, catalog: str):
-        for row in self._fetch(
-            f'SELECT * FROM {self._full_name} WHERE catalog = "{catalog}"'
-        ):
+        for row in self._fetch(f'SELECT * FROM {self._full_name} WHERE catalog = "{catalog}"'):
             yield Grant(*row)
 
     def _crawl(self, catalog: str, databases: list) -> list[Grant]:

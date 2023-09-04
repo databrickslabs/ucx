@@ -96,15 +96,11 @@ class TablesCrawler(CrawlerBase):
             list[Table]: A list of Table objects representing the snapshot of tables.
         """
 
-        return self._snapshot(
-            Table, partial(self._try_load, catalog), partial(self._crawl, catalog, databases)
-        )
+        return self._snapshot(Table, partial(self._try_load, catalog), partial(self._crawl, catalog, databases))
 
     def _try_load(self, catalog: str):
         """Tries to load table information from the database or throws TABLE_OR_VIEW_NOT_FOUND error"""
-        for row in self._fetch(
-            f'SELECT * FROM {self._full_name} WHERE catalog = "{catalog}"'
-        ):
+        for row in self._fetch(f'SELECT * FROM {self._full_name} WHERE catalog = "{catalog}"'):
             yield Table(*row)
 
     def _crawl(self, catalog: str, databases: list) -> list[Table]:
@@ -114,9 +110,9 @@ class TablesCrawler(CrawlerBase):
         DESCRIBE TABLE EXTENDED queries for every table.
         """
         tasks = []
-        for database in databases:
+        for db in databases:
             catalog = self._valid(catalog)
-            database = self._valid(database)
+            database = self._valid(db)
             logger.debug(f"[{catalog}.{database}] listing tables")
             for _, table, _is_tmp in self._fetch(f"SHOW TABLES FROM {catalog}.{database}"):
                 tasks.append(partial(self._describe, catalog, database, table))
