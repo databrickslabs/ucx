@@ -1,8 +1,8 @@
 import datetime as dt
 import logging
+from collections.abc import Iterator
 from concurrent.futures import FIRST_COMPLETED, ThreadPoolExecutor, wait
 from itertools import groupby
-from collections.abc import Iterator
 
 from databricks.sdk import WorkspaceClient
 from databricks.sdk.service.ml import ModelDatabricks

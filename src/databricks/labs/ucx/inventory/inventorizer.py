@@ -9,7 +9,6 @@ from typing import Generic, TypeVar
 from databricks.sdk import WorkspaceClient
 from databricks.sdk.core import DatabricksError
 from databricks.sdk.service.iam import AccessControlResponse, Group, ObjectPermissions
-from databricks.sdk.service.ml import ModelDatabricks
 from databricks.sdk.service.sql import Alert, Dashboard
 from databricks.sdk.service.sql import GetResponse as SqlPermissions
 from databricks.sdk.service.sql import ObjectTypePlural as SqlRequestObjectType
@@ -22,7 +21,11 @@ from databricks.sdk.service.workspace import (
 )
 from ratelimit import limits, sleep_and_retry
 
-from databricks.labs.ucx.inventory.listing import WorkspaceListing
+from databricks.labs.ucx.inventory.listing import (
+    WorkspaceListing,
+    experiments_listing,
+    models_listing,
+)
 from databricks.labs.ucx.inventory.types import (
     AclItemsContainer,
     LogicalObjectType,
@@ -355,25 +358,6 @@ class RolesAndEntitlementsInventorizer(BaseInventorizer[InventoryObject]):
             _items.append(inventory_item)
 
         return _items
-
-
-def models_listing(ws: WorkspaceClient):
-    def inner() -> Iterator[ModelDatabricks]:
-        for model in ws.model_registry.list_models():
-            model_with_id = ws.model_registry.get_model(model.name).registered_model_databricks
-            yield model_with_id
-
-    return inner
-
-
-def experiments_listing(ws: WorkspaceClient):
-    def inner() -> Iterator[ModelDatabricks]:
-        for experiment in ws.experiments.list_experiments():
-            nb_tag = [t for t in experiment.tags if t.key == "mlflow.experimentType" and t.value == "NOTEBOOK"]
-            if not nb_tag:
-                yield experiment
-
-    return inner
 
 
 class DBSQLInventorizer(BaseInventorizer[InventoryObject]):
