@@ -131,5 +131,8 @@ def test_replace_workspace_groups_with_account_groups_should_call_delete_and_do(
     manager.replace_workspace_groups_with_account_groups()
 
     client.groups.delete.assert_called_with(test_workspace_id)
-    client.api_client.do.assert_called_with('PUT', f'/api/2.0/preview/permissionassignments/principals/{test_workspace_id}', data='{"permissions": ["USER"]}')
-
+    client.api_client.do.assert_called_with(
+        'PUT',
+        f'/api/2.0/preview/permissionassignments/principals/{test_workspace_id}',
+        data='{"permissions": ["USER"]}',
+    )
