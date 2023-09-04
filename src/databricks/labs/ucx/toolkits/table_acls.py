@@ -1,4 +1,3 @@
-import argparse
 import logging
 
 from databricks.sdk import WorkspaceClient
@@ -11,7 +10,7 @@ from databricks.labs.ucx.tacl._internal import (
 from databricks.labs.ucx.tacl.grants import GrantsCrawler
 from databricks.labs.ucx.tacl.tables import TablesCrawler
 
-logging.getLogger("databricks.labs.ucx").setLevel("DEBUG")
+logger = logging.getLogger(__name__)
 
 
 class TaclToolkit:
@@ -30,31 +29,3 @@ class TaclToolkit:
         if warehouse_id is None:
             return RuntimeBackend()
         return StatementExecutionBackend(ws, warehouse_id)
-
-
-def main():
-    parser = argparse.ArgumentParser()
-
-    parser.add_argument("--inventory_catalog")
-    parser.add_argument("--inventory_schema")
-    parser.add_argument("--databases", required=False, default="default")
-    parser.add_argument("--warehouse_id", required=False, default=None)
-
-    args = parser.parse_args()
-
-    inventory_catalog = args.inventory_catalog
-    inventory_schema = args.inventory_schema
-    warehouse_id = args.warehouse_id
-    databases = args.databases.split(",")
-
-    ws = WorkspaceClient
-
-    print(databases)
-
-    tak = TaclToolkit(ws, inventory_catalog, inventory_schema, warehouse_id)
-
-    for database in databases:
-        print("database")
-        print(database)
-        tak.grants_snapshot(database)
-        print("fetched database")
