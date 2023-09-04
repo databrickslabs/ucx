@@ -66,13 +66,13 @@ def test_backup_group_should_not_be_created_if_already_exists():
     )
 
 
-def test_prepare_groups_in_environment_with_one_group_in_conf():
+def test_prepare_groups_in_environment_with_one_group_in_conf_should_return_migrationgroupInfo_object():
     client = Mock()
 
     de_group = Group(display_name="de", meta=ResourceMeta(resource_type="WorkspaceGroup"))
     backup_de_group = Group(display_name="dbr_backup_de", meta=ResourceMeta(resource_type="WorkspaceGroup"))
 
-    def my_side_effect(**kwargs):  # noqa: ARG001
+    def my_side_effect(filter, **kwargs):  # noqa: ARG001
         if filter == "displayName eq 'de'":
             return [de_group]
         elif filter == "displayName eq 'dbr_backup_de'":
@@ -114,5 +114,22 @@ def test_prepare_groups_in_environment_with_no_groups_in_conf():
     assert manager._migration_state.groups == [group_info]
 
 
-def test_replace_workspace_groups_with_account_groups():
-    raise NotImplementedError
+def test_replace_workspace_groups_with_account_groups_should_call_delete_and_do():
+    client = Mock()
+
+    test_workspace_id = 100
+    de_group = Group(display_name="de", meta=ResourceMeta(resource_type="WorkspaceGroup"), id=test_workspace_id)
+    backup_de_group = Group(display_name="dbr_backup_de", meta=ResourceMeta(resource_type="WorkspaceGroup"))
+
+    client.groups.list.return_value = [de_group]
+
+    group_conf = GroupsConfig(backup_group_prefix="dbr_backup_", auto=True)
+    manager = GroupManager(client, group_conf)
+
+    group_info = MigrationGroupInfo(workspace=de_group, account=de_group, backup=backup_de_group)
+    manager._migration_state.groups = [group_info]
+    manager.replace_workspace_groups_with_account_groups()
+
+    client.groups.delete.assert_called_with(test_workspace_id)
+    client.api_client.do.assert_called_with('PUT', f'/api/2.0/preview/permissionassignments/principals/{test_workspace_id}', data='{"permissions": ["USER"]}')
+
