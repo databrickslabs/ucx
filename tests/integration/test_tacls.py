@@ -3,6 +3,13 @@ import os
 
 from databricks.sdk import WorkspaceClient
 
+from databricks.labs.ucx.config import (
+    GroupsConfig,
+    InventoryConfig,
+    InventoryTable,
+    MigrationConfig,
+    TaclConfig,
+)
 from databricks.labs.ucx.toolkits.table_acls import TaclToolkit
 
 logger = logging.getLogger(__name__)
@@ -29,12 +36,26 @@ def test_describe_all_tables_in_databases(ws: WorkspaceClient, make_catalog, mak
 
     inventory_schema = make_schema(catalog=make_catalog())
     inventory_catalog, inventory_schema = inventory_schema.split(".")
-    tak = TaclToolkit(ws, inventory_catalog, inventory_schema, warehouse_id)
 
     databases = [schema_a.split(".")[1], schema_b.split(".")[1]]
 
+    config = MigrationConfig(
+        inventory=InventoryConfig(
+            table=InventoryTable(catalog=inventory_catalog, database=inventory_schema, name="ucx_migration_inventory")
+        ),
+        groups=GroupsConfig(
+            auto=True,
+        ),
+        tacl=TaclConfig(
+            databases=databases,
+        ),
+        log_level="DEBUG",
+    )
+
+    tak = TaclToolkit(ws, config, warehouse_id)
+
     all_tables = {}
-    for t in tak.database_snapshot(databases):
+    for t in tak.database_snapshot():
         all_tables[t.key] = t
 
     assert len(all_tables) == 5
@@ -64,20 +85,28 @@ def test_all_grants_in_databases(ws: WorkspaceClient, sql_exec, make_catalog, ma
 
     inventory_schema = make_schema(catalog=make_catalog())
     inventory_catalog, inventory_schema = inventory_schema.split(".")
-    tak = TaclToolkit(ws, inventory_catalog, inventory_schema, warehouse_id)
 
-    databases = [schema_a.split(".")[1], schema_b.split(".")[1]]
+    config = MigrationConfig(
+        inventory=InventoryConfig(
+            table=InventoryTable(catalog=inventory_catalog, database=inventory_schema, name="ucx_migration_inventory")
+        ),
+        groups=GroupsConfig(
+            auto=True,
+        ),
+        tacl=TaclConfig(
+            auto=True,
+        ),
+        log_level="DEBUG",
+    )
 
-    print(f"inventory_schema: {inventory_schema}")
-    print(f"inventory_catalog: {inventory_catalog}")
-    print(f"databases: {databases}")
+    tak = TaclToolkit(ws, config, warehouse_id)
 
     all_grants = {}
-    for grant in tak.grants_snapshot(databases):
+    for grant in tak.grants_snapshot():
         logging.info(f"grant:\n{grant}\n  hive: {grant.hive_grant_sql()}\n  uc: {grant.uc_grant_sql()}")
         all_grants[f"{grant.principal}.{grant.object_key}"] = grant.action_type
 
-    assert len(all_grants) >= 2, "must have at least two grants"
+    assert len(all_grants) >= 3, "must have at least three grants"
     assert all_grants[f"{group_a.display_name}.{table_a}"] == "SELECT"
     assert all_grants[f"{group_b.display_name}.{table_b}"] == "SELECT"
     assert all_grants[f"{group_b.display_name}.{schema_b}"] == "MODIFY"

@@ -36,7 +36,8 @@ update_module_imports()
 # COMMAND ----------
 
 from databricks.labs.ucx.toolkits.group_migration import GroupMigrationToolkit
-from databricks.labs.ucx.config import MigrationConfig, InventoryConfig, GroupsConfig, InventoryTable
+from databricks.labs.ucx.config import MigrationConfig, InventoryConfig, GroupsConfig, InventoryTable, TaclConfig
+from databricks.labs.ucx.toolkits.table_acls import TaclToolkit
 
 # COMMAND ----------
 
@@ -47,7 +48,6 @@ from databricks.labs.ucx.config import MigrationConfig, InventoryConfig, GroupsC
 # COMMAND ----------
 
 config = MigrationConfig(
-    with_table_acls=False,
     inventory=InventoryConfig(table=InventoryTable(catalog="main", database="default", name="ucx_migration_inventory")),
     groups=GroupsConfig(
         # use this option to select specific groups manually
@@ -55,9 +55,16 @@ config = MigrationConfig(
         # use this option to select all groups automatically
         # auto=True
     ),
+    tacl=TaclConfig(
+        # use this option to select specific databases manually
+        databases=["default"],
+        # use this option to select all databases automatically
+        # auto=True
+    ),
     log_level="DEBUG",
 )
 toolkit = GroupMigrationToolkit(config)
+tacltoolkit = TaclToolkit(toolkit._ws, config)
 
 # COMMAND ----------
 
@@ -149,6 +156,16 @@ toolkit.apply_permissions_to_account_groups()
 # COMMAND ----------
 
 toolkit.delete_backup_groups()
+
+# COMMAND ----------
+
+# MAGIC %md
+# MAGIC
+# MAGIC ## Inventorize Table ACL's
+
+# COMMAND ----------
+
+tacltoolkit.grants_snapshot()
 
 # COMMAND ----------
 

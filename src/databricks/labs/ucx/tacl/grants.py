@@ -155,7 +155,6 @@ class GrantsCrawler(CrawlerBase):
         catalog = self._valid(catalog)
         tasks = [partial(self._grants, catalog=catalog)]
         table_snapshot = self._tc.snapshot(catalog, databases)
-        print(table_snapshot)
         for database in databases:
             tasks.append(partial(self._grants, catalog=catalog, database=database))
         for table in table_snapshot:

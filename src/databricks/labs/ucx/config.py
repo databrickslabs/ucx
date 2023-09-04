@@ -92,7 +92,16 @@ class ConnectConfig:
 
 @dataclass
 class TaclConfig:
-    databases: list[str]
+    databases: list[str] | None = None
+    auto: bool | None = None
+
+    def __post_init__(self):
+        if not self.databases and self.auto is None:
+            msg = "Either selected or auto must be set"
+            raise ValueError(msg)
+        if self.databases and self.auto is False:
+            msg = "No selected groups provided, but auto-collection is disabled"
+            raise ValueError(msg)
 
     @classmethod
     def from_dict(cls, raw: dict):

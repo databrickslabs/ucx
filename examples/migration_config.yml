@@ -9,8 +9,6 @@ tacl:
 
 warehouse_id: None
 
-with_table_acls: False
-
 groups:
   selected: [ "analyst" ]
 
