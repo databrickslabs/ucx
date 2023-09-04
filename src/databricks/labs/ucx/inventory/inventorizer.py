@@ -364,9 +364,10 @@ def models_listing(ws: WorkspaceClient):
 def experiments_listing(ws: WorkspaceClient):
     def inner() -> Iterator[ModelDatabricks]:
         for experiment in ws.experiments.list_experiments():
-            nb_tag = [t for t in experiment.tags if t.key == "mlflow.experimentType" and t.value == "NOTEBOOK"]
-            if not nb_tag:
-                yield experiment
+            if experiment.tags:
+                nb_tag = [t for t in experiment.tags if t.key == "mlflow.experimentType" and t.value == "NOTEBOOK"]
+                if not nb_tag:
+                    yield experiment
 
     return inner
 

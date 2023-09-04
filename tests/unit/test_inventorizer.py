@@ -261,9 +261,9 @@ def test_experiments_listing(workspace_client):
     workspace_client.experiments.list_experiments.return_value = [experiment]
     # first test without tags (means `None`)
     # FIX: Bug in function, does not handle None tags!
-    # f = experiments_listing(workspace_client)
-    # experiments = list(f())
-    # assert len(experiments) == 0
+    f = experiments_listing(workspace_client)
+    experiments = list(f())
+    assert len(experiments) == 0
 
     # with the tags filtering the experiment out
     experiment.tags = filtered_tags
