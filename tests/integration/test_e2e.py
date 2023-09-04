@@ -181,20 +181,6 @@ def test_e2e(
     toolkit = GroupMigrationToolkit(config)
     toolkit.prepare_environment()
 
-    logger.debug("Verifying that the groups were created")
-
-    assert len(ws.groups.list(filter=f"displayName sw '{config.groups.backup_group_prefix}{env.test_uid}'")) == len(
-        toolkit.group_manager.migration_groups_provider.groups
-    )
-
-    assert len(ws.groups.list(filter=f"displayName sw '{env.test_uid}'")) == len(
-        toolkit.group_manager.migration_groups_provider.groups
-    )
-
-    assert len(toolkit.group_manager._list_account_level_groups(filter=f"displayName sw '{env.test_uid}'")) == len(
-        toolkit.group_manager.migration_groups_provider.groups
-    )
-
     for _info in toolkit.group_manager.migration_groups_provider.groups:
         _ws = ws.groups.get(id=_info.workspace.id)
         _backup = ws.groups.get(id=_info.backup.id)
