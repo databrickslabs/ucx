@@ -28,9 +28,9 @@ class RequestObjectType(StrEnum):
     SQL_WAREHOUSES = "sql/warehouses"  # / is not a typo, it's the real object type
 
     # adding values from existing type
-    ALERTS = SqlRequestObjectType.ALERTS
-    DASHBOARDS = SqlRequestObjectType.DASHBOARDS
-    QUERIES = SqlRequestObjectType.QUERIES
+    ALERTS = SqlRequestObjectType.ALERTS.value
+    DASHBOARDS = SqlRequestObjectType.DASHBOARDS.value
+    QUERIES = SqlRequestObjectType.QUERIES.value
 
     def __repr__(self):
         return self.value

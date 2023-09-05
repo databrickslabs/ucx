@@ -53,7 +53,7 @@ class BaseInventorizer(ABC, Generic[InventoryObject]):
         """Any inventorization activities should happen here"""
 
 
-class StandardInventorizer(BaseInventorizer[InventoryObject, PermissionsContainer]):
+class StandardInventorizer(BaseInventorizer[InventoryObject], Generic[InventoryObject, PermissionsContainer]):
     """
     Standard means that it can collect using the default listing/permissions function without any additional logic.
     """
@@ -467,19 +467,19 @@ class Inventorizers:
                 self._ws,
                 logical_object_type=LogicalObjectType.ALERT,
                 request_object_type=RequestObjectType.ALERTS,
-                listing_function=self._ws.alerts.list
+                listing_function=self._ws.alerts.list,
             ),
             SqlInventorizer(
                 self._ws,
                 logical_object_type=LogicalObjectType.DASHBOARD,
                 request_object_type=RequestObjectType.DASHBOARDS,
-                listing_function=self._ws.dashboards.list
+                listing_function=self._ws.dashboards.list,
             ),
             SqlInventorizer(
                 self._ws,
                 logical_object_type=LogicalObjectType.QUERY,
                 request_object_type=RequestObjectType.QUERIES,
-                listing_function=self._ws.queries.list
+                listing_function=self._ws.queries.list,
             ),
         ]
 
