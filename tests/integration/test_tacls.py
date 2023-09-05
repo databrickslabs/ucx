@@ -3,7 +3,6 @@ import os
 
 from databricks.sdk import WorkspaceClient
 
-from databricks.labs.ucx.config import TaclConfig
 from databricks.labs.ucx.toolkits.table_acls import TaclToolkit
 
 logger = logging.getLogger(__name__)
@@ -38,11 +37,7 @@ def test_describe_all_tables_in_databases(ws: WorkspaceClient, make_catalog, mak
 
     databases = [schema_a.split(".")[1], schema_b.split(".")[1], schema_c.split(".")[1]]
 
-    taclconfig = TaclConfig(
-        databases=databases,
-    )
-
-    tak = TaclToolkit(ws, inventory_catalog, inventory_schema, taclconfig, warehouse_id)
+    tak = TaclToolkit(ws, inventory_catalog, inventory_schema, warehouse_id, databases)
 
     all_tables = {}
     for t in tak.database_snapshot():
@@ -76,11 +71,7 @@ def test_all_grants_in_databases(ws: WorkspaceClient, sql_exec, make_catalog, ma
     inventory_schema = make_schema(catalog=make_catalog())
     inventory_catalog, inventory_schema = inventory_schema.split(".")
 
-    taclconfig = TaclConfig(
-        auto=True,
-    )
-
-    tak = TaclToolkit(ws, inventory_catalog, inventory_schema, taclconfig, warehouse_id)
+    tak = TaclToolkit(ws, inventory_catalog, inventory_schema, warehouse_id)
 
     all_grants = {}
     for grant in tak.grants_snapshot():
