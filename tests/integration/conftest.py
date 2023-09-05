@@ -2,24 +2,17 @@ import io
 import json
 import logging
 import os
-import pathlib
 import random
-import string
-import sys
-import uuid
 from functools import partial
 
 import databricks.sdk.core
 import pytest
-from _pytest.fixtures import SubRequest
-from databricks.sdk import AccountClient
+from databricks.sdk import AccountClient, WorkspaceClient
 from databricks.sdk.core import Config, DatabricksError
 from databricks.sdk.service.compute import (
     ClusterDetails,
     CreateInstancePoolResponse,
     CreatePolicyResponse,
-    DataSecurityMode,
-    RuntimeEngine,
 )
 from databricks.sdk.service.iam import AccessControlRequest, PermissionLevel
 from databricks.sdk.service.jobs import CreateResponse
@@ -41,24 +34,25 @@ from databricks.sdk.service.workspace import (
     SecretScope,
 )
 
-from uc_migration_toolkit.config import InventoryTable
-from uc_migration_toolkit.managers.inventory.types import RequestObjectType
-from uc_migration_toolkit.providers.client import ImprovedWorkspaceClient
-from uc_migration_toolkit.providers.logger import logger
-from uc_migration_toolkit.utils import ThreadedExecution
+from databricks.labs.ucx.config import InventoryTable
+from databricks.labs.ucx.inventory.types import RequestObjectType
+from databricks.labs.ucx.providers.mixins.fixtures import *  # noqa: F403
+from databricks.labs.ucx.providers.mixins.sql import StatementExecutionExt
+from databricks.labs.ucx.utils import ThreadedExecution
 
 from .utils import (
     EnvironmentInfo,
     InstanceProfile,
     WorkspaceObjects,
-    _cleanup_groups,
-    _create_groups,
     _get_basic_job_cluster,
     _get_basic_task,
     _set_random_permissions,
 )
 
-logging.getLogger("databricks.sdk").setLevel(logging.INFO)
+logging.getLogger("tests").setLevel("DEBUG")
+logging.getLogger("databricks.labs.ucx").setLevel("DEBUG")
+
+logger = logging.getLogger(__name__)
 
 NUM_TEST_GROUPS = int(os.environ.get("NUM_TEST_GROUPS", 5))
 NUM_TEST_INSTANCE_PROFILES = int(os.environ.get("NUM_TEST_INSTANCE_PROFILES", 3))
@@ -74,9 +68,9 @@ NUM_TEST_TOKENS = int(os.environ.get("NUM_TEST_TOKENS", 3))
 NUM_TEST_SECRET_SCOPES = int(os.environ.get("NUM_TEST_SECRET_SCOPES", 10))
 
 NUM_THREADS = int(os.environ.get("NUM_TEST_THREADS", 20))
-DB_CONNECT_CLUSTER_NAME = os.environ.get("DB_CONNECT_CLUSTER_NAME", "ucx-integration-testing")
 UCX_TESTING_PREFIX = os.environ.get("UCX_TESTING_PREFIX", "ucx")
 Threader = partial(ThreadedExecution, num_threads=NUM_THREADS)
+load_debug_env_if_runs_from_ide("ucws")  # noqa: F405
 
 
 def account_host(self: databricks.sdk.core.Config) -> str:
@@ -86,46 +80,6 @@ def account_host(self: databricks.sdk.core.Config) -> str:
         return "https://accounts.gcp.databricks.com/"
     else:
         return "https://accounts.cloud.databricks.com"
-
-
-def _load_debug_env_if_runs_from_ide(key) -> bool:
-    if not _is_in_debug():
-        return False
-    conf_file = pathlib.Path.home() / ".databricks/debug-env.json"
-    with conf_file.open("r") as f:
-        conf = json.load(f)
-        if key not in conf:
-            msg = f"{key} not found in ~/.databricks/debug-env.json"
-            raise KeyError(msg)
-        for k, v in conf[key].items():
-            os.environ[k] = v
-    return True
-
-
-def _is_in_debug() -> bool:
-    return os.path.basename(sys.argv[0]) in [
-        "_jb_pytest_runner.py",
-        "testlauncher.py",
-    ]
-
-
-@pytest.fixture
-def make_random():
-    import random
-
-    def inner(k=16) -> str:
-        charset = string.ascii_uppercase + string.ascii_lowercase + string.digits
-        return "".join(random.choices(charset, k=int(k)))
-
-    return inner
-
-
-@pytest.fixture(scope="session")
-def ws() -> ImprovedWorkspaceClient:
-    # Use variables from Unified Auth
-    # See https://databricks-sdk-py.readthedocs.io/en/latest/authentication.html
-    _load_debug_env_if_runs_from_ide("ucws")
-    return ImprovedWorkspaceClient()
 
 
 @pytest.fixture(scope="session")
@@ -144,77 +98,149 @@ def acc(ws) -> AccountClient:
     return AccountClient(host=account_host(ws.config))
 
 
-@pytest.fixture(scope="session")
-def dbconnect_cluster_id(ws: ImprovedWorkspaceClient) -> str:
-    # TODO: will use predeclared DATABRICKS_CLUSTER_ID env variable
-    dbc_cluster = next(filter(lambda c: c.cluster_name == DB_CONNECT_CLUSTER_NAME, ws.clusters.list()), None)
-
-    if dbc_cluster:
-        logger.debug(f"Integration testing cluster {DB_CONNECT_CLUSTER_NAME} already exists, skipping it's creation")
-        return dbc_cluster.cluster_id
-
-    logger.debug("Creating a cluster for integration testing")
-    dbc_cluster = ws.clusters.create(
-        spark_version=ws.clusters.select_spark_version(latest=True),
-        cluster_name=DB_CONNECT_CLUSTER_NAME,
-        instance_pool_id=os.environ["TEST_INSTANCE_POOL_ID"],
-        driver_node_type_id=os.environ["TEST_INSTANCE_POOL_ID"],
-        num_workers=0,
-        spark_conf={"spark.master": "local[*, 4]", "spark.databricks.cluster.profile": "singleNode"},
-        custom_tags={"ResourceClass": "SingleNode"},
-        data_security_mode=DataSecurityMode.SINGLE_USER,
-        autotermination_minutes=60,
-        runtime_engine=RuntimeEngine.PHOTON,
-    )
-    logger.debug(f"Cluster {dbc_cluster.cluster_id} created")
-
-    # TODO: pre-create the cluster in the test infra
-    return dbc_cluster.cluster_id
+@pytest.fixture
+def sql_exec(ws: WorkspaceClient):
+    warehouse_id = os.environ["TEST_DEFAULT_WAREHOUSE_ID"]
+    statement_execution = StatementExecutionExt(ws.api_client)
+    return partial(statement_execution.execute, warehouse_id)
 
 
-@pytest.fixture(scope="session")
-def env(ws: ImprovedWorkspaceClient, acc: AccountClient, request: SubRequest) -> EnvironmentInfo:
-    # prepare environment
-    test_uid = f"{UCX_TESTING_PREFIX}_{str(uuid.uuid4())[:8]}"
-    logger.debug(f"Creating environment with uid {test_uid}")
-    groups = _create_groups(ws, acc, test_uid, NUM_TEST_GROUPS, Threader)
-
-    def post_cleanup():
-        print("\n")
-        logger.debug("Cleaning up the environment")
-        logger.debug("Deleting test groups")
-        cleanups = [partial(_cleanup_groups, ws, acc, g) for g in groups]
-
-        def error_silencer(func):
-            def _wrapped(*args, **kwargs):
-                try:
-                    func(*args, **kwargs)
-                except Exception as e:
-                    logger.warning(f"Cannot delete temp group, skipping it. Original exception {e}")
-
-            return _wrapped
-
-        silent_delete = error_silencer(ws.groups.delete)
-
-        temp_cleanups = [
-            # TODO: this is too heavy for SCIM API, refactor to ID lookup
-            partial(silent_delete, g.id)
-            for g in ws.groups.list(filter=f"displayName sw 'db-temp-{test_uid}'")
-        ]
-        new_ws_groups_cleanups = [
-            partial(silent_delete, g.id) for g in ws.groups.list(filter=f"displayName sw '{test_uid}'")
-        ]
-
-        all_cleanups = cleanups + temp_cleanups + new_ws_groups_cleanups
-        Threader(all_cleanups).run()
-        logger.debug(f"Finished cleanup for the environment {test_uid}")
-
-    request.addfinalizer(post_cleanup)
-    yield EnvironmentInfo(test_uid=test_uid, groups=groups)
+@pytest.fixture
+def sql_fetch_all(ws: WorkspaceClient):
+    warehouse_id = os.environ["TEST_DEFAULT_WAREHOUSE_ID"]
+    statement_execution = StatementExecutionExt(ws.api_client)
+    return partial(statement_execution.execute_fetch_all, warehouse_id)
 
 
-@pytest.fixture(scope="session")
-def instance_profiles(env: EnvironmentInfo, ws: ImprovedWorkspaceClient) -> list[InstanceProfile]:
+@pytest.fixture
+def make_catalog(sql_exec, make_random):
+    cleanup = []
+
+    def inner():
+        name = f"ucx_C{make_random(4)}".lower()
+        sql_exec(f"CREATE CATALOG {name}")
+        cleanup.append(name)
+        return name
+
+    yield inner
+    logger.debug(f"clearing {len(cleanup)} catalogs")
+    for name in cleanup:
+        logger.debug(f"removing {name} catalog")
+        sql_exec(f"DROP CATALOG IF EXISTS {name} CASCADE")
+    logger.debug(f"removed {len(cleanup)} catalogs")
+
+
+def test_catalog_fixture(make_catalog):
+    logger.info(f"Created new catalog: {make_catalog()}")
+    logger.info(f"Created new catalog: {make_catalog()}")
+
+
+@pytest.fixture
+def make_schema(sql_exec, make_random):
+    cleanup = []
+
+    def inner(catalog="hive_metastore"):
+        name = f"{catalog}.ucx_S{make_random(4)}".lower()
+        sql_exec(f"CREATE SCHEMA {name}")
+        cleanup.append(name)
+        return name
+
+    yield inner
+    logger.debug(f"clearing {len(cleanup)} schemas")
+    for name in cleanup:
+        logger.debug(f"removing {name} schema")
+        sql_exec(f"DROP SCHEMA IF EXISTS {name} CASCADE")
+    logger.debug(f"removed {len(cleanup)} schemas")
+
+
+def test_schema_fixture(make_schema):
+    logger.info(f"Created new schema: {make_schema()}")
+    logger.info(f"Created new schema: {make_schema()}")
+
+
+@pytest.fixture
+def make_table(sql_exec, make_schema, make_random):
+    cleanup = []
+
+    def inner(
+        *,
+        catalog="hive_metastore",
+        schema: str | None = None,
+        ctas: str | None = None,
+        non_detla: bool = False,
+        external: bool = False,
+        view: bool = False,
+    ):
+        if schema is None:
+            schema = make_schema(catalog=catalog)
+        name = f"{schema}.ucx_T{make_random(4)}".lower()
+        ddl = f'CREATE {"VIEW" if view else "TABLE"} {name}'
+        if ctas is not None:
+            # temporary (if not view)
+            ddl = f"{ddl} AS {ctas}"
+        elif non_detla:
+            location = "dbfs:/databricks-datasets/iot-stream/data-device"
+            ddl = f"{ddl} USING json LOCATION '{location}'"
+        elif external:
+            # external table
+            location = "dbfs:/databricks-datasets/nyctaxi-with-zipcodes/subsampled"
+            ddl = f"{ddl} USING delta LOCATION '{location}'"
+        else:
+            # managed table
+            ddl = f"{ddl} (id INT, value STRING)"
+        sql_exec(ddl)
+        cleanup.append(name)
+        return name
+
+    yield inner
+
+    logger.debug(f"clearing {len(cleanup)} tables")
+    for name in cleanup:
+        logger.debug(f"removing {name} table")
+        try:
+            sql_exec(f"DROP TABLE IF EXISTS {name}")
+        except RuntimeError as e:
+            if "Cannot drop a view" in str(e):
+                sql_exec(f"DROP VIEW IF EXISTS {name}")
+            else:
+                raise e
+    logger.debug(f"removed {len(cleanup)} tables")
+
+
+def test_table_fixture(make_table):
+    logger.info(f"Created new managed table in new schema: {make_table()}")
+    logger.info(f'Created new managed table in default schema: {make_table(schema="default")}')
+    logger.info(f"Created new external table in new schema: {make_table(external=True)}")
+    logger.info(f"Created new external JSON table in new schema: {make_table(non_detla=True)}")
+    logger.info(f'Created new tmp table in new schema: {make_table(ctas="SELECT 2+2 AS four")}')
+    logger.info(f'Created new view in new schema: {make_table(view=True, ctas="SELECT 2+2 AS four")}')
+
+
+@pytest.fixture
+def user_pool(ws):
+    return list(ws.users.list(filter="displayName sw 'test-user-'", attributes="id, userName, displayName"))
+
+
+@pytest.fixture
+def make_ucx_group(make_random, make_group, make_acc_group, user_pool):
+    def inner():
+        display_name = f"ucx_{make_random(4)}"
+        members = [_.id for _ in random.choices(user_pool, k=random.randint(1, 40))]
+        ws_group = make_group(display_name=display_name, members=members, entitlements=["allow-cluster-create"])
+        acc_group = make_acc_group(display_name=display_name, members=members)
+        return ws_group, acc_group
+
+    return inner
+
+
+@pytest.fixture
+def env(make_ucx_group, make_random) -> EnvironmentInfo:
+    test_uid = f"ucx_{make_random(4)}"
+    yield EnvironmentInfo(test_uid=test_uid, groups=[make_ucx_group()])
+
+
+@pytest.fixture
+def instance_profiles(env: EnvironmentInfo, ws: WorkspaceClient) -> list[InstanceProfile]:
     logger.debug("Adding test instance profiles")
     profiles: list[InstanceProfile] = []
 
@@ -247,8 +273,8 @@ def instance_profiles(env: EnvironmentInfo, ws: ImprovedWorkspaceClient) -> list
     logger.debug("Test instance profiles deleted")
 
 
-@pytest.fixture(scope="session")
-def instance_pools(env: EnvironmentInfo, ws: ImprovedWorkspaceClient) -> list[CreateInstancePoolResponse]:
+@pytest.fixture
+def instance_pools(env: EnvironmentInfo, ws: WorkspaceClient) -> list[CreateInstancePoolResponse]:
     logger.debug("Creating test instance pools")
 
     test_instance_pools: list[CreateInstancePoolResponse] = [
@@ -272,8 +298,8 @@ def instance_pools(env: EnvironmentInfo, ws: ImprovedWorkspaceClient) -> list[Cr
     Threader(executables).run()
 
 
-@pytest.fixture(scope="session")
-def pipelines(env: EnvironmentInfo, ws: ImprovedWorkspaceClient) -> list[CreatePipelineResponse]:
+@pytest.fixture
+def pipelines(env: EnvironmentInfo, ws: WorkspaceClient) -> list[CreatePipelineResponse]:
     logger.debug("Creating test DLT pipelines")
 
     test_pipelines: list[CreatePipelineResponse] = [
@@ -302,8 +328,8 @@ def pipelines(env: EnvironmentInfo, ws: ImprovedWorkspaceClient) -> list[CreateP
     Threader(executables).run()
 
 
-@pytest.fixture(scope="session")
-def jobs(env: EnvironmentInfo, ws: ImprovedWorkspaceClient) -> list[CreateResponse]:
+@pytest.fixture
+def jobs(env: EnvironmentInfo, ws: WorkspaceClient) -> list[CreateResponse]:
     logger.debug("Creating test jobs")
 
     test_jobs: list[CreateResponse] = [
@@ -329,8 +355,8 @@ def jobs(env: EnvironmentInfo, ws: ImprovedWorkspaceClient) -> list[CreateRespon
     Threader(executables).run()
 
 
-@pytest.fixture(scope="session")
-def cluster_policies(env: EnvironmentInfo, ws: ImprovedWorkspaceClient) -> list[CreatePolicyResponse]:
+@pytest.fixture
+def cluster_policies(env: EnvironmentInfo, ws: WorkspaceClient) -> list[CreatePolicyResponse]:
     logger.debug("Creating test cluster policies")
 
     test_cluster_policies: list[CreatePolicyResponse] = [
@@ -364,8 +390,8 @@ def cluster_policies(env: EnvironmentInfo, ws: ImprovedWorkspaceClient) -> list[
     Threader(executables).run()
 
 
-@pytest.fixture(scope="session")
-def clusters(env: EnvironmentInfo, ws: ImprovedWorkspaceClient) -> list[ClusterDetails]:
+@pytest.fixture
+def clusters(env: EnvironmentInfo, ws: WorkspaceClient) -> list[ClusterDetails]:
     logger.debug("Creating test clusters")
 
     creators = [
@@ -399,8 +425,8 @@ def clusters(env: EnvironmentInfo, ws: ImprovedWorkspaceClient) -> list[ClusterD
     logger.debug("Test clusters deleted")
 
 
-@pytest.fixture(scope="session")
-def experiments(ws: ImprovedWorkspaceClient, env: EnvironmentInfo) -> list[CreateExperimentResponse]:
+@pytest.fixture
+def experiments(ws: WorkspaceClient, env: EnvironmentInfo) -> list[CreateExperimentResponse]:
     logger.debug("Creating test experiments")
 
     try:
@@ -432,8 +458,8 @@ def experiments(ws: ImprovedWorkspaceClient, env: EnvironmentInfo) -> list[Creat
     logger.debug("Test experiments deleted")
 
 
-@pytest.fixture(scope="session")
-def models(ws: ImprovedWorkspaceClient, env: EnvironmentInfo) -> list[ModelDatabricks]:
+@pytest.fixture
+def models(ws: WorkspaceClient, env: EnvironmentInfo) -> list[ModelDatabricks]:
     logger.debug("Creating models")
 
     test_models: list[ModelDatabricks] = [
@@ -465,8 +491,8 @@ def models(ws: ImprovedWorkspaceClient, env: EnvironmentInfo) -> list[ModelDatab
     logger.debug("Test models deleted")
 
 
-@pytest.fixture(scope="session")
-def warehouses(ws: ImprovedWorkspaceClient, env: EnvironmentInfo) -> list[GetWarehouseResponse]:
+@pytest.fixture
+def warehouses(ws: WorkspaceClient, env: EnvironmentInfo) -> list[GetWarehouseResponse]:
     logger.debug("Creating warehouses")
 
     creators = [
@@ -500,13 +526,13 @@ def warehouses(ws: ImprovedWorkspaceClient, env: EnvironmentInfo) -> list[GetWar
     logger.debug("Test warehouses deleted")
 
 
-@pytest.fixture(scope="session")
-def tokens(ws: ImprovedWorkspaceClient, env: EnvironmentInfo) -> list[AccessControlRequest]:
+@pytest.fixture
+def tokens(ws: WorkspaceClient, env: EnvironmentInfo) -> list[AccessControlRequest]:
     logger.debug("Adding token-level permissions to groups")
 
     token_permissions = [
         AccessControlRequest(group_name=ws_group.display_name, permission_level=PermissionLevel.CAN_USE)
-        for ws_group, _ in random.sample(env.groups, k=NUM_TEST_TOKENS)
+        for ws_group, _ in random.sample(env.groups, k=min(len(env.groups), NUM_TEST_TOKENS))
     ]
 
     ws.permissions.update(
@@ -518,8 +544,8 @@ def tokens(ws: ImprovedWorkspaceClient, env: EnvironmentInfo) -> list[AccessCont
     yield token_permissions
 
 
-@pytest.fixture(scope="session")
-def secret_scopes(ws: ImprovedWorkspaceClient, env: EnvironmentInfo) -> list[SecretScope]:
+@pytest.fixture
+def secret_scopes(ws: WorkspaceClient, env: EnvironmentInfo) -> list[SecretScope]:
     logger.debug("Creating test secret scopes")
 
     for i in range(NUM_TEST_SECRET_SCOPES):
@@ -539,8 +565,8 @@ def secret_scopes(ws: ImprovedWorkspaceClient, env: EnvironmentInfo) -> list[Sec
     Threader(executables).run()
 
 
-@pytest.fixture(scope="session")
-def workspace_objects(ws: ImprovedWorkspaceClient, env: EnvironmentInfo) -> WorkspaceObjects:
+@pytest.fixture
+def workspace_objects(ws: WorkspaceClient, env: EnvironmentInfo) -> WorkspaceObjects:
     logger.info(f"Creating test workspace objects under /{env.test_uid}")
     ws.workspace.mkdirs(f"/{env.test_uid}")
 
@@ -594,7 +620,7 @@ def workspace_objects(ws: ImprovedWorkspaceClient, env: EnvironmentInfo) -> Work
     logger.debug("Test workspace objects deleted")
 
 
-@pytest.fixture(scope="session")
+@pytest.fixture
 def verifiable_objects(
     clusters,
     instance_pools,
@@ -625,11 +651,11 @@ def verifiable_objects(
 
 
 @pytest.fixture()
-def inventory_table(env: EnvironmentInfo, ws: ImprovedWorkspaceClient, dbconnect_cluster_id: str) -> InventoryTable:
-    ws.config.cluster_id = dbconnect_cluster_id
+def inventory_table(env: EnvironmentInfo, ws: WorkspaceClient, make_catalog, make_schema) -> InventoryTable:
+    catalog, schema = make_schema(make_catalog()).split(".")
     table = InventoryTable(
-        catalog="main",
-        database="default",
+        catalog=catalog,
+        database=schema,
         name=f"test_inventory_{env.test_uid}",
     )
 

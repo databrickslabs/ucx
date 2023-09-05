@@ -1,8 +1,9 @@
+import dataclasses
+
 from databricks.sdk.service.workspace import AclItem as SdkAclItem
 from databricks.sdk.service.workspace import AclPermission as SdkAclPermission
-from pydantic.tools import parse_obj_as
 
-from uc_migration_toolkit.managers.inventory.types import AclItemsContainer
+from databricks.labs.ucx.inventory.types import AclItemsContainer
 
 
 def test_acl_items_container_serde():
@@ -17,7 +18,7 @@ def test_acl_items_container_serde():
 
     assert after == sdk_items
 
-    _dump = container.model_dump(mode="json")
-    _str = parse_obj_as(AclItemsContainer, _dump)
+    _dump = dataclasses.asdict(container)
+    _str = AclItemsContainer.from_dict(_dump)
 
     assert _str == container
