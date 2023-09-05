@@ -580,7 +580,7 @@ def workspace_objects(ws: WorkspaceClient, env: EnvironmentInfo) -> WorkspaceObj
 
         ws.permissions.set(
             request_object_type=RequestObjectType.DIRECTORIES,
-            request_object_id=object_info.object_id,
+            request_object_id=object_info._object_id,
             access_control_list=[
                 AccessControlRequest(group_name=ws_group.display_name, permission_level=PermissionLevel.CAN_MANAGE)
             ],
@@ -599,7 +599,7 @@ def workspace_objects(ws: WorkspaceClient, env: EnvironmentInfo) -> WorkspaceObj
         notebooks.append(_nb_obj)
         ws.permissions.set(
             request_object_type=RequestObjectType.NOTEBOOKS,
-            request_object_id=_nb_obj.object_id,
+            request_object_id=_nb_obj._object_id,
             access_control_list=[
                 AccessControlRequest(group_name=random_group.display_name, permission_level=PermissionLevel.CAN_EDIT)
             ],
@@ -609,7 +609,7 @@ def workspace_objects(ws: WorkspaceClient, env: EnvironmentInfo) -> WorkspaceObj
         root_dir=ObjectInfo(
             path=f"/{env.test_uid}",
             object_type=ObjectType.DIRECTORY,
-            object_id=ws.workspace.get_status(f"/{env.test_uid}").object_id,
+            object_id=ws.workspace.get_status(f"/{env.test_uid}")._object_id,
         ),
         directories=base_dirs,
         notebooks=notebooks,
