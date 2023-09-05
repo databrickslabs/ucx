@@ -26,7 +26,7 @@ classifiers = [
     "Programming Language :: Python :: Implementation :: PyPy",
 ]
 dependencies = [
-    "databricks-sdk~=0.7.0",
+    "databricks-sdk~=0.8.0",
     "PyYAML>=6.0.0,<7.0.0",
 
     # TODO: remove later
