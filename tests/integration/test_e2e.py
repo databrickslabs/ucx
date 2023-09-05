@@ -164,7 +164,7 @@ def test_e2e(
     )
     verifiable_objects.append(([pool], "instance_pool_id", RequestObjectType.INSTANCE_POOLS))
 
-    cluster = make_cluster(instance_pool_id=os.environ["TEST_INSTANCE_POOL_ID"])
+    cluster = make_cluster(instance_pool_id=os.environ["TEST_INSTANCE_POOL_ID"], single_node=True)
     make_cluster_permissions(
         object_id=cluster.cluster_id,
         permission_level=random.choice(
