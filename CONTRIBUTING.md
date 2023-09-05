@@ -187,7 +187,6 @@ ERROR: ResolutionImpossible: for help visit https://pip.pypa.io/en/latest/topics
 The easiest fix is to remove the environment and have the re-run recreate it:
 
 ```sh
-`
 $ hatch env show
                                  Standalone                                 
 ┏━━━━━━━━━━━━━┳━━━━━━━━━┳━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┳━━━━━━━━━━━━━━━━━┓
