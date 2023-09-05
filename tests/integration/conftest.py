@@ -3,12 +3,10 @@ import json
 import logging
 import os
 import random
-import uuid
 from functools import partial
 
 import databricks.sdk.core
 import pytest
-from _pytest.fixtures import SubRequest
 from databricks.sdk import AccountClient, WorkspaceClient
 from databricks.sdk.core import Config, DatabricksError
 from databricks.sdk.service.compute import (
@@ -46,8 +44,6 @@ from .utils import (
     EnvironmentInfo,
     InstanceProfile,
     WorkspaceObjects,
-    _cleanup_groups,
-    _create_groups,
     _get_basic_job_cluster,
     _get_basic_task,
     _set_random_permissions,
@@ -220,48 +216,30 @@ def test_table_fixture(make_table):
     logger.info(f'Created new view in new schema: {make_table(view=True, ctas="SELECT 2+2 AS four")}')
 
 
-@pytest.fixture(scope="session")
-def env(ws: WorkspaceClient, acc: AccountClient, request: SubRequest) -> EnvironmentInfo:
-    # prepare environment
-    test_uid = f"{UCX_TESTING_PREFIX}_{str(uuid.uuid4())[:8]}"
-    logger.debug(f"Creating environment with uid {test_uid}")
-    groups = _create_groups(ws, acc, test_uid, NUM_TEST_GROUPS, Threader)
-
-    def post_cleanup():
-        print("\n")
-        logger.debug("Cleaning up the environment")
-        logger.debug("Deleting test groups")
-        cleanups = [partial(_cleanup_groups, ws, acc, g) for g in groups]
-
-        def error_silencer(func):
-            def _wrapped(*args, **kwargs):
-                try:
-                    func(*args, **kwargs)
-                except Exception as e:
-                    logger.warning(f"Cannot delete temp group, skipping it. Original exception {e}")
-
-            return _wrapped
-
-        silent_delete = error_silencer(ws.groups.delete)
-
-        temp_cleanups = [
-            # TODO: this is too heavy for SCIM API, refactor to ID lookup
-            partial(silent_delete, g.id)
-            for g in ws.groups.list(filter=f"displayName sw 'db-temp-{test_uid}'")
-        ]
-        new_ws_groups_cleanups = [
-            partial(silent_delete, g.id) for g in ws.groups.list(filter=f"displayName sw '{test_uid}'")
-        ]
-
-        all_cleanups = cleanups + temp_cleanups + new_ws_groups_cleanups
-        Threader(all_cleanups).run()
-        logger.debug(f"Finished cleanup for the environment {test_uid}")
-
-    request.addfinalizer(post_cleanup)
-    yield EnvironmentInfo(test_uid=test_uid, groups=groups)
+@pytest.fixture
+def user_pool(ws):
+    return list(ws.users.list(filter="displayName sw 'test-user-'", attributes="id, userName, displayName"))
 
 
-@pytest.fixture(scope="session")
+@pytest.fixture
+def make_ucx_group(make_random, make_group, make_acc_group, user_pool):
+    def inner():
+        display_name = f"ucx_{make_random(4)}"
+        members = [_.id for _ in random.choices(user_pool, k=random.randint(1, 40))]
+        ws_group = make_group(display_name=display_name, members=members, entitlements=["allow-cluster-create"])
+        acc_group = make_acc_group(display_name=display_name, members=members)
+        return ws_group, acc_group
+
+    return inner
+
+
+@pytest.fixture
+def env(make_ucx_group, make_random) -> EnvironmentInfo:
+    test_uid = f"ucx_{make_random(4)}"
+    yield EnvironmentInfo(test_uid=test_uid, groups=[make_ucx_group()])
+
+
+@pytest.fixture
 def instance_profiles(env: EnvironmentInfo, ws: WorkspaceClient) -> list[InstanceProfile]:
     logger.debug("Adding test instance profiles")
     profiles: list[InstanceProfile] = []
@@ -295,7 +273,7 @@ def instance_profiles(env: EnvironmentInfo, ws: WorkspaceClient) -> list[Instanc
     logger.debug("Test instance profiles deleted")
 
 
-@pytest.fixture(scope="session")
+@pytest.fixture
 def instance_pools(env: EnvironmentInfo, ws: WorkspaceClient) -> list[CreateInstancePoolResponse]:
     logger.debug("Creating test instance pools")
 
@@ -320,7 +298,7 @@ def instance_pools(env: EnvironmentInfo, ws: WorkspaceClient) -> list[CreateInst
     Threader(executables).run()
 
 
-@pytest.fixture(scope="session")
+@pytest.fixture
 def pipelines(env: EnvironmentInfo, ws: WorkspaceClient) -> list[CreatePipelineResponse]:
     logger.debug("Creating test DLT pipelines")
 
@@ -350,7 +328,7 @@ def pipelines(env: EnvironmentInfo, ws: WorkspaceClient) -> list[CreatePipelineR
     Threader(executables).run()
 
 
-@pytest.fixture(scope="session")
+@pytest.fixture
 def jobs(env: EnvironmentInfo, ws: WorkspaceClient) -> list[CreateResponse]:
     logger.debug("Creating test jobs")
 
@@ -377,7 +355,7 @@ def jobs(env: EnvironmentInfo, ws: WorkspaceClient) -> list[CreateResponse]:
     Threader(executables).run()
 
 
-@pytest.fixture(scope="session")
+@pytest.fixture
 def cluster_policies(env: EnvironmentInfo, ws: WorkspaceClient) -> list[CreatePolicyResponse]:
     logger.debug("Creating test cluster policies")
 
@@ -412,7 +390,7 @@ def cluster_policies(env: EnvironmentInfo, ws: WorkspaceClient) -> list[CreatePo
     Threader(executables).run()
 
 
-@pytest.fixture(scope="session")
+@pytest.fixture
 def clusters(env: EnvironmentInfo, ws: WorkspaceClient) -> list[ClusterDetails]:
     logger.debug("Creating test clusters")
 
@@ -447,7 +425,7 @@ def clusters(env: EnvironmentInfo, ws: WorkspaceClient) -> list[ClusterDetails]:
     logger.debug("Test clusters deleted")
 
 
-@pytest.fixture(scope="session")
+@pytest.fixture
 def experiments(ws: WorkspaceClient, env: EnvironmentInfo) -> list[CreateExperimentResponse]:
     logger.debug("Creating test experiments")
 
@@ -480,7 +458,7 @@ def experiments(ws: WorkspaceClient, env: EnvironmentInfo) -> list[CreateExperim
     logger.debug("Test experiments deleted")
 
 
-@pytest.fixture(scope="session")
+@pytest.fixture
 def models(ws: WorkspaceClient, env: EnvironmentInfo) -> list[ModelDatabricks]:
     logger.debug("Creating models")
 
@@ -513,7 +491,7 @@ def models(ws: WorkspaceClient, env: EnvironmentInfo) -> list[ModelDatabricks]:
     logger.debug("Test models deleted")
 
 
-@pytest.fixture(scope="session")
+@pytest.fixture
 def warehouses(ws: WorkspaceClient, env: EnvironmentInfo) -> list[GetWarehouseResponse]:
     logger.debug("Creating warehouses")
 
@@ -548,13 +526,13 @@ def warehouses(ws: WorkspaceClient, env: EnvironmentInfo) -> list[GetWarehouseRe
     logger.debug("Test warehouses deleted")
 
 
-@pytest.fixture(scope="session")
+@pytest.fixture
 def tokens(ws: WorkspaceClient, env: EnvironmentInfo) -> list[AccessControlRequest]:
     logger.debug("Adding token-level permissions to groups")
 
     token_permissions = [
         AccessControlRequest(group_name=ws_group.display_name, permission_level=PermissionLevel.CAN_USE)
-        for ws_group, _ in random.sample(env.groups, k=NUM_TEST_TOKENS)
+        for ws_group, _ in random.sample(env.groups, k=min(len(env.groups), NUM_TEST_TOKENS))
     ]
 
     ws.permissions.update(
@@ -566,7 +544,7 @@ def tokens(ws: WorkspaceClient, env: EnvironmentInfo) -> list[AccessControlReque
     yield token_permissions
 
 
-@pytest.fixture(scope="session")
+@pytest.fixture
 def secret_scopes(ws: WorkspaceClient, env: EnvironmentInfo) -> list[SecretScope]:
     logger.debug("Creating test secret scopes")
 
@@ -587,7 +565,7 @@ def secret_scopes(ws: WorkspaceClient, env: EnvironmentInfo) -> list[SecretScope
     Threader(executables).run()
 
 
-@pytest.fixture(scope="session")
+@pytest.fixture
 def workspace_objects(ws: WorkspaceClient, env: EnvironmentInfo) -> WorkspaceObjects:
     logger.info(f"Creating test workspace objects under /{env.test_uid}")
     ws.workspace.mkdirs(f"/{env.test_uid}")
@@ -642,7 +620,7 @@ def workspace_objects(ws: WorkspaceClient, env: EnvironmentInfo) -> WorkspaceObj
     logger.debug("Test workspace objects deleted")
 
 
-@pytest.fixture(scope="session")
+@pytest.fixture
 def verifiable_objects(
     clusters,
     instance_pools,

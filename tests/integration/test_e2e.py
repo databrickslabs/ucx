@@ -181,21 +181,8 @@ def test_e2e(
     toolkit = GroupMigrationToolkit(config)
     toolkit.prepare_environment()
 
-    logger.debug("Verifying that the groups were created")
-
-    assert len(ws.groups.list(filter=f"displayName sw '{config.groups.backup_group_prefix}{env.test_uid}'")) == len(
-        toolkit.group_manager.migration_groups_provider.groups
-    )
-
-    assert len(ws.groups.list(filter=f"displayName sw '{env.test_uid}'")) == len(
-        toolkit.group_manager.migration_groups_provider.groups
-    )
-
-    assert len(toolkit.group_manager._list_account_level_groups(filter=f"displayName sw '{env.test_uid}'")) == len(
-        toolkit.group_manager.migration_groups_provider.groups
-    )
-
-    for _info in toolkit.group_manager.migration_groups_provider.groups:
+    group_migration_state = toolkit.group_manager.migration_groups_provider
+    for _info in group_migration_state.groups:
         _ws = ws.groups.get(id=_info.workspace.id)
         _backup = ws.groups.get(id=_info.backup.id)
         _ws_members = sorted([m.value for m in _ws.members])
@@ -216,12 +203,14 @@ def test_e2e(
     for _objects, id_attribute, request_object_type in verifiable_objects:
         _verify_group_permissions(_objects, id_attribute, request_object_type, ws, toolkit, "backup")
 
-    _verify_roles_and_entitlements(toolkit.group_manager.migration_groups_provider, ws, "backup")
+    _verify_roles_and_entitlements(group_migration_state, ws, "backup")
 
     toolkit.replace_workspace_groups_with_account_groups()
 
-    new_groups = list(ws.groups.list(filter=f"displayName sw '{env.test_uid}'", attributes="displayName,meta"))
-    assert len(new_groups) == len(toolkit.group_manager.migration_groups_provider.groups)
+    new_groups = [
+        _ for _ in ws.groups.list(attributes="displayName,meta") if group_migration_state.is_in_scope("account", _)
+    ]
+    assert len(new_groups) == len(group_migration_state.groups)
     assert all(g.meta.resource_type == "Group" for g in new_groups)
 
     toolkit.apply_permissions_to_account_groups()
@@ -229,15 +218,13 @@ def test_e2e(
     for _objects, id_attribute, request_object_type in verifiable_objects:
         _verify_group_permissions(_objects, id_attribute, request_object_type, ws, toolkit, "account")
 
-    _verify_roles_and_entitlements(toolkit.group_manager.migration_groups_provider, ws, "account")
+    _verify_roles_and_entitlements(group_migration_state, ws, "account")
 
     toolkit.delete_backup_groups()
 
-    backup_groups = list(
-        ws.groups.list(
-            filter=f"displayName sw '{config.groups.backup_group_prefix}{env.test_uid}'", attributes="displayName,meta"
-        )
-    )
+    backup_groups = [
+        _ for _ in ws.groups.list(attributes="displayName,meta") if group_migration_state.is_in_scope("backup", _)
+    ]
     assert len(backup_groups) == 0
 
     toolkit.cleanup_inventory_table()
