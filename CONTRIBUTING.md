@@ -171,3 +171,64 @@ Here are the example steps to submit your first contribution:
     request description to [automatically link it](https://docs.github.com/en/get-started/writing-on-github/working-with-advanced-formatting/using-keywords-in-issues-and-pull-requests#linking-a-pull-request-to-an-issue)
     to an existing issue.
 14. announce PR for the review
+
+## Troubleshooting
+
+### Environment Issues
+
+Sometimes, when dependencies are updated via `dependabot` for example, the environment may report the following error:
+
+```sh
+$ hatch run unit:test-cov-report
+ERROR: Cannot install databricks-labs-ucx[test]==0.0.3 and databricks-sdk~=0.8.0 because these package versions have conflicting dependencies.
+ERROR: ResolutionImpossible: for help visit https://pip.pypa.io/en/latest/topics/dependency-resolution/#dealing-with-dependency-conflicts
+```
+
+The easiest fix is to remove the environment and have the re-run recreate it:
+
+```sh
+`
+$ hatch env show
+                                 Standalone                                 
+┏━━━━━━━━━━━━━┳━━━━━━━━━┳━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┳━━━━━━━━━━━━━━━━━┓
+┃ Name        ┃ Type    ┃ Dependencies                   ┃ Scripts         ┃
+┡━━━━━━━━━━━━━╇━━━━━━━━━╇━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━╇━━━━━━━━━━━━━━━━━┩
+│ default     │ virtual │                                │                 │
+├─────────────┼─────────┼────────────────────────────────┼─────────────────┤
+│ unit        │ virtual │ databricks-labs-ucx[test]      │ test            │
+│             │         │ delta-spark<3.0.0,>=2.4.0      │ test-cov-report │
+│             │         │ pyspark<=3.5.0,>=3.4.0         │                 │
+├─────────────┼─────────┼────────────────────────────────┼─────────────────┤
+│ integration │ virtual │ databricks-labs-ucx[dbconnect] │ test            │
+│             │         │ databricks-labs-ucx[test]      │                 │
+│             │         │ delta-spark<3.0.0,>=2.4.0      │                 │
+├─────────────┼─────────┼────────────────────────────────┼─────────────────┤
+│ lint        │ virtual │ black>=23.1.0                  │ fmt             │
+│             │         │ isort>=2.5.0                   │ verify          │
+│             │         │ ruff>=0.0.243                  │                 │
+└─────────────┴─────────┴────────────────────────────────┴─────────────────┘
+
+$ hatch env remove unit
+$ hatch run unit:test-cov-report
+========================================================================================== test session starts ===========================================================================================
+platform darwin -- Python 3.11.4, pytest-7.4.1, pluggy-1.3.0 -- /Users/lars.george/Library/Application Support/hatch/env/virtual/databricks-labs-ucx/H6b8Oom-/unit/bin/python
+cachedir: .pytest_cache
+rootdir: /Users/lars.george/projects/work/databricks/ucx
+configfile: pyproject.toml
+plugins: cov-4.1.0, mock-3.11.1
+collected 103 items                                                                                                                                                                                      
+
+tests/unit/test_config.py::test_initialization PASSED
+tests/unit/test_config.py::test_reader PASSED
+...
+tests/unit/test_tables.py::test_uc_sql[table1-CREATE VIEW IF NOT EXISTS new_catalog.db.view AS SELECT * FROM table;] PASSED
+tests/unit/test_tables.py::test_uc_sql[table2-CREATE TABLE IF NOT EXISTS new_catalog.db.external_table LIKE catalog.db.external_table COPY LOCATION;ALTER TABLE catalog.db.external_table SET TBLPROPERTIES ('upgraded_to' = 'new_catalog.db.external_table');] PASSED
+
+---------- coverage: platform darwin, python 3.11.4-final-0 ----------
+Coverage HTML written to dir htmlcov
+
+========================================================================================== 103 passed in 12.61s ==========================================================================================
+$ 
+```
+
+Note: The initial `hatch env show` is just to list the environments managed by Hatch and is not needed.
