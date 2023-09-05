@@ -50,7 +50,7 @@ def test_hive_sql():
 
 def test_hive_revoke_sql():
     grant = Grant(principal="user", action_type="SELECT", catalog="hive_metastore", database="mydb", table="mytable")
-    assert grant.hive_revoke_sql() == "REVOKE SELECT ON TABLE hive_metastore.mydb.mytable TO user"
+    assert grant.hive_revoke_sql() == "REVOKE SELECT ON TABLE hive_metastore.mydb.mytable FROM user"
 
 
 @pytest.mark.parametrize(
