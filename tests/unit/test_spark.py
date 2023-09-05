@@ -1,6 +1,4 @@
 import logging
-import pytest
-import unittest
 from unittest.mock import Mock
 
 from databricks.connect import DatabricksSession
