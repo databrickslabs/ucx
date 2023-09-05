@@ -18,7 +18,7 @@ logger = logging.getLogger(__name__)
 def test_describe_all_tables_in_databases(ws: WorkspaceClient, make_catalog, make_schema, make_table):
     warehouse_id = os.environ["TEST_DEFAULT_WAREHOUSE_ID"]
 
-    logging.info("setting up fixtures")
+    logger.info("setting up fixtures")
     schema_a = make_schema(catalog="hive_metastore")
     schema_b = make_schema(catalog="hive_metastore")
     managed_table = make_table(schema=schema_a)
@@ -27,7 +27,7 @@ def test_describe_all_tables_in_databases(ws: WorkspaceClient, make_catalog, mak
     view = make_table(schema=schema_b, ctas="SELECT 2+2 AS four", view=True)
     non_delta = make_table(schema=schema_a, non_detla=True)
 
-    logging.info(
+    logger.info(
         f"managed_table={managed_table}, "
         f"external_table={external_table}, "
         f"tmp_table={tmp_table}, "
