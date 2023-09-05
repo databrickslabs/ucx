@@ -31,6 +31,15 @@ def test_notebook(make_notebook):
     logger.info(f"created {make_notebook()}")
 
 
+def test_notebook_permissions(make_notebook, make_notebook_permissions, make_group):
+    group = make_group()
+    notebook = make_notebook()
+    acl = make_notebook_permissions(
+        object_id=notebook, permission_level=iam.PermissionLevel.CAN_RUN, group_name=group.display_name  # noqa: F405
+    )
+    logger.info(f"created {acl}")
+
+
 def test_directory(make_notebook, make_directory):
     logger.info(f'created {make_notebook(path=f"{make_directory()}/foo.py")}')
 
