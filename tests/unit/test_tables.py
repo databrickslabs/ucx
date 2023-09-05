@@ -1,6 +1,7 @@
 import pytest
 
-from databricks.labs.ucx.tacl.tables import Table
+from databricks.labs.ucx.tacl._internal import SqlBackend
+from databricks.labs.ucx.tacl.tables import Table, TablesCrawler
 
 
 def test_is_delta_true():
@@ -33,6 +34,13 @@ def test_kind_view():
         view_text="SELECT * FROM table",
     )
     assert view_table.kind == "VIEW"
+
+
+def test_sql_managed_non_delta():
+    with pytest.raises(ValueError):
+        Table(catalog="catalog", database="db", name="table", object_type="type", table_format="PARQUET")._sql_managed(
+            "catalog"
+        )
 
 
 @pytest.mark.parametrize(
@@ -73,3 +81,8 @@ def test_kind_view():
 )
 def test_uc_sql(table, query):
     assert table.uc_create_sql("new_catalog") == query
+
+
+def test_tables_crawler_inventory_table():
+    tc = TablesCrawler(SqlBackend, "main", "default")
+    assert tc._table == "tables"
