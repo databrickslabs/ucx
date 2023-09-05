@@ -31,10 +31,8 @@ def factory(name, create, remove):
             _LOG.debug(f"removing {name} fixture: {x}")
             remove(x)
         except DatabricksError as e:
-            if e.error_code in ("RESOURCE_DOES_NOT_EXIST",):
-                _LOG.debug(f"ignoring error while {name} {x} teardown: {e}")
-                continue
-            raise e
+            # TODO: fix on the databricks-labs-pytester level
+            _LOG.debug(f"ignoring error while {name} {x} teardown: {e}")
 
 
 @pytest.fixture

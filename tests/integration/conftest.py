@@ -229,6 +229,7 @@ def make_ucx_group(make_random, make_group, make_acc_group, user_pool):
         ws_group = make_group(display_name=display_name, members=members, entitlements=["allow-cluster-create"])
         acc_group = make_acc_group(display_name=display_name, members=members)
         return ws_group, acc_group
+
     return inner
 
 

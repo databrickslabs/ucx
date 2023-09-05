@@ -5,11 +5,7 @@ from typing import Any
 
 from databricks.sdk import WorkspaceClient
 from databricks.sdk.service.compute import ClusterSpec, DataSecurityMode
-from databricks.sdk.service.iam import (
-    AccessControlRequest,
-    Group,
-    PermissionLevel,
-)
+from databricks.sdk.service.iam import AccessControlRequest, Group, PermissionLevel
 from databricks.sdk.service.jobs import JobCluster, PythonWheelTask, Task
 from databricks.sdk.service.workspace import ObjectInfo
 
