@@ -63,13 +63,13 @@ class StandardInventorizer(BaseInventorizer[InventoryObject], Generic[InventoryO
         return [self._logical_object_type]
 
     def __init__(
-            self,
-            ws: WorkspaceClient,
-            logical_object_type: LogicalObjectType,
-            request_object_type: RequestObjectType,
-            listing_function: Callable[..., Iterator[InventoryObject]],
-            id_attribute: str,
-            permissions_function: Callable[..., PermissionsContainer] | None = None,
+        self,
+        ws: WorkspaceClient,
+        logical_object_type: LogicalObjectType,
+        request_object_type: RequestObjectType,
+        listing_function: Callable[..., Iterator[InventoryObject]],
+        id_attribute: str,
+        permissions_function: Callable[..., PermissionsContainer] | None = None,
     ):
         self._ws = ws
         self._logical_object_type = logical_object_type
@@ -361,12 +361,12 @@ class RolesAndEntitlementsInventorizer(BaseInventorizer[InventoryObject]):
 
 class SqlInventorizer(StandardInventorizer):
     def __init__(
-            self,
-            ws: WorkspaceClient,
-            logical_object_type: LogicalObjectType,
-            request_object_type: RequestObjectType,
-            listing_function: Callable[..., Iterator[InventoryObject]],
-            id_attribute: str = "id",  # for all SQL objects, the id attribute is the same
+        self,
+        ws: WorkspaceClient,
+        logical_object_type: LogicalObjectType,
+        request_object_type: RequestObjectType,
+        listing_function: Callable[..., Iterator[InventoryObject]],
+        id_attribute: str = "id",  # for all SQL objects, the id attribute is the same
     ):
         permissions_function = self._safe_get_permissions
         super().__init__(
