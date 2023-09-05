@@ -4,9 +4,8 @@ from unittest.mock import Mock
 import pytest
 from databricks.sdk.service.compute import ClusterDetails
 from databricks.sdk.service.iam import ComplexValue, Group, ObjectPermissions
-from databricks.sdk.service.ml import Experiment, ExperimentTag
+from databricks.sdk.service.ml import Experiment, ExperimentTag, ModelDatabricks
 from databricks.sdk.service.workspace import AclPermission, ObjectInfo, ObjectType
-from databricks.sdk.service.ml import ModelDatabricks
 
 from databricks.labs.ucx.inventory.inventorizer import (
     AccessControlResponse,
@@ -338,9 +337,9 @@ def test_workspace_inventorizer_convert_object_to_permission(workspace_inventori
     info = ObjectInfo(object_type=object_type, object_id=1)
     item = workspace_inventorizer._convert_result_to_permission_item(info)
     assert (
-            (object_type == ObjectType.LIBRARY and item is None)
-            or (object_type and item.request_object_type == request_type)
-            or item is None
+        (object_type == ObjectType.LIBRARY and item is None)
+        or (object_type and item.request_object_type == request_type)
+        or item is None
     )
 
 

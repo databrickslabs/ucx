@@ -41,7 +41,9 @@ class GroupMigrationToolkit:
 
     def prepare_environment(self):
         self.group_manager.prepare_groups_in_environment()
-        inventorizers = Inventorizers.provide(self._ws, self.group_manager.migration_groups_provider, self._num_threads)
+        inventorizers = Inventorizers(
+            self._ws, self.group_manager.migration_groups_provider, self._num_threads
+        ).provide()
         self.permissions_manager.set_inventorizers(inventorizers)
 
     def cleanup_inventory_table(self):
