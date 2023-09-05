@@ -2,7 +2,7 @@ import logging
 
 from databricks.sdk import WorkspaceClient
 
-from databricks.labs.ucx.config import MigrationConfig
+from databricks.labs.ucx.config import TaclConfig
 from databricks.labs.ucx.tacl._internal import (
     RuntimeBackend,
     SqlBackend,
@@ -15,16 +15,15 @@ logger = logging.getLogger(__name__)
 
 
 class TaclToolkit:
-    def __init__(self, ws: WorkspaceClient, config: MigrationConfig, warehouse_id=None):
-        self.inventory_catalog = config.inventory.table.catalog
-        self.inventory_schema = config.inventory.table.database
-
-        self._tc = TablesCrawler(self._backend(ws, warehouse_id), self.inventory_catalog, self.inventory_schema)
+    def __init__(
+        self, ws: WorkspaceClient, inventory_catalog, inventory_schema, taclconfig: TaclConfig, warehouse_id=None
+    ):
+        self._tc = TablesCrawler(self._backend(ws, warehouse_id), inventory_catalog, inventory_schema)
         self._gc = GrantsCrawler(self._tc)
 
         self._databases = (
-            config.tacl.databases
-            if config.tacl.databases
+            taclconfig.databases
+            if taclconfig.databases
             else [database.as_dict()["databaseName"] for database in self._tc._all_databases()]
         )
 

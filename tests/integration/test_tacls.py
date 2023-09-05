@@ -3,13 +3,7 @@ import os
 
 from databricks.sdk import WorkspaceClient
 
-from databricks.labs.ucx.config import (
-    GroupsConfig,
-    InventoryConfig,
-    InventoryTable,
-    MigrationConfig,
-    TaclConfig,
-)
+from databricks.labs.ucx.config import TaclConfig
 from databricks.labs.ucx.toolkits.table_acls import TaclToolkit
 
 logger = logging.getLogger(__name__)
@@ -19,8 +13,13 @@ def test_describe_all_tables_in_databases(ws: WorkspaceClient, make_catalog, mak
     warehouse_id = os.environ["TEST_DEFAULT_WAREHOUSE_ID"]
 
     logger.info("setting up fixtures")
+
     schema_a = make_schema(catalog="hive_metastore")
+
     schema_b = make_schema(catalog="hive_metastore")
+
+    schema_c = make_schema(catalog="hive_metastore")
+
     managed_table = make_table(schema=schema_a)
     external_table = make_table(schema=schema_b, external=True)
     tmp_table = make_table(schema=schema_a, ctas="SELECT 2+2 AS four")
@@ -37,22 +36,13 @@ def test_describe_all_tables_in_databases(ws: WorkspaceClient, make_catalog, mak
     inventory_schema = make_schema(catalog=make_catalog())
     inventory_catalog, inventory_schema = inventory_schema.split(".")
 
-    databases = [schema_a.split(".")[1], schema_b.split(".")[1]]
+    databases = [schema_a.split(".")[1], schema_b.split(".")[1], schema_c.split(".")[1]]
 
-    config = MigrationConfig(
-        inventory=InventoryConfig(
-            table=InventoryTable(catalog=inventory_catalog, database=inventory_schema, name="ucx_migration_inventory")
-        ),
-        groups=GroupsConfig(
-            auto=True,
-        ),
-        tacl=TaclConfig(
-            databases=databases,
-        ),
-        log_level="DEBUG",
+    taclconfig = TaclConfig(
+        databases=databases,
     )
 
-    tak = TaclToolkit(ws, config, warehouse_id)
+    tak = TaclToolkit(ws, inventory_catalog, inventory_schema, taclconfig, warehouse_id)
 
     all_tables = {}
     for t in tak.database_snapshot():
@@ -70,36 +60,27 @@ def test_describe_all_tables_in_databases(ws: WorkspaceClient, make_catalog, mak
 def test_all_grants_in_databases(ws: WorkspaceClient, sql_exec, make_catalog, make_schema, make_table, make_group):
     warehouse_id = os.environ["TEST_DEFAULT_WAREHOUSE_ID"]
 
-    group_a = make_group(display_name="sdk_group_a")
-    group_b = make_group(display_name="sdk_group_b")
+    group_a = make_group()
+    group_b = make_group()
     schema_a = make_schema()
     schema_b = make_schema()
     table_a = make_table(schema=schema_a)
     table_b = make_table(schema=schema_b)
 
-    sql_exec(f"GRANT USAGE ON SCHEMA default TO {group_a.display_name}")
-    sql_exec(f"GRANT USAGE ON SCHEMA default TO {group_b.display_name}")
-    sql_exec(f"GRANT SELECT ON TABLE {table_a} TO {group_a.display_name}")
-    sql_exec(f"GRANT SELECT ON TABLE {table_b} TO {group_b.display_name}")
-    sql_exec(f"GRANT MODIFY ON SCHEMA {schema_b} TO {group_b.display_name}")
+    sql_exec(f"GRANT USAGE ON SCHEMA default TO `{group_a.display_name}`")
+    sql_exec(f"GRANT USAGE ON SCHEMA default TO `{group_b.display_name}`")
+    sql_exec(f"GRANT SELECT ON TABLE {table_a} TO `{group_a.display_name}`")
+    sql_exec(f"GRANT SELECT ON TABLE {table_b} TO `{group_b.display_name}`")
+    sql_exec(f"GRANT MODIFY ON SCHEMA {schema_b} TO `{group_b.display_name}`")
 
     inventory_schema = make_schema(catalog=make_catalog())
     inventory_catalog, inventory_schema = inventory_schema.split(".")
 
-    config = MigrationConfig(
-        inventory=InventoryConfig(
-            table=InventoryTable(catalog=inventory_catalog, database=inventory_schema, name="ucx_migration_inventory")
-        ),
-        groups=GroupsConfig(
-            auto=True,
-        ),
-        tacl=TaclConfig(
-            auto=True,
-        ),
-        log_level="DEBUG",
+    taclconfig = TaclConfig(
+        auto=True,
     )
 
-    tak = TaclToolkit(ws, config, warehouse_id)
+    tak = TaclToolkit(ws, inventory_catalog, inventory_schema, taclconfig, warehouse_id)
 
     all_grants = {}
     for grant in tak.grants_snapshot():
