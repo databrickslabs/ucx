@@ -1,4 +1,5 @@
 import logging
+import random
 from typing import Literal
 
 import pytest
@@ -6,8 +7,8 @@ from databricks.sdk import WorkspaceClient
 from databricks.sdk.service.iam import (
     AccessControlRequest,
     AccessControlResponse,
-    ObjectPermissions,
     Permission,
+    PermissionLevel,
 )
 from databricks.sdk.service.workspace import SecretScope
 from pyspark.errors import AnalysisException
@@ -18,6 +19,7 @@ from databricks.labs.ucx.config import (
     InventoryConfig,
     InventoryTable,
     MigrationConfig,
+    TaclConfig,
 )
 from databricks.labs.ucx.inventory.types import RequestObjectType
 from databricks.labs.ucx.providers.groups_info import GroupMigrationState
@@ -116,35 +118,12 @@ def _verify_group_permissions(
         assert [p.all_permissions for p in sorted_ws] == [p.all_permissions for p in sorted_target]
     else:
         for _object in objects:
-            _object_permissions: ObjectPermissions = ws.permissions.get(
-                request_object_type, getattr(_object, id_attribute)
+            toolkit.permissions_manager.verify_applied_permissions(
+                request_object_type,
+                getattr(_object, id_attribute),
+                toolkit.group_manager.migration_groups_provider,
+                target,
             )
-            for migration_info in toolkit.group_manager.migration_groups_provider.groups:
-                target_permissions = sorted(
-                    [
-                        p
-                        for p in _object_permissions.access_control_list
-                        if p.group_name == getattr(migration_info, target).display_name
-                    ],
-                    key=lambda p: p.group_name,
-                )
-
-                source_permissions = sorted(
-                    [
-                        p
-                        for p in _object_permissions.access_control_list
-                        if p.group_name == migration_info.workspace.display_name
-                    ],
-                    key=lambda p: p.group_name,
-                )
-
-                assert len(target_permissions) == len(
-                    source_permissions
-                ), f"Target permissions were not applied correctly for object {_object}"
-
-                assert [t.all_permissions for t in target_permissions] == [
-                    s.all_permissions for s in source_permissions
-                ], f"Target permissions were not applied correctly for object {_object}"
 
 
 def _verify_roles_and_entitlements(
@@ -168,14 +147,25 @@ def test_e2e(
     inventory_table: InventoryTable,
     ws: WorkspaceClient,
     verifiable_objects: list[tuple[list, str, RequestObjectType | None]],
+    make_instance_pool,
+    make_instance_pool_permissions,
 ):
     logger.debug(f"Test environment: {env.test_uid}")
+    ws_group = env.groups[0][0]
+
+    pool = make_instance_pool()
+    make_instance_pool_permissions(
+        object_id=pool.instance_pool_id,
+        permission_level=random.choice([PermissionLevel.CAN_ATTACH_TO, PermissionLevel.CAN_MANAGE]),
+        group_name=ws_group.display_name,
+    )
+    verifiable_objects.append(([pool], "instance_pool_id", RequestObjectType.INSTANCE_POOLS))
 
     config = MigrationConfig(
         connect=ConnectConfig.from_databricks_config(ws.config),
-        with_table_acls=False,
         inventory=InventoryConfig(table=inventory_table),
         groups=GroupsConfig(selected=[g[0].display_name for g in env.groups]),
+        tacl=TaclConfig(auto=True),
         log_level="DEBUG",
     )
     toolkit = GroupMigrationToolkit(config)
