@@ -4,6 +4,8 @@ from databricks.labs.ucx.providers.mixins.sql import Row
 from databricks.labs.ucx.tacl.grants import Grant, GrantsCrawler
 from databricks.labs.ucx.tacl.tables import TablesCrawler
 
+from .mocks import MockBackend
+
 
 def test_type_and_key_table():
     grant = Grant.type_and_key(catalog="hive_metastore", database="mydb", table="mytable")
@@ -125,25 +127,31 @@ ROWS = {
 }
 
 
-def test_crawler_crawl(mock_backend):
-    mock_backend._rows = []
-    table = TablesCrawler(mock_backend, "hive_metastore", "schema")
+def test_crawler_crawl():
+    # Test with no data
+    b = MockBackend()
+    table = TablesCrawler(b, "hive_metastore", "schema")
     crawler = GrantsCrawler(table)
     grants = crawler._crawl("hive_metastore", "schema")
     assert len(grants) == 0
-
-    mock_backend._rows = ROWS
+    # Test with test data
+    b = MockBackend(rows=ROWS)
+    table = TablesCrawler(b, "hive_metastore", "schema")
+    crawler = GrantsCrawler(table)
     grants = crawler._crawl("hive_metastore", "schema")
     assert len(grants) == 3
 
 
-def test_crawler_snapshot(mock_backend):
-    mock_backend._rows = []
-    table = TablesCrawler(mock_backend, "hive_metastore", "schema")
+def test_crawler_snapshot():
+    # Test with no data
+    b = MockBackend()
+    table = TablesCrawler(b, "hive_metastore", "schema")
     crawler = GrantsCrawler(table)
     snapshot = crawler.snapshot("hive_metastore", "schema")
     assert len(snapshot) == 0
-
-    mock_backend._rows = ROWS
+    # Test with test data
+    b = MockBackend(rows=ROWS)
+    table = TablesCrawler(b, "hive_metastore", "schema")
+    crawler = GrantsCrawler(table)
     snapshot = crawler.snapshot("hive_metastore", "schema")
     assert len(snapshot) == 3
