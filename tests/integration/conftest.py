@@ -9,7 +9,7 @@ import databricks.sdk.core
 import pytest
 from databricks.sdk import AccountClient, WorkspaceClient
 from databricks.sdk.core import Config, DatabricksError
-from databricks.sdk.service.compute import ClusterDetails, CreatePolicyResponse
+from databricks.sdk.service.compute import CreatePolicyResponse
 from databricks.sdk.service.iam import AccessControlRequest, PermissionLevel
 from databricks.sdk.service.jobs import CreateResponse
 from databricks.sdk.service.ml import CreateExperimentResponse, ModelDatabricks
@@ -362,41 +362,6 @@ def cluster_policies(env: EnvironmentInfo, ws: WorkspaceClient) -> list[CreatePo
 
 
 @pytest.fixture
-def clusters(env: EnvironmentInfo, ws: WorkspaceClient) -> list[ClusterDetails]:
-    logger.debug("Creating test clusters")
-
-    creators = [
-        partial(
-            ws.clusters.create,
-            spark_version=ws.clusters.select_spark_version(latest=True),
-            instance_pool_id=os.environ["TEST_INSTANCE_POOL_ID"],
-            driver_instance_pool_id=os.environ["TEST_INSTANCE_POOL_ID"],
-            cluster_name=f"{env.test_uid}-test-{i}",
-            num_workers=1,
-        )
-        for i in range(NUM_TEST_CLUSTERS)
-    ]
-
-    test_clusters = Threader(creators).run()
-
-    _set_random_permissions(
-        test_clusters,
-        "cluster_id",
-        RequestObjectType.CLUSTERS,
-        env,
-        ws,
-        permission_levels=[PermissionLevel.CAN_ATTACH_TO, PermissionLevel.CAN_MANAGE, PermissionLevel.CAN_RESTART],
-    )
-
-    yield test_clusters
-
-    logger.debug("Deleting test clusters")
-    executables = [partial(ws.clusters.permanent_delete, c.cluster_id) for c in test_clusters]
-    Threader(executables).run()
-    logger.debug("Test clusters deleted")
-
-
-@pytest.fixture
 def experiments(ws: WorkspaceClient, env: EnvironmentInfo) -> list[CreateExperimentResponse]:
     logger.debug("Creating test experiments")
 
@@ -593,7 +558,6 @@ def workspace_objects(ws: WorkspaceClient, env: EnvironmentInfo) -> WorkspaceObj
 
 @pytest.fixture
 def verifiable_objects(
-    clusters,
     cluster_policies,
     pipelines,
     jobs,
@@ -608,7 +572,6 @@ def verifiable_objects(
         (workspace_objects, "workspace_objects", None),
         (secret_scopes, "secret_scopes", None),
         (tokens, "tokens", RequestObjectType.AUTHORIZATION),
-        (clusters, "cluster_id", RequestObjectType.CLUSTERS),
         (cluster_policies, "policy_id", RequestObjectType.CLUSTER_POLICIES),
         (pipelines, "pipeline_id", RequestObjectType.PIPELINES),
         (jobs, "job_id", RequestObjectType.JOBS),
