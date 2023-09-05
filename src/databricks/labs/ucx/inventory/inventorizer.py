@@ -8,6 +8,8 @@ from typing import Generic, TypeVar
 from databricks.sdk import WorkspaceClient
 from databricks.sdk.core import DatabricksError
 from databricks.sdk.service.iam import AccessControlResponse, Group, ObjectPermissions
+from databricks.sdk.service.sql import GetResponse as SqlPermissions
+from databricks.sdk.service.sql import ObjectTypePlural as SqlRequestObjectType
 from databricks.sdk.service.workspace import (
     AclItem,
     ObjectInfo,
@@ -31,6 +33,8 @@ from databricks.labs.ucx.providers.groups_info import GroupMigrationState
 from databricks.labs.ucx.utils import ProgressReporter, ThreadedExecution
 
 InventoryObject = TypeVar("InventoryObject")
+PermissionsContainer = TypeVar("PermissionsContainer")
+
 logger = logging.getLogger(__name__)
 
 
@@ -49,7 +53,7 @@ class BaseInventorizer(ABC, Generic[InventoryObject]):
         """Any inventorization activities should happen here"""
 
 
-class StandardInventorizer(BaseInventorizer[InventoryObject]):
+class StandardInventorizer(BaseInventorizer[InventoryObject, PermissionsContainer]):
     """
     Standard means that it can collect using the default listing/permissions function without any additional logic.
     """
@@ -59,13 +63,13 @@ class StandardInventorizer(BaseInventorizer[InventoryObject]):
         return [self._logical_object_type]
 
     def __init__(
-        self,
-        ws: WorkspaceClient,
-        logical_object_type: LogicalObjectType,
-        request_object_type: RequestObjectType,
-        listing_function: Callable[..., Iterator[InventoryObject]],
-        id_attribute: str,
-        permissions_function: Callable[..., ObjectPermissions] | None = None,
+            self,
+            ws: WorkspaceClient,
+            logical_object_type: LogicalObjectType,
+            request_object_type: RequestObjectType,
+            listing_function: Callable[..., Iterator[InventoryObject]],
+            id_attribute: str,
+            permissions_function: Callable[..., PermissionsContainer] | None = None,
     ):
         self._ws = ws
         self._logical_object_type = logical_object_type
@@ -355,6 +359,42 @@ class RolesAndEntitlementsInventorizer(BaseInventorizer[InventoryObject]):
         return _items
 
 
+class SqlInventorizer(StandardInventorizer):
+    def __init__(
+            self,
+            ws: WorkspaceClient,
+            logical_object_type: LogicalObjectType,
+            request_object_type: RequestObjectType,
+            listing_function: Callable[..., Iterator[InventoryObject]],
+            id_attribute: str = "id",  # for all SQL objects, the id attribute is the same
+    ):
+        permissions_function = self._safe_get_permissions
+        super().__init__(
+            ws,
+            logical_object_type,
+            request_object_type,
+            listing_function,
+            id_attribute,
+            permissions_function=permissions_function,
+        )
+
+    @sleep_and_retry
+    @limits(calls=100, period=1)
+    def _get_sql_permissions(self, request_object_type: SqlRequestObjectType, request_object_id: str) -> SqlPermissions:
+        return self._ws.permissions.get(object_type=request_object_type, object_id=request_object_id)
+
+    def _safe_get_permissions(self, request_object_type: RequestObjectType, object_id: str) -> SqlPermissions | None:
+        try:
+            permissions = self._get_sql_permissions(request_object_type, object_id)
+            return permissions
+        except DatabricksError as e:
+            if e.error_code in ["RESOURCE_DOES_NOT_EXIST", "RESOURCE_NOT_FOUND", "PERMISSION_DENIED"]:
+                logger.warning(f"Could not get permissions for {request_object_type} {object_id} due to {e.error_code}")
+                return None
+            else:
+                raise e
+
+
 class Inventorizers:
     def __init__(self, ws: WorkspaceClient, migration_state: GroupMigrationState, num_threads: int):
         self._ws = ws
@@ -421,6 +461,28 @@ class Inventorizers:
             ),
         ]
 
+    def _get_sql_inventorizers(self) -> list[SqlInventorizer]:
+        return [
+            SqlInventorizer(
+                self._ws,
+                logical_object_type=LogicalObjectType.ALERT,
+                request_object_type=RequestObjectType.ALERTS,
+                listing_function=self._ws.alerts.list
+            ),
+            SqlInventorizer(
+                self._ws,
+                logical_object_type=LogicalObjectType.DASHBOARD,
+                request_object_type=RequestObjectType.DASHBOARDS,
+                listing_function=self._ws.dashboards.list
+            ),
+            SqlInventorizer(
+                self._ws,
+                logical_object_type=LogicalObjectType.QUERY,
+                request_object_type=RequestObjectType.QUERIES,
+                listing_function=self._ws.queries.list
+            ),
+        ]
+
     def _get_custom_inventorizers(self) -> list[BaseInventorizer]:
         return [
             RolesAndEntitlementsInventorizer(self._ws, self._migration_state),
@@ -432,5 +494,6 @@ class Inventorizers:
     def provide(self) -> list[BaseInventorizer]:
         standard_inventorizers = self._get_standard_inventorizers()
         custom_inventorizers = self._get_custom_inventorizers()
-        all_inventorizers = standard_inventorizers + custom_inventorizers
+        sql_inventorizers = self._get_sql_inventorizers()
+        all_inventorizers = standard_inventorizers + custom_inventorizers + sql_inventorizers
         return all_inventorizers
