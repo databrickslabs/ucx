@@ -1,19 +1,14 @@
+
 from databricks.sdk import WorkspaceClient
 from databricks.sdk.service.compute import Language
-import os.path
-from databricks.labs.ucx.config import MigrationConfig
-from databricks.labs.ucx.inventory.permissions import PermissionManager
-from databricks.labs.ucx.inventory.table import InventoryTableManager
-from databricks.labs.ucx.managers.group import GroupManager
+
 from databricks.labs.ucx.providers.client import ImprovedWorkspaceClient
+from databricks.labs.ucx.providers.mixins.compute import CommandExecutor
 from databricks.labs.ucx.tacl._internal import (
     RuntimeBackend,
     SqlBackend,
     StatementExecutionBackend,
 )
-from databricks.labs.ucx.tacl.grants import GrantsCrawler
-from databricks.labs.ucx.tacl.tables import TablesCrawler
-from databricks.labs.ucx.providers.mixins.compute import CommandExecutor
 
 
 class Assessment:
@@ -40,7 +35,7 @@ class Assessment:
              import org.apache.spark.sql.catalyst.TableIdentifier;
              import java.io.{{FileWriter, BufferedWriter, File}};
              val bw = new BufferedWriter(new FileWriter(new File("/tmp/metastore_schema.csv"), true));
-            
+
              bw.write("db,table,format,type,table_location,created_version,created_time,last_access,lib,inputformat,outputformat\\n");
              val dbs = spark.sharedState.externalCatalog.listDatabases();
              for( db <- dbs) {{
@@ -56,9 +51,9 @@ class Assessment:
                    case e: Exception => bw.write(s"${{db}},${{t}},Unknown,Unknown,NONE,,,,,,,\\n");
                  }}
                }}
-            
+
              }}
-            
+
              bw.close;
              spark.sql("create catalog if not exists {self._inventory_catalog}");
              spark.sql("create database if not exists {self._inventory_catalog}.{self._inventory_schema}");
@@ -69,23 +64,7 @@ class Assessment:
         print(command_output)
 
     def external_locations(self):
-        ext_code = """
-        locations = spark.sql(
-            "select distinct table_location from tmptables where table_location not like 'dbfs%' and table_location <> 'None'").collect()
-        ext_locations = []
-        for location in locations:
-            dupe = False
-            loc = 0
-            while (loc < len(ext_locations) and not dupe):
-                common = os.path.commonprefix([ext_locations[loc], location.table_location])
-                if (common.count("/") > 3):
-                    ext_locations[loc] = (common)
-                    dupe = True
-                loc += 1
-            if (not dupe): 
-                ext_locations.append((os.path.dirname(location.table_location) + '/'))
-                print(os.path.dirname(location.table_location) + '/')
-            """
+        pass
 
     @staticmethod
     def _backend(ws: WorkspaceClient, warehouse_id: str | None = None) -> SqlBackend:
