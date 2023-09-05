@@ -64,7 +64,12 @@ config = MigrationConfig(
     log_level="DEBUG",
 )
 toolkit = GroupMigrationToolkit(config)
-tacltoolkit = TaclToolkit(toolkit._ws, config.inventory.table.catalog, config.tacl)
+tacltoolkit = TaclToolkit(
+    toolkit._ws,
+    config.inventory.table.catalog,
+    config.inventory.table.schema,
+    databases=config.tacl.databases,
+)
 
 # COMMAND ----------
 

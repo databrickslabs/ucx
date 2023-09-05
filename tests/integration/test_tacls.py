@@ -37,7 +37,7 @@ def test_describe_all_tables_in_databases(ws: WorkspaceClient, make_catalog, mak
 
     databases = [schema_a.split(".")[1], schema_b.split(".")[1], schema_c.split(".")[1]]
 
-    tak = TaclToolkit(ws, inventory_catalog, inventory_schema, warehouse_id, databases)
+    tak = TaclToolkit(ws, inventory_catalog, inventory_schema, warehouse_id=warehouse_id, databases=databases)
 
     all_tables = {}
     for t in tak.database_snapshot():
@@ -71,7 +71,7 @@ def test_all_grants_in_databases(ws: WorkspaceClient, sql_exec, make_catalog, ma
     inventory_schema = make_schema(catalog=make_catalog())
     inventory_catalog, inventory_schema = inventory_schema.split(".")
 
-    tak = TaclToolkit(ws, inventory_catalog, inventory_schema, warehouse_id)
+    tak = TaclToolkit(ws, inventory_catalog, inventory_schema, warehouse_id=warehouse_id)
 
     all_grants = {}
     for grant in tak.grants_snapshot():

@@ -14,7 +14,14 @@ logger = logging.getLogger(__name__)
 
 
 class TaclToolkit:
-    def __init__(self, ws: WorkspaceClient, inventory_catalog, inventory_schema, warehouse_id=None, databases=None):
+    def __init__(
+        self,
+        ws: WorkspaceClient,
+        inventory_catalog,
+        inventory_schema,
+        warehouse_id=None,
+        databases=None,
+    ):
         self._tc = TablesCrawler(self._backend(ws, warehouse_id), inventory_catalog, inventory_schema)
         self._gc = GrantsCrawler(self._tc)
 
