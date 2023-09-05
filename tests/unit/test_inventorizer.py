@@ -6,6 +6,7 @@ from databricks.sdk.service.compute import ClusterDetails
 from databricks.sdk.service.iam import ComplexValue, Group, ObjectPermissions
 from databricks.sdk.service.ml import Experiment, ExperimentTag
 from databricks.sdk.service.workspace import AclPermission, ObjectInfo, ObjectType
+from databricks.sdk.service.ml import ModelDatabricks
 
 from databricks.labs.ucx.inventory.inventorizer import (
     AccessControlResponse,
@@ -13,7 +14,6 @@ from databricks.labs.ucx.inventory.inventorizer import (
     DatabricksError,
     Inventorizers,
     LogicalObjectType,
-    ModelDatabricks,
     PermissionsInventoryItem,
     RequestObjectType,
     RolesAndEntitlementsInventorizer,
@@ -292,7 +292,7 @@ def test_experiments_listing(workspace_client):
 
 def test_inventorizers_provide(workspace_client):
     state = GroupMigrationState()
-    inventorizers = Inventorizers.provide(workspace_client, migration_state=state, num_threads=1)
+    inventorizers = Inventorizers(workspace_client, migration_state=state, num_threads=1).provide()
     assert len(inventorizers) > 0
 
 
@@ -338,9 +338,9 @@ def test_workspace_inventorizer_convert_object_to_permission(workspace_inventori
     info = ObjectInfo(object_type=object_type, object_id=1)
     item = workspace_inventorizer._convert_result_to_permission_item(info)
     assert (
-        (object_type == ObjectType.LIBRARY and item is None)
-        or (object_type and item.request_object_type == request_type)
-        or item is None
+            (object_type == ObjectType.LIBRARY and item is None)
+            or (object_type and item.request_object_type == request_type)
+            or item is None
     )
 
 

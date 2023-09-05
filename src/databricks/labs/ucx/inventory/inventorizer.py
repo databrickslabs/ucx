@@ -3,16 +3,11 @@ import logging
 from abc import ABC, abstractmethod
 from collections.abc import Callable, Iterator
 from functools import partial
-from itertools import chain
 from typing import Generic, TypeVar
 
 from databricks.sdk import WorkspaceClient
 from databricks.sdk.core import DatabricksError
 from databricks.sdk.service.iam import AccessControlResponse, Group, ObjectPermissions
-from databricks.sdk.service.sql import Alert, Dashboard
-from databricks.sdk.service.sql import GetResponse as SqlPermissions
-from databricks.sdk.service.sql import ObjectTypePlural as SqlRequestObjectType
-from databricks.sdk.service.sql import Query
 from databricks.sdk.service.workspace import (
     AclItem,
     ObjectInfo,
@@ -64,13 +59,13 @@ class StandardInventorizer(BaseInventorizer[InventoryObject]):
         return [self._logical_object_type]
 
     def __init__(
-        self,
-        ws: WorkspaceClient,
-        logical_object_type: LogicalObjectType,
-        request_object_type: RequestObjectType,
-        listing_function: Callable[..., Iterator[InventoryObject]],
-        id_attribute: str,
-        permissions_function: Callable[..., ObjectPermissions] | None = None,
+            self,
+            ws: WorkspaceClient,
+            logical_object_type: LogicalObjectType,
+            request_object_type: RequestObjectType,
+            listing_function: Callable[..., Iterator[InventoryObject]],
+            id_attribute: str,
+            permissions_function: Callable[..., ObjectPermissions] | None = None,
     ):
         self._ws = ws
         self._logical_object_type = logical_object_type
@@ -360,137 +355,82 @@ class RolesAndEntitlementsInventorizer(BaseInventorizer[InventoryObject]):
         return _items
 
 
-class DBSQLInventorizer(BaseInventorizer[InventoryObject]):
-    def __init__(self, ws: WorkspaceClient):
-        self._ws = ws
-        self._queries: Iterator[Query] = iter([])
-        self._dashboards: Iterator[Dashboard] = iter([])
-        self._alerts: Iterator[Alert] = iter([])
-
-    @property
-    def logical_object_types(self) -> list[LogicalObjectType]:
-        return [LogicalObjectType.ALERT, LogicalObjectType.DASHBOARD, LogicalObjectType.QUERY]
-
-    def preload(self):
-        self._queries = self._ws.queries.list()
-        self._dashboards = self._ws.dashboards.list()
-        self._alerts = self._ws.alerts.list()
-
-    @sleep_and_retry
-    @limits(calls=100, period=1)
-    def _get_dbsql_permissions(
-        self, request_object_type: SqlRequestObjectType, request_object_id: str
-    ) -> SqlPermissions:
-        return self._ws.dbsql_permissions.get(object_type=request_object_type, object_id=request_object_id)
-
-    def _safe_get_dbsql_permissions(
-        self, request_object_type: SqlRequestObjectType, object_id: str
-    ) -> SqlPermissions | None:
-        try:
-            permissions = self._get_dbsql_permissions(request_object_type, object_id)
-            return permissions
-        except DatabricksError as e:
-            if e.error_code in ["RESOURCE_DOES_NOT_EXIST", "RESOURCE_NOT_FOUND", "PERMISSION_DENIED"]:
-                logger.warning(f"Could not get permissions for {request_object_type} {object_id} due to {e.error_code}")
-                return None
-            else:
-                raise e
-
-    def _prepare_permission_item(self, _obj: Alert | Dashboard | Query) -> PermissionsInventoryItem | None:
-        if isinstance(_obj, Alert):
-            logical_type = LogicalObjectType.ALERT
-            request_type = SqlRequestObjectType.ALERTS
-        elif isinstance(_obj, Dashboard):
-            logical_type = LogicalObjectType.DASHBOARD
-            request_type = SqlRequestObjectType.DASHBOARDS
-        elif isinstance(_obj, Query):
-            logical_type = LogicalObjectType.QUERY
-            request_type = SqlRequestObjectType.QUERIES
-        else:
-            logger.warning(f"Unexpected object type {_obj}")
-            return
-
-        _permissions = self._safe_get_dbsql_permissions(request_object_type=request_type, object_id=_obj.id)
-
-        if _permissions:
-            _item = PermissionsInventoryItem(
-                object_id=_obj.id,
-                logical_object_type=logical_type,
-                request_object_type=request_type,
-                raw_object_permissions=json.dumps(_permissions.as_dict()),
-            )
-
-    def inventorize(self) -> list[PermissionsInventoryItem]:
-        chained_objects = chain(self._queries, self._alerts, self._dashboards)
-        executables = [partial(self._prepare_permission_item, _object) for _object in chained_objects]
-        results = ThreadedExecution[PermissionsInventoryItem | None](executables).run()
-        results = [result for result in results if result is not None]
-        logger.info(f"Permissions fetched for {len(results)} DBSQL Objects")
-        return results
-
-
 class Inventorizers:
-    @staticmethod
-    def provide(ws: WorkspaceClient, migration_state: GroupMigrationState, num_threads: int):
+
+    def __init__(self, ws: WorkspaceClient, migration_state: GroupMigrationState, num_threads: int):
+        self._ws = ws
+        self._migration_state = migration_state
+        self._num_threads = num_threads
+
+    def get_standard_inventorizers(self) -> list[StandardInventorizer]:
         return [
-            RolesAndEntitlementsInventorizer(ws, migration_state),
-            TokensAndPasswordsInventorizer(ws),
             StandardInventorizer(
-                ws,
+                self._ws,
                 logical_object_type=LogicalObjectType.CLUSTER,
                 request_object_type=RequestObjectType.CLUSTERS,
-                listing_function=ws.clusters.list,
+                listing_function=self._ws.clusters.list,
                 id_attribute="cluster_id",
             ),
             StandardInventorizer(
-                ws,
+                self._ws,
                 logical_object_type=LogicalObjectType.INSTANCE_POOL,
                 request_object_type=RequestObjectType.INSTANCE_POOLS,
-                listing_function=ws.instance_pools.list,
+                listing_function=self._ws.instance_pools.list,
                 id_attribute="instance_pool_id",
             ),
             StandardInventorizer(
-                ws,
+                self._ws,
                 logical_object_type=LogicalObjectType.CLUSTER_POLICY,
                 request_object_type=RequestObjectType.CLUSTER_POLICIES,
-                listing_function=ws.cluster_policies.list,
+                listing_function=self._ws.cluster_policies.list,
                 id_attribute="policy_id",
             ),
             StandardInventorizer(
-                ws,
+                self._ws,
                 logical_object_type=LogicalObjectType.PIPELINE,
                 request_object_type=RequestObjectType.PIPELINES,
-                listing_function=ws.pipelines.list_pipelines,
+                listing_function=self._ws.pipelines.list_pipelines,
                 id_attribute="pipeline_id",
             ),
             StandardInventorizer(
-                ws,
+                self._ws,
                 logical_object_type=LogicalObjectType.JOB,
                 request_object_type=RequestObjectType.JOBS,
-                listing_function=ws.jobs.list,
+                listing_function=self._ws.jobs.list,
                 id_attribute="job_id",
             ),
             StandardInventorizer(
-                ws,
+                self._ws,
                 logical_object_type=LogicalObjectType.EXPERIMENT,
                 request_object_type=RequestObjectType.EXPERIMENTS,
-                listing_function=experiments_listing(ws),
+                listing_function=experiments_listing(self._ws),
                 id_attribute="experiment_id",
             ),
             StandardInventorizer(
-                ws,
+                self._ws,
                 logical_object_type=LogicalObjectType.MODEL,
                 request_object_type=RequestObjectType.REGISTERED_MODELS,
-                listing_function=models_listing(ws),
+                listing_function=models_listing(self._ws),
                 id_attribute="id",
             ),
             StandardInventorizer(
-                ws,
+                self._ws,
                 logical_object_type=LogicalObjectType.WAREHOUSE,
                 request_object_type=RequestObjectType.SQL_WAREHOUSES,
-                listing_function=ws.warehouses.list,
+                listing_function=self._ws.warehouses.list,
                 id_attribute="id",
-            ),
-            SecretScopeInventorizer(ws),
-            WorkspaceInventorizer(ws, num_threads=num_threads),
+            )]
+
+    def get_custom_inventorizers(self) -> list[BaseInventorizer]:
+        return [
+            RolesAndEntitlementsInventorizer(self._ws, self._migration_state),
+            TokensAndPasswordsInventorizer(self._ws),
+            SecretScopeInventorizer(self._ws),
+            WorkspaceInventorizer(self._ws, num_threads=self._num_threads),
         ]
+
+    def provide(self) -> list[BaseInventorizer]:
+        standard_inventorizers = self.get_standard_inventorizers()
+        custom_inventorizers = self.get_custom_inventorizers()
+        all_inventorizers = standard_inventorizers + custom_inventorizers
+        return all_inventorizers
