@@ -27,8 +27,9 @@ def migrate_groups(config_file: Annotated[Path, typer.Argument(help="Path to con
 
 @app.command()
 def generate_assessment_report():
-    from databricks.labs.ucx.toolkits.assessment import AssessmentToolkit
     from databricks.sdk import WorkspaceClient
+
+    from databricks.labs.ucx.toolkits.assessment import AssessmentToolkit
 
     ws = WorkspaceClient()
     toolkit = AssessmentToolkit(ws)
