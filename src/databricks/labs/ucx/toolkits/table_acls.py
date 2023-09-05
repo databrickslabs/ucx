@@ -29,10 +29,18 @@ class TaclToolkit:
         )
 
     def database_snapshot(self):
-        return self._tc.snapshot("hive_metastore", self._databases)
+        tables = []
+        for db in self._databases:
+            for t in self._tc.snapshot("hive_metastore", db):
+                tables.append(t)
+        return tables
 
     def grants_snapshot(self):
-        return self._gc.snapshot("hive_metastore", self._databases)
+        grants = []
+        for db in self._databases:
+            for grant in self._gc.snapshot("hive_metastore", db):
+                grants.append(grant)
+        return grants
 
     @staticmethod
     def _backend(ws: WorkspaceClient, warehouse_id: str | None = None) -> SqlBackend:
