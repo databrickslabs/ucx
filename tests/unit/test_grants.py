@@ -101,24 +101,26 @@ def make_row(data, columns):
     return row
 
 
-SELECT_COLS = ["catalog", "database", "table", "object_type", "table_format"]
+SELECT_COLS = ["catalog", "database", "table", "object_type", "table_format", "location", "view_text"]
 SHOW_COLS = ["principal", "action_type", "object_type", "ignored"]
-DESCRIBE_COLS = ["Catalog", "Type", "Provider", "Location", "View_Text"]
+DESCRIBE_COLS = ["key", "value", "ignored"]
 ROWS = {
-    "SELECT": [
-        make_row(("foo", "bar", "test_table", "type", "DELTA"), SELECT_COLS),
-        make_row(("foo", "bar", "test_view", "type", "VIEW"), SELECT_COLS),
-        make_row(("foo", None, None, "type", "CATALOG"), SELECT_COLS),
+    "SELECT.*": [
+        make_row(("foo", "bar", "test_table", "type", "DELTA", "/foo/bar/test", None), SELECT_COLS),
+        make_row(("foo", "bar", "test_view", "type", "VIEW", None, "SELECT * FROM table"), SELECT_COLS),
+        make_row(("foo", None, None, "type", "CATALOG", None, None), SELECT_COLS),
     ],
-    "SHOW": [
+    "SHOW.*": [
         make_row(("princ1", "SELECT", "TABLE", "ignored"), SHOW_COLS),
         make_row(("princ1", "SELECT", "VIEW", "ignored"), SHOW_COLS),
         make_row(("princ1", "USE", "CATALOG$", "ignored"), SHOW_COLS),
     ],
-    "DESCRIBE": [
-        make_row(("foo", "TABLE", "", "/foo/bar/test", ""), DESCRIBE_COLS),
-        make_row(("foo", "VIEW", "", "", "SELECT * FROM table"), DESCRIBE_COLS),
-        make_row(("foo", "CATALOG", "", "", ""), DESCRIBE_COLS),
+    "DESCRIBE.*": [
+        make_row(("Catalog", "foo", "ignored"), DESCRIBE_COLS),
+        make_row(("Type", "TABLE", "ignored"), DESCRIBE_COLS),
+        make_row(("Provider", "", "ignored"), DESCRIBE_COLS),
+        make_row(("Location", "/foo/bar/test", "ignored"), DESCRIBE_COLS),
+        make_row(("View Text", "SELECT * FROM table", "ignored"), DESCRIBE_COLS),
     ],
 }
 

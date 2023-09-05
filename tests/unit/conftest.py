@@ -1,4 +1,5 @@
 import logging
+import re
 import shutil
 import tempfile
 from collections.abc import Iterator
@@ -62,10 +63,15 @@ class MockBackend(SqlBackend):
 
     def fetch(self, sql) -> Iterator[any]:
         self._sql(sql)
-        first = sql.upper().split(" ")[0]
         rows = []
-        if first in self._rows:
-            rows = self._rows[first]
+        if self._rows:
+            for pattern in self._rows.keys():
+                logger.debug(f"Checking pattern: {pattern}")
+                r = re.compile(pattern)
+                if r.match(sql):
+                    logger.debug(f"Found match: {sql}")
+                    rows.extend(self._rows[pattern])
+        logger.debug(f"Returning rows: {rows}")
         return iter(rows)
 
 
