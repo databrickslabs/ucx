@@ -22,17 +22,17 @@ class TaclToolkit:
         self._tc = TablesCrawler(self._backend(ws, warehouse_id), self.inventory_catalog, self.inventory_schema)
         self._gc = GrantsCrawler(self._tc)
 
-        self.databases = (
+        self._databases = (
             config.tacl.databases
             if config.tacl.databases
             else [database.as_dict()["databaseName"] for database in self._tc._all_databases()]
         )
 
     def database_snapshot(self):
-        return self._tc.snapshot("hive_metastore", self.databases)
+        return self._tc.snapshot("hive_metastore", self._databases)
 
     def grants_snapshot(self):
-        return self._gc.snapshot("hive_metastore", self.databases)
+        return self._gc.snapshot("hive_metastore", self._databases)
 
     @staticmethod
     def _backend(ws: WorkspaceClient, warehouse_id: str | None = None) -> SqlBackend:
