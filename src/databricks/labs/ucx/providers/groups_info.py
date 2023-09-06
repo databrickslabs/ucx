@@ -19,6 +19,12 @@ class GroupMigrationState:
     def add(self, group: MigrationGroupInfo):
         self.groups.append(group)
 
+    def is_in_scope(self, attr: str, group: Group) -> bool:
+        for info in self.groups:
+            if getattr(info, attr).id == group.id:
+                return True
+        return False
+
     def get_by_workspace_group_name(self, workspace_group_name: str) -> MigrationGroupInfo | None:
         found = [g for g in self.groups if g.workspace.display_name == workspace_group_name]
         if len(found) == 0:

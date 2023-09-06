@@ -335,3 +335,27 @@ class PermissionManager:
 
         self._apply_permissions_in_parallel(requests=permission_payloads)
         logger.info(f"All permissions were applied for {destination} groups")
+
+    def verify_applied_permissions(
+        self,
+        object_type: str,
+        object_id: str,
+        migration_state: GroupMigrationState,
+        target: Literal["backup", "account"],
+    ):
+        op = self._ws.permissions.get(object_type, object_id)
+        for info in migration_state.groups:
+            src_permissions = sorted(
+                [_ for _ in op.access_control_list if _.group_name == info.workspace.display_name],
+                key=lambda p: p.group_name,
+            )
+            dst_permissions = sorted(
+                [_ for _ in op.access_control_list if _.group_name == getattr(info, target).display_name],
+                key=lambda p: p.group_name,
+            )
+            assert len(dst_permissions) == len(
+                src_permissions
+            ), f"Target permissions were not applied correctly for {object_type}/{object_id}"
+            assert [t.all_permissions for t in dst_permissions] == [
+                s.all_permissions for s in src_permissions
+            ], f"Target permissions were not applied correctly for {object_type}/{object_id}"
