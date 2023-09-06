@@ -1,14 +1,15 @@
+import logging
 import os
+import re
+from importlib import resources
 
 from databricks.sdk import WorkspaceClient
 from databricks.sdk.service.compute import Language
 
+from databricks.labs.ucx.assessment import commands
 from databricks.labs.ucx.providers.mixins.compute import CommandExecutor
-from databricks.labs.ucx.tacl._internal import (
-    RuntimeBackend,
-    SqlBackend,
-    StatementExecutionBackend,
-)
+
+logger = logging.getLogger(__name__)
 
 
 class AssessmentToolkit:
@@ -18,6 +19,39 @@ class AssessmentToolkit:
         self._inventory_schema = inventory_schema
         self._warehouse_id = warehouse_id
         self._cluster_id = cluster_id
+        self._command_executor = None
+        self._managed_executor = False
+
+    def _get_command_executor(self, executor: CommandExecutor | None = None, language=None):
+        ce = executor
+        if ce is None:
+            if language:
+                ce = CommandExecutor(self._ws, language=language, cluster_id=self._cluster_id)
+            else:
+                ce = CommandExecutor(self._ws, cluster_id=self._cluster_id)
+            self._managed_executor = True
+        self._command_executor = ce
+        return ce
+
+    def _remove_command_executor(self):
+        if self._managed_executor:
+            self._command_executor = None
+            self._managed_executor = False
+
+    @staticmethod
+    def _load_command_code(name):
+        cmd_file = resources.files(commands) / name
+        with cmd_file.open("rt") as f:
+            cmd_code = f.read()
+        return cmd_code
+
+    def _get_command(self, name, params: dict | None = None):
+        cmd_code = self._load_command_code(name)
+        if params:
+            for pattern, replace in params.items():
+                p = re.compile(pattern)
+                cmd_code = p.sub(replace, cmd_code)
+        return cmd_code
 
     @staticmethod
     def _verify_ws_client(w: WorkspaceClient):
@@ -27,29 +61,32 @@ class AssessmentToolkit:
             msg = "Current user is not a workspace admin"
             raise RuntimeError(msg)
 
-    def table_inventory(self):
-        commands = CommandExecutor(self._ws, language=Language.SCALA, cluster_id=self._cluster_id)
+    def table_inventory(self, executor: CommandExecutor | None = None):
+        logger.info("Started dataset inventorization...")
+        ce = self._get_command_executor(executor, language=Language.SCALA)
+        params = {"SCHEMA": self._inventory_schema}
+        cmd_code = self._get_command("create_table_inventory.scala", params=params)
+        command_output = ce.run(cmd_code)
+        logger.debug(command_output)
+        if executor is None:
+            self._remove_command_executor()
+        logger.info("Completed dataset inventorization...")
 
-        from importlib import resources as impresources
-        from databricks.labs.ucx.assessment import scala
+    def external_locations(self, executor: CommandExecutor | None = None):
+        logger.info("Started external location...")
+        self._get_command_executor(executor, language=Language.SCALA)
+        # TBD
+        if executor is None:
+            self._remove_command_executor()
+        logger.info("Completed external location...")
 
-        inp_file = (impresources.files(scala) / 'assessment.scala')
-        with inp_file.open("rt") as f:
-            template = f.read()
-        setup_code = f"""
-        val schema="{self._inventory_schema}";
-        """
-        command_output = commands.run(setup_code+template)
-        print(command_output)
-
-    def external_locations(self):
-        pass
-
-    @staticmethod
-    def _backend(ws: WorkspaceClient, warehouse_id: str | None = None) -> SqlBackend:
-        if warehouse_id is None:
-            return RuntimeBackend()
-        return StatementExecutionBackend(ws, warehouse_id)
+    def compile_report(self):
+        logger.info("Started report compilation...")
+        ce = self._get_command_executor(None, language=Language.SCALA)
+        self.table_inventory(ce)
+        self.external_locations(ce)
+        self._remove_command_executor()
+        logger.info("Completed report compilation...")
 
 
 if __name__ == "__main__":

@@ -1,3 +1,4 @@
+import os
 from pathlib import Path
 from typing import Annotated
 
@@ -31,10 +32,13 @@ def generate_assessment_report():
 
     from databricks.labs.ucx.toolkits.assessment import AssessmentToolkit
 
-    ws = WorkspaceClient()
-    toolkit = AssessmentToolkit(ws)
-    report = toolkit.generate_report()
-    print(report)
+    profile = os.getenv("WORKSPACE_PROFILE", None)
+    cluster_id = os.getenv("CLUSTER_ID")
+    catalog = os.getenv("INVENTORY_CATALOG", "ucx")
+    schema = os.getenv("INVENTORY_SCHEMA", "ucx")
+    ws = WorkspaceClient(profile=profile)
+    toolkit = AssessmentToolkit(ws=ws, cluster_id=cluster_id, inventory_catalog=catalog, inventory_schema=schema)
+    toolkit.compile_report()
 
 
 if __name__ == "__main__":

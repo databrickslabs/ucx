@@ -1,8 +1,9 @@
-
 import org.apache.spark.sql.catalyst.catalog.{CatalogTable, CatalogTableType};
 
 import org.apache.spark.sql.catalyst.TableIdentifier;
 import java.io.{FileWriter, BufferedWriter, File};
+
+val schema = "SCHEMA"
 val bw = new BufferedWriter(new FileWriter(new File("/tmp/metastore_schema.csv"), true));
 
 bw.write("db,table,format,type,table_location,created_version,created_time,last_access,lib,inputformat,outputformat\n")
