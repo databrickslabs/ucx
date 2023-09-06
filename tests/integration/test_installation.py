@@ -130,10 +130,7 @@ def test_toolkit_notebook(
 
     selected_groups = ",".join([group_a.display_name, group_b.display_name, group_c.display_name])
 
-    logger.info(
-        f"group_a={group_a}, " 
-        f"group_b={group_b}, "
-        f"group_c={group_c}, ")
+    logger.info(f"group_a={group_a}, group_b={group_b}, group_c={group_c}, ")
 
     cluster = make_cluster(num_workers=1)
     cluster_policy = make_cluster_policy()
