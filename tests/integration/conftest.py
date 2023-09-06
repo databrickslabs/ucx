@@ -601,7 +601,6 @@ def verifiable_objects(
     models,
     warehouses,
     tokens,
-    secret_scopes,
     workspace_objects,
 ) -> list[tuple[list, str, RequestObjectType | None]]:
     _verifiable_objects = [
