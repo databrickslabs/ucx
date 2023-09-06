@@ -32,11 +32,10 @@ def generate_assessment_report():
 
     from databricks.labs.ucx.toolkits.assessment import AssessmentToolkit
 
-    profile = os.getenv("WORKSPACE_PROFILE", None)
     cluster_id = os.getenv("CLUSTER_ID")
     catalog = os.getenv("INVENTORY_CATALOG", "ucx")
     schema = os.getenv("INVENTORY_SCHEMA", "ucx")
-    ws = WorkspaceClient(profile=profile)
+    ws = WorkspaceClient()
     toolkit = AssessmentToolkit(ws=ws, cluster_id=cluster_id, inventory_catalog=catalog, inventory_schema=schema)
     toolkit.compile_report()
 

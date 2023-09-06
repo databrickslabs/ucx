@@ -1,5 +1,4 @@
 import logging
-import os
 import re
 from importlib import resources
 
@@ -72,26 +71,9 @@ class AssessmentToolkit:
             self._remove_command_executor()
         logger.info("Completed dataset inventorization...")
 
-    def external_locations(self, executor: CommandExecutor | None = None):
-        logger.info("Started external location...")
-        self._get_command_executor(executor, language=Language.SCALA)
-        # TBD
-        if executor is None:
-            self._remove_command_executor()
-        logger.info("Completed external location...")
-
     def compile_report(self):
         logger.info("Started report compilation...")
         ce = self._get_command_executor(None, language=Language.SCALA)
         self.table_inventory(ce)
-        self.external_locations(ce)
         self._remove_command_executor()
         logger.info("Completed report compilation...")
-
-
-if __name__ == "__main__":
-    ws = WorkspaceClient()
-    cluster_id = os.getenv("CLUSTER_ID")
-    print(cluster_id)
-    assess = AssessmentToolkit(ws, cluster_id, "UCX", "UCX_assessment")
-    assess.table_inventory()
