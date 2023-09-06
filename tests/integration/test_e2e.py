@@ -67,9 +67,9 @@ def _verify_group_permissions(
         assert len(base_acls) == len(target_acls)
 
     elif id_attribute == "secret_scopes":
-        for scope in objects:
+        for scope_name in objects:
             toolkit.permissions_manager.verify_applied_scope_acls(
-                scope, toolkit.group_manager.migration_groups_provider, target
+                scope_name, toolkit.group_manager.migration_groups_provider, target
             )
 
     elif id_attribute in ("tokens", "passwords"):

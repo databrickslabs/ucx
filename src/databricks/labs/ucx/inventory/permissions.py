@@ -190,13 +190,13 @@ class PermissionManager:
             # the api might be inconsistent, therefore we need to check that the permissions were applied
             for _ in range(3):
                 time.sleep(random.random() * 2)
-                applied_acls = self._secret_scope_acls(
+                applied_permission = self._secret_scope_permission(
                     scope_name=request_payload.object_id, group_name=_acl_item.principal
                 )
-                assert applied_acls, f"Failed to apply permissions for {_acl_item.principal}"
-                assert applied_acls.permission == _acl_item.permission, (
+                assert applied_permission, f"Failed to apply permissions for {_acl_item.principal}"
+                assert applied_permission == _acl_item.permission, (
                     f"Failed to apply permissions for {_acl_item.principal}. "
-                    f"Expected: {_acl_item.permission}. Actual: {applied_acls.permission}"
+                    f"Expected: {_acl_item.permission}. Actual: {applied_permission}"
                 )
 
     @sleep_and_retry
@@ -326,21 +326,18 @@ class PermissionManager:
             ], f"Target permissions were not applied correctly for {object_type}/{object_id}"
 
     def verify_applied_scope_acls(
-        self, scope: workspace.SecretScope, migration_state: GroupMigrationState, target: Literal["backup", "account"]
+        self, scope_name: str, migration_state: GroupMigrationState, target: Literal["backup", "account"]
     ):
-        comparison_base = [
-            getattr(mi, "workspace" if target == "backup" else "backup") for mi in migration_state.groups
-        ]
-        comparison_target = [getattr(mi, target) for mi in migration_state.groups]
+        base_attr = "workspace" if target == "backup" else "backup"
+        for mi in migration_state.groups:
+            src_name = getattr(mi, base_attr).display_name
+            dst_name = getattr(mi, target).display_name
+            src_permission = self._secret_scope_permission(scope_name, src_name)
+            dst_permission = self._secret_scope_permission(scope_name, dst_name)
+            assert src_permission == dst_permission, "Scope ACLs were not applied correctly"
 
-        for base_group, target_group in zip(comparison_base, comparison_target, strict=True):
-            base_acl = self._secret_scope_acls(scope.name, base_group.display_name)
-            target_acl = self._secret_scope_acls(scope.name, target_group.display_name)
-            assert base_acl == target_acl, f"Scope ACLs were not applied correctly for {scope.name}"
-
-    def _secret_scope_acls(self, scope_name: str, group_name: str) -> workspace.AclItem | None:
-        all_acls = self._ws.secrets.list_acls(scope=scope_name)
-        for acl in all_acls:
+    def _secret_scope_permission(self, scope_name: str, group_name: str) -> workspace.AclPermission | None:
+        for acl in self._ws.secrets.list_acls(scope=scope_name):
             if acl.principal == group_name:
-                return acl
+                return acl.permission
         return None

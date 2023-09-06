@@ -24,10 +24,8 @@ from databricks.sdk.service.sql import (
     GetWarehouseResponse,
 )
 from databricks.sdk.service.workspace import (
-    AclPermission,
     ObjectInfo,
     ObjectType,
-    SecretScope,
 )
 
 from databricks.labs.ucx.config import InventoryTable
@@ -53,7 +51,6 @@ logger = logging.getLogger(__name__)
 NUM_TEST_GROUPS = int(os.environ.get("NUM_TEST_GROUPS", 5))
 NUM_TEST_INSTANCE_PROFILES = int(os.environ.get("NUM_TEST_INSTANCE_PROFILES", 3))
 NUM_TEST_CLUSTERS = int(os.environ.get("NUM_TEST_CLUSTERS", 3))
-NUM_TEST_INSTANCE_POOLS = int(os.environ.get("NUM_TEST_INSTANCE_POOLS", 3))
 NUM_TEST_CLUSTER_POLICIES = int(os.environ.get("NUM_TEST_CLUSTER_POLICIES", 3))
 NUM_TEST_PIPELINES = int(os.environ.get("NUM_TEST_PIPELINES", 3))
 NUM_TEST_JOBS = int(os.environ.get("NUM_TEST_JOBS", 3))
@@ -61,7 +58,6 @@ NUM_TEST_EXPERIMENTS = int(os.environ.get("NUM_TEST_EXPERIMENTS", 3))
 NUM_TEST_MODELS = int(os.environ.get("NUM_TEST_MODELS", 3))
 NUM_TEST_WAREHOUSES = int(os.environ.get("NUM_TEST_WAREHOUSES", 3))
 NUM_TEST_TOKENS = int(os.environ.get("NUM_TEST_TOKENS", 3))
-NUM_TEST_SECRET_SCOPES = int(os.environ.get("NUM_TEST_SECRET_SCOPES", 10))
 
 NUM_THREADS = int(os.environ.get("NUM_TEST_THREADS", 20))
 UCX_TESTING_PREFIX = os.environ.get("UCX_TESTING_PREFIX", "ucx")
@@ -513,27 +509,6 @@ def tokens(ws: WorkspaceClient, env: EnvironmentInfo) -> list[AccessControlReque
     )
 
     yield token_permissions
-
-
-@pytest.fixture
-def secret_scopes(ws: WorkspaceClient, env: EnvironmentInfo) -> list[SecretScope]:
-    logger.debug("Creating test secret scopes")
-
-    for i in range(NUM_TEST_SECRET_SCOPES):
-        ws.secrets.create_scope(f"{env.test_uid}-test-{i}")
-
-    test_secret_scopes = [s for s in ws.secrets.list_scopes() if s.name.startswith(env.test_uid)]
-
-    for scope in test_secret_scopes:
-        random_permission = random.choice(list(AclPermission))
-        random_ws_group, _ = random.choice(env.groups)
-        ws.secrets.put_acl(scope.name, random_ws_group.display_name, random_permission)
-
-    yield test_secret_scopes
-
-    logger.debug("Deleting test secret scopes")
-    executables = [partial(ws.secrets.delete_scope, s.name) for s in test_secret_scopes]
-    Threader(executables).run()
 
 
 @pytest.fixture
