@@ -4,8 +4,10 @@ inventory:
     database: default
     name: uc_migration_inventory
 
+tacl:
+  databases: [ "default" ]
 
-with_table_acls: False
+warehouse_id: None
 
 groups:
   selected: [ "analyst" ]

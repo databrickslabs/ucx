@@ -5,7 +5,7 @@ import os
 import pathlib
 import string
 import sys
-from typing import BinaryIO
+from typing import BinaryIO, Optional
 
 import pytest
 from databricks.sdk import AccountClient, WorkspaceClient
@@ -58,6 +58,214 @@ def acc() -> AccountClient:
     # Use variables from Unified Auth
     # See https://databricks-sdk-py.readthedocs.io/en/latest/authentication.html
     return AccountClient()
+
+
+def _permissions_mapping():
+    from databricks.sdk.service.iam import PermissionLevel
+
+    def _simple(_, object_id):
+        return object_id
+
+    def _path(ws, path):
+        return ws.workspace.get_status(path).object_id
+
+    return [
+        ("cluster_policy", "cluster-policies", [PermissionLevel.CAN_USE], _simple),
+        (
+            "instance_pool",
+            "instance-pools",
+            [PermissionLevel.CAN_ATTACH_TO, PermissionLevel.CAN_MANAGE],
+            _simple,
+        ),
+        (
+            "cluster",
+            "clusters",
+            [PermissionLevel.CAN_ATTACH_TO, PermissionLevel.CAN_RESTART, PermissionLevel.CAN_MANAGE],
+            _simple,
+        ),
+        (
+            "pipeline",
+            "pipelines",
+            [PermissionLevel.CAN_VIEW, PermissionLevel.CAN_RUN, PermissionLevel.CAN_MANAGE, PermissionLevel.IS_OWNER],
+            _simple,
+        ),
+        (
+            "job",
+            "jobs",
+            [
+                PermissionLevel.CAN_VIEW,
+                PermissionLevel.CAN_MANAGE_RUN,
+                PermissionLevel.IS_OWNER,
+                PermissionLevel.CAN_MANAGE,
+            ],
+            _simple,
+        ),
+        (
+            "notebook",
+            "notebooks",
+            [PermissionLevel.CAN_READ, PermissionLevel.CAN_RUN, PermissionLevel.CAN_EDIT, PermissionLevel.CAN_MANAGE],
+            _path,
+        ),
+        (
+            "directory",
+            "directories",
+            [PermissionLevel.CAN_READ, PermissionLevel.CAN_RUN, PermissionLevel.CAN_EDIT, PermissionLevel.CAN_MANAGE],
+            _path,
+        ),
+        (
+            "workspace_file",
+            "files",
+            [PermissionLevel.CAN_READ, PermissionLevel.CAN_RUN, PermissionLevel.CAN_EDIT, PermissionLevel.CAN_MANAGE],
+            _simple,
+        ),
+        (
+            "workspace_file_path",
+            "files",
+            [PermissionLevel.CAN_READ, PermissionLevel.CAN_RUN, PermissionLevel.CAN_EDIT, PermissionLevel.CAN_MANAGE],
+            _path,
+        ),
+        (
+            "repo",
+            "repos",
+            [PermissionLevel.CAN_READ, PermissionLevel.CAN_RUN, PermissionLevel.CAN_EDIT, PermissionLevel.CAN_MANAGE],
+            _path,
+        ),
+        ("tokens_authorization", "authorization", [PermissionLevel.CAN_USE], _simple),
+        ("passwords_authorization", "authorization", [PermissionLevel.CAN_USE], _simple),
+        (
+            "warehouse",
+            "sql/warehouses",
+            [PermissionLevel.CAN_USE, PermissionLevel.CAN_MANAGE],
+            _simple,
+        ),
+        (
+            "dashboard",
+            "sql/dashboards",
+            [PermissionLevel.CAN_EDIT, PermissionLevel.CAN_RUN, PermissionLevel.CAN_MANAGE, PermissionLevel.CAN_VIEW],
+            _simple,
+        ),
+        (
+            "alert",
+            "sql/alerts",
+            [PermissionLevel.CAN_EDIT, PermissionLevel.CAN_RUN, PermissionLevel.CAN_MANAGE, PermissionLevel.CAN_VIEW],
+            _simple,
+        ),
+        (
+            "query",
+            "sql/queries",
+            [PermissionLevel.CAN_EDIT, PermissionLevel.CAN_RUN, PermissionLevel.CAN_MANAGE, PermissionLevel.CAN_VIEW],
+            _simple,
+        ),
+        (
+            "experiment",
+            "experiments",
+            [PermissionLevel.CAN_READ, PermissionLevel.CAN_EDIT, PermissionLevel.CAN_MANAGE],
+            _simple,
+        ),
+        (
+            "registered_model",
+            "registered-models",
+            [
+                PermissionLevel.CAN_READ,
+                PermissionLevel.CAN_EDIT,
+                PermissionLevel.CAN_MANAGE_STAGING_VERSIONS,
+                PermissionLevel.CAN_MANAGE_PRODUCTION_VERSIONS,
+                PermissionLevel.CAN_MANAGE,
+            ],
+            _simple,
+        ),
+        (
+            "serving_endpoint",
+            "serving-endpoints",
+            [PermissionLevel.CAN_VIEW, PermissionLevel.CAN_MANAGE],
+            _simple,
+        ),
+    ]
+
+
+class _PermissionsChange:
+    def __init__(self, object_id: str, before: list[iam.AccessControlRequest], after: list[iam.AccessControlRequest]):
+        self._object_id = object_id
+        self._before = before
+        self._after = after
+
+    @staticmethod
+    def _principal(acr: iam.AccessControlRequest) -> str:
+        if acr.user_name is not None:
+            return f"user_name {acr.user_name}"
+        elif acr.group_name is not None:
+            return f"group_name {acr.group_name}"
+        else:
+            return f"service_principal_name {acr.service_principal_name}"
+
+    def _list(self, acl: list[iam.AccessControlRequest]):
+        return ", ".join(f"{self._principal(_)} {_.permission_level.value}" for _ in acl)
+
+    def __repr__(self):
+        return f"{self._object_id} [{self._list(self._before)}] -> [{self._list(self._after)}]"
+
+
+def _make_permissions_factory(name, resource_type, levels, id_retriever):
+    def _non_inherited(x: iam.ObjectPermissions):
+        return [
+            iam.AccessControlRequest(
+                permission_level=permission.permission_level,
+                group_name=access_control.group_name,
+                user_name=access_control.user_name,
+                service_principal_name=access_control.service_principal_name,
+            )
+            for access_control in x.access_control_list
+            for permission in access_control.all_permissions
+            if not permission.inherited
+        ]
+
+    def _make_permissions(ws):
+        def create(
+            *,
+            object_id: str,
+            permission_level: iam.PermissionLevel | None = None,
+            group_name: str | None = None,
+            user_name: str | None = None,
+            service_principal_name: str | None = None,
+            access_control_list: Optional["list[iam.AccessControlRequest]"] = None,
+        ):
+            nothing_specified = permission_level is None and access_control_list is None
+            both_specified = permission_level is not None and access_control_list is not None
+            if nothing_specified or both_specified:
+                msg = "either permission_level or access_control_list has to be specified"
+                raise ValueError(msg)
+
+            object_id = id_retriever(ws, object_id)
+            initial = _non_inherited(ws.permissions.get(resource_type, object_id))
+            if access_control_list is None:
+                if permission_level not in levels:
+                    names = ", ".join(_.value for _ in levels)
+                    msg = f"invalid permission level: {permission_level.value}. Valid levels: {names}"
+                    raise ValueError(msg)
+                access_control_list = [
+                    iam.AccessControlRequest(
+                        group_name=group_name,
+                        user_name=user_name,
+                        service_principal_name=service_principal_name,
+                        permission_level=permission_level,
+                    )
+                ]
+            ws.permissions.set(resource_type, object_id, access_control_list=access_control_list)
+            return _PermissionsChange(object_id, initial, access_control_list)
+
+        def remove(change: _PermissionsChange):
+            ws.permissions.set(resource_type, change._object_id, access_control_list=change._before)
+
+        yield from factory(f"{name} permissions", create, remove)
+
+    return _make_permissions
+
+
+for name, resource_type, levels, id_retriever in _permissions_mapping():
+    # wrap function factory, otherwise loop scope sticks the wrong way
+    locals()[f"make_{name}_permissions"] = pytest.fixture(
+        _make_permissions_factory(name, resource_type, levels, id_retriever)
+    )
 
 
 @pytest.fixture

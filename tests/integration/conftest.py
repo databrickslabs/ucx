@@ -9,11 +9,7 @@ import databricks.sdk.core
 import pytest
 from databricks.sdk import AccountClient, WorkspaceClient
 from databricks.sdk.core import Config, DatabricksError
-from databricks.sdk.service.compute import (
-    ClusterDetails,
-    CreateInstancePoolResponse,
-    CreatePolicyResponse,
-)
+from databricks.sdk.service.compute import ClusterDetails, CreatePolicyResponse
 from databricks.sdk.service.iam import AccessControlRequest, PermissionLevel
 from databricks.sdk.service.jobs import CreateResponse
 from databricks.sdk.service.ml import CreateExperimentResponse, ModelDatabricks
@@ -271,31 +267,6 @@ def instance_profiles(env: EnvironmentInfo, ws: WorkspaceClient) -> list[Instanc
     for profile in profiles:
         ws.instance_profiles.remove(profile.instance_profile_arn)
     logger.debug("Test instance profiles deleted")
-
-
-@pytest.fixture
-def instance_pools(env: EnvironmentInfo, ws: WorkspaceClient) -> list[CreateInstancePoolResponse]:
-    logger.debug("Creating test instance pools")
-
-    test_instance_pools: list[CreateInstancePoolResponse] = [
-        ws.instance_pools.create(instance_pool_name=f"{env.test_uid}-test-{i}", node_type_id="i3.xlarge")
-        for i in range(NUM_TEST_INSTANCE_POOLS)
-    ]
-
-    _set_random_permissions(
-        test_instance_pools,
-        "instance_pool_id",
-        RequestObjectType.INSTANCE_POOLS,
-        env,
-        ws,
-        permission_levels=[PermissionLevel.CAN_ATTACH_TO, PermissionLevel.CAN_MANAGE],
-    )
-
-    yield test_instance_pools
-
-    logger.debug("Deleting test instance pools")
-    executables = [partial(ws.instance_pools.delete, p.instance_pool_id) for p in test_instance_pools]
-    Threader(executables).run()
 
 
 @pytest.fixture
@@ -623,7 +594,6 @@ def workspace_objects(ws: WorkspaceClient, env: EnvironmentInfo) -> WorkspaceObj
 @pytest.fixture
 def verifiable_objects(
     clusters,
-    instance_pools,
     cluster_policies,
     pipelines,
     jobs,
@@ -639,7 +609,6 @@ def verifiable_objects(
         (secret_scopes, "secret_scopes", None),
         (tokens, "tokens", RequestObjectType.AUTHORIZATION),
         (clusters, "cluster_id", RequestObjectType.CLUSTERS),
-        (instance_pools, "instance_pool_id", RequestObjectType.INSTANCE_POOLS),
         (cluster_policies, "policy_id", RequestObjectType.CLUSTER_POLICIES),
         (pipelines, "pipeline_id", RequestObjectType.PIPELINES),
         (jobs, "job_id", RequestObjectType.JOBS),
