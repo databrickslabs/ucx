@@ -7,7 +7,7 @@
 # MAGIC This notebook provides toolkit for group migration (workspace to account).
 # MAGIC
 # MAGIC
-# MAGIC - Tested on: DBR 13.2, Single Node cluster, UC enabled (Single-User mode).
+# MAGIC - Tested on: Latest Databricks Runtime, Single Node cluster, UC enabled (Single-User mode).
 # MAGIC
 
 # COMMAND ----------
@@ -23,20 +23,14 @@
 
 # COMMAND ----------
 
-from common import pip_install_dependencies
-
-pip_install_dependencies()
-
-# COMMAND ----------
-
-from common import update_module_imports
-
-update_module_imports()
-
-# COMMAND ----------
-
+from databricks.labs.ucx.config import (
+    GroupsConfig,
+    InventoryConfig,
+    InventoryTable,
+    MigrationConfig,
+    TaclConfig,
+)
 from databricks.labs.ucx.toolkits.group_migration import GroupMigrationToolkit
-from databricks.labs.ucx.config import MigrationConfig, InventoryConfig, GroupsConfig, InventoryTable, TaclConfig
 from databricks.labs.ucx.toolkits.table_acls import TaclToolkit
 
 # COMMAND ----------
@@ -47,17 +41,25 @@ from databricks.labs.ucx.toolkits.table_acls import TaclToolkit
 
 # COMMAND ----------
 
+inventory_catalog = dbutils.widgets.get("inventory_catalog")
+inventory_schema = dbutils.widgets.get("inventory_schema")
+inventory_table = dbutils.widgets.get("inventory_table")
+selected_groups = dbutils.widgets.get("selected_groups").split(",")
+databases = dbutils.widgets.get("databases").split(",")
+
 config = MigrationConfig(
-    inventory=InventoryConfig(table=InventoryTable(catalog="main", database="default", name="ucx_migration_inventory")),
+    inventory=InventoryConfig(
+        table=InventoryTable(catalog=inventory_catalog, database=inventory_schema, name=inventory_table)
+    ),
     groups=GroupsConfig(
         # use this option to select specific groups manually
-        selected=["groupA", "groupB"],
+        selected=selected_groups,
         # use this option to select all groups automatically
         # auto=True
     ),
     tacl=TaclConfig(
         # use this option to select specific databases manually
-        databases=["default"],
+        databases=databases,
         # use this option to select all databases automatically
         # auto=True
     ),
@@ -67,7 +69,7 @@ toolkit = GroupMigrationToolkit(config)
 tacltoolkit = TaclToolkit(
     toolkit._ws,
     config.inventory.table.catalog,
-    config.inventory.table.schema,
+    config.inventory.table.name,
     databases=config.tacl.databases,
 )
 

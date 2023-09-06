@@ -190,7 +190,7 @@ def test_toolkit_notebook(
 
     logger.info("uploading notebook")
 
-    ucx_notebook_path = Path("./test_toolkit_notebook.py").absolute()
+    ucx_notebook_path = Path(__file__).parent.parent.parent / 'notebooks' / 'toolkit.py'
     my_user = ws.current_user.me().user_name
     remote_ucx_notebook_location = f"/Users/{my_user}/notebooks/{make_random(10)}"
     ws.workspace.mkdirs(remote_ucx_notebook_location)
@@ -220,7 +220,7 @@ def test_toolkit_notebook(
                     node_type_id=ws.clusters.select_node_type(local_disk=True),
                     spark_version=ws.clusters.select_spark_version(latest=True),
                     num_workers=1,
-                    spark_conf={"spark.databricks.acl.sqlOnly": True},
+                    spark_conf={"spark.databricks.acl.sqlOnly": "true"},
                 ),
             )
         ],
