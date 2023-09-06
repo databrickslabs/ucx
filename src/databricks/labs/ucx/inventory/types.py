@@ -1,5 +1,6 @@
 import json
 from dataclasses import asdict, dataclass
+from typing import Literal
 
 import pandas as pd
 from databricks.sdk.service.iam import ObjectPermissions
@@ -9,6 +10,8 @@ from databricks.sdk.service.workspace import AclItem as SdkAclItem
 from databricks.sdk.service.workspace import AclPermission as SdkAclPermission
 
 from databricks.labs.ucx.generic import StrEnum
+
+Destination = Literal["backup", "account"]
 
 
 class RequestObjectType(StrEnum):
