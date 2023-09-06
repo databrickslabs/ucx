@@ -106,6 +106,7 @@ class AclItemsContainer:
 
 @dataclass
 class RolesAndEntitlements:
+    group_name: str
     roles: list
     entitlements: list
 
@@ -126,7 +127,7 @@ class PermissionsInventoryItem:
         if self.logical_object_type == LogicalObjectType.SECRET_SCOPE:
             return AclItemsContainer.from_dict(self.object_permissions)
         elif self.logical_object_type in [LogicalObjectType.ROLES, LogicalObjectType.ENTITLEMENTS]:
-            return RolesAndEntitlements(**self.object_permissions)
+            return RolesAndEntitlements(group_name=self.object_id, **self.object_permissions)
         elif self.logical_object_type in [
             LogicalObjectType.ALERT,
             LogicalObjectType.DASHBOARD,

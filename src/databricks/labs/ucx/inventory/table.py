@@ -2,17 +2,12 @@ import logging
 
 import pandas as pd
 from databricks.sdk import WorkspaceClient
-from databricks.sdk.service.iam import ObjectPermissions
 from pyspark.sql import DataFrame
 from pyspark.sql.types import StringType, StructField, StructType
 
 from databricks.labs.ucx.config import InventoryConfig
-from databricks.labs.ucx.inventory.types import (
-    AclItemsContainer,
-    LogicalObjectType,
-    PermissionsInventoryItem,
-    RequestObjectType,
-)
+from databricks.labs.ucx.inventory.relevance import is_item_relevant_to_groups
+from databricks.labs.ucx.inventory.types import PermissionsInventoryItem
 from databricks.labs.ucx.providers.spark import SparkMixin
 
 logger = logging.getLogger(__name__)
@@ -59,28 +54,13 @@ class InventoryTableManager(SparkMixin):
         logger.info("Successfully loaded the inventory table")
         return PermissionsInventoryItem.from_pandas(df)
 
-    @staticmethod
-    def _is_item_relevant_to_groups(item: PermissionsInventoryItem, groups: list[str]) -> bool:
-        if item.logical_object_type == LogicalObjectType.SECRET_SCOPE:
-            _acl_container: AclItemsContainer = item.typed_object_permissions
-            return any(acl_item.principal in groups for acl_item in _acl_container.acls)
-
-        elif isinstance(item.request_object_type, RequestObjectType):
-            _ops: ObjectPermissions = item.typed_object_permissions
-            mentioned_groups = [acl.group_name for acl in _ops.access_control_list]
-            return any(g in mentioned_groups for g in groups)
-
-        elif item.logical_object_type in [LogicalObjectType.ENTITLEMENTS, LogicalObjectType.ROLES]:
-            return any(g in item.object_id for g in groups)
-
-        else:
-            msg = f"Logical object type {item.logical_object_type} is not supported"
-            raise NotImplementedError(msg)
-
     def load_for_groups(self, groups: list[str]) -> list[PermissionsInventoryItem]:
+        """
+        Please note that we need to explicitly filter out the inventory table only for the relevant groups.
+        """
         logger.info(f"Loading inventory table {self.config.table} and filtering it to relevant groups")
         df = self._table.toPandas()
         all_items = PermissionsInventoryItem.from_pandas(df)
-        filtered_items = [item for item in all_items if self._is_item_relevant_to_groups(item, groups)]
+        filtered_items = [item for item in all_items if is_item_relevant_to_groups(item, groups)]
         logger.info(f"Found {len(filtered_items)} items relevant to the groups among {len(all_items)} items")
         return filtered_items
