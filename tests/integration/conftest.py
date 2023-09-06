@@ -606,7 +606,6 @@ def verifiable_objects(
 ) -> list[tuple[list, str, RequestObjectType | None]]:
     _verifiable_objects = [
         (workspace_objects, "workspace_objects", None),
-        (secret_scopes, "secret_scopes", None),
         (tokens, "tokens", RequestObjectType.AUTHORIZATION),
         (clusters, "cluster_id", RequestObjectType.CLUSTERS),
         (cluster_policies, "policy_id", RequestObjectType.CLUSTER_POLICIES),
