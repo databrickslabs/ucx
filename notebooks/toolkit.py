@@ -12,17 +12,6 @@
 
 # COMMAND ----------
 
-# MAGIC %md
-# MAGIC
-# MAGIC ## Prepare imports
-
-# COMMAND ----------
-
-# MAGIC %reload_ext autoreload
-# MAGIC %autoreload 2
-
-# COMMAND ----------
-
 from databricks.labs.ucx.config import (
     GroupsConfig,
     InventoryConfig,
@@ -41,15 +30,13 @@ from databricks.labs.ucx.toolkits.table_acls import TaclToolkit
 
 # COMMAND ----------
 
-inventory_catalog = dbutils.widgets.get("inventory_catalog")
 inventory_schema = dbutils.widgets.get("inventory_schema")
-inventory_table = dbutils.widgets.get("inventory_table")
 selected_groups = dbutils.widgets.get("selected_groups").split(",")
 databases = dbutils.widgets.get("databases").split(",")
 
 config = MigrationConfig(
     inventory=InventoryConfig(
-        table=InventoryTable(catalog=inventory_catalog, database=inventory_schema, name=inventory_table)
+        table=InventoryTable(catalog='hive_metastore', database=inventory_schema, name='permissions')
     ),
     groups=GroupsConfig(
         # use this option to select specific groups manually
@@ -65,11 +52,12 @@ config = MigrationConfig(
     ),
     log_level="DEBUG",
 )
+
 toolkit = GroupMigrationToolkit(config)
 tacltoolkit = TaclToolkit(
     toolkit._ws,
-    config.inventory.table.catalog,
-    config.inventory.table.name,
+    inventory_catalog=config.inventory.table.catalog,
+    inventory_schema=config.inventory.table.database,
     databases=config.tacl.databases,
 )
 

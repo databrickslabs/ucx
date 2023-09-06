@@ -1,4 +1,5 @@
 import logging
+import os
 import shutil
 import subprocess
 import sys
@@ -93,16 +94,13 @@ def test_sql_backend_works(ws, wsfs_wheel):
 
 
 def test_toolkit_notebook(
-    acc,
     ws,
     sql_exec,
     wsfs_wheel,
-    make_acc_group,
-    make_catalog,
     make_cluster,
     make_cluster_policy,
     make_directory,
-    make_group,
+    make_ucx_group,
     make_instance_pool,
     make_job,
     make_notebook,
@@ -122,17 +120,16 @@ def test_toolkit_notebook(
 
     logger.info(f"user_a={user_a}, user_b={user_b}, user_c={user_c}, ")
 
-    # TODO acc_group
     # TODO add users to groups
-    group_a = make_group()
-    group_b = make_group()
-    group_c = make_group()
+    ws_group_a, acc_group_a = make_ucx_group()
+    ws_group_b, acc_group_b = make_ucx_group()
+    ws_group_c, acc_group_c = make_ucx_group()
 
-    selected_groups = ",".join([group_a.display_name, group_b.display_name, group_c.display_name])
+    selected_groups = ",".join([ws_group_a.display_name, ws_group_b.display_name, ws_group_c.display_name])
 
-    logger.info(f"group_a={group_a}, group_b={group_b}, group_c={group_c}, ")
+    logger.info(f"group_a={ws_group_a}, group_b={ws_group_b}, group_c={ws_group_c}, ")
 
-    cluster = make_cluster(num_workers=1)
+    cluster = make_cluster(instance_pool_id=os.environ["TEST_INSTANCE_POOL_ID"], single_node=True)
     cluster_policy = make_cluster_policy()
     directory = make_directory()
     instance_pool = make_instance_pool()
@@ -173,24 +170,19 @@ def test_toolkit_notebook(
 
     databases = ",".join([schema_a.split(".")[1], schema_b.split(".")[1], schema_c.split(".")[1]])
 
-    sql_exec(f"GRANT USAGE ON SCHEMA default TO `{group_a.display_name}`")
-    sql_exec(f"GRANT USAGE ON SCHEMA default TO `{group_b.display_name}`")
-    sql_exec(f"GRANT SELECT ON TABLE {table_a} TO `{group_a.display_name}`")
-    sql_exec(f"GRANT SELECT ON TABLE {table_b} TO `{group_b.display_name}`")
-    sql_exec(f"GRANT MODIFY ON SCHEMA {schema_b} TO `{group_b.display_name}`")
+    sql_exec(f"GRANT USAGE ON SCHEMA default TO `{ws_group_a.display_name}`")
+    sql_exec(f"GRANT USAGE ON SCHEMA default TO `{ws_group_b.display_name}`")
+    sql_exec(f"GRANT SELECT ON TABLE {table_a} TO `{ws_group_a.display_name}`")
+    sql_exec(f"GRANT SELECT ON TABLE {table_b} TO `{ws_group_b.display_name}`")
+    sql_exec(f"GRANT MODIFY ON SCHEMA {schema_b} TO `{ws_group_b.display_name}`")
 
-    inventory_table = make_table(schema=make_schema(catalog=make_catalog()))
-    inventory_catalog, inventory_schema, inventory_table = inventory_table.split(".")
+    _, inventory_schema = make_schema(catalog="hive_metastore").split(".")
 
-    logger.info(
-        f"inventory_catalog={inventory_catalog}, "
-        f"inventory_schema={inventory_schema}, "
-        f"inventory_table={inventory_table}, "
-    )
+    logger.info(f"inventory_schema={inventory_schema}")
 
     logger.info("uploading notebook")
 
-    ucx_notebook_path = Path(__file__).parent.parent.parent / 'notebooks' / 'toolkit.py'
+    ucx_notebook_path = Path(__file__).parent.parent.parent / "notebooks" / "toolkit.py"
     my_user = ws.current_user.me().user_name
     remote_ucx_notebook_location = f"/Users/{my_user}/notebooks/{make_random(10)}"
     ws.workspace.mkdirs(remote_ucx_notebook_location)
@@ -209,7 +201,6 @@ def test_toolkit_notebook(
                 notebook_task=jobs.NotebookTask(
                     notebook_path=f"{remote_ucx_notebook_location}/test_notebook",
                     base_parameters={
-                        "inventory_catalog": inventory_catalog,
                         "inventory_schema": inventory_schema,
                         "selected_groups": selected_groups,
                         "databases": databases,
@@ -217,7 +208,7 @@ def test_toolkit_notebook(
                 ),
                 libraries=[compute.Library(whl=f"/Workspace{wsfs_wheel}")],
                 new_cluster=compute.ClusterSpec(
-                    node_type_id=ws.clusters.select_node_type(local_disk=True),
+                    instance_pool_id=os.environ["TEST_INSTANCE_POOL_ID"],
                     spark_version=ws.clusters.select_spark_version(latest=True),
                     num_workers=1,
                     spark_conf={"spark.databricks.acl.sqlOnly": "true"},
@@ -229,14 +220,14 @@ def test_toolkit_notebook(
 
     logger.info("running job")
 
-    ws.jobs.run_now(created_job.job_id).result()
+    try:
+        ws.jobs.run_now(created_job.job_id).result()
+        # TODO Validate migration, tacl
+    finally:
+        logger.info("deleting workbook")
 
-    # TODO Validate migration, tacl
+        ws.workspace.delete(remote_ucx_notebook_location, recursive=True)
 
-    logger.info("deleting workbook")
+        logger.info("deleting job")
 
-    ws.workspace.delete(remote_ucx_notebook_location, recursive=True)
-
-    logger.info("deleting job")
-
-    ws.jobs.delete(created_job.job_id)
+        ws.jobs.delete(created_job.job_id)
