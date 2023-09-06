@@ -74,3 +74,20 @@ class PermissionManager:
             assert [t.all_permissions for t in dst_permissions] == [
                 s.all_permissions for s in src_permissions
             ], f"Target permissions were not applied correctly for {object_type}/{object_id}"
+
+    def verify_applied_scope_acls(
+        self, scope_name: str, migration_state: GroupMigrationState, target: Literal["backup", "account"]
+    ):
+        base_attr = "workspace" if target == "backup" else "backup"
+        for mi in migration_state.groups:
+            src_name = getattr(mi, base_attr).display_name
+            dst_name = getattr(mi, target).display_name
+            src_permission = self._secret_scope_permission(scope_name, src_name)
+            dst_permission = self._secret_scope_permission(scope_name, dst_name)
+            assert src_permission == dst_permission, "Scope ACLs were not applied correctly"
+
+    def _secret_scope_permission(self, scope_name: str, group_name: str) -> workspace.AclPermission | None:
+        for acl in self._ws.secrets.list_acls(scope=scope_name):
+            if acl.principal == group_name:
+                return acl.permission
+        return None

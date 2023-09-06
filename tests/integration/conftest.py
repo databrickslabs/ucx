@@ -23,12 +23,7 @@ from databricks.sdk.service.sql import (
     CreateWarehouseRequestWarehouseType,
     GetWarehouseResponse,
 )
-from databricks.sdk.service.workspace import (
-    AclPermission,
-    ObjectInfo,
-    ObjectType,
-    SecretScope,
-)
+from databricks.sdk.service.workspace import ObjectInfo, ObjectType
 
 from databricks.labs.ucx.config import InventoryTable
 from databricks.labs.ucx.inventory.types import RequestObjectType
@@ -53,7 +48,6 @@ logger = logging.getLogger(__name__)
 NUM_TEST_GROUPS = int(os.environ.get("NUM_TEST_GROUPS", 5))
 NUM_TEST_INSTANCE_PROFILES = int(os.environ.get("NUM_TEST_INSTANCE_PROFILES", 3))
 NUM_TEST_CLUSTERS = int(os.environ.get("NUM_TEST_CLUSTERS", 3))
-NUM_TEST_INSTANCE_POOLS = int(os.environ.get("NUM_TEST_INSTANCE_POOLS", 3))
 NUM_TEST_CLUSTER_POLICIES = int(os.environ.get("NUM_TEST_CLUSTER_POLICIES", 3))
 NUM_TEST_PIPELINES = int(os.environ.get("NUM_TEST_PIPELINES", 3))
 NUM_TEST_JOBS = int(os.environ.get("NUM_TEST_JOBS", 3))
@@ -61,7 +55,6 @@ NUM_TEST_EXPERIMENTS = int(os.environ.get("NUM_TEST_EXPERIMENTS", 3))
 NUM_TEST_MODELS = int(os.environ.get("NUM_TEST_MODELS", 3))
 NUM_TEST_WAREHOUSES = int(os.environ.get("NUM_TEST_WAREHOUSES", 3))
 NUM_TEST_TOKENS = int(os.environ.get("NUM_TEST_TOKENS", 3))
-NUM_TEST_SECRET_SCOPES = int(os.environ.get("NUM_TEST_SECRET_SCOPES", 10))
 
 NUM_THREADS = int(os.environ.get("NUM_TEST_THREADS", 20))
 UCX_TESTING_PREFIX = os.environ.get("UCX_TESTING_PREFIX", "ucx")
@@ -516,27 +509,6 @@ def tokens(ws: WorkspaceClient, env: EnvironmentInfo) -> list[AccessControlReque
 
 
 @pytest.fixture
-def secret_scopes(ws: WorkspaceClient, env: EnvironmentInfo) -> list[SecretScope]:
-    logger.debug("Creating test secret scopes")
-
-    for i in range(NUM_TEST_SECRET_SCOPES):
-        ws.secrets.create_scope(f"{env.test_uid}-test-{i}")
-
-    test_secret_scopes = [s for s in ws.secrets.list_scopes() if s.name.startswith(env.test_uid)]
-
-    for scope in test_secret_scopes:
-        random_permission = random.choice(list(AclPermission))
-        random_ws_group, _ = random.choice(env.groups)
-        ws.secrets.put_acl(scope.name, random_ws_group.display_name, random_permission)
-
-    yield test_secret_scopes
-
-    logger.debug("Deleting test secret scopes")
-    executables = [partial(ws.secrets.delete_scope, s.name) for s in test_secret_scopes]
-    Threader(executables).run()
-
-
-@pytest.fixture
 def workspace_objects(ws: WorkspaceClient, env: EnvironmentInfo) -> WorkspaceObjects:
     logger.info(f"Creating test workspace objects under /{env.test_uid}")
     ws.workspace.mkdirs(f"/{env.test_uid}")
@@ -601,12 +573,10 @@ def verifiable_objects(
     models,
     warehouses,
     tokens,
-    secret_scopes,
     workspace_objects,
 ) -> list[tuple[list, str, RequestObjectType | None]]:
     _verifiable_objects = [
         (workspace_objects, "workspace_objects", None),
-        (secret_scopes, "secret_scopes", None),
         (tokens, "tokens", RequestObjectType.AUTHORIZATION),
         (clusters, "cluster_id", RequestObjectType.CLUSTERS),
         (cluster_policies, "policy_id", RequestObjectType.CLUSTER_POLICIES),
