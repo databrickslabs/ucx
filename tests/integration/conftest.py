@@ -23,10 +23,7 @@ from databricks.sdk.service.sql import (
     CreateWarehouseRequestWarehouseType,
     GetWarehouseResponse,
 )
-from databricks.sdk.service.workspace import (
-    ObjectInfo,
-    ObjectType,
-)
+from databricks.sdk.service.workspace import ObjectInfo, ObjectType
 
 from databricks.labs.ucx.config import InventoryTable
 from databricks.labs.ucx.inventory.types import RequestObjectType
