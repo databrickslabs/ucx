@@ -25,7 +25,7 @@ from databricks.labs.ucx.inventory.types import (
     RolesAndEntitlements,
 )
 from databricks.labs.ucx.providers.groups_info import GroupMigrationState
-from databricks.labs.ucx.utils import ThreadedExecution, safe_get_acls
+from databricks.labs.ucx.utils import ThreadedExecution
 
 logger = logging.getLogger(__name__)
 

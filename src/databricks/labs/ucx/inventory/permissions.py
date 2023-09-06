@@ -2,6 +2,7 @@ import logging
 from typing import Literal
 
 from databricks.sdk import WorkspaceClient
+from databricks.sdk.service import workspace
 
 from databricks.labs.ucx.inventory.applicator import Applicators
 from databricks.labs.ucx.inventory.inventorizer import BaseInventorizer
