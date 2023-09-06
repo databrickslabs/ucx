@@ -4,13 +4,13 @@ from typing import Literal
 
 import pytest
 from databricks.sdk import WorkspaceClient
+from databricks.sdk.service import workspace
 from databricks.sdk.service.iam import (
     AccessControlRequest,
     AccessControlResponse,
     Permission,
     PermissionLevel,
 )
-from databricks.sdk.service.workspace import SecretScope
 from pyspark.errors import AnalysisException
 
 from databricks.labs.ucx.config import (
@@ -24,7 +24,6 @@ from databricks.labs.ucx.config import (
 from databricks.labs.ucx.inventory.types import RequestObjectType
 from databricks.labs.ucx.providers.groups_info import GroupMigrationState
 from databricks.labs.ucx.toolkits.group_migration import GroupMigrationToolkit
-from databricks.labs.ucx.utils import safe_get_acls
 
 from .utils import EnvironmentInfo, WorkspaceObjects
 
@@ -68,27 +67,10 @@ def _verify_group_permissions(
         assert len(base_acls) == len(target_acls)
 
     elif id_attribute == "secret_scopes":
-        _scopes: list[SecretScope] = objects
-        comparison_base = [
-            getattr(mi, "workspace" if target == "backup" else "backup")
-            for mi in toolkit.group_manager.migration_groups_provider.groups
-        ]
-
-        comparison_target = [getattr(mi, target) for mi in toolkit.group_manager.migration_groups_provider.groups]
-
-        for scope in _scopes:
-            for base_group, target_group in zip(comparison_base, comparison_target, strict=True):
-                base_acl = safe_get_acls(ws, scope.name, base_group.display_name)
-                target_acl = safe_get_acls(ws, scope.name, target_group.display_name)
-
-                if base_acl:
-                    if not target_acl:
-                        msg = "Target ACL is empty, while base ACL is not"
-                        raise AssertionError(msg)
-
-                    assert (
-                        base_acl.permission == target_acl.permission
-                    ), f"Target permissions were not applied correctly for scope {scope.name}"
+        for scope_name in objects:
+            toolkit.permissions_manager.verify_applied_scope_acls(
+                scope_name, toolkit.group_manager.migration_groups_provider, target
+            )
 
     elif id_attribute in ("tokens", "passwords"):
         _typed_objects: list[AccessControlRequest] = objects
@@ -149,6 +131,8 @@ def test_e2e(
     verifiable_objects: list[tuple[list, str, RequestObjectType | None]],
     make_instance_pool,
     make_instance_pool_permissions,
+    make_secret_scope,
+    make_secret_scope_acl,
 ):
     logger.debug(f"Test environment: {env.test_uid}")
     ws_group = env.groups[0][0]
@@ -160,6 +144,10 @@ def test_e2e(
         group_name=ws_group.display_name,
     )
     verifiable_objects.append(([pool], "instance_pool_id", RequestObjectType.INSTANCE_POOLS))
+
+    scope = make_secret_scope()
+    make_secret_scope_acl(scope=scope, principal=ws_group.display_name, permission=workspace.AclPermission.WRITE)
+    verifiable_objects.append(([scope], "secret_scopes", None))
 
     config = MigrationConfig(
         connect=ConnectConfig.from_databricks_config(ws.config),

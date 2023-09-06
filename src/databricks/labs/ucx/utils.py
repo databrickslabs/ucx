@@ -5,9 +5,6 @@ from collections.abc import Callable
 from concurrent.futures import ALL_COMPLETED, ThreadPoolExecutor
 from typing import Generic, TypeVar
 
-from databricks.sdk import WorkspaceClient
-from databricks.sdk.service.workspace import AclItem
-
 from databricks.labs.ucx.generic import StrEnum
 
 ExecutableResult = TypeVar("ExecutableResult")
@@ -83,10 +80,3 @@ class WorkspaceLevelEntitlement(StrEnum):
     DATABRICKS_SQL_ACCESS = "databricks-sql-access"
     ALLOW_CLUSTER_CREATE = "allow-cluster-create"
     ALLOW_INSTANCE_POOL_CREATE = "allow-instance-pool-create"
-
-
-def safe_get_acls(ws: WorkspaceClient, scope_name: str, group_name: str) -> AclItem | None:
-    all_acls = ws.secrets.list_acls(scope=scope_name)
-    for acl in all_acls:
-        if acl.principal == group_name:
-            return acl
