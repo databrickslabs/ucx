@@ -96,7 +96,7 @@ tacltoolkit = TaclToolkit(
 
 # COMMAND ----------
 
-#toolkit.prepare_environment()
+toolkit.prepare_environment()
 
 # COMMAND ----------
 
@@ -106,7 +106,7 @@ tacltoolkit = TaclToolkit(
 
 # COMMAND ----------
 
-#toolkit.cleanup_inventory_table()
+toolkit.cleanup_inventory_table()
 
 # COMMAND ----------
 
@@ -120,7 +120,7 @@ tacltoolkit = TaclToolkit(
 
 # COMMAND ----------
 
-#toolkit.inventorize_permissions()
+toolkit.inventorize_permissions()
 
 # COMMAND ----------
 

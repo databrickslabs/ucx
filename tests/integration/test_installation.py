@@ -11,7 +11,7 @@ from databricks.sdk.service.workspace import ImportFormat
 
 from databricks.labs.ucx.providers.mixins.compute import CommandExecutor
 
-logging.getLogger("databricks.sdk").setLevel("DEBUG")
+logger = logging.getLogger(__name__)
 
 
 @pytest.fixture
@@ -114,13 +114,13 @@ def test_toolkit_notebook(
     make_table,
     make_user,
 ):
-    logging.info("setting up fixtures")
+    logger.info("setting up fixtures")
 
     user_a = make_user()
     user_b = make_user()
     user_c = make_user()
 
-    logging.info(f"user_a={user_a}, user_b={user_b}, user_c={user_c}, ")
+    logger.info(f"user_a={user_a}, user_b={user_b}, user_c={user_c}, ")
 
     # TODO acc_group
     # TODO add users to groups
@@ -130,7 +130,7 @@ def test_toolkit_notebook(
 
     selected_groups = ",".join([group_a.display_name, group_b.display_name, group_c.display_name])
 
-    logging.info(
+    logger.info(
         f"group_a={group_a}, " 
         f"group_b={group_b}, "
         f"group_c={group_c}, ")
@@ -145,7 +145,7 @@ def test_toolkit_notebook(
     repo = make_repo()
     secret_scope = make_secret_scope()
 
-    logging.info(
+    logger.info(
         f"cluster={cluster}, "
         f"cluster_policy={cluster_policy}, "
         f"directory={directory}, "
@@ -166,7 +166,7 @@ def test_toolkit_notebook(
     table_a = make_table(schema=schema_a)
     table_b = make_table(schema=schema_b)
 
-    logging.info(
+    logger.info(
         f"schema_a={schema_a}, "
         f"schema_b={schema_b}, "
         f"schema_c={schema_c}, "
@@ -185,32 +185,32 @@ def test_toolkit_notebook(
     inventory_table = make_table(schema=make_schema(catalog=make_catalog()))
     inventory_catalog, inventory_schema, inventory_table = inventory_table.split(".")
 
-    logging.info(
+    logger.info(
         f"inventory_catalog={inventory_catalog}, "
         f"inventory_schema={inventory_schema}, "
         f"inventory_table={inventory_table}, "
     )
 
-    logging.info("uploading notebook")
+    logger.info("uploading notebook")
 
     ucx_notebook_path = Path("./test_toolkit_notebook.py").absolute()
     my_user = ws.current_user.me().user_name
     remote_ucx_notebook_location = f"/Users/{my_user}/notebooks/{make_random(10)}"
     ws.workspace.mkdirs(remote_ucx_notebook_location)
-    ws_notebook = f"{remote_ucx_notebook_location}/test_notebook"
+    ws_notebook = f"{remote_ucx_notebook_location}/test_notebook.py"
 
     with open(ucx_notebook_path, "rb") as fh:
         buf_notebook = BytesIO(fh.read())
     ws.workspace.upload(ws_notebook, buf_notebook, format=ImportFormat.AUTO)
 
-    logging.info("creating job")
+    logger.info("creating job")
 
     created_job = ws.jobs.create(
         tasks=[
             jobs.Task(
                 task_key="uc-migrate",
                 notebook_task=jobs.NotebookTask(
-                    notebook_path=ws_notebook,
+                    notebook_path=f"{remote_ucx_notebook_location}/test_notebook",
                     base_parameters={
                         "inventory_catalog": inventory_catalog,
                         "inventory_schema": inventory_schema,
@@ -229,14 +229,17 @@ def test_toolkit_notebook(
         ],
         name="[UCX] Run Migration",
     )
+
+    logger.info("running job")
+
     ws.jobs.run_now(created_job.job_id).result()
 
     # TODO Validate migration, tacl
 
-    logging.info("deleting workbook")
+    logger.info("deleting workbook")
 
     ws.workspace.delete(remote_ucx_notebook_location, recursive=True)
 
-    logging.info("deleting job")
+    logger.info("deleting job")
 
     ws.jobs.delete(created_job.job_id)
