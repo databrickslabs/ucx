@@ -3,9 +3,9 @@ import logging
 import random
 import time
 from abc import ABC, abstractmethod
+from collections.abc import Callable
 from copy import deepcopy
-from dataclasses import dataclass
-from typing import Any
+from functools import partial
 
 from databricks.sdk import WorkspaceClient
 from databricks.sdk.service.iam import AccessControlRequest, Group, ObjectPermissions
@@ -19,7 +19,6 @@ from tenacity import retry, stop_after_attempt, wait_fixed, wait_random
 from databricks.labs.ucx.inventory.types import (
     AclItemsContainer,
     Destination,
-    LogicalObjectType,
     PermissionsInventoryItem,
     RequestObjectType,
     RolesAndEntitlements,
@@ -28,6 +27,8 @@ from databricks.labs.ucx.providers.groups_info import GroupMigrationState
 from databricks.labs.ucx.utils import ThreadedExecution
 
 logger = logging.getLogger(__name__)
+
+Executable = Callable[..., None]
 
 
 class BaseApplicator(ABC):
@@ -42,30 +43,19 @@ class BaseApplicator(ABC):
         self._item = item
         self._destination = destination
         self._migration_state = migration_state
-        self._request_payload: Any | None = None
 
     @abstractmethod
-    def prepare(self):
+    @property
+    def func(self) -> Executable:
         """
-        This method should prepare the applicator for the given permissions
+        This method should return a function that will be executed in the threaded execution.
         :return:
-        """
-
-    @abstractmethod
-    def apply(self):
-        """
-        This method should apply the changes.
         """
 
 
 class SecretScopeApplicator(BaseApplicator):
-    # this dataclass is scoped to the applicator
-    @dataclass
-    class SecretsPermissionRequestPayload:
-        object_id: str
-        access_control_list: list[SdkAclItem]
-
-    def prepare(self):
+    @property
+    def func(self):
         _existing_acl_container: AclItemsContainer = self._item.typed_object_permissions
         _final_acls = []
 
@@ -84,27 +74,21 @@ class SecretScopeApplicator(BaseApplicator):
                 _final_acls.append(_new_acl)
 
         _typed_acl_container = AclItemsContainer(acls=_final_acls)
-        self._request_payload = self.SecretsPermissionRequestPayload(
-            self._item.object_id, _typed_acl_container.to_sdk()
-        )
+        return partial(self._apply, self._item.object_id, _typed_acl_container.to_sdk())
 
     @retry(wait=wait_fixed(1) + wait_random(0, 2), stop=stop_after_attempt(5))
-    def apply(self):
-        for _acl_item in self._request_payload.access_control_list:
+    def _apply(self, object_id: str, acl: list[SdkAclItem]):
+        for _acl_item in acl:
             # this request will create OR update the ACL for the given principal
             # it means that the access_control_list should only keep records required for update
-            self._ws.secrets.put_acl(
-                scope=self._request_payload.object_id, principal=_acl_item.principal, permission=_acl_item.permission
-            )
-            logger.debug(f"Applied new permissions for scope {self._request_payload.object_id}: {_acl_item}")
+            self._ws.secrets.put_acl(scope=object_id, principal=_acl_item.principal, permission=_acl_item.permission)
+            logger.debug(f"Applied new permissions for scope {object_id}: {_acl_item}")
             # TODO: add mixin to SDK
             # in-flight check for the applied permissions
             # the api might be inconsistent, therefore we need to check that the permissions were applied
             for _ in range(3):
                 time.sleep(random.random() * 2)
-                applied_acls = safe_get_acls(
-                    self._ws, scope_name=self._request_payload.object_id, group_name=_acl_item.principal
-                )
+                applied_acls = safe_get_acls(self._ws, scope_name=object_id, group_name=_acl_item.principal)
                 assert applied_acls, f"Failed to apply permissions for {_acl_item.principal}"
                 assert applied_acls.permission == _acl_item.permission, (
                     f"Failed to apply permissions for {_acl_item.principal}. "
@@ -113,20 +97,13 @@ class SecretScopeApplicator(BaseApplicator):
 
 
 class RolesAndEntitlementsApplicator(BaseApplicator):
-    @dataclass
-    class RolesAndEntitlementsRequestPayload:
-        payload: RolesAndEntitlements
-        group_id: str
-
-    def prepare(self):
+    def func(self):
         migration_info = self._migration_state.get_by_workspace_group_name(
             self._item.typed_object_permissions.group_name
         )
         assert migration_info is not None, f"Group {self._item.object_id} is not in the migration groups provider"
         destination_group: Group = getattr(migration_info, self._destination)
-        self._request_payload = self.RolesAndEntitlementsRequestPayload(
-            payload=self._item.typed_object_permissions, group_id=destination_group.id
-        )
+        return partial(self._apply, destination_group.id, self._item.typed_object_permissions)
 
     def _patch_workspace_group(self, group_id: str, payload: dict):
         # TODO: replace usages
@@ -140,27 +117,27 @@ class RolesAndEntitlementsApplicator(BaseApplicator):
 
     @sleep_and_retry
     @limits(calls=10, period=1)  # assumption
-    def apply(self):
+    def _apply(self, group_id: str, payload: RolesAndEntitlements):
         # TODO: move to other places, this won't be in SDK
         op_schema = "urn:ietf:params:scim:api:messages:2.0:PatchOp"
         schemas = []
         operations = []
 
-        if self._request_payload.payload.entitlements:
+        if payload.entitlements:
             schemas.append(op_schema)
             entitlements_payload = {
                 "op": "add",
                 "path": "entitlements",
-                "value": self._request_payload.payload.entitlements,
+                "value": payload.entitlements,
             }
             operations.append(entitlements_payload)
 
-        if self._request_payload.payload.roles:
+        if payload.roles:
             schemas.append(op_schema)
             roles_payload = {
                 "op": "add",
                 "path": "roles",
-                "value": self._request_payload.payload.roles,
+                "value": payload.roles,
             }
             operations.append(roles_payload)
 
@@ -169,18 +146,11 @@ class RolesAndEntitlementsApplicator(BaseApplicator):
                 "schemas": schemas,
                 "Operations": operations,
             }
-            self._patch_workspace_group(self._request_payload.group_id, request)
+            self._patch_workspace_group(group_id, request)
 
 
 class ObjectPermissionsApplicator(BaseApplicator):
-    @dataclass
-    class PermissionRequestPayload:
-        logical_object_type: LogicalObjectType
-        request_object_type: RequestObjectType | None
-        object_id: str
-        access_control_list: list[AccessControlRequest]
-
-    def prepare(self):
+    def func(self):
         _existing_permissions: ObjectPermissions = self._item.typed_object_permissions
         _acl = _existing_permissions.access_control_list
         acl_requests = []
@@ -206,12 +176,7 @@ class ObjectPermissionsApplicator(BaseApplicator):
                 ]
                 acl_requests.extend(_reqs)
 
-        self._request_payload = self.PermissionRequestPayload(
-            logical_object_type=self._item.logical_object_type,
-            request_object_type=self._item.request_object_type,
-            object_id=self._item.object_id,
-            access_control_list=acl_requests,
-        )
+        return partial(self._update_permissions, self._item.request_object_type, self._item.object_id, acl_requests)
 
     @sleep_and_retry
     @limits(calls=30, period=1)
@@ -227,22 +192,9 @@ class ObjectPermissionsApplicator(BaseApplicator):
             access_control_list=access_control_list,
         )
 
-    def apply(self):
-        self._update_permissions(
-            request_object_type=self._request_payload.request_object_type,
-            request_object_id=self._request_payload.object_id,
-            access_control_list=self._request_payload.access_control_list,
-        )
-
 
 class SqlPermissionsApplicator(BaseApplicator):
-    @dataclass
-    class SqlObjectRequestPayload:
-        object_id: str
-        request_object_type: SqlRequestObjectType
-        access_control_list: list[SqlAccessControl]
-
-    def prepare(self):
+    def func(self):
         _existing_permissions: SqlPermissions = self._item.typed_object_permissions
         _acl = _existing_permissions.access_control_list
         acl_requests: list[SqlAccessControl] = []
@@ -260,6 +212,8 @@ class SqlPermissionsApplicator(BaseApplicator):
                 # no changes shall be applied
                 acl_requests.append(acl_request)
 
+        return partial(self._set_permissions, self._item.request_object_type, self._item.object_id, acl_requests)
+
     @sleep_and_retry
     @limits(calls=30, period=1)
     def _set_permissions(
@@ -269,13 +223,6 @@ class SqlPermissionsApplicator(BaseApplicator):
             object_id=object_id,
             object_type=object_type,
             access_control_list=access_control_list,
-        )
-
-    def apply(self):
-        self._set_permissions(
-            object_type=self._request_payload.request_object_type,
-            object_id=self._request_payload.object_id,
-            access_control_list=self._request_payload.access_control_list,
         )
 
 
@@ -290,7 +237,7 @@ class Applicators:
         self._ws = ws
         self._migration_state = migration_state
         self._destination = destination
-        self._applicators: list[BaseApplicator] = []
+        self._executables: list[Executable] = []
 
     def _get_applicator(self, item: PermissionsInventoryItem) -> BaseApplicator:
         typed_acl_payload = item.typed_object_permissions
@@ -310,14 +257,11 @@ class Applicators:
         """
         This method should return the correct applicator for the given item.
         """
-        self._applicators = [self._get_applicator(item) for item in items]
-        for applicator in self._applicators:
-            applicator.prepare()
+        self._executables = [self._get_applicator(item).func for item in items]
 
     def apply(self):
         """
         This method should apply the changes.
         """
-        executables = [applicator.apply for applicator in self._applicators]
-        execution = ThreadedExecution[None](executables)
+        execution = ThreadedExecution(self._executables)
         execution.run()
