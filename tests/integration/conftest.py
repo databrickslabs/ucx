@@ -19,10 +19,6 @@ from databricks.sdk.service.pipelines import (
     NotebookLibrary,
     PipelineLibrary,
 )
-from databricks.sdk.service.sql import (
-    CreateWarehouseRequestWarehouseType,
-    GetWarehouseResponse,
-)
 from databricks.sdk.service.workspace import ObjectInfo, ObjectType
 
 from databricks.labs.ucx.config import InventoryTable
@@ -53,7 +49,6 @@ NUM_TEST_PIPELINES = int(os.environ.get("NUM_TEST_PIPELINES", 3))
 NUM_TEST_JOBS = int(os.environ.get("NUM_TEST_JOBS", 3))
 NUM_TEST_EXPERIMENTS = int(os.environ.get("NUM_TEST_EXPERIMENTS", 3))
 NUM_TEST_MODELS = int(os.environ.get("NUM_TEST_MODELS", 3))
-NUM_TEST_WAREHOUSES = int(os.environ.get("NUM_TEST_WAREHOUSES", 3))
 NUM_TEST_TOKENS = int(os.environ.get("NUM_TEST_TOKENS", 3))
 
 NUM_THREADS = int(os.environ.get("NUM_TEST_THREADS", 20))
@@ -418,41 +413,6 @@ def models(ws: WorkspaceClient, env: EnvironmentInfo) -> list[ModelDatabricks]:
     executables = [partial(ws.model_registry.delete_model, m.name) for m in test_models]
     Threader(executables).run()
     logger.debug("Test models deleted")
-
-
-@pytest.fixture
-def warehouses(ws: WorkspaceClient, env: EnvironmentInfo) -> list[GetWarehouseResponse]:
-    logger.debug("Creating warehouses")
-
-    creators = [
-        partial(
-            ws.warehouses.create,
-            name=f"{env.test_uid}-test-{i}",
-            cluster_size="2X-Small",
-            warehouse_type=CreateWarehouseRequestWarehouseType.PRO,
-            max_num_clusters=1,
-            enable_serverless_compute=False,
-        )
-        for i in range(NUM_TEST_WAREHOUSES)
-    ]
-
-    test_warehouses: list[GetWarehouseResponse] = Threader(creators).run()
-
-    _set_random_permissions(
-        test_warehouses,
-        "id",
-        RequestObjectType.SQL_WAREHOUSES,
-        env,
-        ws,
-        permission_levels=[PermissionLevel.CAN_USE, PermissionLevel.CAN_MANAGE],
-    )
-
-    yield test_warehouses
-
-    logger.debug("Deleting test warehouses")
-    executables = [partial(ws.warehouses.delete, w.id) for w in test_warehouses]
-    Threader(executables).run()
-    logger.debug("Test warehouses deleted")
 
 
 @pytest.fixture
