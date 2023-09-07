@@ -1,4 +1,5 @@
 import logging
+import os
 import random
 from typing import Literal
 
@@ -131,6 +132,8 @@ def test_e2e(
     verifiable_objects: list[tuple[list, str, RequestObjectType | None]],
     make_instance_pool,
     make_instance_pool_permissions,
+    make_cluster,
+    make_cluster_permissions,
     make_secret_scope,
     make_secret_scope_acl,
 ):
@@ -144,6 +147,18 @@ def test_e2e(
         group_name=ws_group.display_name,
     )
     verifiable_objects.append(([pool], "instance_pool_id", RequestObjectType.INSTANCE_POOLS))
+
+    cluster = make_cluster(instance_pool_id=os.environ["TEST_INSTANCE_POOL_ID"], single_node=True)
+    make_cluster_permissions(
+        object_id=cluster.cluster_id,
+        permission_level=random.choice(
+            [PermissionLevel.CAN_ATTACH_TO, PermissionLevel.CAN_MANAGE, PermissionLevel.CAN_RESTART]
+        ),
+        group_name=ws_group.display_name,
+    )
+    verifiable_objects.append(
+        ([cluster], "cluster_id", RequestObjectType.CLUSTERS),
+    )
 
     scope = make_secret_scope()
     make_secret_scope_acl(scope=scope, principal=ws_group.display_name, permission=workspace.AclPermission.WRITE)
