@@ -8,6 +8,7 @@ from copy import deepcopy
 from functools import partial
 
 from databricks.sdk import WorkspaceClient
+from databricks.sdk.service import workspace
 from databricks.sdk.service.iam import AccessControlRequest, Group, ObjectPermissions
 from databricks.sdk.service.sql import AccessControl as SqlAccessControl
 from databricks.sdk.service.sql import GetResponse as SqlPermissions
@@ -76,11 +77,15 @@ class SecretScopeApplicator(BaseApplicator):
         _typed_acl_container = AclItemsContainer(acls=_final_acls)
         return partial(self._apply, self._item.object_id, _typed_acl_container.to_sdk())
 
+    def _secret_scope_permission(self, scope_name: str, group_name: str) -> workspace.AclPermission | None:
+        for acl in self._ws.secrets.list_acls(scope=scope_name):
+            if acl.principal == group_name:
+                return acl.permission
+        return None
+
     @retry(wait=wait_fixed(1) + wait_random(0, 2), stop=stop_after_attempt(5))
     def _apply(self, object_id: str, acl: list[SdkAclItem]):
         for _acl_item in acl:
-            # this request will create OR update the ACL for the given principal
-            # it means that the access_control_list should only keep records required for update
             self._ws.secrets.put_acl(scope=object_id, principal=_acl_item.principal, permission=_acl_item.permission)
             logger.debug(f"Applied new permissions for scope {object_id}: {_acl_item}")
             # TODO: add mixin to SDK
@@ -88,11 +93,11 @@ class SecretScopeApplicator(BaseApplicator):
             # the api might be inconsistent, therefore we need to check that the permissions were applied
             for _ in range(3):
                 time.sleep(random.random() * 2)
-                applied_acls = safe_get_acls(self._ws, scope_name=object_id, group_name=_acl_item.principal)
-                assert applied_acls, f"Failed to apply permissions for {_acl_item.principal}"
-                assert applied_acls.permission == _acl_item.permission, (
+                applied_permission = self._secret_scope_permission(scope_name=object_id, group_name=_acl_item.principal)
+                assert applied_permission, f"Failed to apply permissions for {_acl_item.principal}"
+                assert applied_permission == _acl_item.permission, (
                     f"Failed to apply permissions for {_acl_item.principal}. "
-                    f"Expected: {_acl_item.permission}. Actual: {applied_acls.permission}"
+                    f"Expected: {_acl_item.permission}. Actual: {applied_permission}"
                 )
 
 
