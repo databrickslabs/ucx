@@ -8,11 +8,11 @@ from functools import partial
 import databricks.sdk.core
 import pytest
 from databricks.sdk import AccountClient, WorkspaceClient
-from databricks.sdk.core import Config, DatabricksError
+from databricks.sdk.core import Config
 from databricks.sdk.service.compute import CreatePolicyResponse
 from databricks.sdk.service.iam import AccessControlRequest, PermissionLevel
 from databricks.sdk.service.jobs import CreateResponse
-from databricks.sdk.service.ml import CreateExperimentResponse, ModelDatabricks
+from databricks.sdk.service.ml import ModelDatabricks
 from databricks.sdk.service.ml import PermissionLevel as ModelPermissionLevel
 from databricks.sdk.service.pipelines import (
     CreatePipelineResponse,
@@ -51,7 +51,6 @@ NUM_TEST_CLUSTERS = int(os.environ.get("NUM_TEST_CLUSTERS", 3))
 NUM_TEST_CLUSTER_POLICIES = int(os.environ.get("NUM_TEST_CLUSTER_POLICIES", 3))
 NUM_TEST_PIPELINES = int(os.environ.get("NUM_TEST_PIPELINES", 3))
 NUM_TEST_JOBS = int(os.environ.get("NUM_TEST_JOBS", 3))
-NUM_TEST_EXPERIMENTS = int(os.environ.get("NUM_TEST_EXPERIMENTS", 3))
 NUM_TEST_MODELS = int(os.environ.get("NUM_TEST_MODELS", 3))
 NUM_TEST_WAREHOUSES = int(os.environ.get("NUM_TEST_WAREHOUSES", 3))
 NUM_TEST_TOKENS = int(os.environ.get("NUM_TEST_TOKENS", 3))
@@ -355,39 +354,6 @@ def cluster_policies(env: EnvironmentInfo, ws: WorkspaceClient) -> list[CreatePo
 
 
 @pytest.fixture
-def experiments(ws: WorkspaceClient, env: EnvironmentInfo) -> list[CreateExperimentResponse]:
-    logger.debug("Creating test experiments")
-
-    try:
-        ws.workspace.mkdirs("/experiments")
-    except DatabricksError:
-        pass
-
-    test_experiments = Threader(
-        [
-            partial(ws.experiments.create_experiment, name=f"/experiments/{env.test_uid}-test-{i}")
-            for i in range(NUM_TEST_EXPERIMENTS)
-        ]
-    ).run()
-
-    _set_random_permissions(
-        test_experiments,
-        "experiment_id",
-        RequestObjectType.EXPERIMENTS,
-        env,
-        ws,
-        permission_levels=[PermissionLevel.CAN_MANAGE, PermissionLevel.CAN_READ, PermissionLevel.CAN_EDIT],
-    )
-
-    yield test_experiments
-
-    logger.debug("Deleting test experiments")
-    executables = [partial(ws.experiments.delete_experiment, e.experiment_id) for e in test_experiments]
-    Threader(executables).run()
-    logger.debug("Test experiments deleted")
-
-
-@pytest.fixture
 def models(ws: WorkspaceClient, env: EnvironmentInfo) -> list[ModelDatabricks]:
     logger.debug("Creating models")
 
@@ -533,7 +499,6 @@ def verifiable_objects(
     cluster_policies,
     pipelines,
     jobs,
-    experiments,
     models,
     warehouses,
     tokens,
@@ -545,7 +510,6 @@ def verifiable_objects(
         (cluster_policies, "policy_id", RequestObjectType.CLUSTER_POLICIES),
         (pipelines, "pipeline_id", RequestObjectType.PIPELINES),
         (jobs, "job_id", RequestObjectType.JOBS),
-        (experiments, "experiment_id", RequestObjectType.EXPERIMENTS),
         (models, "id", RequestObjectType.REGISTERED_MODELS),
         (warehouses, "id", RequestObjectType.SQL_WAREHOUSES),
     ]
