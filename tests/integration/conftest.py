@@ -12,8 +12,7 @@ from databricks.sdk.core import Config, DatabricksError
 from databricks.sdk.service.compute import CreatePolicyResponse
 from databricks.sdk.service.iam import AccessControlRequest, PermissionLevel
 from databricks.sdk.service.jobs import CreateResponse
-from databricks.sdk.service.ml import CreateExperimentResponse, ModelDatabricks
-from databricks.sdk.service.ml import PermissionLevel as ModelPermissionLevel
+from databricks.sdk.service.ml import CreateExperimentResponse
 from databricks.sdk.service.pipelines import (
     CreatePipelineResponse,
     NotebookLibrary,
@@ -52,7 +51,6 @@ NUM_TEST_CLUSTER_POLICIES = int(os.environ.get("NUM_TEST_CLUSTER_POLICIES", 3))
 NUM_TEST_PIPELINES = int(os.environ.get("NUM_TEST_PIPELINES", 3))
 NUM_TEST_JOBS = int(os.environ.get("NUM_TEST_JOBS", 3))
 NUM_TEST_EXPERIMENTS = int(os.environ.get("NUM_TEST_EXPERIMENTS", 3))
-NUM_TEST_MODELS = int(os.environ.get("NUM_TEST_MODELS", 3))
 NUM_TEST_WAREHOUSES = int(os.environ.get("NUM_TEST_WAREHOUSES", 3))
 NUM_TEST_TOKENS = int(os.environ.get("NUM_TEST_TOKENS", 3))
 
@@ -388,39 +386,6 @@ def experiments(ws: WorkspaceClient, env: EnvironmentInfo) -> list[CreateExperim
 
 
 @pytest.fixture
-def models(ws: WorkspaceClient, env: EnvironmentInfo) -> list[ModelDatabricks]:
-    logger.debug("Creating models")
-
-    test_models: list[ModelDatabricks] = [
-        ws.model_registry.get_model(
-            ws.model_registry.create_model(f"{env.test_uid}-test-{i}").registered_model.name
-        ).registered_model_databricks
-        for i in range(NUM_TEST_MODELS)
-    ]
-
-    _set_random_permissions(
-        test_models,
-        "id",
-        RequestObjectType.REGISTERED_MODELS,
-        env,
-        ws,
-        permission_levels=[
-            ModelPermissionLevel.CAN_READ,
-            ModelPermissionLevel.CAN_MANAGE,
-            ModelPermissionLevel.CAN_MANAGE_PRODUCTION_VERSIONS,
-            ModelPermissionLevel.CAN_MANAGE_STAGING_VERSIONS,
-        ],
-    )
-
-    yield test_models
-
-    logger.debug("Deleting test models")
-    executables = [partial(ws.model_registry.delete_model, m.name) for m in test_models]
-    Threader(executables).run()
-    logger.debug("Test models deleted")
-
-
-@pytest.fixture
 def warehouses(ws: WorkspaceClient, env: EnvironmentInfo) -> list[GetWarehouseResponse]:
     logger.debug("Creating warehouses")
 
@@ -534,7 +499,6 @@ def verifiable_objects(
     pipelines,
     jobs,
     experiments,
-    models,
     warehouses,
     tokens,
     workspace_objects,
@@ -546,7 +510,6 @@ def verifiable_objects(
         (pipelines, "pipeline_id", RequestObjectType.PIPELINES),
         (jobs, "job_id", RequestObjectType.JOBS),
         (experiments, "experiment_id", RequestObjectType.EXPERIMENTS),
-        (models, "id", RequestObjectType.REGISTERED_MODELS),
         (warehouses, "id", RequestObjectType.SQL_WAREHOUSES),
     ]
     yield _verifiable_objects

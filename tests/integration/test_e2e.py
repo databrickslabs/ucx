@@ -134,6 +134,8 @@ def test_e2e(
     make_instance_pool_permissions,
     make_cluster,
     make_cluster_permissions,
+    make_model,
+    make_model_permissions,
     make_secret_scope,
     make_secret_scope_acl,
 ):
@@ -158,6 +160,23 @@ def test_e2e(
     )
     verifiable_objects.append(
         ([cluster], "cluster_id", RequestObjectType.CLUSTERS),
+    )
+
+    model = make_model()
+    make_model_permissions(
+        object_id=model.model_id,
+        permission_level=random.choice(
+            [
+                PermissionLevel.CAN_READ,
+                PermissionLevel.CAN_MANAGE,
+                PermissionLevel.CAN_MANAGE_PRODUCTION_VERSIONS,
+                PermissionLevel.CAN_MANAGE_STAGING_VERSIONS,
+            ]
+        ),
+        group_name=ws_group.display_name,
+    )
+    verifiable_objects.append(
+        ([model], "model_id", RequestObjectType.REGISTERED_MODELS),
     )
 
     scope = make_secret_scope()
