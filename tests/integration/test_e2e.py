@@ -134,6 +134,8 @@ def test_e2e(
     make_instance_pool_permissions,
     make_cluster,
     make_cluster_permissions,
+    make_job,
+    make_job_permissions,
     make_pipeline,
     make_pipeline_permissions,
     make_secret_scope,
@@ -160,6 +162,18 @@ def test_e2e(
     )
     verifiable_objects.append(
         ([cluster], "cluster_id", RequestObjectType.CLUSTERS),
+    )
+
+    job = make_job()
+    make_job_permissions(
+        object_id=job.job_id,
+        permission_level=random.choice(
+            [PermissionLevel.CAN_VIEW, PermissionLevel.CAN_MANAGE_RUN, PermissionLevel.CAN_MANAGE]
+        ),
+        group_name=ws_group.display_name,
+    )
+    verifiable_objects.append(
+        ([job], "job_id", RequestObjectType.JOBS),
     )
 
     pipeline = make_pipeline()
