@@ -4,7 +4,7 @@ from unittest.mock import MagicMock, Mock
 import pytest
 from databricks.sdk.service.iam import AccessControlResponse, Group, ObjectPermissions
 
-from databricks.labs.ucx.inventory.applicator import SecretScopeApplicator
+from databricks.labs.ucx.inventory.applicator import SecretScopeApplicator, RolesAndEntitlementsApplicator
 from databricks.labs.ucx.inventory.permissions import PermissionManager
 from databricks.labs.ucx.inventory.types import (
     LogicalObjectType,
@@ -79,17 +79,25 @@ def test_prepare_request_for_roles_and_entitlements():
         )
     ]
 
-    apply_backup = PermissionManager._prepare_request_for_roles_and_entitlements(item, migration_state, "backup")
+    backup_app = RolesAndEntitlementsApplicator(ws=MagicMock(), migration_state=migration_state, destination="backup", item=item)
+    account_app = RolesAndEntitlementsApplicator(
+        ws=MagicMock(), migration_state=migration_state, destination="account", item=item
+    )
 
-    assert len(apply_backup.payload.roles) == 2
-    assert len(apply_backup.payload.entitlements) == 1
-    assert apply_backup.group_id == "some-prefix-group1"
+    apply_backup_payload = backup_app.func.args[1]
+    apply_backup_gid = backup_app.func.args[0]
 
-    apply_account = PermissionManager._prepare_request_for_roles_and_entitlements(item, migration_state, "account")
+    assert len(apply_backup_payload.roles) == 2
+    assert len(apply_backup_payload.entitlements) == 1
+    assert apply_backup_gid == "some-prefix-group1"
 
-    assert len(apply_account.payload.roles) == 2
-    assert len(apply_account.payload.entitlements) == 1
-    assert apply_account.group_id == "group1"
+
+    apply_account_payload = account_app.func.args[1]
+    apply_account_gid = account_app.func.args[0]
+
+    assert len(apply_account_payload.roles) == 2
+    assert len(apply_account_payload.entitlements) == 1
+    assert apply_account_gid == "group1"
 
 
 @pytest.mark.parametrize(

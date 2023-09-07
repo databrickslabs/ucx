@@ -1,9 +1,9 @@
+import dataclasses
 import json
 import logging
 import random
 import time
 from abc import ABC, abstractmethod
-from copy import deepcopy
 from functools import partial
 
 from databricks.sdk import WorkspaceClient
@@ -33,11 +33,11 @@ Executable = partial[None]
 
 class BaseApplicator(ABC):
     def __init__(
-        self,
-        ws: WorkspaceClient,
-        migration_state: GroupMigrationState,
-        destination: Destination,
-        item: PermissionsInventoryItem,
+            self,
+            ws: WorkspaceClient,
+            migration_state: GroupMigrationState,
+            destination: Destination,
+            item: PermissionsInventoryItem,
     ):
         self._ws = ws
         self._item = item
@@ -66,15 +66,14 @@ class SecretScopeApplicator(BaseApplicator):
         logger.debug("Preparing the permissions for the secrets API")
 
         for _existing_acl in _existing_acl_container.acls:
-            _new_acl = deepcopy(_existing_acl)
 
             if _existing_acl.principal in [g.workspace.display_name for g in self._migration_state.groups]:
                 migration_info = self._migration_state.get_by_workspace_group_name(_existing_acl.principal)
                 assert (
-                    migration_info is not None
+                        migration_info is not None
                 ), f"Group {_existing_acl.principal} is not in the migration groups provider"
                 destination_group: Group = getattr(migration_info, self._destination)
-                _new_acl.principal = destination_group.display_name
+                _new_acl = dataclasses.replace(_existing_acl, principal=destination_group.display_name)
                 _final_acls.append(_new_acl)
 
         _typed_acl_container = AclItemsContainer(acls=_final_acls)
@@ -105,6 +104,7 @@ class SecretScopeApplicator(BaseApplicator):
 
 
 class RolesAndEntitlementsApplicator(BaseApplicator):
+    @property
     def func(self):
         migration_info = self._migration_state.get_by_workspace_group_name(
             self._item.typed_object_permissions.group_name
@@ -158,6 +158,7 @@ class RolesAndEntitlementsApplicator(BaseApplicator):
 
 
 class ObjectPermissionsApplicator(BaseApplicator):
+    @property
     def func(self):
         _existing_permissions: ObjectPermissions = self._item.typed_object_permissions
         _acl = _existing_permissions.access_control_list
@@ -189,10 +190,10 @@ class ObjectPermissionsApplicator(BaseApplicator):
     @sleep_and_retry
     @limits(calls=30, period=1)
     def _update_permissions(
-        self,
-        request_object_type: RequestObjectType,
-        request_object_id: str,
-        access_control_list: list[AccessControlRequest],
+            self,
+            request_object_type: RequestObjectType,
+            request_object_id: str,
+            access_control_list: list[AccessControlRequest],
     ):
         self._ws.permissions.update(
             request_object_type=request_object_type,
@@ -202,6 +203,7 @@ class ObjectPermissionsApplicator(BaseApplicator):
 
 
 class SqlPermissionsApplicator(BaseApplicator):
+    @property
     def func(self):
         _existing_permissions: SqlPermissions = self._item.typed_object_permissions
         _acl = _existing_permissions.access_control_list
@@ -211,7 +213,7 @@ class SqlPermissionsApplicator(BaseApplicator):
             if acl_request.group_name in [g.workspace.display_name for g in self._migration_state.groups]:
                 migration_info = self._migration_state.get_by_workspace_group_name(acl_request.group_name)
                 assert (
-                    migration_info is not None
+                        migration_info is not None
                 ), f"Group {acl_request.group_name} is not in the migration groups provider"
                 destination_group: Group = getattr(migration_info, self._destination)
                 acl_request.group_name = destination_group.display_name
@@ -225,7 +227,7 @@ class SqlPermissionsApplicator(BaseApplicator):
     @sleep_and_retry
     @limits(calls=30, period=1)
     def _set_permissions(
-        self, object_type: SqlRequestObjectType, object_id: str, access_control_list: list[SqlAccessControl]
+            self, object_type: SqlRequestObjectType, object_id: str, access_control_list: list[SqlAccessControl]
     ):
         self._ws.dbsql_permissions.set(
             object_id=object_id,
