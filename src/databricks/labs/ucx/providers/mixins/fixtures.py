@@ -250,7 +250,7 @@ def _make_permissions_factory(name, resource_type, levels, id_retriever):
                         permission_level=permission_level,
                     )
                 ]
-            ws.permissions.set(resource_type, object_id, access_control_list=access_control_list)
+            ws.permissions.update(resource_type, object_id, access_control_list=access_control_list)
             return _PermissionsChange(object_id, initial, access_control_list)
 
         def remove(change: _PermissionsChange):
