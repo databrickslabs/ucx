@@ -1,4 +1,5 @@
 import json
+from json import JSONDecodeError
 from unittest.mock import Mock
 
 import pandas as pd
@@ -7,6 +8,7 @@ from databricks.sdk.service.iam import AccessControlResponse, ObjectPermissions
 from pyspark.sql.types import StringType, StructField, StructType
 
 from databricks.labs.ucx.config import InventoryConfig, InventoryTable
+from databricks.labs.ucx.inventory.relevance import is_item_relevant_to_groups
 from databricks.labs.ucx.inventory.table import InventoryTableManager
 from databricks.labs.ucx.inventory.types import (
     LogicalObjectType,
@@ -157,14 +159,14 @@ def test_load_all(inventory_table_manager):
         ),
     ],
 )
-def test_is_item_relevant_to_groups(inventory_table_manager, items, groups, status):
-    assert inventory_table_manager._is_item_relevant_to_groups(items, groups) is status
+def test_is_item_relevant_to_groups(items, groups, status):
+    assert is_item_relevant_to_groups(items, groups) is status
 
 
-def test_is_item_relevant_to_groups_exception(inventory_table_manager):
+def test_is_item_relevant_to_groups_exception():
     item = PermissionsInventoryItem("object1", "FOO", "BAR", "test acl")
-    with pytest.raises(NotImplementedError):
-        inventory_table_manager._is_item_relevant_to_groups(item, ["g1"])
+    with pytest.raises(JSONDecodeError):
+        is_item_relevant_to_groups(item, ["g1"])
 
 
 def test_load_for_groups(inventory_table_manager):

@@ -33,11 +33,11 @@ Executable = partial[None]
 
 class BaseApplicator(ABC):
     def __init__(
-            self,
-            ws: WorkspaceClient,
-            migration_state: GroupMigrationState,
-            destination: Destination,
-            item: PermissionsInventoryItem,
+        self,
+        ws: WorkspaceClient,
+        migration_state: GroupMigrationState,
+        destination: Destination,
+        item: PermissionsInventoryItem,
     ):
         self._ws = ws
         self._item = item
@@ -66,11 +66,10 @@ class SecretScopeApplicator(BaseApplicator):
         logger.debug("Preparing the permissions for the secrets API")
 
         for _existing_acl in _existing_acl_container.acls:
-
             if _existing_acl.principal in [g.workspace.display_name for g in self._migration_state.groups]:
                 migration_info = self._migration_state.get_by_workspace_group_name(_existing_acl.principal)
                 assert (
-                        migration_info is not None
+                    migration_info is not None
                 ), f"Group {_existing_acl.principal} is not in the migration groups provider"
                 destination_group: Group = getattr(migration_info, self._destination)
                 _new_acl = dataclasses.replace(_existing_acl, principal=destination_group.display_name)
@@ -190,10 +189,10 @@ class ObjectPermissionsApplicator(BaseApplicator):
     @sleep_and_retry
     @limits(calls=30, period=1)
     def _update_permissions(
-            self,
-            request_object_type: RequestObjectType,
-            request_object_id: str,
-            access_control_list: list[AccessControlRequest],
+        self,
+        request_object_type: RequestObjectType,
+        request_object_id: str,
+        access_control_list: list[AccessControlRequest],
     ):
         self._ws.permissions.update(
             request_object_type=request_object_type,
@@ -213,7 +212,7 @@ class SqlPermissionsApplicator(BaseApplicator):
             if acl_request.group_name in [g.workspace.display_name for g in self._migration_state.groups]:
                 migration_info = self._migration_state.get_by_workspace_group_name(acl_request.group_name)
                 assert (
-                        migration_info is not None
+                    migration_info is not None
                 ), f"Group {acl_request.group_name} is not in the migration groups provider"
                 destination_group: Group = getattr(migration_info, self._destination)
                 acl_request.group_name = destination_group.display_name
@@ -227,7 +226,7 @@ class SqlPermissionsApplicator(BaseApplicator):
     @sleep_and_retry
     @limits(calls=30, period=1)
     def _set_permissions(
-            self, object_type: SqlRequestObjectType, object_id: str, access_control_list: list[SqlAccessControl]
+        self, object_type: SqlRequestObjectType, object_id: str, access_control_list: list[SqlAccessControl]
     ):
         self._ws.dbsql_permissions.set(
             object_id=object_id,
@@ -260,7 +259,7 @@ class Applicators:
         elif isinstance(typed_acl_payload, RolesAndEntitlements):
             return RolesAndEntitlementsApplicator(self._ws, self._migration_state, self._destination, item)
         else:
-            msg = f"Unknown type {type(typed_acl_payload)}"
+            msg = f"Unknown type of the object payload: {type(typed_acl_payload)}"
             raise NotImplementedError(msg)
 
     def prepare(self, items: list[PermissionsInventoryItem]):
