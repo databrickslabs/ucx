@@ -452,7 +452,7 @@ def make_job(ws, make_random, make_notebook):
 
 @pytest.fixture
 def make_pipeline(ws, make_random, make_notebook):
-    def create(**kwargs):
+    def create(**kwargs) -> pipelines.CreatePipelineResponse:
         if "name" not in kwargs:
             kwargs["name"] = f"sdk-{make_random(4)}"
         if "libraries" not in kwargs:
