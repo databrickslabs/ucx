@@ -311,3 +311,19 @@ def test_applicator_identification(item, applicator_type):
     )
 
     assert isinstance(applicator, applicator_type) is True
+
+
+def test_unexpected_applicator():
+    # this tests a case when a new object type was added, but not introduced in the applicators logic
+    item_mock = MagicMock()
+    item_mock.typed_object_permissions = {"some_poorly_defined": "applicator"}
+    migration_state = GroupMigrationState()
+    migration_state.groups = [
+        MigrationGroupInfo(
+            account=Group(display_name="group1", id="group1"),
+            workspace=Group(display_name="group1", id="group1"),
+            backup=Group(display_name="some-prefix-group1", id="some-prefix-group1"),
+        )
+    ]
+    with pytest.raises(NotImplementedError):
+        Applicators(ws=MagicMock(), migration_state=migration_state, destination="backup")._get_applicator(item_mock)
