@@ -415,6 +415,26 @@ def make_cluster(ws, make_random):
 
 
 @pytest.fixture
+def make_experiment(ws, make_random):
+    def create(
+        *,
+        experiment_name: str | None = None,
+        **kwargs,
+    ):
+        if experiment_name is None:
+            experiment_name = f"sdk-{make_random(4)}"
+
+        try:
+            ws.workspace.mkdirs("/experiments")
+        except DatabricksError:
+            pass
+
+        return ws.experiments.create_experiment(name=f"/experiments/{experiment_name}", **kwargs)
+
+    yield from factory("experiment", create, lambda item: ws.experiments.delete_experiment(item.experiment_id))
+
+
+@pytest.fixture
 def make_instance_pool(ws, make_random):
     def create(*, instance_pool_name=None, node_type_id=None, **kwargs):
         if instance_pool_name is None:
