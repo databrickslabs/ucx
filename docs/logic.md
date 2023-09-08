@@ -15,6 +15,8 @@ Please note that `table ACLs` logic is currently handled separately from the log
 
 ## Logical objects and relevant APIs
 
+#TODO: switch from table to list
+
 | Logical group | Resource type      | Object ID                  | Listing method             | Get method                                   | Put method                                      | Get response object type                           | Details                                                                                                               |
 |---------------|--------------------|----------------------------|----------------------------|----------------------------------------------|-------------------------------------------------|----------------------------------------------------|-----------------------------------------------------------------------------------------------------------------------|
 | Group level   | Entitlements       | `group_id`                 | `ws.groups.list`           | `ws.groups.get(group_id)`                    | `ws.groups.patch(group_id)`                     | Custom                                             | (One of `workspace-access`, `databricks-sql-access`, `allow-cluster-create`, `allow-instance-pool-create`)            |

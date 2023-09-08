@@ -22,7 +22,7 @@ class WorkspaceListing:
     ):
         self.start_time = None
         self._ws = ws
-        self.results = []
+        self.results: list[ObjectInfo] = []
         self._num_threads = num_threads
         self._with_directories = with_directories
         self._counter = 0
@@ -90,6 +90,7 @@ class WorkspaceListing:
             logger.info(f"Recursive WorkspaceFS listing finished at {dt.datetime.now()}")
             logger.info(f"Total time taken for workspace listing: {dt.datetime.now() - self.start_time}")
             self._progress_report(None)
+        return self.results
 
 
 def models_listing(ws: WorkspaceClient):
