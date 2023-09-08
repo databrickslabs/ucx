@@ -6,7 +6,7 @@ from logging import Logger
 
 from databricks.sdk import WorkspaceClient
 from databricks.sdk.core import DatabricksError
-from databricks.sdk.service import iam, sql, workspace
+from databricks.sdk.service import iam, settings, sql, workspace
 from ratelimit import limits, sleep_and_retry
 
 from databricks.labs.ucx.inventory.listing import WorkspaceListing
@@ -369,6 +369,99 @@ class SqlPermissionsSupport(BaseSupport):
             destination,
         )
         return partial(self._applier_task, item.object_id, new_acl)
+
+
+class TokensSupport(BaseSupport):
+    def get_crawler_tasks(self) -> list[Callable[..., PermissionsInventoryItem | None]]:
+        def token_getter() -> PermissionsInventoryItem:
+            return PermissionsInventoryItem(
+                object_id="tokens",
+                crawler="tokens",
+                raw_object_permissions=json.dumps(self._ws.token_management.get_token_permissions().as_dict()),
+            )
+
+        return [token_getter]
+
+    def is_item_relevant(self, _, __) -> bool:
+        # token settings exist only on the whole workspace level, the relevance check is noop
+        return True
+
+    def _get_apply_task(
+        self, item: PermissionsInventoryItem, migration_state: GroupMigrationState, destination: Destination
+    ):
+        def apply_tokens():
+            permissions = settings.TokenPermissions.from_dict(json.loads(item.raw_object_permissions))
+            new_acl_requests: list[settings.TokenAccessControlRequest] = []
+
+            for acl_item in permissions.access_control_list:
+                if acl_item.group_name in [i.workspace for i in migration_state.groups]:
+                    source_info = migration_state.get_by_workspace_group_name(acl_item.group_name)
+                    target: iam.Group = getattr(source_info, destination)
+                    for permission in acl_item.all_permissions:
+                        _req = settings.TokenAccessControlRequest(
+                            group_name=target.display_name, permission_level=permission
+                        )
+                        new_acl_requests.append(_req)
+                else:
+                    for permission in acl_item.all_permissions:
+                        _req = settings.TokenAccessControlRequest(
+                            group_name=acl_item.group_name,
+                            user_name=acl_item.user_name,
+                            service_principal_name=acl_item.service_principal_name,
+                            permission_level=permission,
+                        )
+                        new_acl_requests.append(_req)
+
+            self._ws.token_management.set_token_permissions(new_acl_requests)
+
+        return apply_tokens
+
+
+class PasswordsSupport(BaseSupport):
+    def get_crawler_tasks(self) -> list[Callable[..., PermissionsInventoryItem | None]]:
+        def getter():
+            permissions = self._ws.users.get_password_permissions()
+            return PermissionsInventoryItem(
+                object_id="passwords",
+                crawler="passwords",
+                raw_object_permissions=json.dumps(permissions.as_dict()),
+            )
+
+        return [getter]
+
+    def is_item_relevant(self, _, __) -> bool:
+        # passwords support is a workspace-level resource
+        return True
+
+    def _get_apply_task(
+        self, item: PermissionsInventoryItem, migration_state: GroupMigrationState, destination: Destination
+    ):
+        def setter():
+            _permissions = iam.PasswordPermissions.from_dict(json.loads(item.raw_object_permissions))
+            new_acl_requests: list[iam.PasswordAccessControlRequest] = []
+
+            for acl_item in _permissions.access_control_list:
+                if acl_item.group_name in [i.workspace for i in migration_state.groups]:
+                    source_info = migration_state.get_by_workspace_group_name(acl_item.group_name)
+                    target: iam.Group = getattr(source_info, destination)
+                    for permission in acl_item.all_permissions:
+                        _req = iam.PasswordAccessControlRequest(
+                            group_name=target.display_name, permission_level=permission
+                        )
+                        new_acl_requests.append(_req)
+                else:
+                    for permission in acl_item.all_permissions:
+                        _req = iam.PasswordAccessControlRequest(
+                            group_name=acl_item.group_name,
+                            user_name=acl_item.user_name,
+                            service_principal_name=acl_item.service_principal_name,
+                            permission_level=permission,
+                        )
+                        new_acl_requests.append(_req)
+
+            self._ws.users.set_password_permissions(new_acl_requests)
+
+        return setter
 
 
 def get_crawlers(ws: WorkspaceClient):
