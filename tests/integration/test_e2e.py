@@ -6,9 +6,7 @@ from typing import Literal
 import pytest
 from databricks.sdk import WorkspaceClient
 from databricks.sdk.service import iam, workspace
-from databricks.sdk.service.iam import (
-    PermissionLevel,
-)
+from databricks.sdk.service.iam import PermissionLevel
 from pyspark.errors import AnalysisException
 
 from databricks.labs.ucx.config import (
