@@ -235,24 +235,6 @@ def instance_profiles(env: EnvironmentInfo, ws: WorkspaceClient) -> list[Instanc
 
 
 @pytest.fixture
-def tokens(ws: WorkspaceClient, env: EnvironmentInfo) -> list[AccessControlRequest]:
-    logger.debug("Adding token-level permissions to groups")
-
-    token_permissions = [
-        AccessControlRequest(group_name=ws_group.display_name, permission_level=PermissionLevel.CAN_USE)
-        for ws_group, _ in random.sample(env.groups, k=min(len(env.groups), NUM_TEST_TOKENS))
-    ]
-
-    ws.permissions.update(
-        request_object_type=RequestObjectType.AUTHORIZATION,
-        request_object_id="tokens",
-        access_control_list=token_permissions,
-    )
-
-    yield token_permissions
-
-
-@pytest.fixture
 def workspace_objects(ws: WorkspaceClient, env: EnvironmentInfo) -> WorkspaceObjects:
     logger.info(f"Creating test workspace objects under /{env.test_uid}")
     ws.workspace.mkdirs(f"/{env.test_uid}")
@@ -309,12 +291,10 @@ def workspace_objects(ws: WorkspaceClient, env: EnvironmentInfo) -> WorkspaceObj
 
 @pytest.fixture
 def verifiable_objects(
-    tokens,
     workspace_objects,
 ) -> list[tuple[list, str, RequestObjectType | None]]:
     _verifiable_objects = [
         (workspace_objects, "workspace_objects", None),
-        (tokens, "tokens", RequestObjectType.AUTHORIZATION),
     ]
     yield _verifiable_objects
 

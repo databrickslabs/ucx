@@ -131,8 +131,7 @@ def _permissions_mapping():
             [PermissionLevel.CAN_READ, PermissionLevel.CAN_RUN, PermissionLevel.CAN_EDIT, PermissionLevel.CAN_MANAGE],
             _path,
         ),
-        ("tokens_authorization", "authorization", [PermissionLevel.CAN_USE], _simple),
-        ("passwords_authorization", "authorization", [PermissionLevel.CAN_USE], _simple),
+        ("authorization", "authorization", [PermissionLevel.CAN_USE], _simple),
         (
             "warehouse",
             "sql/warehouses",
