@@ -5,13 +5,8 @@ from typing import Literal
 
 import pytest
 from databricks.sdk import WorkspaceClient
-from databricks.sdk.service import workspace
-from databricks.sdk.service.iam import (
-    AccessControlRequest,
-    AccessControlResponse,
-    Permission,
-    PermissionLevel,
-)
+from databricks.sdk.service import iam, workspace
+from databricks.sdk.service.iam import PermissionLevel
 from pyspark.errors import AnalysisException
 
 from databricks.labs.ucx.config import (
@@ -72,33 +67,6 @@ def _verify_group_permissions(
             toolkit.permissions_manager.verify_applied_scope_acls(
                 scope_name, toolkit.group_manager.migration_groups_provider, target
             )
-
-    elif id_attribute in ("tokens", "passwords"):
-        _typed_objects: list[AccessControlRequest] = objects
-        ws_permissions = [
-            AccessControlResponse(
-                all_permissions=[
-                    Permission(permission_level=o.permission_level, inherited=False, inherited_from_object=None)
-                ],
-                group_name=o.group_name,
-            )
-            for o in _typed_objects
-        ]
-
-        target_permissions = list(
-            filter(
-                lambda p: p.group_name
-                in [getattr(g, target).display_name for g in toolkit.group_manager.migration_groups_provider.groups],
-                ws.permissions.get(
-                    request_object_type=request_object_type, request_object_id=id_attribute
-                ).access_control_list,
-            )
-        )
-
-        sorted_ws = sorted(ws_permissions, key=lambda p: p.group_name)
-        sorted_target = sorted(target_permissions, key=lambda p: p.group_name)
-
-        assert [p.all_permissions for p in sorted_ws] == [p.all_permissions for p in sorted_target]
     else:
         for _object in objects:
             toolkit.permissions_manager.verify_applied_permissions(
@@ -146,6 +114,7 @@ def test_e2e(
     make_pipeline_permissions,
     make_secret_scope,
     make_secret_scope_acl,
+    make_authorization_permissions,
     make_warehouse,
     make_warehouse_permissions,
 ):
@@ -196,7 +165,7 @@ def test_e2e(
         group_name=ws_group.display_name,
     )
     verifiable_objects.append(
-        ([model], "experiment_id", RequestObjectType.EXPERIMENTS),
+        ([model], "id", RequestObjectType.REGISTERED_MODELS),
     )
 
     experiment = make_experiment()
@@ -236,6 +205,15 @@ def test_e2e(
     scope = make_secret_scope()
     make_secret_scope_acl(scope=scope, principal=ws_group.display_name, permission=workspace.AclPermission.WRITE)
     verifiable_objects.append(([scope], "secret_scopes", None))
+
+    make_authorization_permissions(
+        object_id="tokens",
+        permission_level=PermissionLevel.CAN_USE,
+        group_name=ws_group.display_name,
+    )
+    verifiable_objects.append(
+        ([iam.ObjectPermissions(object_id="tokens")], "object_id", RequestObjectType.AUTHORIZATION)
+    )
 
     warehouse = make_warehouse()
     make_warehouse_permissions(
