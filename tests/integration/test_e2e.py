@@ -184,7 +184,7 @@ def test_e2e(
         group_name=ws_group.display_name,
     )
     verifiable_objects.append(
-      ([experiment], "experiment_id", RequestObjectType.EXPERIMENTS),
+        ([model], "experiment_id", RequestObjectType.EXPERIMENTS),
     )
 
     experiment = make_experiment()
