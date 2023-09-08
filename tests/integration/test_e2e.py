@@ -136,8 +136,16 @@ def test_e2e(
     make_cluster_permissions,
     make_model,
     make_registered_model_permissions,
+    make_experiment,
+    make_experiment_permissions,
+    make_job,
+    make_job_permissions,
+    make_pipeline,
+    make_pipeline_permissions,
     make_secret_scope,
     make_secret_scope_acl,
+    make_warehouse,
+    make_warehouse_permissions,
 ):
     logger.debug(f"Test environment: {env.test_uid}")
     ws_group = env.groups[0][0]
@@ -176,12 +184,56 @@ def test_e2e(
         group_name=ws_group.display_name,
     )
     verifiable_objects.append(
-        ([model], "id", RequestObjectType.REGISTERED_MODELS),
+      ([experiment], "experiment_id", RequestObjectType.EXPERIMENTS),
+    )
+
+    experiment = make_experiment()
+    make_experiment_permissions(
+        object_id=experiment.experiment_id,
+        permission_level=random.choice(
+            [PermissionLevel.CAN_MANAGE, PermissionLevel.CAN_READ, PermissionLevel.CAN_EDIT]
+        ),
+        group_name=ws_group.display_name,
+    )
+    verifiable_objects.append(
+        ([experiment], "experiment_id", RequestObjectType.EXPERIMENTS),
+    )
+
+    job = make_job()
+    make_job_permissions(
+        object_id=job.job_id,
+        permission_level=random.choice(
+            [PermissionLevel.CAN_VIEW, PermissionLevel.CAN_MANAGE_RUN, PermissionLevel.CAN_MANAGE]
+        ),
+        group_name=ws_group.display_name,
+    )
+    verifiable_objects.append(
+        ([job], "job_id", RequestObjectType.JOBS),
+    )
+
+    pipeline = make_pipeline()
+    make_pipeline_permissions(
+        object_id=pipeline.pipeline_id,
+        permission_level=random.choice([PermissionLevel.CAN_VIEW, PermissionLevel.CAN_RUN, PermissionLevel.CAN_MANAGE]),
+        group_name=ws_group.display_name,
+    )
+    verifiable_objects.append(
+        ([pipeline], "pipeline_id", RequestObjectType.PIPELINES),
     )
 
     scope = make_secret_scope()
     make_secret_scope_acl(scope=scope, principal=ws_group.display_name, permission=workspace.AclPermission.WRITE)
     verifiable_objects.append(([scope], "secret_scopes", None))
+
+    warehouse = make_warehouse()
+    make_warehouse_permissions(
+        object_id=warehouse.id,
+        permission_level=random.choice([PermissionLevel.CAN_USE, PermissionLevel.CAN_MANAGE]),
+        group_name=ws_group.display_name,
+    )
+    verifiable_objects.append(
+        ([warehouse], "id", RequestObjectType.SQL_WAREHOUSES),
+    )
 
     config = MigrationConfig(
         connect=ConnectConfig.from_databricks_config(ws.config),
