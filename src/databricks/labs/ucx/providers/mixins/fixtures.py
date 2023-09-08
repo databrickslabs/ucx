@@ -11,6 +11,7 @@ import pytest
 from databricks.sdk import AccountClient, WorkspaceClient
 from databricks.sdk.core import DatabricksError
 from databricks.sdk.service import compute, iam, jobs, pipelines, workspace
+from databricks.sdk.service.sql import CreateWarehouseRequestWarehouseType
 
 _LOG = logging.getLogger(__name__)
 
@@ -250,7 +251,7 @@ def _make_permissions_factory(name, resource_type, levels, id_retriever):
                         permission_level=permission_level,
                     )
                 ]
-            ws.permissions.set(resource_type, object_id, access_control_list=access_control_list)
+            ws.permissions.update(resource_type, object_id, access_control_list=access_control_list)
             return _PermissionsChange(object_id, initial, access_control_list)
 
         def remove(change: _PermissionsChange):
@@ -475,7 +476,7 @@ def make_job(ws, make_random, make_notebook):
 
 @pytest.fixture
 def make_pipeline(ws, make_random, make_notebook):
-    def create(**kwargs):
+    def create(**kwargs) -> pipelines.CreatePipelineResponse:
         if "name" not in kwargs:
             kwargs["name"] = f"sdk-{make_random(4)}"
         if "libraries" not in kwargs:
@@ -494,6 +495,36 @@ def make_pipeline(ws, make_random, make_notebook):
         return ws.pipelines.create(continuous=False, **kwargs)
 
     yield from factory("delta live table", create, lambda item: ws.pipelines.delete(item.pipeline_id))
+
+
+@pytest.fixture
+def make_warehouse(ws, make_random):
+    def create(
+        *,
+        warehouse_name: str | None = None,
+        warehouse_type: CreateWarehouseRequestWarehouseType | None = None,
+        cluster_size: str | None = None,
+        max_num_clusters: int = 1,
+        enable_serverless_compute: bool = False,
+        **kwargs,
+    ):
+        if warehouse_name is None:
+            warehouse_name = f"sdk-{make_random(4)}"
+        if warehouse_type is None:
+            warehouse_type = CreateWarehouseRequestWarehouseType.PRO
+        if cluster_size is None:
+            cluster_size = "2X-Small"
+
+        return ws.warehouses.create(
+            name=warehouse_name,
+            cluster_size=cluster_size,
+            warehouse_type=warehouse_type,
+            max_num_clusters=max_num_clusters,
+            enable_serverless_compute=enable_serverless_compute,
+            **kwargs,
+        )
+
+    yield from factory("warehouse", create, lambda item: ws.warehouses.delete(item.id))
 
 
 def load_debug_env_if_runs_from_ide(key) -> bool:

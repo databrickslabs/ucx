@@ -13,16 +13,8 @@ from databricks.sdk.service.compute import CreatePolicyResponse
 from databricks.sdk.service.iam import AccessControlRequest, PermissionLevel
 from databricks.sdk.service.jobs import CreateResponse
 from databricks.sdk.service.ml import ModelDatabricks
+from databricks.sdk.service.ml import CreateExperimentResponse, ModelDatabricks
 from databricks.sdk.service.ml import PermissionLevel as ModelPermissionLevel
-from databricks.sdk.service.pipelines import (
-    CreatePipelineResponse,
-    NotebookLibrary,
-    PipelineLibrary,
-)
-from databricks.sdk.service.sql import (
-    CreateWarehouseRequestWarehouseType,
-    GetWarehouseResponse,
-)
 from databricks.sdk.service.workspace import ObjectInfo, ObjectType
 
 from databricks.labs.ucx.config import InventoryTable
@@ -35,8 +27,6 @@ from .utils import (
     EnvironmentInfo,
     InstanceProfile,
     WorkspaceObjects,
-    _get_basic_job_cluster,
-    _get_basic_task,
     _set_random_permissions,
 )
 
@@ -47,12 +37,8 @@ logger = logging.getLogger(__name__)
 
 NUM_TEST_GROUPS = int(os.environ.get("NUM_TEST_GROUPS", 5))
 NUM_TEST_INSTANCE_PROFILES = int(os.environ.get("NUM_TEST_INSTANCE_PROFILES", 3))
-NUM_TEST_CLUSTERS = int(os.environ.get("NUM_TEST_CLUSTERS", 3))
 NUM_TEST_CLUSTER_POLICIES = int(os.environ.get("NUM_TEST_CLUSTER_POLICIES", 3))
-NUM_TEST_PIPELINES = int(os.environ.get("NUM_TEST_PIPELINES", 3))
-NUM_TEST_JOBS = int(os.environ.get("NUM_TEST_JOBS", 3))
 NUM_TEST_MODELS = int(os.environ.get("NUM_TEST_MODELS", 3))
-NUM_TEST_WAREHOUSES = int(os.environ.get("NUM_TEST_WAREHOUSES", 3))
 NUM_TEST_TOKENS = int(os.environ.get("NUM_TEST_TOKENS", 3))
 
 NUM_THREADS = int(os.environ.get("NUM_TEST_THREADS", 20))
@@ -262,63 +248,6 @@ def instance_profiles(env: EnvironmentInfo, ws: WorkspaceClient) -> list[Instanc
 
 
 @pytest.fixture
-def pipelines(env: EnvironmentInfo, ws: WorkspaceClient) -> list[CreatePipelineResponse]:
-    logger.debug("Creating test DLT pipelines")
-
-    test_pipelines: list[CreatePipelineResponse] = [
-        ws.pipelines.create(
-            name=f"{env.test_uid}-test-{i}",
-            continuous=False,
-            development=True,
-            libraries=[PipelineLibrary(notebook=NotebookLibrary(path="/Workspace/sample-notebook"))],
-        )
-        for i in range(NUM_TEST_PIPELINES)
-    ]
-
-    _set_random_permissions(
-        test_pipelines,
-        "pipeline_id",
-        RequestObjectType.PIPELINES,
-        env,
-        ws,
-        permission_levels=[PermissionLevel.CAN_VIEW, PermissionLevel.CAN_RUN, PermissionLevel.CAN_MANAGE],
-    )
-
-    yield test_pipelines
-
-    logger.debug("Deleting test instance pools")
-    executables = [partial(ws.pipelines.delete, p.pipeline_id) for p in test_pipelines]
-    Threader(executables).run()
-
-
-@pytest.fixture
-def jobs(env: EnvironmentInfo, ws: WorkspaceClient) -> list[CreateResponse]:
-    logger.debug("Creating test jobs")
-
-    test_jobs: list[CreateResponse] = [
-        ws.jobs.create(
-            name=f"{env.test_uid}-test-{i}", job_clusters=[_get_basic_job_cluster()], tasks=[_get_basic_task()]
-        )
-        for i in range(NUM_TEST_JOBS)
-    ]
-
-    _set_random_permissions(
-        test_jobs,
-        "job_id",
-        RequestObjectType.JOBS,
-        env,
-        ws,
-        permission_levels=[PermissionLevel.CAN_VIEW, PermissionLevel.CAN_MANAGE_RUN, PermissionLevel.CAN_MANAGE],
-    )
-
-    yield test_jobs
-
-    logger.debug("Deleting test jobs")
-    executables = [partial(ws.jobs.delete, j.job_id) for j in test_jobs]
-    Threader(executables).run()
-
-
-@pytest.fixture
 def cluster_policies(env: EnvironmentInfo, ws: WorkspaceClient) -> list[CreatePolicyResponse]:
     logger.debug("Creating test cluster policies")
 
@@ -384,41 +313,6 @@ def models(ws: WorkspaceClient, env: EnvironmentInfo) -> list[ModelDatabricks]:
     executables = [partial(ws.model_registry.delete_model, m.name) for m in test_models]
     Threader(executables).run()
     logger.debug("Test models deleted")
-
-
-@pytest.fixture
-def warehouses(ws: WorkspaceClient, env: EnvironmentInfo) -> list[GetWarehouseResponse]:
-    logger.debug("Creating warehouses")
-
-    creators = [
-        partial(
-            ws.warehouses.create,
-            name=f"{env.test_uid}-test-{i}",
-            cluster_size="2X-Small",
-            warehouse_type=CreateWarehouseRequestWarehouseType.PRO,
-            max_num_clusters=1,
-            enable_serverless_compute=False,
-        )
-        for i in range(NUM_TEST_WAREHOUSES)
-    ]
-
-    test_warehouses: list[GetWarehouseResponse] = Threader(creators).run()
-
-    _set_random_permissions(
-        test_warehouses,
-        "id",
-        RequestObjectType.SQL_WAREHOUSES,
-        env,
-        ws,
-        permission_levels=[PermissionLevel.CAN_USE, PermissionLevel.CAN_MANAGE],
-    )
-
-    yield test_warehouses
-
-    logger.debug("Deleting test warehouses")
-    executables = [partial(ws.warehouses.delete, w.id) for w in test_warehouses]
-    Threader(executables).run()
-    logger.debug("Test warehouses deleted")
 
 
 @pytest.fixture
@@ -497,10 +391,7 @@ def workspace_objects(ws: WorkspaceClient, env: EnvironmentInfo) -> WorkspaceObj
 @pytest.fixture
 def verifiable_objects(
     cluster_policies,
-    pipelines,
-    jobs,
     models,
-    warehouses,
     tokens,
     workspace_objects,
 ) -> list[tuple[list, str, RequestObjectType | None]]:
@@ -508,10 +399,7 @@ def verifiable_objects(
         (workspace_objects, "workspace_objects", None),
         (tokens, "tokens", RequestObjectType.AUTHORIZATION),
         (cluster_policies, "policy_id", RequestObjectType.CLUSTER_POLICIES),
-        (pipelines, "pipeline_id", RequestObjectType.PIPELINES),
-        (jobs, "job_id", RequestObjectType.JOBS),
         (models, "id", RequestObjectType.REGISTERED_MODELS),
-        (warehouses, "id", RequestObjectType.SQL_WAREHOUSES),
     ]
     yield _verifiable_objects
 
