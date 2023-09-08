@@ -139,6 +139,8 @@ class TokensAndPasswordsInventorizer(BaseInventorizer[InventoryObject]):
     def _preload_tokens(self):
         try:
             # TODO: rewrite with self._ws.token_management.get_token_permissions().access_control_list
+            self._ws.token_management.get_token_permissions()
+            self._ws.users.get_password_permissions()
             return self._ws.api_client.do("GET", "/api/2.0/preview/permissions/authorization/tokens").get(
                 "access_control_list", []
             )
