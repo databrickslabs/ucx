@@ -3,8 +3,6 @@ from dataclasses import asdict, dataclass
 from typing import Literal
 
 import pandas as pd
-from databricks.sdk.service.iam import ObjectPermissions
-from databricks.sdk.service.sql import GetResponse as SqlPermissions
 from databricks.sdk.service.sql import ObjectTypePlural as SqlRequestObjectType
 from databricks.sdk.service.workspace import AclItem as SdkAclItem
 from databricks.sdk.service.workspace import AclPermission as SdkAclPermission
@@ -117,28 +115,12 @@ class RolesAndEntitlements:
 @dataclass
 class PermissionsInventoryItem:
     object_id: str
-    logical_object_type: LogicalObjectType
-    request_object_type: RequestObjectType | SqlRequestObjectType | None
+    crawler: str  # shall be taken from CRAWLERS dict
     raw_object_permissions: str
 
     @property
     def object_permissions(self) -> dict:
         return json.loads(self.raw_object_permissions)
-
-    @property
-    def typed_object_permissions(self) -> ObjectPermissions | AclItemsContainer | RolesAndEntitlements | SqlPermissions:
-        if self.logical_object_type == LogicalObjectType.SECRET_SCOPE:
-            return AclItemsContainer.from_dict(self.object_permissions)
-        elif self.logical_object_type in [LogicalObjectType.ROLES, LogicalObjectType.ENTITLEMENTS]:
-            return RolesAndEntitlements(group_name=self.object_id, **self.object_permissions)
-        elif self.logical_object_type in [
-            LogicalObjectType.ALERT,
-            LogicalObjectType.DASHBOARD,
-            LogicalObjectType.QUERY,
-        ]:
-            return SqlPermissions.from_dict(self.object_permissions)
-        else:
-            return ObjectPermissions.from_dict(self.object_permissions)
 
     @staticmethod
     def from_pandas(source: pd.DataFrame) -> list["PermissionsInventoryItem"]:
@@ -152,9 +134,6 @@ class PermissionsInventoryItem:
     def from_dict(cls, raw: dict) -> "PermissionsInventoryItem":
         return cls(
             object_id=raw["object_id"],
-            logical_object_type=LogicalObjectType(raw["logical_object_type"]),
-            request_object_type=RequestObjectType(raw["request_object_type"])
-            if raw.get("request_object_type", None) is not None
-            else None,
-            raw_object_permissions=raw.get("raw_object_permissions", None),
+            raw_object_permissions=raw["raw_object_permissions"],
+            crawler=raw["crawler"],
         )

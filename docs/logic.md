@@ -40,6 +40,9 @@ Please note that `table ACLs` logic is currently handled separately from the log
 
 In the implementation we group the objects by the APIs they use to get/set the permissions.
 
+Crawler and Applier are base classes that should be implemented by each resource type.
+
+
 ## Crawler and serialization logic
 
 Crawlers are expected to return a list of callable functions that will be later used to get the permissions.
@@ -59,4 +62,24 @@ deserialization method.
 
 Since we save all objects into the permission table, we need to filter out the objects that are not relevant to the
 current migration.
-We do this inside the applier, by returning a `noop` callable if the object is not relevant to the current migration.
+We do this inside the `applier`, by returning a `noop` callable if the object is not relevant to the current migration.
+
+## Crawling the permissions
+
+To crawl the permissions, we use the following logic:
+1. Go through the list of all crawlers.
+2. Get the list of all objects of the given type.
+3. For each callable, generate a callable that will return a `PermissionInventoryItem`.
+4. Execute the callables in parallel
+5. Collect the results into a list of `PermissionInventoryItem`.
+6. Save the list of `PermissionInventoryItem` into a Delta Table.
+
+## Applying the permissions
+
+To apply the permissions, we use the following logic:
+
+1. Read the Delta Table with raw permissions.
+2. Map the items to the relevant applier. If no relevant applier is found, we raise an exception.
+3. Deserialize the items using the relevant applier.
+4. Generate a list of callables that will apply the permissions.
+5. Execute the callables in parallel.

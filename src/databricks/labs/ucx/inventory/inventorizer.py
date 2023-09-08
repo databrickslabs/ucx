@@ -209,7 +209,6 @@ class SecretScopeInventorizer(BaseInventorizer[InventoryObject]):
     def _get_acls_for_scope(self, scope: SecretScope) -> Iterator[AclItem]:
         return self._ws.secrets.list_acls(scope.name)
 
-
     def _prepare_permissions_inventory_item(self, scope: SecretScope) -> PermissionsInventoryItem:
         acls = self._get_acls_for_scope(scope)
         acls_container = AclItemsContainer.from_sdk(list(acls))
