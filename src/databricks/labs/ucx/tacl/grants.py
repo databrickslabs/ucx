@@ -39,12 +39,13 @@ class Grant:
         if database is not None:
             catalog = "hive_metastore" if catalog is None else catalog
             return "DATABASE", f"{catalog}.{database}"
-        if catalog is not None:
-            return "CATALOG", catalog
         if any_file:
             return "ANY FILE", ""
         if anonymous_function:
             return "ANONYMOUS FUNCTION", ""
+        # Must come last, as it has lowest priority here but is a required parameter
+        if catalog is not None:
+            return "CATALOG", catalog
         msg = "invalid grant keys"
         raise ValueError(msg)
 
@@ -69,7 +70,7 @@ class Grant:
 
     def hive_revoke_sql(self) -> str:
         object_type, object_key = self._this_type_and_key()
-        return f"REVOKE {self.action_type} ON {object_type} {object_key} TO {self.principal}"
+        return f"REVOKE {self.action_type} ON {object_type} {object_key} FROM {self.principal}"
 
     def _set_owner(self, object_type, object_key):
         return f"ALTER {object_type} {object_key} OWNER TO {self.principal}"

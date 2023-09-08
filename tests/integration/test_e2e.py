@@ -1,15 +1,17 @@
 import logging
+import os
+import random
 from typing import Literal
 
 import pytest
 from databricks.sdk import WorkspaceClient
+from databricks.sdk.service import workspace
 from databricks.sdk.service.iam import (
     AccessControlRequest,
     AccessControlResponse,
-    ObjectPermissions,
     Permission,
+    PermissionLevel,
 )
-from databricks.sdk.service.workspace import SecretScope
 from pyspark.errors import AnalysisException
 
 from databricks.labs.ucx.config import (
@@ -18,11 +20,11 @@ from databricks.labs.ucx.config import (
     InventoryConfig,
     InventoryTable,
     MigrationConfig,
+    TaclConfig,
 )
 from databricks.labs.ucx.inventory.types import RequestObjectType
 from databricks.labs.ucx.providers.groups_info import GroupMigrationState
 from databricks.labs.ucx.toolkits.group_migration import GroupMigrationToolkit
-from databricks.labs.ucx.utils import safe_get_acls
 
 from .utils import EnvironmentInfo, WorkspaceObjects
 
@@ -66,27 +68,10 @@ def _verify_group_permissions(
         assert len(base_acls) == len(target_acls)
 
     elif id_attribute == "secret_scopes":
-        _scopes: list[SecretScope] = objects
-        comparison_base = [
-            getattr(mi, "workspace" if target == "backup" else "backup")
-            for mi in toolkit.group_manager.migration_groups_provider.groups
-        ]
-
-        comparison_target = [getattr(mi, target) for mi in toolkit.group_manager.migration_groups_provider.groups]
-
-        for scope in _scopes:
-            for base_group, target_group in zip(comparison_base, comparison_target, strict=True):
-                base_acl = safe_get_acls(ws, scope.name, base_group.display_name)
-                target_acl = safe_get_acls(ws, scope.name, target_group.display_name)
-
-                if base_acl:
-                    if not target_acl:
-                        msg = "Target ACL is empty, while base ACL is not"
-                        raise AssertionError(msg)
-
-                    assert (
-                        base_acl.permission == target_acl.permission
-                    ), f"Target permissions were not applied correctly for scope {scope.name}"
+        for scope_name in objects:
+            toolkit.permissions_manager.verify_applied_scope_acls(
+                scope_name, toolkit.group_manager.migration_groups_provider, target
+            )
 
     elif id_attribute in ("tokens", "passwords"):
         _typed_objects: list[AccessControlRequest] = objects
@@ -116,35 +101,12 @@ def _verify_group_permissions(
         assert [p.all_permissions for p in sorted_ws] == [p.all_permissions for p in sorted_target]
     else:
         for _object in objects:
-            _object_permissions: ObjectPermissions = ws.permissions.get(
-                request_object_type, getattr(_object, id_attribute)
+            toolkit.permissions_manager.verify_applied_permissions(
+                request_object_type,
+                getattr(_object, id_attribute),
+                toolkit.group_manager.migration_groups_provider,
+                target,
             )
-            for migration_info in toolkit.group_manager.migration_groups_provider.groups:
-                target_permissions = sorted(
-                    [
-                        p
-                        for p in _object_permissions.access_control_list
-                        if p.group_name == getattr(migration_info, target).display_name
-                    ],
-                    key=lambda p: p.group_name,
-                )
-
-                source_permissions = sorted(
-                    [
-                        p
-                        for p in _object_permissions.access_control_list
-                        if p.group_name == migration_info.workspace.display_name
-                    ],
-                    key=lambda p: p.group_name,
-                )
-
-                assert len(target_permissions) == len(
-                    source_permissions
-                ), f"Target permissions were not applied correctly for object {_object}"
-
-                assert [t.all_permissions for t in target_permissions] == [
-                    s.all_permissions for s in source_permissions
-                ], f"Target permissions were not applied correctly for object {_object}"
 
 
 def _verify_roles_and_entitlements(
@@ -168,34 +130,123 @@ def test_e2e(
     inventory_table: InventoryTable,
     ws: WorkspaceClient,
     verifiable_objects: list[tuple[list, str, RequestObjectType | None]],
+    make_instance_pool,
+    make_instance_pool_permissions,
+    make_cluster,
+    make_cluster_permissions,
+    make_model,
+    make_registered_model_permissions,
+    make_experiment,
+    make_experiment_permissions,
+    make_job,
+    make_job_permissions,
+    make_pipeline,
+    make_pipeline_permissions,
+    make_secret_scope,
+    make_secret_scope_acl,
+    make_warehouse,
+    make_warehouse_permissions,
 ):
     logger.debug(f"Test environment: {env.test_uid}")
+    ws_group = env.groups[0][0]
+
+    pool = make_instance_pool()
+    make_instance_pool_permissions(
+        object_id=pool.instance_pool_id,
+        permission_level=random.choice([PermissionLevel.CAN_ATTACH_TO, PermissionLevel.CAN_MANAGE]),
+        group_name=ws_group.display_name,
+    )
+    verifiable_objects.append(([pool], "instance_pool_id", RequestObjectType.INSTANCE_POOLS))
+
+    cluster = make_cluster(instance_pool_id=os.environ["TEST_INSTANCE_POOL_ID"], single_node=True)
+    make_cluster_permissions(
+        object_id=cluster.cluster_id,
+        permission_level=random.choice(
+            [PermissionLevel.CAN_ATTACH_TO, PermissionLevel.CAN_MANAGE, PermissionLevel.CAN_RESTART]
+        ),
+        group_name=ws_group.display_name,
+    )
+    verifiable_objects.append(
+        ([cluster], "cluster_id", RequestObjectType.CLUSTERS),
+    )
+
+    model = make_model()
+    make_registered_model_permissions(
+        object_id=model.id,
+        permission_level=random.choice(
+            [
+                PermissionLevel.CAN_READ,
+                PermissionLevel.CAN_MANAGE,
+                PermissionLevel.CAN_MANAGE_PRODUCTION_VERSIONS,
+                PermissionLevel.CAN_MANAGE_STAGING_VERSIONS,
+            ]
+        ),
+        group_name=ws_group.display_name,
+    )
+    verifiable_objects.append(
+        ([model], "experiment_id", RequestObjectType.EXPERIMENTS),
+    )
+
+    experiment = make_experiment()
+    make_experiment_permissions(
+        object_id=experiment.experiment_id,
+        permission_level=random.choice(
+            [PermissionLevel.CAN_MANAGE, PermissionLevel.CAN_READ, PermissionLevel.CAN_EDIT]
+        ),
+        group_name=ws_group.display_name,
+    )
+    verifiable_objects.append(
+        ([experiment], "experiment_id", RequestObjectType.EXPERIMENTS),
+    )
+
+    job = make_job()
+    make_job_permissions(
+        object_id=job.job_id,
+        permission_level=random.choice(
+            [PermissionLevel.CAN_VIEW, PermissionLevel.CAN_MANAGE_RUN, PermissionLevel.CAN_MANAGE]
+        ),
+        group_name=ws_group.display_name,
+    )
+    verifiable_objects.append(
+        ([job], "job_id", RequestObjectType.JOBS),
+    )
+
+    pipeline = make_pipeline()
+    make_pipeline_permissions(
+        object_id=pipeline.pipeline_id,
+        permission_level=random.choice([PermissionLevel.CAN_VIEW, PermissionLevel.CAN_RUN, PermissionLevel.CAN_MANAGE]),
+        group_name=ws_group.display_name,
+    )
+    verifiable_objects.append(
+        ([pipeline], "pipeline_id", RequestObjectType.PIPELINES),
+    )
+
+    scope = make_secret_scope()
+    make_secret_scope_acl(scope=scope, principal=ws_group.display_name, permission=workspace.AclPermission.WRITE)
+    verifiable_objects.append(([scope], "secret_scopes", None))
+
+    warehouse = make_warehouse()
+    make_warehouse_permissions(
+        object_id=warehouse.id,
+        permission_level=random.choice([PermissionLevel.CAN_USE, PermissionLevel.CAN_MANAGE]),
+        group_name=ws_group.display_name,
+    )
+    verifiable_objects.append(
+        ([warehouse], "id", RequestObjectType.SQL_WAREHOUSES),
+    )
 
     config = MigrationConfig(
         connect=ConnectConfig.from_databricks_config(ws.config),
-        with_table_acls=False,
         inventory=InventoryConfig(table=inventory_table),
         groups=GroupsConfig(selected=[g[0].display_name for g in env.groups]),
+        tacl=TaclConfig(auto=True),
         log_level="DEBUG",
     )
     toolkit = GroupMigrationToolkit(config)
     toolkit.prepare_environment()
 
-    logger.debug("Verifying that the groups were created")
-
-    assert len(ws.groups.list(filter=f"displayName sw '{config.groups.backup_group_prefix}{env.test_uid}'")) == len(
-        toolkit.group_manager.migration_groups_provider.groups
-    )
-
-    assert len(ws.groups.list(filter=f"displayName sw '{env.test_uid}'")) == len(
-        toolkit.group_manager.migration_groups_provider.groups
-    )
-
-    assert len(toolkit.group_manager._list_account_level_groups(filter=f"displayName sw '{env.test_uid}'")) == len(
-        toolkit.group_manager.migration_groups_provider.groups
-    )
-
-    for _info in toolkit.group_manager.migration_groups_provider.groups:
+    group_migration_state = toolkit.group_manager.migration_groups_provider
+    for _info in group_migration_state.groups:
         _ws = ws.groups.get(id=_info.workspace.id)
         _backup = ws.groups.get(id=_info.backup.id)
         _ws_members = sorted([m.value for m in _ws.members])
@@ -216,12 +267,14 @@ def test_e2e(
     for _objects, id_attribute, request_object_type in verifiable_objects:
         _verify_group_permissions(_objects, id_attribute, request_object_type, ws, toolkit, "backup")
 
-    _verify_roles_and_entitlements(toolkit.group_manager.migration_groups_provider, ws, "backup")
+    _verify_roles_and_entitlements(group_migration_state, ws, "backup")
 
     toolkit.replace_workspace_groups_with_account_groups()
 
-    new_groups = list(ws.groups.list(filter=f"displayName sw '{env.test_uid}'", attributes="displayName,meta"))
-    assert len(new_groups) == len(toolkit.group_manager.migration_groups_provider.groups)
+    new_groups = [
+        _ for _ in ws.groups.list(attributes="displayName,meta") if group_migration_state.is_in_scope("account", _)
+    ]
+    assert len(new_groups) == len(group_migration_state.groups)
     assert all(g.meta.resource_type == "Group" for g in new_groups)
 
     toolkit.apply_permissions_to_account_groups()
@@ -229,15 +282,13 @@ def test_e2e(
     for _objects, id_attribute, request_object_type in verifiable_objects:
         _verify_group_permissions(_objects, id_attribute, request_object_type, ws, toolkit, "account")
 
-    _verify_roles_and_entitlements(toolkit.group_manager.migration_groups_provider, ws, "account")
+    _verify_roles_and_entitlements(group_migration_state, ws, "account")
 
     toolkit.delete_backup_groups()
 
-    backup_groups = list(
-        ws.groups.list(
-            filter=f"displayName sw '{config.groups.backup_group_prefix}{env.test_uid}'", attributes="displayName,meta"
-        )
-    )
+    backup_groups = [
+        _ for _ in ws.groups.list(attributes="displayName,meta") if group_migration_state.is_in_scope("backup", _)
+    ]
     assert len(backup_groups) == 0
 
     toolkit.cleanup_inventory_table()

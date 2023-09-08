@@ -8,6 +8,7 @@ from functools import partial
 from typing import Literal
 
 from databricks.sdk import WorkspaceClient
+from databricks.sdk.service import workspace
 from databricks.sdk.service.iam import AccessControlRequest, Group, ObjectPermissions
 from databricks.sdk.service.workspace import AclItem as SdkAclItem
 from ratelimit import limits, sleep_and_retry
@@ -23,7 +24,7 @@ from databricks.labs.ucx.inventory.types import (
     RolesAndEntitlements,
 )
 from databricks.labs.ucx.providers.groups_info import GroupMigrationState
-from databricks.labs.ucx.utils import ThreadedExecution, safe_get_acls
+from databricks.labs.ucx.utils import ThreadedExecution
 
 logger = logging.getLogger(__name__)
 
@@ -189,13 +190,13 @@ class PermissionManager:
             # the api might be inconsistent, therefore we need to check that the permissions were applied
             for _ in range(3):
                 time.sleep(random.random() * 2)
-                applied_acls = safe_get_acls(
-                    self._ws, scope_name=request_payload.object_id, group_name=_acl_item.principal
+                applied_permission = self._secret_scope_permission(
+                    scope_name=request_payload.object_id, group_name=_acl_item.principal
                 )
-                assert applied_acls, f"Failed to apply permissions for {_acl_item.principal}"
-                assert applied_acls.permission == _acl_item.permission, (
+                assert applied_permission, f"Failed to apply permissions for {_acl_item.principal}"
+                assert applied_permission == _acl_item.permission, (
                     f"Failed to apply permissions for {_acl_item.principal}. "
-                    f"Expected: {_acl_item.permission}. Actual: {applied_acls.permission}"
+                    f"Expected: {_acl_item.permission}. Actual: {applied_permission}"
                 )
 
     @sleep_and_retry
@@ -299,3 +300,44 @@ class PermissionManager:
 
         self._apply_permissions_in_parallel(requests=permission_payloads)
         logger.info(f"All permissions were applied for {destination} groups")
+
+    def verify_applied_permissions(
+        self,
+        object_type: str,
+        object_id: str,
+        migration_state: GroupMigrationState,
+        target: Literal["backup", "account"],
+    ):
+        op = self._ws.permissions.get(object_type, object_id)
+        for info in migration_state.groups:
+            src_permissions = sorted(
+                [_ for _ in op.access_control_list if _.group_name == info.workspace.display_name],
+                key=lambda p: p.group_name,
+            )
+            dst_permissions = sorted(
+                [_ for _ in op.access_control_list if _.group_name == getattr(info, target).display_name],
+                key=lambda p: p.group_name,
+            )
+            assert len(dst_permissions) == len(
+                src_permissions
+            ), f"Target permissions were not applied correctly for {object_type}/{object_id}"
+            assert [t.all_permissions for t in dst_permissions] == [
+                s.all_permissions for s in src_permissions
+            ], f"Target permissions were not applied correctly for {object_type}/{object_id}"
+
+    def verify_applied_scope_acls(
+        self, scope_name: str, migration_state: GroupMigrationState, target: Literal["backup", "account"]
+    ):
+        base_attr = "workspace" if target == "backup" else "backup"
+        for mi in migration_state.groups:
+            src_name = getattr(mi, base_attr).display_name
+            dst_name = getattr(mi, target).display_name
+            src_permission = self._secret_scope_permission(scope_name, src_name)
+            dst_permission = self._secret_scope_permission(scope_name, dst_name)
+            assert src_permission == dst_permission, "Scope ACLs were not applied correctly"
+
+    def _secret_scope_permission(self, scope_name: str, group_name: str) -> workspace.AclPermission | None:
+        for acl in self._ws.secrets.list_acls(scope=scope_name):
+            if acl.principal == group_name:
+                return acl.permission
+        return None

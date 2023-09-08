@@ -1,3 +1,4 @@
+import os
 from pathlib import Path
 from typing import Annotated
 
@@ -23,3 +24,21 @@ def migrate_groups(config_file: Annotated[Path, typer.Argument(help="Path to con
     toolkit.apply_permissions_to_account_groups()
     toolkit.delete_backup_groups()
     toolkit.cleanup_inventory_table()
+
+
+@app.command()
+def generate_assessment_report():
+    from databricks.sdk import WorkspaceClient
+
+    from databricks.labs.ucx.toolkits.assessment import AssessmentToolkit
+
+    cluster_id = os.getenv("DATABRICKS_CLUSTER_ID")
+    catalog = os.getenv("INVENTORY_CATALOG", "ucx")
+    schema = os.getenv("INVENTORY_SCHEMA", "ucx")
+    ws = WorkspaceClient()
+    toolkit = AssessmentToolkit(ws=ws, cluster_id=cluster_id, inventory_catalog=catalog, inventory_schema=schema)
+    toolkit.compile_report()
+
+
+if __name__ == "__main__":
+    app()

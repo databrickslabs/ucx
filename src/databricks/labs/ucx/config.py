@@ -91,9 +91,27 @@ class ConnectConfig:
 
 
 @dataclass
+class TaclConfig:
+    databases: list[str] | None = None
+    auto: bool | None = None
+
+    def __post_init__(self):
+        if not self.databases and self.auto is None:
+            msg = "Either selected or auto must be set"
+            raise ValueError(msg)
+        if self.databases and self.auto is False:
+            msg = "No selected groups provided, but auto-collection is disabled"
+            raise ValueError(msg)
+
+    @classmethod
+    def from_dict(cls, raw: dict):
+        return cls(**raw)
+
+
+@dataclass
 class MigrationConfig:
     inventory: InventoryConfig
-    with_table_acls: bool
+    tacl: TaclConfig
     groups: GroupsConfig
     connect: ConnectConfig | None = None
     num_threads: int | None = 4
@@ -102,9 +120,6 @@ class MigrationConfig:
     def __post_init__(self):
         if self.connect is None:
             self.connect = ConnectConfig()
-        if self.with_table_acls:
-            msg = "Table ACLS are not yet implemented"
-            raise NotImplementedError(msg)
 
     def as_dict(self) -> dict:
         from dataclasses import fields, is_dataclass
@@ -126,7 +141,7 @@ class MigrationConfig:
     def from_dict(cls, raw: dict) -> "MigrationConfig":
         return cls(
             inventory=InventoryConfig.from_dict(raw.get("inventory", {})),
-            with_table_acls=raw.get("with_table_acls", False),
+            tacl=TaclConfig.from_dict(raw.get("tacl", {})),
             groups=GroupsConfig.from_dict(raw.get("groups", {})),
             connect=ConnectConfig.from_dict(raw.get("connect", {})),
             num_threads=raw.get("num_threads", 4),
