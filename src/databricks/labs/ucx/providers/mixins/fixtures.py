@@ -488,7 +488,7 @@ def make_warehouse(ws, make_random):
         if warehouse_name is None:
             warehouse_name = f"sdk-{make_random(4)}"
         if warehouse_type is None:
-            warehouse_type = (CreateWarehouseRequestWarehouseType.PRO,)
+            warehouse_type = CreateWarehouseRequestWarehouseType.PRO
         if cluster_size is None:
             cluster_size = "2X-Small"
 
@@ -501,7 +501,7 @@ def make_warehouse(ws, make_random):
             **kwargs,
         )
 
-    yield from factory("warehouse", create, lambda item: ws.warehouses.delete(item.warehouse_id))
+    yield from factory("warehouse", create, lambda item: ws.warehouses.delete(item.id))
 
 
 def load_debug_env_if_runs_from_ide(key) -> bool:

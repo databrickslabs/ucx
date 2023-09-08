@@ -168,12 +168,12 @@ def test_e2e(
 
     warehouse = make_warehouse()
     make_warehouse_permissions(
-        object_id=warehouse.warehouse_id,
+        object_id=warehouse.id,
         permission_level=random.choice([PermissionLevel.CAN_USE, PermissionLevel.CAN_MANAGE]),
         group_name=ws_group.display_name,
     )
     verifiable_objects.append(
-        ([warehouse], "warehouse_id", RequestObjectType.SQL_WAREHOUSES),
+        ([warehouse], "id", RequestObjectType.SQL_WAREHOUSES),
     )
 
     config = MigrationConfig(
