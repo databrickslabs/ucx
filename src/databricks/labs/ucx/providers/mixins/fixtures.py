@@ -467,17 +467,6 @@ def make_model(ws, make_random):
     yield from factory("model", create, lambda item: ws.model_registry.delete_model(item.id))
 
 
-#     test_models: list[ModelDatabricks] = [
-#         ws.model_registry.get_model(
-#             ws.model_registry.create_model(f"{env.test_uid}-test-{i}").registered_model.name
-#         ).registered_model_databricks
-#         for i in range(NUM_TEST_MODELS)
-#     ]
-#
-#     executables = [partial(ws.model_registry.delete_model, m.name) for m in test_models]
-#     Threader(executables).run()
-
-
 @pytest.fixture
 def make_pipeline(ws, make_random, make_notebook):
     def create(**kwargs):
