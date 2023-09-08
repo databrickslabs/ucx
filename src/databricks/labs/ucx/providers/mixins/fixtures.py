@@ -475,6 +475,23 @@ def make_job(ws, make_random, make_notebook):
 
 
 @pytest.fixture
+def make_model(ws, make_random):
+    def create(
+        *,
+        model_name: str | None = None,
+        **kwargs,
+    ):
+        if model_name is None:
+            model_name = f"sdk-{make_random(4)}"
+
+        return ws.model_registry.get_model(
+            ws.model_registry.create_model(model_name, **kwargs).registered_model.name
+        ).registered_model_databricks
+
+    yield from factory("model", create, lambda item: ws.model_registry.delete_model(item.id))
+
+
+@pytest.fixture
 def make_pipeline(ws, make_random, make_notebook):
     def create(**kwargs) -> pipelines.CreatePipelineResponse:
         if "name" not in kwargs:

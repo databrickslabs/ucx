@@ -11,8 +11,6 @@ from databricks.sdk import AccountClient, WorkspaceClient
 from databricks.sdk.core import Config
 from databricks.sdk.service.compute import CreatePolicyResponse
 from databricks.sdk.service.iam import AccessControlRequest, PermissionLevel
-from databricks.sdk.service.ml import ModelDatabricks
-from databricks.sdk.service.ml import PermissionLevel as ModelPermissionLevel
 from databricks.sdk.service.workspace import ObjectInfo, ObjectType
 
 from databricks.labs.ucx.config import InventoryTable
@@ -36,7 +34,6 @@ logger = logging.getLogger(__name__)
 NUM_TEST_GROUPS = int(os.environ.get("NUM_TEST_GROUPS", 5))
 NUM_TEST_INSTANCE_PROFILES = int(os.environ.get("NUM_TEST_INSTANCE_PROFILES", 3))
 NUM_TEST_CLUSTER_POLICIES = int(os.environ.get("NUM_TEST_CLUSTER_POLICIES", 3))
-NUM_TEST_MODELS = int(os.environ.get("NUM_TEST_MODELS", 3))
 NUM_TEST_TOKENS = int(os.environ.get("NUM_TEST_TOKENS", 3))
 
 NUM_THREADS = int(os.environ.get("NUM_TEST_THREADS", 20))
@@ -281,39 +278,6 @@ def cluster_policies(env: EnvironmentInfo, ws: WorkspaceClient) -> list[CreatePo
 
 
 @pytest.fixture
-def models(ws: WorkspaceClient, env: EnvironmentInfo) -> list[ModelDatabricks]:
-    logger.debug("Creating models")
-
-    test_models: list[ModelDatabricks] = [
-        ws.model_registry.get_model(
-            ws.model_registry.create_model(f"{env.test_uid}-test-{i}").registered_model.name
-        ).registered_model_databricks
-        for i in range(NUM_TEST_MODELS)
-    ]
-
-    _set_random_permissions(
-        test_models,
-        "id",
-        RequestObjectType.REGISTERED_MODELS,
-        env,
-        ws,
-        permission_levels=[
-            ModelPermissionLevel.CAN_READ,
-            ModelPermissionLevel.CAN_MANAGE,
-            ModelPermissionLevel.CAN_MANAGE_PRODUCTION_VERSIONS,
-            ModelPermissionLevel.CAN_MANAGE_STAGING_VERSIONS,
-        ],
-    )
-
-    yield test_models
-
-    logger.debug("Deleting test models")
-    executables = [partial(ws.model_registry.delete_model, m.name) for m in test_models]
-    Threader(executables).run()
-    logger.debug("Test models deleted")
-
-
-@pytest.fixture
 def tokens(ws: WorkspaceClient, env: EnvironmentInfo) -> list[AccessControlRequest]:
     logger.debug("Adding token-level permissions to groups")
 
@@ -389,7 +353,6 @@ def workspace_objects(ws: WorkspaceClient, env: EnvironmentInfo) -> WorkspaceObj
 @pytest.fixture
 def verifiable_objects(
     cluster_policies,
-    models,
     tokens,
     workspace_objects,
 ) -> list[tuple[list, str, RequestObjectType | None]]:
@@ -397,7 +360,6 @@ def verifiable_objects(
         (workspace_objects, "workspace_objects", None),
         (tokens, "tokens", RequestObjectType.AUTHORIZATION),
         (cluster_policies, "policy_id", RequestObjectType.CLUSTER_POLICIES),
-        (models, "id", RequestObjectType.REGISTERED_MODELS),
     ]
     yield _verifiable_objects
 
