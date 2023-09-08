@@ -103,7 +103,7 @@ class BaseSupport(ABC, ClientMixin, CrawlerMixin, ApplierMixin, SerdeMixin):
     """
 
 
-class GroupLevelSupport(ABC, BaseSupport):
+class GroupLevelSupport(BaseSupport):
     """
     Base class for group-level properties.
     """
@@ -135,6 +135,9 @@ class GroupLevelSupport(ABC, BaseSupport):
             operations = [Patch(op=PatchOp.ADD, path=self._property_name, value=self._value)]
             schemas = [PatchSchema.URN_IETF_PARAMS_SCIM_API_MESSAGES_2_0_PATCH_OP]
             self._ws.groups.patch(self._group_id, operations=operations, schemas=schemas)
+
+    def is_item_relevant(self, item: PermissionsInventoryItem, migration_state: GroupMigrationState) -> bool:
+        return any(g.workspace.id == item.object_id for g in migration_state.groups)
 
     @classmethod
     def _serialize(cls, group: Group) -> str:
@@ -173,6 +176,12 @@ class RolesSupport(GroupLevelSupport):
 
 
 class PermissionsSupport(BaseSupport):
+    def is_item_relevant(self, item: PermissionsInventoryItem, migration_state: GroupMigrationState) -> bool:
+        mentioned_groups = [
+            acl.group_name for acl in self._deserialize(item.raw_object_permissions).access_control_list
+        ]
+        return any(g in mentioned_groups for g in [info.workspace for info in migration_state.groups])
+
     @classmethod
     def _serialize(cls, typed: ObjectPermissions) -> str:
         return json.dumps(typed.as_dict())
@@ -279,6 +288,12 @@ class PermissionsSupport(BaseSupport):
 
 
 class SqlPermissionsSupport(BaseSupport):
+    def is_item_relevant(self, item: PermissionsInventoryItem, migration_state: GroupMigrationState) -> bool:
+        mentioned_groups = [
+            acl.group_name for acl in self._deserialize(item.raw_object_permissions).access_control_list
+        ]
+        return any(g in mentioned_groups for g in [info.workspace for info in migration_state.groups])
+
     def __init__(
         self, ws: WorkspaceClient, listing_function: Callable, id_attribute: str, object_type: sql.ObjectTypePlural
     ):

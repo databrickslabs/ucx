@@ -1,4 +1,3 @@
-import json
 from dataclasses import asdict, dataclass
 from typing import Literal
 
@@ -110,10 +109,6 @@ class PermissionsInventoryItem:
     object_id: str
     crawler: str  # shall be taken from CRAWLERS dict
     raw_object_permissions: str
-
-    @property
-    def object_permissions(self) -> dict:
-        return json.loads(self.raw_object_permissions)
 
     @staticmethod
     def from_pandas(source: pd.DataFrame) -> list["PermissionsInventoryItem"]:
