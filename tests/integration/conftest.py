@@ -495,7 +495,6 @@ def verifiable_objects(
     jobs,
     experiments,
     models,
-    warehouses,
     tokens,
     workspace_objects,
 ) -> list[tuple[list, str, RequestObjectType | None]]:
@@ -507,7 +506,6 @@ def verifiable_objects(
         (jobs, "job_id", RequestObjectType.JOBS),
         (experiments, "experiment_id", RequestObjectType.EXPERIMENTS),
         (models, "id", RequestObjectType.REGISTERED_MODELS),
-        (warehouses, "id", RequestObjectType.SQL_WAREHOUSES),
     ]
     yield _verifiable_objects
 
