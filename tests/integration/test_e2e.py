@@ -39,30 +39,7 @@ def _verify_group_permissions(
         f"{request_object_type or id_attribute} were applied to {target} groups"
     )
 
-    if id_attribute == "workspace_objects":
-        _workspace_objects: WorkspaceObjects = objects
-
-        # list of groups that source the permissions
-        comparison_base = [
-            getattr(mi, "workspace" if target == "backup" else "backup")
-            for mi in toolkit.group_manager.migration_groups_provider.groups
-        ]
-        # list of groups that are the target of the permissions
-        comparison_target = [getattr(mi, target) for mi in toolkit.group_manager.migration_groups_provider.groups]
-
-        root_permissions = ws.permissions.get(
-            request_object_type=RequestObjectType.DIRECTORIES, request_object_id=_workspace_objects.root_dir.object_id
-        )
-        base_group_names = [g.display_name for g in comparison_base]
-        target_group_names = [g.display_name for g in comparison_target]
-
-        base_acls = [a for a in root_permissions.access_control_list if a.group_name in base_group_names]
-
-        target_acls = [a for a in root_permissions.access_control_list if a.group_name in target_group_names]
-
-        assert len(base_acls) == len(target_acls)
-
-    elif id_attribute == "secret_scopes":
+    if id_attribute == "secret_scopes":
         for scope_name in objects:
             toolkit.permissions_manager.verify_applied_scope_acls(
                 scope_name, toolkit.group_manager.migration_groups_provider, target
@@ -110,6 +87,10 @@ def test_e2e(
     make_experiment_permissions,
     make_job,
     make_job_permissions,
+    make_notebook,
+    make_notebook_permissions,
+    make_directory,
+    make_directory_permissions,
     make_pipeline,
     make_pipeline_permissions,
     make_secret_scope,
@@ -178,6 +159,31 @@ def test_e2e(
     )
     verifiable_objects.append(
         ([experiment], "experiment_id", RequestObjectType.EXPERIMENTS),
+    )
+
+    directory = make_directory()
+    make_directory_permissions(
+        object_id=directory,
+        permission_level=random.choice(
+            [PermissionLevel.CAN_READ, PermissionLevel.CAN_MANAGE, PermissionLevel.CAN_EDIT, PermissionLevel.CAN_RUN]
+        ),
+        group_name=ws_group.display_name,
+    )
+
+    verifiable_objects.append(
+        ([ws.workspace.get_status(directory)], "object_id", RequestObjectType.DIRECTORIES),
+    )
+
+    notebook = make_notebook(path=f"{directory}/sample.py")
+    make_notebook_permissions(
+        object_id=notebook,
+        permission_level=random.choice(
+            [PermissionLevel.CAN_READ, PermissionLevel.CAN_MANAGE, PermissionLevel.CAN_EDIT, PermissionLevel.CAN_RUN]
+        ),
+        group_name=ws_group.display_name,
+    )
+    verifiable_objects.append(
+        ([ws.workspace.get_status(notebook)], "object_id", RequestObjectType.NOTEBOOKS),
     )
 
     job = make_job()
