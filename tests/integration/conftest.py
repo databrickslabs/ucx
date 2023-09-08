@@ -11,14 +11,8 @@ from databricks.sdk import AccountClient, WorkspaceClient
 from databricks.sdk.core import Config, DatabricksError
 from databricks.sdk.service.compute import CreatePolicyResponse
 from databricks.sdk.service.iam import AccessControlRequest, PermissionLevel
-from databricks.sdk.service.jobs import CreateResponse
 from databricks.sdk.service.ml import CreateExperimentResponse, ModelDatabricks
 from databricks.sdk.service.ml import PermissionLevel as ModelPermissionLevel
-from databricks.sdk.service.pipelines import (
-    CreatePipelineResponse,
-    NotebookLibrary,
-    PipelineLibrary,
-)
 from databricks.sdk.service.sql import (
     CreateWarehouseRequestWarehouseType,
     GetWarehouseResponse,
@@ -35,8 +29,6 @@ from .utils import (
     EnvironmentInfo,
     InstanceProfile,
     WorkspaceObjects,
-    _get_basic_job_cluster,
-    _get_basic_task,
     _set_random_permissions,
 )
 
@@ -47,10 +39,7 @@ logger = logging.getLogger(__name__)
 
 NUM_TEST_GROUPS = int(os.environ.get("NUM_TEST_GROUPS", 5))
 NUM_TEST_INSTANCE_PROFILES = int(os.environ.get("NUM_TEST_INSTANCE_PROFILES", 3))
-NUM_TEST_CLUSTERS = int(os.environ.get("NUM_TEST_CLUSTERS", 3))
 NUM_TEST_CLUSTER_POLICIES = int(os.environ.get("NUM_TEST_CLUSTER_POLICIES", 3))
-NUM_TEST_PIPELINES = int(os.environ.get("NUM_TEST_PIPELINES", 3))
-NUM_TEST_JOBS = int(os.environ.get("NUM_TEST_JOBS", 3))
 NUM_TEST_EXPERIMENTS = int(os.environ.get("NUM_TEST_EXPERIMENTS", 3))
 NUM_TEST_MODELS = int(os.environ.get("NUM_TEST_MODELS", 3))
 NUM_TEST_WAREHOUSES = int(os.environ.get("NUM_TEST_WAREHOUSES", 3))
@@ -260,63 +249,6 @@ def instance_profiles(env: EnvironmentInfo, ws: WorkspaceClient) -> list[Instanc
     for profile in profiles:
         ws.instance_profiles.remove(profile.instance_profile_arn)
     logger.debug("Test instance profiles deleted")
-
-
-@pytest.fixture
-def pipelines(env: EnvironmentInfo, ws: WorkspaceClient) -> list[CreatePipelineResponse]:
-    logger.debug("Creating test DLT pipelines")
-
-    test_pipelines: list[CreatePipelineResponse] = [
-        ws.pipelines.create(
-            name=f"{env.test_uid}-test-{i}",
-            continuous=False,
-            development=True,
-            libraries=[PipelineLibrary(notebook=NotebookLibrary(path="/Workspace/sample-notebook"))],
-        )
-        for i in range(NUM_TEST_PIPELINES)
-    ]
-
-    _set_random_permissions(
-        test_pipelines,
-        "pipeline_id",
-        RequestObjectType.PIPELINES,
-        env,
-        ws,
-        permission_levels=[PermissionLevel.CAN_VIEW, PermissionLevel.CAN_RUN, PermissionLevel.CAN_MANAGE],
-    )
-
-    yield test_pipelines
-
-    logger.debug("Deleting test instance pools")
-    executables = [partial(ws.pipelines.delete, p.pipeline_id) for p in test_pipelines]
-    Threader(executables).run()
-
-
-@pytest.fixture
-def jobs(env: EnvironmentInfo, ws: WorkspaceClient) -> list[CreateResponse]:
-    logger.debug("Creating test jobs")
-
-    test_jobs: list[CreateResponse] = [
-        ws.jobs.create(
-            name=f"{env.test_uid}-test-{i}", job_clusters=[_get_basic_job_cluster()], tasks=[_get_basic_task()]
-        )
-        for i in range(NUM_TEST_JOBS)
-    ]
-
-    _set_random_permissions(
-        test_jobs,
-        "job_id",
-        RequestObjectType.JOBS,
-        env,
-        ws,
-        permission_levels=[PermissionLevel.CAN_VIEW, PermissionLevel.CAN_MANAGE_RUN, PermissionLevel.CAN_MANAGE],
-    )
-
-    yield test_jobs
-
-    logger.debug("Deleting test jobs")
-    executables = [partial(ws.jobs.delete, j.job_id) for j in test_jobs]
-    Threader(executables).run()
 
 
 @pytest.fixture
@@ -531,8 +463,6 @@ def workspace_objects(ws: WorkspaceClient, env: EnvironmentInfo) -> WorkspaceObj
 @pytest.fixture
 def verifiable_objects(
     cluster_policies,
-    pipelines,
-    jobs,
     experiments,
     models,
     warehouses,
@@ -543,8 +473,6 @@ def verifiable_objects(
         (workspace_objects, "workspace_objects", None),
         (tokens, "tokens", RequestObjectType.AUTHORIZATION),
         (cluster_policies, "policy_id", RequestObjectType.CLUSTER_POLICIES),
-        (pipelines, "pipeline_id", RequestObjectType.PIPELINES),
-        (jobs, "job_id", RequestObjectType.JOBS),
         (experiments, "experiment_id", RequestObjectType.EXPERIMENTS),
         (models, "id", RequestObjectType.REGISTERED_MODELS),
         (warehouses, "id", RequestObjectType.SQL_WAREHOUSES),
