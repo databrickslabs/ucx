@@ -9,7 +9,6 @@ import databricks.sdk.core
 import pytest
 from databricks.sdk import AccountClient, WorkspaceClient
 from databricks.sdk.core import Config
-from databricks.sdk.service.compute import CreatePolicyResponse
 from databricks.sdk.service.iam import AccessControlRequest, PermissionLevel
 from databricks.sdk.service.workspace import ObjectInfo, ObjectType
 
@@ -19,21 +18,14 @@ from databricks.labs.ucx.providers.mixins.fixtures import *  # noqa: F403
 from databricks.labs.ucx.providers.mixins.sql import StatementExecutionExt
 from databricks.labs.ucx.utils import ThreadedExecution
 
-from .utils import (
-    EnvironmentInfo,
-    InstanceProfile,
-    WorkspaceObjects,
-    _set_random_permissions,
-)
+from .utils import EnvironmentInfo, InstanceProfile, WorkspaceObjects
 
 logging.getLogger("tests").setLevel("DEBUG")
 logging.getLogger("databricks.labs.ucx").setLevel("DEBUG")
 
 logger = logging.getLogger(__name__)
 
-NUM_TEST_GROUPS = int(os.environ.get("NUM_TEST_GROUPS", 5))
 NUM_TEST_INSTANCE_PROFILES = int(os.environ.get("NUM_TEST_INSTANCE_PROFILES", 3))
-NUM_TEST_CLUSTER_POLICIES = int(os.environ.get("NUM_TEST_CLUSTER_POLICIES", 3))
 NUM_TEST_TOKENS = int(os.environ.get("NUM_TEST_TOKENS", 3))
 
 NUM_THREADS = int(os.environ.get("NUM_TEST_THREADS", 20))
@@ -243,41 +235,6 @@ def instance_profiles(env: EnvironmentInfo, ws: WorkspaceClient) -> list[Instanc
 
 
 @pytest.fixture
-def cluster_policies(env: EnvironmentInfo, ws: WorkspaceClient) -> list[CreatePolicyResponse]:
-    logger.debug("Creating test cluster policies")
-
-    test_cluster_policies: list[CreatePolicyResponse] = [
-        ws.cluster_policies.create(
-            name=f"{env.test_uid}-test-{i}",
-            definition="""
-        {
-          "spark_version": {
-                "type": "unlimited",
-                "defaultValue": "auto:latest-lts"
-            }
-        }
-        """,
-        )
-        for i in range(NUM_TEST_CLUSTER_POLICIES)
-    ]
-
-    _set_random_permissions(
-        test_cluster_policies,
-        "policy_id",
-        RequestObjectType.CLUSTER_POLICIES,
-        env,
-        ws,
-        permission_levels=[PermissionLevel.CAN_USE],
-    )
-
-    yield test_cluster_policies
-
-    logger.debug("Deleting test instance pools")
-    executables = [partial(ws.cluster_policies.delete, p.policy_id) for p in test_cluster_policies]
-    Threader(executables).run()
-
-
-@pytest.fixture
 def tokens(ws: WorkspaceClient, env: EnvironmentInfo) -> list[AccessControlRequest]:
     logger.debug("Adding token-level permissions to groups")
 
@@ -352,14 +309,12 @@ def workspace_objects(ws: WorkspaceClient, env: EnvironmentInfo) -> WorkspaceObj
 
 @pytest.fixture
 def verifiable_objects(
-    cluster_policies,
     tokens,
     workspace_objects,
 ) -> list[tuple[list, str, RequestObjectType | None]]:
     _verifiable_objects = [
         (workspace_objects, "workspace_objects", None),
         (tokens, "tokens", RequestObjectType.AUTHORIZATION),
-        (cluster_policies, "policy_id", RequestObjectType.CLUSTER_POLICIES),
     ]
     yield _verifiable_objects
 

@@ -134,6 +134,8 @@ def test_e2e(
     make_instance_pool_permissions,
     make_cluster,
     make_cluster_permissions,
+    make_cluster_policy,
+    make_cluster_policy_permissions,
     make_model,
     make_registered_model_permissions,
     make_experiment,
@@ -168,6 +170,16 @@ def test_e2e(
     )
     verifiable_objects.append(
         ([cluster], "cluster_id", RequestObjectType.CLUSTERS),
+    )
+
+    cluster_policy = make_cluster_policy()
+    make_cluster_policy_permissions(
+        object_id=cluster_policy.policy_id,
+        permission_level=random.choice([PermissionLevel.CAN_USE]),
+        group_name=ws_group.display_name,
+    )
+    verifiable_objects.append(
+        ([cluster_policy], "policy_id", RequestObjectType.CLUSTER_POLICIES),
     )
 
     model = make_model()
