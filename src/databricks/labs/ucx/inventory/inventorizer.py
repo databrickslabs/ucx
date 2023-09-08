@@ -207,6 +207,7 @@ class SecretScopeInventorizer(BaseInventorizer[InventoryObject]):
     def _get_acls_for_scope(self, scope: SecretScope) -> Iterator[AclItem]:
         return self._ws.secrets.list_acls(scope.name)
 
+
     def _prepare_permissions_inventory_item(self, scope: SecretScope) -> PermissionsInventoryItem:
         acls = self._get_acls_for_scope(scope)
         acls_container = AclItemsContainer.from_sdk(list(acls))
@@ -381,7 +382,7 @@ class SqlInventorizer(StandardInventorizer):
     @sleep_and_retry
     @limits(calls=100, period=1)
     def _get_sql_permissions(self, request_object_type: SqlRequestObjectType, request_object_id: str) -> SqlPermissions:
-        return self._ws.permissions.get(object_type=request_object_type, object_id=request_object_id)
+        return self._ws.dbsql_permissions.get(object_type=request_object_type, object_id=request_object_id)
 
     def _safe_get_permissions(self, request_object_type: RequestObjectType, object_id: str) -> SqlPermissions | None:
         try:
