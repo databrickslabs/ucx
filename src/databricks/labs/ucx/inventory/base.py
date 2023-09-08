@@ -64,10 +64,24 @@ class CrawlerMixin:
 
 class ApplierMixin:
     @abstractmethod
-    def get_apply_task(
-            self, item: PermissionsInventoryItem, migration_state: GroupMigrationState, destination: Destination
-    ) -> ApplierTask:
+    def is_item_relevant(self, item: PermissionsInventoryItem, migration_state: GroupMigrationState) -> bool:
         pass
+
+    @abstractmethod
+    def _get_apply_task(
+        self, item: PermissionsInventoryItem, migration_state: GroupMigrationState, destination: Destination
+    ) -> ApplierTask:
+        """
+        This method should return an instance of ApplierTask.
+        """
+
+    def get_apply_task(
+        self, item: PermissionsInventoryItem, migration_state: GroupMigrationState, destination: Destination
+    ) -> ApplierTask | NoopTask:
+        if self.is_item_relevant(item, migration_state):
+            return self._get_apply_task(item, migration_state, destination)
+        else:
+            return NoopTask()
 
 
 class SerdeMixin:
@@ -137,8 +151,8 @@ class GroupLevelSupport(ABC, BaseSupport):
             for g in groups
         ]
 
-    def get_apply_task(
-            self, item: PermissionsInventoryItem, migration_state: GroupMigrationState, destination: Destination
+    def _get_apply_task(
+        self, item: PermissionsInventoryItem, migration_state: GroupMigrationState, destination: Destination
     ) -> ApplierTask:
         value = self._deserialize(item.raw_object_permissions)
         target_info = [g for g in migration_state.groups if g.workspace.id == item.object_id]
@@ -174,7 +188,7 @@ class PermissionsSupport(BaseSupport):
             self._request_type = request_type
 
         def _safe_get_permissions(
-                self, request_object_type: RequestObjectType, object_id: str
+            self, request_object_type: RequestObjectType, object_id: str
         ) -> ObjectPermissions | None:
             try:
                 permissions = self._ws.permissions.get(request_object_type, object_id)
@@ -201,8 +215,7 @@ class PermissionsSupport(BaseSupport):
 
     class PermissionsApplierTask(ApplierTask):
         def __init__(
-                self, ws: WorkspaceClient, acl: list[AccessControlRequest], object_id: str,
-                request_type: RequestObjectType
+            self, ws: WorkspaceClient, acl: list[AccessControlRequest], object_id: str, request_type: RequestObjectType
         ):
             self._ws = ws
             self._acl = acl
@@ -215,7 +228,7 @@ class PermissionsSupport(BaseSupport):
             self._ws.permissions.update(self._request_type, self._object_id, self._acl)
 
     def __init__(
-            self, listing_function: Callable, id_attribute: str, ws: WorkspaceClient, request_type: RequestObjectType
+        self, listing_function: Callable, id_attribute: str, ws: WorkspaceClient, request_type: RequestObjectType
     ):
         super().__init__(ws)
         self._listing_function = listing_function
@@ -229,7 +242,7 @@ class PermissionsSupport(BaseSupport):
         ]
 
     def _prepare_new_acl(
-            self, permissions: ObjectPermissions, migration_state: GroupMigrationState, destination: Destination
+        self, permissions: ObjectPermissions, migration_state: GroupMigrationState, destination: Destination
     ) -> list[AccessControlRequest]:
         _acl = permissions.access_control_list
         acl_requests = []
@@ -257,8 +270,8 @@ class PermissionsSupport(BaseSupport):
 
         return acl_requests
 
-    def get_apply_task(
-            self, item: PermissionsInventoryItem, migration_state: GroupMigrationState, destination: Destination
+    def _get_apply_task(
+        self, item: PermissionsInventoryItem, migration_state: GroupMigrationState, destination: Destination
     ) -> ApplierTask:
         permissions = PermissionsSupport._deserialize(item.raw_object_permissions)
         new_acl = self._prepare_new_acl(permissions, migration_state, destination)
@@ -266,9 +279,9 @@ class PermissionsSupport(BaseSupport):
 
 
 class SqlPermissionsSupport(BaseSupport):
-
-    def __init__(self, ws: WorkspaceClient, listing_function: Callable, id_attribute: str,
-                 object_type: sql.ObjectTypePlural):
+    def __init__(
+        self, ws: WorkspaceClient, listing_function: Callable, id_attribute: str, object_type: sql.ObjectTypePlural
+    ):
         super().__init__(ws)
         self._listing_function = listing_function
         self._id_attribute = id_attribute
@@ -280,16 +293,15 @@ class SqlPermissionsSupport(BaseSupport):
             self._object_type = object_type
             self._object_id = object_id
 
-        def _safe_get_dbsql_permissions(self, object_type: sql.ObjectTypePlural,
-                                        object_id: str) -> sql.GetResponse | None:
+        def _safe_get_dbsql_permissions(
+            self, object_type: sql.ObjectTypePlural, object_id: str
+        ) -> sql.GetResponse | None:
             try:
                 permissions = self._ws.dbsql_permissions.get(object_type, object_id)
                 return permissions
             except DatabricksError as e:
                 if e.error_code in ["RESOURCE_DOES_NOT_EXIST", "RESOURCE_NOT_FOUND", "PERMISSION_DENIED"]:
-                    logger.warning(
-                        f"Could not get permissions for {object_type} {object_id} due to {e.error_code}"
-                    )
+                    logger.warning(f"Could not get permissions for {object_type} {object_id} due to {e.error_code}")
                     return None
                 else:
                     raise e
@@ -306,8 +318,9 @@ class SqlPermissionsSupport(BaseSupport):
                 )
 
     class SqlPermissionsApplierTask(ApplierTask):
-        def __init__(self, ws: WorkspaceClient, acl: list[sql.AccessControl], object_type: sql.ObjectTypePlural,
-                     object_id: str):
+        def __init__(
+            self, ws: WorkspaceClient, acl: list[sql.AccessControl], object_type: sql.ObjectTypePlural, object_id: str
+        ):
             self._ws = ws
             self._acl = acl
             self._object_type = object_type
@@ -321,19 +334,19 @@ class SqlPermissionsSupport(BaseSupport):
     def get_crawler_tasks(self) -> list[CrawlerTask]:
         objects = self._listing_function()
         return [
-            self.SqlPermissionsCrawlerTask(self._ws, self._object_type, getattr(o, self._id_attribute))
-            for o in objects
+            self.SqlPermissionsCrawlerTask(self._ws, self._object_type, getattr(o, self._id_attribute)) for o in objects
         ]
 
-    def _prepare_new_acl(self, acl: list[sql.AccessControl], migration_state: GroupMigrationState,
-                         destination: Destination) -> list[sql.AccessControl]:
+    def _prepare_new_acl(
+        self, acl: list[sql.AccessControl], migration_state: GroupMigrationState, destination: Destination
+    ) -> list[sql.AccessControl]:
         acl_requests: list[sql.AccessControl] = []
 
         for acl_request in acl:
             if acl_request.group_name in [g.workspace.display_name for g in migration_state.groups]:
                 migration_info = migration_state.get_by_workspace_group_name(acl_request.group_name)
                 assert (
-                        migration_info is not None
+                    migration_info is not None
                 ), f"Group {acl_request.group_name} is not in the migration groups provider"
                 destination_group: Group = getattr(migration_info, destination)
                 acl_request.group_name = destination_group.display_name
@@ -344,8 +357,9 @@ class SqlPermissionsSupport(BaseSupport):
 
         return acl_requests
 
-    def get_apply_task(self, item: PermissionsInventoryItem, migration_state: GroupMigrationState,
-                       destination: Destination) -> ApplierTask:
+    def _get_apply_task(
+        self, item: PermissionsInventoryItem, migration_state: GroupMigrationState, destination: Destination
+    ) -> ApplierTask:
         permissions = self._deserialize(item.raw_object_permissions)
         new_acl = self._prepare_new_acl(permissions.access_control_list, migration_state, destination)
         return self.SqlPermissionsApplierTask(self._ws, new_acl, self._object_type, item.object_id)
