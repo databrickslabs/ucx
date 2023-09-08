@@ -3,7 +3,6 @@ from dataclasses import asdict, dataclass
 from typing import Literal
 
 import pandas as pd
-from databricks.sdk.service.sql import ObjectTypePlural as SqlRequestObjectType
 from databricks.sdk.service.workspace import AclItem as SdkAclItem
 from databricks.sdk.service.workspace import AclPermission as SdkAclPermission
 
@@ -25,13 +24,7 @@ class RequestObjectType(StrEnum):
     PIPELINES = "pipelines"
     REGISTERED_MODELS = "registered-models"
     REPOS = "repos"
-    SERVING_ENDPOINTS = "serving-endpoints"
     SQL_WAREHOUSES = "sql/warehouses"  # / is not a typo, it's the real object type
-
-    # adding values from existing type
-    ALERTS = SqlRequestObjectType.ALERTS.value
-    DASHBOARDS = SqlRequestObjectType.DASHBOARDS.value
-    QUERIES = SqlRequestObjectType.QUERIES.value
 
     def __repr__(self):
         return self.value

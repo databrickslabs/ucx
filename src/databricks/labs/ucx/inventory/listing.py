@@ -104,8 +104,16 @@ def models_listing(ws: WorkspaceClient):
 def experiments_listing(ws: WorkspaceClient):
     def inner() -> Iterator[ModelDatabricks]:
         for experiment in ws.experiments.list_experiments():
+            """
+            We filter-out notebook-based experiments, because they are covered by notebooks listing
+            """
+            # workspace-based notebook experiment
             nb_tag = [t for t in experiment.tags if t.key == "mlflow.experimentType" and t.value == "NOTEBOOK"]
-            if not nb_tag:
+            # repo-based notebook experiment
+            repo_nb_tag = [
+                t for t in experiment.tags if t.key == "mlflow.experiment.sourceType" and t.value == "REPO_NOTEBOOK"
+            ]
+            if not nb_tag and not repo_nb_tag:
                 yield experiment
 
     return inner
