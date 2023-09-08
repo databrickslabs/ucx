@@ -140,6 +140,8 @@ def test_e2e(
     make_pipeline_permissions,
     make_secret_scope,
     make_secret_scope_acl,
+    make_warehouse,
+    make_warehouse_permissions,
 ):
     logger.debug(f"Test environment: {env.test_uid}")
     ws_group = env.groups[0][0]
@@ -189,6 +191,16 @@ def test_e2e(
     scope = make_secret_scope()
     make_secret_scope_acl(scope=scope, principal=ws_group.display_name, permission=workspace.AclPermission.WRITE)
     verifiable_objects.append(([scope], "secret_scopes", None))
+
+    warehouse = make_warehouse()
+    make_warehouse_permissions(
+        object_id=warehouse.id,
+        permission_level=random.choice([PermissionLevel.CAN_USE, PermissionLevel.CAN_MANAGE]),
+        group_name=ws_group.display_name,
+    )
+    verifiable_objects.append(
+        ([warehouse], "id", RequestObjectType.SQL_WAREHOUSES),
+    )
 
     config = MigrationConfig(
         connect=ConnectConfig.from_databricks_config(ws.config),
