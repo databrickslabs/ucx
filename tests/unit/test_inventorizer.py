@@ -293,7 +293,7 @@ def test_experiments_listing(workspace_client):
 
 def test_inventorizers_provide(workspace_client):
     state = GroupMigrationState()
-    inventorizers = Inventorizers.provide(workspace_client, migration_state=state, num_threads=1)
+    inventorizers = Inventorizers.provide(workspace_client, migration_state=state, num_threads=1, start_path="/")
     assert len(inventorizers) > 0
 
 
