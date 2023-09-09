@@ -483,9 +483,9 @@ def make_model(ws, make_random):
         if model_name is None:
             model_name = f"sdk-{make_random(4)}"
 
-        return ws.model_registry.get_model(
-            ws.model_registry.create_model(model_name, **kwargs).registered_model.name
-        ).registered_model_databricks
+        created_model = ws.model_registry.create_model(model_name, **kwargs)
+        model = ws.model_registry.get_model(created_model.registered_model.name)
+        return model.registered_model_databricks
 
     yield from factory("model", create, lambda item: ws.model_registry.delete_model(item.id))
 

@@ -30,7 +30,6 @@ def _verify_group_permissions(
     objects: list | WorkspaceObjects | None,
     id_attribute: str,
     request_object_type: RequestObjectType | None,
-    ws: WorkspaceClient,
     toolkit: GroupMigrationToolkit,
     target: Literal["backup", "account"],
 ):
@@ -39,30 +38,7 @@ def _verify_group_permissions(
         f"{request_object_type or id_attribute} were applied to {target} groups"
     )
 
-    if id_attribute == "workspace_objects":
-        _workspace_objects: WorkspaceObjects = objects
-
-        # list of groups that source the permissions
-        comparison_base = [
-            getattr(mi, "workspace" if target == "backup" else "backup")
-            for mi in toolkit.group_manager.migration_groups_provider.groups
-        ]
-        # list of groups that are the target of the permissions
-        comparison_target = [getattr(mi, target) for mi in toolkit.group_manager.migration_groups_provider.groups]
-
-        root_permissions = ws.permissions.get(
-            request_object_type=RequestObjectType.DIRECTORIES, request_object_id=_workspace_objects.root_dir.object_id
-        )
-        base_group_names = [g.display_name for g in comparison_base]
-        target_group_names = [g.display_name for g in comparison_target]
-
-        base_acls = [a for a in root_permissions.access_control_list if a.group_name in base_group_names]
-
-        target_acls = [a for a in root_permissions.access_control_list if a.group_name in target_group_names]
-
-        assert len(base_acls) == len(target_acls)
-
-    elif id_attribute == "secret_scopes":
+    if id_attribute == "secret_scopes":
         for scope_name in objects:
             toolkit.permissions_manager.verify_applied_scope_acls(
                 scope_name, toolkit.group_manager.migration_groups_provider, target
@@ -97,7 +73,6 @@ def test_e2e(
     env: EnvironmentInfo,
     inventory_table: InventoryTable,
     ws: WorkspaceClient,
-    verifiable_objects: list[tuple[list, str, RequestObjectType | None]],
     make_instance_pool,
     make_instance_pool_permissions,
     make_cluster,
@@ -110,6 +85,10 @@ def test_e2e(
     make_experiment_permissions,
     make_job,
     make_job_permissions,
+    make_notebook,
+    make_notebook_permissions,
+    make_directory,
+    make_directory_permissions,
     make_pipeline,
     make_pipeline_permissions,
     make_secret_scope,
@@ -120,6 +99,8 @@ def test_e2e(
 ):
     logger.debug(f"Test environment: {env.test_uid}")
     ws_group = env.groups[0][0]
+
+    verifiable_objects = []
 
     pool = make_instance_pool()
     make_instance_pool_permissions(
@@ -178,6 +159,31 @@ def test_e2e(
     )
     verifiable_objects.append(
         ([experiment], "experiment_id", RequestObjectType.EXPERIMENTS),
+    )
+
+    directory = make_directory()
+    make_directory_permissions(
+        object_id=directory,
+        permission_level=random.choice(
+            [PermissionLevel.CAN_READ, PermissionLevel.CAN_MANAGE, PermissionLevel.CAN_EDIT, PermissionLevel.CAN_RUN]
+        ),
+        group_name=ws_group.display_name,
+    )
+
+    verifiable_objects.append(
+        ([ws.workspace.get_status(directory)], "object_id", RequestObjectType.DIRECTORIES),
+    )
+
+    notebook = make_notebook(path=f"{directory}/sample.py")
+    make_notebook_permissions(
+        object_id=notebook,
+        permission_level=random.choice(
+            [PermissionLevel.CAN_READ, PermissionLevel.CAN_MANAGE, PermissionLevel.CAN_EDIT, PermissionLevel.CAN_RUN]
+        ),
+        group_name=ws_group.display_name,
+    )
+    verifiable_objects.append(
+        ([ws.workspace.get_status(notebook)], "object_id", RequestObjectType.NOTEBOOKS),
     )
 
     job = make_job()
@@ -255,7 +261,7 @@ def test_e2e(
     toolkit.apply_permissions_to_backup_groups()
 
     for _objects, id_attribute, request_object_type in verifiable_objects:
-        _verify_group_permissions(_objects, id_attribute, request_object_type, ws, toolkit, "backup")
+        _verify_group_permissions(_objects, id_attribute, request_object_type, toolkit, "backup")
 
     _verify_roles_and_entitlements(group_migration_state, ws, "backup")
 
@@ -270,7 +276,7 @@ def test_e2e(
     toolkit.apply_permissions_to_account_groups()
 
     for _objects, id_attribute, request_object_type in verifiable_objects:
-        _verify_group_permissions(_objects, id_attribute, request_object_type, ws, toolkit, "account")
+        _verify_group_permissions(_objects, id_attribute, request_object_type, toolkit, "account")
 
     _verify_roles_and_entitlements(group_migration_state, ws, "account")
 
