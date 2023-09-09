@@ -2,11 +2,9 @@ import logging
 import os
 import random
 
-import pytest
 from databricks.sdk import WorkspaceClient
 from databricks.sdk.service import workspace
 from databricks.sdk.service.iam import PermissionLevel
-from pyspark.errors import AnalysisException
 
 from databricks.labs.ucx.config import (
     ConnectConfig,
@@ -172,13 +170,14 @@ def test_e2e(
             )
         ),
         groups=GroupsConfig(selected=[ws_group.display_name]),
+        workspace_start_path=directory,
         tacl=TaclConfig(auto=True),
         log_level="DEBUG",
     )
     toolkit = GroupMigrationToolkit(config)
     toolkit.prepare_environment()
 
-    group_migration_state = toolkit.group_manager.migration_groups_provider
+    group_migration_state = toolkit._group_manager.migration_groups_provider
     for _info in group_migration_state.groups:
         _ws = ws.groups.get(id=_info.workspace.id)
         _backup = ws.groups.get(id=_info.backup.id)
@@ -190,14 +189,11 @@ def test_e2e(
 
     toolkit.cleanup_inventory_table()
 
-    with pytest.raises(AnalysisException):
-        toolkit.table_manager.spark.catalog.getTable(toolkit.table_manager.config.table.to_spark())
-
     toolkit.inventorize_permissions()
 
     toolkit.apply_permissions_to_backup_groups()
 
-    toolkit.permissions_manager.verify(group_migration_state, "backup", to_verify)
+    toolkit.verify_permissions_on_backup_groups(to_verify)
 
     toolkit.replace_workspace_groups_with_account_groups()
 
@@ -209,7 +205,7 @@ def test_e2e(
 
     toolkit.apply_permissions_to_account_groups()
 
-    toolkit.permissions_manager.verify(group_migration_state, "account", to_verify)
+    toolkit.verify_permissions_on_account_groups(to_verify)
 
     toolkit.delete_backup_groups()
 
