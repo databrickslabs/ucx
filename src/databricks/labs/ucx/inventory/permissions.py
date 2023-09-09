@@ -15,7 +15,7 @@ from ratelimit import limits, sleep_and_retry
 from tenacity import retry, stop_after_attempt, wait_fixed, wait_random
 
 from databricks.labs.ucx.inventory.inventorizer import BaseInventorizer
-from databricks.labs.ucx.inventory.table import PermissionsInventoryTable
+from databricks.labs.ucx.inventory.permissions_inventory import PermissionsInventoryTable
 from databricks.labs.ucx.inventory.types import (
     AclItemsContainer,
     LogicalObjectType,
