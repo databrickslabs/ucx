@@ -1,11 +1,10 @@
 import logging
 import os
 import random
-from typing import Literal
 
 import pytest
 from databricks.sdk import WorkspaceClient
-from databricks.sdk.service import iam, workspace
+from databricks.sdk.service import workspace
 from databricks.sdk.service.iam import PermissionLevel
 from pyspark.errors import AnalysisException
 
@@ -17,62 +16,16 @@ from databricks.labs.ucx.config import (
     MigrationConfig,
     TaclConfig,
 )
-from databricks.labs.ucx.inventory.types import RequestObjectType
-from databricks.labs.ucx.providers.groups_info import GroupMigrationState
+from databricks.labs.ucx.inventory.types import LogicalObjectType, RequestObjectType
 from databricks.labs.ucx.toolkits.group_migration import GroupMigrationToolkit
-
-from .utils import EnvironmentInfo, WorkspaceObjects
 
 logger = logging.getLogger(__name__)
 
 
-def _verify_group_permissions(
-    objects: list | WorkspaceObjects | None,
-    id_attribute: str,
-    request_object_type: RequestObjectType | None,
-    toolkit: GroupMigrationToolkit,
-    target: Literal["backup", "account"],
-):
-    logger.debug(
-        f"Verifying that the permissions of object "
-        f"{request_object_type or id_attribute} were applied to {target} groups"
-    )
-
-    if id_attribute == "secret_scopes":
-        for scope_name in objects:
-            toolkit.permissions_manager.verify_applied_scope_acls(
-                scope_name, toolkit.group_manager.migration_groups_provider, target
-            )
-    else:
-        for _object in objects:
-            toolkit.permissions_manager.verify_applied_permissions(
-                request_object_type,
-                getattr(_object, id_attribute),
-                toolkit.group_manager.migration_groups_provider,
-                target,
-            )
-
-
-def _verify_roles_and_entitlements(
-    migration_state: GroupMigrationState,
-    ws: WorkspaceClient,
-    target: Literal["backup", "account"],
-):
-    for el in migration_state.groups:
-        comparison_base = getattr(el, "workspace" if target == "backup" else "backup")
-        comparison_target = getattr(el, target)
-
-        base_group_info = ws.groups.get(comparison_base.id)
-        target_group_info = ws.groups.get(comparison_target.id)
-
-        assert base_group_info.roles == target_group_info.roles
-        assert base_group_info.entitlements == target_group_info.entitlements
-
-
 def test_e2e(
-    env: EnvironmentInfo,
-    inventory_table: InventoryTable,
     ws: WorkspaceClient,
+    make_schema,
+    make_ucx_group,
     make_instance_pool,
     make_instance_pool_permissions,
     make_cluster,
@@ -97,10 +50,9 @@ def test_e2e(
     make_warehouse,
     make_warehouse_permissions,
 ):
-    logger.debug(f"Test environment: {env.test_uid}")
-    ws_group = env.groups[0][0]
+    ws_group, acc_group = make_ucx_group()
 
-    verifiable_objects = []
+    to_verify = set()
 
     pool = make_instance_pool()
     make_instance_pool_permissions(
@@ -108,7 +60,7 @@ def test_e2e(
         permission_level=random.choice([PermissionLevel.CAN_ATTACH_TO, PermissionLevel.CAN_MANAGE]),
         group_name=ws_group.display_name,
     )
-    verifiable_objects.append(([pool], "instance_pool_id", RequestObjectType.INSTANCE_POOLS))
+    to_verify.add((RequestObjectType.INSTANCE_POOLS, pool.instance_pool_id))
 
     cluster = make_cluster(instance_pool_id=os.environ["TEST_INSTANCE_POOL_ID"], single_node=True)
     make_cluster_permissions(
@@ -118,9 +70,7 @@ def test_e2e(
         ),
         group_name=ws_group.display_name,
     )
-    verifiable_objects.append(
-        ([cluster], "cluster_id", RequestObjectType.CLUSTERS),
-    )
+    to_verify.add((RequestObjectType.CLUSTERS, cluster.cluster_id))
 
     cluster_policy = make_cluster_policy()
     make_cluster_policy_permissions(
@@ -128,9 +78,7 @@ def test_e2e(
         permission_level=random.choice([PermissionLevel.CAN_USE]),
         group_name=ws_group.display_name,
     )
-    verifiable_objects.append(
-        ([cluster_policy], "policy_id", RequestObjectType.CLUSTER_POLICIES),
-    )
+    to_verify.add((RequestObjectType.CLUSTER_POLICIES, cluster_policy.policy_id))
 
     model = make_model()
     make_registered_model_permissions(
@@ -145,9 +93,7 @@ def test_e2e(
         ),
         group_name=ws_group.display_name,
     )
-    verifiable_objects.append(
-        ([model], "id", RequestObjectType.REGISTERED_MODELS),
-    )
+    to_verify.add((RequestObjectType.REGISTERED_MODELS, model.id))
 
     experiment = make_experiment()
     make_experiment_permissions(
@@ -157,9 +103,7 @@ def test_e2e(
         ),
         group_name=ws_group.display_name,
     )
-    verifiable_objects.append(
-        ([experiment], "experiment_id", RequestObjectType.EXPERIMENTS),
-    )
+    to_verify.add((RequestObjectType.EXPERIMENTS, experiment.experiment_id))
 
     directory = make_directory()
     make_directory_permissions(
@@ -169,10 +113,7 @@ def test_e2e(
         ),
         group_name=ws_group.display_name,
     )
-
-    verifiable_objects.append(
-        ([ws.workspace.get_status(directory)], "object_id", RequestObjectType.DIRECTORIES),
-    )
+    to_verify.add((RequestObjectType.DIRECTORIES, ws.workspace.get_status(directory).object_id))
 
     notebook = make_notebook(path=f"{directory}/sample.py")
     make_notebook_permissions(
@@ -182,9 +123,7 @@ def test_e2e(
         ),
         group_name=ws_group.display_name,
     )
-    verifiable_objects.append(
-        ([ws.workspace.get_status(notebook)], "object_id", RequestObjectType.NOTEBOOKS),
-    )
+    to_verify.add((RequestObjectType.NOTEBOOKS, ws.workspace.get_status(notebook).object_id))
 
     job = make_job()
     make_job_permissions(
@@ -194,9 +133,7 @@ def test_e2e(
         ),
         group_name=ws_group.display_name,
     )
-    verifiable_objects.append(
-        ([job], "job_id", RequestObjectType.JOBS),
-    )
+    to_verify.add((RequestObjectType.JOBS, job.job_id))
 
     pipeline = make_pipeline()
     make_pipeline_permissions(
@@ -204,22 +141,18 @@ def test_e2e(
         permission_level=random.choice([PermissionLevel.CAN_VIEW, PermissionLevel.CAN_RUN, PermissionLevel.CAN_MANAGE]),
         group_name=ws_group.display_name,
     )
-    verifiable_objects.append(
-        ([pipeline], "pipeline_id", RequestObjectType.PIPELINES),
-    )
+    to_verify.add((RequestObjectType.PIPELINES, pipeline.pipeline_id))
 
     scope = make_secret_scope()
     make_secret_scope_acl(scope=scope, principal=ws_group.display_name, permission=workspace.AclPermission.WRITE)
-    verifiable_objects.append(([scope], "secret_scopes", None))
+    to_verify.add((LogicalObjectType.SECRET_SCOPE, scope))
 
     make_authorization_permissions(
         object_id="tokens",
         permission_level=PermissionLevel.CAN_USE,
         group_name=ws_group.display_name,
     )
-    verifiable_objects.append(
-        ([iam.ObjectPermissions(object_id="tokens")], "object_id", RequestObjectType.AUTHORIZATION)
-    )
+    to_verify.add((RequestObjectType.AUTHORIZATION, "tokens"))
 
     warehouse = make_warehouse()
     make_warehouse_permissions(
@@ -227,14 +160,18 @@ def test_e2e(
         permission_level=random.choice([PermissionLevel.CAN_USE, PermissionLevel.CAN_MANAGE]),
         group_name=ws_group.display_name,
     )
-    verifiable_objects.append(
-        ([warehouse], "id", RequestObjectType.SQL_WAREHOUSES),
-    )
+    to_verify.add((RequestObjectType.SQL_WAREHOUSES, warehouse.id))
 
     config = MigrationConfig(
         connect=ConnectConfig.from_databricks_config(ws.config),
-        inventory=InventoryConfig(table=inventory_table),
-        groups=GroupsConfig(selected=[g[0].display_name for g in env.groups]),
+        inventory=InventoryConfig(
+            table=InventoryTable(
+                catalog="hive_metastore",
+                database=make_schema(catalog="hive_metastore").split(".")[-1],
+                name="permissions",
+            )
+        ),
+        groups=GroupsConfig(selected=[ws_group.display_name]),
         tacl=TaclConfig(auto=True),
         log_level="DEBUG",
     )
@@ -260,10 +197,7 @@ def test_e2e(
 
     toolkit.apply_permissions_to_backup_groups()
 
-    for _objects, id_attribute, request_object_type in verifiable_objects:
-        _verify_group_permissions(_objects, id_attribute, request_object_type, toolkit, "backup")
-
-    _verify_roles_and_entitlements(group_migration_state, ws, "backup")
+    toolkit.permissions_manager.verify(group_migration_state, "backup", to_verify)
 
     toolkit.replace_workspace_groups_with_account_groups()
 
@@ -275,10 +209,7 @@ def test_e2e(
 
     toolkit.apply_permissions_to_account_groups()
 
-    for _objects, id_attribute, request_object_type in verifiable_objects:
-        _verify_group_permissions(_objects, id_attribute, request_object_type, toolkit, "account")
-
-    _verify_roles_and_entitlements(group_migration_state, ws, "account")
+    toolkit.permissions_manager.verify(group_migration_state, "account", to_verify)
 
     toolkit.delete_backup_groups()
 

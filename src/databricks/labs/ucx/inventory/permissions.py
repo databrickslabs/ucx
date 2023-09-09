@@ -301,6 +301,16 @@ class PermissionManager:
         self._apply_permissions_in_parallel(requests=permission_payloads)
         logger.info(f"All permissions were applied for {destination} groups")
 
+    def verify(
+        self, migration_state: GroupMigrationState, target: Literal["backup", "account"], tuples: list[tuple[str, str]]
+    ):
+        for object_type, object_id in tuples:
+            if object_type == LogicalObjectType.SECRET_SCOPE:
+                self.verify_applied_scope_acls(object_id, migration_state, target)
+            else:
+                self.verify_applied_permissions(object_type, object_id, migration_state, target)
+        self.verify_roles_and_entitlements(migration_state, target)
+
     def verify_applied_permissions(
         self,
         object_type: str,
@@ -335,6 +345,17 @@ class PermissionManager:
             src_permission = self._secret_scope_permission(scope_name, src_name)
             dst_permission = self._secret_scope_permission(scope_name, dst_name)
             assert src_permission == dst_permission, "Scope ACLs were not applied correctly"
+
+    def verify_roles_and_entitlements(self, migration_state: GroupMigrationState, target: Literal["backup", "account"]):
+        for el in migration_state.groups:
+            comparison_base = getattr(el, "workspace" if target == "backup" else "backup")
+            comparison_target = getattr(el, target)
+
+            base_group_info = self._ws.groups.get(comparison_base.id)
+            target_group_info = self._ws.groups.get(comparison_target.id)
+
+            assert base_group_info.roles == target_group_info.roles
+            assert base_group_info.entitlements == target_group_info.entitlements
 
     def _secret_scope_permission(self, scope_name: str, group_name: str) -> workspace.AclPermission | None:
         for acl in self._ws.secrets.list_acls(scope=scope_name):
