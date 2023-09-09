@@ -373,7 +373,7 @@ def experiments_listing(ws: WorkspaceClient):
 
 class Inventorizers:
     @staticmethod
-    def provide(ws: WorkspaceClient, migration_state: GroupMigrationState, num_threads: int):
+    def provide(ws: WorkspaceClient, migration_state: GroupMigrationState, num_threads: int, start_path: str):
         return [
             RolesAndEntitlementsInventorizer(ws, migration_state),
             TokensAndPasswordsInventorizer(ws),
@@ -434,5 +434,5 @@ class Inventorizers:
                 id_attribute="id",
             ),
             SecretScopeInventorizer(ws),
-            WorkspaceInventorizer(ws, num_threads=num_threads),
+            WorkspaceInventorizer(ws, num_threads=num_threads, start_path=start_path),
         ]

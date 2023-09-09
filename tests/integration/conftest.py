@@ -1,4 +1,3 @@
-import json
 import logging
 import os
 import random
@@ -9,24 +8,16 @@ import pytest
 from databricks.sdk import AccountClient, WorkspaceClient
 from databricks.sdk.core import Config
 
-from databricks.labs.ucx.config import InventoryTable
 from databricks.labs.ucx.providers.mixins.fixtures import *  # noqa: F403
 from databricks.labs.ucx.providers.mixins.sql import StatementExecutionExt
 from databricks.labs.ucx.utils import ThreadedExecution
-
-from .utils import EnvironmentInfo, InstanceProfile
 
 logging.getLogger("tests").setLevel("DEBUG")
 logging.getLogger("databricks.labs.ucx").setLevel("DEBUG")
 
 logger = logging.getLogger(__name__)
 
-NUM_TEST_INSTANCE_PROFILES = int(os.environ.get("NUM_TEST_INSTANCE_PROFILES", 3))
-NUM_TEST_TOKENS = int(os.environ.get("NUM_TEST_TOKENS", 3))
-
-NUM_THREADS = int(os.environ.get("NUM_TEST_THREADS", 20))
-UCX_TESTING_PREFIX = os.environ.get("UCX_TESTING_PREFIX", "ucx")
-Threader = partial(ThreadedExecution, num_threads=NUM_THREADS)
+Threader = partial(ThreadedExecution, num_threads=20)
 load_debug_env_if_runs_from_ide("ucws")  # noqa: F405
 
 
@@ -188,62 +179,3 @@ def make_ucx_group(make_random, make_group, make_acc_group, user_pool):
         return ws_group, acc_group
 
     return inner
-
-
-@pytest.fixture
-def env(make_ucx_group, make_random) -> EnvironmentInfo:
-    test_uid = f"ucx_{make_random(4)}"
-    yield EnvironmentInfo(test_uid=test_uid, groups=[make_ucx_group()])
-
-
-@pytest.fixture
-def instance_profiles(env: EnvironmentInfo, ws: WorkspaceClient) -> list[InstanceProfile]:
-    logger.debug("Adding test instance profiles")
-    profiles: list[InstanceProfile] = []
-
-    for i in range(NUM_TEST_INSTANCE_PROFILES):
-        profile_arn = f"arn:aws:iam::123456789:instance-profile/{env.test_uid}-test-{i}"
-        iam_role_arn = f"arn:aws:iam::123456789:role/{env.test_uid}-test-{i}"
-        ws.instance_profiles.add(instance_profile_arn=profile_arn, iam_role_arn=iam_role_arn, skip_validation=True)
-        profiles.append(InstanceProfile(instance_profile_arn=profile_arn, iam_role_arn=iam_role_arn))
-
-    for ws_group, _ in env.groups:
-        if random.choice([True, False]):
-            # randomize to apply roles randomly
-            roles = {
-                "schemas": ["urn:ietf:params:scim:api:messages:2.0:PatchOp"],
-                "Operations": [
-                    {
-                        "op": "add",
-                        "path": "roles",
-                        "value": [{"value": p.instance_profile_arn} for p in random.choices(profiles, k=2)],
-                    }
-                ],
-            }
-            ws.api_client.do("PATCH", f"/api/2.0/preview/scim/v2/Groups/{ws_group.id}", data=json.dumps(roles))
-
-    yield profiles
-
-    logger.debug("Deleting test instance profiles")
-    for profile in profiles:
-        ws.instance_profiles.remove(profile.instance_profile_arn)
-    logger.debug("Test instance profiles deleted")
-
-
-@pytest.fixture()
-def inventory_table(env: EnvironmentInfo, ws: WorkspaceClient, make_catalog, make_schema) -> InventoryTable:
-    catalog, schema = make_schema(make_catalog()).split(".")
-    table = InventoryTable(
-        catalog=catalog,
-        database=schema,
-        name=f"test_inventory_{env.test_uid}",
-    )
-
-    yield table
-
-    logger.debug(f"Cleaning up inventory table {table}")
-    try:
-        ws.tables.delete(table.to_spark())
-        logger.debug(f"Inventory table {table} deleted")
-    except Exception as e:
-        logger.warning(f"Cannot delete inventory table, skipping it. Original exception {e}")

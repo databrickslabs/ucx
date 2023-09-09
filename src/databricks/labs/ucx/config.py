@@ -117,6 +117,9 @@ class MigrationConfig:
     num_threads: int | None = 4
     log_level: str | None = "INFO"
 
+    # Starting path for notebooks and directories crawler
+    workspace_start_path: str = "/"
+
     def __post_init__(self):
         if self.connect is None:
             self.connect = ConnectConfig()
