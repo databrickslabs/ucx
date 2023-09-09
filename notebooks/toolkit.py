@@ -14,8 +14,6 @@
 
 from databricks.labs.ucx.config import (
     GroupsConfig,
-    InventoryConfig,
-    InventoryTable,
     MigrationConfig,
     TaclConfig,
 )
@@ -30,14 +28,12 @@ from databricks.labs.ucx.toolkits.table_acls import TaclToolkit
 
 # COMMAND ----------
 
-inventory_schema = dbutils.widgets.get("inventory_schema")
+inventory_database = dbutils.widgets.get("inventory_database")
 selected_groups = dbutils.widgets.get("selected_groups").split(",")
 databases = dbutils.widgets.get("databases").split(",")
 
 config = MigrationConfig(
-    inventory=InventoryConfig(
-        table=InventoryTable(catalog='hive_metastore', database=inventory_schema, name='permissions')
-    ),
+    inventory_database=inventory_database,
     groups=GroupsConfig(
         # use this option to select specific groups manually
         selected=selected_groups,
@@ -56,8 +52,8 @@ config = MigrationConfig(
 toolkit = GroupMigrationToolkit(config)
 tacltoolkit = TaclToolkit(
     toolkit._ws,
-    inventory_catalog=config.inventory.table.catalog,
-    inventory_schema=config.inventory.table.database,
+    inventory_catalog="hive_metastore",
+    inventory_schema=config.inventory_database,
     databases=config.tacl.databases,
 )
 

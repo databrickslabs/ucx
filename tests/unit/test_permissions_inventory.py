@@ -6,8 +6,9 @@ import pytest
 from databricks.sdk.service.iam import AccessControlResponse, ObjectPermissions
 from pyspark.sql.types import StringType, StructField, StructType
 
-from databricks.labs.ucx.config import InventoryConfig, InventoryTable
-from databricks.labs.ucx.inventory.table import InventoryTableManager
+from databricks.labs.ucx.inventory.permissions_inventory import (
+    PermissionsInventoryTable,
+)
 from databricks.labs.ucx.inventory.types import (
     LogicalObjectType,
     PermissionsInventoryItem,
@@ -25,19 +26,16 @@ perm_items = [PermissionsInventoryItem("object1", LogicalObjectType.CLUSTER, Req
 
 
 @pytest.fixture
-def inventory_table_manager(workspace_client, mocker):
+def permissions_inventory(workspace_client, mocker):
     mocker.patch("databricks.labs.ucx.providers.spark.SparkMixin._initialize_spark", Mock())
-    config = InventoryConfig(
-        InventoryTable(catalog="test_catalog", database="test_database", name="test_inventory_table")
-    )
-    return InventoryTableManager(config, workspace_client)
+    return PermissionsInventoryTable("test_database", workspace_client)
 
 
-def test_inventory_table_manager_init(inventory_table_manager):
-    assert str(inventory_table_manager.config.table) == "test_catalog.test_database.test_inventory_table"
+def test_inventory_table_manager_init(permissions_inventory):
+    assert str(permissions_inventory._table) == "hive_metastore.test_database.permissions"
 
 
-def test_table_schema(inventory_table_manager):
+def test_table_schema(permissions_inventory):
     schema = StructType(
         [
             StructField("object_id", StringType(), True),
@@ -46,28 +44,24 @@ def test_table_schema(inventory_table_manager):
             StructField("raw_object_permissions", StringType(), True),
         ]
     )
-    assert inventory_table_manager._table_schema == schema
+    assert permissions_inventory._table_schema == schema
 
 
-def test_table(inventory_table_manager):
-    assert inventory_table_manager._table == inventory_table_manager.spark.table(
-        "test_catalog.test_database.test_inventory_table"
-    )
+def test_table(permissions_inventory):
+    assert permissions_inventory._df == permissions_inventory.spark.table("test_catalog.test_database.permissions")
 
 
-def test_cleanup(inventory_table_manager):
-    inventory_table_manager.cleanup()
-    inventory_table_manager.spark.sql.assert_called_with(
-        "DROP TABLE IF EXISTS test_catalog.test_database.test_inventory_table"
-    )
+def test_cleanup(permissions_inventory):
+    permissions_inventory.cleanup()
+    permissions_inventory.spark.sql.assert_called_with("DROP TABLE IF EXISTS hive_metastore.test_database.permissions")
 
 
-def test_save(inventory_table_manager):
-    inventory_table_manager.save(perm_items)
-    inventory_table_manager.spark.createDataFrame.assert_called_once()
+def test_save(permissions_inventory):
+    permissions_inventory.save(perm_items)
+    permissions_inventory.spark.createDataFrame.assert_called_once()
 
 
-def test_load_all(inventory_table_manager):
+def test_load_all(permissions_inventory):
     items = pd.DataFrame(
         {
             "object_id": ["object1"],
@@ -76,8 +70,8 @@ def test_load_all(inventory_table_manager):
             "raw_object_permissions": ["test acl"],
         }
     )
-    inventory_table_manager._table.toPandas.return_value = items
-    output = inventory_table_manager.load_all()
+    permissions_inventory._df.toPandas.return_value = items
+    output = permissions_inventory.load_all()
     assert output[0] == PermissionsInventoryItem(
         "object1", LogicalObjectType.CLUSTER, RequestObjectType.CLUSTERS, "test acl"
     )
@@ -157,17 +151,17 @@ def test_load_all(inventory_table_manager):
         ),
     ],
 )
-def test_is_item_relevant_to_groups(inventory_table_manager, items, groups, status):
-    assert inventory_table_manager._is_item_relevant_to_groups(items, groups) is status
+def test_is_item_relevant_to_groups(permissions_inventory, items, groups, status):
+    assert permissions_inventory._is_item_relevant_to_groups(items, groups) is status
 
 
-def test_is_item_relevant_to_groups_exception(inventory_table_manager):
+def test_is_item_relevant_to_groups_exception(permissions_inventory):
     item = PermissionsInventoryItem("object1", "FOO", "BAR", "test acl")
     with pytest.raises(NotImplementedError):
-        inventory_table_manager._is_item_relevant_to_groups(item, ["g1"])
+        permissions_inventory._is_item_relevant_to_groups(item, ["g1"])
 
 
-def test_load_for_groups(inventory_table_manager):
+def test_load_for_groups(permissions_inventory):
     items = pd.DataFrame(
         {
             "object_id": ["group1"],
@@ -187,8 +181,8 @@ def test_load_for_groups(inventory_table_manager):
         }
     )
     groups = ["group1", "group2"]
-    inventory_table_manager._table.toPandas.return_value = items
-    output = inventory_table_manager.load_for_groups(groups)
+    permissions_inventory._df.toPandas.return_value = items
+    output = permissions_inventory.load_for_groups(groups)
     assert output[0] == PermissionsInventoryItem(
         object_id="group1",
         logical_object_type=LogicalObjectType.CLUSTER,

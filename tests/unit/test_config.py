@@ -5,19 +5,13 @@ from pathlib import Path
 
 import yaml
 
-from databricks.labs.ucx.config import (
-    GroupsConfig,
-    InventoryConfig,
-    InventoryTable,
-    MigrationConfig,
-    TaclConfig,
-)
+from databricks.labs.ucx.config import GroupsConfig, MigrationConfig, TaclConfig
 
 
 def test_initialization():
     mc = partial(
         MigrationConfig,
-        inventory=InventoryConfig(table=InventoryTable(catalog="catalog", database="database", name="name")),
+        inventory_database="abc",
         groups=GroupsConfig(auto=True),
         tacl=TaclConfig(databases=["default"]),
     )
@@ -49,7 +43,7 @@ def test_reader(tmp_path: Path):
     with set_directory(tmp_path):
         mc = partial(
             MigrationConfig,
-            inventory=InventoryConfig(table=InventoryTable(catalog="catalog", database="database", name="name")),
+            inventory_database="abc",
             groups=GroupsConfig(auto=True),
             tacl=TaclConfig(databases=["default"]),
         )
