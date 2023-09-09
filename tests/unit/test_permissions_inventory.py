@@ -6,7 +6,9 @@ import pytest
 from databricks.sdk.service.iam import AccessControlResponse, ObjectPermissions
 from pyspark.sql.types import StringType, StructField, StructType
 
-from databricks.labs.ucx.inventory.permissions_inventory import PermissionsInventoryTable
+from databricks.labs.ucx.inventory.permissions_inventory import (
+    PermissionsInventoryTable,
+)
 from databricks.labs.ucx.inventory.types import (
     LogicalObjectType,
     PermissionsInventoryItem,
