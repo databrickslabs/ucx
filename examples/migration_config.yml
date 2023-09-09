@@ -1,8 +1,4 @@
-inventory:
-  table:
-    catalog: main
-    database: default
-    name: uc_migration_inventory
+inventory_database: unity_catalog_migration
 
 tacl:
   databases: [ "default" ]
