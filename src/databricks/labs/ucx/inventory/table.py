@@ -17,10 +17,10 @@ from databricks.labs.ucx.providers.spark import SparkMixin
 logger = logging.getLogger(__name__)
 
 
-class InventoryTableManager(SparkMixin):
+class PermissionsInventoryTable(SparkMixin):
     def __init__(self, inventory_database: str, ws: WorkspaceClient):
         super().__init__(ws)
-        self._table = f'hive_metastore.{inventory_database}.permissions'
+        self._table = f"hive_metastore.{inventory_database}.permissions"
 
     @property
     def _table_schema(self) -> StructType:

@@ -5,11 +5,7 @@ from pathlib import Path
 
 import yaml
 
-from databricks.labs.ucx.config import (
-    GroupsConfig,
-    MigrationConfig,
-    TaclConfig,
-)
+from databricks.labs.ucx.config import GroupsConfig, MigrationConfig, TaclConfig
 
 
 def test_initialization():

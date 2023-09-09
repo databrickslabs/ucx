@@ -5,7 +5,7 @@ from databricks.sdk import WorkspaceClient
 from databricks.labs.ucx.config import MigrationConfig
 from databricks.labs.ucx.inventory.inventorizer import Inventorizers
 from databricks.labs.ucx.inventory.permissions import PermissionManager
-from databricks.labs.ucx.inventory.table import InventoryTableManager
+from databricks.labs.ucx.inventory.table import PermissionsInventoryTable
 from databricks.labs.ucx.managers.group import GroupManager
 
 
@@ -24,8 +24,8 @@ class GroupMigrationToolkit:
         self._verify_ws_client(self._ws)
 
         self._group_manager = GroupManager(self._ws, config.groups)
-        self._table_manager = InventoryTableManager(config.inventory_database, self._ws)
-        self._permissions_manager = PermissionManager(self._ws, self._table_manager)
+        self._permissions_inventory = PermissionsInventoryTable(config.inventory_database, self._ws)
+        self._permissions_manager = PermissionManager(self._ws, self._permissions_inventory)
 
     @staticmethod
     def _verify_ws_client(w: WorkspaceClient):
@@ -48,7 +48,7 @@ class GroupMigrationToolkit:
         self._permissions_manager.set_inventorizers(inventorizers)
 
     def cleanup_inventory_table(self):
-        self._table_manager.cleanup()
+        self._permissions_inventory.cleanup()
 
     def inventorize_permissions(self):
         self._permissions_manager.inventorize_permissions()

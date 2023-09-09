@@ -15,7 +15,7 @@ from ratelimit import limits, sleep_and_retry
 from tenacity import retry, stop_after_attempt, wait_fixed, wait_random
 
 from databricks.labs.ucx.inventory.inventorizer import BaseInventorizer
-from databricks.labs.ucx.inventory.table import InventoryTableManager
+from databricks.labs.ucx.inventory.table import PermissionsInventoryTable
 from databricks.labs.ucx.inventory.types import (
     AclItemsContainer,
     LogicalObjectType,
@@ -54,9 +54,9 @@ AnyRequestPayload = PermissionRequestPayload | SecretsPermissionRequestPayload |
 
 # TODO: this class has too many @staticmethod and they must not be such. write a unit test for this logic.
 class PermissionManager:
-    def __init__(self, ws: WorkspaceClient, inventory_table_manager: InventoryTableManager):
+    def __init__(self, ws: WorkspaceClient, permissions_inventory: PermissionsInventoryTable):
         self._ws = ws
-        self.inventory_table_manager = inventory_table_manager
+        self._permissions_inventory = permissions_inventory
         self._inventorizers = []
 
     @property
@@ -72,7 +72,7 @@ class PermissionManager:
             inventorizer.preload()
             collected = inventorizer.inventorize()
             if collected:
-                self.inventory_table_manager.save(collected)
+                self._permissions_inventory.save(collected)
             else:
                 logger.warning(f"No objects of type {inventorizer.logical_object_types} were found")
 
@@ -289,7 +289,7 @@ class PermissionManager:
         logger.info(f"Applying the permissions to {destination} groups")
         logger.info(f"Total groups to apply permissions: {len(migration_state.groups)}")
 
-        permissions_on_source = self.inventory_table_manager.load_for_groups(
+        permissions_on_source = self._permissions_inventory.load_for_groups(
             groups=[g.workspace.display_name for g in migration_state.groups]
         )
         permission_payloads: list[AnyRequestPayload] = [
