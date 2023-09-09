@@ -6,7 +6,6 @@ import pytest
 from databricks.sdk.service.iam import AccessControlResponse, ObjectPermissions
 from pyspark.sql.types import StringType, StructField, StructType
 
-from databricks.labs.ucx.config import InventoryConfig, InventoryTable
 from databricks.labs.ucx.inventory.table import InventoryTableManager
 from databricks.labs.ucx.inventory.types import (
     LogicalObjectType,
@@ -27,14 +26,11 @@ perm_items = [PermissionsInventoryItem("object1", LogicalObjectType.CLUSTER, Req
 @pytest.fixture
 def inventory_table_manager(workspace_client, mocker):
     mocker.patch("databricks.labs.ucx.providers.spark.SparkMixin._initialize_spark", Mock())
-    config = InventoryConfig(
-        InventoryTable(catalog="test_catalog", database="test_database", name="test_inventory_table")
-    )
-    return InventoryTableManager(config, workspace_client)
+    return InventoryTableManager('test_database', workspace_client)
 
 
 def test_inventory_table_manager_init(inventory_table_manager):
-    assert str(inventory_table_manager.config.table) == "test_catalog.test_database.test_inventory_table"
+    assert str(inventory_table_manager._table) == "hive_metastore.test_database.permissions"
 
 
 def test_table_schema(inventory_table_manager):
@@ -50,7 +46,7 @@ def test_table_schema(inventory_table_manager):
 
 
 def test_table(inventory_table_manager):
-    assert inventory_table_manager._table == inventory_table_manager.spark.table(
+    assert inventory_table_manager._df == inventory_table_manager.spark.table(
         "test_catalog.test_database.test_inventory_table"
     )
 
@@ -58,7 +54,7 @@ def test_table(inventory_table_manager):
 def test_cleanup(inventory_table_manager):
     inventory_table_manager.cleanup()
     inventory_table_manager.spark.sql.assert_called_with(
-        "DROP TABLE IF EXISTS test_catalog.test_database.test_inventory_table"
+        "DROP TABLE IF EXISTS hive_metastore.test_database.permissions"
     )
 
 
@@ -76,7 +72,7 @@ def test_load_all(inventory_table_manager):
             "raw_object_permissions": ["test acl"],
         }
     )
-    inventory_table_manager._table.toPandas.return_value = items
+    inventory_table_manager._df.toPandas.return_value = items
     output = inventory_table_manager.load_all()
     assert output[0] == PermissionsInventoryItem(
         "object1", LogicalObjectType.CLUSTER, RequestObjectType.CLUSTERS, "test acl"
@@ -187,7 +183,7 @@ def test_load_for_groups(inventory_table_manager):
         }
     )
     groups = ["group1", "group2"]
-    inventory_table_manager._table.toPandas.return_value = items
+    inventory_table_manager._df.toPandas.return_value = items
     output = inventory_table_manager.load_for_groups(groups)
     assert output[0] == PermissionsInventoryItem(
         object_id="group1",

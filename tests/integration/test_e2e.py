@@ -9,8 +9,6 @@ from databricks.sdk.service.iam import PermissionLevel
 from databricks.labs.ucx.config import (
     ConnectConfig,
     GroupsConfig,
-    InventoryConfig,
-    InventoryTable,
     MigrationConfig,
     TaclConfig,
 )
@@ -162,13 +160,7 @@ def test_e2e(
 
     config = MigrationConfig(
         connect=ConnectConfig.from_databricks_config(ws.config),
-        inventory=InventoryConfig(
-            table=InventoryTable(
-                catalog="hive_metastore",
-                database=make_schema(catalog="hive_metastore").split(".")[-1],
-                name="permissions",
-            )
-        ),
+        inventory_database=make_schema(catalog="hive_metastore").split(".")[-1],
         groups=GroupsConfig(selected=[ws_group.display_name]),
         workspace_start_path=directory,
         tacl=TaclConfig(auto=True),

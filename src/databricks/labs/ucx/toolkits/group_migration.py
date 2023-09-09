@@ -24,7 +24,7 @@ class GroupMigrationToolkit:
         self._verify_ws_client(self._ws)
 
         self._group_manager = GroupManager(self._ws, config.groups)
-        self._table_manager = InventoryTableManager(config.inventory, self._ws)
+        self._table_manager = InventoryTableManager(config.inventory_database, self._ws)
         self._permissions_manager = PermissionManager(self._ws, self._table_manager)
 
     @staticmethod
