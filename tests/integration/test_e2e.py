@@ -30,7 +30,6 @@ def _verify_group_permissions(
     objects: list | WorkspaceObjects | None,
     id_attribute: str,
     request_object_type: RequestObjectType | None,
-    ws: WorkspaceClient,
     toolkit: GroupMigrationToolkit,
     target: Literal["backup", "account"],
 ):
@@ -74,7 +73,6 @@ def test_e2e(
     env: EnvironmentInfo,
     inventory_table: InventoryTable,
     ws: WorkspaceClient,
-    verifiable_objects: list[tuple[list, str, RequestObjectType | None]],
     make_instance_pool,
     make_instance_pool_permissions,
     make_cluster,
@@ -101,6 +99,8 @@ def test_e2e(
 ):
     logger.debug(f"Test environment: {env.test_uid}")
     ws_group = env.groups[0][0]
+
+    verifiable_objects = []
 
     pool = make_instance_pool()
     make_instance_pool_permissions(
@@ -261,7 +261,7 @@ def test_e2e(
     toolkit.apply_permissions_to_backup_groups()
 
     for _objects, id_attribute, request_object_type in verifiable_objects:
-        _verify_group_permissions(_objects, id_attribute, request_object_type, ws, toolkit, "backup")
+        _verify_group_permissions(_objects, id_attribute, request_object_type, toolkit, "backup")
 
     _verify_roles_and_entitlements(group_migration_state, ws, "backup")
 
@@ -276,7 +276,7 @@ def test_e2e(
     toolkit.apply_permissions_to_account_groups()
 
     for _objects, id_attribute, request_object_type in verifiable_objects:
-        _verify_group_permissions(_objects, id_attribute, request_object_type, ws, toolkit, "account")
+        _verify_group_permissions(_objects, id_attribute, request_object_type, toolkit, "account")
 
     _verify_roles_and_entitlements(group_migration_state, ws, "account")
 

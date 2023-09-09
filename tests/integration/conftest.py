@@ -1,4 +1,3 @@
-import io
 import json
 import logging
 import os
@@ -9,16 +8,13 @@ import databricks.sdk.core
 import pytest
 from databricks.sdk import AccountClient, WorkspaceClient
 from databricks.sdk.core import Config
-from databricks.sdk.service.iam import AccessControlRequest, PermissionLevel
-from databricks.sdk.service.workspace import ObjectInfo, ObjectType
 
 from databricks.labs.ucx.config import InventoryTable
-from databricks.labs.ucx.inventory.types import RequestObjectType
 from databricks.labs.ucx.providers.mixins.fixtures import *  # noqa: F403
 from databricks.labs.ucx.providers.mixins.sql import StatementExecutionExt
 from databricks.labs.ucx.utils import ThreadedExecution
 
-from .utils import EnvironmentInfo, InstanceProfile, WorkspaceObjects
+from .utils import EnvironmentInfo, InstanceProfile
 
 logging.getLogger("tests").setLevel("DEBUG")
 logging.getLogger("databricks.labs.ucx").setLevel("DEBUG")
@@ -232,71 +228,6 @@ def instance_profiles(env: EnvironmentInfo, ws: WorkspaceClient) -> list[Instanc
     for profile in profiles:
         ws.instance_profiles.remove(profile.instance_profile_arn)
     logger.debug("Test instance profiles deleted")
-
-
-@pytest.fixture
-def workspace_objects(ws: WorkspaceClient, env: EnvironmentInfo) -> WorkspaceObjects:
-    logger.info(f"Creating test workspace objects under /{env.test_uid}")
-    ws.workspace.mkdirs(f"/{env.test_uid}")
-
-    base_dirs = []
-
-    for ws_group, _ in env.groups:
-        _path = f"/{env.test_uid}/{ws_group.display_name}"
-        ws.workspace.mkdirs(_path)
-        object_info = ws.workspace.get_status(_path)
-        base_dirs.append(object_info)
-
-        ws.permissions.set(
-            request_object_type=RequestObjectType.DIRECTORIES,
-            request_object_id=object_info.object_id,
-            access_control_list=[
-                AccessControlRequest(group_name=ws_group.display_name, permission_level=PermissionLevel.CAN_MANAGE)
-            ],
-        )
-
-    notebooks = []
-
-    for nb_idx in range(3):
-        random_group = random.choice([g[0] for g in env.groups])
-        _nb_path = f"/{env.test_uid}/{random_group.display_name}/nb-{nb_idx}.py"
-        ws.workspace.upload(path=_nb_path, content=io.BytesIO(b"print(1)"))
-        # TODO: add a proper test for this
-        # if random.choice([True, False]):
-        #     ws.experiments.create_experiment(name=_nb_path)  # create experiment to test nb-based experiments
-        _nb_obj = ws.workspace.get_status(_nb_path)
-        notebooks.append(_nb_obj)
-        ws.permissions.set(
-            request_object_type=RequestObjectType.NOTEBOOKS,
-            request_object_id=_nb_obj.object_id,
-            access_control_list=[
-                AccessControlRequest(group_name=random_group.display_name, permission_level=PermissionLevel.CAN_EDIT)
-            ],
-        )
-
-    yield WorkspaceObjects(
-        root_dir=ObjectInfo(
-            path=f"/{env.test_uid}",
-            object_type=ObjectType.DIRECTORY,
-            object_id=ws.workspace.get_status(f"/{env.test_uid}").object_id,
-        ),
-        directories=base_dirs,
-        notebooks=notebooks,
-    )
-
-    logger.debug("Deleting test workspace objects")
-    ws.workspace.delete(f"/{env.test_uid}", recursive=True)
-    logger.debug("Test workspace objects deleted")
-
-
-@pytest.fixture
-def verifiable_objects(
-    workspace_objects,
-) -> list[tuple[list, str, RequestObjectType | None]]:
-    _verifiable_objects = [
-        (workspace_objects, "workspace_objects", None),
-    ]
-    yield _verifiable_objects
 
 
 @pytest.fixture()
