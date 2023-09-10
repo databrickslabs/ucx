@@ -5,7 +5,7 @@ from concurrent.futures import FIRST_COMPLETED, ThreadPoolExecutor, wait
 from itertools import groupby
 
 from databricks.sdk import WorkspaceClient
-from databricks.sdk.service.ml import ModelDatabricks
+from databricks.sdk.service import ml
 from databricks.sdk.service.workspace import ObjectInfo, ObjectType
 from ratelimit import limits, sleep_and_retry
 
@@ -94,7 +94,7 @@ class WorkspaceListing:
 
 
 def models_listing(ws: WorkspaceClient):
-    def inner() -> Iterator[ModelDatabricks]:
+    def inner() -> Iterator[ml.ModelDatabricks]:
         for model in ws.model_registry.list_models():
             model_with_id = ws.model_registry.get_model(model.name).registered_model_databricks
             yield model_with_id
@@ -103,7 +103,7 @@ def models_listing(ws: WorkspaceClient):
 
 
 def experiments_listing(ws: WorkspaceClient):
-    def inner() -> Iterator[ModelDatabricks]:
+    def inner() -> Iterator[ml.Experiment]:
         for experiment in ws.experiments.list_experiments():
             """
             We filter-out notebook-based experiments, because they are covered by notebooks listing

@@ -80,3 +80,7 @@ class WorkspaceLevelEntitlement(StrEnum):
     DATABRICKS_SQL_ACCESS = "databricks-sql-access"
     ALLOW_CLUSTER_CREATE = "allow-cluster-create"
     ALLOW_INSTANCE_POOL_CREATE = "allow-instance-pool-create"
+
+
+def noop():
+    pass
