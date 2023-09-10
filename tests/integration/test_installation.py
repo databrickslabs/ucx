@@ -176,9 +176,9 @@ def test_toolkit_notebook(
     sql_exec(f"GRANT SELECT ON TABLE {table_b} TO `{ws_group_b.display_name}`")
     sql_exec(f"GRANT MODIFY ON SCHEMA {schema_b} TO `{ws_group_b.display_name}`")
 
-    _, inventory_schema = make_schema(catalog="hive_metastore").split(".")
+    _, inventory_database = make_schema(catalog="hive_metastore").split(".")
 
-    logger.info(f"inventory_schema={inventory_schema}")
+    logger.info(f"inventory_schema={inventory_database}")
 
     logger.info("uploading notebook")
 
@@ -201,7 +201,7 @@ def test_toolkit_notebook(
                 notebook_task=jobs.NotebookTask(
                     notebook_path=f"{remote_ucx_notebook_location}/test_notebook",
                     base_parameters={
-                        "inventory_schema": inventory_schema,
+                        "inventory_database": inventory_database,
                         "selected_groups": selected_groups,
                         "databases": databases,
                     },

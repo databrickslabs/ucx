@@ -7,23 +7,6 @@ from databricks.labs.ucx.__about__ import __version__
 
 
 @dataclass
-class InventoryTable:
-    catalog: str
-    database: str
-    name: str
-
-    def __repr__(self):
-        return f"{self.catalog}.{self.database}.{self.name}"
-
-    def to_spark(self):
-        return self.__repr__()
-
-    @classmethod
-    def from_dict(cls, raw: dict):
-        return cls(**raw)
-
-
-@dataclass
 class GroupsConfig:
     selected: list[str] | None = None
     auto: bool | None = None
@@ -40,15 +23,6 @@ class GroupsConfig:
     @classmethod
     def from_dict(cls, raw: dict):
         return cls(**raw)
-
-
-@dataclass
-class InventoryConfig:
-    table: InventoryTable
-
-    @classmethod
-    def from_dict(cls, raw: dict):
-        return cls(table=InventoryTable.from_dict(raw.get("table")))
 
 
 @dataclass
@@ -110,12 +84,15 @@ class TaclConfig:
 
 @dataclass
 class MigrationConfig:
-    inventory: InventoryConfig
+    inventory_database: str
     tacl: TaclConfig
     groups: GroupsConfig
     connect: ConnectConfig | None = None
     num_threads: int | None = 4
     log_level: str | None = "INFO"
+
+    # Starting path for notebooks and directories crawler
+    workspace_start_path: str = "/"
 
     def __post_init__(self):
         if self.connect is None:
@@ -140,7 +117,7 @@ class MigrationConfig:
     @classmethod
     def from_dict(cls, raw: dict) -> "MigrationConfig":
         return cls(
-            inventory=InventoryConfig.from_dict(raw.get("inventory", {})),
+            inventory_database=raw.get("inventory_database"),
             tacl=TaclConfig.from_dict(raw.get("tacl", {})),
             groups=GroupsConfig.from_dict(raw.get("groups", {})),
             connect=ConnectConfig.from_dict(raw.get("connect", {})),

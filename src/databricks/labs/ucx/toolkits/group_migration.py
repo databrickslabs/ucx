@@ -5,13 +5,14 @@ from databricks.sdk import WorkspaceClient
 from databricks.labs.ucx.config import MigrationConfig
 from databricks.labs.ucx.inventory.inventorizer import Inventorizers
 from databricks.labs.ucx.inventory.permissions import PermissionManager
-from databricks.labs.ucx.inventory.table import InventoryTableManager
+from databricks.labs.ucx.inventory.permissions_inventory import PermissionsInventoryTable
 from databricks.labs.ucx.managers.group import GroupManager
 
 
 class GroupMigrationToolkit:
     def __init__(self, config: MigrationConfig):
         self._num_threads = config.num_threads
+        self._workspace_start_path = config.workspace_start_path
 
         databricks_config = config.to_databricks_config()
         self._configure_logger(config.log_level)
@@ -22,9 +23,9 @@ class GroupMigrationToolkit:
         self._ws.api_client._session.adapters["https://"].max_retries.total = 20
         self._verify_ws_client(self._ws)
 
-        self.group_manager = GroupManager(self._ws, config.groups)
-        self.table_manager = InventoryTableManager(config.inventory, self._ws)
-        self.permissions_manager = PermissionManager(self._ws, self.table_manager)
+        self._group_manager = GroupManager(self._ws, config.groups)
+        self._permissions_inventory = PermissionsInventoryTable(config.inventory_database, self._ws)
+        self._permissions_manager = PermissionManager(self._ws, self._permissions_inventory)
 
     @staticmethod
     def _verify_ws_client(w: WorkspaceClient):
@@ -40,30 +41,36 @@ class GroupMigrationToolkit:
         ucx_logger.setLevel(level)
 
     def prepare_environment(self):
-        self.group_manager.prepare_groups_in_environment()
-        inventorizers = Inventorizers(
-            self._ws, self.group_manager.migration_groups_provider, self._num_threads
-        ).provide()
-        self.permissions_manager.set_inventorizers(inventorizers)
+        self._group_manager.prepare_groups_in_environment()
+        inventorizers = Inventorizers.provide(
+            self._ws, self._group_manager.migration_groups_provider, self._num_threads, self._workspace_start_path
+        )
+        self._permissions_manager.set_inventorizers(inventorizers)
 
     def cleanup_inventory_table(self):
-        self.table_manager.cleanup()
+        self._permissions_inventory.cleanup()
 
     def inventorize_permissions(self):
-        self.permissions_manager.inventorize_permissions()
+        self._permissions_manager.inventorize_permissions()
 
     def apply_permissions_to_backup_groups(self):
-        self.permissions_manager.apply_group_permissions(
-            self.group_manager.migration_groups_provider, destination="backup"
+        self._permissions_manager.apply_group_permissions(
+            self._group_manager.migration_groups_provider, destination="backup"
         )
+
+    def verify_permissions_on_backup_groups(self, to_verify):
+        self._permissions_manager.verify(self._group_manager.migration_groups_provider, "backup", to_verify)
 
     def replace_workspace_groups_with_account_groups(self):
-        self.group_manager.replace_workspace_groups_with_account_groups()
+        self._group_manager.replace_workspace_groups_with_account_groups()
 
     def apply_permissions_to_account_groups(self):
-        self.permissions_manager.apply_group_permissions(
-            self.group_manager.migration_groups_provider, destination="account"
+        self._permissions_manager.apply_group_permissions(
+            self._group_manager.migration_groups_provider, destination="account"
         )
 
+    def verify_permissions_on_account_groups(self, to_verify):
+        self._permissions_manager.verify(self._group_manager.migration_groups_provider, "account", to_verify)
+
     def delete_backup_groups(self):
-        self.group_manager.delete_backup_groups()
+        self._group_manager.delete_backup_groups()

@@ -11,6 +11,7 @@ import pytest
 from databricks.sdk import AccountClient, WorkspaceClient
 from databricks.sdk.core import DatabricksError
 from databricks.sdk.service import compute, iam, jobs, pipelines, workspace
+from databricks.sdk.service.sql import CreateWarehouseRequestWarehouseType
 
 _LOG = logging.getLogger(__name__)
 
@@ -130,8 +131,7 @@ def _permissions_mapping():
             [PermissionLevel.CAN_READ, PermissionLevel.CAN_RUN, PermissionLevel.CAN_EDIT, PermissionLevel.CAN_MANAGE],
             _path,
         ),
-        ("tokens_authorization", "authorization", [PermissionLevel.CAN_USE], _simple),
-        ("passwords_authorization", "authorization", [PermissionLevel.CAN_USE], _simple),
+        ("authorization", "authorization", [PermissionLevel.CAN_USE], _simple),
         (
             "warehouse",
             "sql/warehouses",
@@ -415,6 +415,29 @@ def make_cluster(ws, make_random):
 
 
 @pytest.fixture
+def make_experiment(ws, make_random):
+    def create(
+        *,
+        path: str | None = None,
+        experiment_name: str | None = None,
+        **kwargs,
+    ):
+        if path is None:
+            path = f"/Users/{ws.current_user.me().user_name}/{make_random(4)}"
+        if experiment_name is None:
+            experiment_name = f"sdk-{make_random(4)}"
+
+        try:
+            ws.workspace.mkdirs(path)
+        except DatabricksError:
+            pass
+
+        return ws.experiments.create_experiment(name=f"{path}/{experiment_name}", **kwargs)
+
+    yield from factory("experiment", create, lambda item: ws.experiments.delete_experiment(item.experiment_id))
+
+
+@pytest.fixture
 def make_instance_pool(ws, make_random):
     def create(*, instance_pool_name=None, node_type_id=None, **kwargs):
         if instance_pool_name is None:
@@ -451,6 +474,23 @@ def make_job(ws, make_random, make_notebook):
 
 
 @pytest.fixture
+def make_model(ws, make_random):
+    def create(
+        *,
+        model_name: str | None = None,
+        **kwargs,
+    ):
+        if model_name is None:
+            model_name = f"sdk-{make_random(4)}"
+
+        created_model = ws.model_registry.create_model(model_name, **kwargs)
+        model = ws.model_registry.get_model(created_model.registered_model.name)
+        return model.registered_model_databricks
+
+    yield from factory("model", create, lambda item: ws.model_registry.delete_model(item.id))
+
+
+@pytest.fixture
 def make_pipeline(ws, make_random, make_notebook):
     def create(**kwargs) -> pipelines.CreatePipelineResponse:
         if "name" not in kwargs:
@@ -471,6 +511,36 @@ def make_pipeline(ws, make_random, make_notebook):
         return ws.pipelines.create(continuous=False, **kwargs)
 
     yield from factory("delta live table", create, lambda item: ws.pipelines.delete(item.pipeline_id))
+
+
+@pytest.fixture
+def make_warehouse(ws, make_random):
+    def create(
+        *,
+        warehouse_name: str | None = None,
+        warehouse_type: CreateWarehouseRequestWarehouseType | None = None,
+        cluster_size: str | None = None,
+        max_num_clusters: int = 1,
+        enable_serverless_compute: bool = False,
+        **kwargs,
+    ):
+        if warehouse_name is None:
+            warehouse_name = f"sdk-{make_random(4)}"
+        if warehouse_type is None:
+            warehouse_type = CreateWarehouseRequestWarehouseType.PRO
+        if cluster_size is None:
+            cluster_size = "2X-Small"
+
+        return ws.warehouses.create(
+            name=warehouse_name,
+            cluster_size=cluster_size,
+            warehouse_type=warehouse_type,
+            max_num_clusters=max_num_clusters,
+            enable_serverless_compute=enable_serverless_compute,
+            **kwargs,
+        )
+
+    yield from factory("warehouse", create, lambda item: ws.warehouses.delete(item.id))
 
 
 def load_debug_env_if_runs_from_ide(key) -> bool:
