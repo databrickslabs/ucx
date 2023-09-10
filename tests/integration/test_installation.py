@@ -9,6 +9,7 @@ from pathlib import Path
 import pytest
 from databricks.sdk.service import compute, jobs
 from databricks.sdk.service.workspace import ImportFormat
+from databricks.sdk.service.iam import PermissionLevel
 
 from databricks.labs.ucx.providers.mixins.compute import CommandExecutor
 
@@ -98,16 +99,12 @@ def test_toolkit_notebook(
     sql_exec,
     wsfs_wheel,
     make_cluster,
-    make_cluster_policy,
-    make_directory,
+    make_cluster_permissions,
     make_ucx_group,
     make_instance_pool,
     make_job,
-    make_notebook,
-    make_pipeline,
+    make_job_permissions,
     make_random,
-    make_repo,
-    make_secret_scope,
     make_schema,
     make_table,
     make_user,
@@ -120,9 +117,8 @@ def test_toolkit_notebook(
 
     logger.info(f"user_a={user_a}, user_b={user_b}, user_c={user_c}, ")
 
-    # TODO add users to groups
-    ws_group_a, acc_group_a = make_ucx_group()
-    ws_group_b, acc_group_b = make_ucx_group()
+    ws_group_a, acc_group_a = make_ucx_group(members=[user_a, user_b])
+    ws_group_b, acc_group_b = make_ucx_group(members=[user_c])
     ws_group_c, acc_group_c = make_ucx_group()
 
     selected_groups = ",".join([ws_group_a.display_name, ws_group_b.display_name, ws_group_c.display_name])
@@ -130,29 +126,22 @@ def test_toolkit_notebook(
     logger.info(f"group_a={ws_group_a}, group_b={ws_group_b}, group_c={ws_group_c}, ")
 
     cluster = make_cluster(instance_pool_id=os.environ["TEST_INSTANCE_POOL_ID"], single_node=True)
-    cluster_policy = make_cluster_policy()
-    directory = make_directory()
-    instance_pool = make_instance_pool()
+    cluster_permissions = make_cluster_permissions(
+        object_id=cluster.cluster_id,
+        permission_level=PermissionLevel.CAN_RESTART,
+        group_name = ws_group_b.display_name
+    )
     job = make_job()
-    notebook = make_notebook()
-    pipeline = make_pipeline()
-    repo = make_repo()
-    secret_scope = make_secret_scope()
+    job_permissions = make_job_permissions(
+        object_id=job.job_id,
+        permission_level=PermissionLevel.IS_OWNER,
+        group_name=ws_group_b.display_name
+    )
 
     logger.info(
         f"cluster={cluster}, "
-        f"cluster_policy={cluster_policy}, "
-        f"directory={directory}, "
-        f"instance_pool={instance_pool}, "
         f"job={job}, "
-        f"notebook={notebook}, "
-        f"pipeline={pipeline}"
-        f"repo={repo}, "
-        f"secret_scope={secret_scope}, "
     )
-
-    # TODO create fixtures for DBSQL assets
-    # TODO set permissions
 
     schema_a = make_schema()
     schema_b = make_schema()
