@@ -9,7 +9,11 @@ from databricks.sdk.core import DatabricksError
 from databricks.sdk.service import iam, settings, sql, workspace
 from ratelimit import limits, sleep_and_retry
 
-from databricks.labs.ucx.inventory.listing import WorkspaceListing
+from databricks.labs.ucx.inventory.listing import (
+    WorkspaceListing,
+    experiments_listing,
+    models_listing,
+)
 from databricks.labs.ucx.inventory.types import (
     Destination,
     PermissionsInventoryItem,
@@ -227,7 +231,7 @@ class WorkspaceSupport(BaseSupport, PermissionsOp):
     Since all these objects are under `workspace` crawler name, we need to distinct between various request types
     Note that this class heavily shares the code with PermissionsSupport.
     We can't use direct inheritance from PermissionsSupport here due  to different logic of request_type handling.
-    Therefore common methods are put into `PermissionsOp` mixin.
+    Therefore, common methods are put into `PermissionsOp` mixin.
     """
 
     def _get_apply_task(
@@ -464,8 +468,108 @@ class PasswordsSupport(BaseSupport):
         return setter
 
 
+class SecretsSupport(BaseSupport):
+    def get_crawler_tasks(self) -> list[Callable[..., PermissionsInventoryItem | None]]:
+        scopes = self._ws.secrets.list_scopes()
+
+        def _crawler_task(scope: workspace.SecretScope):
+            acl_items = self._ws.secrets.list_acls(scope.name)
+            return PermissionsInventoryItem(
+                object_id=scope.name,
+                crawler="secrets",
+                raw_object_permissions=json.dumps([item.as_dict() for item in acl_items]),
+            )
+
+        return [partial(_crawler_task, scope) for scope in scopes]
+
+    def is_item_relevant(self, item: PermissionsInventoryItem, migration_state: GroupMigrationState) -> bool:
+        acls = [workspace.AclItem.from_dict(acl) for acl in json.loads(item.raw_object_permissions)]
+        mentioned_groups = [acl.principal for acl in acls]
+        return any(g in mentioned_groups for g in [info.workspace for info in migration_state.groups])
+
+    @sleep_and_retry
+    @limits(calls=30, period=1)
+    def _rate_limited_put_acl(self, object_id: str, principal: str, permission: workspace.AclPermission):
+        self._ws.secrets.put_acl(object_id, principal, permission)
+
+    def _get_apply_task(
+        self, item: PermissionsInventoryItem, migration_state: GroupMigrationState, destination: Destination
+    ) -> partial:
+        acls = [workspace.AclItem.from_dict(acl) for acl in json.loads(item.raw_object_permissions)]
+        new_acls = []
+
+        for acl in acls:
+            if acl.principal in [i.workspace for i in migration_state.groups]:
+                source_info = migration_state.get_by_workspace_group_name(acl.principal)
+                target: iam.Group = getattr(source_info, destination)
+                new_acls.append(workspace.AclItem(principal=target.display_name, permission=acl.permission))
+            else:
+                new_acls.append(acl)
+
+        def apply_acls():
+            for acl in new_acls:
+                self._rate_limited_put_acl(item.object_id, acl.principal, acl.permission)
+
+        return partial(apply_acls)
+
+
 def get_crawlers(ws: WorkspaceClient):
     return {
         "entitlements": GroupLevelSupport(ws=ws, property_name="entitlements"),
         "roles": GroupLevelSupport(ws=ws, property_name="roles"),
+        "clusters": PermissionsSupport(
+            ws=ws, listing_function=ws.clusters.list, id_attribute="cluster_id", request_type=RequestObjectType.CLUSTERS
+        ),
+        "cluster_policies": PermissionsSupport(
+            ws=ws,
+            listing_function=ws.cluster_policies.list,
+            id_attribute="cluster_policy_id",
+            request_type=RequestObjectType.CLUSTER_POLICIES,
+        ),
+        "instance_pools": PermissionsSupport(
+            ws=ws,
+            listing_function=ws.instance_pools.list,
+            id_attribute="instance_pool_id",
+            request_type=RequestObjectType.INSTANCE_POOLS,
+        ),
+        "sql_warehouses": PermissionsSupport(
+            ws=ws, listing_function=ws.warehouses.list, id_attribute="id", request_type=RequestObjectType.SQL_WAREHOUSES
+        ),
+        "jobs": PermissionsSupport(
+            ws=ws, listing_function=ws.jobs.list, id_attribute="job_id", request_type=RequestObjectType.JOBS
+        ),
+        "pipelines": PermissionsSupport(
+            ws=ws,
+            listing_function=ws.pipelines.list,
+            id_attribute="pipeline_id",
+            request_type=RequestObjectType.PIPELINES,
+        ),
+        "experiments": PermissionsSupport(
+            ws=ws,
+            listing_function=experiments_listing(ws),
+            id_attribute="experiment_id",
+            request_type=RequestObjectType.EXPERIMENTS,
+        ),
+        "registered_models": PermissionsSupport(
+            ws=ws,
+            listing_function=models_listing(ws),
+            id_attribute="id",
+            request_type=RequestObjectType.REGISTERED_MODELS,
+        ),
+        "alerts": SqlPermissionsSupport(
+            ws=ws, listing_function=ws.alerts.list, id_attribute="alert_id", object_type=sql.ObjectTypePlural.ALERTS
+        ),
+        "dashboards": SqlPermissionsSupport(
+            ws=ws,
+            listing_function=ws.dashboards.list,
+            id_attribute="dashboard_id",
+            object_type=sql.ObjectTypePlural.DASHBOARDS,
+        ),
+        "queries": SqlPermissionsSupport(
+            ws=ws, listing_function=ws.queries.list, id_attribute="query_id", object_type=sql.ObjectTypePlural.QUERIES
+        ),
+        "tokens": TokensSupport(ws=ws),
+        "passwords": PasswordsSupport(ws=ws),
+        "secrets": SecretsSupport(ws),
+        "workspace": WorkspaceSupport(ws=ws),
     }
