@@ -168,7 +168,7 @@ We do this inside the `applier`, by returning a `noop` callable if the object is
 To crawl the permissions, we use the following logic:
 1. Go through the list of all crawlers.
 2. Get the list of all objects of the given type.
-3. For each callable, generate a callable that will return a `PermissionInventoryItem`.
+3. For each object, generate a callable that will return a `PermissionInventoryItem`.
 4. Execute the callables in parallel
 5. Collect the results into a list of `PermissionInventoryItem`.
 6. Save the list of `PermissionInventoryItem` into a Delta Table.
@@ -178,7 +178,7 @@ To crawl the permissions, we use the following logic:
 To apply the permissions, we use the following logic:
 
 1. Read the Delta Table with raw permissions.
-2. Map the items to the relevant applier. If no relevant applier is found, we raise an exception.
+2. Map the items to the relevant `support` object. If no relevant `support` object is found, an exception is raised.
 3. Deserialize the items using the relevant applier.
 4. Generate a list of callables that will apply the permissions.
 5. Execute the callables in parallel.

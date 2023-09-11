@@ -53,11 +53,7 @@ class PermissionManager:
                 raise ValueError(msg)
 
         for support, items_subset in supports_to_items.items():
-            relevant_support = self._supports_provider.supports.get(support)
-            if not relevant_support:
-                msg = f"Could not find support for {support}. Total items for this support: {len(list(items_subset))}"
-                raise ValueError(msg)
-
+            relevant_support = self._supports_provider.supports[support]
             tasks_for_support = [
                 relevant_support.get_apply_task(item, migration_state, destination) for item in items_subset
             ]
