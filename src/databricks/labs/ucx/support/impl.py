@@ -1,5 +1,4 @@
-from collections.abc import Callable
-from collections.abc import Iterator
+from collections.abc import Callable, Iterator
 
 from databricks.sdk import WorkspaceClient
 from databricks.sdk.service import sql
