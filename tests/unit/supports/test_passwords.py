@@ -33,8 +33,11 @@ def test_crawlers():
     tasks = pwd.get_crawler_tasks()
     assert len(tasks) == 1
     getter = tasks[0]
-    getter()
+    item = getter()
     ws_mock.users.get_password_permissions.assert_called_once()
+    assert item.support == Supports.passwords
+    assert item.object_id == "passwords"
+    assert isinstance(json.loads(item.raw_object_permissions), dict)
 
 
 def test_apply():

@@ -39,21 +39,27 @@ class TokensSupport(BaseSupport):
             new_acl_requests: list[settings.TokenAccessControlRequest] = []
 
             for acl_item in permissions.access_control_list:
-                if acl_item.group_name in [i.workspace for i in migration_state.groups]:
+                if acl_item.group_name in [i.workspace.display_name for i in migration_state.groups]:
                     source_info = migration_state.get_by_workspace_group_name(acl_item.group_name)
                     target: iam.Group = getattr(source_info, destination)
                     for permission in acl_item.all_permissions:
+                        if permission.inherited:
+                            continue
+
                         _req = settings.TokenAccessControlRequest(
-                            group_name=target.display_name, permission_level=permission
+                            group_name=target.display_name, permission_level=permission.permission_level
                         )
                         new_acl_requests.append(_req)
                 else:
                     for permission in acl_item.all_permissions:
+                        if permission.inherited:
+                            continue
+
                         _req = settings.TokenAccessControlRequest(
                             group_name=acl_item.group_name,
                             user_name=acl_item.user_name,
                             service_principal_name=acl_item.service_principal_name,
-                            permission_level=permission,
+                            permission_level=permission.permission_level,
                         )
                         new_acl_requests.append(_req)
 
