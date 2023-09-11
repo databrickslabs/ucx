@@ -96,10 +96,7 @@ class GenericPermissionsSupport(BaseSupport):
     ) -> PermissionsInventoryItem | None:
         permissions = self._safe_get_permissions(ws, request_type, object_id)
 
-        if request_type == RequestObjectType.AUTHORIZATION:
-            support = object_id
-        else:
-            support = request_type.value
+        support = object_id if request_type == RequestObjectType.AUTHORIZATION else request_type.value
 
         if permissions:
             return PermissionsInventoryItem(
@@ -115,10 +112,11 @@ class GenericPermissionsSupport(BaseSupport):
             iam.ObjectPermissions.from_dict(json.loads(item.raw_object_permissions)), migration_state, destination
         )
 
-        if item.support in ("passwords", "tokens"):
-            request_type = RequestObjectType.AUTHORIZATION
-        else:
-            request_type = RequestObjectType(item.support)
+        request_type = (
+            RequestObjectType.AUTHORIZATION
+            if item.support in ("passwords", "tokens")
+            else RequestObjectType(item.support)
+        )
 
         return partial(
             self._applier_task,
