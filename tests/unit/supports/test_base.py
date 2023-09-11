@@ -2,8 +2,11 @@ from functools import partial
 
 from databricks.sdk.service import iam
 
-from databricks.labs.ucx.inventory.types import PermissionsInventoryItem, Destination
-from databricks.labs.ucx.providers.groups_info import GroupMigrationState, MigrationGroupInfo
+from databricks.labs.ucx.inventory.types import PermissionsInventoryItem
+from databricks.labs.ucx.providers.groups_info import (
+    GroupMigrationState,
+    MigrationGroupInfo,
+)
 from databricks.labs.ucx.support.base import Applier
 from databricks.labs.ucx.utils import noop
 
@@ -14,12 +17,11 @@ def test_applier():
             workspace_groups = [info.workspace.display_name for info in migration_state.groups]
             return item.object_id in workspace_groups
 
-        def _get_apply_task(self, item: PermissionsInventoryItem, migration_state: GroupMigrationState,
-                            destination: Destination):
-            def applicator_task():
+        def _get_apply_task(self, _, __, ___):
+            def test_task():
                 print("here!")
 
-            return partial(applicator_task)
+            return partial(test_task)
 
     applier = SampleApplier()
     positive_item = PermissionsInventoryItem(object_id="test", support="test", raw_object_permissions="test")
@@ -33,7 +35,7 @@ def test_applier():
     )
 
     task = applier.get_apply_task(positive_item, migration_state, "backup")
-    assert task.func.__name__ == "applicator_task"
+    assert task.func.__name__ == "test_task"
 
     negative_item = PermissionsInventoryItem(object_id="not-here", support="test", raw_object_permissions="test")
     new_task = applier.get_apply_task(negative_item, migration_state, "backup")
