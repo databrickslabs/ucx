@@ -18,12 +18,13 @@ class PermissionsInventoryTable(SparkMixin):
 
     @property
     def _table_schema(self) -> StructType:
+        # TODO: generate the table schema automatically from the PermissionsInventoryItem class
         return StructType(
             [
                 StructField("object_id", StringType(), True),
-                StructField("logical_object_type", StringType(), True),
-                StructField("request_object_type", StringType(), True),
+                StructField("crawler", StringType(), True),
                 StructField("raw_object_permissions", StringType(), True),
+                StructField("raw_extras", StringType(), True),
             ]
         )
 
