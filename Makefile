@@ -6,3 +6,6 @@ fmt:
 
 test:
 	hatch run unit:test
+
+test-cov:
+	hatch run unit:test-cov-report
