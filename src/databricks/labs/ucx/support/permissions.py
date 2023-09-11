@@ -8,10 +8,8 @@ from databricks.sdk.core import DatabricksError
 from databricks.sdk.service import iam, workspace
 from ratelimit import limits, sleep_and_retry
 
-from databricks.labs.ucx.inventory.listing import (
+from databricks.labs.ucx.support.listing import (
     WorkspaceListing,
-    experiments_listing,
-    models_listing,
 )
 from databricks.labs.ucx.inventory.types import (
     Destination,
@@ -205,19 +203,4 @@ def authorization_listing():
     return inner
 
 
-def get_generic_support(ws: WorkspaceClient, num_threads: int, start_path: str):
-    return GenericPermissionsSupport(
-        ws=ws,
-        listings=[
-            listing_wrapper(ws.clusters.list, "cluster_id", RequestObjectType.CLUSTERS),
-            listing_wrapper(ws.cluster_policies.list, "cluster_policy_id", RequestObjectType.CLUSTER_POLICIES),
-            listing_wrapper(ws.instance_pools.list, "instance_pool_id", RequestObjectType.INSTANCE_POOLS),
-            listing_wrapper(ws.warehouses.list, "id", RequestObjectType.SQL_WAREHOUSES),
-            listing_wrapper(ws.jobs.list, "job_id", RequestObjectType.JOBS),
-            listing_wrapper(ws.pipelines.list, "pipeline_id", RequestObjectType.PIPELINES),
-            listing_wrapper(experiments_listing(ws), "experiment_id", RequestObjectType.EXPERIMENTS),
-            listing_wrapper(models_listing(ws), "id", RequestObjectType.REGISTERED_MODELS),
-            _workspace_listing(ws, num_threads=num_threads, start_path=start_path),
-            authorization_listing(),
-        ],
-    )
+

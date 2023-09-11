@@ -2,7 +2,7 @@ from unittest.mock import Mock
 
 from databricks.sdk.service.workspace import ObjectInfo, ObjectType
 
-from databricks.labs.ucx.inventory.listing import WorkspaceListing
+from databricks.labs.ucx.support.listing import WorkspaceListing
 
 
 # Helper to compare an unordered list of objects

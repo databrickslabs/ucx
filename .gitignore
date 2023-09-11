@@ -145,8 +145,6 @@ cython_debug/
 # dev files and scratches
 dev/cleanup.py
 
-Support
-
 .databricks
 .vscode
 
