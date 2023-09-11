@@ -1,6 +1,7 @@
 import json
 from unittest.mock import MagicMock
 
+import pytest
 from databricks.sdk.service import iam
 
 from databricks.labs.ucx.inventory.types import PermissionsInventoryItem
@@ -59,3 +60,34 @@ def test_scim_apply(migration_state):
         operations=[iam.Patch(op=iam.PatchOp.ADD, path="roles", value=sample_permissions)],
         schemas=[iam.PatchSchema.URN_IETF_PARAMS_SCIM_API_MESSAGES_2_0_PATCH_OP],
     )
+
+
+def test_no_group_in_migration_state(migration_state):
+    ws = MagicMock()
+    sup = ScimSupport(ws=ws)
+    sample_permissions = [iam.ComplexValue(value="role1"), iam.ComplexValue(value="role2")]
+    item = PermissionsInventoryItem(
+        object_id="test-non-existent",
+        support="roles",
+        raw_object_permissions=json.dumps([p.as_dict() for p in sample_permissions]),
+    )
+    with pytest.raises(ValueError):
+        sup._get_apply_task(item, migration_state, "backup")
+
+
+def test_non_relevant(migration_state):
+    ws = MagicMock()
+    sup = ScimSupport(ws=ws)
+    sample_permissions = [iam.ComplexValue(value="role1")]
+    relevant_item = PermissionsInventoryItem(
+        object_id="test-ws",
+        support="roles",
+        raw_object_permissions=json.dumps([p.as_dict() for p in sample_permissions]),
+    )
+    irrelevant_item = PermissionsInventoryItem(
+        object_id="something-non-relevant",
+        support="roles",
+        raw_object_permissions=json.dumps([p.as_dict() for p in sample_permissions]),
+    )
+    assert sup.is_item_relevant(relevant_item, migration_state)
+    assert not sup.is_item_relevant(irrelevant_item, migration_state)
