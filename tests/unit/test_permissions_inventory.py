@@ -7,9 +7,7 @@ from pyspark.sql.types import StringType, StructField, StructType
 from databricks.labs.ucx.inventory.permissions_inventory import (
     PermissionsInventoryTable,
 )
-from databricks.labs.ucx.inventory.types import (
-    PermissionsInventoryItem,
-)
+from databricks.labs.ucx.inventory.types import PermissionsInventoryItem
 
 
 @pytest.fixture
