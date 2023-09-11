@@ -1,3 +1,4 @@
+import concurrent.futures
 import json
 import logging
 from abc import ABC, abstractmethod
@@ -372,8 +373,9 @@ def experiments_listing(ws: WorkspaceClient):
 
 
 class MlArtifactsInventorizer(BaseInventorizer[InventoryObject]):
-    def __init__(self, ws: WorkspaceClient):
+    def __init__(self, ws: WorkspaceClient, num_threads: int):
         self._ws = ws
+        self._num_threads = num_threads
         self._permissions = []
 
     @property
@@ -384,11 +386,9 @@ class MlArtifactsInventorizer(BaseInventorizer[InventoryObject]):
         pass
 
     def inventorize(self) -> list[PermissionsInventoryItem]:
-        import concurrent.futures
-
-        with concurrent.futures.ThreadPoolExecutor(max_workers=20) as executor:
-            executor.map(self._inventorize_experiments(), range(20))
-            executor.map(self._inventorize_models(), range(20))
+        with concurrent.futures.ThreadPoolExecutor(max_workers=self._num_threads) as executor:
+            executor.map(self._inventorize_models())
+            executor.map(self._inventorize_models())
 
         return self._permissions
 
@@ -480,25 +480,12 @@ class Inventorizers:
             ),
             StandardInventorizer(
                 ws,
-                logical_object_type=LogicalObjectType.EXPERIMENT,
-                request_object_type=RequestObjectType.EXPERIMENTS,
-                listing_function=experiments_listing(ws),
-                id_attribute="experiment_id",
-            ),
-            StandardInventorizer(
-                ws,
-                logical_object_type=LogicalObjectType.MODEL,
-                request_object_type=RequestObjectType.REGISTERED_MODELS,
-                listing_function=models_listing(ws),
-                id_attribute="id",
-            ),
-            StandardInventorizer(
-                ws,
                 logical_object_type=LogicalObjectType.WAREHOUSE,
                 request_object_type=RequestObjectType.SQL_WAREHOUSES,
                 listing_function=ws.warehouses.list,
                 id_attribute="id",
             ),
+            MlArtifactsInventorizer(ws, num_threads=num_threads),
             SecretScopeInventorizer(ws),
             WorkspaceInventorizer(ws, num_threads=num_threads, start_path=start_path),
         ]

@@ -24,14 +24,14 @@ def test_ml_inventorizer_should_fetch_permission_for_experiments(make_user, make
     req2 = ExperimentAccessControlRequest(
         user_name=user.user_name, permission_level=ExperimentPermissionLevel.CAN_MANAGE
     )
-    ws.experiments.set_experiment_permissions(experiment_id=experiment.experiment_id, access_control_list=[req, req2])
+    ws.experiments.set_permissions(experiment_id=experiment.experiment_id, access_control_list=[req, req2])
 
-    inventorizer = MlArtifactsInventorizer(ws)
-    inventorizer.inventorize()
+    inventorizer = MlArtifactsInventorizer(ws, 1)
+    inventorizer._inventorize_experiments()
     item = inventorizer._permissions[0]
 
     assert item.raw_object_permissions == json.dumps(
-        ws.experiments.get_experiment_permissions(experiment_id=experiment.experiment_id).as_dict()
+        ws.experiments.get_permissions(experiment_id=experiment.experiment_id).as_dict()
     )
     assert item.object_id == experiment.experiment_id
 
@@ -45,13 +45,13 @@ def test_ml_inventorizer_should_fetch_permission_for_models(make_user, make_grou
     req = RegisteredModelAccessControlRequest(
         group_name=group.display_name, permission_level=RegisteredModelPermissionLevel.CAN_MANAGE_PRODUCTION_VERSIONS
     )
-    ws.model_registry.set_registered_model_permissions(registered_model_id=model_id, access_control_list=[req])
+    ws.model_registry.set_permissions(registered_model_id=model_id, access_control_list=[req])
 
-    inventorizer = MlArtifactsInventorizer(ws)
-    inventorizer.inventorize()
+    inventorizer = MlArtifactsInventorizer(ws, 1)
+    inventorizer._inventorize_models()
     item = inventorizer._permissions[0]
 
     assert item.raw_object_permissions == json.dumps(
-        ws.model_registry.get_registered_model_permissions(registered_model_id=model_id).as_dict()
+        ws.model_registry.get_permissions(registered_model_id=model_id).as_dict()
     )
     assert item.object_id == model_id
