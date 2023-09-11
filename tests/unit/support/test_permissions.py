@@ -155,20 +155,14 @@ def test_passwords_tokens_crawler(migration_state):
 
     ws.permissions.get.side_effect = [
         iam.ObjectPermissions(
-            object_id="passwords",
-            object_type=RequestObjectType.AUTHORIZATION,
-            access_control_list=basic_acl
+            object_id="passwords", object_type=RequestObjectType.AUTHORIZATION, access_control_list=basic_acl
         ),
         iam.ObjectPermissions(
-            object_id="tokens",
-            object_type=RequestObjectType.AUTHORIZATION,
-            access_control_list=basic_acl
+            object_id="tokens", object_type=RequestObjectType.AUTHORIZATION, access_control_list=basic_acl
         ),
     ]
 
-    sup = GenericPermissionsSupport(ws=ws, listings=[
-        authorization_listing()
-    ])
+    sup = GenericPermissionsSupport(ws=ws, listings=[authorization_listing()])
     tasks = list(sup.get_crawler_tasks())
     assert len(tasks) == 2
     auth_items = [task() for task in tasks]
@@ -179,12 +173,12 @@ def test_passwords_tokens_crawler(migration_state):
         new_acl = sup._prepare_new_acl(
             permissions=iam.ObjectPermissions.from_dict(json.loads(item.raw_object_permissions)),
             migration_state=migration_state,
-            destination="backup"
+            destination="backup",
         )
         applier()
         ws.permissions.update.assert_called_once_with(
             request_object_type=RequestObjectType.AUTHORIZATION,
             request_object_id=item.object_id,
-            access_control_list=new_acl
+            access_control_list=new_acl,
         )
         ws.permissions.update.reset_mock()
