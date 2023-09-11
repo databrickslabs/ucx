@@ -83,8 +83,7 @@ def test_load_all(permissions_inventory):
         (
             PermissionsInventoryItem(
                 object_id="group1",
-                logical_object_type=LogicalObjectType.CLUSTER,
-                request_object_type=RequestObjectType.CLUSTERS,
+                crawler="clusters",
                 raw_object_permissions=json.dumps(
                     ObjectPermissions(
                         object_id="clusterid1",
@@ -106,8 +105,7 @@ def test_load_all(permissions_inventory):
         (
             PermissionsInventoryItem(
                 object_id="group1",
-                logical_object_type=LogicalObjectType.ROLES,
-                request_object_type=None,
+                crawler="roles",
                 raw_object_permissions=json.dumps(
                     {
                         "roles": [
@@ -124,8 +122,7 @@ def test_load_all(permissions_inventory):
         (
             PermissionsInventoryItem(
                 object_id="scope-1",
-                logical_object_type=LogicalObjectType.SECRET_SCOPE,
-                request_object_type=None,
+                crawler="secrets",
                 raw_object_permissions="""{"acls": [
                     {"principal": "g1", "permission": "READ"},
                     {"principal": "unrelated-group", "permission": "READ"},
@@ -138,8 +135,7 @@ def test_load_all(permissions_inventory):
         (
             PermissionsInventoryItem(
                 object_id="scope-1",
-                logical_object_type=LogicalObjectType.SECRET_SCOPE,
-                request_object_type=None,
+                crawler="secrets",
                 raw_object_permissions="""{"acls": [
                     {"principal": "g1", "permission": "READ"},
                     {"principal": "unrelated-group", "permission": "READ"},

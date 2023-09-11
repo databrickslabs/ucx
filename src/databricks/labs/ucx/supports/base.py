@@ -67,7 +67,7 @@ class BaseSupport(ABC, Crawler, Applier):
         self._ws = ws
 
 
-def get_supports(ws: WorkspaceClient):
+def get_supports(ws: WorkspaceClient, num_threads: int, workspace_start_path: str):
     return {
         "entitlements": GroupLevelSupport(ws=ws, property_name="entitlements"),
         "roles": GroupLevelSupport(ws=ws, property_name="roles"),
@@ -125,5 +125,5 @@ def get_supports(ws: WorkspaceClient):
         "tokens": TokensSupport(ws=ws),
         "passwords": PasswordsSupport(ws=ws),
         "secrets": SecretsSupport(ws),
-        "workspace": WorkspaceSupport(ws=ws),
+        "workspace": WorkspaceSupport(ws=ws, num_threads=num_threads, start_path=workspace_start_path),
     }

@@ -3,12 +3,12 @@ import logging
 from databricks.sdk import WorkspaceClient
 
 from databricks.labs.ucx.config import MigrationConfig
-from databricks.labs.ucx.inventory.inventorizer import Inventorizers
 from databricks.labs.ucx.inventory.permissions import PermissionManager
 from databricks.labs.ucx.inventory.permissions_inventory import (
     PermissionsInventoryTable,
 )
 from databricks.labs.ucx.managers.group import GroupManager
+from databricks.labs.ucx.supports.base import get_supports
 
 
 class GroupMigrationToolkit:
@@ -44,10 +44,8 @@ class GroupMigrationToolkit:
 
     def prepare_environment(self):
         self._group_manager.prepare_groups_in_environment()
-        inventorizers = Inventorizers.provide(
-            self._ws, self._group_manager.migration_groups_provider, self._num_threads, self._workspace_start_path
-        )
-        self._permissions_manager.set_inventorizers(inventorizers)
+        supports = get_supports(self._ws, self._num_threads, self._workspace_start_path)
+        self._permissions_manager.set_supports(supports)
 
     def cleanup_inventory_table(self):
         self._permissions_inventory.cleanup()

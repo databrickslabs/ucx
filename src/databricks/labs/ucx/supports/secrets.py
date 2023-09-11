@@ -1,6 +1,6 @@
 import json
-from functools import partial
 from collections.abc import Callable
+from functools import partial
 
 from databricks.sdk.service import iam, workspace
 from ratelimit import limits, sleep_and_retry

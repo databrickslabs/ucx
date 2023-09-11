@@ -1,6 +1,6 @@
 import json
-from functools import partial
 from collections.abc import Callable
+from functools import partial
 
 from databricks.sdk import WorkspaceClient
 from databricks.sdk.core import DatabricksError
