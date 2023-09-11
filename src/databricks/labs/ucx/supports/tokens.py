@@ -1,19 +1,27 @@
 import json
 from collections.abc import Callable
 
+from databricks.sdk import WorkspaceClient
 from databricks.sdk.service import iam, settings
 
-from databricks.labs.ucx.inventory.types import Destination, PermissionsInventoryItem
+from databricks.labs.ucx.inventory.types import (
+    Destination,
+    PermissionsInventoryItem,
+    Supports,
+)
 from databricks.labs.ucx.providers.groups_info import GroupMigrationState
 from databricks.labs.ucx.supports.base import BaseSupport
 
 
 class TokensSupport(BaseSupport):
+    def __init__(self, ws: WorkspaceClient):
+        super().__init__(ws, support_name=Supports.tokens)
+
     def get_crawler_tasks(self) -> list[Callable[..., PermissionsInventoryItem | None]]:
         def token_getter() -> PermissionsInventoryItem:
             return PermissionsInventoryItem(
                 object_id="tokens",
-                support="tokens",
+                support=self._support_name,
                 raw_object_permissions=json.dumps(self._ws.token_management.get_token_permissions().as_dict()),
             )
 

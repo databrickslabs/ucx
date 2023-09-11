@@ -96,10 +96,8 @@ def get_supports(ws: WorkspaceClient, num_threads: int, workspace_start_path: st
             id_attribute="query_id",
             object_type=sql.ObjectTypePlural.QUERIES,
         ),
-        Supports.tokens: TokensSupport(ws=ws, support_name=Supports.tokens),
-        Supports.passwords: PasswordsSupport(ws=ws, support_name=Supports.passwords),
-        Supports.secrets: SecretsSupport(ws, support_name=Supports.secrets),
-        Supports.workspace: WorkspaceSupport(
-            ws=ws, num_threads=num_threads, start_path=workspace_start_path, support_name=Supports.workspace
-        ),
+        Supports.tokens: TokensSupport(ws=ws),
+        Supports.passwords: PasswordsSupport(ws=ws),
+        Supports.secrets: SecretsSupport(ws),
+        Supports.workspace: WorkspaceSupport(ws=ws, num_threads=num_threads, start_path=workspace_start_path),
     }

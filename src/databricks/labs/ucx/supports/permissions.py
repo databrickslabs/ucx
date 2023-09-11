@@ -160,8 +160,8 @@ class WorkspaceSupport(BaseSupport, PermissionsOp):
             self._applier_task, ws=self._ws, request_type=request_type, acl=new_acl, object_id=item.object_id
         )
 
-    def __init__(self, ws: WorkspaceClient, support_name: Supports, num_threads=20, start_path: str | None = "/"):
-        super().__init__(ws, support_name=support_name)
+    def __init__(self, ws: WorkspaceClient, num_threads=20, start_path: str | None = "/"):
+        super().__init__(ws, support_name=Supports.workspace)
         self.listing = WorkspaceListing(
             ws,
             num_threads=num_threads,
