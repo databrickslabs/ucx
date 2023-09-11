@@ -31,7 +31,7 @@ dbutils.library.restartPython()
 logger = logging.getLogger(__name__)
 
 
-def main(ws: WorkspaceClient, verbose: bool = False):
+def main(ws: WorkspaceClient, *, verbose: bool = False):
     folder_base = f"/Users/{ws.current_user.me().user_name}/.ucx"
     # create configuration file only if this installer is called for the first time,
     # otherwise just open file in the browser

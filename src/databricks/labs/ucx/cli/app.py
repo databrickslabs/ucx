@@ -7,6 +7,7 @@ import typer
 from databricks.sdk import WorkspaceClient
 from typer import Typer
 
+from databricks.labs.ucx.__about__ import __version__
 from databricks.labs.ucx.logger import _install
 
 _install()
@@ -20,7 +21,7 @@ app = Typer(name="UC Migration Toolkit", pretty_exceptions_show_locals=True)
 def install():
     from databricks.labs.ucx.install import main
 
-    ws = WorkspaceClient()
+    ws = WorkspaceClient(product="ucx", product_version=__version__)
     main(ws, verbose=False)
 
 
