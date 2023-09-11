@@ -141,7 +141,7 @@ def test_e2e(
 
     scope = make_secret_scope()
     make_secret_scope_acl(scope=scope, principal=ws_group.display_name, permission=workspace.AclPermission.WRITE)
-    to_verify.add((None, scope))
+    to_verify.add(("secrets", scope))
 
     make_authorization_permissions(
         object_id="tokens",
