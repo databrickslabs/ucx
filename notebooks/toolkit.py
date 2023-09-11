@@ -96,6 +96,16 @@ toolkit.cleanup_inventory_table()
 
 # MAGIC %md
 # MAGIC
+# MAGIC ## Inventorize Table ACL's
+
+# COMMAND ----------
+
+tacltoolkit.grants_snapshot()
+
+# COMMAND ----------
+
+# MAGIC %md
+# MAGIC
 # MAGIC ## Inventorize the permissions
 # MAGIC
 # MAGIC Please check `README.md` for supported permissions.
@@ -148,15 +158,6 @@ toolkit.apply_permissions_to_account_groups()
 
 toolkit.delete_backup_groups()
 
-# COMMAND ----------
-
-# MAGIC %md
-# MAGIC
-# MAGIC ## Inventorize Table ACL's
-
-# COMMAND ----------
-
-tacltoolkit.grants_snapshot()
 
 # COMMAND ----------
 
