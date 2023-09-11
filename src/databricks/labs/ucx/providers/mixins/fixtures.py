@@ -514,25 +514,6 @@ def make_pipeline(ws, make_random, make_notebook):
 
 
 @pytest.fixture
-def make_model(ws, make_random):
-    def create(**kwargs):
-        if "name" not in kwargs:
-            kwargs["name"] = f"sdk-{make_random(4)}"
-        return ws.model_registry.create_model(kwargs["name"]).registered_model
-
-    yield from factory("model", create, lambda item: ws.model_registry.delete_model(item.name))
-
-
-@pytest.fixture
-def make_experiment(ws, make_random):
-    def create(**kwargs):
-        if "path" not in kwargs:
-            kwargs["path"] = f"/Users/{ws.current_user.me().user_name}/{make_random(4)}/"
-        return ws.experiments.create_experiment(kwargs["path"])
-
-    yield from factory("model", create, lambda item: ws.experiments.delete_experiment(item.experiment_id))
-
-@pytest.fixture
 def make_warehouse(ws, make_random):
     def create(
         *,
