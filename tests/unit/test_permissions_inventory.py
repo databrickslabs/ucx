@@ -32,7 +32,6 @@ def test_table_schema(permissions_inventory):
             StructField("object_id", StringType(), True),
             StructField("support", StringType(), True),
             StructField("raw_object_permissions", StringType(), True),
-            StructField("raw_extras", StringType(), True),
         ]
     )
     assert permissions_inventory._table_schema == schema

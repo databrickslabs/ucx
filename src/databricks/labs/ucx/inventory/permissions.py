@@ -25,7 +25,7 @@ class PermissionManager:
 
     def inventorize_permissions(self):
         logger.info("Inventorizing the permissions")
-        crawler_tasks = self._supports_provider.get_crawler_tasks()
+        crawler_tasks = list(self._supports_provider.get_crawler_tasks())
         logger.info(f"Total crawler tasks: {len(crawler_tasks)}")
         logger.info("Starting the permissions inventorization")
         execution = ThreadedExecution[PermissionsInventoryItem | None](crawler_tasks)
