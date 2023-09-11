@@ -69,7 +69,7 @@ def test_walk_with_nested_folders_should_return_nested_objects():
     nested_folder = ObjectInfo(path="/rootPath/nested_folder", object_type=ObjectType.DIRECTORY)
     nested_notebook = ObjectInfo(path="/rootPath/nested_folder/notebook", object_type=ObjectType.NOTEBOOK)
 
-    def my_side_effect(path, **kwargs):  # noqa: ARG001
+    def my_side_effect(path, **kwargs):
         if path == "/rootPath":
             return [file, nested_folder]
         elif path == "/rootPath/nested_folder":
@@ -98,7 +98,7 @@ def test_walk_with_three_level_nested_folders_returns_three_levels():
         path="/rootPath/nested_folder/second_nested_folder/notebook2", object_type=ObjectType.NOTEBOOK
     )
 
-    def my_side_effect(path, **kwargs):  # noqa: ARG001
+    def my_side_effect(path, **kwargs):
         if path == "/rootPath":
             return [file, nested_folder]
         elif path == "/rootPath/nested_folder":

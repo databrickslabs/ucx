@@ -8,7 +8,7 @@ from databricks.labs.ucx.inventory.permissions_inventory import (
     PermissionsInventoryTable,
 )
 from databricks.labs.ucx.managers.group import GroupManager
-from databricks.labs.ucx.supports.base import get_supports
+from databricks.labs.ucx.supports.impl import get_supports
 
 
 class GroupMigrationToolkit:
