@@ -81,7 +81,7 @@ def test_prepare_groups_in_environment_with_one_group_in_conf_should_return_migr
     de_group = Group(display_name="de", meta=ResourceMeta(resource_type="WorkspaceGroup"))
     backup_de_group = Group(display_name="dbr_backup_de", meta=ResourceMeta(resource_type="WorkspaceGroup"))
 
-    def my_side_effect(filter, **kwargs):  # noqa: A002,ARG001
+    def my_side_effect(filter, **kwargs):  # noqa: A002
         if filter == "displayName eq 'de'":
             return [de_group]
         elif filter == "displayName eq 'dbr_backup_de'":
@@ -108,7 +108,7 @@ def test_prepare_groups_in_environment_with_multiple_groups_in_conf_should_retur
 
     client = Mock()
 
-    def api_client_side_effect(method, path, query, **kwargs):  # noqa: ARG001
+    def api_client_side_effect(method, path, query, **kwargs):
         if query == {
             "filter": "displayName eq 'ds'",
             "attributes": "id,displayName,meta,entitlements,roles,members",
@@ -124,7 +124,7 @@ def test_prepare_groups_in_environment_with_multiple_groups_in_conf_should_retur
 
     client.api_client.do.side_effect = api_client_side_effect
 
-    def list_side_effect(filter, **kwargs):  # noqa: A002,ARG001
+    def list_side_effect(filter, **kwargs):  # noqa: A002
         if filter == "displayName eq 'de'":
             return [de_group]
         elif filter == "displayName eq 'ds'":
@@ -178,7 +178,7 @@ def test_prepare_groups_in_environment_with_backup_group_not_created_should_crea
     de_group = Group(display_name="de", meta=ResourceMeta(resource_type="WorkspaceGroup"))
     backup_de_group = Group(display_name="dbr_backup_de", meta=ResourceMeta(resource_type="WorkspaceGroup"))
 
-    def groups_list_side_effect(filter, **kwargs):  # noqa: A002,ARG001
+    def groups_list_side_effect(filter, **kwargs):  # noqa: A002
         if filter == "displayName eq 'de'":
             return [de_group]
         elif filter == "displayName eq 'dbr_backup_de'":
@@ -205,7 +205,7 @@ def test_prepare_groups_in_environment_with_conf_in_auto_mode_should_populate_mi
     de_group = Group(display_name="de", meta=ResourceMeta(resource_type="WorkspaceGroup"))
     backup_de_group = Group(display_name="dbr_backup_de", meta=ResourceMeta(resource_type="WorkspaceGroup"))
 
-    def my_side_effect(filter, **kwargs):  # noqa: A002,ARG001
+    def my_side_effect(filter, **kwargs):  # noqa: A002
         if filter == "displayName eq 'de'":
             return [de_group]
         elif filter == "displayName eq 'dbr_backup_de'":
@@ -230,7 +230,7 @@ def test_prepare_groups_in_environment_with_conf_in_auto_mode_and_backup_group_e
     de_group = Group(display_name="de", meta=ResourceMeta(resource_type="WorkspaceGroup"))
     backup_de_group = Group(display_name="dbr_backup_de", meta=ResourceMeta(resource_type="WorkspaceGroup"))
 
-    def my_side_effect(filter, **kwargs):  # noqa: A002,ARG001
+    def my_side_effect(filter, **kwargs):  # noqa: A002
         if filter == "displayName eq 'de'":
             return [de_group]
         elif filter == "displayName eq 'dbr_backup_de'":
@@ -271,7 +271,7 @@ def test_prepare_groups_in_environment_with_no_groups_in_conf_and_backup_group_e
 
     de_group = Group(display_name="de", meta=ResourceMeta(resource_type="WorkspaceGroup"))
 
-    def my_side_effect(filter, **kwargs):  # noqa: A002,ARG001
+    def my_side_effect(filter, **kwargs):  # noqa: A002
         if filter == "displayName eq 'de'":
             return [de_group]
         elif filter == "displayName eq 'dbr_backup_de'":

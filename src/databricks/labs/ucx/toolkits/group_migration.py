@@ -3,12 +3,13 @@ import logging
 from databricks.sdk import WorkspaceClient
 
 from databricks.labs.ucx.config import MigrationConfig
-from databricks.labs.ucx.inventory.inventorizer import Inventorizers
 from databricks.labs.ucx.inventory.permissions import PermissionManager
 from databricks.labs.ucx.inventory.permissions_inventory import (
     PermissionsInventoryTable,
 )
+from databricks.labs.ucx.inventory.verification import VerificationManager
 from databricks.labs.ucx.managers.group import GroupManager
+from databricks.labs.ucx.support.impl import SupportsProvider
 
 
 class GroupMigrationToolkit:
@@ -27,7 +28,12 @@ class GroupMigrationToolkit:
 
         self._group_manager = GroupManager(self._ws, config.groups)
         self._permissions_inventory = PermissionsInventoryTable(config.inventory_database, self._ws)
-        self._permissions_manager = PermissionManager(self._ws, self._permissions_inventory)
+        self._permissions_manager = PermissionManager(
+            self._ws,
+            self._permissions_inventory,
+            supports_provider=SupportsProvider(self._ws, self._num_threads, self._workspace_start_path),
+        )
+        self._verification_manager = VerificationManager(self._ws)
 
     @staticmethod
     def _verify_ws_client(w: WorkspaceClient):
@@ -44,10 +50,6 @@ class GroupMigrationToolkit:
 
     def prepare_environment(self):
         self._group_manager.prepare_groups_in_environment()
-        inventorizers = Inventorizers.provide(
-            self._ws, self._group_manager.migration_groups_provider, self._num_threads, self._workspace_start_path
-        )
-        self._permissions_manager.set_inventorizers(inventorizers)
 
     def cleanup_inventory_table(self):
         self._permissions_inventory.cleanup()
@@ -61,7 +63,7 @@ class GroupMigrationToolkit:
         )
 
     def verify_permissions_on_backup_groups(self, to_verify):
-        self._permissions_manager.verify(self._group_manager.migration_groups_provider, "backup", to_verify)
+        self._verification_manager.verify(self._group_manager.migration_groups_provider, "backup", to_verify)
 
     def replace_workspace_groups_with_account_groups(self):
         self._group_manager.replace_workspace_groups_with_account_groups()
@@ -72,7 +74,7 @@ class GroupMigrationToolkit:
         )
 
     def verify_permissions_on_account_groups(self, to_verify):
-        self._permissions_manager.verify(self._group_manager.migration_groups_provider, "account", to_verify)
+        self._verification_manager.verify(self._group_manager.migration_groups_provider, "account", to_verify)
 
     def delete_backup_groups(self):
         self._group_manager.delete_backup_groups()

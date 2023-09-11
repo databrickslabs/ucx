@@ -12,7 +12,7 @@ from databricks.labs.ucx.config import (
     MigrationConfig,
     TaclConfig,
 )
-from databricks.labs.ucx.inventory.types import LogicalObjectType, RequestObjectType
+from databricks.labs.ucx.inventory.types import RequestObjectType
 from databricks.labs.ucx.toolkits.group_migration import GroupMigrationToolkit
 
 logger = logging.getLogger(__name__)
@@ -141,7 +141,7 @@ def test_e2e(
 
     scope = make_secret_scope()
     make_secret_scope_acl(scope=scope, principal=ws_group.display_name, permission=workspace.AclPermission.WRITE)
-    to_verify.add((LogicalObjectType.SECRET_SCOPE, scope))
+    to_verify.add(("secrets", scope))
 
     make_authorization_permissions(
         object_id="tokens",
