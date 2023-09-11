@@ -93,7 +93,7 @@ class GenericPermissionsSupport(BaseSupport):
         if permissions:
             return PermissionsInventoryItem(
                 object_id=object_id,
-                support=str(request_type),
+                support=request_type.value,
                 raw_object_permissions=json.dumps(permissions.as_dict()),
             )
 

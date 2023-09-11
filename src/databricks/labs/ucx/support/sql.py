@@ -1,3 +1,4 @@
+import dataclasses
 import json
 from collections.abc import Callable
 from dataclasses import dataclass
@@ -25,7 +26,7 @@ class SqlPermissionsSupport(BaseSupport):
             acl.group_name
             for acl in sql.GetResponse.from_dict(json.loads(item.raw_object_permissions)).access_control_list
         ]
-        return any(g in mentioned_groups for g in [info.workspace for info in migration_state.groups])
+        return any(g in mentioned_groups for g in [info.workspace.display_name for info in migration_state.groups])
 
     def __init__(
         self,
@@ -52,7 +53,7 @@ class SqlPermissionsSupport(BaseSupport):
         if permissions:
             return PermissionsInventoryItem(
                 object_id=object_id,
-                support=str(object_type),
+                support=object_type.value,
                 raw_object_permissions=json.dumps(permissions.as_dict()),
             )
 
@@ -63,7 +64,7 @@ class SqlPermissionsSupport(BaseSupport):
         Please note that we only have SET option (DBSQL Permissions API doesn't support UPDATE operation).
         This affects the way how we prepare the new ACL request.
         """
-        self._ws.dbsql_permissions.set(object_type, object_id, acl)
+        self._ws.dbsql_permissions.set(object_type=object_type, object_id=object_id, acl=acl)
 
     def get_crawler_tasks(self):
         for listing in self._listings:
@@ -85,8 +86,8 @@ class SqlPermissionsSupport(BaseSupport):
                     migration_info is not None
                 ), f"Group {acl_request.group_name} is not in the migration groups provider"
                 destination_group: iam.Group = getattr(migration_info, destination)
-                acl_request.group_name = destination_group.display_name
-                acl_requests.append(acl_request)
+                new_acl_request = dataclasses.replace(acl_request, group_name=destination_group.display_name)
+                acl_requests.append(new_acl_request)
             else:
                 # no changes shall be applied
                 acl_requests.append(acl_request)
@@ -101,7 +102,9 @@ class SqlPermissionsSupport(BaseSupport):
             migration_state,
             destination,
         )
-        return partial(self._applier_task, item.object_id, new_acl)
+        return partial(
+            self._applier_task, object_type=sql.ObjectTypePlural(item.support), object_id=item.object_id, acl=new_acl
+        )
 
 
 def listing_wrapper(
