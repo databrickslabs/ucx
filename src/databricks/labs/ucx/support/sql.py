@@ -115,14 +115,3 @@ def listing_wrapper(
             )
 
     return wrapper
-
-
-def get_sql_support(ws: WorkspaceClient):
-    return SqlPermissionsSupport(
-        ws,
-        listings=[
-            listing_wrapper(ws.alerts.list, sql.ObjectTypePlural.ALERTS),
-            listing_wrapper(ws.dashboards.list, sql.ObjectTypePlural.DASHBOARDS),
-            listing_wrapper(ws.queries.list, sql.ObjectTypePlural.QUERIES),
-        ],
-    )

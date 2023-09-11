@@ -1,14 +1,28 @@
 from collections.abc import Callable
+from collections.abc import Iterator
 
 from databricks.sdk import WorkspaceClient
+from databricks.sdk.service import sql
 
-from databricks.labs.ucx.support.listing import experiments_listing, models_listing
-from databricks.labs.ucx.inventory.types import PermissionsInventoryItem, RequestObjectType
+from databricks.labs.ucx.inventory.types import (
+    PermissionsInventoryItem,
+    RequestObjectType,
+)
 from databricks.labs.ucx.support.base import BaseSupport
 from databricks.labs.ucx.support.group_level import ScimSupport
-from databricks.labs.ucx.support.permissions import GenericPermissionsSupport, listing_wrapper
+from databricks.labs.ucx.support.listing import (
+    authorization_listing,
+    experiments_listing,
+    models_listing,
+    workspace_listing,
+)
+from databricks.labs.ucx.support.permissions import (
+    GenericPermissionsSupport,
+    listing_wrapper,
+)
 from databricks.labs.ucx.support.secrets import SecretScopesSupport
-from databricks.labs.ucx.support.sql import get_sql_support
+from databricks.labs.ucx.support.sql import SqlPermissionsSupport
+from databricks.labs.ucx.support.sql import listing_wrapper as sql_listing_wrapper
 
 
 class SupportsProvider:
@@ -24,15 +38,22 @@ class SupportsProvider:
                 listing_wrapper(ws.pipelines.list, "pipeline_id", RequestObjectType.PIPELINES),
                 listing_wrapper(experiments_listing(ws), "experiment_id", RequestObjectType.EXPERIMENTS),
                 listing_wrapper(models_listing(ws), "id", RequestObjectType.REGISTERED_MODELS),
-                _workspace_listing(ws, num_threads=num_threads, start_path=start_path),
+                workspace_listing(ws, num_threads=num_threads, start_path=workspace_start_path),
                 authorization_listing(),
             ],
         )
         self._secrets_support = SecretScopesSupport(ws=ws)
         self._scim_support = ScimSupport(ws)
-        self._sql_support = get_sql_support(ws=ws)
+        self._sql_support = SqlPermissionsSupport(
+            ws,
+            listings=[
+                sql_listing_wrapper(ws.alerts.list, sql.ObjectTypePlural.ALERTS),
+                sql_listing_wrapper(ws.dashboards.list, sql.ObjectTypePlural.DASHBOARDS),
+                sql_listing_wrapper(ws.queries.list, sql.ObjectTypePlural.QUERIES),
+            ],
+        )
 
-    def get_crawler_tasks(self) -> list[Callable[..., PermissionsInventoryItem | None]]:
+    def get_crawler_tasks(self) -> Iterator[Callable[..., PermissionsInventoryItem | None]]:
         for support in [self._generic_support, self._secrets_support, self._scim_support, self._sql_support]:
             yield from support.get_crawler_tasks()
 
