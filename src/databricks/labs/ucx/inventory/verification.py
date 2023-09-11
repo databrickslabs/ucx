@@ -14,7 +14,7 @@ class VerificationManager:
         self, migration_state: GroupMigrationState, target: Literal["backup", "account"], tuples: list[tuple[str, str]]
     ):
         for object_type, object_id in tuples:
-            if object_type == LogicalObjectType.SECRET_SCOPE:
+            if object_type is None:
                 self.verify_applied_scope_acls(object_id, migration_state, target)
             else:
                 self.verify_applied_permissions(object_type, object_id, migration_state, target)
