@@ -42,7 +42,7 @@ class ThreadedExecution(Generic[ExecutableResult]):
         self._executables = executables
         self._futures = []
         _reporter = ProgressReporter(len(executables)) if not progress_reporter else progress_reporter
-        self._done_callback = _reporter.progress_report
+        self._done_callback: Callable = _reporter.progress_report
 
     @classmethod
     def gather(cls, name: str, tasks: list[ExecutableFunction]) -> list[ExecutableResult]:
@@ -55,8 +55,7 @@ class ThreadedExecution(Generic[ExecutableResult]):
         with ThreadPoolExecutor(self._num_threads) as executor:
             for executable in self._executables:
                 future = executor.submit(executable)
-                if self._done_callback:
-                    future.add_done_callback(self._done_callback)
+                future.add_done_callback(self._done_callback)
                 # TODO: errors are not handled yet - https://github.com/databricks/UC-Upgrade/issues/89
                 self._futures.append(future)
 

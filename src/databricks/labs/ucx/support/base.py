@@ -15,13 +15,18 @@ logger = Logger(__name__)
 class Crawler:
     @abstractmethod
     def get_crawler_tasks(self) -> list[Callable[..., PermissionsInventoryItem | None]]:
-        pass
+        """
+        This method should return a list of crawler tasks (e.g. partials or just any callables)
+        :return:
+        """
 
 
 class Applier:
     @abstractmethod
     def is_item_relevant(self, item: PermissionsInventoryItem, migration_state: GroupMigrationState) -> bool:
-        pass
+        """
+        This method verifies that the given item is relevant for the given migration state.
+        """
 
     @abstractmethod
     def _get_apply_task(
