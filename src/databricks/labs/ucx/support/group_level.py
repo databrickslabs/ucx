@@ -29,8 +29,8 @@ class ScimSupport(BaseSupport):
 
     def get_crawler_tasks(self):
         groups = self._ws.groups.list(attributes="id,displayName,roles,entitlements")
-        with_roles = [g for g in groups if len(g.roles) > 0]
-        with_entitlements = [g for g in groups if len(g.entitlements) > 0]
+        with_roles = [g for g in groups if g.roles and len(g.roles) > 0]
+        with_entitlements = [g for g in groups if g.entitlements and len(g.entitlements) > 0]
         for g in with_roles:
             yield partial(self._crawler_task, g)
         for g in with_entitlements:

@@ -137,9 +137,12 @@ def test_no_permissions():
             cluster_id="test",
         )
     ]
-    sup = GenericPermissionsSupport(ws=ws, listings=[
-        listing_wrapper(ws.clusters.list, "cluster_id", RequestObjectType.CLUSTERS),
-    ])
+    sup = GenericPermissionsSupport(
+        ws=ws,
+        listings=[
+            listing_wrapper(ws.clusters.list, "cluster_id", RequestObjectType.CLUSTERS),
+        ],
+    )
     tasks = list(sup.get_crawler_tasks())
     assert len(tasks) == 1
     ws.clusters.list.assert_called_once()
