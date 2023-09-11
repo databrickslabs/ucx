@@ -243,6 +243,7 @@ def make_pipeline(ws, make_random, make_notebook):
 
     yield from factory("delta live table", create, lambda item: ws.pipelines.delete(item.pipeline_id))
 
+
 @pytest.fixture
 def make_model(ws, make_random):
     def create(**kwargs):
@@ -252,14 +253,16 @@ def make_model(ws, make_random):
 
     yield from factory("model", create, lambda item: ws.model_registry.delete_model(item.name))
 
+
 @pytest.fixture
-def make_experiment(ws, make_random, make_directory):
+def make_experiment(ws, make_random):
     def create(**kwargs):
         if "path" not in kwargs:
             kwargs["path"] = f"/Users/{ws.current_user.me().user_name}/{make_random(4)}/"
         return ws.experiments.create_experiment(kwargs["path"])
 
     yield from factory("model", create, lambda item: ws.experiments.delete_experiment(item.experiment_id))
+
 
 def load_debug_env_if_runs_from_ide(key) -> bool:
     if not _is_in_debug():
