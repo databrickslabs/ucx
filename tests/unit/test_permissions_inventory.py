@@ -8,9 +8,7 @@ from databricks.labs.ucx.inventory.permissions_inventory import (
     PermissionsInventoryTable,
 )
 from databricks.labs.ucx.inventory.types import (
-    LogicalObjectType,
     PermissionsInventoryItem,
-    RequestObjectType,
 )
 
 
@@ -18,9 +16,6 @@ from databricks.labs.ucx.inventory.types import (
 def workspace_client():
     client = Mock()
     return client
-
-
-perm_items = [PermissionsInventoryItem("object1", LogicalObjectType.CLUSTER, RequestObjectType.CLUSTERS, "test acl")]
 
 
 @pytest.fixture
@@ -55,6 +50,7 @@ def test_cleanup(permissions_inventory):
 
 
 def test_save(permissions_inventory):
+    perm_items = [PermissionsInventoryItem("object1", "clusters", "test acl")]
     permissions_inventory.save(perm_items)
     permissions_inventory.spark.createDataFrame.assert_called_once()
 

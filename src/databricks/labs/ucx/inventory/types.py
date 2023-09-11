@@ -3,8 +3,6 @@ from dataclasses import asdict, dataclass
 from typing import Literal
 
 import pandas as pd
-from databricks.sdk.service.workspace import AclItem as SdkAclItem
-from databricks.sdk.service.workspace import AclPermission as SdkAclPermission
 
 from databricks.labs.ucx.generic import StrEnum
 
@@ -28,81 +26,6 @@ class RequestObjectType(StrEnum):
 
     def __repr__(self):
         return self.value
-
-
-class LogicalObjectType(StrEnum):
-    ENTITLEMENTS = "ENTITLEMENTS"
-    ROLES = "ROLES"
-    FILE = "FILE"
-    REPO = "REPO"
-    DIRECTORY = "DIRECTORY"
-    NOTEBOOK = "NOTEBOOK"
-    SECRET_SCOPE = "SECRET_SCOPE"
-    PASSWORD = "PASSWORD"
-    TOKEN = "TOKEN"
-    WAREHOUSE = "WAREHOUSE"
-    MODEL = "MODEL"
-    EXPERIMENT = "EXPERIMENT"
-    JOB = "JOB"
-    PIPELINE = "PIPELINE"
-    CLUSTER = "CLUSTER"
-    INSTANCE_POOL = "INSTANCE_POOL"
-    CLUSTER_POLICY = "CLUSTER_POLICY"
-
-    # DBSQL Objects
-    ALERT = "ALERT"
-    DASHBOARD = "DASHBOARD"
-    QUERY = "QUERY"
-
-    def __repr__(self):
-        return self.value
-
-
-class AclPermission(StrEnum):
-    READ = "READ"
-    WRITE = "WRITE"
-    MANAGE = "MANAGE"
-
-
-@dataclass
-class AclItem:
-    principal: str
-    permission: AclPermission
-
-    @classmethod
-    def from_dict(cls, raw: dict):
-        return cls(principal=raw.get("principal", None), permission=AclPermission(raw.get("permission")))
-
-
-@dataclass
-class AclItemsContainer:
-    acls: list[AclItem]
-
-    @staticmethod
-    def from_sdk(source: list[SdkAclItem]) -> "AclItemsContainer":
-        _typed_acls = [
-            AclItem(principal=acl.principal, permission=AclPermission(acl.permission.value)) for acl in source
-        ]
-        return AclItemsContainer(acls=_typed_acls)
-
-    def to_sdk(self) -> list[SdkAclItem]:
-        return [
-            SdkAclItem(principal=acl.principal, permission=SdkAclPermission(acl.permission.value)) for acl in self.acls
-        ]
-
-    @classmethod
-    def from_dict(cls, raw: dict) -> "AclItemsContainer":
-        return cls(acls=[AclItem.from_dict(a) for a in raw.get("acls", [])])
-
-    def as_dict(self) -> dict:
-        return asdict(self)
-
-
-@dataclass
-class RolesAndEntitlements:
-    group_name: str
-    roles: list
-    entitlements: list
 
 
 @dataclass
