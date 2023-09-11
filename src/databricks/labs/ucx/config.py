@@ -82,6 +82,10 @@ class TaclConfig:
         return cls(**raw)
 
 
+# Used to set the right expectation about configuration file schema
+_CONFIG_VERSION = 1
+
+
 @dataclass
 class MigrationConfig:
     inventory_database: str
@@ -112,10 +116,19 @@ class MigrationConfig:
                 return dict(result)
             return x
 
-        return inner(self)
+        serialized = inner(self)
+        serialized["version"] = _CONFIG_VERSION
+        return serialized
 
     @classmethod
     def from_dict(cls, raw: dict) -> "MigrationConfig":
+        stored_version = raw.get("version", None)
+        if stored_version != _CONFIG_VERSION:
+            msg = (
+                f"Unsupported config version: {stored_version}. "
+                f"UCX v{__version__} expects config version to be {_CONFIG_VERSION}"
+            )
+            raise ValueError(msg)
         return cls(
             inventory_database=raw.get("inventory_database"),
             tacl=TaclConfig.from_dict(raw.get("tacl", {})),
