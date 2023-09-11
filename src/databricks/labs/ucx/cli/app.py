@@ -1,11 +1,28 @@
+import logging
 import os
 from pathlib import Path
 from typing import Annotated
 
 import typer
+from databricks.sdk import WorkspaceClient
 from typer import Typer
 
+from databricks.labs.ucx.__about__ import __version__
+from databricks.labs.ucx.logger import _install
+
+_install()
+logging.root.setLevel("INFO")
+logger = logging.getLogger(__name__)
+
 app = Typer(name="UC Migration Toolkit", pretty_exceptions_show_locals=True)
+
+
+@app.command()
+def install():
+    from databricks.labs.ucx.install import main
+
+    ws = WorkspaceClient(product="ucx", product_version=__version__)
+    main(ws, verbose=False)
 
 
 @app.command()
