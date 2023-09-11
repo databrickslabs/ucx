@@ -9,7 +9,7 @@ from databricks.labs.ucx.inventory.permissions_inventory import (
 )
 from databricks.labs.ucx.inventory.verification import VerificationManager
 from databricks.labs.ucx.managers.group import GroupManager
-from databricks.labs.ucx.supports.impl import SupportsProvider
+from databricks.labs.ucx.support.impl import SupportsProvider
 
 
 class GroupMigrationToolkit:

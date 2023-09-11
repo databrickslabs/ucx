@@ -8,7 +8,7 @@ from databricks.labs.ucx.inventory.permissions_inventory import (
 )
 from databricks.labs.ucx.inventory.types import PermissionsInventoryItem
 from databricks.labs.ucx.providers.groups_info import GroupMigrationState
-from databricks.labs.ucx.supports.impl import SupportsProvider
+from databricks.labs.ucx.support.impl import SupportsProvider
 from databricks.labs.ucx.utils import ThreadedExecution
 
 logger = logging.getLogger(__name__)

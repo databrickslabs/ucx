@@ -7,7 +7,7 @@ from databricks.labs.ucx.inventory.permissions import PermissionManager
 from databricks.labs.ucx.inventory.permissions_inventory import (
     PermissionsInventoryTable,
 )
-from databricks.labs.ucx.supports.impl import get_supports
+from databricks.labs.ucx.support.impl import get_supports
 
 
 @pytest.fixture(scope="function")
