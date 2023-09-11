@@ -14,6 +14,8 @@ from databricks.sdk.service.workspace import ImportFormat
 
 from databricks.labs.ucx.inventory.types import RequestObjectType
 from databricks.labs.ucx.providers.mixins.compute import CommandExecutor
+from databricks.labs.ucx.tacl.grants import Grant
+from databricks.labs.ucx.tacl.tables import Table
 
 logger = logging.getLogger(__name__)
 
@@ -99,6 +101,7 @@ def test_sql_backend_works(ws, wsfs_wheel):
 def test_toolkit_notebook(
     ws,
     sql_exec,
+    sql_fetch_all,
     wsfs_wheel,
     make_cluster,
     make_cluster_permissions,
@@ -166,6 +169,8 @@ def test_toolkit_notebook(
 
     databases = ",".join([schema_a.split(".")[1], schema_b.split(".")[1], schema_c.split(".")[1]])
 
+    logger.info(f"databases={databases}")
+
     sql_exec(f"GRANT USAGE ON SCHEMA default TO `{ws_group_a.display_name}`")
     sql_exec(f"GRANT USAGE ON SCHEMA default TO `{ws_group_b.display_name}`")
     sql_exec(f"GRANT SELECT ON TABLE {table_a} TO `{ws_group_a.display_name}`")
@@ -218,35 +223,34 @@ def test_toolkit_notebook(
 
     try:
         ws.jobs.run_now(created_job.job_id).result()
-        # TODO Validate tacl
 
         logger.info('validating group ids')
 
-        dst_ws_group_a_id = ws.groups.list(filter=f"displayName eq {ws_group_a.display_name}")[0].id
+        dst_ws_group_a = ws.groups.list(filter=f"displayName eq {ws_group_a.display_name}")[0]
         assert (
-            ws_group_a.id != dst_ws_group_a_id
+            ws_group_a.id != dst_ws_group_a.id
         ), f"Group id for target group {ws_group_a.display_name} should differ from group id of source group"
 
-        dst_ws_group_b_id = ws.groups.list(filter=f"displayName eq {ws_group_b.display_name}")[0].id
+        dst_ws_group_b = ws.groups.list(filter=f"displayName eq {ws_group_b.display_name}")[0]
         assert (
-            ws_group_b.id != dst_ws_group_b_id
+            ws_group_b.id != dst_ws_group_b.id
         ), f"Group id for target group {ws_group_b.display_name} should differ from group id of source group"
 
-        dst_ws_group_c_id = ws.groups.list(filter=f"displayName eq {ws_group_c.display_name}")[0].id
+        dst_ws_group_c = ws.groups.list(filter=f"displayName eq {ws_group_c.display_name}")[0]
         assert (
-            ws_group_c.id != dst_ws_group_c_id
+            ws_group_c.id != dst_ws_group_c.id
         ), f"Group id for target group {ws_group_c.display_name} should differ from group id of source group"
 
         logger.info('validating group members')
 
-        members_dst_a = sorted([_.display for _ in ws.groups.get(id=dst_ws_group_a_id).members])
+        members_dst_a = sorted([_.display for _ in ws.groups.get(id=dst_ws_group_a.id).members])
         assert members_dst_a == members_src_a, f"Members from {ws_group_a.display_name} were not migrated correctly"
 
-        members_dst_b = sorted([_.display for _ in ws.groups.get(id=dst_ws_group_b_id).members])
-        assert members_dst_b == members_dst_b, f"Members from {ws_group_b.display_name} were not migrated correctly"
+        members_dst_b = sorted([_.display for _ in ws.groups.get(id=dst_ws_group_b.id).members])
+        assert members_dst_b == members_src_b, f"Members from {ws_group_b.display_name} were not migrated correctly"
 
-        members_dst_c = sorted([_.display for _ in ws.groups.get(id=dst_ws_group_c_id).members])
-        assert members_dst_c == members_dst_c, f"Members from {ws_group_c.display_name} were not migrated correctly"
+        members_dst_c = sorted([_.display for _ in ws.groups.get(id=dst_ws_group_c.id).members])
+        assert members_dst_c == members_src_c, f"Members from {ws_group_c.display_name} were not migrated correctly"
 
         logger.info("validating permissions")
 
@@ -275,6 +279,36 @@ def test_toolkit_notebook(
         ], f"Target permissions were not applied correctly for {RequestObjectType.JOBS}/{job.job_id}"
 
         logger.info('validating tacl')
+
+        tables = sql_fetch_all(f"SELECT * FROM hive_metastore.{inventory_database}.tables")
+
+        all_tables = {}
+        for t_row in tables:
+            table = Table(*t_row)
+            all_tables[table.key] = table
+
+        assert len(all_tables) >= 2, "must have at least two tables"
+
+        logger.info(f"all tables={all_tables}, ")
+
+        grants = sql_fetch_all(
+            f"SELECT * FROM hive_metastore.{inventory_database}.grants"
+        )
+
+        all_grants = {}
+        for g_row in grants:
+            grant = Grant(*g_row)
+            if grant.table:
+                all_grants[f"{grant.principal}.{grant.catalog}.{grant.database}.{grant.table}"] = grant.action_type
+            else:
+                all_grants[f"{grant.principal}.{grant.catalog}.{grant.database}"] = grant.action_type
+
+        logger.info(f"all grants={all_grants}, ")
+
+        assert len(all_grants) >= 3, "must have at least three grants"
+        assert all_grants[f"{ws_group_a.display_name}.{table_a}"] == "SELECT"
+        assert all_grants[f"{ws_group_b.display_name}.{table_b}"] == "SELECT"
+        assert all_grants[f"{ws_group_b.display_name}.{schema_b}"] == "MODIFY"
 
     finally:
         logger.info("deleting workbook")
