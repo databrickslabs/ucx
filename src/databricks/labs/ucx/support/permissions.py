@@ -120,7 +120,7 @@ class GenericPermissionsSupport(BaseSupport):
                 acl.group_name
                 for acl in iam.ObjectPermissions.from_dict(json.loads(item.raw_object_permissions)).access_control_list
             ]
-            return any(g in mentioned_groups for g in [info.workspace for info in migration_state.groups])
+            return any(g in mentioned_groups for g in [info.workspace.display_name for info in migration_state.groups])
 
     def get_crawler_tasks(self):
         for listing in self._listings:

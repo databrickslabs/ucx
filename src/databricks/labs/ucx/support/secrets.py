@@ -1,5 +1,4 @@
 import json
-from collections.abc import Callable
 from functools import partial
 
 from databricks.sdk import WorkspaceClient
@@ -15,7 +14,7 @@ class SecretScopesSupport(BaseSupport):
     def __init__(self, ws: WorkspaceClient):
         super().__init__(ws=ws)
 
-    def get_crawler_tasks(self) -> list[Callable[..., PermissionsInventoryItem | None]]:
+    def get_crawler_tasks(self):
         scopes = self._ws.secrets.list_scopes()
 
         def _crawler_task(scope: workspace.SecretScope):
@@ -26,7 +25,8 @@ class SecretScopesSupport(BaseSupport):
                 raw_object_permissions=json.dumps([item.as_dict() for item in acl_items]),
             )
 
-        return [partial(_crawler_task, scope) for scope in scopes]
+        for scope in scopes:
+            yield partial(_crawler_task, scope)
 
     def is_item_relevant(self, item: PermissionsInventoryItem, migration_state: GroupMigrationState) -> bool:
         acls = [workspace.AclItem.from_dict(acl) for acl in json.loads(item.raw_object_permissions)]

@@ -26,7 +26,7 @@ def test_secret_scopes_crawler():
     ]
 
     sup = SecretScopesSupport(ws=ws)
-    tasks = sup.get_crawler_tasks()
+    tasks = list(sup.get_crawler_tasks())
     assert len(tasks) == 1
     ws.secrets.list_scopes.assert_called_once()
 

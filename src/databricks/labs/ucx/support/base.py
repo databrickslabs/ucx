@@ -1,5 +1,5 @@
 from abc import ABC, abstractmethod
-from collections.abc import Callable
+from collections.abc import Callable, Iterator
 from functools import partial
 from logging import Logger
 
@@ -14,7 +14,7 @@ logger = Logger(__name__)
 
 class Crawler:
     @abstractmethod
-    def get_crawler_tasks(self) -> list[Callable[..., PermissionsInventoryItem | None]]:
+    def get_crawler_tasks(self) -> Iterator[Callable[..., PermissionsInventoryItem | None]]:
         """
         This method should return a list of crawler tasks (e.g. partials or just any callables)
         :return:
