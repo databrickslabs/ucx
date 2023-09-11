@@ -1,5 +1,6 @@
 import json
 from collections.abc import Callable
+from dataclasses import dataclass
 from functools import partial
 
 from databricks.sdk import WorkspaceClient
@@ -7,12 +8,15 @@ from databricks.sdk.core import DatabricksError
 from databricks.sdk.service import iam, workspace
 from ratelimit import limits, sleep_and_retry
 
-from databricks.labs.ucx.inventory.listing import WorkspaceListing
+from databricks.labs.ucx.inventory.listing import (
+    WorkspaceListing,
+    experiments_listing,
+    models_listing,
+)
 from databricks.labs.ucx.inventory.types import (
     Destination,
     PermissionsInventoryItem,
     RequestObjectType,
-    Supports,
 )
 from databricks.labs.ucx.providers.groups_info import GroupMigrationState
 from databricks.labs.ucx.supports.base import BaseSupport, logger
@@ -25,11 +29,15 @@ class PermissionsOp:
     """
 
     def _is_item_relevant(self, item: PermissionsInventoryItem, migration_state: GroupMigrationState) -> bool:
-        mentioned_groups = [
-            acl.group_name
-            for acl in iam.ObjectPermissions.from_dict(json.loads(item.raw_object_permissions)).access_control_list
-        ]
-        return any(g in mentioned_groups for g in [info.workspace for info in migration_state.groups])
+        # passwords and tokens are represented on the workspace-level
+        if item.object_id in ("tokens", "passwords"):
+            return True
+        else:
+            mentioned_groups = [
+                acl.group_name
+                for acl in iam.ObjectPermissions.from_dict(json.loads(item.raw_object_permissions)).access_control_list
+            ]
+            return any(g in mentioned_groups for g in [info.workspace for info in migration_state.groups])
 
     def _safe_get_permissions(
         self, ws: WorkspaceClient, request_object_type: RequestObjectType, object_id: str
@@ -86,21 +94,24 @@ class PermissionsOp:
         self,
         ws: WorkspaceClient,
         object_id: str,
-        support_name: Supports,
         request_type: RequestObjectType,
-        extras: dict | None = None,
     ) -> PermissionsInventoryItem | None:
         permissions = self._safe_get_permissions(ws, request_type, object_id)
         if permissions:
             return PermissionsInventoryItem(
                 object_id=object_id,
-                support=support_name,
+                support=str(request_type),
                 raw_object_permissions=json.dumps(permissions.as_dict()),
-                raw_extras=json.dumps(extras),
             )
 
 
-class PermissionsSupport(BaseSupport, PermissionsOp):
+@dataclass
+class GenericPermissionsInfo:
+    object_id: str
+    request_type: RequestObjectType
+
+
+class GenericPermissionsSupport(BaseSupport, PermissionsOp):
     def _get_apply_task(
         self, item: PermissionsInventoryItem, migration_state: GroupMigrationState, destination: Destination
     ) -> partial:
@@ -108,7 +119,11 @@ class PermissionsSupport(BaseSupport, PermissionsOp):
             iam.ObjectPermissions.from_dict(json.loads(item.raw_object_permissions)), migration_state, destination
         )
         return partial(
-            self._applier_task, ws=self._ws, request_type=self._request_type, acl=new_acl, object_id=item.object_id
+            self._applier_task,
+            ws=self._ws,
+            request_type=RequestObjectType(item.support),
+            acl=new_acl,
+            object_id=item.object_id,
         )
 
     def is_item_relevant(self, item: PermissionsInventoryItem, migration_state: GroupMigrationState) -> bool:
@@ -116,89 +131,93 @@ class PermissionsSupport(BaseSupport, PermissionsOp):
 
     def __init__(
         self,
-        listing_function: Callable,
-        id_attribute: str,
+        listings: list[Callable[..., list[GenericPermissionsInfo]]],
         ws: WorkspaceClient,
-        request_type: RequestObjectType,
-        support_name: Supports,
     ):
-        super().__init__(ws, support_name=support_name)
-        self._listing_function = listing_function
-        self._id_attribute = id_attribute
-        self._request_type = request_type
+        super().__init__(ws)
+        self._listings: list[Callable[..., list[GenericPermissionsInfo]]] = listings
 
     def get_crawler_tasks(self):
-        return [
-            partial(
-                self._crawler_task,
-                ws=self._ws,
-                object_id=getattr(_object, self._id_attribute),
-                request_type=self._request_type,
-                support=self._support_name,
+        for listing in self._listings:
+            for info in listing():
+                yield partial(
+                    self._crawler_task,
+                    ws=self._ws,
+                    object_id=info.object_id,
+                    request_type=info.request_type,
+                )
+
+
+def listing_wrapper(
+    func: Callable[..., list], id_attribute: str, object_type: RequestObjectType
+) -> Callable[..., list[GenericPermissionsInfo]]:
+    def wrapper() -> list[GenericPermissionsInfo]:
+        for item in func():
+            yield GenericPermissionsInfo(
+                object_id=getattr(item, id_attribute),
+                request_type=object_type,
             )
-            for _object in self._listing_function()
-        ]
+
+    return wrapper
 
 
-class WorkspaceSupport(BaseSupport, PermissionsOp):
-    """
-    For this class we're using `extras` payload to properly identify the object type we're working with.
-    Since all these objects are under `workspace` support name, we need to distinct between various request types
-    Note that this class heavily shares the code with PermissionsSupport.
-    We can't use direct inheritance from PermissionsSupport here due  to different logic of request_type handling.
-    Therefore, common methods are put into `PermissionsOp` mixin.
-    """
+def _convert_object_type_to_request_type(_object: workspace.ObjectInfo) -> RequestObjectType | None:
+    match _object.object_type:
+        case workspace.ObjectType.NOTEBOOK:
+            return RequestObjectType.NOTEBOOKS
+        case workspace.ObjectType.DIRECTORY:
+            return RequestObjectType.DIRECTORIES
+        case workspace.ObjectType.LIBRARY:
+            return None
+        case workspace.ObjectType.REPO:
+            return RequestObjectType.REPOS
+        case workspace.ObjectType.FILE:
+            return RequestObjectType.FILES
+        # silent handler for experiments - they'll be inventorized by the experiments manager
+        case None:
+            return None
 
-    def _get_apply_task(
-        self, item: PermissionsInventoryItem, migration_state: GroupMigrationState, destination: Destination
-    ) -> partial:
-        request_type = self.__convert_object_type_to_request_type(item.extras().get("object_type"))
-        new_acl = self._prepare_new_acl(
-            iam.ObjectPermissions.from_dict(json.loads(item.raw_object_permissions)), migration_state, destination
-        )
-        return partial(
-            self._applier_task, ws=self._ws, request_type=request_type, acl=new_acl, object_id=item.object_id
-        )
 
-    def __init__(self, ws: WorkspaceClient, num_threads=20, start_path: str | None = "/"):
-        super().__init__(ws, support_name=Supports.workspace)
-        self.listing = WorkspaceListing(
+def _workspace_listing(ws: WorkspaceClient, num_threads=20, start_path: str | None = "/"):
+    def inner():
+        ws_listing = WorkspaceListing(
             ws,
             num_threads=num_threads,
             with_directories=False,
         )
-        self._start_path = start_path
-
-    @staticmethod
-    def __convert_object_type_to_request_type(_object: workspace.ObjectInfo) -> RequestObjectType | None:
-        match _object.object_type:
-            case workspace.ObjectType.NOTEBOOK:
-                return RequestObjectType.NOTEBOOKS
-            case workspace.ObjectType.DIRECTORY:
-                return RequestObjectType.DIRECTORIES
-            case workspace.ObjectType.LIBRARY:
-                return None
-            case workspace.ObjectType.REPO:
-                return RequestObjectType.REPOS
-            case workspace.ObjectType.FILE:
-                return RequestObjectType.FILES
-            # silent handler for experiments - they'll be inventorized by the experiments manager
-            case None:
-                return None
-
-    def get_crawler_tasks(self) -> list[Callable[..., PermissionsInventoryItem | None]]:
-        object_infos = self.listing.walk(self._start_path)
-        return [
-            partial(
-                self._crawler_task,
-                ws=self._ws,
+        for _object in ws_listing.walk(start_path):
+            yield GenericPermissionsInfo(
                 object_id=_object.object_id,
-                request_type=self.__convert_object_type_to_request_type(_object),
-                support=self._support_name,
-                extras={"object_type": _object.object_type},
+                request_type=_convert_object_type_to_request_type(_object),
             )
-            for _object in object_infos
-        ]
 
-    def is_item_relevant(self, item: PermissionsInventoryItem, migration_state: GroupMigrationState) -> bool:
-        return self._is_item_relevant(item, migration_state)
+    return inner
+
+
+def authorization_listing():
+    def inner():
+        for _value in ["passwords", "tokens"]:
+            yield GenericPermissionsInfo(
+                object_id=_value,
+                request_type=RequestObjectType.AUTHORIZATION,
+            )
+
+    return inner
+
+
+def get_generic_support(ws: WorkspaceClient, num_threads: int, start_path: str):
+    return GenericPermissionsSupport(
+        ws=ws,
+        listings=[
+            listing_wrapper(ws.clusters.list, "cluster_id", RequestObjectType.CLUSTERS),
+            listing_wrapper(ws.cluster_policies.list, "cluster_policy_id", RequestObjectType.CLUSTER_POLICIES),
+            listing_wrapper(ws.instance_pools.list, "instance_pool_id", RequestObjectType.INSTANCE_POOLS),
+            listing_wrapper(ws.warehouses.list, "id", RequestObjectType.SQL_WAREHOUSES),
+            listing_wrapper(ws.jobs.list, "job_id", RequestObjectType.JOBS),
+            listing_wrapper(ws.pipelines.list, "pipeline_id", RequestObjectType.PIPELINES),
+            listing_wrapper(experiments_listing(ws), "experiment_id", RequestObjectType.EXPERIMENTS),
+            listing_wrapper(models_listing(ws), "id", RequestObjectType.REGISTERED_MODELS),
+            _workspace_listing(ws, num_threads=num_threads, start_path=start_path),
+            authorization_listing(),
+        ],
+    )

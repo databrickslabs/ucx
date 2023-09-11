@@ -1,5 +1,6 @@
 import json
 from collections.abc import Callable
+from dataclasses import dataclass
 from functools import partial
 
 from databricks.sdk import WorkspaceClient
@@ -7,13 +8,15 @@ from databricks.sdk.core import DatabricksError
 from databricks.sdk.service import iam, sql
 from ratelimit import limits, sleep_and_retry
 
-from databricks.labs.ucx.inventory.types import (
-    Destination,
-    PermissionsInventoryItem,
-    Supports,
-)
+from databricks.labs.ucx.inventory.types import Destination, PermissionsInventoryItem
 from databricks.labs.ucx.providers.groups_info import GroupMigrationState
 from databricks.labs.ucx.supports.base import BaseSupport, logger
+
+
+@dataclass
+class SqlPermissionsInfo:
+    object_id: str
+    request_type: sql.ObjectTypePlural
 
 
 class SqlPermissionsSupport(BaseSupport):
@@ -27,15 +30,10 @@ class SqlPermissionsSupport(BaseSupport):
     def __init__(
         self,
         ws: WorkspaceClient,
-        listing_function: Callable,
-        id_attribute: str,
-        object_type: sql.ObjectTypePlural,
-        support_name: Supports,
+        listings: list[Callable[..., list[SqlPermissionsInfo]]],
     ):
-        super().__init__(ws, support_name=support_name)
-        self._listing_function = listing_function
-        self._id_attribute = id_attribute
-        self._object_type = object_type
+        super().__init__(ws)
+        self._listings = listings
 
     def _safe_get_dbsql_permissions(self, object_type: sql.ObjectTypePlural, object_id: str) -> sql.GetResponse | None:
         try:
@@ -50,28 +48,28 @@ class SqlPermissionsSupport(BaseSupport):
 
     @sleep_and_retry
     @limits(calls=100, period=1)
-    def _crawler_task(self, object_id: str) -> PermissionsInventoryItem | None:
-        permissions = self._safe_get_dbsql_permissions(self._object_type, object_id)
+    def _crawler_task(self, object_id: str, object_type: sql.ObjectTypePlural) -> PermissionsInventoryItem | None:
+        permissions = self._safe_get_dbsql_permissions(object_type=object_type, object_id=object_id)
         if permissions:
             return PermissionsInventoryItem(
                 object_id=object_id,
-                support=self._support_name,
+                support=str(object_type),
                 raw_object_permissions=json.dumps(permissions.as_dict()),
             )
 
     @sleep_and_retry
     @limits(calls=30, period=1)
-    def _applier_task(self, object_id: str, acl: list[sql.AccessControl]):
+    def _applier_task(self, object_type: sql.ObjectTypePlural, object_id: str, acl: list[sql.AccessControl]):
         """
         Please note that we only have SET option (DBSQL Permissions API doesn't support UPDATE operation).
         This affects the way how we prepare the new ACL request.
         """
-        self._ws.dbsql_permissions.set(self._object_type, object_id, acl)
+        self._ws.dbsql_permissions.set(object_type, object_id, acl)
 
     def get_crawler_tasks(self):
-        return [
-            partial(self._crawler_task, getattr(_object, self._id_attribute)) for _object in self._listing_function()
-        ]
+        for listing in self._listings:
+            for item in listing():
+                yield partial(self._crawler_task, item.object_id, item.request_type)
 
     def _prepare_new_acl(
         self, acl: list[sql.AccessControl], migration_state: GroupMigrationState, destination: Destination
@@ -105,3 +103,27 @@ class SqlPermissionsSupport(BaseSupport):
             destination,
         )
         return partial(self._applier_task, item.object_id, new_acl)
+
+
+def listing_wrapper(
+    func: Callable[..., list], object_type: sql.ObjectTypePlural
+) -> Callable[..., list[SqlPermissionsInfo]]:
+    def wrapper() -> list[SqlPermissionsInfo]:
+        for item in func():
+            yield SqlPermissionsInfo(
+                object_id=item.id,
+                request_type=object_type,
+            )
+
+    return wrapper
+
+
+def get_sql_support(ws: WorkspaceClient):
+    return SqlPermissionsSupport(
+        ws,
+        listings=[
+            listing_wrapper(ws.alerts.list, sql.ObjectTypePlural.ALERTS),
+            listing_wrapper(ws.dashboards.list, sql.ObjectTypePlural.DASHBOARDS),
+            listing_wrapper(ws.queries.list, sql.ObjectTypePlural.QUERIES),
+        ],
+    )

@@ -6,18 +6,14 @@ from databricks.sdk import WorkspaceClient
 from databricks.sdk.service import iam, workspace
 from ratelimit import limits, sleep_and_retry
 
-from databricks.labs.ucx.inventory.types import (
-    Destination,
-    PermissionsInventoryItem,
-    Supports,
-)
+from databricks.labs.ucx.inventory.types import Destination, PermissionsInventoryItem
 from databricks.labs.ucx.providers.groups_info import GroupMigrationState
 from databricks.labs.ucx.supports.base import BaseSupport
 
 
 class SecretsSupport(BaseSupport):
     def __init__(self, ws: WorkspaceClient):
-        super().__init__(ws=ws, support_name=Supports.secrets)
+        super().__init__(ws=ws)
 
     def get_crawler_tasks(self) -> list[Callable[..., PermissionsInventoryItem | None]]:
         scopes = self._ws.secrets.list_scopes()
@@ -26,7 +22,7 @@ class SecretsSupport(BaseSupport):
             acl_items = self._ws.secrets.list_acls(scope.name)
             return PermissionsInventoryItem(
                 object_id=scope.name,
-                support=self._support_name,
+                support="secrets",
                 raw_object_permissions=json.dumps([item.as_dict() for item in acl_items]),
             )
 
