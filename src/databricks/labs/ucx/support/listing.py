@@ -112,13 +112,16 @@ def experiments_listing(ws: WorkspaceClient):
             We filter-out notebook-based experiments, because they are covered by notebooks listing
             """
             # workspace-based notebook experiment
-            nb_tag = [t for t in experiment.tags if t.key == "mlflow.experimentType" and t.value == "NOTEBOOK"]
-            # repo-based notebook experiment
-            repo_nb_tag = [
-                t for t in experiment.tags if t.key == "mlflow.experiment.sourceType" and t.value == "REPO_NOTEBOOK"
-            ]
-            if not nb_tag and not repo_nb_tag:
-                yield experiment
+            if experiment.tags:
+                nb_tag = [t for t in experiment.tags if t.key == "mlflow.experimentType" and t.value == "NOTEBOOK"]
+                # repo-based notebook experiment
+                repo_nb_tag = [
+                    t for t in experiment.tags if t.key == "mlflow.experiment.sourceType" and t.value == "REPO_NOTEBOOK"
+                ]
+                if nb_tag or repo_nb_tag:
+                    continue
+
+            yield experiment
 
     return inner
 
