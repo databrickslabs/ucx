@@ -22,7 +22,7 @@ class ScimSupport(BaseSupport):
     def _applier_task(self, group_id: str, value: list[iam.ComplexValue], property_name: str):
         operations = [iam.Patch(op=iam.PatchOp.ADD, path=property_name, value=value)]
         schemas = [iam.PatchSchema.URN_IETF_PARAMS_SCIM_API_MESSAGES_2_0_PATCH_OP]
-        self._ws.groups.patch(group_id, operations=operations, schemas=schemas)
+        self._ws.groups.patch(id=group_id, operations=operations, schemas=schemas)
 
     def is_item_relevant(self, item: PermissionsInventoryItem, migration_state: GroupMigrationState) -> bool:
         return any(g.workspace.id == item.object_id for g in migration_state.groups)
@@ -32,9 +32,9 @@ class ScimSupport(BaseSupport):
         with_roles = [g for g in groups if g.roles and len(g.roles) > 0]
         with_entitlements = [g for g in groups if g.entitlements and len(g.entitlements) > 0]
         for g in with_roles:
-            yield partial(self._crawler_task, g)
+            yield partial(self._crawler_task, g, "roles")
         for g in with_entitlements:
-            yield partial(self._crawler_task, g)
+            yield partial(self._crawler_task, g, "entitlements")
 
     def _get_apply_task(
         self, item: PermissionsInventoryItem, migration_state: GroupMigrationState, destination: Destination

@@ -1,13 +1,10 @@
 import json
 from unittest.mock import MagicMock, call
 
-from databricks.sdk.service import iam, workspace
+from databricks.sdk.service import workspace
 
 from databricks.labs.ucx.inventory.types import PermissionsInventoryItem
-from databricks.labs.ucx.providers.groups_info import (
-    GroupMigrationState,
-    MigrationGroupInfo,
-)
+from databricks.labs.ucx.providers.groups_info import GroupMigrationState
 from databricks.labs.ucx.support.secrets import SecretScopesSupport
 
 
@@ -38,7 +35,7 @@ def test_secret_scopes_crawler():
     assert item.raw_object_permissions == '[{"permission": "MANAGE", "principal": "test"}]'
 
 
-def test_secret_scopes_apply():
+def test_secret_scopes_apply(migration_state: GroupMigrationState):
     ws = MagicMock()
     sup = SecretScopesSupport(ws=ws)
     item = PermissionsInventoryItem(
@@ -57,15 +54,8 @@ def test_secret_scopes_apply():
             ]
         ),
     )
-    ms = GroupMigrationState()
-    ms.add(
-        group=MigrationGroupInfo(
-            workspace=iam.Group(display_name="test"),
-            backup=iam.Group(display_name="db-temp-test"),
-            account=iam.Group(display_name="test", id="test-acc"),
-        )
-    )
-    task = sup.get_apply_task(item, ms, "backup")
+
+    task = sup.get_apply_task(item, migration_state, "backup")
     task()
     assert ws.secrets.put_acl.call_count == 2
 

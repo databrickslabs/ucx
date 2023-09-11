@@ -9,10 +9,6 @@ from databricks.labs.ucx.inventory.types import (
     PermissionsInventoryItem,
     RequestObjectType,
 )
-from databricks.labs.ucx.providers.groups_info import (
-    GroupMigrationState,
-    MigrationGroupInfo,
-)
 from databricks.labs.ucx.support.permissions import (
     GenericPermissionsSupport,
     listing_wrapper,
@@ -58,7 +54,7 @@ def test_crawler():
     assert json.loads(item.raw_object_permissions) == sample_permission.as_dict()
 
 
-def test_apply():
+def test_apply(migration_state):
     ws = MagicMock()
     sup = GenericPermissionsSupport(ws=ws, listings=[])  # no listings since only apply is tested
 
@@ -85,16 +81,7 @@ def test_apply():
         ),
     )
 
-    ms = GroupMigrationState()
-    ms.add(
-        group=MigrationGroupInfo(
-            workspace=iam.Group(display_name="test"),
-            backup=iam.Group(display_name="db-temp-test"),
-            account=iam.Group(display_name="test", id="test-acc"),
-        )
-    )
-
-    _task = sup.get_apply_task(item, ms, "backup")
+    _task = sup.get_apply_task(item, migration_state, "backup")
     _task()
     ws.permissions.update.assert_called_once()
 
@@ -131,12 +118,12 @@ def test_safe_get():
 
 def test_no_permissions():
     ws = MagicMock()
-    ws.permissions.get.side_effect = DatabricksError(error_code="RESOURCE_DOES_NOT_EXIST")
     ws.clusters.list.return_value = [
         compute.ClusterDetails(
             cluster_id="test",
         )
     ]
+    ws.permissions.get.side_effect = DatabricksError(error_code="RESOURCE_DOES_NOT_EXIST")
     sup = GenericPermissionsSupport(
         ws=ws,
         listings=[
