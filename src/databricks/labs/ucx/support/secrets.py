@@ -31,7 +31,7 @@ class SecretScopesSupport(BaseSupport):
     def is_item_relevant(self, item: PermissionsInventoryItem, migration_state: GroupMigrationState) -> bool:
         acls = [workspace.AclItem.from_dict(acl) for acl in json.loads(item.raw_object_permissions)]
         mentioned_groups = [acl.principal for acl in acls]
-        return any(g in mentioned_groups for g in [info.workspace for info in migration_state.groups])
+        return any(g in mentioned_groups for g in [info.workspace.display_name for info in migration_state.groups])
 
     @sleep_and_retry
     @limits(calls=30, period=1)
@@ -45,7 +45,7 @@ class SecretScopesSupport(BaseSupport):
         new_acls = []
 
         for acl in acls:
-            if acl.principal in [i.workspace for i in migration_state.groups]:
+            if acl.principal in [i.workspace.display_name for i in migration_state.groups]:
                 source_info = migration_state.get_by_workspace_group_name(acl.principal)
                 target: iam.Group = getattr(source_info, destination)
                 new_acls.append(workspace.AclItem(principal=target.display_name, permission=acl.permission))
