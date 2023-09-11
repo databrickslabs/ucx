@@ -39,7 +39,12 @@ class GenericPermissionsSupport(BaseSupport):
             permissions = ws.permissions.get(request_object_type, object_id)
             return permissions
         except DatabricksError as e:
-            if e.error_code in ["RESOURCE_DOES_NOT_EXIST", "RESOURCE_NOT_FOUND", "PERMISSION_DENIED"]:
+            if e.error_code in [
+                "RESOURCE_DOES_NOT_EXIST",
+                "RESOURCE_NOT_FOUND",
+                "PERMISSION_DENIED",
+                "FEATURE_DISABLED",
+            ]:
                 logger.warning(f"Could not get permissions for {request_object_type} {object_id} due to {e.error_code}")
                 return None
             else:
@@ -79,7 +84,7 @@ class GenericPermissionsSupport(BaseSupport):
     def _applier_task(
         self, ws: WorkspaceClient, object_id: str, acl: list[iam.AccessControlRequest], request_type: RequestObjectType
     ):
-        ws.permissions.update(request_type, object_id, acl)
+        ws.permissions.update(request_object_type=request_type, request_object_id=object_id, access_control_list=acl)
 
     @sleep_and_retry
     @limits(calls=100, period=1)
@@ -90,10 +95,16 @@ class GenericPermissionsSupport(BaseSupport):
         request_type: RequestObjectType,
     ) -> PermissionsInventoryItem | None:
         permissions = self._safe_get_permissions(ws, request_type, object_id)
+
+        if request_type == RequestObjectType.AUTHORIZATION:
+            support = object_id
+        else:
+            support = request_type.value
+
         if permissions:
             return PermissionsInventoryItem(
                 object_id=object_id,
-                support=request_type.value,
+                support=support,
                 raw_object_permissions=json.dumps(permissions.as_dict()),
             )
 
@@ -103,10 +114,16 @@ class GenericPermissionsSupport(BaseSupport):
         new_acl = self._prepare_new_acl(
             iam.ObjectPermissions.from_dict(json.loads(item.raw_object_permissions)), migration_state, destination
         )
+
+        if item.support in ("passwords", "tokens"):
+            request_type = RequestObjectType.AUTHORIZATION
+        else:
+            request_type = RequestObjectType(item.support)
+
         return partial(
             self._applier_task,
             ws=self._ws,
-            request_type=RequestObjectType(item.support),
+            request_type=request_type,
             acl=new_acl,
             object_id=item.object_id,
         )

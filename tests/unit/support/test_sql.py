@@ -94,7 +94,7 @@ def test_apply(migration_state):
         ),
     ]
     ws.dbsql_permissions.set.assert_called_once_with(
-        object_type=sql.ObjectTypePlural.ALERTS, object_id="test", acl=expected_payload
+        object_type=sql.ObjectTypePlural.ALERTS, object_id="test", access_control_list=expected_payload
     )
 
 

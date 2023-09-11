@@ -9,6 +9,7 @@ from databricks.labs.ucx.inventory.types import (
     PermissionsInventoryItem,
     RequestObjectType,
 )
+from databricks.labs.ucx.support.listing import authorization_listing
 from databricks.labs.ucx.support.permissions import (
     GenericPermissionsSupport,
     listing_wrapper,
@@ -92,7 +93,11 @@ def test_apply(migration_state):
         )
     ]
 
-    ws.permissions.update.assert_called_with(RequestObjectType.CLUSTERS, "test", expected_acl_payload)
+    ws.permissions.update.assert_called_with(
+        request_object_type=RequestObjectType.CLUSTERS,
+        request_object_id="test",
+        access_control_list=expected_acl_payload,
+    )
 
 
 def test_relevance():
@@ -136,3 +141,50 @@ def test_no_permissions():
     _task = tasks[0]
     item = _task()
     assert item is None
+
+
+def test_passwords_tokens_crawler(migration_state):
+    ws = MagicMock()
+
+    basic_acl = [
+        iam.AccessControlResponse(
+            group_name="test",
+            all_permissions=[iam.Permission(inherited=False, permission_level=iam.PermissionLevel.CAN_USE)],
+        )
+    ]
+
+    ws.permissions.get.side_effect = [
+        iam.ObjectPermissions(
+            object_id="passwords",
+            object_type=RequestObjectType.AUTHORIZATION,
+            access_control_list=basic_acl
+        ),
+        iam.ObjectPermissions(
+            object_id="tokens",
+            object_type=RequestObjectType.AUTHORIZATION,
+            access_control_list=basic_acl
+        ),
+    ]
+
+    sup = GenericPermissionsSupport(ws=ws, listings=[
+        authorization_listing()
+    ])
+    tasks = list(sup.get_crawler_tasks())
+    assert len(tasks) == 2
+    auth_items = [task() for task in tasks]
+    for item in auth_items:
+        assert item.object_id in ["tokens", "passwords"]
+        assert item.support in ["tokens", "passwords"]
+        applier = sup.get_apply_task(item, migration_state, "backup")
+        new_acl = sup._prepare_new_acl(
+            permissions=iam.ObjectPermissions.from_dict(json.loads(item.raw_object_permissions)),
+            migration_state=migration_state,
+            destination="backup"
+        )
+        applier()
+        ws.permissions.update.assert_called_once_with(
+            request_object_type=RequestObjectType.AUTHORIZATION,
+            request_object_id=item.object_id,
+            access_control_list=new_acl
+        )
+        ws.permissions.update.reset_mock()

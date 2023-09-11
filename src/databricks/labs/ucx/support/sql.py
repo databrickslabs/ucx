@@ -64,7 +64,7 @@ class SqlPermissionsSupport(BaseSupport):
         Please note that we only have SET option (DBSQL Permissions API doesn't support UPDATE operation).
         This affects the way how we prepare the new ACL request.
         """
-        self._ws.dbsql_permissions.set(object_type=object_type, object_id=object_id, acl=acl)
+        self._ws.dbsql_permissions.set(object_type=object_type, object_id=object_id, access_control_list=acl)
 
     def get_crawler_tasks(self):
         for listing in self._listings:

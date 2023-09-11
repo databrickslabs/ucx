@@ -39,7 +39,7 @@ class PermissionsInventoryTable(SparkMixin):
     def save(self, items: list[PermissionsInventoryItem]):
         # TODO: update instead of append
         logger.info(f"Saving {len(items)} items to inventory table {self._table}")
-        serialized_items = pd.DataFrame([item.as_dict() for item in items])
+        serialized_items = pd.DataFrame([item.as_dict() for item in items], dtype=str)
         df = self.spark.createDataFrame(serialized_items, schema=self._table_schema)
         df.write.mode("append").format("delta").saveAsTable(self._table)
         logger.info("Successfully saved the items to inventory table")
