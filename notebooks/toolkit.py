@@ -7,36 +7,18 @@
 # MAGIC This notebook provides toolkit for group migration (workspace to account).
 # MAGIC
 # MAGIC
-# MAGIC - Tested on: DBR 13.2, Single Node cluster, UC enabled (Single-User mode).
+# MAGIC - Tested on: Latest Databricks Runtime, Single Node cluster, UC enabled (Single-User mode).
 # MAGIC
 
 # COMMAND ----------
 
-# MAGIC %md
-# MAGIC
-# MAGIC ## Prepare imports
-
-# COMMAND ----------
-
-# MAGIC %reload_ext autoreload
-# MAGIC %autoreload 2
-
-# COMMAND ----------
-
-from common import pip_install_dependencies
-
-pip_install_dependencies()
-
-# COMMAND ----------
-
-from common import update_module_imports
-
-update_module_imports()
-
-# COMMAND ----------
-
+from databricks.labs.ucx.config import (
+    GroupsConfig,
+    MigrationConfig,
+    TaclConfig,
+)
 from databricks.labs.ucx.toolkits.group_migration import GroupMigrationToolkit
-from databricks.labs.ucx.config import MigrationConfig, InventoryConfig, GroupsConfig, InventoryTable
+from databricks.labs.ucx.toolkits.table_acls import TaclToolkit
 
 # COMMAND ----------
 
@@ -46,18 +28,34 @@ from databricks.labs.ucx.config import MigrationConfig, InventoryConfig, GroupsC
 
 # COMMAND ----------
 
+inventory_database = dbutils.widgets.get("inventory_database")
+selected_groups = dbutils.widgets.get("selected_groups").split(",")
+databases = dbutils.widgets.get("databases").split(",")
+
 config = MigrationConfig(
-    with_table_acls=False,
-    inventory=InventoryConfig(table=InventoryTable(catalog="main", database="default", name="ucx_migration_inventory")),
+    inventory_database=inventory_database,
     groups=GroupsConfig(
         # use this option to select specific groups manually
-        selected=["groupA", "groupB"],
+        selected=selected_groups,
         # use this option to select all groups automatically
+        # auto=True
+    ),
+    tacl=TaclConfig(
+        # use this option to select specific databases manually
+        databases=databases,
+        # use this option to select all databases automatically
         # auto=True
     ),
     log_level="DEBUG",
 )
+
 toolkit = GroupMigrationToolkit(config)
+tacltoolkit = TaclToolkit(
+    toolkit._ws,
+    inventory_catalog="hive_metastore",
+    inventory_schema=config.inventory_database,
+    databases=config.tacl.databases,
+)
 
 # COMMAND ----------
 
@@ -149,6 +147,16 @@ toolkit.apply_permissions_to_account_groups()
 # COMMAND ----------
 
 toolkit.delete_backup_groups()
+
+# COMMAND ----------
+
+# MAGIC %md
+# MAGIC
+# MAGIC ## Inventorize Table ACL's
+
+# COMMAND ----------
+
+tacltoolkit.grants_snapshot()
 
 # COMMAND ----------
 

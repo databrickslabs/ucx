@@ -3,28 +3,19 @@ from contextlib import contextmanager
 from functools import partial
 from pathlib import Path
 
-import pytest
 import yaml
 
-from databricks.labs.ucx.config import (
-    GroupsConfig,
-    InventoryConfig,
-    InventoryTable,
-    MigrationConfig,
-)
+from databricks.labs.ucx.config import GroupsConfig, MigrationConfig, TaclConfig
 
 
 def test_initialization():
     mc = partial(
         MigrationConfig,
-        inventory=InventoryConfig(table=InventoryTable(catalog="catalog", database="database", name="name")),
+        inventory_database="abc",
         groups=GroupsConfig(auto=True),
+        tacl=TaclConfig(databases=["default"]),
     )
-
-    with pytest.raises(NotImplementedError):
-        mc(with_table_acls=True)
-
-    mc(with_table_acls=False)
+    mc()
 
 
 # path context manager
@@ -52,11 +43,12 @@ def test_reader(tmp_path: Path):
     with set_directory(tmp_path):
         mc = partial(
             MigrationConfig,
-            inventory=InventoryConfig(table=InventoryTable(catalog="catalog", database="database", name="name")),
+            inventory_database="abc",
             groups=GroupsConfig(auto=True),
+            tacl=TaclConfig(databases=["default"]),
         )
 
-        config: MigrationConfig = mc(with_table_acls=False)
+        config: MigrationConfig = mc()
         config_file = tmp_path / "config.yml"
 
         as_dict = config.as_dict()

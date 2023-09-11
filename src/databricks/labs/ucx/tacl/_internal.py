@@ -143,15 +143,25 @@ class CrawlerBase:
         Returns:
         list[any]: A list of data records, either fetched or loaded.
         """
+        loaded = False
+        trigger_load = ValueError("trigger records load")
         while True:
             try:
                 logger.debug(f"[{self._full_name}] fetching {self._table} inventory")
-                return list(fetcher())
+                cached_results = list(fetcher())
+                if len(cached_results) == 0 and loaded:
+                    return cached_results
+                if len(cached_results) == 0 and not loaded:
+                    raise trigger_load
+                return cached_results
             except Exception as e:
-                if "TABLE_OR_VIEW_NOT_FOUND" not in str(e):
+                if not (e == trigger_load or "TABLE_OR_VIEW_NOT_FOUND" in str(e)):
                     raise e
-                logger.debug(f"[{self._full_name}] {self._table} inventory not found, crawling")
-                self._append_records(klass, loader())
+            logger.debug(f"[{self._full_name}] crawling new batch for {self._table}")
+            loaded_records = list(loader())
+            if len(loaded_records) > 0:
+                self._append_records(klass, loaded_records)
+            loaded = True
 
     @staticmethod
     def _row_to_sql(row, fields):
