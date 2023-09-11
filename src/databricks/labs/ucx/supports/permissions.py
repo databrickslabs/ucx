@@ -12,6 +12,7 @@ from databricks.labs.ucx.inventory.types import (
     Destination,
     PermissionsInventoryItem,
     RequestObjectType,
+    Supports,
 )
 from databricks.labs.ucx.providers.groups_info import GroupMigrationState
 from databricks.labs.ucx.supports.base import BaseSupport, logger
@@ -85,7 +86,7 @@ class PermissionsOp:
         self,
         ws: WorkspaceClient,
         object_id: str,
-        crawler: str,
+        support_name: Supports,
         request_type: RequestObjectType,
         extras: dict | None = None,
     ) -> PermissionsInventoryItem | None:
@@ -93,7 +94,7 @@ class PermissionsOp:
         if permissions:
             return PermissionsInventoryItem(
                 object_id=object_id,
-                crawler=crawler,
+                support=support_name,
                 raw_object_permissions=json.dumps(permissions.as_dict()),
                 raw_extras=json.dumps(extras),
             )
@@ -114,9 +115,14 @@ class PermissionsSupport(BaseSupport, PermissionsOp):
         return self._is_item_relevant(item, migration_state)
 
     def __init__(
-        self, listing_function: Callable, id_attribute: str, ws: WorkspaceClient, request_type: RequestObjectType
+        self,
+        listing_function: Callable,
+        id_attribute: str,
+        ws: WorkspaceClient,
+        request_type: RequestObjectType,
+        support_name: Supports,
     ):
-        super().__init__(ws)
+        super().__init__(ws, support_name=support_name)
         self._listing_function = listing_function
         self._id_attribute = id_attribute
         self._request_type = request_type
@@ -128,7 +134,7 @@ class PermissionsSupport(BaseSupport, PermissionsOp):
                 ws=self._ws,
                 object_id=getattr(_object, self._id_attribute),
                 request_type=self._request_type,
-                crawler=str(self._request_type),
+                support=self._support_name,
             )
             for _object in self._listing_function()
         ]
@@ -137,7 +143,7 @@ class PermissionsSupport(BaseSupport, PermissionsOp):
 class WorkspaceSupport(BaseSupport, PermissionsOp):
     """
     For this class we're using `extras` payload to properly identify the object type we're working with.
-    Since all these objects are under `workspace` crawler name, we need to distinct between various request types
+    Since all these objects are under `workspace` support name, we need to distinct between various request types
     Note that this class heavily shares the code with PermissionsSupport.
     We can't use direct inheritance from PermissionsSupport here due  to different logic of request_type handling.
     Therefore, common methods are put into `PermissionsOp` mixin.
@@ -154,8 +160,8 @@ class WorkspaceSupport(BaseSupport, PermissionsOp):
             self._applier_task, ws=self._ws, request_type=request_type, acl=new_acl, object_id=item.object_id
         )
 
-    def __init__(self, ws: WorkspaceClient, num_threads=20, start_path: str | None = "/"):
-        super().__init__(ws)
+    def __init__(self, ws: WorkspaceClient, support_name: Supports, num_threads=20, start_path: str | None = "/"):
+        super().__init__(ws, support_name=support_name)
         self.listing = WorkspaceListing(
             ws,
             num_threads=num_threads,
@@ -188,7 +194,7 @@ class WorkspaceSupport(BaseSupport, PermissionsOp):
                 ws=self._ws,
                 object_id=_object.object_id,
                 request_type=self.__convert_object_type_to_request_type(_object),
-                crawler="workspace",
+                support=self._support_name,
                 extras={"object_type": _object.object_type},
             )
             for _object in object_infos

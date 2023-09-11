@@ -5,7 +5,11 @@ from logging import Logger
 
 from databricks.sdk import WorkspaceClient
 
-from databricks.labs.ucx.inventory.types import Destination, PermissionsInventoryItem
+from databricks.labs.ucx.inventory.types import (
+    Destination,
+    PermissionsInventoryItem,
+    Supports,
+)
 from databricks.labs.ucx.providers.groups_info import GroupMigrationState
 from databricks.labs.ucx.utils import noop
 
@@ -47,6 +51,7 @@ class BaseSupport(ABC, Crawler, Applier):
     Child classes must implement all abstract methods.
     """
 
-    def __init__(self, ws: WorkspaceClient):
+    def __init__(self, ws: WorkspaceClient, support_name: Supports):
         # workspace client is required in all implementations
         self._ws = ws
+        self._support_name = support_name

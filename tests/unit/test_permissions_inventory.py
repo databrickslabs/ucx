@@ -30,7 +30,7 @@ def test_table_schema(permissions_inventory):
     schema = StructType(
         [
             StructField("object_id", StringType(), True),
-            StructField("crawler", StringType(), True),
+            StructField("support", StringType(), True),
             StructField("raw_object_permissions", StringType(), True),
             StructField("raw_extras", StringType(), True),
         ]
@@ -57,10 +57,10 @@ def test_load_all(permissions_inventory):
     items = pd.DataFrame(
         {
             "object_id": ["object1"],
-            "crawler": ["clusters"],
+            "support": ["clusters"],
             "raw_object_permissions": ["test acl"],
         }
     )
     permissions_inventory._df.toPandas.return_value = items
     output = permissions_inventory.load_all()
-    assert output[0] == PermissionsInventoryItem("object1", crawler="clusters", raw_object_permissions="test acl")
+    assert output[0] == PermissionsInventoryItem("object1", support="clusters", raw_object_permissions="test acl")

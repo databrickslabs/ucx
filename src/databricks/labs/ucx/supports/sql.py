@@ -7,7 +7,11 @@ from databricks.sdk.core import DatabricksError
 from databricks.sdk.service import iam, sql
 from ratelimit import limits, sleep_and_retry
 
-from databricks.labs.ucx.inventory.types import Destination, PermissionsInventoryItem
+from databricks.labs.ucx.inventory.types import (
+    Destination,
+    PermissionsInventoryItem,
+    Supports,
+)
 from databricks.labs.ucx.providers.groups_info import GroupMigrationState
 from databricks.labs.ucx.supports.base import BaseSupport, logger
 
@@ -21,9 +25,14 @@ class SqlPermissionsSupport(BaseSupport):
         return any(g in mentioned_groups for g in [info.workspace for info in migration_state.groups])
 
     def __init__(
-        self, ws: WorkspaceClient, listing_function: Callable, id_attribute: str, object_type: sql.ObjectTypePlural
+        self,
+        ws: WorkspaceClient,
+        listing_function: Callable,
+        id_attribute: str,
+        object_type: sql.ObjectTypePlural,
+        support_name: Supports,
     ):
-        super().__init__(ws)
+        super().__init__(ws, support_name=support_name)
         self._listing_function = listing_function
         self._id_attribute = id_attribute
         self._object_type = object_type
@@ -46,7 +55,7 @@ class SqlPermissionsSupport(BaseSupport):
         if permissions:
             return PermissionsInventoryItem(
                 object_id=object_id,
-                crawler=str(self._object_type),
+                support=self._support_name,
                 raw_object_permissions=json.dumps(permissions.as_dict()),
             )
 

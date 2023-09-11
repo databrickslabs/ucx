@@ -7,7 +7,7 @@ from databricks.labs.ucx.inventory.types import (
 def test_item_without_extras():
     sample_item = PermissionsInventoryItem(
         object_id="object1",
-        crawler="clusters",
+        support="clusters",
         raw_object_permissions="test acl",
     )
     assert sample_item.extras() == {}
@@ -15,7 +15,7 @@ def test_item_without_extras():
 
 def test_item_with_extras():
     sample_item = PermissionsInventoryItem(
-        object_id="object1", crawler="clusters", raw_object_permissions="test acl", raw_extras='{"test": "test"}'
+        object_id="object1", support="clusters", raw_object_permissions="test acl", raw_extras='{"test": "test"}'
     )
     assert sample_item.extras() == {"test": "test"}
 

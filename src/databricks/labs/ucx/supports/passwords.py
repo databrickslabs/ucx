@@ -14,7 +14,7 @@ class PasswordsSupport(BaseSupport):
             permissions = self._ws.users.get_password_permissions()
             return PermissionsInventoryItem(
                 object_id="passwords",
-                crawler="passwords",
+                support="passwords",
                 raw_object_permissions=json.dumps(permissions.as_dict()),
             )
 

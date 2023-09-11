@@ -26,3 +26,21 @@ def test_manager_set_supports(spark_mixin):
     supports = get_supports(ws=MagicMock(), workspace_start_path="/", num_threads=1)
     pm.set_supports(supports)
     assert pm.supports == supports
+
+
+def test_manager_inventorize(spark_mixin):
+    pm = PermissionManager(ws=MagicMock(), permissions_inventory=PermissionsInventoryTable("test", MagicMock()))
+    supports = get_supports(ws=MagicMock(), workspace_start_path="/", num_threads=1)
+    pm.set_supports(supports)
+    with mock.patch("databricks.labs.ucx.inventory.permissions.ThreadedExecution.run", MagicMock()) as run_mock:
+        pm.inventorize_permissions()
+        run_mock.assert_called_once()
+
+
+def test_manager_apply(spark_mixin):
+    pm = PermissionManager(ws=MagicMock(), permissions_inventory=PermissionsInventoryTable("test", MagicMock()))
+    supports = get_supports(ws=MagicMock(), workspace_start_path="/", num_threads=1)
+    pm.set_supports(supports)
+    with mock.patch("databricks.labs.ucx.inventory.permissions.ThreadedExecution.run", MagicMock()) as run_mock:
+        pm.apply_group_permissions(migration_state=MagicMock(), destination="backup")
+        run_mock.assert_called_once()

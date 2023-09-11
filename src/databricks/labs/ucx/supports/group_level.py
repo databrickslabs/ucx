@@ -1,7 +1,6 @@
 import json
 from functools import partial
 
-from databricks.sdk import WorkspaceClient
 from databricks.sdk.service import iam
 from ratelimit import limits, sleep_and_retry
 
@@ -12,22 +11,17 @@ from databricks.labs.ucx.utils import noop
 
 
 class GroupLevelSupport(BaseSupport):
-    def __init__(self, ws: WorkspaceClient, property_name: str):
-        super().__init__(ws)
-        self._ws = ws
-        self._property_name = property_name
-
     def _crawler_task(self, group: iam.Group):
         return PermissionsInventoryItem(
             object_id=group.id,
-            crawler=self._property_name,
-            raw_object_permissions=json.dumps([e.as_dict() for e in getattr(group, self._property_name)]),
+            support=self._support_name.value,
+            raw_object_permissions=json.dumps([e.as_dict() for e in getattr(group, self._support_name.value)]),
         )
 
     @sleep_and_retry
     @limits(calls=10, period=1)
     def _applier_task(self, group_id: str, value: list[iam.ComplexValue]):
-        operations = [iam.Patch(op=iam.PatchOp.ADD, path=self._property_name, value=value)]
+        operations = [iam.Patch(op=iam.PatchOp.ADD, path=self._support_name.value, value=value)]
         schemas = [iam.PatchSchema.URN_IETF_PARAMS_SCIM_API_MESSAGES_2_0_PATCH_OP]
         self._ws.groups.patch(group_id, operations=operations, schemas=schemas)
 
@@ -35,8 +29,10 @@ class GroupLevelSupport(BaseSupport):
         return any(g.workspace.id == item.object_id for g in migration_state.groups)
 
     def get_crawler_tasks(self):
-        groups = self._ws.groups.list(attributes=self._property_name)
-        return [partial(self._crawler_task, g) if getattr(g, self._property_name) else partial(noop) for g in groups]
+        groups = self._ws.groups.list(attributes=self._support_name.value)
+        return [
+            partial(self._crawler_task, g) if getattr(g, self._support_name.value) else partial(noop) for g in groups
+        ]
 
     def _get_apply_task(
         self, item: PermissionsInventoryItem, migration_state: GroupMigrationState, destination: Destination

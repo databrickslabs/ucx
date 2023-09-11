@@ -6,7 +6,7 @@ from databricks.sdk import WorkspaceClient
 from databricks.labs.ucx.inventory.permissions_inventory import (
     PermissionsInventoryTable,
 )
-from databricks.labs.ucx.inventory.types import PermissionsInventoryItem
+from databricks.labs.ucx.inventory.types import PermissionsInventoryItem, Supports
 from databricks.labs.ucx.providers.groups_info import GroupMigrationState
 from databricks.labs.ucx.supports.base import BaseSupport
 from databricks.labs.ucx.utils import ThreadedExecution
@@ -18,13 +18,13 @@ class PermissionManager:
     def __init__(self, ws: WorkspaceClient, permissions_inventory: PermissionsInventoryTable):
         self._ws = ws
         self._permissions_inventory = permissions_inventory
-        self._supports: dict[str, BaseSupport] = {}
+        self._supports: dict[Supports, BaseSupport] = {}
 
     @property
-    def supports(self) -> dict[str, BaseSupport]:
+    def supports(self) -> dict[Supports, BaseSupport]:
         return self._supports
 
-    def set_supports(self, supports: dict[str, BaseSupport]):
+    def set_supports(self, supports: dict[Supports, BaseSupport]):
         self._supports = supports
 
     def inventorize_permissions(self):
@@ -54,7 +54,7 @@ class PermissionManager:
         for name, _support in self._supports.items():
             logger.info(f"Adding applier tasks for {name}")
             applier_tasks.extend(
-                [self._supports.get(item.crawler).get_apply_task(item, migration_state, destination) for item in items]
+                [self._supports.get(item.support).get_apply_task(item, migration_state, destination) for item in items]
             )
             logger.info(f"Added applier tasks for {name}")
 

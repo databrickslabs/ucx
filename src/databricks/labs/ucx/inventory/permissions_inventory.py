@@ -22,7 +22,7 @@ class PermissionsInventoryTable(SparkMixin):
         return StructType(
             [
                 StructField("object_id", StringType(), True),
-                StructField("crawler", StringType(), True),
+                StructField("support", StringType(), True),
                 StructField("raw_object_permissions", StringType(), True),
                 StructField("raw_extras", StringType(), True),
             ]

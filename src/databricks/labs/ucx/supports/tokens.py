@@ -13,7 +13,7 @@ class TokensSupport(BaseSupport):
         def token_getter() -> PermissionsInventoryItem:
             return PermissionsInventoryItem(
                 object_id="tokens",
-                crawler="tokens",
+                support="tokens",
                 raw_object_permissions=json.dumps(self._ws.token_management.get_token_permissions().as_dict()),
             )
 

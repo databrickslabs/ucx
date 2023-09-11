@@ -18,7 +18,7 @@ class SecretsSupport(BaseSupport):
             acl_items = self._ws.secrets.list_acls(scope.name)
             return PermissionsInventoryItem(
                 object_id=scope.name,
-                crawler="secrets",
+                support=self._support_name,
                 raw_object_permissions=json.dumps([item.as_dict() for item in acl_items]),
             )
 

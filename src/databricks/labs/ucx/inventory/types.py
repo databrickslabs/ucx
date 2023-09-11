@@ -28,10 +28,38 @@ class RequestObjectType(StrEnum):
         return self.value
 
 
+class Supports(StrEnum):
+    """
+    This enum is used to define which supports do we actually provide.
+    Please note that if you add a support for new object type, you also need to add it to the get_supports() function.
+    """
+
+    entitlements = "entitlements"
+    roles = "roles"
+    clusters = "clusters"
+    cluster_policies = "cluster_policies"
+    instance_pools = "instance_pools"
+    sql_warehouses = "sql_warehouses"
+    jobs = "jobs"
+    pipelines = "pipelines"
+    experiments = "experiments"
+    registered_models = "registered_models"
+    alerts = "alerts"
+    dashboards = "dashboards"
+    queries = "queries"
+    tokens = "tokens"
+    passwords = "passwords"
+    secrets = "secrets"
+    workspace = "workspace"
+
+    def __repr__(self):
+        return self.value
+
+
 @dataclass
 class PermissionsInventoryItem:
     object_id: str
-    crawler: str  # shall be taken from CRAWLERS dict
+    support: Supports  # shall be taken from CRAWLERS dict
     raw_object_permissions: str
     raw_extras: str | None = None  # any additional information should be stored here in a JSON-formatted dictionary
 
@@ -51,5 +79,5 @@ class PermissionsInventoryItem:
         return cls(
             object_id=raw["object_id"],
             raw_object_permissions=raw["raw_object_permissions"],
-            crawler=raw["crawler"],
+            support=raw["support"],
         )
