@@ -1,5 +1,5 @@
 import json
-from collections.abc import Callable
+from collections.abc import Callable, Iterator
 from dataclasses import dataclass
 from functools import partial
 
@@ -135,8 +135,8 @@ class GenericPermissionsSupport(BaseSupport):
 
 def listing_wrapper(
     func: Callable[..., list], id_attribute: str, object_type: RequestObjectType
-) -> Callable[..., list[GenericPermissionsInfo]]:
-    def wrapper() -> list[GenericPermissionsInfo]:
+) -> Callable[..., Iterator[GenericPermissionsInfo]]:
+    def wrapper() -> Iterator[GenericPermissionsInfo]:
         for item in func():
             yield GenericPermissionsInfo(
                 object_id=getattr(item, id_attribute),
