@@ -26,11 +26,11 @@ class GenericPermissionsInfo:
 class GenericPermissionsSupport(BaseSupport):
     def __init__(
         self,
-        listings: list[Callable[..., list[GenericPermissionsInfo]]],
+        listings: list[Callable[..., Iterator[GenericPermissionsInfo]]],
         ws: WorkspaceClient,
     ):
         super().__init__(ws)
-        self._listings: list[Callable[..., list[GenericPermissionsInfo]]] = listings
+        self._listings: list[Callable[..., Iterator[GenericPermissionsInfo]]] = listings
 
     def _safe_get_permissions(
         self, ws: WorkspaceClient, request_object_type: RequestObjectType, object_id: str
