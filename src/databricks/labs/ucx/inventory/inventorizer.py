@@ -8,7 +8,7 @@ from typing import Generic, TypeVar
 from databricks.sdk import WorkspaceClient
 from databricks.sdk.core import DatabricksError
 from databricks.sdk.service.iam import AccessControlResponse, Group, ObjectPermissions
-from databricks.sdk.service.ml import ModelDatabricks
+from databricks.sdk.service.ml import ModelDatabricks, ExperimentTag
 from databricks.sdk.service.workspace import (
     AclItem,
     ObjectInfo,
@@ -369,6 +369,59 @@ def experiments_listing(ws: WorkspaceClient):
                 yield experiment
 
     return inner
+class MlArtifactsInventorizer(BaseInventorizer[InventoryObject]):
+    def __init__(self, ws: WorkspaceClient):
+        self._ws = ws
+        self._permissions = []
+
+    @property
+    def logical_object_types(self) -> list[LogicalObjectType]:
+        return [LogicalObjectType.EXPERIMENT, LogicalObjectType.MODEL]
+    def preload(self):
+        pass
+    def inventorize(self) -> list[PermissionsInventoryItem]:
+        import concurrent.futures
+        with concurrent.futures.ThreadPoolExecutor(max_workers=20) as executor:
+            executor.map(self._inventorize_experiments(), range(20))
+            executor.map(self._inventorize_models(), range(20))
+
+        return self._permissions
+
+    def _inventorize_experiments(self):
+        experiments = self._ws.experiments.list_experiments()
+        #These experiments cannot have permissions on it, thus they should not considered
+        experiments_out_of_scope = [
+            ExperimentTag(key='mlflow.experimentType', value='NOTEBOOK'),
+            ExperimentTag(key='mlflow.experiment.sourceType', value='REPO_NOTEBOOK')
+        ]
+
+        for experiment in experiments:
+            exp_id = experiment.experiment_id
+            if [i for i in experiment.tags if i in experiments_out_of_scope]:
+                print(f"Experiment {experiment.name} with id {exp_id} out of scope")
+            else:
+                print(f"Fetching permissions for experiment {experiment.name} with id {exp_id}")
+                permissions = self._ws.permissions.get(request_object_type=RequestObjectType.EXPERIMENTS, request_object_id=exp_id)
+
+                self._permissions.append(PermissionsInventoryItem(
+                    object_id=exp_id,
+                    logical_object_type=LogicalObjectType.EXPERIMENT,
+                    request_object_type=RequestObjectType.EXPERIMENTS,
+                    raw_object_permissions=json.dumps(permissions.as_dict()),
+                ))
+
+    def _inventorize_models(self):
+        for model in self._ws.model_registry.list_models():
+            model_id = self._ws.model_registry.get_model(model.name).registered_model_databricks.id
+            print(f"Fetching permissions for model {model.name} with id {model_id}")
+            permissions = self._ws.permissions.get(request_object_type=RequestObjectType.REGISTERED_MODELS, request_object_id=model_id)
+
+            self._permissions.append(PermissionsInventoryItem(
+                    object_id=model_id,
+                    logical_object_type=LogicalObjectType.MODEL,
+                    request_object_type=RequestObjectType.REGISTERED_MODELS,
+                    raw_object_permissions=json.dumps(permissions.as_dict()),
+                ))
 
 
 class Inventorizers:
