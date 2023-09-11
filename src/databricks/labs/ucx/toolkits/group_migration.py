@@ -9,7 +9,7 @@ from databricks.labs.ucx.inventory.permissions_inventory import (
 )
 from databricks.labs.ucx.inventory.verification import VerificationManager
 from databricks.labs.ucx.managers.group import GroupManager
-from databricks.labs.ucx.supports.impl import get_supports
+from databricks.labs.ucx.supports.impl import SupportsProvider
 
 
 class GroupMigrationToolkit:
@@ -28,7 +28,11 @@ class GroupMigrationToolkit:
 
         self._group_manager = GroupManager(self._ws, config.groups)
         self._permissions_inventory = PermissionsInventoryTable(config.inventory_database, self._ws)
-        self._permissions_manager = PermissionManager(self._ws, self._permissions_inventory)
+        self._permissions_manager = PermissionManager(
+            self._ws,
+            self._permissions_inventory,
+            supports_provider=SupportsProvider(self._ws, self._num_threads, self._workspace_start_path),
+        )
         self._verification_manager = VerificationManager(self._ws)
 
     @staticmethod
@@ -46,8 +50,6 @@ class GroupMigrationToolkit:
 
     def prepare_environment(self):
         self._group_manager.prepare_groups_in_environment()
-        supports = get_supports(self._ws, self._num_threads, self._workspace_start_path)
-        self._permissions_manager.set_supports(supports)
 
     def cleanup_inventory_table(self):
         self._permissions_inventory.cleanup()
