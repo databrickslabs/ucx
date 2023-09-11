@@ -5,7 +5,9 @@ from databricks.sdk import WorkspaceClient
 from databricks.labs.ucx.config import MigrationConfig
 from databricks.labs.ucx.inventory.inventorizer import Inventorizers
 from databricks.labs.ucx.inventory.permissions import PermissionManager
-from databricks.labs.ucx.inventory.permissions_inventory import PermissionsInventoryTable
+from databricks.labs.ucx.inventory.permissions_inventory import (
+    PermissionsInventoryTable,
+)
 from databricks.labs.ucx.managers.group import GroupManager
 
 
