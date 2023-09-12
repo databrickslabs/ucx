@@ -54,11 +54,11 @@ def test_manager_apply(spark_mixin):
         ),
         PermissionsInventoryItem(
             object_id="test2",
-            support="cluster_policies",
+            support="cluster-policies",
             raw_object_permissions=json.dumps(
                 iam.ObjectPermissions(
                     object_id="test",
-                    object_type="cluster_policies",
+                    object_type="cluster-policies",
                     access_control_list=[
                         iam.AccessControlResponse(
                             group_name="test",

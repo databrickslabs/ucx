@@ -57,7 +57,7 @@ def test_scim_apply(migration_state):
     task()
     ws.groups.patch.assert_called_once_with(
         id="test-backup",
-        operations=[iam.Patch(op=iam.PatchOp.ADD, path="roles", value=sample_permissions)],
+        operations=[iam.Patch(op=iam.PatchOp.ADD, path="roles", value=[p.as_dict() for p in sample_permissions])],
         schemas=[iam.PatchSchema.URN_IETF_PARAMS_SCIM_API_MESSAGES_2_0_PATCH_OP],
     )
 
