@@ -1,8 +1,7 @@
 import logging
 
 from databricks.sdk import WorkspaceClient
-from pyspark.sql import DataFrame
-from pyspark.sql.types import StringType, StructField, StructType
+from databricks.sdk.service.iam import ObjectPermissions
 
 from databricks.labs.ucx.inventory.types import PermissionsInventoryItem
 from databricks.labs.ucx.providers.spark import SparkMixin
@@ -16,8 +15,9 @@ class PermissionsInventoryTable(SparkMixin):
         self._table = f"hive_metastore.{inventory_database}.permissions"
 
     @property
-    def _table_schema(self) -> StructType:
-        # TODO: generate the table schema automatically from the PermissionsInventoryItem class
+    def _table_schema(self):
+        from pyspark.sql.types import StringType, StructField, StructType
+
         return StructType(
             [
                 StructField("object_id", StringType(), True),
@@ -27,7 +27,7 @@ class PermissionsInventoryTable(SparkMixin):
         )
 
     @property
-    def _df(self) -> DataFrame:
+    def _df(self):
         return self.spark.table(self._table)
 
     def cleanup(self):

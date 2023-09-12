@@ -91,6 +91,7 @@ class MigrationConfig:
     inventory_database: str
     tacl: TaclConfig
     groups: GroupsConfig
+    instance_pool_id: str = None
     connect: ConnectConfig | None = None
     num_threads: int | None = 4
     log_level: str | None = "INFO"
@@ -134,16 +135,21 @@ class MigrationConfig:
             tacl=TaclConfig.from_dict(raw.get("tacl", {})),
             groups=GroupsConfig.from_dict(raw.get("groups", {})),
             connect=ConnectConfig.from_dict(raw.get("connect", {})),
+            instance_pool_id=raw.get("instance_pool_id", None),
             num_threads=raw.get("num_threads", 4),
             log_level=raw.get("log_level", "INFO"),
         )
 
     @classmethod
-    def from_file(cls, config_file: Path) -> "MigrationConfig":
+    def from_bytes(cls, raw: str) -> "MigrationConfig":
         from yaml import safe_load
 
-        raw = safe_load(config_file.read_text())
-        return MigrationConfig.from_dict({} if not raw else raw)
+        raw = safe_load(raw)
+        return cls.from_dict({} if not raw else raw)
+
+    @classmethod
+    def from_file(cls, config_file: Path) -> "MigrationConfig":
+        return cls.from_bytes(config_file.read_text())
 
     def to_databricks_config(self) -> Config:
         connect = self.connect

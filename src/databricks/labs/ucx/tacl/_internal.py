@@ -229,5 +229,11 @@ class CrawlerBase:
                     raise e
                 logger.debug(f"[{self._full_name}] not found. creating")
                 schema = ", ".join(f"{f.name} {self._field_type(f)}" for f in fields)
-                ddl = f"CREATE TABLE {self._full_name} ({schema}) USING DELTA"
-                self._exec(ddl)
+                try:
+                    ddl = f"CREATE TABLE {self._full_name} ({schema}) USING DELTA"
+                    self._exec(ddl)
+                except Exception as e:
+                    schema_not_found = "SCHEMA_NOT_FOUND" in str(e)
+                    if not schema_not_found:
+                        raise e
+                    self._exec(f"CREATE SCHEMA {self._catalog}.{self._schema}")

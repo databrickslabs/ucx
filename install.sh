@@ -59,6 +59,6 @@ $py -m pip install --quiet -e .
 
 # Invoke python module of the install app directly,
 # without console_scripts entrypoint
-$py -m databricks.labs.ucx.cli.app install
+$py -m databricks.labs.ucx.install
 
 rm -r "$tmp_dir"

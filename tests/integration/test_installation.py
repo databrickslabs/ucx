@@ -98,6 +98,14 @@ def test_sql_backend_works(ws, wsfs_wheel):
     assert len(database_names) > 0
 
 
+def test_creating_workflows(ws):
+    from databricks.labs.ucx.install import Installer
+
+    inst = Installer(ws)
+
+    inst._create_jobs()
+
+
 def test_toolkit_notebook(
     ws,
     sql_exec,
