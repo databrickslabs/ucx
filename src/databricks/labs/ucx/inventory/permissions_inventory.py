@@ -1,7 +1,6 @@
 import logging
 
 from databricks.sdk import WorkspaceClient
-from databricks.sdk.service.iam import ObjectPermissions
 
 from databricks.labs.ucx.inventory.types import PermissionsInventoryItem
 from databricks.labs.ucx.providers.spark import SparkMixin

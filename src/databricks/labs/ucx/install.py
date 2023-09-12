@@ -209,9 +209,7 @@ class Installer:
                     new_cluster=replace(
                         spec,
                         data_security_mode=compute.DataSecurityMode.LEGACY_TABLE_ACL,
-                        spark_conf={
-                            'spark.databricks.acl.sqlOnly': 'true'
-                        },
+                        spark_conf={"spark.databricks.acl.sqlOnly": "true"},
                         custom_tags={},
                     ),
                 )
