@@ -70,6 +70,6 @@ def trigger(*argv):
     print(current_task.doc)
 
     cfg = MigrationConfig.from_file(Path(args["config"]))
-    logging.root.setLevel(cfg.log_level)
+    logging.getLogger('databricks').setLevel(cfg.log_level)
 
     current_task.fn(cfg)
