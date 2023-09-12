@@ -7,9 +7,9 @@ from databricks.labs.ucx.support.secrets import SecretScopesSupport
 
 
 class VerificationManager:
-    def __init__(self, ws: WorkspaceClient):
+    def __init__(self, ws: WorkspaceClient, secrets_support: SecretScopesSupport):
         self._ws = ws
-        self._secrets_support = SecretScopesSupport(ws=ws)
+        self._secrets_support = secrets_support
 
     def verify(
         self, migration_state: GroupMigrationState, target: Literal["backup", "account"], tuples: list[tuple[str, str]]

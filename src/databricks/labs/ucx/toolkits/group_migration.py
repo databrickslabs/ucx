@@ -28,12 +28,11 @@ class GroupMigrationToolkit:
 
         self._group_manager = GroupManager(self._ws, config.groups)
         self._permissions_inventory = PermissionsInventoryTable(config.inventory_database, self._ws)
+        self._supports_provider = SupportsProvider(self._ws, self._num_threads, self._workspace_start_path)
         self._permissions_manager = PermissionManager(
-            self._ws,
-            self._permissions_inventory,
-            supports_provider=SupportsProvider(self._ws, self._num_threads, self._workspace_start_path),
+            self._ws, self._permissions_inventory, supports_provider=self._supports_provider
         )
-        self._verification_manager = VerificationManager(self._ws)
+        self._verification_manager = VerificationManager(self._ws, self._supports_provider.supports["secrets"])
 
     @staticmethod
     def _verify_ws_client(w: WorkspaceClient):
