@@ -1,8 +1,9 @@
 import os
+import os.path
 
 from databricks.sdk import WorkspaceClient
 from databricks.sdk.service.compute import Language
-
+from databricks.labs.ucx.tacl.tables import Table
 from databricks.labs.ucx.providers.mixins.compute import CommandExecutor
 from databricks.labs.ucx.tacl._internal import (
     RuntimeBackend,
@@ -18,6 +19,7 @@ class AssessmentToolkit:
         self._inventory_schema = inventory_schema
         self._warehouse_id = warehouse_id
         self._cluster_id = cluster_id
+        self._external_locations = None
 
     @staticmethod
     def _verify_ws_client(w: WorkspaceClient):
@@ -39,11 +41,23 @@ class AssessmentToolkit:
         setup_code = f"""
         val schema="{self._inventory_schema}";
         """
-        command_output = commands.run(setup_code+template)
+        command_output = commands.run(setup_code + template)
         print(command_output)
 
-    def external_locations(self):
-        pass
+    def external_locations(self, tables: [Table]):
+        ext_locations = []
+        for table in tables:
+            dupe = False
+            loc = 0
+            while loc < len(ext_locations) and not dupe:
+                common = os.path.commonprefix([ext_locations[loc], os.path.dirname(table.location) + '/'])
+                if common.count("/") > 2:
+                    ext_locations[loc] = common
+                    dupe = True
+                loc += 1
+            if not dupe:
+                ext_locations.append((os.path.dirname(table.location) + '/'))
+        return ext_locations
 
     @staticmethod
     def _backend(ws: WorkspaceClient, warehouse_id: str | None = None) -> SqlBackend:
@@ -57,4 +71,5 @@ if __name__ == "__main__":
     cluster_id = os.getenv("CLUSTER_ID")
     print(cluster_id)
     assess = AssessmentToolkit(ws, cluster_id, "UCX", "UCX_assessment")
-    assess.table_inventory()
+    # assess.table_inventory()
+    print(assess.external_locations(["1", "2"]))
