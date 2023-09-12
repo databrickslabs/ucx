@@ -8,7 +8,6 @@ from databricks.sdk.service import iam, workspace
 from ratelimit import limits, sleep_and_retry
 
 from databricks.labs.ucx.inventory.types import Destination, PermissionsInventoryItem
-from databricks.labs.ucx.inventory.verification import VerificationManager
 from databricks.labs.ucx.providers.groups_info import GroupMigrationState
 from databricks.labs.ucx.support.base import BaseSupport
 
@@ -36,17 +35,22 @@ class SecretScopesSupport(BaseSupport):
         mentioned_groups = [acl.principal for acl in acls]
         return any(g in mentioned_groups for g in [info.workspace.display_name for info in migration_state.groups])
 
+    def secret_scope_permission(self, scope_name: str, group_name: str) -> workspace.AclPermission | None:
+        for acl in self._ws.secrets.list_acls(scope=scope_name):
+            if acl.principal == group_name:
+                return acl.permission
+        return None
+
     def _inflight_check(
         self, scope_name: str, group_name: str, expected_permission: workspace.AclPermission, num_retries: int = 5
     ):
         # in-flight check for the applied permissions
         # the api might be inconsistent, therefore we need to check that the permissions were applied
         # TODO: add mixin to SDK
-        vm = VerificationManager(self._ws)
         retries_left = num_retries
         while retries_left > 0:
             time.sleep(random.random() * 2)
-            applied_permission = vm.secret_scope_permission(scope_name=scope_name, group_name=group_name)
+            applied_permission = self.secret_scope_permission(scope_name=scope_name, group_name=group_name)
             if applied_permission:
                 if applied_permission == expected_permission:
                     return

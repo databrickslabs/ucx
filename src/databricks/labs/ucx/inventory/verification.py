@@ -1,14 +1,15 @@
 from typing import Literal
 
 from databricks.sdk import WorkspaceClient
-from databricks.sdk.service import workspace
 
 from databricks.labs.ucx.providers.groups_info import GroupMigrationState
+from databricks.labs.ucx.support.secrets import SecretScopesSupport
 
 
 class VerificationManager:
     def __init__(self, ws: WorkspaceClient):
         self._ws = ws
+        self._secrets_support = SecretScopesSupport(ws=ws)
 
     def verify(
         self, migration_state: GroupMigrationState, target: Literal["backup", "account"], tuples: list[tuple[str, str]]
@@ -51,8 +52,8 @@ class VerificationManager:
         for mi in migration_state.groups:
             src_name = getattr(mi, base_attr).display_name
             dst_name = getattr(mi, target).display_name
-            src_permission = self.secret_scope_permission(scope_name, src_name)
-            dst_permission = self.secret_scope_permission(scope_name, dst_name)
+            src_permission = self._secrets_support.secret_scope_permission(scope_name, src_name)
+            dst_permission = self._secrets_support.secret_scope_permission(scope_name, dst_name)
             assert src_permission == dst_permission, "Scope ACLs were not applied correctly"
 
     def verify_roles_and_entitlements(self, migration_state: GroupMigrationState, target: Literal["backup", "account"]):
@@ -65,9 +66,3 @@ class VerificationManager:
 
             assert base_group_info.roles == target_group_info.roles
             assert base_group_info.entitlements == target_group_info.entitlements
-
-    def secret_scope_permission(self, scope_name: str, group_name: str) -> workspace.AclPermission | None:
-        for acl in self._ws.secrets.list_acls(scope=scope_name):
-            if acl.principal == group_name:
-                return acl.permission
-        return None
