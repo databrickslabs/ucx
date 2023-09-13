@@ -27,9 +27,11 @@ class StatementExecutionBackend(SqlBackend):
         self._warehouse_id = warehouse_id
 
     def execute(self, sql):
+        logger.debug(f"[api][execute] {sql}")
         self._sql.execute(self._warehouse_id, sql)
 
     def fetch(self, sql) -> Iterator[any]:
+        logger.debug(f"[api][fetch] {sql}")
         return self._sql.execute_fetch_all(self._warehouse_id, sql)
 
 
@@ -43,9 +45,11 @@ class RuntimeBackend(SqlBackend):
         self._spark = SparkSession.builder.getOrCreate()
 
     def execute(self, sql):
+        logger.debug(f"[spark][execute] {sql}")
         self._spark.sql(sql)
 
     def fetch(self, sql) -> Iterator[any]:
+        logger.debug(f"[spark][fetch] {sql}")
         return self._spark.sql(sql).collect()
 
 
@@ -160,6 +164,7 @@ class CrawlerBase:
             logger.debug(f"[{self._full_name}] crawling new batch for {self._table}")
             loaded_records = list(loader())
             if len(loaded_records) > 0:
+                logger.debug(f"[{self._full_name}] found {len(loaded_records)} new records for {self._table}")
                 self._append_records(klass, loaded_records)
             loaded = True
 
@@ -230,10 +235,10 @@ class CrawlerBase:
                 logger.debug(f"[{self._full_name}] not found. creating")
                 schema = ", ".join(f"{f.name} {self._field_type(f)}" for f in fields)
                 try:
-                    ddl = f"CREATE TABLE {self._full_name} ({schema}) USING DELTA"
-                    self._exec(ddl)
+                    self._exec(f"CREATE TABLE {self._full_name} ({schema}) USING DELTA")
                 except Exception as e:
                     schema_not_found = "SCHEMA_NOT_FOUND" in str(e)
                     if not schema_not_found:
                         raise e
+                    logger.debug(f"[{self._catalog}.{self._schema}] not found. creating")
                     self._exec(f"CREATE SCHEMA {self._catalog}.{self._schema}")
