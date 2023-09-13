@@ -166,7 +166,9 @@ def test_e2e(
         tacl=TaclConfig(auto=True),
         log_level="DEBUG",
     )
-    toolkit = GroupMigrationToolkit(config)
+
+    warehouse_id = os.environ["TEST_DEFAULT_WAREHOUSE_ID"]
+    toolkit = GroupMigrationToolkit(config, warehouse_id=warehouse_id)
     toolkit.prepare_environment()
 
     group_migration_state = toolkit._group_manager.migration_groups_provider

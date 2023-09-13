@@ -13,16 +13,10 @@ from databricks.labs.ucx.inventory.types import PermissionsInventoryItem
 from databricks.labs.ucx.support.impl import SupportsProvider
 
 
-@pytest.fixture(scope="function")
-def spark_mixin():
-    with mock.patch("databricks.labs.ucx.providers.spark.SparkMixin._initialize_spark", MagicMock()):
-        yield
-
-
-def test_manager_inventorize(spark_mixin):
+def test_manager_inventorize():
     sup = SupportsProvider(ws=MagicMock(), num_threads=1, workspace_start_path="/")
     pm = PermissionManager(
-        ws=MagicMock(), permissions_inventory=PermissionsInventoryTable("test", MagicMock()), supports_provider=sup
+        ws=MagicMock(), permissions_inventory=PermissionsInventoryTable(MagicMock(), "test"), supports_provider=sup
     )
 
     with mock.patch("databricks.labs.ucx.inventory.permissions.ThreadedExecution.run", MagicMock()) as run_mock:
@@ -30,7 +24,7 @@ def test_manager_inventorize(spark_mixin):
         run_mock.assert_called_once()
 
 
-def test_manager_apply(spark_mixin):
+def test_manager_apply():
     sup = SupportsProvider(ws=MagicMock(), num_threads=1, workspace_start_path="/")
     inventory = MagicMock(spec=PermissionsInventoryTable)
     inventory.load_all.return_value = [
