@@ -1,7 +1,5 @@
-from dataclasses import asdict, dataclass
+from dataclasses import dataclass
 from typing import Literal
-
-import pandas as pd
 
 from databricks.labs.ucx.generic import StrEnum
 
@@ -32,19 +30,3 @@ class PermissionsInventoryItem:
     object_id: str
     support: str  # shall be taken from CRAWLERS dict
     raw_object_permissions: str
-
-    @staticmethod
-    def from_pandas(source: pd.DataFrame) -> list["PermissionsInventoryItem"]:
-        items = source.to_dict(orient="records")
-        return [PermissionsInventoryItem.from_dict(item) for item in items]
-
-    def as_dict(self) -> dict:
-        return asdict(self)
-
-    @classmethod
-    def from_dict(cls, raw: dict) -> "PermissionsInventoryItem":
-        return cls(
-            object_id=raw["object_id"],
-            raw_object_permissions=raw["raw_object_permissions"],
-            support=raw["support"],
-        )
