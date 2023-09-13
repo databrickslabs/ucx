@@ -8,4 +8,4 @@ test:
 	hatch run unit:test
 
 test-cov:
-	hatch run unit:test-cov-report
+	hatch run unit:test-cov-report && open htmlcov/index.html

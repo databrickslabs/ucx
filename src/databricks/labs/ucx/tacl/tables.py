@@ -3,6 +3,7 @@ from collections.abc import Iterator
 from dataclasses import dataclass
 from functools import partial
 
+from databricks.labs.ucx.providers.mixins.sql import Row
 from databricks.labs.ucx.tacl._internal import CrawlerBase, SqlBackend
 from databricks.labs.ucx.utils import ThreadedExecution
 
@@ -81,7 +82,7 @@ class TablesCrawler(CrawlerBase):
         """
         super().__init__(backend, catalog, schema, "tables")
 
-    def _all_databases(self) -> Iterator[str]:
+    def _all_databases(self) -> Iterator[Row]:
         yield from self._fetch("SHOW DATABASES")
 
     def snapshot(self, catalog: str, database: str) -> list[Table]:
