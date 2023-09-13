@@ -23,4 +23,9 @@ class PermissionsInventoryTable(CrawlerBase):
 
     def load_all(self) -> list[PermissionsInventoryItem]:
         logger.info(f"Loading inventory table {self._full_name}")
-        return [PermissionsInventoryItem(**row.as_dict()) for row in self._fetch(f"SELECT * FROM {self._full_name}")]
+        return [
+            PermissionsInventoryItem(object_id, support, raw_object_permissions)
+            for object_id, support, raw_object_permissions in self._fetch(
+                f"SELECT object_id, support, raw_object_permissions FROM {self._full_name}"
+            )
+        ]
