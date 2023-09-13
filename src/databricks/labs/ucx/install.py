@@ -38,8 +38,20 @@ dbutils.library.restartPython()
 
 # COMMAND ----------
 
+import logging
+from pathlib import Path
 from databricks.labs.ucx.__about__ import __version__
-print(f'Debugging UCX v{__version__}')
+from databricks.labs.ucx.config import MigrationConfig
+from databricks.labs.ucx import logger
+from databricks.sdk import WorkspaceClient
+
+logger._install()
+logging.getLogger("databricks").setLevel("DEBUG")
+
+cfg = MigrationConfig.from_file(Path("/Workspace{config_file}"))
+ws = WorkspaceClient()
+
+print(__version__)
 """
 
 logger = logging.getLogger(__name__)
@@ -183,9 +195,9 @@ class Installer:
         logger.debug(f"Created debug notebook: {self._notebook_link(path)}")
         self._ws.workspace.upload(
             path,
-            DEBUG_NOTEBOOK.format(remote_wheel=remote_wheel, readme_link=readme_link, job_links=job_links).encode(
-                "utf8"
-            ),
+            DEBUG_NOTEBOOK.format(
+                remote_wheel=remote_wheel, readme_link=readme_link, job_links=job_links, config_file=self._config_file
+            ).encode("utf8"),
             overwrite=True,
         )
 
@@ -207,10 +219,13 @@ class Installer:
         with tempfile.TemporaryDirectory() as tmp_dir:
             local_wheel = self._build_wheel(tmp_dir)
             remote_wheel = f"{self._install_folder}/wheels/{local_wheel.name}"
+            remote_dirname = os.path.dirname(remote_wheel)
             with local_wheel.open("rb") as f:
+                self._ws.dbfs.mkdirs(remote_dirname)
                 logger.info(f"Uploading wheel to dbfs:{remote_wheel}")
                 self._ws.dbfs.upload(remote_wheel, f, overwrite=True)
             with local_wheel.open("rb") as f:
+                self._ws.workspace.mkdirs(remote_dirname)
                 logger.info(f"Uploading wheel to /Workspace{remote_wheel}")
                 self._ws.workspace.upload(remote_wheel, f, overwrite=True, format=ImportFormat.AUTO)
         return remote_wheel
@@ -270,6 +285,7 @@ class Installer:
                         spec,
                         data_security_mode=compute.DataSecurityMode.LEGACY_TABLE_ACL,
                         spark_conf={"spark.databricks.acl.sqlOnly": "true"},
+                        num_workers=1, # ShowPermissionsCommand needs a worker
                         custom_tags={},
                     ),
                 )

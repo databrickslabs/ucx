@@ -164,6 +164,7 @@ class CrawlerBase:
             logger.debug(f"[{self._full_name}] crawling new batch for {self._table}")
             loaded_records = list(loader())
             if len(loaded_records) > 0:
+                logger.debug(f"[{self._full_name}] found {len(loaded_records)} new records for {self._table}")
                 self._append_records(klass, loaded_records)
             loaded = True
 
