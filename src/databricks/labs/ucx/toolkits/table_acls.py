@@ -26,7 +26,7 @@ class TaclToolkit:
         self._gc = GrantsCrawler(self._tc)
 
         self._databases = (
-            databases if databases else [database.as_dict()["databaseName"] for database in self._tc._all_databases()]
+            databases if databases else [database["databaseName"] for database in self._tc._all_databases()]
         )
 
     def database_snapshot(self):

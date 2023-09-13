@@ -1,7 +1,6 @@
 import logging
 
 from databricks.sdk import WorkspaceClient
-from pyspark.sql import SparkSession
 
 logger = logging.getLogger(__name__)
 
@@ -11,7 +10,7 @@ class SparkMixin:
         self._spark = self._initialize_spark(ws)
 
     @staticmethod
-    def _initialize_spark(ws: WorkspaceClient) -> SparkSession:
+    def _initialize_spark(ws: WorkspaceClient):
         logger.info("Initializing Spark session")
         try:
             from databricks.sdk.runtime import spark
