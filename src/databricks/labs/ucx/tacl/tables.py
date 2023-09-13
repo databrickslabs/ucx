@@ -119,7 +119,7 @@ class TablesCrawler(CrawlerBase):
         tasks = []
         for _, table, _is_tmp in self._fetch(f"SHOW TABLES FROM {catalog}.{database}"):
             tasks.append(partial(self._describe, catalog, database, table))
-        return ThreadedExecution.gather("listing tables", tasks)
+        return ThreadedExecution.gather(f"listing tables in {catalog}.{database}", tasks)
 
     def _describe(self, catalog: str, database: str, table: str) -> Table:
         """Fetches metadata like table type, data format, external table location,

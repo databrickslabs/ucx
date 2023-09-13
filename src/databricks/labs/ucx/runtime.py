@@ -5,14 +5,9 @@ import sys
 from databricks.sdk import WorkspaceClient
 
 from databricks.labs.ucx.config import MigrationConfig
-from databricks.labs.ucx.logger import _install
 from databricks.labs.ucx.tasks import task, trigger
 from databricks.labs.ucx.toolkits.group_migration import GroupMigrationToolkit
 from databricks.labs.ucx.toolkits.table_acls import TaclToolkit
-
-_install()
-
-logging.root.setLevel("INFO")
 
 logger = logging.getLogger(__name__)
 
