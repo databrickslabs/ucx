@@ -178,8 +178,8 @@ def test_assessment_job_with_no_inventory_database(
     grants = list(sql_fetch_all(f"SELECT * FROM hive_metastore.{install._config.inventory_database}.grants"))
 
     assert len(permissions) > 0
-    assert len(tables) > 0
-    assert len(grants) > 0
+    assert len(tables) == 2
+    assert len(grants) >= 5
 
 
 def test_toolkit_notebook(
