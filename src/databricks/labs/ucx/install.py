@@ -285,7 +285,7 @@ class Installer:
                         spec,
                         data_security_mode=compute.DataSecurityMode.LEGACY_TABLE_ACL,
                         spark_conf={"spark.databricks.acl.sqlOnly": "true"},
-                        num_workers=1, # ShowPermissionsCommand needs a worker
+                        num_workers=1,  # ShowPermissionsCommand needs a worker
                         custom_tags={},
                     ),
                 )
