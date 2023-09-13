@@ -7,10 +7,10 @@ from functools import partial
 from databricks.sdk import WorkspaceClient
 from databricks.sdk.core import DatabricksError
 from databricks.sdk.service import iam, sql
-from ratelimit import limits, sleep_and_retry
 
 from databricks.labs.ucx.inventory.types import Destination, PermissionsInventoryItem
 from databricks.labs.ucx.providers.groups_info import GroupMigrationState
+from databricks.labs.ucx.providers.mixins.hardening import rate_limited
 from databricks.labs.ucx.support.base import BaseSupport, logger
 
 
@@ -46,8 +46,7 @@ class SqlPermissionsSupport(BaseSupport):
             else:
                 raise e
 
-    @sleep_and_retry
-    @limits(calls=100, period=1)
+    @rate_limited(max_requests=100)
     def _crawler_task(self, object_id: str, object_type: sql.ObjectTypePlural) -> PermissionsInventoryItem | None:
         permissions = self._safe_get_dbsql_permissions(object_type=object_type, object_id=object_id)
         if permissions:
@@ -57,8 +56,7 @@ class SqlPermissionsSupport(BaseSupport):
                 raw_object_permissions=json.dumps(permissions.as_dict()),
             )
 
-    @sleep_and_retry
-    @limits(calls=30, period=1)
+    @rate_limited(max_requests=30)
     def _applier_task(self, object_type: sql.ObjectTypePlural, object_id: str, acl: list[sql.AccessControl]):
         """
         Please note that we only have SET option (DBSQL Permissions API doesn't support UPDATE operation).

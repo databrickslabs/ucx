@@ -2,10 +2,10 @@ import json
 from functools import partial
 
 from databricks.sdk.service import iam
-from ratelimit import limits, sleep_and_retry
 
 from databricks.labs.ucx.inventory.types import Destination, PermissionsInventoryItem
 from databricks.labs.ucx.providers.groups_info import GroupMigrationState
+from databricks.labs.ucx.providers.mixins.hardening import rate_limited
 from databricks.labs.ucx.support.base import BaseSupport
 
 
@@ -17,8 +17,7 @@ class ScimSupport(BaseSupport):
             raw_object_permissions=json.dumps([e.as_dict() for e in getattr(group, property_name)]),
         )
 
-    @sleep_and_retry
-    @limits(calls=10, period=1)
+    @rate_limited(max_requests=10)
     def _applier_task(self, group_id: str, value: list[iam.ComplexValue], property_name: str):
         operations = [iam.Patch(op=iam.PatchOp.ADD, path=property_name, value=[e.as_dict() for e in value])]
         schemas = [iam.PatchSchema.URN_IETF_PARAMS_SCIM_API_MESSAGES_2_0_PATCH_OP]
