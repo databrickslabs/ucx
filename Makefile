@@ -1,3 +1,6 @@
+clean:
+	rm -fr htmlcov .mypy_cache .pytest_cache .ruff_cache .coverage
+
 lint:
 	hatch run lint:verify
 
