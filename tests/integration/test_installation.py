@@ -105,7 +105,6 @@ def test_assessment_job_with_no_inventory_database(
     ws,
     sql_exec,
     sql_fetch_all,
-    wsfs_wheel,
     make_cluster_policy,
     make_cluster_policy_permissions,
     make_ucx_group,
