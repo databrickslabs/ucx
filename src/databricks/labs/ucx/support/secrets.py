@@ -5,10 +5,10 @@ from functools import partial
 
 from databricks.sdk import WorkspaceClient
 from databricks.sdk.service import iam, workspace
-from ratelimit import limits, sleep_and_retry
 
 from databricks.labs.ucx.inventory.types import Destination, PermissionsInventoryItem
 from databricks.labs.ucx.providers.groups_info import GroupMigrationState
+from databricks.labs.ucx.providers.mixins.hardening import rate_limited
 from databricks.labs.ucx.support.base import BaseSupport
 
 
@@ -66,8 +66,7 @@ class SecretScopesSupport(BaseSupport):
         msg = f"Failed to apply permissions for {group_name} on scope {scope_name} in {num_retries} retries"
         raise ValueError(msg)
 
-    @sleep_and_retry
-    @limits(calls=30, period=1)
+    @rate_limited(max_requests=30)
     def _rate_limited_put_acl(self, object_id: str, principal: str, permission: workspace.AclPermission):
         self._ws.secrets.put_acl(object_id, principal, permission)
         self._inflight_check(scope_name=object_id, group_name=principal, expected_permission=permission)

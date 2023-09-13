@@ -5,7 +5,6 @@ from functools import partial
 
 from databricks.sdk import WorkspaceClient
 from databricks.sdk.service import iam
-from ratelimit import limits, sleep_and_retry
 
 from databricks.labs.ucx.config import GroupsConfig
 from databricks.labs.ucx.generic import StrEnum
@@ -13,6 +12,7 @@ from databricks.labs.ucx.providers.groups_info import (
     GroupMigrationState,
     MigrationGroupInfo,
 )
+from databricks.labs.ucx.providers.mixins.hardening import rate_limited
 from databricks.labs.ucx.utils import ThreadedExecution
 
 logger = logging.getLogger(__name__)
@@ -117,8 +117,7 @@ class GroupManager:
 
         self._reflect_account_group_to_workspace(migration_info.account)
 
-    @sleep_and_retry
-    @limits(calls=5, period=1)  # assumption
+    @rate_limited(max_requests=5)  # assumption
     def _reflect_account_group_to_workspace(self, acc_group: iam.Group) -> None:
         logger.info(f"Reflecting group {acc_group.display_name} to workspace")
 
