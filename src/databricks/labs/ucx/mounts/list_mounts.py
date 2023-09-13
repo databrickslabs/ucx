@@ -33,6 +33,7 @@ class MountLister():
         code = self.read_code()
 
         data = []
+        #TODO: Make it executable in // as sequential execution is terrible
         for instance_profile in instances:
             try:
                 cluster = self.create_cluster(instance_profile)
@@ -73,6 +74,9 @@ class MountLister():
         context = self._ws.command_execution.create(cluster_id=cluster_id,language=Language.SCALA).result()
 
         logger.info(f"Executing listing code on cluster {cluster_id}")
+        #Executing code in scala as it result in a much faster execution than the one in Python.
+        #Implementation is took directly from our Terraform provider
+        #https://github.com/databricks/terraform-provider-databricks/blob/master/exporter/util.go#L351-L459
         text_results = self._ws.command_execution.execute(cluster_id=cluster_id,
                                                               context_id=context.id,
                                                               language=Language.SCALA,
