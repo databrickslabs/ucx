@@ -11,7 +11,7 @@ name = "databricks-labs-ucx"
 dynamic = ["version"]
 description = 'UCX - Unity Catalog Migration Toolkit'
 readme = "README.md"
-license-files = { paths = ["LICENSE"] }
+license-files = { paths = ["LICENSE", "NOTICE"] }
 requires-python = ">=3.10.6" # latest available in DBR 13.2
 keywords = ["Databricks", "Unity Catalog"]
 authors = [
