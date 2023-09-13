@@ -5,6 +5,7 @@ from functools import wraps
 from pathlib import Path
 
 from databricks.labs.ucx.config import MigrationConfig
+from databricks.labs.ucx.logger import _install
 
 _TASKS: dict[str, "Task"] = {}
 
@@ -68,6 +69,8 @@ def trigger(*argv):
 
     current_task = _TASKS[task_name]
     print(current_task.doc)
+
+    _install()
 
     cfg = MigrationConfig.from_file(Path(args["config"]))
     logging.getLogger("databricks").setLevel(cfg.log_level)

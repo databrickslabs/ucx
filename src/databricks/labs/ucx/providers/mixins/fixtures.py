@@ -354,6 +354,7 @@ def _make_group(name, interface, make_random):
             kwargs["roles"] = _scim_values(roles)
         if entitlements is not None:
             kwargs["entitlements"] = _scim_values(entitlements)
+        # TODO: REQUEST_LIMIT_EXCEEDED: GetUserPermissionsRequest RPC token bucket limit has been exceeded.
         return interface.create(**kwargs)
 
     yield from factory(name, create, lambda item: interface.delete(item.id))

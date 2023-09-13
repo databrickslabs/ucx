@@ -19,15 +19,52 @@ from databricks.labs.ucx.config import GroupsConfig, MigrationConfig, TaclConfig
 from databricks.labs.ucx.runtime import main
 from databricks.labs.ucx.tasks import _TASKS
 
+TAG_STEP = "step"
+TAG_APP = "App"
+
+DEBUG_NOTEBOOK = """
+# Databricks notebook source
+# MAGIC %md
+# MAGIC # Debug companion for UCX installation (see [README]({readme_link}))
+# MAGIC
+# MAGIC Production runs are supposed to be triggered through the following jobs: {job_links}
+# MAGIC
+# MAGIC **This notebook is overwritten with each UCX update/(re)install.**
+
+# COMMAND ----------
+
+# MAGIC %pip install /Workspace{remote_wheel}
+dbutils.library.restartPython()
+
+# COMMAND ----------
+
+import logging
+from pathlib import Path
+from databricks.labs.ucx.__about__ import __version__
+from databricks.labs.ucx.config import MigrationConfig
+from databricks.labs.ucx import logger
+from databricks.sdk import WorkspaceClient
+
+logger._install()
+logging.getLogger("databricks").setLevel("DEBUG")
+
+cfg = MigrationConfig.from_file(Path("/Workspace{config_file}"))
+ws = WorkspaceClient()
+
+print(__version__)
+"""
+
 logger = logging.getLogger(__name__)
 
 
 class Installer:
-    def __init__(self, ws: WorkspaceClient):
+    def __init__(self, ws: WorkspaceClient, *, prefix: str = "ucx", promtps: bool = True):
         if "DATABRICKS_RUNTIME_VERSION" in os.environ:
             msg = "Installer is not supposed to be executed in Databricks Runtime"
             raise SystemExit(msg)
         self._ws = ws
+        self._prefix = prefix
+        self._prompts = promtps
 
     def run(self):
         self._configure()
@@ -45,7 +82,7 @@ class Installer:
 
     @property
     def _install_folder(self):
-        return f"/Users/{self._my_username}/.ucx"
+        return f"/Users/{self._my_username}/.{self._prefix}"
 
     @property
     def _config_file(self):
@@ -60,14 +97,13 @@ class Installer:
         return self._config
 
     def _configure(self):
-        config_path = self._config_file
-        ws_file_url = f"{self._ws.config.host}/#workspace{config_path}"
+        ws_file_url = self._notebook_link(self._config_file)
         try:
-            self._ws.workspace.get_status(config_path)
+            self._ws.workspace.get_status(self._config_file)
             logger.info(f"UCX is already configured. See {ws_file_url}")
-            if self._question("Type 'yes' to open config file in the browser") == "yes":
+            if self._prompts and self._question("Type 'yes' to open config file in the browser") == "yes":
                 webbrowser.open(ws_file_url)
-            return config_path
+            return
         except DatabricksError as err:
             if err.error_code != "RESOURCE_DOES_NOT_EXIST":
                 raise err
@@ -84,41 +120,55 @@ class Installer:
             num_threads=int(self._question("Number of threads", default="8")),
         )
 
-        config_bytes = yaml.dump(self._config.as_dict()).encode("utf8")
-        self._ws.workspace.upload(config_path, config_bytes, format=ImportFormat.AUTO)
-        logger.info(f"Created configuration file: {config_path}")
-        if self._question("Open config file in the browser and continue installing?", default="yes") == "yes":
+        self._write_config()
+        msg = "Open config file in the browser and continue installing?"
+        if self._prompts and self._question(msg, default="yes") == "yes":
             webbrowser.open(ws_file_url)
+
+    def _write_config(self):
+        try:
+            self._ws.workspace.get_status(self._install_folder)
+        except DatabricksError as err:
+            if err.error_code != "RESOURCE_DOES_NOT_EXIST":
+                raise err
+            logger.debug(f"Creating install folder: {self._install_folder}")
+            self._ws.workspace.mkdirs(self._install_folder)
+
+        config_bytes = yaml.dump(self._config.as_dict()).encode("utf8")
+        logger.info(f"Creating configuration file: {self._config_file}")
+        self._ws.workspace.upload(self._config_file, config_bytes, format=ImportFormat.AUTO)
 
     def _create_jobs(self):
         logger.debug(f"Creating jobs from tasks in {main.__name__}")
-        dbfs_path = self._upload_wheel()
-        deployed_steps = self._deployed_steps()
+        remote_wheel = self._upload_wheel()
+        self._deployed_steps = self._deployed_steps()
         desired_steps = {t.workflow for t in _TASKS.values()}
         for step_name in desired_steps:
-            settings = self._job_settings(step_name, dbfs_path)
-            if step_name in deployed_steps:
-                job_id = deployed_steps[step_name]
+            settings = self._job_settings(step_name, remote_wheel)
+            if step_name in self._deployed_steps:
+                job_id = self._deployed_steps[step_name]
                 logger.info(f"Updating configuration for step={step_name} job_id={job_id}")
                 self._ws.jobs.reset(job_id, jobs.JobSettings(**settings))
             else:
                 logger.info(f"Creating new job configuration for step={step_name}")
-                deployed_steps[step_name] = self._ws.jobs.create(**settings).job_id
+                self._deployed_steps[step_name] = self._ws.jobs.create(**settings).job_id
 
-        for step_name, job_id in deployed_steps.items():
+        for step_name, job_id in self._deployed_steps.items():
             if step_name not in desired_steps:
                 logger.info(f"Removing job_id={job_id}, as it is no longer needed")
                 self._ws.jobs.delete(job_id)
 
-        self._create_readme(deployed_steps)
+        self._create_readme()
+        self._create_debug(remote_wheel)
 
-    def _create_readme(self, deployed_steps):
+    def _create_readme(self):
         md = [
             "# UCX - The Unity Catalog Migration Assistant",
             "Here are the descriptions of jobs that trigger various stages of migration.",
+            f'To troubleshoot, see [debug notebook]({self._notebook_link(f"{self._install_folder}/DEBUG.py")}).',
         ]
-        for step_name, job_id in deployed_steps.items():
-            md.append(f"## [[UCX] {step_name}]({self._ws.config.host}#job/{job_id})\n")
+        for step_name, job_id in self._deployed_steps.items():
+            md.append(f"## [[{self._prefix.upper()}] {step_name}]({self._ws.config.host}#job/{job_id})\n")
             for t in _TASKS.values():
                 if t.workflow != step_name:
                     continue
@@ -129,11 +179,30 @@ class Installer:
         intro = "\n".join(preamble + [f"# MAGIC {line}" for line in md])
         path = f"{self._install_folder}/README.py"
         self._ws.workspace.upload(path, intro.encode("utf8"), overwrite=True)
-        url = f"{self._ws.config.host}/#workspace{path}"
-        logger.info(f"Created notebook with job overview: {url}")
+        url = self._notebook_link(path)
+        logger.info(f"Created README notebook with job overview: {url}")
         msg = "Type 'yes' to open job overview in README notebook in your home directory"
-        if self._question(msg) == "yes":
+        if self._prompts and self._question(msg) == "yes":
             webbrowser.open(url)
+
+    def _create_debug(self, remote_wheel: str):
+        readme_link = self._notebook_link(f"{self._install_folder}/README.py")
+        job_links = ", ".join(
+            f"[[{self._prefix.upper()}] {step_name}]({self._ws.config.host}#job/{job_id})"
+            for step_name, job_id in self._deployed_steps.items()
+        )
+        path = f"{self._install_folder}/DEBUG.py"
+        logger.debug(f"Created debug notebook: {self._notebook_link(path)}")
+        self._ws.workspace.upload(
+            path,
+            DEBUG_NOTEBOOK.format(
+                remote_wheel=remote_wheel, readme_link=readme_link, job_links=job_links, config_file=self._config_file
+            ).encode("utf8"),
+            overwrite=True,
+        )
+
+    def _notebook_link(self, path: str) -> str:
+        return f"{self._ws.config.host}/#workspace{path}"
 
     @staticmethod
     def _question(text: str, *, default: str | None = None) -> str:
@@ -146,14 +215,20 @@ class Installer:
                 return default
         return res
 
-    def _upload_wheel(self):
+    def _upload_wheel(self) -> str:
         with tempfile.TemporaryDirectory() as tmp_dir:
-            wheel = self._build_wheel(tmp_dir)
-            dbfs_path = f"{self._install_folder}/wheels/{wheel.name}"
-            with wheel.open("rb") as f:
-                logger.info(f"Uploading wheel to dbfs:{dbfs_path}")
-                self._ws.dbfs.upload(dbfs_path, f, overwrite=True)
-        return dbfs_path
+            local_wheel = self._build_wheel(tmp_dir)
+            remote_wheel = f"{self._install_folder}/wheels/{local_wheel.name}"
+            remote_dirname = os.path.dirname(remote_wheel)
+            with local_wheel.open("rb") as f:
+                self._ws.dbfs.mkdirs(remote_dirname)
+                logger.info(f"Uploading wheel to dbfs:{remote_wheel}")
+                self._ws.dbfs.upload(remote_wheel, f, overwrite=True)
+            with local_wheel.open("rb") as f:
+                self._ws.workspace.mkdirs(remote_dirname)
+                logger.info(f"Uploading wheel to /Workspace{remote_wheel}")
+                self._ws.workspace.upload(remote_wheel, f, overwrite=True, format=ImportFormat.AUTO)
+        return remote_wheel
 
     def _job_settings(self, step_name, dbfs_path):
         config_file = f"/Workspace/{self._install_folder}/config.yml"
@@ -164,8 +239,8 @@ class Installer:
             )
         tasks = sorted([t for t in _TASKS.values() if t.workflow == step_name], key=lambda _: _.name)
         return {
-            "name": f"[UCX] {step_name}",
-            "tags": {"App": "ucx", "step": step_name},
+            "name": f"[{self._prefix.upper()}] {step_name}",
+            "tags": {TAG_APP: self._prefix, TAG_STEP: step_name},
             "job_clusters": self._job_clusters({t.job_cluster for t in tasks}),
             "email_notifications": email_notifications,
             "tasks": [
@@ -210,6 +285,7 @@ class Installer:
                         spec,
                         data_security_mode=compute.DataSecurityMode.LEGACY_TABLE_ACL,
                         spark_conf={"spark.databricks.acl.sqlOnly": "true"},
+                        num_workers=1,  # ShowPermissionsCommand needs a worker
                         custom_tags={},
                     ),
                 )
@@ -270,13 +346,14 @@ class Installer:
 
     def _deployed_steps(self):
         deployed_steps = {}
+        logger.debug(f"Fetching all jobs to determine already deployed steps for app={self._prefix}")
         for j in self._ws.jobs.list():
             tags = j.settings.tags
             if tags is None:
                 continue
-            if tags.get("App", None) != "ucx":
+            if tags.get(TAG_APP, None) != self._prefix:
                 continue
-            deployed_steps[tags.get("step", "_")] = j.job_id
+            deployed_steps[tags.get(TAG_STEP, "_")] = j.job_id
         return deployed_steps
 
 
