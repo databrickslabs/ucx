@@ -97,7 +97,7 @@ class Installer:
         return self._config
 
     def _configure(self):
-        ws_file_url = f"{self._ws.config.host}/#workspace{self._config_file}"
+        ws_file_url = self._notebook_link(self._config_file)
         try:
             self._ws.workspace.get_status(self._config_file)
             logger.info(f"UCX is already configured. See {ws_file_url}")
