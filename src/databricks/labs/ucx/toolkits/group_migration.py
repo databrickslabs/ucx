@@ -10,10 +10,15 @@ from databricks.labs.ucx.inventory.permissions_inventory import (
 from databricks.labs.ucx.inventory.verification import VerificationManager
 from databricks.labs.ucx.managers.group import GroupManager
 from databricks.labs.ucx.support.impl import SupportsProvider
+from databricks.labs.ucx.tacl._internal import (
+    RuntimeBackend,
+    SqlBackend,
+    StatementExecutionBackend,
+)
 
 
 class GroupMigrationToolkit:
-    def __init__(self, config: MigrationConfig):
+    def __init__(self, config: MigrationConfig, *, warehouse_id=None):
         self._num_threads = config.num_threads
         self._workspace_start_path = config.workspace_start_path
 
@@ -27,12 +32,19 @@ class GroupMigrationToolkit:
         self._verify_ws_client(self._ws)
 
         self._group_manager = GroupManager(self._ws, config.groups)
-        self._permissions_inventory = PermissionsInventoryTable(config.inventory_database, self._ws)
+        sql_backend = self._backend(self._ws, warehouse_id)
+        self._permissions_inventory = PermissionsInventoryTable(sql_backend, config.inventory_database)
         self._supports_provider = SupportsProvider(self._ws, self._num_threads, self._workspace_start_path)
         self._permissions_manager = PermissionManager(
             self._ws, self._permissions_inventory, supports_provider=self._supports_provider
         )
         self._verification_manager = VerificationManager(self._ws, self._supports_provider.supports["secrets"])
+
+    @staticmethod
+    def _backend(ws: WorkspaceClient, warehouse_id: str | None = None) -> SqlBackend:
+        if warehouse_id is None:
+            return RuntimeBackend()
+        return StatementExecutionBackend(ws, warehouse_id)
 
     @staticmethod
     def _verify_ws_client(w: WorkspaceClient):

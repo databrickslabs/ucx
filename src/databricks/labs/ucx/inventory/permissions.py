@@ -7,7 +7,6 @@ from databricks.sdk import WorkspaceClient
 from databricks.labs.ucx.inventory.permissions_inventory import (
     PermissionsInventoryTable,
 )
-from databricks.labs.ucx.inventory.types import PermissionsInventoryItem
 from databricks.labs.ucx.providers.groups_info import GroupMigrationState
 from databricks.labs.ucx.support.impl import SupportsProvider
 from databricks.labs.ucx.utils import ThreadedExecution
@@ -28,8 +27,7 @@ class PermissionManager:
         crawler_tasks = list(self._supports_provider.get_crawler_tasks())
         logger.info(f"Total crawler tasks: {len(crawler_tasks)}")
         logger.info("Starting the permissions inventorization")
-        execution = ThreadedExecution[PermissionsInventoryItem | None](crawler_tasks)
-        results = execution.run()
+        results = ThreadedExecution.gather("crawl permissions", crawler_tasks)
         items = [item for item in results if item is not None]
         logger.info(f"Total inventorized items: {len(items)}")
         self._permissions_inventory.save(items)
@@ -62,6 +60,5 @@ class PermissionManager:
 
         logger.info(f"Total applier tasks: {len(applier_tasks)}")
         logger.info("Starting the permissions application")
-        execution = ThreadedExecution(applier_tasks)
-        execution.run()
+        ThreadedExecution.gather("apply permissions", applier_tasks)
         logger.info("Permissions were applied")
