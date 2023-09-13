@@ -170,7 +170,7 @@ def test_assessment_job_with_no_inventory_database(
 
     request.addfinalizer(cleanup_created_resources)
 
-    logger.debug(f'starting job: {ws.config.host}#jobs/{install._deployed_steps["assessment"]}')
+    logger.debug(f'starting job: {ws.config.host}#job/{install._deployed_steps["assessment"]}')
     ws.jobs.run_now(install._deployed_steps["assessment"]).result()
 
     permissions = list(sql_fetch_all(f"SELECT * FROM hive_metastore.{install._config.inventory_database}.permissions"))
