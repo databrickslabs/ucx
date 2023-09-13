@@ -6,7 +6,6 @@ from functools import partial
 from databricks.sdk import WorkspaceClient
 from databricks.sdk.core import DatabricksError
 from databricks.sdk.service import iam
-from ratelimit import limits, sleep_and_retry
 
 from databricks.labs.ucx.inventory.types import (
     Destination,
@@ -14,6 +13,7 @@ from databricks.labs.ucx.inventory.types import (
     RequestObjectType,
 )
 from databricks.labs.ucx.providers.groups_info import GroupMigrationState
+from databricks.labs.ucx.providers.mixins.hardening import rate_limited
 from databricks.labs.ucx.support.base import BaseSupport, logger
 
 
@@ -79,15 +79,13 @@ class GenericPermissionsSupport(BaseSupport):
 
         return acl_requests
 
-    @sleep_and_retry
-    @limits(calls=30, period=1)
+    @rate_limited(max_requests=30)
     def _applier_task(
         self, ws: WorkspaceClient, object_id: str, acl: list[iam.AccessControlRequest], request_type: RequestObjectType
     ):
         ws.permissions.update(request_object_type=request_type, request_object_id=object_id, access_control_list=acl)
 
-    @sleep_and_retry
-    @limits(calls=100, period=1)
+    @rate_limited(max_requests=100)
     def _crawler_task(
         self,
         ws: WorkspaceClient,

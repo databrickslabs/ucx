@@ -41,6 +41,8 @@ class ConnectConfig:
     profile: str | None = None
     debug_headers: bool | None = False
     rate_limit: int | None = None
+    max_connections_per_pool: int | None = None
+    max_connection_pools: int | None = None
 
     @staticmethod
     def from_databricks_config(cfg: Config) -> "ConnectConfig":
@@ -57,6 +59,8 @@ class ConnectConfig:
             profile=cfg.profile,
             debug_headers=cfg.debug_headers,
             rate_limit=cfg.rate_limit,
+            max_connection_pools=cfg.max_connection_pools,
+            max_connections_per_pool=cfg.max_connections_per_pool,
         )
 
     @classmethod
@@ -136,7 +140,7 @@ class MigrationConfig:
             groups=GroupsConfig.from_dict(raw.get("groups", {})),
             connect=ConnectConfig.from_dict(raw.get("connect", {})),
             instance_pool_id=raw.get("instance_pool_id", None),
-            num_threads=raw.get("num_threads", 4),
+            num_threads=raw.get("num_threads", 8),
             log_level=raw.get("log_level", "INFO"),
         )
 
@@ -170,6 +174,8 @@ class MigrationConfig:
             profile=connect.profile,
             debug_headers=connect.debug_headers,
             rate_limit=connect.rate_limit,
+            max_connection_pools=connect.max_connection_pools,
+            max_connections_per_pool=connect.max_connections_per_pool,
             product="ucx",
             product_version=__version__,
         )
