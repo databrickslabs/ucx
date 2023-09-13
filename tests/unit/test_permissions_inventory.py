@@ -1,65 +1,55 @@
-from unittest.mock import Mock
-
-import pandas as pd
-import pytest
-from pyspark.sql.types import StringType, StructField, StructType
-
 from databricks.labs.ucx.inventory.permissions_inventory import (
     PermissionsInventoryTable,
 )
 from databricks.labs.ucx.inventory.types import PermissionsInventoryItem
+from databricks.labs.ucx.providers.mixins.sql import Row
+
+from .mocks import MockBackend
 
 
-@pytest.fixture
-def workspace_client():
-    client = Mock()
-    return client
+def test_inventory_table_manager_init():
+    b = MockBackend()
+    pi = PermissionsInventoryTable(b, "test_database")
+
+    assert pi._full_name == "hive_metastore.test_database.permissions"
 
 
-@pytest.fixture
-def permissions_inventory(workspace_client, mocker):
-    mocker.patch("databricks.labs.ucx.providers.spark.SparkMixin._initialize_spark", Mock())
-    return PermissionsInventoryTable("test_database", workspace_client)
+def test_cleanup():
+    b = MockBackend()
+    pi = PermissionsInventoryTable(b, "test_database")
+
+    pi.cleanup()
+
+    assert "DROP TABLE IF EXISTS hive_metastore.test_database.permissions" == b.queries[0]
 
 
-def test_inventory_table_manager_init(permissions_inventory):
-    assert str(permissions_inventory._table) == "hive_metastore.test_database.permissions"
+def test_save():
+    b = MockBackend()
+    pi = PermissionsInventoryTable(b, "test_database")
+
+    pi.save([PermissionsInventoryItem("object1", "clusters", "test acl")])
+
+    assert (
+        "INSERT INTO hive_metastore.test_database.permissions (object_id, support, "
+        "raw_object_permissions) VALUES ('object1', 'clusters', 'test acl')"
+    ) == b.queries[0]
 
 
-def test_table_schema(permissions_inventory):
-    schema = StructType(
-        [
-            StructField("object_id", StringType(), True),
-            StructField("support", StringType(), True),
-            StructField("raw_object_permissions", StringType(), True),
-        ]
-    )
-    assert permissions_inventory._table_schema == schema
+def make_row(data, columns):
+    row = Row(data)
+    row.__columns__ = columns
+    return row
 
 
-def test_table(permissions_inventory):
-    assert permissions_inventory._df == permissions_inventory.spark.table("test_catalog.test_database.permissions")
-
-
-def test_cleanup(permissions_inventory):
-    permissions_inventory.cleanup()
-    permissions_inventory.spark.sql.assert_called_with("DROP TABLE IF EXISTS hive_metastore.test_database.permissions")
-
-
-def test_save(permissions_inventory):
-    perm_items = [PermissionsInventoryItem("object1", "clusters", "test acl")]
-    permissions_inventory.save(perm_items)
-    permissions_inventory.spark.createDataFrame.assert_called_once()
-
-
-def test_load_all(permissions_inventory):
-    items = pd.DataFrame(
-        {
-            "object_id": ["object1"],
-            "support": ["clusters"],
-            "raw_object_permissions": ["test acl"],
+def test_load_all():
+    b = MockBackend(
+        rows={
+            "SELECT": [
+                make_row(("object1", "clusters", "test acl"), ["object_id", "support", "raw_object_permissions"]),
+            ]
         }
     )
-    permissions_inventory._df.toPandas.return_value = items
-    output = permissions_inventory.load_all()
+    pi = PermissionsInventoryTable(b, "test_database")
+
+    output = pi.load_all()
     assert output[0] == PermissionsInventoryItem("object1", support="clusters", raw_object_permissions="test acl")

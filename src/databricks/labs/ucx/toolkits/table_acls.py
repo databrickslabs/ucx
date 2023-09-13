@@ -25,9 +25,7 @@ class TaclToolkit:
         self._tc = TablesCrawler(self._backend(ws, warehouse_id), inventory_catalog, inventory_schema)
         self._gc = GrantsCrawler(self._tc)
 
-        self._databases = (
-            databases if databases else [database["databaseName"] for database in self._tc._all_databases()]
-        )
+        self._databases = databases if databases else [database for (database,) in self._tc._all_databases()]
 
     def database_snapshot(self):
         tables = []
