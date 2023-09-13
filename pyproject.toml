@@ -9,21 +9,22 @@ include = ["src"]
 [project]
 name = "databricks-labs-ucx"
 dynamic = ["version"]
-description = ''
+description = 'UCX - Unity Catalog Migration Toolkit'
 readme = "README.md"
+license-files = { paths = ["LICENSE"] }
 requires-python = ">=3.10.6" # latest available in DBR 13.2
-keywords = []
+keywords = ["Databricks", "Unity Catalog"]
 authors = [
     { name = "Serge Smertin", email = "serge.smertin@databricks.com" },
     { name = "Ivan Trusov", email = "ivan.trusov@databricks.com" },
 ]
 classifiers = [
     "Development Status :: 3 - Alpha",
+    "License :: Other/Proprietary License",
     "Programming Language :: Python",
     "Programming Language :: Python :: 3.10",
     "Programming Language :: Python :: 3.11",
     "Programming Language :: Python :: Implementation :: CPython",
-    "Programming Language :: Python :: Implementation :: PyPy",
 ]
 dependencies = [
     "databricks-sdk~=0.8.0",
@@ -42,8 +43,8 @@ test = [
 runtime = "databricks.labs.ucx.runtime:main"
 
 [project.urls]
-Issues = "https://github.com/databricks/UC-Upgrade/issues"
-Source = "https://github.com/databricks/UC-Upgrade"
+Issues = "https://github.com/databricks/ucx/issues"
+Source = "https://github.com/databricks/ucx"
 
 [tool.hatch.version]
 path = "src/databricks/labs/ucx/__about__.py"
