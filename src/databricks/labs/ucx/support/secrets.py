@@ -1,4 +1,6 @@
 import json
+import random
+import time
 from functools import partial
 
 from databricks.sdk import WorkspaceClient
@@ -33,10 +35,42 @@ class SecretScopesSupport(BaseSupport):
         mentioned_groups = [acl.principal for acl in acls]
         return any(g in mentioned_groups for g in [info.workspace.display_name for info in migration_state.groups])
 
+    def secret_scope_permission(self, scope_name: str, group_name: str) -> workspace.AclPermission | None:
+        for acl in self._ws.secrets.list_acls(scope=scope_name):
+            if acl.principal == group_name:
+                return acl.permission
+        return None
+
+    def _inflight_check(
+        self, scope_name: str, group_name: str, expected_permission: workspace.AclPermission, num_retries: int = 5
+    ):
+        # in-flight check for the applied permissions
+        # the api might be inconsistent, therefore we need to check that the permissions were applied
+        # TODO: add mixin to SDK
+        retries_left = num_retries
+        while retries_left > 0:
+            time.sleep(random.random() * 2)
+            applied_permission = self.secret_scope_permission(scope_name=scope_name, group_name=group_name)
+            if applied_permission:
+                if applied_permission == expected_permission:
+                    return
+                else:
+                    msg = (
+                        f"Applied permission {applied_permission} is not "
+                        f"equal to expected permission {expected_permission}"
+                    )
+                    raise ValueError(msg)
+
+            retries_left -= 1
+
+        msg = f"Failed to apply permissions for {group_name} on scope {scope_name} in {num_retries} retries"
+        raise ValueError(msg)
+
     @sleep_and_retry
     @limits(calls=30, period=1)
     def _rate_limited_put_acl(self, object_id: str, principal: str, permission: workspace.AclPermission):
         self._ws.secrets.put_acl(object_id, principal, permission)
+        self._inflight_check(scope_name=object_id, group_name=principal, expected_permission=permission)
 
     def _get_apply_task(
         self, item: PermissionsInventoryItem, migration_state: GroupMigrationState, destination: Destination
