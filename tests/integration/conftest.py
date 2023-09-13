@@ -62,20 +62,12 @@ def sql_fetch_all(ws: WorkspaceClient):
 
 @pytest.fixture
 def make_catalog(sql_exec, make_random):
-    cleanup = []
-
-    def inner():
+    def create():
         name = f"ucx_C{make_random(4)}".lower()
         sql_exec(f"CREATE CATALOG {name}")
-        cleanup.append(name)
         return name
 
-    yield inner
-    logger.debug(f"clearing {len(cleanup)} catalogs")
-    for name in cleanup:
-        logger.debug(f"removing {name} catalog")
-        sql_exec(f"DROP CATALOG IF EXISTS {name} CASCADE")
-    logger.debug(f"removed {len(cleanup)} catalogs")
+    yield from factory("catalog", create, lambda name: sql_exec(f"DROP CATALOG IF EXISTS {name} CASCADE"))  # noqa: F405
 
 
 def test_catalog_fixture(make_catalog):
@@ -85,20 +77,12 @@ def test_catalog_fixture(make_catalog):
 
 @pytest.fixture
 def make_schema(sql_exec, make_random):
-    cleanup = []
-
-    def inner(catalog="hive_metastore"):
+    def create(*, catalog="hive_metastore"):
         name = f"{catalog}.ucx_S{make_random(4)}".lower()
         sql_exec(f"CREATE SCHEMA {name}")
-        cleanup.append(name)
         return name
 
-    yield inner
-    logger.debug(f"clearing {len(cleanup)} schemas")
-    for name in cleanup:
-        logger.debug(f"removing {name} schema")
-        sql_exec(f"DROP SCHEMA IF EXISTS {name} CASCADE")
-    logger.debug(f"removed {len(cleanup)} schemas")
+    yield from factory("schema", create, lambda name: sql_exec(f"DROP SCHEMA IF EXISTS {name} CASCADE"))  # noqa: F405
 
 
 def test_schema_fixture(make_schema):
@@ -108,14 +92,12 @@ def test_schema_fixture(make_schema):
 
 @pytest.fixture
 def make_table(sql_exec, make_schema, make_random):
-    cleanup = []
-
-    def inner(
+    def create(
         *,
         catalog="hive_metastore",
         schema: str | None = None,
         ctas: str | None = None,
-        non_detla: bool = False,
+        non_delta: bool = False,
         external: bool = False,
         view: bool = False,
     ):
@@ -126,7 +108,7 @@ def make_table(sql_exec, make_schema, make_random):
         if ctas is not None:
             # temporary (if not view)
             ddl = f"{ddl} AS {ctas}"
-        elif non_detla:
+        elif non_delta:
             location = "dbfs:/databricks-datasets/iot-stream/data-device"
             ddl = f"{ddl} USING json LOCATION '{location}'"
         elif external:
@@ -137,14 +119,9 @@ def make_table(sql_exec, make_schema, make_random):
             # managed table
             ddl = f"{ddl} (id INT, value STRING)"
         sql_exec(ddl)
-        cleanup.append(name)
         return name
 
-    yield inner
-
-    logger.debug(f"clearing {len(cleanup)} tables")
-    for name in cleanup:
-        logger.debug(f"removing {name} table")
+    def remove(name):
         try:
             sql_exec(f"DROP TABLE IF EXISTS {name}")
         except RuntimeError as e:
@@ -152,14 +129,15 @@ def make_table(sql_exec, make_schema, make_random):
                 sql_exec(f"DROP VIEW IF EXISTS {name}")
             else:
                 raise e
-    logger.debug(f"removed {len(cleanup)} tables")
+
+    yield from factory("table", create, remove)  # noqa: F405
 
 
 def test_table_fixture(make_table):
     logger.info(f"Created new managed table in new schema: {make_table()}")
     logger.info(f'Created new managed table in default schema: {make_table(schema="default")}')
     logger.info(f"Created new external table in new schema: {make_table(external=True)}")
-    logger.info(f"Created new external JSON table in new schema: {make_table(non_detla=True)}")
+    logger.info(f"Created new external JSON table in new schema: {make_table(non_delta=True)}")
     logger.info(f'Created new tmp table in new schema: {make_table(ctas="SELECT 2+2 AS four")}')
     logger.info(f'Created new view in new schema: {make_table(view=True, ctas="SELECT 2+2 AS four")}')
 
