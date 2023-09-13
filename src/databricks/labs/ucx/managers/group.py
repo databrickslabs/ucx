@@ -44,7 +44,7 @@ class GroupManager:
         workspace_groups = [
             g
             for g in self._ws.groups.list(attributes="id,displayName,meta")
-            if g.meta.resource_type == "WorkspaceGroup"
+            if g.meta.resource_type == "WorkspaceGroup" and g.display_name not in self.SYSTEM_GROUPS
         ]
         logger.debug(f"Found {len(workspace_groups)} workspace groups")
         return workspace_groups
@@ -59,11 +59,11 @@ class GroupManager:
                 "get",
                 "/api/2.0/account/scim/v2/Groups",
                 query={
-                    "filter": " ".join([f"displayName ne '{group}'" for group in self.SYSTEM_GROUPS]),
                     "attributes": "id,displayName,meta",
                 },
             ).get("Resources", [])
         ]
+        account_groups = [g for g in account_groups if g.display_name not in self.SYSTEM_GROUPS]
         logger.debug(f"Found {len(account_groups)} account groups")
         return account_groups
 
