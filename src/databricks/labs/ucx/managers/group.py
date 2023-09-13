@@ -1,7 +1,6 @@
 import json
 import logging
 import typing
-from dataclasses import dataclass
 from functools import partial
 
 from databricks.sdk import WorkspaceClient
@@ -24,12 +23,6 @@ class GroupLevel(StrEnum):
     ACCOUNT = "account"
 
 
-@dataclass
-class AvailableGroups:
-    workspace: list[iam.Group]
-    account: list[iam.Group]
-
-
 class GroupManager:
     SYSTEM_GROUPS: typing.ClassVar[list[str]] = ["users", "admins", "account users"]
 
@@ -37,7 +30,8 @@ class GroupManager:
         self._ws = ws
         self.config = groups
         self._migration_state: GroupMigrationState = GroupMigrationState()
-        self._available_groups: AvailableGroups = self._list_available_groups()
+        self._account_groups = self._list_account_groups()
+        self._workspace_groups = self._list_workspace_groups()
 
     def _list_workspace_groups(self) -> list[iam.Group]:
         logger.debug("Listing workspace groups...")
@@ -67,26 +61,11 @@ class GroupManager:
         logger.debug(f"Found {len(account_groups)} account groups")
         return account_groups
 
-    def _list_available_groups(self):
-        """
-        Note - this method will provide all groups during initialization.
-        We apply this method to decrease the amount of calls to the SCIM API.
-        To decrease API load, we also do not request the group members.
-        :return:
-        """
-        logger.info("Listing available groups...")
-        workspace_groups = self._list_workspace_groups()
-        account_groups = self._list_account_groups()
-
-        logger.info(f"Found {len(workspace_groups)} workspace groups and {len(account_groups)} account groups")
-        return AvailableGroups(workspace=workspace_groups, account=account_groups)
-
     def _get_group(self, group_name, level: GroupLevel) -> iam.Group | None:
-        relevant_level_groups = (
-            self._available_groups.workspace if level == GroupLevel.WORKSPACE else self._available_groups.account
-        )
-        _group = next((g for g in relevant_level_groups if g.display_name == group_name), None)
-        return _group
+        relevant_level_groups = self._workspace_groups if level == GroupLevel.WORKSPACE else self._account_groups
+        for group in relevant_level_groups:
+            if group.display_name == group_name:
+                return group
 
     def _get_or_create_backup_group(self, source_group_name: str, source_group: iam.Group) -> iam.Group:
         backup_group_name = f"{self.config.backup_group_prefix}{source_group_name}"
@@ -103,7 +82,7 @@ class GroupManager:
                 roles=source_group.roles,
                 members=source_group.members,
             )
-            self._available_groups.workspace.append(backup_group)
+            self._workspace_groups.append(backup_group)
             logger.info(f"Backup group {backup_group_name} successfully created")
 
         return backup_group
@@ -130,6 +109,10 @@ class GroupManager:
 
         logger.info(f"Deleting the workspace-level group {ws_group.display_name} with id {ws_group.id}")
         self._ws.groups.delete(ws_group.id)
+
+        # delete ws_group from the list of workspace groups
+        self._workspace_groups = [g for g in self._workspace_groups if g.id != ws_group.id]
+
         logger.info(f"Workspace-level group {ws_group.display_name} with id {ws_group.id} was deleted")
 
         self._reflect_account_group_to_workspace(migration_info.account)
@@ -163,8 +146,8 @@ class GroupManager:
 
             self._set_migration_groups(self.config.selected)
         else:
-            logger.info("No group listing provided, all available groups will be used")
-            available_group_names = [g.display_name for g in self._available_groups.workspace]
+            logger.info("No group listing provided, all available workspace-level groups will be used")
+            available_group_names = [g.display_name for g in self._workspace_groups]
             self._set_migration_groups(groups_names=available_group_names)
         logger.info("Environment prepared successfully")
 
