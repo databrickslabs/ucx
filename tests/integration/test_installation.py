@@ -146,25 +146,31 @@ def test_assessment_job_with_no_inventory_database(
         group_name=ws_group_b.display_name,
     )
 
-    install = Installer(ws, prefix=make_random(4))
+    install = Installer(ws, prefix=make_random(4), promtps=False)
     install._config = MigrationConfig(
         inventory_database=f"ucx_{make_random(4)}",
         instance_pool_id=os.environ["TEST_INSTANCE_POOL_ID"],
         groups=GroupsConfig(selected=[ws_group_a.display_name, ws_group_b.display_name, ws_group_c.display_name]),
-        tacl=TaclConfig(databases=[schema_a, schema_b, schema_c]),
+        tacl=TaclConfig(databases=[schema_a.split(".")[-1], schema_b.split(".")[-1], schema_c.split(".")[-1]]),
         log_level="DEBUG",
     )
     install._write_config()
     install._create_jobs()
 
     def cleanup_created_resources():
+        logger.debug(f"cleaning up install folder: {install._install_folder}")
         ws.workspace.delete(install._install_folder, recursive=True)
-        for job_id in install._deployed_steps.values():
+
+        for step, job_id in install._deployed_steps.items():
+            logger.debug(f"cleaning up {step} job_id={job_id}")
             ws.jobs.delete(job_id)
+
+        logger.debug(f"cleaning up inventory_database={install._config.inventory_database}")
         sql_exec(f"DROP SCHEMA IF EXISTS `{install._config.inventory_database}` CASCADE")
 
     request.addfinalizer(cleanup_created_resources)
 
+    logger.debug(f'starting job: {ws.config.host}#jobs/{install._deployed_steps["assessment"]}')
     ws.jobs.run_now(install._deployed_steps["assessment"]).result()
 
     permissions = list(sql_fetch_all(f"SELECT * FROM hive_metastore.{install._config.inventory_database}.permissions"))

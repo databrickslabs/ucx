@@ -26,12 +26,13 @@ logger = logging.getLogger(__name__)
 
 
 class Installer:
-    def __init__(self, ws: WorkspaceClient, *, prefix: str = "ucx"):
+    def __init__(self, ws: WorkspaceClient, *, prefix: str = "ucx", promtps: bool = True):
         if "DATABRICKS_RUNTIME_VERSION" in os.environ:
             msg = "Installer is not supposed to be executed in Databricks Runtime"
             raise SystemExit(msg)
         self._ws = ws
         self._prefix = prefix
+        self._prompts = promtps
 
     def run(self):
         self._configure()
@@ -68,7 +69,7 @@ class Installer:
         try:
             self._ws.workspace.get_status(self._config_file)
             logger.info(f"UCX is already configured. See {ws_file_url}")
-            if self._question("Type 'yes' to open config file in the browser") == "yes":
+            if self._prompts and self._question("Type 'yes' to open config file in the browser") == "yes":
                 webbrowser.open(ws_file_url)
             return
         except DatabricksError as err:
@@ -88,13 +89,22 @@ class Installer:
         )
 
         self._write_config()
-        if self._question("Open config file in the browser and continue installing?", default="yes") == "yes":
+        msg = "Open config file in the browser and continue installing?"
+        if self._prompts and self._question(msg, default="yes") == "yes":
             webbrowser.open(ws_file_url)
 
     def _write_config(self):
+        try:
+            self._ws.workspace.get_status(self._install_folder)
+        except DatabricksError as err:
+            if err.error_code != "RESOURCE_DOES_NOT_EXIST":
+                raise err
+            logger.debug(f"Creating install folder: {self._install_folder}")
+            self._ws.workspace.mkdirs(self._install_folder)
+
         config_bytes = yaml.dump(self._config.as_dict()).encode("utf8")
+        logger.info(f"Creating configuration file: {self._config_file}")
         self._ws.workspace.upload(self._config_file, config_bytes, format=ImportFormat.AUTO)
-        logger.info(f"Created configuration file: {self._config_file}")
 
     def _create_jobs(self):
         logger.debug(f"Creating jobs from tasks in {main.__name__}")
@@ -138,7 +148,7 @@ class Installer:
         url = f"{self._ws.config.host}/#workspace{path}"
         logger.info(f"Created notebook with job overview: {url}")
         msg = "Type 'yes' to open job overview in README notebook in your home directory"
-        if self._question(msg) == "yes":
+        if self._prompts and self._question(msg) == "yes":
             webbrowser.open(url)
 
     @staticmethod
