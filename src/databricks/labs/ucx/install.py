@@ -19,15 +19,19 @@ from databricks.labs.ucx.config import GroupsConfig, MigrationConfig, TaclConfig
 from databricks.labs.ucx.runtime import main
 from databricks.labs.ucx.tasks import _TASKS
 
+TAG_STEP = "step"
+TAG_APP = "App"
+
 logger = logging.getLogger(__name__)
 
 
 class Installer:
-    def __init__(self, ws: WorkspaceClient):
+    def __init__(self, ws: WorkspaceClient, *, prefix: str = "ucx"):
         if "DATABRICKS_RUNTIME_VERSION" in os.environ:
             msg = "Installer is not supposed to be executed in Databricks Runtime"
             raise SystemExit(msg)
         self._ws = ws
+        self._prefix = prefix
 
     def run(self):
         self._configure()
@@ -45,7 +49,7 @@ class Installer:
 
     @property
     def _install_folder(self):
-        return f"/Users/{self._my_username}/.ucx"
+        return f"/Users/{self._my_username}/.{self._prefix}"
 
     @property
     def _config_file(self):
@@ -60,14 +64,13 @@ class Installer:
         return self._config
 
     def _configure(self):
-        config_path = self._config_file
-        ws_file_url = f"{self._ws.config.host}/#workspace{config_path}"
+        ws_file_url = f"{self._ws.config.host}/#workspace{self._config_file}"
         try:
-            self._ws.workspace.get_status(config_path)
+            self._ws.workspace.get_status(self._config_file)
             logger.info(f"UCX is already configured. See {ws_file_url}")
             if self._question("Type 'yes' to open config file in the browser") == "yes":
                 webbrowser.open(ws_file_url)
-            return config_path
+            return
         except DatabricksError as err:
             if err.error_code != "RESOURCE_DOES_NOT_EXIST":
                 raise err
@@ -84,41 +87,44 @@ class Installer:
             num_threads=int(self._question("Number of threads", default="8")),
         )
 
-        config_bytes = yaml.dump(self._config.as_dict()).encode("utf8")
-        self._ws.workspace.upload(config_path, config_bytes, format=ImportFormat.AUTO)
-        logger.info(f"Created configuration file: {config_path}")
+        self._write_config()
         if self._question("Open config file in the browser and continue installing?", default="yes") == "yes":
             webbrowser.open(ws_file_url)
+
+    def _write_config(self):
+        config_bytes = yaml.dump(self._config.as_dict()).encode("utf8")
+        self._ws.workspace.upload(self._config_file, config_bytes, format=ImportFormat.AUTO)
+        logger.info(f"Created configuration file: {self._config_file}")
 
     def _create_jobs(self):
         logger.debug(f"Creating jobs from tasks in {main.__name__}")
         dbfs_path = self._upload_wheel()
-        deployed_steps = self._deployed_steps()
+        self._deployed_steps = self._deployed_steps()
         desired_steps = {t.workflow for t in _TASKS.values()}
         for step_name in desired_steps:
             settings = self._job_settings(step_name, dbfs_path)
-            if step_name in deployed_steps:
-                job_id = deployed_steps[step_name]
+            if step_name in self._deployed_steps:
+                job_id = self._deployed_steps[step_name]
                 logger.info(f"Updating configuration for step={step_name} job_id={job_id}")
                 self._ws.jobs.reset(job_id, jobs.JobSettings(**settings))
             else:
                 logger.info(f"Creating new job configuration for step={step_name}")
-                deployed_steps[step_name] = self._ws.jobs.create(**settings).job_id
+                self._deployed_steps[step_name] = self._ws.jobs.create(**settings).job_id
 
-        for step_name, job_id in deployed_steps.items():
+        for step_name, job_id in self._deployed_steps.items():
             if step_name not in desired_steps:
                 logger.info(f"Removing job_id={job_id}, as it is no longer needed")
                 self._ws.jobs.delete(job_id)
 
-        self._create_readme(deployed_steps)
+        self._create_readme()
 
-    def _create_readme(self, deployed_steps):
+    def _create_readme(self):
         md = [
             "# UCX - The Unity Catalog Migration Assistant",
             "Here are the descriptions of jobs that trigger various stages of migration.",
         ]
-        for step_name, job_id in deployed_steps.items():
-            md.append(f"## [[UCX] {step_name}]({self._ws.config.host}#job/{job_id})\n")
+        for step_name, job_id in self._deployed_steps.items():
+            md.append(f"## [[{self._prefix.upper()}] {step_name}]({self._ws.config.host}#job/{job_id})\n")
             for t in _TASKS.values():
                 if t.workflow != step_name:
                     continue
@@ -164,8 +170,8 @@ class Installer:
             )
         tasks = sorted([t for t in _TASKS.values() if t.workflow == step_name], key=lambda _: _.name)
         return {
-            "name": f"[UCX] {step_name}",
-            "tags": {"App": "ucx", "step": step_name},
+            "name": f"[{self._prefix.upper()}] {step_name}",
+            "tags": {TAG_APP: self._prefix, TAG_STEP: step_name},
             "job_clusters": self._job_clusters({t.job_cluster for t in tasks}),
             "email_notifications": email_notifications,
             "tasks": [
@@ -270,13 +276,14 @@ class Installer:
 
     def _deployed_steps(self):
         deployed_steps = {}
+        logger.debug(f"Fetching all jobs to determine already deployed steps for app={self._prefix}")
         for j in self._ws.jobs.list():
             tags = j.settings.tags
             if tags is None:
                 continue
-            if tags.get("App", None) != "ucx":
+            if tags.get(TAG_APP, None) != self._prefix:
                 continue
-            deployed_steps[tags.get("step", "_")] = j.job_id
+            deployed_steps[tags.get(TAG_STEP, "_")] = j.job_id
         return deployed_steps
 
 
