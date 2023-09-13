@@ -7,7 +7,7 @@ from databricks.sdk.core import DatabricksError
 from databricks.sdk.service import iam
 from databricks.sdk.service.workspace import ImportFormat
 
-from databricks.labs.ucx.config import MigrationConfig, GroupsConfig, TaclConfig
+from databricks.labs.ucx.config import GroupsConfig, MigrationConfig, TaclConfig
 from databricks.labs.ucx.install import Installer
 
 
@@ -24,7 +24,7 @@ def test_save_config(mocker):
 
     mocker.patch("builtins.input", return_value="42")
     ws = mocker.Mock()
-    ws.current_user.me = lambda: iam.User(user_name="me@example.com", groups=[iam.ComplexValue(display='admins')])
+    ws.current_user.me = lambda: iam.User(user_name="me@example.com", groups=[iam.ComplexValue(display="admins")])
     ws.config.host = "https://foo"
     ws.workspace.get_status = not_found
 
@@ -54,14 +54,12 @@ def test_main_with_existing_conf_does_not_recreate_config(mocker):
     webbrowser_open = mocker.patch("webbrowser.open")
     ws = mocker.patch("databricks.sdk.WorkspaceClient.__init__")
 
-    ws.current_user.me = lambda: iam.User(user_name="me@example.com", groups=[iam.ComplexValue(display='admins')])
+    ws.current_user.me = lambda: iam.User(user_name="me@example.com", groups=[iam.ComplexValue(display="admins")])
     ws.config.host = "https://foo"
     ws.config.is_aws = True
-    config_bytes = yaml.dump(MigrationConfig(
-        inventory_database='a',
-        groups=GroupsConfig(auto=True),
-        tacl=TaclConfig(auto=True)
-    ).as_dict()).encode("utf8")
+    config_bytes = yaml.dump(
+        MigrationConfig(inventory_database="a", groups=GroupsConfig(auto=True), tacl=TaclConfig(auto=True)).as_dict()
+    ).encode("utf8")
     ws.workspace.download = lambda _: io.BytesIO(config_bytes)
     ws.workspace.get_status = lambda _: None
 
