@@ -23,7 +23,7 @@ def test_describe_all_tables_in_databases(ws: WorkspaceClient, make_catalog, mak
     external_table = make_table(schema=schema_b, external=True)
     tmp_table = make_table(schema=schema_a, ctas="SELECT 2+2 AS four")
     view = make_table(schema=schema_b, ctas="SELECT 2+2 AS four", view=True)
-    non_delta = make_table(schema=schema_a, non_detla=True)
+    non_delta = make_table(schema=schema_a, non_delta=True)
 
     logger.info(
         f"managed_table={managed_table}, "
