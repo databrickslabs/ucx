@@ -39,33 +39,40 @@ def test_external_locations(ws):
 def test_job_assessment(ws):
     assess = AssessmentToolkit(ws, "Fake_ID", "CSX", "assessment")
     sample_jobs = [
-        BaseJob(created_time=1694536604319, creator_user_name='daniel.cadenas@databricks.com', job_id=536591785949415,
+        BaseJob(created_time=1694536604319, creator_user_name='anonymous@databricks.com', job_id=536591785949415,
                 settings=JobSettings(compute=None, continuous=None,
                                      tasks=[
-                                         Task(task_key='Ingest', compute_key=None, condition_task=None, dbt_task=None,
-                                              depends_on=None, description=None,
-                                              email_notifications=None, existing_cluster_id='0807-225846-motto493',
-                                              health=None, job_cluster_key=None,
-                                              libraries=None, max_retries=None, min_retry_interval_millis=None,
-                                              new_cluster=None,
+                                         Task(task_key='Ingest', existing_cluster_id='0807-225846-motto493',
                                               notebook_task=NotebookTask(
                                                   notebook_path='/Users/daniel.cadenas@databricks.com/Customers/Solistica/1.\
-                             TMMX_Predictive_Model_Top_15_vs_Clients - Data Ingestion/Load',
-                                                  base_parameters=None,
+                             TMMX_Predictive_Model_Top_15_vs_Clients - Data Ingestion/Load'
                                               )
-                                              , notification_settings=None, pipeline_task=None, python_wheel_task=None,
-                                              retry_on_timeout=None,
-                                              spark_python_task=None, spark_submit_task=None, sql_task=None,
+                                              ,
                                               timeout_seconds=0)],
-                                     timeout_seconds=0, trigger=None, webhook_notifications=None))
+                                     timeout_seconds=0)),
+        BaseJob(created_time=1694536604321, creator_user_name='anonymous@databricks.com', job_id=536591785949416,
+                settings=JobSettings(compute=None, continuous=None,
+                                     tasks=[
+                                         Task(task_key='Ingest', existing_cluster_id='0810-225833-atlanta69',
+                                              notebook_task=NotebookTask(
+                                                  notebook_path='/Users/daniel.cadenas@databricks.com/Customers/Solistica/1.\
+                         TMMX_Predictive_Model_Top_15_vs_Clients - Data Ingestion/Load'
+                                              )
+                                              ,
+                                              timeout_seconds=0)],
+                                     timeout_seconds=0))
     ]
 
     sample_clusters = [
         ClusterDetails(autoscale=AutoScale(min_workers=1, max_workers=6), spark_conf={
             'spark.databricks.delta.preview.enabled': 'true'}, spark_context_id=5134472582179565315,
-                       spark_env_vars=None, spark_version='13.3.x-cpu-ml-scala2.12', cluster_id='0807-225846-motto493')
+                       spark_env_vars=None, spark_version='13.3.x-cpu-ml-scala2.12', cluster_id='0807-225846-motto493'),
+        ClusterDetails(autoscale=AutoScale(min_workers=1, max_workers=6), spark_conf={
+            'spark.databricks.delta.preview.enabled': 'true'}, spark_context_id=5134472582179565315,
+                       spark_env_vars=None, spark_version='9.3.x-cpu-ml-scala2.12', cluster_id='0810-225833-atlanta69')
     ]
     sample_clusters_by_id = {c.cluster_id: c for c in sample_clusters}
-    result_set = AssessmentToolkit.parse_jobs(sample_jobs, sample_clusters_by_id)
-    assert (result_set.get("536591785949415") is None)
-    assert (len(result_set) == 1)
+    result_set = AssessmentToolkit._parse_jobs(sample_jobs, sample_clusters_by_id)
+    assert (len(result_set.get(536591785949415)) == 0)
+    assert (len(result_set.get(536591785949416)) == 1)
+    assert (len(result_set) == 2)
