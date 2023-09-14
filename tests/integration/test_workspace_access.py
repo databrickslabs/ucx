@@ -164,6 +164,7 @@ def test_workspace_access_e2e(
         workspace_start_path=directory,
         tacl=TaclConfig(auto=True),
         log_level="DEBUG",
+        num_threads=8,
     )
 
     warehouse_id = os.environ["TEST_DEFAULT_WAREHOUSE_ID"]
