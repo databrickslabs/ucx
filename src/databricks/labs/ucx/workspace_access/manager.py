@@ -19,46 +19,22 @@ class PermissionManager(CrawlerBase):
         self._crawlers = crawlers
         self._appliers = appliers
 
-    def cleanup(self):
-        logger.info(f"Cleaning up inventory table {self._full_name}")
-        self._exec(f"DROP TABLE IF EXISTS {self._full_name}")
-        logger.info("Inventory table cleanup complete")
-
-    def save(self, items: list[Permissions]):
-        # TODO: update instead of append
-        logger.info(f"Saving {len(items)} items to inventory table {self._full_name}")
-        self._append_records(Permissions, items)
-        logger.info("Successfully saved the items to inventory table")
-
-    def load_all(self) -> list[Permissions]:
-        logger.info(f"Loading inventory table {self._full_name}")
-        return [
-            Permissions(object_id, object_type, raw_object_permissions)
-            for object_id, object_type, raw_object_permissions in self._fetch(
-                f"SELECT object_id, object_type, raw_object_permissions FROM {self._full_name}"
-            )
-        ]
-
-    def get_crawler_tasks(self) -> Iterator[Callable[..., Permissions | None]]:
-        for support in self._crawlers:
-            yield from support.get_crawler_tasks()
-
     def inventorize_permissions(self):
         logger.info("Inventorizing the permissions")
-        crawler_tasks = list(self.get_crawler_tasks())
+        crawler_tasks = list(self._get_crawler_tasks())
         logger.info(f"Total crawler tasks: {len(crawler_tasks)}")
         logger.info("Starting the permissions inventorization")
         results = ThreadedExecution.gather("crawl permissions", crawler_tasks)
         items = [item for item in results if item is not None]
         logger.info(f"Total inventorized items: {len(items)}")
-        self.save(items)
+        self._save(items)
         logger.info("Permissions were inventorized and saved")
 
     def apply_group_permissions(self, migration_state: GroupMigrationState, destination: Literal["backup", "account"]):
         logger.info(f"Applying the permissions to {destination} groups")
         logger.info(f"Total groups to apply permissions: {len(migration_state.groups)}")
         # list shall be sorted prior to using group by
-        items = sorted(self.load_all(), key=lambda i: i.object_type)
+        items = sorted(self._load_all(), key=lambda i: i.object_type)
         logger.info(f"Total inventorized items: {len(items)}")
         applier_tasks = []
         supports_to_items = {
@@ -83,3 +59,27 @@ class PermissionManager(CrawlerBase):
         logger.info("Starting the permissions application")
         ThreadedExecution.gather("apply permissions", applier_tasks)
         logger.info("Permissions were applied")
+
+    def cleanup(self):
+        logger.info(f"Cleaning up inventory table {self._full_name}")
+        self._exec(f"DROP TABLE IF EXISTS {self._full_name}")
+        logger.info("Inventory table cleanup complete")
+
+    def _save(self, items: list[Permissions]):
+        # TODO: update instead of append
+        logger.info(f"Saving {len(items)} items to inventory table {self._full_name}")
+        self._append_records(Permissions, items)
+        logger.info("Successfully saved the items to inventory table")
+
+    def _load_all(self) -> list[Permissions]:
+        logger.info(f"Loading inventory table {self._full_name}")
+        return [
+            Permissions(object_id, object_type, raw_object_permissions)
+            for object_id, object_type, raw_object_permissions in self._fetch(
+                f"SELECT object_id, object_type, raw_object_permissions FROM {self._full_name}"
+            )
+        ]
+
+    def _get_crawler_tasks(self) -> Iterator[Callable[..., Permissions | None]]:
+        for support in self._crawlers:
+            yield from support.get_crawler_tasks()

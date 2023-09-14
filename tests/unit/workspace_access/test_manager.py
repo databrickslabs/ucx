@@ -32,7 +32,7 @@ def test_cleanup(b):
 def test_save(b):
     pi = PermissionManager(b, "test_database", [], {})
 
-    pi.save([Permissions("object1", "clusters", "test acl")])
+    pi._save([Permissions("object1", "clusters", "test acl")])
 
     assert (
         "INSERT INTO hive_metastore.test_database.permissions (object_id, object_type, "
@@ -56,7 +56,7 @@ def test_load_all():
     )
     pi = PermissionManager(b, "test_database", [], {})
 
-    output = pi.load_all()
+    output = pi._load_all()
     assert output[0] == Permissions("object1", "clusters", "test acl")
 
 

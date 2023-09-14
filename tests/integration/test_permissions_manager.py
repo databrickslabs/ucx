@@ -15,7 +15,7 @@ def test_permissions_save_and_load(ws, make_schema):
         Permissions(object_id="efg", object_type="fgh", raw_object_permissions="ghi"),
     ]
 
-    pi.save(saved)
-    loaded = pi.load_all()
+    pi._save(saved)
+    loaded = pi._load_all()
 
     assert saved == loaded
