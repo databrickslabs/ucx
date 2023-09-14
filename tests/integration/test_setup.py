@@ -5,7 +5,7 @@ import pytest
 from databricks.sdk import WorkspaceClient
 from databricks.sdk.service.iam import ComplexValue
 
-from databricks.labs.ucx.utils import ThreadedExecution
+from databricks.labs.ucx.framework.parallel import ThreadedExecution
 
 logger = logging.getLogger(__name__)
 Threader = partial(ThreadedExecution, num_threads=40)

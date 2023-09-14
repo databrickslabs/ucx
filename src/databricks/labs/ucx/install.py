@@ -16,8 +16,8 @@ from databricks.sdk.service.workspace import ImportFormat
 
 from databricks.labs.ucx.__about__ import __version__
 from databricks.labs.ucx.config import GroupsConfig, MigrationConfig, TaclConfig
+from databricks.labs.ucx.framework.tasks import _TASKS
 from databricks.labs.ucx.runtime import main
-from databricks.labs.ucx.tasks import _TASKS
 
 TAG_STEP = "step"
 TAG_APP = "App"

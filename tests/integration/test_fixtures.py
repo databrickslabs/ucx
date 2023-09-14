@@ -3,7 +3,7 @@ import os
 
 from databricks.sdk.service.workspace import AclPermission
 
-from databricks.labs.ucx.providers.mixins.fixtures import *  # noqa: F403
+from databricks.labs.ucx.mixins.fixtures import *  # noqa: F403
 
 load_debug_env_if_runs_from_ide("ucws")  # noqa: F405
 

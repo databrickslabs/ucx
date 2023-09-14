@@ -163,14 +163,14 @@ ban-relative-imports = "all"
     "ARG001" # tests may not use the provided fixtures
 ]
 
-"src/databricks/labs/ucx/providers/mixins/redash.py" = ["A002", "A003", "N815"]
+"src/databricks/labs/ucx/mixins/redash.py" = ["A002", "A003", "N815"]
 
 [tool.coverage.run]
 branch = true
 parallel = true
 
 [tool.coverage.report]
-omit = ["src/databricks/labs/ucx/providers/mixins/*"]
+omit = ["src/databricks/labs/ucx/mixins/*"]
 exclude_lines = [
     "no cov",
     "if __name__ == .__main__.:",
