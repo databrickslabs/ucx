@@ -6,7 +6,7 @@ from databricks.sdk import WorkspaceClient
 from databricks.sdk.service.compute import Language
 
 from databricks.labs.ucx.assessment import commands
-from databricks.labs.ucx.providers.mixins.compute import CommandExecutor
+from databricks.labs.ucx.mixins.compute import CommandExecutor
 
 logger = logging.getLogger(__name__)
 

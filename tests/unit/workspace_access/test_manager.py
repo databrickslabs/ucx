@@ -1,13 +1,13 @@
 import json
-from unittest import mock
 from unittest.mock import MagicMock
 
 import pytest
 from databricks.sdk.service import iam
-from unit.framework.mocks import MockBackend
 
 from databricks.labs.ucx.mixins.sql import Row
 from databricks.labs.ucx.workspace_access.manager import PermissionManager, Permissions
+
+from ..framework.mocks import MockBackend
 
 
 @pytest.fixture
@@ -60,13 +60,17 @@ def test_load_all():
     assert output[0] == Permissions("object1", "clusters", "test acl")
 
 
-def test_manager_inventorize(b):
-    # FIXME: make it work
-    pm = PermissionManager(b, "test_database", [], {})
+def test_manager_inventorize(b, mocker):
+    some_crawler = mocker.Mock()
+    some_crawler.get_crawler_tasks = lambda: [lambda: None, lambda: Permissions("a", "b", "c"), lambda: None]
+    pm = PermissionManager(b, "test_database", [some_crawler], {})
 
-    with mock.patch("databricks.labs.ucx.inventory.permissions.ThreadedExecution.run", MagicMock()) as run_mock:
-        pm.inventorize_permissions()
-        run_mock.assert_called_once()
+    pm.inventorize_permissions()
+
+    assert (
+        "INSERT INTO hive_metastore.test_database.permissions "
+        "(object_id, object_type, raw_object_permissions) VALUES ('a', 'b', 'c')" == b.queries[0]
+    )
 
 
 def test_manager_apply(mocker):
@@ -112,23 +116,27 @@ def test_manager_apply(mocker):
             ]
         }
     )
-    clusters_applier = mocker.Mock()
-    cluster_policy_applier = mocker.Mock()
-    other_applier = mocker.Mock()
+
+    # has to be set, as it's going to be appended through multiple threads
+    applied_items = set()
+    mock_applier = mocker.Mock()
+    # this emulates a real applier and call to an API
+    mock_applier.get_apply_task = lambda item, _, dst: lambda: applied_items.add(
+        f"{item.object_id} {item.object_id} {dst}"
+    )
+
     pm = PermissionManager(
         b,
         "test_database",
         [],
         {
-            "clusters": clusters_applier,
-            "cluster-policies": cluster_policy_applier,
-            "other": other_applier,
+            "clusters": mock_applier,
+            "cluster-policies": mock_applier,
         },
     )
     pm.apply_group_permissions(MagicMock(), "backup")
 
-    clusters_applier.assert_called_with(...)
-    cluster_policy_applier.assert_called_with(...)
+    assert {"test2 test2 backup", "test test backup"} == applied_items
 
 
 def test_unregistered_support():

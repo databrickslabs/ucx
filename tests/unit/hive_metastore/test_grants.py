@@ -1,9 +1,10 @@
 import pytest
-from unit.framework.mocks import MockBackend
 
 from databricks.labs.ucx.hive_metastore.grants import Grant, GrantsCrawler
 from databricks.labs.ucx.hive_metastore.tables import TablesCrawler
 from databricks.labs.ucx.mixins.sql import Row
+
+from ..framework.mocks import MockBackend
 
 
 def test_type_and_key_table():

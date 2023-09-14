@@ -66,17 +66,17 @@ class PermissionManager(CrawlerBase):
         }
 
         # we first check that all supports are valid.
-        for support in supports_to_items:
-            if support not in self._appliers:
-                msg = f"Could not find support for {support}. Please check the inventory table."
+        for object_type in supports_to_items:
+            if object_type not in self._appliers:
+                msg = f"Could not find support for {object_type}. Please check the inventory table."
                 raise ValueError(msg)
 
-        for support, items_subset in supports_to_items.items():
-            relevant_support = self._appliers[support]
+        for object_type, items_subset in supports_to_items.items():
+            relevant_support = self._appliers[object_type]
             tasks_for_support = [
                 relevant_support.get_apply_task(item, migration_state, destination) for item in items_subset
             ]
-            logger.info(f"Total tasks for {support}: {len(tasks_for_support)}")
+            logger.info(f"Total tasks for {object_type}: {len(tasks_for_support)}")
             applier_tasks.extend(tasks_for_support)
 
         logger.info(f"Total applier tasks: {len(applier_tasks)}")

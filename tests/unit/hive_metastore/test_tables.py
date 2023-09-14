@@ -1,8 +1,8 @@
 import pytest
 
-from databricks.labs.ucx.framework.crawlers import SqlBackend
 from databricks.labs.ucx.hive_metastore.tables import Table, TablesCrawler
-from unit.framework.mocks import MockBackend
+
+from ..framework.mocks import MockBackend
 
 
 def test_is_delta_true():

@@ -27,7 +27,7 @@ class SecretScopesSupport(Crawler, Applier):
             acl_items = self._ws.secrets.list_acls(scope.name)
             return Permissions(
                 object_id=scope.name,
-                support="secrets",
+                object_type="secrets",
                 raw_object_permissions=json.dumps([item.as_dict() for item in acl_items]),
             )
 

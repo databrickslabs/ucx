@@ -30,7 +30,7 @@ def test_workspace_listing():
         workspace.ObjectInfo(object_id=6, object_type=None),  # MLflow Experiment
     ]
 
-    with patch("databricks.labs.ucx.support.listing.WorkspaceListing", return_value=listing):
+    with patch("databricks.labs.ucx.workspace_access.listing.WorkspaceListing", return_value=listing):
         results = workspace_listing(ws=MagicMock())()
         assert len(list(results)) == 4
         listing.walk.assert_called_once()
