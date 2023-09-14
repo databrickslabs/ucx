@@ -5,7 +5,7 @@ from functools import wraps
 from pathlib import Path
 
 from databricks.labs.ucx.config import MigrationConfig
-from databricks.labs.ucx.logger import _install
+from databricks.labs.ucx.framework.logger import _install
 
 _TASKS: dict[str, "Task"] = {}
 

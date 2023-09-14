@@ -1,6 +1,6 @@
 from unittest.mock import Mock
 
-from databricks.labs.ucx.toolkits.assessment import AssessmentToolkit
+from databricks.labs.ucx.assessment.assessment import AssessmentToolkit
 
 
 def test_get_command():

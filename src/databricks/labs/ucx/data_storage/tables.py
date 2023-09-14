@@ -3,8 +3,8 @@ from collections.abc import Iterator
 from dataclasses import dataclass
 from functools import partial
 
-from databricks.labs.ucx.providers.mixins.sql import Row
-from databricks.labs.ucx.tacl._internal import CrawlerBase, SqlBackend
+from databricks.labs.ucx.framework.crawlers import CrawlerBase, SqlBackend
+from databricks.labs.ucx.mixins.sql import Row
 from databricks.labs.ucx.utils import ThreadedExecution
 
 logger = logging.getLogger(__name__)

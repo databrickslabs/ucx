@@ -2,7 +2,7 @@ from dataclasses import dataclass
 
 import pytest
 
-from databricks.labs.ucx.tacl._internal import CrawlerBase
+from databricks.labs.ucx.data_storage._internal import CrawlerBase
 
 from .mocks import MockBackend
 

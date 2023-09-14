@@ -1,8 +1,8 @@
-from databricks.labs.ucx.inventory.permissions_inventory import (
+from databricks.labs.ucx.providers.mixins.sql import Row
+from databricks.labs.ucx.workspace_access.permissions_inventory import (
     PermissionsInventoryTable,
 )
-from databricks.labs.ucx.inventory.types import PermissionsInventoryItem
-from databricks.labs.ucx.providers.mixins.sql import Row
+from databricks.labs.ucx.workspace_access.types import PermissionsInventoryItem
 
 from .mocks import MockBackend
 

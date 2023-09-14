@@ -1,7 +1,7 @@
 import pytest
 
-from databricks.labs.ucx.tacl._internal import SqlBackend
-from databricks.labs.ucx.tacl.tables import Table, TablesCrawler
+from databricks.labs.ucx.data_storage._internal import SqlBackend
+from databricks.labs.ucx.data_storage.tables import Table, TablesCrawler
 
 
 def test_is_delta_true():

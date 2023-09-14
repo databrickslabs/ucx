@@ -5,12 +5,12 @@ from unittest.mock import MagicMock
 import pytest
 from databricks.sdk.service import iam
 
-from databricks.labs.ucx.inventory.permissions import PermissionManager
-from databricks.labs.ucx.inventory.permissions_inventory import (
+from databricks.labs.ucx.support.impl import SupportsProvider
+from databricks.labs.ucx.workspace_access.permissions import PermissionManager
+from databricks.labs.ucx.workspace_access.permissions_inventory import (
     PermissionsInventoryTable,
 )
-from databricks.labs.ucx.inventory.types import PermissionsInventoryItem
-from databricks.labs.ucx.support.impl import SupportsProvider
+from databricks.labs.ucx.workspace_access.types import PermissionsInventoryItem
 
 
 def test_manager_inventorize():

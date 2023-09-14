@@ -1,6 +1,6 @@
 import pytest
 
-from databricks.labs.ucx.toolkits.assessment import AssessmentToolkit
+from databricks.labs.ucx.assessment.assessment import AssessmentToolkit
 
 
 def test_table_inventory(ws, make_catalog, make_schema):

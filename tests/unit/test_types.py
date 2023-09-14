@@ -1,4 +1,4 @@
-from databricks.labs.ucx.inventory.types import RequestObjectType
+from databricks.labs.ucx.workspace_access.types import RequestObjectType
 
 
 def test_request_object_type():

@@ -2,8 +2,8 @@ from typing import Literal
 
 from databricks.sdk import WorkspaceClient
 
-from databricks.labs.ucx.providers.groups_info import GroupMigrationState
-from databricks.labs.ucx.support.secrets import SecretScopesSupport
+from databricks.labs.ucx.workspace_access.groups import GroupMigrationState
+from databricks.labs.ucx.workspace_access.secrets import SecretScopesSupport
 
 
 class VerificationManager:

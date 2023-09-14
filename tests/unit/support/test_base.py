@@ -2,13 +2,13 @@ from functools import partial
 
 from databricks.sdk.service import iam
 
-from databricks.labs.ucx.inventory.types import PermissionsInventoryItem
 from databricks.labs.ucx.providers.groups_info import (
     GroupMigrationState,
     MigrationGroupInfo,
 )
-from databricks.labs.ucx.support.base import Applier
 from databricks.labs.ucx.utils import noop
+from databricks.labs.ucx.workspace_access.base import Applier
+from databricks.labs.ucx.workspace_access.types import PermissionsInventoryItem
 
 
 def test_applier():

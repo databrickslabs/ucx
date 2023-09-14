@@ -5,14 +5,14 @@ import pytest
 from databricks.sdk.core import DatabricksError
 from databricks.sdk.service import compute, iam
 
-from databricks.labs.ucx.inventory.types import (
-    PermissionsInventoryItem,
-    RequestObjectType,
-)
-from databricks.labs.ucx.support.listing import authorization_listing
 from databricks.labs.ucx.support.permissions import (
     GenericPermissionsSupport,
     listing_wrapper,
+)
+from databricks.labs.ucx.workspace_access.listing import authorization_listing
+from databricks.labs.ucx.workspace_access.types import (
+    PermissionsInventoryItem,
+    RequestObjectType,
 )
 
 
@@ -51,7 +51,7 @@ def test_crawler():
     item = _task()
     ws.permissions.get.assert_called_once()
     assert item.object_id == "test"
-    assert item.support == "clusters"
+    assert item.object_type == "clusters"
     assert json.loads(item.raw_object_permissions) == sample_permission.as_dict()
 
 
@@ -168,7 +168,7 @@ def test_passwords_tokens_crawler(migration_state):
     auth_items = [task() for task in tasks]
     for item in auth_items:
         assert item.object_id in ["tokens", "passwords"]
-        assert item.support in ["tokens", "passwords"]
+        assert item.object_type in ["tokens", "passwords"]
         applier = sup.get_apply_task(item, migration_state, "backup")
         new_acl = sup._prepare_new_acl(
             permissions=iam.ObjectPermissions.from_dict(json.loads(item.raw_object_permissions)),

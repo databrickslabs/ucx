@@ -4,8 +4,8 @@ from unittest.mock import MagicMock
 import pytest
 from databricks.sdk.service import iam
 
-from databricks.labs.ucx.inventory.types import PermissionsInventoryItem
 from databricks.labs.ucx.support.group_level import ScimSupport
+from databricks.labs.ucx.workspace_access.types import PermissionsInventoryItem
 
 
 def test_scim_crawler():
@@ -39,7 +39,7 @@ def test_scim_crawler():
             assert item is None
         else:
             assert item.object_id in ["2", "3"]
-            assert item.support in ["roles", "entitlements"]
+            assert item.object_type in ["roles", "entitlements"]
             assert item.raw_object_permissions is not None
 
 

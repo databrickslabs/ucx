@@ -5,12 +5,9 @@ from concurrent.futures import FIRST_COMPLETED, ThreadPoolExecutor, wait
 from itertools import groupby
 
 from databricks.sdk import WorkspaceClient
-from databricks.sdk.service import ml, workspace
 from databricks.sdk.service.workspace import ObjectInfo, ObjectType
 
-from databricks.labs.ucx.inventory.types import RequestObjectType
-from databricks.labs.ucx.providers.mixins.hardening import rate_limited
-from databricks.labs.ucx.support.permissions import GenericPermissionsInfo
+from databricks.labs.ucx.mixins.hardening import rate_limited
 
 logger = logging.getLogger(__name__)
 
@@ -93,76 +90,3 @@ class WorkspaceListing:
             logger.info(f"Total time taken for workspace listing: {dt.datetime.now() - self.start_time}")
             self._progress_report(None)
         return self.results
-
-
-def models_listing(ws: WorkspaceClient):
-    def inner() -> Iterator[ml.ModelDatabricks]:
-        for model in ws.model_registry.list_models():
-            model_with_id = ws.model_registry.get_model(model.name).registered_model_databricks
-            yield model_with_id
-
-    return inner
-
-
-def experiments_listing(ws: WorkspaceClient):
-    def inner() -> Iterator[ml.Experiment]:
-        for experiment in ws.experiments.list_experiments():
-            """
-            We filter-out notebook-based experiments, because they are covered by notebooks listing
-            """
-            # workspace-based notebook experiment
-            if experiment.tags:
-                nb_tag = [t for t in experiment.tags if t.key == "mlflow.experimentType" and t.value == "NOTEBOOK"]
-                # repo-based notebook experiment
-                repo_nb_tag = [
-                    t for t in experiment.tags if t.key == "mlflow.experiment.sourceType" and t.value == "REPO_NOTEBOOK"
-                ]
-                if nb_tag or repo_nb_tag:
-                    continue
-
-            yield experiment
-
-    return inner
-
-
-def authorization_listing():
-    def inner():
-        for _value in ["passwords", "tokens"]:
-            yield GenericPermissionsInfo(
-                object_id=_value,
-                request_type=RequestObjectType.AUTHORIZATION,
-            )
-
-    return inner
-
-
-def _convert_object_type_to_request_type(_object: workspace.ObjectInfo) -> RequestObjectType | None:
-    match _object.object_type:
-        case workspace.ObjectType.NOTEBOOK:
-            return RequestObjectType.NOTEBOOKS
-        case workspace.ObjectType.DIRECTORY:
-            return RequestObjectType.DIRECTORIES
-        case workspace.ObjectType.LIBRARY:
-            return None
-        case workspace.ObjectType.REPO:
-            return RequestObjectType.REPOS
-        case workspace.ObjectType.FILE:
-            return RequestObjectType.FILES
-        # silent handler for experiments - they'll be inventorized by the experiments manager
-        case None:
-            return None
-
-
-def workspace_listing(ws: WorkspaceClient, num_threads=20, start_path: str | None = "/"):
-    def inner():
-        ws_listing = WorkspaceListing(
-            ws,
-            num_threads=num_threads,
-            with_directories=False,
-        )
-        for _object in ws_listing.walk(start_path):
-            request_type = _convert_object_type_to_request_type(_object)
-            if request_type:
-                yield GenericPermissionsInfo(object_id=str(_object.object_id), request_type=request_type)
-
-    return inner

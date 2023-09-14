@@ -1,8 +1,8 @@
 import pytest
 
+from databricks.labs.ucx.data_storage.grants import Grant, GrantsCrawler
+from databricks.labs.ucx.data_storage.tables import TablesCrawler
 from databricks.labs.ucx.providers.mixins.sql import Row
-from databricks.labs.ucx.tacl.grants import Grant, GrantsCrawler
-from databricks.labs.ucx.tacl.tables import TablesCrawler
 
 from .mocks import MockBackend
 

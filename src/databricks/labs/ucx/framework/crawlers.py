@@ -6,7 +6,7 @@ from collections.abc import Iterator
 
 from databricks.sdk import WorkspaceClient
 
-from databricks.labs.ucx.providers.mixins.sql import StatementExecutionExt
+from databricks.labs.ucx.mixins.sql import StatementExecutionExt
 
 logger = logging.getLogger(__name__)
 

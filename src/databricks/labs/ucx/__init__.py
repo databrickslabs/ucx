@@ -1,3 +1,3 @@
-from databricks.labs.ucx.logger import _install
+from databricks.labs.ucx.framework.logger import _install
 
 _install()

@@ -3,15 +3,15 @@ from unittest.mock import MagicMock, patch
 
 from databricks.sdk.service import ml, workspace
 
-from databricks.labs.ucx.inventory.types import RequestObjectType
-from databricks.labs.ucx.support.listing import (
+from databricks.labs.ucx.support.permissions import listing_wrapper
+from databricks.labs.ucx.workspace_access.listing import (
     WorkspaceListing,
     experiments_listing,
     logger,
     models_listing,
     workspace_listing,
 )
-from databricks.labs.ucx.support.permissions import listing_wrapper
+from databricks.labs.ucx.workspace_access.types import RequestObjectType
 
 
 def test_logging_calls():

@@ -6,22 +6,26 @@ from functools import partial
 from databricks.sdk import WorkspaceClient
 from databricks.sdk.service import iam, workspace
 
-from databricks.labs.ucx.inventory.types import Destination, PermissionsInventoryItem
-from databricks.labs.ucx.providers.groups_info import GroupMigrationState
-from databricks.labs.ucx.providers.mixins.hardening import rate_limited
-from databricks.labs.ucx.support.base import BaseSupport
+from databricks.labs.ucx.mixins.hardening import rate_limited
+from databricks.labs.ucx.workspace_access.base import (
+    Applier,
+    Crawler,
+    Destination,
+    Permissions,
+)
+from databricks.labs.ucx.workspace_access.groups import GroupMigrationState
 
 
-class SecretScopesSupport(BaseSupport):
+class SecretScopesSupport(Crawler, Applier):
     def __init__(self, ws: WorkspaceClient):
-        super().__init__(ws=ws)
+        self._ws = ws
 
     def get_crawler_tasks(self):
         scopes = self._ws.secrets.list_scopes()
 
         def _crawler_task(scope: workspace.SecretScope):
             acl_items = self._ws.secrets.list_acls(scope.name)
-            return PermissionsInventoryItem(
+            return Permissions(
                 object_id=scope.name,
                 support="secrets",
                 raw_object_permissions=json.dumps([item.as_dict() for item in acl_items]),
@@ -30,7 +34,7 @@ class SecretScopesSupport(BaseSupport):
         for scope in scopes:
             yield partial(_crawler_task, scope)
 
-    def is_item_relevant(self, item: PermissionsInventoryItem, migration_state: GroupMigrationState) -> bool:
+    def is_item_relevant(self, item: Permissions, migration_state: GroupMigrationState) -> bool:
         acls = [workspace.AclItem.from_dict(acl) for acl in json.loads(item.raw_object_permissions)]
         mentioned_groups = [acl.principal for acl in acls]
         return any(g in mentioned_groups for g in [info.workspace.display_name for info in migration_state.groups])
@@ -72,7 +76,7 @@ class SecretScopesSupport(BaseSupport):
         self._inflight_check(scope_name=object_id, group_name=principal, expected_permission=permission)
 
     def _get_apply_task(
-        self, item: PermissionsInventoryItem, migration_state: GroupMigrationState, destination: Destination
+        self, item: Permissions, migration_state: GroupMigrationState, destination: Destination
     ) -> partial:
         acls = [workspace.AclItem.from_dict(acl) for acl in json.loads(item.raw_object_permissions)]
         new_acls = []

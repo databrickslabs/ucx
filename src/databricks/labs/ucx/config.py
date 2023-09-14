@@ -136,7 +136,7 @@ class MigrationConfig:
             raise ValueError(msg)
         return cls(
             inventory_database=raw.get("inventory_database"),
-            tacl=TaclConfig.from_dict(raw.get("tacl", {})),
+            tacl=TaclConfig.from_dict(raw.get("data_storage", {})),
             groups=GroupsConfig.from_dict(raw.get("groups", {})),
             connect=ConnectConfig.from_dict(raw.get("connect", {})),
             instance_pool_id=raw.get("instance_pool_id", None),

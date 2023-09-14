@@ -1,10 +1,10 @@
 import os
 
-from databricks.labs.ucx.inventory.permissions_inventory import (
+from databricks.labs.ucx.data_storage._internal import StatementExecutionBackend
+from databricks.labs.ucx.workspace_access.permissions_inventory import (
     PermissionsInventoryTable,
 )
-from databricks.labs.ucx.inventory.types import PermissionsInventoryItem
-from databricks.labs.ucx.tacl._internal import StatementExecutionBackend
+from databricks.labs.ucx.workspace_access.types import PermissionsInventoryItem
 
 
 def test_permissions_save_and_load(ws, make_schema):

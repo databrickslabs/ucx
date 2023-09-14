@@ -13,11 +13,11 @@ from databricks.sdk.service.iam import PermissionLevel
 from databricks.sdk.service.workspace import ImportFormat
 
 from databricks.labs.ucx.config import GroupsConfig, MigrationConfig, TaclConfig
+from databricks.labs.ucx.data_storage.grants import Grant
+from databricks.labs.ucx.data_storage.tables import Table
 from databricks.labs.ucx.install import Installer
-from databricks.labs.ucx.inventory.types import RequestObjectType
 from databricks.labs.ucx.providers.mixins.compute import CommandExecutor
-from databricks.labs.ucx.tacl.grants import Grant
-from databricks.labs.ucx.tacl.tables import Table
+from databricks.labs.ucx.workspace_access.types import RequestObjectType
 
 logger = logging.getLogger(__name__)
 

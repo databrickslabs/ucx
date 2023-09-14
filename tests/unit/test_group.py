@@ -4,7 +4,7 @@ import pytest
 from databricks.sdk.service.iam import Group, ResourceMeta
 
 from databricks.labs.ucx.config import GroupsConfig
-from databricks.labs.ucx.managers.group import GroupManager
+from databricks.labs.ucx.group import GroupManager
 from databricks.labs.ucx.providers.groups_info import MigrationGroupInfo
 
 

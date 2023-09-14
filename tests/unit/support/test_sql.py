@@ -5,8 +5,11 @@ import pytest
 from databricks.sdk.core import DatabricksError
 from databricks.sdk.service import sql
 
-from databricks.labs.ucx.inventory.types import PermissionsInventoryItem
-from databricks.labs.ucx.support.sql import SqlPermissionsSupport, listing_wrapper
+from databricks.labs.ucx.support.sql import (
+    SqlPermissionsSupport,
+    redash_listing_wrapper,
+)
+from databricks.labs.ucx.workspace_access.types import PermissionsInventoryItem
 
 
 def test_crawlers():
@@ -39,9 +42,9 @@ def test_crawlers():
     sup = SqlPermissionsSupport(
         ws=ws,
         listings=[
-            listing_wrapper(ws.alerts.list, sql.ObjectTypePlural.ALERTS),
-            listing_wrapper(ws.dashboards.list, sql.ObjectTypePlural.DASHBOARDS),
-            listing_wrapper(ws.queries.list, sql.ObjectTypePlural.QUERIES),
+            redash_listing_wrapper(ws.alerts.list, sql.ObjectTypePlural.ALERTS),
+            redash_listing_wrapper(ws.dashboards.list, sql.ObjectTypePlural.DASHBOARDS),
+            redash_listing_wrapper(ws.queries.list, sql.ObjectTypePlural.QUERIES),
         ],
     )
 
@@ -53,7 +56,7 @@ def test_crawlers():
     for task in tasks:
         item = task()
         assert item.object_id == "test"
-        assert item.support in ["alerts", "dashboards", "queries"]
+        assert item.object_type in ["alerts", "dashboards", "queries"]
         assert item.raw_object_permissions is not None
 
 

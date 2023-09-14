@@ -12,8 +12,8 @@ from databricks.labs.ucx.config import (
     MigrationConfig,
     TaclConfig,
 )
-from databricks.labs.ucx.inventory.types import RequestObjectType
-from databricks.labs.ucx.toolkits.group_migration import GroupMigrationToolkit
+from databricks.labs.ucx.workspace_access.group_migration import GroupMigrationToolkit
+from databricks.labs.ucx.workspace_access.types import RequestObjectType
 
 logger = logging.getLogger(__name__)
 

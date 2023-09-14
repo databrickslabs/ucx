@@ -5,8 +5,6 @@ from collections.abc import Callable
 from concurrent.futures import ALL_COMPLETED, ThreadPoolExecutor
 from typing import Generic, TypeVar
 
-from databricks.labs.ucx.generic import StrEnum
-
 ExecutableResult = TypeVar("ExecutableResult")
 ExecutableFunction = Callable[..., ExecutableResult]
 logger = logging.getLogger(__name__)
@@ -64,21 +62,6 @@ class ThreadedExecution(Generic[ExecutableResult]):
         logger.debug("Collecting the results from threaded execution")
         collected = [future.result() for future in results.done]
         return collected
-
-
-class Request:
-    def __init__(self, req: dict):
-        self.request = req
-
-    def as_dict(self) -> dict:
-        return self.request
-
-
-class WorkspaceLevelEntitlement(StrEnum):
-    WORKSPACE_ACCESS = "workspace-access"
-    DATABRICKS_SQL_ACCESS = "databricks-sql-access"
-    ALLOW_CLUSTER_CREATE = "allow-cluster-create"
-    ALLOW_INSTANCE_POOL_CREATE = "allow-instance-pool-create"
 
 
 def noop():

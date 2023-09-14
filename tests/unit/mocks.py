@@ -2,7 +2,7 @@ import logging
 import re
 from collections.abc import Iterator
 
-from databricks.labs.ucx.tacl._internal import SqlBackend
+from databricks.labs.ucx.data_storage._internal import SqlBackend
 
 logger = logging.getLogger(__name__)
 
