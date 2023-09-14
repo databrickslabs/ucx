@@ -25,7 +25,14 @@ class PermissionManager(CrawlerBase):
         logger.info(f"Total crawler tasks: {len(crawler_tasks)}")
         logger.info("Starting the permissions inventorization")
         results = ThreadedExecution.gather("crawl permissions", crawler_tasks)
-        items = [item for item in results if item is not None]
+        items = []
+        for item in results:
+            if item is None:
+                continue
+            if item.object_type not in self._appliers:
+                msg = f"unknown object_type: {item.object_type}"
+                raise KeyError(msg)
+            items.append(item)
         logger.info(f"Total inventorized items: {len(items)}")
         self._save(items)
         logger.info("Permissions were inventorized and saved")

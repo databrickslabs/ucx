@@ -63,7 +63,7 @@ def test_load_all():
 def test_manager_inventorize(b, mocker):
     some_crawler = mocker.Mock()
     some_crawler.get_crawler_tasks = lambda: [lambda: None, lambda: Permissions("a", "b", "c"), lambda: None]
-    pm = PermissionManager(b, "test_database", [some_crawler], {})
+    pm = PermissionManager(b, "test_database", [some_crawler], {"b": mocker.Mock()})
 
     pm.inventorize_permissions()
 
@@ -71,6 +71,15 @@ def test_manager_inventorize(b, mocker):
         "INSERT INTO hive_metastore.test_database.permissions "
         "(object_id, object_type, raw) VALUES ('a', 'b', 'c')" == b.queries[0]
     )
+
+
+def test_manager_inventorize_unknown_object_type_raises_error(b, mocker):
+    some_crawler = mocker.Mock()
+    some_crawler.get_crawler_tasks = lambda: [lambda: None, lambda: Permissions("a", "b", "c"), lambda: None]
+    pm = PermissionManager(b, "test_database", [some_crawler], {})
+
+    with pytest.raises(KeyError):
+        pm.inventorize_permissions()
 
 
 def test_manager_apply(mocker):
