@@ -35,7 +35,7 @@ class GroupMigrationToolkit:
         ws = WorkspaceClient(config=config.to_databricks_config())
         ws.api_client._session.adapters["https://"].max_retries.total = 20
         self._verify_ws_client(ws)
-        self._ws = ws # TODO: remove this once notebooks/toolkit.py is removed
+        self._ws = ws  # TODO: remove this once notebooks/toolkit.py is removed
 
         generic_acl_listing = [
             listing_wrapper(ws.clusters.list, "cluster_id", "clusters"),

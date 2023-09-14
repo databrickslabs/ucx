@@ -49,6 +49,7 @@ class GroupMigrationState:
 
 class GroupManager:
     SYSTEM_GROUPS: typing.ClassVar[list[str]] = ["users", "admins", "account users"]
+    SCIM_ATTRIBUTES = "id,displayName,meta,members"
 
     def __init__(self, ws: WorkspaceClient, groups: GroupsConfig):
         self._ws = ws
@@ -61,11 +62,11 @@ class GroupManager:
         logger.debug("Listing workspace groups...")
         workspace_groups = [
             g
-            for g in self._ws.groups.list(attributes="id,displayName,meta")
+            for g in self._ws.groups.list(attributes=self.SCIM_ATTRIBUTES)
             if g.meta.resource_type == "WorkspaceGroup" and g.display_name not in self.SYSTEM_GROUPS
         ]
         logger.debug(f"Found {len(workspace_groups)} workspace groups")
-        return workspace_groups
+        return sorted(workspace_groups, key=lambda _: _.display_name)
 
     def _list_account_groups(self) -> list[iam.Group]:
         # TODO: we should avoid using this method, as it's not documented
@@ -76,14 +77,12 @@ class GroupManager:
             for r in self._ws.api_client.do(
                 "get",
                 "/api/2.0/account/scim/v2/Groups",
-                query={
-                    "attributes": "id,displayName,meta",
-                },
+                query={"attributes": self.SCIM_ATTRIBUTES},
             ).get("Resources", [])
         ]
         account_groups = [g for g in account_groups if g.display_name not in self.SYSTEM_GROUPS]
         logger.debug(f"Found {len(account_groups)} account groups")
-        return account_groups
+        return sorted(account_groups, key=lambda _: _.display_name)
 
     def _get_group(self, group_name, level: GroupLevel) -> iam.Group | None:
         relevant_level_groups = self._workspace_groups if level == "workspace" else self._account_groups
