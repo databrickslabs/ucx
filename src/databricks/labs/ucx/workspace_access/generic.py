@@ -39,7 +39,7 @@ class GenericPermissionsSupport(Crawler, Applier):
         else:
             mentioned_groups = [
                 acl.group_name
-                for acl in iam.ObjectPermissions.from_dict(json.loads(item.raw_object_permissions)).access_control_list
+                for acl in iam.ObjectPermissions.from_dict(json.loads(item.raw)).access_control_list
             ]
             return any(g in mentioned_groups for g in [info.workspace.display_name for info in migration_state.groups])
 
@@ -57,7 +57,7 @@ class GenericPermissionsSupport(Crawler, Applier):
         self, item: Permissions, migration_state: GroupMigrationState, destination: Destination
     ) -> partial:
         new_acl = self._prepare_new_acl(
-            iam.ObjectPermissions.from_dict(json.loads(item.raw_object_permissions)), migration_state, destination
+            iam.ObjectPermissions.from_dict(json.loads(item.raw)), migration_state, destination
         )
 
         request_type = (
@@ -142,7 +142,7 @@ class GenericPermissionsSupport(Crawler, Applier):
             return Permissions(
                 object_id=object_id,
                 object_type=support,
-                raw_object_permissions=json.dumps(permissions.as_dict()),
+                raw=json.dumps(permissions.as_dict()),
             )
 
 

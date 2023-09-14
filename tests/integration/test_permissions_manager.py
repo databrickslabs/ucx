@@ -11,8 +11,8 @@ def test_permissions_save_and_load(ws, make_schema):
     pi = PermissionManager(backend, schema, [], {})
 
     saved = [
-        Permissions(object_id="abc", object_type="bcd", raw_object_permissions="def"),
-        Permissions(object_id="efg", object_type="fgh", raw_object_permissions="ghi"),
+        Permissions(object_id="abc", object_type="bcd", raw="def"),
+        Permissions(object_id="efg", object_type="fgh", raw="ghi"),
     ]
 
     pi._save(saved)

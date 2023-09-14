@@ -57,7 +57,7 @@ def test_crawlers():
         item = task()
         assert item.object_id == "test"
         assert item.object_type in ["alerts", "dashboards", "queries"]
-        assert item.raw_object_permissions is not None
+        assert item.raw is not None
 
 
 def test_apply(migration_state):
@@ -66,7 +66,7 @@ def test_apply(migration_state):
     item = Permissions(
         object_id="test",
         object_type="alerts",
-        raw_object_permissions=json.dumps(
+        raw=json.dumps(
             sql.GetResponse(
                 object_type=sql.ObjectType.ALERT,
                 object_id="test",

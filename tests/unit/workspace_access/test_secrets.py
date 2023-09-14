@@ -35,7 +35,7 @@ def test_secret_scopes_crawler():
 
     assert item.object_id == "test"
     assert item.object_type == "secrets"
-    assert item.raw_object_permissions == '[{"permission": "MANAGE", "principal": "test"}]'
+    assert item.raw == '[{"permission": "MANAGE", "principal": "test"}]'
 
 
 def test_secret_scopes_apply(migration_state: GroupMigrationState):
@@ -44,7 +44,7 @@ def test_secret_scopes_apply(migration_state: GroupMigrationState):
     item = Permissions(
         object_id="test",
         object_type="secrets",
-        raw_object_permissions=json.dumps(
+        raw=json.dumps(
             [
                 workspace.AclItem(
                     principal="test",

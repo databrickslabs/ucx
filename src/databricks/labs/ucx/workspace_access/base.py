@@ -29,7 +29,7 @@ class StrEnum(str, enum.Enum):  # re-exported for compatability with older pytho
 class Permissions:
     object_id: str
     object_type: str
-    raw_object_permissions: str
+    raw: str
 
 
 Destination = Literal["backup", "account"]

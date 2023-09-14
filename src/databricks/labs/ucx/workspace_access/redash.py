@@ -36,7 +36,7 @@ class SqlPermissionsSupport(Crawler, Applier):
     def is_item_relevant(self, item: Permissions, migration_state: GroupMigrationState) -> bool:
         mentioned_groups = [
             acl.group_name
-            for acl in sql.GetResponse.from_dict(json.loads(item.raw_object_permissions)).access_control_list
+            for acl in sql.GetResponse.from_dict(json.loads(item.raw)).access_control_list
         ]
         return any(g in mentioned_groups for g in [info.workspace.display_name for info in migration_state.groups])
 
@@ -47,7 +47,7 @@ class SqlPermissionsSupport(Crawler, Applier):
 
     def _get_apply_task(self, item: Permissions, migration_state: GroupMigrationState, destination: Destination):
         new_acl = self._prepare_new_acl(
-            sql.GetResponse.from_dict(json.loads(item.raw_object_permissions)).access_control_list,
+            sql.GetResponse.from_dict(json.loads(item.raw)).access_control_list,
             migration_state,
             destination,
         )
@@ -75,7 +75,7 @@ class SqlPermissionsSupport(Crawler, Applier):
             return Permissions(
                 object_id=object_id,
                 object_type=object_type.value,
-                raw_object_permissions=json.dumps(permissions.as_dict()),
+                raw=json.dumps(permissions.as_dict()),
             )
 
     @rate_limited(max_requests=30)

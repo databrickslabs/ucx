@@ -31,7 +31,7 @@ class ScimSupport(Crawler, Applier):
             yield partial(self._crawler_task, g, "entitlements")
 
     def _get_apply_task(self, item: Permissions, migration_state: GroupMigrationState, destination: Destination):
-        value = [iam.ComplexValue.from_dict(e) for e in json.loads(item.raw_object_permissions)]
+        value = [iam.ComplexValue.from_dict(e) for e in json.loads(item.raw)]
         target_info = [g for g in migration_state.groups if g.workspace.id == item.object_id]
         if len(target_info) == 0:
             msg = f"Could not find group with ID {item.object_id}"
@@ -44,7 +44,7 @@ class ScimSupport(Crawler, Applier):
         return Permissions(
             object_id=group.id,
             object_type=property_name,
-            raw_object_permissions=json.dumps([e.as_dict() for e in getattr(group, property_name)]),
+            raw=json.dumps([e.as_dict() for e in getattr(group, property_name)]),
         )
 
     @rate_limited(max_requests=10)

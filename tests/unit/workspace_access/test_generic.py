@@ -52,7 +52,7 @@ def test_crawler():
     ws.permissions.get.assert_called_once()
     assert item.object_id == "test"
     assert item.object_type == "clusters"
-    assert json.loads(item.raw_object_permissions) == sample_permission.as_dict()
+    assert json.loads(item.raw) == sample_permission.as_dict()
 
 
 def test_apply(migration_state):
@@ -62,7 +62,7 @@ def test_apply(migration_state):
     item = Permissions(
         object_id="test",
         object_type="clusters",
-        raw_object_permissions=json.dumps(
+        raw=json.dumps(
             iam.ObjectPermissions(
                 object_id="test",
                 object_type=str(RequestObjectType.CLUSTERS),
@@ -103,7 +103,7 @@ def test_apply(migration_state):
 def test_relevance():
     sup = GenericPermissionsSupport(ws=MagicMock(), listings=[])  # no listings since only apply is tested
     result = sup.is_item_relevant(
-        item=Permissions(object_id="passwords", object_type="passwords", raw_object_permissions="some-stuff"),
+        item=Permissions(object_id="passwords", object_type="passwords", raw="some-stuff"),
         migration_state=MagicMock(),
     )
     assert result is True
@@ -171,7 +171,7 @@ def test_passwords_tokens_crawler(migration_state):
         assert item.object_type in ["tokens", "passwords"]
         applier = sup.get_apply_task(item, migration_state, "backup")
         new_acl = sup._prepare_new_acl(
-            permissions=iam.ObjectPermissions.from_dict(json.loads(item.raw_object_permissions)),
+            permissions=iam.ObjectPermissions.from_dict(json.loads(item.raw)),
             migration_state=migration_state,
             destination="backup",
         )

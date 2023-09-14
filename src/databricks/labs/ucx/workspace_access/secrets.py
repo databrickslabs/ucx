@@ -28,14 +28,14 @@ class SecretScopesSupport(Crawler, Applier):
             return Permissions(
                 object_id=scope.name,
                 object_type="secrets",
-                raw_object_permissions=json.dumps([item.as_dict() for item in acl_items]),
+                raw=json.dumps([item.as_dict() for item in acl_items]),
             )
 
         for scope in scopes:
             yield partial(_crawler_task, scope)
 
     def is_item_relevant(self, item: Permissions, migration_state: GroupMigrationState) -> bool:
-        acls = [workspace.AclItem.from_dict(acl) for acl in json.loads(item.raw_object_permissions)]
+        acls = [workspace.AclItem.from_dict(acl) for acl in json.loads(item.raw)]
         mentioned_groups = [acl.principal for acl in acls]
         return any(g in mentioned_groups for g in [info.workspace.display_name for info in migration_state.groups])
 
@@ -78,7 +78,7 @@ class SecretScopesSupport(Crawler, Applier):
     def _get_apply_task(
         self, item: Permissions, migration_state: GroupMigrationState, destination: Destination
     ) -> partial:
-        acls = [workspace.AclItem.from_dict(acl) for acl in json.loads(item.raw_object_permissions)]
+        acls = [workspace.AclItem.from_dict(acl) for acl in json.loads(item.raw)]
         new_acls = []
 
         for acl in acls:

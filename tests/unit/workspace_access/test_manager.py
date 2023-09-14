@@ -36,13 +36,13 @@ def test_save(b):
 
     assert (
         "INSERT INTO hive_metastore.test_database.permissions (object_id, object_type, "
-        "raw_object_permissions) VALUES ('object1', 'clusters', 'test acl')"
+        "raw) VALUES ('object1', 'clusters', 'test acl')"
     ) == b.queries[0]
 
 
 def permissions_row(*data):
     row = Row(data)
-    row.__columns__ = ["object_id", "object_type", "raw_object_permissions"]
+    row.__columns__ = ["object_id", "object_type", "raw"]
     return row
 
 
@@ -69,7 +69,7 @@ def test_manager_inventorize(b, mocker):
 
     assert (
         "INSERT INTO hive_metastore.test_database.permissions "
-        "(object_id, object_type, raw_object_permissions) VALUES ('a', 'b', 'c')" == b.queries[0]
+        "(object_id, object_type, raw) VALUES ('a', 'b', 'c')" == b.queries[0]
     )
 
 

@@ -74,9 +74,9 @@ class PermissionManager(CrawlerBase):
     def _load_all(self) -> list[Permissions]:
         logger.info(f"Loading inventory table {self._full_name}")
         return [
-            Permissions(object_id, object_type, raw_object_permissions)
-            for object_id, object_type, raw_object_permissions in self._fetch(
-                f"SELECT object_id, object_type, raw_object_permissions FROM {self._full_name}"
+            Permissions(object_id, object_type, raw)
+            for object_id, object_type, raw in self._fetch(
+                f"SELECT object_id, object_type, raw FROM {self._full_name}"
             )
         ]
 

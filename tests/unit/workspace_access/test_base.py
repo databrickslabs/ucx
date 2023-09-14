@@ -22,7 +22,7 @@ def test_applier():
             return partial(test_task)
 
     applier = SampleApplier()
-    positive_item = Permissions(object_id="test", object_type="test", raw_object_permissions="test")
+    positive_item = Permissions(object_id="test", object_type="test", raw="test")
     migration_state = GroupMigrationState()
     migration_state.add(
         group=MigrationGroupInfo(
@@ -35,6 +35,6 @@ def test_applier():
     task = applier.get_apply_task(positive_item, migration_state, "backup")
     assert task.func.__name__ == "test_task"
 
-    negative_item = Permissions(object_id="not-here", object_type="test", raw_object_permissions="test")
+    negative_item = Permissions(object_id="not-here", object_type="test", raw="test")
     new_task = applier.get_apply_task(negative_item, migration_state, "backup")
     new_task.func()

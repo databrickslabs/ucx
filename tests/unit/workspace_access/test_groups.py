@@ -42,7 +42,7 @@ def test_scim_crawler():
         else:
             assert item.object_id in ["2", "3"]
             assert item.object_type in ["roles", "entitlements"]
-            assert item.raw_object_permissions is not None
+            assert item.raw is not None
 
 
 def test_scim_apply(migration_state):
@@ -52,7 +52,7 @@ def test_scim_apply(migration_state):
     item = Permissions(
         object_id="test-ws",
         object_type="roles",
-        raw_object_permissions=json.dumps([p.as_dict() for p in sample_permissions]),
+        raw=json.dumps([p.as_dict() for p in sample_permissions]),
     )
 
     task = sup.get_apply_task(item, migration_state, "backup")
@@ -71,7 +71,7 @@ def test_no_group_in_migration_state(migration_state):
     item = Permissions(
         object_id="test-non-existent",
         object_type="roles",
-        raw_object_permissions=json.dumps([p.as_dict() for p in sample_permissions]),
+        raw=json.dumps([p.as_dict() for p in sample_permissions]),
     )
     with pytest.raises(ValueError):
         sup._get_apply_task(item, migration_state, "backup")
@@ -84,12 +84,12 @@ def test_non_relevant(migration_state):
     relevant_item = Permissions(
         object_id="test-ws",
         object_type="roles",
-        raw_object_permissions=json.dumps([p.as_dict() for p in sample_permissions]),
+        raw=json.dumps([p.as_dict() for p in sample_permissions]),
     )
     irrelevant_item = Permissions(
         object_id="something-non-relevant",
         object_type="roles",
-        raw_object_permissions=json.dumps([p.as_dict() for p in sample_permissions]),
+        raw=json.dumps([p.as_dict() for p in sample_permissions]),
     )
     assert sup.is_item_relevant(relevant_item, migration_state)
     assert not sup.is_item_relevant(irrelevant_item, migration_state)
