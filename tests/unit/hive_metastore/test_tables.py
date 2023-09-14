@@ -1,7 +1,8 @@
 import pytest
 
-from databricks.labs.ucx.data_storage._internal import SqlBackend
-from databricks.labs.ucx.data_storage.tables import Table, TablesCrawler
+from databricks.labs.ucx.framework.crawlers import SqlBackend
+from databricks.labs.ucx.hive_metastore.tables import Table, TablesCrawler
+from unit.framework.mocks import MockBackend
 
 
 def test_is_delta_true():
@@ -84,5 +85,5 @@ def test_uc_sql(table, query):
 
 
 def test_tables_crawler_inventory_table():
-    tc = TablesCrawler(SqlBackend, "main", "default")
+    tc = TablesCrawler(MockBackend(), "main", "default")
     assert tc._table == "tables"

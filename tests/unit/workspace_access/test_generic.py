@@ -3,16 +3,16 @@ from unittest.mock import MagicMock
 
 import pytest
 from databricks.sdk.core import DatabricksError
-from databricks.sdk.service import compute, iam
+from databricks.sdk.service import compute, iam, ml
 
-from databricks.labs.ucx.support.permissions import (
+from databricks.labs.ucx.workspace_access.generic import (
     GenericPermissionsSupport,
-    listing_wrapper,
-)
-from databricks.labs.ucx.workspace_access.listing import authorization_listing
-from databricks.labs.ucx.workspace_access.types import (
-    PermissionsInventoryItem,
+    Permissions,
     RequestObjectType,
+    authorization_listing,
+    experiments_listing,
+    listing_wrapper,
+    models_listing,
 )
 
 
@@ -59,9 +59,9 @@ def test_apply(migration_state):
     ws = MagicMock()
     sup = GenericPermissionsSupport(ws=ws, listings=[])  # no listings since only apply is tested
 
-    item = PermissionsInventoryItem(
+    item = Permissions(
         object_id="test",
-        support="clusters",
+        object_type="clusters",
         raw_object_permissions=json.dumps(
             iam.ObjectPermissions(
                 object_id="test",
@@ -103,7 +103,7 @@ def test_apply(migration_state):
 def test_relevance():
     sup = GenericPermissionsSupport(ws=MagicMock(), listings=[])  # no listings since only apply is tested
     result = sup.is_item_relevant(
-        item=PermissionsInventoryItem(object_id="passwords", support="passwords", raw_object_permissions="some-stuff"),
+        item=Permissions(object_id="passwords", object_type="passwords", raw_object_permissions="some-stuff"),
         migration_state=MagicMock(),
     )
     assert result is True
@@ -182,3 +182,40 @@ def test_passwords_tokens_crawler(migration_state):
             access_control_list=new_acl,
         )
         ws.permissions.update.reset_mock()
+
+
+def test_models_listing():
+    ws = MagicMock()
+    ws.model_registry.list_models.return_value = [ml.Model(name="test")]
+    ws.model_registry.get_model.return_value = ml.GetModelResponse(
+        registered_model_databricks=ml.ModelDatabricks(
+            id="some-id",
+            name="test",
+        )
+    )
+
+    wrapped = listing_wrapper(models_listing(ws), id_attribute="id", object_type=RequestObjectType.REGISTERED_MODELS)
+    result = list(wrapped())
+    assert len(result) == 1
+    assert result[0].object_id == "some-id"
+    assert result[0].request_type == RequestObjectType.REGISTERED_MODELS
+
+
+def test_experiment_listing():
+    ws = MagicMock()
+    ws.experiments.list_experiments.return_value = [
+        ml.Experiment(experiment_id="test"),
+        ml.Experiment(experiment_id="test2", tags=[ml.ExperimentTag(key="whatever", value="SOMETHING")]),
+        ml.Experiment(experiment_id="test3", tags=[ml.ExperimentTag(key="mlflow.experimentType", value="NOTEBOOK")]),
+        ml.Experiment(
+            experiment_id="test4", tags=[ml.ExperimentTag(key="mlflow.experiment.sourceType", value="REPO_NOTEBOOK")]
+        ),
+    ]
+    wrapped = listing_wrapper(
+        experiments_listing(ws), id_attribute="experiment_id", object_type=RequestObjectType.EXPERIMENTS
+    )
+    results = list(wrapped())
+    assert len(results) == 2
+    for res in results:
+        assert res.request_type == RequestObjectType.EXPERIMENTS
+        assert res.object_id in ["test", "test2"]

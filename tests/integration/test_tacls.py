@@ -3,7 +3,7 @@ import os
 
 from databricks.sdk import WorkspaceClient
 
-from databricks.labs.ucx.data_storage.table_acls import TaclToolkit
+from databricks.labs.ucx.hive_metastore.table_acls import TaclToolkit
 
 logger = logging.getLogger(__name__)
 

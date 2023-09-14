@@ -5,11 +5,11 @@ import pytest
 from databricks.sdk.core import DatabricksError
 from databricks.sdk.service import sql
 
-from databricks.labs.ucx.support.sql import (
+from databricks.labs.ucx.workspace_access.redash import (
+    Permissions,
     SqlPermissionsSupport,
     redash_listing_wrapper,
 )
-from databricks.labs.ucx.workspace_access.types import PermissionsInventoryItem
 
 
 def test_crawlers():
@@ -63,9 +63,9 @@ def test_crawlers():
 def test_apply(migration_state):
     ws = MagicMock()
     sup = SqlPermissionsSupport(ws=ws, listings=[])
-    item = PermissionsInventoryItem(
+    item = Permissions(
         object_id="test",
-        support="alerts",
+        object_type="alerts",
         raw_object_permissions=json.dumps(
             sql.GetResponse(
                 object_type=sql.ObjectType.ALERT,

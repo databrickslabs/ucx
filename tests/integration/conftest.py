@@ -8,16 +8,14 @@ import pytest
 from databricks.sdk import AccountClient, WorkspaceClient
 from databricks.sdk.core import Config
 
-from databricks.labs.ucx.providers.mixins.fixtures import *  # noqa: F403
-from databricks.labs.ucx.providers.mixins.sql import StatementExecutionExt
-from databricks.labs.ucx.utils import ThreadedExecution
+from databricks.labs.ucx.mixins.fixtures import *  # noqa: F403
+from databricks.labs.ucx.mixins.sql import StatementExecutionExt
 
 logging.getLogger("tests").setLevel("DEBUG")
 logging.getLogger("databricks.labs.ucx").setLevel("DEBUG")
 
 logger = logging.getLogger(__name__)
 
-Threader = partial(ThreadedExecution, num_threads=20)
 load_debug_env_if_runs_from_ide("ucws")  # noqa: F405
 
 

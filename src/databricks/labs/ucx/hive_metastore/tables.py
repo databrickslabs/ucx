@@ -4,8 +4,8 @@ from dataclasses import dataclass
 from functools import partial
 
 from databricks.labs.ucx.framework.crawlers import CrawlerBase, SqlBackend
+from databricks.labs.ucx.framework.parallel import ThreadedExecution
 from databricks.labs.ucx.mixins.sql import Row
-from databricks.labs.ucx.utils import ThreadedExecution
 
 logger = logging.getLogger(__name__)
 
@@ -75,8 +75,7 @@ class TablesCrawler(CrawlerBase):
         Initializes a TablesCrawler instance.
 
         Args:
-            ws (WorkspaceClient): The WorkspaceClient instance.
-            warehouse_id: The warehouse ID.
+            backend (SqlBackend): The SQL Execution Backend abstraction (either REST API or Spark)
             catalog (str): The catalog name for the inventory persistence.
             schema: The schema name for the inventory persistence.
         """

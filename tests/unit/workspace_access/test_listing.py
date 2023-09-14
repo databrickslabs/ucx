@@ -1,8 +1,47 @@
-from unittest.mock import Mock
+import datetime as dt
+from unittest.mock import MagicMock, Mock, patch
 
+from databricks.sdk.service import workspace
 from databricks.sdk.service.workspace import ObjectInfo, ObjectType
 
+from databricks.labs.ucx.workspace_access.base import RequestObjectType
+from databricks.labs.ucx.workspace_access.generic import workspace_listing
 from databricks.labs.ucx.workspace_access.listing import WorkspaceListing
+
+
+def test_logging_calls():
+    ws = MagicMock()
+    workspace_listing = WorkspaceListing(ws=ws, num_threads=1)
+    workspace_listing.start_time = dt.datetime.now()
+    workspace_listing._counter = 9
+    # with patch.object(logger, "info") as mock_info:
+    #     workspace_listing._progress_report(None)
+    #     mock_info.assert_called_once()
+
+
+def test_workspace_listing():
+    listing = MagicMock(spec=WorkspaceListing)
+    listing.walk.return_value = [
+        workspace.ObjectInfo(object_id=1, object_type=workspace.ObjectType.NOTEBOOK),
+        workspace.ObjectInfo(object_id=2, object_type=workspace.ObjectType.DIRECTORY),
+        workspace.ObjectInfo(object_id=3, object_type=workspace.ObjectType.LIBRARY),
+        workspace.ObjectInfo(object_id=4, object_type=workspace.ObjectType.REPO),
+        workspace.ObjectInfo(object_id=5, object_type=workspace.ObjectType.FILE),
+        workspace.ObjectInfo(object_id=6, object_type=None),  # MLflow Experiment
+    ]
+
+    with patch("databricks.labs.ucx.support.listing.WorkspaceListing", return_value=listing):
+        results = workspace_listing(ws=MagicMock())()
+        assert len(list(results)) == 4
+        listing.walk.assert_called_once()
+        for res in results:
+            assert res.request_type in [
+                RequestObjectType.NOTEBOOKS,
+                RequestObjectType.DIRECTORIES,
+                RequestObjectType.REPOS,
+                RequestObjectType.FILES,
+            ]
+            assert res.object_id in [1, 2, 4, 5]
 
 
 # Helper to compare an unordered list of objects

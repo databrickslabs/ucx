@@ -10,14 +10,23 @@ from databricks.labs.ucx.framework.crawlers import (
     StatementExecutionBackend,
 )
 from databricks.labs.ucx.workspace_access.base import RequestObjectType
+from databricks.labs.ucx.workspace_access.generic import (
+    GenericPermissionsSupport,
+    authorization_listing,
+    experiments_listing,
+    listing_wrapper,
+    models_listing,
+    workspace_listing,
+)
 from databricks.labs.ucx.workspace_access.groups import GroupManager
 from databricks.labs.ucx.workspace_access.manager import PermissionManager
+from databricks.labs.ucx.workspace_access.redash import (
+    SqlPermissionsSupport,
+    redash_listing_wrapper,
+)
+from databricks.labs.ucx.workspace_access.scim import ScimSupport
 from databricks.labs.ucx.workspace_access.secrets import SecretScopesSupport
 from databricks.labs.ucx.workspace_access.verification import VerificationManager
-
-from databricks.labs.ucx.workspace_access.generic import GenericPermissionsSupport, authorization_listing, experiments_listing, listing_wrapper, models_listing, workspace_listing
-from databricks.labs.ucx.workspace_access.redash import SqlPermissionsSupport, redash_listing_wrapper
-from databricks.labs.ucx.workspace_access.scim import ScimSupport
 
 
 class GroupMigrationToolkit:

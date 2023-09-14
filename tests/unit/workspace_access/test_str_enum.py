@@ -1,6 +1,6 @@
 import pytest
 
-from databricks.labs.ucx.generic import StrEnum
+from databricks.labs.ucx.workspace_access.base import StrEnum
 
 
 def test_error():

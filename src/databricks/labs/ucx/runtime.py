@@ -5,8 +5,8 @@ import sys
 from databricks.sdk import WorkspaceClient
 
 from databricks.labs.ucx.config import MigrationConfig
-from databricks.labs.ucx.data_storage import TaclToolkit
 from databricks.labs.ucx.framework.tasks import task, trigger
+from databricks.labs.ucx.hive_metastore import TaclToolkit
 from databricks.labs.ucx.workspace_access import GroupMigrationToolkit
 
 logger = logging.getLogger(__name__)

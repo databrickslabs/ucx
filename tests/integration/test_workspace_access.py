@@ -12,13 +12,13 @@ from databricks.labs.ucx.config import (
     MigrationConfig,
     TaclConfig,
 )
-from databricks.labs.ucx.workspace_access.group_migration import GroupMigrationToolkit
-from databricks.labs.ucx.workspace_access.types import RequestObjectType
+from databricks.labs.ucx.workspace_access import GroupMigrationToolkit
+from databricks.labs.ucx.workspace_access.base import RequestObjectType
 
 logger = logging.getLogger(__name__)
 
 
-def test_e2e(
+def test_workspace_access_e2e(
     ws: WorkspaceClient,
     make_schema,
     make_ucx_group,

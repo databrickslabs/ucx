@@ -2,13 +2,13 @@ import logging
 
 from databricks.sdk import WorkspaceClient
 
-from databricks.labs.ucx.data_storage.grants import GrantsCrawler
-from databricks.labs.ucx.data_storage.tables import TablesCrawler
 from databricks.labs.ucx.framework.crawlers import (
     RuntimeBackend,
     SqlBackend,
     StatementExecutionBackend,
 )
+from databricks.labs.ucx.hive_metastore.grants import GrantsCrawler
+from databricks.labs.ucx.hive_metastore.tables import TablesCrawler
 
 logger = logging.getLogger(__name__)
 

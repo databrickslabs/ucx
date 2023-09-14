@@ -17,8 +17,8 @@ from databricks.labs.ucx.config import (
     MigrationConfig,
     TaclConfig,
 )
-from databricks.labs.ucx.workspace_access.group_migration import GroupMigrationToolkit
-from databricks.labs.ucx.data_storage.table_acls import TaclToolkit
+from databricks.labs.ucx.workspace_access import GroupMigrationToolkit
+from databricks.labs.ucx.hive_metastore import TaclToolkit
 
 # COMMAND ----------
 

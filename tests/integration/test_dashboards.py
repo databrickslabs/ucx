@@ -4,7 +4,7 @@ import pytest
 from databricks.sdk import WorkspaceClient
 from databricks.sdk.service.sql import AccessControl, ObjectTypePlural, PermissionLevel
 
-from databricks.labs.ucx.providers.mixins.redash import (
+from databricks.labs.ucx.mixins.redash import (
     DashboardWidgetsAPI,
     QueryVisualizationsExt,
     VizColumn,

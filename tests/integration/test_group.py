@@ -1,7 +1,7 @@
 from databricks.sdk import WorkspaceClient
 
 from databricks.labs.ucx.config import GroupsConfig
-from databricks.labs.ucx.group import GroupLevel, GroupManager
+from databricks.labs.ucx.workspace_access.groups import GroupLevel, GroupManager
 
 
 def test_group_listing(ws: WorkspaceClient, make_ucx_group):

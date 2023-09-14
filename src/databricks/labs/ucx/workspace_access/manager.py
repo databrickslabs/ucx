@@ -5,11 +5,7 @@ from typing import Literal
 
 from databricks.labs.ucx.framework.crawlers import CrawlerBase, SqlBackend
 from databricks.labs.ucx.framework.parallel import ThreadedExecution
-from databricks.labs.ucx.workspace_access.base import (
-    Applier,
-    Crawler,
-    Permissions,
-)
+from databricks.labs.ucx.workspace_access.base import Applier, Crawler, Permissions
 from databricks.labs.ucx.workspace_access.groups import GroupMigrationState
 
 logger = logging.getLogger(__name__)

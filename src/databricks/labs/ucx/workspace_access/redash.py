@@ -45,16 +45,17 @@ class SqlPermissionsSupport(Crawler, Applier):
             for item in listing():
                 yield partial(self._crawler_task, item.object_id, item.request_type)
 
-    def _get_apply_task(
-        self, item: Permissions, migration_state: GroupMigrationState, destination: Destination
-    ):
+    def _get_apply_task(self, item: Permissions, migration_state: GroupMigrationState, destination: Destination):
         new_acl = self._prepare_new_acl(
             sql.GetResponse.from_dict(json.loads(item.raw_object_permissions)).access_control_list,
             migration_state,
             destination,
         )
         return partial(
-            self._applier_task, object_type=sql.ObjectTypePlural(item.object_type), object_id=item.object_id, acl=new_acl
+            self._applier_task,
+            object_type=sql.ObjectTypePlural(item.object_type),
+            object_id=item.object_id,
+            acl=new_acl,
         )
 
     def _safe_get_dbsql_permissions(self, object_type: sql.ObjectTypePlural, object_id: str) -> sql.GetResponse | None:
@@ -73,7 +74,7 @@ class SqlPermissionsSupport(Crawler, Applier):
         if permissions:
             return Permissions(
                 object_id=object_id,
-                support=object_type.value,
+                object_type=object_type.value,
                 raw_object_permissions=json.dumps(permissions.as_dict()),
             )
 

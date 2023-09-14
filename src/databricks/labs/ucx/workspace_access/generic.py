@@ -9,8 +9,13 @@ from databricks.sdk.core import DatabricksError
 from databricks.sdk.service import iam, ml, workspace
 
 from databricks.labs.ucx.mixins.hardening import rate_limited
-
-from databricks.labs.ucx.workspace_access.base import Applier, Crawler, Destination, Permissions, RequestObjectType
+from databricks.labs.ucx.workspace_access.base import (
+    Applier,
+    Crawler,
+    Destination,
+    Permissions,
+    RequestObjectType,
+)
 from databricks.labs.ucx.workspace_access.groups import GroupMigrationState
 
 logger = logging.getLogger(__name__)

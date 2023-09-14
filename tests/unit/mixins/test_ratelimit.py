@@ -1,6 +1,6 @@
 import pytest
 
-from databricks.labs.ucx.providers.mixins.hardening import rate_limited
+from databricks.labs.ucx.mixins.hardening import rate_limited
 
 
 def test_ratelimiting(mocker):

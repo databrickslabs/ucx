@@ -30,9 +30,7 @@ class ScimSupport(Crawler, Applier):
         for g in with_entitlements:
             yield partial(self._crawler_task, g, "entitlements")
 
-    def _get_apply_task(
-        self, item: Permissions, migration_state: GroupMigrationState, destination: Destination
-    ):
+    def _get_apply_task(self, item: Permissions, migration_state: GroupMigrationState, destination: Destination):
         value = [iam.ComplexValue.from_dict(e) for e in json.loads(item.raw_object_permissions)]
         target_info = [g for g in migration_state.groups if g.workspace.id == item.object_id]
         if len(target_info) == 0:
@@ -45,7 +43,7 @@ class ScimSupport(Crawler, Applier):
     def _crawler_task(self, group: iam.Group, property_name: str):
         return Permissions(
             object_id=group.id,
-            support=property_name,
+            object_type=property_name,
             raw_object_permissions=json.dumps([e.as_dict() for e in getattr(group, property_name)]),
         )
 

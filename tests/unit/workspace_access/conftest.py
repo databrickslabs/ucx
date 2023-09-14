@@ -1,7 +1,7 @@
 import pytest
 from databricks.sdk.service import iam
 
-from databricks.labs.ucx.providers.groups_info import (
+from databricks.labs.ucx.workspace_access.groups import (
     GroupMigrationState,
     MigrationGroupInfo,
 )

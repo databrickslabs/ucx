@@ -2,9 +2,9 @@ from collections.abc import Iterator
 from dataclasses import dataclass
 from functools import partial
 
-from databricks.labs.ucx.data_storage.tables import TablesCrawler
 from databricks.labs.ucx.framework.crawlers import CrawlerBase
-from databricks.labs.ucx.utils import ThreadedExecution
+from databricks.labs.ucx.framework.parallel import ThreadedExecution
+from databricks.labs.ucx.hive_metastore.tables import TablesCrawler
 
 
 @dataclass(frozen=True)

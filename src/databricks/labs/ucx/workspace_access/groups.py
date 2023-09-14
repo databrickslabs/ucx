@@ -1,10 +1,12 @@
 import json
 import logging
 import typing
+from dataclasses import dataclass
 from functools import partial
 
 from databricks.sdk import WorkspaceClient
 from databricks.sdk.service import iam
+from databricks.sdk.service.iam import Group
 
 from databricks.labs.ucx.config import GroupsConfig
 from databricks.labs.ucx.framework.parallel import ThreadedExecution
@@ -13,10 +15,6 @@ from databricks.labs.ucx.mixins.hardening import rate_limited
 logger = logging.getLogger(__name__)
 
 GroupLevel = typing.Literal["workspace", "account"]
-
-from dataclasses import dataclass
-
-from databricks.sdk.service.iam import Group
 
 
 @dataclass
@@ -88,14 +86,14 @@ class GroupManager:
         return account_groups
 
     def _get_group(self, group_name, level: GroupLevel) -> iam.Group | None:
-        relevant_level_groups = self._workspace_groups if level == GroupLevel.WORKSPACE else self._account_groups
+        relevant_level_groups = self._workspace_groups if level == "workspace" else self._account_groups
         for group in relevant_level_groups:
             if group.display_name == group_name:
                 return group
 
     def _get_or_create_backup_group(self, source_group_name: str, source_group: iam.Group) -> iam.Group:
         backup_group_name = f"{self.config.backup_group_prefix}{source_group_name}"
-        backup_group = self._get_group(backup_group_name, GroupLevel.WORKSPACE)
+        backup_group = self._get_group(backup_group_name, "workspace")
 
         if backup_group:
             logger.info(f"Backup group {backup_group_name} already exists, no action required")
@@ -115,16 +113,16 @@ class GroupManager:
 
     def _set_migration_groups(self, groups_names: list[str]):
         def get_group_info(name: str):
-            ws_group = self._get_group(name, GroupLevel.WORKSPACE)
+            ws_group = self._get_group(name, "workspace")
             assert ws_group, f"Group {name} not found on the workspace level"
-            acc_group = self._get_group(name, GroupLevel.ACCOUNT)
+            acc_group = self._get_group(name, "account")
             assert acc_group, f"Group {name} not found on the account level"
             backup_group = self._get_or_create_backup_group(source_group_name=name, source_group=ws_group)
             return MigrationGroupInfo(workspace=ws_group, backup=backup_group, account=acc_group)
 
-        executables = [partial(get_group_info, group_name) for group_name in groups_names]
-
-        collected_groups = ThreadedExecution[MigrationGroupInfo](executables).run()
+        collected_groups = ThreadedExecution.gather(
+            "get group info", [partial(get_group_info, group_name) for group_name in groups_names]
+        )
         for g in collected_groups:
             self._migration_state.add(g)
 
@@ -166,8 +164,8 @@ class GroupManager:
 
             for g in self.config.selected:
                 assert g not in self.SYSTEM_GROUPS, f"Cannot migrate system group {g}"
-                assert self._get_group(g, GroupLevel.WORKSPACE), f"Group {g} not found on the workspace level"
-                assert self._get_group(g, GroupLevel.ACCOUNT), f"Group {g} not found on the account level"
+                assert self._get_group(g, "workspace"), f"Group {g} not found on the workspace level"
+                assert self._get_group(g, "account"), f"Group {g} not found on the account level"
 
             self._set_migration_groups(self.config.selected)
         else:
@@ -183,12 +181,10 @@ class GroupManager:
 
     def replace_workspace_groups_with_account_groups(self):
         logger.info("Replacing the workspace groups with account-level groups")
-        logger.info(f"In total, {len(self.migration_groups_provider.groups)} group(s) to be replaced")
-
-        executables = [
-            partial(self._replace_group, migration_info) for migration_info in self.migration_groups_provider.groups
-        ]
-        ThreadedExecution(executables).run()
+        ThreadedExecution.gather(
+            "groups: workspace -> account",
+            [partial(self._replace_group, migration_info) for migration_info in self.migration_groups_provider.groups],
+        )
         logger.info("Workspace groups were successfully replaced with account-level groups")
 
     def delete_backup_groups(self):
