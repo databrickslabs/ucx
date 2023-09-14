@@ -39,9 +39,11 @@ class PermissionManager(CrawlerBase):
     def apply_group_permissions(self, migration_state: GroupMigrationState, destination: Literal["backup", "account"]):
         # list shall be sorted prior to using group by
         items = sorted(self._load_all(), key=lambda i: i.object_type)
-        logger.info(f"Applying the permissions to {destination} groups. "
-                    f"Total groups to apply permissions: {len(migration_state.groups)}. "
-                    f"Total permissions found: {len(items)}")
+        logger.info(
+            f"Applying the permissions to {destination} groups. "
+            f"Total groups to apply permissions: {len(migration_state.groups)}. "
+            f"Total permissions found: {len(items)}"
+        )
         applier_tasks = []
         supports_to_items = {
             support: list(items_subset) for support, items_subset in groupby(items, key=lambda i: i.object_type)

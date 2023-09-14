@@ -157,8 +157,10 @@ class GroupManager:
     # please keep the public methods below this line
 
     def prepare_groups_in_environment(self):
-        logger.info("Preparing groups in the current environment. At this step we'll verify that all groups "
-                    "exist and are of the correct type. If some temporary groups are missing, they'll be created")
+        logger.info(
+            "Preparing groups in the current environment. At this step we'll verify that all groups "
+            "exist and are of the correct type. If some temporary groups are missing, they'll be created"
+        )
         if self.config.selected:
             logger.info("Using the provided group listing")
 
@@ -188,8 +190,10 @@ class GroupManager:
         logger.info("Workspace groups were successfully replaced with account-level groups")
 
     def delete_backup_groups(self):
-        logger.info(f"Deleting the workspace-level backup groups. "
-                    f"In total, {len(self.migration_groups_provider.groups)} group(s) to be deleted")
+        logger.info(
+            f"Deleting the workspace-level backup groups. "
+            f"In total, {len(self.migration_groups_provider.groups)} group(s) to be deleted"
+        )
 
         for migration_info in self.migration_groups_provider.groups:
             try:
