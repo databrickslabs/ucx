@@ -17,7 +17,6 @@ from databricks.labs.ucx.hive_metastore.grants import Grant
 from databricks.labs.ucx.hive_metastore.tables import Table
 from databricks.labs.ucx.install import Installer
 from databricks.labs.ucx.mixins.compute import CommandExecutor
-from databricks.labs.ucx.workspace_access.base import RequestObjectType
 
 logger = logging.getLogger(__name__)
 
@@ -215,7 +214,7 @@ def test_toolkit_notebook(
         permission_level=random.choice([PermissionLevel.CAN_USE]),
         group_name=ws_group_a.display_name,
     )
-    cpp_src = ws.permissions.get(RequestObjectType.CLUSTER_POLICIES, cluster_policy.policy_id)
+    cpp_src = ws.permissions.get("cluster-policies", cluster_policy.policy_id)
     cluster_policy_src_permissions = sorted(
         [_ for _ in cpp_src.access_control_list if _.group_name == ws_group_a.display_name],
         key=lambda p: p.group_name,
@@ -228,7 +227,7 @@ def test_toolkit_notebook(
         ),
         group_name=ws_group_b.display_name,
     )
-    jp_src = ws.permissions.get(RequestObjectType.JOBS, job.job_id)
+    jp_src = ws.permissions.get("jobs", job.job_id)
     job_src_permissions = sorted(
         [_ for _ in jp_src.access_control_list if _.group_name == ws_group_b.display_name],
         key=lambda p: p.group_name,
@@ -334,7 +333,7 @@ def test_toolkit_notebook(
 
         logger.info("validating permissions")
 
-        cp_dst = ws.permissions.get(RequestObjectType.CLUSTER_POLICIES, cluster_policy.policy_id)
+        cp_dst = ws.permissions.get("cluster-policies", cluster_policy.policy_id)
         cluster_policy_dst_permissions = sorted(
             [_ for _ in cp_dst.access_control_list if _.group_name == ws_group_a.display_name],
             key=lambda p: p.group_name,
@@ -346,17 +345,17 @@ def test_toolkit_notebook(
             s.all_permissions for s in cluster_policy_src_permissions
         ], "Target permissions were not applied correctly for cluster policies"
 
-        jp_dst = ws.permissions.get(RequestObjectType.JOBS, job.job_id)
+        jp_dst = ws.permissions.get("jobs", job.job_id)
         job_dst_permissions = sorted(
             [_ for _ in jp_dst.access_control_list if _.group_name == ws_group_b.display_name],
             key=lambda p: p.group_name,
         )
         assert len(job_dst_permissions) == len(
             job_src_permissions
-        ), f"Target permissions were not applied correctly for {RequestObjectType.JOBS}/{job.job_id}"
+        ), f"Target permissions were not applied correctly for jobs/{job.job_id}"
         assert [t.all_permissions for t in job_dst_permissions] == [
             s.all_permissions for s in job_src_permissions
-        ], f"Target permissions were not applied correctly for {RequestObjectType.JOBS}/{job.job_id}"
+        ], f"Target permissions were not applied correctly for jobs/{job.job_id}"
 
         logger.info("validating tacl")
 

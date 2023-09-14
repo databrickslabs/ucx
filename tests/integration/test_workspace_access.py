@@ -13,7 +13,6 @@ from databricks.labs.ucx.config import (
     TaclConfig,
 )
 from databricks.labs.ucx.workspace_access import GroupMigrationToolkit
-from databricks.labs.ucx.workspace_access.base import RequestObjectType
 
 logger = logging.getLogger(__name__)
 
@@ -56,7 +55,7 @@ def test_workspace_access_e2e(
         permission_level=random.choice([PermissionLevel.CAN_ATTACH_TO, PermissionLevel.CAN_MANAGE]),
         group_name=ws_group.display_name,
     )
-    to_verify.add((RequestObjectType.INSTANCE_POOLS, pool.instance_pool_id))
+    to_verify.add(("instance-pools", pool.instance_pool_id))
 
     cluster = make_cluster(instance_pool_id=os.environ["TEST_INSTANCE_POOL_ID"], single_node=True)
     make_cluster_permissions(
@@ -66,7 +65,7 @@ def test_workspace_access_e2e(
         ),
         group_name=ws_group.display_name,
     )
-    to_verify.add((RequestObjectType.CLUSTERS, cluster.cluster_id))
+    to_verify.add(("clusters", cluster.cluster_id))
 
     cluster_policy = make_cluster_policy()
     make_cluster_policy_permissions(
@@ -74,7 +73,7 @@ def test_workspace_access_e2e(
         permission_level=random.choice([PermissionLevel.CAN_USE]),
         group_name=ws_group.display_name,
     )
-    to_verify.add((RequestObjectType.CLUSTER_POLICIES, cluster_policy.policy_id))
+    to_verify.add(("cluster-policies", cluster_policy.policy_id))
 
     model = make_model()
     make_registered_model_permissions(
@@ -89,7 +88,7 @@ def test_workspace_access_e2e(
         ),
         group_name=ws_group.display_name,
     )
-    to_verify.add((RequestObjectType.REGISTERED_MODELS, model.id))
+    to_verify.add(("registered-models", model.id))
 
     experiment = make_experiment()
     make_experiment_permissions(
@@ -99,7 +98,7 @@ def test_workspace_access_e2e(
         ),
         group_name=ws_group.display_name,
     )
-    to_verify.add((RequestObjectType.EXPERIMENTS, experiment.experiment_id))
+    to_verify.add(("experiments", experiment.experiment_id))
 
     directory = make_directory()
     make_directory_permissions(
@@ -109,7 +108,7 @@ def test_workspace_access_e2e(
         ),
         group_name=ws_group.display_name,
     )
-    to_verify.add((RequestObjectType.DIRECTORIES, ws.workspace.get_status(directory).object_id))
+    to_verify.add(("directories", ws.workspace.get_status(directory).object_id))
 
     notebook = make_notebook(path=f"{directory}/sample.py")
     make_notebook_permissions(
@@ -119,7 +118,7 @@ def test_workspace_access_e2e(
         ),
         group_name=ws_group.display_name,
     )
-    to_verify.add((RequestObjectType.NOTEBOOKS, ws.workspace.get_status(notebook).object_id))
+    to_verify.add(("notebooks", ws.workspace.get_status(notebook).object_id))
 
     job = make_job()
     make_job_permissions(
@@ -129,7 +128,7 @@ def test_workspace_access_e2e(
         ),
         group_name=ws_group.display_name,
     )
-    to_verify.add((RequestObjectType.JOBS, job.job_id))
+    to_verify.add(("jobs", job.job_id))
 
     pipeline = make_pipeline()
     make_pipeline_permissions(
@@ -137,7 +136,7 @@ def test_workspace_access_e2e(
         permission_level=random.choice([PermissionLevel.CAN_VIEW, PermissionLevel.CAN_RUN, PermissionLevel.CAN_MANAGE]),
         group_name=ws_group.display_name,
     )
-    to_verify.add((RequestObjectType.PIPELINES, pipeline.pipeline_id))
+    to_verify.add(("pipelines", pipeline.pipeline_id))
 
     scope = make_secret_scope()
     make_secret_scope_acl(scope=scope, principal=ws_group.display_name, permission=workspace.AclPermission.WRITE)
@@ -148,7 +147,7 @@ def test_workspace_access_e2e(
         permission_level=PermissionLevel.CAN_USE,
         group_name=ws_group.display_name,
     )
-    to_verify.add((RequestObjectType.AUTHORIZATION, "tokens"))
+    to_verify.add(("authorization", "tokens"))
 
     warehouse = make_warehouse()
     make_warehouse_permissions(
@@ -156,7 +155,7 @@ def test_workspace_access_e2e(
         permission_level=random.choice([PermissionLevel.CAN_USE, PermissionLevel.CAN_MANAGE]),
         group_name=ws_group.display_name,
     )
-    to_verify.add((RequestObjectType.SQL_WAREHOUSES, warehouse.id))
+    to_verify.add(("sql/warehouses", warehouse.id))
 
     config = MigrationConfig(
         connect=ConnectConfig.from_databricks_config(ws.config),

@@ -4,7 +4,6 @@ from unittest.mock import MagicMock, Mock, patch
 from databricks.sdk.service import workspace
 from databricks.sdk.service.workspace import ObjectInfo, ObjectType
 
-from databricks.labs.ucx.workspace_access.base import RequestObjectType
 from databricks.labs.ucx.workspace_access.generic import workspace_listing
 from databricks.labs.ucx.workspace_access.listing import WorkspaceListing
 
@@ -36,10 +35,10 @@ def test_workspace_listing():
         listing.walk.assert_called_once()
         for res in results:
             assert res.request_type in [
-                RequestObjectType.NOTEBOOKS,
-                RequestObjectType.DIRECTORIES,
-                RequestObjectType.REPOS,
-                RequestObjectType.FILES,
+                "notebooks",
+                "directories",
+                "repos",
+                "files",
             ]
             assert res.object_id in [1, 2, 4, 5]
 

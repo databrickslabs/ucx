@@ -9,7 +9,6 @@ from databricks.labs.ucx.framework.crawlers import (
     SqlBackend,
     StatementExecutionBackend,
 )
-from databricks.labs.ucx.workspace_access.base import RequestObjectType
 from databricks.labs.ucx.workspace_access.generic import (
     GenericPermissionsSupport,
     authorization_listing,
@@ -38,14 +37,14 @@ class GroupMigrationToolkit:
         self._verify_ws_client(ws)
 
         generic_acl_listing = [
-            listing_wrapper(ws.clusters.list, "cluster_id", RequestObjectType.CLUSTERS),
-            listing_wrapper(ws.cluster_policies.list, "policy_id", RequestObjectType.CLUSTER_POLICIES),
-            listing_wrapper(ws.instance_pools.list, "instance_pool_id", RequestObjectType.INSTANCE_POOLS),
-            listing_wrapper(ws.warehouses.list, "id", RequestObjectType.SQL_WAREHOUSES),
-            listing_wrapper(ws.jobs.list, "job_id", RequestObjectType.JOBS),
-            listing_wrapper(ws.pipelines.list_pipelines, "pipeline_id", RequestObjectType.PIPELINES),
-            listing_wrapper(experiments_listing(ws), "experiment_id", RequestObjectType.EXPERIMENTS),
-            listing_wrapper(models_listing(ws), "id", RequestObjectType.REGISTERED_MODELS),
+            listing_wrapper(ws.clusters.list, "cluster_id", "clusters"),
+            listing_wrapper(ws.cluster_policies.list, "policy_id", "cluster-policies"),
+            listing_wrapper(ws.instance_pools.list, "instance_pool_id", "instance-pools"),
+            listing_wrapper(ws.warehouses.list, "id", "sql/warehouses"),
+            listing_wrapper(ws.jobs.list, "job_id", "jobs"),
+            listing_wrapper(ws.pipelines.list_pipelines, "pipeline_id", "pipelines"),
+            listing_wrapper(experiments_listing(ws), "experiment_id", "experiments"),
+            listing_wrapper(models_listing(ws), "id", "registered-models"),
             workspace_listing(ws, num_threads=config.num_threads, start_path=config.workspace_start_path),
             authorization_listing(),
         ]

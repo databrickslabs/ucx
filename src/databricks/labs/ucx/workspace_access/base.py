@@ -1,4 +1,3 @@
-import enum
 from abc import abstractmethod
 from collections.abc import Callable, Iterator
 from dataclasses import dataclass
@@ -11,20 +10,6 @@ from databricks.labs.ucx.workspace_access.groups import GroupMigrationState
 logger = Logger(__name__)
 
 
-class StrEnum(str, enum.Enum):  # re-exported for compatability with older python versions
-    def __new__(cls, value, *args, **kwargs):
-        if not isinstance(value, str | enum.auto):
-            msg = f"Values of StrEnums must be strings: {value!r} is a {type(value)}"
-            raise TypeError(msg)
-        return super().__new__(cls, value, *args, **kwargs)
-
-    def __str__(self):
-        return str(self.value)
-
-    def _generate_next_value_(name, *_):  # noqa: N805
-        return name
-
-
 @dataclass
 class Permissions:
     object_id: str
@@ -33,25 +18,6 @@ class Permissions:
 
 
 Destination = Literal["backup", "account"]
-
-
-class RequestObjectType(StrEnum):
-    AUTHORIZATION = "authorization"  # tokens and passwords are here too!
-    CLUSTERS = "clusters"
-    CLUSTER_POLICIES = "cluster-policies"
-    DIRECTORIES = "directories"
-    EXPERIMENTS = "experiments"
-    FILES = "files"
-    INSTANCE_POOLS = "instance-pools"
-    JOBS = "jobs"
-    NOTEBOOKS = "notebooks"
-    PIPELINES = "pipelines"
-    REGISTERED_MODELS = "registered-models"
-    REPOS = "repos"
-    SQL_WAREHOUSES = "sql/warehouses"  # / is not a typo, it's the real object type
-
-    def __repr__(self):
-        return self.value
 
 
 class Crawler:

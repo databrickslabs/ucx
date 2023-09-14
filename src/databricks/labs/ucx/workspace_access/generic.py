@@ -14,7 +14,6 @@ from databricks.labs.ucx.workspace_access.base import (
     Crawler,
     Destination,
     Permissions,
-    RequestObjectType,
 )
 from databricks.labs.ucx.workspace_access.groups import GroupMigrationState
 
@@ -24,34 +23,27 @@ logger = logging.getLogger(__name__)
 @dataclass
 class GenericPermissionsInfo:
     object_id: str
-    request_type: RequestObjectType
+    request_type: str
 
 
 class GenericPermissionsSupport(Crawler, Applier):
     def __init__(self, ws: WorkspaceClient, listings: list[Callable[..., Iterator[GenericPermissionsInfo]]]):
-        self._listings = listings
         self._ws = ws
+        self._listings = listings
+
+    def get_crawler_tasks(self):
+        for listing in self._listings:
+            for info in listing():
+                yield partial(self._crawler_task, info.request_type, info.object_id)
 
     def is_item_relevant(self, item: Permissions, migration_state: GroupMigrationState) -> bool:
         # passwords and tokens are represented on the workspace-level
         if item.object_id in ("tokens", "passwords"):
             return True
-        else:
-            mentioned_groups = [
-                acl.group_name
-                for acl in iam.ObjectPermissions.from_dict(json.loads(item.raw)).access_control_list
-            ]
-            return any(g in mentioned_groups for g in [info.workspace.display_name for info in migration_state.groups])
-
-    def get_crawler_tasks(self):
-        for listing in self._listings:
-            for info in listing():
-                yield partial(
-                    self._crawler_task,
-                    ws=self._ws,
-                    object_id=info.object_id,
-                    request_type=info.request_type,
-                )
+        mentioned_groups = [
+            acl.group_name for acl in iam.ObjectPermissions.from_dict(json.loads(item.raw)).access_control_list
+        ]
+        return any(g in mentioned_groups for g in [info.workspace.display_name for info in migration_state.groups])
 
     def _get_apply_task(
         self, item: Permissions, migration_state: GroupMigrationState, destination: Destination
@@ -59,27 +51,26 @@ class GenericPermissionsSupport(Crawler, Applier):
         new_acl = self._prepare_new_acl(
             iam.ObjectPermissions.from_dict(json.loads(item.raw)), migration_state, destination
         )
+        return partial(self._applier_task, item.object_type, item.object_id, new_acl)
 
-        request_type = (
-            RequestObjectType.AUTHORIZATION
-            if item.object_type in ("passwords", "tokens")
-            else RequestObjectType(item.object_type)
+    @rate_limited(max_requests=30)
+    def _applier_task(self, object_type: str, object_id: str, acl: list[iam.AccessControlRequest]):
+        self._ws.permissions.update(object_type, object_id, access_control_list=acl)
+
+    @rate_limited(max_requests=100)
+    def _crawler_task(self, object_type: str, object_id: str) -> Permissions | None:
+        permissions = self._safe_get_permissions(object_type, object_id)
+        if not permissions:
+            return None
+        return Permissions(
+            object_id=object_id,
+            object_type=object_type,
+            raw=json.dumps(permissions.as_dict()),
         )
 
-        return partial(
-            self._applier_task,
-            ws=self._ws,
-            request_type=request_type,
-            acl=new_acl,
-            object_id=item.object_id,
-        )
-
-    def _safe_get_permissions(
-        self, ws: WorkspaceClient, request_object_type: RequestObjectType, object_id: str
-    ) -> iam.ObjectPermissions | None:
+    def _safe_get_permissions(self, object_type: str, object_id: str) -> iam.ObjectPermissions | None:
         try:
-            permissions = ws.permissions.get(request_object_type, object_id)
-            return permissions
+            return self._ws.permissions.get(object_type, object_id)
         except DatabricksError as e:
             if e.error_code in [
                 "RESOURCE_DOES_NOT_EXIST",
@@ -87,7 +78,7 @@ class GenericPermissionsSupport(Crawler, Applier):
                 "PERMISSION_DENIED",
                 "FEATURE_DISABLED",
             ]:
-                logger.warning(f"Could not get permissions for {request_object_type} {object_id} due to {e.error_code}")
+                logger.warning(f"Could not get permissions for {object_type} {object_id} due to {e.error_code}")
                 return None
             else:
                 raise e
@@ -121,33 +112,9 @@ class GenericPermissionsSupport(Crawler, Applier):
 
         return acl_requests
 
-    @rate_limited(max_requests=30)
-    def _applier_task(
-        self, ws: WorkspaceClient, object_id: str, acl: list[iam.AccessControlRequest], request_type: RequestObjectType
-    ):
-        ws.permissions.update(request_object_type=request_type, request_object_id=object_id, access_control_list=acl)
-
-    @rate_limited(max_requests=100)
-    def _crawler_task(
-        self,
-        ws: WorkspaceClient,
-        object_id: str,
-        request_type: RequestObjectType,
-    ) -> Permissions | None:
-        permissions = self._safe_get_permissions(ws, request_type, object_id)
-
-        support = object_id if request_type == RequestObjectType.AUTHORIZATION else request_type.value
-
-        if permissions:
-            return Permissions(
-                object_id=object_id,
-                object_type=support,
-                raw=json.dumps(permissions.as_dict()),
-            )
-
 
 def listing_wrapper(
-    func: Callable[..., list], id_attribute: str, object_type: RequestObjectType
+    func: Callable[..., list], id_attribute: str, object_type: str
 ) -> Callable[..., Iterator[GenericPermissionsInfo]]:
     def wrapper() -> Iterator[GenericPermissionsInfo]:
         for item in func():
@@ -160,18 +127,18 @@ def listing_wrapper(
 
 
 def workspace_listing(ws: WorkspaceClient, num_threads=20, start_path: str | None = "/"):
-    def _convert_object_type_to_request_type(_object: workspace.ObjectInfo) -> RequestObjectType | None:
+    def _convert_object_type_to_request_type(_object: workspace.ObjectInfo) -> str | None:
         match _object.object_type:
             case workspace.ObjectType.NOTEBOOK:
-                return RequestObjectType.NOTEBOOKS
+                return "notebooks"
             case workspace.ObjectType.DIRECTORY:
-                return RequestObjectType.DIRECTORIES
+                return "directories"
             case workspace.ObjectType.LIBRARY:
                 return None
             case workspace.ObjectType.REPO:
-                return RequestObjectType.REPOS
+                return "repos"
             case workspace.ObjectType.FILE:
-                return RequestObjectType.FILES
+                return "files"
             # silent handler for experiments - they'll be inventorized by the experiments manager
             case None:
                 return None
@@ -179,11 +146,7 @@ def workspace_listing(ws: WorkspaceClient, num_threads=20, start_path: str | Non
     def inner():
         from databricks.labs.ucx.workspace_access.listing import WorkspaceListing
 
-        ws_listing = WorkspaceListing(
-            ws,
-            num_threads=num_threads,
-            with_directories=False,
-        )
+        ws_listing = WorkspaceListing(ws, num_threads=num_threads, with_directories=False)
         for _object in ws_listing.walk(start_path):
             request_type = _convert_object_type_to_request_type(_object)
             if request_type:
@@ -227,7 +190,7 @@ def authorization_listing():
         for _value in ["passwords", "tokens"]:
             yield GenericPermissionsInfo(
                 object_id=_value,
-                request_type=RequestObjectType.AUTHORIZATION,
+                request_type="authorization",
             )
 
     return inner

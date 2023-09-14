@@ -8,7 +8,6 @@ from databricks.sdk.service import compute, iam, ml
 from databricks.labs.ucx.workspace_access.generic import (
     GenericPermissionsSupport,
     Permissions,
-    RequestObjectType,
     authorization_listing,
     experiments_listing,
     listing_wrapper,
@@ -26,7 +25,7 @@ def test_crawler():
 
     sample_permission = iam.ObjectPermissions(
         object_id="test",
-        object_type=str(RequestObjectType.CLUSTERS),
+        object_type="clusters",
         access_control_list=[
             iam.AccessControlResponse(
                 group_name="test",
@@ -40,7 +39,7 @@ def test_crawler():
     sup = GenericPermissionsSupport(
         ws=ws,
         listings=[
-            listing_wrapper(ws.clusters.list, "cluster_id", RequestObjectType.CLUSTERS),
+            listing_wrapper(ws.clusters.list, "cluster_id", "clusters"),
         ],
     )
 
@@ -65,7 +64,7 @@ def test_apply(migration_state):
         raw=json.dumps(
             iam.ObjectPermissions(
                 object_id="test",
-                object_type=str(RequestObjectType.CLUSTERS),
+                object_type="clusters",
                 access_control_list=[
                     iam.AccessControlResponse(
                         group_name="test",
@@ -93,11 +92,7 @@ def test_apply(migration_state):
         )
     ]
 
-    ws.permissions.update.assert_called_with(
-        request_object_type=RequestObjectType.CLUSTERS,
-        request_object_id="test",
-        access_control_list=expected_acl_payload,
-    )
+    ws.permissions.update.assert_called_with("clusters", "test", access_control_list=expected_acl_payload)
 
 
 def test_relevance():
@@ -113,12 +108,12 @@ def test_safe_get():
     ws = MagicMock()
     ws.permissions.get.side_effect = DatabricksError(error_code="RESOURCE_DOES_NOT_EXIST")
     sup = GenericPermissionsSupport(ws=ws, listings=[])
-    result = sup._safe_get_permissions(ws, RequestObjectType.CLUSTERS, "test")
+    result = sup._safe_get_permissions("clusters", "test")
     assert result is None
 
     ws.permissions.get.side_effect = DatabricksError(error_code="SOMETHING_UNEXPECTED")
     with pytest.raises(DatabricksError):
-        sup._safe_get_permissions(ws, RequestObjectType.CLUSTERS, "test")
+        sup._safe_get_permissions("clusters", "test")
 
 
 def test_no_permissions():
@@ -132,7 +127,7 @@ def test_no_permissions():
     sup = GenericPermissionsSupport(
         ws=ws,
         listings=[
-            listing_wrapper(ws.clusters.list, "cluster_id", RequestObjectType.CLUSTERS),
+            listing_wrapper(ws.clusters.list, "cluster_id", "clusters"),
         ],
     )
     tasks = list(sup.get_crawler_tasks())
@@ -154,12 +149,8 @@ def test_passwords_tokens_crawler(migration_state):
     ]
 
     ws.permissions.get.side_effect = [
-        iam.ObjectPermissions(
-            object_id="passwords", object_type=RequestObjectType.AUTHORIZATION, access_control_list=basic_acl
-        ),
-        iam.ObjectPermissions(
-            object_id="tokens", object_type=RequestObjectType.AUTHORIZATION, access_control_list=basic_acl
-        ),
+        iam.ObjectPermissions(object_id="passwords", object_type="authorization", access_control_list=basic_acl),
+        iam.ObjectPermissions(object_id="tokens", object_type="authorization", access_control_list=basic_acl),
     ]
 
     sup = GenericPermissionsSupport(ws=ws, listings=[authorization_listing()])
@@ -168,18 +159,15 @@ def test_passwords_tokens_crawler(migration_state):
     auth_items = [task() for task in tasks]
     for item in auth_items:
         assert item.object_id in ["tokens", "passwords"]
-        assert item.object_type in ["tokens", "passwords"]
+        assert item.object_type == "authorization"
         applier = sup.get_apply_task(item, migration_state, "backup")
-        new_acl = sup._prepare_new_acl(
-            permissions=iam.ObjectPermissions.from_dict(json.loads(item.raw)),
-            migration_state=migration_state,
-            destination="backup",
-        )
         applier()
         ws.permissions.update.assert_called_once_with(
-            request_object_type=RequestObjectType.AUTHORIZATION,
-            request_object_id=item.object_id,
-            access_control_list=new_acl,
+            item.object_type,
+            item.object_id,
+            access_control_list=[
+                iam.AccessControlRequest(group_name="db-temp-test", permission_level=iam.PermissionLevel.CAN_USE)
+            ],
         )
         ws.permissions.update.reset_mock()
 
@@ -194,11 +182,11 @@ def test_models_listing():
         )
     )
 
-    wrapped = listing_wrapper(models_listing(ws), id_attribute="id", object_type=RequestObjectType.REGISTERED_MODELS)
+    wrapped = listing_wrapper(models_listing(ws), id_attribute="id", object_type="registered-models")
     result = list(wrapped())
     assert len(result) == 1
     assert result[0].object_id == "some-id"
-    assert result[0].request_type == RequestObjectType.REGISTERED_MODELS
+    assert result[0].request_type == "registered-models"
 
 
 def test_experiment_listing():
@@ -211,11 +199,9 @@ def test_experiment_listing():
             experiment_id="test4", tags=[ml.ExperimentTag(key="mlflow.experiment.sourceType", value="REPO_NOTEBOOK")]
         ),
     ]
-    wrapped = listing_wrapper(
-        experiments_listing(ws), id_attribute="experiment_id", object_type=RequestObjectType.EXPERIMENTS
-    )
+    wrapped = listing_wrapper(experiments_listing(ws), id_attribute="experiment_id", object_type="experiments")
     results = list(wrapped())
     assert len(results) == 2
     for res in results:
-        assert res.request_type == RequestObjectType.EXPERIMENTS
+        assert res.request_type == "experiments"
         assert res.object_id in ["test", "test2"]

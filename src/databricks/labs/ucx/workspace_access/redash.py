@@ -35,8 +35,7 @@ class SqlPermissionsSupport(Crawler, Applier):
 
     def is_item_relevant(self, item: Permissions, migration_state: GroupMigrationState) -> bool:
         mentioned_groups = [
-            acl.group_name
-            for acl in sql.GetResponse.from_dict(json.loads(item.raw)).access_control_list
+            acl.group_name for acl in sql.GetResponse.from_dict(json.loads(item.raw)).access_control_list
         ]
         return any(g in mentioned_groups for g in [info.workspace.display_name for info in migration_state.groups])
 
