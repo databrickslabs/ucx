@@ -20,10 +20,9 @@ class PermissionManager(CrawlerBase):
         self._appliers = appliers
 
     def inventorize_permissions(self):
-        logger.info("Inventorizing the permissions")
+        logger.debug("Crawling permissions")
         crawler_tasks = list(self._get_crawler_tasks())
-        logger.info(f"Total crawler tasks: {len(crawler_tasks)}")
-        logger.info("Starting the permissions inventorization")
+        logger.info(f"Starting to crawl permissions. Total tasks: {len(crawler_tasks)}")
         results = ThreadedExecution.gather("crawl permissions", crawler_tasks)
         items = []
         for item in results:
@@ -33,16 +32,16 @@ class PermissionManager(CrawlerBase):
                 msg = f"unknown object_type: {item.object_type}"
                 raise KeyError(msg)
             items.append(item)
-        logger.info(f"Total inventorized items: {len(items)}")
+        logger.info(f"Total crawled permissions after filtering: {len(items)}")
         self._save(items)
-        logger.info("Permissions were inventorized and saved")
+        logger.info(f"Saved {len(items)} to {self._full_name}")
 
     def apply_group_permissions(self, migration_state: GroupMigrationState, destination: Literal["backup", "account"]):
-        logger.info(f"Applying the permissions to {destination} groups")
-        logger.info(f"Total groups to apply permissions: {len(migration_state.groups)}")
         # list shall be sorted prior to using group by
         items = sorted(self._load_all(), key=lambda i: i.object_type)
-        logger.info(f"Total inventorized items: {len(items)}")
+        logger.info(f"Applying the permissions to {destination} groups. "
+                    f"Total groups to apply permissions: {len(migration_state.groups)}. "
+                    f"Total permissions found: {len(items)}")
         applier_tasks = []
         supports_to_items = {
             support: list(items_subset) for support, items_subset in groupby(items, key=lambda i: i.object_type)
@@ -62,9 +61,8 @@ class PermissionManager(CrawlerBase):
             logger.info(f"Total tasks for {object_type}: {len(tasks_for_support)}")
             applier_tasks.extend(tasks_for_support)
 
-        logger.info(f"Total applier tasks: {len(applier_tasks)}")
-        logger.info("Starting the permissions application")
-        ThreadedExecution.gather("apply permissions", applier_tasks)
+        logger.info(f"Starting to apply permissions on {destination} groups. Total tasks: {len(applier_tasks)}")
+        ThreadedExecution.gather(f"apply {destination} group permissions", applier_tasks)
         logger.info("Permissions were applied")
 
     def cleanup(self):
@@ -74,7 +72,7 @@ class PermissionManager(CrawlerBase):
 
     def _save(self, items: list[Permissions]):
         # TODO: update instead of append
-        logger.info(f"Saving {len(items)} items to inventory table {self._full_name}")
+        logger.info(f"Saving {len(items)} items to {self._full_name}")
         self._append_records(Permissions, items)
         logger.info("Successfully saved the items to inventory table")
 

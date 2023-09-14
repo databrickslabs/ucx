@@ -86,7 +86,7 @@ class WorkspaceListing:
                             new_futures[new_future] = directory
                         futures_to_objects.update(new_futures)
 
-            logger.info(f"Recursive WorkspaceFS listing finished at {dt.datetime.now()}")
-            logger.info(f"Total time taken for workspace listing: {dt.datetime.now() - self.start_time}")
+            logger.info(f"Recursive WorkspaceFS listing finished at {dt.datetime.now()}. "
+                        f"Total time taken for workspace listing: {dt.datetime.now() - self.start_time}")
             self._progress_report(None)
         return self.results
