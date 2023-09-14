@@ -35,6 +35,7 @@ class GroupMigrationToolkit:
         ws = WorkspaceClient(config=config.to_databricks_config())
         ws.api_client._session.adapters["https://"].max_retries.total = 20
         self._verify_ws_client(ws)
+        self._ws = ws # TODO: remove this once notebooks/toolkit.py is removed
 
         generic_acl_listing = [
             listing_wrapper(ws.clusters.list, "cluster_id", "clusters"),
@@ -72,7 +73,8 @@ class GroupMigrationToolkit:
             # SCIM-based API
             "entitlements": scim_support,
             "roles": scim_support,
-            # generic API
+            # Generic Permissions API
+            "authorization": generic_support,
             "clusters": generic_support,
             "cluster-policies": generic_support,
             "instance-pools": generic_support,
@@ -81,18 +83,15 @@ class GroupMigrationToolkit:
             "pipelines": generic_support,
             "experiments": generic_support,
             "registered-models": generic_support,
-            "tokens": generic_support,
-            "passwords": generic_support,
-            # workspace objects
             "notebooks": generic_support,
             "files": generic_support,
             "directories": generic_support,
             "repos": generic_support,
-            # SQL API
+            # Redash equivalent of Generic Permissions API
             "alerts": sql_support,
             "queries": sql_support,
             "dashboards": sql_support,
-            # secrets API
+            # Secret Scope ACL API
             "secrets": secrets_support,
         }
 

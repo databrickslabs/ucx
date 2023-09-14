@@ -90,7 +90,7 @@ def test_sql_backend_works(ws, wsfs_wheel):
     commands.install_notebook_library(f"/Workspace{wsfs_wheel}")
     database_names = commands.run(
         """
-        from databricks.labs.ucx.tacl._internal import RuntimeBackend
+        from databricks.labs.ucx.framework.crawlers import RuntimeBackend
         backend = RuntimeBackend()
         return backend.fetch("SHOW DATABASES")
         """
