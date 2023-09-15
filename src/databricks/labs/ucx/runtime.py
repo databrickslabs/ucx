@@ -126,7 +126,7 @@ def delete_backup_groups(cfg: MigrationConfig):
     toolkit.prepare_environment()
     toolkit.delete_backup_groups()
 
-
+    
 @task("list_mounts")
 def list_mount_points(cfg: MigrationConfig):
     toolkit = GroupMigrationToolkit(cfg)

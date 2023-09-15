@@ -10,6 +10,7 @@ from databricks.labs.ucx.framework.crawlers import (
     StatementExecutionBackend,
 )
 from databricks.labs.ucx.mounts.list_mounts import MountLister
+
 from databricks.labs.ucx.workspace_access.generic import (
     GenericPermissionsSupport,
     authorization_listing,
