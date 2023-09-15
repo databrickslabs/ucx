@@ -2,7 +2,7 @@ from dataclasses import dataclass
 
 import pytest
 
-from databricks.labs.ucx.framework.crawlers import CrawlerBase
+from databricks.labs.ucx.framework.crawlers import CrawlerBase, SqlBackend
 
 from ..framework.mocks import MockBackend
 
@@ -28,6 +28,15 @@ def test_invalid():
 def test_full_name():
     cb = CrawlerBase(MockBackend(), "a", "b", "c")
     assert "a.b.c" == cb._full_name
+
+
+def test_creating_schema():
+    from databricks.labs.ucx.hive_metastore.grants import Grant
+    from databricks.labs.ucx.hive_metastore.tables import Table
+
+    x = SqlBackend.schema_for(Grant)
+
+    print(x)
 
 
 def test_snapshot_appends_to_existing_table():
