@@ -53,6 +53,13 @@ $py -m venv "$tmp_dir"
 # Use the Python from Virtualenv
 py="$tmp_dir/bin/python"
 
+echo "[+] making sure we have the latest pip version"
+# Always upgrade pip, so that the hatchling build backend works. Hinted by errors like
+# > File "setup.py" or "setup.cfg" not found. Directory cannot be installed in editable mode
+#
+# See https://github.com/databrickslabs/ucx/issues/198
+$py -m pip install --quiet --upgrade pip
+
 echo "[+] installing dependencies within ephemeral Virtualenv: $tmp_dir"
 # Install all project dependencies, so that installer can proceed
 $py -m pip install --quiet -e .
