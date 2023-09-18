@@ -16,7 +16,7 @@ from databricks.sdk.service.workspace import ImportFormat
 
 from databricks.labs.ucx.__about__ import __version__
 from databricks.labs.ucx.config import GroupsConfig, MigrationConfig, TaclConfig
-from databricks.labs.ucx.framework.tasks import _TASKS
+from databricks.labs.ucx.framework.tasks import _TASKS, Task
 from databricks.labs.ucx.runtime import main
 
 TAG_STEP = "step"
@@ -65,6 +65,7 @@ class Installer:
         self._ws = ws
         self._prefix = prefix
         self._prompts = promtps
+        self._this_file = Path(__file__)
 
     def run(self):
         self._configure()
@@ -230,8 +231,7 @@ class Installer:
                 self._ws.workspace.upload(remote_wheel, f, overwrite=True, format=ImportFormat.AUTO)
         return remote_wheel
 
-    def _job_settings(self, step_name, dbfs_path):
-        config_file = f"/Workspace/{self._install_folder}/config.yml"
+    def _job_settings(self, step_name: str, dbfs_path: str):
         email_notifications = None
         if "@" in self._my_username:
             email_notifications = jobs.JobEmailNotifications(
@@ -243,21 +243,43 @@ class Installer:
             "tags": {TAG_APP: self._prefix, TAG_STEP: step_name},
             "job_clusters": self._job_clusters({t.job_cluster for t in tasks}),
             "email_notifications": email_notifications,
-            "tasks": [
-                jobs.Task(
-                    task_key=task.name,
-                    job_cluster_key=task.job_cluster,
-                    depends_on=[jobs.TaskDependency(task_key=d) for d in _TASKS[task.name].depends_on],
-                    libraries=[compute.Library(whl=f"dbfs:{dbfs_path}")],
-                    python_wheel_task=jobs.PythonWheelTask(
-                        package_name="databricks_labs_ucx",
-                        entry_point="runtime",  # [project.entry-points.databricks] in pyproject.toml
-                        named_parameters={"task": task.name, "config": config_file},
-                    ),
-                )
-                for task in tasks
-            ],
+            "tasks": [self._job_task(task, dbfs_path) for task in tasks],
         }
+
+    def _job_task(self, task: Task, dbfs_path: str):
+        jobs_task = jobs.Task(
+            task_key=task.name,
+            job_cluster_key=task.job_cluster,
+            depends_on=[jobs.TaskDependency(task_key=d) for d in _TASKS[task.name].depends_on],
+        )
+        if task.notebook:
+            return self._job_notebook_task(jobs_task, task)
+        return self._job_wheel_task(jobs_task, task, dbfs_path)
+
+    def _job_notebook_task(self, jobs_task: jobs.Task, task: Task) -> jobs.Task:
+        local_notebook = self._this_file.parent / task.notebook
+        remote_notebook = f"{self._install_folder}/{local_notebook.name}"
+        with local_notebook.open("rb") as f:
+            self._ws.workspace.upload(remote_notebook, f)
+        return replace(
+            jobs_task,
+            notebook_task=jobs.NotebookTask(
+                notebook_path=remote_notebook,
+                # ES-872211: currently, we cannot read WSFS files from Scala context
+                base_parameters={"inventory_database": self._current_config.inventory_database},
+            ),
+        )
+
+    def _job_wheel_task(self, jobs_task: jobs.Task, task: Task, dbfs_path: str) -> jobs.Task:
+        return replace(
+            jobs_task,
+            libraries=[compute.Library(whl=f"dbfs:{dbfs_path}")],
+            python_wheel_task=jobs.PythonWheelTask(
+                package_name="databricks_labs_ucx",
+                entry_point="runtime",  # [project.entry-points.databricks] in pyproject.toml
+                named_parameters={"task": task.name, "config": self._config_file},
+            ),
+        )
 
     def _job_clusters(self, names: set[str]):
         clusters = []
@@ -292,8 +314,7 @@ class Installer:
             )
         return clusters
 
-    @staticmethod
-    def _build_wheel(tmp_dir: str, *, verbose: bool = False):
+    def _build_wheel(self, tmp_dir: str, *, verbose: bool = False):
         """Helper to build the wheel package"""
         streams = {}
         if not verbose:
@@ -301,7 +322,7 @@ class Installer:
                 "stdout": subprocess.DEVNULL,
                 "stderr": subprocess.DEVNULL,
             }
-        project_root = Installer._find_project_root(Path(__file__))
+        project_root = Installer._find_project_root(self._this_file)
         if not project_root:
             msg = "Cannot find project root"
             raise NotADirectoryError(msg)

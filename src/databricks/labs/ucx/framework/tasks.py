@@ -18,9 +18,10 @@ class Task:
     fn: Callable[[MigrationConfig], None]
     depends_on: list[str] = None
     job_cluster: str = "main"
+    notebook: str = None
 
 
-def task(workflow, *, depends_on=None, job_cluster="main"):
+def task(workflow, *, depends_on=None, job_cluster="main", notebook: str | None = None):
     def decorator(func):
         @wraps(func)
         def wrapper(*args, **kwargs):
@@ -52,7 +53,13 @@ def task(workflow, *, depends_on=None, job_cluster="main"):
             raise SyntaxError(msg)
 
         _TASKS[func.__name__] = Task(
-            workflow=workflow, name=func.__name__, doc=func.__doc__, fn=func, depends_on=deps, job_cluster=job_cluster
+            workflow=workflow,
+            name=func.__name__,
+            doc=func.__doc__,
+            fn=func,
+            depends_on=deps,
+            job_cluster=job_cluster,
+            notebook=notebook,
         )
 
         return wrapper
