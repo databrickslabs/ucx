@@ -5,6 +5,7 @@ import sys
 from databricks.sdk import WorkspaceClient
 
 from databricks.labs.ucx.config import MigrationConfig
+from databricks.labs.ucx.framework.crawlers import RuntimeBackend
 from databricks.labs.ucx.framework.tasks import task, trigger
 from databricks.labs.ucx.hive_metastore import TaclToolkit
 from databricks.labs.ucx.workspace_access import GroupMigrationToolkit
@@ -13,6 +14,13 @@ logger = logging.getLogger(__name__)
 
 
 @task("assessment")
+def setup_schema(cfg: MigrationConfig):
+    """Creates a database for UCX migration intermediate state"""
+    backend = RuntimeBackend()
+    backend.execute(f"CREATE SCHEMA IF NOT EXISTS hive_metastore.{cfg.inventory_database}")
+
+
+@task("assessment", depends_on=[setup_schema])
 def crawl_tables(cfg: MigrationConfig):
     """During this operation, a systematic scan is conducted, encompassing every table within the Hive Metastore.
     This scan extracts essential details associated with each table, including its unique identifier or name, table
@@ -48,7 +56,7 @@ def crawl_grants(cfg: MigrationConfig):
     tacls.grants_snapshot()
 
 
-@task("assessment")
+@task("assessment", depends_on=[setup_schema])
 def inventorize_permissions(cfg: MigrationConfig):
     """As we embark on the complex migration journey from Hive Metastore to the Databricks Unity Catalog, a pivotal
     aspect of this transition is the comprehensive examination and preservation of permissions associated with a myriad

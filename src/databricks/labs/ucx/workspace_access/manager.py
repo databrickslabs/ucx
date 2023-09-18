@@ -73,9 +73,7 @@ class PermissionManager(CrawlerBase):
         logger.info("Inventory table cleanup complete")
 
     def _save(self, items: list[Permissions]):
-        # TODO: update instead of append
-        logger.info(f"Saving {len(items)} items to {self._full_name}")
-        self._append_records(Permissions, items)
+        self._append_records(items)  # TODO: update instead of append
         logger.info("Successfully saved the items to inventory table")
 
     def _load_all(self) -> list[Permissions]:
