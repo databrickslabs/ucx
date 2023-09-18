@@ -76,3 +76,18 @@ def test_job_assessment(ws):
     assert (len(result_set.get(536591785949415)) == 0)
     assert (len(result_set.get(536591785949416)) == 1)
     assert (len(result_set) == 2)
+
+
+def test_cluster_assessment(ws):
+    sample_clusters = [
+        ClusterDetails(autoscale=AutoScale(min_workers=1, max_workers=6), spark_conf={
+            'spark.databricks.delta.preview.enabled': 'true'}, spark_context_id=5134472582179565315,
+                       spark_env_vars=None, spark_version='13.3.x-cpu-ml-scala2.12', cluster_id='0807-225846-motto493'),
+        ClusterDetails(autoscale=AutoScale(min_workers=1, max_workers=6), spark_conf={
+            'spark.databricks.delta.preview.enabled': 'true'}, spark_context_id=5134472582179565315,
+                       spark_env_vars=None, spark_version='9.3.x-cpu-ml-scala2.12', cluster_id='0810-225833-atlanta69')
+    ]
+    result_set = AssessmentToolkit._parse_clusters(sample_clusters)
+    assert(len(result_set) == 2)
+    assert (len(result_set.get('0807-225846-motto493')) == 0)
+    assert (len(result_set.get('0810-225833-atlanta69')) == 1)

@@ -6,7 +6,7 @@ import functools
 from dataclasses import dataclass
 
 from databricks.sdk import WorkspaceClient
-from databricks.sdk.service.compute import Language
+from databricks.sdk.service.compute import Language, ClusterDetails
 from databricks.labs.ucx.tacl.tables import Table
 from databricks.labs.ucx.providers.mixins.compute import CommandExecutor
 from databricks.labs.ucx.tacl._internal import (
@@ -33,6 +33,11 @@ def spark_version_compatibility(spark_version: str) -> str:
     return 'supported'
 
 class AssessmentToolkit:
+    incompatible_spark_config_keys = {
+        'spark.databricks.passthrough.enabled',
+        'spark.hadoop.javax.jdo.option.ConnectionURL',
+        'spark.databricks.hive.metastore.glueCatalog.enabled'
+    }
     def __init__(self, ws: WorkspaceClient, cluster_id, inventory_catalog, inventory_schema, warehouse_id=None):
         self._all_jobs = None
         self._all_clusters_by_id = None
@@ -115,6 +120,9 @@ class AssessmentToolkit:
     def generate_job_assessment(self):
         return AssessmentToolkit._parse_jobs(self.retrieve_jobs(), self.retrieve_clusters())
 
+    def generate_cluster_assessment(self):
+        return AssessmentToolkit._parse_clusters(self._ws.clusters.list())
+
     @staticmethod
     def _parse_jobs(all_jobs, all_clusters):
         incompatible_spark_config_keys = {
@@ -144,6 +152,26 @@ class AssessmentToolkit:
         return job_assessment
 
     @staticmethod
+    def _parse_clusters(all_clusters: [ClusterDetails]):
+        cluster_assessment = {}
+        for cluster in all_clusters:
+            cluster_assessment[cluster.cluster_id] = set()
+            support_status = spark_version_compatibility(cluster.spark_version)
+            if support_status != 'supported':
+                cluster_assessment[cluster.cluster_id].add(f'not supported DBR: {cluster.spark_version}')
+
+            if cluster.spark_conf is not None:
+                for k in AssessmentToolkit.incompatible_spark_config_keys:
+                    if k in cluster.spark_conf:
+                        using_incompatible_config = True
+                        cluster_assessment[cluster.cluster_id].add(f'unsupported config: {k}')
+
+                for value in cluster.spark_conf.values():
+                    if 'dbfs:/mnt' in value or '/dbfs/mnt' in value:
+                        cluster_assessment[cluster.cluster_id].add(f'using DBFS mount in configuration: {value}')
+        return cluster_assessment
+
+    @staticmethod
     def _backend(ws: WorkspaceClient, warehouse_id: str | None = None) -> SqlBackend:
         if warehouse_id is None:
             return RuntimeBackend()
@@ -164,4 +192,4 @@ if __name__ == "__main__":
     print(cluster_id)
     assess = AssessmentToolkit(ws, cluster_id, "UCX", "UCX_assessment")
     # assess.table_inventory()
-    print(assess.generate_job_assessment())
+    print(assess.generate_cluster_assessment())
