@@ -1,5 +1,5 @@
 clean:
-	rm -fr htmlcov .mypy_cache .pytest_cache .ruff_cache .coverage
+	rm -fr htmlcov .mypy_cache .pytest_cache .ruff_cache .coverage coverage.xml
 
 lint:
 	hatch run lint:verify
