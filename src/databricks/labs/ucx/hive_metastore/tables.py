@@ -95,9 +95,7 @@ class TablesCrawler(CrawlerBase):
         Returns:
             list[Table]: A list of Table objects representing the snapshot of tables.
         """
-        return self._snapshot(
-            Table, partial(self._try_load, catalog, database), partial(self._crawl, catalog, database)
-        )
+        return self._snapshot(partial(self._try_load, catalog, database), partial(self._crawl, catalog, database))
 
     def _try_load(self, catalog: str, database: str):
         """Tries to load table information from the database or throws TABLE_OR_VIEW_NOT_FOUND error"""

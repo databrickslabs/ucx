@@ -13,6 +13,7 @@ class MockBackend(SqlBackend):
         if not rows:
             rows = {}
         self._rows = rows
+        self._save_table = []
         self.queries = []
 
     def _sql(self, sql):
@@ -39,3 +40,14 @@ class MockBackend(SqlBackend):
                     rows.extend(self._rows[pattern])
         logger.debug(f"Returning rows: {rows}")
         return iter(rows)
+
+    def save_table(self, full_name: str, rows: list[any], mode: str = "append"):
+        self._save_table.append((full_name, rows, mode))
+
+    def rows_written_for(self, full_name: str, mode: str) -> list[any]:
+        rows = []
+        for stub_full_name, stub_rows, stub_mode in self._save_table:
+            if not (stub_full_name == full_name and stub_mode == mode):
+                continue
+            rows += stub_rows
+        return rows
