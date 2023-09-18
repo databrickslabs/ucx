@@ -17,7 +17,7 @@ from databricks.labs.ucx.hive_metastore.grants import Grant
 from databricks.labs.ucx.hive_metastore.tables import Table
 from databricks.labs.ucx.install import Installer
 from databricks.labs.ucx.mixins.compute import CommandExecutor
-from databricks.labs.ucx.mounts.list_mounts import MountInfo
+from databricks.labs.ucx.mounts.list_mounts import Mount
 
 logger = logging.getLogger(__name__)
 
@@ -418,7 +418,7 @@ def test_mount_listing(ws, wsfs_wheel, make_schema, sql_fetch_all):
     results = []
 
     for mount in mounts:
-        mount_info = MountInfo(*mount)
+        mount_info = Mount(*mount)
         results.append(mount_info)
 
     assert len(results) > 0
