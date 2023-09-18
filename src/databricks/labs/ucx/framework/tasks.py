@@ -47,6 +47,10 @@ def task(workflow, *, depends_on=None, job_cluster="main"):
                     continue
                 deps.append(fn.__name__)
 
+        if not func.__doc__:
+            msg = f"Task {func.__name__} must have documentation"
+            raise SyntaxError(msg)
+
         _TASKS[func.__name__] = Task(
             workflow=workflow, name=func.__name__, doc=func.__doc__, fn=func, depends_on=deps, job_cluster=job_cluster
         )
