@@ -246,7 +246,7 @@ class Installer:
             "tasks": [self._job_task(task, dbfs_path) for task in tasks],
         }
 
-    def _job_task(self, task: Task, dbfs_path: str):
+    def _job_task(self, task: Task, dbfs_path: str) -> jobs.Task:
         jobs_task = jobs.Task(
             task_key=task.name,
             job_cluster_key=task.job_cluster,
