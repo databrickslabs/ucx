@@ -1,6 +1,13 @@
 # UCX - Unity Catalog Migration Toolkit
 
-Your best companion for enabling the Unity Catalog.
+[![build](https://github.com/databrickslabs/ucx/actions/workflows/push.yml/badge.svg)](https://github.com/databrickslabs/ucx/actions/workflows/push.yml) [![codecov](https://codecov.io/github/databrickslabs/ucx/graph/badge.svg?token=p0WKAfW5HQ)](https://codecov.io/github/databrickslabs/ucx)
+
+Your best companion for enabling the Unity Catalog. It helps you to migrate all Databricks workspace assets:
+Entitlements, AWS instance profiles, Clusters, Cluster policies, Instance Pools, Databricks SQL warehouses, Delta Live 
+Tables, Jobs, MLflow experiments, MLflow registry, SQL Dashboards & Queries, SQL Alerts, Token and Password usage 
+permissions that are set on the workspace level, Secret scopes, Notebooks, Directories, Repos, Files.
+
+See [contributing instructions](CONTRIBUTING.md) to help improve this project.
 
 ## Installation
 
@@ -18,7 +25,7 @@ export DATABRICKS_CONFIG_PROFILE=ABC
 ```
 
 You can also specify environment variables in a more direct way, like in this example for installing 
-on a Azure Databricks Workspace using the Azure CLI authentication:
+on an Azure Databricks Workspace using the Azure CLI authentication:
 
 ```shell
 az login
@@ -26,11 +33,11 @@ export DATABRICKS_HOST=https://adb-123....azuredatabricks.net/
 ./install.sh
 ```
 
-## Latest working version and how-to
+Please follow the instructions in `./install.sh`, which will open a notebook with the description of all jobs to trigger. The journey starts with assessment. 
 
-Please note that current project statis is 🏗️ **WIP**, but we have a minimal set of already working utilities.
+## Star History
 
-See [contributing instructions](CONTRIBUTING.md).
+[![Star History Chart](https://api.star-history.com/svg?repos=databrickslabs/ucx&type=Date)](https://star-history.com/#databrickslabs/ucx)
 
 ## Project Support
 Please note that all projects in the /databrickslabs github account are provided for your exploration only, and are not formally supported by Databricks with Service Level Agreements (SLAs).  They are provided AS-IS and we do not make any guarantees of any kind.  Please do not submit a support ticket relating to any issues arising from the use of these projects.
