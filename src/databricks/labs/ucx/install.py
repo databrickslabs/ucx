@@ -277,7 +277,7 @@ class Installer:
             python_wheel_task=jobs.PythonWheelTask(
                 package_name="databricks_labs_ucx",
                 entry_point="runtime",  # [project.entry-points.databricks] in pyproject.toml
-                named_parameters={"task": task.name, "config": self._config_file},
+                named_parameters={"task": task.name, "config": f"/Workspace{self._config_file}"},
             ),
         )
 
