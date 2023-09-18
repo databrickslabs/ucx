@@ -47,6 +47,5 @@ jobs:
         run: hatch run unit:test
 
       - name: Publish test coverage
-        uses: codecov/codecov-action@v3
-        with:
-          files: .coverage
+        uses: codecov/codecov-action@v1
+

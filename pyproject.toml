@@ -55,7 +55,7 @@ dependencies = [
 ]
 
 [tool.hatch.envs.unit.scripts]
-test = "pytest --cov src tests/unit"
+test = "pytest --cov src --cov-report=xml tests/unit"
 test-cov-report = "pytest --cov src tests/unit --cov-report=html"
 
 [tool.hatch.envs.integration]
