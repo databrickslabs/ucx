@@ -57,11 +57,12 @@ def inventorize_mounts(cfg: MigrationConfig):
     migrated into Unity Catalog. Since these objects are not supported in the UC paragidm, part of the migration phase
     is to migrate them into Unity Catalog External Locations.
 
-    The assessment is going in the workspace to list all the Mount points that has been created, and then store them
-    in the `$inventory.mounts` table, which will allow you to have a snapshot of your existing Mount Point infrastructure.
+    The assessment is going in the workspace to list all the Mount points that has been created, and then store them in
+    the `$inventory.mounts` table, which will allow you to have a snapshot of your existing Mount Point infrastructure.
     """
     toolkit = GroupMigrationToolkit(cfg)
     toolkit.inventorize_mounts()
+
 
 @task("assessment", depends_on=[setup_schema])
 def inventorize_permissions(cfg: MigrationConfig):

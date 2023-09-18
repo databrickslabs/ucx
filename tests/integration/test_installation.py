@@ -67,7 +67,7 @@ def wsfs_wheel(ws, fresh_wheel_file, make_random):
 
     yield wsfs_wheel
 
-    #ws.workspace.delete(workspace_location, recursive=True)
+    # ws.workspace.delete(workspace_location, recursive=True)
 
 
 def test_this_wheel_installs(ws, wsfs_wheel):
@@ -397,19 +397,17 @@ def test_toolkit_notebook(
         ws.jobs.delete(created_job.job_id)
 
 
-def test_mount_listing(
-    ws,
-    sql_fetch_all,
-    make_random,
-    wsfs_wheel,
-        make_schema,
-        sql_exec
-):
+def test_mount_listing(ws, sql_fetch_all, make_random, wsfs_wheel, make_schema, sql_exec):
     logger.info("setting up schema and target table")
 
     _, inventory_database = make_schema(catalog="hive_metastore").split(".")
     logger.info(f"target_schema={inventory_database}")
-    sql_exec(f"CREATE TABLE hive_metastore.{inventory_database}.mounts (name string not null, source string not null, instance_profile string)")
+    sql_exec(
+        f"""CREATE TABLE hive_metastore.{inventory_database}.mounts (
+            name string not null,
+            source string not null,
+            instance_profile string)"""
+    )
 
     logger.info("uploading notebook")
 
@@ -441,7 +439,7 @@ def test_mount_listing(
                 new_cluster=compute.ClusterSpec(
                     instance_pool_id=os.environ["TEST_INSTANCE_POOL_ID"],
                     spark_version=ws.clusters.select_spark_version(latest=True),
-                    num_workers=1
+                    num_workers=1,
                 ),
             )
         ],
@@ -451,10 +449,11 @@ def test_mount_listing(
     logger.info("running job")
 
     try:
-        from databricks.labs.ucx.mounts.list_mounts import MountLister, MountResult
+        from databricks.labs.ucx.mounts.list_mounts import MountResult
+
         ws.jobs.run_now(created_job.job_id).result()
         mounts = sql_fetch_all(f"SELECT * FROM hive_metastore.{inventory_database}.mounts")
-        rests=[]
+        rests = []
         for mount in mounts:
             result = MountResult(*mount)
             rests.append(result)

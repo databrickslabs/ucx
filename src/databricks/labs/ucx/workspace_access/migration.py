@@ -2,7 +2,6 @@ import logging
 
 from databricks.sdk import WorkspaceClient
 from databricks.sdk.service import sql
-from databricks.labs.ucx.mounts.list_mounts import MountLister
 
 from databricks.labs.ucx.config import MigrationConfig
 from databricks.labs.ucx.framework.crawlers import (
@@ -10,6 +9,7 @@ from databricks.labs.ucx.framework.crawlers import (
     SqlBackend,
     StatementExecutionBackend,
 )
+from databricks.labs.ucx.mounts.list_mounts import MountLister
 from databricks.labs.ucx.workspace_access.generic import (
     GenericPermissionsSupport,
     authorization_listing,
