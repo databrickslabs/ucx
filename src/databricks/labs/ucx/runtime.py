@@ -20,8 +20,8 @@ def setup_schema(cfg: MigrationConfig):
     backend.execute(f"CREATE SCHEMA IF NOT EXISTS hive_metastore.{cfg.inventory_database}")
 
 
-@task("assessment", depends_on=[setup_schema])
-def crawl_tables(cfg: MigrationConfig):
+@task("assessment", depends_on=[setup_schema], notebook="hive_metastore/tables.scala")
+def crawl_tables(_: MigrationConfig):
     """During this operation, a systematic scan is conducted, encompassing every table within the Hive Metastore.
     This scan extracts essential details associated with each table, including its unique identifier or name, table
     format, storage location details.
@@ -29,11 +29,6 @@ def crawl_tables(cfg: MigrationConfig):
     The extracted metadata is subsequently organized and cataloged within a dedicated storage entity known as
     the `$inventory.tables` table. This table functions as a comprehensive inventory, providing a structured and
     easily accessible reference point for users, data engineers, and administrators."""
-    ws = WorkspaceClient(config=cfg.to_databricks_config())
-    tacls = TaclToolkit(
-        ws, inventory_catalog="hive_metastore", inventory_schema=cfg.inventory_database, databases=cfg.tacl.databases
-    )
-    tacls.database_snapshot()
 
 
 @task("assessment", depends_on=[crawl_tables], job_cluster="tacl")
