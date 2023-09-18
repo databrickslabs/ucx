@@ -3,9 +3,6 @@ from dataclasses import dataclass
 
 from databricks.sdk import WorkspaceClient
 
-# Added a * import otherwise it won't be possible to import spark directly
-from databricks.sdk.runtime import *  # noqa: F403
-
 from databricks.labs.ucx.framework.crawlers import CrawlerBase, SqlBackend
 
 logger = logging.getLogger(__name__)
