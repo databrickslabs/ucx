@@ -8,6 +8,7 @@ from databricks.labs.ucx.config import MigrationConfig
 from databricks.labs.ucx.framework.crawlers import RuntimeBackend
 from databricks.labs.ucx.framework.tasks import task, trigger
 from databricks.labs.ucx.hive_metastore import TaclToolkit
+from databricks.labs.ucx.mounts.migration import MountMigrationToolKit
 from databricks.labs.ucx.workspace_access import GroupMigrationToolkit
 
 logger = logging.getLogger(__name__)
@@ -60,7 +61,7 @@ def inventorize_mounts(cfg: MigrationConfig):
     The assessment is going in the workspace to list all the Mount points that has been created, and then store them in
     the `$inventory.mounts` table, which will allow you to have a snapshot of your existing Mount Point infrastructure.
     """
-    toolkit = GroupMigrationToolkit(cfg)
+    toolkit = MountMigrationToolKit(cfg)
     toolkit.inventorize_mounts()
 
 

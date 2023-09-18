@@ -6,26 +6,24 @@ from databricks.sdk import WorkspaceClient
 # Added a * import otherwise it won't be possible to import spark directly
 from databricks.sdk.runtime import *  # noqa: F403
 
+from databricks.labs.ucx.framework.crawlers import CrawlerBase, SqlBackend
+
 logger = logging.getLogger(__name__)
 
 
 @dataclass
-class MountResult:
+class MountInfo:
     name: str
     source: str
-    instance_profile: str | None = None
 
 
-class MountLister:
-    def __init__(self, ws: WorkspaceClient, inventory_database: str):
-        self._ws = ws
-        self._inventory_database = inventory_database
+class Mounts(CrawlerBase):
+    def __init__(self, backend: SqlBackend, ws: WorkspaceClient, inventory_database: str):
+        super().__init__(backend, "hive_metastore", inventory_database, "mounts")
+        self._dbutils = ws.dbutils
 
     def inventorize_mounts(self):
-        mounts = dbutils.fs.mounts()  # noqa: F405
-        print(f"found {len(mounts)} mount points in this workspace")
-        df = spark.createDataFrame(dbutils.fs.mounts()).selectExpr("mountPoint as name", "source")  # noqa: F405
-
-        target_table = f"{self._inventory_database}.mounts"
-        df.writeTo(target_table).replace()
-        print(f"All workspace mounts points saved to {target_table}")
+        mounts = []
+        for mount_point, source, _ in self._dbutils.fs.mounts():
+            mounts.append(MountInfo(mount_point, source))
+        self._append_records(mounts)

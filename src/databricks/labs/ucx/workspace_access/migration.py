@@ -9,7 +9,6 @@ from databricks.labs.ucx.framework.crawlers import (
     SqlBackend,
     StatementExecutionBackend,
 )
-from databricks.labs.ucx.mounts.list_mounts import MountLister
 from databricks.labs.ucx.workspace_access.generic import (
     GenericPermissionsSupport,
     authorization_listing,
@@ -67,7 +66,6 @@ class GroupMigrationToolkit:
         )
         self._group_manager = GroupManager(ws, config.groups)
         self._verification_manager = VerificationManager(ws, secrets_support)
-        self._mount_lister = MountLister(ws, config.inventory_database)
 
     @staticmethod
     def _object_type_appliers(generic_support, sql_support, secrets_support, scim_support):
@@ -146,6 +144,3 @@ class GroupMigrationToolkit:
 
     def delete_backup_groups(self):
         self._group_manager.delete_backup_groups()
-
-    def inventorize_mounts(self):
-        self._mount_lister.inventorize_mounts()
