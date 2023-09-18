@@ -187,4 +187,4 @@ def test_runtime_backend_save_table(mocker):
             [Foo(first="aaa", second=True), Foo(first="bbb", second=False)],
             "first STRING NOT NULL, second BOOLEAN NOT NULL",
         )
-        rb._spark.createDataFrame().saveAsTable.assert_called_with("a.b.c", mode="append")
+        rb._spark.createDataFrame().write.saveAsTable.assert_called_with("a.b.c", mode="append")

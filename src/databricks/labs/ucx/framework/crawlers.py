@@ -113,7 +113,7 @@ class RuntimeBackend(SqlBackend):
             return
         # pyspark deals well with lists of dataclass instances, as long as schema is provided
         df = self._spark.createDataFrame(rows, self._schema_for(rows[0]))
-        df.saveAsTable(full_name, mode=mode)
+        df.write.saveAsTable(full_name, mode=mode)
 
 
 class CrawlerBase:
