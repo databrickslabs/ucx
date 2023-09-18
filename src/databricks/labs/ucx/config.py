@@ -96,6 +96,7 @@ class MigrationConfig:
     tacl: TaclConfig
     groups: GroupsConfig
     instance_pool_id: str = None
+    warehouse_id: str = None
     connect: ConnectConfig | None = None
     num_threads: int | None = 4
     log_level: str | None = "INFO"
@@ -140,6 +141,7 @@ class MigrationConfig:
             groups=GroupsConfig.from_dict(raw.get("groups", {})),
             connect=ConnectConfig.from_dict(raw.get("connect", {})),
             instance_pool_id=raw.get("instance_pool_id", None),
+            warehouse_id=raw.get("warehouse_id", None),
             num_threads=raw.get("num_threads", 8),
             log_level=raw.get("log_level", "INFO"),
         )

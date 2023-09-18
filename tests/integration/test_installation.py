@@ -312,3 +312,21 @@ def test_toolkit_notebook(
         logger.info("deleting job")
 
         ws.jobs.delete(created_job.job_id)
+
+
+def test_creates_some_dashboards(ws, make_random):
+    install = Installer(ws, prefix=make_random(4), promtps=False)
+    install._config = MigrationConfig(
+        inventory_database=f"ucx_{make_random(4)}",
+        instance_pool_id=os.environ["TEST_INSTANCE_POOL_ID"],
+        groups=GroupsConfig(auto=True),
+        tacl=TaclConfig(auto=True),
+        log_level="DEBUG",
+    )
+    install._write_config()
+
+    logging.getLogger('databricks').setLevel('DEBUG')
+
+    install._create_dashboards()
+
+    print(1)

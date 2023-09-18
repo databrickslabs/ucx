@@ -1,3 +1,4 @@
+import json
 import logging
 import os
 import re
@@ -12,11 +13,13 @@ import yaml
 from databricks.sdk import WorkspaceClient
 from databricks.sdk.core import DatabricksError
 from databricks.sdk.service import compute, jobs
-from databricks.sdk.service.workspace import ImportFormat
+from databricks.sdk.service.sql import Visualization
+from databricks.sdk.service.workspace import ImportFormat, ExportFormat
 
 from databricks.labs.ucx.__about__ import __version__
 from databricks.labs.ucx.config import GroupsConfig, MigrationConfig, TaclConfig
 from databricks.labs.ucx.framework.tasks import _TASKS, Task
+from databricks.labs.ucx.mixins import redash
 from databricks.labs.ucx.runtime import main
 
 TAG_STEP = "step"
@@ -149,6 +152,63 @@ class Installer:
         config_bytes = yaml.dump(self._config.as_dict()).encode("utf8")
         logger.info(f"Creating configuration file: {self._config_file}")
         self._ws.workspace.upload(self._config_file, config_bytes, format=ImportFormat.AUTO)
+
+    def _create_dashboards(self):
+        from databricks.sdk.service.sql import ObjectTypePlural, AccessControl, PermissionLevel, RunAsRole
+
+        query_dir = f'{self._install_folder}/queries'
+        deployed_dashboards = json.load(self._ws.workspace.download(f'{query_dir}/state.json'))
+
+
+        self._ws.workspace.mkdirs(query_dir)
+        object_info = self._ws.workspace.get_status(query_dir)
+        data_sources = {_.warehouse_id:_.id for _ in self._ws.data_sources.list()}
+        warehouses = self._ws.warehouses.list()
+        warehouse_id = self._current_config.warehouse_id
+        if not warehouse_id and not warehouses:
+            raise ValueError('need either configured warehouse_id or an existing SQL warehouse')
+        if not warehouse_id:
+            warehouse_id = warehouses[0].id
+        data_source_id = data_sources[warehouse_id]
+        query = self._ws.queries.create(data_source_id=data_source_id,
+                                parent=f'folders/{object_info.object_id}',
+                                name=f'[{self._prefix}] abc query',
+                                run_as_role=RunAsRole.VIEWER,
+                                query='SELECT 2+2 AS four')
+        self._ws.dbsql_permissions.set(ObjectTypePlural.QUERIES, query.id, access_control_list=[
+            AccessControl(group_name='users', permission_level=PermissionLevel.CAN_RUN)
+        ])
+
+        queries = list(self._ws.queries.list(q=f'[{self._prefix}]'))
+
+        viz = self._create_table_viz(query.id, 'some viz', columns=[redash.VizColumn(name='four', title='four')])
+
+        webbrowser.open(self._notebook_link(self._install_folder))
+
+    def _create_table_viz(
+            self,
+            query_id: str,
+            name: str,
+            columns: list[redash.VizColumn],
+            *,
+            items_per_page: int = 25,
+            condensed=True,
+            with_row_number=False,
+            description: str | None = None,
+    ) -> Visualization:
+        return self._ws.query_visualizations.create(
+            query_id,
+            "TABLE",
+            {
+                "itemsPerPage": items_per_page,
+                "condensed": condensed,
+                "withRowNumber": with_row_number,
+                "version": 2,
+                "columns": [x.as_dict() for x in columns],
+            },
+            name=name,
+            description=description,
+        )
 
     def _create_jobs(self):
         logger.debug(f"Creating jobs from tasks in {main.__name__}")
