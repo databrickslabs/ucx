@@ -51,6 +51,18 @@ def crawl_grants(cfg: MigrationConfig):
     tacls.grants_snapshot()
 
 
+@task("assessment")
+def inventorize_mounts(cfg: MigrationConfig):
+    """In this part of the assessment, we're going to scope the mount points that are going to be
+    migrated into Unity Catalog. Since these objects are not supported in the UC paragidm, part of the migration phase
+    is to migrate them into Unity Catalog External Locations.
+
+    The assessment is going in the workspace to list all the Mount points that has been created, and then store them
+    in the `$inventory.mounts` table, which will allow you to have a snapshot of your existing Mount Point infrastructure.
+    """
+    toolkit = GroupMigrationToolkit(cfg)
+    toolkit.inventorize_mounts()
+
 @task("assessment", depends_on=[setup_schema])
 def inventorize_permissions(cfg: MigrationConfig):
     """As we embark on the complex migration journey from Hive Metastore to the Databricks Unity Catalog, a pivotal

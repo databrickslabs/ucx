@@ -67,7 +67,7 @@ def wsfs_wheel(ws, fresh_wheel_file, make_random):
 
     yield wsfs_wheel
 
-    ws.workspace.delete(workspace_location, recursive=True)
+    #ws.workspace.delete(workspace_location, recursive=True)
 
 
 def test_this_wheel_installs(ws, wsfs_wheel):
@@ -386,6 +386,80 @@ def test_toolkit_notebook(
         assert all_grants[f"{ws_group_a.display_name}.{table_a}"] == "SELECT"
         assert all_grants[f"{ws_group_b.display_name}.{table_b}"] == "SELECT"
         assert all_grants[f"{ws_group_b.display_name}.{schema_b}"] == "MODIFY"
+
+    finally:
+        logger.info("deleting workbook")
+
+        ws.workspace.delete(remote_ucx_notebook_location, recursive=True)
+
+        logger.info("deleting job")
+
+        ws.jobs.delete(created_job.job_id)
+
+
+def test_mount_listing(
+    ws,
+    sql_fetch_all,
+    make_random,
+    wsfs_wheel,
+        make_schema,
+        sql_exec
+):
+    logger.info("setting up schema and target table")
+
+    _, inventory_database = make_schema(catalog="hive_metastore").split(".")
+    logger.info(f"target_schema={inventory_database}")
+    sql_exec(f"CREATE TABLE hive_metastore.{inventory_database}.mounts (name string not null, source string not null, instance_profile string)")
+
+    logger.info("uploading notebook")
+
+    ucx_notebook_path = Path(__file__).parent.parent.parent / "notebooks" / "mounts_listing.py"
+    my_user = ws.current_user.me().user_name
+    remote_ucx_notebook_location = f"/Users/{my_user}/notebooks/{make_random(10)}"
+    ws.workspace.mkdirs(remote_ucx_notebook_location)
+    ws_notebook = f"{remote_ucx_notebook_location}/test_notebook.py"
+
+    with open(ucx_notebook_path, "rb") as fh:
+        buf_notebook = BytesIO(fh.read())
+    ws.workspace.upload(ws_notebook, buf_notebook, format=ImportFormat.AUTO)
+
+    logger.info("creating job")
+
+    created_job = ws.jobs.create(
+        tasks=[
+            jobs.Task(
+                task_key="uc-migrate",
+                notebook_task=jobs.NotebookTask(
+                    notebook_path=f"{remote_ucx_notebook_location}/test_notebook",
+                    base_parameters={
+                        "inventory_database": inventory_database,
+                        "selected_groups": "selected_groups",
+                        "databases": "databases",
+                    },
+                ),
+                libraries=[compute.Library(whl=f"/Workspace{wsfs_wheel}")],
+                new_cluster=compute.ClusterSpec(
+                    instance_pool_id=os.environ["TEST_INSTANCE_POOL_ID"],
+                    spark_version=ws.clusters.select_spark_version(latest=True),
+                    num_workers=1
+                ),
+            )
+        ],
+        name="[UCX] Run Migration",
+    )
+
+    logger.info("running job")
+
+    try:
+        from databricks.labs.ucx.mounts.list_mounts import MountLister, MountResult
+        ws.jobs.run_now(created_job.job_id).result()
+        mounts = sql_fetch_all(f"SELECT * FROM hive_metastore.{inventory_database}.mounts")
+        rests=[]
+        for mount in mounts:
+            result = MountResult(*mount)
+            rests.append(result)
+
+        assert len(rests) > 0
 
     finally:
         logger.info("deleting workbook")
