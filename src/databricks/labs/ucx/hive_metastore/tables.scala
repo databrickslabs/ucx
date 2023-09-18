@@ -1,50 +1,42 @@
-import spark.implicits._
 import org.apache.spark.sql.catalyst.catalog.{CatalogTable, CatalogTableType}
+import org.apache.spark.sql.DataFrame
 
-val PERSIST_SCHEMA = "ucx"
-val DEBUG = true
-
+// must follow the same structure as databricks.labs.ucx.hive_metastore.tables.Table
 case class TableDetails(catalog: String, database: String, name: String, object_type: String,
                         table_format: String, location: String, view_text: String)
 
-// Get metadata for a given table and map it to a TableDetails case class object
-def getTableDetails(db: String, t: String): Option[TableDetails] = {
-  try {
-    val table: CatalogTable = spark.sharedState.externalCatalog.getTable(db = db, table = t)
+def metadataForAllTables(databases: Seq[String]): DataFrame = {
+  import spark.implicits._
 
-    if (table == null) {
-      println(s"getTable('${db}.${t}') returned null")
-      None
+  val externalCatalog = spark.sharedState.externalCatalog
+  databases.par.flatMap(databaseName => {
+    val tables = externalCatalog.listTables(databaseName)
+    if (tables == null) {
+      println(s"[WARN][${databaseName}] listTables returned null")
+      Seq()
     } else {
-      Some(TableDetails("hive_metastore", db, t, table.tableType.name, table.provider.getOrElse("Unknown"),
-        table.storage.locationUri.getOrElse("None").toString, table.viewText.getOrElse("None"), "", // TBD: Set WS ID
-        table.createTime, table.lastAccessTime))
+      tables.par.map(tableName => try {
+        val table = externalCatalog.getTable(databaseName, tableName)
+        if (table == null) {
+          println(s"[WARN][${databaseName}.${tableName}] result is null")
+          None
+        } else {
+          Some(TableDetails("hive_metastore", databaseName, tableName, table.tableType.name, table.provider.orNull,
+            table.storage.locationUri.map(_.toString).orNull, table.viewText.orNull))
+        }
+      } catch {
+        case err: Throwable =>
+          println(s"[ERROR][${databaseName}.${tableName}] ignoring table because of ${err}")
+          None
+      }).toList.collect {
+        case Some(x) => x
+      }
     }
-  } catch {
-    case err: Throwable =>
-      println(s"Got some other kind of Throwable exception, ignoring for ${db}.${t}")
-      println(s"Error: ${err}")
-      None
-  }
+  }).toList.toDF
 }
 
-// Retrieve metadata for a database and map it to a list of TableDetails case class objects
-def getDbTables(db: String): Seq[TableDetails] = {
-  val tables = spark.sharedState.externalCatalog.listTables(db)
-  if (tables == null) {
-    println(s"listTable('${db}') returned null")
-    Seq()
-  } else {
-    tables.par.map(getTableDetails(db, _)).toList.collect { case Some(x) => x }
-  }
-}
+dbutils.widgets.text("inventory_database", "ucx")
+val inventoryDatabase = dbutils.widgets.get("inventory_database")
 
-val dbs = spark.sharedState.externalCatalog.listDatabases()
-
-// create schema if not available
-spark.sql(s"CREATE SCHEMA IF NOT EXISTS ${PERSIST_SCHEMA}")
-
-val df = dbs.par.flatMap(getDbTables).toList.toDF
-
-// write rows to table
-df.write.mode("overwrite").option("overwriteSchema", "true").saveAsTable(s"${PERSIST_SCHEMA}.tables")
+val df = metadataForAllTables(spark.sharedState.externalCatalog.listDatabases())
+df.write.mode("overwrite").option("overwriteSchema", "true").saveAsTable(s"$inventoryDatabase.tables")
