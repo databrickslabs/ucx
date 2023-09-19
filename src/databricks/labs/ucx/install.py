@@ -102,7 +102,7 @@ class Installer:
         try:
             self._ws.workspace.get_status(self._config_file)
             logger.info(f"UCX is already configured. See {ws_file_url}")
-            if self._prompts and self._question("Type 'yes' to open config file in the browser") == "yes":
+            if self._prompts and self._question("Open config file in the browser", default="yes") == "yes":
                 webbrowser.open(ws_file_url)
             return
         except DatabricksError as err:
@@ -271,7 +271,7 @@ class Installer:
         local_notebook = self._this_file.parent / task.notebook
         remote_notebook = f"{self._install_folder}/{local_notebook.name}"
         with local_notebook.open("rb") as f:
-            self._ws.workspace.upload(remote_notebook, f)
+            self._ws.workspace.upload(remote_notebook, f, overwrite=True)
         return replace(
             jobs_task,
             notebook_task=jobs.NotebookTask(
