@@ -176,8 +176,9 @@ class Installer:
     def _create_readme(self):
         md = [
             "# UCX - The Unity Catalog Migration Assistant",
-            "Here are the descriptions of jobs that trigger various stages of migration.",
-            f'To troubleshoot, see [debug notebook]({self._notebook_link(f"{self._install_folder}/DEBUG.py")}).',
+            f'To troubleshoot, see [debug notebook]({self._notebook_link(f"{self._install_folder}/DEBUG.py")}).\n',
+            "Here are the URL and descriptions of jobs that trigger's various stages of migration.",
+            "All jobs are defined with necessary cluster configurations and DBR versions.",
         ]
         for step_name, job_id in self._deployed_steps.items():
             md.append(f"## [[{self._prefix.upper()}] {step_name}]({self._ws.config.host}#job/{job_id})\n")
