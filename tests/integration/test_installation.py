@@ -325,7 +325,7 @@ def test_creates_some_dashboards(ws, make_random):
     )
     install._write_config()
 
-    logging.getLogger('databricks').setLevel('DEBUG')
+    logging.getLogger("databricks").setLevel("DEBUG")
 
     install._create_dashboards()
 
