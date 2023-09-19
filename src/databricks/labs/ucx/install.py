@@ -110,15 +110,26 @@ class Installer:
                 raise err
 
         logger.info("Please answer a couple of questions to configure Unity Catalog migration")
+        inventory_database = self._question("Inventory Database", default="ucx")
+        selected_groups = self._question(
+            "Comma-separated list of workspace group names to migrate (empty means all)", default="<ALL>"
+        )
+        backup_group_prefix = self._question("Backup prefix", default="db-temp-")
+        log_level = self._question("Log level", default="INFO")
+        num_threads = int(self._question("Number of threads", default="8"))
+        groups_config_args = {
+            "backup_group_prefix": backup_group_prefix,
+        }
+        if selected_groups != "<ALL>":
+            groups_config_args["selected"] = [x.strip() for x in selected_groups.split(",")]
+        else:
+            groups_config_args["auto"] = True
         self._config = MigrationConfig(
-            inventory_database=self._question("Inventory Database", default="ucx"),
-            groups=GroupsConfig(
-                selected=self._question("Comma-separated list of workspace group names to migrate").split(","),
-                backup_group_prefix=self._question("Backup prefix", default="db-temp-"),
-            ),
+            inventory_database=inventory_database,
+            groups=GroupsConfig(**groups_config_args),
             tacl=TaclConfig(auto=True),
-            log_level=self._question("Log level", default="INFO"),
-            num_threads=int(self._question("Number of threads", default="8")),
+            log_level=log_level,
+            num_threads=num_threads,
         )
 
         self._write_config()
@@ -182,8 +193,8 @@ class Installer:
         self._ws.workspace.upload(path, intro.encode("utf8"), overwrite=True)
         url = self._notebook_link(path)
         logger.info(f"Created README notebook with job overview: {url}")
-        msg = "Type 'yes' to open job overview in README notebook in your home directory"
-        if self._prompts and self._question(msg) == "yes":
+        msg = "Open job overview in README notebook in your home directory"
+        if self._prompts and self._question(msg, default="yes") == "yes":
             webbrowser.open(url)
 
     def _create_debug(self, remote_wheel: str):
