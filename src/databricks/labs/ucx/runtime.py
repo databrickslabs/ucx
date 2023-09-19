@@ -8,7 +8,7 @@ from databricks.labs.ucx.config import MigrationConfig
 from databricks.labs.ucx.framework.crawlers import RuntimeBackend
 from databricks.labs.ucx.framework.tasks import task, trigger
 from databricks.labs.ucx.hive_metastore import TaclToolkit
-from databricks.labs.ucx.mounts.migration import MountMigrationToolKit
+from databricks.labs.ucx.hive_metastore.list_mounts import Mounts
 from databricks.labs.ucx.workspace_access import GroupMigrationToolkit
 
 logger = logging.getLogger(__name__)
@@ -52,7 +52,7 @@ def crawl_grants(cfg: MigrationConfig):
     tacls.grants_snapshot()
 
 
-@task("assessment")
+@task("assessment", depends_on=[setup_schema])
 def inventorize_mounts(cfg: MigrationConfig):
     """In this part of the assessment, we're going to scope the mount points that are going to be
     migrated into Unity Catalog. Since these objects are not supported in the UC paragidm, part of the migration phase
@@ -61,8 +61,9 @@ def inventorize_mounts(cfg: MigrationConfig):
     The assessment is going in the workspace to list all the Mount points that has been created, and then store them in
     the `$inventory.mounts` table, which will allow you to have a snapshot of your existing Mount Point infrastructure.
     """
-    toolkit = MountMigrationToolKit(cfg)
-    toolkit.inventorize_mounts()
+    ws = WorkspaceClient(config=cfg.to_databricks_config())
+    mounts = Mounts(backend=RuntimeBackend(), ws=ws, inventory_database=cfg.inventory_database)
+    mounts.inventorize_mounts()
 
 
 @task("assessment", depends_on=[setup_schema])
