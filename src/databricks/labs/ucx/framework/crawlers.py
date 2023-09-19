@@ -6,7 +6,6 @@ from collections.abc import Iterator
 from typing import ClassVar
 
 from databricks.sdk import WorkspaceClient
-
 from databricks.labs.ucx.mixins.sql import StatementExecutionExt
 
 logger = logging.getLogger(__name__)
@@ -217,3 +216,5 @@ class CrawlerBase:
             return
         logger.debug(f"[{self._full_name}] found {len(items)} new records for {self._table}")
         self._backend.save_table(self._full_name, items, mode="append")
+
+
