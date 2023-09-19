@@ -19,9 +19,10 @@ class Task:
     depends_on: list[str] = None
     job_cluster: str = "main"
     notebook: str = None
+    dashboard: str = None
 
 
-def task(workflow, *, depends_on=None, job_cluster="main", notebook: str | None = None):
+def task(workflow, *, depends_on=None, job_cluster="main", notebook: str | None = None, dashboard: str | None = None):
     def decorator(func):
         @wraps(func)
         def wrapper(*args, **kwargs):
@@ -60,6 +61,7 @@ def task(workflow, *, depends_on=None, job_cluster="main", notebook: str | None 
             depends_on=deps,
             job_cluster=job_cluster,
             notebook=notebook,
+            dashboard=dashboard,
         )
 
         return wrapper

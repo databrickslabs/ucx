@@ -6,7 +6,15 @@ import pytest
 import yaml
 from databricks.sdk.core import DatabricksError
 from databricks.sdk.service import iam
-from databricks.sdk.service.workspace import ImportFormat
+from databricks.sdk.service.sql import (
+    Dashboard,
+    DataSource,
+    EndpointInfo,
+    Query,
+    Visualization,
+    Widget,
+)
+from databricks.sdk.service.workspace import ImportFormat, ObjectInfo
 
 from databricks.labs.ucx.config import GroupsConfig, MigrationConfig, TaclConfig
 from databricks.labs.ucx.install import Installer
@@ -155,7 +163,13 @@ def test_main_with_existing_conf_does_not_recreate_config(mocker):
         MigrationConfig(inventory_database="a", groups=GroupsConfig(auto=True), tacl=TaclConfig(auto=True)).as_dict()
     ).encode("utf8")
     ws.workspace.download = lambda _: io.BytesIO(config_bytes)
-    ws.workspace.get_status = lambda _: None
+    ws.workspace.get_status = lambda _: ObjectInfo(object_id=123)
+    ws.data_sources.list = lambda: [DataSource(id="bcd", warehouse_id="abc")]
+    ws.warehouses.list = lambda **_: [EndpointInfo(id="abc")]
+    ws.dashboards.create.return_value = Dashboard(id="abc")
+    ws.queries.create.return_value = Query(id="abc")
+    ws.query_visualizations.create.return_value = Visualization(id="abc")
+    ws.dashboard_widgets.create.return_value = Widget(id="abc")
 
     install = Installer(ws)
     install._build_wheel = lambda _: Path(__file__)

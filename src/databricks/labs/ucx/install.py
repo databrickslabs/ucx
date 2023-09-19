@@ -1,4 +1,3 @@
-import json
 import logging
 import os
 import re
@@ -6,20 +5,19 @@ import subprocess
 import sys
 import tempfile
 import webbrowser
-from dataclasses import dataclass, replace
+from dataclasses import replace
 from pathlib import Path
 
 import yaml
 from databricks.sdk import WorkspaceClient
 from databricks.sdk.core import DatabricksError
 from databricks.sdk.service import compute, jobs
-from databricks.sdk.service.sql import WidgetOptions
 from databricks.sdk.service.workspace import ImportFormat
 
 from databricks.labs.ucx.__about__ import __version__
 from databricks.labs.ucx.config import GroupsConfig, MigrationConfig, TaclConfig
+from databricks.labs.ucx.framework.dashboards import DashboardFromFiles
 from databricks.labs.ucx.framework.tasks import _TASKS, Task
-from databricks.labs.ucx.mixins import redash
 from databricks.labs.ucx.runtime import main
 
 TAG_STEP = "step"
@@ -60,34 +58,6 @@ print(__version__)
 logger = logging.getLogger(__name__)
 
 
-@dataclass
-class SimpleQuery:
-    name: str
-    query: str
-    viz: dict[str, str]
-    widget: dict[str, str]
-
-    @property
-    def query_key(self):
-        return f"{self.name}:query_id"
-
-    @property
-    def viz_key(self):
-        return f"{self.name}:viz_id"
-
-    @property
-    def widget_key(self):
-        return f"{self.name}:widget_id"
-
-    @property
-    def viz_type(self) -> str:
-        return self.viz.get("type", None)
-
-    @property
-    def viz_args(self) -> dict:
-        return {k: v for k, v in self.viz.items() if k not in ["type"]}
-
-
 class Installer:
     def __init__(self, ws: WorkspaceClient, *, prefix: str = "ucx", promtps: bool = True):
         if "DATABRICKS_RUNTIME_VERSION" in os.environ:
@@ -97,10 +67,38 @@ class Installer:
         self._prefix = prefix
         self._prompts = promtps
         self._this_file = Path(__file__)
+        self._dashboards = {}
 
     def run(self):
         self._configure()
+        self._create_dashboards()
         self._create_jobs()
+
+    def _create_dashboards(self):
+        local_query_files = self._find_project_root() / "src/databricks/labs/ucx/assessment/queries"
+        dash = DashboardFromFiles(
+            self._ws,
+            local_folder=local_query_files,
+            remote_folder=f"{self._install_folder}/queries",
+            name=f"[{self._prefix}] UCX Assessment",
+            warehouse_id=self._warehouse_id,
+            query_text_callback=self._replace_inventory_variable,
+        )
+        self._dashboards["assessment"] = dash.create_dashboard()
+
+    @property
+    def _warehouse_id(self) -> str:
+        if self._current_config.warehouse_id is not None:
+            return self._current_config.warehouse_id
+        warehouses = self._ws.warehouses.list()
+        warehouse_id = self._current_config.warehouse_id
+        if not warehouse_id and not warehouses:
+            msg = "need either configured warehouse_id or an existing SQL warehouse"
+            raise ValueError(msg)
+        if not warehouse_id:
+            warehouse_id = warehouses[0].id
+        self._current_config.warehouse_id = warehouse_id
+        return warehouse_id
 
     @property
     def _my_username(self):
@@ -181,178 +179,6 @@ class Installer:
         logger.info(f"Creating configuration file: {self._config_file}")
         self._ws.workspace.upload(self._config_file, config_bytes, format=ImportFormat.AUTO)
 
-    @property
-    def _query_dir(self):
-        return f"{self._install_folder}/queries"
-
-    @property
-    def _query_state(self):
-        return f"{self._query_dir}/state.json"
-
-    def _create_dashboards(self):
-        desired_queries = self._desired_queries()
-        parent, state = self._deployed_query_state()
-        data_source_id = self._dashboard_data_source()
-        self._deploy_dashboard(state)
-        for query in desired_queries:
-            self._install_query(query, state, data_source_id, parent)
-            self._install_viz(query, state)
-
-            widget_options = WidgetOptions()
-            if query.widget_key in state:
-                pass
-            else:
-                widget = self._ws.dashboard_widgets.create(
-                    state["dashboard_id"], widget_options, visualization_id=state[query.viz_key]
-                )
-                state[query.widget_key] = widget.id
-
-        self._store_query_state(desired_queries, state)
-
-        webbrowser.open(self._notebook_link(self._install_folder))
-
-    def _store_query_state(self, desired_queries, state):
-        desired_keys = ["dashboard_id"]
-        for query in desired_queries:
-            desired_keys.append(query.query_key)
-            desired_keys.append(query.viz_key)
-            desired_keys.append(query.widget_key)
-        destructors = {
-            "query_id": self._ws.queries.delete,
-            "viz_id": self._ws.query_visualizations.delete,
-            "widget_id": self._ws.dashboard_widgets.delete,
-        }
-        new_state = {}
-        for k, v in state.items():
-            if k in desired_keys:
-                new_state[k] = v
-                continue
-            _, name = k.split(":")
-            if name not in destructors:
-                continue
-            destructors[name](v)
-        self._ws.workspace.upload(self._query_state, json.dumps(new_state).encode("utf8"))
-
-    def _deploy_dashboard(self, state):
-        if "dashboard_id" in state:
-            return
-        from databricks.sdk.service.sql import (
-            AccessControl,
-            ObjectTypePlural,
-            PermissionLevel,
-            RunAsRole,
-        )
-
-        dash = self._ws.dashboards.create(f"[{self._prefix}] Assessment", run_as_role=RunAsRole.VIEWER)
-        self._ws.dbsql_permissions.set(
-            ObjectTypePlural.DASHBOARDS,
-            dash.id,
-            access_control_list=[AccessControl(group_name="users", permission_level=PermissionLevel.CAN_VIEW)],
-        )
-        state["dashboard_id"] = dash.id
-
-    def _deployed_query_state(self):
-        state = {}
-        try:
-            state = json.load(self._ws.workspace.download(self._query_state))
-        except DatabricksError as err:
-            if err.error_code != "RESOURCE_DOES_NOT_EXIST":
-                raise err
-            self._ws.workspace.mkdirs(self._query_dir)
-        object_info = self._ws.workspace.get_status(self._query_dir)
-        parent = f"folders/{object_info.object_id}"
-        return parent, state
-
-    def _desired_queries(self) -> list[SimpleQuery]:
-        desired_queries = []
-        local_query_files = self._find_project_root() / "src/databricks/labs/ucx/assessment/queries"
-        for f in local_query_files.glob("*.sql"):
-            text = f.read_text("utf8")
-            text = text.replace("$inventory", f"hive_metastore.{self._current_config.inventory_database}")
-            desired_queries.append(
-                SimpleQuery(
-                    name=f.name,
-                    query=text,
-                    viz=self._parse_magic_comment(f, "-- viz ", text),
-                    widget=self._parse_magic_comment(f, "-- widget ", text),
-                )
-            )
-        return desired_queries
-
-    def _install_viz(self, query, state):
-        viz_types = {"table": self._table_viz_args}
-        if query.viz_type not in viz_types:
-            msg = f"{query.query}: unknown viz type: {query.viz_type}"
-            raise SyntaxError(msg)
-
-        viz_args = viz_types[query.viz_type](**query.viz_args)
-        if query.viz_key in state:
-            return self._ws.query_visualizations.update(state[query.viz_key], **viz_args)
-        viz = self._ws.query_visualizations.create(state[query.query_key], **viz_args)
-        state[query.viz_key] = viz.id
-
-    def _install_query(self, query: SimpleQuery, state: dict, data_source_id: str, parent: str):
-        from databricks.sdk.service.sql import (
-            AccessControl,
-            ObjectTypePlural,
-            PermissionLevel,
-            RunAsRole,
-        )
-
-        query_meta = {"data_source_id": data_source_id, "name": f"[{self._prefix}] {query.name}", "query": query.query}
-        if query.query_key in state:
-            return self._ws.queries.update(state[query.query_key], **query_meta)
-
-        deployed_query = self._ws.queries.create(parent=parent, run_as_role=RunAsRole.VIEWER, **query_meta)
-        self._ws.dbsql_permissions.set(
-            ObjectTypePlural.QUERIES,
-            deployed_query.id,
-            access_control_list=[AccessControl(group_name="users", permission_level=PermissionLevel.CAN_RUN)],
-        )
-        state[query.query_key] = deployed_query.id
-
-    def _table_viz_args(
-        self,
-        name: str,
-        columns: str,
-        *,
-        items_per_page: int = 25,
-        condensed=True,
-        with_row_number=False,
-        description: str | None = None,
-    ) -> dict:
-        return {
-            "type": "TABLE",
-            "name": name,
-            "description": description,
-            "options": {
-                "itemsPerPage": items_per_page,
-                "condensed": condensed,
-                "withRowNumber": with_row_number,
-                "version": 2,
-                "columns": [redash.VizColumn(name=x, title=x).as_dict() for x in columns.split(",")],
-            },
-        }
-
-    def _parse_magic_comment(self, f, magic_comment, text):
-        viz_comment = next(l for l in text.splitlines() if l.startswith(magic_comment))
-        if not viz_comment:
-            msg = f'{f}: cannot find "{magic_comment}" magic comment'
-            raise SyntaxError(msg)
-        return dict(_.split("=") for _ in viz_comment.replace(magic_comment, "").split(", "))
-
-    def _dashboard_data_source(self) -> str:
-        data_sources = {_.warehouse_id: _.id for _ in self._ws.data_sources.list()}
-        warehouses = self._ws.warehouses.list()
-        warehouse_id = self._current_config.warehouse_id
-        if not warehouse_id and not warehouses:
-            msg = "need either configured warehouse_id or an existing SQL warehouse"
-            raise ValueError(msg)
-        if not warehouse_id:
-            warehouse_id = warehouses[0].id
-        data_source_id = data_sources[warehouse_id]
-        return data_source_id
-
     def _create_jobs(self):
         logger.debug(f"Creating jobs from tasks in {main.__name__}")
         remote_wheel = self._upload_wheel()
@@ -384,11 +210,17 @@ class Installer:
             "All jobs are defined with necessary cluster configurations and DBR versions.",
         ]
         for step_name, job_id in self._deployed_steps.items():
-            md.append(f"## [[{self._prefix.upper()}] {step_name}]({self._ws.config.host}#job/{job_id})\n")
+            dashboard_link = ""
+            if step_name in self._dashboards:
+                dashboard_link = f"{self._ws.config.host}/sql/dashboards/{self._dashboards[step_name]}"
+                dashboard_link = f" (see [{step_name} dashboard]({dashboard_link}) after finish)"
+            job_link = f"[[{self._prefix.upper()}] {step_name}]({self._ws.config.host}#job/{job_id})"
+            md.append(f"## {job_link}{dashboard_link}\n")
             for t in _TASKS.values():
                 if t.workflow != step_name:
                     continue
                 doc = re.sub(r"\s+", " ", t.doc)
+                doc = self._replace_inventory_variable(doc)
                 md.append(f" - `{t.name}`:  {doc}")
                 md.append("")
         preamble = ["# Databricks notebook source", "# MAGIC %md"]
@@ -400,6 +232,9 @@ class Installer:
         msg = "Open job overview in README notebook in your home directory"
         if self._prompts and self._question(msg, default="yes") == "yes":
             webbrowser.open(url)
+
+    def _replace_inventory_variable(self, text: str) -> str:
+        return text.replace("$inventory", f"hive_metastore.{self._current_config.inventory_database}")
 
     def _create_debug(self, remote_wheel: str):
         readme_link = self._notebook_link(f"{self._install_folder}/README.py")
@@ -467,9 +302,20 @@ class Installer:
             job_cluster_key=task.job_cluster,
             depends_on=[jobs.TaskDependency(task_key=d) for d in _TASKS[task.name].depends_on],
         )
+        if task.dashboard:
+            return self._job_dashboard_task(jobs_task, task)
         if task.notebook:
             return self._job_notebook_task(jobs_task, task)
         return self._job_wheel_task(jobs_task, task, dbfs_path)
+
+    def _job_dashboard_task(self, jobs_task: jobs.Task, task: Task) -> jobs.Task:
+        return replace(
+            jobs_task,
+            sql_task=jobs.SqlTask(
+                warehouse_id=self._warehouse_id,
+                dashboard=jobs.SqlTaskDashboard(dashboard_id=self._dashboards[task.dashboard]),
+            ),
+        )
 
     def _job_notebook_task(self, jobs_task: jobs.Task, task: Task) -> jobs.Task:
         local_notebook = self._this_file.parent / task.notebook
