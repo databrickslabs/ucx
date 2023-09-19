@@ -19,6 +19,7 @@ from databricks.sdk.service.sql import (
 from databricks.sdk.service.workspace import ImportFormat, ObjectInfo
 
 from databricks.labs.ucx.config import GroupsConfig, MigrationConfig, TaclConfig
+from databricks.labs.ucx.framework.dashboards import DashboardFromFiles
 from databricks.labs.ucx.install import Installer
 
 
@@ -194,3 +195,34 @@ def test_main_with_existing_conf_does_not_recreate_config(mocker):
 
     webbrowser_open.assert_called_with("https://foo/#workspace/Users/me@example.com/.ucx/README.py")
     # ws.workspace.mkdirs.assert_called_with("/Users/me@example.com/.ucx")
+
+
+def test_query_metadata(mocker):
+    ws = mocker.Mock()
+    install = Installer(ws)
+    local_query_files = install._find_project_root() / "src/databricks/labs/ucx/assessment/queries"
+    DashboardFromFiles(ws, local_query_files, "any", "any").validate()
+
+
+def test_choices_out_of_range(mocker):
+    ws = mocker.Mock()
+    install = Installer(ws)
+    mocker.patch("builtins.input", return_value="42")
+    with pytest.raises(ValueError):
+        install._choice("foo", ["a", "b"])
+
+
+def test_choices_not_a_number(mocker):
+    ws = mocker.Mock()
+    install = Installer(ws)
+    mocker.patch("builtins.input", return_value="two")
+    with pytest.raises(ValueError):
+        install._choice("foo", ["a", "b"])
+
+
+def test_choices_happy(mocker):
+    ws = mocker.Mock()
+    install = Installer(ws)
+    mocker.patch("builtins.input", return_value="1")
+    res = install._choice("foo", ["a", "b"])
+    assert "b" == res

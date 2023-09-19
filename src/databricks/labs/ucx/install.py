@@ -281,13 +281,15 @@ class Installer:
         key = self._choice(text, list(choices.keys()))
         return choices[key]
 
-    def _choice(self, text: str, choices: list[Any]) -> str:
+    def _choice(self, text: str, choices: list[Any], *, max_attempts: int = 10) -> str:
         if not self._prompts:
             return "any"
         choices = sorted(choices)
         numbered = "\n".join(f"\033[1m[{i}]\033[0m \033[36m{v}\033[0m" for i, v in enumerate(choices))
         prompt = f"\033[1m{text}\033[0m\n{numbered}\nEnter a number between 0 and {len(choices)-1}: "
-        while True:
+        attempt = 0
+        while attempt < max_attempts:
+            attempt += 1
             res = input(prompt)
             try:
                 res = int(res)
@@ -298,6 +300,8 @@ class Installer:
                 print(f"\033[31m[ERROR] Out of range: {res}\033[0m\n")
                 continue
             return choices[res]
+        msg = f"cannot get answer within {max_attempts} attempt"
+        raise ValueError(msg)
 
     @staticmethod
     def _question(text: str, *, default: str | None = None) -> str:

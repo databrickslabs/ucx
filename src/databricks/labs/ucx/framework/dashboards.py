@@ -110,7 +110,24 @@ class DashboardFromFiles:
         self._store_query_state(desired_queries)
         return self._state["dashboard_id"]
 
-    def _install_widget(self, query):
+    def validate(self):
+        for query in self._desired_queries():
+            try:
+                self._get_viz_options(query)
+                self._get_widget_options(query)
+            except Exception as err:
+                msg = f"Error in {query.name}: {err}"
+                raise AssertionError(msg) from err
+
+    def _install_widget(self, query: SimpleQuery):
+        widget_options = self._get_widget_options(query)
+        # widgets are cleaned up every dashboard redeploy
+        widget = self._ws.dashboard_widgets.create(
+            self._state["dashboard_id"], widget_options, 1, visualization_id=self._state[query.viz_key]
+        )
+        self._state[query.widget_key] = widget.id
+
+    def _get_widget_options(self, query: SimpleQuery):
         self._pos += 1
         widget_options = WidgetOptions(
             title=query.widget["title"],
@@ -122,11 +139,7 @@ class DashboardFromFiles:
                 size_y=int(query.widget.get("size_y", 3)),
             ),
         )
-        # widgets are cleaned up every dashboard redeploy
-        widget = self._ws.dashboard_widgets.create(
-            self._state["dashboard_id"], widget_options, 1, visualization_id=self._state[query.viz_key]
-        )
-        self._state[query.widget_key] = widget.id
+        return widget_options
 
     def _installed_query_state(self):
         try:
@@ -154,7 +167,7 @@ class DashboardFromFiles:
         parent = f"folders/{object_info.object_id}"
         return parent
 
-    def _store_query_state(self, desired_queries):
+    def _store_query_state(self, desired_queries: list[SimpleQuery]):
         desired_keys = ["dashboard_id"]
         for query in desired_queries:
             desired_keys.append(query.query_key)
@@ -177,7 +190,7 @@ class DashboardFromFiles:
         state_dump = json.dumps(new_state, indent=2).encode("utf8")
         self._ws.workspace.upload(self._query_state, state_dump, format=ImportFormat.AUTO, overwrite=True)
 
-    def _install_dashboard(self, parent):
+    def _install_dashboard(self, parent: str):
         if "dashboard_id" in self._state:
             for widget in self._ws.dashboards.get(self._state["dashboard_id"]).widgets:
                 self._ws.dashboard_widgets.delete(widget.id)
@@ -206,17 +219,20 @@ class DashboardFromFiles:
             )
         return desired_queries
 
-    def _install_viz(self, query):
-        viz_types = {"table": self._table_viz_args}
-        if query.viz_type not in viz_types:
-            msg = f"{query.query}: unknown viz type: {query.viz_type}"
-            raise SyntaxError(msg)
-
-        viz_args = viz_types[query.viz_type](**query.viz_args)
+    def _install_viz(self, query: SimpleQuery):
+        viz_args = self._get_viz_options(query)
         if query.viz_key in self._state:
             return self._ws.query_visualizations.update(self._state[query.viz_key], **viz_args)
         viz = self._ws.query_visualizations.create(self._state[query.query_key], **viz_args)
         self._state[query.viz_key] = viz.id
+
+    def _get_viz_options(self, query: SimpleQuery):
+        viz_types = {"table": self._table_viz_args}
+        if query.viz_type not in viz_types:
+            msg = f"{query.query}: unknown viz type: {query.viz_type}"
+            raise SyntaxError(msg)
+        viz_args = viz_types[query.viz_type](**query.viz_args)
+        return viz_args
 
     def _install_query(self, query: SimpleQuery, data_source_id: str, parent: str):
         query_meta = {"data_source_id": data_source_id, "name": f"{self._name} - {query.name}", "query": query.query}
