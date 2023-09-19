@@ -3,8 +3,11 @@ import json
 import logging
 import os
 import pathlib
+import shutil
 import string
+import subprocess
 import sys
+from pathlib import Path
 from typing import BinaryIO, Optional
 
 import pytest
@@ -12,6 +15,7 @@ from databricks.sdk import AccountClient, WorkspaceClient
 from databricks.sdk.core import DatabricksError
 from databricks.sdk.service import compute, iam, jobs, pipelines, workspace
 from databricks.sdk.service.sql import CreateWarehouseRequestWarehouseType
+from databricks.sdk.service.workspace import ImportFormat
 
 _LOG = logging.getLogger(__name__)
 
@@ -34,6 +38,55 @@ def factory(name, create, remove):
         except DatabricksError as e:
             # TODO: fix on the databricks-labs-pytester level
             _LOG.debug(f"ignoring error while {name} {x} teardown: {e}")
+
+
+@pytest.fixture
+def fresh_wheel_file(tmp_path) -> Path:
+    this_file = Path(__file__)
+    project_root = this_file.parent.parent.parent.parent.parent.parent.absolute()
+    # TODO: we can dynamically determine this with python -m build .
+    wheel_name = "databricks_labs_ucx"
+
+    build_root = tmp_path / fresh_wheel_file.__name__
+    shutil.copytree(project_root, build_root)
+    try:
+        completed_process = subprocess.run(
+            [sys.executable, "-m", "pip", "wheel", "."],
+            capture_output=True,
+            cwd=build_root,
+            check=True,
+        )
+        if completed_process.returncode != 0:
+            raise RuntimeError(completed_process.stderr)
+
+        found_wheels = list(build_root.glob(f"{wheel_name}-*.whl"))
+        if not found_wheels:
+            msg = f"cannot find {wheel_name}-*.whl"
+            raise RuntimeError(msg)
+        if len(found_wheels) > 1:
+            conflicts = ", ".join(str(whl) for whl in found_wheels)
+            msg = f"more than one wheel match: {conflicts}"
+            raise RuntimeError(msg)
+        wheel_file = found_wheels[0]
+
+        return wheel_file
+    except subprocess.CalledProcessError as e:
+        raise RuntimeError(e.stderr) from None
+
+
+@pytest.fixture
+def wsfs_wheel(ws, fresh_wheel_file, make_random):
+    my_user = ws.current_user.me().user_name
+    workspace_location = f"/Users/{my_user}/wheels/{make_random(10)}"
+    ws.workspace.mkdirs(workspace_location)
+
+    wsfs_wheel = f"{workspace_location}/{fresh_wheel_file.name}"
+    with fresh_wheel_file.open("rb") as f:
+        ws.workspace.upload(wsfs_wheel, f, format=ImportFormat.AUTO)
+
+    yield wsfs_wheel
+
+    ws.workspace.delete(workspace_location, recursive=True)
 
 
 @pytest.fixture

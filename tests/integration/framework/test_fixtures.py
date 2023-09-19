@@ -3,6 +3,7 @@ import os
 
 from databricks.sdk.service.workspace import AclPermission
 
+from databricks.labs.ucx.mixins.compute import CommandExecutor
 from databricks.labs.ucx.mixins.fixtures import *  # noqa: F403
 
 load_debug_env_if_runs_from_ide("ucws")  # noqa: F405
@@ -66,3 +67,32 @@ def test_job(make_job):
 
 def test_pipeline(make_pipeline):
     logger.info(f"created {make_pipeline()}")
+
+
+def test_this_wheel_installs(ws, wsfs_wheel):
+    commands = CommandExecutor(ws)
+
+    commands.install_notebook_library(f"/Workspace{wsfs_wheel}")
+    installed_version = commands.run(
+        """
+        from databricks.labs.ucx.__about__ import __version__
+        print(__version__)
+        """
+    )
+
+    assert installed_version is not None
+
+
+def test_sql_backend_works(ws, wsfs_wheel):
+    commands = CommandExecutor(ws)
+
+    commands.install_notebook_library(f"/Workspace{wsfs_wheel}")
+    database_names = commands.run(
+        """
+        from databricks.labs.ucx.framework.crawlers import RuntimeBackend
+        backend = RuntimeBackend()
+        return backend.fetch("SHOW DATABASES")
+        """
+    )
+
+    assert len(database_names) > 0
