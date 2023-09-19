@@ -7,11 +7,13 @@ import tempfile
 import webbrowser
 from dataclasses import replace
 from pathlib import Path
+from typing import Any
 
 import yaml
 from databricks.sdk import WorkspaceClient
 from databricks.sdk.core import DatabricksError
 from databricks.sdk.service import compute, jobs
+from databricks.sdk.service.sql import EndpointInfoWarehouseType, SpotInstancePolicy
 from databricks.sdk.service.workspace import ImportFormat
 
 from databricks.labs.ucx.__about__ import __version__
@@ -90,10 +92,10 @@ class Installer:
     def _warehouse_id(self) -> str:
         if self._current_config.warehouse_id is not None:
             return self._current_config.warehouse_id
-        warehouses = self._ws.warehouses.list()
+        warehouses = [_ for _ in self._ws.warehouses.list() if _.warehouse_type == EndpointInfoWarehouseType.PRO]
         warehouse_id = self._current_config.warehouse_id
         if not warehouse_id and not warehouses:
-            msg = "need either configured warehouse_id or an existing SQL warehouse"
+            msg = "need either configured warehouse_id or an existing PRO SQL warehouse"
             raise ValueError(msg)
         if not warehouse_id:
             warehouse_id = warehouses[0].id
@@ -140,6 +142,25 @@ class Installer:
 
         logger.info("Please answer a couple of questions to configure Unity Catalog migration")
         inventory_database = self._question("Inventory Database", default="ucx")
+
+        pro_warehouses = {"[Create new PRO SQL warehouse]": "create_new"} | {
+            f"{_.name} ({_.id}, {_.warehouse_type.value}, {_.state.value})": _.id
+            for _ in self._ws.warehouses.list()
+            if _.warehouse_type == EndpointInfoWarehouseType.PRO
+        }
+        warehouse_id = self._choice_from_dict(
+            "Select PRO or SERVERLESS SQL warehouse to run assessment dashboards on", pro_warehouses
+        )
+        if warehouse_id == "create_new":
+            new_warehouse = self._ws.warehouses.create(
+                name="Unity Catalog Migration",
+                spot_instance_policy=SpotInstancePolicy.COST_OPTIMIZED,
+                warehouse_type=EndpointInfoWarehouseType.PRO,
+                cluster_size="Small",
+                max_num_clusters=1,
+            )
+            warehouse_id = new_warehouse.id
+
         selected_groups = self._question(
             "Comma-separated list of workspace group names to migrate (empty means all)", default="<ALL>"
         )
@@ -157,6 +178,7 @@ class Installer:
             inventory_database=inventory_database,
             groups=GroupsConfig(**groups_config_args),
             tacl=TaclConfig(auto=True),
+            warehouse_id=warehouse_id,
             log_level=log_level,
             num_threads=num_threads,
         )
@@ -255,6 +277,28 @@ class Installer:
     def _notebook_link(self, path: str) -> str:
         return f"{self._ws.config.host}/#workspace{path}"
 
+    def _choice_from_dict(self, text: str, choices: dict[str, Any]) -> Any:
+        key = self._choice(text, list(choices.keys()))
+        return choices[key]
+
+    def _choice(self, text: str, choices: list[Any]) -> str:
+        if not self._prompts:
+            return "any"
+        choices = sorted(choices)
+        numbered = "\n".join(f"\033[1m[{i}]\033[0m \033[36m{v}\033[0m" for i, v in enumerate(choices))
+        prompt = f"\033[1m{text}\033[0m\n{numbered}\nEnter a number between 0 and {len(choices)-1}: "
+        while True:
+            res = input(prompt)
+            try:
+                res = int(res)
+            except ValueError:
+                print(f"\033[31m[ERROR] Invalid number: {res}\033[0m\n")
+                continue
+            if res >= len(choices) or res < 0:
+                print(f"\033[31m[ERROR] Out of range: {res}\033[0m\n")
+                continue
+            return choices[res]
+
     @staticmethod
     def _question(text: str, *, default: str | None = None) -> str:
         default_help = "" if default is None else f"\033[36m (default: {default})\033[0m"
@@ -311,6 +355,7 @@ class Installer:
     def _job_dashboard_task(self, jobs_task: jobs.Task, task: Task) -> jobs.Task:
         return replace(
             jobs_task,
+            job_cluster_key=None,
             sql_task=jobs.SqlTask(
                 warehouse_id=self._warehouse_id,
                 dashboard=jobs.SqlTaskDashboard(dashboard_id=self._dashboards[task.dashboard]),

@@ -10,7 +10,9 @@ from databricks.sdk.service.sql import (
     Dashboard,
     DataSource,
     EndpointInfo,
+    EndpointInfoWarehouseType,
     Query,
+    State,
     Visualization,
     Widget,
 )
@@ -36,8 +38,12 @@ def test_save_config(mocker):
     ws.current_user.me = lambda: iam.User(user_name="me@example.com", groups=[iam.ComplexValue(display="admins")])
     ws.config.host = "https://foo"
     ws.workspace.get_status = not_found
+    ws.warehouses.list = lambda **_: [
+        EndpointInfo(id="abc", warehouse_type=EndpointInfoWarehouseType.PRO, state=State.RUNNING)
+    ]
 
     install = Installer(ws)
+    install._choice = lambda _1, _2: "None (abc, PRO, RUNNING)"
     install._configure()
 
     ws.workspace.upload.assert_called_with(
@@ -52,6 +58,7 @@ num_threads: 42
 tacl:
   auto: true
 version: 1
+warehouse_id: abc
 workspace_start_path: /
 """,
         format=ImportFormat.AUTO,
@@ -89,9 +96,13 @@ def test_save_config_auto_groups(mocker):
     ws.current_user.me = lambda: iam.User(user_name="me@example.com", groups=[iam.ComplexValue(display="admins")])
     ws.config.host = "https://foo"
     ws.workspace.get_status = not_found
+    ws.warehouses.list = lambda **_: [
+        EndpointInfo(id="abc", warehouse_type=EndpointInfoWarehouseType.PRO, state=State.RUNNING)
+    ]
 
     install = Installer(ws)
     install._question = mock_question
+    install._choice = lambda _1, _2: "None (abc, PRO, RUNNING)"
     install._configure()
 
     ws.workspace.upload.assert_called_with(
@@ -105,6 +116,7 @@ num_threads: 42
 tacl:
   auto: true
 version: 1
+warehouse_id: abc
 workspace_start_path: /
 """,
         format=ImportFormat.AUTO,
@@ -126,9 +138,13 @@ def test_save_config_strip_group_names(mocker):
     ws.current_user.me = lambda: iam.User(user_name="me@example.com", groups=[iam.ComplexValue(display="admins")])
     ws.config.host = "https://foo"
     ws.workspace.get_status = not_found
+    ws.warehouses.list = lambda **_: [
+        EndpointInfo(id="abc", warehouse_type=EndpointInfoWarehouseType.PRO, state=State.RUNNING)
+    ]
 
     install = Installer(ws)
     install._question = mock_question
+    install._choice = lambda _1, _2: "None (abc, PRO, RUNNING)"
     install._configure()
 
     ws.workspace.upload.assert_called_with(
@@ -145,6 +161,7 @@ num_threads: 42
 tacl:
   auto: true
 version: 1
+warehouse_id: abc
 workspace_start_path: /
 """,
         format=ImportFormat.AUTO,
@@ -165,7 +182,7 @@ def test_main_with_existing_conf_does_not_recreate_config(mocker):
     ws.workspace.download = lambda _: io.BytesIO(config_bytes)
     ws.workspace.get_status = lambda _: ObjectInfo(object_id=123)
     ws.data_sources.list = lambda: [DataSource(id="bcd", warehouse_id="abc")]
-    ws.warehouses.list = lambda **_: [EndpointInfo(id="abc")]
+    ws.warehouses.list = lambda **_: [EndpointInfo(id="abc", warehouse_type=EndpointInfoWarehouseType.PRO)]
     ws.dashboards.create.return_value = Dashboard(id="abc")
     ws.queries.create.return_value = Query(id="abc")
     ws.query_visualizations.create.return_value = Visualization(id="abc")
