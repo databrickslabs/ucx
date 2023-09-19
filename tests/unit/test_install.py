@@ -169,6 +169,99 @@ workspace_start_path: /
     )
 
 
+def test_save_config_with_error(mocker):
+    def not_found(_):
+        raise DatabricksError(error_code="RAISED_FOR_TESTING")
+
+    mocker.patch("builtins.input", return_value="42")
+    ws = mocker.Mock()
+    ws.current_user.me = lambda: iam.User(user_name="me@example.com", groups=[iam.ComplexValue(display="admins")])
+    ws.config.host = "https://foo"
+    ws.workspace.get_status = not_found
+
+    install = Installer(ws)
+    with pytest.raises(DatabricksError) as e_info:
+        install._configure()
+    assert str(e_info.value.error_code) == "RAISED_FOR_TESTING"
+
+
+def test_save_config_auto_groups(mocker):
+    def not_found(_):
+        raise DatabricksError(error_code="RESOURCE_DOES_NOT_EXIST")
+
+    def mock_question(text: str, *, default: str | None = None) -> str:
+        if "workspace group names" in text:
+            return "<ALL>"
+        else:
+            return "42"
+
+    mocker.patch("builtins.input", return_value="42")
+    ws = mocker.Mock()
+    ws.current_user.me = lambda: iam.User(user_name="me@example.com", groups=[iam.ComplexValue(display="admins")])
+    ws.config.host = "https://foo"
+    ws.workspace.get_status = not_found
+
+    install = Installer(ws)
+    install._question = mock_question
+    install._configure()
+
+    ws.workspace.upload.assert_called_with(
+        "/Users/me@example.com/.ucx/config.yml",
+        b"""groups:
+  auto: true
+  backup_group_prefix: '42'
+inventory_database: '42'
+log_level: '42'
+num_threads: 42
+tacl:
+  auto: true
+version: 1
+workspace_start_path: /
+""",
+        format=ImportFormat.AUTO,
+    )
+
+
+def test_save_config_strip_group_names(mocker):
+    def not_found(_):
+        raise DatabricksError(error_code="RESOURCE_DOES_NOT_EXIST")
+
+    def mock_question(text: str, *, default: str | None = None) -> str:
+        if "workspace group names" in text:
+            return "g1, g2, g99"
+        else:
+            return "42"
+
+    mocker.patch("builtins.input", return_value="42")
+    ws = mocker.Mock()
+    ws.current_user.me = lambda: iam.User(user_name="me@example.com", groups=[iam.ComplexValue(display="admins")])
+    ws.config.host = "https://foo"
+    ws.workspace.get_status = not_found
+
+    install = Installer(ws)
+    install._question = mock_question
+    install._configure()
+
+    ws.workspace.upload.assert_called_with(
+        "/Users/me@example.com/.ucx/config.yml",
+        b"""groups:
+  backup_group_prefix: '42'
+  selected:
+  - g1
+  - g2
+  - g99
+inventory_database: '42'
+log_level: '42'
+num_threads: 42
+tacl:
+  auto: true
+version: 1
+workspace_start_path: /
+""",
+        format=ImportFormat.AUTO,
+    )
+
+
 def test_main_with_existing_conf_does_not_recreate_config(mocker):
     mocker.patch("builtins.input", return_value="yes")
     webbrowser_open = mocker.patch("webbrowser.open")
