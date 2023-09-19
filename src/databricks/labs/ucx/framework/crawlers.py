@@ -85,7 +85,10 @@ class StatementExecutionBackend(SqlBackend):
             elif f.type == bool:
                 data.append("TRUE" if value else "FALSE")
             elif f.type == str:
+                value = value.replace("'", "''")
                 data.append(f"'{value}'")
+            elif f.type == int:
+                data.append(f"{value}")
             else:
                 msg = f"unknown type: {f.type}"
                 raise ValueError(msg)

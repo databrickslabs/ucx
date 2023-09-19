@@ -7,6 +7,8 @@ from dataclasses import dataclass
 
 from databricks.sdk import WorkspaceClient
 from databricks.sdk.service.compute import Language, ClusterDetails
+
+from databricks.labs.ucx.framework.crawlers import CrawlerBase
 from databricks.labs.ucx.hive_metastore.tables import Table
 from databricks.labs.ucx.hive_metastore.table_acls import (
     RuntimeBackend,
@@ -14,6 +16,34 @@ from databricks.labs.ucx.hive_metastore.table_acls import (
     StatementExecutionBackend,
 )
 from databricks.labs.ucx.mixins.sql import StatementExecutionExt
+
+
+@dataclass
+class JobInfo:
+    job_id: str
+    job_name: str
+    creator: str
+    success: int
+    failures: str
+
+@dataclass
+class ClusterInfo:
+    cluster_id: str
+    cluster_name: str
+    creator: str
+    success: int
+    failures: str
+
+
+@dataclass
+class ExtLoc:
+    location: str
+
+@dataclass
+class Mount:
+    name: str
+    source: str
+    instance_profile: str
 
 
 def spark_version_compatibility(spark_version: str) -> str:
@@ -40,14 +70,13 @@ class AssessmentToolkit:
         'spark.databricks.hive.metastore.glueCatalog.enabled'
     }
 
-    def __init__(self, ws: WorkspaceClient, cluster_id, inventory_catalog, inventory_schema, warehouse_id=None):
+    def __init__(self, ws: WorkspaceClient, inventory_catalog, inventory_schema, warehouse_id=None):
         self._all_jobs = None
         self._all_clusters_by_id = None
         self._ws = ws
         self._inventory_catalog = inventory_catalog
         self._inventory_schema = inventory_schema
         self._warehouse_id = warehouse_id
-        self._cluster_id = cluster_id
         self._external_locations = None
 
     @staticmethod
@@ -58,55 +87,11 @@ class AssessmentToolkit:
             msg = "Current user is not a workspace admin"
             raise RuntimeError(msg)
 
-    @staticmethod
-    def _external_locations(tables: [Table]):
-        ext_locations = []
-        for table in tables:
-            dupe = False
-            loc = 0
-            while loc < len(ext_locations) and not dupe:
-                common = os.path.commonprefix([ext_locations[loc], os.path.dirname(table.location) + '/'])
-                if common.count("/") > 2:
-                    ext_locations[loc] = common
-                    dupe = True
-                loc += 1
-            if not dupe:
-                ext_locations.append((os.path.dirname(table.location) + '/'))
-        return ext_locations
-
     def generate_ext_loc_list(self):
-        crawler = InventoryTableCrawler(self._ws, self._warehouse_id, "ucx_assessment", "hms_tables")
-        table_list = crawler.get_all_tables()
-        return AssessmentToolkit._external_locations(table_list)
-
-    def retrieve_mount_points(self):
-        mount_points = []
-        return None
-
-    def retrieve_jobs(self):
-        return list(self._ws.jobs.list(expand_tasks=True))
-
-    def retrieve_clusters(self):
-        return {c.cluster_id: c for c in self._ws.clusters.list()}
-
-    @staticmethod
-    def _get_cluster_configs_from_all_jobs(all_jobs, all_clusters_by_id):
-        for j in all_jobs:
-            if j.settings.job_clusters is not None:
-                for jc in j.settings.job_clusters:
-                    if jc.new_cluster is None:
-                        continue
-                    yield j, jc.new_cluster
-
-            for t in j.settings.tasks:
-                if t.existing_cluster_id is not None:
-                    interactive_cluster = all_clusters_by_id.get(t.existing_cluster_id, None)
-                    if interactive_cluster is None:
-                        continue
-                    yield j, interactive_cluster
-
-                elif t.new_cluster is not None:
-                    yield j, t.new_cluster
+        crawler = ExternalLocationCrawler(self._backend(self._ws, self._warehouse_id), ws, self._inventory_catalog,
+                                          self._inventory_schema)
+        ext_loc_list = crawler.snapshot()
+        return ext_loc_list
 
     def generate_job_assessment(self):
         return AssessmentToolkit._parse_jobs(self.retrieve_jobs(), self.retrieve_clusters())
@@ -169,36 +154,209 @@ class AssessmentToolkit:
         return StatementExecutionBackend(ws, warehouse_id)
 
 
-class InventoryTableCrawler:
-    def __init__(self, ws: WorkspaceClient, warehouse_id, schema: str, table: str):
-        self._schema = schema
-        self._table = table
+class InventoryTableCrawler(CrawlerBase):
+
+    def __init__(self, sbe: SqlBackend, catalog, schema):
+        super().__init__(sbe, catalog, schema, "tables")
+
+    def snapshot(self) -> list[Table]:
+        return self._snapshot(self._try_fetch, self._mock_loader)
+
+    def _mock_loader(self):
+        return None
+
+    def _try_fetch(self) -> list[Table]:
+        for row in self._fetch(
+            f'SELECT * FROM {self._schema}.{self._table}'
+        ):
+            yield Table(*row)
+
+
+class ExternalLocationCrawler(CrawlerBase):
+
+    def __init__(self, sbe: SqlBackend, ws: WorkspaceClient, catalog, schema):
+        super().__init__(sbe, catalog, schema, "external_locations")
         self._ws = ws
-        self._warehouse_id = warehouse_id
-        self._executor = StatementExecutionBackend(ws, warehouse_id)
-        #self._executor = StatementExecutionExt(ws.api_client)
 
-    def get_all_tables(self):
-        result_set = []
-        for table_entry in list(self._executor.fetch(f"select * from {self._schema}.{self._table}")):
-            cur_table = Table("hive_metastore", table_entry.as_dict()["db"], table_entry.as_dict()["table"], table_entry.as_dict()["type"],
-                              table_entry.as_dict()["format"], table_entry.as_dict()["table_location"])
-            result_set.append(cur_table)
-        return result_set
+    def _external_locations(self, tables: [ExtLoc]):
+        mounts = MountsCrawler(self._backend, self._ws, self._schema).snapshot()
+        ext_locations = []
+        for table in tables:
+            location = table.location
+            if location is not None and len(location) > 0:
+                if location.startswith("dbfs:/mnt"):
+                    for mount in mounts:
+                        if location[5:0].startswith(mount.name):
+                            location = location.replace(mount.name,mount.source)
+                            break
+                if not location.startswith("dbfs"):
+                    dupe = False
+                    loc = 0
+                    while loc < len(ext_locations) and not dupe:
+                        common = os.path.commonprefix([ext_locations[loc].location, os.path.dirname(location) + '/'])
+                        if common.count("/") > 2:
+                            ext_locations[loc] = ExtLoc(common)
+                            dupe = True
+                        loc += 1
+                    if not dupe:
+                        ext_locations.append(ExtLoc(os.path.dirname(location) + '/'))
+        return ext_locations
 
-@dataclass
-class JobInfo:
-    job_id: int
-    name: str
-    success: int
-    failures: list[str]
+    def _ext_loc_list(self):
+        crawler = InventoryTableCrawler(self._backend, self._catalog, self._schema)
+        table_list = crawler.snapshot()
+        return self._external_locations(table_list)
 
+    def snapshot(self) -> list[ExtLoc]:
+        return self._snapshot(self._try_fetch, self._ext_loc_list)
+
+    def _try_fetch(self) -> list[ExtLoc]:
+        for row in self._fetch(
+            f'SELECT * FROM {self._schema}.{self._table}'
+        ):
+            yield ExtLoc(*row)
+
+
+class MountsCrawler(CrawlerBase):
+    def __init__(self, backend: SqlBackend, ws: WorkspaceClient, inventory_database: str):
+        super().__init__(backend, "hive_metastore", inventory_database, "mounts")
+        self._dbutils = ws.dbutils
+
+    def inventorize_mounts(self):
+        self._append_records(self._list_mounts())
+
+    def _list_mounts(self):
+        mounts = []
+        for mount_point, source, _ in self._dbutils.fs.mounts():
+            mounts.append(Mount(mount_point, source))
+        return mounts
+
+    def snapshot(self) -> list[Mount]:
+        return self._snapshot(self._try_fetch, self._list_mounts)
+
+    def _try_fetch(self) -> list[Mount]:
+        for row in self._fetch(
+            f'SELECT * FROM {self._schema}.{self._table}'
+        ):
+            yield Mount(*row)
+
+
+class ClustersCrawler(CrawlerBase):
+
+    def __init__(self, sbe: SqlBackend, ws: WorkspaceClient, catalog, schema):
+        super().__init__(sbe, catalog, schema, "clusters")
+        self._ws = ws
+
+    def _crawl(self) -> list[ClusterInfo]:
+        all_clusters = list(self._ws.clusters.list())
+        for cluster in all_clusters:
+            cluster_info = ClusterInfo(cluster.cluster_id, cluster.cluster_name, cluster.creator_user_name, 1, [])
+            support_status = spark_version_compatibility(cluster.spark_version)
+            failures = []
+            if support_status != 'supported':
+                failures.append(f'not supported DBR: {cluster.spark_version}')
+
+            if cluster.spark_conf is not None:
+                for k in AssessmentToolkit.incompatible_spark_config_keys:
+                    if k in cluster.spark_conf:
+                        using_incompatible_config = True
+                        failures.append(f'unsupported config: {k}')
+
+                for value in cluster.spark_conf.values():
+                    if 'dbfs:/mnt' in value or '/dbfs/mnt' in value:
+                        failures.append(f'using DBFS mount in configuration: {value}')
+            cluster_info.failures = json.dumps(failures)
+            if len(failures) > 0:
+                cluster_info.success = 0
+            yield cluster_info
+
+    def snapshot(self) -> list[ClusterInfo]:
+        return self._snapshot(self._try_fetch, self._crawl)
+
+    def _try_fetch(self) -> list[ClusterInfo]:
+        for row in self._fetch(
+            f'SELECT * FROM {self._schema}.{self._table}'
+        ):
+            yield ExtLoc(*row)
+
+
+class JobsCrawler(CrawlerBase):
+
+    def __init__(self, sbe: SqlBackend, ws: WorkspaceClient, catalog, schema):
+        super().__init__(sbe, catalog, schema, "jobs")
+        self._ws = ws
+
+    def _get_cluster_configs_from_all_jobs(self, all_jobs, all_clusters_by_id):
+        for j in all_jobs:
+            if j.settings.job_clusters is not None:
+                for jc in j.settings.job_clusters:
+                    if jc.new_cluster is None:
+                        continue
+                    yield j, jc.new_cluster
+
+            for t in j.settings.tasks:
+                if t.existing_cluster_id is not None:
+                    interactive_cluster = all_clusters_by_id.get(t.existing_cluster_id, None)
+                    if interactive_cluster is None:
+                        continue
+                    yield j, interactive_cluster
+
+                elif t.new_cluster is not None:
+                    yield j, t.new_cluster
+
+    def _crawl(self) -> list[JobInfo]:
+
+        all_jobs = list(self._ws.jobs.list(expand_tasks=True))
+        all_clusters = {c.cluster_id: c for c in self._ws.clusters.list()}
+        incompatible_spark_config_keys = {
+            'spark.databricks.passthrough.enabled',
+            'spark.hadoop.javax.jdo.option.ConnectionURL',
+            'spark.databricks.hive.metastore.glueCatalog.enabled'
+        }
+        job_assessment = {}
+        job_details = {}
+        for job in all_jobs:
+            job_assessment[job.job_id] = set()
+            job_details[job.job_id] = JobInfo(str(job.job_id), job.settings.name, job.creator_user_name, 1, "")
+
+        for job, cluster_config in \
+                self._get_cluster_configs_from_all_jobs(all_jobs, all_clusters):
+            support_status = spark_version_compatibility(cluster_config.spark_version)
+            if support_status != 'supported':
+                job_assessment[job.job_id].add(f'not supported DBR: {cluster_config.spark_version}')
+
+            if cluster_config.spark_conf is not None:
+                for k in incompatible_spark_config_keys:
+                    if k in cluster_config.spark_conf:
+                        using_incompatible_config = True
+                        job_assessment[job.job_id].add(f'unsupported config: {k}')
+
+                for value in cluster_config.spark_conf.values():
+                    if 'dbfs:/mnt' in value or '/dbfs/mnt' in value:
+                        job_assessment[job.job_id].add(f'using DBFS mount in configuration: {value}')
+        for job_key in job_details.keys():
+            job_details[job_key].failures = json.dumps(list(job_assessment[job_key]))
+            if len(job_assessment[job_key]) > 0:
+                job_details[job_key].success = 0
+        return list(job_details.values())
+
+    def snapshot(self) -> list[ClusterInfo]:
+        return self._snapshot(self._try_fetch, self._crawl)
+
+    def _try_fetch(self) -> list[ClusterInfo]:
+        for row in self._fetch(
+            f'SELECT * FROM {self._schema}.{self._table}'
+        ):
+            yield ExtLoc(*row)
 
 if __name__ == "__main__":
-    ws = WorkspaceClient()
-    cluster_id = os.getenv("CLUSTER_ID")
-    print(cluster_id)
-    assess = AssessmentToolkit(ws, cluster_id, "UCX", "UCX_assessment",os.getenv("TEST_DEFAULT_WAREHOUSE_ID"))
+    ws = WorkspaceClient(cluster_id="0919-184725-qa0q5jkc")
+
+    assess = AssessmentToolkit(ws, "hive_metastore", "ucx", os.getenv("TEST_DEFAULT_WAREHOUSE_ID"))
     # assess.table_inventory()
-    resultSet = assess.generate_ext_loc_list()
-    print(resultSet)
+    # resultSet = assess.generate_ext_loc_list()
+    # print(resultSet)
+    # print(MountsCrawler(StatementExecutionBackend(ws, os.getenv("TEST_DEFAULT_WAREHOUSE_ID")), ws, "ucx").snapshot())
+    crawler = JobsCrawler(StatementExecutionBackend(ws, os.getenv("TEST_DEFAULT_WAREHOUSE_ID")), ws, "hive_metastore", "ucx")
+    print(crawler.snapshot())
+
