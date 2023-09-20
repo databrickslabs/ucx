@@ -139,7 +139,7 @@ def migrate_permissions(cfg: MigrationConfig):
 
 @task("migrate-groups-cleanup", depends_on=[migrate_permissions])
 def delete_backup_groups(cfg: MigrationConfig):
-    """Removes backup groups"""
+    """Removes workspace-level backup groups"""
     toolkit = GroupMigrationToolkit(cfg)
     toolkit.prepare_environment()
     toolkit.delete_backup_groups()
