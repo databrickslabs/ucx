@@ -27,3 +27,12 @@ class Mounts(CrawlerBase):
         for mount_point, source, _ in self._dbutils.fs.mounts():
             mounts.append(Mount(mount_point, source))
         return mounts
+
+    def snapshot(self) -> list[Mount]:
+        return self._snapshot(self._try_fetch, self._list_mounts)
+
+    def _try_fetch(self) -> list[Mount]:
+        for row in self._fetch(
+            f'SELECT * FROM {self._schema}.{self._table}'
+        ):
+            yield Mount(*row)

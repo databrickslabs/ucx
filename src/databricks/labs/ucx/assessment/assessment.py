@@ -9,13 +9,14 @@ from databricks.sdk import WorkspaceClient
 from databricks.sdk.service.compute import Language, ClusterDetails
 
 from databricks.labs.ucx.framework.crawlers import CrawlerBase
+from databricks.labs.ucx.hive_metastore.data_objects import ExternalLocationCrawler, ExtLoc
 from databricks.labs.ucx.hive_metastore.tables import Table
 from databricks.labs.ucx.hive_metastore.table_acls import (
     RuntimeBackend,
     SqlBackend,
-    StatementExecutionBackend,
+    StatementExecutionBackend
 )
-from databricks.labs.ucx.mixins.sql import StatementExecutionExt
+from databricks.labs.ucx.mixins.sql import StatementExecutionExt, Row
 
 
 @dataclass
@@ -26,6 +27,7 @@ class JobInfo:
     success: int
     failures: str
 
+
 @dataclass
 class ClusterInfo:
     cluster_id: str
@@ -33,17 +35,6 @@ class ClusterInfo:
     creator: str
     success: int
     failures: str
-
-
-@dataclass
-class ExtLoc:
-    location: str
-
-@dataclass
-class Mount:
-    name: str
-    source: str
-    instance_profile: str
 
 
 def spark_version_compatibility(spark_version: str) -> str:
@@ -70,11 +61,10 @@ class AssessmentToolkit:
         'spark.databricks.hive.metastore.glueCatalog.enabled'
     }
 
-    def __init__(self, ws: WorkspaceClient, inventory_catalog, inventory_schema, backend=None):
+    def __init__(self, ws: WorkspaceClient, inventory_schema, backend=None):
         self._all_jobs = None
         self._all_clusters_by_id = None
         self._ws = ws
-        self._inventory_catalog = inventory_catalog
         self._inventory_schema = inventory_schema
         self._backend = backend
         self._external_locations = None
@@ -88,18 +78,15 @@ class AssessmentToolkit:
             raise RuntimeError(msg)
 
     def generate_ext_loc_list(self):
-        crawler = ExternalLocationCrawler(self._backend, ws, self._inventory_catalog,
-                                          self._inventory_schema)
+        crawler = ExternalLocationCrawler(ws, self._backend, self._inventory_schema)
         return crawler.snapshot()
 
     def generate_job_assessment(self):
-        crawler = JobsCrawler(self._backend, ws, "hive_metastore",
-                              self._inventory_catalog)
+        crawler = JobsCrawler(self._backend, self._inventory_schema)
         return crawler.snapshot()
 
     def generate_cluster_assessment(self):
-        crawler = ClustersCrawler(self._backend, ws, "hive_metastore",
-                                  self._inventory_catalog)
+        crawler = ClustersCrawler(self._backend, self._inventory_schema)
         return crawler.snapshot()
 
 
@@ -110,103 +97,16 @@ class AssessmentToolkit:
     #     return StatementExecutionBackend(ws, warehouse_id)
 
 
-class InventoryTableCrawler(CrawlerBase):
-
-    def __init__(self, sbe: SqlBackend, catalog, schema):
-        super().__init__(sbe, catalog, schema, "tables")
-
-    def snapshot(self) -> list[Table]:
-        return self._snapshot(self._try_fetch, self._mock_loader)
-
-    def _mock_loader(self):
-        return None
-
-    def _try_fetch(self) -> list[Table]:
-        for row in self._fetch(
-            f'SELECT * FROM {self._schema}.{self._table}'
-        ):
-            yield Table(*row)
-
-
-class ExternalLocationCrawler(CrawlerBase):
-
-    def __init__(self, sbe: SqlBackend, ws: WorkspaceClient, catalog, schema):
-        super().__init__(sbe, catalog, schema, "external_locations")
-        self._ws = ws
-
-    def _external_locations(self, tables: [ExtLoc]):
-        mounts = MountsCrawler(self._backend, self._ws, self._schema).snapshot()
-        ext_locations = []
-        for table in tables:
-            location = table.location
-            if location is not None and len(location) > 0:
-                if location.startswith("dbfs:/mnt"):
-                    for mount in mounts:
-                        if location[5:0].startswith(mount.name):
-                            location = location.replace(mount.name,mount.source)
-                            break
-                if not location.startswith("dbfs"):
-                    dupe = False
-                    loc = 0
-                    while loc < len(ext_locations) and not dupe:
-                        common = os.path.commonprefix([ext_locations[loc].location, os.path.dirname(location) + '/'])
-                        if common.count("/") > 2:
-                            ext_locations[loc] = ExtLoc(common)
-                            dupe = True
-                        loc += 1
-                    if not dupe:
-                        ext_locations.append(ExtLoc(os.path.dirname(location) + '/'))
-        return ext_locations
-
-    def _ext_loc_list(self):
-        crawler = InventoryTableCrawler(self._backend, self._catalog, self._schema)
-        table_list = crawler.snapshot()
-        return self._external_locations(table_list)
-
-    def snapshot(self) -> list[ExtLoc]:
-        return self._snapshot(self._try_fetch, self._ext_loc_list)
-
-    def _try_fetch(self) -> list[ExtLoc]:
-        for row in self._fetch(
-            f'SELECT * FROM {self._schema}.{self._table}'
-        ):
-            yield ExtLoc(*row)
-
-
-class MountsCrawler(CrawlerBase):
-    def __init__(self, backend: SqlBackend, ws: WorkspaceClient, inventory_database: str):
-        super().__init__(backend, "hive_metastore", inventory_database, "mounts")
-        self._dbutils = ws.dbutils
-
-    def inventorize_mounts(self):
-        self._append_records(self._list_mounts())
-
-    def _list_mounts(self):
-        mounts = []
-        for mount_point, source, _ in self._dbutils.fs.mounts():
-            mounts.append(Mount(mount_point, source))
-        return mounts
-
-    def snapshot(self) -> list[Mount]:
-        return self._snapshot(self._try_fetch, self._list_mounts)
-
-    def _try_fetch(self) -> list[Mount]:
-        for row in self._fetch(
-            f'SELECT * FROM {self._schema}.{self._table}'
-        ):
-            yield Mount(*row)
-
-
 class ClustersCrawler(CrawlerBase):
 
-    def __init__(self, sbe: SqlBackend, ws: WorkspaceClient, catalog, schema):
-        super().__init__(sbe, catalog, schema, "clusters")
+    def __init__(self, sbe: SqlBackend, schema):
+        super().__init__(sbe, "hive_metastore", schema, "clusters")
         self._ws = ws
 
     def _crawl(self) -> list[ClusterInfo]:
         all_clusters = list(self._ws.clusters.list())
         for cluster in all_clusters:
-            cluster_info = ClusterInfo(cluster.cluster_id, cluster.cluster_name, cluster.creator_user_name, 1, [])
+            cluster_info = ClusterInfo(cluster.cluster_id, cluster.cluster_name, cluster.creator_user_name, 1, "")
             support_status = spark_version_compatibility(cluster.spark_version)
             failures = []
             if support_status != 'supported':
@@ -233,7 +133,7 @@ class ClustersCrawler(CrawlerBase):
         for row in self._fetch(
             f'SELECT * FROM {self._schema}.{self._table}'
         ):
-            yield ExtLoc(*row)
+            yield ClusterInfo(*row)
 
 
 class JobsCrawler(CrawlerBase):
@@ -309,7 +209,12 @@ class JobsCrawler(CrawlerBase):
 if __name__ == "__main__":
     ws = WorkspaceClient(cluster_id="0919-184725-qa0q5jkc")
 
-    assess = AssessmentToolkit(ws, "hive_metastore", "ucx", StatementExecutionBackend(ws, "2e39d99c480ac668"))
-    print(assess.generate_ext_loc_list())
+    # assess = AssessmentToolkit(ws, "ucx", StatementExecutionBackend(ws, "cdae2fd48f8d4841"))
+    # print(assess.generate_ext_loc_list())
+    # tables = StatementExecutionBackend(ws, "cdae2fd48f8d4841").fetch(
+    #     f"SELECT location FROM ucx.tables WHERE location IS NOT NULL")
 
-
+    # print(list(tables))
+    row_factory = type("Row", (Row,), {"__columns__": ["location"]})
+    tt = row_factory(["TEST"])
+    print(tt)

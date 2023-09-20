@@ -17,6 +17,8 @@ from databricks.labs.ucx.assessment.assessment import ExternalLocationCrawler
 from databricks.labs.ucx.framework.crawlers import StatementExecutionBackend
 from databricks.labs.ucx.hive_metastore.list_mounts import Mount
 from databricks.labs.ucx.hive_metastore.tables import Table
+from databricks.labs.ucx.mixins.sql import Row
+from tests.unit.framework.mocks import MockBackend
 
 
 @pytest.fixture
@@ -27,50 +29,23 @@ def ws():
 
 @pytest.fixture
 def sbe():
-    sbe = StatementExecutionBackend(Mock(), "1111")
+    sbe = MockBackend()
     return sbe
 
 
 def test_external_locations(ws, sbe):
-    crawler = ExternalLocationCrawler(sbe, ws, "test", "test")
-    sample_tables = [
-        Table(
-            "No_Catalog",
-            "No_Database",
-            "No_Name",
-            "TABLE",
-            "DELTA",
-            location="s3://us-east-1-dev-account-staging-uc-ext-loc-bucket-1/Location/Table",
-        ),
-        Table(
-            "No_Catalog",
-            "No_Database",
-            "No_Name",
-            "TABLE",
-            "DELTA",
-            location="s3://us-east-1-dev-account-staging-uc-ext-loc-bucket-1/Location/Table2",
-        ),
-        Table(
-            "No_Catalog",
-            "No_Database",
-            "No_Name",
-            "TABLE",
-            "DELTA",
-            location="s3://us-east-1-dev-account-staging-uc-ext-loc-bucket-23/testloc/Table3",
-        ),
-        Table(
-            "No_Catalog",
-            "No_Database",
-            "No_Name",
-            "TABLE",
-            "DELTA",
-            location="s3://us-east-1-dev-account-staging-uc-ext-loc-bucket-23/anotherloc/Table4",
-        ),
-        Table("No_Catalog", "No_Database", "No_Name", "TABLE", "DELTA", location="dbfs:/mnt/ucx/database1/table1"),
-        Table("No_Catalog", "No_Database", "No_Name", "TABLE", "DELTA", location="dbfs:/mnt/ucx/database2/table2"),
+    crawler = ExternalLocationCrawler(ws, sbe, "test")
+    row_factory = type("Row", (Row,), {"__columns__": ["location"]})
+    sample_locations = [
+        row_factory(["s3://us-east-1-dev-account-staging-uc-ext-loc-bucket-1/Location/Table"]),
+        row_factory(["s3://us-east-1-dev-account-staging-uc-ext-loc-bucket-1/Location/Table2"]),
+        row_factory(["s3://us-east-1-dev-account-staging-uc-ext-loc-bucket-23/testloc/Table3"]),
+        row_factory(["s3://us-east-1-dev-account-staging-uc-ext-loc-bucket-23/anotherloc/Table4"]),
+        row_factory(["dbfs:/mnt/ucx/database1/table1"]),
+        row_factory(["dbfs:/mnt/ucx/database2/table2"])
     ]
     sample_mounts = [Mount("/mnt/ucx", "s3://us-east-1-ucx-container")]
-    result_set = crawler._external_locations(sample_tables, sample_mounts)
+    result_set = crawler._external_locations(sample_locations, sample_mounts)
     assert len(result_set) == 3
     assert result_set[0].location == "s3://us-east-1-dev-account-staging-uc-ext-loc-bucket-1/Location/"
     assert result_set[1].location == "s3://us-east-1-dev-account-staging-uc-ext-loc-bucket-23/"
@@ -78,7 +53,7 @@ def test_external_locations(ws, sbe):
 
 
 def test_job_assessment(ws):
-    AssessmentToolkit(ws, "Fake_ID", "CSX", "assessment")
+    crawler = AssessmentToolkit(Mock(), "UCX")
     sample_jobs = [
         BaseJob(
             created_time=1694536604319,
