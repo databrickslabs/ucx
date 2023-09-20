@@ -1,5 +1,5 @@
 from databricks.labs.ucx.framework.crawlers import CrawlerBase, SqlBackend
-from databricks.labs.ucx.hive_metastore.list_mounts import Mounts, Mount
+from databricks.labs.ucx.hive_metastore.list_mounts import Mounts
 from dataclasses import dataclass
 from databricks.sdk import WorkspaceClient
 import os

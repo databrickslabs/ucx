@@ -1,22 +1,13 @@
-import concurrent.futures
-import os
-import os.path
 import json
-import functools
 from dataclasses import dataclass
-
 from databricks.sdk import WorkspaceClient
-from databricks.sdk.service.compute import Language, ClusterDetails
+from databricks.sdk.service.jobs import BaseJob
 
 from databricks.labs.ucx.framework.crawlers import CrawlerBase
-from databricks.labs.ucx.hive_metastore.data_objects import ExternalLocationCrawler, ExtLoc
-from databricks.labs.ucx.hive_metastore.tables import Table
+from databricks.labs.ucx.hive_metastore.data_objects import ExternalLocationCrawler
 from databricks.labs.ucx.hive_metastore.table_acls import (
-    RuntimeBackend,
-    SqlBackend,
-    StatementExecutionBackend
+    SqlBackend
 )
-from databricks.labs.ucx.mixins.sql import StatementExecutionExt, Row
 
 
 @dataclass
@@ -78,33 +69,29 @@ class AssessmentToolkit:
             raise RuntimeError(msg)
 
     def generate_ext_loc_list(self):
-        crawler = ExternalLocationCrawler(ws, self._backend, self._inventory_schema)
+        crawler = ExternalLocationCrawler(self._ws, self._backend, self._inventory_schema)
         return crawler.snapshot()
 
     def generate_job_assessment(self):
-        crawler = JobsCrawler(self._backend, self._inventory_schema)
+        crawler = JobsCrawler(self._ws, self._backend, self._inventory_schema)
         return crawler.snapshot()
 
     def generate_cluster_assessment(self):
-        crawler = ClustersCrawler(self._backend, self._inventory_schema)
+        crawler = ClustersCrawler(self._ws, self._backend, self._inventory_schema)
         return crawler.snapshot()
-
-
-    # @staticmethod
-    # def _backend(ws: WorkspaceClient, warehouse_id: str | None = None) -> SqlBackend:
-    #     if warehouse_id is None:
-    #         return RuntimeBackend()
-    #     return StatementExecutionBackend(ws, warehouse_id)
 
 
 class ClustersCrawler(CrawlerBase):
 
-    def __init__(self, sbe: SqlBackend, schema):
+    def __init__(self, ws: WorkspaceClient, sbe: SqlBackend, schema):
         super().__init__(sbe, "hive_metastore", schema, "clusters")
         self._ws = ws
 
     def _crawl(self) -> list[ClusterInfo]:
         all_clusters = list(self._ws.clusters.list())
+        self._assess_cluster(all_clusters)
+
+    def _assess_clusters(self, all_clusters):
         for cluster in all_clusters:
             cluster_info = ClusterInfo(cluster.cluster_id, cluster.cluster_name, cluster.creator_user_name, 1, "")
             support_status = spark_version_compatibility(cluster.spark_version)
@@ -115,7 +102,6 @@ class ClustersCrawler(CrawlerBase):
             if cluster.spark_conf is not None:
                 for k in AssessmentToolkit.incompatible_spark_config_keys:
                     if k in cluster.spark_conf:
-                        using_incompatible_config = True
                         failures.append(f'unsupported config: {k}')
 
                 for value in cluster.spark_conf.values():
@@ -131,15 +117,15 @@ class ClustersCrawler(CrawlerBase):
 
     def _try_fetch(self) -> list[ClusterInfo]:
         for row in self._fetch(
-            f'SELECT * FROM {self._schema}.{self._table}'
+                f'SELECT * FROM {self._schema}.{self._table}'
         ):
             yield ClusterInfo(*row)
 
 
 class JobsCrawler(CrawlerBase):
 
-    def __init__(self, sbe: SqlBackend, ws: WorkspaceClient, catalog, schema):
-        super().__init__(sbe, catalog, schema, "jobs")
+    def __init__(self, ws: WorkspaceClient, sbe: SqlBackend, schema):
+        super().__init__(sbe, "hive_metastore", schema, "jobs")
         self._ws = ws
 
     def _get_cluster_configs_from_all_jobs(self, all_jobs, all_clusters_by_id):
@@ -161,9 +147,11 @@ class JobsCrawler(CrawlerBase):
                     yield j, t.new_cluster
 
     def _crawl(self) -> list[JobInfo]:
-
         all_jobs = list(self._ws.jobs.list(expand_tasks=True))
         all_clusters = {c.cluster_id: c for c in self._ws.clusters.list()}
+        return self._assess_jobs(all_jobs, all_clusters)
+
+    def _assess_jobs(self, all_jobs: list[BaseJob], all_clusters_by_id) -> list[JobInfo]:
         incompatible_spark_config_keys = {
             'spark.databricks.passthrough.enabled',
             'spark.hadoop.javax.jdo.option.ConnectionURL',
@@ -176,7 +164,7 @@ class JobsCrawler(CrawlerBase):
             job_details[job.job_id] = JobInfo(str(job.job_id), job.settings.name, job.creator_user_name, 1, "")
 
         for job, cluster_config in \
-                self._get_cluster_configs_from_all_jobs(all_jobs, all_clusters):
+                self._get_cluster_configs_from_all_jobs(all_jobs, all_clusters_by_id):
             support_status = spark_version_compatibility(cluster_config.spark_version)
             if support_status != 'supported':
                 job_assessment[job.job_id].add(f'not supported DBR: {cluster_config.spark_version}')
@@ -184,7 +172,6 @@ class JobsCrawler(CrawlerBase):
             if cluster_config.spark_conf is not None:
                 for k in incompatible_spark_config_keys:
                     if k in cluster_config.spark_conf:
-                        using_incompatible_config = True
                         job_assessment[job.job_id].add(f'unsupported config: {k}')
 
                 for value in cluster_config.spark_conf.values():
@@ -201,20 +188,18 @@ class JobsCrawler(CrawlerBase):
 
     def _try_fetch(self) -> list[ClusterInfo]:
         for row in self._fetch(
-            f'SELECT * FROM {self._schema}.{self._table}'
+                f'SELECT * FROM {self._schema}.{self._table}'
         ):
             yield JobInfo(*row)
 
 
 if __name__ == "__main__":
-    ws = WorkspaceClient(cluster_id="0919-184725-qa0q5jkc")
-
+    print("Databricks UC Assessment")
+    # ws = WorkspaceClient(cluster_id="0919-184725-qa0q5jkc")
+    #
     # assess = AssessmentToolkit(ws, "ucx", StatementExecutionBackend(ws, "cdae2fd48f8d4841"))
     # print(assess.generate_ext_loc_list())
     # tables = StatementExecutionBackend(ws, "cdae2fd48f8d4841").fetch(
     #     f"SELECT location FROM ucx.tables WHERE location IS NOT NULL")
 
     # print(list(tables))
-    row_factory = type("Row", (Row,), {"__columns__": ["location"]})
-    tt = row_factory(["TEST"])
-    print(tt)

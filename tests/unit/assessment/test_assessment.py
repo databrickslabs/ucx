@@ -13,7 +13,7 @@ from databricks.sdk.service.jobs import (
 )
 
 from databricks.labs.ucx.assessment import AssessmentToolkit
-from databricks.labs.ucx.assessment.assessment import ExternalLocationCrawler
+from databricks.labs.ucx.assessment.assessment import ExternalLocationCrawler, JobsCrawler, ClustersCrawler
 from databricks.labs.ucx.framework.crawlers import StatementExecutionBackend
 from databricks.labs.ucx.hive_metastore.list_mounts import Mount
 from databricks.labs.ucx.hive_metastore.tables import Table
@@ -53,7 +53,6 @@ def test_external_locations(ws, sbe):
 
 
 def test_job_assessment(ws):
-    crawler = AssessmentToolkit(Mock(), "UCX")
     sample_jobs = [
         BaseJob(
             created_time=1694536604319,
@@ -118,10 +117,11 @@ def test_job_assessment(ws):
         ),
     ]
     sample_clusters_by_id = {c.cluster_id: c for c in sample_clusters}
-    result_set = AssessmentToolkit._parse_jobs(sample_jobs, sample_clusters_by_id)
-    assert len(result_set.get(536591785949415)) == 0
-    assert len(result_set.get(536591785949416)) == 1
+    result_set = JobsCrawler(Mock(), MockBackend(), "ucx")._assess_jobs(sample_jobs,
+                                                                        {c.cluster_id: c for c in sample_clusters})
     assert len(result_set) == 2
+    assert result_set[0].success == 1
+    assert result_set[1].success == 0
 
 
 def test_cluster_assessment(ws):
@@ -143,7 +143,7 @@ def test_cluster_assessment(ws):
             cluster_id="0810-225833-atlanta69",
         ),
     ]
-    result_set = AssessmentToolkit._parse_clusters(sample_clusters)
+    result_set = list(ClustersCrawler(Mock(), MockBackend(), "ucx")._assess_clusters(sample_clusters))
     assert len(result_set) == 2
-    assert len(result_set.get("0807-225846-motto493")) == 0
-    assert len(result_set.get("0810-225833-atlanta69")) == 1
+    assert result_set[0].success == 1
+    assert result_set[1].success == 0
