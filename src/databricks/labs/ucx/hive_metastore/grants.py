@@ -229,9 +229,6 @@ class GrantsCrawler(CrawlerBase):
                 if object_type in object_type_normalization:
                     object_type = object_type_normalization[object_type]
                 if on_type != object_type:
-                    logger.warning(
-                        f"Types for object {key} doesn't match after listing grants {object_type} != {on_type}"
-                    )
                     continue
                 yield Grant(
                     principal=principal,
