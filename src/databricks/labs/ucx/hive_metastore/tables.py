@@ -128,7 +128,7 @@ class TablesCrawler(CrawlerBase):
         full_name = f"{catalog}.{database}.{table}"
         try:
             logger.debug(f"[{full_name}] fetching table metadata")
-            full_name
+            describe = {}
             for key, value, _ in self._fetch(f"DESCRIBE TABLE EXTENDED {full_name}"):
                 describe[key] = value
             return Table(
