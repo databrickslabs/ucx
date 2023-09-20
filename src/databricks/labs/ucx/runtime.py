@@ -37,9 +37,9 @@ def crawl_grants(cfg: MigrationConfig):
     """During this process, our methodology is purposefully designed to systematically scan and retrieve ACLs
     (Access Control Lists) associated with Legacy Tables from the Hive Metastore. These ACLs encompass comprehensive
     information, including permissions for users and groups, role-based access settings, and any custom access
-    configurations. These ACLs are then thoughtfully structured and securely stored within the `$inventory.grants` table.
-    This dedicated table serves as a central repository, ensuring the uninterrupted preservation of access control data
-    as we transition to the Databricks Unity Catalog.
+    configurations. These ACLs are then thoughtfully structured and securely stored within the `$inventory.grants`
+    table. This dedicated table serves as a central repository, ensuring the uninterrupted preservation of access
+    control data as we transition to the Databricks Unity Catalog.
 
     By meticulously migrating these Legacy Table ACLs, we guarantee the seamless transfer of the data governance and
     security framework established in our legacy Hive Metastore environment to our new Databricks Unity Catalog
@@ -56,8 +56,8 @@ def crawl_grants(cfg: MigrationConfig):
 @task("assessment", depends_on=[setup_schema])
 def inventorize_mounts(cfg: MigrationConfig):
     """In this segment of the assessment, we will define the scope of the mount points intended for migration into the
-    Unity Catalog. As these objects are not compatible with the Unity Catalog paradigm, a key component of the migration
-    process involves transferring them to Unity Catalog External Locations.
+    Unity Catalog. As these objects are not compatible with the Unity Catalog paradigm, a key component of the
+    migration process involves transferring them to Unity Catalog External Locations.
 
     The assessment involves scanning the workspace to compile a list of all existing mount points and subsequently
     storing this information in the `$inventory.mounts` table. This step enables you to create a snapshot of your
