@@ -43,9 +43,10 @@ class SqlBackend(ABC):
 
 
 class StatementExecutionBackend(SqlBackend):
-    def __init__(self, ws: WorkspaceClient, warehouse_id):
+    def __init__(self, ws: WorkspaceClient, warehouse_id, *, max_records_per_batch: int = 1000):
         self._sql = StatementExecutionExt(ws.api_client)
         self._warehouse_id = warehouse_id
+        self._max_records_per_batch = max_records_per_batch
 
     def execute(self, sql):
         logger.debug(f"[api][execute] {sql}")
@@ -69,9 +70,11 @@ class StatementExecutionBackend(SqlBackend):
 
         fields = dataclasses.fields(klass)
         field_names = [f.name for f in fields]
-        vals = "), (".join(self._row_to_sql(r, fields) for r in rows)
-        sql = f'INSERT INTO {full_name} ({", ".join(field_names)}) VALUES ({vals})'
-        self.execute(sql)
+        for i in range(0, len(rows), self._max_records_per_batch):
+            batch = rows[i : i + self._max_records_per_batch]
+            vals = "), (".join(self._row_to_sql(r, fields) for r in batch)
+            sql = f'INSERT INTO {full_name} ({", ".join(field_names)}) VALUES ({vals})'
+            self.execute(sql)
 
     @staticmethod
     def _row_to_sql(row, fields):
