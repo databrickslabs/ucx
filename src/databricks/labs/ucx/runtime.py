@@ -5,7 +5,6 @@ import sys
 from databricks.sdk import WorkspaceClient
 
 from databricks.labs.ucx.assessment import AssessmentToolkit
-from databricks.labs.ucx.assessment.assessment import ExternalLocationCrawler
 from databricks.labs.ucx.config import MigrationConfig
 from databricks.labs.ucx.framework.crawlers import RuntimeBackend
 from databricks.labs.ucx.framework.tasks import task, trigger
@@ -88,12 +87,14 @@ def inventorize_external_locations(cfg: MigrationConfig):
 @task("assessment", depends_on=[setup_schema])
 def inventorize_jobs(cfg: MigrationConfig):
     """This part scan through all the jobs and locate ones that are not compatible with UC.
-    It looks for:
-    1. Clusters with DBR version earlier than 11.3
-    1. Clusters using Passthru Authentication
-    1. Clusters with incompatible spark config tags
-    1. Clusters referencing DBFS locations in one or more config options
-
+    It looks for:<br>
+    <ol>
+    <li>Clusters with DBR version earlier than 11.3<br>
+    <li>Clusters using Passthru Authentication<br>
+    <li>Clusters with incompatible spark config tags<br>
+    <li>Clusters referencing DBFS locations in one or more config options<br>
+    </ol>
+    <br>
     A report with a list of all the Jobs is saved to the `$inventory.jobs` Table.
     """
     ws = WorkspaceClient(config=cfg.to_databricks_config())
@@ -103,12 +104,14 @@ def inventorize_jobs(cfg: MigrationConfig):
 @task("assessment", depends_on=[setup_schema])
 def inventorize_clusters(cfg: MigrationConfig):
     """This part scan through all the clusters and locate ones that are not compatible with UC.
-    It looks for:
-    1. Clusters with DBR version earlier than 11.3
-    1. Clusters using Passthru Authentication
-    1. Clusters with incompatible spark config tags
-    1. Clusters referencing DBFS locations in one or more config options
-
+    It looks for:<br>
+    <ol>
+    <li>Clusters with DBR version earlier than 11.3<br>
+    <li>Clusters using Passthru Authentication<br>
+    <li>Clusters with incompatible spark config tags<br>
+    <li>Clusters referencing DBFS locations in one or more config options<br>
+    </ol>
+    <br>
     A report with a list of all the Jobs is saved to the `$inventory.clusters` Table.
     """
     ws = WorkspaceClient(config=cfg.to_databricks_config())
