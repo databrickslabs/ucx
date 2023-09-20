@@ -11,8 +11,9 @@ See [contributing instructions](CONTRIBUTING.md) to help improve this project.
 
 ## Installation
 
+First clone this project repo to your local environment (better, make a fork in case you make changes to contribute back). 
+
 The `./install.sh` script will guide you through installation process. 
-First clone this repo to your local environment to get install.sh and the rest of the project (better, make a fork in case you make changes to contribute back). 
 Make sure you have Python 3.10 (or greater) 
 installed on your workstation, and you've configured authentication for 
 the [Databricks Workspace](https://databricks-sdk-py.readthedocs.io/en/latest/authentication.html#default-authentication-flow).

@@ -251,7 +251,7 @@ class Installer:
         self._ws.workspace.upload(path, intro.encode("utf8"), overwrite=True)
         url = self._notebook_link(path)
         logger.info(f"Created README notebook with job overview: {url}")
-        msg = "Open job overview in README notebook in your home directory"
+        msg = "Open job overview in README notebook in your home directory ?"
         if self._prompts and self._question(msg, default="yes") == "yes":
             webbrowser.open(url)
 
