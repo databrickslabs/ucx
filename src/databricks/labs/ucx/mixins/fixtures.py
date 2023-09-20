@@ -101,17 +101,24 @@ def make_random():
 
 
 @pytest.fixture(scope="session")
-def ws() -> WorkspaceClient:
-    # Use variables from Unified Auth
-    # See https://databricks-sdk-py.readthedocs.io/en/latest/authentication.html
-    return WorkspaceClient()
+def product_info():
+    return None, None
 
 
 @pytest.fixture(scope="session")
-def acc() -> AccountClient:
+def ws(product_info) -> WorkspaceClient:
     # Use variables from Unified Auth
     # See https://databricks-sdk-py.readthedocs.io/en/latest/authentication.html
-    return AccountClient()
+    product_name, product_version = product_info
+    return WorkspaceClient(product=product_name, product_version=product_version)
+
+
+@pytest.fixture(scope="session")
+def acc(product_info) -> AccountClient:
+    # Use variables from Unified Auth
+    # See https://databricks-sdk-py.readthedocs.io/en/latest/authentication.html
+    product_name, product_version = product_info
+    return AccountClient(product=product_name, product_version=product_version)
 
 
 def _permissions_mapping():

@@ -29,6 +29,13 @@ def account_host(self: databricks.sdk.core.Config) -> str:
 
 
 @pytest.fixture(scope="session")
+def product_info():
+    from databricks.labs.ucx.__about__ import __version__
+
+    return "ucx", __version__
+
+
+@pytest.fixture(scope="session")
 def acc(ws) -> AccountClient:
     # TODO: move to SDK
     def account_host(cfg: Config) -> str:

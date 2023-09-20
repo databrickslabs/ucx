@@ -7,15 +7,18 @@ import tempfile
 import webbrowser
 from dataclasses import replace
 from pathlib import Path
+from typing import Any
 
 import yaml
 from databricks.sdk import WorkspaceClient
 from databricks.sdk.core import DatabricksError
 from databricks.sdk.service import compute, jobs
+from databricks.sdk.service.sql import EndpointInfoWarehouseType, SpotInstancePolicy
 from databricks.sdk.service.workspace import ImportFormat
 
 from databricks.labs.ucx.__about__ import __version__
 from databricks.labs.ucx.config import GroupsConfig, MigrationConfig, TaclConfig
+from databricks.labs.ucx.framework.dashboards import DashboardFromFiles
 from databricks.labs.ucx.framework.tasks import _TASKS, Task
 from databricks.labs.ucx.runtime import main
 
@@ -66,10 +69,38 @@ class Installer:
         self._prefix = prefix
         self._prompts = promtps
         self._this_file = Path(__file__)
+        self._dashboards = {}
 
     def run(self):
         self._configure()
+        self._create_dashboards()
         self._create_jobs()
+
+    def _create_dashboards(self):
+        local_query_files = self._find_project_root() / "src/databricks/labs/ucx/assessment/queries"
+        dash = DashboardFromFiles(
+            self._ws,
+            local_folder=local_query_files,
+            remote_folder=f"{self._install_folder}/queries",
+            name=f"[{self._prefix}] UCX Assessment",
+            warehouse_id=self._warehouse_id,
+            query_text_callback=self._replace_inventory_variable,
+        )
+        self._dashboards["assessment"] = dash.create_dashboard()
+
+    @property
+    def _warehouse_id(self) -> str:
+        if self._current_config.warehouse_id is not None:
+            return self._current_config.warehouse_id
+        warehouses = [_ for _ in self._ws.warehouses.list() if _.warehouse_type == EndpointInfoWarehouseType.PRO]
+        warehouse_id = self._current_config.warehouse_id
+        if not warehouse_id and not warehouses:
+            msg = "need either configured warehouse_id or an existing PRO SQL warehouse"
+            raise ValueError(msg)
+        if not warehouse_id:
+            warehouse_id = warehouses[0].id
+        self._current_config.warehouse_id = warehouse_id
+        return warehouse_id
 
     @property
     def _my_username(self):
@@ -111,6 +142,25 @@ class Installer:
 
         logger.info("Please answer a couple of questions to configure Unity Catalog migration")
         inventory_database = self._question("Inventory Database", default="ucx")
+
+        pro_warehouses = {"[Create new PRO SQL warehouse]": "create_new"} | {
+            f"{_.name} ({_.id}, {_.warehouse_type.value}, {_.state.value})": _.id
+            for _ in self._ws.warehouses.list()
+            if _.warehouse_type == EndpointInfoWarehouseType.PRO
+        }
+        warehouse_id = self._choice_from_dict(
+            "Select PRO or SERVERLESS SQL warehouse to run assessment dashboards on", pro_warehouses
+        )
+        if warehouse_id == "create_new":
+            new_warehouse = self._ws.warehouses.create(
+                name="Unity Catalog Migration",
+                spot_instance_policy=SpotInstancePolicy.COST_OPTIMIZED,
+                warehouse_type=EndpointInfoWarehouseType.PRO,
+                cluster_size="Small",
+                max_num_clusters=1,
+            )
+            warehouse_id = new_warehouse.id
+
         selected_groups = self._question(
             "Comma-separated list of workspace group names to migrate (empty means all)", default="<ALL>"
         )
@@ -128,6 +178,7 @@ class Installer:
             inventory_database=inventory_database,
             groups=GroupsConfig(**groups_config_args),
             tacl=TaclConfig(auto=True),
+            warehouse_id=warehouse_id,
             log_level=log_level,
             num_threads=num_threads,
         )
@@ -181,11 +232,17 @@ class Installer:
             "All jobs are defined with necessary cluster configurations and DBR versions.",
         ]
         for step_name, job_id in self._deployed_steps.items():
-            md.append(f"## [[{self._prefix.upper()}] {step_name}]({self._ws.config.host}#job/{job_id})\n")
+            dashboard_link = ""
+            if step_name in self._dashboards:
+                dashboard_link = f"{self._ws.config.host}/sql/dashboards/{self._dashboards[step_name]}"
+                dashboard_link = f" (see [{step_name} dashboard]({dashboard_link}) after finish)"
+            job_link = f"[[{self._prefix.upper()}] {step_name}]({self._ws.config.host}#job/{job_id})"
+            md.append(f"## {job_link}{dashboard_link}\n")
             for t in _TASKS.values():
                 if t.workflow != step_name:
                     continue
                 doc = re.sub(r"\s+", " ", t.doc)
+                doc = self._replace_inventory_variable(doc)
                 md.append(f" - `{t.name}`:  {doc}")
                 md.append("")
         preamble = ["# Databricks notebook source", "# MAGIC %md"]
@@ -197,6 +254,9 @@ class Installer:
         msg = "Open job overview in README notebook in your home directory ?"
         if self._prompts and self._question(msg, default="yes") == "yes":
             webbrowser.open(url)
+
+    def _replace_inventory_variable(self, text: str) -> str:
+        return text.replace("$inventory", f"hive_metastore.{self._current_config.inventory_database}")
 
     def _create_debug(self, remote_wheel: str):
         readme_link = self._notebook_link(f"{self._install_folder}/README.py")
@@ -216,6 +276,32 @@ class Installer:
 
     def _notebook_link(self, path: str) -> str:
         return f"{self._ws.config.host}/#workspace{path}"
+
+    def _choice_from_dict(self, text: str, choices: dict[str, Any]) -> Any:
+        key = self._choice(text, list(choices.keys()))
+        return choices[key]
+
+    def _choice(self, text: str, choices: list[Any], *, max_attempts: int = 10) -> str:
+        if not self._prompts:
+            return "any"
+        choices = sorted(choices)
+        numbered = "\n".join(f"\033[1m[{i}]\033[0m \033[36m{v}\033[0m" for i, v in enumerate(choices))
+        prompt = f"\033[1m{text}\033[0m\n{numbered}\nEnter a number between 0 and {len(choices)-1}: "
+        attempt = 0
+        while attempt < max_attempts:
+            attempt += 1
+            res = input(prompt)
+            try:
+                res = int(res)
+            except ValueError:
+                print(f"\033[31m[ERROR] Invalid number: {res}\033[0m\n")
+                continue
+            if res >= len(choices) or res < 0:
+                print(f"\033[31m[ERROR] Out of range: {res}\033[0m\n")
+                continue
+            return choices[res]
+        msg = f"cannot get answer within {max_attempts} attempt"
+        raise ValueError(msg)
 
     @staticmethod
     def _question(text: str, *, default: str | None = None) -> str:
@@ -264,9 +350,21 @@ class Installer:
             job_cluster_key=task.job_cluster,
             depends_on=[jobs.TaskDependency(task_key=d) for d in _TASKS[task.name].depends_on],
         )
+        if task.dashboard:
+            return self._job_dashboard_task(jobs_task, task)
         if task.notebook:
             return self._job_notebook_task(jobs_task, task)
         return self._job_wheel_task(jobs_task, task, dbfs_path)
+
+    def _job_dashboard_task(self, jobs_task: jobs.Task, task: Task) -> jobs.Task:
+        return replace(
+            jobs_task,
+            job_cluster_key=None,
+            sql_task=jobs.SqlTask(
+                warehouse_id=self._warehouse_id,
+                dashboard=jobs.SqlTaskDashboard(dashboard_id=self._dashboards[task.dashboard]),
+            ),
+        )
 
     def _job_notebook_task(self, jobs_task: jobs.Task, task: Task) -> jobs.Task:
         local_notebook = self._this_file.parent / task.notebook
@@ -334,10 +432,7 @@ class Installer:
                 "stdout": subprocess.DEVNULL,
                 "stderr": subprocess.DEVNULL,
             }
-        project_root = Installer._find_project_root(self._this_file)
-        if not project_root:
-            msg = "Cannot find project root"
-            raise NotADirectoryError(msg)
+        project_root = self._find_project_root()
         logger.debug(f"Building wheel for {project_root} in {tmp_dir}")
         subprocess.run(
             [sys.executable, "-m", "pip", "wheel", "--no-deps", "--wheel-dir", tmp_dir, project_root],
@@ -347,13 +442,13 @@ class Installer:
         # get wheel name as first file in the temp directory
         return next(Path(tmp_dir).glob("*.whl"))
 
-    @staticmethod
-    def _find_project_root(folder: Path) -> Path | None:
+    def _find_project_root(self) -> Path:
         for leaf in ["pyproject.toml", "setup.py"]:
-            root = Installer._find_dir_with_leaf(folder, leaf)
+            root = Installer._find_dir_with_leaf(self._this_file, leaf)
             if root is not None:
                 return root
-        return None
+        msg = "Cannot find project root"
+        raise NotADirectoryError(msg)
 
     @staticmethod
     def _find_dir_with_leaf(folder: Path, leaf: str) -> Path | None:

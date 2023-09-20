@@ -87,7 +87,7 @@ def inventorize_permissions(cfg: MigrationConfig):
     toolkit.inventorize_permissions()
 
 
-@task("assessment", depends_on=[crawl_tables, crawl_grants, inventorize_permissions])
+@task("assessment", depends_on=[crawl_tables, crawl_grants, inventorize_permissions], dashboard="assessment")
 def assessment_report(_: MigrationConfig):
     """This meticulously prepared report serves the purpose of evaluating and gauging the preparedness of a specific
     workspace for a smooth transition to the Unity Catalog.
@@ -107,7 +107,6 @@ def assessment_report(_: MigrationConfig):
     risk-mitigated migration process. It guarantees that our migration to the Databricks Unity Catalog is not only
     efficient but also seamlessly aligns with our data governance, security, and operational requirements, paving the
     way for a new era of excellence in data management."""
-    logger.info(f"{__name__} called")
 
 
 @task("migrate-groups", depends_on=[inventorize_permissions])

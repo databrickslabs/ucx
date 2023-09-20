@@ -71,7 +71,7 @@ def test_assessment_job_with_no_inventory_database(
         log_level="DEBUG",
     )
     install._write_config()
-    install._create_jobs()
+    install.run()
 
     def cleanup_created_resources():
         logger.debug(f"cleaning up install folder: {install._install_folder}")

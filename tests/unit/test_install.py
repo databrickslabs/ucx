@@ -6,9 +6,20 @@ import pytest
 import yaml
 from databricks.sdk.core import DatabricksError
 from databricks.sdk.service import iam
-from databricks.sdk.service.workspace import ImportFormat
+from databricks.sdk.service.sql import (
+    Dashboard,
+    DataSource,
+    EndpointInfo,
+    EndpointInfoWarehouseType,
+    Query,
+    State,
+    Visualization,
+    Widget,
+)
+from databricks.sdk.service.workspace import ImportFormat, ObjectInfo
 
 from databricks.labs.ucx.config import GroupsConfig, MigrationConfig, TaclConfig
+from databricks.labs.ucx.framework.dashboards import DashboardFromFiles
 from databricks.labs.ucx.install import Installer
 
 
@@ -28,8 +39,12 @@ def test_save_config(mocker):
     ws.current_user.me = lambda: iam.User(user_name="me@example.com", groups=[iam.ComplexValue(display="admins")])
     ws.config.host = "https://foo"
     ws.workspace.get_status = not_found
+    ws.warehouses.list = lambda **_: [
+        EndpointInfo(id="abc", warehouse_type=EndpointInfoWarehouseType.PRO, state=State.RUNNING)
+    ]
 
     install = Installer(ws)
+    install._choice = lambda _1, _2: "None (abc, PRO, RUNNING)"
     install._configure()
 
     ws.workspace.upload.assert_called_with(
@@ -44,6 +59,7 @@ num_threads: 42
 tacl:
   auto: true
 version: 1
+warehouse_id: abc
 workspace_start_path: /
 """,
         format=ImportFormat.AUTO,
@@ -81,9 +97,13 @@ def test_save_config_auto_groups(mocker):
     ws.current_user.me = lambda: iam.User(user_name="me@example.com", groups=[iam.ComplexValue(display="admins")])
     ws.config.host = "https://foo"
     ws.workspace.get_status = not_found
+    ws.warehouses.list = lambda **_: [
+        EndpointInfo(id="abc", warehouse_type=EndpointInfoWarehouseType.PRO, state=State.RUNNING)
+    ]
 
     install = Installer(ws)
     install._question = mock_question
+    install._choice = lambda _1, _2: "None (abc, PRO, RUNNING)"
     install._configure()
 
     ws.workspace.upload.assert_called_with(
@@ -97,6 +117,7 @@ num_threads: 42
 tacl:
   auto: true
 version: 1
+warehouse_id: abc
 workspace_start_path: /
 """,
         format=ImportFormat.AUTO,
@@ -118,9 +139,13 @@ def test_save_config_strip_group_names(mocker):
     ws.current_user.me = lambda: iam.User(user_name="me@example.com", groups=[iam.ComplexValue(display="admins")])
     ws.config.host = "https://foo"
     ws.workspace.get_status = not_found
+    ws.warehouses.list = lambda **_: [
+        EndpointInfo(id="abc", warehouse_type=EndpointInfoWarehouseType.PRO, state=State.RUNNING)
+    ]
 
     install = Installer(ws)
     install._question = mock_question
+    install._choice = lambda _1, _2: "None (abc, PRO, RUNNING)"
     install._configure()
 
     ws.workspace.upload.assert_called_with(
@@ -137,6 +162,7 @@ num_threads: 42
 tacl:
   auto: true
 version: 1
+warehouse_id: abc
 workspace_start_path: /
 """,
         format=ImportFormat.AUTO,
@@ -155,7 +181,13 @@ def test_main_with_existing_conf_does_not_recreate_config(mocker):
         MigrationConfig(inventory_database="a", groups=GroupsConfig(auto=True), tacl=TaclConfig(auto=True)).as_dict()
     ).encode("utf8")
     ws.workspace.download = lambda _: io.BytesIO(config_bytes)
-    ws.workspace.get_status = lambda _: None
+    ws.workspace.get_status = lambda _: ObjectInfo(object_id=123)
+    ws.data_sources.list = lambda: [DataSource(id="bcd", warehouse_id="abc")]
+    ws.warehouses.list = lambda **_: [EndpointInfo(id="abc", warehouse_type=EndpointInfoWarehouseType.PRO)]
+    ws.dashboards.create.return_value = Dashboard(id="abc")
+    ws.queries.create.return_value = Query(id="abc")
+    ws.query_visualizations.create.return_value = Visualization(id="abc")
+    ws.dashboard_widgets.create.return_value = Widget(id="abc")
 
     install = Installer(ws)
     install._build_wheel = lambda _: Path(__file__)
@@ -163,3 +195,34 @@ def test_main_with_existing_conf_does_not_recreate_config(mocker):
 
     webbrowser_open.assert_called_with("https://foo/#workspace/Users/me@example.com/.ucx/README.py")
     # ws.workspace.mkdirs.assert_called_with("/Users/me@example.com/.ucx")
+
+
+def test_query_metadata(mocker):
+    ws = mocker.Mock()
+    install = Installer(ws)
+    local_query_files = install._find_project_root() / "src/databricks/labs/ucx/assessment/queries"
+    DashboardFromFiles(ws, local_query_files, "any", "any").validate()
+
+
+def test_choices_out_of_range(mocker):
+    ws = mocker.Mock()
+    install = Installer(ws)
+    mocker.patch("builtins.input", return_value="42")
+    with pytest.raises(ValueError):
+        install._choice("foo", ["a", "b"])
+
+
+def test_choices_not_a_number(mocker):
+    ws = mocker.Mock()
+    install = Installer(ws)
+    mocker.patch("builtins.input", return_value="two")
+    with pytest.raises(ValueError):
+        install._choice("foo", ["a", "b"])
+
+
+def test_choices_happy(mocker):
+    ws = mocker.Mock()
+    install = Installer(ws)
+    mocker.patch("builtins.input", return_value="1")
+    res = install._choice("foo", ["a", "b"])
+    assert "b" == res
