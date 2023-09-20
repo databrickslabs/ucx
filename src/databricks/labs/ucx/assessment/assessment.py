@@ -3,7 +3,7 @@ from dataclasses import dataclass
 from databricks.sdk import WorkspaceClient
 from databricks.sdk.service.jobs import BaseJob
 
-from databricks.labs.ucx.framework.crawlers import CrawlerBase
+from databricks.labs.ucx.framework.crawlers import CrawlerBase, StatementExecutionBackend
 from databricks.labs.ucx.hive_metastore.data_objects import ExternalLocationCrawler
 from databricks.labs.ucx.hive_metastore.table_acls import (
     SqlBackend
@@ -195,10 +195,10 @@ class JobsCrawler(CrawlerBase):
 
 if __name__ == "__main__":
     print("Databricks UC Assessment")
-    # ws = WorkspaceClient(cluster_id="0919-184725-qa0q5jkc")
+    ws = WorkspaceClient(cluster_id="0919-184725-qa0q5jkc")
     #
-    # assess = AssessmentToolkit(ws, "ucx", StatementExecutionBackend(ws, "cdae2fd48f8d4841"))
-    # print(assess.generate_ext_loc_list())
+    assess = AssessmentToolkit(ws, "ucx", StatementExecutionBackend(ws, "cdae2fd48f8d4841"))
+    print(assess.generate_ext_loc_list())
     # tables = StatementExecutionBackend(ws, "cdae2fd48f8d4841").fetch(
     #     f"SELECT location FROM ucx.tables WHERE location IS NOT NULL")
 

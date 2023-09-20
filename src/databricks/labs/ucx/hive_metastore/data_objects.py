@@ -26,7 +26,7 @@ class ExternalLocationCrawler(CrawlerBase):
                         if location[5:].startswith(mount.name):
                             location = location[5:].replace(mount.name, mount.source)
                             break
-                if not location.startswith("dbfs"):
+                if not location.startswith("dbfs") and (0 < location.find(":/") < 12):
                     dupe = False
                     loc = 0
                     while loc < len(ext_locations) and not dupe:
