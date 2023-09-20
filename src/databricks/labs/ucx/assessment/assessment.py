@@ -89,7 +89,7 @@ class ClustersCrawler(CrawlerBase):
 
     def _crawl(self) -> list[ClusterInfo]:
         all_clusters = list(self._ws.clusters.list())
-        self._assess_cluster(all_clusters)
+        return list(self._assess_clusters(all_clusters))
 
     def _assess_clusters(self, all_clusters):
         for cluster in all_clusters:
@@ -198,7 +198,7 @@ if __name__ == "__main__":
     ws = WorkspaceClient(cluster_id="0919-184725-qa0q5jkc")
     #
     assess = AssessmentToolkit(ws, "ucx", StatementExecutionBackend(ws, "cdae2fd48f8d4841"))
-    print(assess.generate_ext_loc_list())
+    print(assess.generate_cluster_assessment())
     # tables = StatementExecutionBackend(ws, "cdae2fd48f8d4841").fetch(
     #     f"SELECT location FROM ucx.tables WHERE location IS NOT NULL")
 
