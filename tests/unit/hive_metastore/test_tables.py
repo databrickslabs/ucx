@@ -1,11 +1,13 @@
+import logging
+
 import pytest
 
 from databricks.labs.ucx.hive_metastore.tables import Table, TablesCrawler
-from unittest.mock import MagicMock
+
 from ..framework.mocks import MockBackend
-import logging
 
 logger = logging.getLogger(__name__)
+
 
 def test_is_delta_true():
     delta_table = Table(catalog="catalog", database="db", name="table", object_type="type", table_format="DELTA")
@@ -92,11 +94,10 @@ def test_tables_crawler_inventory_table():
 
 
 def test_tables_returning_error_when_describing():
-    errors= {"DESCRIBE TABLE EXTENDED test.database.table1": "error"}
+    errors = {"DESCRIBE TABLE EXTENDED test.database.table1": "error"}
     rows = {
         "SHOW TABLES FROM test.database": [("", "table1", ""), ("", "table2", "")],
-        "DESCRIBE TABLE EXTENDED test.database.table2": [('Catalog', 'catalog', ''), ('Type', 'delta', '')]
+        "DESCRIBE TABLE EXTENDED test.database.table2": [("Catalog", "catalog", ""), ("Type", "delta", "")],
     }
     tc = TablesCrawler(MockBackend(fails_on_first=errors, rows=rows), "main", "default")
     assert len(tc._crawl("test", "database")) == 1
-
