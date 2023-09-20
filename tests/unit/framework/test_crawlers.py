@@ -141,6 +141,22 @@ def test_statement_execution_backend_save_table_two_records(mocker):
     ] == execute_sql.mock_calls
 
 
+def test_statement_execution_backend_save_table_in_batches_of_two(mocker):
+    execute_sql = mocker.patch("databricks.labs.ucx.mixins.sql.StatementExecutionExt.execute")
+
+    seb = StatementExecutionBackend(mocker.Mock(), "abc", max_records_per_batch=2)
+
+    seb.save_table("a.b.c", [Foo("aaa", True), Foo("bbb", False), Foo("ccc", True)])
+
+    assert [
+        mocker.call(
+            "abc", "CREATE TABLE IF NOT EXISTS a.b.c (first STRING NOT NULL, second BOOLEAN NOT NULL) USING DELTA"
+        ),
+        mocker.call("abc", "INSERT INTO a.b.c (first, second) VALUES ('aaa', TRUE), ('bbb', FALSE)"),
+        mocker.call("abc", "INSERT INTO a.b.c (first, second) VALUES ('ccc', TRUE)"),
+    ] == execute_sql.mock_calls
+
+
 def test_runtime_backend_execute(mocker):
     from unittest import mock
 
