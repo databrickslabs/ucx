@@ -5,7 +5,6 @@ import sys
 from databricks.sdk import WorkspaceClient
 
 from databricks.labs.ucx.assessment import AssessmentToolkit
-from databricks.labs.ucx.assessment.assessment import ExternalLocationCrawler
 from databricks.labs.ucx.config import MigrationConfig
 from databricks.labs.ucx.framework.crawlers import RuntimeBackend
 from databricks.labs.ucx.framework.tasks import task, trigger
@@ -88,6 +87,7 @@ def inventorize_jobs(cfg: MigrationConfig):
     ws = WorkspaceClient(config=cfg.to_databricks_config())
     assess = AssessmentToolkit(ws, "hive_metastore", cfg.inventory_database, RuntimeBackend())
     assess.generate_job_assessment()
+
 
 @task("assessment", depends_on=[setup_schema])
 def inventorize_clusters(cfg: MigrationConfig):
