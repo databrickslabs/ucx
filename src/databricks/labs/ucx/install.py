@@ -82,7 +82,7 @@ class Installer:
             self._ws,
             local_folder=local_query_files,
             remote_folder=f"{self._install_folder}/queries",
-            name=f"[{self._prefix}] UCX Assessment",
+            name=self._name("UCX Assessment"),
             warehouse_id=self._warehouse_id,
             query_text_callback=self._replace_inventory_variable,
         )
@@ -113,6 +113,24 @@ class Installer:
         return self._me.user_name
 
     @property
+    def _short_name(self):
+        if "@" in self._my_username:
+            username = self._my_username.split("@")[0]
+        else:
+            username = self._me.display_name
+        return username
+
+    @property
+    def _app(self):
+        if not hasattr(self, "__app"):
+            # return lower-cased alphanumeric + _ combination of prefix (UCX by default)
+            # and shorter variant of username (or service principal) to serve as a unique
+            # installation identifier on the workspace.
+            app = f"{self._prefix}_{self._short_name}".lower()
+            self.__app = "".join([_ if _.isalnum() else "_" for _ in app])
+        return self.__app
+
+    @property
     def _install_folder(self):
         return f"/Users/{self._my_username}/.{self._prefix}"
 
@@ -127,6 +145,9 @@ class Installer:
         with self._ws.workspace.download(self._config_file) as f:
             self._config = MigrationConfig.from_bytes(f.read())
         return self._config
+
+    def _name(self, name: str) -> str:
+        return f"[{self._prefix.upper()}][{self._short_name}] {name}"
 
     def _configure(self):
         ws_file_url = self._notebook_link(self._config_file)
@@ -236,7 +257,7 @@ class Installer:
             if step_name in self._dashboards:
                 dashboard_link = f"{self._ws.config.host}/sql/dashboards/{self._dashboards[step_name]}"
                 dashboard_link = f" (see [{step_name} dashboard]({dashboard_link}) after finish)"
-            job_link = f"[[{self._prefix.upper()}] {step_name}]({self._ws.config.host}#job/{job_id})"
+            job_link = f"[{self._name(step_name)}]({self._ws.config.host}#job/{job_id})"
             md.append(f"## {job_link}{dashboard_link}\n")
             for t in _TASKS.values():
                 if t.workflow != step_name:
@@ -261,7 +282,7 @@ class Installer:
     def _create_debug(self, remote_wheel: str):
         readme_link = self._notebook_link(f"{self._install_folder}/README.py")
         job_links = ", ".join(
-            f"[[{self._prefix.upper()}] {step_name}]({self._ws.config.host}#job/{job_id})"
+            f"[{self._name(step_name)}]({self._ws.config.host}#job/{job_id})"
             for step_name, job_id in self._deployed_steps.items()
         )
         path = f"{self._install_folder}/DEBUG.py"
@@ -337,8 +358,8 @@ class Installer:
             )
         tasks = sorted([t for t in _TASKS.values() if t.workflow == step_name], key=lambda _: _.name)
         return {
-            "name": f"[{self._prefix.upper()}] {step_name}",
-            "tags": {TAG_APP: self._prefix, TAG_STEP: step_name},
+            "name": self._name(step_name),
+            "tags": {TAG_APP: self._app, TAG_STEP: step_name},
             "job_clusters": self._job_clusters({t.job_cluster for t in tasks}),
             "email_notifications": email_notifications,
             "tasks": [self._job_task(task, dbfs_path) for task in tasks],
@@ -474,12 +495,12 @@ class Installer:
 
     def _deployed_steps(self):
         deployed_steps = {}
-        logger.debug(f"Fetching all jobs to determine already deployed steps for app={self._prefix}")
+        logger.debug(f"Fetching all jobs to determine already deployed steps for app={self._app}")
         for j in self._ws.jobs.list():
             tags = j.settings.tags
             if tags is None:
                 continue
-            if tags.get(TAG_APP, None) != self._prefix:
+            if tags.get(TAG_APP, None) != self._app:
                 continue
             deployed_steps[tags.get(TAG_STEP, "_")] = j.job_id
         return deployed_steps
