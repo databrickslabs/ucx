@@ -116,24 +116,30 @@ class TablesCrawler(CrawlerBase):
         tasks = []
         for _, table, _is_tmp in self._fetch(f"SHOW TABLES FROM {catalog}.{database}"):
             tasks.append(partial(self._describe, catalog, database, table))
-        return ThreadedExecution.gather(f"listing tables in {catalog}.{database}", tasks)
+        results = ThreadedExecution.gather(f"listing tables in {catalog}.{database}", tasks)
 
-    def _describe(self, catalog: str, database: str, table: str) -> Table:
+        return [x for x in results if x is not None]
+
+    def _describe(self, catalog: str, database: str, table: str) -> Table | None:
         """Fetches metadata like table type, data format, external table location,
         and the text of a view if specified for a specific table within the given
         catalog and database.
         """
-        describe = {}
         full_name = f"{catalog}.{database}.{table}"
-        logger.debug(f"[{full_name}] fetching table metadata")
-        for key, value, _ in self._fetch(f"DESCRIBE TABLE EXTENDED {full_name}"):
-            describe[key] = value
-        return Table(
-            catalog=describe["Catalog"],
-            database=database,
-            name=table,
-            object_type=describe["Type"],
-            table_format=describe.get("Provider", "").upper(),
-            location=describe.get("Location", None),
-            view_text=describe.get("View Text", None),
-        )
+        try:
+            logger.debug(f"[{full_name}] fetching table metadata")
+            describe = {}
+            for key, value, _ in self._fetch(f"DESCRIBE TABLE EXTENDED {full_name}"):
+                describe[key] = value
+            return Table(
+                catalog=describe["Catalog"],
+                database=database,
+                name=table,
+                object_type=describe["Type"],
+                table_format=describe.get("Provider", "").upper(),
+                location=describe.get("Location", None),
+                view_text=describe.get("View Text", None),
+            )
+        except RuntimeError as e:
+            logger.error(f"Couldn't fetch information for table {full_name} : {e}")
+            return None
