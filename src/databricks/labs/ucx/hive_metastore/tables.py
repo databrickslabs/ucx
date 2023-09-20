@@ -125,10 +125,10 @@ class TablesCrawler(CrawlerBase):
         and the text of a view if specified for a specific table within the given
         catalog and database.
         """
+        full_name = f"{catalog}.{database}.{table}"
         try:
-            describe = {}
-            full_name = f"{catalog}.{database}.{table}"
             logger.debug(f"[{full_name}] fetching table metadata")
+            full_name
             for key, value, _ in self._fetch(f"DESCRIBE TABLE EXTENDED {full_name}"):
                 describe[key] = value
             return Table(
