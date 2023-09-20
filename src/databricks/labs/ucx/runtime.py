@@ -28,8 +28,8 @@ def crawl_tables(_: MigrationConfig):
     storage location details.
 
     The gathered metadata is then subsequently organized and documented within a designated storage entity referred to
-    as the `$inventory.tables` table. This table serves as an extensive inventory, offering a well-structured and
-    readily accessible point of reference for users, data engineers, and administrators."""
+    as the `hive_metastore.ucx.tables` table. This table serves as an extensive inventory, offering a well-structured
+    and readily accessible point of reference for users, data engineers, and administrators."""
 
 
 @task("assessment", depends_on=[crawl_tables], job_cluster="tacl")
@@ -37,9 +37,9 @@ def crawl_grants(cfg: MigrationConfig):
     """During this process, our methodology is purposefully designed to systematically scan and retrieve ACLs
     (Access Control Lists) associated with Legacy Tables from the Hive Metastore. These ACLs encompass comprehensive
     information, including permissions for users and groups, role-based access settings, and any custom access
-    configurations. These ACLs are then thoughtfully structured and securely stored within the `$inventory.grants`
-    table. This dedicated table serves as a central repository, ensuring the uninterrupted preservation of access
-    control data as we transition to the Databricks Unity Catalog.
+    configurations. These ACLs are then thoughtfully structured and securely stored within the
+    `hive_metastore.ucx.grants` table. This dedicated table serves as a central repository, ensuring the uninterrupted
+    preservation of access control data as we transition to the Databricks Unity Catalog.
 
     By meticulously migrating these Legacy Table ACLs, we guarantee the seamless transfer of the data governance and
     security framework established in our legacy Hive Metastore environment to our new Databricks Unity Catalog
@@ -60,8 +60,8 @@ def inventorize_mounts(cfg: MigrationConfig):
     migration process involves transferring them to Unity Catalog External Locations.
 
     The assessment involves scanning the workspace to compile a list of all existing mount points and subsequently
-    storing this information in the `$inventory.mounts` table. This step enables you to create a snapshot of your
-    current Mount Point infrastructure, which is crucial for planning the migration."""
+    storing this information in the `hive_metastore.ucx.mounts` table. This step enables you to create a snapshot of
+    your current Mount Point infrastructure, which is crucial for planning the migration."""
     ws = WorkspaceClient(config=cfg.to_databricks_config())
     mounts = Mounts(backend=RuntimeBackend(), ws=ws, inventory_database=cfg.inventory_database)
     mounts.inventorize_mounts()
@@ -79,8 +79,8 @@ def inventorize_permissions(cfg: MigrationConfig):
     Our carefully designed procedure systematically scans and extracts permissions associated with these diverse
     Databricks Workspace objects. This process encompasses rights granted to users and groups, role-based permissions,
     custom access configurations, and any specialized policies governing resource access. The results of this
-    meticulous scan are methodically stored within the `$inventory.permissions` table, which serves as a central
-    repository for preserving and managing these crucial access control details."""
+    meticulous scan are methodically stored within the `hive_metastore.ucx.permissions` table, which serves as a
+    central repository for preserving and managing these crucial access control details."""
     toolkit = GroupMigrationToolkit(cfg)
     toolkit.prepare_environment()
     toolkit.cleanup_inventory_table()
