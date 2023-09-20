@@ -20,20 +20,22 @@ def workspace_list(
     notebooks_modified_after: int | None = None,
     yield_folders: bool | None = False,
     threads: int | None = None,
+    max_depth: int | None = None,
 ) -> Iterator[ObjectInfo]:
     if not threads:
         threads = os.cpu_count()
-    yield from _ParallelRecursiveListing(path, parent_list, threads, yield_folders, notebooks_modified_after)
+    yield from _ParallelRecursiveListing(path, parent_list, threads, yield_folders, notebooks_modified_after, max_depth)
 
 
 class _ParallelRecursiveListing(Iterable[ObjectInfo]):
-    def __init__(self, path, listing, threads, yield_folders, notebooks_modified_after):
+    def __init__(self, path, listing, threads, yield_folders, notebooks_modified_after, max_depth):
         self._path = path
         self._listing = listing
         self._threads = threads
         self._yield_folders = yield_folders
         self._notebooks_modified_after = notebooks_modified_after
-        self._depth = 0
+        self._max_depth = max_depth
+        self._in_progress = 0
         self._work = Queue()
         self._results = Queue()
         self._cond = Condition()
@@ -43,14 +45,15 @@ class _ParallelRecursiveListing(Iterable[ObjectInfo]):
     def _enter_folder(self, path: str):
         with self._cond:
             _LOG.debug(f"Entering folder: {path}")
-            self._depth += 1
+            self._in_progress += 1
         self._work.put_nowait(path)
 
     def _leave_folder(self, path: str):
         with self._cond:
-            self._depth -= 1
+            self._in_progress -= 1
+            self._scans += 1
             _LOG.debug(f"Leaving folder: {path}")
-            if self._depth != 0:
+            if self._in_progress != 0:
                 return
             self._cond.notify_all()
             _LOG.debug("Sending poison pills to other workers")
@@ -59,7 +62,7 @@ class _ParallelRecursiveListing(Iterable[ObjectInfo]):
 
     def _is_running(self):
         with self._cond:
-            return self._depth > 0
+            return self._in_progress > 0
 
     def _reporter(self):
         _LOG.debug("Starting workspace listing reporter")
@@ -80,12 +83,15 @@ class _ParallelRecursiveListing(Iterable[ObjectInfo]):
                 break  # poison pill
             try:
                 listing = self._listing(path, notebooks_modified_after=self._notebooks_modified_after)
-                self._scans += 1
                 for object_info in sorted(listing, key=lambda _: _.path):
                     if object_info.object_type == ObjectType.DIRECTORY:
-                        self._enter_folder(object_info.path)
                         if self._yield_folders:
                             self._results.put_nowait(object_info)
+                        if self._max_depth is not None and len(object_info.path.split('/')) > self._max_depth:
+                            msg = f"Folder is too deep (max depth {self._max_depth}): {object_info.path}. Skipping"
+                            _LOG.warning(msg)
+                            continue
+                        self._enter_folder(object_info.path)
                         continue
                     self._results.put_nowait(object_info)
             except DatabricksError as err:
