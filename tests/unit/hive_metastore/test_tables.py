@@ -1,12 +1,8 @@
-import logging
-
 import pytest
 
 from databricks.labs.ucx.hive_metastore.tables import Table, TablesCrawler
 
 from ..framework.mocks import MockBackend
-
-logger = logging.getLogger(__name__)
 
 
 def test_is_delta_true():

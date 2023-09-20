@@ -17,6 +17,7 @@ class Table:
     name: str
     object_type: str
     table_format: str
+
     location: str = None
     view_text: str = None
 
