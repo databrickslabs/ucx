@@ -4,6 +4,8 @@ import sys
 
 from databricks.sdk import WorkspaceClient
 
+from databricks.labs.ucx.assessment import AssessmentToolkit
+from databricks.labs.ucx.assessment.assessment import ExternalLocationCrawler
 from databricks.labs.ucx.config import MigrationConfig
 from databricks.labs.ucx.framework.crawlers import RuntimeBackend
 from databricks.labs.ucx.framework.tasks import task, trigger
@@ -65,6 +67,36 @@ def inventorize_mounts(cfg: MigrationConfig):
     ws = WorkspaceClient(config=cfg.to_databricks_config())
     mounts = Mounts(backend=RuntimeBackend(), ws=ws, inventory_database=cfg.inventory_database)
     mounts.inventorize_mounts()
+
+
+@task("assessment", depends_on=[inventorize_mounts, crawl_tables])
+def inventorize_external_locations(cfg: MigrationConfig):
+    """In this part of the assessment, we're going to look up the location of all the tables. Locations that use
+    Mount Points will be looked up. We will then find out the External Locations required for a proper migration and
+    save these to a Table.
+    """
+    ws = WorkspaceClient(config=cfg.to_databricks_config())
+    assess = AssessmentToolkit(ws, "hive_metastore", cfg.inventory_database, RuntimeBackend())
+    assess.generate_ext_loc_list()
+
+
+@task("assessment", depends_on=[setup_schema])
+def inventorize_jobs(cfg: MigrationConfig):
+    """This part scan through all the jobs and locate ones that are not compatible with UC. It looks for common culprits,
+    such as incompatible DBR version, passthru authentication and others. All the jobs are persisted to the jobs tables.
+    """
+    ws = WorkspaceClient(config=cfg.to_databricks_config())
+    assess = AssessmentToolkit(ws, "hive_metastore", cfg.inventory_database, RuntimeBackend())
+    assess.generate_job_assessment()
+
+@task("assessment", depends_on=[setup_schema])
+def inventorize_clusters(cfg: MigrationConfig):
+    """This part scan through all the clusters and locate ones that are not compatible with UC. It looks for common culprits,
+    such as incompatible DBR version, passthru authentication and others. All the clusters are persisted to the clusters tables
+    """
+    ws = WorkspaceClient(config=cfg.to_databricks_config())
+    assess = AssessmentToolkit(ws, "hive_metastore", cfg.inventory_database, RuntimeBackend())
+    assess.generate_cluster_assessment()
 
 
 @task("assessment", depends_on=[setup_schema])

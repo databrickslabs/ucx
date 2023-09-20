@@ -70,13 +70,13 @@ class AssessmentToolkit:
         'spark.databricks.hive.metastore.glueCatalog.enabled'
     }
 
-    def __init__(self, ws: WorkspaceClient, inventory_catalog, inventory_schema, warehouse_id=None):
+    def __init__(self, ws: WorkspaceClient, inventory_catalog, inventory_schema, backend=None):
         self._all_jobs = None
         self._all_clusters_by_id = None
         self._ws = ws
         self._inventory_catalog = inventory_catalog
         self._inventory_schema = inventory_schema
-        self._warehouse_id = warehouse_id
+        self._backend = backend
         self._external_locations = None
 
     @staticmethod
@@ -88,70 +88,26 @@ class AssessmentToolkit:
             raise RuntimeError(msg)
 
     def generate_ext_loc_list(self):
-        crawler = ExternalLocationCrawler(self._backend(self._ws, self._warehouse_id), ws, self._inventory_catalog,
+        crawler = ExternalLocationCrawler(self._backend, ws, self._inventory_catalog,
                                           self._inventory_schema)
-        ext_loc_list = crawler.snapshot()
-        return ext_loc_list
+        return crawler.snapshot()
 
     def generate_job_assessment(self):
-        return AssessmentToolkit._parse_jobs(self.retrieve_jobs(), self.retrieve_clusters())
+        crawler = JobsCrawler(self._backend, ws, "hive_metastore",
+                              self._inventory_catalog)
+        return crawler.snapshot()
 
     def generate_cluster_assessment(self):
-        return AssessmentToolkit._parse_clusters(self._ws.clusters.list())
+        crawler = ClustersCrawler(self._backend, ws, "hive_metastore",
+                                  self._inventory_catalog)
+        return crawler.snapshot()
 
-    @staticmethod
-    def _parse_jobs(all_jobs, all_clusters):
-        incompatible_spark_config_keys = {
-            'spark.databricks.passthrough.enabled',
-            'spark.hadoop.javax.jdo.option.ConnectionURL',
-            'spark.databricks.hive.metastore.glueCatalog.enabled'
-        }
-        job_assessment = {}
-        for job in all_jobs:
-            job_assessment[job.job_id] = set()
 
-        for job, cluster_config in \
-                AssessmentToolkit._get_cluster_configs_from_all_jobs(all_jobs, all_clusters):
-            support_status = spark_version_compatibility(cluster_config.spark_version)
-            if support_status != 'supported':
-                job_assessment[job.job_id].add(f'not supported DBR: {cluster_config.spark_version}')
-
-            if cluster_config.spark_conf is not None:
-                for k in incompatible_spark_config_keys:
-                    if k in cluster_config.spark_conf:
-                        using_incompatible_config = True
-                        job_assessment[job.job_id].add(f'unsupported config: {k}')
-
-                for value in cluster_config.spark_conf.values():
-                    if 'dbfs:/mnt' in value or '/dbfs/mnt' in value:
-                        job_assessment[job.job_id].add(f'using DBFS mount in configuration: {value}')
-        return job_assessment
-
-    @staticmethod
-    def _parse_clusters(all_clusters: [ClusterDetails]):
-        cluster_assessment = {}
-        for cluster in all_clusters:
-            cluster_assessment[cluster.cluster_id] = set()
-            support_status = spark_version_compatibility(cluster.spark_version)
-            if support_status != 'supported':
-                cluster_assessment[cluster.cluster_id].add(f'not supported DBR: {cluster.spark_version}')
-
-            if cluster.spark_conf is not None:
-                for k in AssessmentToolkit.incompatible_spark_config_keys:
-                    if k in cluster.spark_conf:
-                        using_incompatible_config = True
-                        cluster_assessment[cluster.cluster_id].add(f'unsupported config: {k}')
-
-                for value in cluster.spark_conf.values():
-                    if 'dbfs:/mnt' in value or '/dbfs/mnt' in value:
-                        cluster_assessment[cluster.cluster_id].add(f'using DBFS mount in configuration: {value}')
-        return cluster_assessment
-
-    @staticmethod
-    def _backend(ws: WorkspaceClient, warehouse_id: str | None = None) -> SqlBackend:
-        if warehouse_id is None:
-            return RuntimeBackend()
-        return StatementExecutionBackend(ws, warehouse_id)
+    # @staticmethod
+    # def _backend(ws: WorkspaceClient, warehouse_id: str | None = None) -> SqlBackend:
+    #     if warehouse_id is None:
+    #         return RuntimeBackend()
+    #     return StatementExecutionBackend(ws, warehouse_id)
 
 
 class InventoryTableCrawler(CrawlerBase):
@@ -347,16 +303,13 @@ class JobsCrawler(CrawlerBase):
         for row in self._fetch(
             f'SELECT * FROM {self._schema}.{self._table}'
         ):
-            yield ExtLoc(*row)
+            yield JobInfo(*row)
+
 
 if __name__ == "__main__":
     ws = WorkspaceClient(cluster_id="0919-184725-qa0q5jkc")
 
-    assess = AssessmentToolkit(ws, "hive_metastore", "ucx", os.getenv("TEST_DEFAULT_WAREHOUSE_ID"))
-    # assess.table_inventory()
-    # resultSet = assess.generate_ext_loc_list()
-    # print(resultSet)
-    # print(MountsCrawler(StatementExecutionBackend(ws, os.getenv("TEST_DEFAULT_WAREHOUSE_ID")), ws, "ucx").snapshot())
-    crawler = JobsCrawler(StatementExecutionBackend(ws, os.getenv("TEST_DEFAULT_WAREHOUSE_ID")), ws, "hive_metastore", "ucx")
-    print(crawler.snapshot())
+    assess = AssessmentToolkit(ws, "hive_metastore", "ucx", StatementExecutionBackend(ws, "2e39d99c480ac668"))
+    print(assess.generate_ext_loc_list())
+
 
