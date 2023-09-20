@@ -1,3 +1,4 @@
+import logging
 from collections.abc import Iterator
 from dataclasses import dataclass
 from functools import partial
@@ -5,8 +6,6 @@ from functools import partial
 from databricks.labs.ucx.framework.crawlers import CrawlerBase
 from databricks.labs.ucx.framework.parallel import ThreadedExecution
 from databricks.labs.ucx.hive_metastore.tables import TablesCrawler
-
-import logging
 
 logger = logging.getLogger(__name__)
 
@@ -230,7 +229,10 @@ class GrantsCrawler(CrawlerBase):
                 if object_type in object_type_normalization:
                     object_type = object_type_normalization[object_type]
                 if on_type != object_type:
-                    logger.warning("Object ")
+                    logger.warning(
+                        f"Types for object {key} doesn't match after listing grants {object_type} != {on_type}"
+                    )
+                    continue
                 yield Grant(
                     principal=principal,
                     action_type=action_type,

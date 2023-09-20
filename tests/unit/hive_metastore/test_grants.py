@@ -166,11 +166,15 @@ def test_crawler_snapshot():
     snapshot = crawler.snapshot("hive_metastore", "schema")
     assert len(snapshot) == 3
 
+
 def test_grants_returning_error_when_describing():
     errors = {"DESCRIBE TABLE EXTENDED hive_metastore.test_database.table1": "error"}
     rows = {
         "SHOW GRANTS ON TABLE hive_metastore.test_database.table2": [("principal1", "OWNER", "TABLE", "")],
-        "DESCRIBE TABLE EXTENDED hive_metastore.test_database.table2": [("Catalog", "catalog", ""), ("Type", "delta", "")],
+        "DESCRIBE TABLE EXTENDED hive_metastore.test_database.table2": [
+            ("Catalog", "catalog", ""),
+            ("Type", "delta", ""),
+        ],
         "SHOW TABLES FROM hive_metastore.test": [("dummy", "table1", False), ("dummy", "table2", False)],
     }
 
@@ -178,4 +182,14 @@ def test_grants_returning_error_when_describing():
     crawler = GrantsCrawler(tc)
 
     results = crawler._crawl(catalog="hive_metastore", database="test_database")
-    assert results == [Grant(principal='principal1', action_type='OWNER', catalog='hive_metastore', database='test_database', table='table2', any_file=False, anonymous_function=False)]
+    assert results == [
+        Grant(
+            principal="principal1",
+            action_type="OWNER",
+            catalog="hive_metastore",
+            database="test_database",
+            table="table2",
+            any_file=False,
+            anonymous_function=False,
+        )
+    ]
