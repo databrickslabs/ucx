@@ -5,6 +5,7 @@ from concurrent.futures import FIRST_COMPLETED, ThreadPoolExecutor, wait
 from itertools import groupby
 
 from databricks.sdk import WorkspaceClient
+from databricks.sdk.core import DatabricksError
 from databricks.sdk.service.workspace import ObjectInfo, ObjectType
 
 from databricks.labs.ucx.mixins.hardening import rate_limited
@@ -49,14 +50,21 @@ class WorkspaceListing:
     def _list_and_analyze(self, obj: ObjectInfo) -> (list[ObjectInfo], list[ObjectInfo]):
         directories = []
         others = []
-        grouped_iterator = groupby(self._list_workspace(obj.path), key=lambda x: x.object_type == ObjectType.DIRECTORY)
-        for is_directory, objects in grouped_iterator:
-            if is_directory:
-                directories.extend(list(objects))
-            else:
-                others.extend(list(objects))
-
-        logger.debug(f"Listed {obj.path}, found {len(directories)} sub-directories and {len(others)} other objects")
+        try:
+            grouped_iterator = groupby(
+                self._list_workspace(obj.path), key=lambda x: x.object_type == ObjectType.DIRECTORY
+            )
+            for is_directory, objects in grouped_iterator:
+                if is_directory:
+                    directories.extend(list(objects))
+                else:
+                    others.extend(list(objects))
+            logger.debug(f"Listed {obj.path}, found {len(directories)} sub-directories and {len(others)} other objects")
+        except DatabricksError as err:
+            # See https://github.com/databrickslabs/ucx/issues/230
+            if err.error_code != "RESOURCE_DOES_NOT_EXIST":
+                raise err
+            logger.warning(f"{obj.path} is not listable. Ignoring")
         return directories, others
 
     def walk(self, start_path="/"):
