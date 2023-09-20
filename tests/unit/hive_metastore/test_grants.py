@@ -168,14 +168,14 @@ def test_crawler_snapshot():
 
 
 def test_grants_returning_error_when_describing():
-    errors = {"DESCRIBE TABLE EXTENDED hive_metastore.test_database.table1": "error"}
+    errors = {"SHOW GRANTS ON TABLE hive_metastore.test_database.table1": "error"}
     rows = {
+        "SHOW TABLES FROM hive_metastore.test": [("dummy", "table1", False), ("dummy", "table2", False)],
         "SHOW GRANTS ON TABLE hive_metastore.test_database.table2": [("principal1", "OWNER", "TABLE", "")],
-        "DESCRIBE TABLE EXTENDED hive_metastore.test_database.table2": [
+        "DESCRIBE *": [
             ("Catalog", "catalog", ""),
             ("Type", "delta", ""),
         ],
-        "SHOW TABLES FROM hive_metastore.test": [("dummy", "table1", False), ("dummy", "table2", False)],
     }
 
     tc = TablesCrawler(MockBackend(fails_on_first=errors, rows=rows), "main", "default")
