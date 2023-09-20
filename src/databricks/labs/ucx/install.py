@@ -72,6 +72,7 @@ class Installer:
         self._dashboards = {}
 
     def run(self):
+        logger.info(f'Installing UCX v{__version__}')
         self._configure()
         self._create_dashboards()
         self._create_jobs()
@@ -508,5 +509,6 @@ class Installer:
 
 if __name__ == "__main__":
     ws = WorkspaceClient(product="ucx", product_version=__version__)
+    logger.setLevel('INFO')
     installer = Installer(ws)
     installer.run()
