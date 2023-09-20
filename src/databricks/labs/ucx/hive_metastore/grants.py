@@ -1,3 +1,4 @@
+import logging
 from collections.abc import Iterator
 from dataclasses import dataclass
 from functools import partial
@@ -5,6 +6,8 @@ from functools import partial
 from databricks.labs.ucx.framework.crawlers import CrawlerBase
 from databricks.labs.ucx.framework.parallel import ThreadedExecution
 from databricks.labs.ucx.hive_metastore.tables import TablesCrawler
+
+logger = logging.getLogger(__name__)
 
 
 @dataclass(frozen=True)
@@ -219,20 +222,24 @@ class GrantsCrawler(CrawlerBase):
             any_file=any_file,
             anonymous_function=anonymous_function,
         )
-        object_type_normalization = {"SCHEMA": "DATABASE", "CATALOG$": "CATALOG"}
-        for row in self._fetch(f"SHOW GRANTS ON {on_type} {key}"):
-            (principal, action_type, object_type, _) = row
-            if object_type in object_type_normalization:
-                object_type = object_type_normalization[object_type]
-            if on_type != object_type:
-                continue
-            yield Grant(
-                principal=principal,
-                action_type=action_type,
-                table=table,
-                view=view,
-                database=database,
-                catalog=catalog,
-                any_file=any_file,
-                anonymous_function=anonymous_function,
-            )
+        try:
+            object_type_normalization = {"SCHEMA": "DATABASE", "CATALOG$": "CATALOG"}
+            for row in self._fetch(f"SHOW GRANTS ON {on_type} {key}"):
+                (principal, action_type, object_type, _) = row
+                if object_type in object_type_normalization:
+                    object_type = object_type_normalization[object_type]
+                if on_type != object_type:
+                    continue
+                yield Grant(
+                    principal=principal,
+                    action_type=action_type,
+                    table=table,
+                    view=view,
+                    database=database,
+                    catalog=catalog,
+                    any_file=any_file,
+                    anonymous_function=anonymous_function,
+                )
+        except RuntimeError as e:
+            logger.error(f"Couldn't fetch grants for object {on_type} {key}: {e}")
+            return []
