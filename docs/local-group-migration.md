@@ -145,6 +145,10 @@ Additional info:
 - put method: `ws.permissions.update(object_id, object_type)`
 - get response object type: `databricks.sdk.service.iam.ObjectPermissions`
 
+#### Known issues
+
+- Folder names with forward-slash (`/`) in directory name will be skipped by the inventory. Databricks UI no longer allows creating folders with a forward slash. See [this issue](https://github.com/databrickslabs/ucx/issues/230) for more details.
+
 ### Secrets (uses Secrets API)
 
 - [x] Secrets
