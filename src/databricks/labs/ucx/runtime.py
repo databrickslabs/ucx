@@ -82,7 +82,6 @@ def inventorize_permissions(cfg: MigrationConfig):
     meticulous scan are methodically stored within the `$inventory.permissions` table, which serves as a central
     repository for preserving and managing these crucial access control details."""
     toolkit = GroupMigrationToolkit(cfg)
-    toolkit.prepare_environment()
     toolkit.cleanup_inventory_table()
     toolkit.inventorize_permissions()
 
