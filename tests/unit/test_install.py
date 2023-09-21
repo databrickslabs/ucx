@@ -18,7 +18,7 @@ from databricks.sdk.service.sql import (
 )
 from databricks.sdk.service.workspace import ImportFormat, ObjectInfo
 
-from databricks.labs.ucx.config import GroupsConfig, MigrationConfig, TaclConfig
+from databricks.labs.ucx.config import GroupsConfig, MigrationConfig
 from databricks.labs.ucx.framework.dashboards import DashboardFromFiles
 from databricks.labs.ucx.install import Installer
 
@@ -56,8 +56,6 @@ def test_save_config(mocker):
 inventory_database: '42'
 log_level: '42'
 num_threads: 42
-tacl:
-  auto: true
 version: 1
 warehouse_id: abc
 workspace_start_path: /
@@ -114,8 +112,6 @@ def test_save_config_auto_groups(mocker):
 inventory_database: '42'
 log_level: '42'
 num_threads: 42
-tacl:
-  auto: true
 version: 1
 warehouse_id: abc
 workspace_start_path: /
@@ -159,8 +155,6 @@ def test_save_config_strip_group_names(mocker):
 inventory_database: '42'
 log_level: '42'
 num_threads: 42
-tacl:
-  auto: true
 version: 1
 warehouse_id: abc
 workspace_start_path: /
@@ -177,9 +171,9 @@ def test_main_with_existing_conf_does_not_recreate_config(mocker):
     ws.current_user.me = lambda: iam.User(user_name="me@example.com", groups=[iam.ComplexValue(display="admins")])
     ws.config.host = "https://foo"
     ws.config.is_aws = True
-    config_bytes = yaml.dump(
-        MigrationConfig(inventory_database="a", groups=GroupsConfig(auto=True), tacl=TaclConfig(auto=True)).as_dict()
-    ).encode("utf8")
+    config_bytes = yaml.dump(MigrationConfig(inventory_database="a", groups=GroupsConfig(auto=True)).as_dict()).encode(
+        "utf8"
+    )
     ws.workspace.download = lambda _: io.BytesIO(config_bytes)
     ws.workspace.get_status = lambda _: ObjectInfo(object_id=123)
     ws.data_sources.list = lambda: [DataSource(id="bcd", warehouse_id="abc")]

@@ -5,7 +5,7 @@ from pathlib import Path
 
 import yaml
 
-from databricks.labs.ucx.config import GroupsConfig, MigrationConfig, TaclConfig
+from databricks.labs.ucx.config import GroupsConfig, MigrationConfig
 
 
 def test_initialization():
@@ -13,7 +13,6 @@ def test_initialization():
         MigrationConfig,
         inventory_database="abc",
         groups=GroupsConfig(auto=True),
-        tacl=TaclConfig(databases=["default"]),
     )
     mc()
 
@@ -45,7 +44,6 @@ def test_reader(tmp_path: Path):
             MigrationConfig,
             inventory_database="abc",
             groups=GroupsConfig(auto=True),
-            tacl=TaclConfig(databases=["default"]),
         )
 
         config: MigrationConfig = mc()

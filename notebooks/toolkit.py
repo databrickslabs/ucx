@@ -15,10 +15,10 @@
 from databricks.labs.ucx.config import (
     GroupsConfig,
     MigrationConfig,
-    TaclConfig,
 )
+from databricks.labs.ucx.framework.crawlers import RuntimeBackend
 from databricks.labs.ucx.workspace_access import GroupMigrationToolkit
-from databricks.labs.ucx.hive_metastore import TaclToolkit
+from databricks.labs.ucx.hive_metastore import TablesCrawler, GrantsCrawler
 
 # COMMAND ----------
 
@@ -40,22 +40,13 @@ config = MigrationConfig(
         # use this option to select all groups automatically
         # auto=True
     ),
-    tacl=TaclConfig(
-        # use this option to select specific databases manually
-        databases=databases,
-        # use this option to select all databases automatically
-        # auto=True
-    ),
     log_level="DEBUG",
 )
 
 toolkit = GroupMigrationToolkit(config)
-tacltoolkit = TaclToolkit(
-    toolkit._ws,
-    inventory_catalog="hive_metastore",
-    inventory_schema=config.inventory_database,
-    databases=config.tacl.databases,
-)
+backend = RuntimeBackend()
+tables = TablesCrawler(backend, config.inventory_database)
+grants = GrantsCrawler(tables)
 
 # COMMAND ----------
 
@@ -100,7 +91,7 @@ toolkit.cleanup_inventory_table()
 
 # COMMAND ----------
 
-tacltoolkit.grants_snapshot()
+grants.snapshot()
 
 # COMMAND ----------
 

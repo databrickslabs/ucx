@@ -33,7 +33,6 @@ class MockBackend(SqlBackend):
         rows = []
         if self._rows:
             for pattern in self._rows.keys():
-                logger.debug(f"Checking pattern: {pattern}")
                 r = re.compile(pattern)
                 if r.match(sql):
                     logger.debug(f"Found match: {sql}")

@@ -17,7 +17,7 @@ from databricks.sdk.service.sql import EndpointInfoWarehouseType, SpotInstancePo
 from databricks.sdk.service.workspace import ImportFormat
 
 from databricks.labs.ucx.__about__ import __version__
-from databricks.labs.ucx.config import GroupsConfig, MigrationConfig, TaclConfig
+from databricks.labs.ucx.config import GroupsConfig, MigrationConfig
 from databricks.labs.ucx.framework.dashboards import DashboardFromFiles
 from databricks.labs.ucx.framework.tasks import _TASKS, Task
 from databricks.labs.ucx.runtime import main
@@ -199,7 +199,6 @@ class Installer:
         self._config = MigrationConfig(
             inventory_database=inventory_database,
             groups=GroupsConfig(**groups_config_args),
-            tacl=TaclConfig(auto=True),
             warehouse_id=warehouse_id,
             log_level=log_level,
             num_threads=num_threads,

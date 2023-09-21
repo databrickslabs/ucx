@@ -1,8 +1,5 @@
 inventory_database: unity_catalog_migration
 
-tacl:
-  databases: [ "default" ]
-
 warehouse_id: None
 
 groups:

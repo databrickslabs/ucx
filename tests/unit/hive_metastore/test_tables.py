@@ -85,15 +85,18 @@ def test_uc_sql(table, query):
 
 
 def test_tables_crawler_inventory_table():
-    tc = TablesCrawler(MockBackend(), "main", "default")
+    tc = TablesCrawler(MockBackend(), "default")
     assert tc._table == "tables"
 
 
 def test_tables_returning_error_when_describing():
-    errors = {"DESCRIBE TABLE EXTENDED test.database.table1": "error"}
+    errors = {"DESCRIBE TABLE EXTENDED hive_metastore.database.table1": "error"}
     rows = {
-        "SHOW TABLES FROM test.database": [("", "table1", ""), ("", "table2", "")],
-        "DESCRIBE TABLE EXTENDED test.database.table2": [("Catalog", "catalog", ""), ("Type", "delta", "")],
+        "SHOW DATABASES": [("database",)],
+        "SHOW TABLES FROM hive_metastore.database": [("", "table1", ""), ("", "table2", "")],
+        "DESCRIBE TABLE EXTENDED hive_metastore.database.table2": [("Catalog", "catalog", ""), ("Type", "delta", "")],
     }
-    tc = TablesCrawler(MockBackend(fails_on_first=errors, rows=rows), "main", "default")
-    assert len(tc._crawl("test", "database")) == 1
+    backend = MockBackend(fails_on_first=errors, rows=rows)
+    tc = TablesCrawler(backend, "default")
+    results = tc._crawl()
+    assert len(results) == 1
