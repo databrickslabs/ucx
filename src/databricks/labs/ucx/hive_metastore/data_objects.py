@@ -25,7 +25,7 @@ class ExternalLocationCrawler(CrawlerBase):
         min_slash = 2
         external_locations: list[ExternalLocation] = []
         for table in tables:
-            location = table.as_dict()["location"]
+            location = table.location
             if location is not None and len(location) > 0:
                 if location.startswith("dbfs:/mnt"):
                     for mount in mounts:
