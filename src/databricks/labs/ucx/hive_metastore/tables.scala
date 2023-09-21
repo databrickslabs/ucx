@@ -1,3 +1,4 @@
+import org.apache.spark.sql.catalyst.analysis.NoSuchDatabaseException
 import org.apache.spark.sql.catalyst.catalog.{CatalogTable, CatalogTableType}
 import org.apache.spark.sql.DataFrame
 
@@ -10,7 +11,13 @@ def metadataForAllTables(databases: Seq[String]): DataFrame = {
 
   val externalCatalog = spark.sharedState.externalCatalog
   databases.par.flatMap(databaseName => {
-    val tables = externalCatalog.listTables(databaseName)
+    val tables = try {
+      externalCatalog.listTables(databaseName)
+    } catch {
+      case err: NoSuchDatabaseException =>
+        println(s"[ERROR][${databaseName}] ignoring database because of ${err}")
+        null
+    }
     if (tables == null) {
       println(s"[WARN][${databaseName}] listTables returned null")
       Seq()
