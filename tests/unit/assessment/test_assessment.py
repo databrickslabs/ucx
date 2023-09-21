@@ -14,20 +14,8 @@ from databricks.labs.ucx.mixins.sql import Row
 from tests.unit.framework.mocks import MockBackend
 
 
-@pytest.fixture
-def ws():
-    client = Mock()
-    return client
-
-
-@pytest.fixture
-def sbe():
-    sbe = MockBackend()
-    return sbe
-
-
-def test_external_locations(ws, sbe):
-    crawler = ExternalLocationCrawler(ws, sbe, "test")
+def test_external_locations():
+    crawler = ExternalLocationCrawler(Mock(), MockBackend(), "test")
     row_factory = type("Row", (Row,), {"__columns__": ["location"]})
     sample_locations = [
         row_factory(["s3://us-east-1-dev-account-staging-uc-ext-loc-bucket-1/Location/Table"]),
@@ -50,7 +38,7 @@ def test_external_locations(ws, sbe):
     assert result_set[2].location == "s3://us-east-1-ucx-container/"
 
 
-def test_job_assessment(ws):
+def test_job_assessment():
     sample_jobs = [
         BaseJob(
             created_time=1694536604319,
@@ -114,7 +102,6 @@ def test_job_assessment(ws):
             cluster_id="0810-225833-atlanta69",
         ),
     ]
-    {c.cluster_id: c for c in sample_clusters}
     result_set = JobsCrawler(Mock(), MockBackend(), "ucx")._assess_jobs(
         sample_jobs, {c.cluster_id: c for c in sample_clusters}
     )
@@ -123,7 +110,7 @@ def test_job_assessment(ws):
     assert result_set[1].success == 0
 
 
-def test_cluster_assessment(ws):
+def test_cluster_assessment():
     sample_clusters = [
         ClusterDetails(
             autoscale=AutoScale(min_workers=1, max_workers=6),
