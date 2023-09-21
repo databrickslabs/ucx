@@ -4,8 +4,7 @@ from dataclasses import dataclass
 from databricks.sdk import WorkspaceClient
 from databricks.sdk.service.jobs import BaseJob
 
-from databricks.labs.ucx.framework.crawlers import CrawlerBase
-from databricks.labs.ucx.hive_metastore.table_acls import SqlBackend
+from databricks.labs.ucx.framework.crawlers import CrawlerBase, SqlBackend
 
 INCOMPATIBLE_SPARK_CONFIG_KEYS = [
     "spark.databricks.passthrough.enabled",

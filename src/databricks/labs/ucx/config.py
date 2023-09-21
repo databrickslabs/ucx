@@ -68,24 +68,6 @@ class ConnectConfig:
         return cls(**raw)
 
 
-@dataclass
-class TaclConfig:
-    databases: list[str] | None = None
-    auto: bool | None = None
-
-    def __post_init__(self):
-        if not self.databases and self.auto is None:
-            msg = "Either selected or auto must be set"
-            raise ValueError(msg)
-        if self.databases and self.auto is False:
-            msg = "No selected groups provided, but auto-collection is disabled"
-            raise ValueError(msg)
-
-    @classmethod
-    def from_dict(cls, raw: dict):
-        return cls(**raw)
-
-
 # Used to set the right expectation about configuration file schema
 _CONFIG_VERSION = 1
 
@@ -93,12 +75,11 @@ _CONFIG_VERSION = 1
 @dataclass
 class MigrationConfig:
     inventory_database: str
-    tacl: TaclConfig
     groups: GroupsConfig
     instance_pool_id: str = None
     warehouse_id: str = None
     connect: ConnectConfig | None = None
-    num_threads: int | None = 4
+    num_threads: int | None = 10
     log_level: str | None = "INFO"
 
     # Starting path for notebooks and directories crawler
@@ -137,12 +118,11 @@ class MigrationConfig:
             raise ValueError(msg)
         return cls(
             inventory_database=raw.get("inventory_database"),
-            tacl=TaclConfig.from_dict(raw.get("tacl", {})),
             groups=GroupsConfig.from_dict(raw.get("groups", {})),
             connect=ConnectConfig.from_dict(raw.get("connect", {})),
             instance_pool_id=raw.get("instance_pool_id", None),
             warehouse_id=raw.get("warehouse_id", None),
-            num_threads=raw.get("num_threads", 8),
+            num_threads=raw.get("num_threads", 10),
             log_level=raw.get("log_level", "INFO"),
         )
 

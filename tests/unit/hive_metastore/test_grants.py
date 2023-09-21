@@ -137,40 +137,73 @@ ROWS = {
 }
 
 
-def test_crawler_crawl():
-    # Test with no data
+def test_crawler_no_data():
     b = MockBackend()
-    table = TablesCrawler(b, "hive_metastore", "schema")
+    table = TablesCrawler(b, "schema")
     crawler = GrantsCrawler(table)
-    grants = crawler._crawl("hive_metastore", "schema")
+    grants = crawler.snapshot()
     assert len(grants) == 0
-    # Test with test data
-    b = MockBackend(rows=ROWS)
-    table = TablesCrawler(b, "hive_metastore", "schema")
+
+
+def test_crawler_crawl():
+    b = MockBackend(
+        rows={
+            "SHOW DATABASES": [("database_one",), ("database_two",)],
+            "SHOW TABLES FROM hive_metastore.database_one": [
+                ("database_one", "table_one", "true"),
+                ("database_one", "table_two", "true"),
+            ],
+            "SELECT * FROM hive_metastore.schema.tables": [
+                make_row(("foo", "bar", "test_table", "type", "DELTA", "/foo/bar/test", None), SELECT_COLS),
+                make_row(("foo", "bar", "test_view", "type", "VIEW", None, "SELECT * FROM table"), SELECT_COLS),
+                make_row(("foo", None, None, "type", "CATALOG", None, None), SELECT_COLS),
+            ],
+            "DESCRIBE TABLE EXTENDED hive_metastore.database_one.*": [
+                make_row(("Catalog", "foo", "ignored"), DESCRIBE_COLS),
+                make_row(("Type", "TABLE", "ignored"), DESCRIBE_COLS),
+                make_row(("Provider", "", "ignored"), DESCRIBE_COLS),
+                make_row(("Location", "/foo/bar/test", "ignored"), DESCRIBE_COLS),
+                make_row(("View Text", "SELECT * FROM table", "ignored"), DESCRIBE_COLS),
+            ],
+            "SHOW GRANTS ON .*": [
+                make_row(("princ1", "SELECT", "TABLE", "ignored"), SHOW_COLS),
+                make_row(("princ1", "SELECT", "VIEW", "ignored"), SHOW_COLS),
+                make_row(("princ1", "USE", "CATALOG$", "ignored"), SHOW_COLS),
+            ],
+        }
+    )
+    table = TablesCrawler(b, "schema")
     crawler = GrantsCrawler(table)
-    grants = crawler._crawl("hive_metastore", "schema")
+    grants = crawler.snapshot()
     assert len(grants) == 3
 
 
 def test_crawler_snapshot():
     # Test with no data
     b = MockBackend()
-    table = TablesCrawler(b, "hive_metastore", "schema")
+    table = TablesCrawler(b, "schema")
     crawler = GrantsCrawler(table)
-    snapshot = crawler.snapshot("hive_metastore", "schema")
+    snapshot = crawler.snapshot()
     assert len(snapshot) == 0
     # Test with test data
     b = MockBackend(rows=ROWS)
-    table = TablesCrawler(b, "hive_metastore", "schema")
+    table = TablesCrawler(b, "schema")
     crawler = GrantsCrawler(table)
-    snapshot = crawler.snapshot("hive_metastore", "schema")
+    snapshot = crawler.snapshot()
     assert len(snapshot) == 3
 
 
 def test_grants_returning_error_when_describing():
     errors = {"SHOW GRANTS ON TABLE hive_metastore.test_database.table1": "error"}
     rows = {
-        "SHOW TABLES FROM hive_metastore.test": [("dummy", "table1", False), ("dummy", "table2", False)],
+        "SHOW DATABASES": [
+            ("test_database",),
+            ("other_database",),
+        ],
+        "SHOW TABLES FROM hive_metastore.test_database": [
+            ("test_database", "table1", False),
+            ("test_database", "table2", False),
+        ],
         "SHOW GRANTS ON TABLE hive_metastore.test_database.table2": [("principal1", "OWNER", "TABLE", "")],
         "DESCRIBE *": [
             ("Catalog", "catalog", ""),
@@ -178,10 +211,10 @@ def test_grants_returning_error_when_describing():
         ],
     }
 
-    tc = TablesCrawler(MockBackend(fails_on_first=errors, rows=rows), "main", "default")
+    tc = TablesCrawler(MockBackend(fails_on_first=errors, rows=rows), "default")
     crawler = GrantsCrawler(tc)
 
-    results = crawler._crawl(catalog="hive_metastore", database="test_database")
+    results = crawler._crawl()
     assert results == [
         Grant(
             principal="principal1",

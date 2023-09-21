@@ -8,7 +8,7 @@ from databricks.labs.ucx.assessment.crawlers import ClustersCrawler, JobsCrawler
 from databricks.labs.ucx.config import MigrationConfig
 from databricks.labs.ucx.framework.crawlers import RuntimeBackend
 from databricks.labs.ucx.framework.tasks import task, trigger
-from databricks.labs.ucx.hive_metastore import TaclToolkit
+from databricks.labs.ucx.hive_metastore import GrantsCrawler, TablesCrawler
 from databricks.labs.ucx.hive_metastore.data_objects import ExternalLocationCrawler
 from databricks.labs.ucx.hive_metastore.list_mounts import Mounts
 from databricks.labs.ucx.workspace_access import GroupMigrationToolkit
@@ -48,11 +48,10 @@ def crawl_grants(cfg: MigrationConfig):
     setup. This approach not only safeguards data integrity and access control but also ensures a smooth and
     secure transition for our data assets. It reinforces our commitment to data security and compliance throughout the
     migration process and beyond"""
-    ws = WorkspaceClient(config=cfg.to_databricks_config())
-    tacls = TaclToolkit(
-        ws, inventory_catalog="hive_metastore", inventory_schema=cfg.inventory_database, databases=cfg.tacl.databases
-    )
-    tacls.grants_snapshot()
+    backend = RuntimeBackend()
+    tables = TablesCrawler(backend, cfg.inventory_database)
+    grants = GrantsCrawler(tables)
+    grants.snapshot()
 
 
 @task("assessment", depends_on=[setup_schema])

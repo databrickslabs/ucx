@@ -1,3 +1,5 @@
-from databricks.labs.ucx.hive_metastore.table_acls import TaclToolkit
+from databricks.labs.ucx.hive_metastore.grants import GrantsCrawler
+from databricks.labs.ucx.hive_metastore.list_mounts import Mounts
+from databricks.labs.ucx.hive_metastore.tables import TablesCrawler
 
-__all__ = ["TaclToolkit"]
+__all__ = ["TablesCrawler", "GrantsCrawler", "Mounts"]

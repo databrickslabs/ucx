@@ -122,28 +122,21 @@ class GrantsCrawler(CrawlerBase):
         super().__init__(tc._backend, tc._catalog, tc._schema, "grants")
         self._tc = tc
 
-    def snapshot(self, catalog: str, database: str) -> list[Grant]:
-        return self._snapshot(partial(self._try_load, catalog, database), partial(self._crawl, catalog, database))
+    def snapshot(self) -> list[Grant]:
+        return self._snapshot(partial(self._try_load), partial(self._crawl))
 
-    def _try_load(self, catalog: str, database: str):
-        for row in self._fetch(
-            f'SELECT * FROM {self._full_name} WHERE catalog = "{catalog}" AND database = "{database}"'
-        ):
+    def _try_load(self):
+        for row in self._fetch(f"SELECT * FROM {self._full_name}"):
             yield Grant(*row)
 
-    def _crawl(self, catalog: str, database: str) -> list[Grant]:
+    def _crawl(self) -> list[Grant]:
         """
-        Crawls and lists grants for tables and views within the specified catalog and database.
-
-        Args:
-            catalog (str): The catalog name.
-            database (str): The database name.
+        Crawls and lists grants for all databases, tables, and views within hive_metastore.
 
         Returns:
             list[Grant]: A list of Grant objects representing the listed grants.
 
         Behavior:
-        - Validates and prepares the provided catalog and database names.
         - Constructs a list of tasks to fetch grants using the `_grants` method, including both database-wide and
           table/view-specific grants.
         - Iterates through tables in the specified database using the `_tc.snapshot` method.
@@ -156,21 +149,22 @@ class GrantsCrawler(CrawlerBase):
           database, table, view).
 
         Returns:
-        list[Grant]: A list of Grant objects representing the grants found in the specified catalog and database.
+        list[Grant]: A list of Grant objects representing the grants found in hive_metastore.
         """
-        catalog = self._valid(catalog)
-        database = self._valid(database)
-        tasks = [partial(self._grants, catalog=catalog), partial(self._grants, catalog=catalog, database=database)]
-        for table in self._tc.snapshot(catalog, database):
-            fn = partial(self._grants, catalog=catalog, database=database)
+        seen_databases = set()
+        catalog = "hive_metastore"
+        tasks = [partial(self._grants, catalog=catalog)]
+        for table in self._tc.snapshot():
+            if table.database not in seen_databases:
+                tasks.append(partial(self._grants, catalog=catalog, database=table.database))
+                seen_databases.add(table.database)
+            fn = partial(self._grants, catalog=catalog, database=table.database)
             if table.kind == "VIEW":
                 tasks.append(partial(fn, view=table.name))
             else:
                 tasks.append(partial(fn, table=table.name))
         return [
-            grant
-            for grants in ThreadedExecution.gather(f"listing grants for {catalog}.{database}", tasks)
-            for grant in grants
+            grant for grants in ThreadedExecution.gather(f"listing grants for {catalog}", tasks) for grant in grants
         ]
 
     def _grants(
