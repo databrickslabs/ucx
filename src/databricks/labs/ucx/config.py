@@ -103,6 +103,7 @@ class MigrationConfig:
 
     # Starting path for notebooks and directories crawler
     workspace_start_path: str = "/"
+    workspace_max_depth: int = None
 
     def __post_init__(self):
         if self.connect is None:
@@ -144,6 +145,8 @@ class MigrationConfig:
             warehouse_id=raw.get("warehouse_id", None),
             num_threads=raw.get("num_threads", 8),
             log_level=raw.get("log_level", "INFO"),
+            workspace_start_path=raw.get("workspace_start_path", "/"),
+            workspace_max_depth=raw.get("workspace_max_depth", None),
         )
 
     @classmethod

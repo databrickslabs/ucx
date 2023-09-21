@@ -9,6 +9,7 @@ from databricks.labs.ucx.framework.crawlers import (
     SqlBackend,
     StatementExecutionBackend,
 )
+from databricks.labs.ucx.notebooks.workspace_tree import WorkspaceObjects
 from databricks.labs.ucx.workspace_access.generic import (
     GenericPermissionsSupport,
     authorization_listing,
@@ -37,6 +38,16 @@ class GroupMigrationToolkit:
         self._verify_ws_client(ws)
         self._ws = ws  # TODO: remove this once notebooks/toolkit.py is removed
 
+        backend = self._backend(ws, warehouse_id)
+        workspace_objects = WorkspaceObjects(
+            backend,
+            ws,
+            config.inventory_database,
+            start_path=config.workspace_start_path,
+            num_threads=config.num_threads,
+            max_depth=config.workspace_max_depth,
+        )
+
         generic_acl_listing = [
             listing_wrapper(ws.clusters.list, "cluster_id", "clusters"),
             listing_wrapper(ws.cluster_policies.list, "policy_id", "cluster-policies"),
@@ -46,7 +57,7 @@ class GroupMigrationToolkit:
             listing_wrapper(ws.pipelines.list_pipelines, "pipeline_id", "pipelines"),
             listing_wrapper(experiments_listing(ws), "experiment_id", "experiments"),
             listing_wrapper(models_listing(ws), "id", "registered-models"),
-            workspace_listing(ws, num_threads=config.num_threads, start_path=config.workspace_start_path),
+            workspace_listing(workspace_objects),
             authorization_listing(),
         ]
         redash_acl_listing = [
@@ -59,7 +70,7 @@ class GroupMigrationToolkit:
         secrets_support = SecretScopesSupport(ws)
         scim_support = ScimSupport(ws)
         self._permissions_manager = PermissionManager(
-            self._backend(ws, warehouse_id),
+            backend,
             config.inventory_database,
             [generic_support, sql_support, secrets_support, scim_support],
             self._object_type_appliers(generic_support, sql_support, secrets_support, scim_support),

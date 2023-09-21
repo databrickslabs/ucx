@@ -9,6 +9,7 @@ from databricks.sdk.core import DatabricksError
 from databricks.sdk.service import iam, ml, workspace
 
 from databricks.labs.ucx.mixins.hardening import rate_limited
+from databricks.labs.ucx.notebooks.workspace_tree import WorkspaceObjects
 from databricks.labs.ucx.workspace_access.base import (
     Applier,
     Crawler,
@@ -126,7 +127,7 @@ def listing_wrapper(
     return wrapper
 
 
-def workspace_listing(ws: WorkspaceClient, num_threads=20, start_path: str | None = "/"):
+def workspace_listing(workspace_objects: WorkspaceObjects):
     def _convert_object_type_to_request_type(_object: workspace.ObjectInfo) -> str | None:
         match _object.object_type:
             case workspace.ObjectType.NOTEBOOK:
@@ -144,13 +145,11 @@ def workspace_listing(ws: WorkspaceClient, num_threads=20, start_path: str | Non
                 return None
 
     def inner():
-        from databricks.labs.ucx.workspace_access.listing import WorkspaceListing
-
-        ws_listing = WorkspaceListing(ws, num_threads=num_threads, with_directories=False)
-        for _object in ws_listing.walk(start_path):
-            request_type = _convert_object_type_to_request_type(_object)
-            if request_type:
-                yield GenericPermissionsInfo(object_id=str(_object.object_id), request_type=request_type)
+        for object_info in workspace_objects.snapshot():
+            request_type = _convert_object_type_to_request_type(object_info)
+            if request_type is None:
+                continue
+            yield GenericPermissionsInfo(object_id=str(object_info.object_id), request_type=request_type)
 
     return inner
 

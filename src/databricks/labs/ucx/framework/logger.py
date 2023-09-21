@@ -13,7 +13,7 @@ class NiceFormatter(logging.Formatter):
     MAGENTA = "\033[35m"
     GRAY = "\033[90m"
 
-    def __init__(self, *, probe_tty: bool = False) -> None:
+    def __init__(self, *, probe_tty: bool = False, with_thread_name: bool = False) -> None:
         super().__init__(fmt="%(asctime)s %(levelname)s [%(name)s] %(message)s", datefmt="%H:%M")
         self._levels = {
             logging.NOTSET: self._bold(f"{self.BLACK}TRACE"),
@@ -25,6 +25,7 @@ class NiceFormatter(logging.Formatter):
         }
         # show colors in runtime, github actions, and while debugging
         self.colors = sys.stdout.isatty() if probe_tty else True
+        self._with_thread_name = with_thread_name
 
     def _bold(self, text):
         return f"{self.BOLD}{text}{self.RESET}"
@@ -51,7 +52,10 @@ class NiceFormatter(logging.Formatter):
             color_marker = self.BLACK + self.BOLD
         elif record.levelno in (logging.ERROR, logging.FATAL):
             color_marker = self.RED + self.BOLD
-        return f"{self.GRAY}{ts}{self.RESET} {level} {color_marker}[{name}] {msg}{self.RESET}"
+        thread_name = ""
+        if self._with_thread_name:
+            thread_name = f"[{record.threadName}]"
+        return f"{self.GRAY}{ts}{self.RESET} {level} {color_marker}[{name}]{thread_name} {msg}{self.RESET}"
 
 
 def _install():
