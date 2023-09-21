@@ -4,6 +4,7 @@ import sys
 
 from databricks.sdk import WorkspaceClient
 
+from databricks.labs.ucx.assessment import AssessmentToolkit
 from databricks.labs.ucx.config import MigrationConfig
 from databricks.labs.ucx.framework.crawlers import RuntimeBackend
 from databricks.labs.ucx.framework.tasks import task, trigger
@@ -67,6 +68,58 @@ def inventorize_mounts(cfg: MigrationConfig):
     mounts.inventorize_mounts()
 
 
+@task("assessment", depends_on=[inventorize_mounts, crawl_tables])
+def inventorize_external_locations(cfg: MigrationConfig):
+    """In this part of the assessment, we're going to look up the location of all the tables.
+    Locations that use
+    Mount Points will be looked up. We will then find out the External Locations required for a proper migration and
+    save these to the `$inventory.external_locations` Table.
+    The logic this assessment follow is extract all the locations for tables that are not using DBFS
+    (we capture the locations for tables using mount points).
+    We then scan all the locations and find the common folders that accommodate them.
+    These external_locations will be created in a later stage before the table can be migrated.
+    """
+    ws = WorkspaceClient(config=cfg.to_databricks_config())
+    assess = AssessmentToolkit(ws, cfg.inventory_database, RuntimeBackend())
+    assess.generate_external_location_list()
+
+
+@task("assessment", depends_on=[setup_schema])
+def inventorize_jobs(cfg: MigrationConfig):
+    """This part scan through all the jobs and locate ones that are not compatible with UC.
+    It looks for:<br>
+    <ol>
+    <li>Clusters with DBR version earlier than 11.3<br>
+    <li>Clusters using Passthru Authentication<br>
+    <li>Clusters with incompatible spark config tags<br>
+    <li>Clusters referencing DBFS locations in one or more config options<br>
+    </ol>
+    <br>
+    A report with a list of all the Jobs is saved to the `$inventory.jobs` Table.
+    """
+    ws = WorkspaceClient(config=cfg.to_databricks_config())
+    assess = AssessmentToolkit(ws, cfg.inventory_database, RuntimeBackend())
+    assess.generate_job_assessment()
+
+
+@task("assessment", depends_on=[setup_schema])
+def inventorize_clusters(cfg: MigrationConfig):
+    """This part scan through all the clusters and locate ones that are not compatible with UC.
+    It looks for:<br>
+    <ol>
+    <li>Clusters with DBR version earlier than 11.3<br>
+    <li>Clusters using Passthru Authentication<br>
+    <li>Clusters with incompatible spark config tags<br>
+    <li>Clusters referencing DBFS locations in one or more config options<br>
+    </ol>
+    <br>
+    A report with a list of all the Jobs is saved to the `$inventory.clusters` Table.
+    """
+    ws = WorkspaceClient(config=cfg.to_databricks_config())
+    assess = AssessmentToolkit(ws, cfg.inventory_database, RuntimeBackend())
+    assess.generate_cluster_assessment()
+
+
 @task("assessment", depends_on=[setup_schema])
 def inventorize_permissions(cfg: MigrationConfig):
     """As we commence the intricate migration process from Hive Metastore to the Databricks Unity Catalog, a critical
@@ -82,6 +135,7 @@ def inventorize_permissions(cfg: MigrationConfig):
     meticulous scan are methodically stored within the `$inventory.permissions` table, which serves as a central
     repository for preserving and managing these crucial access control details."""
     toolkit = GroupMigrationToolkit(cfg)
+    toolkit.prepare_environment()
     toolkit.cleanup_inventory_table()
     toolkit.inventorize_permissions()
 
