@@ -73,7 +73,7 @@ def guess_external_locations(cfg: MigrationConfig):
     """In this section of the assessment, our objective is to determine the whereabouts of all the tables.
     Specifically, we will focus on identifying locations that utilize Mount Points. Our goal is to identify the
     External Locations necessary for a successful migration and store this information in the
-    $inventory.external_locations Table.
+    `$inventory.external_locations` Table.
 
     The approach taken in this assessment involves the following steps:
     -   Extracting all the locations associated with tables that do not use DBFS (with a focus on those
