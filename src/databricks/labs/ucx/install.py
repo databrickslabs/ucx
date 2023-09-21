@@ -1,8 +1,6 @@
-import datetime
 import logging
 import os
 import re
-import shutil
 import subprocess
 import sys
 import tempfile
@@ -324,8 +322,7 @@ class WorkspaceInstaller:
             for t in self._sorted_tasks():
                 if t.workflow != step_name:
                     continue
-                doc = re.sub(r"\s+", " ", t.doc)
-                doc = self._replace_inventory_variable(doc)
+                doc = self._replace_inventory_variable(t.doc)
                 md.append(f" - `{t.name}`:  {doc}")
                 md.append("")
         preamble = ["# Databricks notebook source", "# MAGIC %md"]
