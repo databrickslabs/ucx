@@ -9,7 +9,7 @@ from databricks.labs.ucx.hive_metastore.list_mounts import Mounts
 
 
 @dataclass
-class ExtLoc:
+class ExternalLocation:
     location: str
 
 
@@ -22,7 +22,7 @@ class ExternalLocationCrawler(CrawlerBase):
 
     def _external_locations(self, tables, mounts):
         min_slash = 2
-        ext_locations = []
+        external_locations = []
         for table in tables:
             location = table.as_dict()["location"]
             if location is not None and len(location) > 0:
@@ -36,29 +36,29 @@ class ExternalLocationCrawler(CrawlerBase):
                 ):
                     dupe = False
                     loc = 0
-                    while loc < len(ext_locations) and not dupe:
+                    while loc < len(external_locations) and not dupe:
                         common = (
-                            os.path.commonpath([ext_locations[loc].location, os.path.dirname(location) + "/"]).replace(
+                            os.path.commonpath([external_locations[loc].location, os.path.dirname(location) + "/"]).replace(
                                 ":/", "://"
                             )
                             + "/"
                         )
                         if common.count("/") > min_slash:
-                            ext_locations[loc] = ExtLoc(common)
+                            external_locations[loc] = ExternalLocation(common)
                             dupe = True
                         loc += 1
                     if not dupe:
-                        ext_locations.append(ExtLoc(os.path.dirname(location) + "/"))
-        return ext_locations
+                        external_locations.append(ExternalLocation(os.path.dirname(location) + "/"))
+        return external_locations
 
-    def _ext_loc_list(self):
+    def _external_location_list(self):
         tables = self._backend.fetch(f"SELECT location FROM {self._schema}.tables WHERE location IS NOT NULL")
         mounts = Mounts(self._backend, self._ws, self._schema).snapshot()
         return self._external_locations(list(tables), list(mounts))
 
-    def snapshot(self) -> list[ExtLoc]:
-        return self._snapshot(self._try_fetch, self._ext_loc_list)
+    def snapshot(self) -> list[ExternalLocation]:
+        return self._snapshot(self._try_fetch, self._external_location_list)
 
-    def _try_fetch(self) -> list[ExtLoc]:
+    def _try_fetch(self) -> list[ExternalLocation]:
         for row in self._fetch(f"SELECT * FROM {self._schema}.{self._table}"):
-            yield ExtLoc(*row)
+            yield ExternalLocation(*row)

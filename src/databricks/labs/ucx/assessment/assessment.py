@@ -70,7 +70,7 @@ class AssessmentToolkit:
             msg = "Current user is not a workspace admin"
             raise RuntimeError(msg)
 
-    def generate_ext_loc_list(self):
+    def generate_external_location_list(self):
         crawler = ExternalLocationCrawler(self._ws, self._backend, self._inventory_schema)
         return crawler.snapshot()
 

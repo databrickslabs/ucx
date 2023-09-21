@@ -81,7 +81,7 @@ def inventorize_external_locations(cfg: MigrationConfig):
     """
     ws = WorkspaceClient(config=cfg.to_databricks_config())
     assess = AssessmentToolkit(ws, cfg.inventory_database, RuntimeBackend())
-    assess.generate_ext_loc_list()
+    assess.generate_external_location_list()
 
 
 @task("assessment", depends_on=[setup_schema])

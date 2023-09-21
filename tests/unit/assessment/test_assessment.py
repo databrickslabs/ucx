@@ -25,7 +25,7 @@ def test_external_locations():
         row_factory(["dbfs:/mnt/ucx/database2/table2"]),
         row_factory(
             [
-                "DatabricksRootmntDatabricksRootdbacademy-usersDatabricksRootali.karaouzene@databricks.comDatabricksRootdata-engineer-learning-pathDatabricksRootdatabase.dbDatabricksRootevents"
+                "DatabricksRootmntDatabricksRoot"
             ]
         ),
     ]
@@ -51,8 +51,7 @@ def test_job_assessment():
                         task_key="Ingest",
                         existing_cluster_id="0807-225846-motto493",
                         notebook_task=NotebookTask(
-                            notebook_path="/Users/daniel.cadenas@databricks.com/Customers/Solistica/1.\
-                             TMMX_Predictive_Model_Top_15_vs_Clients - Data Ingestion/Load"
+                            notebook_path="/Users/foo.bar@databricks.com/Customers/Example/Test/Load"
                         ),
                         timeout_seconds=0,
                     )
@@ -72,8 +71,7 @@ def test_job_assessment():
                         task_key="Ingest",
                         existing_cluster_id="0810-225833-atlanta69",
                         notebook_task=NotebookTask(
-                            notebook_path="/Users/daniel.cadenas@databricks.com/Customers/Solistica/1.\
-                         TMMX_Predictive_Model_Top_15_vs_Clients - Data Ingestion/Load"
+                            notebook_path="/Users/foo.bar@databricks.com/Customers/Example/Test/Load"
                         ),
                         timeout_seconds=0,
                     )
