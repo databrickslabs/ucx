@@ -6,6 +6,7 @@ from databricks.sdk import WorkspaceClient
 
 from databricks.labs.ucx.framework.crawlers import CrawlerBase, SqlBackend
 from databricks.labs.ucx.hive_metastore.list_mounts import Mounts
+from databricks.labs.ucx.mixins.sql import Row
 
 
 @dataclass
@@ -20,9 +21,9 @@ class ExternalLocationCrawler(CrawlerBase):
         super().__init__(sbe, "hive_metastore", schema, "external_locations")
         self._ws = ws
 
-    def _external_locations(self, tables, mounts):
+    def _external_locations(self, tables: list[Row], mounts) -> list[ExternalLocation]:
         min_slash = 2
-        external_locations = []
+        external_locations: list[ExternalLocation] = []
         for table in tables:
             location = table.as_dict()["location"]
             if location is not None and len(location) > 0:
@@ -52,7 +53,7 @@ class ExternalLocationCrawler(CrawlerBase):
         return external_locations
 
     def _external_location_list(self):
-        tables = self._backend.fetch(f"SELECT location FROM {self._schema}.tables WHERE location IS NOT NULL")
+        tables = list(self._backend.fetch(f"SELECT location FROM {self._schema}.tables WHERE location IS NOT NULL"))
         mounts = Mounts(self._backend, self._ws, self._schema).snapshot()
         return self._external_locations(list(tables), list(mounts))
 
