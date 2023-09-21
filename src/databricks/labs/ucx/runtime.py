@@ -4,11 +4,12 @@ import sys
 
 from databricks.sdk import WorkspaceClient
 
-from databricks.labs.ucx.assessment import AssessmentToolkit
+from databricks.labs.ucx.assessment.crawlers import ClustersCrawler, JobsCrawler
 from databricks.labs.ucx.config import MigrationConfig
 from databricks.labs.ucx.framework.crawlers import RuntimeBackend
 from databricks.labs.ucx.framework.tasks import task, trigger
 from databricks.labs.ucx.hive_metastore import TaclToolkit
+from databricks.labs.ucx.hive_metastore.data_objects import ExternalLocationCrawler
 from databricks.labs.ucx.hive_metastore.list_mounts import Mounts
 from databricks.labs.ucx.workspace_access import GroupMigrationToolkit
 
@@ -80,44 +81,38 @@ def inventorize_external_locations(cfg: MigrationConfig):
     These external_locations will be created in a later stage before the table can be migrated.
     """
     ws = WorkspaceClient(config=cfg.to_databricks_config())
-    assess = AssessmentToolkit(ws, cfg.inventory_database, RuntimeBackend())
-    assess.generate_external_location_list()
+    crawler = ExternalLocationCrawler(ws, RuntimeBackend(), cfg.inventory_database)
+    crawler.snapshot()
 
 
 @task("assessment", depends_on=[setup_schema])
 def inventorize_jobs(cfg: MigrationConfig):
     """This part scan through all the jobs and locate ones that are not compatible with UC.
-    It looks for:<br>
-    <ol>
-    <li>Clusters with DBR version earlier than 11.3<br>
-    <li>Clusters using Passthru Authentication<br>
-    <li>Clusters with incompatible spark config tags<br>
-    <li>Clusters referencing DBFS locations in one or more config options<br>
-    </ol>
-    <br>
-    A report with a list of all the Jobs is saved to the `$inventory.jobs` Table.
+    It looks for:
+      - Clusters with DBR version earlier than 11.3
+      - Clusters using Passthru Authentication
+      - Clusters with incompatible spark config tags
+      - Clusters referencing DBFS locations in one or more config options
+    A report with a list of all the Jobs is saved to the `$inventory.jobs` table.
     """
     ws = WorkspaceClient(config=cfg.to_databricks_config())
-    assess = AssessmentToolkit(ws, cfg.inventory_database, RuntimeBackend())
-    assess.generate_job_assessment()
+    crawler = JobsCrawler(ws, RuntimeBackend(), cfg.inventory_database)
+    crawler.snapshot()
 
 
 @task("assessment", depends_on=[setup_schema])
 def inventorize_clusters(cfg: MigrationConfig):
     """This part scan through all the clusters and locate ones that are not compatible with UC.
-    It looks for:<br>
-    <ol>
-    <li>Clusters with DBR version earlier than 11.3<br>
-    <li>Clusters using Passthru Authentication<br>
-    <li>Clusters with incompatible spark config tags<br>
-    <li>Clusters referencing DBFS locations in one or more config options<br>
-    </ol>
-    <br>
-    A report with a list of all the Jobs is saved to the `$inventory.clusters` Table.
+    It looks for:
+      - Clusters with DBR version earlier than 11.3
+      - Clusters using Passthru Authentication
+      - Clusters with incompatible spark config tags
+      - Clusters referencing DBFS locations in one or more config options
+    A report with a list of all the Jobs is saved to the `$inventory.clusters` table.
     """
     ws = WorkspaceClient(config=cfg.to_databricks_config())
-    assess = AssessmentToolkit(ws, cfg.inventory_database, RuntimeBackend())
-    assess.generate_cluster_assessment()
+    crawler = ClustersCrawler(ws, RuntimeBackend(), cfg.inventory_database)
+    crawler.snapshot()
 
 
 @task("assessment", depends_on=[setup_schema])
