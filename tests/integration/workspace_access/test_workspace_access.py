@@ -6,11 +6,7 @@ from databricks.sdk import WorkspaceClient
 from databricks.sdk.service import workspace
 from databricks.sdk.service.iam import PermissionLevel
 
-from databricks.labs.ucx.config import (
-    ConnectConfig,
-    GroupsConfig,
-    MigrationConfig,
-)
+from databricks.labs.ucx.config import ConnectConfig, GroupsConfig, MigrationConfig
 from databricks.labs.ucx.workspace_access import GroupMigrationToolkit
 
 logger = logging.getLogger(__name__)
@@ -161,7 +157,6 @@ def test_workspace_access_e2e(
         inventory_database=make_schema(catalog="hive_metastore").split(".")[-1],
         groups=GroupsConfig(selected=[ws_group.display_name]),
         workspace_start_path=directory,
-        tacl=TaclConfig(auto=True),
         log_level="DEBUG",
         num_threads=8,
     )

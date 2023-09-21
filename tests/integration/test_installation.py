@@ -36,7 +36,7 @@ def test_assessment_job_with_no_inventory_database(
 
     schema_a = make_schema()
     schema_b = make_schema()
-    schema_c = make_schema()
+    make_schema()
     table_a = make_table(schema=schema_a)
     table_b = make_table(schema=schema_b)
 
