@@ -147,6 +147,7 @@ def test_walk_with_three_level_nested_folders_returns_three_levels():
             return [nested_notebook, second_nested_folder]
         elif path == "/rootPath/nested_folder/second_nested_folder":
             return [second_nested_notebook]
+        return []
 
     ws = Mock()
     ws.workspace.list.side_effect = my_side_effect
@@ -154,7 +155,7 @@ def test_walk_with_three_level_nested_folders_returns_three_levels():
 
     mock_backend = MockBackend()
 
-    workspace_objects = WorkspaceObjects(mock_backend, ws, "unit", start_path="/rootPath", num_threads=2)
+    workspace_objects = WorkspaceObjects(mock_backend, ws, "unit", start_path="/rootPath", num_threads=3)
     results = workspace_objects.snapshot()
 
     assert len(results) == 6
