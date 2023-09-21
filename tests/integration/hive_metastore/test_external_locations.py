@@ -13,7 +13,6 @@ def test_table_inventory(ws, make_warehouse, make_schema):
     warehouse_id = os.environ["TEST_DEFAULT_WAREHOUSE_ID"]
 
     logger.info("setting up fixtures")
-    warehouse_id = os.environ["TEST_DEFAULT_WAREHOUSE_ID"]
     sbe = StatementExecutionBackend(ws, warehouse_id)
     tables = [
         Table("hive_metastore", "foo", "bar", "MANAGED", "delta", location="s3://test_location/test1/table1"),
