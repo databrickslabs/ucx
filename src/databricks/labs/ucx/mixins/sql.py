@@ -36,16 +36,28 @@ class _RowCreator(tuple):
 
 
 class Row(tuple):
+    # Python SDK convention
     def as_dict(self) -> dict[str, any]:
         return dict(zip(self.__columns__, self, strict=True))
 
-    def __getattr__(self, col):
-        idx = self.__columns__.index(col)
-        return self[idx]
+    # PySpark convention
+    def __contains__(self, item):
+        return item in self.__columns__
 
     def __getitem__(self, col):
+        if isinstance(col, int | slice):
+            return super().__getitem__(col)
         # if columns are named `2 + 2`, for example
         return self.__getattr__(col)
+
+    def __getattr__(self, col):
+        try:
+            idx = self.__columns__.index(col)
+            return self[idx]
+        except IndexError:
+            raise AttributeError(col)  # noqa: B904
+        except ValueError:
+            raise AttributeError(col)  # noqa: B904
 
     def __repr__(self):
         return f"Row({', '.join(f'{k}={v}' for (k, v) in zip(self.__columns__, self, strict=True))})"

@@ -148,7 +148,3 @@ class JobsCrawler(CrawlerBase):
     def _try_fetch(self) -> list[ClusterInfo]:
         for row in self._fetch(f"SELECT * FROM {self._schema}.{self._table}"):
             yield JobInfo(*row)
-
-
-if __name__ == "__main__":
-    print("Databricks UC Assessment")

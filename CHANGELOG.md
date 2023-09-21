@@ -1,5 +1,26 @@
 # Version changelog
 
+## 0.1.1
+
+* Added batched iteration for `INSERT INTO` queries in `StatementExecutionBackend` with default `max_records_per_batch=1000` ([#237](https://github.com/databricks/ucx/pull/237)).
+* Added crawler for mount points ([#209](https://github.com/databricks/ucx/pull/209)).
+* Added crawlers for compatibility of jobs and clusters, along with basic recommendations for external locations ([#244](https://github.com/databricks/ucx/pull/244)).
+* Added safe return on grants ([#246](https://github.com/databricks/ucx/pull/246)).
+* Added ability to specify empty group filter in the installer script ([#216](https://github.com/databricks/ucx/pull/216)) ([#217](https://github.com/databricks/ucx/pull/217)).
+* Added ability to install application by multiple different users on the same workspace ([#235](https://github.com/databricks/ucx/pull/235)).
+* Added dashboard creation on installation and a requirement for `warehouse_id` in config, so that the assessment dashboards are refreshed automatically after job runs ([#214](https://github.com/databricks/ucx/pull/214)).
+* Added reliance on rate limiting from Databricks SDK for listing workspace ([#258](https://github.com/databricks/ucx/pull/258)).
+* Fixed errors in corner cases where Azure Service Principal Credentials were not available in Spark context ([#254](https://github.com/databricks/ucx/pull/254)).
+* Fixed `DESCRIBE TABLE` throwing errors when listing Legacy Table ACLs ([#238](https://github.com/databricks/ucx/pull/238)).
+* Fixed `file already exists` error in the installer script ([#219](https://github.com/databricks/ucx/pull/219)) ([#222](https://github.com/databricks/ucx/pull/222)).
+* Fixed `guess_external_locations` failure with `AttributeError: as_dict` and added an integration test ([#259](https://github.com/databricks/ucx/pull/259)).
+* Fixed error handling edge cases in `crawl_tables` task ([#243](https://github.com/databricks/ucx/pull/243)) ([#251](https://github.com/databricks/ucx/pull/251)).
+* Fixed `crawl_permissions` task failure on folder names containing a forward slash ([#234](https://github.com/databricks/ucx/pull/234)).
+* Improved `README` notebook documentation ([#260](https://github.com/databricks/ucx/pull/260), [#228](https://github.com/databricks/ucx/pull/228), [#252](https://github.com/databricks/ucx/pull/252), [#223](https://github.com/databricks/ucx/pull/223), [#225](https://github.com/databricks/ucx/pull/225)).
+* Removed redundant `.python-version` file ([#221](https://github.com/databricks/ucx/pull/221)).
+* Removed discovery of account groups from `crawl_permissions` task ([#240](https://github.com/databricks/ucx/pull/240)).
+* Updated databricks-sdk requirement from ~=0.8.0 to ~=0.9.0 ([#245](https://github.com/databricks/ucx/pull/245)).
+
 ## 0.1.0
 
 Features
