@@ -9,9 +9,16 @@ permissions that are set on the workspace level, Secret scopes, Notebooks, Direc
 
 See [contributing instructions](CONTRIBUTING.md) to help improve this project.
 
+## Introduction
+UCX will guide you, the Databricks customer through the process of upgrading your account, groups, workspaces, jobs etc to Unity Catalog. 
+
+The Unity Catalog upgrade process starts with an `install.sh` which creates a custom installation. By running the installation you install the assessment job and a number of upgrade jobs. The assessment and upgrade jobs are outlined in the custom generated README that is created by the installer. Once the custom Databricks jobs are installed, begin by triggering the assessment job. Once the assessment job is complete, you can review the results in the custom generated Databricks dashboard (linked to by the custom README.py found in the workspace folder created for you).
+
+You will need account, unity catalog and workspace administrative authority to complete the upgrade process.
+
 ## Installation
 
-First clone this project repo to your local environment (better, make a fork in case you make changes to contribute back). 
+As a customer, download the latest release from github onto your laptop/desktop machine. Unzip or untar the release.
 
 The `./install.sh` script will guide you through installation process. 
 Make sure you have Python 3.10 (or greater) 
