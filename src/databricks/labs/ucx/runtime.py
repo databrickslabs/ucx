@@ -93,7 +93,7 @@ def inventorize_jobs(cfg: MigrationConfig):
       - Clusters using Passthru Authentication
       - Clusters with incompatible spark config tags
       - Clusters referencing DBFS locations in one or more config options
-    Subsequently, it generates a report with a list of all the Jobs is saved to the `$inventory.jobs` table."""
+    Subsequently, the list of all the jobs is stored in the `$inventory.jobs` table."""
     ws = WorkspaceClient(config=cfg.to_databricks_config())
     crawler = JobsCrawler(ws, RuntimeBackend(), cfg.inventory_database)
     crawler.snapshot()
@@ -107,7 +107,7 @@ def inventorize_clusters(cfg: MigrationConfig):
       - Clusters using Passthru Authentication
       - Clusters with incompatible spark config tags
       - Clusters referencing DBFS locations in one or more config options
-    Subsequently, it generates a report with a list of all the Jobs is saved to the `$inventory.clusters` table."""
+    Subsequently, the list of all the clusters is stored in the`$inventory.clusters` table."""
     ws = WorkspaceClient(config=cfg.to_databricks_config())
     crawler = ClustersCrawler(ws, RuntimeBackend(), cfg.inventory_database)
     crawler.snapshot()
