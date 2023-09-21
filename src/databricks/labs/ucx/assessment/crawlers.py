@@ -1,13 +1,17 @@
 import json
-import typing
 from dataclasses import dataclass
 
 from databricks.sdk import WorkspaceClient
 from databricks.sdk.service.jobs import BaseJob
 
 from databricks.labs.ucx.framework.crawlers import CrawlerBase
-from databricks.labs.ucx.hive_metastore.data_objects import ExternalLocationCrawler
 from databricks.labs.ucx.hive_metastore.table_acls import SqlBackend
+
+INCOMPATIBLE_SPARK_CONFIG_KEYS = [
+    "spark.databricks.passthrough.enabled",
+    "spark.hadoop.javax.jdo.option.ConnectionURL",
+    "spark.databricks.hive.metastore.glueCatalog.enabled",
+]
 
 
 @dataclass
@@ -47,42 +51,6 @@ def spark_version_compatibility(spark_version: str) -> str:
     return "supported"
 
 
-class AssessmentToolkit:
-    incompatible_spark_config_keys: typing.ClassVar[tuple] = {
-        "spark.databricks.passthrough.enabled",
-        "spark.hadoop.javax.jdo.option.ConnectionURL",
-        "spark.databricks.hive.metastore.glueCatalog.enabled",
-    }
-
-    def __init__(self, ws: WorkspaceClient, inventory_schema, backend=None):
-        self._all_jobs = None
-        self._all_clusters_by_id = None
-        self._ws = ws
-        self._inventory_schema = inventory_schema
-        self._backend = backend
-        self._external_locations = None
-
-    @staticmethod
-    def _verify_ws_client(w: WorkspaceClient):
-        _me = w.current_user.me()
-        is_workspace_admin = any(g.display == "admins" for g in _me.groups)
-        if not is_workspace_admin:
-            msg = "Current user is not a workspace admin"
-            raise RuntimeError(msg)
-
-    def generate_external_location_list(self):
-        crawler = ExternalLocationCrawler(self._ws, self._backend, self._inventory_schema)
-        return crawler.snapshot()
-
-    def generate_job_assessment(self):
-        crawler = JobsCrawler(self._ws, self._backend, self._inventory_schema)
-        return crawler.snapshot()
-
-    def generate_cluster_assessment(self):
-        crawler = ClustersCrawler(self._ws, self._backend, self._inventory_schema)
-        return crawler.snapshot()
-
-
 class ClustersCrawler(CrawlerBase):
     def __init__(self, ws: WorkspaceClient, sbe: SqlBackend, schema):
         super().__init__(sbe, "hive_metastore", schema, "clusters")
@@ -101,7 +69,7 @@ class ClustersCrawler(CrawlerBase):
                 failures.append(f"not supported DBR: {cluster.spark_version}")
 
             if cluster.spark_conf is not None:
-                for k in AssessmentToolkit.incompatible_spark_config_keys:
+                for k in INCOMPATIBLE_SPARK_CONFIG_KEYS:
                     if k in cluster.spark_conf:
                         failures.append(f"unsupported config: {k}")
 
@@ -162,7 +130,7 @@ class JobsCrawler(CrawlerBase):
                 job_assessment[job.job_id].add(f"not supported DBR: {cluster_config.spark_version}")
 
             if cluster_config.spark_conf is not None:
-                for k in AssessmentToolkit.incompatible_spark_config_keys:
+                for k in INCOMPATIBLE_SPARK_CONFIG_KEYS:
                     if k in cluster_config.spark_conf:
                         job_assessment[job.job_id].add(f"unsupported config: {k}")
 

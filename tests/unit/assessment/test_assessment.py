@@ -3,11 +3,8 @@ from unittest.mock import Mock
 from databricks.sdk.service.compute import AutoScale, ClusterDetails
 from databricks.sdk.service.jobs import BaseJob, JobSettings, NotebookTask, Task
 
-from databricks.labs.ucx.assessment.assessment import (
-    ClustersCrawler,
-    ExternalLocationCrawler,
-    JobsCrawler,
-)
+from databricks.labs.ucx.assessment.crawlers import ClustersCrawler, JobsCrawler
+from databricks.labs.ucx.hive_metastore.data_objects import ExternalLocationCrawler
 from databricks.labs.ucx.hive_metastore.list_mounts import Mount
 from databricks.labs.ucx.mixins.sql import Row
 from tests.unit.framework.mocks import MockBackend
