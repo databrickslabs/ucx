@@ -70,15 +70,16 @@ def inventorize_mounts(cfg: MigrationConfig):
 
 @task("assessment", depends_on=[inventorize_mounts, crawl_tables])
 def inventorize_external_locations(cfg: MigrationConfig):
-    """In this part of the assessment, we're going to look up the location of all the tables.
-    Locations that use
-    Mount Points will be looked up. We will then find out the External Locations required for a proper migration and
-    save these to the `$inventory.external_locations` Table.
-    The logic this assessment follow is extract all the locations for tables that are not using DBFS
-    (we capture the locations for tables using mount points).
-    We then scan all the locations and find the common folders that accommodate them.
-    These external_locations will be created in a later stage before the table can be migrated.
-    """
+    """In this section of the assessment, our objective is to determine the whereabouts of all the tables.
+    Specifically, we will focus on identifying locations that utilize Mount Points. Our goal is to identify the
+    External Locations necessary for a successful migration and store this information in the
+    $inventory.external_locations Table.
+
+    The approach taken in this assessment involves the following steps:
+    -   Extracting all the locations associated with tables that do not use DBFS (with a focus on those
+    using mount points).
+    -   Scanning all these locations to identify common folders that can accommodate them.
+    -   These identified external locations will be created subsequently prior to the actual table migration"""
     ws = WorkspaceClient(config=cfg.to_databricks_config())
     crawler = ExternalLocationCrawler(ws, RuntimeBackend(), cfg.inventory_database)
     crawler.snapshot()
@@ -86,14 +87,13 @@ def inventorize_external_locations(cfg: MigrationConfig):
 
 @task("assessment", depends_on=[setup_schema])
 def inventorize_jobs(cfg: MigrationConfig):
-    """This part scan through all the jobs and locate ones that are not compatible with UC.
+    """This module scans through all the jobs and identifies those that are not compatible with UC.
     It looks for:
       - Clusters with DBR version earlier than 11.3
       - Clusters using Passthru Authentication
       - Clusters with incompatible spark config tags
       - Clusters referencing DBFS locations in one or more config options
-    A report with a list of all the Jobs is saved to the `$inventory.jobs` table.
-    """
+    Subsequently, it generates a report with a list of all the Jobs is saved to the `$inventory.jobs` table."""
     ws = WorkspaceClient(config=cfg.to_databricks_config())
     crawler = JobsCrawler(ws, RuntimeBackend(), cfg.inventory_database)
     crawler.snapshot()
@@ -101,14 +101,13 @@ def inventorize_jobs(cfg: MigrationConfig):
 
 @task("assessment", depends_on=[setup_schema])
 def inventorize_clusters(cfg: MigrationConfig):
-    """This part scan through all the clusters and locate ones that are not compatible with UC.
+    """This module scan through all the clusters and identifies those that are not compatible with UC.
     It looks for:
       - Clusters with DBR version earlier than 11.3
       - Clusters using Passthru Authentication
       - Clusters with incompatible spark config tags
       - Clusters referencing DBFS locations in one or more config options
-    A report with a list of all the Jobs is saved to the `$inventory.clusters` table.
-    """
+    Subsequently, it generates a report with a list of all the Jobs is saved to the `$inventory.clusters` table."""
     ws = WorkspaceClient(config=cfg.to_databricks_config())
     crawler = ClustersCrawler(ws, RuntimeBackend(), cfg.inventory_database)
     crawler.snapshot()
