@@ -3,7 +3,7 @@ import os
 
 from databricks.labs.ucx.framework.crawlers import StatementExecutionBackend
 from databricks.labs.ucx.hive_metastore.data_objects import ExternalLocationCrawler
-from databricks.labs.ucx.hive_metastore.list_mounts import Mount
+from databricks.labs.ucx.hive_metastore.mounts import Mount
 from databricks.labs.ucx.hive_metastore.tables import Table
 
 logger = logging.getLogger(__name__)

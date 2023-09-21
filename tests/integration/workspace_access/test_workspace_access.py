@@ -10,7 +10,6 @@ from databricks.labs.ucx.config import (
     ConnectConfig,
     GroupsConfig,
     MigrationConfig,
-    TaclConfig,
 )
 from databricks.labs.ucx.workspace_access import GroupMigrationToolkit
 

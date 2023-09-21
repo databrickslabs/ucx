@@ -8,7 +8,7 @@ from databricks.sdk.service import compute, jobs
 from databricks.sdk.service.iam import PermissionLevel
 from databricks.sdk.service.workspace import ImportFormat
 
-from databricks.labs.ucx.config import GroupsConfig, MigrationConfig, TaclConfig
+from databricks.labs.ucx.config import GroupsConfig, MigrationConfig
 from databricks.labs.ucx.hive_metastore.grants import Grant
 from databricks.labs.ucx.hive_metastore.tables import Table
 from databricks.labs.ucx.install import Installer
@@ -67,7 +67,6 @@ def test_assessment_job_with_no_inventory_database(
         inventory_database=f"ucx_{make_random(4)}",
         instance_pool_id=os.environ["TEST_INSTANCE_POOL_ID"],
         groups=GroupsConfig(selected=[ws_group_a.display_name, ws_group_b.display_name, ws_group_c.display_name]),
-        tacl=TaclConfig(databases=[schema_a.split(".")[-1], schema_b.split(".")[-1], schema_c.split(".")[-1]]),
         log_level="DEBUG",
     )
     install._write_config()
