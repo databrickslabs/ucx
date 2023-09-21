@@ -10,7 +10,7 @@ from databricks.labs.ucx.framework.crawlers import RuntimeBackend
 from databricks.labs.ucx.framework.tasks import task, trigger
 from databricks.labs.ucx.hive_metastore import GrantsCrawler, TablesCrawler
 from databricks.labs.ucx.hive_metastore.data_objects import ExternalLocationCrawler
-from databricks.labs.ucx.hive_metastore.list_mounts import Mounts
+from databricks.labs.ucx.hive_metastore.mounts import Mounts
 from databricks.labs.ucx.workspace_access import GroupMigrationToolkit
 
 logger = logging.getLogger(__name__)
@@ -55,7 +55,7 @@ def crawl_grants(cfg: MigrationConfig):
 
 
 @task("assessment", depends_on=[setup_schema])
-def inventorize_mounts(cfg: MigrationConfig):
+def crawl_mounts(cfg: MigrationConfig):
     """In this segment of the assessment, we will define the scope of the mount points intended for migration into the
     Unity Catalog. As these objects are not compatible with the Unity Catalog paradigm, a key component of the
     migration process involves transferring them to Unity Catalog External Locations.
@@ -68,8 +68,8 @@ def inventorize_mounts(cfg: MigrationConfig):
     mounts.inventorize_mounts()
 
 
-@task("assessment", depends_on=[inventorize_mounts, crawl_tables])
-def inventorize_external_locations(cfg: MigrationConfig):
+@task("assessment", depends_on=[crawl_mounts, crawl_tables])
+def guess_external_locations(cfg: MigrationConfig):
     """In this section of the assessment, our objective is to determine the whereabouts of all the tables.
     Specifically, we will focus on identifying locations that utilize Mount Points. Our goal is to identify the
     External Locations necessary for a successful migration and store this information in the
@@ -86,11 +86,11 @@ def inventorize_external_locations(cfg: MigrationConfig):
 
 
 @task("assessment", depends_on=[setup_schema])
-def inventorize_jobs(cfg: MigrationConfig):
+def assess_jobs(cfg: MigrationConfig):
     """This module scans through all the jobs and identifies those that are not compatible with UC.
     It looks for:
       - Clusters with DBR version earlier than 11.3
-      - Clusters using Passthru Authentication
+      - Clusters using Passthrough Authentication
       - Clusters with incompatible spark config tags
       - Clusters referencing DBFS locations in one or more config options
     Subsequently, the list of all the jobs is stored in the `$inventory.jobs` table."""
@@ -100,11 +100,11 @@ def inventorize_jobs(cfg: MigrationConfig):
 
 
 @task("assessment", depends_on=[setup_schema])
-def inventorize_clusters(cfg: MigrationConfig):
+def assess_clusters(cfg: MigrationConfig):
     """This module scan through all the clusters and identifies those that are not compatible with UC.
     It looks for:
       - Clusters with DBR version earlier than 11.3
-      - Clusters using Passthru Authentication
+      - Clusters using Passthrough Authentication
       - Clusters with incompatible spark config tags
       - Clusters referencing DBFS locations in one or more config options
     Subsequently, the list of all the clusters is stored in the`$inventory.clusters` table."""
@@ -114,7 +114,7 @@ def inventorize_clusters(cfg: MigrationConfig):
 
 
 @task("assessment", depends_on=[setup_schema])
-def inventorize_permissions(cfg: MigrationConfig):
+def crawl_permissions(cfg: MigrationConfig):
     """As we commence the intricate migration process from Hive Metastore to the Databricks Unity Catalog, a critical
     element of this transition is the thorough examination and preservation of permissions linked to a wide array of
     Databricks Workspace components. These components encompass a broad spectrum of resources, including clusters,
@@ -128,12 +128,15 @@ def inventorize_permissions(cfg: MigrationConfig):
     meticulous scan are methodically stored within the `$inventory.permissions` table, which serves as a central
     repository for preserving and managing these crucial access control details."""
     toolkit = GroupMigrationToolkit(cfg)
-    toolkit.prepare_environment()
     toolkit.cleanup_inventory_table()
     toolkit.inventorize_permissions()
 
 
-@task("assessment", depends_on=[crawl_tables, crawl_grants, inventorize_permissions], dashboard="assessment")
+@task(
+    "assessment",
+    depends_on=[crawl_grants, crawl_permissions, guess_external_locations, assess_jobs, assess_clusters],
+    dashboard="assessment",
+)
 def assessment_report(_: MigrationConfig):
     """This meticulously prepared report serves the purpose of evaluating and gauging the preparedness of a specific
     workspace for a smooth transition to the Unity Catalog.
@@ -155,7 +158,7 @@ def assessment_report(_: MigrationConfig):
     way for a new era of excellence in data management."""
 
 
-@task("migrate-groups", depends_on=[inventorize_permissions])
+@task("migrate-groups", depends_on=[crawl_permissions])
 def migrate_permissions(cfg: MigrationConfig):
     """As we embark on the complex journey of migrating from Hive Metastore to the Databricks Unity Catalog,
     a crucial phase in this transition involves the careful management of permissions.
@@ -191,6 +194,12 @@ def delete_backup_groups(cfg: MigrationConfig):
     toolkit = GroupMigrationToolkit(cfg)
     toolkit.prepare_environment()
     toolkit.delete_backup_groups()
+
+
+@task("destroy-schema")
+def destroy_schema(cfg: MigrationConfig):
+    """Removes the `$inventory` database"""
+    RuntimeBackend().execute(f"DROP DATABASE {cfg.inventory_database} CASCADE")
 
 
 def main():

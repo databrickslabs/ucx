@@ -8,8 +8,6 @@ from databricks.sdk import WorkspaceClient
 from databricks.sdk.core import DatabricksError
 from databricks.sdk.service.workspace import ObjectInfo, ObjectType
 
-from databricks.labs.ucx.mixins.hardening import rate_limited
-
 logger = logging.getLogger(__name__)
 
 
@@ -42,7 +40,6 @@ class WorkspaceListing:
                 f" rps: {rps:.3f}/sec"
             )
 
-    @rate_limited(max_requests=45)  # safety value, can be 50 actually
     def _list_workspace(self, path: str) -> Iterator[ObjectType]:
         # TODO: remove, use SDK
         return self._ws.workspace.list(path=path, recursive=False)
