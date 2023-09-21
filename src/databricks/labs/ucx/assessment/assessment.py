@@ -5,10 +5,7 @@ from dataclasses import dataclass
 from databricks.sdk import WorkspaceClient
 from databricks.sdk.service.jobs import BaseJob
 
-from databricks.labs.ucx.framework.crawlers import (
-    CrawlerBase,
-    StatementExecutionBackend,
-)
+from databricks.labs.ucx.framework.crawlers import CrawlerBase
 from databricks.labs.ucx.hive_metastore.data_objects import ExternalLocationCrawler
 from databricks.labs.ucx.hive_metastore.table_acls import SqlBackend
 
@@ -188,4 +185,3 @@ class JobsCrawler(CrawlerBase):
 
 if __name__ == "__main__":
     print("Databricks UC Assessment")
-

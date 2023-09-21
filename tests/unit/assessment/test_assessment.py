@@ -1,6 +1,5 @@
 from unittest.mock import Mock
 
-import pytest
 from databricks.sdk.service.compute import AutoScale, ClusterDetails
 from databricks.sdk.service.jobs import BaseJob, JobSettings, NotebookTask, Task
 
