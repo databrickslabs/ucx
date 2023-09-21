@@ -38,9 +38,9 @@ class ExternalLocationCrawler(CrawlerBase):
                     loc = 0
                     while loc < len(external_locations) and not dupe:
                         common = (
-                            os.path.commonpath([external_locations[loc].location, os.path.dirname(location) + "/"]).replace(
-                                ":/", "://"
-                            )
+                            os.path.commonpath(
+                                [external_locations[loc].location, os.path.dirname(location) + "/"]
+                            ).replace(":/", "://")
                             + "/"
                         )
                         if common.count("/") > min_slash:

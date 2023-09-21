@@ -23,11 +23,7 @@ def test_external_locations():
         row_factory(["s3://us-east-1-dev-account-staging-uc-ext-loc-bucket-23/anotherloc/Table4"]),
         row_factory(["dbfs:/mnt/ucx/database1/table1"]),
         row_factory(["dbfs:/mnt/ucx/database2/table2"]),
-        row_factory(
-            [
-                "DatabricksRootmntDatabricksRoot"
-            ]
-        ),
+        row_factory(["DatabricksRootmntDatabricksRoot"]),
     ]
     sample_mounts = [Mount("/mnt/ucx", "s3://us-east-1-ucx-container")]
     result_set = crawler._external_locations(sample_locations, sample_mounts)
