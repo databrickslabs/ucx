@@ -234,6 +234,6 @@ class GrantsCrawler(CrawlerBase):
                     any_file=any_file,
                     anonymous_function=anonymous_function,
                 )
-        except RuntimeError as e:
+        except Exception as e:
             logger.error(f"Couldn't fetch grants for object {on_type} {key}: {e}")
             return []

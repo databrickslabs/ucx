@@ -34,7 +34,12 @@ def crawl_tables(_: MigrationConfig):
     readily accessible point of reference for users, data engineers, and administrators."""
 
 
-@task("assessment", depends_on=[crawl_tables], job_cluster="tacl")
+@task("assessment", job_cluster="tacl")
+def setup_tacl(_: MigrationConfig):
+    """(Optimization) Starts tacl job cluster in parallel to crawling tables"""
+
+
+@task("assessment", depends_on=[crawl_tables, setup_tacl], job_cluster="tacl")
 def crawl_grants(cfg: MigrationConfig):
     """During this process, our methodology is purposefully designed to systematically scan and retrieve ACLs
     (Access Control Lists) associated with Legacy Tables from the Hive Metastore. These ACLs encompass comprehensive

@@ -140,6 +140,6 @@ class TablesCrawler(CrawlerBase):
                 location=describe.get("Location", None),
                 view_text=describe.get("View Text", None),
             )
-        except RuntimeError as e:
+        except Exception as e:
             logger.error(f"Couldn't fetch information for table {full_name} : {e}")
             return None
