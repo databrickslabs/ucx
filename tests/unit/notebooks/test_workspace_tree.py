@@ -1,11 +1,15 @@
 import datetime as dt
+import logging
 from unittest.mock import MagicMock, Mock, patch
 
 from databricks.sdk.service import workspace
 from databricks.sdk.service.workspace import ObjectInfo, ObjectType
+from unit.framework.mocks import MockBackend
 
+from databricks.labs.ucx.notebooks.workspace_tree import WorkspaceObjects
 from databricks.labs.ucx.workspace_access.generic import workspace_listing
-from databricks.labs.ucx.workspace_access.listing import WorkspaceListing
+
+logger = logging.getLogger("databricks").setLevel("DEBUG")
 
 
 def test_logging_calls():
@@ -144,13 +148,16 @@ def test_walk_with_three_level_nested_folders_returns_three_levels():
         elif path == "/rootPath/nested_folder/second_nested_folder":
             return [second_nested_notebook]
 
-    client = Mock()
-    client.workspace.list.side_effect = my_side_effect
-    client.workspace.get_status.return_value = rootobj
-    listing = WorkspaceListing(client, 2)
-    listing.walk("/rootPath")
+    ws = Mock()
+    ws.workspace.list.side_effect = my_side_effect
+    ws.workspace.get_status.return_value = rootobj
 
-    assert len(listing.results) == 6
+    mock_backend = MockBackend()
+
+    workspace_objects = WorkspaceObjects(mock_backend, ws, "unit", start_path="/rootPath", num_threads=2)
+    results = workspace_objects.snapshot()
+
+    assert len(results) == 6
     assert compare(
-        listing.results, [rootobj, file, nested_folder, nested_notebook, second_nested_folder, second_nested_notebook]
+        results, [rootobj, file, nested_folder, nested_notebook, second_nested_folder, second_nested_notebook]
     )

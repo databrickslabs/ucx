@@ -188,7 +188,7 @@ class Installer:
         )
         backup_group_prefix = self._question("Backup prefix", default="db-temp-")
         log_level = self._question("Log level", default="INFO")
-        num_threads = int(self._question("Number of threads", default="8"))
+        num_threads = int(self._question("Number of threads", default="10"))
         groups_config_args = {
             "backup_group_prefix": backup_group_prefix,
         }

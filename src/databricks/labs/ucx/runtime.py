@@ -68,6 +68,15 @@ def inventorize_mounts(cfg: MigrationConfig):
 
 
 @task("assessment", depends_on=[setup_schema])
+def crawl_notebooks(cfg: MigrationConfig):
+    """Recursively crawls all the folders and notebooks in the given workspace, storing results in
+    the `$inventory.workspace` table, so that notebook profiler and permissions crawler can pick up
+    these results immediately, without having to spend a long time retrieving this information from
+    Databricks API."""
+    pass
+
+
+@task("assessment", depends_on=[setup_schema, crawl_notebooks])
 def inventorize_permissions(cfg: MigrationConfig):
     """As we commence the intricate migration process from Hive Metastore to the Databricks Unity Catalog, a critical
     element of this transition is the thorough examination and preservation of permissions linked to a wide array of

@@ -1,11 +1,10 @@
 import logging
 import os
-import threading
+from collections.abc import Iterable, Iterator
 from concurrent import futures
 from datetime import datetime
 from queue import Queue
 from threading import Condition
-from collections.abc import Iterable, Iterator
 
 from databricks.sdk.core import DatabricksError
 from databricks.sdk.service.workspace import ObjectInfo, ObjectType
@@ -27,20 +26,22 @@ def workspace_list(
     yield from _ParallelRecursiveListing(path, parent_list, threads, yield_folders, notebooks_modified_after, max_depth)
 
 
+# staged for SDK in https://github.com/databricks/databricks-sdk-py/pull/284
 class _ParallelRecursiveListing(Iterable[ObjectInfo]):
     def __init__(self, path, listing, threads, yield_folders, notebooks_modified_after, max_depth):
         self._path = path
         self._listing = listing
         self._threads = threads
+        self._max_depth = max_depth
         self._yield_folders = yield_folders
         self._notebooks_modified_after = notebooks_modified_after
-        self._max_depth = max_depth
+        self._scans = 0
         self._in_progress = 0
         self._work = Queue()
         self._results = Queue()
         self._cond = Condition()
-        self._report_cond = Condition(threading.Lock())
-        self._scans = 0
+        self._reporter_interval = 5
+        self._reporter_cond = Condition()
 
     def _enter_folder(self, path: str):
         with self._cond:
@@ -67,12 +68,13 @@ class _ParallelRecursiveListing(Iterable[ObjectInfo]):
     def _reporter(self):
         _LOG.debug("Starting workspace listing reporter")
         while self._is_running():
-            with self._report_cond:
-                self._report_cond.wait(5)
-            took = datetime.now() - self._started
+            with self._reporter_cond:
+                self._reporter_cond.wait(self._reporter_interval)
             scans = self._scans
+            took = datetime.now() - self._started
             rps = int(scans / took.total_seconds())
-            _LOG.info(f"Scanned {scans} workpace folders at {rps}rps")
+            _LOG.info(f"Scanned {scans} workspace folders at {rps}rps")
+        _LOG.debug("Finished workspace listing reporter")
 
     def _worker(self, num):
         _LOG.debug(f"Starting workspace listing worker {num}")
@@ -87,7 +89,7 @@ class _ParallelRecursiveListing(Iterable[ObjectInfo]):
                     if object_info.object_type == ObjectType.DIRECTORY:
                         if self._yield_folders:
                             self._results.put_nowait(object_info)
-                        if self._max_depth is not None and len(object_info.path.split('/')) > self._max_depth:
+                        if self._max_depth is not None and len(object_info.path.split("/")) > self._max_depth:
                             msg = f"Folder is too deep (max depth {self._max_depth}): {object_info.path}. Skipping"
                             _LOG.warning(msg)
                             continue
