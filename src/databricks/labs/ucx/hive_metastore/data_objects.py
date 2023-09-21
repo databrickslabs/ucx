@@ -1,8 +1,11 @@
+import os
+import typing
+from dataclasses import dataclass
+
+from databricks.sdk import WorkspaceClient
+
 from databricks.labs.ucx.framework.crawlers import CrawlerBase, SqlBackend
 from databricks.labs.ucx.hive_metastore.list_mounts import Mounts
-from dataclasses import dataclass
-from databricks.sdk import WorkspaceClient
-import os
 
 
 @dataclass
@@ -11,6 +14,7 @@ class ExtLoc:
 
 
 class ExternalLocationCrawler(CrawlerBase):
+    _prefix_size: typing.ClassVar[list[int]] = [1, 12]
 
     def __init__(self, ws: WorkspaceClient, sbe: SqlBackend, schema):
         super().__init__(sbe, "hive_metastore", schema, "external_locations")
@@ -26,23 +30,28 @@ class ExternalLocationCrawler(CrawlerBase):
                         if location[5:].startswith(mount.name):
                             location = location[5:].replace(mount.name, mount.source)
                             break
-                if not location.startswith("dbfs") and (0 < location.find(":/") < 12):
+                if not location.startswith("dbfs") and (
+                    self._prefix_size[0] < location.find(":/") < self._prefix_size[1]
+                ):
                     dupe = False
                     loc = 0
                     while loc < len(ext_locations) and not dupe:
-                        common = os.path.commonpath([ext_locations[loc].location, os.path.dirname(location) + '/']) \
-                                     .replace(":/", "://") + '/'
+                        common = (
+                            os.path.commonpath([ext_locations[loc].location, os.path.dirname(location) + "/"]).replace(
+                                ":/", "://"
+                            )
+                            + "/"
+                        )
                         if common.count("/") > 2:
                             ext_locations[loc] = ExtLoc(common)
                             dupe = True
                         loc += 1
                     if not dupe:
-                        ext_locations.append(ExtLoc(os.path.dirname(location) + '/'))
+                        ext_locations.append(ExtLoc(os.path.dirname(location) + "/"))
         return ext_locations
 
     def _ext_loc_list(self):
-        tables = self._backend.fetch(
-            f"SELECT location FROM {self._schema}.tables WHERE location IS NOT NULL")
+        tables = self._backend.fetch(f"SELECT location FROM {self._schema}.tables WHERE location IS NOT NULL")
         mounts = Mounts(self._backend, self._ws, self._schema).snapshot()
         return self._external_locations(list(tables), list(mounts))
 
@@ -50,7 +59,5 @@ class ExternalLocationCrawler(CrawlerBase):
         return self._snapshot(self._try_fetch, self._ext_loc_list)
 
     def _try_fetch(self) -> list[ExtLoc]:
-        for row in self._fetch(
-                f'SELECT * FROM {self._schema}.{self._table}'
-        ):
+        for row in self._fetch(f"SELECT * FROM {self._schema}.{self._table}"):
             yield ExtLoc(*row)

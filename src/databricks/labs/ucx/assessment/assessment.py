@@ -1,13 +1,16 @@
 import json
+import typing
 from dataclasses import dataclass
+
 from databricks.sdk import WorkspaceClient
 from databricks.sdk.service.jobs import BaseJob
 
-from databricks.labs.ucx.framework.crawlers import CrawlerBase, StatementExecutionBackend
-from databricks.labs.ucx.hive_metastore.data_objects import ExternalLocationCrawler
-from databricks.labs.ucx.hive_metastore.table_acls import (
-    SqlBackend
+from databricks.labs.ucx.framework.crawlers import (
+    CrawlerBase,
+    StatementExecutionBackend,
 )
+from databricks.labs.ucx.hive_metastore.data_objects import ExternalLocationCrawler
+from databricks.labs.ucx.hive_metastore.table_acls import SqlBackend
 
 
 @dataclass
@@ -29,27 +32,27 @@ class ClusterInfo:
 
 
 def spark_version_compatibility(spark_version: str) -> str:
-    dbr_version_components = spark_version.split('-')
-    first_components = dbr_version_components[0].split('.')
+    dbr_version_components = spark_version.split("-")
+    first_components = dbr_version_components[0].split(".")
     if len(first_components) != 3:
         # custom runtime
-        return 'unsupported'
-    if first_components[2] != 'x':
+        return "unsupported"
+    if first_components[2] != "x":
         # custom runtime
-        return 'unsupported'
+        return "unsupported"
     version = int(first_components[0]), int(first_components[1])
     if version < (10, 0):
-        return 'unsupported'
+        return "unsupported"
     if (10, 0) <= version < (11, 3):
-        return 'kinda works'
-    return 'supported'
+        return "kinda works"
+    return "supported"
 
 
 class AssessmentToolkit:
-    incompatible_spark_config_keys = {
-        'spark.databricks.passthrough.enabled',
-        'spark.hadoop.javax.jdo.option.ConnectionURL',
-        'spark.databricks.hive.metastore.glueCatalog.enabled'
+    incompatible_spark_config_keys: typing.ClassVar[tuple] = {
+        "spark.databricks.passthrough.enabled",
+        "spark.hadoop.javax.jdo.option.ConnectionURL",
+        "spark.databricks.hive.metastore.glueCatalog.enabled",
     }
 
     def __init__(self, ws: WorkspaceClient, inventory_schema, backend=None):
@@ -82,7 +85,6 @@ class AssessmentToolkit:
 
 
 class ClustersCrawler(CrawlerBase):
-
     def __init__(self, ws: WorkspaceClient, sbe: SqlBackend, schema):
         super().__init__(sbe, "hive_metastore", schema, "clusters")
         self._ws = ws
@@ -96,17 +98,17 @@ class ClustersCrawler(CrawlerBase):
             cluster_info = ClusterInfo(cluster.cluster_id, cluster.cluster_name, cluster.creator_user_name, 1, "")
             support_status = spark_version_compatibility(cluster.spark_version)
             failures = []
-            if support_status != 'supported':
-                failures.append(f'not supported DBR: {cluster.spark_version}')
+            if support_status != "supported":
+                failures.append(f"not supported DBR: {cluster.spark_version}")
 
             if cluster.spark_conf is not None:
                 for k in AssessmentToolkit.incompatible_spark_config_keys:
                     if k in cluster.spark_conf:
-                        failures.append(f'unsupported config: {k}')
+                        failures.append(f"unsupported config: {k}")
 
                 for value in cluster.spark_conf.values():
-                    if 'dbfs:/mnt' in value or '/dbfs/mnt' in value:
-                        failures.append(f'using DBFS mount in configuration: {value}')
+                    if "dbfs:/mnt" in value or "/dbfs/mnt" in value:
+                        failures.append(f"using DBFS mount in configuration: {value}")
             cluster_info.failures = json.dumps(failures)
             if len(failures) > 0:
                 cluster_info.success = 0
@@ -116,14 +118,11 @@ class ClustersCrawler(CrawlerBase):
         return self._snapshot(self._try_fetch, self._crawl)
 
     def _try_fetch(self) -> list[ClusterInfo]:
-        for row in self._fetch(
-                f'SELECT * FROM {self._schema}.{self._table}'
-        ):
+        for row in self._fetch(f"SELECT * FROM {self._schema}.{self._table}"):
             yield ClusterInfo(*row)
 
 
 class JobsCrawler(CrawlerBase):
-
     def __init__(self, ws: WorkspaceClient, sbe: SqlBackend, schema):
         super().__init__(sbe, "hive_metastore", schema, "jobs")
         self._ws = ws
@@ -152,31 +151,25 @@ class JobsCrawler(CrawlerBase):
         return self._assess_jobs(all_jobs, all_clusters)
 
     def _assess_jobs(self, all_jobs: list[BaseJob], all_clusters_by_id) -> list[JobInfo]:
-        incompatible_spark_config_keys = {
-            'spark.databricks.passthrough.enabled',
-            'spark.hadoop.javax.jdo.option.ConnectionURL',
-            'spark.databricks.hive.metastore.glueCatalog.enabled'
-        }
         job_assessment = {}
         job_details = {}
         for job in all_jobs:
             job_assessment[job.job_id] = set()
             job_details[job.job_id] = JobInfo(str(job.job_id), job.settings.name, job.creator_user_name, 1, "")
 
-        for job, cluster_config in \
-                self._get_cluster_configs_from_all_jobs(all_jobs, all_clusters_by_id):
+        for job, cluster_config in self._get_cluster_configs_from_all_jobs(all_jobs, all_clusters_by_id):
             support_status = spark_version_compatibility(cluster_config.spark_version)
-            if support_status != 'supported':
-                job_assessment[job.job_id].add(f'not supported DBR: {cluster_config.spark_version}')
+            if support_status != "supported":
+                job_assessment[job.job_id].add(f"not supported DBR: {cluster_config.spark_version}")
 
             if cluster_config.spark_conf is not None:
-                for k in incompatible_spark_config_keys:
+                for k in AssessmentToolkit.incompatible_spark_config_keys:
                     if k in cluster_config.spark_conf:
-                        job_assessment[job.job_id].add(f'unsupported config: {k}')
+                        job_assessment[job.job_id].add(f"unsupported config: {k}")
 
                 for value in cluster_config.spark_conf.values():
-                    if 'dbfs:/mnt' in value or '/dbfs/mnt' in value:
-                        job_assessment[job.job_id].add(f'using DBFS mount in configuration: {value}')
+                    if "dbfs:/mnt" in value or "/dbfs/mnt" in value:
+                        job_assessment[job.job_id].add(f"using DBFS mount in configuration: {value}")
         for job_key in job_details.keys():
             job_details[job_key].failures = json.dumps(list(job_assessment[job_key]))
             if len(job_assessment[job_key]) > 0:
@@ -187,9 +180,7 @@ class JobsCrawler(CrawlerBase):
         return self._snapshot(self._try_fetch, self._crawl)
 
     def _try_fetch(self) -> list[ClusterInfo]:
-        for row in self._fetch(
-                f'SELECT * FROM {self._schema}.{self._table}'
-        ):
+        for row in self._fetch(f"SELECT * FROM {self._schema}.{self._table}"):
             yield JobInfo(*row)
 
 
@@ -198,7 +189,7 @@ if __name__ == "__main__":
     ws = WorkspaceClient(cluster_id="0919-184725-qa0q5jkc")
     #
     assess = AssessmentToolkit(ws, "ucx", StatementExecutionBackend(ws, "cdae2fd48f8d4841"))
-    print(assess.generate_cluster_assessment())
+    print(assess.generate_ext_loc_list())
     # tables = StatementExecutionBackend(ws, "cdae2fd48f8d4841").fetch(
     #     f"SELECT location FROM ucx.tables WHERE location IS NOT NULL")
 

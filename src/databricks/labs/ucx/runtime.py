@@ -101,6 +101,7 @@ def inventorize_jobs(cfg: MigrationConfig):
     assess = AssessmentToolkit(ws, cfg.inventory_database, RuntimeBackend())
     assess.generate_job_assessment()
 
+
 @task("assessment", depends_on=[setup_schema])
 def inventorize_clusters(cfg: MigrationConfig):
     """This part scan through all the clusters and locate ones that are not compatible with UC.

@@ -1,22 +1,15 @@
 from unittest.mock import Mock
 
 import pytest
-from databricks.sdk.service.compute import (
-    AutoScale,
-    ClusterDetails,
-)
-from databricks.sdk.service.jobs import (
-    BaseJob,
-    JobSettings,
-    NotebookTask,
-    Task,
-)
+from databricks.sdk.service.compute import AutoScale, ClusterDetails
+from databricks.sdk.service.jobs import BaseJob, JobSettings, NotebookTask, Task
 
-from databricks.labs.ucx.assessment import AssessmentToolkit
-from databricks.labs.ucx.assessment.assessment import ExternalLocationCrawler, JobsCrawler, ClustersCrawler
-from databricks.labs.ucx.framework.crawlers import StatementExecutionBackend
+from databricks.labs.ucx.assessment.assessment import (
+    ClustersCrawler,
+    ExternalLocationCrawler,
+    JobsCrawler,
+)
 from databricks.labs.ucx.hive_metastore.list_mounts import Mount
-from databricks.labs.ucx.hive_metastore.tables import Table
 from databricks.labs.ucx.mixins.sql import Row
 from tests.unit.framework.mocks import MockBackend
 
@@ -43,7 +36,11 @@ def test_external_locations(ws, sbe):
         row_factory(["s3://us-east-1-dev-account-staging-uc-ext-loc-bucket-23/anotherloc/Table4"]),
         row_factory(["dbfs:/mnt/ucx/database1/table1"]),
         row_factory(["dbfs:/mnt/ucx/database2/table2"]),
-        row_factory(["DatabricksRootmntDatabricksRootdbacademy-usersDatabricksRootali.karaouzene@databricks.comDatabricksRootdata-engineer-learning-pathDatabricksRootdatabase.dbDatabricksRootevents"])
+        row_factory(
+            [
+                "DatabricksRootmntDatabricksRootdbacademy-usersDatabricksRootali.karaouzene@databricks.comDatabricksRootdata-engineer-learning-pathDatabricksRootdatabase.dbDatabricksRootevents"
+            ]
+        ),
     ]
     sample_mounts = [Mount("/mnt/ucx", "s3://us-east-1-ucx-container")]
     result_set = crawler._external_locations(sample_locations, sample_mounts)
@@ -117,9 +114,10 @@ def test_job_assessment(ws):
             cluster_id="0810-225833-atlanta69",
         ),
     ]
-    sample_clusters_by_id = {c.cluster_id: c for c in sample_clusters}
-    result_set = JobsCrawler(Mock(), MockBackend(), "ucx")._assess_jobs(sample_jobs,
-                                                                        {c.cluster_id: c for c in sample_clusters})
+    {c.cluster_id: c for c in sample_clusters}
+    result_set = JobsCrawler(Mock(), MockBackend(), "ucx")._assess_jobs(
+        sample_jobs, {c.cluster_id: c for c in sample_clusters}
+    )
     assert len(result_set) == 2
     assert result_set[0].success == 1
     assert result_set[1].success == 0
