@@ -10,7 +10,7 @@ from databricks.labs.ucx.framework.crawlers import RuntimeBackend
 from databricks.labs.ucx.framework.tasks import task, trigger
 from databricks.labs.ucx.hive_metastore import GrantsCrawler, TablesCrawler
 from databricks.labs.ucx.hive_metastore.data_objects import ExternalLocationCrawler
-from databricks.labs.ucx.hive_metastore.list_mounts import Mounts
+from databricks.labs.ucx.hive_metastore.mounts import Mounts
 from databricks.labs.ucx.workspace_access import GroupMigrationToolkit
 
 logger = logging.getLogger(__name__)
@@ -194,6 +194,12 @@ def delete_backup_groups(cfg: MigrationConfig):
     toolkit = GroupMigrationToolkit(cfg)
     toolkit.prepare_environment()
     toolkit.delete_backup_groups()
+
+
+@task("destroy-schema")
+def destroy_schema(cfg: MigrationConfig):
+    """Removes the `$inventory` database"""
+    RuntimeBackend().execute(f"DROP DATABASE {cfg.inventory_database} CASCADE")
 
 
 def main():

@@ -2,7 +2,7 @@ from unittest.mock import MagicMock
 
 from databricks.sdk.dbutils import MountInfo
 
-from databricks.labs.ucx.hive_metastore.list_mounts import Mount, Mounts
+from databricks.labs.ucx.hive_metastore.mounts import Mount, Mounts
 from tests.unit.framework.mocks import MockBackend
 
 
