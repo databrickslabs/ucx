@@ -21,6 +21,7 @@ class ExternalLocationCrawler(CrawlerBase):
         self._ws = ws
 
     def _external_locations(self, tables, mounts):
+        min_slash = 2
         ext_locations = []
         for table in tables:
             location = table.as_dict()["location"]
@@ -42,7 +43,7 @@ class ExternalLocationCrawler(CrawlerBase):
                             )
                             + "/"
                         )
-                        if common.count("/") > 2:
+                        if common.count("/") > min_slash:
                             ext_locations[loc] = ExtLoc(common)
                             dupe = True
                         loc += 1

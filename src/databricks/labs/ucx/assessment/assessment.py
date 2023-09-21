@@ -32,12 +32,14 @@ class ClusterInfo:
 
 
 def spark_version_compatibility(spark_version: str) -> str:
+    first_comp_custom_rt = 3
+    first_comp_custom_x = 2
     dbr_version_components = spark_version.split("-")
     first_components = dbr_version_components[0].split(".")
-    if len(first_components) != 3:
+    if len(first_components) != first_comp_custom_rt:
         # custom runtime
         return "unsupported"
-    if first_components[2] != "x":
+    if first_components[first_comp_custom_x] != "x":
         # custom runtime
         return "unsupported"
     version = int(first_components[0]), int(first_components[1])
