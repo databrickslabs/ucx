@@ -1,4 +1,4 @@
--- viz type=table, name=Jobs, columns=job id,job name,creator,compatible,failures
+-- viz type=table, name=Jobs, columns=job_id,job_name,creator,compatible,failures
 -- widget title=Jobs, col=3, row=10, size_x=3, size_y=4
 SELECT
   job_id,
