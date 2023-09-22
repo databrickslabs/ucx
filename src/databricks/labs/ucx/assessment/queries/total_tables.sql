@@ -1,11 +1,14 @@
--- viz type=table, name=Table Types, columns=count,managed_tables,managed_pct,external_tables,external_pct,views,view_pct
--- widget title=Table Types, col=0, row=1, size_x=3, size_y=3
+-- viz type=table, name=Table Types, columns=database,name,type,table_format,table_view,storage,is_delta,location
+-- widget title=Table Types, col=0, row=1, size_x=6, size_y=10
 SELECT
-  COUNT(*) AS count,
-  SUM(IF(object_type == "MANAGED", 1, 0)) AS managed_tables,
-  ROUND(100 * SUM(IF(object_type == "MANAGED", 1, 0)) / COUNT(*), 0) AS managed_pct,
-  SUM(IF(object_type == "EXTERNAL", 1, 0)) AS external_tables,
-  ROUND(100 * SUM(IF(object_type == "EXTERNAL", 1, 0)) / COUNT(*), 0) AS external_pct,
-  SUM(IF(object_type == "VIEW", 1, 0)) AS views,
-  ROUND(100 * SUM(IF(object_type == "VIEW", 1, 0)) / COUNT(*), 0) AS view_pct
-FROM $inventory.tables
+  `database`,
+  name,
+  object_type AS type,
+  upper(table_format) AS format,
+  CASE WHEN object_type IN ("MANAGED", "EXTERNAL") THEN "TABLE" ELSE "VIEW" END AS table_view,
+  CASE WHEN SUBSTRING(location,1,4)="dbfs" AND SUBSTRING(location,6,10)<>"/mnt" THEN "DBFS ROOT"
+       WHEN SUBSTRING(location,1,4)="dbfs" AND SUBSTRING(location,6,10)="/mnt" THEN "DBFS MOUNT"
+       ELSE "EXTERNAL" END AS storage,
+  CASE WHEN format LIKE "delta" THEN "Yes" ELSE "No" END AS is_delta,
+  location
+FROM hive_metastore.ucx.tables
