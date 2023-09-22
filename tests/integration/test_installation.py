@@ -12,7 +12,7 @@ from databricks.labs.ucx.install import WorkspaceInstaller
 logger = logging.getLogger(__name__)
 
 
-def test_assessment_job_with_no_inventory_database(
+def test_jobs_with_no_inventory_database(
     ws,
     sql_exec,
     sql_fetch_all,
@@ -189,5 +189,3 @@ def test_assessment_job_with_no_inventory_database(
             logger.debug(f"cleaning up {step} job_id={job_id}")
             ws.jobs.delete(job_id)
 
-        logger.debug(f"cleaning up inventory_database={install._config.inventory_database}")
-        sql_exec(f"DROP SCHEMA IF EXISTS `{install._config.inventory_database}` CASCADE")
