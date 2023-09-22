@@ -67,10 +67,11 @@ def test_building_dashboard(ws):
     def _replace_inventory_variable(text: str) -> str:
         return text.replace("$inventory", f"hive_metastore.ucx")
     installer = Installer(ws)
+    installer._configure()
     warehouse_id = os.environ["TEST_DEFAULT_WAREHOUSE_ID"]
     dash = DashboardFromFiles(
         Mock(),
-        local_folder=installer._find_project_root() ,
+        local_folder=installer._find_project_root(),
         remote_folder=f"{installer._install_folder}/queries",
         name="UCX Assessment",
         warehouse_id=warehouse_id,
