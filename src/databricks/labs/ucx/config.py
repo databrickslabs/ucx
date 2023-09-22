@@ -163,7 +163,22 @@ class _Config(Generic[T]):
 
 @dataclass
 class AccountConfig(_Config["AccountConfig"]):
-    connect: ConnectConfig | None = None
+    # At least account console hostname and Databricks Account ID are required for the wide
+    # account-level installation. These values we cannot determine automatically. For Azure,
+    # it is required to run `az login` before the setup. For AWS, administrators may need
+    # to specify username and password credentials to speak to non-UC workspaces, otherwise
+    # `databricks auth login` from Databricks CLI is enough.
+    #
+    # The same configuration is optional on the workspace level, as we rely on the runtime-native
+    # authentication of Databricks SDK for Python.
+    connect: ConnectConfig
+
+    # Inventory database holds the working state of UCX within hive_metastore catalogs
+    # across all deployed workspaces. Once configured, it cannot be changed. In the rare
+    # circumstances when we need to change the database name, we have to destroy all
+    # databases with the previous name in each workspace and restart the assessment steps.
+    inventory_database: str
+
     include_workspace_names: list[str] = dataclasses.field(default_factory=list)
     include_azure_subscription_ids: list[str] = dataclasses.field(default_factory=list)
     include_azure_subscription_names: list[str] = dataclasses.field(default_factory=list)

@@ -62,15 +62,16 @@ def test_assessment_job_with_no_inventory_database(
         group_name=ws_group_b.display_name,
     )
 
-    install = WorkspaceInstaller(ws, prefix=make_random(4), promtps=False)
-    install._config = WorkspaceConfig(
-        inventory_database=f"ucx_{make_random(4)}",
-        instance_pool_id=os.environ["TEST_INSTANCE_POOL_ID"],
-        groups=GroupsConfig(selected=[ws_group_a.display_name, ws_group_b.display_name, ws_group_c.display_name]),
-        log_level="DEBUG",
+    install = WorkspaceInstaller.run_for_config(
+        ws,
+        WorkspaceConfig(
+            inventory_database=f"ucx_{make_random(4)}",
+            instance_pool_id=os.environ["TEST_INSTANCE_POOL_ID"],
+            groups=GroupsConfig(selected=[ws_group_a.display_name, ws_group_b.display_name, ws_group_c.display_name]),
+            log_level="DEBUG",
+        ),
+        prefix=make_random(4),
     )
-    install._write_config()
-    install.run()
 
     def cleanup_created_resources():
         logger.debug(f"cleaning up install folder: {install._install_folder}")
