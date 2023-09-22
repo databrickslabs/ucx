@@ -68,28 +68,40 @@ class AzureWorkspaceLister:
             "unknown": PricingTier.UNKNOWN,
         }
         items = self._get(endpoint, api_version="2023-02-01").get("value", [])
-        for item in sorted(items, key=lambda _: _['name'].lower()):
+        for item in sorted(items, key=lambda _: _["name"].lower()):
             properties = item["properties"]
             if properties["provisioningState"] != "Succeeded":
                 continue
             if "workspaceUrl" not in properties:
                 continue
+            parameters = properties.get("parameters", {})
             workspace_url = properties["workspaceUrl"]
             tags = item.get("tags", {})
-            tags["AzureSubscriptionID"] = subscription_id
+            if "AzureSubscriptionID" not in tags:
+                tags["AzureSubscriptionID"] = subscription_id
+            if "AzureResourceGroup" not in tags:
+                tags["AzureResourceGroup"] = item["id"].split("resourceGroups/")[1].split("/")[0]
             yield Workspace(
                 cloud="azure",
                 location=item["location"],
-                custom_tags=tags,
                 workspace_name=item["name"],
-                deployment_name=workspace_url.replace(".azuredatabricks.net", ""),
                 workspace_id=int(properties["workspaceId"]),
+                workspace_status_message=properties["provisioningState"],
+                deployment_name=workspace_url.replace(".azuredatabricks.net", ""),
                 pricing_tier=sku_tiers.get(item.get("sku", {"name": None})["name"], None),
+                # These fields are just approximation for the fields with same meaning in AWS and GCP
+                storage_configuration_id=parameters.get("storageAccountName", {"value": None})["value"],
+                network_id=parameters.get("customVirtualNetworkId", {"value": None})["value"],
+                custom_tags=tags,
             )
 
 
 class Workspaces:
-    _tlds: ClassVar = {"aws": "cloud.databricks.com", "azure": "azuredatabricks.net", "gcp": "gcp.databricks.com"}
+    _tlds: ClassVar[dict[str, str]] = {
+        "aws": "cloud.databricks.com",
+        "azure": "azuredatabricks.net",
+        "gcp": "gcp.databricks.com",
+    }
 
     def __init__(self, cfg: AccountConfig):
         self._ac = cfg.to_account_client()
@@ -132,7 +144,8 @@ class Workspaces:
                     logger.debug(f"skipping {sub.name} ({sub.subscription_id} because its not explicitly included")
                     continue
             for workspace in azure_lister.list_workspaces(sub.subscription_id):
-                workspace.custom_tags["AzureSubscription"] = sub.name
+                if "AzureSubscription" not in workspace.custom_tags:
+                    workspace.custom_tags["AzureSubscription"] = sub.name
                 yield workspace
 
 
@@ -155,8 +168,7 @@ def main():
         except DatabricksError:
             pass
         except ConnectionError:
-            logger.warning(f'Private DNS for {workspace.workspace_name} is not yet supported?..')
-
+            logger.warning(f"Private DNS for {workspace.workspace_name} is not yet supported?..")
 
         logger.info(
             f"workspace: {workspace.workspace_name}: "
