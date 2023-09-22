@@ -163,7 +163,12 @@ class Installer:
                 raise err
 
         logger.info("Please answer a couple of questions to configure Unity Catalog migration")
-        inventory_database = self._question("Inventory Database", default="ucx")
+        while True:
+            inventory_database = self._question("Inventory Database stored in hive_metastore", default="ucx")
+            if re.match(r'^\w+$', inventory_database):
+                break
+            else:
+                print(f"{inventory_database} is not a valid database name")
 
         pro_warehouses = {"[Create new PRO SQL warehouse]": "create_new"} | {
             f"{_.name} ({_.id}, {_.warehouse_type.value}, {_.state.value})": _.id
