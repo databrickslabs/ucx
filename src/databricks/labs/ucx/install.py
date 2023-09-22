@@ -45,7 +45,7 @@ import logging
 from pathlib import Path
 from databricks.labs.ucx.__about__ import __version__
 from databricks.labs.ucx.config import MigrationConfig
-from databricks.labs.ucx import logger
+from databricks.labs.ucx.framework import logger
 from databricks.sdk import WorkspaceClient
 
 logger._install()
