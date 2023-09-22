@@ -165,7 +165,7 @@ class Installer:
         logger.info("Please answer a couple of questions to configure Unity Catalog migration")
         while True:
             inventory_database = self._question("Inventory Database stored in hive_metastore", default="ucx")
-            if re.match(r'^\w+$', inventory_database):
+            if re.match(r"^\w+$", inventory_database):
                 break
             else:
                 print(f"{inventory_database} is not a valid database name")
