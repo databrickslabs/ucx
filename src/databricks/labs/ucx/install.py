@@ -76,6 +76,9 @@ class Installer:
         self._configure()
         self._create_dashboards()
         self._create_jobs()
+        readme = f'{self._notebook_link(f"{self._install_folder}/README.py")}'
+        msg = f"Installation completed successfully! Please refer to the {readme} notebook for next steps."
+        logger.info(msg)
 
     def _create_dashboards(self):
         local_query_files = self._find_project_root() / "src/databricks/labs/ucx/assessment/queries"
