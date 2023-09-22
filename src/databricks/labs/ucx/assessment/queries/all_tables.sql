@@ -11,4 +11,4 @@ SELECT
        ELSE "EXTERNAL" END AS storage,
   CASE WHEN format LIKE "delta" THEN "Yes" ELSE "No" END AS is_delta,
   location
-FROM hive_metastore.ucx.tables
+FROM $inventory.tables

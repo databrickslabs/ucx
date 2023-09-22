@@ -23,7 +23,7 @@ SELECT
   CASE WHEN object_type="VIEW" THEN 1 ELSE 0 END AS IS_VIEW,
   CASE WHEN SUBSTRING(location,0,3)="dbfs" AND SUBSTRING(location,4,9)<>"/mnt" THEN 1 ELSE 0 END AS IS_DBFS_Root,
   CASE WHEN upper(format) LIKE "DELTA" THEN 1 ELSE 0 END AS IS_DELTA
-FROM hive_metastore.ucx.tables
+FROM $inventory.tables
 )
 GROUP BY `database`
 ORDER BY `database`
