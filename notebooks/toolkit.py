@@ -14,7 +14,7 @@
 
 from databricks.labs.ucx.config import (
     GroupsConfig,
-    MigrationConfig,
+    WorkspaceConfig,
 )
 from databricks.labs.ucx.framework.crawlers import RuntimeBackend
 from databricks.labs.ucx.workspace_access import GroupMigrationToolkit
@@ -32,7 +32,7 @@ inventory_database = dbutils.widgets.get("inventory_database")
 selected_groups = dbutils.widgets.get("selected_groups").split(",")
 databases = dbutils.widgets.get("databases").split(",")
 
-config = MigrationConfig(
+config = WorkspaceConfig(
     inventory_database=inventory_database,
     groups=GroupsConfig(
         # use this option to select specific groups manually

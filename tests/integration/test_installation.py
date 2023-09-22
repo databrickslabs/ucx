@@ -8,10 +8,10 @@ from databricks.sdk.service import compute, jobs
 from databricks.sdk.service.iam import PermissionLevel
 from databricks.sdk.service.workspace import ImportFormat
 
-from databricks.labs.ucx.config import GroupsConfig, MigrationConfig
+from databricks.labs.ucx.config import GroupsConfig, WorkspaceConfig
 from databricks.labs.ucx.hive_metastore.grants import Grant
 from databricks.labs.ucx.hive_metastore.tables import Table
-from databricks.labs.ucx.install import Installer
+from databricks.labs.ucx.install import WorkspaceInstaller
 
 logger = logging.getLogger(__name__)
 
@@ -62,8 +62,8 @@ def test_assessment_job_with_no_inventory_database(
         group_name=ws_group_b.display_name,
     )
 
-    install = Installer(ws, prefix=make_random(4), promtps=False)
-    install._config = MigrationConfig(
+    install = WorkspaceInstaller(ws, prefix=make_random(4), promtps=False)
+    install._config = WorkspaceConfig(
         inventory_database=f"ucx_{make_random(4)}",
         instance_pool_id=os.environ["TEST_INSTANCE_POOL_ID"],
         groups=GroupsConfig(selected=[ws_group_a.display_name, ws_group_b.display_name, ws_group_c.display_name]),
