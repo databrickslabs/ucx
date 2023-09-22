@@ -21,7 +21,7 @@ SELECT
   location,
   CASE WHEN object_type IN ("MANAGED","EXTERNAL") THEN 1 ELSE 0 END AS is_table,
   CASE WHEN object_type="VIEW" THEN 1 ELSE 0 END AS is_view,
-  CASE WHEN SUBSTRING(location,0,3)="dbfs" AND SUBSTRING(location,4,9)<>"/mnt" THEN 1 ELSE 0 END AS is_dbfs_root,
+  CASE WHEN SUBSTRING(location,1,4)="dbfs" AND SUBSTRING(location,6,4)<>"/mnt" THEN 1 ELSE 0 END AS is_dbfs_root,
   CASE WHEN upper(format) LIKE "DELTA" THEN 1 ELSE 0 END AS is_delta
 FROM $inventory.tables
 )
