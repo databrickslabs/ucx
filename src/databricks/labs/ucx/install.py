@@ -187,7 +187,7 @@ class Installer:
             "Comma-separated list of workspace group names to migrate (empty means all)", default="<ALL>"
         )
         backup_group_prefix = self._question("Backup prefix", default="db-temp-")
-        log_level = self._question("Log level", default="INFO")
+        log_level = self._question("Log level", default="INFO").upper()
         num_threads = int(self._question("Number of threads", default="8"))
         groups_config_args = {
             "backup_group_prefix": backup_group_prefix,
