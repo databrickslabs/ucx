@@ -1,6 +1,6 @@
 -- viz type=table, name=Database Summary, columns=database,name,type,table_format,table_view,storage,is_delta,location
 -- widget title=Database Summary, col=0, row=11, size_x=3, size_y=10
-select
+SELECT
   `database`,
   SUM(IS_TABLE) AS Tables,
   SUM(IS_VIEW) AS Views,
@@ -23,7 +23,7 @@ SELECT
   CASE WHEN object_type="VIEW" THEN 1 ELSE 0 END AS IS_VIEW,
   CASE WHEN SUBSTRING(location,1,4)="dbfs" AND SUBSTRING(location,6,10)<>"/mnt" THEN 1 ELSE 0 END AS IS_DBFS_Root,
   CASE WHEN format LIKE "delta" THEN 1 ELSE 0 END AS IS_DELTA
-FROM hive_metastore.ucx.tables
+FROM $inventory.tables
 )
 GROUP BY `database`
 ORDER BY `database`
