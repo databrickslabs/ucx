@@ -8,6 +8,7 @@ from databricks.labs.ucx.config import WorkspaceConfig
 from databricks.labs.ucx.framework.logger import _install
 
 _TASKS: dict[str, "Task"] = {}
+_TASK_ORDER: list[str] = []
 
 
 @dataclass
@@ -63,6 +64,7 @@ def task(workflow, *, depends_on=None, job_cluster="main", notebook: str | None 
             notebook=notebook,
             dashboard=dashboard,
         )
+        _TASK_ORDER.append(func.__name__)
 
         return wrapper
 
