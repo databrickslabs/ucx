@@ -2,31 +2,34 @@
 
 # This script will eventually be replaced with `databricks labs install ucx` command.
 
-# Initialize an empty array to store Python 3 binary paths
-python3_binaries=()
+# Initialize an empty array to store Python binary paths
+python_binaries=()
 
 # Split the $PATH variable into an array using ':' as the delimiter
 IFS=':' read -ra path_dirs <<< "$PATH"
 
 # Iterate over each directory in the $PATH
 for dir in "${path_dirs[@]}"; do
-    # Construct the full path to the python3 binary in the current directory
+    # Construct the full path to the python binaries in the current directory
+    python2_path="${dir}/python"
     python3_path="${dir}/python3"
 
-    # Check if the python3 binary exists and is executable
+    # Check if the python binary exists and is executable
     if [ -x "$python3_path" ]; then
-        python3_binaries+=("$python3_path")
+        python_binaries+=("$python3_path")
+    elif [ -x "$python2_path" ]; then
+        python_binaries+=("$python2_path")
     fi
 done
 
-if [ -z "${python3_binaries[*]}" ]; then
+if [ -z "${python_binaries[*]}" ]; then
     echo "[!] No Python binaries detected"
     exit 1
 fi
 
 # Check versions for all Python binaries found
 python_versions=()
-for python_binary in "${python3_binaries[@]}"; do
+for python_binary in "${python_binaries[@]}"; do
     python_version=$("$python_binary" --version | awk '{print $2}')
     python_versions+=("$python_version -> $(realpath "$python_binary")")
 done
