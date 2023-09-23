@@ -80,12 +80,12 @@ def trigger(*argv):
         msg = f'task "{task_name}" not found. Valid tasks are: {", ".join(_TASKS.keys())}'
         raise KeyError(msg)
 
-    current_task = _TASKS[task_name]
-    print(current_task.doc)
-
-    _install()
-
     cfg = MigrationConfig.from_file(Path(args["config"]))
-    logging.getLogger("databricks").setLevel(cfg.log_level)
-
-    current_task.fn(cfg)
+    if task_name not in cfg.skip_tasks:
+        current_task = _TASKS[task_name]
+        print(current_task.doc)
+        _install()
+        logging.getLogger("databricks").setLevel(cfg.log_level)
+        current_task.fn(cfg)
+    else:
+        print(f"Skipping task '{task_name}' as set in configuration file.")

@@ -81,6 +81,7 @@ class MigrationConfig:
     connect: ConnectConfig | None = None
     num_threads: int | None = 10
     log_level: str | None = "INFO"
+    skip_tasks: list[str] | None = None
 
     # Starting path for notebooks and directories crawler
     workspace_start_path: str = "/"
@@ -124,6 +125,7 @@ class MigrationConfig:
             warehouse_id=raw.get("warehouse_id", None),
             num_threads=raw.get("num_threads", 10),
             log_level=raw.get("log_level", "INFO"),
+            skip_tasks=raw.get("skip_tasks", []),
         )
 
     @classmethod
