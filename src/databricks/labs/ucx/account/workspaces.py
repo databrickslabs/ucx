@@ -46,7 +46,8 @@ class AzureWorkspaceLister:
     def _tenant_id(self):
         token = self._token_source.token()
         _, payload, _ = token.access_token.split(".")
-        claims = json.loads(base64.standard_b64decode(payload + "=="))
+        b64_decoded = base64.standard_b64decode(payload + "==").decode("utf8")
+        claims = json.loads(b64_decoded)
         return claims["tid"]
 
     def current_tenant_subscriptions(self):
