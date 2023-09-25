@@ -9,7 +9,7 @@ from databricks.labs.ucx.mixins.redash import (
     QueryVisualizationsExt,
     VizColumn,
     WidgetOptions,
-    WidgetPosition,
+    WidgetPosition
 )
 
 # logging.getLogger("databricks").setLevel("DEBUG")
