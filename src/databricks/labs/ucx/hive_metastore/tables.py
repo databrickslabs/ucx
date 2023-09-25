@@ -42,11 +42,7 @@ class Table:
         )
 
     def _sql_external(self, catalog):
-        # TODO: https://github.com/databricks/ucx/issues/106
-        return (
-            f"CREATE TABLE IF NOT EXISTS {catalog}.{self.database}.{self.name}"
-            f" LIKE {self.key} COPY LOCATION;" + self._sql_alter(catalog)
-        )
+        return f"SYNC TABLE {catalog}.{self.database}.{self.name} FROM {self.key};" + self._sql_alter(catalog)
 
     def _sql_managed(self, catalog):
         if not self.is_delta:

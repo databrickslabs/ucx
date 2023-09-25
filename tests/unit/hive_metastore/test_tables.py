@@ -73,10 +73,8 @@ def test_sql_managed_non_delta():
                 table_format="DELTA",
                 location="s3a://foo/bar",
             ),
-            "CREATE TABLE IF NOT EXISTS new_catalog.db.external_table LIKE "
-            "catalog.db.external_table COPY LOCATION;ALTER TABLE "
-            "catalog.db.external_table SET TBLPROPERTIES ('upgraded_to' = "
-            "'new_catalog.db.external_table');",
+            "SYNC TABLE new_catalog.db.external_table FROM catalog.db.external_table;"
+            "ALTER TABLE catalog.db.external_table SET TBLPROPERTIES ('upgraded_to' = 'new_catalog.db.external_table');"
         ),
     ],
 )
