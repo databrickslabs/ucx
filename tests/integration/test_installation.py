@@ -38,6 +38,7 @@ def test_jobs_with_no_inventory_database(
     _ = make_schema()
     table_a = make_table(schema=schema_a)
     table_b = make_table(schema=schema_b)
+    make_table(schema=schema_b, external=True)
 
     sql_exec(f"GRANT USAGE ON SCHEMA default TO `{ws_group_a.display_name}`")
     sql_exec(f"GRANT USAGE ON SCHEMA default TO `{ws_group_b.display_name}`")
