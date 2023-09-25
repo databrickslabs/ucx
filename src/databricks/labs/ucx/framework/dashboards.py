@@ -130,7 +130,7 @@ class DashboardFromFiles:
     def _get_widget_options(self, query: SimpleQuery):
         self._pos += 1
         widget_options = WidgetOptions(
-            title=query.widget["title"],
+            title=query.widget.get("title", ""),
             description=query.widget.get("description", None),
             position=WidgetPosition(
                 col=int(query.widget.get("col", 0)),

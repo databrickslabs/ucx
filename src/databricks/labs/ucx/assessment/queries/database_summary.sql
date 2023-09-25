@@ -1,5 +1,5 @@
 -- viz type=table, name=Database Summary, columns=database,tables,views,dbfs_root,delta_tables,upgrade
--- widget title=Database Summary, col=0, row=6, size_x=3, size_y=8
+-- widget title=Database Summary, col=0, row=9, size_x=6, size_y=8
 SELECT `database`,
        SUM(is_table) AS tables,
        SUM(is_view) AS views,
@@ -18,8 +18,7 @@ FROM
           LOCATION,
           IF(object_type IN ("MANAGED", "EXTERNAL"), 1, 0) AS is_table,
           IF(object_type = "VIEW", 1, 0) AS is_view,
-          IF(STARTSWITH(location, "/dbfs/")
-             AND NOT STARTSWITH(location, "/dbfs/mnt"), 1, 0) AS is_dbfs_root,
+          IF(STARTSWITH(location, "/dbfs/") AND NOT STARTSWITH(location, "/dbfs/mnt"), 1, 0) AS is_dbfs_root,
           IF(UPPER(format) = "DELTA", 1, 0) AS is_delta
    FROM $inventory.tables)
 GROUP BY `database`
