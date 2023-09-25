@@ -74,7 +74,8 @@ def test_sql_managed_non_delta():
                 location="s3a://foo/bar",
             ),
             "SYNC TABLE new_catalog.db.external_table FROM catalog.db.external_table;"
-            "ALTER TABLE catalog.db.external_table SET TBLPROPERTIES ('upgraded_to' = 'new_catalog.db.external_table');"
+            "ALTER TABLE catalog.db.external_table SET "
+            "TBLPROPERTIES ('upgraded_to' = 'new_catalog.db.external_table');",
         ),
     ],
 )
