@@ -19,7 +19,7 @@ from databricks.sdk.service.workspace import ImportFormat
 from databricks.labs.ucx.__about__ import __version__
 from databricks.labs.ucx.config import GroupsConfig, WorkspaceConfig
 from databricks.labs.ucx.framework.dashboards import DashboardFromFiles
-from databricks.labs.ucx.framework.tasks import _TASK_ORDER, _TASKS, Task
+from databricks.labs.ucx.framework.tasks import _TASKS, Task
 from databricks.labs.ucx.runtime import main
 
 TAG_STEP = "step"
@@ -264,9 +264,13 @@ class WorkspaceInstaller:
         self._create_debug(remote_wheel)
 
     @staticmethod
-    def _step_list() -> list[str]:
+    def _sort_task_list() -> list[Task]:
+        return sorted(_TASKS.values(), key=lambda x: x.task_id)
+
+    @classmethod
+    def _step_list(cls) -> list[str]:
         step_list = []
-        [step_list.append(task.workflow) for task in _TASKS.values() if task.workflow not in step_list]
+        [step_list.append(task.workflow) for task in cls._sort_task_list() if task.workflow not in step_list]
         return step_list
 
     def _create_readme(self):
@@ -277,6 +281,9 @@ class WorkspaceInstaller:
             "All jobs are defined with necessary cluster configurations and DBR versions.",
         ]
         for step_name in self._step_list():
+            if step_name not in self._deployed_steps:
+                logger.warning(f"Skipping step '{step_name}' since it was not deployed.")
+                continue
             job_id = self._deployed_steps[step_name]
             dashboard_link = ""
             if step_name in self._dashboards:
@@ -284,8 +291,7 @@ class WorkspaceInstaller:
                 dashboard_link = f" (see [{step_name} dashboard]({dashboard_link}) after finish)"
             job_link = f"[{self._name(step_name)}]({self._ws.config.host}#job/{job_id})"
             md.append(f"## {job_link}{dashboard_link}\n")
-            for task in _TASK_ORDER:
-                t = _TASKS[task]
+            for t in self._sort_task_list():
                 if t.workflow != step_name:
                     continue
                 doc = re.sub(r"\s+", " ", t.doc)
