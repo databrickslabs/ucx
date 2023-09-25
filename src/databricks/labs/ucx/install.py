@@ -188,7 +188,8 @@ class Installer:
 
         selected_groups = self._question(
             "Comma-separated list of workspace group names to migrate. If not specified, we'll wse all "
-            "account-level groups with matching names to workspace-level groups.", default="<ALL>"
+            "account-level groups with matching names to workspace-level groups.",
+            default="<ALL>",
         )
         backup_group_prefix = self._question("Backup prefix", default="db-temp-")
         log_level = self._question("Log level", default="INFO").upper()
