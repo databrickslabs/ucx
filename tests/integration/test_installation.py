@@ -188,4 +188,3 @@ def test_jobs_with_no_inventory_database(
         for step, job_id in install._deployed_steps.items():
             logger.debug(f"cleaning up {step} job_id={job_id}")
             ws.jobs.delete(job_id)
-
