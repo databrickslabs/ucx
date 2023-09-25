@@ -1,12 +1,9 @@
 import os
-from unittest.mock import Mock
 
 import pytest
 from databricks.sdk import WorkspaceClient
 from databricks.sdk.service.sql import AccessControl, ObjectTypePlural, PermissionLevel
 
-from databricks.labs.ucx.framework.dashboards import DashboardFromFiles
-from databricks.labs.ucx.install import Installer
 from databricks.labs.ucx.mixins.redash import (
     DashboardWidgetsAPI,
     QueryVisualizationsExt,
@@ -61,4 +58,3 @@ def test_creating_widgets(ws: WorkspaceClient, make_warehouse, make_schema):
 
     y = query_visualizations_api.create_table(query.id, "ABC Viz", [VizColumn(name="databaseName", title="DB")])
     print(y)
-

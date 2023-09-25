@@ -4,11 +4,7 @@ SELECT `database`,
        name,
        object_type AS type,
        UPPER(table_format) AS format,
-       CASE
-           WHEN object_type IN ("MANAGED",
-                                "EXTERNAL") THEN "TABLE"
-           ELSE "VIEW"
-       END AS table_view,
+       IF(object_type IN ("MANAGED", "EXTERNAL"), "TABLE", "VIEW") AS table_view,
        CASE
            WHEN STARTSWITH(location, "/dbfs/")
                 AND NOT STARTSWITH(location, "/dbfs/mnt") THEN "DBFS ROOT"
@@ -16,9 +12,6 @@ SELECT `database`,
                 AND STARTSWITH(location, "/dbfs/mnt") THEN "DBFS MOUNT"
            ELSE "EXTERNAL"
        END AS storage,
-       CASE
-           WHEN format LIKE "delta" THEN "Yes"
-           ELSE "No"
-       END AS is_delta,
+       IF(format = "delta", "Yes", "No") AS is_delta,
        location
 FROM $inventory.tables
