@@ -61,6 +61,7 @@ def test_list_azure_workspaces(arm_requests):
                 "value": [
                     {"displayName": "first", "subscriptionId": "001", "tenantId": "xxx"},
                     {"displayName": "second", "subscriptionId": "002", "tenantId": "def_from_token"},
+                    {"displayName": "third", "subscriptionId": "003", "tenantId": "def_from_token"},
                 ]
             },
             "/subscriptions/002/providers/Microsoft.Databricks/workspaces": {
@@ -75,14 +76,29 @@ def test_list_azure_workspaces(arm_requests):
                             "workspaceUrl": "adb-123.10.azuredatabricks.net",
                             "workspaceId": "123",
                         },
-                    }
+                    },
+                    {
+                        "id": ".../resourceGroups/first-rg/...",
+                        "name": "second-workspace",
+                        "location": "eastus",
+                        "sku": {"name": "premium"},
+                        "properties": {
+                            "provisioningState": "Succeeded",
+                            "workspaceUrl": "adb-123.10.azuredatabricks.net",
+                            "workspaceId": "123",
+                        },
+                    },
                 ]
             },
         }
     )
 
     wrksp = Workspaces(
-        AccountConfig(connect=ConnectConfig(host="https://accounts.azuredatabricks.net"), inventory_database="ucx")
+        AccountConfig(
+            connect=ConnectConfig(host="https://accounts.azuredatabricks.net"),
+            include_workspace_names=["first-workspace"],
+            include_azure_subscription_names=["second"],
+        )
     )
 
     all_workspaces = list(wrksp.configured_workspaces())
@@ -99,3 +115,19 @@ def test_list_azure_workspaces(arm_requests):
             custom_tags={"AzureResourceGroup": "first-rg", "AzureSubscription": "second", "AzureSubscriptionID": "002"},
         )
     ] == all_workspaces
+
+
+def test_client_for_workspace():
+    wrksp = Workspaces(
+        AccountConfig(
+            connect=ConnectConfig(
+                host="https://accounts.azuredatabricks.net",
+                azure_tenant_id="abc",
+                azure_client_id="bcd",
+                azure_client_secret="def",
+            )
+        )
+    )
+    specified_workspace_client = wrksp.client_for(Workspace(cloud="azure", deployment_name="adb-123.10"))
+    assert "azure-client-secret" == specified_workspace_client.config.auth_type
+    assert "https://adb-123.10.azuredatabricks.net" == specified_workspace_client.config.host

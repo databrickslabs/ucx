@@ -113,7 +113,8 @@ class Workspaces:
             if self._cfg.include_workspace_names:
                 if workspace.workspace_name not in self._cfg.include_workspace_names:
                     logger.debug(
-                        f"skipping {workspace.name} ({workspace.workspace_id} because its not explicitly included"
+                        f"skipping {workspace.workspace_name} ({workspace.workspace_id} because "
+                        f"its not explicitly included"
                     )
                     continue
             yield workspace
@@ -150,7 +151,7 @@ class Workspaces:
                 yield workspace
 
 
-def main():
+if __name__ == "__main__":
     logger.setLevel("INFO")
 
     config_file = Path.home() / ".ucx/config.yml"
@@ -176,7 +177,3 @@ def main():
             f"metastore {metastore_id}, "
             f"default catalog: {default_catalog}"
         )
-
-
-if __name__ == "__main__":
-    main()
