@@ -17,7 +17,7 @@ from databricks.sdk.service.sql import EndpointInfoWarehouseType, SpotInstancePo
 from databricks.sdk.service.workspace import ImportFormat
 
 from databricks.labs.ucx.__about__ import __version__
-from databricks.labs.ucx.config import GroupsConfig, MigrationConfig
+from databricks.labs.ucx.config import GroupsConfig, WorkspaceConfig
 from databricks.labs.ucx.framework.dashboards import DashboardFromFiles
 from databricks.labs.ucx.framework.tasks import _TASKS, Task
 from databricks.labs.ucx.runtime import main
@@ -44,14 +44,14 @@ dbutils.library.restartPython()
 import logging
 from pathlib import Path
 from databricks.labs.ucx.__about__ import __version__
-from databricks.labs.ucx.config import MigrationConfig
+from databricks.labs.ucx.config import WorkspaceConfig
 from databricks.labs.ucx.framework import logger
 from databricks.sdk import WorkspaceClient
 
 logger._install()
 logging.getLogger("databricks").setLevel("DEBUG")
 
-cfg = MigrationConfig.from_file(Path("/Workspace{config_file}"))
+cfg = WorkspaceConfig.from_file(Path("/Workspace{config_file}"))
 ws = WorkspaceClient()
 
 print(__version__)
@@ -60,10 +60,10 @@ print(__version__)
 logger = logging.getLogger(__name__)
 
 
-class Installer:
+class WorkspaceInstaller:
     def __init__(self, ws: WorkspaceClient, *, prefix: str = "ucx", promtps: bool = True):
         if "DATABRICKS_RUNTIME_VERSION" in os.environ:
-            msg = "Installer is not supposed to be executed in Databricks Runtime"
+            msg = "WorkspaceInstaller is not supposed to be executed in Databricks Runtime"
             raise SystemExit(msg)
         self._ws = ws
         self._prefix = prefix
@@ -74,11 +74,24 @@ class Installer:
     def run(self):
         logger.info(f"Installing UCX v{__version__}")
         self._configure()
+        self._run_configured()
+
+    def _run_configured(self):
         self._create_dashboards()
         self._create_jobs()
         readme = f'{self._notebook_link(f"{self._install_folder}/README.py")}'
         msg = f"Installation completed successfully! Please refer to the {readme} notebook for next steps."
         logger.info(msg)
+
+    @staticmethod
+    def run_for_config(ws: WorkspaceClient, config: WorkspaceConfig, *, prefix="ucx") -> "WorkspaceInstaller":
+        logger.info(f"Installing UCX v{__version__} on {ws.config.host}")
+        workspace_installer = WorkspaceInstaller(ws, prefix=prefix, promtps=False)
+        workspace_installer._config = config
+        workspace_installer._write_config()
+        # TODO: rather introduce a method `is_configured`, as we may want to reconfigure workspaces for some reason
+        workspace_installer._run_configured()
+        return workspace_installer
 
     def _create_dashboards(self):
         local_query_files = self._find_project_root() / "src/databricks/labs/ucx/assessment/queries"
@@ -147,7 +160,7 @@ class Installer:
         if hasattr(self, "_config"):
             return self._config
         with self._ws.workspace.download(self._config_file) as f:
-            self._config = MigrationConfig.from_bytes(f.read())
+            self._config = WorkspaceConfig.from_bytes(f.read())
         return self._config
 
     def _name(self, name: str) -> str:
@@ -201,7 +214,7 @@ class Installer:
             groups_config_args["selected"] = [x.strip() for x in selected_groups.split(",")]
         else:
             groups_config_args["auto"] = True
-        self._config = MigrationConfig(
+        self._config = WorkspaceConfig(
             inventory_database=inventory_database,
             groups=GroupsConfig(**groups_config_args),
             warehouse_id=warehouse_id,
@@ -470,7 +483,7 @@ class Installer:
 
     def _find_project_root(self) -> Path:
         for leaf in ["pyproject.toml", "setup.py"]:
-            root = Installer._find_dir_with_leaf(self._this_file, leaf)
+            root = WorkspaceInstaller._find_dir_with_leaf(self._this_file, leaf)
             if root is not None:
                 return root
         msg = "Cannot find project root"
@@ -514,5 +527,5 @@ class Installer:
 if __name__ == "__main__":
     ws = WorkspaceClient(product="ucx", product_version=__version__)
     logger.setLevel("INFO")
-    installer = Installer(ws)
+    installer = WorkspaceInstaller(ws)
     installer.run()

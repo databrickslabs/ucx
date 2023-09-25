@@ -4,7 +4,7 @@ from dataclasses import dataclass
 from functools import wraps
 from pathlib import Path
 
-from databricks.labs.ucx.config import MigrationConfig
+from databricks.labs.ucx.config import WorkspaceConfig
 from databricks.labs.ucx.framework.logger import _install
 
 _TASKS: dict[str, "Task"] = {}
@@ -15,7 +15,7 @@ class Task:
     workflow: str
     name: str
     doc: str
-    fn: Callable[[MigrationConfig], None]
+    fn: Callable[[WorkspaceConfig], None]
     depends_on: list[str] = None
     job_cluster: str = "main"
     notebook: str = None
@@ -85,7 +85,7 @@ def trigger(*argv):
 
     _install()
 
-    cfg = MigrationConfig.from_file(Path(args["config"]))
+    cfg = WorkspaceConfig.from_file(Path(args["config"]))
     logging.getLogger("databricks").setLevel(cfg.log_level)
 
     current_task.fn(cfg)
