@@ -41,3 +41,4 @@ def test_dashboard(mocker):
     )
     dashboard = dash.create_dashboard()
     assert dashboard is not None
+    assert dashboard == "abc"
