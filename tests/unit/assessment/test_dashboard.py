@@ -2,9 +2,15 @@ import io
 
 import yaml
 from databricks.sdk.service import iam
-from databricks.sdk.service.sql import DataSource, Dashboard, Query, Visualization, Widget
+from databricks.sdk.service.sql import (
+    Dashboard,
+    DataSource,
+    Query,
+    Visualization,
+    Widget,
+)
 
-from databricks.labs.ucx.config import MigrationConfig, GroupsConfig
+from databricks.labs.ucx.config import GroupsConfig, MigrationConfig
 from databricks.labs.ucx.framework.dashboards import DashboardFromFiles
 from databricks.labs.ucx.install import Installer
 
@@ -28,7 +34,7 @@ def test_dashboard(mocker):
     dash = DashboardFromFiles(
         ws,
         local_folder=local_query_files,
-        remote_folder=f"/users/not_a_real_user/queries",
+        remote_folder="/users/not_a_real_user/queries",
         name="Assessment",
         warehouse_id="000000",
         query_text_callback=installer._replace_inventory_variable,
