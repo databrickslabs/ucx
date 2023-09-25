@@ -186,7 +186,7 @@ def migrate_permissions(cfg: WorkspaceConfig):
     operation, we not only meet data security and governance standards but also enhance the overall efficiency and
     manageability of our data ecosystem, laying the foundation for a new era of data management excellence within our
     organization.
-    
+
     See [interactive tutorial here](https://app.getreprise.com/launch/myM3VNn/)."""
     toolkit = GroupMigrationToolkit(cfg)
     toolkit.prepare_environment()
