@@ -263,6 +263,18 @@ class WorkspaceInstaller:
         self._create_readme()
         self._create_debug(remote_wheel)
 
+    @staticmethod
+    def _sorted_tasks() -> list[Task]:
+        return sorted(_TASKS.values(), key=lambda x: x.task_id)
+
+    @classmethod
+    def _step_list(cls) -> list[str]:
+        step_list = []
+        for task in cls._sorted_tasks():
+            if task.workflow not in step_list:
+                step_list.append(task.workflow)
+        return step_list
+
     def _create_readme(self):
         md = [
             "# UCX - The Unity Catalog Migration Assistant",
@@ -270,14 +282,18 @@ class WorkspaceInstaller:
             "Here are the URL and descriptions of jobs that trigger's various stages of migration.",
             "All jobs are defined with necessary cluster configurations and DBR versions.",
         ]
-        for step_name, job_id in self._deployed_steps.items():
+        for step_name in self._step_list():
+            if step_name not in self._deployed_steps:
+                logger.warning(f"Skipping step '{step_name}' since it was not deployed.")
+                continue
+            job_id = self._deployed_steps[step_name]
             dashboard_link = ""
             if step_name in self._dashboards:
                 dashboard_link = f"{self._ws.config.host}/sql/dashboards/{self._dashboards[step_name]}"
                 dashboard_link = f" (see [{step_name} dashboard]({dashboard_link}) after finish)"
             job_link = f"[{self._name(step_name)}]({self._ws.config.host}#job/{job_id})"
             md.append(f"## {job_link}{dashboard_link}\n")
-            for t in _TASKS.values():
+            for t in self._sorted_tasks():
                 if t.workflow != step_name:
                     continue
                 doc = re.sub(r"\s+", " ", t.doc)

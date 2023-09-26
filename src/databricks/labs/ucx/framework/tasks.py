@@ -12,6 +12,7 @@ _TASKS: dict[str, "Task"] = {}
 
 @dataclass
 class Task:
+    task_id: int
     workflow: str
     name: str
     doc: str
@@ -54,6 +55,7 @@ def task(workflow, *, depends_on=None, job_cluster="main", notebook: str | None 
             raise SyntaxError(msg)
 
         _TASKS[func.__name__] = Task(
+            task_id=len(_TASKS),
             workflow=workflow,
             name=func.__name__,
             doc=func.__doc__,
