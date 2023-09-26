@@ -62,25 +62,26 @@ class ClustersCrawler(CrawlerBase):
 
     def _assess_clusters(self, all_clusters):
         for cluster in all_clusters:
-            if cluster.cluster_source != ClusterSource.JOB:
-                cluster_info = ClusterInfo(cluster.cluster_id, cluster.cluster_name, cluster.creator_user_name, 1, "")
-                support_status = spark_version_compatibility(cluster.spark_version)
-                failures = []
-                if support_status != "supported":
-                    failures.append(f"not supported DBR: {cluster.spark_version}")
+            if cluster.cluster_source == ClusterSource.JOB:
+                continue
+            cluster_info = ClusterInfo(cluster.cluster_id, cluster.cluster_name, cluster.creator_user_name, 1, "")
+            support_status = spark_version_compatibility(cluster.spark_version)
+            failures = []
+            if support_status != "supported":
+                failures.append(f"not supported DBR: {cluster.spark_version}")
 
-                if cluster.spark_conf is not None:
-                    for k in INCOMPATIBLE_SPARK_CONFIG_KEYS:
-                        if k in cluster.spark_conf:
-                            failures.append(f"unsupported config: {k}")
+            if cluster.spark_conf is not None:
+                for k in INCOMPATIBLE_SPARK_CONFIG_KEYS:
+                    if k in cluster.spark_conf:
+                        failures.append(f"unsupported config: {k}")
 
-                    for value in cluster.spark_conf.values():
-                        if "dbfs:/mnt" in value or "/dbfs/mnt" in value:
-                            failures.append(f"using DBFS mount in configuration: {value}")
-                cluster_info.failures = json.dumps(failures)
-                if len(failures) > 0:
-                    cluster_info.success = 0
-                yield cluster_info
+                for value in cluster.spark_conf.values():
+                    if "dbfs:/mnt" in value or "/dbfs/mnt" in value:
+                        failures.append(f"using DBFS mount in configuration: {value}")
+            cluster_info.failures = json.dumps(failures)
+            if len(failures) > 0:
+                cluster_info.success = 0
+            yield cluster_info
 
     def snapshot(self) -> list[ClusterInfo]:
         return self._snapshot(self._try_fetch, self._crawl)
