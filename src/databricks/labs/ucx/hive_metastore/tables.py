@@ -9,16 +9,18 @@ from databricks.labs.ucx.mixins.sql import Row
 
 logger = logging.getLogger(__name__)
 
+
 @dataclass
 class SyncStatus:
     source_schema: str
     source_name: str
-    source_type:str
-    target_catalog:str
-    target_schema:str
-    target_name:str
-    status_code:str
-    description:str
+    source_type: str
+    target_catalog: str
+    target_schema: str
+    target_name: str
+    status_code: str
+    description: str
+
 
 @dataclass
 class Table:
@@ -58,10 +60,7 @@ class Table:
         if not self.is_delta:
             msg = f"{self.key} is not DELTA: {self.table_format}"
             raise ValueError(msg)
-        return (
-            f"CREATE TABLE IF NOT EXISTS {catalog}.{self.database}.{self.name}"
-            f" DEEP CLONE {self.key} "
-        )
+        return f"CREATE TABLE IF NOT EXISTS {catalog}.{self.database}.{self.name} DEEP CLONE {self.key} "
 
     def _sql_view(self, catalog):
         return f"CREATE VIEW IF NOT EXISTS {catalog}.{self.database}.{self.name} AS {self.view_text};"
@@ -161,10 +160,12 @@ class TablesCrawler(CrawlerBase):
             sql = table.uc_create_sql(target_catalog)
             logger.debug(f"Migrating table {table.key} to using SQL query: {sql}")
             if table.object_type == "EXTERNAL":
-                sync_status = SyncStatus(*list(self._backend.fetch(sql))[0])
+                sync_status = SyncStatus(*next(iter(self._backend.fetch(sql))))
                 if sync_status.status_code != "SUCCESS":
-                    logger.error(f"Could not sync external table {table.key} to {target_catalog}.{table.database} "
-                                 f"because: {sync_status.status_code} {sync_status.description}")
+                    logger.error(
+                        f"Could not sync external table {table.key} to {target_catalog}.{table.database} "
+                        f"because: {sync_status.status_code} {sync_status.description}"
+                    )
                 else:
                     self._backend.execute(table.sql_alter(target_catalog))
             else:
@@ -183,4 +184,3 @@ class TablesCrawler(CrawlerBase):
         except Exception as e:
             logger.error(f"Could not query inventory table : {e}")
             raise e
-

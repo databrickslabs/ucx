@@ -4,7 +4,7 @@ import os
 import pytest
 from databricks.sdk import WorkspaceClient
 
-from databricks.labs.ucx.framework.crawlers import StatementExecutionBackend, RuntimeBackend
+from databricks.labs.ucx.framework.crawlers import StatementExecutionBackend
 from databricks.labs.ucx.hive_metastore import TablesCrawler
 
 logger = logging.getLogger(__name__)
@@ -63,11 +63,7 @@ def test_migrate_view_and_managed_tables(ws, make_catalog, make_schema, make_tab
     managed_table = make_table(schema=schema_a)
     view = make_table(schema=schema_a, ctas="SELECT 2+2 AS four", view=True)
 
-    logger.info(
-        f"target catalog={target_catalog}, "
-        f"managed_table={managed_table}, "
-        f"view={view}"
-    )
+    logger.info(f"target catalog={target_catalog}, managed_table={managed_table}, view={view}")
 
     inventory_schema = make_schema(catalog="hive_metastore")
     _, inventory_schema = inventory_schema.split(".")
@@ -106,10 +102,7 @@ def test_migrate_external_table(ws, make_catalog, make_schema, make_table):
 
     external_table = make_table(schema=schema_a, external=True)
 
-    logger.info(
-        f"target catalog={target_catalog}, "
-        f"external_table={external_table} "
-    )
+    logger.info(f"target catalog={target_catalog}, external_table={external_table} ")
 
     inventory_schema = make_schema(catalog="hive_metastore")
     _, inventory_schema = inventory_schema.split(".")
@@ -122,5 +115,3 @@ def test_migrate_external_table(ws, make_catalog, make_schema, make_table):
 
     target_tables = list(backend.fetch(f"SHOW TABLES IN {target_catalog}.{target_schema}"))
     assert len(target_tables) == 1
-
-

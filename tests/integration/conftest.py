@@ -90,7 +90,9 @@ def make_schema(sql_exec, make_random):
         sql_exec(f"CREATE SCHEMA {schema_name}")
         return schema_name
 
-    yield from factory("schema", create, lambda schema_name: sql_exec(f"DROP SCHEMA IF EXISTS {schema_name} CASCADE"))  # noqa: F405
+    yield from factory(  # noqa: F405
+        "schema", create, lambda schema_name: sql_exec(f"DROP SCHEMA IF EXISTS {schema_name} CASCADE")
+    )
 
 
 def test_schema_fixture(make_schema):
