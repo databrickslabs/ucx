@@ -8,7 +8,6 @@ from databricks.labs.ucx.config import WorkspaceConfig
 from databricks.labs.ucx.framework.logger import _install
 
 _TASKS: dict[str, "Task"] = {}
-_TASK_ID_GENERATOR: int = 0
 
 
 @dataclass
@@ -55,11 +54,8 @@ def task(workflow, *, depends_on=None, job_cluster="main", notebook: str | None 
             msg = f"Task {func.__name__} must have documentation"
             raise SyntaxError(msg)
 
-        global _TASK_ID_GENERATOR
-        task_id = _TASK_ID_GENERATOR
-        _TASK_ID_GENERATOR += 1
         _TASKS[func.__name__] = Task(
-            task_id=task_id,
+            task_id=len(_TASKS),
             workflow=workflow,
             name=func.__name__,
             doc=func.__doc__,

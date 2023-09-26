@@ -224,14 +224,17 @@ def test_choices_happy(mocker):
 
 def test_step_list(mocker):
     ws = mocker.Mock()
-    install = Installer(ws)
-    from databricks.labs.ucx.framework.tasks import _TASKS, Task
+    from databricks.labs.ucx.framework.tasks import Task
 
-    _TASKS.clear()
-    _TASKS["func_A"] = Task(workflow="wl_1", name="n1", doc="d1", fn=lambda: None)
-    _TASKS["func_B"] = Task(workflow="wl_2", name="n1", doc="d2", fn=lambda: None)
-    _TASKS["func_C"] = Task(workflow="wl_1", name="n1", doc="d3", fn=lambda: None)
-    steps = install._step_list()
+    tasks = [
+        Task(task_id=0, workflow="wl_1", name="n3", doc="d3", fn=lambda: None),
+        Task(task_id=1, workflow="wl_2", name="n2", doc="d2", fn=lambda: None),
+        Task(task_id=2, workflow="wl_1", name="n1", doc="d1", fn=lambda: None),
+    ]
+
+    with mocker.patch.object(Installer, attribute="_sort_task_list", return_value=tasks):
+        install = Installer(ws)
+        steps = install._step_list()
     assert len(steps) == 2
     assert steps[0] == "wl_1" and steps[1] == "wl_2"
 
@@ -248,20 +251,18 @@ def test_create_readme(mocker):
     )
     ws.workspace.download = lambda _: io.BytesIO(config_bytes)
 
-    from databricks.labs.ucx.framework.tasks import _TASK_ORDER, _TASKS, Task
+    from databricks.labs.ucx.framework.tasks import Task
 
-    _TASKS.clear()
-    _TASKS["func_A"] = Task(workflow="wl_1", name="n1", doc="d1", fn=lambda: None)
-    _TASKS["func_B"] = Task(workflow="wl_2", name="n2", doc="d2", fn=lambda: None)
-    _TASKS["func_C"] = Task(workflow="wl_1", name="n3", doc="d3", fn=lambda: None)
-    _TASK_ORDER.clear()
-    _TASK_ORDER.append("func_C")
-    _TASK_ORDER.append("func_A")
-    _TASK_ORDER.append("func_B")
+    tasks = [
+        Task(task_id=0, workflow="wl_1", name="n3", doc="d3", fn=lambda: None),
+        Task(task_id=1, workflow="wl_2", name="n2", doc="d2", fn=lambda: None),
+        Task(task_id=2, workflow="wl_1", name="n1", doc="d1", fn=lambda: None),
+    ]
 
-    install = Installer(ws)
-    install._deployed_steps = {"wl_1": 1, "wl_2": 2}
-    install._create_readme()
+    with mocker.patch.object(Installer, attribute="_sort_task_list", return_value=tasks):
+        install = Installer(ws)
+        install._deployed_steps = {"wl_1": 1, "wl_2": 2}
+        install._create_readme()
 
     webbrowser_open.assert_called_with("https://foo/#workspace/Users/me@example.com/.ucx/README.py")
 
