@@ -9,6 +9,16 @@ from databricks.labs.ucx.mixins.sql import Row
 
 logger = logging.getLogger(__name__)
 
+@dataclass
+class SyncStatus:
+    source_schema: str
+    source_name: str
+    source_type:str
+    target_catalog:str
+    target_schema:str
+    target_name:str
+    status_code:str
+    description:str
 
 @dataclass
 class Table:
@@ -35,14 +45,14 @@ class Table:
     def kind(self) -> str:
         return "VIEW" if self.view_text is not None else "TABLE"
 
-    def _sql_alter(self, catalog):
+    def sql_alter(self, catalog):
         return (
             f"ALTER {self.kind} {self.key} SET"
             f" TBLPROPERTIES ('upgraded_to' = '{catalog}.{self.database}.{self.name}');"
         )
 
     def _sql_external(self, catalog):
-        return f"SYNC TABLE {catalog}.{self.database}.{self.name} FROM {self.key};" + self._sql_alter(catalog)
+        return f"SYNC TABLE {catalog}.{self.database}.{self.name} FROM {self.key}; "
 
     def _sql_managed(self, catalog):
         if not self.is_delta:
@@ -50,7 +60,7 @@ class Table:
             raise ValueError(msg)
         return (
             f"CREATE TABLE IF NOT EXISTS {catalog}.{self.database}.{self.name}"
-            f" DEEP CLONE {self.key};" + self._sql_alter(catalog)
+            f" DEEP CLONE {self.key} "
         )
 
     def _sql_view(self, catalog):
@@ -59,7 +69,7 @@ class Table:
     def uc_create_sql(self, catalog):
         if self.kind == "VIEW":
             return self._sql_view(catalog)
-        elif self.location is not None:
+        elif self.object_type == "EXTERNAL":
             return self._sql_external(catalog)
         else:
             return self._sql_managed(catalog)
@@ -75,6 +85,7 @@ class TablesCrawler(CrawlerBase):
             schema: The schema name for the inventory persistence.
         """
         super().__init__(backend, "hive_metastore", schema, "tables")
+        self._inventory_database = schema
 
     def _all_databases(self) -> Iterator[Row]:
         yield from self._fetch("SHOW DATABASES")
@@ -139,3 +150,37 @@ class TablesCrawler(CrawlerBase):
         except Exception as e:
             logger.error(f"Couldn't fetch information for table {full_name} : {e}")
             return None
+
+    def migrate_tables(self, target_catalog):
+        tables = self._fetch_tables()
+        for table in tables:
+            self._migrate_table(target_catalog, table)
+
+    def _migrate_table(self, target_catalog, table):
+        try:
+            sql = table.uc_create_sql(target_catalog)
+            logger.debug(f"Migrating table {table.key} to using SQL query: {sql}")
+            if table.object_type == "EXTERNAL":
+                sync_status = SyncStatus(*list(self._backend.fetch(sql))[0])
+                if sync_status.status_code != "SUCCESS":
+                    logger.error(f"Could not sync external table {table.key} to {target_catalog}.{table.database} "
+                                 f"because: {sync_status.status_code} {sync_status.description}")
+                else:
+                    self._backend.execute(table.sql_alter(target_catalog))
+            else:
+                self._backend.execute(sql)
+                self._backend.execute(table.sql_alter(target_catalog))
+        except Exception as e:
+            logger.error(f"Could not create table {table.name} because: {e}")
+
+    def _fetch_tables(self):
+        try:
+            tables = []
+            for row in self._backend.fetch(f"SELECT * FROM hive_metastore.{self._inventory_database}.tables"):
+                tables.append(Table(*row))
+            logger.debug(f"Found {len(tables)} tables to migrate")
+            return tables
+        except Exception as e:
+            logger.error(f"Could not query inventory table : {e}")
+            raise e
+
