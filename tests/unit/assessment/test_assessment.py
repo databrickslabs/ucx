@@ -1,6 +1,6 @@
 from unittest.mock import Mock
 
-from databricks.sdk.service.compute import AutoScale, ClusterDetails
+from databricks.sdk.service.compute import AutoScale, ClusterDetails, ClusterSource
 from databricks.sdk.service.jobs import BaseJob, JobSettings, NotebookTask, Task
 
 from databricks.labs.ucx.assessment.crawlers import ClustersCrawler, JobsCrawler
@@ -82,6 +82,7 @@ def test_job_assessment():
             spark_env_vars=None,
             spark_version="13.3.x-cpu-ml-scala2.12",
             cluster_id="0807-225846-motto493",
+            cluster_source=ClusterSource.UI,
         ),
         ClusterDetails(
             autoscale=AutoScale(min_workers=1, max_workers=6),
@@ -90,6 +91,16 @@ def test_job_assessment():
             spark_env_vars=None,
             spark_version="9.3.x-cpu-ml-scala2.12",
             cluster_id="0810-225833-atlanta69",
+            cluster_source=ClusterSource.UI,
+        ),
+        ClusterDetails(
+            autoscale=AutoScale(min_workers=1, max_workers=6),
+            spark_conf={"spark.databricks.delta.preview.enabled": "true"},
+            spark_context_id=5134472582179566666,
+            spark_env_vars=None,
+            spark_version="13.3.x-cpu-ml-scala2.12",
+            cluster_id="0810-229933-chicago12",
+            cluster_source=ClusterSource.JOB,
         ),
     ]
     result_set = JobsCrawler(Mock(), MockBackend(), "ucx")._assess_jobs(
