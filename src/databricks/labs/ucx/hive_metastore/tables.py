@@ -151,9 +151,19 @@ class TablesCrawler(CrawlerBase):
             return None
 
     def migrate_tables(self, target_catalog):
-        tables = self._fetch_tables()
-        for table in tables:
+        for table in self._fetch_tables():
             self._migrate_table(target_catalog, table)
+
+    def _fetch_tables(self):
+        try:
+            tables = []
+            for row in self._backend.fetch(f"SELECT * FROM hive_metastore.{self._inventory_database}.tables"):
+                tables.append(Table(*row))
+            logger.debug(f"Found {len(tables)} tables to migrate")
+            return tables
+        except Exception as e:
+            logger.error(f"Could not query inventory table : {e}")
+            raise e
 
     def _migrate_table(self, target_catalog, table):
         try:
@@ -173,14 +183,3 @@ class TablesCrawler(CrawlerBase):
                 self._backend.execute(table.sql_alter(target_catalog))
         except Exception as e:
             logger.error(f"Could not create table {table.name} because: {e}")
-
-    def _fetch_tables(self):
-        try:
-            tables = []
-            for row in self._backend.fetch(f"SELECT * FROM hive_metastore.{self._inventory_database}.tables"):
-                tables.append(Table(*row))
-            logger.debug(f"Found {len(tables)} tables to migrate")
-            return tables
-        except Exception as e:
-            logger.error(f"Could not query inventory table : {e}")
-            raise e

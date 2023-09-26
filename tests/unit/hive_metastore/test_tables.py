@@ -95,3 +95,33 @@ def test_tables_returning_error_when_describing():
     tc = TablesCrawler(backend, "default")
     results = tc._crawl()
     assert len(results) == 1
+
+
+def test_external_tables_returning_error_should_be_catched_and_logged():
+    errors = {}
+    rows = {
+        "SELECT": [
+            ("catalog", "database", "external_table", "EXTERNAL", "DELTA"),
+        ],
+        "SYNC": [
+            ("catalog", "database", "external_table", "target_catalog", "target_schema", "target_table", "ERROR", ""),
+        ],
+    }
+    backend = MockBackend(fails_on_first=errors, rows=rows)
+    tc = TablesCrawler(backend, "inventory_database")
+    tc.migrate_tables("target_catalog")
+
+
+def test_upgrade_tables_returning_error_should_be_catched_and_logged():
+    errors = {
+        "CREATE": "Can not create the managed table('managed'). "
+        "The associated location('dbfs:/user/hive/warehouse/somedata') already exists.;"
+    }
+    rows = {
+        "SELECT": [
+            ("catalog", "database", "managed", "MANAGED", "DELTA"),
+        ]
+    }
+    backend = MockBackend(fails_on_first=errors, rows=rows)
+    tc = TablesCrawler(backend, "inventory_database")
+    tc.migrate_tables("target_catalog")
