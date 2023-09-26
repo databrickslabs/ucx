@@ -232,7 +232,7 @@ def test_step_list(mocker):
         Task(task_id=2, workflow="wl_1", name="n1", doc="d1", fn=lambda: None),
     ]
 
-    with mocker.patch.object(Installer, attribute="_sort_task_list", return_value=tasks):
+    with mocker.patch.object(Installer, attribute="_sorted_tasks", return_value=tasks):
         install = Installer(ws)
         steps = install._step_list()
     assert len(steps) == 2
@@ -259,7 +259,7 @@ def test_create_readme(mocker):
         Task(task_id=2, workflow="wl_1", name="n1", doc="d1", fn=lambda: None),
     ]
 
-    with mocker.patch.object(Installer, attribute="_sort_task_list", return_value=tasks):
+    with mocker.patch.object(Installer, attribute="_sorted_tasks", return_value=tasks):
         install = Installer(ws)
         install._deployed_steps = {"wl_1": 1, "wl_2": 2}
         install._create_readme()

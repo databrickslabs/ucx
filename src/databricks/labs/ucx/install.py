@@ -264,13 +264,13 @@ class WorkspaceInstaller:
         self._create_debug(remote_wheel)
 
     @staticmethod
-    def _sort_task_list() -> list[Task]:
+    def _sorted_tasks() -> list[Task]:
         return sorted(_TASKS.values(), key=lambda x: x.task_id)
 
     @classmethod
     def _step_list(cls) -> list[str]:
         step_list = []
-        [step_list.append(task.workflow) for task in cls._sort_task_list() if task.workflow not in step_list]
+        [step_list.append(task.workflow) for task in cls._sorted_tasks() if task.workflow not in step_list]
         return step_list
 
     def _create_readme(self):
@@ -291,7 +291,7 @@ class WorkspaceInstaller:
                 dashboard_link = f" (see [{step_name} dashboard]({dashboard_link}) after finish)"
             job_link = f"[{self._name(step_name)}]({self._ws.config.host}#job/{job_id})"
             md.append(f"## {job_link}{dashboard_link}\n")
-            for t in self._sort_task_list():
+            for t in self._sorted_tasks():
                 if t.workflow != step_name:
                     continue
                 doc = re.sub(r"\s+", " ", t.doc)
