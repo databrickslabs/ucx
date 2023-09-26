@@ -232,8 +232,8 @@ def test_step_list(mocker):
         Task(task_id=2, workflow="wl_1", name="n1", doc="d1", fn=lambda: None),
     ]
 
-    with mocker.patch.object(Installer, attribute="_sorted_tasks", return_value=tasks):
-        install = Installer(ws)
+    with mocker.patch.object(WorkspaceInstaller, attribute="_sorted_tasks", return_value=tasks):
+        install = WorkspaceInstaller(ws)
         steps = install._step_list()
     assert len(steps) == 2
     assert steps[0] == "wl_1" and steps[1] == "wl_2"
@@ -246,7 +246,7 @@ def test_create_readme(mocker):
 
     ws.current_user.me = lambda: iam.User(user_name="me@example.com", groups=[iam.ComplexValue(display="admins")])
     ws.config.host = "https://foo"
-    config_bytes = yaml.dump(MigrationConfig(inventory_database="a", groups=GroupsConfig(auto=True)).as_dict()).encode(
+    config_bytes = yaml.dump(WorkspaceConfig(inventory_database="a", groups=GroupsConfig(auto=True)).as_dict()).encode(
         "utf8"
     )
     ws.workspace.download = lambda _: io.BytesIO(config_bytes)
@@ -259,8 +259,8 @@ def test_create_readme(mocker):
         Task(task_id=2, workflow="wl_1", name="n1", doc="d1", fn=lambda: None),
     ]
 
-    with mocker.patch.object(Installer, attribute="_sorted_tasks", return_value=tasks):
-        install = Installer(ws)
+    with mocker.patch.object(WorkspaceInstaller, attribute="_sorted_tasks", return_value=tasks):
+        install = WorkspaceInstaller(ws)
         install._deployed_steps = {"wl_1": 1, "wl_2": 2}
         install._create_readme()
 
