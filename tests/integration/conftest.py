@@ -118,8 +118,9 @@ def make_table(sql_exec, make_schema, make_random):
             ddl = f"{ddl} USING json LOCATION '{location}'"
         elif external:
             # external table
-            location = "dbfs:/databricks-datasets/nyctaxi-with-zipcodes/subsampled"
-            ddl = f"{ddl} USING delta LOCATION '{location}'"
+            url = "s3a://databricks-datasets-oregon/delta-sharing/share/open-datasets.share"
+            share = f"{url}#delta_sharing.default.lending_club"
+            ddl = f"{ddl} USING deltaSharing LOCATION '{share}'"
         else:
             # managed table
             ddl = f"{ddl} (id INT, value STRING)"
