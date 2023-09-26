@@ -2,6 +2,7 @@ import json
 from dataclasses import dataclass
 
 from databricks.sdk import WorkspaceClient
+from databricks.sdk.service.compute import ClusterSource
 from databricks.sdk.service.jobs import BaseJob
 
 from databricks.labs.ucx.framework.crawlers import CrawlerBase, SqlBackend
@@ -61,6 +62,8 @@ class ClustersCrawler(CrawlerBase):
 
     def _assess_clusters(self, all_clusters):
         for cluster in all_clusters:
+            if cluster.cluster_source == ClusterSource.JOB:
+                continue
             cluster_info = ClusterInfo(cluster.cluster_id, cluster.cluster_name, cluster.creator_user_name, 1, "")
             support_status = spark_version_compatibility(cluster.spark_version)
             failures = []
