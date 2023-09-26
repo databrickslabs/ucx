@@ -1,7 +1,13 @@
 from databricks.sdk import WorkspaceClient
 
 from databricks.labs.ucx.config import GroupsConfig
-from databricks.labs.ucx.workspace_access.groups import GroupManager
+from databricks.labs.ucx.workspace_access.groups import GroupCrawler, GroupManager
+
+
+def test_group_crawler(ws):
+    gc = GroupCrawler(ws)
+    gc.membership()
+    print(1)
 
 
 def test_prepare_environment(ws, make_ucx_group):

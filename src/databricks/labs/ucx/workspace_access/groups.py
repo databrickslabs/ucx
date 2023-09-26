@@ -1,3 +1,4 @@
+import collections
 import json
 import logging
 import typing
@@ -45,6 +46,40 @@ class GroupMigrationState:
             return None
         else:
             return found[0]
+
+
+# TODO: check if we can merge GroupCrawler and GroupManager
+class GroupCrawler:
+    _SYSTEM_GROUPS: typing.ClassVar[list[str]] = ["users", "admins", "account users"]
+    _GROUP_ATTRIBUTES = "id,displayName,meta"
+    _USER_ATTRIBUTES = "id,userName,groups"
+
+    def __init__(self, ws: WorkspaceClient):
+        self._ws = ws
+        self._groups = self._list_workspace_groups()
+        self._users = self._ws.users.list(attributes=self._USER_ATTRIBUTES)
+
+    def _list_workspace_groups(self) -> list[iam.Group]:
+        logger.debug("Listing workspace groups...")
+        workspace_groups = [
+            g
+            for g in self._ws.groups.list(attributes=self._GROUP_ATTRIBUTES)
+            if g.meta.resource_type == "WorkspaceGroup" and g.display_name not in self._SYSTEM_GROUPS
+        ]
+        logger.debug(f"Found {len(workspace_groups)} workspace groups")
+        return sorted(workspace_groups, key=lambda _: _.display_name)
+
+    def membership(self):
+        membership = collections.defaultdict(set)
+        workspace_groups_ids = {g.id for g in self._groups}
+        for u in self._users:
+            for g in u.groups:
+                if g.type != "direct":
+                    continue
+                if g.value not in workspace_groups_ids:
+                    continue
+                membership[g.display].add(u.user_name)
+        return membership
 
 
 class GroupManager:
