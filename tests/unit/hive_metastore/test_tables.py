@@ -49,7 +49,7 @@ def test_sql_managed_non_delta():
     [
         (
             Table(catalog="catalog", database="db", name="managed_table", object_type="..", table_format="DELTA"),
-            "CREATE TABLE IF NOT EXISTS new_catalog.db.managed_table DEEP CLONE catalog.db.managed_table;"
+            "CREATE TABLE IF NOT EXISTS new_catalog.db.managed_table DEEP CLONE catalog.db.managed_table;",
         ),
         (
             Table(
@@ -71,7 +71,7 @@ def test_sql_managed_non_delta():
                 table_format="DELTA",
                 location="s3a://foo/bar",
             ),
-            "SYNC TABLE new_catalog.db.external_table FROM catalog.db.external_table;"
+            "SYNC TABLE new_catalog.db.external_table FROM catalog.db.external_table;",
         ),
     ],
 )
