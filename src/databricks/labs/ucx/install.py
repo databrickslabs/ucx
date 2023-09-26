@@ -270,7 +270,9 @@ class WorkspaceInstaller:
     @classmethod
     def _step_list(cls) -> list[str]:
         step_list = []
-        [step_list.append(task.workflow) for task in cls._sorted_tasks() if task.workflow not in step_list]
+        for task in cls._sorted_tasks():
+            if task.workflow not in step_list:
+                step_list.append(task.workflow)
         return step_list
 
     def _create_readme(self):
