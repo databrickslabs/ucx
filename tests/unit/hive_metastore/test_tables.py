@@ -49,16 +49,14 @@ def test_sql_managed_non_delta():
     [
         (
             Table(catalog="catalog", database="db", name="managed_table", object_type="..", table_format="DELTA"),
-            "CREATE TABLE IF NOT EXISTS new_catalog.db.managed_table DEEP CLONE "
-            "catalog.db.managed_table;ALTER TABLE catalog.db.managed_table SET "
-            "TBLPROPERTIES ('upgraded_to' = 'new_catalog.db.managed_table');",
+            "CREATE TABLE IF NOT EXISTS new_catalog.db.managed_table DEEP CLONE catalog.db.managed_table;"
         ),
         (
             Table(
                 catalog="catalog",
                 database="db",
                 name="view",
-                object_type="..",
+                object_type="VIEW",
                 table_format="DELTA",
                 view_text="SELECT * FROM table",
             ),
@@ -69,13 +67,11 @@ def test_sql_managed_non_delta():
                 catalog="catalog",
                 database="db",
                 name="external_table",
-                object_type="..",
+                object_type="EXTERNAL",
                 table_format="DELTA",
                 location="s3a://foo/bar",
             ),
             "SYNC TABLE new_catalog.db.external_table FROM catalog.db.external_table;"
-            "ALTER TABLE catalog.db.external_table SET "
-            "TBLPROPERTIES ('upgraded_to' = 'new_catalog.db.external_table');",
         ),
     ],
 )

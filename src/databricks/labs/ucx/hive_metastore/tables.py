@@ -54,13 +54,13 @@ class Table:
         )
 
     def _sql_external(self, catalog):
-        return f"SYNC TABLE {catalog}.{self.database}.{self.name} FROM {self.key}; "
+        return f"SYNC TABLE {catalog}.{self.database}.{self.name} FROM {self.key};"
 
     def _sql_managed(self, catalog):
         if not self.is_delta:
             msg = f"{self.key} is not DELTA: {self.table_format}"
             raise ValueError(msg)
-        return f"CREATE TABLE IF NOT EXISTS {catalog}.{self.database}.{self.name} DEEP CLONE {self.key} "
+        return f"CREATE TABLE IF NOT EXISTS {catalog}.{self.database}.{self.name} DEEP CLONE {self.key};"
 
     def _sql_view(self, catalog):
         return f"CREATE VIEW IF NOT EXISTS {catalog}.{self.database}.{self.name} AS {self.view_text};"
