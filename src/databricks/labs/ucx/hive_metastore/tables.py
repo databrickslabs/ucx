@@ -165,7 +165,9 @@ class TablesCrawler(CrawlerBase):
     def _fetch_tables(self):
         try:
             tables = []
-            for row in self._backend.fetch(f"SELECT * FROM hive_metastore.{self._workspace_config.inventory_database}.tables"):
+            for row in self._backend.fetch(
+                f"SELECT * FROM hive_metastore.{self._workspace_config.inventory_database}.tables"
+            ):
                 tables.append(Table(*row))
             logger.debug(f"Found {len(tables)} tables to migrate")
             return tables

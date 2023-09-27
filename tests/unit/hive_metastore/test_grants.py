@@ -1,6 +1,6 @@
 import pytest
 
-from databricks.labs.ucx.config import WorkspaceConfig, GroupsConfig
+from databricks.labs.ucx.config import GroupsConfig, WorkspaceConfig
 from databricks.labs.ucx.hive_metastore.grants import Grant, GrantsCrawler
 from databricks.labs.ucx.hive_metastore.tables import TablesCrawler
 from databricks.labs.ucx.mixins.sql import Row

@@ -108,7 +108,9 @@ def test_migrate_tables_should_migrate_tables_to_default_catalog():
         ]
     }
     backend = MockBackend(fails_on_first=errors, rows=rows)
-    workspace_cfg = WorkspaceConfig(default_catalog="target_catalog", groups=GroupsConfig(auto=True), inventory_database="inventory_database")
+    workspace_cfg = WorkspaceConfig(
+        default_catalog="target_catalog", groups=GroupsConfig(auto=True), inventory_database="inventory_database"
+    )
     tc = TablesCrawler(backend, workspace_cfg)
     tc.migrate_tables()
 
@@ -131,7 +133,9 @@ def test_migrate_tables_should_migrate_tables_to_appropriate_catalog_if_config()
     backend = MockBackend(fails_on_first=errors, rows=rows)
     database_to_catalog_mapping = {"db1": "catalog_1", "db2": "catalog_2"}
     workspace_cfg = WorkspaceConfig(
-        database_to_catalog_mapping=database_to_catalog_mapping, groups=GroupsConfig(auto=True), inventory_database="inventory_database"
+        database_to_catalog_mapping=database_to_catalog_mapping,
+        groups=GroupsConfig(auto=True),
+        inventory_database="inventory_database",
     )
 
     tc = TablesCrawler(backend, workspace_cfg)
@@ -158,7 +162,9 @@ def test_migrate_tables_should_migrate_tables_to_default_catalog_if_not_found_in
     backend = MockBackend(fails_on_first=errors, rows=rows)
     database_to_catalog_mapping = {"db1": "catalog_1", "db2": "catalog_2"}
     workspace_cfg = WorkspaceConfig(
-        database_to_catalog_mapping=database_to_catalog_mapping, groups=GroupsConfig(auto=True), inventory_database="inventory_database"
+        database_to_catalog_mapping=database_to_catalog_mapping,
+        groups=GroupsConfig(auto=True),
+        inventory_database="inventory_database",
     )
 
     tc = TablesCrawler(backend, workspace_cfg)
@@ -182,7 +188,9 @@ def test_migrate_external_tables_should_have_appropriate_sql():
         ],
     }
     backend = MockBackend(fails_on_first=errors, rows=rows)
-    workspace_cfg = WorkspaceConfig(default_catalog="target_catalog", groups=GroupsConfig(auto=True), inventory_database="inventory_database")
+    workspace_cfg = WorkspaceConfig(
+        default_catalog="target_catalog", groups=GroupsConfig(auto=True), inventory_database="inventory_database"
+    )
     tc = TablesCrawler(backend, workspace_cfg)
     tc.migrate_tables()
 
@@ -201,7 +209,9 @@ def test_migrate_views_should_have_appropriate_sql():
         ],
     }
     backend = MockBackend(fails_on_first=errors, rows=rows)
-    workspace_cfg = WorkspaceConfig(default_catalog="target_catalog", groups=GroupsConfig(auto=True), inventory_database="inventory_database")
+    workspace_cfg = WorkspaceConfig(
+        default_catalog="target_catalog", groups=GroupsConfig(auto=True), inventory_database="inventory_database"
+    )
     tc = TablesCrawler(backend, workspace_cfg)
     tc.migrate_tables()
 
@@ -223,6 +233,8 @@ def test_external_tables_returning_error_should_be_catched_and_logged():
         ],
     }
     backend = MockBackend(fails_on_first=errors, rows=rows)
-    workspace_cfg = WorkspaceConfig(default_catalog="target_catalog", groups=GroupsConfig(auto=True), inventory_database="inventory_database")
+    workspace_cfg = WorkspaceConfig(
+        default_catalog="target_catalog", groups=GroupsConfig(auto=True), inventory_database="inventory_database"
+    )
     tc = TablesCrawler(backend, workspace_cfg)
     tc.migrate_tables()

@@ -71,7 +71,9 @@ def test_migrate_view_and_managed_tables(ws, make_catalog, make_schema, make_tab
     _, inventory_schema = inventory_schema.split(".")
 
     backend = StatementExecutionBackend(ws, os.environ["TEST_DEFAULT_WAREHOUSE_ID"])
-    workspace_cfg = WorkspaceConfig(default_catalog=target_catalog, groups=GroupsConfig(auto=True), inventory_database="")
+    workspace_cfg = WorkspaceConfig(
+        default_catalog=target_catalog, groups=GroupsConfig(auto=True), inventory_database=""
+    )
     tables = TablesCrawler(backend, workspace_cfg)
     tables.snapshot()
     tables.migrate_tables()
