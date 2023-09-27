@@ -49,7 +49,8 @@ def test_save_config(mocker):
 
     ws.workspace.upload.assert_called_with(
         "/Users/me@example.com/.ucx/config.yml",
-        b"""groups:
+        b"""default_catalog: ucx_default
+groups:
   backup_group_prefix: '42'
   selected:
   - '42'
@@ -106,7 +107,8 @@ def test_save_config_auto_groups(mocker):
 
     ws.workspace.upload.assert_called_with(
         "/Users/me@example.com/.ucx/config.yml",
-        b"""groups:
+        b"""default_catalog: ucx_default
+groups:
   auto: true
   backup_group_prefix: '42'
 inventory_database: '42'
@@ -146,7 +148,8 @@ def test_save_config_strip_group_names(mocker):
 
     ws.workspace.upload.assert_called_with(
         "/Users/me@example.com/.ucx/config.yml",
-        b"""groups:
+        b"""default_catalog: ucx_default
+groups:
   backup_group_prefix: '42'
   selected:
   - g1

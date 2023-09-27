@@ -205,6 +205,8 @@ class WorkspaceConfig(_Config["WorkspaceConfig"]):
     connect: ConnectConfig | None = None
     num_threads: int | None = 10
     log_level: str | None = "INFO"
+    database_to_catalog_mapping: dict[str, str] = None
+    default_catalog: str = "ucx_default"
 
     # Starting path for notebooks and directories crawler
     workspace_start_path: str = "/"
@@ -220,6 +222,8 @@ class WorkspaceConfig(_Config["WorkspaceConfig"]):
             warehouse_id=raw.get("warehouse_id", None),
             num_threads=raw.get("num_threads", 10),
             log_level=raw.get("log_level", "INFO"),
+            database_to_catalog_mapping=raw.get("database_to_catalog_mapping", None),
+            default_catalog=raw.get("default_catalog", "ucx_default"),
         )
 
     def to_workspace_client(self) -> WorkspaceClient:

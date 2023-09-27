@@ -3,6 +3,7 @@ from collections.abc import Iterator
 from dataclasses import dataclass
 from functools import partial
 
+from databricks.labs.ucx.config import WorkspaceConfig
 from databricks.labs.ucx.framework.crawlers import CrawlerBase, SqlBackend
 from databricks.labs.ucx.framework.parallel import ThreadedExecution
 from databricks.labs.ucx.mixins.sql import Row
@@ -75,7 +76,7 @@ class Table:
 
 
 class TablesCrawler(CrawlerBase):
-    def __init__(self, backend: SqlBackend, schema):
+    def __init__(self, backend: SqlBackend, cfg: WorkspaceConfig):
         """
         Initializes a TablesCrawler instance.
 
@@ -83,8 +84,8 @@ class TablesCrawler(CrawlerBase):
             backend (SqlBackend): The SQL Execution Backend abstraction (either REST API or Spark)
             schema: The schema name for the inventory persistence.
         """
-        super().__init__(backend, "hive_metastore", schema, "tables")
-        self._inventory_database = schema
+        super().__init__(backend, "hive_metastore", cfg.inventory_database, "tables")
+        self._workspace_config = cfg
 
     def _all_databases(self) -> Iterator[Row]:
         yield from self._fetch("SHOW DATABASES")
@@ -150,14 +151,21 @@ class TablesCrawler(CrawlerBase):
             logger.error(f"Couldn't fetch information for table {full_name} : {e}")
             return None
 
-    def migrate_tables(self, target_catalog):
-        for table in self._fetch_tables():
-            self._migrate_table(target_catalog, table)
+    def migrate_tables(self):
+        if self._workspace_config.database_to_catalog_mapping:
+            for table in self._fetch_tables():
+                target_catalog = self._workspace_config.database_to_catalog_mapping.get(
+                    table.database, self._workspace_config.default_catalog
+                )
+                self._migrate_table(target_catalog, table)
+        else:
+            for table in self._fetch_tables():
+                self._migrate_table(self._workspace_config.default_catalog, table)
 
     def _fetch_tables(self):
         try:
             tables = []
-            for row in self._backend.fetch(f"SELECT * FROM hive_metastore.{self._inventory_database}.tables"):
+            for row in self._backend.fetch(f"SELECT * FROM hive_metastore.{self._workspace_config.inventory_database}.tables"):
                 tables.append(Table(*row))
             logger.debug(f"Found {len(tables)} tables to migrate")
             return tables

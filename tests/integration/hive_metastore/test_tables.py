@@ -4,6 +4,7 @@ import os
 import pytest
 from databricks.sdk import WorkspaceClient
 
+from databricks.labs.ucx.config import GroupsConfig, WorkspaceConfig
 from databricks.labs.ucx.framework.crawlers import StatementExecutionBackend
 from databricks.labs.ucx.hive_metastore import TablesCrawler
 
@@ -38,7 +39,8 @@ def test_describe_all_tables_in_databases(ws: WorkspaceClient, make_catalog, mak
     _, inventory_schema = inventory_schema.split(".")
 
     backend = StatementExecutionBackend(ws, warehouse_id)
-    tables = TablesCrawler(backend, inventory_schema)
+    workspace_cfg = WorkspaceConfig(groups=GroupsConfig(auto=True), inventory_database=inventory_schema)
+    tables = TablesCrawler(backend, workspace_cfg)
 
     all_tables = {}
     for t in tables.snapshot():
@@ -69,10 +71,10 @@ def test_migrate_view_and_managed_tables(ws, make_catalog, make_schema, make_tab
     _, inventory_schema = inventory_schema.split(".")
 
     backend = StatementExecutionBackend(ws, os.environ["TEST_DEFAULT_WAREHOUSE_ID"])
-
-    tables = TablesCrawler(backend, inventory_schema)
+    workspace_cfg = WorkspaceConfig(default_catalog=target_catalog, groups=GroupsConfig(auto=True), inventory_database="")
+    tables = TablesCrawler(backend, workspace_cfg)
     tables.snapshot()
-    tables.migrate_tables(target_catalog)
+    tables.migrate_tables()
 
     target_tables = list(backend.fetch(f"SHOW TABLES IN {target_catalog}.{target_schema}"))
     assert len(target_tables) == 2
@@ -111,7 +113,7 @@ def test_migrate_external_table(ws, make_catalog, make_schema, make_table):
 
     tables = TablesCrawler(backend, inventory_schema)
     tables.snapshot()
-    tables.migrate_tables(target_catalog)
+    tables.migrate_tables()
 
     target_tables = list(backend.fetch(f"SHOW TABLES IN {target_catalog}.{target_schema}"))
     assert len(target_tables) == 1

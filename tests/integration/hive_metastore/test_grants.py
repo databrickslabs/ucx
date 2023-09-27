@@ -3,6 +3,7 @@ import os
 
 from databricks.sdk import WorkspaceClient
 
+from databricks.labs.ucx.config import WorkspaceConfig, GroupsConfig
 from databricks.labs.ucx.framework.crawlers import StatementExecutionBackend
 from databricks.labs.ucx.hive_metastore import GrantsCrawler, TablesCrawler
 
@@ -29,7 +30,8 @@ def test_all_grants_in_databases(ws: WorkspaceClient, sql_exec, make_catalog, ma
     _, inventory_schema = inventory_schema.split(".")
 
     backend = StatementExecutionBackend(ws, warehouse_id)
-    tables = TablesCrawler(backend, inventory_schema)
+    workspace_cfg = WorkspaceConfig(groups=GroupsConfig(auto=True), inventory_database=inventory_schema)
+    tables = TablesCrawler(backend, workspace_cfg)
     grants = GrantsCrawler(tables)
 
     all_grants = {}
