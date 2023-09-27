@@ -30,8 +30,13 @@ fi
 # Check versions for all Python binaries found
 python_versions=()
 for python_binary in "${python_binaries[@]}"; do
-    python_version=$("$python_binary" --version | awk '{print $2}')
-    python_versions+=("$python_version -> $(realpath "$python_binary")")
+    python_version=$("$python_binary" --version)
+    IFS=" " read -ra parts <<< "$python_version"
+    if [ "${#parts[@]}" -eq "2" ]; then
+      python_versions+=("${parts[1]} -> $(realpath "$python_binary")")
+    else
+        echo "[!] Found bad version string, skipping binary"
+    fi
 done
 
 IFS=$'\n' python_versions=($(printf "%s\n" "${python_versions[@]}" | sort -V))
@@ -60,7 +65,7 @@ elif [ -f "$tmp_dir/Scripts/activate" ]; then
     . "$tmp_dir/Scripts/activate"
     py="$tmp_dir/Scripts/python"
 else
-    echo "[!] Creating Python virtual environment failed!"
+    echo "[!] Creating Python virtual environment failed"
     exit 1
 fi
 
