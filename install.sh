@@ -40,7 +40,7 @@ py="/dev/null"
 for version_and_binary in "${python_versions[@]}"; do
     echo "[i] found Python $version_and_binary"
     IFS=" -> " read -ra parts <<< "$version_and_binary"
-    py="${parts[2]}"
+    IFS="" py="${parts[@]:2}"
 done
 
 echo "[i] latest python is $py"
@@ -49,12 +49,20 @@ tmp_dir=$(mktemp -d)
 
 # Create isolated Virtualenv with the latest Python version
 # in the ephemeral temporary directory
+echo "[i] installing venv into: $tmp_dir"
 $py -m venv "$tmp_dir"
 
-. "$tmp_dir/bin/activate"
-
-# Use the Python from Virtualenv
-py="$tmp_dir/bin/python"
+# Detect which venv this is, activate and reset Python binary
+if [ -f "$tmp_dir/bin/activate" ]; then
+    . "$tmp_dir/bin/activate"
+    py="$tmp_dir/bin/python"
+elif [ -f "$tmp_dir/Scripts/activate" ]; then
+    . "$tmp_dir/Scripts/activate"
+    py="$tmp_dir/Scripts/python"
+else
+    echo "[!] Creating Python virtual environment failed!"
+    exit 1
+fi
 
 echo "[+] making sure we have the latest pip version"
 # Always upgrade pip, so that the hatchling build backend works. Hinted by errors like
