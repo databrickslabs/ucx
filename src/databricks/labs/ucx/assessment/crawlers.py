@@ -76,6 +76,7 @@ class ClustersCrawler(CrawlerBase):
 
     def _get_cluster_policy(self, policy_id):
         return self._ws.cluster_policies.get(policy_id).as_dict()
+
     def _assess_clusters(self, all_clusters):
         for cluster in all_clusters:
             if cluster.cluster_source == ClusterSource.JOB:
@@ -117,7 +118,7 @@ class ClustersCrawler(CrawlerBase):
                         for pol in AZURE_CLUSTER_POLICY:
                             if re.search(pol, str(value)):
                                 confPolicyList += [{key: value}]
-                if confList:
+                if confPolicyList:
                     clusterPolicyDict['clusterName'] = cluster.cluster_name
                     clusterPolicyDict['clusterSparkConf'] = confPolicyList
                     failures.append(clusterPolicyDict)
