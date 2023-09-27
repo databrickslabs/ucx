@@ -5,7 +5,7 @@ import sys
 from databricks.sdk import WorkspaceClient
 
 from databricks.labs.ucx.assessment.crawlers import ClustersCrawler, JobsCrawler
-from databricks.labs.ucx.config import MigrationConfig
+from databricks.labs.ucx.config import WorkspaceConfig
 from databricks.labs.ucx.framework.crawlers import RuntimeBackend
 from databricks.labs.ucx.framework.tasks import task, trigger
 from databricks.labs.ucx.hive_metastore import GrantsCrawler, TablesCrawler
@@ -17,14 +17,14 @@ logger = logging.getLogger(__name__)
 
 
 @task("assessment")
-def setup_schema(cfg: MigrationConfig):
+def setup_schema(cfg: WorkspaceConfig):
     """Creates a database for UCX migration intermediate state"""
     backend = RuntimeBackend()
     backend.execute(f"CREATE SCHEMA IF NOT EXISTS hive_metastore.{cfg.inventory_database}")
 
 
 @task("assessment", depends_on=[setup_schema], notebook="hive_metastore/tables.scala")
-def crawl_tables(_: MigrationConfig):
+def crawl_tables(_: WorkspaceConfig):
     """In this procedure, we systematically scan every table stored within the Hive Metastore. This scanning process
     retrieves vital information for each table, which includes its distinct identifier or name, table format, and
     storage location details.
@@ -35,12 +35,12 @@ def crawl_tables(_: MigrationConfig):
 
 
 @task("assessment", job_cluster="tacl")
-def setup_tacl(_: MigrationConfig):
+def setup_tacl(_: WorkspaceConfig):
     """(Optimization) Starts tacl job cluster in parallel to crawling tables"""
 
 
 @task("assessment", depends_on=[crawl_tables, setup_tacl], job_cluster="tacl")
-def crawl_grants(cfg: MigrationConfig):
+def crawl_grants(cfg: WorkspaceConfig):
     """During this process, our methodology is purposefully designed to systematically scan and retrieve ACLs
     (Access Control Lists) associated with Legacy Tables from the Hive Metastore. These ACLs encompass comprehensive
     information, including permissions for users and groups, role-based access settings, and any custom access
@@ -60,7 +60,7 @@ def crawl_grants(cfg: MigrationConfig):
 
 
 @task("assessment", depends_on=[setup_schema])
-def crawl_mounts(cfg: MigrationConfig):
+def crawl_mounts(cfg: WorkspaceConfig):
     """In this segment of the assessment, we will define the scope of the mount points intended for migration into the
     Unity Catalog. As these objects are not compatible with the Unity Catalog paradigm, a key component of the
     migration process involves transferring them to Unity Catalog External Locations.
@@ -74,7 +74,7 @@ def crawl_mounts(cfg: MigrationConfig):
 
 
 @task("assessment", depends_on=[crawl_mounts, crawl_tables])
-def guess_external_locations(cfg: MigrationConfig):
+def guess_external_locations(cfg: WorkspaceConfig):
     """In this section of the assessment, our objective is to determine the whereabouts of all the tables.
     Specifically, we will focus on identifying locations that utilize Mount Points. Our goal is to identify the
     External Locations necessary for a successful migration and store this information in the
@@ -91,7 +91,7 @@ def guess_external_locations(cfg: MigrationConfig):
 
 
 @task("assessment", depends_on=[setup_schema])
-def assess_jobs(cfg: MigrationConfig):
+def assess_jobs(cfg: WorkspaceConfig):
     """This module scans through all the jobs and identifies those that are not compatible with UC.
     It looks for:
       - Clusters with DBR version earlier than 11.3
@@ -105,7 +105,7 @@ def assess_jobs(cfg: MigrationConfig):
 
 
 @task("assessment", depends_on=[setup_schema])
-def assess_clusters(cfg: MigrationConfig):
+def assess_clusters(cfg: WorkspaceConfig):
     """This module scan through all the clusters and identifies those that are not compatible with UC.
     It looks for:
       - Clusters with DBR version earlier than 11.3
@@ -119,7 +119,7 @@ def assess_clusters(cfg: MigrationConfig):
 
 
 @task("assessment", depends_on=[setup_schema])
-def crawl_permissions(cfg: MigrationConfig):
+def crawl_permissions(cfg: WorkspaceConfig):
     """As we commence the intricate migration process from Hive Metastore to the Databricks Unity Catalog, a critical
     element of this transition is the thorough examination and preservation of permissions linked to a wide array of
     Databricks Workspace components. These components encompass a broad spectrum of resources, including clusters,
@@ -142,7 +142,7 @@ def crawl_permissions(cfg: MigrationConfig):
     depends_on=[crawl_grants, crawl_permissions, guess_external_locations, assess_jobs, assess_clusters],
     dashboard="assessment",
 )
-def assessment_report(_: MigrationConfig):
+def assessment_report(_: WorkspaceConfig):
     """This meticulously prepared report serves the purpose of evaluating and gauging the preparedness of a specific
     workspace for a smooth transition to the Unity Catalog.
 
@@ -164,7 +164,7 @@ def assessment_report(_: MigrationConfig):
 
 
 @task("migrate-groups", depends_on=[crawl_permissions])
-def migrate_permissions(cfg: MigrationConfig):
+def migrate_permissions(cfg: WorkspaceConfig):
     """As we embark on the complex journey of migrating from Hive Metastore to the Databricks Unity Catalog,
     a crucial phase in this transition involves the careful management of permissions.
     This intricate process entails several key steps: first, applying permissions to designated backup groups;
@@ -185,7 +185,9 @@ def migrate_permissions(cfg: MigrationConfig):
     workflows, and ensures a smooth migration experience for both users and administrators. By executing this precise
     operation, we not only meet data security and governance standards but also enhance the overall efficiency and
     manageability of our data ecosystem, laying the foundation for a new era of data management excellence within our
-    organization."""
+    organization.
+
+    See [interactive tutorial here](https://app.getreprise.com/launch/myM3VNn/)."""
     toolkit = GroupMigrationToolkit(cfg)
     toolkit.prepare_environment()
     toolkit.apply_permissions_to_backup_groups()
@@ -194,7 +196,7 @@ def migrate_permissions(cfg: MigrationConfig):
 
 
 @task("migrate-groups-cleanup", depends_on=[migrate_permissions])
-def delete_backup_groups(cfg: MigrationConfig):
+def delete_backup_groups(cfg: WorkspaceConfig):
     """Removes workspace-level backup groups"""
     toolkit = GroupMigrationToolkit(cfg)
     toolkit.prepare_environment()
@@ -202,7 +204,7 @@ def delete_backup_groups(cfg: MigrationConfig):
 
 
 @task("destroy-schema")
-def destroy_schema(cfg: MigrationConfig):
+def destroy_schema(cfg: WorkspaceConfig):
     """Removes the `$inventory` database"""
     RuntimeBackend().execute(f"DROP DATABASE {cfg.inventory_database} CASCADE")
 

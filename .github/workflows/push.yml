@@ -40,12 +40,27 @@ jobs:
       - name: Install hatch
         run: pip install hatch==$HATCH_VERSION
 
-      - name: Verify linting
-        run: hatch run lint:verify
-
       - name: Run unit tests
         run: hatch run unit:test
 
       - name: Publish test coverage
         uses: codecov/codecov-action@v1
 
+  fmt:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v3
+
+      - name: Install Python
+        uses: actions/setup-python@v4
+        with:
+          cache: 'pip'
+          cache-dependency-path: '**/pyproject.toml'
+          python-version: 3.10.x
+
+      - name: Install hatch
+        run: pip install hatch==$HATCH_VERSION
+
+      - name: Verify linting
+        run: hatch run lint:verify

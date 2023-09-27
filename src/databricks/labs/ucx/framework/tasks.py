@@ -4,7 +4,7 @@ from dataclasses import dataclass
 from functools import wraps
 from pathlib import Path
 
-from databricks.labs.ucx.config import MigrationConfig
+from databricks.labs.ucx.config import WorkspaceConfig
 from databricks.labs.ucx.framework.logger import _install
 
 _TASKS: dict[str, "Task"] = {}
@@ -12,10 +12,11 @@ _TASKS: dict[str, "Task"] = {}
 
 @dataclass
 class Task:
+    task_id: int
     workflow: str
     name: str
     doc: str
-    fn: Callable[[MigrationConfig], None]
+    fn: Callable[[WorkspaceConfig], None]
     depends_on: list[str] = None
     job_cluster: str = "main"
     notebook: str = None
@@ -54,6 +55,7 @@ def task(workflow, *, depends_on=None, job_cluster="main", notebook: str | None 
             raise SyntaxError(msg)
 
         _TASKS[func.__name__] = Task(
+            task_id=len(_TASKS),
             workflow=workflow,
             name=func.__name__,
             doc=func.__doc__,
@@ -85,7 +87,7 @@ def trigger(*argv):
 
     _install()
 
-    cfg = MigrationConfig.from_file(Path(args["config"]))
+    cfg = WorkspaceConfig.from_file(Path(args["config"]))
     logging.getLogger("databricks").setLevel(cfg.log_level)
 
     current_task.fn(cfg)

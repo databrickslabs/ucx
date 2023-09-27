@@ -18,14 +18,14 @@ from databricks.sdk.service.sql import (
 )
 from databricks.sdk.service.workspace import ImportFormat, ObjectInfo
 
-from databricks.labs.ucx.config import GroupsConfig, MigrationConfig
+from databricks.labs.ucx.config import GroupsConfig, WorkspaceConfig
 from databricks.labs.ucx.framework.dashboards import DashboardFromFiles
-from databricks.labs.ucx.install import Installer
+from databricks.labs.ucx.install import WorkspaceInstaller
 
 
 def test_build_wheel(mocker, tmp_path):
     ws = mocker.Mock()
-    install = Installer(ws)
+    install = WorkspaceInstaller(ws)
     whl = install._build_wheel(str(tmp_path))
     assert os.path.exists(whl)
 
@@ -43,7 +43,7 @@ def test_save_config(mocker):
         EndpointInfo(id="abc", warehouse_type=EndpointInfoWarehouseType.PRO, state=State.RUNNING)
     ]
 
-    install = Installer(ws)
+    install = WorkspaceInstaller(ws)
     install._choice = lambda _1, _2: "None (abc, PRO, RUNNING)"
     install._configure()
 
@@ -74,7 +74,7 @@ def test_save_config_with_error(mocker):
     ws.config.host = "https://foo"
     ws.workspace.get_status = not_found
 
-    install = Installer(ws)
+    install = WorkspaceInstaller(ws)
     with pytest.raises(DatabricksError) as e_info:
         install._configure()
     assert str(e_info.value.error_code) == "RAISED_FOR_TESTING"
@@ -99,7 +99,7 @@ def test_save_config_auto_groups(mocker):
         EndpointInfo(id="abc", warehouse_type=EndpointInfoWarehouseType.PRO, state=State.RUNNING)
     ]
 
-    install = Installer(ws)
+    install = WorkspaceInstaller(ws)
     install._question = mock_question
     install._choice = lambda _1, _2: "None (abc, PRO, RUNNING)"
     install._configure()
@@ -139,7 +139,7 @@ def test_save_config_strip_group_names(mocker):
         EndpointInfo(id="abc", warehouse_type=EndpointInfoWarehouseType.PRO, state=State.RUNNING)
     ]
 
-    install = Installer(ws)
+    install = WorkspaceInstaller(ws)
     install._question = mock_question
     install._choice = lambda _1, _2: "None (abc, PRO, RUNNING)"
     install._configure()
@@ -171,7 +171,7 @@ def test_main_with_existing_conf_does_not_recreate_config(mocker):
     ws.current_user.me = lambda: iam.User(user_name="me@example.com", groups=[iam.ComplexValue(display="admins")])
     ws.config.host = "https://foo"
     ws.config.is_aws = True
-    config_bytes = yaml.dump(MigrationConfig(inventory_database="a", groups=GroupsConfig(auto=True)).as_dict()).encode(
+    config_bytes = yaml.dump(WorkspaceConfig(inventory_database="a", groups=GroupsConfig(auto=True)).as_dict()).encode(
         "utf8"
     )
     ws.workspace.download = lambda _: io.BytesIO(config_bytes)
@@ -183,7 +183,7 @@ def test_main_with_existing_conf_does_not_recreate_config(mocker):
     ws.query_visualizations.create.return_value = Visualization(id="abc")
     ws.dashboard_widgets.create.return_value = Widget(id="abc")
 
-    install = Installer(ws)
+    install = WorkspaceInstaller(ws)
     install._build_wheel = lambda _: Path(__file__)
     install.run()
 
@@ -193,14 +193,14 @@ def test_main_with_existing_conf_does_not_recreate_config(mocker):
 
 def test_query_metadata(mocker):
     ws = mocker.Mock()
-    install = Installer(ws)
+    install = WorkspaceInstaller(ws)
     local_query_files = install._find_project_root() / "src/databricks/labs/ucx/assessment/queries"
     DashboardFromFiles(ws, local_query_files, "any", "any").validate()
 
 
 def test_choices_out_of_range(mocker):
     ws = mocker.Mock()
-    install = Installer(ws)
+    install = WorkspaceInstaller(ws)
     mocker.patch("builtins.input", return_value="42")
     with pytest.raises(ValueError):
         install._choice("foo", ["a", "b"])
@@ -208,7 +208,7 @@ def test_choices_out_of_range(mocker):
 
 def test_choices_not_a_number(mocker):
     ws = mocker.Mock()
-    install = Installer(ws)
+    install = WorkspaceInstaller(ws)
     mocker.patch("builtins.input", return_value="two")
     with pytest.raises(ValueError):
         install._choice("foo", ["a", "b"])
@@ -216,7 +216,60 @@ def test_choices_not_a_number(mocker):
 
 def test_choices_happy(mocker):
     ws = mocker.Mock()
-    install = Installer(ws)
+    install = WorkspaceInstaller(ws)
     mocker.patch("builtins.input", return_value="1")
     res = install._choice("foo", ["a", "b"])
     assert "b" == res
+
+
+def test_step_list(mocker):
+    ws = mocker.Mock()
+    from databricks.labs.ucx.framework.tasks import Task
+
+    tasks = [
+        Task(task_id=0, workflow="wl_1", name="n3", doc="d3", fn=lambda: None),
+        Task(task_id=1, workflow="wl_2", name="n2", doc="d2", fn=lambda: None),
+        Task(task_id=2, workflow="wl_1", name="n1", doc="d1", fn=lambda: None),
+    ]
+
+    with mocker.patch.object(WorkspaceInstaller, attribute="_sorted_tasks", return_value=tasks):
+        install = WorkspaceInstaller(ws)
+        steps = install._step_list()
+    assert len(steps) == 2
+    assert steps[0] == "wl_1" and steps[1] == "wl_2"
+
+
+def test_create_readme(mocker):
+    mocker.patch("builtins.input", return_value="yes")
+    webbrowser_open = mocker.patch("webbrowser.open")
+    ws = mocker.Mock()
+
+    ws.current_user.me = lambda: iam.User(user_name="me@example.com", groups=[iam.ComplexValue(display="admins")])
+    ws.config.host = "https://foo"
+    config_bytes = yaml.dump(WorkspaceConfig(inventory_database="a", groups=GroupsConfig(auto=True)).as_dict()).encode(
+        "utf8"
+    )
+    ws.workspace.download = lambda _: io.BytesIO(config_bytes)
+
+    from databricks.labs.ucx.framework.tasks import Task
+
+    tasks = [
+        Task(task_id=0, workflow="wl_1", name="n3", doc="d3", fn=lambda: None),
+        Task(task_id=1, workflow="wl_2", name="n2", doc="d2", fn=lambda: None),
+        Task(task_id=2, workflow="wl_1", name="n1", doc="d1", fn=lambda: None),
+    ]
+
+    with mocker.patch.object(WorkspaceInstaller, attribute="_sorted_tasks", return_value=tasks):
+        install = WorkspaceInstaller(ws)
+        install._deployed_steps = {"wl_1": 1, "wl_2": 2}
+        install._create_readme()
+
+    webbrowser_open.assert_called_with("https://foo/#workspace/Users/me@example.com/.ucx/README.py")
+
+    _, args, kwargs = ws.mock_calls[0]
+    assert args[0] == "/Users/me@example.com/.ucx/README.py"
+
+    import re
+
+    p = re.compile(".*wl_1.*n3.*n1.*wl_2.*n2.*")
+    assert p.match(str(args[1]))

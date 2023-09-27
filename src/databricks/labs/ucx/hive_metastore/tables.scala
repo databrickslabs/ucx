@@ -1,3 +1,6 @@
+import java.util.concurrent.ConcurrentLinkedQueue
+import scala.collection.JavaConverters
+
 import org.apache.spark.sql.catalyst.analysis.NoSuchDatabaseException
 import org.apache.spark.sql.catalyst.catalog.{CatalogTable, CatalogTableType}
 import org.apache.spark.sql.DataFrame
@@ -6,7 +9,12 @@ import org.apache.spark.sql.DataFrame
 case class TableDetails(catalog: String, database: String, name: String, object_type: String,
                         table_format: String, location: String, view_text: String)
 
-def metadataForAllTables(databases: Seq[String]): DataFrame = {
+// recording error log in the database
+case class TableError(catalog: String, database: String, name: String, error: String)
+
+val failures = new ConcurrentLinkedQueue[TableError]()
+
+def metadataForAllTables(databases: Seq[String], queue: ConcurrentLinkedQueue[TableError]): DataFrame = {
   import spark.implicits._
 
   val externalCatalog = spark.sharedState.externalCatalog
@@ -15,17 +23,17 @@ def metadataForAllTables(databases: Seq[String]): DataFrame = {
       externalCatalog.listTables(databaseName)
     } catch {
       case err: NoSuchDatabaseException =>
-        println(s"[ERROR][${databaseName}] ignoring database because of ${err}")
+        failures.add(TableError("hive_metastore", databaseName, null, s"ignoring database because of ${err}"))
         null
     }
     if (tables == null) {
-      println(s"[WARN][${databaseName}] listTables returned null")
+      failures.add(TableError("hive_metastore", databaseName, null, s"listTables returned null"))
       Seq()
     } else {
       tables.par.map(tableName => try {
         val table = externalCatalog.getTable(databaseName, tableName)
         if (table == null) {
-          println(s"[WARN][${databaseName}.${tableName}] result is null")
+          failures.add(TableError("hive_metastore", databaseName, tableName, s"result is null"))
           None
         } else {
           Some(TableDetails("hive_metastore", databaseName, tableName, table.tableType.name, table.provider.orNull,
@@ -33,7 +41,7 @@ def metadataForAllTables(databases: Seq[String]): DataFrame = {
         }
       } catch {
         case err: Throwable =>
-          println(s"[ERROR][${databaseName}.${tableName}] ignoring table because of ${err}")
+          failures.add(TableError("hive_metastore", databaseName, tableName, s"ignoring table because of ${err}"))
           None
       }).toList.collect {
         case Some(x) => x
@@ -45,5 +53,8 @@ def metadataForAllTables(databases: Seq[String]): DataFrame = {
 dbutils.widgets.text("inventory_database", "ucx")
 val inventoryDatabase = dbutils.widgets.get("inventory_database")
 
-val df = metadataForAllTables(spark.sharedState.externalCatalog.listDatabases())
+val df = metadataForAllTables(spark.sharedState.externalCatalog.listDatabases(), failures)
 df.write.mode("overwrite").option("overwriteSchema", "true").saveAsTable(s"$inventoryDatabase.tables")
+
+JavaConverters.asScalaIteratorConverter(failures.iterator).asScala.toList.toDF
+  .write.mode("overwrite").option("overwriteSchema", "true").saveAsTable(s"$inventoryDatabase.table_failures")
