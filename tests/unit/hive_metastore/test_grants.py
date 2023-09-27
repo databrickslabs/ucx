@@ -1,6 +1,5 @@
 import pytest
 
-from databricks.labs.ucx.config import GroupsConfig, WorkspaceConfig
 from databricks.labs.ucx.hive_metastore.grants import Grant, GrantsCrawler
 from databricks.labs.ucx.hive_metastore.tables import TablesCrawler
 from databricks.labs.ucx.mixins.sql import Row
@@ -140,8 +139,7 @@ ROWS = {
 
 def test_crawler_no_data():
     b = MockBackend()
-    workspace_cfg = WorkspaceConfig(groups=GroupsConfig(auto=True), inventory_database="schema")
-    table = TablesCrawler(b, workspace_cfg)
+    table = TablesCrawler(b, "schema")
     crawler = GrantsCrawler(table)
     grants = crawler.snapshot()
     assert len(grants) == 0
@@ -174,8 +172,7 @@ def test_crawler_crawl():
             ],
         }
     )
-    workspace_cfg = WorkspaceConfig(groups=GroupsConfig(auto=True), inventory_database="schema")
-    table = TablesCrawler(b, workspace_cfg)
+    table = TablesCrawler(b, "schema")
     crawler = GrantsCrawler(table)
     grants = crawler.snapshot()
     assert len(grants) == 3
@@ -184,14 +181,13 @@ def test_crawler_crawl():
 def test_crawler_snapshot():
     # Test with no data
     b = MockBackend()
-    workspace_cfg = WorkspaceConfig(groups=GroupsConfig(auto=True), inventory_database="schema")
-    table = TablesCrawler(b, workspace_cfg)
+    table = TablesCrawler(b, "schema")
     crawler = GrantsCrawler(table)
     snapshot = crawler.snapshot()
     assert len(snapshot) == 0
     # Test with test data
     b = MockBackend(rows=ROWS)
-    table = TablesCrawler(b, workspace_cfg)
+    table = TablesCrawler(b, "schema")
     crawler = GrantsCrawler(table)
     snapshot = crawler.snapshot()
     assert len(snapshot) == 3
@@ -214,8 +210,8 @@ def test_grants_returning_error_when_describing():
             ("Type", "delta", ""),
         ],
     }
-    workspace_cfg = WorkspaceConfig(groups=GroupsConfig(auto=True), inventory_database="default")
-    tc = TablesCrawler(MockBackend(fails_on_first=errors, rows=rows), workspace_cfg)
+
+    tc = TablesCrawler(MockBackend(fails_on_first=errors, rows=rows), "default")
     crawler = GrantsCrawler(tc)
 
     results = crawler._crawl()
