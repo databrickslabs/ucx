@@ -3,7 +3,6 @@ import os
 
 from databricks.sdk import WorkspaceClient
 
-from databricks.labs.ucx.config import GroupsConfig, WorkspaceConfig
 from databricks.labs.ucx.framework.crawlers import StatementExecutionBackend
 from databricks.labs.ucx.hive_metastore import GrantsCrawler, TablesCrawler
 
