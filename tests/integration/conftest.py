@@ -82,13 +82,13 @@ def test_catalog_fixture(make_catalog):
 
 @pytest.fixture
 def make_schema(sql_exec, make_random):
-    def create(*, catalog="hive_metastore", schema_name: str | None = None):
-        if schema_name is None:
-            schema_name = f"{catalog}.ucx_S{make_random(4)}".lower()
+    def create(*, catalog="hive_metastore", schema: str | None = None):
+        if schema is None:
+            schema = f"{catalog}.ucx_S{make_random(4)}".lower()
         else:
-            schema_name = f"{catalog}.{schema_name}"
-        sql_exec(f"CREATE SCHEMA {schema_name}")
-        return schema_name
+            schema = f"{catalog}.{schema}"
+        sql_exec(f"CREATE SCHEMA {schema}")
+        return schema
 
     yield from factory(  # noqa: F405
         "schema", create, lambda schema_name: sql_exec(f"DROP SCHEMA IF EXISTS {schema_name} CASCADE")

@@ -30,8 +30,7 @@ def test_all_grants_in_databases(ws: WorkspaceClient, sql_exec, make_catalog, ma
     _, inventory_schema = inventory_schema.split(".")
 
     backend = StatementExecutionBackend(ws, warehouse_id)
-    workspace_cfg = WorkspaceConfig(groups=GroupsConfig(auto=True), inventory_database=inventory_schema)
-    tables = TablesCrawler(backend, workspace_cfg)
+    tables = TablesCrawler(backend)
     grants = GrantsCrawler(tables)
 
     all_grants = {}
