@@ -221,6 +221,24 @@ def test_migrate_views_should_have_appropriate_sql():
         "ALTER VIEW hive_metastore.db1.view_1 SET TBLPROPERTIES ('upgraded_to' = 'target_catalog.db1.view_1');",
     ]
 
+def test_migrate_tables_already_migrated_should_be_skipped():
+    errors = {}
+    rows = {
+        "SELECT": [
+            ("hive_metastore", "db1", "managed", "MANAGED", "DELTA", None, None, "[delta.checkpoint.writeStatsAsJson=false,upgraded_to=target_catalog.db1.view_1]"),
+        ],
+    }
+    backend = MockBackend(fails_on_first=errors, rows=rows)
+    workspace_cfg = WorkspaceConfig(
+        default_catalog="target_catalog", groups=GroupsConfig(auto=True), inventory_database="inventory_database"
+    )
+    tc = TablesCrawler(backend, workspace_cfg)
+    tc.migrate_tables()
+
+    assert (list(backend.queries)) == [
+        "SELECT * FROM hive_metastore.inventory_database.tables"
+    ]
+
 
 def test_external_tables_returning_error_should_be_catched_and_logged():
     errors = {}

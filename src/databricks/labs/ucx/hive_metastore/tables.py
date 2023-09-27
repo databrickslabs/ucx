@@ -33,6 +33,7 @@ class Table:
 
     location: str = None
     view_text: str = None
+    table_properties: str = None
 
     @property
     def is_delta(self) -> bool:
@@ -146,6 +147,7 @@ class TablesCrawler(CrawlerBase):
                 table_format=describe.get("Provider", "").upper(),
                 location=describe.get("Location", None),
                 view_text=describe.get("View Text", None),
+                table_properties=describe.get("Table Properties", None),
             )
         except Exception as e:
             logger.error(f"Couldn't fetch information for table {full_name} : {e}")
@@ -154,13 +156,19 @@ class TablesCrawler(CrawlerBase):
     def migrate_tables(self):
         if self._workspace_config.database_to_catalog_mapping:
             for table in self._fetch_tables():
-                target_catalog = self._workspace_config.database_to_catalog_mapping.get(
-                    table.database, self._workspace_config.default_catalog
-                )
-                self._migrate_table(target_catalog, table)
+                if table.table_properties and "upgraded_to" in table.table_properties:
+                    logger.info(f"Table {table.key} already migrated, skipping")
+                else:
+                    target_catalog = self._workspace_config.database_to_catalog_mapping.get(
+                        table.database, self._workspace_config.default_catalog
+                    )
+                    self._migrate_table(target_catalog, table)
         else:
             for table in self._fetch_tables():
-                self._migrate_table(self._workspace_config.default_catalog, table)
+                if table.table_properties and "upgraded_to" in table.table_properties:
+                    logger.info(f"Table {table.key} already migrated, skipping")
+                else:
+                    self._migrate_table(self._workspace_config.default_catalog, table)
 
     def _fetch_tables(self):
         try:
