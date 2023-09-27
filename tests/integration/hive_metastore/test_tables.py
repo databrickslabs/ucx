@@ -7,7 +7,7 @@ from databricks.labs.ucx.framework.crawlers import StatementExecutionBackend
 from databricks.labs.ucx.hive_metastore import TablesCrawler
 
 logger = logging.getLogger(__name__)
-logging.getLogger("databricks").setLevel("DEBUG")
+
 
 def test_describe_all_tables_in_databases(ws: WorkspaceClient, make_catalog, make_schema, make_table):
     warehouse_id = os.environ["TEST_DEFAULT_WAREHOUSE_ID"]

@@ -1,6 +1,6 @@
 import json
-from dataclasses import dataclass
 import re
+from dataclasses import dataclass
 
 from databricks.sdk import WorkspaceClient
 from databricks.sdk.service.compute import ClusterSource
@@ -14,19 +14,14 @@ INCOMPATIBLE_SPARK_CONFIG_KEYS = [
     "spark.databricks.hive.metastore.glueCatalog.enabled",
 ]
 
-AZURE_SP_CLUSTER_CONF = ["fs.azure.account.key",
-                         "fs.azure.account.auth.type",
-                         "fs.azure.account.oauth.provider.type",
-                         "fs.azure.account.oauth2.client.id",
-                         "fs.azure.account.oauth2.client.secret",
-                         "fs.azure.account.oauth2.client.endpoint"]
-
-AZURE_CLUSTER_POLICY = ["spark_conf.fs.azure.account.auth.type",
-                        "spark_conf.fs.azure.account.oauth.provider.type",
-                        "spark_conf.fs.azure.account.oauth2.client.id",
-                        "spark_conf.fs.azure.account.oauth2.client.secret",
-                        "spark_conf.fs.azure.account.oauth2.client.endpoint",
-                        "spark_conf.spark.databricks.cluster.profile"]
+_AZURE_SP_CLUSTER_CONF = [
+    "fs.azure.account.key",
+    "fs.azure.account.auth.type",
+    "fs.azure.account.oauth.provider.type",
+    "fs.azure.account.oauth2.client.id",
+    "fs.azure.account.oauth2.client.secret",
+    "fs.azure.account.oauth2.client.endpoint",
+]
 
 
 @dataclass
@@ -65,6 +60,7 @@ def spark_version_compatibility(spark_version: str) -> str:
         return "kinda works"
     return "supported"
 
+
 class ClustersCrawler(CrawlerBase):
     def __init__(self, ws: WorkspaceClient, sbe: SqlBackend, schema):
         super().__init__(sbe, "hive_metastore", schema, "clusters")
@@ -74,8 +70,11 @@ class ClustersCrawler(CrawlerBase):
         all_clusters = list(self._ws.clusters.list())
         return list(self._assess_clusters(all_clusters))
 
-    def _get_cluster_policy(self, policy_id):
-        return self._ws.cluster_policies.get(policy_id).as_dict()
+    def _get_cluster_policy_definition(self, policy_id):
+        return str(self._ws.cluster_policies.get(policy_id).definition)
+
+    def _get_cluster_family_definition(self, policy_id):
+        return str(self._ws.cluster_policies.get(policy_id).policy_family_definition_overrides)
 
     def _assess_clusters(self, all_clusters):
         for cluster in all_clusters:
@@ -84,10 +83,10 @@ class ClustersCrawler(CrawlerBase):
             cluster_info = ClusterInfo(cluster.cluster_id, cluster.cluster_name, cluster.creator_user_name, 1, "")
             support_status = spark_version_compatibility(cluster.spark_version)
             failures = []
-            confList = []
-            clusterDict = {}
-            confPolicyList = []
-            clusterPolicyDict = {}
+            conf_list = []
+            cluster_dict = {}
+            conf_policy_list = []
+            cluster_policy_dict = {}
             if support_status != "supported":
                 failures.append(f"not supported DBR: {cluster.spark_version}")
 
@@ -102,26 +101,28 @@ class ClustersCrawler(CrawlerBase):
 
                 # Checking if Azure cluster config is present in spark config
                 for key, value in cluster.spark_conf.items():
-                    for conf in AZURE_SP_CLUSTER_CONF:
+                    for conf in _AZURE_SP_CLUSTER_CONF:
                         if re.search(conf, key):
-                            confList += [{key: value}]
-                if confList:
-                    clusterDict['clusterName'] = cluster.cluster_name
-                    clusterDict['clusterSparkConf'] = confList
-                    failures.append(clusterDict)
+                            conf_list += [{key: value}]
+                if conf_list:
+                    cluster_dict["clusterName"] = cluster.cluster_name
+                    cluster_dict["clusterSparkConf"] = conf_list
+                    failures.append(json.dumps(cluster_dict))
 
             # Checking if Azure cluster config is present in cluster policies
             if cluster.policy_id:
-                policy_defn = self._get_cluster_policy(cluster.policy_id)
-                for key, value in policy_defn.items():
-                    if key == 'definition' or key == 'policy_family_definition_overrides':
-                        for pol in AZURE_CLUSTER_POLICY:
-                            if re.search(pol, str(value)):
-                                confPolicyList += [{key: value}]
-                if confPolicyList:
-                    clusterPolicyDict['clusterName'] = cluster.cluster_name
-                    clusterPolicyDict['clusterSparkConf'] = confPolicyList
-                    failures.append(clusterPolicyDict)
+                cluster_policy_definition = self._get_cluster_policy_definition(cluster.policy_id)
+                cluster_family_definition = self._get_cluster_family_definition(cluster.policy_id)
+                for pol in _AZURE_SP_CLUSTER_CONF:
+                    if re.search("spark_conf." + pol, cluster_policy_definition):
+                        conf_policy_list += [{"definition": cluster_policy_definition}]
+                    if re.search("spark_conf." + pol, cluster_family_definition):
+                        conf_policy_list += [{"policy_family_definition_overrides": cluster_family_definition}]
+
+                if conf_policy_list:
+                    cluster_policy_dict["clusterName"] = cluster.cluster_name
+                    cluster_policy_dict["clusterPolicy"] = conf_policy_list
+                    failures.append(json.dumps(cluster_policy_dict))
 
             cluster_info.failures = json.dumps(failures)
             if len(failures) > 0:

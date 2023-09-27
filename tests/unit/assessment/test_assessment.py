@@ -133,9 +133,13 @@ def test_cluster_assessment(mocker):
             cluster_name="Tech Summit FY24 Cluster",
             autoscale=AutoScale(min_workers=1, max_workers=6),
             spark_conf={
-                "spark.hadoop.fs.azure.account.oauth2.client.id.ggwstdlrs.dfs.core.windows.net": "{{secrets/ggwiebe/sp_app_client_id}}",
-                "spark.hadoop.fs.azure.account.oauth2.client.endpoint.ggwstdlrs.dfs.core.windows.net": "https://login.microsoftonline.com/9f37a392-f0ae-4280-9796-f1864a10effc/oauth2/token",
-                "spark.hadoop.fs.azure.account.oauth2.client.secret.ggwstdlrs.dfs.core.windows.net": "{{secrets/ggwiebe/sp_secret}}"},
+                "spark.hadoop.fs.azure.account."
+                "oauth2.client.id.abcde.dfs.core.windows.net": "{{secrets/abcff/sp_app_client_id}}",
+                "spark.hadoop.fs.azure.account."
+                "oauth2.client.endpoint.abcde.dfs.core.windows.net": "https://login.microsoftonline.com/dedededede/token",
+                "spark.hadoop.fs.azure.account."
+                "oauth2.client.secret.abcde.dfs.core.windows.net": "{{secrets/abcff/sp_secret}}",
+            },
             spark_context_id=5134472582179565315,
             spark_env_vars=None,
             spark_version="13.3.x-cpu-ml-scala2.12",
@@ -149,14 +153,28 @@ def test_cluster_assessment(mocker):
             policy_id="D96308F1BF0003A7",
             spark_version="13.3.x-cpu-ml-scala2.12",
             cluster_id="0915-190044-3dqy6751",
-        )
+        ),
     ]
 
     ws = mocker.Mock()
     mock_cluster_policy = mocker.Mock()
-    mock_cluster_policy.as_dict.return_value = {
-        "definition": '{\n  "spark_conf.fs.azure.account.auth.type": {\n    "type": "fixed",\n    "value": "OAuth",\n    "hidden": true\n  }'}
-    ws.cluster_policies.get.return_value = mock_cluster_policy
+    mock_cluster_policy.return_value = (
+        '{\n  "spark_conf.fs.azure.account.auth.type": {\n    '
+        '"type": "fixed",\n    "value": "OAuth",\n   '
+        ' "hidden": true\n  },\n  "spark_conf.fs.azure.account.oauth.provider.type": {\n   '
+        ' "type": "fixed",\n    "value": '
+        '"org.apache.hadoop.fs.azurebfs.oauth2.ClientCredsTokenProvider",\n    '
+        '"hidden": true\n  },\n  "spark_conf.fs.azure.account.oauth2.client.id": {\n    '
+        '"type": "fixed",\n    "value": "fsfsfsfsffsfsf",\n    "hidden": true\n  },\n  '
+        '"spark_conf.fs.azure.account.oauth2.client.secret": {\n    "type": "fixed",\n    '
+        '"value": "gfgfgfgfggfggfgfdds",\n    "hidden": true\n  },\n  '
+        '"spark_conf.fs.azure.account.oauth2.client.endpoint": {\n    '
+        '"type": "fixed",\n    '
+        '"value": "https://login.microsoftonline.com/1234ededed/oauth2/token",\n    '
+        '"hidden": true\n  }\n}'
+    )
+
+    ws.cluster_policies.get.cluster_policy_definition = mock_cluster_policy
 
     crawler = ClustersCrawler(ws, MockBackend(), "ucx")._assess_clusters(sample_clusters)
     result_set = list(crawler)
@@ -165,10 +183,10 @@ def test_cluster_assessment(mocker):
     assert result_set[0].success == 1
     assert result_set[1].success == 0
     assert result_set[2].success == 0
-    assert result_set[3].success == 0
+    assert result_set[3].success == 1
 
 
-def test_cluster_assessment_1(mocker):
+def test_cluster_assessment_cluster_policy_no_spark_conf(mocker):
     sample_clusters1 = [
         ClusterDetails(
             cluster_name="Tech Summit FY24 Cluster-2",
@@ -182,9 +200,12 @@ def test_cluster_assessment_1(mocker):
     ]
     ws = mocker.Mock()
     mock_cluster_policy = mocker.Mock()
-    mock_cluster_policy.as_dict.return_value = {
-        "definition": '{"node_type_id":{"type":"allowlist","values":["Standard_DS3_v2","Standard_DS4_v2","Standard_DS5_v2","Standard_NC4as_T4_v3"],"defaultValue":"Standard_DS3_v2"}'}
-    ws.cluster_policies.get.return_value = mock_cluster_policy
+    mock_cluster_policy.return_value = {
+        "definition": '{"node_type_id":{"type":"allowlist",'
+        '"values":["Standard_DS3_v2","Standard_DS4_v2","Standard_DS5_v2","Standard_NC4as_T4_v3"],'
+        '"defaultValue":"Standard_DS3_v2"}'
+    }
+    ws.cluster_policies.get.cluster_policy_definition = mock_cluster_policy
 
     crawler = ClustersCrawler(ws, MockBackend(), "ucx")._assess_clusters(sample_clusters1)
     result_set1 = list(crawler)
