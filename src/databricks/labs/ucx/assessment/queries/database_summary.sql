@@ -5,7 +5,7 @@ SELECT `database`,
        SUM(is_view) AS views,
        SUM(is_dbfs_root) AS dbfs_root,
        SUM(is_delta) AS delta_tables,
-       SUM(upgrade_status) AS upgraded_tables
+       SUM(upgrade_status) AS upgraded_tables,
        CASE
            WHEN (SUM(upgrade_status) = SUM(is_table)) THEN "Fully Upgraded"
            WHEN (SUM(is_dbfs_root)/SUM(is_table) > .3) THEN "Asset Replication Required"
