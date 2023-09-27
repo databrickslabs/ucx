@@ -74,7 +74,7 @@ def test_jobs_with_no_inventory_database(
     logger.info(f"cluster_policy={cluster_policy}, job={job}, ")
 
     inventory_database = f"ucx_{make_random(4)}"
-    install = WorkspaceInstaller.run_for_config(
+    install = WorkspaceInstaller.for_config(
         ws,
         WorkspaceConfig(
             inventory_database=inventory_database,
@@ -83,7 +83,7 @@ def test_jobs_with_no_inventory_database(
             log_level="DEBUG",
         ),
         prefix=make_random(4),
-    )
+    ).run()
 
     try:
         for step in ["assessment", "migrate-groups", "migrate-groups-cleanup"]:

@@ -10,17 +10,26 @@ from pathlib import Path
 from typing import Any
 
 import yaml
-from databricks.sdk import WorkspaceClient
+from databricks.sdk import AccountClient, WorkspaceClient
 from databricks.sdk.core import DatabricksError
 from databricks.sdk.service import compute, jobs
 from databricks.sdk.service.sql import EndpointInfoWarehouseType, SpotInstancePolicy
 from databricks.sdk.service.workspace import ImportFormat
 
 from databricks.labs.ucx.__about__ import __version__
-from databricks.labs.ucx.config import GroupsConfig, WorkspaceConfig
+from databricks.labs.ucx.account.workspaces import AzureWorkspaceLister, Workspaces
+from databricks.labs.ucx.config import (
+    AccountConfig,
+    ConnectConfig,
+    GroupsConfig,
+    WorkspaceConfig,
+)
 from databricks.labs.ucx.framework.dashboards import DashboardFromFiles
 from databricks.labs.ucx.framework.tasks import _TASKS, Task
 from databricks.labs.ucx.runtime import main
+from databricks.labs.ucx.workspace_access.groups import GroupManager
+
+MAX_ATTEMPTS = 5
 
 TAG_STEP = "step"
 TAG_APP = "App"
@@ -60,6 +69,61 @@ print(__version__)
 logger = logging.getLogger(__name__)
 
 
+class Prompts:
+    def multi_select_from_dict(self, all_prompt: str, item_prompt: str, choices: dict[str, Any]) -> list[Any]:
+        selected = []
+        if self.question(all_prompt, default="no") == "yes":
+            return selected
+        dropdown = {"[DONE]": "done"} | choices
+        while True:
+            key = self.choice(item_prompt, list(dropdown.keys()))
+            if key == "done":
+                break
+            selected.append(choices[key])
+            del dropdown[key]
+            if len(selected) == len(choices):
+                # we've selected everything
+                break
+        return selected
+
+    def choice_from_dict(self, text: str, choices: dict[str, Any]) -> Any:
+        key = self.choice(text, list(choices.keys()))
+        return choices[key]
+
+    def choice(self, text: str, choices: list[Any], *, max_attempts: int = 10) -> str:
+        if not self._prompts:
+            return "any"
+        choices = sorted(choices)
+        numbered = "\n".join(f"\033[1m[{i}]\033[0m \033[36m{v}\033[0m" for i, v in enumerate(choices))
+        prompt = f"\033[1m{text}\033[0m\n{numbered}\nEnter a number between 0 and {len(choices)-1}: "
+        attempt = 0
+        while attempt < max_attempts:
+            attempt += 1
+            res = input(prompt)
+            try:
+                res = int(res)
+            except ValueError:
+                print(f"\033[31m[ERROR] Invalid number: {res}\033[0m\n")
+                continue
+            if res >= len(choices) or res < 0:
+                print(f"\033[31m[ERROR] Out of range: {res}\033[0m\n")
+                continue
+            return choices[res]
+        msg = f"cannot get answer within {max_attempts} attempt"
+        raise ValueError(msg)
+
+    @staticmethod
+    def question(text: str, *, default: str | None = None) -> str:
+        default_help = "" if default is None else f"\033[36m (default: {default})\033[0m"
+        prompt = f"\033[1m{text}{default_help}: \033[0m"
+        res = None
+        while not res:
+            res = input(prompt)
+            if not res and default is not None:
+                return default
+        return res
+
+
 class WorkspaceInstaller:
     def __init__(self, ws: WorkspaceClient, *, prefix: str = "ucx", promtps: bool = True):
         if "DATABRICKS_RUNTIME_VERSION" in os.environ:
@@ -72,11 +136,6 @@ class WorkspaceInstaller:
         self._dashboards = {}
 
     def run(self):
-        logger.info(f"Installing UCX v{__version__}")
-        self._configure()
-        self._run_configured()
-
-    def _run_configured(self):
         self._create_dashboards()
         self._create_jobs()
         readme = f'{self._notebook_link(f"{self._install_folder}/README.py")}'
@@ -84,13 +143,11 @@ class WorkspaceInstaller:
         logger.info(msg)
 
     @staticmethod
-    def run_for_config(ws: WorkspaceClient, config: WorkspaceConfig, *, prefix="ucx") -> "WorkspaceInstaller":
+    def for_config(ws: WorkspaceClient, config: WorkspaceConfig, *, prefix="ucx") -> "WorkspaceInstaller":
         logger.info(f"Installing UCX v{__version__} on {ws.config.host}")
         workspace_installer = WorkspaceInstaller(ws, prefix=prefix, promtps=False)
         workspace_installer._config = config
         workspace_installer._write_config()
-        # TODO: rather introduce a method `is_configured`, as we may want to reconfigure workspaces for some reason
-        workspace_installer._run_configured()
         return workspace_installer
 
     def _create_dashboards(self):
@@ -332,43 +389,6 @@ class WorkspaceInstaller:
     def _notebook_link(self, path: str) -> str:
         return f"{self._ws.config.host}/#workspace{path}"
 
-    def _choice_from_dict(self, text: str, choices: dict[str, Any]) -> Any:
-        key = self._choice(text, list(choices.keys()))
-        return choices[key]
-
-    def _choice(self, text: str, choices: list[Any], *, max_attempts: int = 10) -> str:
-        if not self._prompts:
-            return "any"
-        choices = sorted(choices)
-        numbered = "\n".join(f"\033[1m[{i}]\033[0m \033[36m{v}\033[0m" for i, v in enumerate(choices))
-        prompt = f"\033[1m{text}\033[0m\n{numbered}\nEnter a number between 0 and {len(choices)-1}: "
-        attempt = 0
-        while attempt < max_attempts:
-            attempt += 1
-            res = input(prompt)
-            try:
-                res = int(res)
-            except ValueError:
-                print(f"\033[31m[ERROR] Invalid number: {res}\033[0m\n")
-                continue
-            if res >= len(choices) or res < 0:
-                print(f"\033[31m[ERROR] Out of range: {res}\033[0m\n")
-                continue
-            return choices[res]
-        msg = f"cannot get answer within {max_attempts} attempt"
-        raise ValueError(msg)
-
-    @staticmethod
-    def _question(text: str, *, default: str | None = None) -> str:
-        default_help = "" if default is None else f"\033[36m (default: {default})\033[0m"
-        prompt = f"\033[1m{text}{default_help}: \033[0m"
-        res = None
-        while not res:
-            res = input(prompt)
-            if not res and default is not None:
-                return default
-        return res
-
     def _upload_wheel(self) -> str:
         with tempfile.TemporaryDirectory() as tmp_dir:
             local_wheel = self._build_wheel(tmp_dir)
@@ -540,8 +560,152 @@ class WorkspaceInstaller:
         return deployed_steps
 
 
+class AccountInstaller:
+    def __init__(self):
+        self._prompts = Prompts()
+        self._account_config = AccountConfig(connect=ConnectConfig())
+        self._create_warehouses = False
+
+    @property
+    def _config_file(self):
+        return Path.home() / ".ucx/config.yml"
+
+    def run(self):
+        ac = self._get_account_client()
+        if ac.config.is_azure:
+            azure_workspace_lister = AzureWorkspaceLister(ac.config)
+            subs = azure_workspace_lister.subscriptions_name_to_id()
+            self._account_config.include_azure_subscription_ids = self._prompts.multi_select_from_dict(
+                f"You have access to {len(subs)} Azure Subscriptions. Type `yes` to select them all. Otherwise go "
+                f"through a wizard to select each subscription individually",
+                "Pick a subscription from a list and pick [DONE] when you are ready",
+                subs,
+            )
+
+        workspaces = self._workspaces()
+        workspace_name_to_id = {
+            f"{_.workspace_name} ({workspaces.host_for(_)})": _.workspace_name
+            for _ in self._workspaces().configured_workspaces()
+        }
+        self._account_config.include_workspace_names = self._prompts.multi_select_from_dict(
+            f"You have {len(workspace_name_to_id)} Databricks Workspaces. Type `yes` to select them all. Otherwise go "
+            f"through a wizard to select each subscription individually",
+            "Pick a Databricks Workspace from a list and pick [DONE] when you are ready",
+            workspace_name_to_id,
+        )
+
+        db = self._prompts.question(
+            "Database name to store UCX migration state per workspace. This value cannot be changed after",
+            default="ucx",
+        )
+        self._account_config.inventory_database = db
+
+        # reload with the new configuration
+        workspaces = self._workspaces()
+        configured_workspaces = workspaces.configured_workspaces()
+        logger.info(
+            f"UCX needs a Databricks SQL PRO Warehouse in each of {len(configured_workspaces)} workspaces "
+            f"and it will create a smallest one in each workspace. You can later change this configuration "
+            f"by manually editing `warehouse_id` in .ucx/config.yml file after."
+        )
+
+        backup_group_prefix = self._prompts.question("Backup prefix", default="db-temp-")
+        log_level = self._prompts.question("Log level", default="INFO").upper()
+        num_threads = int(self._prompts.question("Number of threads", default="8"))
+
+        launch_assessment = self._prompts.question(
+            f"Trigger assessment jobs in each of {len(configured_workspaces)} workspaces to crawl the metadata about "
+            f"the current workspace state, which is necessary for Unity Catalog migration",
+            default="no",
+        ).lower()
+
+        logger.info(
+            f"Installation wizard may ask you some questions related to {len(configured_workspaces)} "
+            f"workspaces, it may take a while. Please wait until installation wizard is complete, "
+            f"otherwise we may need to start over again."
+        )
+
+        for workspace in configured_workspaces:
+            ws = workspaces.client_for(workspace)
+
+            new_warehouse = ws.warehouses.create(
+                name="[UCX] Unity Catalog Migration",
+                spot_instance_policy=SpotInstancePolicy.COST_OPTIMIZED,
+                warehouse_type=EndpointInfoWarehouseType.PRO,
+                cluster_size="Small",
+                max_num_clusters=1,
+            )
+
+            group_manager = GroupManager(ws, backup_group_prefix=backup_group_prefix)
+            group_choice = group_manager.default_group_choice()
+            include_groups_for_migration = self._prompts.multi_select_from_dict(
+                f"Workspace {workspace.workspace_name} has {len(group_choice)} workspace-level groups that match names "
+                f"with account-level groups. Type `yes` to select them all. Otherwise go through a wizard to select "
+                f"each subscription individually",
+                "Pick a group from a list and pick [DONE] when you are ready",
+                group_choice,
+            )
+
+            workspace_installer = WorkspaceInstaller.for_config(
+                ws,
+                WorkspaceConfig(
+                    inventory_database=self._account_config.inventory_database,
+                    include_groups_for_migration=include_groups_for_migration,
+                    backup_group_prefix=backup_group_prefix,
+                    workspace_name=workspace.workspace_name,
+                    warehouse_id=new_warehouse.id,
+                    num_threads=num_threads,
+                    log_level=log_level,
+                ),
+            )
+
+            # TODO: build wheel only once
+            workspace_installer.run()
+
+            if launch_assessment == "yes":
+                step = "assessment"
+                logger.info(f"starting {step} job: {ws.config.host}#job/{workspace_installer._deployed_steps[step]}")
+                ws.jobs.run_now(workspace_installer._deployed_steps[step]).result()
+
+    def _workspaces(self):
+        return Workspaces(self._account_config)
+
+    def _get_account_client(self):
+        attempts = 0
+        creds = {}
+        while attempts < MAX_ATTEMPTS:
+            attempts += 1
+            host = self._prompts.choice_from_dict(
+                "Select cloud",
+                {
+                    "AWS": "https://accounts.cloud.databricks.com",
+                    "Azure": "https://accounts.azuredatabricks.net",
+                },
+            )
+            self._account_config.connect.host = host
+
+            account_id = self._prompts.question("Databricks Account ID")
+            self._account_config.connect.account_id = account_id
+
+            config = creds | {"host": host, "account_id": account_id}
+            ac = AccountClient(product="ucx", product_version=__version__, **config)
+            try:
+                ac.groups.list()
+                return ac
+            except DatabricksError as err:
+                logger.warning(f"Failure: {err}")
+                if ac.config.is_aws:
+                    creds["username"] = self._prompts.question("Databricks Account Console Username")
+                    self._account_config.connect.username = creds["username"]
+                    creds["password"] = self._prompts.question("Databricks Account Console Password")
+                elif ac.config.is_azure:
+                    logger.info("Make sure to run `az login` to authenticate your machine for AAD")
+                continue
+        msg = f"cannot configure account authentication after {attempts} attempts"
+        raise TimeoutError(msg)
+
+
 if __name__ == "__main__":
-    ws = WorkspaceClient(product="ucx", product_version=__version__)
     logger.setLevel("INFO")
-    installer = WorkspaceInstaller(ws)
+    installer = AccountInstaller()
     installer.run()

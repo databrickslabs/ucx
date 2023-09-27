@@ -6,7 +6,7 @@ from pathlib import Path
 from typing import ClassVar
 
 import requests
-from databricks.sdk import WorkspaceClient
+from databricks.sdk import AccountClient, WorkspaceClient
 from databricks.sdk.core import AzureCliTokenSource, Config, DatabricksError
 from databricks.sdk.service.provisioning import PricingTier, Workspace
 from requests.exceptions import ConnectionError
@@ -104,8 +104,8 @@ class Workspaces:
         "gcp": "gcp.databricks.com",
     }
 
-    def __init__(self, cfg: AccountConfig):
-        self._ac = cfg.to_account_client()
+    def __init__(self, cfg: AccountConfig, *, account_client: AccountClient = None):
+        self._ac = cfg.to_account_client() if account_client is None else account_client
         self._cfg = cfg
 
     def configured_workspaces(self):
@@ -119,10 +119,13 @@ class Workspaces:
                     continue
             yield workspace
 
+    def host_for(self, workspace: Workspace) -> str:
+        return f"https://{workspace.deployment_name}.{self._tlds[workspace.cloud]}"
+
     def client_for(self, workspace: Workspace) -> WorkspaceClient:
         config = self._ac.config.as_dict()
         # copy current config and swap with a host relevant to a workspace
-        config["host"] = f"https://{workspace.deployment_name}.{self._tlds[workspace.cloud]}"
+        config["host"] = self.host_for(workspace)
         return WorkspaceClient(**config, product="ucx", product_version=__version__)
 
     def _all_workspaces(self):

@@ -8,7 +8,6 @@ from databricks.sdk import WorkspaceClient
 from databricks.sdk.service import iam
 from databricks.sdk.service.iam import Group
 
-from databricks.labs.ucx.config import GroupsConfig
 from databricks.labs.ucx.framework.parallel import ThreadedExecution
 from databricks.labs.ucx.mixins.hardening import rate_limited
 
@@ -51,9 +50,12 @@ class GroupManager:
     SYSTEM_GROUPS: typing.ClassVar[list[str]] = ["users", "admins", "account users"]
     SCIM_ATTRIBUTES = "id,displayName,meta,members"
 
-    def __init__(self, ws: WorkspaceClient, groups: GroupsConfig):
+    def __init__(
+        self, ws: WorkspaceClient, selected: list[str] | None = None, backup_group_prefix: str | None = "db-temp-"
+    ):
         self._ws = ws
-        self.config = groups
+        self._selected = selected
+        self._backup_group_prefix = backup_group_prefix
         self._migration_state: GroupMigrationState = GroupMigrationState()
         self._account_groups = self._list_account_groups()
         self._workspace_groups = self._list_workspace_groups()
@@ -91,7 +93,7 @@ class GroupManager:
                 return group
 
     def _get_or_create_backup_group(self, source_group_name: str, source_group: iam.Group) -> iam.Group:
-        backup_group_name = f"{self.config.backup_group_prefix}{source_group_name}"
+        backup_group_name = f"{self._backup_group_prefix}{source_group_name}"
         backup_group = self._get_group(backup_group_name, "workspace")
 
         if backup_group:
@@ -160,7 +162,7 @@ class GroupManager:
             "Preparing groups in the current environment. At this step we'll verify that all groups "
             "exist and are of the correct type. If some temporary groups are missing, they'll be created"
         )
-        group_names = self.config.selected
+        group_names = self._selected
         if group_names:
             logger.info("Using the provided group listing")
 
@@ -174,12 +176,24 @@ class GroupManager:
                 "No group listing provided, all available workspace-level groups that have an account-level "
                 "group with the same name will be used"
             )
-            ws_group_names = {_.display_name for _ in self._workspace_groups}
-            ac_group_names = {_.display_name for _ in self._account_groups}
-            group_names = list(ws_group_names.intersection(ac_group_names))
+            group_names = sorted(self.default_group_choice().values())
 
         self._set_migration_groups(group_names)
         logger.info("Environment prepared successfully")
+
+    def default_group_choice(self):
+        ws_group_names = {_.display_name for _ in self._workspace_groups}
+        ac_group_names = {_.display_name for _ in self._account_groups}
+        group_names = list(ws_group_names.intersection(ac_group_names))
+
+        choices = {}
+        for name in group_names:
+            ws_group = self._get_group(name, "workspace")
+            ac_group = self._get_group(name, "account")
+            key = f"{name} (members: {len(ws_group.members)} workspace, {len(ac_group.members)} account)"
+            choices[key] = name
+
+        return choices
 
     @property
     def migration_groups_provider(self) -> GroupMigrationState:

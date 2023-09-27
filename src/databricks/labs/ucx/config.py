@@ -45,6 +45,8 @@ class ConnectConfig:
     azure_client_secret: str | None = None
     azure_environment: str | None = None
     cluster_id: str | None = None
+    username: str | None = None
+    password: str | None = None
     profile: str | None = None
     debug_headers: bool | None = False
     rate_limit: int | None = None
@@ -63,6 +65,8 @@ class ConnectConfig:
             azure_client_secret=cfg.azure_client_secret,
             azure_environment=cfg.azure_environment,
             cluster_id=cfg.cluster_id,
+            username=cfg.username,
+            password=cfg.password,
             profile=cfg.profile,
             debug_headers=cfg.debug_headers,
             rate_limit=cfg.rate_limit,
@@ -82,6 +86,8 @@ class ConnectConfig:
             azure_client_secret=self.azure_client_secret,
             azure_environment=self.azure_environment,
             cluster_id=self.cluster_id,
+            username=self.username,
+            password=self.password,
             profile=self.profile,
             debug_headers=self.debug_headers,
             rate_limit=self.rate_limit,
@@ -198,10 +204,14 @@ class AccountConfig(_Config["AccountConfig"]):
 
 @dataclass
 class WorkspaceConfig(_Config["WorkspaceConfig"]):
+    workspace_name: str
     inventory_database: str
-    groups: GroupsConfig
+    warehouse_id: str
+
+    include_groups_for_migration: list[str] = dataclasses.field(default_factory=list)
+    backup_group_prefix: str | None = "db-temp-"
+
     instance_pool_id: str = None
-    warehouse_id: str = None
     connect: ConnectConfig | None = None
     num_threads: int | None = 10
     log_level: str | None = "INFO"
@@ -212,15 +222,8 @@ class WorkspaceConfig(_Config["WorkspaceConfig"]):
     @classmethod
     def from_dict(cls, raw: dict):
         cls._verify_version(raw)
-        return cls(
-            inventory_database=raw.get("inventory_database"),
-            groups=GroupsConfig.from_dict(raw.get("groups", {})),
-            connect=ConnectConfig.from_dict(raw.get("connect", {})),
-            instance_pool_id=raw.get("instance_pool_id", None),
-            warehouse_id=raw.get("warehouse_id", None),
-            num_threads=raw.get("num_threads", 10),
-            log_level=raw.get("log_level", "INFO"),
-        )
+        connect = ConnectConfig.from_dict(raw.pop("connect", {}))
+        return cls(connect=connect, **raw)
 
     def to_workspace_client(self) -> WorkspaceClient:
         return WorkspaceClient(config=self.to_databricks_config())
