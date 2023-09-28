@@ -37,6 +37,7 @@ def test_migrate_managed_tables(ws, make_catalog, make_schema, make_table):
 
     assert target_table_properties["upgraded_from"] == managed_table
 
+
 def test_migrate_tables_with_cache_should_not_create_table(ws, make_random, make_catalog, make_schema, make_table):
     target_catalog = make_catalog()
     schema_a = make_schema(catalog="hive_metastore")
@@ -47,13 +48,19 @@ def test_migrate_tables_with_cache_should_not_create_table(ws, make_random, make
     table_name = make_random().lower()
     target_table = f"{target_catalog}.{target_schema}.{table_name}"
     source_table = f"hive_metastore.{target_schema}.{table_name}"
-    target_managed_table = make_table(name=target_table, tbl_properties=f"TBLPROPERTIES ('upgraded_from' = '{source_table}')")
-    source_managed_table = make_table(name=source_table, tbl_properties=f"TBLPROPERTIES ('upgraded_from' = '{target_table}')")
+    target_managed_table = make_table(
+        name=target_table, tbl_properties=f"TBLPROPERTIES ('upgraded_from' = '{source_table}')"
+    )
+    source_managed_table = make_table(
+        name=source_table, tbl_properties=f"TBLPROPERTIES ('upgraded_from' = '{target_table}')"
+    )
 
-    logger.info(f"target_catalog={target_catalog}, "
-                f"source_managed_table={source_managed_table}"
-                f"target_managed_table={target_managed_table}"
-                f"")
+    logger.info(
+        f"target_catalog={target_catalog}, "
+        f"source_managed_table={source_managed_table}"
+        f"target_managed_table={target_managed_table}"
+        f""
+    )
 
     inventory_schema = make_schema(catalog="hive_metastore")
     _, inventory_schema = inventory_schema.split(".")

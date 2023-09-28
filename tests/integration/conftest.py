@@ -105,13 +105,13 @@ def make_table(sql_exec, make_schema, make_random):
     def create(
         *,
         catalog="hive_metastore",
-        name:str | None = None,
+        name: str | None = None,
         schema: str | None = None,
         ctas: str | None = None,
         non_delta: bool = False,
         external: bool = False,
         view: bool = False,
-        tbl_properties: str = ""
+        tbl_properties: str = "",
     ):
         if schema is None:
             schema = make_schema(catalog=catalog)
@@ -134,7 +134,7 @@ def make_table(sql_exec, make_schema, make_random):
             ddl = f"{ddl} (id INT, value STRING)"
 
         if tbl_properties:
-            sql_exec(ddl +" "+ tbl_properties)
+            sql_exec(ddl + " " + tbl_properties)
         else:
             sql_exec(ddl)
         return name

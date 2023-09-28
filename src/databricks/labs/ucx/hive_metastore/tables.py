@@ -201,7 +201,7 @@ class TablesMigrate:
                 for table in tables:
                     try:
                         self._seen_tables[table.full_name] = table.properties["upgraded_from"]
-                    except:
+                    except RuntimeError:
                         continue
 
     def _table_already_upgraded(self, target_catalog, table):
@@ -210,5 +210,5 @@ class TablesMigrate:
             upgraded_from = self._seen_tables[target]
             logger.info(f"Table {table.key} already upgraded to {upgraded_from}")
             return True
-        except:
+        except RuntimeError:
             return False

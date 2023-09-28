@@ -1,8 +1,7 @@
 import logging
 from unittest.mock import MagicMock
 
-import pytest
-from databricks.sdk.service.catalog import TableInfo, CatalogInfo, SchemaInfo
+from databricks.sdk.service.catalog import CatalogInfo, SchemaInfo, TableInfo
 
 from databricks.labs.ucx.hive_metastore.tables import TablesCrawler, TablesMigrate
 
@@ -52,7 +51,9 @@ def test_migrate_managed_tables_should_do_nothing_if_upgrade_tag_is_present():
     client = MagicMock()
     client.catalogs.list.return_value = [CatalogInfo(name="catalog_1")]
     client.schemas.list.return_value = [SchemaInfo(name="db1")]
-    client.tables.list.return_value = [TableInfo(full_name="catalog_1.db1.managed", properties={"upgraded_from": "hive_metastore.db1.managed"})]
+    client.tables.list.return_value = [
+        TableInfo(full_name="catalog_1.db1.managed", properties={"upgraded_from": "hive_metastore.db1.managed"})
+    ]
     tm = TablesMigrate(tc, client, backend, default_catalog="catalog_1")
     tm.migrate_tables()
 
