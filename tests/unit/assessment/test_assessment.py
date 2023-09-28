@@ -156,9 +156,23 @@ def test_cluster_assessment(mocker):
         ),
     ]
 
-    ws = mocker.Mock()
-    mock_cluster_policy = mocker.Mock()
-    mock_cluster_policy.return_value = (
+    ws = Mock()
+    ws.cluster_policies.get.return_value.definition = (
+        '{\n  "spark_conf.fs.azure.account.auth.type": {\n    '
+        '"type": "fixed",\n    "value": "OAuth",\n   '
+        ' "hidden": true\n  },\n  "spark_conf.fs.azure.account.oauth.provider.type": {\n   '
+        ' "type": "fixed",\n    "value": '
+        '"org.apache.hadoop.fs.azurebfs.oauth2.ClientCredsTokenProvider",\n    '
+        '"hidden": true\n  },\n  "spark_conf.fs.azure.account.oauth2.client.id": {\n    '
+        '"type": "fixed",\n    "value": "fsfsfsfsffsfsf",\n    "hidden": true\n  },\n  '
+        '"spark_conf.fs.azure.account.oauth2.client.secret": {\n    "type": "fixed",\n    '
+        '"value": "gfgfgfgfggfggfgfdds",\n    "hidden": true\n  },\n  '
+        '"spark_conf.fs.azure.account.oauth2.client.endpoint": {\n    '
+        '"type": "fixed",\n    '
+        '"value": "https://login.microsoftonline.com/1234ededed/oauth2/token",\n    '
+        '"hidden": true\n  }\n}'
+    )
+    ws.cluster_policies.get.return_value.policy_family_definition_overrides = (
         '{\n  "spark_conf.fs.azure.account.auth.type": {\n    '
         '"type": "fixed",\n    "value": "OAuth",\n   '
         ' "hidden": true\n  },\n  "spark_conf.fs.azure.account.oauth.provider.type": {\n   '
@@ -174,8 +188,6 @@ def test_cluster_assessment(mocker):
         '"hidden": true\n  }\n}'
     )
 
-    ws.cluster_policies.get.cluster_policy_definition = mock_cluster_policy
-
     crawler = ClustersCrawler(ws, MockBackend(), "ucx")._assess_clusters(sample_clusters)
     result_set = list(crawler)
 
@@ -183,7 +195,7 @@ def test_cluster_assessment(mocker):
     assert result_set[0].success == 1
     assert result_set[1].success == 0
     assert result_set[2].success == 0
-    assert result_set[3].success == 1
+    assert result_set[3].success == 0
 
 
 def test_cluster_assessment_cluster_policy_no_spark_conf(mocker):
@@ -198,14 +210,13 @@ def test_cluster_assessment_cluster_policy_no_spark_conf(mocker):
             cluster_id="0915-190044-3dqy6751",
         )
     ]
-    ws = mocker.Mock()
-    mock_cluster_policy = mocker.Mock()
-    mock_cluster_policy.return_value = {
+    ws = Mock()
+    ws.cluster_policies.get.return_value.definition = {
         "definition": '{"node_type_id":{"type":"allowlist",'
         '"values":["Standard_DS3_v2","Standard_DS4_v2","Standard_DS5_v2","Standard_NC4as_T4_v3"],'
         '"defaultValue":"Standard_DS3_v2"}'
     }
-    ws.cluster_policies.get.cluster_policy_definition = mock_cluster_policy
+    ws.cluster_policies.get.return_value.policy_family_definition_overrides = "family_definition"
 
     crawler = ClustersCrawler(ws, MockBackend(), "ucx")._assess_clusters(sample_clusters1)
     result_set1 = list(crawler)
