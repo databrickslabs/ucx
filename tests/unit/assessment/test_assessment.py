@@ -7,6 +7,7 @@ from databricks.sdk.service.pipelines import PipelineState, PipelineStateInfo
 from databricks.labs.ucx.assessment.crawlers import (
     ClustersCrawler,
     JobsCrawler,
+    PipelineInfo,
     PipelinesCrawler,
 )
 from databricks.labs.ucx.hive_metastore.data_objects import ExternalLocationCrawler
@@ -372,7 +373,21 @@ def test_cluster_assessment_cluster_policy_no_spark_conf(mocker):
         '"autotermination_minutes":{"type":"unlimited","defaultValue":4320,"isOptional":true}}'
     )
 
-    ws.cluster_policies.get().policy_family_definition_overrides = "family_definition"
+    ws.cluster_policies.get().policy_family_definition_overrides = (
+        '{\n  "not.spark.conf": {\n    '
+        '"type": "fixed",\n    "value": "OAuth",\n   '
+        ' "hidden": true\n  },\n  "not.a.type": {\n   '
+        ' "type": "fixed",\n    "value": '
+        '"not.a.matching.type",\n    '
+        '"hidden": true\n  },\n  "not.a.matching.type": {\n    '
+        '"type": "fixed",\n    "value": "fsfsfsfsffsfsf",\n    "hidden": true\n  },\n  '
+        '"not.a.matching.type": {\n    "type": "fixed",\n    '
+        '"value": "gfgfgfgfggfggfgfdds",\n    "hidden": true\n  },\n  '
+        '"not.a.matching.type": {\n    '
+        '"type": "fixed",\n    '
+        '"value": "https://login.microsoftonline.com/1234ededed/oauth2/token",\n    '
+        '"hidden": true\n  }\n}'
+    )
 
     crawler = ClustersCrawler(ws, MockBackend(), "ucx")._assess_clusters(sample_clusters1)
     result_set1 = list(crawler)
@@ -426,6 +441,29 @@ def test_pipeline_assessment_without_config(mocker):
     ws.pipelines.get().spec.configuration = config_dict
     crawler = PipelinesCrawler(ws, MockBackend(), "ucx")._assess_pipelines(sample_pipelines)
     result_set = list(crawler)
+
+    assert len(result_set) == 1
+    assert result_set[0].success == 1
+
+
+def test_pipeline_snapshot_with_config():
+    sample_pipelines = [
+        PipelineInfo(
+            creator_name="abcde.defgh@databricks.com",
+            pipeline_name="New DLT Pipeline",
+            pipeline_id="0112eae7-9d11-4b40-a2b8-6c83cb3c7497",
+            success=1,
+            failures="",
+        )
+    ]
+    mock_ws = Mock()
+
+    crawler = PipelinesCrawler(mock_ws, MockBackend(), "ucx")
+
+    crawler._try_fetch = Mock(return_value=[])
+    crawler._crawl = Mock(return_value=sample_pipelines)
+
+    result_set = crawler.snapshot()
 
     assert len(result_set) == 1
     assert result_set[0].success == 1

@@ -53,12 +53,12 @@ class PipelineInfo:
     failures: str
 
 
-def azure_sp_conf_usage_check(config: str) -> bool:
-    sp_conf_present = False
-    for conf in _AZURE_SP_CONF:
-        if re.search(conf, config):
-            sp_conf_present = True
-    return sp_conf_present
+def _azure_sp_conf_present_check(config: dict) -> bool:
+    for key in config.keys():
+        for conf in _AZURE_SP_CONF:
+            if re.search(conf, key):
+                return True
+    return False
 
 
 def spark_version_compatibility(spark_version: str) -> str:
@@ -95,10 +95,8 @@ class PipelinesCrawler(CrawlerBase):
             failures = []
             pipeline_config = self._ws.pipelines.get(pipeline.pipeline_id).spec.configuration
             if pipeline_config:
-                for key in pipeline_config.items():
-                    if azure_sp_conf_usage_check(str(key)):
-                        failures.append(f"{_AZURE_SP_CONF_FAILURE_MSG} pipeline.")
-                        break
+                if _azure_sp_conf_present_check(pipeline_config):
+                    failures.append(f"{_AZURE_SP_CONF_FAILURE_MSG} pipeline.")
 
             pipeline_info.failures = json.dumps(failures)
             if len(failures) > 0:
@@ -142,22 +140,16 @@ class ClustersCrawler(CrawlerBase):
                         failures.append(f"using DBFS mount in configuration: {value}")
 
                 # Checking if Azure cluster config is present in spark config
-                for key in cluster.spark_conf.items():
-                    if azure_sp_conf_usage_check(str(key)):
-                        failures.append(f"{_AZURE_SP_CONF_FAILURE_MSG} cluster.")
-                        break
+                if _azure_sp_conf_present_check(cluster.spark_conf):
+                    failures.append(f"{_AZURE_SP_CONF_FAILURE_MSG} cluster.")
 
             # Checking if Azure cluster config is present in cluster policies
             if cluster.policy_id:
-                cluster_policy_definition = self._ws.cluster_policies.get(cluster.policy_id).definition
-                if azure_sp_conf_usage_check(cluster_policy_definition):
+                policy = self._ws.cluster_policies.get(cluster.policy_id)
+                if _azure_sp_conf_present_check(json.loads(policy.definition)):
                     failures.append(f"{_AZURE_SP_CONF_FAILURE_MSG} cluster.")
-
-                cluster_family_definition = self._ws.cluster_policies.get(
-                    cluster.policy_id
-                ).policy_family_definition_overrides
-                if cluster_family_definition:
-                    if azure_sp_conf_usage_check(cluster_family_definition):
+                if policy.policy_family_definition_overrides:
+                    if _azure_sp_conf_present_check(json.loads(policy.policy_family_definition_overrides)):
                         failures.append(f"{_AZURE_SP_CONF_FAILURE_MSG} cluster.")
 
             cluster_info.failures = json.dumps(failures)
@@ -223,22 +215,16 @@ class JobsCrawler(CrawlerBase):
                         job_assessment[job.job_id].add(f"using DBFS mount in configuration: {value}")
 
                 # Checking if Azure cluster config is present in spark config
-                for key in cluster_config.spark_conf.items():
-                    if azure_sp_conf_usage_check(str(key)):
-                        job_assessment[job.job_id].add(f"{_AZURE_SP_CONF_FAILURE_MSG} Job cluster.")
-                        break
+                if _azure_sp_conf_present_check(cluster_config.spark_conf):
+                    job_assessment[job.job_id].add(f"{_AZURE_SP_CONF_FAILURE_MSG} Job cluster.")
 
             # Checking if Azure cluster config is present in cluster policies
             if cluster_config.policy_id:
-                job_cluster_policy_definition = self._ws.cluster_policies.get(cluster_config.policy_id).definition
-                if azure_sp_conf_usage_check(job_cluster_policy_definition):
+                policy = self._ws.cluster_policies.get(cluster_config.policy_id)
+                if _azure_sp_conf_present_check(json.loads(policy.definition)):
                     job_assessment[job.job_id].add(f"{_AZURE_SP_CONF_FAILURE_MSG} Job cluster.")
-
-                job_cluster_family_definition = self._ws.cluster_policies.get(
-                    cluster_config.policy_id
-                ).policy_family_definition_overrides
-                if job_cluster_family_definition:
-                    if azure_sp_conf_usage_check(job_cluster_family_definition):
+                if policy.policy_family_definition_overrides:
+                    if _azure_sp_conf_present_check(json.loads(policy.policy_family_definition_overrides)):
                         job_assessment[job.job_id].add(f"{_AZURE_SP_CONF_FAILURE_MSG} Job cluster.")
 
         for job_key in job_details.keys():
