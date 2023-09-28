@@ -143,7 +143,7 @@ class ClustersCrawler(CrawlerBase):
                 ).policy_family_definition_overrides
                 for pol in _AZURE_SP_CLUSTER_CONF:
                     if re.search(f"spark_conf.{pol}", cluster_policy_definition) or re.search(
-                            f"spark_conf.{pol}", cluster_family_definition
+                        f"spark_conf.{pol}", cluster_family_definition
                     ):
                         failures.append("Uses azure service principal credentials in cluster config.")
 
@@ -222,7 +222,7 @@ class JobsCrawler(CrawlerBase):
                 ).policy_family_definition_overrides
                 for pol in _AZURE_SP_CLUSTER_CONF:
                     if re.search(f"spark_conf.{pol}", job_cluster_policy_definition) or re.search(
-                            f"spark_conf.{pol}", job_cluster_family_definition
+                        f"spark_conf.{pol}", job_cluster_family_definition
                     ):
                         job_assessment[job.job_id].add("Uses azure service principal credentials in cluster config.")
 
