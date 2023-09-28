@@ -3,6 +3,8 @@ from collections.abc import Iterator
 from dataclasses import dataclass
 from functools import partial
 
+from databricks.sdk import WorkspaceClient
+
 from databricks.labs.ucx.framework.crawlers import CrawlerBase, SqlBackend
 from databricks.labs.ucx.framework.parallel import ThreadedExecution
 from databricks.labs.ucx.mixins.sql import Row
@@ -35,27 +37,14 @@ class Table:
     def kind(self) -> str:
         return "VIEW" if self.view_text is not None else "TABLE"
 
-    def _sql_alter(self, catalog):
-        return (
-            f"ALTER {self.kind} {self.key} SET"
-            f" TBLPROPERTIES ('upgraded_to' = '{catalog}.{self.database}.{self.name}');"
-        )
-
     def _sql_external(self, catalog):
-        # TODO: https://github.com/databricks/ucx/issues/106
-        return (
-            f"CREATE TABLE IF NOT EXISTS {catalog}.{self.database}.{self.name}"
-            f" LIKE {self.key} COPY LOCATION;" + self._sql_alter(catalog)
-        )
+        return f"SYNC TABLE {catalog}.{self.database}.{self.name} FROM {self.key};"
 
     def _sql_managed(self, catalog):
         if not self.is_delta:
             msg = f"{self.key} is not DELTA: {self.table_format}"
             raise ValueError(msg)
-        return (
-            f"CREATE TABLE IF NOT EXISTS {catalog}.{self.database}.{self.name}"
-            f" DEEP CLONE {self.key};" + self._sql_alter(catalog)
-        )
+        return f"CREATE TABLE IF NOT EXISTS {catalog}.{self.database}.{self.name} DEEP CLONE {self.key};"
 
     def _sql_view(self, catalog):
         return f"CREATE VIEW IF NOT EXISTS {catalog}.{self.database}.{self.name} AS {self.view_text};"
@@ -63,10 +52,22 @@ class Table:
     def uc_create_sql(self, catalog):
         if self.kind == "VIEW":
             return self._sql_view(catalog)
-        elif self.location is not None:
+        elif self.object_type == "EXTERNAL":
             return self._sql_external(catalog)
         else:
             return self._sql_managed(catalog)
+
+    def sql_alter_to(self, catalog):
+        return (
+            f"ALTER {self.kind} {self.key} SET"
+            f" TBLPROPERTIES ('upgraded_to' = '{catalog}.{self.database}.{self.name}');"
+        )
+
+    def sql_alter_from(self, catalog):
+        return (
+            f"ALTER {self.kind} {catalog}.{self.database}.{self.name} SET"
+            f" TBLPROPERTIES ('upgraded_from' = '{self.key}');"
+        )
 
 
 class TablesCrawler(CrawlerBase):
@@ -143,3 +144,52 @@ class TablesCrawler(CrawlerBase):
         except Exception as e:
             logger.error(f"Couldn't fetch information for table {full_name} : {e}")
             return None
+
+
+class TablesMigrate:
+    def __init__(
+        self,
+        tc: TablesCrawler,
+        ws: WorkspaceClient,
+        backend: SqlBackend,
+        inventory_database: str,
+        default_catalog=None,
+        database_to_catalog_mapping: dict[str, str] | None = None,
+    ):
+        self._tc = tc
+        self._backend = backend
+        self._ws = ws
+        self._inventory_database = inventory_database
+        self._database_to_catalog_mapping = database_to_catalog_mapping
+        self._seen_tables = {}
+        self._default_catalog = self._init_default_catalog(default_catalog)
+
+    @staticmethod
+    def _init_default_catalog(default_catalog):
+        if default_catalog:
+            return default_catalog
+        else:
+            return "ucx_default"  # TODO : Fetch current workspace name and append it to the default catalog.
+
+    def migrate_tables(self):
+        tasks = []
+        for table in self._tc.snapshot():
+            target_catalog = self._default_catalog
+            if self._database_to_catalog_mapping:
+                target_catalog = self._database_to_catalog_mapping[table.database]
+            tasks.append(partial(self._migrate_table, target_catalog, table))
+        ThreadedExecution.gather("migrate tables", tasks)
+
+    def _migrate_table(self, target_catalog, table):
+        try:
+            sql = table.uc_create_sql(target_catalog)
+            logger.debug(f"Migrating table {table.key} to using SQL query: {sql}")
+
+            if table.object_type == "MANAGED":
+                self._backend.execute(sql)
+                self._backend.execute(table.sql_alter_to(target_catalog))
+                self._backend.execute(table.sql_alter_from(target_catalog))
+            else:
+                logger.info(f"Table {table.key} is a {table.object_type} and is not supported for migration yet ")
+        except Exception as e:
+            logger.error(f"Could not create table {table.name} because: {e}")
