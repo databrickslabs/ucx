@@ -422,6 +422,8 @@ def test_pipeline_assessment_without_config(mocker):
         )
     ]
     ws = Mock()
+    config_dict = {}
+    ws.pipelines.get().spec.configuration = config_dict
     crawler = PipelinesCrawler(ws, MockBackend(), "ucx")._assess_pipelines(sample_pipelines)
     result_set = list(crawler)
 

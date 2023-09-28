@@ -14,7 +14,7 @@ INCOMPATIBLE_SPARK_CONFIG_KEYS = [
     "spark.databricks.hive.metastore.glueCatalog.enabled",
 ]
 
-_AZURE_SP_CLUSTER_CONF = [
+_AZURE_SP_CONF = [
     "fs.azure.account.key",
     "fs.azure.account.auth.type",
     "fs.azure.account.oauth.provider.type",
@@ -22,6 +22,8 @@ _AZURE_SP_CLUSTER_CONF = [
     "fs.azure.account.oauth2.client.secret",
     "fs.azure.account.oauth2.client.endpoint",
 ]
+
+_AZURE_SP_CONF_FAILURE_MSG = "Uses azure service principal credentials config in "
 
 
 @dataclass
@@ -49,6 +51,14 @@ class PipelineInfo:
     creator_name: str
     success: int
     failures: str
+
+
+def azure_sp_conf_usage_check(config: str) -> bool:
+    sp_conf_present = False
+    for conf in _AZURE_SP_CONF:
+        if re.search(conf, config):
+            sp_conf_present = True
+    return sp_conf_present
 
 
 def spark_version_compatibility(spark_version: str) -> str:
@@ -85,9 +95,10 @@ class PipelinesCrawler(CrawlerBase):
             failures = []
             pipeline_config = self._ws.pipelines.get(pipeline.pipeline_id).spec.configuration
             if pipeline_config:
-                for conf in _AZURE_SP_CLUSTER_CONF:
-                    if re.search(conf, str(pipeline_config)):
-                        failures.append("Uses azure service principal credentials in pipeline config.")
+                for key in pipeline_config.items():
+                    if azure_sp_conf_usage_check(str(key)):
+                        failures.append(f"{_AZURE_SP_CONF_FAILURE_MSG} pipeline.")
+                        break
 
             pipeline_info.failures = json.dumps(failures)
             if len(failures) > 0:
@@ -131,21 +142,23 @@ class ClustersCrawler(CrawlerBase):
                         failures.append(f"using DBFS mount in configuration: {value}")
 
                 # Checking if Azure cluster config is present in spark config
-                for conf in _AZURE_SP_CLUSTER_CONF:
-                    if re.search(conf, str(cluster.spark_conf)):
-                        failures.append("Uses azure service principal credentials in cluster config.")
+                for key in cluster.spark_conf.items():
+                    if azure_sp_conf_usage_check(str(key)):
+                        failures.append(f"{_AZURE_SP_CONF_FAILURE_MSG} cluster.")
+                        break
 
             # Checking if Azure cluster config is present in cluster policies
             if cluster.policy_id:
                 cluster_policy_definition = self._ws.cluster_policies.get(cluster.policy_id).definition
+                if azure_sp_conf_usage_check(cluster_policy_definition):
+                    failures.append(f"{_AZURE_SP_CONF_FAILURE_MSG} cluster.")
+
                 cluster_family_definition = self._ws.cluster_policies.get(
                     cluster.policy_id
                 ).policy_family_definition_overrides
-                for pol in _AZURE_SP_CLUSTER_CONF:
-                    if re.search(f"spark_conf.{pol}", cluster_policy_definition) or re.search(
-                        f"spark_conf.{pol}", cluster_family_definition
-                    ):
-                        failures.append("Uses azure service principal credentials in cluster config.")
+                if cluster_family_definition:
+                    if azure_sp_conf_usage_check(cluster_family_definition):
+                        failures.append(f"{_AZURE_SP_CONF_FAILURE_MSG} cluster.")
 
             cluster_info.failures = json.dumps(failures)
             if len(failures) > 0:
@@ -210,21 +223,23 @@ class JobsCrawler(CrawlerBase):
                         job_assessment[job.job_id].add(f"using DBFS mount in configuration: {value}")
 
                 # Checking if Azure cluster config is present in spark config
-                for conf in _AZURE_SP_CLUSTER_CONF:
-                    if re.search(conf, json.dumps(cluster_config.spark_conf)):
-                        job_assessment[job.job_id].add("Uses azure service principal credentials in cluster config.")
+                for key in cluster_config.spark_conf.items():
+                    if azure_sp_conf_usage_check(str(key)):
+                        job_assessment[job.job_id].add(f"{_AZURE_SP_CONF_FAILURE_MSG} Job cluster.")
+                        break
 
             # Checking if Azure cluster config is present in cluster policies
             if cluster_config.policy_id:
                 job_cluster_policy_definition = self._ws.cluster_policies.get(cluster_config.policy_id).definition
+                if azure_sp_conf_usage_check(job_cluster_policy_definition):
+                    job_assessment[job.job_id].add(f"{_AZURE_SP_CONF_FAILURE_MSG} Job cluster.")
+
                 job_cluster_family_definition = self._ws.cluster_policies.get(
                     cluster_config.policy_id
                 ).policy_family_definition_overrides
-                for pol in _AZURE_SP_CLUSTER_CONF:
-                    if re.search(f"spark_conf.{pol}", job_cluster_policy_definition) or re.search(
-                        f"spark_conf.{pol}", job_cluster_family_definition
-                    ):
-                        job_assessment[job.job_id].add("Uses azure service principal credentials in cluster config.")
+                if job_cluster_family_definition:
+                    if azure_sp_conf_usage_check(job_cluster_family_definition):
+                        job_assessment[job.job_id].add(f"{_AZURE_SP_CONF_FAILURE_MSG} Job cluster.")
 
         for job_key in job_details.keys():
             job_details[job_key].failures = json.dumps(list(job_assessment[job_key]))
