@@ -61,7 +61,7 @@ class AzureServicePrincipalInfo:
     entitlements: list
     external_id: str
     groups: list
-    id: str
+    spn_id: str
     roles: list
 
 
@@ -112,8 +112,16 @@ class AzureServicePrincipalCrawler(CrawlerBase):
                 _groups = [group.as_dict() for group in spn.groups]
             if spn.roles:
                 _roles = [role.as_dict() for role in spn.roles]
-            spn_info = AzureServicePrincipalInfo(spn.active, spn.application_id, spn.display_name,
-                                                 _entitlements, spn.external_id, _groups, spn.id, _roles)
+            spn_info = AzureServicePrincipalInfo(
+                spn.active,
+                spn.application_id,
+                spn.display_name,
+                _entitlements,
+                spn.external_id,
+                _groups,
+                spn.id,
+                _roles,
+            )
             yield spn_info
 
     def snapshot(self) -> list[AzureServicePrincipalInfo]:
