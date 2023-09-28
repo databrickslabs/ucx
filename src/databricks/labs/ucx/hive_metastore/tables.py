@@ -174,10 +174,10 @@ class TablesMigrate:
     def migrate_tables(self):
         tasks = []
         for table in self._tc.snapshot():
+            target_catalog = self._default_catalog
             if self._database_to_catalog_mapping:
-                tasks.append(partial(self._migrate_table, self._database_to_catalog_mapping[table.database], table))
-            else:
-                tasks.append(partial(self._migrate_table, self._default_catalog, table))
+                target_catalog = self._database_to_catalog_mapping[table.database]
+            tasks.append(partial(self._migrate_table, target_catalog, table))
         ThreadedExecution.gather("migrate tables", tasks)
 
     def _migrate_table(self, target_catalog, table):
