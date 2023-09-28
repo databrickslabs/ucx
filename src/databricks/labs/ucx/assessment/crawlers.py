@@ -81,8 +81,8 @@ def spark_version_compatibility(spark_version: str) -> str:
 
 
 class AzureServicePrincipalInventory(CrawlerBase):
-
-
+    def __init__(self):
+        super().__init__()
 
 
 class PipelinesCrawler(CrawlerBase):
