@@ -22,7 +22,6 @@ class Table:
 
     location: str = None
     view_text: str = None
-    table_properties: str = None
 
     @property
     def is_delta(self) -> bool:
@@ -141,7 +140,6 @@ class TablesCrawler(CrawlerBase):
                 table_format=describe.get("Provider", "").upper(),
                 location=describe.get("Location", None),
                 view_text=describe.get("View Text", None),
-                table_properties=describe.get("Table Properties", None),
             )
         except Exception as e:
             logger.error(f"Couldn't fetch information for table {full_name} : {e}")
@@ -187,7 +185,7 @@ class TablesMigrate:
             sql = table.uc_create_sql(target_catalog)
             logger.debug(f"Migrating table {table.key} to using SQL query: {sql}")
 
-            if table.object_type == "MANAGED" and "upgraded_to" not in table.table_properties:
+            if table.object_type == "MANAGED":
                 self._backend.execute(sql)
                 self._backend.execute(table.sql_alter_to(target_catalog))
                 self._backend.execute(table.sql_alter_from(target_catalog))
