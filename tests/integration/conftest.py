@@ -82,7 +82,7 @@ def test_catalog_fixture(make_catalog):
 
 @pytest.fixture
 def make_schema(sql_exec, make_random):
-    def create(*, catalog="hive_metastore", schema):
+    def create(*, catalog="hive_metastore", schema=None):
         if schema is None:
             schema = f"{catalog}.ucx_S{make_random(4)}".lower()
         else:
@@ -91,7 +91,7 @@ def make_schema(sql_exec, make_random):
         return schema
 
     yield from factory(  # noqa: F405
-        "schema", create, lambda schema_name: sql_exec(f"DROP SCHEMA IF EXISTS {schema_name} CASCADE")
+        "schema", create, lambda schema: sql_exec(f"DROP SCHEMA IF EXISTS {schema} CASCADE")
     )
 
 
@@ -105,15 +105,18 @@ def make_table(sql_exec, make_schema, make_random):
     def create(
         *,
         catalog="hive_metastore",
+        name:str | None = None,
         schema: str | None = None,
         ctas: str | None = None,
         non_delta: bool = False,
         external: bool = False,
         view: bool = False,
+        tbl_properties: str = ""
     ):
         if schema is None:
             schema = make_schema(catalog=catalog)
-        name = f"{schema}.ucx_T{make_random(4)}".lower()
+        if name is None:
+            name = f"{schema}.ucx_T{make_random(4)}".lower()
         ddl = f'CREATE {"VIEW" if view else "TABLE"} {name}'
         if ctas is not None:
             # temporary (if not view)
@@ -129,7 +132,11 @@ def make_table(sql_exec, make_schema, make_random):
         else:
             # managed table
             ddl = f"{ddl} (id INT, value STRING)"
-        sql_exec(ddl)
+
+        if tbl_properties:
+            sql_exec(ddl +" "+ tbl_properties)
+        else:
+            sql_exec(ddl)
         return name
 
     def remove(name):

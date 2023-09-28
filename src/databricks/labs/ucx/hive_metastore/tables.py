@@ -152,17 +152,15 @@ class TablesMigrate:
         tc: TablesCrawler,
         ws: WorkspaceClient,
         backend: SqlBackend,
-        inventory_database: str,
         default_catalog=None,
         database_to_catalog_mapping: dict[str, str] | None = None,
     ):
         self._tc = tc
         self._backend = backend
         self._ws = ws
-        self._inventory_database = inventory_database
         self._database_to_catalog_mapping = database_to_catalog_mapping
-        self._seen_tables = {}
         self._default_catalog = self._init_default_catalog(default_catalog)
+        self._seen_tables = {}
 
     @staticmethod
     def _init_default_catalog(default_catalog):
@@ -172,6 +170,7 @@ class TablesMigrate:
             return "ucx_default"  # TODO : Fetch current workspace name and append it to the default catalog.
 
     def migrate_tables(self):
+        self._init_seen_tables()
         tasks = []
         for table in self._tc.snapshot():
             target_catalog = self._default_catalog
@@ -184,8 +183,7 @@ class TablesMigrate:
         try:
             sql = table.uc_create_sql(target_catalog)
             logger.debug(f"Migrating table {table.key} to using SQL query: {sql}")
-
-            if table.object_type == "MANAGED":
+            if table.object_type == "MANAGED" and not self._table_already_upgraded(target_catalog, table):
                 self._backend.execute(sql)
                 self._backend.execute(table.sql_alter_to(target_catalog))
                 self._backend.execute(table.sql_alter_from(target_catalog))
@@ -193,3 +191,24 @@ class TablesMigrate:
                 logger.info(f"Table {table.key} is a {table.object_type} and is not supported for migration yet ")
         except Exception as e:
             logger.error(f"Could not create table {table.name} because: {e}")
+
+    def _init_seen_tables(self):
+        catalogs = self._ws.catalogs.list()
+        for catalog in catalogs:
+            schemas = self._ws.schemas.list(catalog_name=catalog.name)
+            for schema in schemas:
+                tables = self._ws.tables.list(catalog_name=catalog.name, schema_name=schema.name)
+                for table in tables:
+                    try:
+                        self._seen_tables[table.full_name] = table.properties["upgraded_from"]
+                    except:
+                        continue
+
+    def _table_already_upgraded(self, target_catalog, table):
+        try:
+            target = f"{target_catalog}.{table.database}.{table.name}"
+            upgraded_from = self._seen_tables[target]
+            logger.info(f"Table {table.key} already upgraded to {upgraded_from}")
+            return True
+        except:
+            return False
