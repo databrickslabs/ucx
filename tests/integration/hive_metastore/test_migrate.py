@@ -5,7 +5,7 @@ import pytest
 
 from databricks.labs.ucx.framework.crawlers import StatementExecutionBackend
 from databricks.labs.ucx.hive_metastore import TablesCrawler
-from databricks.labs.ucx.hive_metastore.migrate_tables import TablesMigrate
+from databricks.labs.ucx.hive_metastore.tables import TablesMigrate
 
 logger = logging.getLogger(__name__)
 
@@ -26,7 +26,8 @@ def test_migrate_managed_tables(ws, make_catalog, make_schema, make_table):
 
     backend = StatementExecutionBackend(ws, os.environ["TEST_DEFAULT_WAREHOUSE_ID"])
     crawler = TablesCrawler(backend, inventory_schema)
-    TablesMigrate(crawler, ws, backend, target_catalog, inventory_schema).migrate_tables()
+    tm = TablesMigrate(crawler, ws, backend, target_catalog, inventory_schema)
+    tm.migrate_tables()
 
     target_tables = list(backend.fetch(f"SHOW TABLES IN {target_catalog}.{target_schema}"))
     assert len(target_tables) == 1
@@ -56,7 +57,8 @@ def test_migrate_external_table(ws, make_catalog, make_schema, make_table):
 
     backend = StatementExecutionBackend(ws, os.environ["TEST_DEFAULT_WAREHOUSE_ID"])
     crawler = TablesCrawler(backend, inventory_schema)
-    TablesMigrate(crawler, ws, backend, target_catalog, inventory_schema).migrate_tables()
+    tm = TablesMigrate(crawler, ws, backend, target_catalog, inventory_schema)
+    tm.migrate_tables()
 
     target_tables = list(backend.fetch(f"SHOW TABLES IN {target_catalog}.{target_schema}"))
     assert len(target_tables) == 1

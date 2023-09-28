@@ -3,6 +3,8 @@ from collections.abc import Iterator
 from dataclasses import dataclass
 from functools import partial
 
+from databricks.sdk import WorkspaceClient
+
 from databricks.labs.ucx.framework.crawlers import CrawlerBase, SqlBackend
 from databricks.labs.ucx.framework.parallel import ThreadedExecution
 from databricks.labs.ucx.mixins.sql import Row
@@ -144,3 +146,52 @@ class TablesCrawler(CrawlerBase):
         except Exception as e:
             logger.error(f"Couldn't fetch information for table {full_name} : {e}")
             return None
+
+
+class TablesMigrate:
+    def __init__(
+        self,
+        tc: TablesCrawler,
+        ws: WorkspaceClient,
+        backend: SqlBackend,
+        inventory_database: str,
+        default_catalog=None,
+        database_to_catalog_mapping: dict[str, str] | None = None,
+    ):
+        self._tc = tc
+        self._backend = backend
+        self._ws = ws
+        self._inventory_database = inventory_database
+        self._database_to_catalog_mapping = database_to_catalog_mapping
+        self._seen_tables = {}
+        self._default_catalog = self._init_default_catalog(default_catalog)
+
+    @staticmethod
+    def _init_default_catalog(default_catalog):
+        if default_catalog:
+            return default_catalog
+        else:
+            return "ucx_default"  # TODO : Fetch current workspace name and append it to the default catalog.
+
+    def migrate_tables(self):
+        tasks = []
+        for table in self._tc.snapshot():
+            if self._database_to_catalog_mapping:
+                tasks.append(partial(self._migrate_table, self._database_to_catalog_mapping[table.database], table))
+            else:
+                tasks.append(partial(self._migrate_table, self._default_catalog, table))
+        ThreadedExecution.gather("migrate tables", tasks)
+
+    def _migrate_table(self, target_catalog, table):
+        try:
+            sql = table.uc_create_sql(target_catalog)
+            logger.debug(f"Migrating table {table.key} to using SQL query: {sql}")
+
+            if table.object_type == "MANAGED" and "upgraded_to" not in table.table_properties:
+                self._backend.execute(sql)
+                self._backend.execute(table.sql_alter_to(target_catalog))
+                self._backend.execute(table.sql_alter_from(target_catalog))
+            else:
+                logger.info(f"Table {table.key} is a {table.object_type} and is not supported for migration yet ")
+        except Exception as e:
+            logger.error(f"Could not create table {table.name} because: {e}")

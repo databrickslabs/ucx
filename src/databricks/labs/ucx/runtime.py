@@ -54,7 +54,7 @@ def crawl_grants(cfg: WorkspaceConfig):
     secure transition for our data assets. It reinforces our commitment to data security and compliance throughout the
     migration process and beyond"""
     backend = RuntimeBackend()
-    tables = TablesCrawler(backend, cfg)
+    tables = TablesCrawler(backend, cfg.inventory_database)
     grants = GrantsCrawler(tables)
     grants.snapshot()
 
