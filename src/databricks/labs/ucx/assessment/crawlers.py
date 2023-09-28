@@ -53,6 +53,18 @@ class PipelineInfo:
     failures: str
 
 
+@dataclass
+class AzureServicePrincipalInfo:
+    active: bool
+    application_id: str
+    display_name: str
+    entitlements: list
+    external_id: str
+    groups: list
+    id: str
+    roles: list
+
+
 def _azure_sp_conf_present_check(config: dict) -> bool:
     for key in config.keys():
         for conf in _AZURE_SP_CONF:
@@ -80,9 +92,36 @@ def spark_version_compatibility(spark_version: str) -> str:
     return "supported"
 
 
-class AzureServicePrincipalInventory(CrawlerBase):
-    def __init__(self):
-        super().__init__()
+class AzureServicePrincipalCrawler(CrawlerBase):
+    def __init__(self, ws: WorkspaceClient, sbe: SqlBackend, schema):
+        super().__init__(sbe, "hive_metastore", schema, "azure_service_principals")
+        self._ws = ws
+
+    def _crawl(self) -> list[AzureServicePrincipalInfo]:
+        all_service_principals = list(self._ws.service_principals.list())
+        return list(self._assess_service_principals(all_service_principals))
+
+    def _assess_service_principals(self, all_service_principals):
+        _entitlements = []
+        _groups = []
+        _roles = []
+        for spn in all_service_principals:
+            if spn.entitlements:
+                _entitlements = [entitlement.as_dict() for entitlement in spn.entitlements]
+            if spn.groups:
+                _groups = [group.as_dict() for group in spn.groups]
+            if spn.roles:
+                _roles = [role.as_dict() for role in spn.roles]
+            spn_info = AzureServicePrincipalInfo(spn.active, spn.application_id, spn.display_name,
+                                                 _entitlements, spn.external_id, _groups, spn.id, _roles)
+            yield spn_info
+
+    def snapshot(self) -> list[AzureServicePrincipalInfo]:
+        return self._snapshot(self._try_fetch, self._crawl)
+
+    def _try_fetch(self) -> list[AzureServicePrincipalInfo]:
+        for row in self._fetch(f"SELECT * FROM {self._schema}.{self._table}"):
+            yield AzureServicePrincipalInfo(*row)
 
 
 class PipelinesCrawler(CrawlerBase):

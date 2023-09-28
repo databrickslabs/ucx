@@ -1,6 +1,7 @@
 from unittest.mock import Mock
 
 from databricks.sdk.service.compute import AutoScale, ClusterDetails, ClusterSource
+from databricks.sdk.service.iam import ServicePrincipal, ComplexValue
 from databricks.sdk.service.jobs import BaseJob, JobSettings, NotebookTask, Task
 from databricks.sdk.service.pipelines import PipelineState, PipelineStateInfo
 
@@ -8,7 +9,7 @@ from databricks.labs.ucx.assessment.crawlers import (
     ClustersCrawler,
     JobsCrawler,
     PipelineInfo,
-    PipelinesCrawler,
+    PipelinesCrawler, AzureServicePrincipalCrawler,
 )
 from databricks.labs.ucx.hive_metastore.data_objects import ExternalLocationCrawler
 from databricks.labs.ucx.hive_metastore.mounts import Mount
@@ -457,9 +458,7 @@ def test_pipeline_snapshot_with_config():
         )
     ]
     mock_ws = Mock()
-
     crawler = PipelinesCrawler(mock_ws, MockBackend(), "ucx")
-
     crawler._try_fetch = Mock(return_value=[])
     crawler._crawl = Mock(return_value=sample_pipelines)
 
@@ -467,3 +466,45 @@ def test_pipeline_snapshot_with_config():
 
     assert len(result_set) == 1
     assert result_set[0].success == 1
+
+def test_azure_spn_info(mocker):
+    sample_spns = [ServicePrincipal(active=True, application_id='6838ba8c-613c-4a2b-aded-7591ff633986',
+                                   display_name='eric_azure_mlops_everest-cicd', entitlements=None, external_id=None,
+                                   groups=None, id='22880264257977', roles=None),
+        ServicePrincipal(active=True, application_id='4ca07e18-cac0-4aac-a230-aad85f28aa25',
+                         display_name='PROPHECY_USER',
+                         entitlements=[ComplexValue(display=None, primary=None, type=None, value='workspace-access'),
+                             ComplexValue(display=None, primary=None, type=None, value='allow-cluster-create')],
+                         external_id=None, groups=None, id='57176659362130', roles=None),
+        ServicePrincipal(active=True, application_id='fc11f197-fede-40fd-a53f-7e69f94b1bfc', display_name='ug',
+                         entitlements=None, external_id='18b3c55c-6d87-4f89-8b86-36acdd04ee46', groups=None, id='63562194880794', roles=None),
+        ServicePrincipal(active=True, application_id='84ded2fb-1f8e-42f3-a1e5-d17c9fc12b4f', display_name='HEX_USER',
+                         entitlements=[
+                             ComplexValue(display=None, primary=None, type=None, value='databricks-sql-access')],
+                         external_id=None, groups=None, id='91991490737373', roles=None),
+        ServicePrincipal(active=True, application_id='c50e118f-7ac8-4a23-9da7-eed19f5ac063',
+                         display_name='common-sa-sp',
+                         entitlements=[ComplexValue(display=None, primary=None, type=None, value='workspace-access'),
+                             ComplexValue(display=None, primary=None, type=None, value='databricks-sql-access'),
+                             ComplexValue(display=None, primary=None, type=None, value='allow-cluster-create')],
+                         external_id=None, groups=None, id='111887457057642', roles=None),
+        ServicePrincipal(active=True, application_id='b672d6b3-e6f2-4404-9f5f-600151d7edab', display_name=None,
+                         entitlements=None, external_id=None,
+                         groups=[ComplexValue(display='admins', primary=None, type='direct', value='8460646211285870')],
+                         id='139292275309160', roles=[ComplexValue(display='admin_role', primary=None, type='direct',
+                                                                   value='123456789')])
+    ]
+    ws = mocker.Mock()
+    crawler = AzureServicePrincipalCrawler(ws, MockBackend(), "ucx")._assess_service_principals(sample_spns)
+    result_set = list(crawler)
+
+    assert len(result_set) == 6
+    assert result_set[0].active == True
+    assert result_set[4].application_id == 'c50e118f-7ac8-4a23-9da7-eed19f5ac063'
+    assert result_set[1].display_name == 'PROPHECY_USER'
+    assert result_set[4].entitlements == [{'value': 'workspace-access'}, {'value': 'databricks-sql-access'},
+        {'value': 'allow-cluster-create'}]
+    assert result_set[2].external_id == '18b3c55c-6d87-4f89-8b86-36acdd04ee46'
+    assert result_set[5].groups == [{'display': 'admins', 'type': 'direct', 'value': '8460646211285870'}]
+    assert result_set[3].id == '91991490737373'
+    assert result_set[5].roles == [{'display': 'admin_role', 'type': 'direct', 'value': '123456789'}]
