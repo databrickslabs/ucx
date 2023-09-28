@@ -80,6 +80,11 @@ def spark_version_compatibility(spark_version: str) -> str:
     return "supported"
 
 
+class AzureServicePrincipalInventory(CrawlerBase):
+
+
+
+
 class PipelinesCrawler(CrawlerBase):
     def __init__(self, ws: WorkspaceClient, sbe: SqlBackend, schema):
         super().__init__(sbe, "hive_metastore", schema, "pipelines")
