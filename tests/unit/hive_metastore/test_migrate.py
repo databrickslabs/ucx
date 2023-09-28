@@ -1,6 +1,7 @@
 import logging
-import pytest
 from unittest.mock import MagicMock
+
+import pytest
 
 from databricks.labs.ucx.hive_metastore.tables import TablesCrawler, TablesMigrate
 
@@ -36,6 +37,7 @@ def test_migrate_managed_tables_should_produce_proper_queries():
         "ALTER TABLE hive_metastore.db1.managed SET TBLPROPERTIES ('upgraded_to' = 'ucx_default.db1.managed');",
         "ALTER TABLE ucx_default.db1.managed SET TBLPROPERTIES ('upgraded_from' = 'hive_metastore.db1.managed');",
     ]
+
 
 @pytest.mark.skip(reason="Not implemented yet")
 def test_migrate_managed_tables_should_do_nothing_if_upgrade_tag_is_present():
