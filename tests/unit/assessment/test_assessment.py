@@ -101,7 +101,7 @@ def test_job_assessment():
             spark_version="13.3.x-cpu-ml-scala2.12",
             cluster_id="0810-229933-chicago12",
             cluster_source=ClusterSource.JOB,
-        )
+        ),
     ]
     result_set = JobsCrawler(Mock(), MockBackend(), "ucx")._assess_jobs(
         sample_jobs, {c.cluster_id: c for c in sample_clusters}
@@ -172,7 +172,7 @@ def test_job_assessment_for_azure_spark_config():
                 ],
                 timeout_seconds=0,
             ),
-        )
+        ),
     ]
 
     sample_clusters = [
@@ -210,7 +210,7 @@ def test_job_assessment_for_azure_spark_config():
             policy_id="D96308F1BF0003A9",
             cluster_id="0811-929933-maine96",
             cluster_source=ClusterSource.JOB,
-        )
+        ),
     ]
     ws = Mock()
     ws.cluster_policies.get().definition = (
@@ -294,7 +294,7 @@ def test_cluster_assessment(mocker):
             policy_id="D96308F1BF0003A7",
             spark_version="13.3.x-cpu-ml-scala2.12",
             cluster_id="0915-190044-3dqy6751",
-        )
+        ),
     ]
 
     ws = Mock()

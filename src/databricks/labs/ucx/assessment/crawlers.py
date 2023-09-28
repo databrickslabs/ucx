@@ -90,18 +90,22 @@ class ClustersCrawler(CrawlerBase):
                         failures.append(f"using DBFS mount in configuration: {value}")
 
                 # Checking if Azure cluster config is present in spark config
-                for key, value in cluster.spark_conf.items():
+                for key in cluster.spark_conf.items():
                     for conf in _AZURE_SP_CLUSTER_CONF:
-                        if re.search(conf, key):
-                            failures.append(f"Uses azure service principal credentials in cluster config.")
+                        if re.search(conf, str(key)):
+                            failures.append("Uses azure service principal credentials in cluster config.")
 
             # Checking if Azure cluster config is present in cluster policies
             if cluster.policy_id:
                 cluster_policy_definition = self._ws.cluster_policies.get(cluster.policy_id).definition
-                cluster_family_definition = self._ws.cluster_policies.get(cluster.policy_id).policy_family_definition_overrides
+                cluster_family_definition = self._ws.cluster_policies.get(
+                    cluster.policy_id
+                ).policy_family_definition_overrides
                 for pol in _AZURE_SP_CLUSTER_CONF:
-                    if re.search(f"spark_conf.{pol}", cluster_policy_definition) or re.search(f"spark_conf.{pol}", cluster_family_definition):
-                        failures.append(f"Uses azure service principal credentials in cluster config.")
+                    if re.search(f"spark_conf.{pol}", cluster_policy_definition) or re.search(
+                        f"spark_conf.{pol}", cluster_family_definition
+                    ):
+                        failures.append("Uses azure service principal credentials in cluster config.")
 
             cluster_info.failures = json.dumps(failures)
             if len(failures) > 0:
@@ -168,17 +172,19 @@ class JobsCrawler(CrawlerBase):
                 # Checking if Azure cluster config is present in spark config
                 for conf in _AZURE_SP_CLUSTER_CONF:
                     if re.search(conf, json.dumps(cluster_config.spark_conf)):
-                        job_assessment[job.job_id].add(f"Uses azure service principal credentials in cluster config.")
+                        job_assessment[job.job_id].add("Uses azure service principal credentials in cluster config.")
 
             # Checking if Azure cluster config is present in cluster policies
             if cluster_config.policy_id:
                 job_cluster_policy_definition = self._ws.cluster_policies.get(cluster_config.policy_id).definition
                 job_cluster_family_definition = self._ws.cluster_policies.get(
-                    cluster_config.policy_id).policy_family_definition_overrides
+                    cluster_config.policy_id
+                ).policy_family_definition_overrides
                 for pol in _AZURE_SP_CLUSTER_CONF:
                     if re.search(f"spark_conf.{pol}", job_cluster_policy_definition) or re.search(
-                            f"spark_conf.{pol}", job_cluster_family_definition):
-                        job_assessment[job.job_id].add(f"Uses azure service principal credentials in cluster config.")
+                        f"spark_conf.{pol}", job_cluster_family_definition
+                    ):
+                        job_assessment[job.job_id].add("Uses azure service principal credentials in cluster config.")
 
         for job_key in job_details.keys():
             job_details[job_key].failures = json.dumps(list(job_assessment[job_key]))
