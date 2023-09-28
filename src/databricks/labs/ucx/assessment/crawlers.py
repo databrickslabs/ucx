@@ -70,12 +70,6 @@ class ClustersCrawler(CrawlerBase):
         all_clusters = list(self._ws.clusters.list())
         return list(self._assess_clusters(all_clusters))
 
-    def _get_cluster_policy_definition(self, policy_id):
-        return str(self._ws.cluster_policies.get(policy_id).definition)
-
-    def _get_cluster_family_definition(self, policy_id):
-        return str(self._ws.cluster_policies.get(policy_id).policy_family_definition_overrides)
-
     def _assess_clusters(self, all_clusters):
         for cluster in all_clusters:
             if cluster.cluster_source == ClusterSource.JOB:
@@ -83,10 +77,6 @@ class ClustersCrawler(CrawlerBase):
             cluster_info = ClusterInfo(cluster.cluster_id, cluster.cluster_name, cluster.creator_user_name, 1, "")
             support_status = spark_version_compatibility(cluster.spark_version)
             failures = []
-            conf_list = []
-            cluster_dict = {}
-            conf_policy_list = []
-            cluster_policy_dict = {}
             if support_status != "supported":
                 failures.append(f"not supported DBR: {cluster.spark_version}")
 
@@ -103,26 +93,15 @@ class ClustersCrawler(CrawlerBase):
                 for key, value in cluster.spark_conf.items():
                     for conf in _AZURE_SP_CLUSTER_CONF:
                         if re.search(conf, key):
-                            conf_list += [{key: value}]
-                if conf_list:
-                    cluster_dict["clusterName"] = cluster.cluster_name
-                    cluster_dict["clusterSparkConf"] = conf_list
-                    failures.append(json.dumps(cluster_dict))
+                            failures.append(f"Uses azure service principal credentials in cluster config.")
 
             # Checking if Azure cluster config is present in cluster policies
             if cluster.policy_id:
-                cluster_policy_definition = self._get_cluster_policy_definition(cluster.policy_id)
-                cluster_family_definition = self._get_cluster_family_definition(cluster.policy_id)
+                cluster_policy_definition = self._ws.cluster_policies.get(cluster.policy_id).definition
+                cluster_family_definition = self._ws.cluster_policies.get(cluster.policy_id).policy_family_definition_overrides
                 for pol in _AZURE_SP_CLUSTER_CONF:
-                    if re.search("spark_conf." + pol, cluster_policy_definition):
-                        conf_policy_list += [{"definition": cluster_policy_definition}]
-                    if re.search("spark_conf." + pol, cluster_family_definition):
-                        conf_policy_list += [{"policy_family_definition_overrides": cluster_family_definition}]
-
-                if conf_policy_list:
-                    cluster_policy_dict["clusterName"] = cluster.cluster_name
-                    cluster_policy_dict["clusterPolicy"] = conf_policy_list
-                    failures.append(json.dumps(cluster_policy_dict))
+                    if re.search(f"spark_conf.{pol}", cluster_policy_definition) or re.search(f"spark_conf.{pol}", cluster_family_definition):
+                        failures.append(f"Uses azure service principal credentials in cluster config.")
 
             cluster_info.failures = json.dumps(failures)
             if len(failures) > 0:
@@ -185,6 +164,22 @@ class JobsCrawler(CrawlerBase):
                 for value in cluster_config.spark_conf.values():
                     if "dbfs:/mnt" in value or "/dbfs/mnt" in value:
                         job_assessment[job.job_id].add(f"using DBFS mount in configuration: {value}")
+
+                # Checking if Azure cluster config is present in spark config
+                for conf in _AZURE_SP_CLUSTER_CONF:
+                    if re.search(conf, json.dumps(cluster_config.spark_conf)):
+                        job_assessment[job.job_id].add(f"Uses azure service principal credentials in cluster config.")
+
+            # Checking if Azure cluster config is present in cluster policies
+            if cluster_config.policy_id:
+                job_cluster_policy_definition = self._ws.cluster_policies.get(cluster_config.policy_id).definition
+                job_cluster_family_definition = self._ws.cluster_policies.get(
+                    cluster_config.policy_id).policy_family_definition_overrides
+                for pol in _AZURE_SP_CLUSTER_CONF:
+                    if re.search(f"spark_conf.{pol}", job_cluster_policy_definition) or re.search(
+                            f"spark_conf.{pol}", job_cluster_family_definition):
+                        job_assessment[job.job_id].add(f"Uses azure service principal credentials in cluster config.")
+
         for job_key in job_details.keys():
             job_details[job_key].failures = json.dumps(list(job_assessment[job_key]))
             if len(job_assessment[job_key]) > 0:
