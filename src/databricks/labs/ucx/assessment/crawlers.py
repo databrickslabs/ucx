@@ -42,6 +42,15 @@ class ClusterInfo:
     failures: str
 
 
+@dataclass
+class PipelineInfo:
+    pipeline_id: str
+    pipeline_name: str
+    creator_name: str
+    success: int
+    failures: str
+
+
 def spark_version_compatibility(spark_version: str) -> str:
     first_comp_custom_rt = 3
     first_comp_custom_x = 2
@@ -59,6 +68,38 @@ def spark_version_compatibility(spark_version: str) -> str:
     if (10, 0) <= version < (11, 3):
         return "kinda works"
     return "supported"
+
+
+class PipelinesCrawler(CrawlerBase):
+    def __init__(self, ws: WorkspaceClient, sbe: SqlBackend, schema):
+        super().__init__(sbe, "hive_metastore", schema, "pipelines")
+        self._ws = ws
+
+    def _crawl(self) -> list[PipelineInfo]:
+        all_pipelines = list(self._ws.pipelines.list_pipelines())
+        return list(self._assess_pipelines(all_pipelines))
+
+    def _assess_pipelines(self, all_pipelines):
+        for pipeline in all_pipelines:
+            pipeline_info = PipelineInfo(pipeline.pipeline_id, pipeline.name, pipeline.creator_user_name, 1, "")
+            failures = []
+            pipeline_config = self._ws.pipelines.get(pipeline.pipeline_id).spec.configuration
+            if pipeline_config:
+                for conf in _AZURE_SP_CLUSTER_CONF:
+                    if re.search(conf, str(pipeline_config)):
+                        failures.append("Uses azure service principal credentials in pipeline config.")
+
+            pipeline_info.failures = json.dumps(failures)
+            if len(failures) > 0:
+                pipeline_info.success = 0
+            yield pipeline_info
+
+    def snapshot(self) -> list[PipelineInfo]:
+        return self._snapshot(self._try_fetch, self._crawl)
+
+    def _try_fetch(self) -> list[PipelineInfo]:
+        for row in self._fetch(f"SELECT * FROM {self._schema}.{self._table}"):
+            yield PipelineInfo(*row)
 
 
 class ClustersCrawler(CrawlerBase):
@@ -90,10 +131,9 @@ class ClustersCrawler(CrawlerBase):
                         failures.append(f"using DBFS mount in configuration: {value}")
 
                 # Checking if Azure cluster config is present in spark config
-                for key in cluster.spark_conf.items():
-                    for conf in _AZURE_SP_CLUSTER_CONF:
-                        if re.search(conf, str(key)):
-                            failures.append("Uses azure service principal credentials in cluster config.")
+                for conf in _AZURE_SP_CLUSTER_CONF:
+                    if re.search(conf, str(cluster.spark_conf)):
+                        failures.append("Uses azure service principal credentials in cluster config.")
 
             # Checking if Azure cluster config is present in cluster policies
             if cluster.policy_id:
@@ -103,7 +143,7 @@ class ClustersCrawler(CrawlerBase):
                 ).policy_family_definition_overrides
                 for pol in _AZURE_SP_CLUSTER_CONF:
                     if re.search(f"spark_conf.{pol}", cluster_policy_definition) or re.search(
-                        f"spark_conf.{pol}", cluster_family_definition
+                            f"spark_conf.{pol}", cluster_family_definition
                     ):
                         failures.append("Uses azure service principal credentials in cluster config.")
 
@@ -182,7 +222,7 @@ class JobsCrawler(CrawlerBase):
                 ).policy_family_definition_overrides
                 for pol in _AZURE_SP_CLUSTER_CONF:
                     if re.search(f"spark_conf.{pol}", job_cluster_policy_definition) or re.search(
-                        f"spark_conf.{pol}", job_cluster_family_definition
+                            f"spark_conf.{pol}", job_cluster_family_definition
                     ):
                         job_assessment[job.job_id].add("Uses azure service principal credentials in cluster config.")
 
