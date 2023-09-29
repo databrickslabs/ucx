@@ -497,6 +497,37 @@ def test_azure_spn_info_without_secret(mocker):
     assert len(result_set) == 1
     assert result_set[0].application_id == "test123456789"
 
+def test_azure_spn_info_with_secret_crawl(mocker):
+    sample_clusters = [
+        ClusterDetails(
+            cluster_name="Tech Summit FY24 Cluster",
+            autoscale=AutoScale(min_workers=1, max_workers=6),
+            spark_conf={
+                "spark.hadoop.fs.azure.account."
+                "oauth2.client.id.abcde.dfs.core.windows.net": "{{secrets/abcff/sp_app_client_id}}",
+                "spark.hadoop.fs.azure.account."
+                "oauth2.client.endpoint.abcde.dfs.core.windows.net": "https://login.microsoftonline.com/dedededede/token",
+                "spark.hadoop.fs.azure.account."
+                "oauth2.client.secret.abcde.dfs.core.windows.net": "{{secrets/abcff/sp_secret}}",
+            },
+            spark_context_id=5134472582179565315,
+            spark_env_vars=None,
+            spark_version="13.3.x-cpu-ml-scala2.12",
+            cluster_id="0915-190044-3dqy6751",
+        )
+    ]
+    sample_spns = [{"application_id": "test123456780", "secret_scope": "abcff", "secret_key": "sp_app_client_id"}]
+    ws = mocker.Mock()
+    ws._get_relevant_service_principals.return_value = sample_spns
+    ws.clusters.list.return_value = sample_clusters
+    ws.secrets.get_secret.return_value = "test123456780"
+    AzureServicePrincipalCrawler(ws, MockBackend(), "ucx")._list_all_cluster_with_spn_in_spark_conf()
+    crawler = AzureServicePrincipalCrawler(ws, MockBackend(), "ucx")._crawl()
+    result_set = list(crawler)
+
+    assert len(result_set) == 1
+    assert result_set[0].secret_scope == "abcff"
+    assert result_set[0].secret_key == "sp_app_client_id"
 
 def test_azure_spn_info_with_secret(mocker):
     sample_clusters = [
