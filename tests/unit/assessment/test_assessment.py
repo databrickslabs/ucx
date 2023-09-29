@@ -577,3 +577,26 @@ def test_azure_spn_info(mocker):
     assert len(result_set) == 1
     assert result_set[0].active is True
     assert result_set[0].application_id == "bewygd1728ety1gwd1"
+
+def test_spn_with_spark_config_snapshot(mocker):
+    sample_spns = [
+        ServicePrincipal(
+            active=True,
+            application_id="bewygd1728ety1gwd1",
+            display_name="eric_azure_mlops_everest-cicd",
+            entitlements=None,
+            external_id=None,
+            groups=None,
+            id="22880264257977",
+            roles=None,
+        )]
+    mock_ws = Mock()
+    _azure_spn_list_with_data_access = ["bewygd1728ety1gwd1"]
+    crawler = AzureServicePrincipalCrawler(_azure_spn_list_with_data_access, mock_ws, MockBackend(), "ucx")
+    crawler._try_fetch = Mock(return_value=[])
+    crawler._crawl = Mock(return_value=sample_spns)
+
+    result_set = crawler.snapshot()
+
+    assert len(result_set) == 1
+    assert result_set[0].application_id == "bewygd1728ety1gwd1"
