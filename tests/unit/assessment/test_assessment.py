@@ -468,6 +468,7 @@ def test_pipeline_snapshot_with_config():
     assert len(result_set) == 1
     assert result_set[0].success == 1
 
+
 def test_azure_spn_info_without_matching_spark_conf(mocker):
     sample_clusters = [
         ClusterDetails(
@@ -489,7 +490,7 @@ def test_azure_spn_info_without_matching_spark_conf(mocker):
     result_set = list(crawler)
 
     assert len(result_set) == 1
-    assert result_set[0].application_id == None
+    assert result_set[0].application_id is None
 
 
 def test_azure_spn_info_without_spark_conf(mocker):
@@ -512,7 +513,8 @@ def test_azure_spn_info_without_spark_conf(mocker):
     result_set = list(crawler)
 
     assert len(result_set) == 1
-    assert result_set[0].application_id == None
+    assert result_set[0].application_id is None
+
 
 def test_azure_spn_info_without_secret(mocker):
     sample_clusters = [
