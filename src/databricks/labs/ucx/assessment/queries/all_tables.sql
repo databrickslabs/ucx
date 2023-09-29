@@ -1,4 +1,4 @@
--- viz type=table, name=Table Types, columns=database,name,type,format,table_view,storage,is_delta,location,upgrade_status,upgrade_target
+-- viz type=table, name=Table Types, columns=database,name,type,format,table_view,storage,is_delta,location
 -- widget title=Table Types, col=0, row=3, size_x=6, size_y=6
 SELECT `database`,
        name,
@@ -12,7 +12,5 @@ SELECT `database`,
            ELSE "EXTERNAL"
        END AS storage,
        IF(format = "delta", "Yes", "No") AS is_delta,
-       location,
-       upgrade_status,
-       upgrade_target
+       location
 FROM $inventory.tables
