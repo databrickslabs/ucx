@@ -82,9 +82,9 @@ def test_catalog_fixture(make_catalog):
 
 @pytest.fixture
 def make_schema(sql_exec, make_random):
-    def create(*, catalog: str = "hive_metastore", schema: str = None):
+    def create(*, catalog: str = "hive_metastore", schema: str | None = None):
         if schema is None:
-            schema = f'ucx_S{make_random(4)}'
+            schema = f"ucx_S{make_random(4)}"
         schema = f"{catalog}.{schema}".lower()
         sql_exec(f"CREATE SCHEMA {schema}")
         return schema
