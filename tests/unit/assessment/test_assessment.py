@@ -478,7 +478,7 @@ def test_azure_spn_info(mocker):
             spark_env_vars=None,
             spark_version="9.3.x-cpu-ml-scala2.12",
             cluster_id="0810-225833-atlanta69",
-            cluster_name="Tech Summit FY24 Cluster-1"
+            cluster_name="Tech Summit FY24 Cluster-1",
         ),
         ClusterDetails(
             cluster_name="Tech Summit FY24 Cluster",
@@ -495,7 +495,8 @@ def test_azure_spn_info(mocker):
             spark_env_vars=None,
             spark_version="13.3.x-cpu-ml-scala2.12",
             cluster_id="0915-190044-3dqy6751",
-        )]
+        ),
+    ]
     sample_spns = [
         ServicePrincipal(
             active=True,
@@ -568,8 +569,9 @@ def test_azure_spn_info(mocker):
     ws = mocker.Mock()
     ws.clusters.list.return_value = sample_clusters
     _azure_spn_list_with_data_access = ["bewygd1728ety1gwd1"]
-    crawler = AzureServicePrincipalCrawler(_azure_spn_list_with_data_access, ws, MockBackend(),
-                                           "ucx")._assess_service_principals(sample_spns)
+    crawler = AzureServicePrincipalCrawler(
+        _azure_spn_list_with_data_access, ws, MockBackend(), "ucx"
+    )._assess_service_principals(sample_spns)
     result_set = list(crawler)
 
     assert len(result_set) == 1
