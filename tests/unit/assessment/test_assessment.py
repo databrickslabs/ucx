@@ -545,39 +545,6 @@ def test_azure_spn_info_without_secret(mocker):
     assert result_set[0].application_id == "test123456789"
 
 
-def test_azure_spn_info_with_secret_crawl(mocker):
-    sample_clusters = [
-        ClusterDetails(
-            cluster_name="Tech Summit FY24 Cluster",
-            autoscale=AutoScale(min_workers=1, max_workers=6),
-            spark_conf={
-                "spark.hadoop.fs.azure.account."
-                "oauth2.client.id.abcde.dfs.core.windows.net": "{{secrets/abcff/sp_app_client_id}}",
-                "spark.hadoop.fs.azure.account."
-                "oauth2.client.endpoint.abcde.dfs.core.windows.net": "https://login.microsoftonline.com/dedededede/token",
-                "spark.hadoop.fs.azure.account."
-                "oauth2.client.secret.abcde.dfs.core.windows.net": "{{secrets/abcff/sp_secret}}",
-            },
-            spark_context_id=5134472582179565315,
-            spark_env_vars=None,
-            spark_version="13.3.x-cpu-ml-scala2.12",
-            cluster_id="0915-190044-3dqy6751",
-        )
-    ]
-    sample_spns = [{"application_id": "test123456780", "secret_scope": "abcff", "secret_key": "sp_app_client_id"}]
-    ws = mocker.Mock()
-    ws._get_relevant_service_principals.return_value = sample_spns
-    ws.clusters.list.return_value = sample_clusters
-    ws.secrets.get_secret.return_value = "test123456780"
-    AzureServicePrincipalCrawler(ws, MockBackend(), "ucx")._list_all_cluster_with_spn_in_spark_conf()
-    crawler = AzureServicePrincipalCrawler(ws, MockBackend(), "ucx")._crawl()
-    result_set = list(crawler)
-
-    assert len(result_set) == 1
-    assert result_set[0].secret_scope == "abcff"
-    assert result_set[0].secret_key == "sp_app_client_id"
-
-
 def test_azure_spn_info_with_secret(mocker):
     sample_clusters = [
         ClusterDetails(
@@ -622,3 +589,83 @@ def test_spn_with_spark_config_snapshot(mocker):
         "secret_scope": "abcff",
         "secret_key": "sp_app_client_id",
     }
+
+
+def test_list_all_cluster_with_spn_in_spark_conf(mocker):
+    sample_clusters = [
+        ClusterDetails(
+            cluster_name="Tech Summit FY24 Cluster",
+            autoscale=AutoScale(min_workers=1, max_workers=6),
+            spark_conf={
+                "spark.hadoop.fs.azure.account."
+                "oauth2.client.id.abcde.dfs.core.windows.net": "{{secrets/abcff/sp_app_client_id}}",
+                "spark.hadoop.fs.azure.account."
+                "oauth2.client.endpoint.abcde.dfs.core.windows.net": "https://login.microsoftonline.com/dedededede/token",
+                "spark.hadoop.fs.azure.account."
+                "oauth2.client.secret.abcde.dfs.core.windows.net": "{{secrets/abcff/sp_secret}}",
+            },
+            spark_context_id=5134472582179565315,
+            spark_env_vars=None,
+            spark_version="13.3.x-cpu-ml-scala2.12",
+            cluster_id="0915-190044-3dqy6751",
+        )
+    ]
+    sample_pipelines = [
+        PipelineInfo(
+            creator_name="abcde.defgh@databricks.com",
+            pipeline_name="New DLT Pipeline",
+            pipeline_id="0112eae7-9d11-4b40-a2b8-6c83cb3c7497",
+            success=1,
+            failures="",
+        )
+    ]
+    sample_jobs = [
+        BaseJob(
+            created_time=1694536604319,
+            creator_user_name="anonymous@databricks.com",
+            job_id=536591785949415,
+            settings=JobSettings(
+                compute=None,
+                continuous=None,
+                tasks=[
+                    Task(
+                        task_key="Ingest",
+                        existing_cluster_id="0807-225846-motto493",
+                        notebook_task=NotebookTask(
+                            notebook_path="/Users/foo.bar@databricks.com/Customers/Example/Test/Load"
+                        ),
+                        timeout_seconds=0,
+                    )
+                ],
+                timeout_seconds=0,
+            ),
+        )
+    ]
+    sample_job_clusters = [
+        ClusterDetails(
+            autoscale=AutoScale(min_workers=1, max_workers=6),
+            spark_conf={"spark.databricks.delta.preview.enabled": "true"},
+            spark_context_id=5134472582179565315,
+            spark_env_vars=None,
+            spark_version="13.3.x-cpu-ml-scala2.12",
+            cluster_id="0807-225846-motto493",
+            cluster_source=ClusterSource.JOB,
+        )
+    ]
+    ws = mocker.Mock()
+    ws.clusters.list.return_value = sample_clusters
+    ws.pipelines.list_pipelines.return_value = sample_pipelines
+    ws.jobs.list.return_value = sample_jobs
+    ws.clusters.list.return_value = sample_job_clusters
+    config_dict = {
+        "spark.hadoop.fs.azure.account.auth.type.abcde.dfs.core.windows.net": "SAS",
+        "spark.hadoop.fs.azure.sas.token.provider.type.abcde.dfs."
+        "core.windows.net": "org.apache.hadoop.fs.azurebfs.sas.FixedSASTokenProvider",
+        "spark.hadoop.fs.azure.sas.fixed.token.abcde.dfs.core.windows.net": "{{secrets/abcde_access/sasFixedToken}}",
+    }
+    ws.pipelines.get().spec.configuration = config_dict
+
+    crawler = AzureServicePrincipalCrawler(ws, MockBackend(), "ucx").snapshot()
+    result_set = list(crawler)
+
+    assert len(result_set) == 0

@@ -100,11 +100,96 @@ class AzureServicePrincipalCrawler(CrawlerBase):
 
     def _crawl(self) -> list[AzureServicePrincipalInfo]:
         self._get_relevant_service_principals()
-        all_relevant_service_principals = self._azure_spn_list_with_data_access
+        all_relevant_service_principals = [
+            dict(t) for t in {tuple(d.items()) for d in self._azure_spn_list_with_data_access}
+        ]
         return list(self._assess_service_principals(all_relevant_service_principals))
+
+    def _add_spn_to_list(self, spn_application_id):
+        matched = re.search(_SECRET_PATTERN, spn_application_id)
+        if not matched:
+            self._azure_spn_list_with_data_access.append(
+                {"application_id": spn_application_id, "secret_scope": "", "secret_key": ""}
+            )
+        else:
+            spn_secret_application_id = self._ws.secrets.get_secret(
+                matched.group(1).split("/")[1], matched.group(1).split("/")[2]
+            )
+            self._azure_spn_list_with_data_access.append(
+                {
+                    "application_id": spn_secret_application_id,
+                    "secret_scope": matched.group(1).split("/")[1],
+                    "secret_key": matched.group(1).split("/")[2],
+                }
+            )
+
+    def _get_cluster_configs_from_all_jobs(self, all_jobs, all_clusters_by_id):
+        for j in all_jobs:
+            if j.settings.job_clusters is not None:
+                for jc in j.settings.job_clusters:
+                    if jc.new_cluster is None:
+                        continue
+                    yield j, jc.new_cluster
+
+            for t in j.settings.tasks:
+                if t.existing_cluster_id is not None:
+                    interactive_cluster = all_clusters_by_id.get(t.existing_cluster_id, None)
+                    if interactive_cluster is None:
+                        continue
+                    yield j, interactive_cluster
+
+                elif t.new_cluster is not None:
+                    yield j, t.new_cluster
 
     def _get_relevant_service_principals(self):
         self._list_all_cluster_with_spn_in_spark_conf()
+        self._list_all_pipeline_with_spn_in_spark_conf()
+        self._list_all_jobs_with_spn_in_spark_conf()
+
+    def _list_all_jobs_with_spn_in_spark_conf(self):
+        all_jobs = list(self._ws.jobs.list(expand_tasks=True))
+        all_clusters_by_id = {c.cluster_id: c for c in self._ws.clusters.list()}
+        for _job, cluster_config in self._get_cluster_configs_from_all_jobs(all_jobs, all_clusters_by_id):
+            if not cluster_config.spark_conf:
+                continue
+                # Checking if Azure cluster config is present in spark config
+            if not _azure_sp_conf_present_check(cluster_config.spark_conf):
+                continue
+            spn_application_id = _get_azure_spn_application_id(cluster_config.spark_conf)
+            if not spn_application_id:
+                continue
+            self._add_spn_to_list(spn_application_id)
+
+            # Checking if Azure cluster config is present in cluster policies
+            if not cluster_config.policy_id:
+                continue
+            policy = self._ws.cluster_policies.get(cluster_config.policy_id)
+            if not _azure_sp_conf_present_check(json.loads(policy.definition)):
+                continue
+            spn_application_id = _get_azure_spn_application_id(json.loads(policy.definition))
+            if not spn_application_id:
+                continue
+            self._add_spn_to_list(spn_application_id)
+            if not policy.policy_family_definition_overrides:
+                continue
+            if not _azure_sp_conf_present_check(json.loads(policy.policy_family_definition_overrides)):
+                continue
+            spn_application_id = _get_azure_spn_application_id(json.loads(policy.policy_family_definition_overrides))
+            if not spn_application_id:
+                continue
+            self._add_spn_to_list(spn_application_id)
+
+    def _list_all_pipeline_with_spn_in_spark_conf(self):
+        for pipeline in self._ws.pipelines.list_pipelines():
+            pipeline_config = self._ws.pipelines.get(pipeline.pipeline_id).spec.configuration
+            if not pipeline_config:
+                continue
+            if not _azure_sp_conf_present_check(pipeline_config):
+                continue
+            spn_application_id = _get_azure_spn_application_id(pipeline_config)
+            if not spn_application_id:
+                continue
+            self._add_spn_to_list(spn_application_id)
 
     def _list_all_cluster_with_spn_in_spark_conf(self):
         for cluster in self._ws.clusters.list():
@@ -116,21 +201,27 @@ class AzureServicePrincipalCrawler(CrawlerBase):
                 spn_application_id = _get_azure_spn_application_id(cluster.spark_conf)
                 if not spn_application_id:
                     continue
-                matched = re.search(_SECRET_PATTERN, spn_application_id)
-                if matched:
-                    self._ws.secrets.get_secret(matched.group(1).split("/")[1], matched.group(1).split("/")[2])
-                    self._azure_spn_list_with_data_access.append(
-                        {
-                            "application_id": spn_application_id,
-                            "secret_scope": matched.group(1).split("/")[1],
-                            "secret_key": matched.group(1).split("/")[2],
-                        }
-                    )
-                else:
-                    print("in else")
-                    self._azure_spn_list_with_data_access.append(
-                        {"application_id": spn_application_id, "secret_scope": "", "secret_key": ""}
-                    )
+                self._add_spn_to_list(spn_application_id)
+
+                if not cluster.policy_id:
+                    continue
+                policy = self._ws.cluster_policies.get(cluster.policy_id)
+                if not _azure_sp_conf_present_check(json.loads(policy.definition)):
+                    continue
+                spn_application_id = _get_azure_spn_application_id(json.loads(policy.definition))
+                if not spn_application_id:
+                    continue
+                self._add_spn_to_list(spn_application_id)
+                if not policy.policy_family_definition_overrides:
+                    continue
+                if not _azure_sp_conf_present_check(json.loads(policy.policy_family_definition_overrides)):
+                    continue
+                spn_application_id = _get_azure_spn_application_id(
+                    json.loads(policy.policy_family_definition_overrides)
+                )
+                if not spn_application_id:
+                    continue
+                self._add_spn_to_list(spn_application_id)
 
     def _assess_service_principals(self, all_relevant_service_principals: list):
         for spn in all_relevant_service_principals:
