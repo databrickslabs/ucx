@@ -130,7 +130,7 @@ class DashboardFromFiles:
     def _get_widget_options(self, query: SimpleQuery):
         self._pos += 1
         widget_options = WidgetOptions(
-            title=query.widget["title"],
+            title=query.widget.get("title", ""),
             description=query.widget.get("description", None),
             position=WidgetPosition(
                 col=int(query.widget.get("col", 0)),
@@ -227,7 +227,7 @@ class DashboardFromFiles:
         self._state[query.viz_key] = viz.id
 
     def _get_viz_options(self, query: SimpleQuery):
-        viz_types = {"table": self._table_viz_args}
+        viz_types = {"table": self._table_viz_args, "counter": self._counter_viz_args}
         if query.viz_type not in viz_types:
             msg = f"{query.query}: unknown viz type: {query.viz_type}"
             raise SyntaxError(msg)
@@ -267,6 +267,38 @@ class DashboardFromFiles:
                 "withRowNumber": with_row_number,
                 "version": 2,
                 "columns": [VizColumn(name=x, title=x).as_dict() for x in columns.split(",")],
+            },
+        }
+
+    @staticmethod
+    def _counter_viz_args(
+        name: str,
+        value_column: str,
+        *,
+        description: str | None = None,
+        counter_label: str | None = None,
+        value_row_number: int = 1,
+        target_row_number: int = 1,
+        string_decimal: int = 0,
+        string_decimal_char: str = ".",
+        string_thousand_separator: str = ",",
+        tooltip_format: str = "0,0.000",
+        count_row: bool = False,
+    ) -> dict:
+        return {
+            "type": "COUNTER",
+            "name": name,
+            "description": description,
+            "options": {
+                "counterLabel": counter_label,
+                "counterColName": value_column,
+                "rowNumber": value_row_number,
+                "targetRowNumber": target_row_number,
+                "stringDecimal": string_decimal,
+                "stringDecChar": string_decimal_char,
+                "stringThouSep": string_thousand_separator,
+                "tooltipFormat": tooltip_format,
+                "countRow": count_row,
             },
         }
 
