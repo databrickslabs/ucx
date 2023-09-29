@@ -33,7 +33,6 @@ Holds Inventory of all tables in all databases and their relevant metadata.
 |table_format|string|Table provider. Like delta or json or parquet.|
 |location|string|Location of the data for table|
 |view_text|nullable string|If the table is the view, then this column holds the definition of the view|
-|workspace_id|string|A workspace ID of the HMS (Optional)|
 
 <br/>
 
@@ -96,8 +95,7 @@ Holds a list of all jobs with a notation of potential issues.
 |job_name|string|Job Name|
 |job_creator|string|UserID of the Job Creator|
 |compatible|int|1 or 0, used for percentage reporting|
-|notes|string|List of issues identified by the assessment in JSON format|
-|azure_sp|string|List of Azure SP utilized by this job|
+|failures|string|List of issues identified by the assessment in JSON format|
 
 
 #### _$inventory_.clusters
@@ -109,8 +107,7 @@ Holds a list of all clusters with a notation of potential issues.
 |cluster_name|string|Cluster Name|
 |cluster_creator|string|UserID of the Cluster Creator|
 |compatible|int|1 or 0, used for percentage reporting|
-|notes|string|List of issues identified by the assessment in JSON format|
-|azure_sp|string|List of Azure SP utilized by this job|
+|failures|string|List of issues identified by the assessment in JSON format|
 
 
 #### _$inventory_.external_locations
