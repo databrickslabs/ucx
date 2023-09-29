@@ -15,7 +15,6 @@ INCOMPATIBLE_SPARK_CONFIG_KEYS = [
 ]
 
 _AZURE_SP_CONF = [
-    "fs.azure.account.key",
     "fs.azure.account.auth.type",
     "fs.azure.account.oauth.provider.type",
     "fs.azure.account.oauth2.client.id",
@@ -24,6 +23,8 @@ _AZURE_SP_CONF = [
 ]
 
 _AZURE_SP_CONF_FAILURE_MSG = "Uses azure service principal credentials config in "
+_SECRET_PATTERN = r"{{(secrets.*?)}}"
+_AZURE_SPN_LIST = []
 
 
 @dataclass
@@ -58,11 +59,13 @@ class AzureServicePrincipalInfo:
     active: bool
     application_id: str
     display_name: str
-    entitlements: list
     external_id: str
-    groups: list
     spn_id: str
-    roles: list
+
+
+@dataclass
+class AzureServicePrincipalApplicationId:
+    application_id: str
 
 
 def _azure_sp_conf_present_check(config: dict) -> bool:
@@ -71,6 +74,12 @@ def _azure_sp_conf_present_check(config: dict) -> bool:
             if re.search(conf, key):
                 return True
     return False
+
+
+def _get_azure_spn_application_id(config: dict) -> str:
+    matching_key = [key for key in config.keys() if _AZURE_SP_CONF[2] in key]
+    if len(matching_key) > 0:
+        return config.get(matching_key[0])
 
 
 def spark_version_compatibility(spark_version: str) -> str:
@@ -98,29 +107,15 @@ class AzureServicePrincipalCrawler(CrawlerBase):
         self._ws = ws
 
     def _crawl(self) -> list[AzureServicePrincipalInfo]:
-        all_service_principals = list(self._ws.service_principals.list())
-        return list(self._assess_service_principals(all_service_principals))
+        relevant_service_principals = [
+            spn for spn in self._ws.service_principals.list() if spn.application_id in _AZURE_SPN_LIST
+        ]
+        return list(self._assess_service_principals(relevant_service_principals))
 
-    def _assess_service_principals(self, all_service_principals):
-        _entitlements = []
-        _groups = []
-        _roles = []
-        for spn in all_service_principals:
-            if spn.entitlements:
-                _entitlements = [entitlement.as_dict() for entitlement in spn.entitlements]
-            if spn.groups:
-                _groups = [group.as_dict() for group in spn.groups]
-            if spn.roles:
-                _roles = [role.as_dict() for role in spn.roles]
+    def _assess_service_principals(self, relevant_service_principals):
+        for spn in relevant_service_principals:
             spn_info = AzureServicePrincipalInfo(
-                spn.active,
-                spn.application_id,
-                spn.display_name,
-                _entitlements,
-                spn.external_id,
-                _groups,
-                spn.id,
-                _roles,
+                spn.active, spn.application_id, spn.display_name, spn.external_id, spn.id
             )
             yield spn_info
 
@@ -148,6 +143,14 @@ class PipelinesCrawler(CrawlerBase):
             pipeline_config = self._ws.pipelines.get(pipeline.pipeline_id).spec.configuration
             if pipeline_config:
                 if _azure_sp_conf_present_check(pipeline_config):
+                    spn_application_id = _get_azure_spn_application_id(config=pipeline_config)
+                    if spn_application_id:
+                        matched = re.search(_SECRET_PATTERN, spn_application_id)
+                        if matched:
+                            spn_application_id = self._ws.secrets.get_secret(
+                                matched.group(1).split("/")[1], matched.group(1).split("/")[2]
+                            )
+                        _AZURE_SPN_LIST.append(AzureServicePrincipalApplicationId(spn_application_id))
                     failures.append(f"{_AZURE_SP_CONF_FAILURE_MSG} pipeline.")
 
             pipeline_info.failures = json.dumps(failures)

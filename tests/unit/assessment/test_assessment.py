@@ -547,12 +547,5 @@ def test_azure_spn_info(mocker):
     assert result_set[0].active is True
     assert result_set[4].application_id == "c50e118f-7ac8-4a23-9da7-eed19f5ac063"
     assert result_set[1].display_name == "PROPHECY_USER"
-    assert result_set[4].entitlements == [
-        {"value": "workspace-access"},
-        {"value": "databricks-sql-access"},
-        {"value": "allow-cluster-create"},
-    ]
     assert result_set[2].external_id == "18b3c55c-6d87-4f89-8b86-36acdd04ee46"
-    assert result_set[5].groups == [{"display": "admins", "type": "direct", "value": "8460646211285870"}]
     assert result_set[3].spn_id == "91991490737373"
-    assert result_set[5].roles == [{"display": "admin_role", "type": "direct", "value": "123456789"}]
