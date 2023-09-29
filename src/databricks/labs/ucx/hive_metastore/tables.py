@@ -22,6 +22,8 @@ class Table:
 
     location: str = None
     view_text: str = None
+    upgrade_status: int = 0
+    upgrade_target: str = None
 
     @property
     def is_delta(self) -> bool:

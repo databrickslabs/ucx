@@ -24,15 +24,17 @@ Table Utilization:
 
 Holds Inventory of all tables in all databases and their relevant metadata.
 
-| Column    | Datatype | Description | Comments |
-|-----------|----------|-------------|----------|
-| catalog   | string   | Original catalog of the table. _hive_metastore_ by default |
-| database  | string   | Original schema of the table |
-| name |string|Name of the table|
-|object_type|string|MANAGED, EXTERNAL, or VIEW|
-|table_format|string|Table provider. Like delta or json or parquet.|
-|location|string|Location of the data for table|
-|view_text|nullable string|If the table is the view, then this column holds the definition of the view|
+| Column         | Datatype | Description | Comments |
+|----------------|----------|-------------|----------|
+| catalog        | string   | Original catalog of the table. _hive_metastore_ by default |
+| database       | string   | Original schema of the table |
+| name           |string|Name of the table|
+| object_type    |string|MANAGED, EXTERNAL, or VIEW|
+| table_format   |string|Table provider. Like delta or json or parquet.|
+| location       |string|Location of the data for table|
+| view_text      |nullable string|If the table is the view, then this column holds the definition of the view|
+| upgrade_status |int|0-Not Upgraded (default) 1-Upgraded|
+| upgrade_target |string|Upgrade Target (3 level namespace)|
 
 <br/>
 
