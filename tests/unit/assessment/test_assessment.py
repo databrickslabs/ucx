@@ -527,7 +527,7 @@ def test_azure_spn_info(mocker):
             entitlements=None,
             external_id="hwebdgwdg8yd",
             groups=None,
-            id="63562194880794",
+            id="635621948807945",
             roles=None,
         ),
         ServicePrincipal(
