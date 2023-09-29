@@ -15,7 +15,7 @@ def test_migrate_managed_tables(ws, make_catalog, make_schema, make_table):
     schema_a = make_schema(catalog="hive_metastore")
     _, target_schema = schema_a.split(".")
 
-    make_schema(catalog=target_catalog, schema_name=target_schema)
+    make_schema(catalog=target_catalog, schema=target_schema)
 
     managed_table = make_table(schema=schema_a)
 

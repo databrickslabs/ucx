@@ -393,7 +393,7 @@ class WorkspaceInstaller:
         tasks = sorted([t for t in _TASKS.values() if t.workflow == step_name], key=lambda _: _.name)
         return {
             "name": self._name(step_name),
-            "tags": {TAG_APP: self._app, TAG_STEP: step_name},
+            "tags": {TAG_APP: self._app, TAG_STEP: step_name, 'version': f'v{__version__}'},
             "job_clusters": self._job_clusters({t.job_cluster for t in tasks}),
             "email_notifications": email_notifications,
             "tasks": [self._job_task(task, dbfs_path) for task in tasks],
