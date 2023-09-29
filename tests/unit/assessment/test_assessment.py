@@ -1,7 +1,6 @@
 from unittest.mock import Mock
 
 from databricks.sdk.service.compute import AutoScale, ClusterDetails, ClusterSource
-from databricks.sdk.service.iam import ServicePrincipal
 from databricks.sdk.service.jobs import BaseJob, JobSettings, NotebookTask, Task
 from databricks.sdk.service.pipelines import PipelineState, PipelineStateInfo
 
@@ -618,4 +617,8 @@ def test_spn_with_spark_config_snapshot(mocker):
     result_set = crawler.snapshot()
 
     assert len(result_set) == 1
-    assert result_set[0] == {"application_id": "test123456780", "secret_scope": "abcff", "secret_key": "sp_app_client_id"}
+    assert result_set[0] == {
+        "application_id": "test123456780",
+        "secret_scope": "abcff",
+        "secret_key": "sp_app_client_id",
+    }
