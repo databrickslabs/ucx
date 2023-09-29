@@ -183,7 +183,7 @@ class TablesMigrate:
         try:
             sql = table.uc_create_sql(target_catalog)
             logger.debug(f"Migrating table {table.key} to using SQL query: {sql}")
-            target = f"{target_catalog}.{table.database}.{table.name}"
+            target = f"{target_catalog}.{table.database}.{table.name}".lower()
 
             if self._table_already_upgraded(target):
                 logger.info(f"Table {table.key} already upgraded to {self._seen_tables[target]}")
@@ -202,7 +202,7 @@ class TablesMigrate:
             for schema in self._ws.schemas.list(catalog_name=catalog.name):
                 for table in self._ws.tables.list(catalog_name=catalog.name, schema_name=schema.name):
                     if table.properties is not None and "upgraded_from" in table.properties:
-                        self._seen_tables[table.full_name] = table.properties["upgraded_from"]
+                        self._seen_tables[table.full_name.lower()] = table.properties["upgraded_from"].lower()
 
     def _table_already_upgraded(self, target) -> bool:
         return target in self._seen_tables
