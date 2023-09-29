@@ -15,14 +15,13 @@ INCOMPATIBLE_SPARK_CONFIG_KEYS = [
 ]
 
 _AZURE_SP_CONF = [
-    "fs.azure.account.key",
     "fs.azure.account.auth.type",
     "fs.azure.account.oauth.provider.type",
     "fs.azure.account.oauth2.client.id",
     "fs.azure.account.oauth2.client.secret",
     "fs.azure.account.oauth2.client.endpoint",
 ]
-
+_SECRET_PATTERN = r"{{(secrets.*?)}}"
 _AZURE_SP_CONF_FAILURE_MSG = "Uses azure service principal credentials config in "
 
 
@@ -58,11 +57,8 @@ class AzureServicePrincipalInfo:
     active: bool
     application_id: str
     display_name: str
-    entitlements: list
     external_id: str
-    groups: list
     spn_id: str
-    roles: list
 
 
 def _azure_sp_conf_present_check(config: dict) -> bool:
@@ -71,6 +67,12 @@ def _azure_sp_conf_present_check(config: dict) -> bool:
             if re.search(conf, key):
                 return True
     return False
+
+
+def _get_azure_spn_application_id(config: dict) -> str:
+    matching_key = [key for key in config.keys() if _AZURE_SP_CONF[2] in key]
+    if len(matching_key) > 0:
+        return config.get(matching_key[0])
 
 
 def spark_version_compatibility(spark_version: str) -> str:
@@ -93,36 +95,37 @@ def spark_version_compatibility(spark_version: str) -> str:
 
 
 class AzureServicePrincipalCrawler(CrawlerBase):
-    def __init__(self, ws: WorkspaceClient, sbe: SqlBackend, schema):
+    def __init__(self, _azure_spn_list_with_data_access: list, ws: WorkspaceClient, sbe: SqlBackend, schema):
         super().__init__(sbe, "hive_metastore", schema, "azure_service_principals")
         self._ws = ws
+        self._azure_spn_list_with_data_access = _azure_spn_list_with_data_access
 
     def _crawl(self) -> list[AzureServicePrincipalInfo]:
         all_service_principals = list(self._ws.service_principals.list())
         return list(self._assess_service_principals(all_service_principals))
 
+    def _list_all_cluster_with_spn_in_spark_conf(self):
+        for cluster in self._ws.clusters.list():
+            if cluster.cluster_source != ClusterSource.JOB:
+                if cluster.spark_conf is not None:
+                    if _azure_sp_conf_present_check(cluster.spark_conf):
+                        spn_application_id = _get_azure_spn_application_id(cluster.spark_conf)
+                        if spn_application_id:
+                            matched = re.search(_SECRET_PATTERN, spn_application_id)
+                            if matched:
+                                spn_application_id = self._ws.secrets.get_secret(
+                                    matched.group(1).split("/")[1], matched.group(1).split("/")[2]
+                                )
+                            self._azure_spn_list_with_data_access.append(spn_application_id)
+
     def _assess_service_principals(self, all_service_principals):
-        _entitlements = []
-        _groups = []
-        _roles = []
+        self._list_all_cluster_with_spn_in_spark_conf()
         for spn in all_service_principals:
-            if spn.entitlements:
-                _entitlements = [entitlement.as_dict() for entitlement in spn.entitlements]
-            if spn.groups:
-                _groups = [group.as_dict() for group in spn.groups]
-            if spn.roles:
-                _roles = [role.as_dict() for role in spn.roles]
-            spn_info = AzureServicePrincipalInfo(
-                spn.active,
-                spn.application_id,
-                spn.display_name,
-                _entitlements,
-                spn.external_id,
-                _groups,
-                spn.id,
-                _roles,
-            )
-            yield spn_info
+            if spn.application_id in self._azure_spn_list_with_data_access:
+                spn_info = AzureServicePrincipalInfo(
+                    spn.active, spn.application_id, spn.display_name, spn.external_id, spn.id
+                )
+                yield spn_info
 
     def snapshot(self) -> list[AzureServicePrincipalInfo]:
         return self._snapshot(self._try_fetch, self._crawl)
