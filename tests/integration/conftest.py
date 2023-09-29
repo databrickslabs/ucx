@@ -111,7 +111,7 @@ def make_table(sql_exec, make_schema, make_random):
         non_delta: bool = False,
         external: bool = False,
         view: bool = False,
-        tbl_properties: str = "",
+        tbl_properties: dict[str, str] | None = None,
     ):
         if schema is None:
             schema = make_schema(catalog=catalog)
@@ -132,11 +132,11 @@ def make_table(sql_exec, make_schema, make_random):
         else:
             # managed table
             ddl = f"{ddl} (id INT, value STRING)"
-
         if tbl_properties:
-            sql_exec(ddl + " " + tbl_properties)
-        else:
-            sql_exec(ddl)
+            tbl_properties = ",".join([f" '{k}' = '{v}' " for k, v in tbl_properties.items()])
+            ddl = f"{ddl} TBLPROPERTIES ({tbl_properties})"
+
+        sql_exec(ddl)
         return name
 
     def remove(name):
@@ -158,6 +158,7 @@ def test_table_fixture(make_table):
     logger.info(f"Created new external JSON table in new schema: {make_table(non_delta=True)}")
     logger.info(f'Created new tmp table in new schema: {make_table(ctas="SELECT 2+2 AS four")}')
     logger.info(f'Created new view in new schema: {make_table(view=True, ctas="SELECT 2+2 AS four")}')
+    logger.info(f'Created table with properties: {make_table(tbl_properties={"test": "tableproperty"})}')
 
 
 @pytest.fixture

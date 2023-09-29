@@ -183,32 +183,26 @@ class TablesMigrate:
         try:
             sql = table.uc_create_sql(target_catalog)
             logger.debug(f"Migrating table {table.key} to using SQL query: {sql}")
-            if table.object_type == "MANAGED" and not self._table_already_upgraded(target_catalog, table):
+            target = f"{target_catalog}.{table.database}.{table.name}"
+
+            if self._table_already_upgraded(target):
+                logger.info(f"Table {table.key} already upgraded to {self._seen_tables[target]}")
+            elif table.object_type == "MANAGED":
                 self._backend.execute(sql)
                 self._backend.execute(table.sql_alter_to(target_catalog))
                 self._backend.execute(table.sql_alter_from(target_catalog))
+                self._seen_tables[target] = table.key
             else:
                 logger.info(f"Table {table.key} is a {table.object_type} and is not supported for migration yet ")
         except Exception as e:
             logger.error(f"Could not create table {table.name} because: {e}")
 
     def _init_seen_tables(self):
-        catalogs = self._ws.catalogs.list()
-        for catalog in catalogs:
-            schemas = self._ws.schemas.list(catalog_name=catalog.name)
-            for schema in schemas:
-                tables = self._ws.tables.list(catalog_name=catalog.name, schema_name=schema.name)
-                for table in tables:
-                    try:
+        for catalog in self._ws.catalogs.list():
+            for schema in self._ws.schemas.list(catalog_name=catalog.name):
+                for table in self._ws.tables.list(catalog_name=catalog.name, schema_name=schema.name):
+                    if table.properties is not None and "upgraded_from" in table.properties:
                         self._seen_tables[table.full_name] = table.properties["upgraded_from"]
-                    except:  # noqa: E722,S112
-                        continue
 
-    def _table_already_upgraded(self, target_catalog, table):
-        try:
-            target = f"{target_catalog}.{table.database}.{table.name}"
-            upgraded_from = self._seen_tables[target]
-            logger.info(f"Table {table.key} already upgraded to {upgraded_from}")
-            return True
-        except:  # noqa: E722
-            return False
+    def _table_already_upgraded(self, target) -> bool:
+        return target in self._seen_tables

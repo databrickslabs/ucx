@@ -101,3 +101,19 @@ def test_migrate_tables_should_migrate_tables_to_default_catalog_if_specified():
         "ALTER TABLE hive_metastore.db1.managed SET TBLPROPERTIES ('upgraded_to' = 'test_catalog.db1.managed');",
         "ALTER TABLE test_catalog.db1.managed SET TBLPROPERTIES ('upgraded_from' = 'hive_metastore.db1.managed');",
     ]
+
+
+def test_migrate_tables_should_add_table_to_cache_when_migrated():
+    errors = {}
+    rows = {
+        "SELECT": [
+            ("hive_metastore", "db1", "managed", "MANAGED", "DELTA", None, None),
+        ]
+    }
+    backend = MockBackend(fails_on_first=errors, rows=rows)
+    tc = TablesCrawler(backend, "inventory_database")
+    client = MagicMock()
+    tm = TablesMigrate(tc, client, backend, default_catalog="test_catalog")
+    tm.migrate_tables()
+
+    assert tm._seen_tables == {"test_catalog.db1.managed": "hive_metastore.db1.managed"}

@@ -26,7 +26,7 @@ def test_migrate_managed_tables(ws, make_catalog, make_schema, make_table):
 
     backend = StatementExecutionBackend(ws, os.environ["TEST_DEFAULT_WAREHOUSE_ID"])
     crawler = TablesCrawler(backend, inventory_schema)
-    tm = TablesMigrate(tc=crawler, ws=ws, backend=backend, default_catalog=target_catalog)
+    tm = TablesMigrate(crawler, ws, backend, target_catalog)
     tm.migrate_tables()
 
     target_tables = list(backend.fetch(f"SHOW TABLES IN {target_catalog}.{target_schema}"))
@@ -48,12 +48,8 @@ def test_migrate_tables_with_cache_should_not_create_table(ws, make_random, make
     table_name = make_random().lower()
     target_table = f"{target_catalog}.{target_schema}.{table_name}"
     source_table = f"hive_metastore.{target_schema}.{table_name}"
-    target_managed_table = make_table(
-        name=target_table, tbl_properties=f"TBLPROPERTIES ('upgraded_from' = '{source_table}')"
-    )
-    source_managed_table = make_table(
-        name=source_table, tbl_properties=f"TBLPROPERTIES ('upgraded_from' = '{target_table}')"
-    )
+    target_managed_table = make_table(name=target_table, tbl_properties={"upgraded_from": f"{source_table}"})
+    source_managed_table = make_table(name=source_table, tbl_properties={"upgraded_from": f"{target_table}"})
 
     logger.info(
         f"target_catalog={target_catalog}, "
@@ -67,7 +63,7 @@ def test_migrate_tables_with_cache_should_not_create_table(ws, make_random, make
 
     backend = StatementExecutionBackend(ws, os.environ["TEST_DEFAULT_WAREHOUSE_ID"])
     crawler = TablesCrawler(backend, inventory_schema)
-    tm = TablesMigrate(tc=crawler, ws=ws, backend=backend, default_catalog=target_catalog)
+    tm = TablesMigrate(crawler, ws, backend, target_catalog)
     tm.migrate_tables()
 
     target_tables = list(backend.fetch(f"SHOW TABLES IN {target_catalog}.{target_schema}"))
