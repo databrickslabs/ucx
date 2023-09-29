@@ -468,6 +468,51 @@ def test_pipeline_snapshot_with_config():
     assert len(result_set) == 1
     assert result_set[0].success == 1
 
+def test_azure_spn_info_without_matching_spark_conf(mocker):
+    sample_clusters = [
+        ClusterDetails(
+            autoscale=AutoScale(min_workers=1, max_workers=6),
+            cluster_source=ClusterSource.UI,
+            spark_conf={"spark.databricks.delta.preview.enabled": "true"},
+            spark_context_id=5134472582179565315,
+            spark_env_vars=None,
+            spark_version="9.3.x-cpu-ml-scala2.12",
+            cluster_id="0810-225833-atlanta69",
+            cluster_name="Tech Summit FY24 Cluster-1",
+        )
+    ]
+    sample_spns = [{}]
+    ws = mocker.Mock()
+    ws.clusters.list.return_value = sample_clusters
+    AzureServicePrincipalCrawler(ws, MockBackend(), "ucx")._list_all_cluster_with_spn_in_spark_conf()
+    crawler = AzureServicePrincipalCrawler(ws, MockBackend(), "ucx")._assess_service_principals(sample_spns)
+    result_set = list(crawler)
+
+    assert len(result_set) == 1
+    assert result_set[0].application_id == None
+
+
+def test_azure_spn_info_without_spark_conf(mocker):
+    sample_clusters = [
+        ClusterDetails(
+            autoscale=AutoScale(min_workers=1, max_workers=6),
+            cluster_source=ClusterSource.UI,
+            spark_context_id=5134472582179565315,
+            spark_env_vars=None,
+            spark_version="9.3.x-cpu-ml-scala2.12",
+            cluster_id="0810-225833-atlanta69",
+            cluster_name="Tech Summit FY24 Cluster-1",
+        )
+    ]
+    sample_spns = [{}]
+    ws = mocker.Mock()
+    ws.clusters.list.return_value = sample_clusters
+    AzureServicePrincipalCrawler(ws, MockBackend(), "ucx")._list_all_cluster_with_spn_in_spark_conf()
+    crawler = AzureServicePrincipalCrawler(ws, MockBackend(), "ucx")._assess_service_principals(sample_spns)
+    result_set = list(crawler)
+
+    assert len(result_set) == 1
+    assert result_set[0].application_id == None
 
 def test_azure_spn_info_without_secret(mocker):
     sample_clusters = [
@@ -496,6 +541,7 @@ def test_azure_spn_info_without_secret(mocker):
 
     assert len(result_set) == 1
     assert result_set[0].application_id == "test123456789"
+
 
 def test_azure_spn_info_with_secret_crawl(mocker):
     sample_clusters = [
@@ -528,6 +574,7 @@ def test_azure_spn_info_with_secret_crawl(mocker):
     assert len(result_set) == 1
     assert result_set[0].secret_scope == "abcff"
     assert result_set[0].secret_key == "sp_app_client_id"
+
 
 def test_azure_spn_info_with_secret(mocker):
     sample_clusters = [
