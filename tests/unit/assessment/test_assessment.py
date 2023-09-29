@@ -1,7 +1,13 @@
 from unittest.mock import Mock
 
 from databricks.sdk.service.compute import AutoScale, ClusterDetails, ClusterSource
-from databricks.sdk.service.jobs import BaseJob, JobSettings, NotebookTask, Task
+from databricks.sdk.service.jobs import (
+    BaseJob,
+    JobCluster,
+    JobSettings,
+    NotebookTask,
+    Task,
+)
 from databricks.sdk.service.pipelines import PipelineState, PipelineStateInfo
 
 from databricks.labs.ucx.assessment.crawlers import (
@@ -702,6 +708,7 @@ def test_get_cluster_configs_from_all_jobs(mocker):
             settings=JobSettings(
                 compute=None,
                 continuous=None,
+                job_clusters=[JobCluster(job_cluster_key="redkite-pricinganalytics")],
                 tasks=[
                     Task(
                         task_key="Ingest",
