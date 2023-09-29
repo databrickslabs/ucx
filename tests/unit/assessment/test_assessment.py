@@ -470,10 +470,36 @@ def test_pipeline_snapshot_with_config():
 
 
 def test_azure_spn_info(mocker):
+    sample_clusters = [
+        ClusterDetails(
+            autoscale=AutoScale(min_workers=1, max_workers=6),
+            spark_conf={"spark.databricks.delta.preview.enabled": "true"},
+            spark_context_id=5134472582179565315,
+            spark_env_vars=None,
+            spark_version="9.3.x-cpu-ml-scala2.12",
+            cluster_id="0810-225833-atlanta69",
+            cluster_name="Tech Summit FY24 Cluster-1"
+        ),
+        ClusterDetails(
+            cluster_name="Tech Summit FY24 Cluster",
+            autoscale=AutoScale(min_workers=1, max_workers=6),
+            spark_conf={
+                "spark.hadoop.fs.azure.account."
+                "oauth2.client.id.abcde.dfs.core.windows.net": "{{secrets/abcff/sp_app_client_id}}",
+                "spark.hadoop.fs.azure.account."
+                "oauth2.client.endpoint.abcde.dfs.core.windows.net": "https://login.microsoftonline.com/dedededede/token",
+                "spark.hadoop.fs.azure.account."
+                "oauth2.client.secret.abcde.dfs.core.windows.net": "{{secrets/abcff/sp_secret}}",
+            },
+            spark_context_id=5134472582179565315,
+            spark_env_vars=None,
+            spark_version="13.3.x-cpu-ml-scala2.12",
+            cluster_id="0915-190044-3dqy6751",
+        )]
     sample_spns = [
         ServicePrincipal(
             active=True,
-            application_id="6838ba8c-613c-4a2b-aded-7591ff633986",
+            application_id="cv67wqgdywqvdvqwq",
             display_name="eric_azure_mlops_everest-cicd",
             entitlements=None,
             external_id=None,
@@ -483,7 +509,7 @@ def test_azure_spn_info(mocker):
         ),
         ServicePrincipal(
             active=True,
-            application_id="4ca07e18-cac0-4aac-a230-aad85f28aa25",
+            application_id="uqwvd67qwdqw",
             display_name="PROPHECY_USER",
             entitlements=[
                 ComplexValue(display=None, primary=None, type=None, value="workspace-access"),
@@ -496,17 +522,17 @@ def test_azure_spn_info(mocker):
         ),
         ServicePrincipal(
             active=True,
-            application_id="fc11f197-fede-40fd-a53f-7e69f94b1bfc",
+            application_id="bewygd1728ety1gwd1",
             display_name="ug",
             entitlements=None,
-            external_id="18b3c55c-6d87-4f89-8b86-36acdd04ee46",
+            external_id="hwebdgwdg8yd",
             groups=None,
             id="63562194880794",
             roles=None,
         ),
         ServicePrincipal(
             active=True,
-            application_id="84ded2fb-1f8e-42f3-a1e5-d17c9fc12b4f",
+            application_id="1hve12ygewyqvdwq",
             display_name="HEX_USER",
             entitlements=[ComplexValue(display=None, primary=None, type=None, value="databricks-sql-access")],
             external_id=None,
@@ -516,7 +542,7 @@ def test_azure_spn_info(mocker):
         ),
         ServicePrincipal(
             active=True,
-            application_id="c50e118f-7ac8-4a23-9da7-eed19f5ac063",
+            application_id="2126gewgdu21y8yequwhd",
             display_name="common-sa-sp",
             entitlements=[
                 ComplexValue(display=None, primary=None, type=None, value="workspace-access"),
@@ -530,22 +556,22 @@ def test_azure_spn_info(mocker):
         ),
         ServicePrincipal(
             active=True,
-            application_id="b672d6b3-e6f2-4404-9f5f-600151d7edab",
+            application_id="111111111111111",
             display_name=None,
             entitlements=None,
             external_id=None,
-            groups=[ComplexValue(display="admins", primary=None, type="direct", value="8460646211285870")],
-            id="139292275309160",
+            groups=[ComplexValue(display="admins", primary=None, type="direct", value="4444444444444")],
+            id="2222222222222",
             roles=[ComplexValue(display="admin_role", primary=None, type="direct", value="123456789")],
         ),
     ]
     ws = mocker.Mock()
-    crawler = AzureServicePrincipalCrawler(ws, MockBackend(), "ucx")._assess_service_principals(sample_spns)
+    ws.clusters.list.return_value = sample_clusters
+    _azure_spn_list_with_data_access = ["bewygd1728ety1gwd1"]
+    crawler = AzureServicePrincipalCrawler(_azure_spn_list_with_data_access, ws, MockBackend(),
+                                           "ucx")._assess_service_principals(sample_spns)
     result_set = list(crawler)
 
-    assert len(result_set) == 6
+    assert len(result_set) == 1
     assert result_set[0].active is True
-    assert result_set[4].application_id == "c50e118f-7ac8-4a23-9da7-eed19f5ac063"
-    assert result_set[1].display_name == "PROPHECY_USER"
-    assert result_set[2].external_id == "18b3c55c-6d87-4f89-8b86-36acdd04ee46"
-    assert result_set[3].spn_id == "91991490737373"
+    assert result_set[0].application_id == "bewygd1728ety1gwd1"
