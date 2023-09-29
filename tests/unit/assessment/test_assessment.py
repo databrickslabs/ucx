@@ -691,3 +691,45 @@ def test_add_spn_to_list_with_secret(mocker):
 
     result_set = []
     assert len(result_set) == 0
+
+
+def test_get_cluster_configs_from_all_jobs(mocker):
+    sample_jobs = [
+        BaseJob(
+            created_time=1694536604319,
+            creator_user_name="anonymous@databricks.com",
+            job_id=536591785949415,
+            settings=JobSettings(
+                compute=None,
+                continuous=None,
+                tasks=[
+                    Task(
+                        task_key="Ingest",
+                        existing_cluster_id="0807-225846-motto493",
+                        notebook_task=NotebookTask(
+                            notebook_path="/Users/foo.bar@databricks.com/Customers/Example/Test/Load"
+                        ),
+                        timeout_seconds=0,
+                    )
+                ],
+                timeout_seconds=0,
+            ),
+        )
+    ]
+    sample_job_clusters = [
+        ClusterDetails(
+            autoscale=AutoScale(min_workers=1, max_workers=6),
+            spark_conf={"spark.databricks.delta.preview.enabled": "true"},
+            spark_context_id=5134472582179565315,
+            spark_env_vars=None,
+            spark_version="13.3.x-cpu-ml-scala2.12",
+            cluster_id="0807-225846-motto493",
+            cluster_source=ClusterSource.JOB,
+        )
+    ]
+    ws = mocker.Mock()
+    crawler = AzureServicePrincipalCrawler(ws, MockBackend(), "ucx")._get_cluster_configs_from_all_jobs(
+        sample_jobs, {c.cluster_id: c for c in sample_job_clusters}
+    )
+    result_set = list(crawler)
+    assert len(result_set) == 1
