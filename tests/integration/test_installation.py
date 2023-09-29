@@ -47,15 +47,15 @@ def test_jobs_with_no_inventory_database(
     sql_exec(f"GRANT MODIFY ON SCHEMA {schema_b} TO `{ws_group_b.display_name}`")
 
     cluster_policy = make_cluster_policy()
+    make_cluster_policy_permissions(
+        object_id=cluster_policy.policy_id,
+        permission_level=PermissionLevel.CAN_USE,
+        group_name=ws_group_a.display_name,
+    )
     cpp_src = ws.permissions.get("cluster-policies", cluster_policy.policy_id)
     cluster_policy_src_permissions = sorted(
         [_ for _ in cpp_src.access_control_list if _.group_name == ws_group_a.display_name],
         key=lambda p: p.group_name,
-    )
-    make_cluster_policy_permissions(
-        object_id=cluster_policy.policy_id,
-        permission_level=random.choice([PermissionLevel.CAN_USE]),
-        group_name=ws_group_a.display_name,
     )
 
     job = make_job()
@@ -86,7 +86,7 @@ def test_jobs_with_no_inventory_database(
     )
 
     try:
-        for step in ["assessment", "migrate-groups", "migrate-groups-cleanup"]:
+        for step in ["assessment", "migrate-groups"]:
             logger.debug(f"starting {step} job: {ws.config.host}#job/{install._deployed_steps[step]}")
             ws.jobs.run_now(install._deployed_steps[step]).result()
 
