@@ -538,6 +538,7 @@ def test_azure_spn_info_without_secret(mocker):
     sample_spns = [{"application_id": "test123456789", "secret_scope": "", "secret_key": ""}]
     ws = mocker.Mock()
     ws.clusters.list.return_value = sample_clusters
+    AzureServicePrincipalCrawler(ws, MockBackend(), "ucx")._list_all_cluster_with_spn_in_spark_conf()
     crawler = AzureServicePrincipalCrawler(ws, MockBackend(), "ucx")._assess_service_principals(sample_spns)
     result_set = list(crawler)
 
@@ -608,25 +609,13 @@ def test_azure_spn_info_with_secret(mocker):
 
 
 def test_spn_with_spark_config_snapshot(mocker):
-    sample_spns = [
-        ServicePrincipal(
-            active=True,
-            application_id="bewygd1728ety1gwd1",
-            display_name="eric_azure_mlops_everest-cicd",
-            entitlements=None,
-            external_id=None,
-            groups=None,
-            id="22880264257977",
-            roles=None,
-        )
-    ]
+    sample_spns = [{"application_id": "test123456780", "secret_scope": "abcff", "secret_key": "sp_app_client_id"}]
     mock_ws = Mock()
-    _azure_spn_list_with_data_access = ["bewygd1728ety1gwd1"]
     crawler = AzureServicePrincipalCrawler(mock_ws, MockBackend(), "ucx")
-    crawler._try_fetch = Mock(return_value=[])
+    crawler._try_fetch = Mock(return_value=sample_spns)
     crawler._crawl = Mock(return_value=sample_spns)
 
     result_set = crawler.snapshot()
 
     assert len(result_set) == 1
-    assert result_set[0].application_id == "bewygd1728ety1gwd1"
+    assert result_set[0] == {"application_id": "test123456780", "secret_scope": "abcff", "secret_key": "sp_app_client_id"}
