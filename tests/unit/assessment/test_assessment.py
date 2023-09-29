@@ -475,7 +475,7 @@ def test_azure_spn_info_without_secret(mocker):
             autoscale=AutoScale(min_workers=1, max_workers=6),
             cluster_source=ClusterSource.UI,
             spark_conf={
-                "spark.hadoop.fs.azure.account.oauth2.client.id.abcde.dfs.core.windows.net": "bewygd1728ety1gwd2",
+                "spark.hadoop.fs.azure.account.oauth2.client.id.abcde.dfs.core.windows.net": "test123456789",
                 "spark.hadoop.fs.azure.account."
                 "oauth2.client.endpoint.abcde.dfs.core.windows.net": "https://login.microsoftonline.com/dedededede/token",
                 "spark.hadoop.fs.azure.account."
@@ -488,14 +488,14 @@ def test_azure_spn_info_without_secret(mocker):
             cluster_name="Tech Summit FY24 Cluster-1",
         )
     ]
-    sample_spns = [{"application_id": "bewygd1728ety1gwd2", "secret_scope": "abcff", "secret_key": "sp_app_client_id"}]
+    sample_spns = [{"application_id": "test123456789", "secret_scope": "", "secret_key": ""}]
     ws = mocker.Mock()
     ws.clusters.list.return_value = sample_clusters
     crawler = AzureServicePrincipalCrawler(ws, MockBackend(), "ucx")._assess_service_principals(sample_spns)
     result_set = list(crawler)
 
     assert len(result_set) == 1
-    assert result_set[0].application_id == "bewygd1728ety1gwd2"
+    assert result_set[0].application_id == "test123456789"
 
 
 def test_azure_spn_info_with_secret(mocker):
@@ -517,14 +517,14 @@ def test_azure_spn_info_with_secret(mocker):
             cluster_id="0915-190044-3dqy6751",
         )
     ]
-    sample_spns = [{"application_id": "bewygd1728ety1gwd1", "secret_scope": "abcff", "secret_key": "sp_app_client_id"}]
+    sample_spns = [{"application_id": "test123456780", "secret_scope": "abcff", "secret_key": "sp_app_client_id"}]
     ws = mocker.Mock()
     ws.clusters.list.return_value = sample_clusters
     crawler = AzureServicePrincipalCrawler(ws, MockBackend(), "ucx")._assess_service_principals(sample_spns)
     result_set = list(crawler)
 
     assert len(result_set) == 1
-    assert result_set[0].application_id == "bewygd1728ety1gwd1"
+    assert result_set[0].application_id == "test123456780"
 
 
 def test_spn_with_spark_config_snapshot(mocker):
