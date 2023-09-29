@@ -54,11 +54,9 @@ class PipelineInfo:
 
 @dataclass
 class AzureServicePrincipalInfo:
-    active: bool
     application_id: str
-    display_name: str
-    external_id: str
-    spn_id: str
+    secret_scope: str
+    secret_key: str
 
 
 def _azure_sp_conf_present_check(config: dict) -> bool:
@@ -95,37 +93,53 @@ def spark_version_compatibility(spark_version: str) -> str:
 
 
 class AzureServicePrincipalCrawler(CrawlerBase):
-    def __init__(self, _azure_spn_list_with_data_access: list, ws: WorkspaceClient, sbe: SqlBackend, schema):
+    def __init__(self, ws: WorkspaceClient, sbe: SqlBackend, schema):
         super().__init__(sbe, "hive_metastore", schema, "azure_service_principals")
         self._ws = ws
-        self._azure_spn_list_with_data_access = _azure_spn_list_with_data_access
+        self._azure_spn_list_with_data_access = []
 
     def _crawl(self) -> list[AzureServicePrincipalInfo]:
-        all_service_principals = list(self._ws.service_principals.list())
-        return list(self._assess_service_principals(all_service_principals))
+        self._get_relevant_service_principals()
+        all_relevant_service_principals = self._azure_spn_list_with_data_access
+        return list(self._assess_service_principals(all_relevant_service_principals))
+
+    def _get_relevant_service_principals(self):
+        self._list_all_cluster_with_spn_in_spark_conf()
 
     def _list_all_cluster_with_spn_in_spark_conf(self):
         for cluster in self._ws.clusters.list():
             if cluster.cluster_source != ClusterSource.JOB:
-                if cluster.spark_conf is not None:
-                    if _azure_sp_conf_present_check(cluster.spark_conf):
-                        spn_application_id = _get_azure_spn_application_id(cluster.spark_conf)
-                        if spn_application_id:
-                            matched = re.search(_SECRET_PATTERN, spn_application_id)
-                            if matched:
-                                spn_application_id = self._ws.secrets.get_secret(
-                                    matched.group(1).split("/")[1], matched.group(1).split("/")[2]
-                                )
-                            self._azure_spn_list_with_data_access.append(spn_application_id)
+                if not cluster.spark_conf:
+                    continue
+                if not _azure_sp_conf_present_check(cluster.spark_conf):
+                    continue
+                spn_application_id = _get_azure_spn_application_id(cluster.spark_conf)
+                if not spn_application_id:
+                    continue
+                matched = re.search(_SECRET_PATTERN, spn_application_id)
+                if matched:
+                    self._ws.secrets.get_secret(matched.group(1).split("/")[1], matched.group(1).split("/")[2])
+                    self._azure_spn_list_with_data_access.append(
+                        {
+                            "application_id": spn_application_id,
+                            "secret_scope": matched.group(1).split("/")[1],
+                            "secret_key": matched.group(1).split("/")[2],
+                        }
+                    )
+                else:
+                    print("in else")
+                    self._azure_spn_list_with_data_access.append(
+                        {"application_id": spn_application_id, "secret_scope": "", "secret_key": ""}
+                    )
 
-    def _assess_service_principals(self, all_service_principals):
-        self._list_all_cluster_with_spn_in_spark_conf()
-        for spn in all_service_principals:
-            if spn.application_id in self._azure_spn_list_with_data_access:
-                spn_info = AzureServicePrincipalInfo(
-                    spn.active, spn.application_id, spn.display_name, spn.external_id, spn.id
-                )
-                yield spn_info
+    def _assess_service_principals(self, all_relevant_service_principals: list):
+        for spn in all_relevant_service_principals:
+            spn_info = AzureServicePrincipalInfo(
+                application_id=spn.get("application_id"),
+                secret_scope=spn.get("secret_scope"),
+                secret_key=spn.get("secret_key"),
+            )
+            yield spn_info
 
     def snapshot(self) -> list[AzureServicePrincipalInfo]:
         return self._snapshot(self._try_fetch, self._crawl)

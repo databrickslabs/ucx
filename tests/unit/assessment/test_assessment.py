@@ -1,7 +1,7 @@
 from unittest.mock import Mock
 
 from databricks.sdk.service.compute import AutoScale, ClusterDetails, ClusterSource
-from databricks.sdk.service.iam import ComplexValue, ServicePrincipal
+from databricks.sdk.service.iam import ServicePrincipal
 from databricks.sdk.service.jobs import BaseJob, JobSettings, NotebookTask, Task
 from databricks.sdk.service.pipelines import PipelineState, PipelineStateInfo
 
@@ -469,17 +469,37 @@ def test_pipeline_snapshot_with_config():
     assert result_set[0].success == 1
 
 
-def test_azure_spn_info(mocker):
+def test_azure_spn_info_without_secret(mocker):
     sample_clusters = [
         ClusterDetails(
             autoscale=AutoScale(min_workers=1, max_workers=6),
-            spark_conf={"spark.databricks.delta.preview.enabled": "true"},
+            cluster_source=ClusterSource.UI,
+            spark_conf={
+                "spark.hadoop.fs.azure.account.oauth2.client.id.abcde.dfs.core.windows.net": "bewygd1728ety1gwd2",
+                "spark.hadoop.fs.azure.account."
+                "oauth2.client.endpoint.abcde.dfs.core.windows.net": "https://login.microsoftonline.com/dedededede/token",
+                "spark.hadoop.fs.azure.account."
+                "oauth2.client.secret.abcde.dfs.core.windows.net": "{{secrets/abcff/sp_secret}}",
+            },
             spark_context_id=5134472582179565315,
             spark_env_vars=None,
             spark_version="9.3.x-cpu-ml-scala2.12",
             cluster_id="0810-225833-atlanta69",
             cluster_name="Tech Summit FY24 Cluster-1",
-        ),
+        )
+    ]
+    sample_spns = [{"application_id": "bewygd1728ety1gwd2", "secret_scope": "abcff", "secret_key": "sp_app_client_id"}]
+    ws = mocker.Mock()
+    ws.clusters.list.return_value = sample_clusters
+    crawler = AzureServicePrincipalCrawler(ws, MockBackend(), "ucx")._assess_service_principals(sample_spns)
+    result_set = list(crawler)
+
+    assert len(result_set) == 1
+    assert result_set[0].application_id == "bewygd1728ety1gwd2"
+
+
+def test_azure_spn_info_with_secret(mocker):
+    sample_clusters = [
         ClusterDetails(
             cluster_name="Tech Summit FY24 Cluster",
             autoscale=AutoScale(min_workers=1, max_workers=6),
@@ -495,88 +515,17 @@ def test_azure_spn_info(mocker):
             spark_env_vars=None,
             spark_version="13.3.x-cpu-ml-scala2.12",
             cluster_id="0915-190044-3dqy6751",
-        ),
+        )
     ]
-    sample_spns = [
-        ServicePrincipal(
-            active=True,
-            application_id="cv67wqgdywqvdvqwq",
-            display_name="eric_azure_mlops_everest-cicd",
-            entitlements=None,
-            external_id=None,
-            groups=None,
-            id="22880264257977",
-            roles=None,
-        ),
-        ServicePrincipal(
-            active=True,
-            application_id="uqwvd67qwdqw",
-            display_name="PROPHECY_USER",
-            entitlements=[
-                ComplexValue(display=None, primary=None, type=None, value="workspace-access"),
-                ComplexValue(display=None, primary=None, type=None, value="allow-cluster-create"),
-            ],
-            external_id=None,
-            groups=None,
-            id="57176659362130",
-            roles=None,
-        ),
-        ServicePrincipal(
-            active=True,
-            application_id="bewygd1728ety1gwd1",
-            display_name="ug",
-            entitlements=None,
-            external_id="hwebdgwdg8yd",
-            groups=None,
-            id="635621948807945",
-            roles=None,
-        ),
-        ServicePrincipal(
-            active=True,
-            application_id="1hve12ygewyqvdwq",
-            display_name="HEX_USER",
-            entitlements=[ComplexValue(display=None, primary=None, type=None, value="databricks-sql-access")],
-            external_id=None,
-            groups=None,
-            id="91991490737373",
-            roles=None,
-        ),
-        ServicePrincipal(
-            active=True,
-            application_id="2126gewgdu21y8yequwhd",
-            display_name="common-sa-sp",
-            entitlements=[
-                ComplexValue(display=None, primary=None, type=None, value="workspace-access"),
-                ComplexValue(display=None, primary=None, type=None, value="databricks-sql-access"),
-                ComplexValue(display=None, primary=None, type=None, value="allow-cluster-create"),
-            ],
-            external_id=None,
-            groups=None,
-            id="111887457057642",
-            roles=None,
-        ),
-        ServicePrincipal(
-            active=True,
-            application_id="111111111111111",
-            display_name=None,
-            entitlements=None,
-            external_id=None,
-            groups=[ComplexValue(display="admins", primary=None, type="direct", value="4444444444444")],
-            id="2222222222222",
-            roles=[ComplexValue(display="admin_role", primary=None, type="direct", value="123456789")],
-        ),
-    ]
+    sample_spns = [{"application_id": "bewygd1728ety1gwd1", "secret_scope": "abcff", "secret_key": "sp_app_client_id"}]
     ws = mocker.Mock()
     ws.clusters.list.return_value = sample_clusters
-    _azure_spn_list_with_data_access = ["bewygd1728ety1gwd1"]
-    crawler = AzureServicePrincipalCrawler(
-        _azure_spn_list_with_data_access, ws, MockBackend(), "ucx"
-    )._assess_service_principals(sample_spns)
+    crawler = AzureServicePrincipalCrawler(ws, MockBackend(), "ucx")._assess_service_principals(sample_spns)
     result_set = list(crawler)
 
     assert len(result_set) == 1
-    assert result_set[0].active is True
     assert result_set[0].application_id == "bewygd1728ety1gwd1"
+
 
 def test_spn_with_spark_config_snapshot(mocker):
     sample_spns = [
@@ -589,10 +538,11 @@ def test_spn_with_spark_config_snapshot(mocker):
             groups=None,
             id="22880264257977",
             roles=None,
-        )]
+        )
+    ]
     mock_ws = Mock()
     _azure_spn_list_with_data_access = ["bewygd1728ety1gwd1"]
-    crawler = AzureServicePrincipalCrawler(_azure_spn_list_with_data_access, mock_ws, MockBackend(), "ucx")
+    crawler = AzureServicePrincipalCrawler(mock_ws, MockBackend(), "ucx")
     crawler._try_fetch = Mock(return_value=[])
     crawler._crawl = Mock(return_value=sample_spns)
 
