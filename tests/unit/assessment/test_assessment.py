@@ -16,6 +16,8 @@ from databricks.labs.ucx.hive_metastore.mounts import Mount
 from databricks.labs.ucx.mixins.sql import Row
 from tests.unit.framework.mocks import MockBackend
 
+_SECRET_PATTERN = r"{{(secrets.*?)}}"
+
 
 def test_external_locations():
     crawler = ExternalLocationCrawler(Mock(), MockBackend(), "test")
@@ -668,4 +670,24 @@ def test_list_all_cluster_with_spn_in_spark_conf(mocker):
     crawler = AzureServicePrincipalCrawler(ws, MockBackend(), "ucx").snapshot()
     result_set = list(crawler)
 
+    assert len(result_set) == 0
+
+
+def test_add_spn_to_list_wo_secret(mocker):
+    spn_application_id = "test123456780"
+    ws = mocker.Mock()
+    # ws.secrets.get_secret.return_value = "test123456780"
+    AzureServicePrincipalCrawler(ws, MockBackend(), "ucx")._add_spn_to_list(spn_application_id)
+
+    result_set = []
+    assert len(result_set) == 0
+
+
+def test_add_spn_to_list_with_secret(mocker):
+    spn_application_id = "{{secrets/abcde_access/sasFixedToken}}"
+    ws = mocker.Mock()
+    ws.secrets.get_secret.return_value = "test123456780"
+    AzureServicePrincipalCrawler(ws, MockBackend(), "ucx")._add_spn_to_list(spn_application_id)
+
+    result_set = []
     assert len(result_set) == 0
