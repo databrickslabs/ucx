@@ -498,6 +498,7 @@ def test_azure_spn_info_without_matching_spark_conf(mocker):
     sample_spns = [{}]
     ws = mocker.Mock()
     ws.clusters.list.return_value = sample_clusters
+    ws.cluster_policies.get().policy_family_definition_overrides = None
     AzureServicePrincipalCrawler(ws, MockBackend(), "ucx")._list_all_cluster_with_spn_in_spark_conf()
     crawler = AzureServicePrincipalCrawler(ws, MockBackend(), "ucx")._assess_service_principals(sample_spns)
     result_set = list(crawler)
