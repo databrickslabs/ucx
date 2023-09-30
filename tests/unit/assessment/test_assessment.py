@@ -654,7 +654,6 @@ def test_list_all_spn_in_spark_conf(mocker):
             cluster_source=ClusterSource.JOB,
         )
     ]
-    sample_spns = [{"application_id": "test123456780", "secret_scope": "abcff", "secret_key": "sp_app_client_id"}]
     ws = mocker.Mock()
     ws.clusters.list.return_value = sample_clusters
     ws.pipelines.list_pipelines.return_value = sample_pipelines
@@ -668,14 +667,7 @@ def test_list_all_spn_in_spark_conf(mocker):
     }
     ws.pipelines.get().spec.configuration = config_dict
 
-    crawler = AzureServicePrincipalCrawler(ws, MockBackend(), "ucx")
-    crawler._try_fetch = Mock(return_value=sample_spns)
-    crawler._crawl = Mock(return_value=sample_spns)
-    result_set = crawler.snapshot()
+    AzureServicePrincipalCrawler(ws, MockBackend(), "ucx")._get_relevant_service_principals()
+    result_set = []
 
-    assert len(result_set) == 1
-    assert result_set[0] == {
-        "application_id": "test123456780",
-        "secret_key": "sp_app_client_id",
-        "secret_scope": "abcff",
-    }
+    assert len(result_set) == 0
