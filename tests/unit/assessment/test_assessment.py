@@ -593,7 +593,122 @@ def test_spn_with_spark_config_snapshot(mocker):
     }
 
 
-def test_list_all_spn_in_spark_conf(mocker):
+def test_list_all_cluster_with_spn_in_spark_conf_with_secret(mocker):
+    sample_clusters = [
+        ClusterDetails(
+            cluster_name="Tech Summit FY24 Cluster",
+            autoscale=AutoScale(min_workers=1, max_workers=6),
+            spark_conf={
+                "spark.hadoop.fs.azure.account."
+                "oauth2.client.id.abcde.dfs.core.windows.net": "{{secrets/abcff/sp_app_client_id}}",
+                "spark.hadoop.fs.azure.account."
+                "oauth2.client.endpoint.abcde.dfs.core.windows.net": "https://login.microsoftonline.com/dedededede/token",
+                "spark.hadoop.fs.azure.account."
+                "oauth2.client.secret.abcde.dfs.core.windows.net": "{{secrets/abcff/sp_secret}}",
+            },
+            spark_context_id=5134472582179565315,
+            spark_env_vars=None,
+            spark_version="13.3.x-cpu-ml-scala2.12",
+            cluster_id="0915-190044-3dqy6751",
+        )
+    ]
+
+    ws = mocker.Mock()
+    ws.clusters.list.return_value = sample_clusters
+    AzureServicePrincipalCrawler(ws, MockBackend(), "ucx")._list_all_cluster_with_spn_in_spark_conf()
+    result_set = []
+
+    assert len(result_set) == 0
+
+
+def test_list_all_cluster_with_spn_in_spark_conf_without_secret(mocker):
+    sample_clusters = [
+        ClusterDetails(
+            cluster_name="Tech Summit FY24 Cluster",
+            autoscale=AutoScale(min_workers=1, max_workers=6),
+            spark_conf={
+                "spark.hadoop.fs.azure.account.oauth2.client.id.abcde.dfs.core.windows.net": "dummyappid",
+                "spark.hadoop.fs.azure.account."
+                "oauth2.client.endpoint.abcde.dfs.core.windows.net": "https://login.microsoftonline.com/dedededede/token",
+                "spark.hadoop.fs.azure.account."
+                "oauth2.client.secret.abcde.dfs.core.windows.net": "{{secrets/abcff/sp_secret}}",
+            },
+            spark_context_id=5134472582179565315,
+            spark_env_vars=None,
+            spark_version="13.3.x-cpu-ml-scala2.12",
+            cluster_id="0915-190044-3dqy6751",
+            policy_id="D96308F1BF0003A7",
+        )
+    ]
+
+    ws = mocker.Mock()
+    ws.clusters.list.return_value = sample_clusters
+    ws.cluster_policies.get().definition = (
+        '{"node_type_id":{"type":"allowlist","values":["Standard_DS3_v2",'
+        '"Standard_DS4_v2","Standard_DS5_v2","Standard_NC4as_T4_v3"],"defaultValue":'
+        '"Standard_DS3_v2"},"spark_version":{"type":"unlimited","defaultValue":"auto:latest-ml"},'
+        '"runtime_engine":{"type":"fixed","value":"STANDARD","hidden":true},'
+        '"num_workers":{"type":"fixed","value":0,"hidden":true},"data_security_mode":'
+        '{"type":"allowlist","values":["SINGLE_USER","LEGACY_SINGLE_USER","LEGACY_SINGLE_USER_STANDARD"],'
+        '"defaultValue":"SINGLE_USER","hidden":true},"driver_instance_pool_id":{"type":"forbidden","hidden":true},'
+        '"cluster_type":{"type":"fixed","value":"all-purpose"},"instance_pool_id":{"type":"forbidden","hidden":true},'
+        '"azure_attributes.availability":{"type":"fixed","value":"ON_DEMAND_AZURE","hidden":true},'
+        '"spark_conf.spark.databricks.cluster.profile":{"type":"fixed","value":"singleNode","hidden":true},'
+        '"autotermination_minutes":{"type":"unlimited","defaultValue":4320,"isOptional":true}}'
+    )
+    AzureServicePrincipalCrawler(ws, MockBackend(), "ucx")._list_all_cluster_with_spn_in_spark_conf()
+    result_set = []
+
+    assert len(result_set) == 0
+
+
+def test_list_all_pipeline_with_conf_spn_in_spark_conf(mocker):
+    sample_pipelines = [
+        PipelineInfo(
+            creator_name="abcde.defgh@databricks.com",
+            pipeline_name="New DLT Pipeline",
+            pipeline_id="0112eae7-9d11-4b40-a2b8-6c83cb3c7497",
+            success=1,
+            failures="",
+        )
+    ]
+    ws = mocker.Mock()
+    ws.pipelines.list_pipelines.return_value = sample_pipelines
+    config_dict = {
+        "spark.hadoop.fs.azure.account.auth.type.abcde.dfs.core.windows.net": "SAS",
+        "spark.hadoop.fs.azure.sas.token.provider.type.abcde.dfs."
+        "core.windows.net": "org.apache.hadoop.fs.azurebfs.sas.FixedSASTokenProvider",
+        "spark.hadoop.fs.azure.sas.fixed.token.abcde.dfs.core.windows.net": "{{secrets/abcde_access/sasFixedToken}}",
+    }
+    ws.pipelines.get().spec.configuration = config_dict
+
+    AzureServicePrincipalCrawler(ws, MockBackend(), "ucx")._list_all_pipeline_with_spn_in_spark_conf()
+    result_set = []
+
+    assert len(result_set) == 0
+
+
+def test_list_all_pipeline_wo_conf_spn_in_spark_conf(mocker):
+    sample_pipelines = [
+        PipelineInfo(
+            creator_name="abcde.defgh@databricks.com",
+            pipeline_name="New DLT Pipeline",
+            pipeline_id="0112eae7-9d11-4b40-a2b8-6c83cb3c7497",
+            success=1,
+            failures="",
+        )
+    ]
+    ws = mocker.Mock()
+    ws.pipelines.list_pipelines.return_value = sample_pipelines
+    config_dict = {}
+    ws.pipelines.get().spec.configuration = config_dict
+    AzureServicePrincipalCrawler(ws, MockBackend(), "ucx")._list_all_pipeline_with_spn_in_spark_conf()
+    result_set = []
+
+    assert len(result_set) == 0
+
+
+def test_list_all_jobs_with_spn_in_spark_conf(mocker):
     sample_clusters = [
         ClusterDetails(
             cluster_name="Tech Summit FY24 Cluster",
