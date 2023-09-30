@@ -70,6 +70,8 @@ def _azure_sp_conf_present_check(config: dict) -> bool:
 def _get_azure_spn_application_id(config: dict) -> str:
     matching_key = [key for key in config.keys() if _AZURE_SP_CONF[2] in key]
     if len(matching_key) > 0:
+        if re.search("spark_conf", matching_key[0]):
+            return config.get(matching_key[0]).get("value")
         return config.get(matching_key[0])
 
 
@@ -142,8 +144,8 @@ class AzureServicePrincipalCrawler(CrawlerBase):
                     yield j, t.new_cluster
 
     def _get_relevant_service_principals(self):
-        self._list_all_cluster_with_spn_in_spark_conf()
-        self._list_all_pipeline_with_spn_in_spark_conf()
+        # self._list_all_cluster_with_spn_in_spark_conf()
+        # self._list_all_pipeline_with_spn_in_spark_conf()
         self._list_all_jobs_with_spn_in_spark_conf()
 
     def _list_all_jobs_with_spn_in_spark_conf(self):
