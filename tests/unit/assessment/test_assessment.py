@@ -898,10 +898,17 @@ def test_azure_service_principal_info_no_spark_conf_crawl(mocker):
             settings=JobSettings(
                 compute=None,
                 continuous=None,
+                job_clusters=[
+                    JobCluster(
+                        job_cluster_key="redkite-pricinganalytics",
+                        new_cluster=ClusterSpec(autoscale=None, node_type_id="Standard_DS3_v2", num_workers=2),
+                    ),
+                ],
                 tasks=[
                     Task(
                         task_key="Ingest",
-                        existing_cluster_id="0807-225846-motto493",
+                        existing_cluster_id="0810-225833-atlanta69",
+                        new_cluster=ClusterSpec(autoscale=None, node_type_id="Standard_DS3_v2", num_workers=2),
                         notebook_task=NotebookTask(
                             notebook_path="/Users/foo.bar@databricks.com/Customers/Example/Test/Load"
                         ),
@@ -910,7 +917,33 @@ def test_azure_service_principal_info_no_spark_conf_crawl(mocker):
                 ],
                 timeout_seconds=0,
             ),
-        )
+        ),
+        BaseJob(
+            created_time=1694536604319,
+            creator_user_name="anonymous@databricks.com",
+            job_id=536591785949415,
+            settings=JobSettings(
+                compute=None,
+                continuous=None,
+                job_clusters=[
+                    JobCluster(
+                        job_cluster_key="redkite-pricinganalytics",
+                        new_cluster=ClusterSpec(autoscale=None, node_type_id="Standard_DS3_v2", num_workers=2),
+                    ),
+                ],
+                tasks=[
+                    Task(
+                        task_key="Ingest",
+                        new_cluster=ClusterSpec(autoscale=None, node_type_id="Standard_DS3_v2", num_workers=2),
+                        notebook_task=NotebookTask(
+                            notebook_path="/Users/foo.bar@databricks.com/Customers/Example/Test/Load"
+                        ),
+                        timeout_seconds=0,
+                    )
+                ],
+                timeout_seconds=0,
+            ),
+        ),
     ]
     ws = mocker.Mock()
     ws.clusters.list.return_value = sample_clusters
