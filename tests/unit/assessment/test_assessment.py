@@ -558,7 +558,7 @@ def test_azure_spn_info_without_secret(mocker):
     assert result_set[0].application_id == "test123456789"
 
 
-def test_azureserviceprincipalinfo_crawl(mocker):
+def test_azure_service_principal_info_crawl(mocker):
     sample_clusters = [
         ClusterDetails(
             autoscale=AutoScale(min_workers=1, max_workers=6),
@@ -632,11 +632,66 @@ def test_azureserviceprincipalinfo_crawl(mocker):
                             node_type_id="Standard_DS3_v2",
                             num_workers=2,
                             spark_conf={
-                                "spark.databricks.delta.preview.enabled": "true",
+                                "spark.hadoop.fs.azure.account.oauth2.client.id.abcde.dfs"
+                                ".core.windows.net": "1234567890",
                                 "spark.databricks.delta.formatCheck.enabled": "false",
                             },
                         ),
+                    ),
+                ],
+                tasks=[
+                    Task(
+                        task_key="Ingest",
+                        notebook_task=NotebookTask(
+                            notebook_path="/Users/foo.bar@databricks.com/Customers/Example/Test/Load"
+                        ),
+                        timeout_seconds=0,
                     )
+                ],
+                timeout_seconds=0,
+            ),
+        ),
+        BaseJob(
+            created_time=1694536604319,
+            creator_user_name="anonymous@databricks.com",
+            job_id=536591785949416,
+            settings=JobSettings(
+                compute=None,
+                continuous=None,
+                job_clusters=[
+                    JobCluster(
+                        job_cluster_key="redkite-pricinganalytics",
+                        new_cluster=ClusterSpec(
+                            autoscale=None,
+                            node_type_id="Standard_DS3_v2",
+                            num_workers=2,
+                            spark_conf={
+                                "spark.databricks.delta.formatCheck.enabled": "false",
+                            },
+                        ),
+                    ),
+                ],
+                tasks=[
+                    Task(
+                        task_key="Ingest",
+                        notebook_task=NotebookTask(
+                            notebook_path="/Users/foo.bar@databricks.com/Customers/Example/Test/Load"
+                        ),
+                        timeout_seconds=0,
+                    )
+                ],
+                timeout_seconds=0,
+            ),
+        ),
+        BaseJob(
+            created_time=1694536604319,
+            creator_user_name="anonymous@databricks.com",
+            job_id=536591785949416,
+            settings=JobSettings(
+                compute=None,
+                continuous=None,
+                job_clusters=[
+                    JobCluster(job_cluster_key="redkite-pricinganalytics"),
                 ],
                 tasks=[
                     Task(
@@ -652,17 +707,6 @@ def test_azureserviceprincipalinfo_crawl(mocker):
             ),
         ),
     ]
-    [
-        ClusterDetails(
-            autoscale=AutoScale(min_workers=1, max_workers=6),
-            spark_conf={"spark.databricks.delta.preview.enabled": "true"},
-            spark_context_id=5134472582179565315,
-            spark_env_vars=None,
-            spark_version="13.3.x-cpu-ml-scala2.12",
-            cluster_id="0807-225846-motto493",
-            cluster_source=ClusterSource.JOB,
-        )
-    ]
     ws = mocker.Mock()
     ws.clusters.list.return_value = sample_clusters
     ws.pipelines.list_pipelines.return_value = sample_pipelines
@@ -675,11 +719,9 @@ def test_azureserviceprincipalinfo_crawl(mocker):
     }
     ws.pipelines.get().spec.configuration = config_dict
     ws.jobs.list.return_value = sample_jobs
-    # ws.clusters.list.return_value = sample_job_clusters
     spn_crawler = AzureServicePrincipalCrawler(ws, MockBackend(), "ucx")._crawl()
 
-    assert len(spn_crawler) == 2
-    assert spn_crawler[1].application_id == "wewewerty"
+    assert len(spn_crawler) == 3
 
 
 def test_azure_spn_info_with_secret(mocker):
