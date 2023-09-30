@@ -152,78 +152,70 @@ class AzureServicePrincipalCrawler(CrawlerBase):
         all_jobs = list(self._ws.jobs.list(expand_tasks=True))
         all_clusters_by_id = {c.cluster_id: c for c in self._ws.clusters.list()}
         for _job, cluster_config in self._get_cluster_configs_from_all_jobs(all_jobs, all_clusters_by_id):
-            if not cluster_config.spark_conf:
-                continue
-                # Checking if Azure cluster config is present in spark config
-            if not _azure_sp_conf_present_check(cluster_config.spark_conf):
-                continue
-            spn_application_id = _get_azure_spn_application_id(cluster_config.spark_conf)
-            if not spn_application_id:
-                continue
-            self._add_spn_to_list(spn_application_id)
-
-            # Checking if Azure cluster config is present in cluster policies
-            if not cluster_config.policy_id:
-                continue
             policy = self._ws.cluster_policies.get(cluster_config.policy_id)
-            if not _azure_sp_conf_present_check(json.loads(policy.definition)):
-                continue
-            spn_application_id = _get_azure_spn_application_id(json.loads(policy.definition))
-            if not spn_application_id:
-                continue
-            self._add_spn_to_list(spn_application_id)
-            if not policy.policy_family_definition_overrides:
-                continue
-            if not _azure_sp_conf_present_check(json.loads(policy.policy_family_definition_overrides)):
-                continue
-            spn_application_id = _get_azure_spn_application_id(json.loads(policy.policy_family_definition_overrides))
-            if not spn_application_id:
-                continue
-            self._add_spn_to_list(spn_application_id)
+            if cluster_config.spark_conf:
+                if not _azure_sp_conf_present_check(cluster_config.spark_conf):
+                    continue
+                spn_application_id = _get_azure_spn_application_id(cluster_config.spark_conf)
+                if not spn_application_id:
+                    continue
+                self._add_spn_to_list(spn_application_id)
+
+            if cluster_config.policy_id:
+                if _azure_sp_conf_present_check(json.loads(policy.definition)):
+                    spn_application_id = _get_azure_spn_application_id(json.loads(policy.definition))
+                    if not spn_application_id:
+                        continue
+                    self._add_spn_to_list(spn_application_id)
+
+            if policy.policy_family_definition_overrides:
+                if not _azure_sp_conf_present_check(json.loads(policy.policy_family_definition_overrides)):
+                    continue
+                spn_application_id = _get_azure_spn_application_id(json.loads(policy.policy_family_definition_overrides))
+                if not spn_application_id:
+                    continue
+                self._add_spn_to_list(spn_application_id)
 
     def _list_all_pipeline_with_spn_in_spark_conf(self):
         for pipeline in self._ws.pipelines.list_pipelines():
             pipeline_config = self._ws.pipelines.get(pipeline.pipeline_id).spec.configuration
-            if not pipeline_config:
-                continue
-            if not _azure_sp_conf_present_check(pipeline_config):
-                continue
-            spn_application_id = _get_azure_spn_application_id(pipeline_config)
-            if not spn_application_id:
-                continue
-            self._add_spn_to_list(spn_application_id)
+            if pipeline_config:
+                if not _azure_sp_conf_present_check(pipeline_config):
+                    continue
+                spn_application_id = _get_azure_spn_application_id(pipeline_config)
+                if not spn_application_id:
+                    continue
+                self._add_spn_to_list(spn_application_id)
 
     def _list_all_cluster_with_spn_in_spark_conf(self):
         for cluster in self._ws.clusters.list():
             if cluster.cluster_source != ClusterSource.JOB:
-                if not cluster.spark_conf:
-                    continue
-                if not _azure_sp_conf_present_check(cluster.spark_conf):
-                    continue
-                spn_application_id = _get_azure_spn_application_id(cluster.spark_conf)
-                if not spn_application_id:
-                    continue
-                self._add_spn_to_list(spn_application_id)
-
-                if not cluster.policy_id:
-                    continue
                 policy = self._ws.cluster_policies.get(cluster.policy_id)
-                if not _azure_sp_conf_present_check(json.loads(policy.definition)):
-                    continue
-                spn_application_id = _get_azure_spn_application_id(json.loads(policy.definition))
-                if not spn_application_id:
-                    continue
-                self._add_spn_to_list(spn_application_id)
-                if not policy.policy_family_definition_overrides:
-                    continue
-                if not _azure_sp_conf_present_check(json.loads(policy.policy_family_definition_overrides)):
-                    continue
-                spn_application_id = _get_azure_spn_application_id(
-                    json.loads(policy.policy_family_definition_overrides)
-                )
-                if not spn_application_id:
-                    continue
-                self._add_spn_to_list(spn_application_id)
+                if cluster.spark_conf:
+                    if not _azure_sp_conf_present_check(cluster.spark_conf):
+                        continue
+                    spn_application_id = _get_azure_spn_application_id(cluster.spark_conf)
+                    if not spn_application_id:
+                        continue
+                    self._add_spn_to_list(spn_application_id)
+
+                if cluster.policy_id:
+                    if not _azure_sp_conf_present_check(json.loads(policy.definition)):
+                        continue
+                    spn_application_id = _get_azure_spn_application_id(json.loads(policy.definition))
+                    if not spn_application_id:
+                        continue
+                    self._add_spn_to_list(spn_application_id)
+
+                if policy.policy_family_definition_overrides:
+                    if not _azure_sp_conf_present_check(json.loads(policy.policy_family_definition_overrides)):
+                        continue
+                    spn_application_id = _get_azure_spn_application_id(
+                        json.loads(policy.policy_family_definition_overrides)
+                    )
+                    if not spn_application_id:
+                        continue
+                    self._add_spn_to_list(spn_application_id)
 
     def _assess_service_principals(self, all_relevant_service_principals: list):
         for spn in all_relevant_service_principals:
