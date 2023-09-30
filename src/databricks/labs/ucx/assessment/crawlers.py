@@ -171,7 +171,9 @@ class AzureServicePrincipalCrawler(CrawlerBase):
             if policy.policy_family_definition_overrides:
                 if not _azure_sp_conf_present_check(json.loads(policy.policy_family_definition_overrides)):
                     continue
-                spn_application_id = _get_azure_spn_application_id(json.loads(policy.policy_family_definition_overrides))
+                spn_application_id = _get_azure_spn_application_id(
+                    json.loads(policy.policy_family_definition_overrides)
+                )
                 if not spn_application_id:
                     continue
                 self._add_spn_to_list(spn_application_id)

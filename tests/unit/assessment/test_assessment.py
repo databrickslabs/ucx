@@ -552,6 +552,7 @@ def test_azure_spn_info_without_secret(mocker):
     sample_spns = [{"application_id": "test123456789", "secret_scope": "", "secret_key": ""}]
     ws = mocker.Mock()
     ws.clusters.list.return_value = sample_clusters
+    ws.cluster_policies.get().policy_family_definition_overrides = None
     AzureServicePrincipalCrawler(ws, MockBackend(), "ucx")._list_all_cluster_with_spn_in_spark_conf()
     crawler = AzureServicePrincipalCrawler(ws, MockBackend(), "ucx")._assess_service_principals(sample_spns)
     result_set = list(crawler)
@@ -973,7 +974,7 @@ def test_azure_service_principal_info_null_applid_crawl(mocker):
             spark_version="9.3.x-cpu-ml-scala2.12",
             cluster_id="0810-225833-atlanta69",
             cluster_name="Tech Summit FY24 Cluster-1",
-            policy_id="bdqwbdqiwd1111"
+            policy_id="bdqwbdqiwd1111",
         )
     ]
     sample_pipelines = [
