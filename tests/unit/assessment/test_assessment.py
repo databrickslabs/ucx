@@ -599,7 +599,7 @@ def test_spn_with_spark_config_snapshot(mocker):
     }
 
 
-def test_list_all_cluster_with_spn_in_spark_conf(mocker):
+def test_list_all_spn_in_spark_conf(mocker):
     sample_clusters = [
         ClusterDetails(
             cluster_name="Tech Summit FY24 Cluster",
@@ -675,7 +675,6 @@ def test_list_all_cluster_with_spn_in_spark_conf(mocker):
 
     crawler = AzureServicePrincipalCrawler(ws, MockBackend(), "ucx").snapshot()
     result_set = list(crawler)
-
     assert len(result_set) == 0
 
 
@@ -740,3 +739,73 @@ def test_get_cluster_configs_from_all_jobs(mocker):
     )
     result_set = list(crawler)
     assert len(result_set) == 1
+
+
+def test_list_all_jobs_with_spn_in_spark_conf(mocker):
+    sample_jobs = [
+        BaseJob(
+            created_time=1694536604319,
+            creator_user_name="anonymous@databricks.com",
+            job_id=536591785949415,
+            settings=JobSettings(
+                compute=None,
+                continuous=None,
+                job_clusters=[JobCluster(job_cluster_key="redkite-pricinganalytics")],
+                tasks=[
+                    Task(
+                        task_key="Ingest",
+                        existing_cluster_id="0807-225846-motto493",
+                        notebook_task=NotebookTask(
+                            notebook_path="/Users/foo.bar@databricks.com/Customers/Example/Test/Load"
+                        ),
+                        timeout_seconds=0,
+                    )
+                ],
+                timeout_seconds=0,
+            ),
+        )
+    ]
+    sample_job_clusters = [
+        ClusterDetails(
+            autoscale=AutoScale(min_workers=1, max_workers=6),
+            spark_conf={"spark.databricks.delta.preview.enabled": "true"},
+            spark_context_id=5134472582179565315,
+            spark_env_vars=None,
+            spark_version="13.3.x-cpu-ml-scala2.12",
+            cluster_id="0807-225846-motto493",
+            cluster_source=ClusterSource.JOB,
+        )
+    ]
+
+    ws = mocker.Mock()
+    ws.jobs.list.return_value = sample_jobs
+    ws.clusters.list.return_value = sample_job_clusters
+    AzureServicePrincipalCrawler(ws, MockBackend(), "ucx")._list_all_jobs_with_spn_in_spark_conf()
+    result_set = []
+    assert len(result_set) == 0
+
+
+def test_list_all_pipeline_with_spn_in_spark_conf(mocker):
+    sample_pipelines = [
+        PipelineInfo(
+            creator_name="abcde.defgh@databricks.com",
+            pipeline_name="New DLT Pipeline",
+            pipeline_id="0112eae7-9d11-4b40-a2b8-6c83cb3c7497",
+            success=1,
+            failures="",
+        )
+    ]
+    ws = mocker.Mock()
+    ws.pipelines.list_pipelines.return_value = sample_pipelines
+
+    config_dict = {
+        "spark.hadoop.fs.azure.account.auth.type.abcde.dfs.core.windows.net": "SAS",
+        "spark.hadoop.fs.azure.sas.token.provider.type.abcde.dfs."
+        "core.windows.net": "org.apache.hadoop.fs.azurebfs.sas.FixedSASTokenProvider",
+        "spark.hadoop.fs.azure.sas.fixed.token.abcde.dfs.core.windows.net": "{{secrets/abcde_access/sasFixedToken}}",
+    }
+    ws.pipelines.get().spec.configuration = config_dict
+
+    AzureServicePrincipalCrawler(ws, MockBackend(), "ucx")._list_all_pipeline_with_spn_in_spark_conf()
+    result_set = []
+    assert len(result_set) == 0
