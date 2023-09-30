@@ -144,8 +144,8 @@ class AzureServicePrincipalCrawler(CrawlerBase):
                     yield j, t.new_cluster
 
     def _get_relevant_service_principals(self):
-        # self._list_all_cluster_with_spn_in_spark_conf()
-        # self._list_all_pipeline_with_spn_in_spark_conf()
+        self._list_all_cluster_with_spn_in_spark_conf()
+        self._list_all_pipeline_with_spn_in_spark_conf()
         self._list_all_jobs_with_spn_in_spark_conf()
 
     def _list_all_jobs_with_spn_in_spark_conf(self):

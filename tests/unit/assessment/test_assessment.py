@@ -722,7 +722,7 @@ def test_azure_service_principal_info_crawl(mocker):
     ws.jobs.list.return_value = sample_jobs
     spn_crawler = AzureServicePrincipalCrawler(ws, MockBackend(), "ucx")._crawl()
 
-    assert len(spn_crawler) == 1
+    assert len(spn_crawler) == 3
 
 
 def test_azure_service_principal_info_spark_conf_crawl(mocker):
@@ -879,6 +879,9 @@ def test_azure_service_principal_info_no_spark_conf_crawl(mocker):
             spark_version="9.3.x-cpu-ml-scala2.12",
             cluster_id="0810-225833-atlanta69",
             cluster_name="Tech Summit FY24 Cluster-1",
+            spark_conf={
+                "spark.hadoop.fs.azure.account.oauth2.client.id.abcde.dfs.core.windows.net": "",
+            },
         )
     ]
     sample_pipelines = [
@@ -1124,6 +1127,87 @@ def test_azure_service_principal_info_policy_conf(mocker):
     spn_crawler = AzureServicePrincipalCrawler(ws, MockBackend(), "ucx")._crawl()
 
     assert len(spn_crawler) == 2
+
+
+def test_azure_service_principal_info_non_matching_policy_conf(mocker):
+    sample_clusters = [
+        ClusterDetails(
+            autoscale=AutoScale(min_workers=1, max_workers=6),
+            cluster_source=ClusterSource.UI,
+            spark_context_id=5134472582179565315,
+            spark_env_vars=None,
+            spark_version="9.3.x-cpu-ml-scala2.12",
+            cluster_id="0810-225833-atlanta69",
+            cluster_name="Tech Summit FY24 Cluster-1",
+            policy_id="1234567890",
+        )
+    ]
+    sample_pipelines = [
+        PipelineInfo(
+            creator_name="abcde.defgh@databricks.com",
+            pipeline_name="New DLT Pipeline",
+            pipeline_id="0112eae7-9d11-4b40-a2b8-6c83cb3c7497",
+            success=1,
+            failures="",
+        )
+    ]
+    sample_jobs = [
+        BaseJob(
+            created_time=1694536604319,
+            creator_user_name="anonymous@databricks.com",
+            job_id=536591785949415,
+            settings=JobSettings(
+                compute=None,
+                continuous=None,
+                job_clusters=[
+                    JobCluster(
+                        job_cluster_key="redkite-pricinganalytics",
+                        new_cluster=ClusterSpec(
+                            autoscale=None,
+                            node_type_id="Standard_DS3_v2",
+                            num_workers=2,
+                            policy_id="1111111",
+                            spark_conf={
+                                "spark.hadoop.fs.azure.account.oauth2.client.id.abcde.dfs"
+                                ".core.windows.net": "1234567890",
+                                "spark.databricks.delta.formatCheck.enabled": "false",
+                            },
+                        ),
+                    ),
+                ],
+                tasks=[
+                    Task(
+                        task_key="Ingest",
+                        notebook_task=NotebookTask(
+                            notebook_path="/Users/foo.bar@databricks.com/Customers/Example/Test/Load"
+                        ),
+                        timeout_seconds=0,
+                    )
+                ],
+                timeout_seconds=0,
+            ),
+        )
+    ]
+    ws = mocker.Mock()
+    ws.clusters.list.return_value = sample_clusters
+    ws.pipelines.list_pipelines.return_value = sample_pipelines
+    config_dict = {}
+    ws.pipelines.get().spec.configuration = config_dict
+    ws.jobs.list.return_value = sample_jobs
+    ws.cluster_policies.get().definition = json.dumps(
+        {
+            "spark_conf.fs.azure1.account.auth.type": {"type": "fixed", "value": "OAuth", "hidden": "true"},
+            "spark_conf.fs.azure1.account.oauth.provider.type": {
+                "type": "fixed",
+                "value": "org.apache.hadoop.fs.azurebfs.oauth2.ClientCredsTokenProvider",
+                "hidden": "true",
+            },
+        }
+    )
+    ws.cluster_policies.get().policy_family_definition_overrides = None
+    spn_crawler = AzureServicePrincipalCrawler(ws, MockBackend(), "ucx")._crawl()
+
+    assert len(spn_crawler) == 1
 
 
 def test_list_all_pipeline_with_conf_spn_in_spark_conf(mocker):
