@@ -33,7 +33,6 @@ Holds Inventory of all tables in all databases and their relevant metadata.
 | table_format   |string|Table provider. Like delta or json or parquet.|
 | location       |string|Location of the data for table|
 | view_text      |nullable string|If the table is the view, then this column holds the definition of the view|
-| upgrade_status |int|0-Not Upgraded (default) 1-Upgraded|
 | upgrade_target |string|Upgrade Target (3 level namespace)|
 
 <br/>

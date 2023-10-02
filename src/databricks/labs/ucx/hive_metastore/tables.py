@@ -1,4 +1,6 @@
 import logging
+import re
+import string
 from collections.abc import Iterator
 from dataclasses import dataclass
 from functools import partial
@@ -22,8 +24,7 @@ class Table:
 
     location: str = None
     view_text: str = None
-    upgrade_status: int = 0
-    upgrade_target: str = None
+    upgraded_to: str = None
 
     @property
     def is_delta(self) -> bool:
@@ -70,6 +71,13 @@ class Table:
             f"ALTER {self.kind} {catalog}.{self.database}.{self.name} SET"
             f" TBLPROPERTIES ('upgraded_from' = '{self.key}');"
         )
+
+
+def parse_table_props(tbl_props: string) -> {}:
+    pattern = r"([^,\[\]]+)=([^,\[\]]+)"
+    key_value_pairs = re.findall(pattern, tbl_props)
+    # Convert key-value pairs to dictionary
+    return dict(key_value_pairs)
 
 
 class TablesCrawler(CrawlerBase):
@@ -142,6 +150,7 @@ class TablesCrawler(CrawlerBase):
                 table_format=describe.get("Provider", "").upper(),
                 location=describe.get("Location", None),
                 view_text=describe.get("View Text", None),
+                upgraded_to=parse_table_props(describe.get("Table Properties", "")).get("upgraded_to", ""),
             )
         except Exception as e:
             logger.error(f"Couldn't fetch information for table {full_name} : {e}")
