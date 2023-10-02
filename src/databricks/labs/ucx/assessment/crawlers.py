@@ -1,7 +1,6 @@
 import json
 import re
 from dataclasses import dataclass
-from enum import Enum
 
 from databricks.sdk import WorkspaceClient
 from databricks.sdk.service.compute import ClusterSource
@@ -24,12 +23,8 @@ _AZURE_SP_CONF = [
 ]
 _SECRET_PATTERN = r"{{(secrets.*?)}}"
 _AZURE_SP_CONF_FAILURE_MSG = "Uses azure service principal credentials config in "
-
-
-@dataclass
-class FixedNumber(Enum):
-    SIX = 6
-    THREE = 3
+_SECRET_LIST_LENGTH = 3
+_CLIENT_ENDPOINT_LENGTH = 6
 
 
 @dataclass
@@ -85,7 +80,7 @@ def _get_azure_spn_tenant_id(config: dict) -> str:
             client_endpoint_list = config.get(matching_key[0]).get("value").split("/")
         else:
             client_endpoint_list = config.get(matching_key[0]).split("/")
-        if len(client_endpoint_list) == FixedNumber.SIX:
+        if len(client_endpoint_list) == _CLIENT_ENDPOINT_LENGTH:
             return client_endpoint_list[3]
 
 
@@ -131,7 +126,7 @@ class AzureServicePrincipalCrawler(CrawlerBase):
         matched = re.search(_SECRET_PATTERN, spn_application_id)
         if matched:
             split = matched.group(1).split("/")
-            if len(split) == FixedNumber.THREE:
+            if len(split) == _SECRET_LIST_LENGTH:
                 secret_scope, secret_key = split[1], split[2]
                 spn_application_id = self._ws.secrets.get_secret(secret_scope, secret_key)
         return {
@@ -169,7 +164,7 @@ class AzureServicePrincipalCrawler(CrawlerBase):
             + azure_spn_list_with_data_access_from_jobs
         )
 
-    def _list_all_jobs_with_spn_in_spark_conf(self):
+    def _list_all_jobs_with_spn_in_spark_conf(self) -> list:
         azure_spn_list_with_data_access_from_jobs = []
         tenant_id = None
         all_jobs = list(self._ws.jobs.list(expand_tasks=True))
@@ -206,7 +201,7 @@ class AzureServicePrincipalCrawler(CrawlerBase):
                         )
         return azure_spn_list_with_data_access_from_jobs
 
-    def _list_all_pipeline_with_spn_in_spark_conf(self):
+    def _list_all_pipeline_with_spn_in_spark_conf(self) -> list:
         azure_spn_list_with_data_access_from_pipeline = []
         for pipeline in self._ws.pipelines.list_pipelines():
             pipeline_config = self._ws.pipelines.get(pipeline.pipeline_id).spec.configuration
@@ -222,7 +217,7 @@ class AzureServicePrincipalCrawler(CrawlerBase):
                 )
         return azure_spn_list_with_data_access_from_pipeline
 
-    def _list_all_cluster_with_spn_in_spark_conf(self):
+    def _list_all_cluster_with_spn_in_spark_conf(self) -> list:
         azure_spn_list_with_data_access_from_cluster = []
         for cluster in self._ws.clusters.list():
             if cluster.cluster_source != ClusterSource.JOB:

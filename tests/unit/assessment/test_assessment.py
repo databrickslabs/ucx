@@ -1286,10 +1286,39 @@ def test_list_all_cluster_with_spn_in_spark_conf_with_secret(mocker):
     ws = mocker.Mock()
     ws.clusters.list.return_value = sample_clusters
     ws.cluster_policies.get().policy_family_definition_overrides = None
-    AzureServicePrincipalCrawler(ws, MockBackend(), "ucx")._list_all_cluster_with_spn_in_spark_conf()
-    result_set = []
+    crawler = AzureServicePrincipalCrawler(ws, MockBackend(), "ucx")._list_all_cluster_with_spn_in_spark_conf()
+    result_set = list(crawler)
 
-    assert len(result_set) == 0
+    assert len(result_set) == 1
+
+
+def test_list_all_clusters_spn_in_spark_conf_with_tenant(mocker):
+    sample_clusters = [
+        ClusterDetails(
+            cluster_name="Tech Summit FY24 Cluster",
+            autoscale=AutoScale(min_workers=1, max_workers=6),
+            spark_conf={
+                "spark.hadoop.fs.azure.account."
+                "oauth2.client.id.abcde.dfs.core.windows.net": "{{secrets/abcff/sp_app_client_id}}",
+                "spark.hadoop.fs.azure.account."
+                "oauth2.client.endpoint.abcde.dfs.core.windows.net": "https://login.microsoftonline.com/dummy-tenant-id/oauth2/token",
+                "spark.hadoop.fs.azure.account."
+                "oauth2.client.secret.abcde.dfs.core.windows.net": "{{secrets/abcff/sp_secret}}",
+            },
+            spark_context_id=5134472582179565315,
+            spark_env_vars=None,
+            spark_version="13.3.x-cpu-ml-scala2.12",
+            cluster_id="0915-190044-3dqy6751",
+        )
+    ]
+
+    ws = mocker.Mock()
+    ws.clusters.list.return_value = sample_clusters
+    ws.cluster_policies.get().policy_family_definition_overrides = None
+    result_set = AzureServicePrincipalCrawler(ws, MockBackend(), "ucx")._list_all_cluster_with_spn_in_spark_conf()
+
+    assert len(result_set) == 1
+    assert result_set[0].get("tenant_id") == "dummy-tenant-id"
 
 
 def test_azure_service_principal_info_policy_conf(mocker):
