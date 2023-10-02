@@ -5,6 +5,8 @@ import re
 from dataclasses import dataclass
 
 from databricks.sdk import WorkspaceClient
+from databricks.sdk.service.compute import ClusterDetails, ClusterSource
+from databricks.sdk.service.compute import ClusterSource, ClusterDetails
 from databricks.sdk.core import DatabricksError
 from databricks.sdk.service.compute import ClusterSource
 from databricks.sdk.service.compute import ClusterDetails, ClusterSource
