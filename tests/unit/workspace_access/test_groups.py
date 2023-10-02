@@ -216,7 +216,7 @@ def test_prepare_groups_in_environment_with_multiple_groups_in_conf_should_retur
     assert compare(manager._migration_state.groups, [ds_group_info, de_group_info])
 
 
-def test_prepare_groups_in_environment_should_throw_when_account_group_doesnt_exist():
+def test_prepare_groups_in_environment_should_not_throw_when_account_group_doesnt_exist():
     de_group = Group(display_name="de", meta=ResourceMeta(resource_type="WorkspaceGroup"))
 
     client = Mock()
@@ -227,9 +227,8 @@ def test_prepare_groups_in_environment_should_throw_when_account_group_doesnt_ex
     group_conf = GroupsConfig(selected=["de"], backup_group_prefix="dbr_backup_")
     manager = GroupManager(client, group_conf)
 
-    with pytest.raises(AssertionError) as e_info:
-        manager.prepare_groups_in_environment()
-    assert str(e_info.value) == "Group de not found on the account level"
+    manager.prepare_groups_in_environment()
+    assert len(manager.migration_groups_provider.groups) == 0
 
 
 def test_prepare_groups_in_environment_should_throw_when_workspace_group_doesnt_exist():
