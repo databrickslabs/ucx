@@ -1334,6 +1334,7 @@ def test_azure_service_principal_info_policy_conf(mocker):
                                 "spark.hadoop.fs.azure.account.oauth2.client.id.abcde.dfs"
                                 ".core.windows.net": "1234567890",
                                 "spark.databricks.delta.formatCheck.enabled": "false",
+                                "fs.azure.account.oauth2.client.endpoint.dummy.dfs.core.windows.net": "https://login.microsoftonline.com/dummy-123tenant-123/oauth2/token",
                             },
                         ),
                     ),
