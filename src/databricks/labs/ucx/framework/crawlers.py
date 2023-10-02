@@ -44,13 +44,20 @@ class SqlBackend(ABC):
     @classmethod
     def _filter_none_rows(cls, rows):
         results = []
+        nullable_fields = []
+
+        for field in dataclasses.fields(rows[0]):
+            if field.default is None:
+                nullable_fields.append(field.name)
+
         for row in rows:
             row_contains_none = False
-            for k, v in dataclasses.asdict(row).items():
-                if v is None:
-                    logger.debug(f"Field {k} is None, filtering row")
+            for column, value in dataclasses.asdict(row).items():
+                if value is None and column not in nullable_fields:
+                    logger.debug(f"Field {column} is None, filtering row")
                     row_contains_none = True
                     break
+
             if not row_contains_none:
                 results.append(row)
         return results
