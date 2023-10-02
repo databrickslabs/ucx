@@ -41,6 +41,21 @@ class SqlBackend(ABC):
             fields.append(f"{f.name} {spark_type}{not_null}")
         return ", ".join(fields)
 
+    @classmethod
+    def _filter_none_rows(cls, rows):
+        results = []
+        for row in rows:
+            row_contains_none = False
+            for k, v in dataclasses.asdict(row).items():
+                if v is None:
+                    print(f"Field {k} is None, filtering")
+                    row_contains_none = True
+                    break
+            if not row_contains_none:
+                results.append(row)
+        return results
+
+
 
 class StatementExecutionBackend(SqlBackend):
     def __init__(self, ws: WorkspaceClient, warehouse_id, *, max_records_per_batch: int = 1000):
@@ -115,6 +130,8 @@ class RuntimeBackend(SqlBackend):
         return self._spark.sql(sql).collect()
 
     def save_table(self, full_name: str, rows: list[any], mode: str = "append"):
+        rows = self._filter_none_rows(rows)
+
         if len(rows) == 0:
             return
         # pyspark deals well with lists of dataclass instances, as long as schema is provided
