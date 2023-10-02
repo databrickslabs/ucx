@@ -48,13 +48,12 @@ class SqlBackend(ABC):
             row_contains_none = False
             for k, v in dataclasses.asdict(row).items():
                 if v is None:
-                    print(f"Field {k} is None, filtering")
+                    logger.debug(f"Field {k} is None, filtering row")
                     row_contains_none = True
                     break
             if not row_contains_none:
                 results.append(row)
         return results
-
 
 
 class StatementExecutionBackend(SqlBackend):
