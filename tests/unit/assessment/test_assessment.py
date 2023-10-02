@@ -1,5 +1,10 @@
+import json
 from unittest.mock import Mock
 
+from databricks.sdk.service import compute
+from databricks.sdk.service.compute import AutoScale, ClusterDetails, ClusterSource, DataSecurityMode
+from databricks.sdk.service.jobs import BaseJob, JobSettings, NotebookTask, Task, RunType, BaseRun, JobCluster, \
+    ClusterSpec
 from databricks.sdk.core import DatabricksError
 from databricks.sdk.service.compute import (
     AutoScale,
@@ -24,7 +29,7 @@ from databricks.labs.ucx.assessment.crawlers import (
     JobsCrawler,
     JobsRunCrawler,
     PipelineInfo,
-    PipelinesCrawler,
+    PipelinesCrawler, JobsRunCrawler, JobRunInfo,
 )
 from databricks.labs.ucx.hive_metastore.data_objects import ExternalLocationCrawler
 from databricks.labs.ucx.hive_metastore.mounts import Mount
@@ -516,14 +521,14 @@ def test_job_run_crawler():
             run_type=RunType.SUBMIT_RUN.value,
             cluster_key=None,
             spark_version="11.3.x-scala2.12",
-            data_security_mode=DataSecurityMode.NONE.value,
+            data_security_mode=DataSecurityMode.NONE.value
         ),
         JobRunInfo(
             run_id=123456790,
             run_type=RunType.WORKFLOW_RUN.value,
             cluster_key=None,
             spark_version="11.3.x-scala2.12",
-            data_security_mode=DataSecurityMode.SINGLE_USER.value,
+            data_security_mode=DataSecurityMode.SINGLE_USER.value
         ),
     ]
     mock_ws = Mock()
@@ -545,13 +550,16 @@ def test_job_run_crawler_filters_runs_with_job_id():
      - job runs with a job id are not included in the result set
     """
     sample_job_runs = [
-        BaseRun(
-            job_id=12345678910,
-            run_id=123456789,
-            run_type=RunType.SUBMIT_RUN,
-            job_clusters=[JobCluster(job_cluster_key="my_job_cluster")],
-        )
-    ]
+            BaseRun(job_id=12345678910,
+                    run_id=123456789,
+                    run_type=RunType.SUBMIT_RUN,
+                    job_clusters=[
+                        JobCluster(
+                            job_cluster_key="my_job_cluster"
+                        )
+                    ]
+                    )
+        ]
     sample_clusters = [
         ClusterDetails(
             autoscale=AutoScale(min_workers=1, max_workers=6),
