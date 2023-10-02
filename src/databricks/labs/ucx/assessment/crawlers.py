@@ -1,9 +1,11 @@
+import datetime
 import json
 import re
 from dataclasses import dataclass
+from typing import Optional
 
 from databricks.sdk import WorkspaceClient
-from databricks.sdk.service.compute import ClusterSource
+from databricks.sdk.service.compute import ClusterSource, ClusterDetails
 from databricks.sdk.service.jobs import BaseJob
 
 from databricks.labs.ucx.framework.crawlers import CrawlerBase, SqlBackend
@@ -51,6 +53,15 @@ class PipelineInfo:
     creator_name: str
     success: int
     failures: str
+
+
+@dataclass
+class JobRunInfo:
+    run_id: int
+    run_type: str
+    cluster_key: Optional[str]
+    spark_version: str
+    data_security_mode: str
 
 
 def _azure_sp_conf_present_check(config: dict) -> bool:
@@ -239,3 +250,42 @@ class JobsCrawler(CrawlerBase):
     def _try_fetch(self) -> list[ClusterInfo]:
         for row in self._fetch(f"SELECT * FROM {self._schema}.{self._table}"):
             yield JobInfo(*row)
+
+
+class JobsRunCrawler(CrawlerBase):
+    def __init__(self, ws: WorkspaceClient, sbe: SqlBackend, schema):
+        super().__init__(sbe, "hive_metastore", schema, "job_runs")
+        self._ws = ws
+
+    def _crawl(self) -> list[JobRunInfo]:
+        no_of_days_back = datetime.timedelta(days=30)  # todo make configurable in yaml?
+        start_time_from = datetime.datetime.now() - no_of_days_back
+        # todo figure out if we need to specify a default timezone
+        all_job_runs = list(self._ws.jobs.list_runs(start_time_from=start_time_from,
+                                                    start_time_to=datetime.datetime.now()))
+        all_clusters: dict[str, ClusterDetails] = {c.cluster_id: c for c in self._ws.clusters.list()}
+        return self._assess_job_runs(all_clusters, all_job_runs)
+
+    def _assess_job_runs(self, all_clusters, all_job_runs):
+        all_job_run_info = []
+        job_runs_without_job_id = list(filter(lambda jr: jr.job_id is None, all_job_runs))
+        for job_run in job_runs_without_job_id:
+            for job_run_cluster in job_run.job_clusters:
+                cluster_key = job_run_cluster.job_cluster_key
+                cluster: ClusterDetails = all_clusters[cluster_key] if cluster_key is not None else job_run_cluster.new_cluster
+                spark_version = cluster.spark_version
+                data_security_mode = cluster.data_security_mode
+                job_run_info = JobRunInfo(run_id=job_run.run_id,
+                                          run_type=str(job_run.run_type.value),
+                                          cluster_key=cluster_key,
+                                          spark_version=spark_version,
+                                          data_security_mode=str(data_security_mode.value))
+                all_job_run_info.append(job_run_info)
+        return all_job_run_info
+
+    def snapshot(self) -> list[JobRunInfo]:
+        return self._snapshot(self._try_fetch, self._crawl)
+
+    def _try_fetch(self) -> list[JobRunInfo]:
+        for row in self._fetch(f"SELECT * FROM {self._schema}.{self._table}"):
+            yield JobRunInfo(*row)

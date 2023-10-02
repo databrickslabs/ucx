@@ -1,14 +1,17 @@
+import json
 from unittest.mock import Mock
 
-from databricks.sdk.service.compute import AutoScale, ClusterDetails, ClusterSource
-from databricks.sdk.service.jobs import BaseJob, JobSettings, NotebookTask, Task
+from databricks.sdk.service import compute
+from databricks.sdk.service.compute import AutoScale, ClusterDetails, ClusterSource, DataSecurityMode
+from databricks.sdk.service.jobs import BaseJob, JobSettings, NotebookTask, Task, RunType, BaseRun, JobCluster, \
+    ClusterSpec
 from databricks.sdk.service.pipelines import PipelineState, PipelineStateInfo
 
 from databricks.labs.ucx.assessment.crawlers import (
     ClustersCrawler,
     JobsCrawler,
     PipelineInfo,
-    PipelinesCrawler,
+    PipelinesCrawler, JobsRunCrawler, JobRunInfo,
 )
 from databricks.labs.ucx.hive_metastore.data_objects import ExternalLocationCrawler
 from databricks.labs.ucx.hive_metastore.mounts import Mount
@@ -467,3 +470,79 @@ def test_pipeline_snapshot_with_config():
 
     assert len(result_set) == 1
     assert result_set[0].success == 1
+
+
+def test_job_run_crawler():
+    """
+    Simple test to validate that JobsRunCrawler
+     - returns a list of JobRunInfo objects
+     - of appropriate size
+     - with expected values
+    """
+    sample_job_run_infos = [
+        JobRunInfo(
+            run_id=123456789,
+            run_type=RunType.SUBMIT_RUN.value,
+            cluster_key=None,
+            spark_version="11.3.x-scala2.12",
+            data_security_mode=DataSecurityMode.NONE.value
+        ),
+        JobRunInfo(
+            run_id=123456790,
+            run_type=RunType.WORKFLOW_RUN.value,
+            cluster_key=None,
+            spark_version="11.3.x-scala2.12",
+            data_security_mode=DataSecurityMode.SINGLE_USER.value
+        ),
+    ]
+    mock_ws = Mock()
+
+    crawler = JobsRunCrawler(mock_ws, MockBackend(), "ucx")
+
+    crawler._try_fetch = Mock(return_value=[])
+    crawler._crawl = Mock(return_value=sample_job_run_infos)
+
+    result_set = crawler.snapshot()
+
+    assert len(result_set) == 2
+    assert result_set[0].data_security_mode == DataSecurityMode.NONE.value
+
+
+def test_job_run_crawler_filters_runs_with_job_id():
+    """
+    Test to validate
+     - job runs with a job id are not included in the result set
+    """
+    sample_job_runs = [
+            BaseRun(job_id=12345678910,
+                    run_id=123456789,
+                    run_type=RunType.SUBMIT_RUN,
+                    job_clusters=[
+                        JobCluster(
+                            job_cluster_key="my_job_cluster"
+                        )
+                    ]
+                    )
+        ]
+    sample_clusters = [
+        ClusterDetails(
+            autoscale=AutoScale(min_workers=1, max_workers=6),
+            spark_context_id=5134472582179565315,
+            spark_env_vars=None,
+            spark_version="11.3.x-scala2.12",
+            cluster_id="my_job_cluster",
+            cluster_source=ClusterSource.JOB,
+        )
+    ]
+    mock_ws = Mock()
+
+    mock_ws.jobs.list_runs = Mock(return_value=sample_job_runs)
+    mock_ws.clusters.list = Mock(return_value=sample_clusters)
+
+    crawler = JobsRunCrawler(mock_ws, MockBackend(), "ucx")
+
+    crawler._try_fetch = Mock(return_value=[])
+
+    result_set = crawler.snapshot()
+
+    assert len(result_set) == 0
