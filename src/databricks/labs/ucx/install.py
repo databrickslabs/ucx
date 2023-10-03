@@ -24,6 +24,7 @@ from databricks.labs.ucx.runtime import main
 
 TAG_STEP = "step"
 TAG_APP = "App"
+NUM_USER_ATTEMPTS = 10  # number of attempts user gets at answering a question
 
 DEBUG_NOTEBOOK = """
 # Databricks notebook source

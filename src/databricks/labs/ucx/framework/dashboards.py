@@ -1,5 +1,6 @@
 import dataclasses
 import json
+import logging
 from collections.abc import Callable
 from dataclasses import dataclass
 from json import JSONDecodeError
@@ -16,6 +17,8 @@ from databricks.sdk.service.sql import (
     WidgetPosition,
 )
 from databricks.sdk.service.workspace import ImportFormat
+
+logger = logging.getLogger(__name__)
 
 
 @dataclass
@@ -186,7 +189,10 @@ class DashboardFromFiles:
             _, name = k.split(":")
             if name not in destructors:
                 continue
-            destructors[name](v)
+            try:
+                destructors[name](v)
+            except DatabricksError as err:
+                logger.info(f"Failed to delete {name}-{v} --- {err.error_code}")
         state_dump = json.dumps(new_state, indent=2).encode("utf8")
         self._ws.workspace.upload(self._query_state, state_dump, format=ImportFormat.AUTO, overwrite=True)
 
