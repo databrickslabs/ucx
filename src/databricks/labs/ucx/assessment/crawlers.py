@@ -22,7 +22,7 @@ _AZURE_SP_CONF = [
     "fs.azure.account.oauth2.client.endpoint",
 ]
 _SECRET_PATTERN = r"{{(secrets.*?)}}"
-_STORAGE_ACCOUNT_PATTERN = r"(?:id|endpoint)(.*?)dfs"
+_STORAGE_ACCOUNT_EXTRACT_PATTERN = r"(?:id|endpoint)(.*?)dfs"
 _AZURE_SP_CONF_FAILURE_MSG = "Uses azure service principal credentials config in "
 _SECRET_LIST_LENGTH = 3
 _CLIENT_ENDPOINT_LENGTH = 6
@@ -127,7 +127,7 @@ class AzureServicePrincipalCrawler(CrawlerBase):
         matching_key_list = [key for key in config.keys() if "fs.azure.account.oauth2.client.id" in key]
         if len(matching_key_list) > 0:
             for key in matching_key_list:
-                storage_account_match = re.search(_STORAGE_ACCOUNT_PATTERN, key)
+                storage_account_match = re.search(_STORAGE_ACCOUNT_EXTRACT_PATTERN, key)
                 if re.search("spark_conf", key):
                     spn_application_id = config.get(key).get("value")
                 else:
