@@ -70,7 +70,7 @@ class GroupManager:
 
     def _list_account_groups(self) -> list[iam.Group]:
         # TODO: we should avoid using this method, as it's not documented
-        # unfortunately, there's no other way to consistently get the list of account groups
+        # get account-level groups even if they're not (yet) assigned to a workspace
         logger.debug("Listing account groups...")
         account_groups = [
             iam.Group.from_dict(r)
@@ -160,20 +160,29 @@ class GroupManager:
             "Preparing groups in the current environment. At this step we'll verify that all groups "
             "exist and are of the correct type. If some temporary groups are missing, they'll be created"
         )
-        if self.config.selected:
+        group_names = self.config.selected
+        if group_names:
             logger.info("Using the provided group listing")
 
-            for g in self.config.selected:
+            for g in group_names:
                 assert g not in self.SYSTEM_GROUPS, f"Cannot migrate system group {g}"
                 assert self._get_group(g, "workspace"), f"Group {g} not found on the workspace level"
                 assert self._get_group(g, "account"), f"Group {g} not found on the account level"
 
-            self._set_migration_groups(self.config.selected)
-        else:
-            logger.info("No group listing provided, all available workspace-level groups will be used")
-            available_group_names = [g.display_name for g in self._workspace_groups]
-            self._set_migration_groups(groups_names=available_group_names)
+        if not group_names:
+            logger.info(
+                "No group listing provided, all available workspace-level groups that have an account-level "
+                "group with the same name will be used"
+            )
+            ws_group_names = {_.display_name for _ in self._workspace_groups}
+            ac_group_names = {_.display_name for _ in self._account_groups}
+            group_names = list(ws_group_names.intersection(ac_group_names))
+
+        self._set_migration_groups(group_names)
         logger.info("Environment prepared successfully")
+
+    def has_groups(self) -> bool:
+        return len(self._migration_state.groups) > 0
 
     @property
     def migration_groups_provider(self) -> GroupMigrationState:

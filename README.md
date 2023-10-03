@@ -9,9 +9,30 @@ permissions that are set on the workspace level, Secret scopes, Notebooks, Direc
 
 See [contributing instructions](CONTRIBUTING.md) to help improve this project.
 
+## Introduction
+UCX will guide you, the Databricks customer through the process of upgrading your account, groups, workspaces, jobs etc to Unity Catalog. 
+
+The upgrade process starts with installing code to run the upgrade assessment as well as modules for upgrading various components of the system. Component upgrades typically involve evolving configuration and metadata contained within your Databricks deployment. There are parts of the upgrade process that will recommend individual code changes for jobs. The upgrade user will be directed to trigger these operations one by one. 
+
+
+UCX leverages Databricks Lakehouse platform to upgrade itself, this includes creating jobs, notebooks, deploying code and configuration files. The `install.sh` guides you through this installation.
+By running the installation you install the assessment job and a number of upgrade jobs. The assessment and upgrade jobs are outlined in the custom generated README.py that is created by the installer and displayed to you by the `install.sh`. See interactive installation [tutorial here](https://app.getreprise.com/launch/G6YbWLn/). 
+
+
+The custom generated README.py, config.yaml and other assets are placed into your Databricks workspace home folder, into a subfolder named `.ucx`. See [interactive tutorial](https://app.getreprise.com/launch/zXPxBZX/).
+
+
+Once the custom Databricks jobs are installed, begin by triggering the assessment job. The assessment job can be found under your workflows or via the active link in the README.py. Once the assessment job is complete, you can review the results in the custom generated Databricks dashboard (linked to by the custom README.py found in the workspace folder created for you).
+
+
+You will need account, unity catalog and workspace administrative authority to complete the upgrade process. To run the installer, you will need to setup `databricks-cli` and a credential, [following these instructions.](https://docs.databricks.com/en/dev-tools/cli/databricks-cli.html) Additionally, the interim metadata and config data being processed by UCX will be stored into a Hive Metastore database schema generated at install time.
+
+
+For questions, troubleshooting or bug fixes, please see your Databricks account team or submit an issue to the [Databricks UCX github repo](https://github.com/databrickslabs/ucx)
+
 ## Installation
 
-First clone this project repo to your local environment (better, make a fork in case you make changes to contribute back). 
+As a customer, download the latest release from github onto your laptop/desktop machine. Unzip or untar the release.
 
 The `./install.sh` script will guide you through installation process. 
 Make sure you have Python 3.10 (or greater) 

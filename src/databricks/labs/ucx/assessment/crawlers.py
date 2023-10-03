@@ -1,16 +1,33 @@
 import json
+import logging
+import re
 from dataclasses import dataclass
 
 from databricks.sdk import WorkspaceClient
+from databricks.sdk.core import DatabricksError
+from databricks.sdk.service.compute import ClusterSource
 from databricks.sdk.service.jobs import BaseJob
 
 from databricks.labs.ucx.framework.crawlers import CrawlerBase, SqlBackend
+
+logger = logging.getLogger(__name__)
 
 INCOMPATIBLE_SPARK_CONFIG_KEYS = [
     "spark.databricks.passthrough.enabled",
     "spark.hadoop.javax.jdo.option.ConnectionURL",
     "spark.databricks.hive.metastore.glueCatalog.enabled",
 ]
+
+_AZURE_SP_CONF = [
+    "fs.azure.account.key",
+    "fs.azure.account.auth.type",
+    "fs.azure.account.oauth.provider.type",
+    "fs.azure.account.oauth2.client.id",
+    "fs.azure.account.oauth2.client.secret",
+    "fs.azure.account.oauth2.client.endpoint",
+]
+
+_AZURE_SP_CONF_FAILURE_MSG = "Uses azure service principal credentials config in "
 
 
 @dataclass
@@ -29,6 +46,23 @@ class ClusterInfo:
     creator: str
     success: int
     failures: str
+
+
+@dataclass
+class PipelineInfo:
+    pipeline_id: str
+    pipeline_name: str
+    creator_name: str
+    success: int
+    failures: str
+
+
+def _azure_sp_conf_present_check(config: dict) -> bool:
+    for key in config.keys():
+        for conf in _AZURE_SP_CONF:
+            if re.search(conf, key):
+                return True
+    return False
 
 
 def spark_version_compatibility(spark_version: str) -> str:
@@ -50,6 +84,37 @@ def spark_version_compatibility(spark_version: str) -> str:
     return "supported"
 
 
+class PipelinesCrawler(CrawlerBase):
+    def __init__(self, ws: WorkspaceClient, sbe: SqlBackend, schema):
+        super().__init__(sbe, "hive_metastore", schema, "pipelines")
+        self._ws = ws
+
+    def _crawl(self) -> list[PipelineInfo]:
+        all_pipelines = list(self._ws.pipelines.list_pipelines())
+        return list(self._assess_pipelines(all_pipelines))
+
+    def _assess_pipelines(self, all_pipelines):
+        for pipeline in all_pipelines:
+            pipeline_info = PipelineInfo(pipeline.pipeline_id, pipeline.name, pipeline.creator_user_name, 1, "")
+            failures = []
+            pipeline_config = self._ws.pipelines.get(pipeline.pipeline_id).spec.configuration
+            if pipeline_config:
+                if _azure_sp_conf_present_check(pipeline_config):
+                    failures.append(f"{_AZURE_SP_CONF_FAILURE_MSG} pipeline.")
+
+            pipeline_info.failures = json.dumps(failures)
+            if len(failures) > 0:
+                pipeline_info.success = 0
+            yield pipeline_info
+
+    def snapshot(self) -> list[PipelineInfo]:
+        return self._snapshot(self._try_fetch, self._crawl)
+
+    def _try_fetch(self) -> list[PipelineInfo]:
+        for row in self._fetch(f"SELECT * FROM {self._schema}.{self._table}"):
+            yield PipelineInfo(*row)
+
+
 class ClustersCrawler(CrawlerBase):
     def __init__(self, ws: WorkspaceClient, sbe: SqlBackend, schema):
         super().__init__(sbe, "hive_metastore", schema, "clusters")
@@ -61,6 +126,8 @@ class ClustersCrawler(CrawlerBase):
 
     def _assess_clusters(self, all_clusters):
         for cluster in all_clusters:
+            if cluster.cluster_source == ClusterSource.JOB:
+                continue
             cluster_info = ClusterInfo(cluster.cluster_id, cluster.cluster_name, cluster.creator_user_name, 1, "")
             support_status = spark_version_compatibility(cluster.spark_version)
             failures = []
@@ -75,6 +142,23 @@ class ClustersCrawler(CrawlerBase):
                 for value in cluster.spark_conf.values():
                     if "dbfs:/mnt" in value or "/dbfs/mnt" in value:
                         failures.append(f"using DBFS mount in configuration: {value}")
+
+                # Checking if Azure cluster config is present in spark config
+                if _azure_sp_conf_present_check(cluster.spark_conf):
+                    failures.append(f"{_AZURE_SP_CONF_FAILURE_MSG} cluster.")
+
+            # Checking if Azure cluster config is present in cluster policies
+            if cluster.policy_id:
+                try:
+                    policy = self._ws.cluster_policies.get(cluster.policy_id)
+                    if _azure_sp_conf_present_check(json.loads(policy.definition)):
+                        failures.append(f"{_AZURE_SP_CONF_FAILURE_MSG} cluster.")
+                    if policy.policy_family_definition_overrides:
+                        if _azure_sp_conf_present_check(json.loads(policy.policy_family_definition_overrides)):
+                            failures.append(f"{_AZURE_SP_CONF_FAILURE_MSG} cluster.")
+                except DatabricksError as err:
+                    logger.warning(f"Error retrieving cluster policy {cluster.policy_id}. Error: {err}")
+
             cluster_info.failures = json.dumps(failures)
             if len(failures) > 0:
                 cluster_info.success = 0
@@ -136,6 +220,23 @@ class JobsCrawler(CrawlerBase):
                 for value in cluster_config.spark_conf.values():
                     if "dbfs:/mnt" in value or "/dbfs/mnt" in value:
                         job_assessment[job.job_id].add(f"using DBFS mount in configuration: {value}")
+
+                # Checking if Azure cluster config is present in spark config
+                if _azure_sp_conf_present_check(cluster_config.spark_conf):
+                    job_assessment[job.job_id].add(f"{_AZURE_SP_CONF_FAILURE_MSG} Job cluster.")
+
+            # Checking if Azure cluster config is present in cluster policies
+            if cluster_config.policy_id:
+                try:
+                    policy = self._ws.cluster_policies.get(cluster_config.policy_id)
+                    if _azure_sp_conf_present_check(json.loads(policy.definition)):
+                        job_assessment[job.job_id].add(f"{_AZURE_SP_CONF_FAILURE_MSG} Job cluster.")
+                    if policy.policy_family_definition_overrides:
+                        if _azure_sp_conf_present_check(json.loads(policy.policy_family_definition_overrides)):
+                            job_assessment[job.job_id].add(f"{_AZURE_SP_CONF_FAILURE_MSG} Job cluster.")
+                except DatabricksError as err:
+                    logger.warning(f"Error retrieving cluster policy {cluster_config.policy_id}. Error: {err}")
+
         for job_key in job_details.keys():
             job_details[job_key].failures = json.dumps(list(job_assessment[job_key]))
             if len(job_assessment[job_key]) > 0:

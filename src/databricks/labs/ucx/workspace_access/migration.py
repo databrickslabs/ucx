@@ -3,7 +3,7 @@ import logging
 from databricks.sdk import WorkspaceClient
 from databricks.sdk.service import sql
 
-from databricks.labs.ucx.config import MigrationConfig
+from databricks.labs.ucx.config import WorkspaceConfig
 from databricks.labs.ucx.framework.crawlers import (
     RuntimeBackend,
     SqlBackend,
@@ -29,7 +29,7 @@ from databricks.labs.ucx.workspace_access.verification import VerificationManage
 
 
 class GroupMigrationToolkit:
-    def __init__(self, config: MigrationConfig, *, warehouse_id=None):
+    def __init__(self, config: WorkspaceConfig, *, warehouse_id=None):
         self._configure_logger(config.log_level)
 
         ws = WorkspaceClient(config=config.to_databricks_config())
@@ -113,6 +113,9 @@ class GroupMigrationToolkit:
     def _configure_logger(level: str):
         ucx_logger = logging.getLogger("databricks.labs.ucx")
         ucx_logger.setLevel(level)
+
+    def has_groups(self) -> bool:
+        return self._group_manager.has_groups()
 
     def prepare_environment(self):
         self._group_manager.prepare_groups_in_environment()
