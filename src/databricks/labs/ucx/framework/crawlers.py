@@ -42,19 +42,24 @@ class SqlBackend(ABC):
         return ", ".join(fields)
 
     @classmethod
-    def _filter_none_rows(cls, rows):
+    def _filter_none_rows(cls, rows, full_name):
+        if len(rows) == 0:
+            return rows
+
         results = []
-        nullable_fields = []
+        nullable_fields = set()
 
         for field in dataclasses.fields(rows[0]):
             if field.default is None:
-                nullable_fields.append(field.name)
+                nullable_fields.add(field.name)
 
         for row in rows:
+            if row is None:
+                continue
             row_contains_none = False
             for column, value in dataclasses.asdict(row).items():
                 if value is None and column not in nullable_fields:
-                    logger.debug(f"Field {column} is None, filtering row")
+                    logger.warning(f"[{full_name}] Field {column} is None, filtering row")
                     row_contains_none = True
                     break
 
@@ -81,7 +86,7 @@ class StatementExecutionBackend(SqlBackend):
         if mode == "overwrite":
             msg = "Overwrite mode is not yet supported"
             raise NotImplementedError(msg)
-
+        rows = self._filter_none_rows(rows, full_name)
         if len(rows) == 0:
             return
 
@@ -136,7 +141,7 @@ class RuntimeBackend(SqlBackend):
         return self._spark.sql(sql).collect()
 
     def save_table(self, full_name: str, rows: list[any], mode: str = "append"):
-        rows = self._filter_none_rows(rows)
+        rows = self._filter_none_rows(rows, full_name)
 
         if len(rows) == 0:
             return

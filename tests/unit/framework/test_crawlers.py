@@ -221,7 +221,7 @@ def test_runtime_backend_save_table_with_row_containing_none(mocker):
 
         rb = RuntimeBackend()
 
-        rb.save_table("a.b.c", [Foo("aaa", True), Foo("bbb", False), Foo("bbb", None)])
+        rb.save_table("a.b.c", [Foo("aaa", True), Foo("bbb", False), Foo("ccc", None)])
 
         rb._spark.createDataFrame.assert_called_with(
             [Foo(first="aaa", second=True), Foo(first="bbb", second=False)],
