@@ -19,41 +19,33 @@ logger = logging.getLogger(__name__)
 
 @task("assessment")
 def setup_schema(cfg: WorkspaceConfig):
-    """Creates a database for UCX migration intermediate state"""
+    """Creates a database for the UCX migration intermediate state. The name comes from the configuration file
+    and is set with the `inventory_database` key."""
     backend = RuntimeBackend()
     backend.execute(f"CREATE SCHEMA IF NOT EXISTS hive_metastore.{cfg.inventory_database}")
 
 
 @task("assessment", depends_on=[setup_schema], notebook="hive_metastore/tables.scala")
 def crawl_tables(_: WorkspaceConfig):
-    """In this procedure, we systematically scan every table stored within the Hive Metastore. This scanning process
-    retrieves vital information for each table, which includes its distinct identifier or name, table format, and
-    storage location details.
-
-    The gathered metadata is then subsequently organized and documented within a designated storage entity referred to
-    as the `$inventory.tables` table. This table serves as an extensive inventory, offering a well-structured and
-    readily accessible point of reference for users, data engineers, and administrators."""
+    """Iterates over all tables in the Hive Metastore of the current workspace and persists their metadata, such
+    as _database name_, _table name_, _table type_, _table location_, etc., in the Delta table named
+    `${inventory_database}.tables`. The `inventory_database` placeholder is set in the configuration file. The metadata
+    stored is then used in the subsequent tasks of the assessment job to find all Hive Metastore tables that cannot
+    easily be migrated to Unity Catalog."""
 
 
 @task("assessment", job_cluster="tacl")
 def setup_tacl(_: WorkspaceConfig):
-    """(Optimization) Starts tacl job cluster in parallel to crawling tables"""
+    """(Optimization) Starts `tacl` job cluster in parallel to crawling tables."""
 
 
 @task("assessment", depends_on=[crawl_tables, setup_tacl], job_cluster="tacl")
 def crawl_grants(cfg: WorkspaceConfig):
-    """During this process, our methodology is purposefully designed to systematically scan and retrieve ACLs
-    (Access Control Lists) associated with Legacy Tables from the Hive Metastore. These ACLs encompass comprehensive
-    information, including permissions for users and groups, role-based access settings, and any custom access
-    configurations. These ACLs are then thoughtfully structured and securely stored within the `$inventory.grants`
-    table. This dedicated table serves as a central repository, ensuring the uninterrupted preservation of access
-    control data as we transition to the Databricks Unity Catalog.
-
-    By meticulously migrating these Legacy Table ACLs, we guarantee the seamless transfer of the data governance and
-    security framework established in our legacy Hive Metastore environment to our new Databricks Unity Catalog
-    setup. This approach not only safeguards data integrity and access control but also ensures a smooth and
-    secure transition for our data assets. It reinforces our commitment to data security and compliance throughout the
-    migration process and beyond"""
+    """Scans the previously created Delta table named `tables` and issues a `SHOW GRANTS` statement for every object
+    to retrieve the permissions it has assigned to it. The permissions include information such as the _principal_,
+    _action type_, and the _table_ it applies to. This is persisted in the Delta table `${inventory_database}.grants`.
+    Other, migration related jobs use this inventory table to convert the legacy Table ACLs to Unity Catalog
+    permissions."""
     backend = RuntimeBackend()
     tables = TablesCrawler(backend, cfg.inventory_database)
     grants = GrantsCrawler(tables)
