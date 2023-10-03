@@ -39,7 +39,7 @@ def metadataForAllTables(databases: Seq[String], queue: ConcurrentLinkedQueue[Ta
           val upgraded_to=table.properties.get("upgraded_to")
           Some(TableDetails("hive_metastore", databaseName, tableName, table.tableType.name, table.provider.orNull,
             table.storage.locationUri.map(_.toString).orNull, table.viewText.orNull,
-              upgraded_to match {case Some(target) => target case None => ""}))
+              upgraded_to match {case Some(target) => target case None => null}))
         }
       } catch {
         case err: Throwable =>

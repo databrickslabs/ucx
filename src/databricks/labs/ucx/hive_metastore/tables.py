@@ -73,13 +73,6 @@ class Table:
         )
 
 
-def parse_table_props(tbl_props: string) -> {}:
-    pattern = r"([^,\[\]]+)=([^,\[\]]+)"
-    key_value_pairs = re.findall(pattern, tbl_props)
-    # Convert key-value pairs to dictionary
-    return dict(key_value_pairs)
-
-
 class TablesCrawler(CrawlerBase):
     def __init__(self, backend: SqlBackend, schema):
         """
@@ -102,6 +95,13 @@ class TablesCrawler(CrawlerBase):
             list[Table]: A list of Table objects representing the snapshot of tables.
         """
         return self._snapshot(partial(self._try_load), partial(self._crawl))
+
+    @staticmethod
+    def _parse_table_props(tbl_props: string) -> {}:
+        pattern = r"([^,\[\]]+)=([^,\[\]]+)"
+        key_value_pairs = re.findall(pattern, tbl_props)
+        # Convert key-value pairs to dictionary
+        return dict(key_value_pairs)
 
     def _try_load(self):
         """Tries to load table information from the database or throws TABLE_OR_VIEW_NOT_FOUND error"""
@@ -150,7 +150,7 @@ class TablesCrawler(CrawlerBase):
                 table_format=describe.get("Provider", "").upper(),
                 location=describe.get("Location", None),
                 view_text=describe.get("View Text", None),
-                upgraded_to=parse_table_props(describe.get("Table Properties", "")).get("upgraded_to", ""),
+                upgraded_to=self._parse_table_props(describe.get("Table Properties", "")).get("upgraded_to", None),
             )
         except Exception as e:
             logger.error(f"Couldn't fetch information for table {full_name} : {e}")
