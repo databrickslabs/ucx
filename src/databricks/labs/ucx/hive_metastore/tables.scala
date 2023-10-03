@@ -7,7 +7,7 @@ import org.apache.spark.sql.DataFrame
 
 // must follow the same structure as databricks.labs.ucx.hive_metastore.tables.Table
 case class TableDetails(catalog: String, database: String, name: String, object_type: String,
-                        table_format: String, location: String, view_text: String)
+                        table_format: String, location: String, view_text: String, upgraded_to: String)
 
 // recording error log in the database
 case class TableError(catalog: String, database: String, name: String, error: String)
@@ -36,8 +36,10 @@ def metadataForAllTables(databases: Seq[String], queue: ConcurrentLinkedQueue[Ta
           failures.add(TableError("hive_metastore", databaseName, tableName, s"result is null"))
           None
         } else {
+          val upgraded_to=table.properties.get("upgraded_to")
           Some(TableDetails("hive_metastore", databaseName, tableName, table.tableType.name, table.provider.orNull,
-            table.storage.locationUri.map(_.toString).orNull, table.viewText.orNull))
+            table.storage.locationUri.map(_.toString).orNull, table.viewText.orNull,
+              upgraded_to match {case Some(target) => target case None => null}))
         }
       } catch {
         case err: Throwable =>
