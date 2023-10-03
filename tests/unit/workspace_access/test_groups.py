@@ -286,6 +286,19 @@ def test_prepare_groups_in_environment_with_conf_in_auto_mode_should_populate_mi
     assert manager._migration_state.groups == [group_info]
 
 
+def test_prepare_groups_in_environment_with_no_groups():
+    client = Mock()
+    client.groups.list.return_value = iter([])
+    client.api_client.do.return_value = {
+        "Resources": [],
+    }
+
+    group_conf = GroupsConfig(auto=True)
+    manager = GroupManager(client, group_conf)
+    manager.prepare_groups_in_environment()
+    assert not manager.has_groups()
+
+
 def test_replace_workspace_groups_with_account_groups_should_call_delete_and_do():
     client = Mock()
 
