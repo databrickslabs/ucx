@@ -186,7 +186,10 @@ class DashboardFromFiles:
             _, name = k.split(":")
             if name not in destructors:
                 continue
-            destructors[name](v)
+            try:
+                destructors[name](v)
+            except DatabricksError:
+                print(f"Failed to delete {name}-{v}")
         state_dump = json.dumps(new_state, indent=2).encode("utf8")
         self._ws.workspace.upload(self._query_state, state_dump, format=ImportFormat.AUTO, overwrite=True)
 
