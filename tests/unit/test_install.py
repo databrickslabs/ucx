@@ -23,6 +23,23 @@ from databricks.labs.ucx.framework.dashboards import DashboardFromFiles
 from databricks.labs.ucx.install import WorkspaceInstaller
 
 
+def test_install_database_happy(mocker, tmp_path):
+    ws = mocker.Mock()
+    install = WorkspaceInstaller(ws)
+    mocker.patch("builtins.input", return_value="ucx")
+    res = install._configure_inventory_database()
+    assert "ucx" == res
+
+
+def test_install_database_unhappy(mocker, tmp_path):
+    ws = mocker.Mock()
+    install = WorkspaceInstaller(ws)
+    mocker.patch("builtins.input", return_value="main.ucx")
+
+    with pytest.raises(SystemExit):
+        install._configure_inventory_database()
+
+
 def test_build_wheel(mocker, tmp_path):
     ws = mocker.Mock()
     install = WorkspaceInstaller(ws)
