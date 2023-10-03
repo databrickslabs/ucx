@@ -192,8 +192,7 @@ class DashboardFromFiles:
             try:
                 destructors[name](v)
             except DatabricksError as err:
-                if err.error_code != "RESOURCE_DOES_NOT_EXIST":
-                    logger.info(f"Failed to delete {name}-{v}")
+                logger.info(f"Failed to delete {name}-{v} --- {err.error_code}")
         state_dump = json.dumps(new_state, indent=2).encode("utf8")
         self._ws.workspace.upload(self._query_state, state_dump, format=ImportFormat.AUTO, overwrite=True)
 
