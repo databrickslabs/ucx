@@ -161,24 +161,34 @@ class GroupManager:
             "exist and are of the correct type. If some temporary groups are missing, they'll be created"
         )
         group_names = self.config.selected
+        valid_group_names = []
         if group_names:
             logger.info("Using the provided group listing")
 
             for g in group_names:
-                assert g not in self.SYSTEM_GROUPS, f"Cannot migrate system group {g}"
-                assert self._get_group(g, "workspace"), f"Group {g} not found on the workspace level"
-                assert self._get_group(g, "account"), f"Group {g} not found on the account level"
-
-        if not group_names:
+                if g in self.SYSTEM_GROUPS:
+                    logger.info(f"Cannot migrate system group {g}. {g} will be skipped.")
+                    continue
+                if not self._get_group(g, "workspace"):
+                    logger.info(f"Group {g} not found on the workspace level. {g} will be skipped.")
+                    continue
+                if not self._get_group(g, "account"):
+                    logger.info(
+                        f"Group {g} not found on the account level. {g} will be skipped. You can add {g} "
+                        f"to the account and rerun the job."
+                    )
+                    continue
+                valid_group_names.append(g)
+        else:
             logger.info(
                 "No group listing provided, all available workspace-level groups that have an account-level "
                 "group with the same name will be used"
             )
             ws_group_names = {_.display_name for _ in self._workspace_groups}
             ac_group_names = {_.display_name for _ in self._account_groups}
-            group_names = list(ws_group_names.intersection(ac_group_names))
+            valid_group_names = list(ws_group_names.intersection(ac_group_names))
 
-        self._set_migration_groups(group_names)
+        self._set_migration_groups(valid_group_names)
         logger.info("Environment prepared successfully")
 
     def has_groups(self) -> bool:
@@ -186,11 +196,15 @@ class GroupManager:
 
     @property
     def migration_groups_provider(self) -> GroupMigrationState:
-        assert len(self._migration_state.groups) > 0, "Migration groups were not loaded or initialized"
+        if len(self._migration_state.groups) == 0:
+            logger.info("No groups were loaded or initialized, nothing to do")
         return self._migration_state
 
     def replace_workspace_groups_with_account_groups(self):
         logger.info("Replacing the workspace groups with account-level groups")
+        if len(self._migration_state.groups) == 0:
+            logger.info("No groups were loaded or initialized, nothing to do")
+            return
         ThreadedExecution.gather(
             "groups: workspace -> account",
             [partial(self._replace_group, migration_info) for migration_info in self.migration_groups_provider.groups],
@@ -198,6 +212,8 @@ class GroupManager:
         logger.info("Workspace groups were successfully replaced with account-level groups")
 
     def delete_backup_groups(self):
+        if len(self._migration_state.groups) == 0:
+            return
         logger.info(
             f"Deleting the workspace-level backup groups. "
             f"In total, {len(self.migration_groups_provider.groups)} group(s) to be deleted"

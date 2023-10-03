@@ -216,7 +216,7 @@ def test_prepare_groups_in_environment_with_multiple_groups_in_conf_should_retur
     assert compare(manager._migration_state.groups, [ds_group_info, de_group_info])
 
 
-def test_prepare_groups_in_environment_should_throw_when_account_group_doesnt_exist():
+def test_prepare_groups_in_environment_should_not_throw_when_account_group_doesnt_exist():
     de_group = Group(display_name="de", meta=ResourceMeta(resource_type="WorkspaceGroup"))
 
     client = Mock()
@@ -227,9 +227,8 @@ def test_prepare_groups_in_environment_should_throw_when_account_group_doesnt_ex
     group_conf = GroupsConfig(selected=["de"], backup_group_prefix="dbr_backup_")
     manager = GroupManager(client, group_conf)
 
-    with pytest.raises(AssertionError) as e_info:
-        manager.prepare_groups_in_environment()
-    assert str(e_info.value) == "Group de not found on the account level"
+    manager.prepare_groups_in_environment()
+    assert len(manager.migration_groups_provider.groups) == 0
 
 
 def test_prepare_groups_in_environment_should_throw_when_workspace_group_doesnt_exist():
@@ -330,6 +329,44 @@ def test_replace_workspace_groups_with_account_groups_should_call_delete_and_do(
         f"/api/2.0/preview/permissionassignments/principals/{test_acc_group_id}",
         data='{"permissions": ["USER"]}',
     )
+
+
+def test_system_groups():
+    client = Mock()
+    test_ws_group = Group(display_name="admins", meta=ResourceMeta(resource_type="WorkspaceGroup"))
+    test_acc_group = Group(display_name="admins", meta=ResourceMeta(resource_type="Group"))
+    backup_group_id = "100"
+    client.groups.list.return_value = [test_ws_group]
+    client.groups.create.return_value = Group(
+        display_name="dbr_backup_de", meta=ResourceMeta(resource_type="WorkspaceGroup"), id=backup_group_id
+    )
+    client.api_client.do.return_value = {
+        "Resources": [g.as_dict() for g in [test_acc_group]],
+    }
+
+    group_conf = GroupsConfig(backup_group_prefix="dbr_backup_", selected=["admins"])
+    manager = GroupManager(client, group_conf)
+    manager.prepare_groups_in_environment()
+    assert len(manager._migration_state.groups) == 0
+
+
+def test_workspace_only_groups():
+    client = Mock()
+    test_ws_group = Group(display_name="ws_group", meta=ResourceMeta(resource_type="WorkspaceGroup"))
+    test_acc_group = Group(display_name="acc_group", meta=ResourceMeta(resource_type="Group"))
+    backup_group_id = "100"
+    client.groups.list.return_value = [test_ws_group, test_acc_group]
+    client.groups.create.return_value = Group(
+        display_name="dbr_backup_de", meta=ResourceMeta(resource_type="WorkspaceGroup"), id=backup_group_id
+    )
+    client.api_client.do.return_value = {
+        "Resources": [g.as_dict() for g in [test_acc_group]],
+    }
+
+    group_conf = GroupsConfig(backup_group_prefix="dbr_backup_", selected=["ws_group"])
+    manager = GroupManager(client, group_conf)
+    manager.prepare_groups_in_environment()
+    assert len(manager._migration_state.groups) == 0
 
 
 def test_delete_backup_groups():
