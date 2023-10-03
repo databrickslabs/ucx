@@ -1633,7 +1633,7 @@ def test_azure_service_principal_info_policy_conf(mocker):
     assert len(spn_crawler) == 4
 
 
-def test_azure_service_principal_info_non_matching_policy_conf(mocker):
+def test_azure_service_principal_info_dedupe(mocker):
     sample_clusters = [
         ClusterDetails(
             autoscale=AutoScale(min_workers=1, max_workers=6),
@@ -1672,9 +1672,17 @@ def test_azure_service_principal_info_non_matching_policy_conf(mocker):
                             num_workers=2,
                             policy_id="1111111",
                             spark_conf={
-                                "spark.hadoop.fs.azure.account.oauth2.client.id.abcde.dfs"
-                                ".core.windows.net": "1234567890",
-                                "spark.databricks.delta.formatCheck.enabled": "false",
+                                "spark.hadoop.fs.azure.account.auth.type.abcde.dfs.core.windows.net": "OAuth",
+                                "spark.hadoop.fs.azure.account.oauth.provider.type.abcde."
+                                "dfs.core.windows.net": "org.apache.hadoop.fs.azurebfs."
+                                "oauth2.ClientCredsTokenProvider",
+                                "spark.hadoop.fs.azure.account.oauth2.client."
+                                "id.abcde.dfs.core.windows.net": "dummy_application_id",
+                                "spark.hadoop.fs.azure.account.oauth2.client.secret.abcde.dfs.core."
+                                "windows.net": "ddddddddddddddddddd",
+                                "spark.hadoop.fs.azure.account.oauth2.client.endpoint."
+                                "abcde.dfs.core.windows."
+                                "net": "https://login.microsoftonline.com/dummy_tenant_id/oauth2/token",
                             },
                         ),
                     ),
@@ -1700,8 +1708,8 @@ def test_azure_service_principal_info_non_matching_policy_conf(mocker):
     ws.jobs.list.return_value = sample_jobs
     ws.cluster_policies.get().definition = json.dumps(
         {
-            "spark_conf.fs.azure1.account.auth.type": {"type": "fixed", "value": "OAuth", "hidden": "true"},
-            "spark_conf.fs.azure1.account.oauth.provider.type": {
+            "spark_conf.fs.azure.account.auth.type": {"type": "fixed", "value": "OAuth", "hidden": "true"},
+            "spark_conf.fs.azure.account.oauth.provider.type": {
                 "type": "fixed",
                 "value": "org.apache.hadoop.fs.azurebfs.oauth2.ClientCredsTokenProvider",
                 "hidden": "true",
@@ -1747,7 +1755,7 @@ def test_azure_service_principal_info_non_matching_policy_conf(mocker):
     ]
     spn_crawler = AzureServicePrincipalCrawler(ws, MockBackend(), "ucx")._crawl()
 
-    assert len(spn_crawler) == 3
+    assert len(spn_crawler) == 2
 
 
 def test_list_all_pipeline_with_conf_spn_in_spark_conf(mocker):
