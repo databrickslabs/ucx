@@ -167,6 +167,21 @@ class WorkspaceInstaller:
     def _name(self, name: str) -> str:
         return f"[{self._prefix.upper()}][{self._short_name}] {name}"
 
+    def _configure_inventory_database(self):
+        counter = 0
+        inventory_database = None
+        while True:
+            inventory_database = self._question("Inventory Database stored in hive_metastore", default="ucx")
+            if re.match(r"^\w+$", inventory_database):
+                break
+            else:
+                print(f"{inventory_database} is not a valid database name")
+                counter = counter + 1
+                if counter > NUM_USER_ATTEMPTS:
+                    msg = "Exceeded max tries to get a valid database name, try again later."
+                    raise SystemExit(msg)
+        return inventory_database
+
     def _configure(self):
         ws_file_url = self._notebook_link(self._config_file)
         try:
@@ -180,17 +195,7 @@ class WorkspaceInstaller:
                 raise err
 
         logger.info("Please answer a couple of questions to configure Unity Catalog migration")
-        counter = 0
-        while True:
-            inventory_database = self._question("Inventory Database stored in hive_metastore", default="ucx")
-            if re.match(r"^\w+$", inventory_database):
-                break
-            else:
-                print(f"{inventory_database} is not a valid database name")
-                counter = counter + 1
-                if counter > NUM_USER_ATTEMPTS:
-                    msg = "Exceeded max tries to get a valid database name, try again later."
-                    raise SystemExit(msg)
+        inventory_database = self._configure_inventory_database()
 
         pro_warehouses = {"[Create new PRO SQL warehouse]": "create_new"} | {
             f"{_.name} ({_.id}, {_.warehouse_type.value}, {_.state.value})": _.id
