@@ -22,6 +22,7 @@ _AZURE_SP_CONF = [
     "fs.azure.account.oauth2.client.endpoint",
 ]
 _SECRET_PATTERN = r"{{(secrets.*?)}}"
+_STORAGE_ACCOUNT_PATTERN = r"(?:id|endpoint)(.*?)dfs"
 _AZURE_SP_CONF_FAILURE_MSG = "Uses azure service principal credentials config in "
 _SECRET_LIST_LENGTH = 3
 _CLIENT_ENDPOINT_LENGTH = 6
@@ -63,6 +64,7 @@ class AzureServicePrincipalInfo:
     secret_key: str
     # fs.azure.account.oauth2.client.endpoint: "https://login.microsoftonline.com/${local.tenant_id}/oauth2/token"
     tenant_id: str
+    storage_account: str
 
 
 def _azure_sp_conf_present_check(config: dict) -> bool:
@@ -71,25 +73,6 @@ def _azure_sp_conf_present_check(config: dict) -> bool:
             if re.search(conf, key):
                 return True
     return False
-
-
-def _get_azure_spn_tenant_id(config: dict) -> str:
-    matching_key = [key for key in config.keys() if "fs.azure.account.oauth2.client.endpoint" in key]
-    if len(matching_key) > 0:
-        if re.search("spark_conf", matching_key[0]):
-            client_endpoint_list = config.get(matching_key[0]).get("value").split("/")
-        else:
-            client_endpoint_list = config.get(matching_key[0]).split("/")
-        if len(client_endpoint_list) == _CLIENT_ENDPOINT_LENGTH:
-            return client_endpoint_list[3]
-
-
-def _get_azure_spn_application_id(config: dict) -> str:
-    matching_key = [key for key in config.keys() if "fs.azure.account.oauth2.client.id" in key]
-    if len(matching_key) > 0:
-        if re.search("spark_conf", matching_key[0]):
-            return config.get(matching_key[0]).get("value")
-        return config.get(matching_key[0])
 
 
 def spark_version_compatibility(spark_version: str) -> str:
@@ -121,20 +104,61 @@ class AzureServicePrincipalCrawler(CrawlerBase):
         deduped_service_principals = [dict(t) for t in {tuple(d.items()) for d in all_relevant_service_principals}]
         return list(self._assess_service_principals(deduped_service_principals))
 
-    def _add_spn_to_list(self, spn_application_id, tenant_id) -> dict:
-        secret_scope, secret_key = None, None
-        matched = re.search(_SECRET_PATTERN, spn_application_id)
-        if matched:
-            split = matched.group(1).split("/")
-            if len(split) == _SECRET_LIST_LENGTH:
-                secret_scope, secret_key = split[1], split[2]
-                spn_application_id = self._ws.secrets.get_secret(secret_scope, secret_key)
-        return {
-            "application_id": spn_application_id,
-            "secret_scope": secret_scope,
-            "secret_key": secret_key,
-            "tenant_id": tenant_id,
-        }
+    def _check_secret_and_get_application_id(self, secret_matched) -> str:
+        split = secret_matched.group(1).split("/")
+        if len(split) == _SECRET_LIST_LENGTH:
+            secret_scope, secret_key = split[1], split[2]
+            spn_application_id = self._ws.secrets.get_secret(secret_scope, secret_key)
+            return spn_application_id
+
+    def _get_azure_spn_tenant_id(self, config: dict, tenant_key: str) -> str:
+        matching_key = [key for key in config.keys() if re.search(tenant_key, key)]
+        if len(matching_key) > 0:
+            if re.search("spark_conf", matching_key[0]):
+                client_endpoint_list = config.get(matching_key[0]).get("value").split("/")
+            else:
+                client_endpoint_list = config.get(matching_key[0]).split("/")
+            if len(client_endpoint_list) == _CLIENT_ENDPOINT_LENGTH:
+                return client_endpoint_list[3]
+
+    def _get_azure_spn_list(self, config: dict) -> list:
+        spn_list = []
+        secret_scope, secret_key, tenant_id, storage_account = None, None, None, None
+        matching_key_list = [key for key in config.keys() if "fs.azure.account.oauth2.client.id" in key]
+        if len(matching_key_list) > 0:
+            for key in matching_key_list:
+                storage_account_match = re.search(_STORAGE_ACCOUNT_PATTERN, key)
+                if re.search("spark_conf", key):
+                    spn_application_id = config.get(key).get("value")
+                else:
+                    spn_application_id = config.get(key)
+                if not spn_application_id:
+                    continue
+                secret_matched = re.search(_SECRET_PATTERN, spn_application_id)
+                if secret_matched:
+                    spn_application_id = self._check_secret_and_get_application_id(secret_matched)
+                    if not spn_application_id:
+                        continue
+                    secret_scope, secret_key = (
+                        secret_matched.group(1).split("/")[1],
+                        secret_matched.group(1).split("/")[2],
+                    )
+                if storage_account_match:
+                    storage_account = storage_account_match.group(1).strip(".")
+                    tenant_key = "fs.azure.account.oauth2.client.endpoint." + storage_account
+                else:
+                    tenant_key = "fs.azure.account.oauth2.client.endpoint."
+                tenant_id = self._get_azure_spn_tenant_id(config, tenant_key)
+                spn_list.append(
+                    {
+                        "application_id": spn_application_id,
+                        "secret_scope": secret_scope,
+                        "secret_key": secret_key,
+                        "tenant_id": tenant_id,
+                        "storage_account": storage_account,
+                    }
+                )
+            return spn_list
 
     def _get_cluster_configs_from_all_jobs(self, all_jobs, all_clusters_by_id):
         for j in all_jobs:
@@ -154,52 +178,54 @@ class AzureServicePrincipalCrawler(CrawlerBase):
                 elif t.new_cluster is not None:
                     yield j, t.new_cluster
 
-    def _get_relevant_service_principals(self):
-        azure_spn_list_with_data_access_from_cluster = self._list_all_cluster_with_spn_in_spark_conf()
-        azure_spn_list_with_data_access_from_pipeline = self._list_all_pipeline_with_spn_in_spark_conf()
-        azure_spn_list_with_data_access_from_jobs = self._list_all_jobs_with_spn_in_spark_conf()
-        return (
-            azure_spn_list_with_data_access_from_cluster
-            + azure_spn_list_with_data_access_from_pipeline
-            + azure_spn_list_with_data_access_from_jobs
-        )
+    def _get_relevant_service_principals(self) -> list:
+        relevant_service_principals = []
+        temp_list = self._list_all_cluster_with_spn_in_spark_conf()
+        if temp_list:
+            relevant_service_principals += temp_list
+        temp_list = self._list_all_pipeline_with_spn_in_spark_conf()
+        if temp_list:
+            relevant_service_principals += temp_list
+        temp_list = self._list_all_jobs_with_spn_in_spark_conf()
+        if temp_list:
+            relevant_service_principals += temp_list
+        temp_list = self._list_all_spn_in_sql_warehouses_spark_conf()
+        if temp_list:
+            relevant_service_principals += temp_list
+        return relevant_service_principals
 
     def _list_all_jobs_with_spn_in_spark_conf(self) -> list:
         azure_spn_list_with_data_access_from_jobs = []
-        tenant_id = None
         all_jobs = list(self._ws.jobs.list(expand_tasks=True))
         all_clusters_by_id = {c.cluster_id: c for c in self._ws.clusters.list()}
         for _job, cluster_config in self._get_cluster_configs_from_all_jobs(all_jobs, all_clusters_by_id):
             policy = self._ws.cluster_policies.get(cluster_config.policy_id)
             if cluster_config.spark_conf:
                 if _azure_sp_conf_present_check(cluster_config.spark_conf):
-                    spn_application_id = _get_azure_spn_application_id(cluster_config.spark_conf)
-                    if spn_application_id:
-                        tenant_id = _get_azure_spn_tenant_id(cluster_config.spark_conf)
-                        azure_spn_list_with_data_access_from_jobs.append(
-                            self._add_spn_to_list(spn_application_id, tenant_id)
-                        )
+                    temp_list = self._get_azure_spn_list(cluster_config.spark_conf)
+                    if temp_list:
+                        azure_spn_list_with_data_access_from_jobs += temp_list
 
             if cluster_config.policy_id:
                 if _azure_sp_conf_present_check(json.loads(policy.definition)):
-                    spn_application_id = _get_azure_spn_application_id(json.loads(policy.definition))
-                    if spn_application_id:
-                        tenant_id = _get_azure_spn_tenant_id(json.loads(policy.definition))
-                        azure_spn_list_with_data_access_from_jobs.append(
-                            self._add_spn_to_list(spn_application_id, tenant_id)
-                        )
+                    temp_list = self._get_azure_spn_list(json.loads(policy.definition))
+                    if temp_list:
+                        azure_spn_list_with_data_access_from_jobs += temp_list
 
             if policy.policy_family_definition_overrides:
                 if _azure_sp_conf_present_check(json.loads(policy.policy_family_definition_overrides)):
-                    spn_application_id = _get_azure_spn_application_id(
-                        json.loads(policy.policy_family_definition_overrides)
-                    )
-                    if spn_application_id:
-                        tenant_id = _get_azure_spn_tenant_id(json.loads(policy.policy_family_definition_overrides))
-                        azure_spn_list_with_data_access_from_jobs.append(
-                            self._add_spn_to_list(spn_application_id, tenant_id)
-                        )
+                    temp_list = self._get_azure_spn_list(json.loads(policy.policy_family_definition_overrides))
+                    if temp_list:
+                        azure_spn_list_with_data_access_from_jobs += temp_list
         return azure_spn_list_with_data_access_from_jobs
+
+    def _list_all_spn_in_sql_warehouses_spark_conf(self) -> list:
+        warehouse_config_list = self._ws.warehouses.get_workspace_warehouse_config().data_access_config
+        if len(warehouse_config_list) > 0:
+            warehouse_config_dict = {config.key: config.value for config in warehouse_config_list}
+            if warehouse_config_dict:
+                if _azure_sp_conf_present_check(warehouse_config_dict):
+                    return self._get_azure_spn_list(warehouse_config_dict)
 
     def _list_all_pipeline_with_spn_in_spark_conf(self) -> list:
         azure_spn_list_with_data_access_from_pipeline = []
@@ -208,13 +234,9 @@ class AzureServicePrincipalCrawler(CrawlerBase):
             if pipeline_config:
                 if not _azure_sp_conf_present_check(pipeline_config):
                     continue
-                spn_application_id = _get_azure_spn_application_id(pipeline_config)
-                if not spn_application_id:
-                    continue
-                tenant_id = _get_azure_spn_tenant_id(pipeline_config)
-                azure_spn_list_with_data_access_from_pipeline.append(
-                    self._add_spn_to_list(spn_application_id, tenant_id)
-                )
+                temp_list = self._get_azure_spn_list(pipeline_config)
+                if temp_list:
+                    azure_spn_list_with_data_access_from_pipeline += temp_list
         return azure_spn_list_with_data_access_from_pipeline
 
     def _list_all_cluster_with_spn_in_spark_conf(self) -> list:
@@ -224,33 +246,21 @@ class AzureServicePrincipalCrawler(CrawlerBase):
                 policy = self._ws.cluster_policies.get(cluster.policy_id)
                 if cluster.spark_conf:
                     if _azure_sp_conf_present_check(cluster.spark_conf):
-                        spn_application_id = _get_azure_spn_application_id(cluster.spark_conf)
-                        if spn_application_id:
-                            tenant_id = _get_azure_spn_tenant_id(cluster.spark_conf)
-                            azure_spn_list_with_data_access_from_cluster.append(
-                                self._add_spn_to_list(spn_application_id, tenant_id)
-                            )
+                        temp_list = self._get_azure_spn_list(cluster.spark_conf)
+                        if temp_list:
+                            azure_spn_list_with_data_access_from_cluster += temp_list
 
                 if cluster.policy_id:
                     if _azure_sp_conf_present_check(json.loads(policy.definition)):
-                        spn_application_id = _get_azure_spn_application_id(json.loads(policy.definition))
-                        if spn_application_id:
-                            tenant_id = _get_azure_spn_tenant_id(json.loads(policy.definition))
-                            azure_spn_list_with_data_access_from_cluster.append(
-                                self._add_spn_to_list(spn_application_id, tenant_id)
-                            )
+                        temp_list = self._get_azure_spn_list(json.loads(policy.definition))
+                        if temp_list:
+                            azure_spn_list_with_data_access_from_cluster += temp_list
 
                 if policy.policy_family_definition_overrides:
                     if _azure_sp_conf_present_check(json.loads(policy.policy_family_definition_overrides)):
-                        spn_application_id = _get_azure_spn_application_id(
-                            json.loads(policy.policy_family_definition_overrides)
-                        )
-                        if spn_application_id:
-                            tenant_id = _get_azure_spn_tenant_id(json.loads(policy.policy_family_definition_overrides))
-                            azure_spn_list_with_data_access_from_cluster.append(
-                                self._add_spn_to_list(spn_application_id, tenant_id)
-                            )
-
+                        temp_list = self._get_azure_spn_list(json.loads(policy.policy_family_definition_overrides))
+                        if temp_list:
+                            azure_spn_list_with_data_access_from_cluster += temp_list
         return azure_spn_list_with_data_access_from_cluster
 
     def _assess_service_principals(self, relevant_service_principals: list):
@@ -260,6 +270,7 @@ class AzureServicePrincipalCrawler(CrawlerBase):
                 secret_scope=spn.get("secret_scope"),
                 secret_key=spn.get("secret_key"),
                 tenant_id=spn.get("tenant_id"),
+                storage_account=spn.get("storage_account"),
             )
             yield spn_info
 

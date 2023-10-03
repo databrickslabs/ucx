@@ -15,6 +15,7 @@ from databricks.sdk.service.jobs import (
     Task,
 )
 from databricks.sdk.service.pipelines import PipelineState, PipelineStateInfo
+from databricks.sdk.service.sql import EndpointConfPair
 
 from databricks.labs.ucx.assessment.crawlers import (
     AzureServicePrincipalCrawler,
@@ -721,12 +722,52 @@ def test_azure_service_principal_info_crawl(mocker):
         "core.windows.net": "org.apache.hadoop.fs.azurebfs.sas.FixedSASTokenProvider",
         "spark.hadoop.fs.azure.sas.fixed.token.abcde.dfs.core.windows.net": "{{secrets/abcde_access/sasFixedToken}}",
     }
+    ws.warehouses.get_workspace_warehouse_config().data_access_config = [
+        EndpointConfPair(
+            key="spark.hadoop.fs.azure.account.auth.type.storage_acct1.dfs.core.windows.net", value="OAuth"
+        ),
+        EndpointConfPair(
+            key="spark.hadoop.fs.azure.account.oauth.provider.type.storage_acct1.dfs.core.windows.net",
+            value="org.apache.hadoop.fs.azurebfs.oauth2.ClientCredsTokenProvider",
+        ),
+        EndpointConfPair(
+            key="spark.hadoop.fs.azure.account.oauth2.client.id.storage_acct2.dfs.core.windows.net",
+            value="dummy_application_id",
+        ),
+        EndpointConfPair(
+            key="spark.hadoop.fs.azure.account.oauth2.client.secret.storage_acct1.dfs.core.windows.net",
+            value="dfddsaaaaddwwdds",
+        ),
+        EndpointConfPair(
+            key="spark.hadoop.fs.azure.account.oauth2.client.endpoint.storage_acct2.dfs.core.windows.net",
+            value="https://login.microsoftonline.com/dummy_tenant_id/oauth2/token",
+        ),
+        EndpointConfPair(
+            key="spark.hadoop.fs.azure.account.auth.type.storage_acct2.dfs.core.windows.net", value="OAuth"
+        ),
+        EndpointConfPair(
+            key="spark.hadoop.fs.azure.account.oauth.provider.type.storage_acct2.dfs.core.windows.net",
+            value="org.apache.hadoop.fs.azurebfs.oauth2.ClientCredsTokenProvider",
+        ),
+        EndpointConfPair(
+            key="spark.hadoop.fs.azure.account.oauth2.client.id.storage_acct1.dfs.core.windows.net",
+            value="dummy_application_id_2",
+        ),
+        EndpointConfPair(
+            key="spark.hadoop.fs.azure.account.oauth2.client.secret.storage_acct2.dfs.core.windows.net",
+            value="dfddsaaaaddwwdds",
+        ),
+        EndpointConfPair(
+            key="spark.hadoop.fs.azure.account.oauth2.client.endpoint.storage_acct1.dfs.core.windows.net",
+            value="https://login.microsoftonline.com/dummy_tenant_id_2/oauth2/token",
+        ),
+    ]
     ws.pipelines.get().spec.configuration = config_dict
     ws.cluster_policies.get().policy_family_definition_overrides = None
     ws.jobs.list.return_value = sample_jobs
     spn_crawler = AzureServicePrincipalCrawler(ws, MockBackend(), "ucx")._crawl()
 
-    assert len(spn_crawler) == 3
+    assert len(spn_crawler) == 5
 
 
 def test_azure_service_principal_info_spark_conf_crawl(mocker):
@@ -868,10 +909,49 @@ def test_azure_service_principal_info_spark_conf_crawl(mocker):
     ws.pipelines.get().spec.configuration = config_dict
     ws.cluster_policies.get().policy_family_definition_overrides = None
     ws.jobs.list.return_value = sample_jobs
+    ws.warehouses.get_workspace_warehouse_config().data_access_config = [
+        EndpointConfPair(
+            key="spark.hadoop.fs.azure.account.auth.type.storage_acct1.dfs.core.windows.net", value="OAuth"
+        ),
+        EndpointConfPair(
+            key="spark.hadoop.fs.azure.account.oauth.provider.type.storage_acct1.dfs.core.windows.net",
+            value="org.apache.hadoop.fs.azurebfs.oauth2.ClientCredsTokenProvider",
+        ),
+        EndpointConfPair(
+            key="spark.hadoop.fs.azure.account.oauth2.client.id.storage_acct2.dfs.core.windows.net",
+            value="dummy_application_id",
+        ),
+        EndpointConfPair(
+            key="spark.hadoop.fs.azure.account.oauth2.client.secret.storage_acct1.dfs.core.windows.net",
+            value="dfddsaaaaddwwdds",
+        ),
+        EndpointConfPair(
+            key="spark.hadoop.fs.azure.account.oauth2.client.endpoint.storage_acct2.dfs.core.windows.net",
+            value="https://login.microsoftonline.com/dummy_tenant_id/oauth2/token",
+        ),
+        EndpointConfPair(
+            key="spark.hadoop.fs.azure.account.auth.type.storage_acct2.dfs.core.windows.net", value="OAuth"
+        ),
+        EndpointConfPair(
+            key="spark.hadoop.fs.azure.account.oauth.provider.type.storage_acct2.dfs.core.windows.net",
+            value="org.apache.hadoop.fs.azurebfs.oauth2.ClientCredsTokenProvider",
+        ),
+        EndpointConfPair(
+            key="spark.hadoop.fs.azure.account.oauth2.client.id.storage_acct1.dfs.core.windows.net",
+            value="dummy_application_id_2",
+        ),
+        EndpointConfPair(
+            key="spark.hadoop.fs.azure.account.oauth2.client.secret.storage_acct2.dfs.core.windows.net",
+            value="dfddsaaaaddwwdds",
+        ),
+        EndpointConfPair(
+            key="spark.hadoop.fs.azure.account.oauth2.client.endpoint.storage_acct1.dfs.core.windows.net",
+            value="https://login.microsoftonline.com/dummy_tenant_id_2/oauth2/token",
+        ),
+    ]
     spn_crawler = AzureServicePrincipalCrawler(ws, MockBackend(), "ucx")._crawl()
 
-    assert len(spn_crawler) == 1
-    assert spn_crawler[0].application_id == "1234567890"
+    assert len(spn_crawler) == 3
 
 
 def test_azure_service_principal_info_no_spark_conf_crawl(mocker):
@@ -984,6 +1064,7 @@ def test_azure_service_principal_info_no_spark_conf_crawl(mocker):
             },
         }
     )
+    ws.warehouses.get_workspace_warehouse_config().data_access_config = []
     spn_crawler = AzureServicePrincipalCrawler(ws, MockBackend(), "ucx")._crawl()
 
     assert len(spn_crawler) == 0
@@ -1099,6 +1180,7 @@ def test_azure_service_principal_info_policy_family_conf_crawl(mocker):
             },
         }
     )
+    ws.warehouses.get_workspace_warehouse_config().data_access_config = []
     spn_crawler = AzureServicePrincipalCrawler(ws, MockBackend(), "ucx")._crawl()
 
     assert len(spn_crawler) == 0
@@ -1182,6 +1264,7 @@ def test_azure_service_principal_info_null_applid_crawl(mocker):
         ),
     ]
     ws = mocker.Mock()
+    ws.warehouses.get_workspace_warehouse_config().data_access_config = []
     ws.clusters.list.return_value = sample_clusters
     ws.pipelines.list_pipelines.return_value = sample_pipelines
     config_dict = {}
@@ -1290,6 +1373,102 @@ def test_list_all_cluster_with_spn_in_spark_conf_with_secret(mocker):
     result_set = list(crawler)
 
     assert len(result_set) == 1
+
+
+def test_list_all_wh_config_with_spn_no_secret(mocker):
+    ws = mocker.Mock()
+    ws.warehouses.get_workspace_warehouse_config().data_access_config = [
+        EndpointConfPair(
+            key="spark.hadoop.fs.azure.account.auth.type.storage_acct1.dfs.core.windows.net", value="OAuth"
+        ),
+        EndpointConfPair(
+            key="spark.hadoop.fs.azure.account.oauth.provider.type.storage_acct1.dfs.core.windows.net",
+            value="org.apache.hadoop.fs.azurebfs.oauth2.ClientCredsTokenProvider",
+        ),
+        EndpointConfPair(
+            key="spark.hadoop.fs.azure.account.oauth2.client.id.storage_acct2.dfs.core.windows.net",
+            value="dummy_application_id",
+        ),
+        EndpointConfPair(
+            key="spark.hadoop.fs.azure.account.oauth2.client.secret.storage_acct1.dfs.core.windows.net",
+            value="dfddsaaaaddwwdds",
+        ),
+        EndpointConfPair(
+            key="spark.hadoop.fs.azure.account.oauth2.client.endpoint.storage_acct2.dfs.core.windows.net",
+            value="https://login.microsoftonline.com/dummy_tenant_id/oauth2/token",
+        ),
+        EndpointConfPair(
+            key="spark.hadoop.fs.azure.account.auth.type.storage_acct2.dfs.core.windows.net", value="OAuth"
+        ),
+        EndpointConfPair(
+            key="spark.hadoop.fs.azure.account.oauth.provider.type.storage_acct2.dfs.core.windows.net",
+            value="org.apache.hadoop.fs.azurebfs.oauth2.ClientCredsTokenProvider",
+        ),
+        EndpointConfPair(
+            key="spark.hadoop.fs.azure.account.oauth2.client.id.storage_acct1.dfs.core.windows.net",
+            value="dummy_application_id_2",
+        ),
+        EndpointConfPair(
+            key="spark.hadoop.fs.azure.account.oauth2.client.secret.storage_acct2.dfs.core.windows.net",
+            value="dfddsaaaaddwwdds",
+        ),
+        EndpointConfPair(
+            key="spark.hadoop.fs.azure.account.oauth2.client.endpoint.storage_acct1.dfs.core.windows.net",
+            value="https://login.microsoftonline.com/dummy_tenant_id_2/oauth2/token",
+        ),
+    ]
+    result_set = AzureServicePrincipalCrawler(ws, MockBackend(), "ucx")._list_all_spn_in_sql_warehouses_spark_conf()
+
+    assert len(result_set) == 2
+    assert result_set[0].get("application_id") == "dummy_application_id"
+    assert result_set[0].get("tenant_id") == "dummy_tenant_id"
+    assert result_set[0].get("storage_account") == "storage_acct2"
+
+
+def test_list_all_wh_config_with_spn_and_secret(mocker):
+    ws = mocker.Mock()
+    ws.warehouses.get_workspace_warehouse_config().data_access_config = [
+        EndpointConfPair(key="spark.hadoop.fs.azure.account.auth.type.abcde.dfs.core.windows.net", value="OAuth"),
+        EndpointConfPair(
+            key="spark.hadoop.fs.azure.account.oauth.provider.type.xyz.dfs.core.windows.net",
+            value="org.apache.hadoop.fs.azurebfs.oauth2.ClientCredsTokenProvider",
+        ),
+        EndpointConfPair(
+            key="spark.hadoop.fs.azure.account.oauth2.client.id.abcde.dfs.core.windows.net",
+            value="dummy_application_id",
+        ),
+        EndpointConfPair(
+            key="spark.hadoop.fs.azure.account.oauth2.client.secret.xyz.dfs.core.windows.net",
+            value="ddddddddddddddddddd",
+        ),
+        EndpointConfPair(
+            key="spark.hadoop.fs.azure.account.oauth2.client.endpoint.abcde.dfs.core.windows.net",
+            value="https://login.microsoftonline.com/dummy_tenant_id/oauth2/token",
+        ),
+        EndpointConfPair(key="spark.hadoop.fs.azure.account.auth.type.xyz.dfs.core.windows.net", value="OAuth"),
+        EndpointConfPair(
+            key="spark.hadoop.fs.azure.account.oauth.provider.type.abcde.dfs.core.windows.net",
+            value="org.apache.hadoop.fs.azurebfs.oauth2.ClientCredsTokenProvider",
+        ),
+        EndpointConfPair(
+            key="spark.hadoop.fs.azure.account.oauth2.client.id.xyz.dfs.core.windows.net",
+            value="{{secrets/dummy_scope/sp_app_client_id}}",
+        ),
+        EndpointConfPair(
+            key="spark.hadoop.fs.azure.account.oauth2.client.secret.abcde.dfs.core.windows.net",
+            value="ddddddddddddddddddd",
+        ),
+        EndpointConfPair(
+            key="spark.hadoop.fs.azure.account.oauth2.client.endpoint.xyz.dfs.core.windows.net",
+            value="https://login.microsoftonline.com/dummy_tenant_id2/oauth2/token",
+        ),
+    ]
+    mocker.Mock().secrets.get_secret()
+    result_set = AzureServicePrincipalCrawler(ws, MockBackend(), "ucx")._list_all_spn_in_sql_warehouses_spark_conf()
+
+    assert len(result_set) == 2
+    assert result_set[0].get("tenant_id") == "dummy_tenant_id"
+    assert result_set[0].get("storage_account") == "abcde"
 
 
 def test_list_all_clusters_spn_in_spark_conf_with_tenant(mocker):
@@ -1413,9 +1592,45 @@ def test_azure_service_principal_info_policy_conf(mocker):
         }
     )
     ws.cluster_policies.get().policy_family_definition_overrides = None
+    ws.warehouses.get_workspace_warehouse_config().data_access_config = [
+        EndpointConfPair(key="spark.hadoop.fs.azure.account.auth.type.abcde.dfs.core.windows.net", value="OAuth"),
+        EndpointConfPair(
+            key="spark.hadoop.fs.azure.account.oauth.provider.type.xyz.dfs.core.windows.net",
+            value="org.apache.hadoop.fs.azurebfs.oauth2.ClientCredsTokenProvider",
+        ),
+        EndpointConfPair(
+            key="spark.hadoop.fs.azure.account.oauth2.client.id.abcde.dfs.core.windows.net",
+            value="dummy_application_id",
+        ),
+        EndpointConfPair(
+            key="spark.hadoop.fs.azure.account.oauth2.client.secret.xyz.dfs.core.windows.net",
+            value="ddddddddddddddddddd",
+        ),
+        EndpointConfPair(
+            key="spark.hadoop.fs.azure.account.oauth2.client.endpoint.abcde.dfs.core.windows.net",
+            value="https://login.microsoftonline.com/dummy_tenant_id/oauth2/token",
+        ),
+        EndpointConfPair(key="spark.hadoop.fs.azure.account.auth.type.xyz.dfs.core.windows.net", value="OAuth"),
+        EndpointConfPair(
+            key="spark.hadoop.fs.azure.account.oauth.provider.type.abcde.dfs.core.windows.net",
+            value="org.apache.hadoop.fs.azurebfs.oauth2.ClientCredsTokenProvider",
+        ),
+        EndpointConfPair(
+            key="spark.hadoop.fs.azure.account.oauth2.client.id.xyz.dfs.core.windows.net",
+            value="{{secrets/dummy_scope/sp_app_client_id}}",
+        ),
+        EndpointConfPair(
+            key="spark.hadoop.fs.azure.account.oauth2.client.secret.abcde.dfs.core.windows.net",
+            value="ddddddddddddddddddd",
+        ),
+        EndpointConfPair(
+            key="spark.hadoop.fs.azure.account.oauth2.client.endpoint.xyz.dfs.core.windows.net",
+            value="https://login.microsoftonline.com/dummy_tenant_id2/oauth2/token",
+        ),
+    ]
     spn_crawler = AzureServicePrincipalCrawler(ws, MockBackend(), "ucx")._crawl()
 
-    assert len(spn_crawler) == 2
+    assert len(spn_crawler) == 4
 
 
 def test_azure_service_principal_info_non_matching_policy_conf(mocker):
@@ -1494,9 +1709,45 @@ def test_azure_service_principal_info_non_matching_policy_conf(mocker):
         }
     )
     ws.cluster_policies.get().policy_family_definition_overrides = None
+    ws.warehouses.get_workspace_warehouse_config().data_access_config = [
+        EndpointConfPair(key="spark.hadoop.fs.azure.account.auth.type.abcde.dfs.core.windows.net", value="OAuth"),
+        EndpointConfPair(
+            key="spark.hadoop.fs.azure.account.oauth.provider.type.xyz.dfs.core.windows.net",
+            value="org.apache.hadoop.fs.azurebfs.oauth2.ClientCredsTokenProvider",
+        ),
+        EndpointConfPair(
+            key="spark.hadoop.fs.azure.account.oauth2.client.id.abcde.dfs.core.windows.net",
+            value="dummy_application_id",
+        ),
+        EndpointConfPair(
+            key="spark.hadoop.fs.azure.account.oauth2.client.secret.xyz.dfs.core.windows.net",
+            value="ddddddddddddddddddd",
+        ),
+        EndpointConfPair(
+            key="spark.hadoop.fs.azure.account.oauth2.client.endpoint.abcde.dfs.core.windows.net",
+            value="https://login.microsoftonline.com/dummy_tenant_id/oauth2/token",
+        ),
+        EndpointConfPair(key="spark.hadoop.fs.azure.account.auth.type.xyz.dfs.core.windows.net", value="OAuth"),
+        EndpointConfPair(
+            key="spark.hadoop.fs.azure.account.oauth.provider.type.abcde.dfs.core.windows.net",
+            value="org.apache.hadoop.fs.azurebfs.oauth2.ClientCredsTokenProvider",
+        ),
+        EndpointConfPair(
+            key="spark.hadoop.fs.azure.account.oauth2.client.id.xyz.dfs.core.windows.net",
+            value="{{secrets/dummy_scope/sp_app_client_id}}",
+        ),
+        EndpointConfPair(
+            key="spark.hadoop.fs.azure.account.oauth2.client.secret.abcde.dfs.core.windows.net",
+            value="ddddddddddddddddddd",
+        ),
+        EndpointConfPair(
+            key="spark.hadoop.fs.azure.account.oauth2.client.endpoint.xyz.dfs.core.windows.net",
+            value="https://login.microsoftonline.com/dummy_tenant_id2/oauth2/token",
+        ),
+    ]
     spn_crawler = AzureServicePrincipalCrawler(ws, MockBackend(), "ucx")._crawl()
 
-    assert len(spn_crawler) == 1
+    assert len(spn_crawler) == 3
 
 
 def test_list_all_pipeline_with_conf_spn_in_spark_conf(mocker):
@@ -1512,17 +1763,21 @@ def test_list_all_pipeline_with_conf_spn_in_spark_conf(mocker):
     ws = mocker.Mock()
     ws.pipelines.list_pipelines.return_value = sample_pipelines
     config_dict = {
-        "spark.hadoop.fs.azure.account.auth.type.abcde.dfs.core.windows.net": "SAS",
-        "spark.hadoop.fs.azure.sas.token.provider.type.abcde.dfs."
-        "core.windows.net": "org.apache.hadoop.fs.azurebfs.sas.FixedSASTokenProvider",
+        "spark.hadoop.fs.azure.account.oauth2.client.id.newstorageacct.dfs.core.windows"
+        ".net": "pipeline_dummy_application_id",
+        "spark.hadoop.fs.azure.account.oauth2.client."
+        "endpoint.newstorageacct.dfs.core.windows.net": "https://"
+        "login.microsoftonline.com/directory_12345/oauth2/token",
         "spark.hadoop.fs.azure.sas.fixed.token.abcde.dfs.core.windows.net": "{{secrets/abcde_access/sasFixedToken}}",
     }
     ws.pipelines.get().spec.configuration = config_dict
 
-    AzureServicePrincipalCrawler(ws, MockBackend(), "ucx")._list_all_pipeline_with_spn_in_spark_conf()
-    result_set = []
+    result_set = AzureServicePrincipalCrawler(ws, MockBackend(), "ucx")._list_all_pipeline_with_spn_in_spark_conf()
 
-    assert len(result_set) == 0
+    assert len(result_set) == 1
+    assert result_set[0].get("storage_account") == "newstorageacct"
+    assert result_set[0].get("tenant_id") == "directory_12345"
+    assert result_set[0].get("application_id") == "pipeline_dummy_application_id"
 
 
 def test_list_all_pipeline_wo_conf_spn_in_spark_conf(mocker):
@@ -1539,7 +1794,6 @@ def test_list_all_pipeline_wo_conf_spn_in_spark_conf(mocker):
     ws.pipelines.list_pipelines.return_value = sample_pipelines
     config_dict = {}
     ws.pipelines.get().spec.configuration = config_dict
-    AzureServicePrincipalCrawler(ws, MockBackend(), "ucx")._list_all_pipeline_with_spn_in_spark_conf()
-    result_set = []
+    result_set = AzureServicePrincipalCrawler(ws, MockBackend(), "ucx")._list_all_pipeline_with_spn_in_spark_conf()
 
     assert len(result_set) == 0
