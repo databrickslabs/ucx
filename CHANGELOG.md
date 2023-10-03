@@ -1,5 +1,17 @@
 # Version changelog
 
+## 0.3.0
+
+* Added `inventory_database` name check during installation ([#275](https://github.com/databricks/ucx/pull/275)).
+* Added a column to `$inventory.tables` to specify if a table might have been synchronised to Unity Catalog already or not ([#306](https://github.com/databricks/ucx/pull/306)).
+* Added a migration state to skip already migrated tables ([#325](https://github.com/databricks/ucx/pull/325)).
+* Fixed appending to tables by adding filtering of `None` rows ([#356](https://github.com/databricks/ucx/pull/356)).
+* Fixed handling of missing but linked cluster policies. ([#361](https://github.com/databricks/ucx/pull/361)).
+* Ignore errors for Redash widgets and queries redeployment during installation ([#367](https://github.com/databricks/ucx/pull/367)).
+* Remove exception and added proper logging for groups in the list that… ([#357](https://github.com/databricks/ucx/pull/357)).
+* Skip group migration when no groups are available after preparation step. ([#363](https://github.com/databricks/ucx/pull/363)).
+* Update databricks-sdk requirement from ~=0.9.0 to ~=0.10.0 ([#362](https://github.com/databricks/ucx/pull/362)).
+
 ## 0.2.0
 
 * Added retrieving for all account-level groups with matching names to workspace-level groups in case no explicit configuration ([#277](https://github.com/databricks/ucx/pull/277)).
