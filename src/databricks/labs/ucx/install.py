@@ -24,6 +24,7 @@ from databricks.labs.ucx.runtime import main
 
 TAG_STEP = "step"
 TAG_APP = "App"
+NUM_USER_ATTEMPTS = 10  # number of attempts user gets at answering a question
 
 DEBUG_NOTEBOOK = """
 # Databricks notebook source
@@ -179,7 +180,17 @@ class WorkspaceInstaller:
                 raise err
 
         logger.info("Please answer a couple of questions to configure Unity Catalog migration")
-        inventory_database = self._question("Inventory Database", default="ucx")
+        counter = 0
+        while True:
+            inventory_database = self._question("Inventory Database stored in hive_metastore", default="ucx")
+            if re.match(r"^\w+$", inventory_database):
+                break
+            else:
+                print(f"{inventory_database} is not a valid database name")
+                counter = counter + 1
+                if counter > NUM_USER_ATTEMPTS:
+                    msg = "Exceeded max tries to get a valid database name, try again later."
+                    raise SystemExit(msg)
 
         pro_warehouses = {"[Create new PRO SQL warehouse]": "create_new"} | {
             f"{_.name} ({_.id}, {_.warehouse_type.value}, {_.state.value})": _.id
