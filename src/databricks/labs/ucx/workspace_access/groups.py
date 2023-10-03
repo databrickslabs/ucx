@@ -7,6 +7,7 @@ from functools import partial
 from databricks.sdk import WorkspaceClient
 from databricks.sdk.service import iam
 from databricks.sdk.service.iam import Group
+from databricks.sdk.retries import retried
 
 from databricks.labs.ucx.config import GroupsConfig
 from databricks.labs.ucx.framework.parallel import ThreadedExecution
@@ -90,6 +91,8 @@ class GroupManager:
             if group.display_name == group_name:
                 return group
 
+    @retried(on=[IOError])
+    @rate_limited(max_requests=5)
     def _get_or_create_backup_group(self, source_group_name: str, source_group: iam.Group) -> iam.Group:
         backup_group_name = f"{self.config.backup_group_prefix}{source_group_name}"
         backup_group = self._get_group(backup_group_name, "workspace")
@@ -131,17 +134,24 @@ class GroupManager:
     def _replace_group(self, migration_info: MigrationGroupInfo):
         ws_group = migration_info.workspace
 
-        logger.info(f"Deleting the workspace-level group {ws_group.display_name} with id {ws_group.id}")
-        self._ws.groups.delete(ws_group.id)
+        self._delete_workspace_group(ws_group)
 
         # delete ws_group from the list of workspace groups
         self._workspace_groups = [g for g in self._workspace_groups if g.id != ws_group.id]
 
-        logger.info(f"Workspace-level group {ws_group.display_name} with id {ws_group.id} was deleted")
-
         self._reflect_account_group_to_workspace(migration_info.account)
 
-    @rate_limited(max_requests=5)  # assumption
+    @retried(on=[IOError])
+    @rate_limited(max_requests=5)
+    def _delete_workspace_group(self, ws_group: iam.Group) -> None:
+        logger.info(f"Deleting the workspace-level group {ws_group.display_name} with id {ws_group.id}")
+
+        self._ws.groups.delete(ws_group.id)
+
+        logger.info(f"Workspace-level group {ws_group.display_name} with id {ws_group.id} was deleted")
+
+    @retried(on=[IOError])
+    @rate_limited(max_requests=10)
     def _reflect_account_group_to_workspace(self, acc_group: iam.Group) -> None:
         logger.info(f"Reflecting group {acc_group.display_name} to workspace")
 
@@ -212,21 +222,12 @@ class GroupManager:
         logger.info("Workspace groups were successfully replaced with account-level groups")
 
     def delete_backup_groups(self):
-        if len(self._migration_state.groups) == 0:
-            return
         logger.info(
             f"Deleting the workspace-level backup groups. "
             f"In total, {len(self.migration_groups_provider.groups)} group(s) to be deleted"
         )
 
         for migration_info in self.migration_groups_provider.groups:
-            try:
-                self._ws.groups.delete(id=migration_info.backup.id)
-            except Exception as e:
-                logger.warning(
-                    f"Failed to delete backup group {migration_info.backup.display_name} "
-                    f"with id {migration_info.backup.id}"
-                )
-                logger.warning(f"Original exception {e}")
+            self._delete_workspace_group(migration_info.backup)
 
         logger.info("Backup groups were successfully deleted")
