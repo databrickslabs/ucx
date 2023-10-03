@@ -35,6 +35,7 @@ Holds Inventory of all tables in all databases and their relevant metadata.
 | view_text    |nullable string|If the table is the view, then this column holds the definition of the view|
 | upgraded_to  |string|Upgrade Target (3 level namespace)|
 
+
 <br/>
 
 #### _$inventory_.table_failures
@@ -84,6 +85,7 @@ Workspace object level permissions
 | object_id              | string   | Either:<br/>Group ID<br/>Workspace Object ID<br/>Redash Object ID<br/>Scope name                                                                                                                                                            |          |
 | supports               | string   | One of:<br/>AUTHORIZATION<br/><br/>CLUSTERS<br/>CLUSTER_POLICIES<br/>DIRECTORIES<br/>EXPERIMENTS<br/>FILES<br/>INSTANCE_POOLS<br/>JOBS<br/>NOTEBOOKS<br/>PIPELINES<br/>REGISTERED_MODELS<br/>REPOS<br/>SERVING_ENDPOINTS<br/>SQL_WAREHOUSES |          |
 | raw_object_permissions | JSON     | JSON-serialized response of:<br/>Generic Permissions<br/>Secret ACL<br/>Group roles and entitlements<br/>Redash permissions                                                                                                                 |          |
+
 
 <br/>
 

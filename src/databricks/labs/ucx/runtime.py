@@ -190,9 +190,12 @@ def migrate_permissions(cfg: WorkspaceConfig):
     See [interactive tutorial here](https://app.getreprise.com/launch/myM3VNn/)."""
     toolkit = GroupMigrationToolkit(cfg)
     toolkit.prepare_environment()
-    toolkit.apply_permissions_to_backup_groups()
-    toolkit.replace_workspace_groups_with_account_groups()
-    toolkit.apply_permissions_to_account_groups()
+    if toolkit.has_groups():
+        toolkit.apply_permissions_to_backup_groups()
+        toolkit.replace_workspace_groups_with_account_groups()
+        toolkit.apply_permissions_to_account_groups()
+    else:
+        logger.info("Skipping group migration as no groups were found.")
 
 
 @task("migrate-groups-cleanup", depends_on=[migrate_permissions])

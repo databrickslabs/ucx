@@ -1,5 +1,6 @@
 from unittest.mock import Mock
 
+from databricks.sdk.core import DatabricksError
 from databricks.sdk.service.compute import AutoScale, ClusterDetails, ClusterSource
 from databricks.sdk.service.jobs import BaseJob, JobSettings, NotebookTask, Task
 from databricks.sdk.service.pipelines import PipelineState, PipelineStateInfo
@@ -393,6 +394,24 @@ def test_cluster_assessment_cluster_policy_no_spark_conf(mocker):
     result_set1 = list(crawler)
     assert len(result_set1) == 1
     assert result_set1[0].success == 1
+
+
+def test_cluster_assessment_cluster_policy_not_found(mocker):
+    sample_clusters1 = [
+        ClusterDetails(
+            cluster_name="cluster1",
+            autoscale=AutoScale(min_workers=1, max_workers=6),
+            spark_context_id=5134472582179565315,
+            spark_env_vars=None,
+            policy_id="D96308F1BF0003A8",
+            spark_version="13.3.x-cpu-ml-scala2.12",
+            cluster_id="0915-190044-3dqy6751",
+        )
+    ]
+    ws = Mock()
+    ws.cluster_policies.get.side_effect = DatabricksError(error="NO_POLICY", error_code="NO_POLICY")
+    crawler = ClustersCrawler(ws, MockBackend(), "ucx")._assess_clusters(sample_clusters1)
+    list(crawler)
 
 
 def test_pipeline_assessment_with_config(mocker):

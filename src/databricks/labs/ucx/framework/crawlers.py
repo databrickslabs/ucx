@@ -41,6 +41,32 @@ class SqlBackend(ABC):
             fields.append(f"{f.name} {spark_type}{not_null}")
         return ", ".join(fields)
 
+    @classmethod
+    def _filter_none_rows(cls, rows, full_name):
+        if len(rows) == 0:
+            return rows
+
+        results = []
+        nullable_fields = set()
+
+        for field in dataclasses.fields(rows[0]):
+            if field.default is None:
+                nullable_fields.add(field.name)
+
+        for row in rows:
+            if row is None:
+                continue
+            row_contains_none = False
+            for column, value in dataclasses.asdict(row).items():
+                if value is None and column not in nullable_fields:
+                    logger.warning(f"[{full_name}] Field {column} is None, filtering row")
+                    row_contains_none = True
+                    break
+
+            if not row_contains_none:
+                results.append(row)
+        return results
+
 
 class StatementExecutionBackend(SqlBackend):
     def __init__(self, ws: WorkspaceClient, warehouse_id, *, max_records_per_batch: int = 1000):
@@ -60,7 +86,7 @@ class StatementExecutionBackend(SqlBackend):
         if mode == "overwrite":
             msg = "Overwrite mode is not yet supported"
             raise NotImplementedError(msg)
-
+        rows = self._filter_none_rows(rows, full_name)
         if len(rows) == 0:
             return
 
@@ -115,6 +141,8 @@ class RuntimeBackend(SqlBackend):
         return self._spark.sql(sql).collect()
 
     def save_table(self, full_name: str, rows: list[any], mode: str = "append"):
+        rows = self._filter_none_rows(rows, full_name)
+
         if len(rows) == 0:
             return
         # pyspark deals well with lists of dataclass instances, as long as schema is provided
