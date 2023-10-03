@@ -114,6 +114,9 @@ class GroupMigrationToolkit:
         ucx_logger = logging.getLogger("databricks.labs.ucx")
         ucx_logger.setLevel(level)
 
+    def has_groups(self) -> bool:
+        return self._group_manager.has_groups()
+
     def prepare_environment(self):
         self._group_manager.prepare_groups_in_environment()
 
