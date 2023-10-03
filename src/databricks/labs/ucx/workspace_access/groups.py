@@ -181,6 +181,9 @@ class GroupManager:
         self._set_migration_groups(group_names)
         logger.info("Environment prepared successfully")
 
+    def has_groups(self) -> bool:
+        return len(self._migration_state.groups) > 0
+
     @property
     def migration_groups_provider(self) -> GroupMigrationState:
         assert len(self._migration_state.groups) > 0, "Migration groups were not loaded or initialized"

@@ -115,7 +115,7 @@ class GroupMigrationToolkit:
         ucx_logger.setLevel(level)
 
     def has_groups(self) -> bool:
-        return len(self._group_manager.migration_groups_provider.groups) > 0
+        return self._group_manager.has_groups()
 
     def prepare_environment(self):
         self._group_manager.prepare_groups_in_environment()
