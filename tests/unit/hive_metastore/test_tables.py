@@ -84,6 +84,18 @@ def test_tables_crawler_inventory_table():
     assert tc._table == "tables"
 
 
+def test_tables_crawler_parse_tp():
+    tc = TablesCrawler(MockBackend(), "default")
+    tp1 = tc._parse_table_props(
+        "[delta.minReaderVersion=1,delta.minWriterVersion=2,upgraded_to=fake_cat.fake_ext.fake_delta]"
+    )
+    tp2 = tc._parse_table_props("[delta.minReaderVersion=1,delta.minWriterVersion=2]")
+    assert len(tp1) == 3
+    assert tp1.get("upgraded_to") == "fake_cat.fake_ext.fake_delta"
+    assert len(tp2) == 2
+    assert tp2.get("upgraded_to") is None
+
+
 def test_tables_returning_error_when_describing():
     errors = {"DESCRIBE TABLE EXTENDED hive_metastore.database.table1": "error"}
     rows = {
