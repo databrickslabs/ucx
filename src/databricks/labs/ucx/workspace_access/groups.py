@@ -146,7 +146,7 @@ class GroupManager:
     def _delete_workspace_group(self, ws_group: iam.Group) -> None:
         logger.info(f"Deleting the workspace-level group {ws_group.display_name} with id {ws_group.id}")
 
-        self._ws.groups.delete(ws_group.id)
+        self._ws.groups.delete(id=ws_group.id)
 
         logger.info(f"Workspace-level group {ws_group.display_name} with id {ws_group.id} was deleted")
 
@@ -222,6 +222,8 @@ class GroupManager:
         logger.info("Workspace groups were successfully replaced with account-level groups")
 
     def delete_backup_groups(self):
+        if len(self._migration_state.groups) == 0:
+            return
         logger.info(
             f"Deleting the workspace-level backup groups. "
             f"In total, {len(self.migration_groups_provider.groups)} group(s) to be deleted"

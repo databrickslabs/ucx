@@ -59,13 +59,12 @@ print(__version__)
 
 # COMMAND ----------
 
-workspace_users = ws.users.list(attributes='id,userName,groups')
 workspace_groups = [
             g
             for g in ws.groups.list(attributes='id,displayName,meta')
             if g.meta.resource_type == "WorkspaceGroup"
         ]
-print(f'users: {len(workspace_users)}, groups: {len(workspace_groups)}')
+print(f'groups: {{len(workspace_groups)}}')
 
 # COMMAND ----------
 
@@ -75,18 +74,18 @@ account_groups = [
     for r in ws.api_client.do(
         "get",
         "/api/2.0/account/scim/v2/Groups",
-        query={"attributes": "id,displayName,meta,members"},
+        query={{"attributes": "id,displayName,meta,members"}},
     ).get("Resources", [])
 ]
 account_groups = [g for g in account_groups if g.display_name not in ["users", "admins", "account users"]]
-print(f"Found {len(account_groups)} account groups")
+print(f"Found {{len(account_groups)}} account groups")
 
 # COMMAND ----------
 
-ws_group_names = {_.display_name for _ in workspace_groups}
-ac_group_names = {_.display_name for _ in account_groups}
+ws_group_names = {{_.display_name for _ in workspace_groups}}
+ac_group_names = {{_.display_name for _ in account_groups}}
 group_names = list(ws_group_names.intersection(ac_group_names))
-print(f"Found {len(group_names)} groups to migrate")
+print(f"Found {{len(group_names)}} groups to migrate")
 """
 
 logger = logging.getLogger(__name__)

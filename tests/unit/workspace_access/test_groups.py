@@ -323,7 +323,7 @@ def test_replace_workspace_groups_with_account_groups_should_call_delete_and_do(
     manager._migration_state.groups = [group_info]
     manager.replace_workspace_groups_with_account_groups()
 
-    client.groups.delete.assert_called_with(test_ws_group_id)
+    client.groups.delete.assert_called_with(id=test_ws_group_id)
     client.api_client.do.assert_called_with(
         "PUT",
         f"/api/2.0/preview/permissionassignments/principals/{test_acc_group_id}",
