@@ -161,25 +161,24 @@ class GroupManager:
             "exist and are of the correct type. If some temporary groups are missing, they'll be created"
         )
         group_names = self.config.selected
+        valid_group_names = []
         if group_names:
             logger.info("Using the provided group listing")
 
             for g in group_names:
                 if g in self.SYSTEM_GROUPS:
                     logger.info(f"Cannot migrate system group {g}. {g} will be skipped.")
-                    group_names.remove(g)
                     continue
                 if not self._get_group(g, "workspace"):
                     logger.info(f"Group {g} not found on the workspace level. {g} will be skipped.")
-                    group_names.remove(g)
                     continue
                 if not self._get_group(g, "account"):
                     logger.info(
                         f"Group {g} not found on the account level. {g} will be skipped. You can add {g} "
                         f"to the account and rerun the job."
                     )
-                    group_names.remove(g)
                     continue
+                valid_group_names.append(g)
         else:
             logger.info(
                 "No group listing provided, all available workspace-level groups that have an account-level "
@@ -187,9 +186,9 @@ class GroupManager:
             )
             ws_group_names = {_.display_name for _ in self._workspace_groups}
             ac_group_names = {_.display_name for _ in self._account_groups}
-            group_names = list(ws_group_names.intersection(ac_group_names))
+            valid_group_names = list(ws_group_names.intersection(ac_group_names))
 
-        self._set_migration_groups(group_names)
+        self._set_migration_groups(valid_group_names)
         logger.info("Environment prepared successfully")
 
     @property

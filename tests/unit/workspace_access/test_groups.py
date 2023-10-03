@@ -318,6 +318,44 @@ def test_replace_workspace_groups_with_account_groups_should_call_delete_and_do(
     )
 
 
+def test_system_groups():
+    client = Mock()
+    test_ws_group = Group(display_name="admins", meta=ResourceMeta(resource_type="WorkspaceGroup"))
+    test_acc_group = Group(display_name="admins", meta=ResourceMeta(resource_type="Group"))
+    backup_group_id = "100"
+    client.groups.list.return_value = [test_ws_group]
+    client.groups.create.return_value = Group(
+        display_name="dbr_backup_de", meta=ResourceMeta(resource_type="WorkspaceGroup"), id=backup_group_id
+    )
+    client.api_client.do.return_value = {
+        "Resources": [g.as_dict() for g in [test_acc_group]],
+    }
+
+    group_conf = GroupsConfig(backup_group_prefix="dbr_backup_", selected=["admins"])
+    manager = GroupManager(client, group_conf)
+    manager.prepare_groups_in_environment()
+    assert len(manager._migration_state.groups) == 0
+
+
+def test_workspace_only_groups():
+    client = Mock()
+    test_ws_group = Group(display_name="ws_group", meta=ResourceMeta(resource_type="WorkspaceGroup"))
+    test_acc_group = Group(display_name="acc_group", meta=ResourceMeta(resource_type="Group"))
+    backup_group_id = "100"
+    client.groups.list.return_value = [test_ws_group, test_acc_group]
+    client.groups.create.return_value = Group(
+        display_name="dbr_backup_de", meta=ResourceMeta(resource_type="WorkspaceGroup"), id=backup_group_id
+    )
+    client.api_client.do.return_value = {
+        "Resources": [g.as_dict() for g in [test_acc_group]],
+    }
+
+    group_conf = GroupsConfig(backup_group_prefix="dbr_backup_", selected=["ws_group"])
+    manager = GroupManager(client, group_conf)
+    manager.prepare_groups_in_environment()
+    assert len(manager._migration_state.groups) == 0
+
+
 def test_delete_backup_groups():
     client = Mock()
 
