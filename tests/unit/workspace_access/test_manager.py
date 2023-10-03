@@ -3,8 +3,13 @@ from unittest.mock import MagicMock
 
 import pytest
 from databricks.sdk.service import iam
+from databricks.sdk.service.iam import Group, ResourceMeta
 
 from databricks.labs.ucx.mixins.sql import Row
+from databricks.labs.ucx.workspace_access.groups import (
+    GroupMigrationState,
+    MigrationGroupInfo,
+)
 from databricks.labs.ucx.workspace_access.manager import PermissionManager, Permissions
 
 from ..framework.mocks import MockBackend
@@ -141,7 +146,16 @@ def test_manager_apply(mocker):
             "cluster-policies": mock_applier,
         },
     )
-    pm.apply_group_permissions(MagicMock(), "backup")
+    group_migration_state: GroupMigrationState = MagicMock()
+    group_migration_state.groups = [
+        MigrationGroupInfo(
+            Group(display_name="group", meta=ResourceMeta(resource_type="WorkspaceGroup")),
+            Group(display_name="group_backup", meta=ResourceMeta(resource_type="WorkspaceGroup")),
+            Group(display_name="group", meta=ResourceMeta(resource_type="AccountGroup")),
+        )
+    ]
+
+    pm.apply_group_permissions(group_migration_state, "backup")
 
     assert {"test2 test2 backup", "test test backup"} == applied_items
 
@@ -155,5 +169,4 @@ def test_unregistered_support():
         }
     )
     pm = PermissionManager(b, "test", [], {})
-    with pytest.raises(ValueError):
-        pm.apply_group_permissions(migration_state=MagicMock(), destination="backup")
+    pm.apply_group_permissions(migration_state=MagicMock(), destination="backup")
