@@ -25,6 +25,10 @@ class SqlBackend(ABC):
     def save_table(self, full_name: str, rows: list[any], mode: str = "append"):
         raise NotImplementedError
 
+    @abstractmethod
+    def create_empty_table(self, full_name: str, klass):
+        raise NotImplementedError
+
     _builtin_type_mapping: ClassVar[dict[type, str]] = {str: "STRING", int: "INT", bool: "BOOLEAN", float: "FLOAT"}
 
     @classmethod
@@ -91,9 +95,7 @@ class StatementExecutionBackend(SqlBackend):
             return
 
         klass = rows[0].__class__
-        ddl = f"CREATE TABLE IF NOT EXISTS {full_name} ({self._schema_for(klass)}) USING DELTA"
-        self.execute(ddl)
-
+        self.create_empty_table(full_name, klass)
         fields = dataclasses.fields(klass)
         field_names = [f.name for f in fields]
         for i in range(0, len(rows), self._max_records_per_batch):
@@ -101,6 +103,10 @@ class StatementExecutionBackend(SqlBackend):
             vals = "), (".join(self._row_to_sql(r, fields) for r in batch)
             sql = f'INSERT INTO {full_name} ({", ".join(field_names)}) VALUES ({vals})'
             self.execute(sql)
+
+    def create_empty_table(self, full_name: str, klass):
+        ddl = f"CREATE TABLE IF NOT EXISTS {full_name} ({self._schema_for(klass)}) USING DELTA"
+        self.execute(ddl)
 
     @staticmethod
     def _row_to_sql(row, fields):
@@ -149,9 +155,13 @@ class RuntimeBackend(SqlBackend):
         df = self._spark.createDataFrame(rows, self._schema_for(rows[0]))
         df.write.saveAsTable(full_name, mode=mode)
 
+    def create_empty_table(self, full_name: str, klass):
+        ddl = f"CREATE TABLE IF NOT EXISTS {full_name} ({self._schema_for(klass)}) USING DELTA"
+        self.execute(ddl)
+
 
 class CrawlerBase:
-    def __init__(self, backend: SqlBackend, catalog: str, schema: str, table: str):
+    def __init__(self, backend: SqlBackend, catalog: str, schema: str, table: str, klass=None):
         """
         Initializes a CrawlerBase instance.
 
@@ -168,6 +178,7 @@ class CrawlerBase:
         self._backend = backend
         self._fetch = backend.fetch
         self._exec = backend.execute
+        self._klass = klass
 
     @property
     def _full_name(self) -> str:
@@ -245,6 +256,8 @@ class CrawlerBase:
 
     def _append_records(self, items):
         if len(items) == 0:
+            if self._klass is not None:
+                self._backend.create_empty_table(self._full_name, self._klass)
             return
         logger.debug(f"[{self._full_name}] found {len(items)} new records for {self._table}")
         self._backend.save_table(self._full_name, items, mode="append")
