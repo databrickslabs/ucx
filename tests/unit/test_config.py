@@ -5,12 +5,12 @@ from pathlib import Path
 
 import yaml
 
-from databricks.labs.ucx.config import GroupsConfig, MigrationConfig
+from databricks.labs.ucx.config import GroupsConfig, WorkspaceConfig
 
 
 def test_initialization():
     mc = partial(
-        MigrationConfig,
+        WorkspaceConfig,
         inventory_database="abc",
         groups=GroupsConfig(auto=True),
     )
@@ -41,17 +41,17 @@ def set_directory(path: Path):
 def test_reader(tmp_path: Path):
     with set_directory(tmp_path):
         mc = partial(
-            MigrationConfig,
+            WorkspaceConfig,
             inventory_database="abc",
             groups=GroupsConfig(auto=True),
         )
 
-        config: MigrationConfig = mc()
+        config: WorkspaceConfig = mc()
         config_file = tmp_path / "config.yml"
 
         as_dict = config.as_dict()
         with config_file.open("w") as writable:
             yaml.safe_dump(as_dict, writable)
 
-        loaded = MigrationConfig.from_file(config_file)
+        loaded = WorkspaceConfig.from_file(config_file)
         assert loaded == config

@@ -16,10 +16,10 @@ The upgrade process starts with installing code to run the upgrade assessment as
 
 
 UCX leverages Databricks Lakehouse platform to upgrade itself, this includes creating jobs, notebooks, deploying code and configuration files. The `install.sh` guides you through this installation.
-By running the installation you install the assessment job and a number of upgrade jobs. The assessment and upgrade jobs are outlined in the custom generated README.py that is created by the installer and displayed to you by the `install.sh`
+By running the installation you install the assessment job and a number of upgrade jobs. The assessment and upgrade jobs are outlined in the custom generated README.py that is created by the installer and displayed to you by the `install.sh`. See interactive installation [tutorial here](https://app.getreprise.com/launch/G6YbWLn/). 
 
 
-The custom generated README.py, config.yaml and other assets are placed into your Databricks workspace home folder, into a subfolder named `.ucx`
+The custom generated README.py, config.yaml and other assets are placed into your Databricks workspace home folder, into a subfolder named `.ucx`. See [interactive tutorial](https://app.getreprise.com/launch/zXPxBZX/).
 
 
 Once the custom Databricks jobs are installed, begin by triggering the assessment job. The assessment job can be found under your workflows or via the active link in the README.py. Once the assessment job is complete, you can review the results in the custom generated Databricks dashboard (linked to by the custom README.py found in the workspace folder created for you).

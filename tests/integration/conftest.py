@@ -82,12 +82,16 @@ def test_catalog_fixture(make_catalog):
 
 @pytest.fixture
 def make_schema(sql_exec, make_random):
-    def create(*, catalog="hive_metastore"):
-        name = f"{catalog}.ucx_S{make_random(4)}".lower()
-        sql_exec(f"CREATE SCHEMA {name}")
-        return name
+    def create(*, catalog: str = "hive_metastore", schema: str | None = None):
+        if schema is None:
+            schema = f"ucx_S{make_random(4)}"
+        schema = f"{catalog}.{schema}".lower()
+        sql_exec(f"CREATE SCHEMA {schema}")
+        return schema
 
-    yield from factory("schema", create, lambda name: sql_exec(f"DROP SCHEMA IF EXISTS {name} CASCADE"))  # noqa: F405
+    yield from factory(  # noqa: F405
+        "schema", create, lambda schema: sql_exec(f"DROP SCHEMA IF EXISTS {schema} CASCADE")
+    )
 
 
 def test_schema_fixture(make_schema):
@@ -100,15 +104,18 @@ def make_table(sql_exec, make_schema, make_random):
     def create(
         *,
         catalog="hive_metastore",
+        name: str | None = None,
         schema: str | None = None,
         ctas: str | None = None,
         non_delta: bool = False,
         external: bool = False,
         view: bool = False,
+        tbl_properties: dict[str, str] | None = None,
     ):
         if schema is None:
             schema = make_schema(catalog=catalog)
-        name = f"{schema}.ucx_T{make_random(4)}".lower()
+        if name is None:
+            name = f"{schema}.ucx_T{make_random(4)}".lower()
         ddl = f'CREATE {"VIEW" if view else "TABLE"} {name}'
         if ctas is not None:
             # temporary (if not view)
@@ -118,11 +125,16 @@ def make_table(sql_exec, make_schema, make_random):
             ddl = f"{ddl} USING json LOCATION '{location}'"
         elif external:
             # external table
-            location = "dbfs:/databricks-datasets/nyctaxi-with-zipcodes/subsampled"
-            ddl = f"{ddl} USING delta LOCATION '{location}'"
+            url = "s3a://databricks-datasets-oregon/delta-sharing/share/open-datasets.share"
+            share = f"{url}#delta_sharing.default.lending_club"
+            ddl = f"{ddl} USING deltaSharing LOCATION '{share}'"
         else:
             # managed table
             ddl = f"{ddl} (id INT, value STRING)"
+        if tbl_properties:
+            tbl_properties = ",".join([f" '{k}' = '{v}' " for k, v in tbl_properties.items()])
+            ddl = f"{ddl} TBLPROPERTIES ({tbl_properties})"
+
         sql_exec(ddl)
         return name
 
@@ -145,6 +157,7 @@ def test_table_fixture(make_table):
     logger.info(f"Created new external JSON table in new schema: {make_table(non_delta=True)}")
     logger.info(f'Created new tmp table in new schema: {make_table(ctas="SELECT 2+2 AS four")}')
     logger.info(f'Created new view in new schema: {make_table(view=True, ctas="SELECT 2+2 AS four")}')
+    logger.info(f'Created table with properties: {make_table(tbl_properties={"test": "tableproperty"})}')
 
 
 @pytest.fixture

@@ -13,10 +13,10 @@ def test_mount_listing(ws, wsfs_wheel, make_schema, sql_fetch_all):
     commands.run(
         f"""
         from databricks.labs.ucx.hive_metastore.list_mounts import Mounts
-        from databricks.labs.ucx.config import MigrationConfig, GroupsConfig, TaclConfig
+        from databricks.labs.ucx.config import WorkspaceConfig, GroupsConfig, TaclConfig
         from databricks.sdk import WorkspaceClient
         from databricks.labs.ucx.framework.crawlers import RuntimeBackend
-        cfg = MigrationConfig(
+        cfg = WorkspaceConfig(
             inventory_database="{inventory_database}",
             groups=GroupsConfig(auto=True),
             tacl=TaclConfig(databases=["default"]))
