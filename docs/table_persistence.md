@@ -24,16 +24,15 @@ Table Utilization:
 
 Holds Inventory of all tables in all databases and their relevant metadata.
 
-| Column       | Datatype | Description | Comments |
-|--------------|----------|-------------|----------|
-| catalog      | string   | Original catalog of the table. _hive_metastore_ by default |
-| database     | string   | Original schema of the table |
-| name         |string|Name of the table|
-| object_type  |string|MANAGED, EXTERNAL, or VIEW|
-| table_format |string|Table provider. Like delta or json or parquet.|
-| location     |string|Location of the data for table|
-| view_text    |nullable string|If the table is the view, then this column holds the definition of the view|
-| upgraded_to  |string|Upgrade Target (3 level namespace)|
+| Column    | Datatype | Description | Comments |
+|-----------|----------|-------------|----------|
+| catalog   | string   | Original catalog of the table. _hive_metastore_ by default |
+| database  | string   | Original schema of the table |
+| name |string|Name of the table|
+|object_type|string|MANAGED, EXTERNAL, or VIEW|
+|table_format|string|Table provider. Like delta or json or parquet.|
+|location|string|Location of the data for table|
+|view_text|nullable string|If the table is the view, then this column holds the definition of the view|
 
 <br/>
 
@@ -79,11 +78,11 @@ List of DBFS mount points.
 #### _$inventory_.permissions
 Workspace object level permissions
 
-| Column                 | Datatype | Description                                                                                                                                                                                                                                 | Comments |
-|------------------------|----------|---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|----------|
-| object_id              | string   | Either:<br/>Group ID<br/>Workspace Object ID<br/>Redash Object ID<br/>Scope name                                                                                                                                                            |          |
-| supports               | string   | One of:<br/>AUTHORIZATION<br/><br/>CLUSTERS<br/>CLUSTER_POLICIES<br/>DIRECTORIES<br/>EXPERIMENTS<br/>FILES<br/>INSTANCE_POOLS<br/>JOBS<br/>NOTEBOOKS<br/>PIPELINES<br/>REGISTERED_MODELS<br/>REPOS<br/>SERVING_ENDPOINTS<br/>SQL_WAREHOUSES |          |
-| raw_object_permissions | JSON     | JSON-serialized response of:<br/>Generic Permissions<br/>Secret ACL<br/>Group roles and entitlements<br/>Redash permissions                                                                                                                 |          |
+| Column    | Datatype | Description | Comments |
+|-----------|----------|-------------|----------|
+|object_id|string|Either:<br/>Group ID<br/>Workspace Object ID<br/>Redash Object ID<br/>Scope name
+|supports|string|One of:<br/>AUTHORIZATION<br/><br/>CLUSTERS<br/>CLUSTER_POLICIES<br/>DIRECTORIES<br/>EXPERIMENTS<br/>FILES<br/>INSTANCE_POOLS<br/>JOBS<br/>NOTEBOOKS<br/>PIPELINES<br/>REGISTERED_MODELS<br/>REPOS<br/>SERVING_ENDPOINTS<br/>SQL_WAREHOUSES
+|raw_object_permissions|JSON|JSON-serialized response of:<br/>Generic Permissions<br/>Secret ACL<br/>Group roles and entitlements<br/>Redash permissions|
 
 <br/>
 
