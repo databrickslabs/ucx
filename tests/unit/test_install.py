@@ -23,6 +23,37 @@ from databricks.labs.ucx.framework.dashboards import DashboardFromFiles
 from databricks.labs.ucx.install import WorkspaceInstaller
 
 
+def mock_ws(mocker):
+    ws = mocker.Mock()
+    ws = mocker.patch("databricks.sdk.WorkspaceClient.__init__")
+
+    ws.current_user.me = lambda: iam.User(user_name="me@example.com", groups=[iam.ComplexValue(display="admins")])
+    ws.config.host = "https://foo"
+    ws.config.is_aws = True
+    config_bytes = yaml.dump(WorkspaceConfig(inventory_database="a", groups=GroupsConfig(auto=True)).as_dict()).encode(
+        "utf8"
+    )
+    ws.workspace.download = lambda _: io.BytesIO(config_bytes)
+    ws.workspace.get_status = lambda _: ObjectInfo(object_id=123)
+    ws.data_sources.list = lambda: [DataSource(id="bcd", warehouse_id="abc")]
+    ws.warehouses.list = lambda **_: [EndpointInfo(id="abc", warehouse_type=EndpointInfoWarehouseType.PRO)]
+    ws.dashboards.create.return_value = Dashboard(id="abc")
+    ws.queries.create.return_value = Query(id="abc")
+    ws.query_visualizations.create.return_value = Visualization(id="abc")
+    ws.dashboard_widgets.create.return_value = Widget(id="abc")
+    return ws
+
+
+def test_run_for_config(mocker, tmp_path):
+    # run_for_config(ws: WorkspaceClient, config: WorkspaceConfig, *, prefix="ucx") -> "WorkspaceInstaller":
+    ws = mock_ws(mocker)
+
+    install = WorkspaceInstaller(ws)
+    wc = WorkspaceConfig(inventory_database="a", groups=GroupsConfig(auto=True))
+    return_value = install.run_for_config(ws, wc)
+    assert return_value
+
+
 def test_install_database_happy(mocker, tmp_path):
     ws = mocker.Mock()
     install = WorkspaceInstaller(ws)
