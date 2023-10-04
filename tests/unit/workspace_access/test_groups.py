@@ -389,3 +389,25 @@ def test_delete_backup_groups():
     manager = GroupManager(client, group_conf)
     manager.delete_backup_groups()
     client.groups.delete.assert_called_with(id=backup_group_id)
+
+
+def test_delete_selected_backup_groups():
+    client = Mock()
+
+    backup_group_id = "100"
+    ws_group = Group(display_name="de", meta=ResourceMeta(resource_type="Group"))
+    test_ws_backup_group = Group(
+        display_name="dbr_backup_de", meta=ResourceMeta(resource_type="WorkspaceGroup"), id=backup_group_id
+    )
+
+    client.groups.list.return_value = [ws_group, test_ws_backup_group]
+
+    test_acc_group = Group(display_name="de", meta=ResourceMeta(resource_type="Group"))
+    client.api_client.do.return_value = {
+        "Resources": [g.as_dict() for g in [test_acc_group]],
+    }
+
+    group_conf = GroupsConfig(backup_group_prefix="dbr_backup_", selected=["de"])
+    manager = GroupManager(client, group_conf)
+    manager.delete_backup_groups()
+    client.groups.delete.assert_called_with(id=backup_group_id)

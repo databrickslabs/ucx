@@ -164,7 +164,10 @@ class GroupManager:
         logger.info(f"Group {acc_group.display_name} successfully reflected to workspace")
 
     def _get_backup_groups(self) -> list[iam.Group]:
-        ac_group_names = {_.display_name for _ in self._account_groups}
+        if self.config.selected:
+            ac_group_names = {_.display_name for _ in self._account_groups if _.display_name in self.config.selected}
+        else:
+            ac_group_names = {_.display_name for _ in self._account_groups}
 
         backup_groups = [
             g
