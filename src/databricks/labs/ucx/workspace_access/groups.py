@@ -5,10 +5,10 @@ from dataclasses import dataclass
 from functools import partial
 
 from databricks.sdk import WorkspaceClient
+from databricks.sdk.core import DatabricksError
 from databricks.sdk.retries import retried
 from databricks.sdk.service import iam
 from databricks.sdk.service.iam import Group
-from databricks.sdk.core import DatabricksError
 
 from databricks.labs.ucx.config import GroupsConfig
 from databricks.labs.ucx.framework.parallel import ThreadedExecution
