@@ -277,7 +277,7 @@ class ExternallyOrchestratedJobTaskCrawler(CrawlerBase):
         self._ws = ws
 
     def _crawl(self) -> list[ExternallyOrchestratedJobTask]:
-        no_of_days_back = datetime.timedelta(days=30)  # todo make configurable in yaml?
+        no_of_days_back = datetime.timedelta(days=90)  # todo make configurable in yaml?
         start_time_from = datetime.datetime.now() - no_of_days_back
         # todo figure out if we need to specify a default timezone
         all_job_runs = list(
