@@ -5,24 +5,28 @@ from databricks.sdk.service.compute import (
     AutoScale,
     ClusterDetails,
     ClusterSource,
-    DataSecurityMode, ClusterSpec,
+    ClusterSpec,
+    DataSecurityMode,
 )
 from databricks.sdk.service.jobs import (
     BaseJob,
     BaseRun,
+    ClusterInstance,
     JobCluster,
     JobSettings,
     NotebookTask,
+    RunTask,
     RunType,
-    Task, RunTask, SparkJarTask, ClusterInstance,
+    SparkJarTask,
+    Task,
 )
 from databricks.sdk.service.pipelines import PipelineState, PipelineStateInfo
 
 from databricks.labs.ucx.assessment.crawlers import (
     ClustersCrawler,
+    ExternallyOrchestratedJobCrawler,
     ExternallyOrchestratedJobTask,
     JobsCrawler,
-    ExternallyOrchestratedJobCrawler,
     PipelineInfo,
     PipelinesCrawler,
 )
@@ -555,30 +559,36 @@ def test_externally_orchestrated_jobs_crawler_filters_runs_with_job_id():
                 RunTask(
                     notebook_task=NotebookTask(notebook_path="/some/notebook/path"),
                     new_cluster=ClusterSpec(
-                        spark_version="2.1.0-db3-scala2.11",
-                        node_type_id="r3.xlarge",
-                        num_workers=8
+                        spark_version="2.1.0-db3-scala2.11", node_type_id="r3.xlarge", num_workers=8
                     ),
-                    task_key="task1"
+                    task_key="task1",
                 )
-            ]
+            ],
         ),
         BaseRun(
             job_id=12345678909,
             run_id=123456790,
             run_type=RunType.SUBMIT_RUN,
-            job_clusters=[JobCluster(job_cluster_key="my_ephemeral_job_cluster",
-                                     new_cluster=ClusterSpec(spark_version="2.1.0-db3-scala2.11",
-                                                             node_type_id="r3.xlarge",
-                                                             num_workers=8, ))],
+            job_clusters=[
+                JobCluster(
+                    job_cluster_key="my_ephemeral_job_cluster",
+                    new_cluster=ClusterSpec(
+                        spark_version="2.1.0-db3-scala2.11",
+                        node_type_id="r3.xlarge",
+                        num_workers=8,
+                    ),
+                )
+            ],
             tasks=[
                 RunTask(
-                    spark_jar_task=SparkJarTask(jar_uri="dbfs:/some/jar.jar", main_class_name="some.awesome.class.name"),
+                    spark_jar_task=SparkJarTask(
+                        jar_uri="dbfs:/some/jar.jar", main_class_name="some.awesome.class.name"
+                    ),
                     task_key="task2",
-                    existing_cluster_id="my_ephemeral_job_cluster"
+                    existing_cluster_id="my_ephemeral_job_cluster",
                 )
-            ]
-        )
+            ],
+        ),
     ]
 
     sample_jobs = [
@@ -623,32 +633,39 @@ def test_externally_orchestrated_jobs_crawler_returns_multiple_tasks():
             job_id=12345678909,
             run_id=123456789,
             run_type=RunType.SUBMIT_RUN,
-            job_clusters=[JobCluster(job_cluster_key="my_ephemeral_job_cluster", new_cluster=ClusterSpec(
-                spark_version="11.3.x-scala2.12",
-                node_type_id="r3.xlarge",
-                num_workers=8,
-                data_security_mode=DataSecurityMode.SINGLE_USER
-            ))],
+            job_clusters=[
+                JobCluster(
+                    job_cluster_key="my_ephemeral_job_cluster",
+                    new_cluster=ClusterSpec(
+                        spark_version="11.3.x-scala2.12",
+                        node_type_id="r3.xlarge",
+                        num_workers=8,
+                        data_security_mode=DataSecurityMode.SINGLE_USER,
+                    ),
+                )
+            ],
             tasks=[
                 RunTask(
-                    spark_jar_task=SparkJarTask(jar_uri="dbfs:/some/jar.jar", main_class_name="some.awesome.class.name"),
+                    spark_jar_task=SparkJarTask(
+                        jar_uri="dbfs:/some/jar.jar", main_class_name="some.awesome.class.name"
+                    ),
                     task_key="task1",
-                    existing_cluster_id="my_ephemeral_job_cluster"  # this should pull from all clusters, pre-existing
+                    existing_cluster_id="my_ephemeral_job_cluster",  # this should pull from all clusters, pre-existing
                 ),
                 RunTask(
                     notebook_task=NotebookTask(notebook_path="/some/notebook/path"),
                     new_cluster=ClusterSpec(
-                        spark_version="2.1.0-db3-scala2.11",
-                        node_type_id="r3.xlarge",
-                        num_workers=8
+                        spark_version="2.1.0-db3-scala2.11", node_type_id="r3.xlarge", num_workers=8
                     ),
-                    task_key="task1"
+                    task_key="task1",
                 ),
                 RunTask(
                     notebook_task=NotebookTask(notebook_path="/some/notebook/path"),
-                    cluster_instance=ClusterInstance(cluster_id="my_persistent_job_cluster")  #  this should pull from the job def
-                )
-            ]
+                    cluster_instance=ClusterInstance(
+                        cluster_id="my_persistent_job_cluster"
+                    ),  #  this should pull from the job def
+                ),
+            ],
         )
     ]
 
@@ -686,3 +703,113 @@ def test_externally_orchestrated_jobs_crawler_returns_multiple_tasks():
     assert result_set[1].run_id == 123456789
     assert result_set[1].spark_version == "2.1.0-db3-scala2.11"
     assert result_set[2].spark_version == "12.1.x-scala2.12"
+
+
+def test_externally_orchestrated_jobs_crawler_deterministic_hashing():
+    """
+    Test to validate
+     - when multiple job runs are submitted that are effectively identical they receive the same hash
+    """
+    sample_job_runs = [
+        BaseRun(
+            job_id=12345678909,
+            run_id=123456789,
+            run_type=RunType.SUBMIT_RUN,
+            job_clusters=[
+                JobCluster(
+                    job_cluster_key="my_ephemeral_job_cluster",
+                    new_cluster=ClusterSpec(
+                        spark_version="11.3.x-scala2.12",
+                        node_type_id="r3.xlarge",
+                        num_workers=8,
+                        data_security_mode=DataSecurityMode.SINGLE_USER,
+                    ),
+                )
+            ],
+            tasks=[
+                RunTask(
+                    spark_jar_task=SparkJarTask(
+                        jar_uri="dbfs:/some/jar.jar", main_class_name="some.awesome.class.name"
+                    ),
+                    task_key="task1",
+                    existing_cluster_id="my_ephemeral_job_cluster",  # this should pull from all clusters, pre-existing
+                ),
+                RunTask(
+                    notebook_task=NotebookTask(notebook_path="/some/notebook/path"),
+                    new_cluster=ClusterSpec(
+                        spark_version="2.1.0-db3-scala2.11", node_type_id="r3.xlarge", num_workers=8
+                    ),
+                    task_key="task1",
+                ),
+                RunTask(
+                    notebook_task=NotebookTask(notebook_path="/some/notebook/path"),
+                    cluster_instance=ClusterInstance(
+                        cluster_id="my_persistent_job_cluster"
+                    ),  #  this should pull from the job def
+                ),
+            ],
+        ),
+        BaseRun(
+            job_id=12345679000,
+            run_id=987654321,
+            run_type=RunType.SUBMIT_RUN,
+            job_clusters=[
+                JobCluster(
+                    job_cluster_key="my_ephemeral_job_cluster",
+                    new_cluster=ClusterSpec(
+                        spark_version="11.3.x-scala2.12",
+                        node_type_id="r3.xlarge",
+                        num_workers=8,
+                        data_security_mode=DataSecurityMode.SINGLE_USER,
+                    ),
+                )
+            ],
+            tasks=[
+                RunTask(
+                    spark_jar_task=SparkJarTask(
+                        jar_uri="dbfs:/some/jar.jar", main_class_name="some.awesome.class.name"
+                    ),
+                    task_key="task1",
+                    existing_cluster_id="my_ephemeral_job_cluster",  # this should pull from all clusters, pre-existing
+                ),
+                RunTask(
+                    notebook_task=NotebookTask(notebook_path="/some/notebook/path"),
+                    new_cluster=ClusterSpec(
+                        spark_version="2.1.0-db3-scala2.11", node_type_id="r3.xlarge", num_workers=8
+                    ),
+                    task_key="task1",
+                ),
+            ],
+        ),
+    ]
+    sample_jobs = [
+        BaseJob(
+            job_id=12345678910,
+        )
+    ]
+
+    sample_clusters = [
+        ClusterDetails(
+            autoscale=AutoScale(min_workers=1, max_workers=6),
+            spark_context_id=5134472582179565315,
+            spark_env_vars=None,
+            spark_version="12.1.x-scala2.12",
+            cluster_id="my_persistent_job_cluster",
+            cluster_source=ClusterSource.JOB,
+        )
+    ]
+    mock_ws = Mock()
+
+    mock_ws.jobs.list_runs = Mock(return_value=sample_job_runs)
+    mock_ws.clusters.list = Mock(return_value=sample_clusters)
+    mock_ws.jobs.list = Mock(return_value=sample_jobs)
+
+    crawler = ExternallyOrchestratedJobCrawler(mock_ws, MockBackend(), "ucx")
+
+    crawler._try_fetch = Mock(return_value=[])
+
+    result_set = crawler.snapshot()
+
+    assert len(result_set) == 5
+    assert result_set[0].hashed_id == result_set[3].hashed_id
+    assert result_set[1].hashed_id == result_set[4].hashed_id

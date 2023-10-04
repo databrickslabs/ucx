@@ -8,7 +8,14 @@ from hashlib import sha256
 from databricks.sdk import WorkspaceClient
 from databricks.sdk.core import DatabricksError
 from databricks.sdk.service.compute import ClusterDetails, ClusterSource
-from databricks.sdk.service.jobs import BaseJob, BaseRun, RunType, RunTask, ClusterSpec, JobCluster
+from databricks.sdk.service.jobs import (
+    BaseJob,
+    BaseRun,
+    ClusterSpec,
+    JobCluster,
+    RunTask,
+    RunType,
+)
 
 from databricks.labs.ucx.framework.crawlers import CrawlerBase, SqlBackend
 
@@ -273,11 +280,14 @@ class ExternallyOrchestratedJobCrawler(CrawlerBase):
         start_time_from = datetime.datetime.now() - no_of_days_back
         # todo figure out if we need to specify a default timezone
         all_job_runs = list(
-            self._ws.jobs.list_runs(expand_tasks=True, start_time_from=start_time_from, start_time_to=datetime.datetime.now(), run_type=RunType.SUBMIT_RUN)
+            self._ws.jobs.list_runs(
+                expand_tasks=True,
+                start_time_from=start_time_from,
+                start_time_to=datetime.datetime.now(),
+                run_type=RunType.SUBMIT_RUN,
+            )
         )
-        all_jobs = list(
-            self._ws.jobs.list()
-        )
+        all_jobs = list(self._ws.jobs.list())
         all_clusters: dict[str, ClusterDetails] = {c.cluster_id: c for c in self._ws.clusters.list()}
         return self._assess_job_runs(all_clusters, all_job_runs, all_jobs)
 
@@ -332,7 +342,9 @@ class ExternallyOrchestratedJobCrawler(CrawlerBase):
         hash_value_string = "|".join([value for value in hash_values if value is not None])
         return sha256(bytes(hash_value_string.encode("utf-8"))).hexdigest()
 
-    def _get_cluster_from_task(self, task: RunTask, job_run: BaseRun, all_clusters: dict[str, ClusterDetails]) -> ClusterSpec | ClusterDetails:
+    def _get_cluster_from_task(
+        self, task: RunTask, job_run: BaseRun, all_clusters: dict[str, ClusterDetails]
+    ) -> ClusterSpec | ClusterDetails:
         """
         Determine the cluster associated with the task
         1) Look for new_cluster on the task
@@ -353,27 +365,34 @@ class ExternallyOrchestratedJobCrawler(CrawlerBase):
             # fall back option 2
             return all_clusters[job_run.cluster_instance.cluster_id]
 
-    def _get_spark_version_from_task(self, task: RunTask, job_run: BaseRun, all_clusters: dict[str, ClusterDetails]) -> str:
+    def _get_spark_version_from_task(
+        self, task: RunTask, job_run: BaseRun, all_clusters: dict[str, ClusterDetails]
+    ) -> str:
         """
         Returns the spark version of the task cluster
         """
         return self._get_cluster_from_task(task, job_run, all_clusters).spark_version
 
-    def _get_data_security_mode_from_task(self, task: RunTask, job_run: BaseRun, all_clusters: dict[str, ClusterDetails]) -> str:
+    def _get_data_security_mode_from_task(
+        self, task: RunTask, job_run: BaseRun, all_clusters: dict[str, ClusterDetails]
+    ) -> str:
         """
         Returns the security mode of the task cluster
         """
         data_security_mode = self._get_cluster_from_task(task, job_run, all_clusters).data_security_mode
         return data_security_mode.value if data_security_mode is not None else None
 
-    def _assess_job_runs(self, all_clusters: dict[str, ClusterDetails], all_job_runs: list[BaseRun],
-                         all_jobs: list[BaseJob]) -> list[ExternallyOrchestratedJobTask]:
+    def _assess_job_runs(
+        self, all_clusters: dict[str, ClusterDetails], all_job_runs: list[BaseRun], all_jobs: list[BaseJob]
+    ) -> list[ExternallyOrchestratedJobTask]:
         """
         Returns a list of ExternallyOrchestratedJobs
         """
         ext_orc_job_tasks: list[ExternallyOrchestratedJobTask] = list[ExternallyOrchestratedJobTask]()
         all_persisted_job_ids = [x.job_id for x in all_jobs]
-        not_persisted_job_runs = list(filter(lambda jr: jr.job_id is None or jr.job_id not in all_persisted_job_ids, all_job_runs))
+        not_persisted_job_runs = list(
+            filter(lambda jr: jr.job_id is None or jr.job_id not in all_persisted_job_ids, all_job_runs)
+        )
         for job_run in not_persisted_job_runs:
             for task in job_run.tasks:
                 spark_version = self._get_spark_version_from_task(task, job_run, all_clusters)
