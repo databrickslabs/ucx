@@ -6,6 +6,7 @@ from functools import partial
 
 from databricks.sdk import WorkspaceClient
 from databricks.sdk.core import DatabricksError
+from databricks.sdk.retries import retried
 from databricks.sdk.service import iam, ml, workspace
 
 from databricks.labs.ucx.mixins.hardening import rate_limited
@@ -24,6 +25,10 @@ logger = logging.getLogger(__name__)
 class GenericPermissionsInfo:
     object_id: str
     request_type: str
+
+
+class RetryableError(DatabricksError):
+    pass
 
 
 class GenericPermissionsSupport(Crawler, Applier):
@@ -68,6 +73,8 @@ class GenericPermissionsSupport(Crawler, Applier):
             raw=json.dumps(permissions.as_dict()),
         )
 
+    # TODO remove after ES-892977 is fixed
+    @retried(on=[RetryableError])
     def _safe_get_permissions(self, object_type: str, object_id: str) -> iam.ObjectPermissions | None:
         try:
             return self._ws.permissions.get(object_type, object_id)
@@ -81,7 +88,7 @@ class GenericPermissionsSupport(Crawler, Applier):
                 logger.warning(f"Could not get permissions for {object_type} {object_id} due to {e.error_code}")
                 return None
             else:
-                raise e
+                raise RetryableError() from e
 
     def _prepare_new_acl(
         self, permissions: iam.ObjectPermissions, migration_state: GroupMigrationState, destination: Destination

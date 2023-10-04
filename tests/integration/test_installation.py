@@ -86,7 +86,7 @@ def test_jobs_with_no_inventory_database(
     )
 
     try:
-        for step in ["assessment", "migrate-groups"]:
+        for step in ["assessment", "migrate-groups", "migrate-groups-cleanup"]:
             logger.debug(f"starting {step} job: {ws.config.host}#job/{install._deployed_steps[step]}")
             ws.jobs.run_now(install._deployed_steps[step]).result()
 
