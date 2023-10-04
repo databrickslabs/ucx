@@ -16,7 +16,7 @@ class Mount:
 
 class Mounts(CrawlerBase):
     def __init__(self, backend: SqlBackend, ws: WorkspaceClient, inventory_database: str):
-        super().__init__(backend, "hive_metastore", inventory_database, "mounts")
+        super().__init__(backend, "hive_metastore", inventory_database, "mounts", Mount)
         self._dbutils = ws.dbutils
 
     def inventorize_mounts(self):

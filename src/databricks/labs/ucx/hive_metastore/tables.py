@@ -82,7 +82,7 @@ class TablesCrawler(CrawlerBase):
             backend (SqlBackend): The SQL Execution Backend abstraction (either REST API or Spark)
             schema: The schema name for the inventory persistence.
         """
-        super().__init__(backend, "hive_metastore", schema, "tables")
+        super().__init__(backend, "hive_metastore", schema, "tables", Table)
 
     def _all_databases(self) -> Iterator[Row]:
         yield from self._fetch("SHOW DATABASES")
