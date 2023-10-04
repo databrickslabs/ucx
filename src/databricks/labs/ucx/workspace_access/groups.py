@@ -163,6 +163,21 @@ class GroupManager:
 
         logger.info(f"Group {acc_group.display_name} successfully reflected to workspace")
 
+    def _get_backup_groups(self) -> list[iam.Group]:
+        ac_group_names = {_.display_name for _ in self._account_groups}
+
+        backup_groups = [
+            g
+            for g in self._workspace_groups
+            if g.display_name.startswith(self.config.backup_group_prefix)
+            # backup groups are only created for workspace groups that have corresponding account group
+            and g.display_name.removeprefix(self.config.backup_group_prefix) in ac_group_names
+        ]
+
+        logger.info(f"Found {len(backup_groups)} backup groups")
+
+        return backup_groups
+
     # please keep the public methods below this line
 
     def prepare_groups_in_environment(self):
@@ -223,14 +238,13 @@ class GroupManager:
         logger.info("Workspace groups were successfully replaced with account-level groups")
 
     def delete_backup_groups(self):
-        if len(self._migration_state.groups) == 0:
-            return
+        backup_groups = self._get_backup_groups()
+
         logger.info(
-            f"Deleting the workspace-level backup groups. "
-            f"In total, {len(self.migration_groups_provider.groups)} group(s) to be deleted"
+            f"Deleting the workspace-level backup groups. In total, {len(backup_groups)} group(s) to be deleted"
         )
 
-        for migration_info in self.migration_groups_provider.groups:
-            self._delete_workspace_group(migration_info.backup)
+        for group in backup_groups:
+            self._delete_workspace_group(group)
 
         logger.info("Backup groups were successfully deleted")
