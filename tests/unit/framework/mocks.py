@@ -14,7 +14,6 @@ class MockBackend(SqlBackend):
             rows = {}
         self._rows = rows
         self._save_table = []
-        self._create_table = []
         self.queries = []
 
     def _sql(self, sql):
@@ -41,11 +40,9 @@ class MockBackend(SqlBackend):
         logger.debug(f"Returning rows: {rows}")
         return iter(rows)
 
-    def save_table(self, full_name: str, rows: list[any], mode: str = "append"):
-        self._save_table.append((full_name, rows, mode))
-
-    def create_empty_table(self, full_name: str, klass):
-        self._create_table.append((full_name, klass))
+    def save_table(self, full_name: str, rows: list[any], klass, mode: str = "append"):
+        if klass.__class__ == type:
+            self._save_table.append((full_name, rows, mode))
 
     def rows_written_for(self, full_name: str, mode: str) -> list[any]:
         rows = []
