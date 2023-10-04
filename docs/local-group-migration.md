@@ -203,3 +203,39 @@ To apply the permissions, we use the following logic:
 3. Deserialize the items using the relevant applier.
 4. Generate a list of callables that will apply the permissions.
 5. Execute the callables in parallel.
+
+## Troubleshooting
+
+Below are some useful code snippets that can be useful for troubleshooting. 
+Make sure to install [databricks-sdk](https://docs.databricks.com/en/dev-tools/sdk-python.html) on the cluster to run it.
+
+1. Find workspace-local groups that are eligible for migration to the account:
+```
+from databricks.sdk import WorkspaceClient
+from databricks.sdk.service import iam
+
+ws = WorkspaceClient()
+
+workspace_groups = [
+            g
+            for g in ws.groups.list(attributes='id,displayName,meta')
+            if g.meta.resource_type == "WorkspaceGroup"
+        ]
+print(f'Found {len(workspace_groups)} workspace-local groups')
+
+account_groups = [
+    iam.Group.from_dict(r)
+    for r in ws.api_client.do(
+        "get",
+        "/api/2.0/account/scim/v2/Groups",
+        query={"attributes": "id,displayName,meta,members"},
+    ).get("Resources", [])
+]
+account_groups = [g for g in account_groups if g.display_name not in ["users", "admins", "account users"]]
+print(f"Found {len(account_groups)} account groups")
+
+ws_group_names = {{_.display_name for _ in workspace_groups}}
+ac_group_names = {{_.display_name for _ in account_groups}}
+group_names = list(ws_group_names.intersection(ac_group_names))
+print(f"Found {len(group_names)} groups to migrate")
+```

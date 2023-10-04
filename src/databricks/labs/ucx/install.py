@@ -56,36 +56,6 @@ cfg = WorkspaceConfig.from_file(Path("/Workspace{config_file}"))
 ws = WorkspaceClient()
 
 print(__version__)
-
-# COMMAND ----------
-
-workspace_groups = [
-            g
-            for g in ws.groups.list(attributes='id,displayName,meta')
-            if g.meta.resource_type == "WorkspaceGroup"
-        ]
-print(f'groups: {{len(workspace_groups)}}')
-
-# COMMAND ----------
-
-from databricks.sdk.service import iam
-account_groups = [
-    iam.Group.from_dict(r)
-    for r in ws.api_client.do(
-        "get",
-        "/api/2.0/account/scim/v2/Groups",
-        query={{"attributes": "id,displayName,meta,members"}},
-    ).get("Resources", [])
-]
-account_groups = [g for g in account_groups if g.display_name not in ["users", "admins", "account users"]]
-print(f"Found {{len(account_groups)}} account groups")
-
-# COMMAND ----------
-
-ws_group_names = {{_.display_name for _ in workspace_groups}}
-ac_group_names = {{_.display_name for _ in account_groups}}
-group_names = list(ws_group_names.intersection(ac_group_names))
-print(f"Found {{len(group_names)}} groups to migrate")
 """
 
 logger = logging.getLogger(__name__)
