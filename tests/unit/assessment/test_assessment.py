@@ -1806,6 +1806,7 @@ def test_list_all_pipeline_wo_conf_spn_in_spark_conf(mocker):
 
     assert len(result_set) == 0
 
+
 def test_list_all_pipeline_with_conf_spn_tenat(mocker):
     sample_pipelines = [
         PipelineInfo(
@@ -1834,6 +1835,7 @@ def test_list_all_pipeline_with_conf_spn_tenat(mocker):
     assert result_set[0].get("storage_account") == "newstorageacct"
     assert result_set[0].get("application_id") == "pipeline_dummy_application_id"
 
+
 def test_list_all_pipeline_with_conf_spn_secret(mocker):
     sample_pipelines = [
         PipelineInfo(
@@ -1860,6 +1862,7 @@ def test_list_all_pipeline_with_conf_spn_secret(mocker):
 
     assert len(result_set) == 1
     assert result_set[0].get("storage_account") == "newstorageacct"
+
 
 def test_azure_service_principal_info_policy_family(mocker):
     sample_clusters = [
