@@ -8,6 +8,7 @@ from databricks.sdk import WorkspaceClient
 from databricks.sdk.retries import retried
 from databricks.sdk.service import iam
 from databricks.sdk.service.iam import Group
+from databricks.sdk.core import DatabricksError
 
 from databricks.labs.ucx.config import GroupsConfig
 from databricks.labs.ucx.framework.parallel import ThreadedExecution
@@ -91,7 +92,7 @@ class GroupManager:
             if group.display_name == group_name:
                 return group
 
-    @retried(on=[IOError])
+    @retried(on=[DatabricksError])
     @rate_limited(max_requests=5)
     def _get_or_create_backup_group(self, source_group_name: str, source_group: iam.Group) -> iam.Group:
         backup_group_name = f"{self.config.backup_group_prefix}{source_group_name}"
@@ -141,7 +142,7 @@ class GroupManager:
 
         self._reflect_account_group_to_workspace(migration_info.account)
 
-    @retried(on=[IOError])
+    @retried(on=[DatabricksError])
     @rate_limited(max_requests=5)
     def _delete_workspace_group(self, ws_group: iam.Group) -> None:
         logger.info(f"Deleting the workspace-level group {ws_group.display_name} with id {ws_group.id}")
@@ -150,7 +151,7 @@ class GroupManager:
 
         logger.info(f"Workspace-level group {ws_group.display_name} with id {ws_group.id} was deleted")
 
-    @retried(on=[IOError])
+    @retried(on=[DatabricksError])
     @rate_limited(max_requests=10)
     def _reflect_account_group_to_workspace(self, acc_group: iam.Group) -> None:
         logger.info(f"Reflecting group {acc_group.display_name} to workspace")
