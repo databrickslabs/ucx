@@ -24,8 +24,8 @@ from databricks.sdk.service.pipelines import PipelineState, PipelineStateInfo
 
 from databricks.labs.ucx.assessment.crawlers import (
     ClustersCrawler,
-    ExternallyOrchestratedJobCrawler,
     ExternallyOrchestratedJobTask,
+    ExternallyOrchestratedJobTaskCrawler,
     JobsCrawler,
     PipelineInfo,
     PipelinesCrawler,
@@ -534,7 +534,7 @@ def test_externally_orchestrated_jobs_crawler():
     ]
     mock_ws = Mock()
 
-    crawler = ExternallyOrchestratedJobCrawler(mock_ws, MockBackend(), "ucx")
+    crawler = ExternallyOrchestratedJobTaskCrawler(mock_ws, MockBackend(), "ucx")
 
     crawler._try_fetch = Mock(return_value=[])
     crawler._crawl = Mock(return_value=sample_ext_jobs)
@@ -613,7 +613,7 @@ def test_externally_orchestrated_jobs_crawler_filters_runs_with_job_id():
     mock_ws.clusters.list = Mock(return_value=sample_clusters)
     mock_ws.jobs.list = Mock(return_value=sample_jobs)
 
-    crawler = ExternallyOrchestratedJobCrawler(mock_ws, MockBackend(), "ucx")
+    crawler = ExternallyOrchestratedJobTaskCrawler(mock_ws, MockBackend(), "ucx")
 
     crawler._try_fetch = Mock(return_value=[])
 
@@ -691,7 +691,7 @@ def test_externally_orchestrated_jobs_crawler_returns_multiple_tasks():
     mock_ws.clusters.list = Mock(return_value=sample_clusters)
     mock_ws.jobs.list = Mock(return_value=sample_jobs)
 
-    crawler = ExternallyOrchestratedJobCrawler(mock_ws, MockBackend(), "ucx")
+    crawler = ExternallyOrchestratedJobTaskCrawler(mock_ws, MockBackend(), "ucx")
 
     crawler._try_fetch = Mock(return_value=[])
 
@@ -804,7 +804,7 @@ def test_externally_orchestrated_jobs_crawler_deterministic_hashing():
     mock_ws.clusters.list = Mock(return_value=sample_clusters)
     mock_ws.jobs.list = Mock(return_value=sample_jobs)
 
-    crawler = ExternallyOrchestratedJobCrawler(mock_ws, MockBackend(), "ucx")
+    crawler = ExternallyOrchestratedJobTaskCrawler(mock_ws, MockBackend(), "ucx")
 
     crawler._try_fetch = Mock(return_value=[])
 

@@ -271,9 +271,9 @@ class JobsCrawler(CrawlerBase):
             yield JobInfo(*row)
 
 
-class ExternallyOrchestratedJobCrawler(CrawlerBase):
+class ExternallyOrchestratedJobTaskCrawler(CrawlerBase):
     def __init__(self, ws: WorkspaceClient, sbe: SqlBackend, schema):
-        super().__init__(sbe, "hive_metastore", schema, "job_runs")
+        super().__init__(sbe, "hive_metastore", schema, "job_runs", ExternallyOrchestratedJobTask)
         self._ws = ws
 
     def _crawl(self) -> list[ExternallyOrchestratedJobTask]:
