@@ -60,19 +60,19 @@ class GroupManager:
         self._workspace_groups = self._list_workspace_groups()
 
     def _list_workspace_groups(self) -> list[iam.Group]:
-        logger.debug("Listing workspace groups...")
+        logger.info("Listing workspace groups...")
         workspace_groups = [
             g
             for g in self._ws.groups.list(attributes=self.SCIM_ATTRIBUTES)
             if g.meta.resource_type == "WorkspaceGroup" and g.display_name not in self.SYSTEM_GROUPS
         ]
-        logger.debug(f"Found {len(workspace_groups)} workspace groups")
+        logger.info(f"Found {len(workspace_groups)} workspace groups")
         return sorted(workspace_groups, key=lambda _: _.display_name)
 
     def _list_account_groups(self) -> list[iam.Group]:
         # TODO: we should avoid using this method, as it's not documented
         # get account-level groups even if they're not (yet) assigned to a workspace
-        logger.debug("Listing account groups...")
+        logger.info("Listing account groups...")
         account_groups = [
             iam.Group.from_dict(r)
             for r in self._ws.api_client.do(
@@ -82,7 +82,7 @@ class GroupManager:
             ).get("Resources", [])
         ]
         account_groups = [g for g in account_groups if g.display_name not in self.SYSTEM_GROUPS]
-        logger.debug(f"Found {len(account_groups)} account groups")
+        logger.info(f"Found {len(account_groups)} account groups")
         return sorted(account_groups, key=lambda _: _.display_name)
 
     def _get_group(self, group_name, level: GroupLevel) -> iam.Group | None:
