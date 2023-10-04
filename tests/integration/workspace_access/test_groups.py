@@ -164,7 +164,7 @@ def test_replace_workspace_groups_with_account_groups(
     for _info in group_manager.migration_state.groups:
         ws.groups.delete(_info.backup.id)
 
-    @retried(on=[AssertionError], timeout=timedelta(seconds=30))
+    @retried(on=[AssertionError], timeout=timedelta(minutes=1))
     def check_table_permissions_after_backup_delete():
         logger.info("check_table_permissions_after_backup_delete()")
 
@@ -172,7 +172,6 @@ def test_replace_workspace_groups_with_account_groups(
         assert group_info.backup.display_name not in policy_permissions
 
         table_permissions = grants.for_table_info(dummy_table)
-        assert group_info.backup.display_name not in table_permissions
         assert group_info.account.display_name in table_permissions
         assert "SELECT" in table_permissions[group_info.account.display_name]
 

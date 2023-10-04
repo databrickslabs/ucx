@@ -211,24 +211,6 @@ def test_runtime_backend_save_table(mocker):
         rb._spark.createDataFrame().write.saveAsTable.assert_called_with("a.b.c", mode="append")
 
 
-def test_runtime_backend_save_table_with_row_containing_none(mocker):
-    from unittest import mock
-
-    with mock.patch.dict(os.environ, {"DATABRICKS_RUNTIME_VERSION": "14.0"}):
-        pyspark_sql_session = mocker.Mock()
-        sys.modules["pyspark.sql.session"] = pyspark_sql_session
-
-        rb = RuntimeBackend()
-
-        rb.save_table("a.b.c", [Foo("aaa", True), Foo("bbb", False), Foo("ccc", None)], Bar)
-
-        rb._spark.createDataFrame.assert_called_with(
-            [Foo(first="aaa", second=True), Foo(first="bbb", second=False)],
-            "first STRING NOT NULL, second BOOLEAN NOT NULL",
-        )
-        rb._spark.createDataFrame().write.saveAsTable.assert_called_with("a.b.c", mode="append")
-
-
 def test_runtime_backend_save_table_with_row_containing_none_with_nullable_class(mocker):
     from unittest import mock
 

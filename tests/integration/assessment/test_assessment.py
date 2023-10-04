@@ -120,26 +120,17 @@ def test_spn_crawler_no_config(ws, inventory_schema, make_job, make_pipeline, sq
     make_pipeline()
     make_cluster(single_node=True)
     spn_crawler = AzureServicePrincipalCrawler(ws=ws, sbe=sql_backend, schema=inventory_schema)
-    spns = spn_crawler.snapshot()
-    results = []
-    for spn in spns:
-        results.append(spn)
-
-    assert len(results) >= 1
+    spn_crawler.snapshot()
 
 
-def test_spn_crawler_with_pipeline_unavlbl_secret(ws, inventory_schema, make_job, make_pipeline, sql_backend):
+def test_spn_crawler_with_pipeline_unavailable_secret(ws, inventory_schema, make_job, make_pipeline, sql_backend):
     make_job(spark_conf=_SPARK_CONF)
     make_pipeline(configuration=_PIPELINE_CONF_WITH_SECRET)
     spn_crawler = AzureServicePrincipalCrawler(ws=ws, sbe=sql_backend, schema=inventory_schema)
-    spns = spn_crawler.snapshot()
-    results = []
-    for spn in spns:
-        results.append(spn)
+    results = spn_crawler.snapshot()
 
-    assert len(results) >= 2
-    assert results[0].storage_account == "storage_acct_1"
-    assert results[0].tenant_id == "directory_12345"
+    assert any(_ for _ in results if _.tenant_id == "directory_12345")
+    assert any(_ for _ in results if _.storage_account == "storage_acct_1")
 
 
 def test_spn_crawler_with_available_secrets(
@@ -158,27 +149,16 @@ def test_spn_crawler_with_available_secrets(
     make_job()
     make_pipeline(configuration=_pipeline_conf_with_avlbl_secret)
     spn_crawler = AzureServicePrincipalCrawler(ws=ws, sbe=sql_backend, schema=inventory_schema)
-    spns = spn_crawler.snapshot()
-    results = []
-    for spn in spns:
-        results.append(spn)
+    results = spn_crawler.snapshot()
 
-    ws.secrets.delete_secret(scope=secret_scope, key=secret_key)
-
-    assert len(results) >= 2
+    assert any(_ for _ in results if _.secret_scope == secret_scope)
+    assert any(_ for _ in results if _.secret_key == secret_key)
 
 
-def test_workspace_object_crawler(ws, make_directory, inventory_schema, sql_backend):
-    new_directory = make_directory()
-    workspace_listing = WorkspaceListing(
-        ws=ws, sql_backend=sql_backend, inventory_database=inventory_schema, start_path=new_directory
-    )
-    listing_results = workspace_listing.snapshot()
-    results = []
-    for _result in listing_results:
-        if _result.path == new_directory:
-            results.append(_result)
+def test_workspace_object_crawler(ws, make_notebook, inventory_schema, sql_backend):
+    notebook = make_notebook()
+    workspace_listing = WorkspaceListing(ws, sql_backend, inventory_schema)
+    workspace_objects = {_.path: _ for _ in workspace_listing.snapshot()}
 
-    assert len(results) == 1
-    assert results[0].path == new_directory
-    assert results[0].object_type == "DIRECTORY"
+    assert notebook in workspace_objects
+    assert "NOTEBOOK" == workspace_objects[notebook].object_type

@@ -1,7 +1,7 @@
 import json
+import logging
 import time
 from functools import partial
-from logging import Logger
 
 from databricks.sdk import WorkspaceClient
 from databricks.sdk.core import DatabricksError
@@ -16,7 +16,7 @@ from databricks.labs.ucx.workspace_access.base import (
 )
 from databricks.labs.ucx.workspace_access.groups import GroupMigrationState
 
-logger = Logger(__name__)
+logger = logging.getLogger(__name__)
 
 
 class ScimSupport(AclSupport):

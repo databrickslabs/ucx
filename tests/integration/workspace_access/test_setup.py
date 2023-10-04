@@ -8,7 +8,6 @@ from databricks.sdk.service.iam import ComplexValue
 from databricks.labs.ucx.framework.parallel import Threads
 
 logger = logging.getLogger(__name__)
-Threader = partial(Threads, num_threads=40)
 
 
 def _create_user(ws: WorkspaceClient, uid: str):
@@ -28,5 +27,4 @@ def _create_user(ws: WorkspaceClient, uid: str):
 
 def test_create_users(ws):
     pytest.skip("run only in debug")
-    executables = [partial(_create_user, ws, uid) for uid in range(200)]
-    Threader(executables)._run()
+    Threads.gather("creating fixtures", [partial(_create_user, ws, uid) for uid in range(5)])
