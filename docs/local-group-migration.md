@@ -234,8 +234,8 @@ account_groups = [
 account_groups = [g for g in account_groups if g.display_name not in ["users", "admins", "account users"]]
 print(f"Found {len(account_groups)} account groups")
 
-ws_group_names = {{_.display_name for _ in workspace_groups}}
-ac_group_names = {{_.display_name for _ in account_groups}}
+ws_group_names = {_.display_name for _ in workspace_groups}
+ac_group_names = {_.display_name for _ in account_groups}
 group_names = list(ws_group_names.intersection(ac_group_names))
 print(f"Found {len(group_names)} groups to migrate")
 ```
