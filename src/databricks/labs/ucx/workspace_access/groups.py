@@ -60,8 +60,6 @@ class GroupManager:
         self._account_groups = self._list_account_groups()
         self._workspace_groups = self._list_workspace_groups()
 
-    # TODO remove after ES-892977 is fixed
-    @retried(on=[DatabricksError])
     def _list_workspace_groups(self) -> list[iam.Group]:
         logger.info("Listing workspace groups...")
         workspace_groups = [
@@ -72,7 +70,6 @@ class GroupManager:
         logger.info(f"Found {len(workspace_groups)} workspace groups")
         return sorted(workspace_groups, key=lambda _: _.display_name)
 
-    @retried(on=[DatabricksError])
     def _list_account_groups(self) -> list[iam.Group]:
         # TODO: we should avoid using this method, as it's not documented
         # get account-level groups even if they're not (yet) assigned to a workspace

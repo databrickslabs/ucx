@@ -27,6 +27,10 @@ class GenericPermissionsInfo:
     request_type: str
 
 
+class RetryableError(DatabricksError):
+    pass
+
+
 class GenericPermissionsSupport(Crawler, Applier):
     def __init__(self, ws: WorkspaceClient, listings: list[Callable[..., Iterator[GenericPermissionsInfo]]]):
         self._ws = ws
@@ -70,7 +74,7 @@ class GenericPermissionsSupport(Crawler, Applier):
         )
 
     # TODO remove after ES-892977 is fixed
-    @retried(on=[DatabricksError])
+    @retried(on=[RetryableError])
     def _safe_get_permissions(self, object_type: str, object_id: str) -> iam.ObjectPermissions | None:
         try:
             return self._ws.permissions.get(object_type, object_id)
@@ -84,7 +88,7 @@ class GenericPermissionsSupport(Crawler, Applier):
                 logger.warning(f"Could not get permissions for {object_type} {object_id} due to {e.error_code}")
                 return None
             else:
-                raise e
+                raise RetryableError(error_code="SOMETHING_UNEXPECTED") from e
 
     def _prepare_new_acl(
         self, permissions: iam.ObjectPermissions, migration_state: GroupMigrationState, destination: Destination
