@@ -59,8 +59,7 @@ class ThreadedExecution(Generic[ExecutableResult]):
                 try:
                     return func(*args, **kwargs)
                 except Exception as ex:
-                    msg = getattr(ex, "message", ex)
-                    logger.warning(f"An error occurred while '{name}', message: {msg}")
+                    logger.warning(f"{name} task failed: {ex!s}")
                     return None
 
             return inner
@@ -74,7 +73,7 @@ class ThreadedExecution(Generic[ExecutableResult]):
             results = concurrent.futures.wait(self._futures, return_when=ALL_COMPLETED)
 
         logger.debug("Collecting the results from threaded execution")
-        collected = [future.result() for future in results.done if future.result()]
+        collected = [result for future in results.done if (result := future.result())]
         failed_count = len(self._executables) - len(collected)
         if failed_count > 0:
             logger.warning(f"The parallel run of '{self._name}' incurred {failed_count} failed tasks")
