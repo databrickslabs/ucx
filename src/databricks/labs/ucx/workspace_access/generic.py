@@ -88,7 +88,7 @@ class GenericPermissionsSupport(Crawler, Applier):
                 logger.warning(f"Could not get permissions for {object_type} {object_id} due to {e.error_code}")
                 return None
             else:
-                raise RetryableError(error_code="SOMETHING_UNEXPECTED") from e
+                raise RetryableError() from e
 
     def _prepare_new_acl(
         self, permissions: iam.ObjectPermissions, migration_state: GroupMigrationState, destination: Destination
