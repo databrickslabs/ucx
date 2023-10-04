@@ -19,4 +19,4 @@ def test_list_mounts_should_return_a_list_of_mount_without_encryption_type():
     instance.inventorize_mounts()
 
     expected = [Mount("mp_1", "path_1"), Mount("mp_2", "path_2")]
-    assert backend.rows_written_for("hive_metastore.test.mounts", "append") == expected
+    assert expected == backend.rows_written_for("hive_metastore.test.mounts", "append")

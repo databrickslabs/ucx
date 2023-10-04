@@ -86,7 +86,7 @@ def spark_version_compatibility(spark_version: str) -> str:
 
 class PipelinesCrawler(CrawlerBase):
     def __init__(self, ws: WorkspaceClient, sbe: SqlBackend, schema):
-        super().__init__(sbe, "hive_metastore", schema, "pipelines")
+        super().__init__(sbe, "hive_metastore", schema, "pipelines", PipelineInfo)
         self._ws = ws
 
     def _crawl(self) -> list[PipelineInfo]:
@@ -117,7 +117,7 @@ class PipelinesCrawler(CrawlerBase):
 
 class ClustersCrawler(CrawlerBase):
     def __init__(self, ws: WorkspaceClient, sbe: SqlBackend, schema):
-        super().__init__(sbe, "hive_metastore", schema, "clusters")
+        super().__init__(sbe, "hive_metastore", schema, "clusters", ClusterInfo)
         self._ws = ws
 
     def _crawl(self) -> list[ClusterInfo]:
@@ -174,10 +174,11 @@ class ClustersCrawler(CrawlerBase):
 
 class JobsCrawler(CrawlerBase):
     def __init__(self, ws: WorkspaceClient, sbe: SqlBackend, schema):
-        super().__init__(sbe, "hive_metastore", schema, "jobs")
+        super().__init__(sbe, "hive_metastore", schema, "jobs", JobInfo)
         self._ws = ws
 
-    def _get_cluster_configs_from_all_jobs(self, all_jobs, all_clusters_by_id):
+    @staticmethod
+    def _get_cluster_configs_from_all_jobs(all_jobs, all_clusters_by_id):
         for j in all_jobs:
             if j.settings.job_clusters is not None:
                 for jc in j.settings.job_clusters:
