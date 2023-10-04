@@ -119,7 +119,7 @@ class Grant:
 
 class GrantsCrawler(CrawlerBase):
     def __init__(self, tc: TablesCrawler):
-        super().__init__(tc._backend, tc._catalog, tc._schema, "grants")
+        super().__init__(tc._backend, tc._catalog, tc._schema, "grants", Grant)
         self._tc = tc
 
     def snapshot(self) -> list[Grant]:

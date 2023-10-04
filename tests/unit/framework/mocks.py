@@ -40,8 +40,9 @@ class MockBackend(SqlBackend):
         logger.debug(f"Returning rows: {rows}")
         return iter(rows)
 
-    def save_table(self, full_name: str, rows: list[any], mode: str = "append"):
-        self._save_table.append((full_name, rows, mode))
+    def save_table(self, full_name: str, rows: list[any], klass, mode: str = "append"):
+        if klass.__class__ == type:
+            self._save_table.append((full_name, rows, mode))
 
     def rows_written_for(self, full_name: str, mode: str) -> list[any]:
         rows = []
