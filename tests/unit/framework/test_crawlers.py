@@ -35,17 +35,17 @@ class Bar:
 
 def test_invalid():
     with pytest.raises(ValueError):
-        CrawlerBase(MockBackend(), "a.a.a", "b", "c")
+        CrawlerBase(MockBackend(), "a.a.a", "b", "c", Bar)
 
 
 def test_full_name():
-    cb = CrawlerBase(MockBackend(), "a", "b", "c")
+    cb = CrawlerBase(MockBackend(), "a", "b", "c", Bar)
     assert "a.b.c" == cb._full_name
 
 
 def test_snapshot_appends_to_existing_table():
     b = MockBackend()
-    cb = CrawlerBase(b, "a", "b", "c")
+    cb = CrawlerBase(b, "a", "b", "c", Bar)
 
     result = cb._snapshot(fetcher=lambda: [], loader=lambda: [Foo(first="first", second=True)])
 
@@ -55,7 +55,7 @@ def test_snapshot_appends_to_existing_table():
 
 def test_snapshot_appends_to_new_table():
     b = MockBackend()
-    cb = CrawlerBase(b, "a", "b", "c")
+    cb = CrawlerBase(b, "a", "b", "c", Bar)
 
     def fetcher():
         msg = ".. TABLE_OR_VIEW_NOT_FOUND .."
@@ -69,7 +69,7 @@ def test_snapshot_appends_to_new_table():
 
 def test_snapshot_wrong_error():
     b = MockBackend()
-    cb = CrawlerBase(b, "a", "b", "c")
+    cb = CrawlerBase(b, "a", "b", "c", Bar)
 
     def fetcher():
         msg = "always fails"
@@ -119,7 +119,7 @@ def test_statement_execution_backend_fetch_happy(mocker):
 def test_statement_execution_backend_save_table_overwrite(mocker):
     seb = StatementExecutionBackend(mocker.Mock(), "abc")
     with pytest.raises(NotImplementedError):
-        seb.save_table("a.b.c", [1, 2, 3], mode="overwrite")
+        seb.save_table("a.b.c", [1, 2, 3], Bar, mode="overwrite")
 
 
 def test_statement_execution_backend_save_table_empty_records(mocker):
@@ -127,9 +127,9 @@ def test_statement_execution_backend_save_table_empty_records(mocker):
 
     seb = StatementExecutionBackend(mocker.Mock(), "abc")
 
-    seb.save_table("a.b.c", [])
+    seb.save_table("a.b.c", [], Bar)
 
-    execute_sql.assert_not_called()
+    execute_sql.assert_called()
 
 
 def test_statement_execution_backend_save_table_two_records(mocker):
@@ -137,7 +137,7 @@ def test_statement_execution_backend_save_table_two_records(mocker):
 
     seb = StatementExecutionBackend(mocker.Mock(), "abc")
 
-    seb.save_table("a.b.c", [Foo("aaa", True), Foo("bbb", False)])
+    seb.save_table("a.b.c", [Foo("aaa", True), Foo("bbb", False)], Foo)
 
     assert [
         mocker.call(
@@ -152,8 +152,7 @@ def test_statement_execution_backend_save_table_in_batches_of_two(mocker):
 
     seb = StatementExecutionBackend(mocker.Mock(), "abc", max_records_per_batch=2)
 
-    seb.save_table("a.b.c", [Foo("aaa", True), Foo("bbb", False), Foo("ccc", True)])
-
+    seb.save_table("a.b.c", [Foo("aaa", True), Foo("bbb", False), Foo("ccc", True)], Foo)
     assert [
         mocker.call(
             "abc", "CREATE TABLE IF NOT EXISTS a.b.c (first STRING NOT NULL, second BOOLEAN NOT NULL) USING DELTA"
@@ -203,7 +202,7 @@ def test_runtime_backend_save_table(mocker):
 
         rb = RuntimeBackend()
 
-        rb.save_table("a.b.c", [Foo("aaa", True), Foo("bbb", False)])
+        rb.save_table("a.b.c", [Foo("aaa", True), Foo("bbb", False)], Bar)
 
         rb._spark.createDataFrame.assert_called_with(
             [Foo(first="aaa", second=True), Foo(first="bbb", second=False)],
@@ -221,7 +220,7 @@ def test_runtime_backend_save_table_with_row_containing_none(mocker):
 
         rb = RuntimeBackend()
 
-        rb.save_table("a.b.c", [Foo("aaa", True), Foo("bbb", False), Foo("ccc", None)])
+        rb.save_table("a.b.c", [Foo("aaa", True), Foo("bbb", False), Foo("ccc", None)], Bar)
 
         rb._spark.createDataFrame.assert_called_with(
             [Foo(first="aaa", second=True), Foo(first="bbb", second=False)],
@@ -239,7 +238,7 @@ def test_runtime_backend_save_table_with_row_containing_none_with_nullable_class
 
         rb = RuntimeBackend()
 
-        rb.save_table("a.b.c", [Baz("aaa", "ccc"), Baz("bbb", None)])
+        rb.save_table("a.b.c", [Baz("aaa", "ccc"), Baz("bbb", None)], Bar)
 
         rb._spark.createDataFrame.assert_called_with(
             [Baz(first="aaa", second="ccc"), Baz(first="bbb", second=None)],

@@ -22,8 +22,12 @@ class SqlBackend(ABC):
         raise NotImplementedError
 
     @abstractmethod
-    def save_table(self, full_name: str, rows: list[any], mode: str = "append"):
+    def save_table(self, full_name: str, rows: list[any], klass: type, mode: str = "append"):
         raise NotImplementedError
+
+    def create_table(self, full_name: str, klass: type):
+        ddl = f"CREATE TABLE IF NOT EXISTS {full_name} ({self._schema_for(klass)}) USING DELTA"
+        self.execute(ddl)
 
     _builtin_type_mapping: ClassVar[dict[type, str]] = {str: "STRING", int: "INT", bool: "BOOLEAN", float: "FLOAT"}
 
@@ -82,18 +86,14 @@ class StatementExecutionBackend(SqlBackend):
         logger.debug(f"[api][fetch] {sql}")
         return self._sql.execute_fetch_all(self._warehouse_id, sql)
 
-    def save_table(self, full_name: str, rows: list[any], mode="append"):
+    def save_table(self, full_name: str, rows: list[any], klass: type, mode="append"):
         if mode == "overwrite":
             msg = "Overwrite mode is not yet supported"
             raise NotImplementedError(msg)
         rows = self._filter_none_rows(rows, full_name)
+        self.create_table(full_name, klass)
         if len(rows) == 0:
             return
-
-        klass = rows[0].__class__
-        ddl = f"CREATE TABLE IF NOT EXISTS {full_name} ({self._schema_for(klass)}) USING DELTA"
-        self.execute(ddl)
-
         fields = dataclasses.fields(klass)
         field_names = [f.name for f in fields]
         for i in range(0, len(rows), self._max_records_per_batch):
@@ -140,10 +140,11 @@ class RuntimeBackend(SqlBackend):
         logger.debug(f"[spark][fetch] {sql}")
         return self._spark.sql(sql).collect()
 
-    def save_table(self, full_name: str, rows: list[any], mode: str = "append"):
+    def save_table(self, full_name: str, rows: list[any], klass: type, mode: str = "append"):
         rows = self._filter_none_rows(rows, full_name)
 
         if len(rows) == 0:
+            self.create_table(full_name, klass)
             return
         # pyspark deals well with lists of dataclass instances, as long as schema is provided
         df = self._spark.createDataFrame(rows, self._schema_for(rows[0]))
@@ -151,7 +152,7 @@ class RuntimeBackend(SqlBackend):
 
 
 class CrawlerBase:
-    def __init__(self, backend: SqlBackend, catalog: str, schema: str, table: str):
+    def __init__(self, backend: SqlBackend, catalog: str, schema: str, table: str, klass: type):
         """
         Initializes a CrawlerBase instance.
 
@@ -168,6 +169,7 @@ class CrawlerBase:
         self._backend = backend
         self._fetch = backend.fetch
         self._exec = backend.execute
+        self._klass = klass
 
     @property
     def _full_name(self) -> str:
@@ -244,7 +246,5 @@ class CrawlerBase:
         return loaded_records
 
     def _append_records(self, items):
-        if len(items) == 0:
-            return
         logger.debug(f"[{self._full_name}] found {len(items)} new records for {self._table}")
-        self._backend.save_table(self._full_name, items, mode="append")
+        self._backend.save_table(self._full_name, items, self._klass, mode="append")

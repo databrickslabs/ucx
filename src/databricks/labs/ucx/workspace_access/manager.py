@@ -15,7 +15,7 @@ class PermissionManager(CrawlerBase):
     def __init__(
         self, backend: SqlBackend, inventory_database: str, crawlers: list[Crawler], appliers: dict[str, Applier]
     ):
-        super().__init__(backend, "hive_metastore", inventory_database, "permissions")
+        super().__init__(backend, "hive_metastore", inventory_database, "permissions", Permissions)
         self._crawlers = crawlers
         self._appliers = appliers
 
