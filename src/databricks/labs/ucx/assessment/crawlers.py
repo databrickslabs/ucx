@@ -340,7 +340,7 @@ class ExternallyOrchestratedJobTaskCrawler(CrawlerBase):
             hash_values.append(task.git_source.git_provider)
             hash_values.append(task.git_source.git_snapshot.used_commit)
 
-        hash_value_string = "|".join([value for value in hash_values if value is not None])
+        hash_value_string = "|".join([str(value) for value in hash_values if value is not None])
         return sha256(bytes(hash_value_string.encode("utf-8"))).hexdigest()
 
     def _get_cluster_from_task(
