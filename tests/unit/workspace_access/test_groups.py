@@ -323,7 +323,7 @@ def test_replace_workspace_groups_with_account_groups_should_call_delete_and_do(
     manager._migration_state.groups = [group_info]
     manager.replace_workspace_groups_with_account_groups()
 
-    client.groups.delete.assert_called_with(test_ws_group_id)
+    client.groups.delete.assert_called_with(id=test_ws_group_id)
     client.api_client.do.assert_called_with(
         "PUT",
         f"/api/2.0/preview/permissionassignments/principals/{test_acc_group_id}",
@@ -372,19 +372,48 @@ def test_workspace_only_groups():
 def test_delete_backup_groups():
     client = Mock()
 
-    test_ws_group = Group(display_name="de", meta=ResourceMeta(resource_type="WorkspaceGroup"))
-    test_acc_group = Group(display_name="de", meta=ResourceMeta(resource_type="Group"))
     backup_group_id = "100"
-    client.groups.list.return_value = [test_ws_group]
-    client.groups.create.return_value = Group(
+    ws_group = Group(display_name="de", meta=ResourceMeta(resource_type="Group"))
+    test_ws_backup_group = Group(
         display_name="dbr_backup_de", meta=ResourceMeta(resource_type="WorkspaceGroup"), id=backup_group_id
     )
+
+    client.groups.list.return_value = [ws_group, test_ws_backup_group]
+
+    test_acc_group = Group(display_name="de", meta=ResourceMeta(resource_type="Group"))
     client.api_client.do.return_value = {
         "Resources": [g.as_dict() for g in [test_acc_group]],
     }
 
+    group_conf = GroupsConfig(backup_group_prefix="dbr_backup_", auto=True)
+    manager = GroupManager(client, group_conf)
+    manager.delete_backup_groups()
+    client.groups.delete.assert_called_with(id=backup_group_id)
+
+
+def test_delete_selected_backup_groups():
+    client = Mock()
+
+    backup_group_id = "100"
+    ws_group = Group(display_name="de", meta=ResourceMeta(resource_type="Group"))
+    test_ws_backup_group = Group(
+        display_name="dbr_backup_de", meta=ResourceMeta(resource_type="WorkspaceGroup"), id=backup_group_id
+    )
+
+    ws_group_to_skip = Group(display_name="de2", meta=ResourceMeta(resource_type="Group"))
+    test_ws_backup_group_to_skip = Group(
+        display_name="dbr_backup_de2", meta=ResourceMeta(resource_type="WorkspaceGroup"), id="1"
+    )
+
+    client.groups.list.return_value = [ws_group, test_ws_backup_group, ws_group_to_skip, test_ws_backup_group_to_skip]
+
+    test_acc_group = Group(display_name="de", meta=ResourceMeta(resource_type="Group"))
+    test_acc_group_to_skip = Group(display_name="de2", meta=ResourceMeta(resource_type="Group"))
+    client.api_client.do.return_value = {
+        "Resources": [g.as_dict() for g in [test_acc_group, test_acc_group_to_skip]],
+    }
+
     group_conf = GroupsConfig(backup_group_prefix="dbr_backup_", selected=["de"])
     manager = GroupManager(client, group_conf)
-    manager.prepare_groups_in_environment()
     manager.delete_backup_groups()
     client.groups.delete.assert_called_with(id=backup_group_id)
