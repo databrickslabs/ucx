@@ -240,6 +240,10 @@ class GroupManager:
     def delete_backup_groups(self):
         backup_groups = self._get_backup_groups()
 
+        if len(backup_groups) == 0:
+            logger.info("No backup group found, nothing to do")
+            return
+
         logger.info(
             f"Deleting the workspace-level backup groups. In total, {len(backup_groups)} group(s) to be deleted"
         )
