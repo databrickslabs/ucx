@@ -197,6 +197,7 @@ class GroupManager:
             ws_group_names = {_.display_name for _ in self._workspace_groups}
             ac_group_names = {_.display_name for _ in self._account_groups}
             valid_group_names = list(ws_group_names.intersection(ac_group_names))
+            logger.info(f"Found {len(valid_group_names)} workspace groups that have corresponding account groups")
 
         self._set_migration_groups(valid_group_names)
         logger.info("Environment prepared successfully")
