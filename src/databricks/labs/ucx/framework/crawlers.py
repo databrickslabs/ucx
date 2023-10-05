@@ -22,10 +22,10 @@ class SqlBackend(ABC):
         raise NotImplementedError
 
     @abstractmethod
-    def save_table(self, full_name: str, rows: list[any], klass: type, mode: str = "append"):
+    def save_table(self, full_name: str, rows: list[any], klass: dataclasses.dataclass, mode: str = "append"):
         raise NotImplementedError
 
-    def create_table(self, full_name: str, klass: type):
+    def create_table(self, full_name: str, klass: dataclasses.dataclass):
         ddl = f"CREATE TABLE IF NOT EXISTS {full_name} ({self._schema_for(klass)}) USING DELTA"
         self.execute(ddl)
 
@@ -86,7 +86,7 @@ class StatementExecutionBackend(SqlBackend):
         logger.debug(f"[api][fetch] {sql}")
         return self._sql.execute_fetch_all(self._warehouse_id, sql)
 
-    def save_table(self, full_name: str, rows: list[any], klass: type, mode="append"):
+    def save_table(self, full_name: str, rows: list[any], klass: dataclasses.dataclass, mode="append"):
         if mode == "overwrite":
             msg = "Overwrite mode is not yet supported"
             raise NotImplementedError(msg)
@@ -140,7 +140,7 @@ class RuntimeBackend(SqlBackend):
         logger.debug(f"[spark][fetch] {sql}")
         return self._spark.sql(sql).collect()
 
-    def save_table(self, full_name: str, rows: list[any], klass: type, mode: str = "append"):
+    def save_table(self, full_name: str, rows: list[any], klass: dataclasses.dataclass, mode: str = "append"):
         rows = self._filter_none_rows(rows, full_name)
 
         if len(rows) == 0:
@@ -152,7 +152,7 @@ class RuntimeBackend(SqlBackend):
 
 
 class CrawlerBase:
-    def __init__(self, backend: SqlBackend, catalog: str, schema: str, table: str, klass: type):
+    def __init__(self, backend: SqlBackend, catalog: str, schema: str, table: str, klass: dataclasses.dataclass):
         """
         Initializes a CrawlerBase instance.
 
