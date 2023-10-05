@@ -2,8 +2,6 @@ import json
 from unittest.mock import Mock
 
 from databricks.sdk.core import DatabricksError
-from databricks.sdk.service.compute import AutoScale, ClusterDetails, ClusterSource
-from databricks.sdk.service.jobs import BaseJob, JobSettings, NotebookTask, Task
 from databricks.sdk.service.compute import (
     AutoScale,
     ClusterDetails,

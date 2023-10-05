@@ -1,3 +1,4 @@
+import dataclasses
 import json
 import logging
 import re
@@ -102,7 +103,7 @@ def spark_version_compatibility(spark_version: str) -> str:
 
 class AzureServicePrincipalCrawler(CrawlerBase):
     def __init__(self, ws: WorkspaceClient, sbe: SqlBackend, schema):
-        super().__init__(sbe, "hive_metastore", schema, "azure_service_principals")
+        super().__init__(sbe, "hive_metastore", schema, "azure_service_principals", dataclasses.dataclass)
         self._ws = ws
 
     def _crawl(self) -> list[AzureServicePrincipalInfo]:
