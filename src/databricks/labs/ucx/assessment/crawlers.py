@@ -201,7 +201,7 @@ class AzureServicePrincipalCrawler(CrawlerBase):
         all_jobs = list(self._ws.jobs.list(expand_tasks=True))
         all_clusters_by_id = {c.cluster_id: c for c in self._ws.clusters.list()}
         for _job, cluster_config in self._get_cluster_configs_from_all_jobs(all_jobs, all_clusters_by_id):
-            policy = self._ws.cluster_policies.get(cluster_config.policy_id)
+
             if cluster_config.spark_conf:
                 if _azure_sp_conf_present_check(cluster_config.spark_conf):
                     temp_list = self._get_azure_spn_list(cluster_config.spark_conf)
@@ -209,25 +209,27 @@ class AzureServicePrincipalCrawler(CrawlerBase):
                         azure_spn_list_with_data_access_from_jobs += temp_list
 
             if cluster_config.policy_id:
+                policy = self._ws.cluster_policies.get(cluster_config.policy_id)
                 if _azure_sp_conf_present_check(json.loads(policy.definition)):
                     temp_list = self._get_azure_spn_list(json.loads(policy.definition))
                     if temp_list:
                         azure_spn_list_with_data_access_from_jobs += temp_list
 
-            if policy.policy_family_definition_overrides:
-                if _azure_sp_conf_present_check(json.loads(policy.policy_family_definition_overrides)):
-                    temp_list = self._get_azure_spn_list(json.loads(policy.policy_family_definition_overrides))
-                    if temp_list:
-                        azure_spn_list_with_data_access_from_jobs += temp_list
+                if policy.policy_family_definition_overrides:
+                    if _azure_sp_conf_present_check(json.loads(policy.policy_family_definition_overrides)):
+                        temp_list = self._get_azure_spn_list(json.loads(policy.policy_family_definition_overrides))
+                        if temp_list:
+                            azure_spn_list_with_data_access_from_jobs += temp_list
         return azure_spn_list_with_data_access_from_jobs
 
     def _list_all_spn_in_sql_warehouses_spark_conf(self) -> list:
         warehouse_config_list = self._ws.warehouses.get_workspace_warehouse_config().data_access_config
-        if len(warehouse_config_list) > 0:
-            warehouse_config_dict = {config.key: config.value for config in warehouse_config_list}
-            if warehouse_config_dict:
-                if _azure_sp_conf_present_check(warehouse_config_dict):
-                    return self._get_azure_spn_list(warehouse_config_dict)
+        if warehouse_config_list:
+            if len(warehouse_config_list) > 0:
+                warehouse_config_dict = {config.key: config.value for config in warehouse_config_list}
+                if warehouse_config_dict:
+                    if _azure_sp_conf_present_check(warehouse_config_dict):
+                        return self._get_azure_spn_list(warehouse_config_dict)
 
     def _list_all_pipeline_with_spn_in_spark_conf(self) -> list:
         azure_spn_list_with_data_access_from_pipeline = []
@@ -245,7 +247,6 @@ class AzureServicePrincipalCrawler(CrawlerBase):
         azure_spn_list_with_data_access_from_cluster = []
         for cluster in self._ws.clusters.list():
             if cluster.cluster_source != ClusterSource.JOB:
-                policy = self._ws.cluster_policies.get(cluster.policy_id)
                 if cluster.spark_conf:
                     if _azure_sp_conf_present_check(cluster.spark_conf):
                         temp_list = self._get_azure_spn_list(cluster.spark_conf)
@@ -253,16 +254,17 @@ class AzureServicePrincipalCrawler(CrawlerBase):
                             azure_spn_list_with_data_access_from_cluster += temp_list
 
                 if cluster.policy_id:
+                    policy = self._ws.cluster_policies.get(cluster.policy_id)
                     if _azure_sp_conf_present_check(json.loads(policy.definition)):
                         temp_list = self._get_azure_spn_list(json.loads(policy.definition))
                         if temp_list:
                             azure_spn_list_with_data_access_from_cluster += temp_list
 
-                if policy.policy_family_definition_overrides:
-                    if _azure_sp_conf_present_check(json.loads(policy.policy_family_definition_overrides)):
-                        temp_list = self._get_azure_spn_list(json.loads(policy.policy_family_definition_overrides))
-                        if temp_list:
-                            azure_spn_list_with_data_access_from_cluster += temp_list
+                    if policy.policy_family_definition_overrides:
+                        if _azure_sp_conf_present_check(json.loads(policy.policy_family_definition_overrides)):
+                            temp_list = self._get_azure_spn_list(json.loads(policy.policy_family_definition_overrides))
+                            if temp_list:
+                                azure_spn_list_with_data_access_from_cluster += temp_list
         return azure_spn_list_with_data_access_from_cluster
 
     def _assess_service_principals(self, relevant_service_principals: list):
