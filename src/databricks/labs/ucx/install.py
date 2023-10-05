@@ -197,8 +197,11 @@ class WorkspaceInstaller:
         logger.info("Please answer a couple of questions to configure Unity Catalog migration")
         inventory_database = self._configure_inventory_database()
 
+        def warehouse_type(_):
+            return _.warehouse_type.value if not _.enable_serverless_compute else "SERVERLESS"
+
         pro_warehouses = {"[Create new PRO SQL warehouse]": "create_new"} | {
-            f"{_.name} ({_.id}, {_.warehouse_type.value}, {_.state.value})": _.id
+            f"{_.name} ({_.id}, {warehouse_type(_)}, {_.state.value})": _.id
             for _ in self._ws.warehouses.list()
             if _.warehouse_type == EndpointInfoWarehouseType.PRO
         }
@@ -355,7 +358,7 @@ class WorkspaceInstaller:
     def _choice(self, text: str, choices: list[Any], *, max_attempts: int = 10) -> str:
         if not self._prompts:
             return "any"
-        choices = sorted(choices)
+        choices = sorted(choices, key=str.casefold)
         numbered = "\n".join(f"\033[1m[{i}]\033[0m \033[36m{v}\033[0m" for i, v in enumerate(choices))
         prompt = f"\033[1m{text}\033[0m\n{numbered}\nEnter a number between 0 and {len(choices)-1}: "
         attempt = 0
