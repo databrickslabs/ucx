@@ -9,7 +9,7 @@ from databricks.labs.ucx.hive_metastore.tables import Table
 logger = logging.getLogger(__name__)
 
 
-def test_table_inventory(ws, make_warehouse, make_schema):
+def test_external_locations(ws, make_warehouse, make_schema):
     warehouse_id = os.environ["TEST_DEFAULT_WAREHOUSE_ID"]
 
     logger.info("setting up fixtures")
@@ -20,8 +20,8 @@ def test_table_inventory(ws, make_warehouse, make_schema):
         Table("hive_metastore", "foo", "bar", "EXTERNAL", "delta", location="dbfs:/mnt/foo/test3/table3"),
     ]
     schema = make_schema()
-    sbe.save_table(f"{schema}.tables", tables)
-    sbe.save_table(f"{schema}.mounts", [Mount("/mnt/foo", "s3://bar")])
+    sbe.save_table(f"{schema}.tables", tables, Table)
+    sbe.save_table(f"{schema}.mounts", [Mount("/mnt/foo", "s3://bar")], Mount)
 
     crawler = ExternalLocationCrawler(ws, sbe, schema.split(".")[1])
     results = crawler.snapshot()
