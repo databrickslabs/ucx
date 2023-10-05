@@ -201,7 +201,7 @@ class WorkspaceInstaller:
             return _.warehouse_type.value if not _.enable_serverless_compute else "SERVERLESS"
 
         pro_warehouses = {"[Create new PRO SQL warehouse]": "create_new"} | {
-            f"{_.name.strip()} ({_.id}, {warehouse_type(_)}, {_.state.value})": _.id
+            f"{_.name} ({_.id}, {warehouse_type(_)}, {_.state.value})": _.id
             for _ in self._ws.warehouses.list()
             if _.warehouse_type == EndpointInfoWarehouseType.PRO
         }
