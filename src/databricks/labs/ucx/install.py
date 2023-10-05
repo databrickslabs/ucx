@@ -198,7 +198,7 @@ class WorkspaceInstaller:
         inventory_database = self._configure_inventory_database()
 
         pro_warehouses = {"[Create new PRO SQL warehouse]": "create_new"} | {
-            f"{_.name} ({_.id}, {_.warehouse_type.value}, {_.state.value})": _.id
+            f"{_.name} ({_.id}, {_.warehouse_type.value if not _.enable_serverless_compute else 'Serverless'}, {_.state.value})": _.id
             for _ in self._ws.warehouses.list()
             if _.warehouse_type == EndpointInfoWarehouseType.PRO
         }
