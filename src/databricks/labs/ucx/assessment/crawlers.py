@@ -149,7 +149,7 @@ class AzureServicePrincipalCrawler(CrawlerBase):
                     storage_account = storage_account_match.group(1).strip(".")
                     tenant_key = "fs.azure.account.oauth2.client.endpoint." + storage_account
                 else:
-                    tenant_key = "fs.azure.account.oauth2.client.endpoint."
+                    tenant_key = "fs.azure.account.oauth2.client.endpoint"
                 tenant_id = self._get_azure_spn_tenant_id(config, tenant_key)
                 spn_list.append(
                     {
@@ -201,7 +201,6 @@ class AzureServicePrincipalCrawler(CrawlerBase):
         all_jobs = list(self._ws.jobs.list(expand_tasks=True))
         all_clusters_by_id = {c.cluster_id: c for c in self._ws.clusters.list()}
         for _job, cluster_config in self._get_cluster_configs_from_all_jobs(all_jobs, all_clusters_by_id):
-
             if cluster_config.spark_conf:
                 if _azure_sp_conf_present_check(cluster_config.spark_conf):
                     temp_list = self._get_azure_spn_list(cluster_config.spark_conf)
@@ -210,10 +209,11 @@ class AzureServicePrincipalCrawler(CrawlerBase):
 
             if cluster_config.policy_id:
                 policy = self._ws.cluster_policies.get(cluster_config.policy_id)
-                if _azure_sp_conf_present_check(json.loads(policy.definition)):
-                    temp_list = self._get_azure_spn_list(json.loads(policy.definition))
-                    if temp_list:
-                        azure_spn_list_with_data_access_from_jobs += temp_list
+                if policy.definition:
+                    if _azure_sp_conf_present_check(json.loads(policy.definition)):
+                        temp_list = self._get_azure_spn_list(json.loads(policy.definition))
+                        if temp_list:
+                            azure_spn_list_with_data_access_from_jobs += temp_list
 
                 if policy.policy_family_definition_overrides:
                     if _azure_sp_conf_present_check(json.loads(policy.policy_family_definition_overrides)):
@@ -255,10 +255,11 @@ class AzureServicePrincipalCrawler(CrawlerBase):
 
                 if cluster.policy_id:
                     policy = self._ws.cluster_policies.get(cluster.policy_id)
-                    if _azure_sp_conf_present_check(json.loads(policy.definition)):
-                        temp_list = self._get_azure_spn_list(json.loads(policy.definition))
-                        if temp_list:
-                            azure_spn_list_with_data_access_from_cluster += temp_list
+                    if policy.definition:
+                        if _azure_sp_conf_present_check(json.loads(policy.definition)):
+                            temp_list = self._get_azure_spn_list(json.loads(policy.definition))
+                            if temp_list:
+                                azure_spn_list_with_data_access_from_cluster += temp_list
 
                     if policy.policy_family_definition_overrides:
                         if _azure_sp_conf_present_check(json.loads(policy.policy_family_definition_overrides)):
@@ -352,8 +353,9 @@ class ClustersCrawler(CrawlerBase):
             # Checking if Azure cluster config is present in cluster policies
             if cluster.policy_id:
                 policy = self._ws.cluster_policies.get(cluster.policy_id)
-                if _azure_sp_conf_present_check(json.loads(policy.definition)):
-                    failures.append(f"{_AZURE_SP_CONF_FAILURE_MSG} cluster.")
+                if policy.definition:
+                    if _azure_sp_conf_present_check(json.loads(policy.definition)):
+                        failures.append(f"{_AZURE_SP_CONF_FAILURE_MSG} cluster.")
                 if policy.policy_family_definition_overrides:
                     if _azure_sp_conf_present_check(json.loads(policy.policy_family_definition_overrides)):
                         failures.append(f"{_AZURE_SP_CONF_FAILURE_MSG} cluster.")
@@ -427,8 +429,9 @@ class JobsCrawler(CrawlerBase):
             # Checking if Azure cluster config is present in cluster policies
             if cluster_config.policy_id:
                 policy = self._ws.cluster_policies.get(cluster_config.policy_id)
-                if _azure_sp_conf_present_check(json.loads(policy.definition)):
-                    job_assessment[job.job_id].add(f"{_AZURE_SP_CONF_FAILURE_MSG} Job cluster.")
+                if policy.definition:
+                    if _azure_sp_conf_present_check(json.loads(policy.definition)):
+                        job_assessment[job.job_id].add(f"{_AZURE_SP_CONF_FAILURE_MSG} Job cluster.")
                 if policy.policy_family_definition_overrides:
                     if _azure_sp_conf_present_check(json.loads(policy.policy_family_definition_overrides)):
                         job_assessment[job.job_id].add(f"{_AZURE_SP_CONF_FAILURE_MSG} Job cluster.")

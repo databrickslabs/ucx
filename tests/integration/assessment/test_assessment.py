@@ -1,7 +1,7 @@
 # def test_table_inventory(ws, make_catalog, make_schema):
 #     pytest.skip("test is broken")
 
-import pytest
+
 from databricks.labs.ucx.mixins.compute import CommandExecutor
 
 
@@ -29,7 +29,7 @@ def test_pipeline_crawler(ws, wsfs_wheel, make_schema, sql_fetch_all):
     pipelines = sql_fetch_all(f"SELECT * FROM hive_metastore.{inventory_database}.pipelines")
     results = []
     for pipeline in pipelines:
-        if pipeline['success'] != 0:
+        if pipeline["success"] != 0:
             continue
         results.append(pipeline)
 
@@ -62,7 +62,7 @@ def test_cluster_crawler(ws, wsfs_wheel, make_schema, sql_fetch_all):
     clusters = sql_fetch_all(f"SELECT * FROM hive_metastore.{inventory_database}.clusters")
     results = []
     for cluster in clusters:
-        if cluster['success'] != 0:
+        if cluster["success"] != 0:
             continue
         results.append(cluster)
 

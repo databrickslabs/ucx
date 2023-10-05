@@ -1874,9 +1874,8 @@ def test_azure_service_principal_info_policy_family(mocker):
             spark_version="9.3.x-cpu-ml-scala2.12",
             cluster_id="0810-225833-atlanta69",
             cluster_name="Tech Summit FY24 Cluster-1",
-            spark_conf={
-                "spark.hadoop.fs.azure.account.oauth2.client.id.abcde.dfs.core.windows.net": "",
-            },
+            spark_conf={"spark.hadoop.fs.azure.account.oauth2.client.id.abcde.dfs.core.windows.net": ""},
+            policy_id="D96308F1BF0003A9",
         )
     ]
     sample_pipelines = [
@@ -1949,6 +1948,7 @@ def test_azure_service_principal_info_policy_family(mocker):
     config_dict = {}
     ws.pipelines.get().spec.configuration = config_dict
     ws.jobs.list.return_value = sample_jobs
+    ws.cluster_policies.get().definition = json.dumps({})
     ws.cluster_policies.get().policy_family_definition_overrides = json.dumps(
         {
             "spark_conf.fs.azure.account.auth.type": {"type": "fixed", "value": "OAuth", "hidden": "true"},
@@ -1969,7 +1969,7 @@ def test_azure_service_principal_info_policy_family(mocker):
             },
             "spark_conf.fs.azure.account.oauth2.client.endpoint": {
                 "type": "fixed",
-                "value": "https://login.microsoftonline.com/1234ededed/oauth2/token",
+                "value": "https://login.microsoftonline.com/dummy_tenant_id/oauth2/token",
                 "hidden": "true",
             },
         }
@@ -1979,3 +1979,4 @@ def test_azure_service_principal_info_policy_family(mocker):
 
     assert len(spn_crawler) == 1
     assert spn_crawler[0].application_id == "dummy_appl_id"
+    assert spn_crawler[0].tenant_id == "dummy_tenant_id"
