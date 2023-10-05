@@ -1,11 +1,11 @@
 # def test_table_inventory(ws, make_catalog, make_schema):
 #     pytest.skip("test is broken")
 
-
+import pytest
 from databricks.labs.ucx.mixins.compute import CommandExecutor
 
 
-# @pytest.mark.skip(reason="Needs to have DLT Pipelines already created ")
+@pytest.mark.skip(reason="Needs to have DLT Pipelines already created ")
 def test_pipeline_crawler(ws, wsfs_wheel, make_schema, sql_fetch_all):
     _, inventory_database = make_schema(catalog="hive_metastore", schema="ucx_dk").split(".")
     commands = CommandExecutor(ws)
@@ -38,6 +38,13 @@ def test_pipeline_crawler(ws, wsfs_wheel, make_schema, sql_fetch_all):
     assert results[0].pipeline_name == "ucx-test-pipeline"
     assert results[0].creator_name == "dipankar.kushari@databricks.com"
 
+# Cluster config setup -
+# fs.azure.account.auth.type.storage_acct_1.dfs.core.windows.net OAuth
+# fs.azure.account.oauth.provider.type.storage_acct_1.dfs.core.windows.net org.apache.hadoop.fs.azurebfs.oauth2.ClientCredsTokenProvider
+# fs.azure.account.oauth2.client.id.storage_acct_1.dfs.core.windows.net dummy_application_id
+# fs.azure.account.oauth2.client.secret.storage_acct_1.dfs.core.windows.net ddddddddddddddddddd
+# fs.azure.account.oauth2.client.endpoint.storage_acct_1.dfs.core.windows.net https://login.microsoftonline.com/dummy_tenant_id/oauth2/token
+
 
 def test_cluster_crawler(ws, wsfs_wheel, make_schema, sql_fetch_all):
     _, inventory_database = make_schema(catalog="hive_metastore", schema="ucx_dk").split(".")
@@ -67,7 +74,7 @@ def test_cluster_crawler(ws, wsfs_wheel, make_schema, sql_fetch_all):
         results.append(cluster)
 
     assert len(results) > 0
-    assert results[0].cluster_id == "1005-055227-lnfw00g5"
+    assert results[0].cluster_id == "1005-133624-c9lbpv58"
     assert results[0].cluster_name == "Dipankar Kushari's Cluster"
     assert results[0].creator == "dipankar.kushari@databricks.com"
 
@@ -100,6 +107,6 @@ def test_cluster_crawler(ws, wsfs_wheel, make_schema, sql_fetch_all):
 #         results.append(spn)
 #
 #     assert len(results) > 0
-#     # assert results[0].cluster_id == "1005-055227-lnfw00g5"
-#     # assert results[0].cluster_name == "Dipankar Kushari's Cluster"
-#     # assert results[0].creator == "dipankar.kushari@databricks.com"
+    # assert results[0].cluster_id == "1005-055227-lnfw00g5"
+    # assert results[0].cluster_name == "Dipankar Kushari's Cluster"
+    # assert results[0].creator == "dipankar.kushari@databricks.com"
