@@ -383,7 +383,7 @@ class ClustersCrawler(CrawlerBase):
 
 class JobsCrawler(CrawlerBase):
     def __init__(self, ws: WorkspaceClient, sbe: SqlBackend, schema):
-        super().__init__(sbe, "hive_metastore", schema, "jobs", JobInfo)
+        super().__init__(sbe, "hive_metastore", schema, "jobs", JobInfo, dataclasses.dataclass)
         self._ws = ws
 
     @staticmethod
