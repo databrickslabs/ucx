@@ -233,7 +233,7 @@ class DashboardFromFiles:
         self._state[query.viz_key] = viz.id
 
     def _get_viz_options(self, query: SimpleQuery):
-        viz_types = {"table": self._table_viz_args, "counter": self._counter_viz_args}
+        viz_types = {"table": self._table_viz_args, "counter": self._counter_viz_args, "chart": self._chart_viz_args}
         if query.viz_type not in viz_types:
             msg = f"{query.query}: unknown viz type: {query.viz_type}"
             raise SyntaxError(msg)
@@ -306,6 +306,73 @@ class DashboardFromFiles:
                 "tooltipFormat": tooltip_format,
                 "countRow": count_row,
             },
+        }
+
+    @staticmethod
+    def _chart_viz_args(
+        name: str,
+        series_type: str = "pie",
+        *,
+        description: str | None = None,
+        sort_x: bool = True,
+        sort_y: bool = True,
+        legend_traceorder: str = "normal",
+        align_y_axes_at_zero: bool = True,
+        error_y_type: str = "data",
+        error_y_visible: bool = True,
+        series_stacking: str | None = None,
+        series_error_y_type: str = "data",
+        series_error_y_visible: bool = True,
+        values_options: dict | None = None,
+        direction_type: str = "counterclockwise",
+        size_mode: str = "diameter",
+        coefficient: int = 1,
+        number_format: str = "0,0[.]00000",
+        percent_format: str = "0[.]00%",
+        text_format: str = "",
+        missing_values_as_zero: bool = True,
+        use_aggregations_ui: bool = True,
+        swapped_axes: bool = False,
+        date_time_format: str = "YYYY-MM-DD HH:mm:ss.SSS",
+        show_data_labels: bool = True,
+        column_x: str | None = None,
+        column_y: str | None = None,
+        is_aggregation_on: bool = False,
+    ) -> dict:
+        return {
+            "type": "CHART",
+            "name": name,
+            "description": description,
+            "options": {
+                "globalSeriesType": series_type,
+                "sortX": sort_x,
+                "sortY": sort_y,
+                "legend": {"traceorder": legend_traceorder},
+                "alignYAxesAtZero": align_y_axes_at_zero,
+                "error_y": {"type": error_y_type, "visible": error_y_visible},
+                "series": {
+                    "stacking": series_stacking,
+                    "error_y": {"type": series_error_y_type, "visible": series_error_y_visible},
+                },
+                "valuesOptions": values_options,
+                "direction": {"type": direction_type},
+                "sizemode": size_mode,
+                "coefficient": coefficient,
+                "numberFormat": number_format,
+                "percentFormat": percent_format,
+                "textFormat": text_format,
+                "missingValuesAsZero": missing_values_as_zero,
+                "useAggregationsUi": use_aggregations_ui,
+                "swappedAxes": swapped_axes,
+                "dateTimeFormat": date_time_format,
+                "showDataLabels": show_data_labels,
+                "columnConfigurationMap": {
+                    "x": {"column": column_x},
+                    "y": [{"column": column_y, "transform": "COUNT"}],
+                },
+                "isAggregationOn": is_aggregation_on,
+            },
+            # "query_plan": {"selects": [{"column": "database"}, {"column": "delta_tables"}]},
         }
 
     @staticmethod
