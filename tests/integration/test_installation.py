@@ -73,13 +73,17 @@ def test_jobs_with_no_inventory_database(
     )
     logger.info(f"cluster_policy={cluster_policy}, job={job}, ")
 
+    backup_group_prefix = "db-temp-"
     inventory_database = f"ucx_{make_random(4)}"
     install = WorkspaceInstaller.run_for_config(
         ws,
         WorkspaceConfig(
             inventory_database=inventory_database,
             instance_pool_id=os.environ["TEST_INSTANCE_POOL_ID"],
-            groups=GroupsConfig(selected=[ws_group_a.display_name, ws_group_b.display_name, ws_group_c.display_name]),
+            groups=GroupsConfig(
+                selected=[ws_group_a.display_name, ws_group_b.display_name, ws_group_c.display_name],
+                backup_group_prefix=backup_group_prefix,
+            ),
             log_level="DEBUG",
         ),
         prefix=make_random(4),
@@ -106,6 +110,29 @@ def test_jobs_with_no_inventory_database(
         assert (
             ws_group_c.id != dst_ws_group_c.id
         ), f"Group id for target group {ws_group_c.display_name} should differ from group id of source group"
+
+        logger.info("validating clean up of backup groups")
+
+        backup_ws_group_a_iter = ws.groups.list(
+            filter=f"displayName eq { backup_group_prefix + ws_group_a.display_name}"
+        )
+        assert all(
+            False for _ in backup_ws_group_a_iter
+        ), f"Backup group {backup_group_prefix + ws_group_a.display_name} was not deleted"
+
+        backup_ws_group_b_iter = ws.groups.list(
+            filter=f"displayName eq { backup_group_prefix + ws_group_b.display_name}"
+        )
+        assert all(
+            False for _ in backup_ws_group_b_iter
+        ), f"Backup group {backup_group_prefix + ws_group_b.display_name} was not deleted"
+
+        backup_ws_group_c_iter = ws.groups.list(
+            filter=f"displayName eq { backup_group_prefix + ws_group_c.display_name}"
+        )
+        assert all(
+            False for _ in backup_ws_group_c_iter
+        ), f"Backup group {backup_group_prefix + ws_group_c.display_name} was not deleted"
 
         logger.info("validating group members")
 
