@@ -5,6 +5,8 @@ from dataclasses import dataclass
 from functools import partial
 
 from databricks.sdk import WorkspaceClient
+from databricks.sdk.core import DatabricksError
+from databricks.sdk.retries import retried
 from databricks.sdk.service import iam
 from databricks.sdk.service.iam import Group
 
@@ -59,19 +61,19 @@ class GroupManager:
         self._workspace_groups = self._list_workspace_groups()
 
     def _list_workspace_groups(self) -> list[iam.Group]:
-        logger.debug("Listing workspace groups...")
+        logger.info("Listing workspace groups...")
         workspace_groups = [
             g
             for g in self._ws.groups.list(attributes=self.SCIM_ATTRIBUTES)
             if g.meta.resource_type == "WorkspaceGroup" and g.display_name not in self.SYSTEM_GROUPS
         ]
-        logger.debug(f"Found {len(workspace_groups)} workspace groups")
+        logger.info(f"Found {len(workspace_groups)} workspace groups")
         return sorted(workspace_groups, key=lambda _: _.display_name)
 
     def _list_account_groups(self) -> list[iam.Group]:
         # TODO: we should avoid using this method, as it's not documented
         # get account-level groups even if they're not (yet) assigned to a workspace
-        logger.debug("Listing account groups...")
+        logger.info("Listing account groups...")
         account_groups = [
             iam.Group.from_dict(r)
             for r in self._ws.api_client.do(
@@ -81,7 +83,7 @@ class GroupManager:
             ).get("Resources", [])
         ]
         account_groups = [g for g in account_groups if g.display_name not in self.SYSTEM_GROUPS]
-        logger.debug(f"Found {len(account_groups)} account groups")
+        logger.info(f"Found {len(account_groups)} account groups")
         return sorted(account_groups, key=lambda _: _.display_name)
 
     def _get_group(self, group_name, level: GroupLevel) -> iam.Group | None:
@@ -90,6 +92,8 @@ class GroupManager:
             if group.display_name == group_name:
                 return group
 
+    @retried(on=[DatabricksError])
+    @rate_limited(max_requests=5)
     def _get_or_create_backup_group(self, source_group_name: str, source_group: iam.Group) -> iam.Group:
         backup_group_name = f"{self.config.backup_group_prefix}{source_group_name}"
         backup_group = self._get_group(backup_group_name, "workspace")
@@ -131,17 +135,24 @@ class GroupManager:
     def _replace_group(self, migration_info: MigrationGroupInfo):
         ws_group = migration_info.workspace
 
-        logger.info(f"Deleting the workspace-level group {ws_group.display_name} with id {ws_group.id}")
-        self._ws.groups.delete(ws_group.id)
+        self._delete_workspace_group(ws_group)
 
         # delete ws_group from the list of workspace groups
         self._workspace_groups = [g for g in self._workspace_groups if g.id != ws_group.id]
 
-        logger.info(f"Workspace-level group {ws_group.display_name} with id {ws_group.id} was deleted")
-
         self._reflect_account_group_to_workspace(migration_info.account)
 
-    @rate_limited(max_requests=5)  # assumption
+    @retried(on=[DatabricksError])
+    @rate_limited(max_requests=5)
+    def _delete_workspace_group(self, ws_group: iam.Group) -> None:
+        logger.info(f"Deleting the workspace-level group {ws_group.display_name} with id {ws_group.id}")
+
+        self._ws.groups.delete(id=ws_group.id)
+
+        logger.info(f"Workspace-level group {ws_group.display_name} with id {ws_group.id} was deleted")
+
+    @retried(on=[DatabricksError])
+    @rate_limited(max_requests=10)
     def _reflect_account_group_to_workspace(self, acc_group: iam.Group) -> None:
         logger.info(f"Reflecting group {acc_group.display_name} to workspace")
 
@@ -153,6 +164,24 @@ class GroupManager:
 
         logger.info(f"Group {acc_group.display_name} successfully reflected to workspace")
 
+    def _get_backup_groups(self) -> list[iam.Group]:
+        if self.config.selected:
+            ac_group_names = {_.display_name for _ in self._account_groups if _.display_name in self.config.selected}
+        else:
+            ac_group_names = {_.display_name for _ in self._account_groups}
+
+        backup_groups = [
+            g
+            for g in self._workspace_groups
+            if g.display_name.startswith(self.config.backup_group_prefix)
+            # backup groups are only created for workspace groups that have corresponding account group
+            and g.display_name.removeprefix(self.config.backup_group_prefix) in ac_group_names
+        ]
+
+        logger.info(f"Found {len(backup_groups)} backup groups")
+
+        return backup_groups
+
     # please keep the public methods below this line
 
     def prepare_groups_in_environment(self):
@@ -161,33 +190,51 @@ class GroupManager:
             "exist and are of the correct type. If some temporary groups are missing, they'll be created"
         )
         group_names = self.config.selected
+        valid_group_names = []
         if group_names:
             logger.info("Using the provided group listing")
 
             for g in group_names:
-                assert g not in self.SYSTEM_GROUPS, f"Cannot migrate system group {g}"
-                assert self._get_group(g, "workspace"), f"Group {g} not found on the workspace level"
-                assert self._get_group(g, "account"), f"Group {g} not found on the account level"
-
-        if not group_names:
+                if g in self.SYSTEM_GROUPS:
+                    logger.info(f"Cannot migrate system group {g}. {g} will be skipped.")
+                    continue
+                if not self._get_group(g, "workspace"):
+                    logger.info(f"Group {g} not found on the workspace level. {g} will be skipped.")
+                    continue
+                if not self._get_group(g, "account"):
+                    logger.info(
+                        f"Group {g} not found on the account level. {g} will be skipped. You can add {g} "
+                        f"to the account and rerun the job."
+                    )
+                    continue
+                valid_group_names.append(g)
+        else:
             logger.info(
                 "No group listing provided, all available workspace-level groups that have an account-level "
                 "group with the same name will be used"
             )
             ws_group_names = {_.display_name for _ in self._workspace_groups}
             ac_group_names = {_.display_name for _ in self._account_groups}
-            group_names = list(ws_group_names.intersection(ac_group_names))
+            valid_group_names = list(ws_group_names.intersection(ac_group_names))
+            logger.info(f"Found {len(valid_group_names)} workspace groups that have corresponding account groups")
 
-        self._set_migration_groups(group_names)
+        self._set_migration_groups(valid_group_names)
         logger.info("Environment prepared successfully")
+
+    def has_groups(self) -> bool:
+        return len(self._migration_state.groups) > 0
 
     @property
     def migration_groups_provider(self) -> GroupMigrationState:
-        assert len(self._migration_state.groups) > 0, "Migration groups were not loaded or initialized"
+        if len(self._migration_state.groups) == 0:
+            logger.info("No groups were loaded or initialized, nothing to do")
         return self._migration_state
 
     def replace_workspace_groups_with_account_groups(self):
         logger.info("Replacing the workspace groups with account-level groups")
+        if len(self._migration_state.groups) == 0:
+            logger.info("No groups were loaded or initialized, nothing to do")
+            return
         ThreadedExecution.gather(
             "groups: workspace -> account",
             [partial(self._replace_group, migration_info) for migration_info in self.migration_groups_provider.groups],
@@ -195,19 +242,17 @@ class GroupManager:
         logger.info("Workspace groups were successfully replaced with account-level groups")
 
     def delete_backup_groups(self):
+        backup_groups = self._get_backup_groups()
+
+        if len(backup_groups) == 0:
+            logger.info("No backup group found, nothing to do")
+            return
+
         logger.info(
-            f"Deleting the workspace-level backup groups. "
-            f"In total, {len(self.migration_groups_provider.groups)} group(s) to be deleted"
+            f"Deleting the workspace-level backup groups. In total, {len(backup_groups)} group(s) to be deleted"
         )
 
-        for migration_info in self.migration_groups_provider.groups:
-            try:
-                self._ws.groups.delete(id=migration_info.backup.id)
-            except Exception as e:
-                logger.warning(
-                    f"Failed to delete backup group {migration_info.backup.display_name} "
-                    f"with id {migration_info.backup.id}"
-                )
-                logger.warning(f"Original exception {e}")
+        for group in backup_groups:
+            self._delete_workspace_group(group)
 
         logger.info("Backup groups were successfully deleted")

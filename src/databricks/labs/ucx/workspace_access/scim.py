@@ -2,6 +2,8 @@ import json
 from functools import partial
 
 from databricks.sdk import WorkspaceClient
+from databricks.sdk.core import DatabricksError
+from databricks.sdk.retries import retried
 from databricks.sdk.service import iam
 
 from databricks.labs.ucx.mixins.hardening import rate_limited
@@ -22,13 +24,18 @@ class ScimSupport(Crawler, Applier):
         return any(g.workspace.id == item.object_id for g in migration_state.groups)
 
     def get_crawler_tasks(self):
-        groups = self._ws.groups.list(attributes="id,displayName,roles,entitlements")
+        groups = self._get_groups()
         with_roles = [g for g in groups if g.roles and len(g.roles) > 0]
         with_entitlements = [g for g in groups if g.entitlements and len(g.entitlements) > 0]
         for g in with_roles:
             yield partial(self._crawler_task, g, "roles")
         for g in with_entitlements:
             yield partial(self._crawler_task, g, "entitlements")
+
+    # TODO remove after ES-892977 is fixed
+    @retried(on=[DatabricksError])
+    def _get_groups(self):
+        return self._ws.groups.list(attributes="id,displayName,roles,entitlements")
 
     def _get_apply_task(self, item: Permissions, migration_state: GroupMigrationState, destination: Destination):
         value = [iam.ComplexValue.from_dict(e) for e in json.loads(item.raw)]

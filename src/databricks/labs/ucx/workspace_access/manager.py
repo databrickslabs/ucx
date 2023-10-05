@@ -15,7 +15,7 @@ class PermissionManager(CrawlerBase):
     def __init__(
         self, backend: SqlBackend, inventory_database: str, crawlers: list[Crawler], appliers: dict[str, Applier]
     ):
-        super().__init__(backend, "hive_metastore", inventory_database, "permissions")
+        super().__init__(backend, "hive_metastore", inventory_database, "permissions", Permissions)
         self._crawlers = crawlers
         self._appliers = appliers
 
@@ -38,6 +38,9 @@ class PermissionManager(CrawlerBase):
 
     def apply_group_permissions(self, migration_state: GroupMigrationState, destination: Literal["backup", "account"]):
         # list shall be sorted prior to using group by
+        if len(migration_state.groups) == 0:
+            logger.info("No valid groups selected, nothing to do.")
+            return
         items = sorted(self._load_all(), key=lambda i: i.object_type)
         logger.info(
             f"Applying the permissions to {destination} groups. "

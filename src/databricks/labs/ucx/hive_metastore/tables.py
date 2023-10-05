@@ -1,4 +1,6 @@
 import logging
+import re
+import string
 from collections.abc import Iterator
 from dataclasses import dataclass
 from functools import partial
@@ -22,6 +24,7 @@ class Table:
 
     location: str = None
     view_text: str = None
+    upgraded_to: str = None
 
     @property
     def is_delta(self) -> bool:
@@ -79,7 +82,7 @@ class TablesCrawler(CrawlerBase):
             backend (SqlBackend): The SQL Execution Backend abstraction (either REST API or Spark)
             schema: The schema name for the inventory persistence.
         """
-        super().__init__(backend, "hive_metastore", schema, "tables")
+        super().__init__(backend, "hive_metastore", schema, "tables", Table)
 
     def _all_databases(self) -> Iterator[Row]:
         yield from self._fetch("SHOW DATABASES")
@@ -92,6 +95,13 @@ class TablesCrawler(CrawlerBase):
             list[Table]: A list of Table objects representing the snapshot of tables.
         """
         return self._snapshot(partial(self._try_load), partial(self._crawl))
+
+    @staticmethod
+    def _parse_table_props(tbl_props: string) -> {}:
+        pattern = r"([^,\[\]]+)=([^,\[\]]+)"
+        key_value_pairs = re.findall(pattern, tbl_props)
+        # Convert key-value pairs to dictionary
+        return dict(key_value_pairs)
 
     def _try_load(self):
         """Tries to load table information from the database or throws TABLE_OR_VIEW_NOT_FOUND error"""
@@ -140,6 +150,7 @@ class TablesCrawler(CrawlerBase):
                 table_format=describe.get("Provider", "").upper(),
                 location=describe.get("Location", None),
                 view_text=describe.get("View Text", None),
+                upgraded_to=self._parse_table_props(describe.get("Table Properties", "")).get("upgraded_to", None),
             )
         except Exception as e:
             logger.error(f"Couldn't fetch information for table {full_name} : {e}")
@@ -152,17 +163,15 @@ class TablesMigrate:
         tc: TablesCrawler,
         ws: WorkspaceClient,
         backend: SqlBackend,
-        inventory_database: str,
         default_catalog=None,
         database_to_catalog_mapping: dict[str, str] | None = None,
     ):
         self._tc = tc
         self._backend = backend
         self._ws = ws
-        self._inventory_database = inventory_database
         self._database_to_catalog_mapping = database_to_catalog_mapping
-        self._seen_tables = {}
         self._default_catalog = self._init_default_catalog(default_catalog)
+        self._seen_tables = {}
 
     @staticmethod
     def _init_default_catalog(default_catalog):
@@ -172,6 +181,7 @@ class TablesMigrate:
             return "ucx_default"  # TODO : Fetch current workspace name and append it to the default catalog.
 
     def migrate_tables(self):
+        self._init_seen_tables()
         tasks = []
         for table in self._tc.snapshot():
             target_catalog = self._default_catalog
@@ -184,12 +194,26 @@ class TablesMigrate:
         try:
             sql = table.uc_create_sql(target_catalog)
             logger.debug(f"Migrating table {table.key} to using SQL query: {sql}")
+            target = f"{target_catalog}.{table.database}.{table.name}".lower()
 
-            if table.object_type == "MANAGED":
+            if self._table_already_upgraded(target):
+                logger.info(f"Table {table.key} already upgraded to {self._seen_tables[target]}")
+            elif table.object_type == "MANAGED":
                 self._backend.execute(sql)
                 self._backend.execute(table.sql_alter_to(target_catalog))
                 self._backend.execute(table.sql_alter_from(target_catalog))
+                self._seen_tables[target] = table.key
             else:
                 logger.info(f"Table {table.key} is a {table.object_type} and is not supported for migration yet ")
         except Exception as e:
             logger.error(f"Could not create table {table.name} because: {e}")
+
+    def _init_seen_tables(self):
+        for catalog in self._ws.catalogs.list():
+            for schema in self._ws.schemas.list(catalog_name=catalog.name):
+                for table in self._ws.tables.list(catalog_name=catalog.name, schema_name=schema.name):
+                    if table.properties is not None and "upgraded_from" in table.properties:
+                        self._seen_tables[table.full_name.lower()] = table.properties["upgraded_from"].lower()
+
+    def _table_already_upgraded(self, target) -> bool:
+        return target in self._seen_tables

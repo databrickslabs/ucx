@@ -1,5 +1,39 @@
 # Version changelog
 
+## 0.3.0
+
+* Added `inventory_database` name check during installation ([#275](https://github.com/databricks/ucx/pull/275)).
+* Added a column to `$inventory.tables` to specify if a table might have been synchronised to Unity Catalog already or not ([#306](https://github.com/databricks/ucx/pull/306)).
+* Added a migration state to skip already migrated tables ([#325](https://github.com/databricks/ucx/pull/325)).
+* Fixed appending to tables by adding filtering of `None` rows ([#356](https://github.com/databricks/ucx/pull/356)).
+* Fixed handling of missing but linked cluster policies. ([#361](https://github.com/databricks/ucx/pull/361)).
+* Ignore errors for Redash widgets and queries redeployment during installation ([#367](https://github.com/databricks/ucx/pull/367)).
+* Remove exception and added proper logging for groups in the list that… ([#357](https://github.com/databricks/ucx/pull/357)).
+* Skip group migration when no groups are available after preparation step. ([#363](https://github.com/databricks/ucx/pull/363)).
+* Update databricks-sdk requirement from ~=0.9.0 to ~=0.10.0 ([#362](https://github.com/databricks/ucx/pull/362)).
+
+## 0.2.0
+
+* Added retrieving for all account-level groups with matching names to workspace-level groups in case no explicit configuration ([#277](https://github.com/databricks/ucx/pull/277)).
+* Added crawler for Azure Service principals used for direct storage access ([#305](https://github.com/databricks/ucx/pull/305)).
+* Added more SQL queries to the assessment step dashboard ([#269](https://github.com/databricks/ucx/pull/269)).
+* Added filtering out for job clusters in the clusters crawler ([#298](https://github.com/databricks/ucx/pull/298)).
+* Added recording errors from `crawl_tables` step in `$inventory.table_failures` table and display counter on the dashboard ([#300](https://github.com/databricks/ucx/pull/300)).
+* Added comprehensive introduction user manual ([#273](https://github.com/databricks/ucx/pull/273)).
+* Added interactive tutorial for local group migration readme ([#291](https://github.com/databricks/ucx/pull/291)).
+* Added tutorial links to the landing page of documentation ([#290](https://github.com/databricks/ucx/pull/290)).
+* Added (internal) support for account-level configuration and multi-cloud workspace list ([#264](https://github.com/databricks/ucx/pull/264)).
+* Improved order of tasks in the README notebook ([#286](https://github.com/databricks/ucx/pull/286)).
+* Improved installation script to run in a Windows Git Bash terminal ([#282](https://github.com/databricks/ucx/pull/282)).
+* Improved installation script by setting log level to uppercase by default ([#271](https://github.com/databricks/ucx/pull/271)).
+* Improved installation finish messages within installer script ([#267](https://github.com/databricks/ucx/pull/267)).
+* Improved automation for `MANAGED` table migration and continued building tables migration component ([#295](https://github.com/databricks/ucx/pull/295)).
+* Fixed debug notebook code with refactored package structure ([#250](https://github.com/databricks/ucx/pull/250)) ([#265](https://github.com/databricks/ucx/pull/265)).
+* Fixed replacement of custom configured database to replicate in the report for external locations ([#296](https://github.com/databricks/ucx/pull/296)).
+* Removed redundant `notebooks` top-level folder ([#263](https://github.com/databricks/ucx/pull/263)).
+* Split checking for test failures and linting errors into independent GitHub Actions checks ([#287](https://github.com/databricks/ucx/pull/287)).
+* Verify query metadata for assessment dashboards during unit tests ([#294](https://github.com/databricks/ucx/pull/294)).
+
 ## 0.1.1
 
 * Added batched iteration for `INSERT INTO` queries in `StatementExecutionBackend` with default `max_records_per_batch=1000` ([#237](https://github.com/databricks/ucx/pull/237)).

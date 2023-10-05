@@ -1,12 +1,16 @@
 import json
+import logging
 import re
 from dataclasses import dataclass
 
 from databricks.sdk import WorkspaceClient
+from databricks.sdk.core import DatabricksError
 from databricks.sdk.service.compute import ClusterSource
 from databricks.sdk.service.jobs import BaseJob
 
 from databricks.labs.ucx.framework.crawlers import CrawlerBase, SqlBackend
+
+logger = logging.getLogger(__name__)
 
 INCOMPATIBLE_SPARK_CONFIG_KEYS = [
     "spark.databricks.passthrough.enabled",
@@ -289,7 +293,7 @@ class AzureServicePrincipalCrawler(CrawlerBase):
 
 class PipelinesCrawler(CrawlerBase):
     def __init__(self, ws: WorkspaceClient, sbe: SqlBackend, schema):
-        super().__init__(sbe, "hive_metastore", schema, "pipelines")
+        super().__init__(sbe, "hive_metastore", schema, "pipelines", PipelineInfo)
         self._ws = ws
 
     def _crawl(self) -> list[PipelineInfo]:
@@ -320,7 +324,7 @@ class PipelinesCrawler(CrawlerBase):
 
 class ClustersCrawler(CrawlerBase):
     def __init__(self, ws: WorkspaceClient, sbe: SqlBackend, schema):
-        super().__init__(sbe, "hive_metastore", schema, "clusters")
+        super().__init__(sbe, "hive_metastore", schema, "clusters", ClusterInfo)
         self._ws = ws
 
     def _crawl(self) -> list[ClusterInfo]:
@@ -352,13 +356,16 @@ class ClustersCrawler(CrawlerBase):
 
             # Checking if Azure cluster config is present in cluster policies
             if cluster.policy_id:
-                policy = self._ws.cluster_policies.get(cluster.policy_id)
-                if policy.definition:
-                    if _azure_sp_conf_present_check(json.loads(policy.definition)):
-                        failures.append(f"{_AZURE_SP_CONF_FAILURE_MSG} cluster.")
-                if policy.policy_family_definition_overrides:
-                    if _azure_sp_conf_present_check(json.loads(policy.policy_family_definition_overrides)):
-                        failures.append(f"{_AZURE_SP_CONF_FAILURE_MSG} cluster.")
+                try:
+                    policy = self._ws.cluster_policies.get(cluster.policy_id)
+                    if policy.definition:
+                        if _azure_sp_conf_present_check(json.loads(policy.definition)):
+                            failures.append(f"{_AZURE_SP_CONF_FAILURE_MSG} cluster.")
+                    if policy.policy_family_definition_overrides:
+                        if _azure_sp_conf_present_check(json.loads(policy.policy_family_definition_overrides)):
+                            failures.append(f"{_AZURE_SP_CONF_FAILURE_MSG} cluster.")
+                except DatabricksError as err:
+                    logger.warning(f"Error retrieving cluster policy {cluster.policy_id}. Error: {err}")
 
             cluster_info.failures = json.dumps(failures)
             if len(failures) > 0:
@@ -375,10 +382,11 @@ class ClustersCrawler(CrawlerBase):
 
 class JobsCrawler(CrawlerBase):
     def __init__(self, ws: WorkspaceClient, sbe: SqlBackend, schema):
-        super().__init__(sbe, "hive_metastore", schema, "jobs")
+        super().__init__(sbe, "hive_metastore", schema, "jobs", JobInfo)
         self._ws = ws
 
-    def _get_cluster_configs_from_all_jobs(self, all_jobs, all_clusters_by_id):
+    @staticmethod
+    def _get_cluster_configs_from_all_jobs(all_jobs, all_clusters_by_id):
         for j in all_jobs:
             if j.settings.job_clusters is not None:
                 for jc in j.settings.job_clusters:
@@ -428,13 +436,16 @@ class JobsCrawler(CrawlerBase):
 
             # Checking if Azure cluster config is present in cluster policies
             if cluster_config.policy_id:
-                policy = self._ws.cluster_policies.get(cluster_config.policy_id)
-                if policy.definition:
-                    if _azure_sp_conf_present_check(json.loads(policy.definition)):
-                        job_assessment[job.job_id].add(f"{_AZURE_SP_CONF_FAILURE_MSG} Job cluster.")
-                if policy.policy_family_definition_overrides:
-                    if _azure_sp_conf_present_check(json.loads(policy.policy_family_definition_overrides)):
-                        job_assessment[job.job_id].add(f"{_AZURE_SP_CONF_FAILURE_MSG} Job cluster.")
+                try:
+                    policy = self._ws.cluster_policies.get(cluster_config.policy_id)
+                    if policy.definition:
+                        if _azure_sp_conf_present_check(json.loads(policy.definition)):
+                            job_assessment[job.job_id].add(f"{_AZURE_SP_CONF_FAILURE_MSG} Job cluster.")
+                    if policy.policy_family_definition_overrides:
+                        if _azure_sp_conf_present_check(json.loads(policy.policy_family_definition_overrides)):
+                            job_assessment[job.job_id].add(f"{_AZURE_SP_CONF_FAILURE_MSG} Job cluster.")
+                except DatabricksError as err:
+                    logger.warning(f"Error retrieving cluster policy {cluster_config.policy_id}. Error: {err}")
 
         for job_key in job_details.keys():
             job_details[job_key].failures = json.dumps(list(job_assessment[job_key]))

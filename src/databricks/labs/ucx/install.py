@@ -24,6 +24,7 @@ from databricks.labs.ucx.runtime import main
 
 TAG_STEP = "step"
 TAG_APP = "App"
+NUM_USER_ATTEMPTS = 10  # number of attempts user gets at answering a question
 
 DEBUG_NOTEBOOK = """
 # Databricks notebook source
@@ -166,6 +167,21 @@ class WorkspaceInstaller:
     def _name(self, name: str) -> str:
         return f"[{self._prefix.upper()}][{self._short_name}] {name}"
 
+    def _configure_inventory_database(self):
+        counter = 0
+        inventory_database = None
+        while True:
+            inventory_database = self._question("Inventory Database stored in hive_metastore", default="ucx")
+            if re.match(r"^\w+$", inventory_database):
+                break
+            else:
+                print(f"{inventory_database} is not a valid database name")
+                counter = counter + 1
+                if counter > NUM_USER_ATTEMPTS:
+                    msg = "Exceeded max tries to get a valid database name, try again later."
+                    raise SystemExit(msg)
+        return inventory_database
+
     def _configure(self):
         ws_file_url = self._notebook_link(self._config_file)
         try:
@@ -179,10 +195,13 @@ class WorkspaceInstaller:
                 raise err
 
         logger.info("Please answer a couple of questions to configure Unity Catalog migration")
-        inventory_database = self._question("Inventory Database", default="ucx")
+        inventory_database = self._configure_inventory_database()
+
+        def warehouse_type(_):
+            return _.warehouse_type.value if not _.enable_serverless_compute else "SERVERLESS"
 
         pro_warehouses = {"[Create new PRO SQL warehouse]": "create_new"} | {
-            f"{_.name} ({_.id}, {_.warehouse_type.value}, {_.state.value})": _.id
+            f"{_.name} ({_.id}, {warehouse_type(_)}, {_.state.value})": _.id
             for _ in self._ws.warehouses.list()
             if _.warehouse_type == EndpointInfoWarehouseType.PRO
         }
@@ -339,7 +358,7 @@ class WorkspaceInstaller:
     def _choice(self, text: str, choices: list[Any], *, max_attempts: int = 10) -> str:
         if not self._prompts:
             return "any"
-        choices = sorted(choices)
+        choices = sorted(choices, key=str.casefold)
         numbered = "\n".join(f"\033[1m[{i}]\033[0m \033[36m{v}\033[0m" for i, v in enumerate(choices))
         prompt = f"\033[1m{text}\033[0m\n{numbered}\nEnter a number between 0 and {len(choices)-1}: "
         attempt = 0
@@ -393,7 +412,7 @@ class WorkspaceInstaller:
         tasks = sorted([t for t in _TASKS.values() if t.workflow == step_name], key=lambda _: _.name)
         return {
             "name": self._name(step_name),
-            "tags": {TAG_APP: self._app, TAG_STEP: step_name},
+            "tags": {TAG_APP: self._app, TAG_STEP: step_name, "version": f"v{__version__}"},
             "job_clusters": self._job_clusters({t.job_cluster for t in tasks}),
             "email_notifications": email_notifications,
             "tasks": [self._job_task(task, dbfs_path) for task in tasks],
