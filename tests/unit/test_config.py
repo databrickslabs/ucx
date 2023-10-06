@@ -44,6 +44,8 @@ def test_reader(tmp_path: Path):
             WorkspaceConfig,
             inventory_database="abc",
             groups=GroupsConfig(auto=True),
+            database_to_catalog_mapping={"db1": "cat1", "db2": "cat2"},
+            spark_conf={"key1": "val1", "key2": "val2"}
         )
 
         config: WorkspaceConfig = mc()

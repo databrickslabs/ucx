@@ -2,7 +2,7 @@ import dataclasses
 from abc import abstractmethod
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Any, Generic, TypeVar, Dict
+from typing import Any, Generic, TypeVar
 
 from databricks.sdk import AccountClient, WorkspaceClient
 from databricks.sdk.core import Config
@@ -210,7 +210,7 @@ class WorkspaceConfig(_Config["WorkspaceConfig"]):
     # Starting path for notebooks and directories crawler
     workspace_start_path: str = "/"
     instance_profile: str = None
-    spark_conf: Dict[str, str] = dataclasses.field(default_factory=lambda: ({}))
+    spark_conf: dict[str, str] = None
 
     @classmethod
     def from_dict(cls, raw: dict):
@@ -225,7 +225,7 @@ class WorkspaceConfig(_Config["WorkspaceConfig"]):
             log_level=raw.get("log_level", "INFO"),
             database_to_catalog_mapping=raw.get("database_to_catalog_mapping", None),
             instance_profile=raw.get("instance_profile", None),
-            spark_conf=raw.get("spark_config", {}),
+            spark_conf=raw.get("spark_conf", None),
             default_catalog=raw.get("default_catalog", "main"),
             workspace_start_path=raw.get("workspace_start_path", "/"),
         )
