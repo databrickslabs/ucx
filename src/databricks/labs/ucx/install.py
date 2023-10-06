@@ -96,6 +96,7 @@ class WorkspaceInstaller:
         self._this_file = Path(__file__)
         self._override_clusters = None
         self._dashboards = {}
+        self._instance_profile = None
 
     def run(self):
         logger.info(f"Installing UCX v{self._version}")
@@ -285,12 +286,35 @@ class WorkspaceInstaller:
             groups_config_args["selected"] = [x.strip() for x in selected_groups.split(",")]
         else:
             groups_config_args["auto"] = True
+
+        instance_profile = None
+        spark_conf_list = []
+        # Options for external metastore
+        if (
+            self._prompts
+            and self._question("Do you need to configure an external Hive Metastore (Glue)", default="no") == "yes"
+        ):
+            logger.info("Setting up an external metastore")
+            instance_profiles = self._instance_profiles()
+            instance_profile = ""
+            if len(instance_profiles) > 1:
+                instance_profile = self._choice_from_dict("Select Instance Profile from List", instance_profiles)
+
+            spark_conf = self._question(
+                "Please enter a comma-separated list of spark config options.",
+                default="",
+            )
+            if spark_conf != "":
+                spark_conf_list = [x.strip() for x in spark_conf.split(",")]
+
         self._config = WorkspaceConfig(
             inventory_database=inventory_database,
             groups=GroupsConfig(**groups_config_args),
             warehouse_id=warehouse_id,
             log_level=log_level,
             num_threads=num_threads,
+            instance_profile=instance_profile,
+            spark_config=spark_conf_list,
         )
 
         self._write_config()
@@ -563,15 +587,24 @@ class WorkspaceInstaller:
 
     def _job_clusters(self, names: set[str]):
         clusters = []
+        spark_conf = {"spark.databricks.cluster.profile": "singleNode", "spark.master": "local[*]"}
+        for conf in self._config.spark_conf:
+            sp_conf = conf.split(" ")
+            if len(sp_conf) > 1:
+                continue
+            spark_conf[sp_conf[0]] = sp_conf[1]
         spec = self._cluster_node_type(
             compute.ClusterSpec(
                 spark_version=self._ws.clusters.select_spark_version(latest=True),
                 data_security_mode=compute.DataSecurityMode.NONE,
-                spark_conf={"spark.databricks.cluster.profile": "singleNode", "spark.master": "local[*]"},
+                spark_conf=spark_conf,
                 custom_tags={"ResourceClass": "SingleNode"},
                 num_workers=0,
             )
         )
+        if self._ws.config.is_aws:
+            aws_attributes = replace(spec.aws_attributes, instance_profile_arn=self._config.instance_profile)
+            spec = replace(spec, aws_attributes=aws_attributes)
         if "main" in names:
             clusters.append(
                 jobs.JobCluster(
@@ -696,6 +729,11 @@ class WorkspaceInstaller:
                 continue
             deployed_steps[tags.get(TAG_STEP, "_")] = j.job_id
         return deployed_steps
+
+    def _instance_profiles(self):
+        return {"No Instance Profile": None} | {
+            profile.instance_profile_arn: profile.instance_profile_arn for profile in self._ws.instance_profiles.list()
+        }
 
 
 if __name__ == "__main__":
