@@ -16,6 +16,11 @@ logging.getLogger("databricks.labs.ucx").setLevel("DEBUG")
 logger = logging.getLogger(__name__)
 
 
+@pytest.fixture
+def debug_env_name():
+    return "ucws"
+
+
 def account_host(self: databricks.sdk.core.Config) -> str:
     if self.is_azure:
         return "https://accounts.azuredatabricks.net"
@@ -32,9 +37,9 @@ def product_info():
     return "ucx", __version__
 
 
-@pytest.fixture(scope="session")
+@pytest.fixture
 def acc(ws) -> AccountClient:
-    # TODO: move to SDK
+    # TODO: https://github.com/databricks/databricks-sdk-py/pull/390
     def account_host(cfg: Config) -> str:
         if cfg.is_azure:
             return "https://accounts.azuredatabricks.net"

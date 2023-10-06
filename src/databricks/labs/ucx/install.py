@@ -70,6 +70,7 @@ class WorkspaceInstaller:
         self._prefix = prefix
         self._prompts = promtps
         self._this_file = Path(__file__)
+        self._override_clusters = None
         self._dashboards = {}
 
     def run(self):
@@ -85,11 +86,14 @@ class WorkspaceInstaller:
         logger.info(msg)
 
     @staticmethod
-    def run_for_config(ws: WorkspaceClient, config: WorkspaceConfig, *, prefix="ucx") -> "WorkspaceInstaller":
+    def run_for_config(
+        ws: WorkspaceClient, config: WorkspaceConfig, *, prefix="ucx", override_clusters: dict[str, str] | None = None
+    ) -> "WorkspaceInstaller":
         logger.info(f"Installing UCX v{__version__} on {ws.config.host}")
         workspace_installer = WorkspaceInstaller(ws, prefix=prefix, promtps=False)
         workspace_installer._config = config
         workspace_installer._write_config()
+        workspace_installer._override_clusters = override_clusters
         # TODO: rather introduce a method `is_configured`, as we may want to reconfigure workspaces for some reason
         workspace_installer._run_configured()
         return workspace_installer
@@ -266,6 +270,8 @@ class WorkspaceInstaller:
         desired_steps = {t.workflow for t in _TASKS.values()}
         for step_name in desired_steps:
             settings = self._job_settings(step_name, remote_wheel)
+            if self._override_clusters:
+                settings = self._apply_cluster_overrides(settings, self._override_clusters)
             if step_name in self._deployed_steps:
                 job_id = self._deployed_steps[step_name]
                 logger.info(f"Updating configuration for step={step_name} job_id={job_id}")
@@ -417,6 +423,17 @@ class WorkspaceInstaller:
             "email_notifications": email_notifications,
             "tasks": [self._job_task(task, dbfs_path) for task in tasks],
         }
+
+    @staticmethod
+    def _apply_cluster_overrides(settings: dict[str, any], overrides: dict[str, str]) -> dict:
+        settings["job_clusters"] = [_ for _ in settings["job_clusters"] if _.job_cluster_key not in overrides]
+        for job_task in settings["tasks"]:
+            if job_task.job_cluster_key is None:
+                continue
+            if job_task.job_cluster_key in overrides:
+                job_task.existing_cluster_id = overrides[job_task.job_cluster_key]
+                job_task.job_cluster_key = None
+        return settings
 
     def _job_task(self, task: Task, dbfs_path: str) -> jobs.Task:
         jobs_task = jobs.Task(
