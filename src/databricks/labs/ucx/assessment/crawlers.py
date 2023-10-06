@@ -103,7 +103,7 @@ def spark_version_compatibility(spark_version: str) -> str:
 
 class AzureServicePrincipalCrawler(CrawlerBase):
     def __init__(self, ws: WorkspaceClient, sbe: SqlBackend, schema):
-        super().__init__(sbe, "hive_metastore", schema, "azure_service_principals", dataclasses.dataclass)
+        super().__init__(sbe, "hive_metastore", schema, "azure_service_principals", AzureServicePrincipalInfo)
         self._ws = ws
 
     def _crawl(self) -> list[AzureServicePrincipalInfo]:
@@ -383,7 +383,7 @@ class ClustersCrawler(CrawlerBase):
 
 class JobsCrawler(CrawlerBase):
     def __init__(self, ws: WorkspaceClient, sbe: SqlBackend, schema):
-        super().__init__(sbe, "hive_metastore", schema, "jobs", JobInfo, dataclasses.dataclass)
+        super().__init__(sbe, "hive_metastore", schema, "jobs", JobInfo)
         self._ws = ws
 
     @staticmethod
@@ -454,9 +454,9 @@ class JobsCrawler(CrawlerBase):
                 job_details[job_key].success = 0
         return list(job_details.values())
 
-    def snapshot(self) -> list[ClusterInfo]:
+    def snapshot(self) -> list[JobInfo]:
         return self._snapshot(self._try_fetch, self._crawl)
 
-    def _try_fetch(self) -> list[ClusterInfo]:
+    def _try_fetch(self) -> list[JobInfo]:
         for row in self._fetch(f"SELECT * FROM {self._schema}.{self._table}"):
             yield JobInfo(*row)
