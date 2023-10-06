@@ -7,6 +7,7 @@ import shutil
 import string
 import subprocess
 import sys
+from collections.abc import Callable, MutableMapping
 from pathlib import Path
 from typing import BinaryIO, Optional
 
@@ -100,25 +101,31 @@ def make_random():
     return inner
 
 
-@pytest.fixture(scope="session")
+@pytest.fixture
 def product_info():
     return None, None
 
 
-@pytest.fixture(scope="session")
-def ws(product_info) -> WorkspaceClient:
+@pytest.fixture
+def ws(product_info, debug_env) -> WorkspaceClient:
     # Use variables from Unified Auth
     # See https://databricks-sdk-py.readthedocs.io/en/latest/authentication.html
     product_name, product_version = product_info
-    return WorkspaceClient(product=product_name, product_version=product_version)
+    return WorkspaceClient(host=debug_env["DATABRICKS_HOST"], product=product_name, product_version=product_version)
 
 
-@pytest.fixture(scope="session")
-def acc(product_info) -> AccountClient:
+@pytest.fixture
+def acc(product_info, debug_env) -> AccountClient:
     # Use variables from Unified Auth
     # See https://databricks-sdk-py.readthedocs.io/en/latest/authentication.html
     product_name, product_version = product_info
-    return AccountClient(product=product_name, product_version=product_version)
+    _LOG.debug(f"Running with {len(debug_env)} env variables")
+    return AccountClient(
+        host=debug_env["DATABRICKS_HOST"],
+        account_id=debug_env["DATABRICKS_ACCOUNT_ID"],
+        product=product_name,
+        product_version=product_version,
+    )
 
 
 def _permissions_mapping():
@@ -604,22 +611,60 @@ def make_warehouse(ws, make_random):
     yield from factory("warehouse", create, lambda item: ws.warehouses.delete(item.id))
 
 
-def load_debug_env_if_runs_from_ide(key) -> bool:
-    if not _is_in_debug():
-        return False
-    conf_file = pathlib.Path.home() / ".databricks/debug-env.json"
-    with conf_file.open("r") as f:
-        conf = json.load(f)
-        if key not in conf:
-            msg = f"{key} not found in ~/.databricks/debug-env.json"
-            raise KeyError(msg)
-        for k, v in conf[key].items():
-            os.environ[k] = v
-    return True
-
-
 def _is_in_debug() -> bool:
     return os.path.basename(sys.argv[0]) in [
         "_jb_pytest_runner.py",
         "testlauncher.py",
     ]
+
+
+@pytest.fixture
+def debug_env_name():
+    # Alternatively, we could use @pytest.mark.xxx, but
+    # not sure how reusable it becomes then.
+    #
+    # we don't use scope=session, as monkeypatch.setenv
+    # doesn't work on a session level
+    return "UNKNOWN"
+
+
+@pytest.fixture
+def debug_env(monkeypatch, debug_env_name) -> MutableMapping[str, str]:
+    if not _is_in_debug():
+        return os.environ
+    conf_file = pathlib.Path.home() / ".databricks/debug-env.json"
+    if not conf_file.exists():
+        return os.environ
+    with conf_file.open("r") as f:
+        conf = json.load(f)
+        if debug_env_name not in conf:
+            sys.stderr.write(
+                f"""{debug_env_name} not found in ~/.databricks/debug-env.json
+
+            this usually means that you have to add the following fixture to
+            conftest.py file in the relevant directory:
+
+            @pytest.fixture
+            def debug_env_name():
+                return 'ENV_NAME' # where ENV_NAME is one of: {", ".join(conf.keys())}
+            """
+            )
+            msg = f"{debug_env_name} not found in ~/.databricks/debug-env.json"
+            raise KeyError(msg)
+        for k, v in conf[debug_env_name].items():
+            monkeypatch.setenv(k, v)
+    return os.environ
+
+
+@pytest.fixture
+def env_or_skip(debug_env) -> Callable[[str], str]:
+    skip = pytest.skip
+    if _is_in_debug():
+        skip = pytest.fail
+
+    def inner(var: str) -> str:
+        if var not in debug_env:
+            skip(f"Environment variable {var} is missing")
+        return debug_env[var]
+
+    return inner
