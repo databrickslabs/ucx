@@ -113,6 +113,10 @@ class WorkspaceInstaller:
     def run_for_config(
         ws: WorkspaceClient, config: WorkspaceConfig, *, prefix="ucx", override_clusters: dict[str, str] | None = None
     ) -> "WorkspaceInstaller":
+    def run_for_config(
+        ws: WorkspaceClient, config: WorkspaceConfig, *, prefix="ucx", override_clusters: dict[str, str] | None = None
+    ) -> "WorkspaceInstaller":
+        logger.info(f"Installing UCX v{__version__} on {ws.config.host}")
         workspace_installer = WorkspaceInstaller(ws, prefix=prefix, promtps=False)
         logger.info(f"Installing UCX v{workspace_installer._version} on {ws.config.host}")
         workspace_installer._config = config
@@ -541,6 +545,17 @@ class WorkspaceInstaller:
             "email_notifications": email_notifications,
             "tasks": [self._job_task(task, dbfs_path) for task in tasks],
         }
+
+    @staticmethod
+    def _apply_cluster_overrides(settings: dict[str, any], overrides: dict[str, str]) -> dict:
+        settings["job_clusters"] = [_ for _ in settings["job_clusters"] if _.job_cluster_key not in overrides]
+        for job_task in settings["tasks"]:
+            if job_task.job_cluster_key is None:
+                continue
+            if job_task.job_cluster_key in overrides:
+                job_task.existing_cluster_id = overrides[job_task.job_cluster_key]
+                job_task.job_cluster_key = None
+        return settings
 
     def _upload_wheel_runner(self, remote_wheel: str):
         # TODO: we have to be doing this workaround until ES-897453 is solved in the platform
