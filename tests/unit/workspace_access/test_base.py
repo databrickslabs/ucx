@@ -8,9 +8,7 @@ from databricks.labs.ucx.workspace_access.base import (
     Destination,
     Permissions,
 )
-from databricks.labs.ucx.workspace_access.groups import (
-    GroupMigrationState,
-)
+from databricks.labs.ucx.workspace_access.groups import GroupMigrationState
 
 
 def test_applier():

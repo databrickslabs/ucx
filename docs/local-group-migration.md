@@ -245,3 +245,20 @@ from databricks.labs.ucx.config import GroupsConfig
 group_manager = GroupManager(ws, GroupsConfig(auto=True))
 group_manager.ws_local_group_deletion_recovery()
 ```
+
+3. Recover Table ACL from `$inventory.grants` to `$inventory.permissions`:
+
+```python
+from databricks.labs.ucx.hive_metastore import GrantsCrawler, TablesCrawler
+from databricks.labs.ucx.workspace_access.manager import PermissionManager
+from databricks.labs.ucx.workspace_access.tacl import TableAclSupport
+from databricks.labs.ucx.framework.crawlers import RuntimeBackend
+
+sql_backend = RuntimeBackend()
+inventory_schema = cfg.inventory_database
+tables = TablesCrawler(sql_backend, inventory_schema)
+grants = GrantsCrawler(tables)
+tacl = TableAclSupport(grants, sql_backend)
+permission_manager = PermissionManager(sql_backend, inventory_schema, [tacl])
+permission_manager.inventorize_permissions()
+```

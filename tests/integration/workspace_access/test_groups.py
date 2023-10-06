@@ -1,15 +1,20 @@
 import logging
+from datetime import timedelta
 
 from databricks.sdk import WorkspaceClient
+from databricks.sdk.retries import retried
 from databricks.sdk.service.iam import PermissionLevel
 
 from databricks.labs.ucx.config import GroupsConfig
 from databricks.labs.ucx.hive_metastore import GrantsCrawler, TablesCrawler
+from databricks.labs.ucx.hive_metastore.grants import Grant
 from databricks.labs.ucx.workspace_access.generic import (
-    GenericPermissionsSupport, Listing,
+    GenericPermissionsSupport,
+    Listing,
 )
 from databricks.labs.ucx.workspace_access.groups import GroupManager
 from databricks.labs.ucx.workspace_access.manager import PermissionManager
+from databricks.labs.ucx.workspace_access.tacl import TableAclSupport
 
 logger = logging.getLogger(__name__)
 
@@ -89,16 +94,31 @@ def test_replace_workspace_groups_with_account_groups(
     generic_permissions = GenericPermissionsSupport(
         ws, [Listing(ws.cluster_policies.list, "policy_id", "cluster-policies")]
     )
-    permission_manager = PermissionManager(sql_backend, inventory_schema, [generic_permissions])
     tables = TablesCrawler(sql_backend, inventory_schema)
     grants = GrantsCrawler(tables)
+    tacl = TableAclSupport(grants, sql_backend)
+    permission_manager = PermissionManager(sql_backend, inventory_schema, [generic_permissions, tacl])
 
     permission_manager.inventorize_permissions()
 
+    dummy_grants = list(permission_manager.load_all_for("TABLE", dummy_table.full_name, Grant))
+    assert 2 == len(dummy_grants)
+
     table_permissions = grants.for_table_info(dummy_table)
-    print(table_permissions)
+    assert ws_group.display_name in table_permissions
+    assert "SELECT" in table_permissions[ws_group.display_name]
 
     permission_manager.apply_group_permissions(group_manager.migration_state, destination="backup")
+
+    @retried(on=[AssertionError], timeout=timedelta(seconds=30))
+    def check_table_permissions_for_backup_group():
+        table_permissions = grants.for_table_info(dummy_table)
+        assert group_info.workspace.display_name in table_permissions
+        assert group_info.backup.display_name in table_permissions
+        assert "SELECT" in table_permissions[group_info.workspace.display_name]
+        assert "SELECT" in table_permissions[group_info.backup.display_name]
+
+    check_table_permissions_for_backup_group()
 
     policy_permissions = generic_permissions.load_as_dict("cluster-policies", cluster_policy.policy_id)
     assert PermissionLevel.CAN_USE == policy_permissions[group_info.workspace.display_name]
@@ -106,8 +126,14 @@ def test_replace_workspace_groups_with_account_groups(
 
     group_manager.replace_workspace_groups_with_account_groups()
 
-    table_permissions = grants.for_table_info(dummy_table)
-    print(table_permissions)
+    @retried(on=[AssertionError], timeout=timedelta(seconds=30))
+    def check_table_permissions_for_account_group():
+        table_permissions = grants.for_table_info(dummy_table)
+        assert group_info.account.display_name in table_permissions
+        assert group_info.backup.display_name in table_permissions
+        assert "SELECT" in table_permissions[group_info.backup.display_name]
+
+    check_table_permissions_for_account_group()
 
     policy_permissions = generic_permissions.load_as_dict("cluster-policies", cluster_policy.policy_id)
     assert group_info.workspace.display_name not in policy_permissions
@@ -115,20 +141,34 @@ def test_replace_workspace_groups_with_account_groups(
 
     permission_manager.apply_group_permissions(group_manager.migration_state, destination="account")
 
-    table_permissions = grants.for_table_info(dummy_table)
-    print(table_permissions)
+    @retried(on=[AssertionError], timeout=timedelta(seconds=30))
+    def check_table_permissions_for_account_group():
+        table_permissions = grants.for_table_info(dummy_table)
+        assert group_info.account.display_name in table_permissions
+        assert group_info.backup.display_name in table_permissions
+        assert "SELECT" in table_permissions[group_info.backup.display_name]
+        assert "SELECT" in table_permissions[group_info.account.display_name]
+
+    check_table_permissions_for_account_group()
 
     policy_permissions = generic_permissions.load_as_dict("cluster-policies", cluster_policy.policy_id)
     assert PermissionLevel.CAN_USE == policy_permissions[group_info.account.display_name]
     assert PermissionLevel.CAN_USE == policy_permissions[group_info.backup.display_name]
-
-    # TODO: check hive grants as well
 
     for _info in group_manager.migration_state.groups:
         ws.groups.delete(_info.backup.id)
 
     policy_permissions = generic_permissions.load_as_dict("cluster-policies", cluster_policy.policy_id)
     assert group_info.backup.display_name not in policy_permissions
+
+    @retried(on=[AssertionError], timeout=timedelta(seconds=30))
+    def check_table_permissions_after_backup_delete():
+        table_permissions = grants.for_table_info(dummy_table)
+        assert group_info.backup.display_name not in table_permissions
+        assert group_info.account.display_name in table_permissions
+        assert "SELECT" in table_permissions[group_info.account.display_name]
+
+    check_table_permissions_after_backup_delete()
 
 
 def test_group_listing(ws: WorkspaceClient, make_ucx_group):

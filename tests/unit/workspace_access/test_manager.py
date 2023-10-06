@@ -60,7 +60,7 @@ def test_load_all():
     )
     pi = PermissionManager(b, "test_database", [])
 
-    output = pi._load_all()
+    output = pi.load_all()
     assert output[0] == Permissions("object1", "clusters", "test acl")
 
 

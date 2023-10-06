@@ -69,6 +69,8 @@ class Threads(Generic[Result]):
         with ThreadPoolExecutor(self._num_threads) as pool:
             futures = []
             for task in self._tasks:
+                if task is None:
+                    continue
                 future = pool.submit(self._wrap_result(task, self._name))
                 future.add_done_callback(self._progress_report)
                 futures.append(future)
@@ -98,7 +100,7 @@ class Threads(Generic[Result]):
             try:
                 return func(*args, **kwargs), None
             except Exception as err:
-                logger.error(f"{name} task failed: {err!s}")
+                logger.error(f"{name} task failed: {err!s}", exc_info=err)
                 return None, err
 
         return inner
