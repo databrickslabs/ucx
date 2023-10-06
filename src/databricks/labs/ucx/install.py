@@ -1,8 +1,6 @@
-import datetime
 import logging
 import os
 import re
-import shutil
 import subprocess
 import sys
 import tempfile
@@ -14,8 +12,6 @@ from typing import Any
 import yaml
 from databricks.sdk import WorkspaceClient
 from databricks.sdk.core import DatabricksError
-from databricks.sdk.errors import OperationFailed
-from databricks.sdk.mixins.compute import SemVer
 from databricks.sdk.service import compute, jobs
 from databricks.sdk.service.sql import EndpointInfoWarehouseType, SpotInstancePolicy
 from databricks.sdk.service.workspace import ImportFormat
@@ -29,11 +25,7 @@ from databricks.labs.ucx.runtime import main
 TAG_STEP = "step"
 TAG_APP = "App"
 NUM_USER_ATTEMPTS = 10  # number of attempts user gets at answering a question
-EXTRA_TASK_PARAMS = {
-    "job_id": "{{job_id}}",
-    "run_id": "{{run_id}}",
-    "parent_run_id": "{{parent_run_id}}",
-}
+
 DEBUG_NOTEBOOK = """
 # Databricks notebook source
 # MAGIC %md
@@ -66,22 +58,6 @@ ws = WorkspaceClient()
 print(__version__)
 """
 
-TEST_RUNNER_NOTEBOOK = """
-# Databricks notebook source
-# MAGIC %pip install /Workspace{remote_wheel}
-dbutils.library.restartPython()
-
-# COMMAND ----------
-
-from databricks.labs.ucx.runtime import main
-
-main(f'--config=/Workspace{config_file}',
-     f'--task=' + dbutils.widgets.get('task'),
-     f'--job_id=' + dbutils.widgets.get('job_id'),
-     f'--run_id=' + dbutils.widgets.get('run_id'),
-     f'--parent_run_id=' + dbutils.widgets.get('parent_run_id'))
-"""
-
 logger = logging.getLogger(__name__)
 
 
@@ -99,7 +75,7 @@ class WorkspaceInstaller:
         self._instance_profile = None
 
     def run(self):
-        logger.info(f"Installing UCX v{self._version}")
+        logger.info(f"Installing UCX v{__version__}")
         self._configure()
         self._run_configured()
 
@@ -114,8 +90,8 @@ class WorkspaceInstaller:
     def run_for_config(
         ws: WorkspaceClient, config: WorkspaceConfig, *, prefix="ucx", override_clusters: dict[str, str] | None = None
     ) -> "WorkspaceInstaller":
+        logger.info(f"Installing UCX v{__version__} on {ws.config.host}")
         workspace_installer = WorkspaceInstaller(ws, prefix=prefix, promtps=False)
-        logger.info(f"Installing UCX v{workspace_installer._version} on {ws.config.host}")
         workspace_installer._config = config
         workspace_installer._write_config()
         workspace_installer._override_clusters = override_clusters
@@ -123,41 +99,17 @@ class WorkspaceInstaller:
         workspace_installer._run_configured()
         return workspace_installer
 
-    def run_workflow(self, step: str):
-        job_id = self._deployed_steps[step]
-        logger.debug(f"starting {step} job: {self._ws.config.host}#job/{job_id}")
-        job_run_waiter = self._ws.jobs.run_now(job_id)
-        try:
-            job_run_waiter.result()
-        except OperationFailed:
-            # currently we don't have any good message from API, so we have to work around it.
-            job_run = self._ws.jobs.get_run(job_run_waiter.run_id)
-            messages = []
-            for run_task in job_run.tasks:
-                if run_task.state.result_state == jobs.RunResultState.TIMEDOUT:
-                    messages.append(f"{run_task.task_key}: The run was stopped after reaching the timeout")
-                    continue
-                if run_task.state.result_state != jobs.RunResultState.FAILED:
-                    continue
-                run_output = self._ws.jobs.get_run_output(run_task.run_id)
-                if logger.isEnabledFor(logging.DEBUG):
-                    sys.stderr.write(run_output.error_trace)
-                messages.append(f"{run_task.task_key}: {run_output.error}")
-            msg = f'{job_run.state.state_message.rstrip(".")}: {", ".join(messages)}'
-            raise OperationFailed(msg) from None
-
     def _create_dashboards(self):
-        logger.info("Creating dashboards...")
-        local_query_files = self._find_project_root() / "src/databricks/labs/ucx/queries"
+        local_query_files = self._find_project_root() / "src/databricks/labs/ucx/assessment/queries"
         dash = DashboardFromFiles(
             self._ws,
             local_folder=local_query_files,
             remote_folder=f"{self._install_folder}/queries",
-            name_prefix=self._name("UCX "),
+            name=self._name("UCX Assessment"),
             warehouse_id=self._warehouse_id,
-            query_text_callback=self._current_config.replace_inventory_variable,
+            query_text_callback=self._replace_inventory_variable,
         )
-        self._dashboards = dash.create_dashboards()
+        self._dashboards["assessment"] = dash.create_dashboard()
 
     @property
     def _warehouse_id(self) -> str:
@@ -341,14 +293,10 @@ class WorkspaceInstaller:
         remote_wheel = self._upload_wheel()
         self._deployed_steps = self._deployed_steps()
         desired_steps = {t.workflow for t in _TASKS.values()}
-        wheel_runner = None
-
-        if self._override_clusters:
-            wheel_runner = self._upload_wheel_runner(remote_wheel)
         for step_name in desired_steps:
             settings = self._job_settings(step_name, remote_wheel)
             if self._override_clusters:
-                settings = self._apply_cluster_overrides(settings, self._override_clusters, wheel_runner)
+                settings = self._apply_cluster_overrides(settings, self._override_clusters)
             if step_name in self._deployed_steps:
                 job_id = self._deployed_steps[step_name]
                 logger.info(f"Updating configuration for step={step_name} job_id={job_id}")
@@ -381,8 +329,8 @@ class WorkspaceInstaller:
         md = [
             "# UCX - The Unity Catalog Migration Assistant",
             f'To troubleshoot, see [debug notebook]({self._notebook_link(f"{self._install_folder}/DEBUG.py")}).\n',
-            "Here are the URLs and descriptions of workflows that trigger various stages of migration.",
-            "All jobs are defined with necessary cluster configurations and DBR versions.\n",
+            "Here are the URL and descriptions of jobs that trigger's various stages of migration.",
+            "All jobs are defined with necessary cluster configurations and DBR versions.",
         ]
         for step_name in self._step_list():
             if step_name not in self._deployed_steps:
@@ -390,25 +338,18 @@ class WorkspaceInstaller:
                 continue
             job_id = self._deployed_steps[step_name]
             dashboard_link = ""
-            dashboards_per_step = [d for d in self._dashboards.keys() if d.startswith(step_name)]
-            for dash in dashboards_per_step:
-                if len(dashboard_link) == 0:
-                    dashboard_link += "Go to the one of the following dashboards after running the job:\n"
-                first, second = dash.replace("_", " ").title().split()
-                dashboard_url = f"{self._ws.config.host}/sql/dashboards/{self._dashboards[dash]}"
-                dashboard_link += f"  - [{first} ({second}) dashboard]({dashboard_url})\n"
+            if step_name in self._dashboards:
+                dashboard_link = f"{self._ws.config.host}/sql/dashboards/{self._dashboards[step_name]}"
+                dashboard_link = f" (see [{step_name} dashboard]({dashboard_link}) after finish)"
             job_link = f"[{self._name(step_name)}]({self._ws.config.host}#job/{job_id})"
-            md.append("---\n\n")
-            md.append(f"## {job_link}\n\n")
-            md.append(f"{dashboard_link}")
-            md.append("\nThe workflow consists of the following separate tasks:\n\n")
+            md.append(f"## {job_link}{dashboard_link}\n")
             for t in self._sorted_tasks():
                 if t.workflow != step_name:
                     continue
-                doc = self._current_config.replace_inventory_variable(t.doc)
-                md.append(f"### `{t.name}`\n\n")
-                md.append(f"{doc}\n")
-                md.append("\n\n")
+                doc = re.sub(r"\s+", " ", t.doc)
+                doc = self._replace_inventory_variable(doc)
+                md.append(f" - `{t.name}`:  {doc}")
+                md.append("")
         preamble = ["# Databricks notebook source", "# MAGIC %md"]
         intro = "\n".join(preamble + [f"# MAGIC {line}" for line in md])
         path = f"{self._install_folder}/README.py"
@@ -495,32 +436,21 @@ class WorkspaceInstaller:
 
     def _job_settings(self, step_name: str, dbfs_path: str):
         email_notifications = None
-        if not self._override_clusters and "@" in self._my_username:
-            # set email notifications only if we're running the real
-            # installation and not the integration test.
+        if "@" in self._my_username:
             email_notifications = jobs.JobEmailNotifications(
                 on_success=[self._my_username], on_failure=[self._my_username]
             )
         tasks = sorted([t for t in _TASKS.values() if t.workflow == step_name], key=lambda _: _.name)
-        version = self._version if not self._ws.config.is_gcp else self._version.replace("+", "-")
         return {
             "name": self._name(step_name),
-            "tags": {TAG_APP: self._app, TAG_STEP: step_name, "version": f"v{version}"},
+            "tags": {TAG_APP: self._app, TAG_STEP: step_name, "version": f"v{__version__}"},
             "job_clusters": self._job_clusters({t.job_cluster for t in tasks}),
             "email_notifications": email_notifications,
             "tasks": [self._job_task(task, dbfs_path) for task in tasks],
         }
 
-    def _upload_wheel_runner(self, remote_wheel: str):
-        # TODO: we have to be doing this workaround until ES-897453 is solved in the platform
-        path = f"{self._install_folder}/wheels/wheel-test-runner-{self._version}.py"
-        logger.debug(f"Created runner notebook: {self._notebook_link(path)}")
-        py = TEST_RUNNER_NOTEBOOK.format(remote_wheel=remote_wheel, config_file=self._config_file).encode("utf8")
-        self._ws.workspace.upload(path, py, overwrite=True)
-        return path
-
     @staticmethod
-    def _apply_cluster_overrides(settings: dict[str, any], overrides: dict[str, str], wheel_runner: str) -> dict:
+    def _apply_cluster_overrides(settings: dict[str, any], overrides: dict[str, str]) -> dict:
         settings["job_clusters"] = [_ for _ in settings["job_clusters"] if _.job_cluster_key not in overrides]
         for job_task in settings["tasks"]:
             if job_task.job_cluster_key is None:
@@ -528,10 +458,6 @@ class WorkspaceInstaller:
             if job_task.job_cluster_key in overrides:
                 job_task.existing_cluster_id = overrides[job_task.job_cluster_key]
                 job_task.job_cluster_key = None
-            if job_task.python_wheel_task is not None:
-                job_task.python_wheel_task = None
-                params = {"task": job_task.task_key} | EXTRA_TASK_PARAMS
-                job_task.notebook_task = jobs.NotebookTask(notebook_path=wheel_runner, base_parameters=params)
         return settings
 
     def _job_task(self, task: Task, dbfs_path: str) -> jobs.Task:
@@ -566,12 +492,7 @@ class WorkspaceInstaller:
             notebook_task=jobs.NotebookTask(
                 notebook_path=remote_notebook,
                 # ES-872211: currently, we cannot read WSFS files from Scala context
-                base_parameters={
-                    "inventory_database": self._current_config.inventory_database,
-                    "task": task.name,
-                    "config": f"/Workspace{self._config_file}",
-                }
-                | EXTRA_TASK_PARAMS,
+                base_parameters={"inventory_database": self._current_config.inventory_database},
             ),
         )
 
@@ -582,7 +503,7 @@ class WorkspaceInstaller:
             python_wheel_task=jobs.PythonWheelTask(
                 package_name="databricks_labs_ucx",
                 entry_point="runtime",  # [project.entry-points.databricks] in pyproject.toml
-                named_parameters={"task": task.name, "config": f"/Workspace{self._config_file}"} | EXTRA_TASK_PARAMS,
+                named_parameters={"task": task.name, "config": f"/Workspace{self._config_file}"},
             ),
         )
 
@@ -626,38 +547,6 @@ class WorkspaceInstaller:
             )
         return clusters
 
-    @property
-    def _version(self):
-        if hasattr(self, "__version"):
-            return self.__version
-        project_root = self._find_project_root()
-        if not (project_root / ".git/config").exists():
-            # normal install, downloaded releases won't have the .git folder
-            return __version__
-        try:
-            out = subprocess.run(["git", "describe", "--tags"], stdout=subprocess.PIPE, check=True)  # noqa S607
-            git_detached_version = out.stdout.decode("utf8")
-            dv = SemVer.parse(git_detached_version)
-            datestamp = datetime.datetime.now().strftime("%Y%m%d%H%M%S")
-            # new commits on main branch since the last tag
-            new_commits = dv.pre_release.split("-")[0]
-            # show that it's a version different from the released one in stats
-            bump_patch = dv.patch + 1
-            # create something that is both https://semver.org and https://peps.python.org/pep-0440/
-            semver_and_pep0440 = f"{dv.major}.{dv.minor}.{bump_patch}+{new_commits}{datestamp}"
-            # validate the semver
-            SemVer.parse(semver_and_pep0440)
-            self.__version = semver_and_pep0440
-            return semver_and_pep0440
-        except Exception as err:
-            msg = (
-                f"Cannot determine unreleased version. Please report this error "
-                f"message that you see on https://github.com/databrickslabs/ucx/issues/new. "
-                f"Meanwhile, download, unpack, and install the latest released version from "
-                f"https://github.com/databrickslabs/ucx/releases. Original error is: {err!s}"
-            )
-            raise OSError(msg) from None
-
     def _build_wheel(self, tmp_dir: str, *, verbose: bool = False):
         """Helper to build the wheel package"""
         streams = {}
@@ -667,17 +556,6 @@ class WorkspaceInstaller:
                 "stderr": subprocess.DEVNULL,
             }
         project_root = self._find_project_root()
-        is_non_released_version = "+" in self._version
-        if (project_root / ".git" / "config").exists() and is_non_released_version:
-            tmp_dir_path = Path(tmp_dir) / "working-copy"
-            # copy everything to a temporary directory
-            shutil.copytree(project_root, tmp_dir_path)
-            # and override the version file
-            version_file = tmp_dir_path / "src/databricks/labs/ucx/__about__.py"
-            with version_file.open("w") as f:
-                f.write(f'__version__ = "{self._version}"')
-            # working copy becomes project root for building a wheel
-            project_root = tmp_dir_path
         logger.debug(f"Building wheel for {project_root} in {tmp_dir}")
         subprocess.run(
             [sys.executable, "-m", "pip", "wheel", "--no-deps", "--wheel-dir", tmp_dir, project_root],
