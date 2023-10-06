@@ -288,8 +288,7 @@ class WorkspaceInstaller:
             groups_config_args["auto"] = True
 
         instance_profile = None
-        spark_conf_list = []
-        # Options for external metastore
+        spark_conf_dict = {}
         if (
             self._prompts
             and self._question("Do you need to configure an external Hive Metastore (Glue)", default="no") == "yes"
@@ -304,9 +303,10 @@ class WorkspaceInstaller:
                 "Please enter a comma-separated list of spark config options.",
                 default="",
             )
-            spark_conf_list = []
             if spark_conf != "":
-                spark_conf_list = [x.strip() for x in spark_conf.split(",")]
+                for spark_conf_val in [x.strip().split(" ") for x in spark_conf.split(",")]:
+                    if len(spark_conf_val) > 1:
+                        spark_conf_dict[spark_conf_val[0]] = spark_conf_val[1]
 
         self._config = WorkspaceConfig(
             inventory_database=inventory_database,
@@ -315,7 +315,7 @@ class WorkspaceInstaller:
             log_level=log_level,
             num_threads=num_threads,
             instance_profile=instance_profile,
-            spark_conf=spark_conf_list,
+            spark_conf=spark_conf_dict,
         )
 
         self._write_config()
@@ -450,7 +450,7 @@ class WorkspaceInstaller:
             return "any"
         choices = sorted(choices, key=str.casefold)
         numbered = "\n".join(f"\033[1m[{i}]\033[0m \033[36m{v}\033[0m" for i, v in enumerate(choices))
-        prompt = f"\033[1m{text}\033[0m\n{numbered}\nEnter a number between 0 and {len(choices)-1}: "
+        prompt = f"\033[1m{text}\033[0m\n{numbered}\nEnter a number between 0 and {len(choices) - 1}: "
         attempt = 0
         while attempt < max_attempts:
             attempt += 1
@@ -588,13 +588,10 @@ class WorkspaceInstaller:
 
     def _job_clusters(self, names: set[str]):
         clusters = []
-        spark_conf = {"spark.databricks.cluster.profile": "singleNode", "spark.master": "local[*]"}
-        if self._config.spark_conf is not None:
-            for conf in self._config.spark_conf:
-                sp_conf = conf.split(" ")
-                if len(sp_conf) > 1:
-                    continue
-                spark_conf[sp_conf[0]] = sp_conf[1]
+        spark_conf = {
+            "spark.databricks.cluster.profile": "singleNode",
+            "spark.master": "local[*]",
+        } | self._config.spark_conf
         spec = self._cluster_node_type(
             compute.ClusterSpec(
                 spark_version=self._ws.clusters.select_spark_version(latest=True),
