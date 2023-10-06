@@ -80,8 +80,7 @@ def _azure_sp_conf_present_check(config: dict) -> bool:
 
 def is_custom_image(version_string: str):
     """
-    If we're missing a major or minor version
-    Or if the patch version is not x, then this is is a custom image
+    Is this a custom version?
     """
     return "custom" in version_string
 
@@ -318,6 +317,15 @@ class JobsCrawler(CrawlerBase):
 
 
 class ExternallyOrchestratedJobRunsWithFailingConfigCrawler(CrawlerBase):
+    """
+    This class will look for job runs that are sent from external orchestrators that have
+    a failing configuration with UC
+    - There will be no persisted job id, ie job id will not be in list jobs
+    - The data security mode is None AND the DBR>=11.3
+
+    Return a list of records, one per failing job, with a task count of affected tasks
+    and the lowest DBR version across all tasks
+    """
     def __init__(self, ws: WorkspaceClient, sbe: SqlBackend, schema):
         super().__init__(
             sbe,
@@ -346,7 +354,7 @@ class ExternallyOrchestratedJobRunsWithFailingConfigCrawler(CrawlerBase):
 
     def _retrieve_hash_values_from_task(self, task: RunTask) -> list[str]:
         """
-        Retrieve all hashable attributes and append to a list with None's removed
+        Retrieve all hashable attributes and append to a list with None removed
         - specifically ignore parameters as these change.
         """
         hash_values = []
@@ -397,7 +405,7 @@ class ExternallyOrchestratedJobRunsWithFailingConfigCrawler(CrawlerBase):
         self, all_clusters: dict[str, ClusterDetails], all_job_runs: list[BaseRun], all_jobs: list[BaseJob]
     ) -> list[ExternallyOrchestratedJobRunWithFailingConfiguration]:
         """
-        Returns a list of ExternallyOrchestratedJobs
+        Returns a list of ExternallyOrchestratedJobRunWithFailingConfiguration
         """
         all_persisted_job_ids = [x.job_id for x in all_jobs]
         not_persisted_job_runs = list(
