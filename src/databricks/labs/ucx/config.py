@@ -207,6 +207,7 @@ class WorkspaceConfig(_Config["WorkspaceConfig"]):
     log_level: str | None = "INFO"
     database_to_catalog_mapping: dict[str, str] = None
     default_catalog: str = "ucx_default"
+
     # Starting path for notebooks and directories crawler
     workspace_start_path: str = "/"
     instance_profile: str = None

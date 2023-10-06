@@ -241,36 +241,12 @@ class WorkspaceInstaller:
             groups_config_args["selected"] = [x.strip() for x in selected_groups.split(",")]
         else:
             groups_config_args["auto"] = True
-
-        instance_profile = None
-        spark_conf_dict = {}
-        if (
-            self._prompts
-            and self._question("Do you need to configure an external Hive Metastore (Glue)", default="no") == "yes"
-        ):
-            logger.info("Setting up an external metastore")
-            instance_profiles = self._instance_profiles()
-            instance_profile = ""
-            if len(instance_profiles) > 1:
-                instance_profile = self._choice_from_dict("Select Instance Profile from List", instance_profiles)
-
-            spark_conf = self._question(
-                "Please enter a comma-separated list of spark config options.",
-                default="",
-            )
-            if spark_conf != "":
-                for spark_conf_val in [x.strip().split(" ") for x in spark_conf.split(",")]:
-                    if len(spark_conf_val) > 1:
-                        spark_conf_dict[spark_conf_val[0]] = spark_conf_val[1]
-
         self._config = WorkspaceConfig(
             inventory_database=inventory_database,
             groups=GroupsConfig(**groups_config_args),
             warehouse_id=warehouse_id,
             log_level=log_level,
             num_threads=num_threads,
-            instance_profile=instance_profile,
-            spark_conf=spark_conf_dict,
         )
 
         self._write_config()
@@ -394,7 +370,7 @@ class WorkspaceInstaller:
             return "any"
         choices = sorted(choices, key=str.casefold)
         numbered = "\n".join(f"\033[1m[{i}]\033[0m \033[36m{v}\033[0m" for i, v in enumerate(choices))
-        prompt = f"\033[1m{text}\033[0m\n{numbered}\nEnter a number between 0 and {len(choices) - 1}: "
+        prompt = f"\033[1m{text}\033[0m\n{numbered}\nEnter a number between 0 and {len(choices)-1}: "
         attempt = 0
         while attempt < max_attempts:
             attempt += 1
@@ -512,22 +488,15 @@ class WorkspaceInstaller:
 
     def _job_clusters(self, names: set[str]):
         clusters = []
-        spark_conf = {
-            "spark.databricks.cluster.profile": "singleNode",
-            "spark.master": "local[*]",
-        } | self._config.spark_conf
         spec = self._cluster_node_type(
             compute.ClusterSpec(
                 spark_version=self._ws.clusters.select_spark_version(latest=True),
                 data_security_mode=compute.DataSecurityMode.NONE,
-                spark_conf=spark_conf,
+                spark_conf={"spark.databricks.cluster.profile": "singleNode", "spark.master": "local[*]"},
                 custom_tags={"ResourceClass": "SingleNode"},
                 num_workers=0,
             )
         )
-        if self._ws.config.is_aws:
-            aws_attributes = replace(spec.aws_attributes, instance_profile_arn=self._config.instance_profile)
-            spec = replace(spec, aws_attributes=aws_attributes)
         if "main" in names:
             clusters.append(
                 jobs.JobCluster(
@@ -652,11 +621,6 @@ class WorkspaceInstaller:
                 continue
             deployed_steps[tags.get(TAG_STEP, "_")] = j.job_id
         return deployed_steps
-
-    def _instance_profiles(self):
-        return {"No Instance Profile": None} | {
-            profile.instance_profile_arn: profile.instance_profile_arn for profile in self._ws.instance_profiles.list()
-        }
 
 
 if __name__ == "__main__":
