@@ -5,7 +5,6 @@ from dataclasses import dataclass
 from functools import partial
 
 from databricks.sdk.service.catalog import SchemaInfo, TableInfo
-
 from databricks.labs.ucx.framework.crawlers import CrawlerBase
 from databricks.labs.ucx.framework.parallel import Threads
 from databricks.labs.ucx.hive_metastore.tables import TablesCrawler
@@ -192,7 +191,7 @@ class GrantsCrawler(CrawlerBase):
     def _grants(
         self,
         *,
-        catalog: str = False,
+        catalog: str | None = None,
         database: str | None = None,
         table: str | None = None,
         view: str | None = None,
@@ -257,5 +256,6 @@ class GrantsCrawler(CrawlerBase):
                     anonymous_function=anonymous_function,
                 )
         except Exception as e:
+            # TODO: https://github.com/databrickslabs/ucx/issues/406
             logger.error(f"Couldn't fetch grants for object {on_type} {key}: {e}")
             return []

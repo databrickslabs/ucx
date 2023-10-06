@@ -4,6 +4,7 @@ from dataclasses import dataclass
 from functools import wraps
 from pathlib import Path
 
+from databricks.labs.ucx.__about__ import __version__
 from databricks.labs.ucx.config import WorkspaceConfig
 from databricks.labs.ucx.framework.logger import _install
 
@@ -94,6 +95,8 @@ def trigger(*argv):
     if task_name not in _TASKS:
         msg = f'task "{task_name}" not found. Valid tasks are: {", ".join(_TASKS.keys())}'
         raise KeyError(msg)
+
+    print(f"UCX v{__version__}")
 
     current_task = _TASKS[task_name]
     print(current_task.doc)

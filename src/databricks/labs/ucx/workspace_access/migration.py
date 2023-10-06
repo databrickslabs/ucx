@@ -95,23 +95,19 @@ class GroupMigrationToolkit:
         self._permissions_manager.inventorize_permissions()
 
     def apply_permissions_to_backup_groups(self):
-        self._permissions_manager.apply_group_permissions(
-            self._group_manager.migration_groups_provider, destination="backup"
-        )
+        self._permissions_manager.apply_group_permissions(self._group_manager.migration_state, destination="backup")
 
     def verify_permissions_on_backup_groups(self, to_verify):
-        self._verification_manager.verify(self._group_manager.migration_groups_provider, "backup", to_verify)
+        self._verification_manager.verify(self._group_manager.migration_state, "backup", to_verify)
 
     def replace_workspace_groups_with_account_groups(self):
         self._group_manager.replace_workspace_groups_with_account_groups()
 
     def apply_permissions_to_account_groups(self):
-        self._permissions_manager.apply_group_permissions(
-            self._group_manager.migration_groups_provider, destination="account"
-        )
+        self._permissions_manager.apply_group_permissions(self._group_manager.migration_state, destination="account")
 
     def verify_permissions_on_account_groups(self, to_verify):
-        self._verification_manager.verify(self._group_manager.migration_groups_provider, "account", to_verify)
+        self._verification_manager.verify(self._group_manager.migration_state, "account", to_verify)
 
     def delete_backup_groups(self):
         self._group_manager.delete_backup_groups()

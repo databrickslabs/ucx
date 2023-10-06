@@ -12,7 +12,7 @@ def test_logging_calls():
     workspace_listing = listing.WorkspaceListing(ws=ws, num_threads=1)
     workspace_listing.start_time = dt.datetime.now()
     workspace_listing._counter = 9
-    # with patch.object(logger, "info") as mock_info:
+    # with patch.object(logger, "table") as mock_info:
     #     workspace_listing._progress_report(None)
     #     mock_info.assert_called_once()
 
