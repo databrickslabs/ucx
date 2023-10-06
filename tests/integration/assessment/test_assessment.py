@@ -1,43 +1,58 @@
 import base64
-import time
-from databricks.sdk.service import workspace, pipelines, jobs
-from databricks.labs.ucx.assessment.crawlers import AzureServicePrincipalCrawler, PipelinesCrawler, ClustersCrawler, \
-    JobsCrawler
 import logging
 import os
+import time
+
+from databricks.sdk.service import jobs, pipelines, workspace
+
+from databricks.labs.ucx.assessment.crawlers import (
+    AzureServicePrincipalCrawler,
+    ClustersCrawler,
+    JobsCrawler,
+    PipelinesCrawler,
+)
 from databricks.labs.ucx.framework.crawlers import StatementExecutionBackend
 
 logger = logging.getLogger(__name__)
 
 
 def import_notebook(w) -> str:
-    notebook_path = f'/Users/{w.current_user.me().user_name}/ucx-dlt-pipeline-notebook'
-    w.workspace.import_(path=notebook_path,
-                        overwrite=True,
-                        format=workspace.ImportFormat.SOURCE,
-                        language=workspace.Language.PYTHON,
-                        content=base64.b64encode("""Dummy Notebook for DLT""".encode()).decode())
+    notebook_path = f"/Users/{w.current_user.me().user_name}/ucx-dlt-pipeline-notebook"
+    w.workspace.import_(
+        path=notebook_path,
+        overwrite=True,
+        format=workspace.ImportFormat.SOURCE,
+        language=workspace.Language.PYTHON,
+        content=base64.b64encode(b"""Dummy Notebook for DLT""").decode(),
+    )
     return notebook_path
 
 
 def create_dlt_pipeline(ws) -> str:
     notebook_path = import_notebook(ws)
-    pipeline = ws.pipelines.create(name=f"ucx_SPN_config_test-{time.time_ns()}", libraries=[pipelines.PipelineLibrary
-    (notebook=pipelines.NotebookLibrary(path=notebook_path))],
-                                   clusters=[
-                                       pipelines.PipelineCluster(instance_pool_id=os.environ["TEST_INSTANCE_POOL_ID"],
-                                                                 label="default",
-                                                                 num_workers=1,
-                                                                 custom_tags={
-                                                                     "cluster_type": "default",
-                                                                 })],
-                                   development=True, configuration={
+    pipeline = ws.pipelines.create(
+        name=f"ucx_SPN_config_test-{time.time_ns()}",
+        libraries=[pipelines.PipelineLibrary(notebook=pipelines.NotebookLibrary(path=notebook_path))],
+        clusters=[
+            pipelines.PipelineCluster(
+                instance_pool_id=os.environ["TEST_INSTANCE_POOL_ID"],
+                label="default",
+                num_workers=1,
+                custom_tags={
+                    "cluster_type": "default",
+                },
+            )
+        ],
+        development=True,
+        configuration={
             "spark.hadoop.fs.azure.account.oauth2.client.id."
             "newstorageacct.dfs.core.windows"
             ".net": "pipeline_dummy_application_id",
             "spark.hadoop.fs.azure.account.oauth2.client.endpoint."
             "newstorageacct.dfs.core.windows.net": "https://login.microsoftonline.com"
-                                                   "/directory_12345/oauth2/token"})
+            "/directory_12345/oauth2/token",
+        },
+    )
 
     return pipeline.pipeline_id
 
@@ -67,21 +82,24 @@ def test_pipeline_crawler(ws, make_schema):
 def create_cluster(ws) -> str:
     latest = ws.clusters.select_spark_version(latest=True)
 
-    cluster_name = f'sdk-ucx-test-cluster-{time.time_ns()}'
+    cluster_name = f"sdk-ucx-test-cluster-{time.time_ns()}"
 
-    clstr = ws.clusters.create(cluster_name=cluster_name,
-                               spark_version=latest,
-                               instance_pool_id=os.environ["TEST_INSTANCE_POOL_ID"],
-                               autotermination_minutes=15,
-                               spark_conf={
-                                   "fs.azure.account.auth.type.storage_acct_1.dfs.core.windows.net": "OAuth",
-                                   "fs.azure.account.oauth.provider.type.storage_acct_1.dfs.core.windows.net":
-                                       "org.apache.hadoop.fs.azurebfs.oauth2.ClientCredsTokenProvider",
-                                   "fs.azure.account.oauth2.client.id.storage_acct_1.dfs.core.windows.net": "dummy_application_id",
-                                   "fs.azure.account.oauth2.client.secret.storage_acct_1.dfs.core.windows.net": "dummy",
-                                   "fs.azure.account.oauth2.client.endpoint.storage_acct_1.dfs.core.windows.net":
-                                       "https://login.microsoftonline.com/dummy_tenant_id/oauth2/token"},
-                               num_workers=1).result()
+    clstr = ws.clusters.create(
+        cluster_name=cluster_name,
+        spark_version=latest,
+        instance_pool_id=os.environ["TEST_INSTANCE_POOL_ID"],
+        autotermination_minutes=15,
+        spark_conf={
+            "fs.azure.account.auth.type.storage_acct_1.dfs.core.windows.net": "OAuth",
+            "fs.azure.account.oauth.provider.type.storage_acct_1.dfs.core.windows"
+            ".net": "org.apache.hadoop.fs.azurebfs.oauth2.ClientCredsTokenProvider",
+            "fs.azure.account.oauth2.client.id.storage_acct_1.dfs.core.windows.net": "dummy_application_id",
+            "fs.azure.account.oauth2.client.secret.storage_acct_1.dfs.core.windows.net": "dummy",
+            "fs.azure.account.oauth2.client.endpoint.storage_acct_1.dfs.core.windows"
+            ".net": "https://login.microsoftonline.com/dummy_tenant_id/oauth2/token",
+        },
+        num_workers=1,
+    ).result()
     return clstr.cluster_id
 
 
@@ -109,18 +127,21 @@ def test_cluster_crawler(ws, make_schema):
 def create_job(ws) -> int:
     notebook_path = import_notebook(ws)
 
-    ws.clusters.ensure_cluster_is_running(
-        os.environ["DATABRICKS_CLUSTER_ID"]) and os.environ["DATABRICKS_CLUSTER_ID"]
+    ws.clusters.ensure_cluster_is_running(os.environ["DATABRICKS_CLUSTER_ID"]) and os.environ["DATABRICKS_CLUSTER_ID"]
     cluster_id = os.environ["DATABRICKS_CLUSTER_ID"]
 
-    created_job = ws.jobs.create(name=f'sdk-ucx-jobs-{time.time_ns()}',
-                                 tasks=[
-                                     jobs.Task(description="test",
-                                               existing_cluster_id=cluster_id,
-                                               notebook_task=jobs.NotebookTask(notebook_path=notebook_path),
-                                               task_key="test",
-                                               timeout_seconds=0)
-                                 ])
+    created_job = ws.jobs.create(
+        name=f"sdk-ucx-jobs-{time.time_ns()}",
+        tasks=[
+            jobs.Task(
+                description="test",
+                existing_cluster_id=cluster_id,
+                notebook_task=jobs.NotebookTask(notebook_path=notebook_path),
+                task_key="test",
+                timeout_seconds=0,
+            )
+        ],
+    )
     return created_job.job_id
 
 
