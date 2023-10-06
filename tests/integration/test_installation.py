@@ -25,6 +25,11 @@ def test_jobs_with_no_inventory_database(
     make_table,
     env_or_skip,
 ):
+    default_cluster_id = env_or_skip("TEST_DEFAULT_CLUSTER_ID")
+    tacl_cluster_id = env_or_skip("TEST_LEGACY_TABLE_ACL_CLUSTER_ID")
+    ws.clusters.ensure_cluster_is_running(default_cluster_id)
+    ws.clusters.ensure_cluster_is_running(tacl_cluster_id)
+
     ws_group_a, acc_group_a = make_ucx_group()
     ws_group_b, acc_group_b = make_ucx_group()
     ws_group_c, acc_group_c = make_ucx_group()
@@ -87,6 +92,10 @@ def test_jobs_with_no_inventory_database(
             log_level="DEBUG",
         ),
         prefix=make_random(4),
+        override_clusters={
+            "main": default_cluster_id,
+            "tacl": tacl_cluster_id,
+        },
     )
 
     try:
