@@ -1,14 +1,18 @@
 import logging
-import os
 
+import pytest
+from _pytest.outcomes import Failed, Skipped
 from databricks.sdk.service.workspace import AclPermission
 
 from databricks.labs.ucx.mixins.compute import CommandExecutor
 from databricks.labs.ucx.mixins.fixtures import *  # noqa: F403
 
-load_debug_env_if_runs_from_ide("ucws")  # noqa: F405
-
 logger = logging.getLogger(__name__)
+
+
+@pytest.fixture
+def debug_env_name():
+    return "ucws"
 
 
 def test_user(make_user):
@@ -53,8 +57,8 @@ def test_cluster_policy(make_cluster_policy):
     logger.info(f"created {make_cluster_policy()}")
 
 
-def test_cluster(make_cluster):
-    logger.info(f"created {make_cluster(single_node=True, instance_pool_id=os.environ['TEST_INSTANCE_POOL_ID'])}")
+def test_cluster(make_cluster, env_or_skip):
+    logger.info(f"created {make_cluster(single_node=True, instance_pool_id=env_or_skip('TEST_INSTANCE_POOL_ID'))}")
 
 
 def test_instance_pool(make_instance_pool):
@@ -96,3 +100,8 @@ def test_sql_backend_works(ws, wsfs_wheel):
     )
 
     assert len(database_names) > 0
+
+
+def test_env_or_skip(env_or_skip):
+    with pytest.raises((Skipped, Failed)):
+        env_or_skip("NO_ENV_VAR_HERE")

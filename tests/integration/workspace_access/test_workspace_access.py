@@ -1,5 +1,4 @@
 import logging
-import os
 import random
 
 from databricks.sdk import WorkspaceClient
@@ -39,6 +38,7 @@ def test_workspace_access_e2e(
     make_authorization_permissions,
     make_warehouse,
     make_warehouse_permissions,
+    env_or_skip,
 ):
     ws_group, acc_group = make_ucx_group()
 
@@ -52,7 +52,7 @@ def test_workspace_access_e2e(
     )
     to_verify.add(("instance-pools", pool.instance_pool_id))
 
-    cluster = make_cluster(instance_pool_id=os.environ["TEST_INSTANCE_POOL_ID"], single_node=True)
+    cluster = make_cluster(instance_pool_id=env_or_skip("TEST_INSTANCE_POOL_ID"), single_node=True)
     make_cluster_permissions(
         object_id=cluster.cluster_id,
         permission_level=random.choice(
@@ -161,7 +161,7 @@ def test_workspace_access_e2e(
         num_threads=8,
     )
 
-    warehouse_id = os.environ["TEST_DEFAULT_WAREHOUSE_ID"]
+    warehouse_id = env_or_skip("TEST_DEFAULT_WAREHOUSE_ID")
     toolkit = GroupMigrationToolkit(config, warehouse_id=warehouse_id)
     toolkit.prepare_environment()
 

@@ -1,5 +1,4 @@
 import logging
-import os
 import random
 from functools import partial
 
@@ -15,8 +14,6 @@ logging.getLogger("tests").setLevel("DEBUG")
 logging.getLogger("databricks.labs.ucx").setLevel("DEBUG")
 
 logger = logging.getLogger(__name__)
-
-load_debug_env_if_runs_from_ide("ucws")  # noqa: F405
 
 
 def account_host(self: databricks.sdk.core.Config) -> str:
@@ -52,15 +49,15 @@ def acc(ws) -> AccountClient:
 
 
 @pytest.fixture
-def sql_exec(ws: WorkspaceClient):
-    warehouse_id = os.environ["TEST_DEFAULT_WAREHOUSE_ID"]
+def sql_exec(ws: WorkspaceClient, env_or_skip):
+    warehouse_id = env_or_skip("TEST_DEFAULT_WAREHOUSE_ID")
     statement_execution = StatementExecutionExt(ws.api_client)
     return partial(statement_execution.execute, warehouse_id)
 
 
 @pytest.fixture
-def sql_fetch_all(ws: WorkspaceClient):
-    warehouse_id = os.environ["TEST_DEFAULT_WAREHOUSE_ID"]
+def sql_fetch_all(ws: WorkspaceClient, env_or_skip):
+    warehouse_id = env_or_skip("TEST_DEFAULT_WAREHOUSE_ID")
     statement_execution = StatementExecutionExt(ws.api_client)
     return partial(statement_execution.execute_fetch_all, warehouse_id)
 

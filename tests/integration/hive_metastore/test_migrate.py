@@ -1,5 +1,4 @@
 import logging
-import os
 
 import pytest
 
@@ -10,7 +9,7 @@ from databricks.labs.ucx.hive_metastore.tables import TablesMigrate
 logger = logging.getLogger(__name__)
 
 
-def test_migrate_managed_tables(ws, make_catalog, make_schema, make_table):
+def test_migrate_managed_tables(ws, make_catalog, make_schema, make_table, env_or_skip):
     target_catalog = make_catalog()
     schema_a = make_schema(catalog="hive_metastore")
     _, target_schema = schema_a.split(".")
@@ -24,7 +23,7 @@ def test_migrate_managed_tables(ws, make_catalog, make_schema, make_table):
     inventory_schema = make_schema(catalog="hive_metastore")
     _, inventory_schema = inventory_schema.split(".")
 
-    backend = StatementExecutionBackend(ws, os.environ["TEST_DEFAULT_WAREHOUSE_ID"])
+    backend = StatementExecutionBackend(ws, env_or_skip("TEST_DEFAULT_WAREHOUSE_ID"))
     crawler = TablesCrawler(backend, inventory_schema)
     tm = TablesMigrate(crawler, ws, backend, target_catalog)
     tm.migrate_tables()
@@ -38,7 +37,9 @@ def test_migrate_managed_tables(ws, make_catalog, make_schema, make_table):
     assert target_table_properties["upgraded_from"] == managed_table
 
 
-def test_migrate_tables_with_cache_should_not_create_table(ws, make_random, make_catalog, make_schema, make_table):
+def test_migrate_tables_with_cache_should_not_create_table(
+    ws, make_random, make_catalog, make_schema, make_table, env_or_skip
+):
     target_catalog = make_catalog()
     schema_a = make_schema(catalog="hive_metastore")
     _, target_schema = schema_a.split(".")
@@ -61,7 +62,7 @@ def test_migrate_tables_with_cache_should_not_create_table(ws, make_random, make
     inventory_schema = make_schema(catalog="hive_metastore")
     _, inventory_schema = inventory_schema.split(".")
 
-    backend = StatementExecutionBackend(ws, os.environ["TEST_DEFAULT_WAREHOUSE_ID"])
+    backend = StatementExecutionBackend(ws, env_or_skip("TEST_DEFAULT_WAREHOUSE_ID"))
     crawler = TablesCrawler(backend, inventory_schema)
     tm = TablesMigrate(crawler, ws, backend, target_catalog)
     tm.migrate_tables()
@@ -73,7 +74,7 @@ def test_migrate_tables_with_cache_should_not_create_table(ws, make_random, make
 
 
 @pytest.mark.skip(reason="Needs Storage credential + External Location in place")
-def test_migrate_external_table(ws, make_catalog, make_schema, make_table):
+def test_migrate_external_table(ws, make_catalog, make_schema, make_table, env_or_skip):
     target_catalog = make_catalog()
     schema_a = make_schema(catalog="hive_metastore")
     _, target_schema = schema_a.split(".")
@@ -87,9 +88,9 @@ def test_migrate_external_table(ws, make_catalog, make_schema, make_table):
     inventory_schema = make_schema(catalog="hive_metastore")
     _, inventory_schema = inventory_schema.split(".")
 
-    backend = StatementExecutionBackend(ws, os.environ["TEST_DEFAULT_WAREHOUSE_ID"])
+    backend = StatementExecutionBackend(ws, env_or_skip("TEST_DEFAULT_WAREHOUSE_ID"))
 
-    backend = StatementExecutionBackend(ws, os.environ["TEST_DEFAULT_WAREHOUSE_ID"])
+    backend = StatementExecutionBackend(ws, env_or_skip("TEST_DEFAULT_WAREHOUSE_ID"))
     crawler = TablesCrawler(backend, inventory_schema)
     tm = TablesMigrate(crawler, ws, backend, target_catalog, inventory_schema)
     tm.migrate_tables()

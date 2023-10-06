@@ -1,5 +1,4 @@
 import logging
-import os
 import random
 
 from databricks.sdk.service.iam import PermissionLevel
@@ -24,6 +23,7 @@ def test_jobs_with_no_inventory_database(
     make_random,
     make_schema,
     make_table,
+    env_or_skip,
 ):
     ws_group_a, acc_group_a = make_ucx_group()
     ws_group_b, acc_group_b = make_ucx_group()
@@ -79,7 +79,7 @@ def test_jobs_with_no_inventory_database(
         ws,
         WorkspaceConfig(
             inventory_database=inventory_database,
-            instance_pool_id=os.environ["TEST_INSTANCE_POOL_ID"],
+            instance_pool_id=env_or_skip("TEST_INSTANCE_POOL_ID"),
             groups=GroupsConfig(
                 selected=[ws_group_a.display_name, ws_group_b.display_name, ws_group_c.display_name],
                 backup_group_prefix=backup_group_prefix,
