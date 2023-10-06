@@ -6,9 +6,12 @@ SELECT `database`,
        UPPER(table_format) AS format,
        IF(object_type IN ("MANAGED", "EXTERNAL"), "TABLE", "VIEW") AS table_view,
        CASE
-           WHEN STARTSWITH(location, "/dbfs/")
-                AND NOT STARTSWITH(location, "/dbfs/mnt") THEN "DBFS ROOT"
+           WHEN STARTSWITH(location, "dbfs:/mnt") THEN "DBFS MOUNT"
            WHEN STARTSWITH(location, "/dbfs/mnt") THEN "DBFS MOUNT"
+           WHEN STARTSWITH(location, "dbfs:/") THEN "DBFS ROOT"
+           WHEN STARTSWITH(location, "/dbfs/") THEN "DBFS ROOT"
+           WHEN STARTSWITH(location, "wasb") THEN "INCOMPATIBLE STORAGE"
+           WHEN STARTSWITH(location, "adl") THEN "UNSUPPORTED"
            ELSE "EXTERNAL"
        END AS storage,
        IF(format = "delta", "Yes", "No") AS is_delta,
