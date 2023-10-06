@@ -304,6 +304,7 @@ class WorkspaceInstaller:
                 "Please enter a comma-separated list of spark config options.",
                 default="",
             )
+            spark_conf_list = []
             if spark_conf != "":
                 spark_conf_list = [x.strip() for x in spark_conf.split(",")]
 
@@ -314,7 +315,7 @@ class WorkspaceInstaller:
             log_level=log_level,
             num_threads=num_threads,
             instance_profile=instance_profile,
-            spark_config=spark_conf_list,
+            spark_conf=spark_conf_list,
         )
 
         self._write_config()
@@ -588,11 +589,12 @@ class WorkspaceInstaller:
     def _job_clusters(self, names: set[str]):
         clusters = []
         spark_conf = {"spark.databricks.cluster.profile": "singleNode", "spark.master": "local[*]"}
-        for conf in self._config.spark_conf:
-            sp_conf = conf.split(" ")
-            if len(sp_conf) > 1:
-                continue
-            spark_conf[sp_conf[0]] = sp_conf[1]
+        if self._config.spark_conf is not None:
+            for conf in self._config.spark_conf:
+                sp_conf = conf.split(" ")
+                if len(sp_conf) > 1:
+                    continue
+                spark_conf[sp_conf[0]] = sp_conf[1]
         spec = self._cluster_node_type(
             compute.ClusterSpec(
                 spark_version=self._ws.clusters.select_spark_version(latest=True),
