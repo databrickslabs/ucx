@@ -1,5 +1,3 @@
-import os
-
 import pytest
 from databricks.sdk import WorkspaceClient
 from databricks.sdk.service.sql import AccessControl, ObjectTypePlural, PermissionLevel
@@ -12,10 +10,8 @@ from databricks.labs.ucx.mixins.redash import (
     WidgetPosition,
 )
 
-# logging.getLogger("databricks").setLevel("DEBUG")
 
-
-def test_creating_widgets(ws: WorkspaceClient, make_warehouse, make_schema):
+def test_creating_widgets(ws: WorkspaceClient, make_warehouse, make_schema, env_or_skip):
     pytest.skip()
     dashboard_widgets_api = DashboardWidgetsAPI(ws.api_client)
     query_visualizations_api = QueryVisualizationsExt(ws.api_client)
@@ -46,7 +42,7 @@ def test_creating_widgets(ws: WorkspaceClient, make_warehouse, make_schema):
     )
 
     data_sources = {x.warehouse_id: x.id for x in ws.data_sources.list()}
-    warehouse_id = os.environ["TEST_DEFAULT_WAREHOUSE_ID"]
+    warehouse_id = env_or_skip("TEST_DEFAULT_WAREHOUSE_ID")
 
     query = ws.queries.create(
         data_source_id=data_sources[warehouse_id],

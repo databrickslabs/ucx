@@ -1,6 +1,8 @@
+import datetime
 import logging
 import os
 import re
+import shutil
 import subprocess
 import sys
 import tempfile
@@ -12,6 +14,7 @@ from typing import Any
 import yaml
 from databricks.sdk import WorkspaceClient
 from databricks.sdk.core import DatabricksError
+from databricks.sdk.mixins.compute import SemVer
 from databricks.sdk.service import compute, jobs
 from databricks.sdk.service.sql import EndpointInfoWarehouseType, SpotInstancePolicy
 from databricks.sdk.service.workspace import ImportFormat
@@ -70,10 +73,11 @@ class WorkspaceInstaller:
         self._prefix = prefix
         self._prompts = promtps
         self._this_file = Path(__file__)
+        self._override_clusters = None
         self._dashboards = {}
 
     def run(self):
-        logger.info(f"Installing UCX v{__version__}")
+        logger.info(f"Installing UCX v{self._version}")
         self._configure()
         self._run_configured()
 
@@ -85,11 +89,14 @@ class WorkspaceInstaller:
         logger.info(msg)
 
     @staticmethod
-    def run_for_config(ws: WorkspaceClient, config: WorkspaceConfig, *, prefix="ucx") -> "WorkspaceInstaller":
-        logger.info(f"Installing UCX v{__version__} on {ws.config.host}")
+    def run_for_config(
+        ws: WorkspaceClient, config: WorkspaceConfig, *, prefix="ucx", override_clusters: dict[str, str] | None = None
+    ) -> "WorkspaceInstaller":
         workspace_installer = WorkspaceInstaller(ws, prefix=prefix, promtps=False)
+        logger.info(f"Installing UCX v{workspace_installer._version} on {ws.config.host}")
         workspace_installer._config = config
         workspace_installer._write_config()
+        workspace_installer._override_clusters = override_clusters
         # TODO: rather introduce a method `is_configured`, as we may want to reconfigure workspaces for some reason
         workspace_installer._run_configured()
         return workspace_installer
@@ -266,6 +273,8 @@ class WorkspaceInstaller:
         desired_steps = {t.workflow for t in _TASKS.values()}
         for step_name in desired_steps:
             settings = self._job_settings(step_name, remote_wheel)
+            if self._override_clusters:
+                settings = self._apply_cluster_overrides(settings, self._override_clusters)
             if step_name in self._deployed_steps:
                 job_id = self._deployed_steps[step_name]
                 logger.info(f"Updating configuration for step={step_name} job_id={job_id}")
@@ -412,11 +421,22 @@ class WorkspaceInstaller:
         tasks = sorted([t for t in _TASKS.values() if t.workflow == step_name], key=lambda _: _.name)
         return {
             "name": self._name(step_name),
-            "tags": {TAG_APP: self._app, TAG_STEP: step_name, "version": f"v{__version__}"},
+            "tags": {TAG_APP: self._app, TAG_STEP: step_name, "version": f"v{self._version}"},
             "job_clusters": self._job_clusters({t.job_cluster for t in tasks}),
             "email_notifications": email_notifications,
             "tasks": [self._job_task(task, dbfs_path) for task in tasks],
         }
+
+    @staticmethod
+    def _apply_cluster_overrides(settings: dict[str, any], overrides: dict[str, str]) -> dict:
+        settings["job_clusters"] = [_ for _ in settings["job_clusters"] if _.job_cluster_key not in overrides]
+        for job_task in settings["tasks"]:
+            if job_task.job_cluster_key is None:
+                continue
+            if job_task.job_cluster_key in overrides:
+                job_task.existing_cluster_id = overrides[job_task.job_cluster_key]
+                job_task.job_cluster_key = None
+        return settings
 
     def _job_task(self, task: Task, dbfs_path: str) -> jobs.Task:
         jobs_task = jobs.Task(
@@ -498,6 +518,38 @@ class WorkspaceInstaller:
             )
         return clusters
 
+    @property
+    def _version(self):
+        if hasattr(self, "__version"):
+            return self.__version
+        project_root = self._find_project_root()
+        if not (project_root / ".git/config").exists():
+            # normal install, downloaded releases won't have the .git folder
+            return __version__
+        try:
+            out = subprocess.run(["git", "describe", "--tags"], stdout=subprocess.PIPE, check=True)  # noqa S607
+            git_detached_version = out.stdout.decode("utf8")
+            dv = SemVer.parse(git_detached_version)
+            datestamp = datetime.datetime.now().strftime("%Y%m%d%H%M%S")
+            # new commits on main branch since the last tag
+            new_commits = dv.pre_release.split("-")[0]
+            # show that it's a version different from the released one in stats
+            bump_patch = dv.patch + 1
+            # create something that is both https://semver.org and https://peps.python.org/pep-0440/
+            semver_and_pep0440 = f"{dv.major}.{dv.minor}.{bump_patch}+{new_commits}{datestamp}"
+            # validate the semver
+            SemVer.parse(semver_and_pep0440)
+            self.__version = semver_and_pep0440
+            return semver_and_pep0440
+        except Exception as err:
+            msg = (
+                f"Cannot determine unreleased version. Please report this error "
+                f"message that you see on https://github.com/databrickslabs/ucx/issues/new. "
+                f"Meanwhile, download, unpack, and install the latest released version from "
+                f"https://github.com/databrickslabs/ucx/releases. Original error is: {err!s}"
+            )
+            raise OSError(msg) from None
+
     def _build_wheel(self, tmp_dir: str, *, verbose: bool = False):
         """Helper to build the wheel package"""
         streams = {}
@@ -507,6 +559,17 @@ class WorkspaceInstaller:
                 "stderr": subprocess.DEVNULL,
             }
         project_root = self._find_project_root()
+        is_non_released_version = "+" in self._version
+        if (project_root / ".git" / "config").exists() and is_non_released_version:
+            tmp_dir_path = Path(tmp_dir) / "working-copy"
+            # copy everything to a temporary directory
+            shutil.copytree(project_root, tmp_dir_path)
+            # and override the version file
+            version_file = tmp_dir_path / "src/databricks/labs/ucx/__about__.py"
+            with version_file.open("w") as f:
+                f.write(f'__version__ = "{self._version}"')
+            # working copy becomes project root for building a wheel
+            project_root = tmp_dir_path
         logger.debug(f"Building wheel for {project_root} in {tmp_dir}")
         subprocess.run(
             [sys.executable, "-m", "pip", "wheel", "--no-deps", "--wheel-dir", tmp_dir, project_root],

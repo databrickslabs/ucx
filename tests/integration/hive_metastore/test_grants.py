@@ -1,5 +1,4 @@
 import logging
-import os
 
 from databricks.sdk import WorkspaceClient
 
@@ -9,8 +8,10 @@ from databricks.labs.ucx.hive_metastore import GrantsCrawler, TablesCrawler
 logger = logging.getLogger(__name__)
 
 
-def test_all_grants_in_databases(ws: WorkspaceClient, sql_exec, make_catalog, make_schema, make_table, make_group):
-    warehouse_id = os.environ["TEST_DEFAULT_WAREHOUSE_ID"]
+def test_all_grants_in_databases(
+    ws: WorkspaceClient, sql_exec, make_catalog, make_schema, make_table, make_group, env_or_skip
+):
+    warehouse_id = env_or_skip("TEST_DEFAULT_WAREHOUSE_ID")
 
     group_a = make_group()
     group_b = make_group()
