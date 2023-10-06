@@ -24,8 +24,8 @@ from databricks.sdk.service.pipelines import PipelineState, PipelineStateInfo
 
 from databricks.labs.ucx.assessment.crawlers import (
     ClustersCrawler,
-    ExternallyOrchestratedJobTask,
-    ExternallyOrchestratedJobTaskCrawler,
+    ExternallyOrchestratedJobRunsWithFailingConfigCrawler,
+    ExternallyOrchestratedJobRunWithFailingConfiguration,
     JobsCrawler,
     PipelineInfo,
     PipelinesCrawler,
@@ -507,7 +507,7 @@ def test_pipeline_snapshot_with_config():
     assert result_set[0].success == 1
 
 
-def test_externally_orchestrated_jobs_crawler():
+def test_externally_orchestrated_jobs_with_failing_config_crawler():
     """
     Simple test to validate that JobsRunCrawler
      - returns a list of JobRunInfo objects
@@ -515,26 +515,22 @@ def test_externally_orchestrated_jobs_crawler():
      - with expected values
     """
     sample_ext_jobs = [
-        ExternallyOrchestratedJobTask(
+        ExternallyOrchestratedJobRunWithFailingConfiguration(
             run_id=123456789,
-            run_type=RunType.SUBMIT_RUN.value,
-            task_key="task_key1",
             hashed_id="test1",
             spark_version="11.3.x-scala2.12",
-            data_security_mode=DataSecurityMode.NONE.value,
+            num_tasks_with_failing_configuration=1,
         ),
-        ExternallyOrchestratedJobTask(
+        ExternallyOrchestratedJobRunWithFailingConfiguration(
             run_id=123456790,
-            run_type=RunType.WORKFLOW_RUN.value,
-            task_key="task_key2",
             hashed_id="test2",
             spark_version="11.3.x-scala2.12",
-            data_security_mode=DataSecurityMode.SINGLE_USER.value,
+            num_tasks_with_failing_configuration=3,
         ),
     ]
     mock_ws = Mock()
 
-    crawler = ExternallyOrchestratedJobTaskCrawler(mock_ws, MockBackend(), "ucx")
+    crawler = ExternallyOrchestratedJobRunsWithFailingConfigCrawler(mock_ws, MockBackend(), "ucx")
 
     crawler._try_fetch = Mock(return_value=[])
     crawler._crawl = Mock(return_value=sample_ext_jobs)
@@ -542,13 +538,14 @@ def test_externally_orchestrated_jobs_crawler():
     result_set = crawler.snapshot()
 
     assert len(result_set) == 2
-    assert result_set[0].data_security_mode == DataSecurityMode.NONE.value
+    assert result_set[0].num_tasks_with_failing_configuration == 1
+    assert result_set[1].num_tasks_with_failing_configuration == 3
 
 
-def test_externally_orchestrated_jobs_crawler_filters_runs_with_job_id():
+def test_externally_orchestrated_jobs_with_failing_config_crawler_filters_runs_with_job_id():
     """
     Test to validate
-     - job runs with a job id are not included in the result set
+     - job runs with a persisted job id are not included in the result set
     """
     sample_job_runs = [
         BaseRun(
@@ -558,9 +555,7 @@ def test_externally_orchestrated_jobs_crawler_filters_runs_with_job_id():
             tasks=[
                 RunTask(
                     notebook_task=NotebookTask(notebook_path="/some/notebook/path"),
-                    new_cluster=ClusterSpec(
-                        spark_version="2.1.0-db3-scala2.11", node_type_id="r3.xlarge", num_workers=8
-                    ),
+                    new_cluster=ClusterSpec(spark_version="11.3.x-scala2.12", node_type_id="r3.xlarge", num_workers=8),
                     task_key="task1",
                 )
             ],
@@ -593,7 +588,7 @@ def test_externally_orchestrated_jobs_crawler_filters_runs_with_job_id():
 
     sample_jobs = [
         BaseJob(
-            job_id=12345678910,
+            job_id=12345678909,
         )
     ]
 
@@ -613,7 +608,7 @@ def test_externally_orchestrated_jobs_crawler_filters_runs_with_job_id():
     mock_ws.clusters.list = Mock(return_value=sample_clusters)
     mock_ws.jobs.list = Mock(return_value=sample_jobs)
 
-    crawler = ExternallyOrchestratedJobTaskCrawler(mock_ws, MockBackend(), "ucx")
+    crawler = ExternallyOrchestratedJobRunsWithFailingConfigCrawler(mock_ws, MockBackend(), "ucx")
 
     crawler._try_fetch = Mock(return_value=[])
 
@@ -622,11 +617,12 @@ def test_externally_orchestrated_jobs_crawler_filters_runs_with_job_id():
     assert len(result_set) == 1
 
 
-def test_externally_orchestrated_jobs_crawler_returns_multiple_tasks():
+def test_externally_orchestrated_jobs_with_failing_config_crawler_returns_multiple_task_counts():
     """
     Test to validate
      - multiple tasks are returned in a single job run
      - clusters are resolved from new_cluster, existing_cluster_id on the task
+     - if data security mode is set, task will not count
     """
     sample_job_runs = [
         BaseRun(
@@ -650,20 +646,19 @@ def test_externally_orchestrated_jobs_crawler_returns_multiple_tasks():
                         jar_uri="dbfs:/some/jar.jar", main_class_name="some.awesome.class.name"
                     ),
                     task_key="task1",
-                    existing_cluster_id="my_ephemeral_job_cluster",  # this should pull from all clusters, pre-existing
+                    existing_cluster_id="my_ephemeral_job_cluster",
                 ),
                 RunTask(
                     notebook_task=NotebookTask(notebook_path="/some/notebook/path"),
                     new_cluster=ClusterSpec(
                         spark_version="2.1.0-db3-scala2.11", node_type_id="r3.xlarge", num_workers=8
                     ),
-                    task_key="task1",
+                    task_key="task2",
                 ),
                 RunTask(
                     notebook_task=NotebookTask(notebook_path="/some/notebook/path"),
-                    cluster_instance=ClusterInstance(
-                        cluster_id="my_persistent_job_cluster"
-                    ),  #  this should pull from the job def
+                    task_key="task3",
+                    cluster_instance=ClusterInstance(cluster_id="my_persistent_job_cluster"),
                 ),
             ],
         )
@@ -691,18 +686,16 @@ def test_externally_orchestrated_jobs_crawler_returns_multiple_tasks():
     mock_ws.clusters.list = Mock(return_value=sample_clusters)
     mock_ws.jobs.list = Mock(return_value=sample_jobs)
 
-    crawler = ExternallyOrchestratedJobTaskCrawler(mock_ws, MockBackend(), "ucx")
+    crawler = ExternallyOrchestratedJobRunsWithFailingConfigCrawler(mock_ws, MockBackend(), "ucx")
 
     crawler._try_fetch = Mock(return_value=[])
 
     result_set = crawler.snapshot()
 
-    assert len(result_set) == 3
-    assert result_set[0].spark_version == "11.3.x-scala2.12"
-    assert result_set[0].data_security_mode == "SINGLE_USER"
-    assert result_set[1].run_id == 123456789
-    assert result_set[1].spark_version == "2.1.0-db3-scala2.11"
-    assert result_set[2].spark_version == "12.1.x-scala2.12"
+    assert len(result_set) == 1
+    assert result_set[0].spark_version == "12.1.x-scala2.12"
+    assert result_set[0].run_id == 123456789
+    assert result_set[0].num_tasks_with_failing_configuration == 1
 
 
 def test_externally_orchestrated_jobs_crawler_deterministic_hashing():
@@ -712,7 +705,7 @@ def test_externally_orchestrated_jobs_crawler_deterministic_hashing():
     """
     sample_job_runs = [
         BaseRun(
-            job_id=12345678909,
+            job_id=12345678911,
             run_id=123456789,
             run_type=RunType.SUBMIT_RUN,
             job_clusters=[
@@ -727,30 +720,29 @@ def test_externally_orchestrated_jobs_crawler_deterministic_hashing():
                 )
             ],
             tasks=[
-                RunTask(
+                RunTask(  # should not fail
                     spark_jar_task=SparkJarTask(
                         jar_uri="dbfs:/some/jar.jar", main_class_name="some.awesome.class.name"
                     ),
                     task_key="task1",
                     existing_cluster_id="my_ephemeral_job_cluster",  # this should pull from all clusters, pre-existing
                 ),
-                RunTask(
+                RunTask(  # should not fail
                     notebook_task=NotebookTask(notebook_path="/some/notebook/path"),
                     new_cluster=ClusterSpec(
                         spark_version="2.1.0-db3-scala2.11", node_type_id="r3.xlarge", num_workers=8
                     ),
-                    task_key="task1",
+                    task_key="task2",
                 ),
-                RunTask(
+                RunTask(  # should fail
                     notebook_task=NotebookTask(notebook_path="/some/notebook/path"),
-                    cluster_instance=ClusterInstance(
-                        cluster_id="my_persistent_job_cluster"
-                    ),  #  this should pull from the job def
+                    task_key="task3",
+                    cluster_instance=ClusterInstance(cluster_id="my_persistent_job_cluster"),
                 ),
             ],
         ),
         BaseRun(
-            job_id=12345679000,
+            job_id=12345678912,
             run_id=987654321,
             run_type=RunType.SUBMIT_RUN,
             job_clusters=[
@@ -765,19 +757,21 @@ def test_externally_orchestrated_jobs_crawler_deterministic_hashing():
                 )
             ],
             tasks=[
-                RunTask(
+                RunTask(  # should not fail
                     spark_jar_task=SparkJarTask(
                         jar_uri="dbfs:/some/jar.jar", main_class_name="some.awesome.class.name"
                     ),
-                    task_key="task1",
+                    task_key="task4",
                     existing_cluster_id="my_ephemeral_job_cluster",  # this should pull from all clusters, pre-existing
                 ),
-                RunTask(
+                RunTask(  # should fail
                     notebook_task=NotebookTask(notebook_path="/some/notebook/path"),
                     new_cluster=ClusterSpec(
-                        spark_version="2.1.0-db3-scala2.11", node_type_id="r3.xlarge", num_workers=8
+                        spark_version="11.3.x-scala2.12",
+                        node_type_id="r3.xlarge",
+                        num_workers=8,
                     ),
-                    task_key="task1",
+                    task_key="task5",
                 ),
             ],
         ),
@@ -804,12 +798,11 @@ def test_externally_orchestrated_jobs_crawler_deterministic_hashing():
     mock_ws.clusters.list = Mock(return_value=sample_clusters)
     mock_ws.jobs.list = Mock(return_value=sample_jobs)
 
-    crawler = ExternallyOrchestratedJobTaskCrawler(mock_ws, MockBackend(), "ucx")
+    crawler = ExternallyOrchestratedJobRunsWithFailingConfigCrawler(mock_ws, MockBackend(), "ucx")
 
     crawler._try_fetch = Mock(return_value=[])
 
     result_set = crawler.snapshot()
 
-    assert len(result_set) == 5
-    assert result_set[0].hashed_id == result_set[3].hashed_id
-    assert result_set[1].hashed_id == result_set[4].hashed_id
+    assert len(result_set) == 1
+    assert result_set[0].num_tasks_with_failing_configuration == 1

@@ -7,15 +7,9 @@ from hashlib import sha256
 
 from databricks.sdk import WorkspaceClient
 from databricks.sdk.core import DatabricksError
+from databricks.sdk.service import compute
 from databricks.sdk.service.compute import ClusterDetails, ClusterSource
-from databricks.sdk.service.jobs import (
-    BaseJob,
-    BaseRun,
-    ClusterSpec,
-    JobCluster,
-    RunTask,
-    RunType,
-)
+from databricks.sdk.service.jobs import BaseJob, BaseRun, JobCluster, RunTask, RunType
 
 from databricks.labs.ucx.framework.crawlers import CrawlerBase, SqlBackend
 
@@ -26,6 +20,8 @@ INCOMPATIBLE_SPARK_CONFIG_KEYS = [
     "spark.hadoop.javax.jdo.option.ConnectionURL",
     "spark.databricks.hive.metastore.glueCatalog.enabled",
 ]
+
+LOWEST_COMPATIBLE_DBR = "11.3.x"
 
 _AZURE_SP_CONF = [
     "fs.azure.account.key",
@@ -67,13 +63,11 @@ class PipelineInfo:
 
 
 @dataclass
-class ExternallyOrchestratedJobTask:
+class ExternallyOrchestratedJobRunWithFailingConfiguration:
     run_id: int
-    task_key: str
-    run_type: str
     hashed_id: str
     spark_version: str
-    data_security_mode: str
+    num_tasks_with_failing_configuration: int
 
 
 def _azure_sp_conf_present_check(config: dict) -> bool:
@@ -84,7 +78,39 @@ def _azure_sp_conf_present_check(config: dict) -> bool:
     return False
 
 
+def is_custom_image(version_string: str):
+    """
+    If we're missing a major or minor version
+    Or if the patch version is not x, then this is is a custom image
+    """
+    return "custom" in version_string
+
+
+def spark_version_greater_than(left_version: str | None, right_version: str | None) -> bool:
+    """
+    Is left version greater than right version
+    """
+    if left_version is None or is_custom_image(left_version):
+        return False
+    if right_version is None or is_custom_image(right_version):
+        return True
+    pattern = r"^(?P<major>\d+)?\.(?P<minor>\d+)?\.(?P<patch>[\dx]+)?.*"
+    lvg = re.match(pattern, left_version)
+    rvg = re.match(pattern, right_version)
+    left = (int(lvg.group("major")), int(lvg.group("minor")))
+    right = (int(rvg.group("major")), int(rvg.group("minor")))
+    return left >= right
+
+
 def spark_version_compatibility(spark_version: str) -> str:
+    """
+    Determine dbr/spark version compatibility UC
+    - If the spark version is greater than 10.0 return "kinda works"
+    - If the spark is greater than 11.3 return "supported"
+    - All other cases, return "unsupported", including custom images
+    -- Custom images look like: 11.3.1-scala2.12 or 11.3-scala.2.12
+    -- Standard dbr/spark versions look like 11.3.x-scala2.1.2
+    """
     first_comp_custom_rt = 3
     first_comp_custom_x = 2
     dbr_version_components = spark_version.split("-")
@@ -101,6 +127,26 @@ def spark_version_compatibility(spark_version: str) -> str:
     if (10, 0) <= version < (11, 3):
         return "kinda works"
     return "supported"
+
+
+def get_job_cluster_from_task(
+    task: RunTask, job_run: BaseRun, all_clusters: dict[str, ClusterDetails]
+) -> compute.ClusterSpec | ClusterDetails | None:
+    """
+    Determine the cluster associated with the task
+    1) Look for new_cluster on the task
+    2) Look for existing cluster on the task
+    """
+    if task.new_cluster is not None:
+        return task.new_cluster
+    if task.existing_cluster_id is not None:
+        # from api docs If existing_cluster_id, the ID of an existing cluster that is used for all runs of this job.
+        job_clusters: dict[str, JobCluster] = {x.job_cluster_key: x for x in job_run.job_clusters}
+        if job_clusters.get(task.existing_cluster_id, None) is not None:
+            return job_clusters.get(task.existing_cluster_id).new_cluster
+    if task.cluster_instance is not None:
+        return all_clusters.get(task.cluster_instance.cluster_id)
+    return None
 
 
 class PipelinesCrawler(CrawlerBase):
@@ -271,13 +317,19 @@ class JobsCrawler(CrawlerBase):
             yield JobInfo(*row)
 
 
-class ExternallyOrchestratedJobTaskCrawler(CrawlerBase):
+class ExternallyOrchestratedJobRunsWithFailingConfigCrawler(CrawlerBase):
     def __init__(self, ws: WorkspaceClient, sbe: SqlBackend, schema):
-        super().__init__(sbe, "hive_metastore", schema, "job_runs", ExternallyOrchestratedJobTask)
+        super().__init__(
+            sbe,
+            "hive_metastore",
+            schema,
+            "ext_orc_job_runs_with_failing_config",
+            ExternallyOrchestratedJobRunWithFailingConfiguration,
+        )
         self._ws = ws
 
-    def _crawl(self) -> list[ExternallyOrchestratedJobTask]:
-        no_of_days_back = datetime.timedelta(days=90)  # todo make configurable in yaml?
+    def _crawl(self) -> list[ExternallyOrchestratedJobRunWithFailingConfiguration]:
+        no_of_days_back = datetime.timedelta(days=30)  # todo make configurable in yaml?
         start_time_from = datetime.datetime.now() - no_of_days_back
         # todo figure out if we need to specify a default timezone
         all_job_runs = list(
@@ -292,10 +344,9 @@ class ExternallyOrchestratedJobTaskCrawler(CrawlerBase):
         all_clusters: dict[str, ClusterDetails] = {c.cluster_id: c for c in self._ws.clusters.list()}
         return self._assess_job_runs(all_clusters, all_job_runs, all_jobs)
 
-    def _create_hash_from_job_run_task(self, task: RunTask) -> str:
+    def _retrieve_hash_values_from_task(self, task: RunTask) -> list[str]:
         """
-        Check all hashable attributes, append to a singular list, remove None's,
-        pipe separate and hash the value to provide a uniqueness identifier
+        Retrieve all hashable attributes and append to a list with None's removed
         - specifically ignore parameters as these change.
         """
         hash_values = []
@@ -340,79 +391,56 @@ class ExternallyOrchestratedJobTaskCrawler(CrawlerBase):
             hash_values.append(task.git_source.git_provider)
             hash_values.append(task.git_source.git_snapshot.used_commit)
 
-        hash_value_string = "|".join([str(value) for value in hash_values if value is not None])
-        return sha256(bytes(hash_value_string.encode("utf-8"))).hexdigest()
-
-    def _get_cluster_from_task(
-        self, task: RunTask, job_run: BaseRun, all_clusters: dict[str, ClusterDetails]
-    ) -> ClusterSpec | ClusterDetails:
-        """
-        Determine the cluster associated with the task
-        1) Look for new_cluster on the task
-        2) Look for existing cluster on the task
-        3) Look for cluster_instance on the task (filled when the task is run)
-        4) Look for cluster instance on the job (filled when the job is run)
-        """
-        if task.new_cluster is not None:
-            return task.new_cluster
-        elif task.existing_cluster_id is not None:
-            # from api docs If existing_cluster_id, the ID of an existing cluster that is used for all runs of this job.
-            job_clusters: dict[str, JobCluster] = {x.job_cluster_key: x for x in job_run.job_clusters}
-            return job_clusters[task.existing_cluster_id].new_cluster
-        elif task.cluster_instance is not None:
-            # fall back option 1
-            return all_clusters[task.cluster_instance.cluster_id]
-        elif job_run.cluster_instance is not None:
-            # fall back option 2
-            return all_clusters[job_run.cluster_instance.cluster_id]
-
-    def _get_spark_version_from_task(
-        self, task: RunTask, job_run: BaseRun, all_clusters: dict[str, ClusterDetails]
-    ) -> str:
-        """
-        Returns the spark version of the task cluster
-        """
-        return self._get_cluster_from_task(task, job_run, all_clusters).spark_version
-
-    def _get_data_security_mode_from_task(
-        self, task: RunTask, job_run: BaseRun, all_clusters: dict[str, ClusterDetails]
-    ) -> str:
-        """
-        Returns the security mode of the task cluster
-        """
-        data_security_mode = self._get_cluster_from_task(task, job_run, all_clusters).data_security_mode
-        return data_security_mode.value if data_security_mode is not None else None
+        return [str(value) for value in hash_values if value is not None]
 
     def _assess_job_runs(
         self, all_clusters: dict[str, ClusterDetails], all_job_runs: list[BaseRun], all_jobs: list[BaseJob]
-    ) -> list[ExternallyOrchestratedJobTask]:
+    ) -> list[ExternallyOrchestratedJobRunWithFailingConfiguration]:
         """
         Returns a list of ExternallyOrchestratedJobs
         """
-        ext_orc_job_tasks: list[ExternallyOrchestratedJobTask] = list[ExternallyOrchestratedJobTask]()
         all_persisted_job_ids = [x.job_id for x in all_jobs]
         not_persisted_job_runs = list(
             filter(lambda jr: jr.job_id is None or jr.job_id not in all_persisted_job_ids, all_job_runs)
         )
+        ext_orc_job_runs_with_failing_configuration: dict[
+            str, ExternallyOrchestratedJobRunWithFailingConfiguration
+        ] = {}
         for job_run in not_persisted_job_runs:
-            for task in job_run.tasks:
-                spark_version = self._get_spark_version_from_task(task, job_run, all_clusters)
-                data_security_mode = self._get_data_security_mode_from_task(task, job_run, all_clusters)
-                hashed_id = self._create_hash_from_job_run_task(task)
-                ext_orc_job_task = ExternallyOrchestratedJobTask(
+            num_tasks_with_failing_configuration = 0
+            lowest_dbr = None
+            hashable_items = []
+            all_tasks = job_run.tasks if job_run.tasks is not None else []
+            for task in sorted(all_tasks, key=lambda x: x.task_key):
+                task_cluster = get_job_cluster_from_task(task, job_run, all_clusters)
+                if task_cluster is None:
+                    continue
+                if task_cluster.data_security_mode is None and spark_version_greater_than(
+                    task_cluster.spark_version, LOWEST_COMPATIBLE_DBR
+                ):
+                    if lowest_dbr is None or spark_version_greater_than(
+                        lowest_dbr,
+                        task_cluster.spark_version,
+                    ):
+                        lowest_dbr = task_cluster.spark_version
+                    num_tasks_with_failing_configuration += 1
+                    hashable_items.extend(self._retrieve_hash_values_from_task(task))
+            if num_tasks_with_failing_configuration > 0:
+                hashed_id = sha256(bytes("|".join(hashable_items).encode("utf-8"))).hexdigest()
+                ext_orc_job_runs_with_failing_configuration[
+                    hashed_id
+                ] = ExternallyOrchestratedJobRunWithFailingConfiguration(
                     run_id=job_run.run_id,
-                    task_key=task.task_key,
                     hashed_id=hashed_id,
-                    run_type=str(job_run.run_type.value),
-                    spark_version=spark_version,
-                    data_security_mode=data_security_mode,
+                    num_tasks_with_failing_configuration=num_tasks_with_failing_configuration,
+                    spark_version=lowest_dbr,
                 )
-                ext_orc_job_tasks.append(ext_orc_job_task)
-        return ext_orc_job_tasks
 
-    def snapshot(self) -> list[ExternallyOrchestratedJobTask]:
+        return list(ext_orc_job_runs_with_failing_configuration.values())
+
+    def snapshot(self) -> list[ExternallyOrchestratedJobRunWithFailingConfiguration]:
         return self._snapshot(self._try_fetch, self._crawl)
 
-    def _try_fetch(self) -> list[ExternallyOrchestratedJobTask]:
+    def _try_fetch(self) -> list[ExternallyOrchestratedJobRunWithFailingConfiguration]:
         for row in self._fetch(f"SELECT * FROM {self._schema}.{self._table}"):
-            yield ExternallyOrchestratedJobTask(*row)
+            yield ExternallyOrchestratedJobRunWithFailingConfiguration(*row)
