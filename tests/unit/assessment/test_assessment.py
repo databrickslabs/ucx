@@ -502,6 +502,25 @@ def test_pipeline_snapshot_with_config():
     assert result_set[0].success == 1
 
 
+def test_pipeline_list_with_no_config():
+    sample_pipelines = [
+        PipelineInfo(
+            creator_name="abcde.defgh@databricks.com",
+            pipeline_name="New DLT Pipeline",
+            pipeline_id="0112eae7-9d11-4b40-a2b8-6c83cb3c7497",
+            success=1,
+            failures="",
+        )
+    ]
+    mock_ws = Mock()
+    mock_ws.pipelines.list_pipelines.return_value = sample_pipelines = sample_pipelines
+    config_dict = {"spark.hadoop.fs.azure1.account.oauth2.client.id.abcde.dfs.core.windows.net": "wewewerty"}
+    mock_ws.pipelines.get().spec.configuration = config_dict
+    crawler = AzureServicePrincipalCrawler(mock_ws, MockBackend(), "ucx")._list_all_pipeline_with_spn_in_spark_conf()
+
+    assert len(crawler) == 0
+
+
 def test_azure_spn_info_without_matching_spark_conf(mocker):
     sample_clusters = [
         ClusterDetails(
@@ -1346,6 +1365,26 @@ def test_azure_spn_info_with_secret(mocker):
 
     assert len(result_set) == 1
     assert result_set[0].application_id == "test123456780"
+
+
+def test_spn_with_spark_config_snapshot_try_fetch(mocker):
+    sample_spns = [
+        {
+            "application_id": "test123456780",
+            "secret_scope": "abcff",
+            "secret_key": "sp_app_client_id",
+            "tenant_id": "dummy",
+            "storage_account": "SA_Dummy",
+        }
+    ]
+    mock_ws = Mock()
+    crawler = AzureServicePrincipalCrawler(mock_ws, MockBackend(), "ucx")
+    crawler._fetch = Mock(return_value=sample_spns)
+    crawler._crawl = Mock(return_value=sample_spns)
+
+    result_set = crawler.snapshot()
+
+    assert len(result_set) == 1
 
 
 def test_spn_with_spark_config_snapshot(mocker):
