@@ -7,6 +7,25 @@ from databricks.sdk.service.compute import (
     ClusterDetails,
     ClusterSource,
     ClusterSpec,
+    DataSecurityMode,
+)
+from databricks.sdk.service.jobs import (
+    BaseJob,
+    BaseRun,
+    ClusterInstance,
+    JobCluster,
+    JobSettings,
+    NotebookTask,
+    RunTask,
+    RunType,
+    SparkJarTask,
+    Task,
+)
+from databricks.sdk.service.compute import (
+    AutoScale,
+    ClusterDetails,
+    ClusterSource,
+    ClusterSpec,
     DbfsStorageInfo,
     GlobalInitScriptDetails,
     InitScriptInfo,
@@ -24,9 +43,9 @@ from databricks.sdk.service.sql import EndpointConfPair
 from databricks.sdk.service.workspace import GetSecretResponse
 
 from databricks.labs.ucx.assessment.crawlers import (
-    AzureServicePrincipalCrawler,
     ClustersCrawler,
-    GlobalInitScriptCrawler,
+    ExternallyOrchestratedJobRunsWithFailingConfigCrawler,
+    ExternallyOrchestratedJobRunWithFailingConfiguration,
     JobsCrawler,
     PipelineInfo,
     PipelinesCrawler,
@@ -2514,3 +2533,304 @@ def test_list_all_pipeline_with_conf_spn_secret_avlb(mocker):
     assert result_set[0].get("application_id") == "Hello, World!"
     assert result_set[0].get("tenant_id") == "directory_12345"
     assert result_set[0].get("storage_account") == "newstorageacct"
+
+
+def test_externally_orchestrated_jobs_with_failing_config_crawler():
+    """
+    Simple test to validate that JobsRunCrawler
+     - returns a list of JobRunInfo objects
+     - of appropriate size
+     - with expected values
+    """
+    sample_ext_jobs = [
+        ExternallyOrchestratedJobRunWithFailingConfiguration(
+            run_id=123456789,
+            hashed_id="test1",
+            spark_version="11.3.x-scala2.12",
+            num_tasks_with_failing_configuration=1,
+        ),
+        ExternallyOrchestratedJobRunWithFailingConfiguration(
+            run_id=123456790,
+            hashed_id="test2",
+            spark_version="11.3.x-scala2.12",
+            num_tasks_with_failing_configuration=3,
+        ),
+    ]
+    mock_ws = Mock()
+
+    crawler = ExternallyOrchestratedJobRunsWithFailingConfigCrawler(mock_ws, MockBackend(), "ucx")
+
+    crawler._try_fetch = Mock(return_value=[])
+    crawler._crawl = Mock(return_value=sample_ext_jobs)
+
+    result_set = crawler.snapshot()
+
+    assert len(result_set) == 2
+    assert result_set[0].num_tasks_with_failing_configuration == 1
+    assert result_set[1].num_tasks_with_failing_configuration == 3
+
+
+def test_externally_orchestrated_jobs_with_failing_config_crawler_filters_runs_with_job_id():
+    """
+    Test to validate
+     - job runs with a persisted job id are not included in the result set
+    """
+    sample_job_runs = [
+        BaseRun(
+            job_id=12345678910,
+            run_id=123456789,
+            run_type=RunType.SUBMIT_RUN,
+            tasks=[
+                RunTask(
+                    notebook_task=NotebookTask(notebook_path="/some/notebook/path"),
+                    new_cluster=ClusterSpec(spark_version="11.3.x-scala2.12", node_type_id="r3.xlarge", num_workers=8),
+                    task_key="task1",
+                )
+            ],
+        ),
+        BaseRun(
+            job_id=12345678909,
+            run_id=123456790,
+            run_type=RunType.SUBMIT_RUN,
+            job_clusters=[
+                JobCluster(
+                    job_cluster_key="my_ephemeral_job_cluster",
+                    new_cluster=ClusterSpec(
+                        spark_version="2.1.0-db3-scala2.11",
+                        node_type_id="r3.xlarge",
+                        num_workers=8,
+                    ),
+                )
+            ],
+            tasks=[
+                RunTask(
+                    spark_jar_task=SparkJarTask(
+                        jar_uri="dbfs:/some/jar.jar", main_class_name="some.awesome.class.name"
+                    ),
+                    task_key="task2",
+                    existing_cluster_id="my_ephemeral_job_cluster",
+                )
+            ],
+        ),
+    ]
+
+    sample_jobs = [
+        BaseJob(
+            job_id=12345678909,
+        )
+    ]
+
+    sample_clusters = [
+        ClusterDetails(
+            autoscale=AutoScale(min_workers=1, max_workers=6),
+            spark_context_id=5134472582179565315,
+            spark_env_vars=None,
+            spark_version="11.3.x-scala2.12",
+            cluster_id="my_job_cluster",
+            cluster_source=ClusterSource.JOB,
+        )
+    ]
+    mock_ws = Mock()
+
+    mock_ws.jobs.list_runs = Mock(return_value=sample_job_runs)
+    mock_ws.clusters.list = Mock(return_value=sample_clusters)
+    mock_ws.jobs.list = Mock(return_value=sample_jobs)
+
+    crawler = ExternallyOrchestratedJobRunsWithFailingConfigCrawler(mock_ws, MockBackend(), "ucx")
+
+    crawler._try_fetch = Mock(return_value=[])
+
+    result_set = crawler.snapshot()
+
+    assert len(result_set) == 1
+
+
+def test_externally_orchestrated_jobs_with_failing_config_crawler_returns_multiple_task_counts():
+    """
+    Test to validate
+     - multiple tasks are returned in a single job run
+     - clusters are resolved from new_cluster, existing_cluster_id on the task
+     - if data security mode is set, task will not count
+    """
+    sample_job_runs = [
+        BaseRun(
+            job_id=12345678909,
+            run_id=123456789,
+            run_type=RunType.SUBMIT_RUN,
+            job_clusters=[
+                JobCluster(
+                    job_cluster_key="my_ephemeral_job_cluster",
+                    new_cluster=ClusterSpec(
+                        spark_version="11.3.x-scala2.12",
+                        node_type_id="r3.xlarge",
+                        num_workers=8,
+                        data_security_mode=DataSecurityMode.SINGLE_USER,
+                    ),
+                )
+            ],
+            tasks=[
+                RunTask(
+                    spark_jar_task=SparkJarTask(
+                        jar_uri="dbfs:/some/jar.jar", main_class_name="some.awesome.class.name"
+                    ),
+                    task_key="task1",
+                    existing_cluster_id="my_ephemeral_job_cluster",
+                ),
+                RunTask(
+                    notebook_task=NotebookTask(notebook_path="/some/notebook/path"),
+                    new_cluster=ClusterSpec(
+                        spark_version="2.1.0-db3-scala2.11", node_type_id="r3.xlarge", num_workers=8
+                    ),
+                    task_key="task2",
+                ),
+                RunTask(
+                    notebook_task=NotebookTask(notebook_path="/some/notebook/path"),
+                    task_key="task3",
+                    cluster_instance=ClusterInstance(cluster_id="my_persistent_job_cluster"),
+                ),
+            ],
+        )
+    ]
+
+    sample_jobs = [
+        BaseJob(
+            job_id=12345678910,
+        )
+    ]
+
+    sample_clusters = [
+        ClusterDetails(
+            autoscale=AutoScale(min_workers=1, max_workers=6),
+            spark_context_id=5134472582179565315,
+            spark_env_vars=None,
+            spark_version="12.1.x-scala2.12",
+            cluster_id="my_persistent_job_cluster",
+            cluster_source=ClusterSource.JOB,
+        )
+    ]
+    mock_ws = Mock()
+
+    mock_ws.jobs.list_runs = Mock(return_value=sample_job_runs)
+    mock_ws.clusters.list = Mock(return_value=sample_clusters)
+    mock_ws.jobs.list = Mock(return_value=sample_jobs)
+
+    crawler = ExternallyOrchestratedJobRunsWithFailingConfigCrawler(mock_ws, MockBackend(), "ucx")
+
+    crawler._try_fetch = Mock(return_value=[])
+
+    result_set = crawler.snapshot()
+
+    assert len(result_set) == 1
+    assert result_set[0].spark_version == "12.1.x-scala2.12"
+    assert result_set[0].run_id == 123456789
+    assert result_set[0].num_tasks_with_failing_configuration == 1
+
+
+def test_externally_orchestrated_jobs_crawler_deterministic_hashing():
+    """
+    Test to validate
+     - when multiple job runs are submitted that are effectively identical they receive the same hash
+    """
+    sample_job_runs = [
+        BaseRun(
+            job_id=12345678911,
+            run_id=123456789,
+            run_type=RunType.SUBMIT_RUN,
+            job_clusters=[
+                JobCluster(
+                    job_cluster_key="my_ephemeral_job_cluster",
+                    new_cluster=ClusterSpec(
+                        spark_version="11.3.x-scala2.12",
+                        node_type_id="r3.xlarge",
+                        num_workers=8,
+                        data_security_mode=DataSecurityMode.SINGLE_USER,
+                    ),
+                )
+            ],
+            tasks=[
+                RunTask(  # should not fail
+                    spark_jar_task=SparkJarTask(
+                        jar_uri="dbfs:/some/jar.jar", main_class_name="some.awesome.class.name"
+                    ),
+                    task_key="task1",
+                    existing_cluster_id="my_ephemeral_job_cluster",  # this should pull from all clusters, pre-existing
+                ),
+                RunTask(  # should not fail
+                    notebook_task=NotebookTask(notebook_path="/some/notebook/path"),
+                    new_cluster=ClusterSpec(
+                        spark_version="2.1.0-db3-scala2.11", node_type_id="r3.xlarge", num_workers=8
+                    ),
+                    task_key="task2",
+                ),
+                RunTask(  # should fail
+                    notebook_task=NotebookTask(notebook_path="/some/notebook/path"),
+                    task_key="task3",
+                    cluster_instance=ClusterInstance(cluster_id="my_persistent_job_cluster"),
+                ),
+            ],
+        ),
+        BaseRun(
+            job_id=12345678912,
+            run_id=987654321,
+            run_type=RunType.SUBMIT_RUN,
+            job_clusters=[
+                JobCluster(
+                    job_cluster_key="my_ephemeral_job_cluster",
+                    new_cluster=ClusterSpec(
+                        spark_version="11.3.x-scala2.12",
+                        node_type_id="r3.xlarge",
+                        num_workers=8,
+                        data_security_mode=DataSecurityMode.SINGLE_USER,
+                    ),
+                )
+            ],
+            tasks=[
+                RunTask(  # should not fail
+                    spark_jar_task=SparkJarTask(
+                        jar_uri="dbfs:/some/jar.jar", main_class_name="some.awesome.class.name"
+                    ),
+                    task_key="task4",
+                    existing_cluster_id="my_ephemeral_job_cluster",  # this should pull from all clusters, pre-existing
+                ),
+                RunTask(  # should fail
+                    notebook_task=NotebookTask(notebook_path="/some/notebook/path"),
+                    new_cluster=ClusterSpec(
+                        spark_version="11.3.x-scala2.12",
+                        node_type_id="r3.xlarge",
+                        num_workers=8,
+                    ),
+                    task_key="task5",
+                ),
+            ],
+        ),
+    ]
+    sample_jobs = [
+        BaseJob(
+            job_id=12345678910,
+        )
+    ]
+
+    sample_clusters = [
+        ClusterDetails(
+            autoscale=AutoScale(min_workers=1, max_workers=6),
+            spark_context_id=5134472582179565315,
+            spark_env_vars=None,
+            spark_version="12.1.x-scala2.12",
+            cluster_id="my_persistent_job_cluster",
+            cluster_source=ClusterSource.JOB,
+        )
+    ]
+    mock_ws = Mock()
+
+    mock_ws.jobs.list_runs = Mock(return_value=sample_job_runs)
+    mock_ws.clusters.list = Mock(return_value=sample_clusters)
+    mock_ws.jobs.list = Mock(return_value=sample_jobs)
+
+    crawler = ExternallyOrchestratedJobRunsWithFailingConfigCrawler(mock_ws, MockBackend(), "ucx")
+
+    crawler._try_fetch = Mock(return_value=[])
+
+    result_set = crawler.snapshot()
+
+    assert len(result_set) == 1
+    assert result_set[0].num_tasks_with_failing_configuration == 1
