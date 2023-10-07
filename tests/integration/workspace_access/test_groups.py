@@ -32,8 +32,8 @@ def test_prepare_environment_no_groups_selected(ws, make_ucx_group, make_group, 
         _ws = ws.groups.get(id=_info.workspace.id)
         _backup = ws.groups.get(id=_info.backup.id)
         # https://github.com/databricks/databricks-sdk-py/pull/361 may fix the NPE gotcha with empty members
-        _ws_members = sorted([m.value for m in _ws.members])
-        _backup_members = sorted([m.value for m in _backup.members])
+        _ws_members = sorted([m.value for m in _ws.members]) if _ws.members is not None else []
+        _backup_members = sorted([m.value for m in _backup.members]) if _backup.members is not None else []
         assert _ws_members == _backup_members
 
     for g, _ in for_test:

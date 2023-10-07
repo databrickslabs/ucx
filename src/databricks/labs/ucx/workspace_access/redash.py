@@ -84,6 +84,7 @@ class SqlPermissionsSupport(Crawler, Applier):
         This affects the way how we prepare the new ACL request.
         """
         self._ws.dbsql_permissions.set(object_type=object_type, object_id=object_id, access_control_list=acl)
+        return True
 
     def _prepare_new_acl(
         self, acl: list[sql.AccessControl], migration_state: GroupMigrationState, destination: Destination

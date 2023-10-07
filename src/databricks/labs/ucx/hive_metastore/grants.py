@@ -4,7 +4,7 @@ from dataclasses import dataclass
 from functools import partial
 
 from databricks.labs.ucx.framework.crawlers import CrawlerBase
-from databricks.labs.ucx.framework.parallel import ThreadedExecution
+from databricks.labs.ucx.framework.parallel import Threads
 from databricks.labs.ucx.hive_metastore.tables import TablesCrawler
 
 logger = logging.getLogger(__name__)
@@ -141,7 +141,7 @@ class GrantsCrawler(CrawlerBase):
           table/view-specific grants.
         - Iterates through tables in the specified database using the `_tc.snapshot` method.
         - For each table, adds tasks to fetch grants for the table or its view, depending on the kind of the table.
-        - Executes the tasks concurrently using ThreadedExecution.gather.
+        - Executes the tasks concurrently using Threads.gather.
         - Flattens the list of retrieved grant lists into a single list of Grant objects.
 
         Note:
@@ -163,9 +163,11 @@ class GrantsCrawler(CrawlerBase):
                 tasks.append(partial(fn, view=table.name))
             else:
                 tasks.append(partial(fn, table=table.name))
-        return [
-            grant for grants in ThreadedExecution.gather(f"listing grants for {catalog}", tasks) for grant in grants
-        ]
+        catalog_grants, errors = Threads.gather(f"listing grants for {catalog}", tasks)
+        if len(errors) > 0:
+            # TODO: https://github.com/databrickslabs/ucx/issues/406
+            logger.error(f"Detected {len(errors)} during scanning for grants in {catalog}")
+        return [grant for grants in catalog_grants for grant in grants]
 
     def _grants(
         self,

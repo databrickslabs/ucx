@@ -170,3 +170,9 @@ def test_unregistered_support():
     )
     pm = PermissionManager(b, "test", [], {})
     pm.apply_group_permissions(migration_state=MagicMock(), destination="backup")
+
+
+def test_factory(mocker):
+    ws = mocker.Mock()
+    b = MockBackend()
+    PermissionManager.factory(ws, b, "test")

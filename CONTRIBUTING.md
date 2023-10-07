@@ -92,7 +92,7 @@ development cycle times and allowing for more immediate feedback during developm
 
 ```python
 from databricks.sdk.service.workspace import AclPermission
-from databricks.labs.ucx.providers.mixins.fixtures import *  # noqa: F403
+from databricks.labs.ucx.mixins.fixtures import *  # noqa: F403
 
 def test_secret_scope_acl(make_secret_scope, make_secret_scope_acl, make_group):
     scope_name = make_secret_scope()
@@ -104,7 +104,7 @@ with the [Python plugin (Community Edition)](https://plugins.jetbrains.com/plugi
 IntelliJ CE, then it would work in PyCharm. Debugging capabilities are essential for troubleshooting and diagnosing issues during 
 development. Please make sure that your test setup allows for easy debugging by following best practices.
 
-![debugging tests](./examples/debugging-tests.gif)
+![debugging tests](docs/debugging-tests.gif)
 
 Adhering to these guidelines ensures that our integration tests are robust, efficient, and easily maintainable. This, 
 in turn, contributes to the overall reliability and quality of our software.
@@ -138,7 +138,7 @@ hatch run python -c "import sys; print(sys.executable)"
 ```
 
 Configure your IDE to use this Python path so that you work within the virtual environment when developing the project:
-![IDE Setup](./examples/hatch-intellij.gif)
+![IDE Setup](docs/hatch-intellij.gif)
 
 Before every commit, apply the consistent formatting of the code, as we want our codebase look consistent:
 ```shell

@@ -8,7 +8,7 @@ from functools import partial
 from databricks.sdk import WorkspaceClient
 
 from databricks.labs.ucx.framework.crawlers import CrawlerBase, SqlBackend
-from databricks.labs.ucx.framework.parallel import ThreadedExecution
+from databricks.labs.ucx.framework.parallel import Threads
 from databricks.labs.ucx.mixins.sql import Row
 
 logger = logging.getLogger(__name__)
@@ -128,8 +128,11 @@ class TablesCrawler(CrawlerBase):
             logger.debug(f"[{catalog}.{database}] listing tables")
             for _, table, _is_tmp in self._fetch(f"SHOW TABLES FROM {catalog}.{database}"):
                 tasks.append(partial(self._describe, catalog, database, table))
-        results = ThreadedExecution.gather(f"listing tables in {catalog}", tasks)
-        return [x for x in results if x is not None]
+        catalog_tables, errors = Threads.gather(f"listing tables in {catalog}", tasks)
+        if len(errors) > 0:
+            # TODO: https://github.com/databrickslabs/ucx/issues/406
+            logger.error(f"Detected {len(errors)} while scanning tables in {catalog}")
+        return catalog_tables
 
     def _describe(self, catalog: str, database: str, table: str) -> Table | None:
         """Fetches metadata like table type, data format, external table location,
@@ -153,6 +156,7 @@ class TablesCrawler(CrawlerBase):
                 upgraded_to=self._parse_table_props(describe.get("Table Properties", "")).get("upgraded_to", None),
             )
         except Exception as e:
+            # TODO: https://github.com/databrickslabs/ucx/issues/406
             logger.error(f"Couldn't fetch information for table {full_name} : {e}")
             return None
 
@@ -188,25 +192,26 @@ class TablesMigrate:
             if self._database_to_catalog_mapping:
                 target_catalog = self._database_to_catalog_mapping[table.database]
             tasks.append(partial(self._migrate_table, target_catalog, table))
-        ThreadedExecution.gather("migrate tables", tasks)
+        _, errors = Threads.gather("migrate tables", tasks)
+        if len(errors) > 0:
+            # TODO: https://github.com/databrickslabs/ucx/issues/406
+            logger.error(f"Detected {len(errors)} errors while migrating tables")
 
     def _migrate_table(self, target_catalog, table):
-        try:
-            sql = table.uc_create_sql(target_catalog)
-            logger.debug(f"Migrating table {table.key} to using SQL query: {sql}")
-            target = f"{target_catalog}.{table.database}.{table.name}".lower()
+        sql = table.uc_create_sql(target_catalog)
+        logger.debug(f"Migrating table {table.key} to using SQL query: {sql}")
+        target = f"{target_catalog}.{table.database}.{table.name}".lower()
 
-            if self._table_already_upgraded(target):
-                logger.info(f"Table {table.key} already upgraded to {self._seen_tables[target]}")
-            elif table.object_type == "MANAGED":
-                self._backend.execute(sql)
-                self._backend.execute(table.sql_alter_to(target_catalog))
-                self._backend.execute(table.sql_alter_from(target_catalog))
-                self._seen_tables[target] = table.key
-            else:
-                logger.info(f"Table {table.key} is a {table.object_type} and is not supported for migration yet ")
-        except Exception as e:
-            logger.error(f"Could not create table {table.name} because: {e}")
+        if self._table_already_upgraded(target):
+            logger.info(f"Table {table.key} already upgraded to {self._seen_tables[target]}")
+        elif table.object_type == "MANAGED":
+            self._backend.execute(sql)
+            self._backend.execute(table.sql_alter_to(target_catalog))
+            self._backend.execute(table.sql_alter_from(target_catalog))
+            self._seen_tables[target] = table.key
+        else:
+            logger.info(f"Table {table.key} is a {table.object_type} and is not supported for migration yet ")
+        return True
 
     def _init_seen_tables(self):
         for catalog in self._ws.catalogs.list():
