@@ -124,9 +124,11 @@ class GroupManager:
             backup_group = self._get_or_create_backup_group(source_group_name=name, source_group=ws_group)
             return MigrationGroupInfo(workspace=ws_group, backup=backup_group, account=acc_group)
 
-        collected_groups = Threads.gather(
-            "get group info", [partial(get_group_info, group_name) for group_name in groups_names]
-        )
+        groups_names_ = [partial(get_group_info, group_name) for group_name in groups_names]
+        collected_groups, errors = Threads.gather("get group info", groups_names_)
+        if len(errors) > 0:
+            # TODO: https://github.com/databrickslabs/ucx/issues/406
+            logger.error(f"Detected {len(errors)} while collecting groups")
         for g in collected_groups:
             self._migration_state.add(g)
 
@@ -236,12 +238,17 @@ class GroupManager:
         logger.info("Replacing the workspace groups with account-level groups")
         if len(self._migration_state.groups) == 0:
             logger.info("No groups were loaded or initialized, nothing to do")
-            return
-        Threads.gather(
-            "groups: workspace -> account",
-            [partial(self._replace_group, migration_info) for migration_info in self.migration_groups_provider.groups],
-        )
+            return True
+        groups_ = [
+            partial(self._replace_group, migration_info) for migration_info in self.migration_groups_provider.groups
+        ]
+        _, errors = Threads.gather("groups: workspace -> account", groups_)
+        if len(errors) > 0:
+            # TODO: https://github.com/databrickslabs/ucx/issues/406
+            logger.error(f"Detected {len(errors)} while replacing groups")
+            return False
         logger.info("Workspace groups were successfully replaced with account-level groups")
+        return True
 
     def delete_backup_groups(self):
         backup_groups = self._get_backup_groups()

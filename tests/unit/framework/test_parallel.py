@@ -24,9 +24,10 @@ def test_gather_with_failed_task(caplog):
         raise DatabricksError(msg)
 
     tasks = [works, fails, works, fails, works, fails, works, fails]
-    results = Threads.gather("testing", tasks)
+    results, errors = Threads.gather("testing", tasks)
 
     assert [True, True, True, True] == results
+    assert 4 == len(errors)
     assert [
         "More than half 'testing' tasks failed: 50% (4/8)",
         "testing task failed: failed",
@@ -50,9 +51,10 @@ def test_gather_with_failed_task_no_message(caplog):
         raise OSError(1, msg)
 
     tasks = [works, not_really_but_fine, works, fails, works, works]
-    results = Threads.gather("testing", tasks)
+    results, errors = Threads.gather("testing", tasks)
 
     assert [True, True, True, True] == results
+    assert 1 == len(errors)
     assert [
         "Some 'testing' tasks failed: 17% (1/6)",
         "did something, but returned None",
@@ -67,9 +69,10 @@ def test_all_none(caplog):
         logging.info("did something, but returned None")
 
     tasks = [not_really_but_fine, not_really_but_fine, not_really_but_fine, not_really_but_fine]
-    results = Threads.gather("testing", tasks)
+    results, errors = Threads.gather("testing", tasks)
 
     assert [] == results
+    assert [] == errors
     assert [
         "Finished 'testing' tasks: non-empty 0% (0/4)",
         "did something, but returned None",
@@ -85,9 +88,10 @@ def test_all_failed(caplog):
         raise DatabricksError(msg)
 
     tasks = [fails, fails, fails, fails]
-    results = Threads.gather("testing", tasks)
+    results, errors = Threads.gather("testing", tasks)
 
     assert [] == results
+    assert 4 == len(errors)
     assert [
         "All 'testing' tasks failed!!!",
         "testing task failed: failed",

@@ -25,33 +25,32 @@ class Threads(Generic[Result]):
         self._default_log_every = 100
 
     @classmethod
-    def gather(cls, name: str, tasks: list[Callable[..., Result]]) -> list[Result]:
+    def gather(cls, name: str, tasks: list[Callable[..., Result]]) -> (list[Result], list[Exception]):
         num_threads = os.cpu_count() * 2
         return cls(name, tasks, num_threads=num_threads)._run()
 
-    def _run(self) -> list[Result]:
+    def _run(self) -> (list[Result], list[Exception]):
         given_cnt = len(self._tasks)
         if given_cnt == 0:
-            return []
+            return [], []
         logger.debug(f"Starting {given_cnt} tasks in {self._num_threads} threads")
 
         collected = []
-        failed_cnt = 0
+        errors = []
         for future in self._execute():
             return_value = future.result()
             if return_value is None:
                 continue
             result, err = return_value
             if err is not None:
-                # TODO: record errors in database
-                failed_cnt += 1
+                errors.append(err)
                 continue
             if result is None:
                 continue
             collected.append(result)
-        self._on_finish(given_cnt, failed_cnt)
+        self._on_finish(given_cnt, len(errors))
 
-        return collected
+        return collected, errors
 
     def _on_finish(self, given_cnt, failed_cnt):
         since = dt.datetime.now() - self._started

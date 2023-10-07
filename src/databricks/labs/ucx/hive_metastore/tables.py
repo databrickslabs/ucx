@@ -128,7 +128,11 @@ class TablesCrawler(CrawlerBase):
             logger.debug(f"[{catalog}.{database}] listing tables")
             for _, table, _is_tmp in self._fetch(f"SHOW TABLES FROM {catalog}.{database}"):
                 tasks.append(partial(self._describe, catalog, database, table))
-        return Threads.gather(f"listing tables in {catalog}", tasks)
+        catalog_tables, errors = Threads.gather(f"listing tables in {catalog}", tasks)
+        if len(errors) > 0:
+            # TODO: https://github.com/databrickslabs/ucx/issues/406
+            logger.error(f"Detected {len(errors)} while scanning tables in {catalog}")
+        return catalog_tables
 
     def _describe(self, catalog: str, database: str, table: str) -> Table | None:
         """Fetches metadata like table type, data format, external table location,
@@ -152,6 +156,7 @@ class TablesCrawler(CrawlerBase):
                 upgraded_to=self._parse_table_props(describe.get("Table Properties", "")).get("upgraded_to", None),
             )
         except Exception as e:
+            # TODO: https://github.com/databrickslabs/ucx/issues/406
             logger.error(f"Couldn't fetch information for table {full_name} : {e}")
             return None
 
@@ -187,7 +192,10 @@ class TablesMigrate:
             if self._database_to_catalog_mapping:
                 target_catalog = self._database_to_catalog_mapping[table.database]
             tasks.append(partial(self._migrate_table, target_catalog, table))
-        Threads.gather("migrate tables", tasks)
+        _, errors = Threads.gather("migrate tables", tasks)
+        if len(errors) > 0:
+            # TODO: https://github.com/databrickslabs/ucx/issues/406
+            logger.error(f"Detected {len(errors)} while migrating tables")
 
     def _migrate_table(self, target_catalog, table):
         sql = table.uc_create_sql(target_catalog)
