@@ -6,13 +6,11 @@ from databricks.labs.ucx.assessment.crawlers import (
     JobsCrawler,
     PipelinesCrawler,
 )
-from databricks.labs.ucx.framework.crawlers import StatementExecutionBackend
 
 logger = logging.getLogger(__name__)
 
 
 def test_pipeline_crawler(ws, make_pipeline, inventory_schema, sql_backend):
-
     logger.info("setting up fixtures")
     created_pipeline = make_pipeline(spn_example=1)
 
@@ -29,12 +27,7 @@ def test_pipeline_crawler(ws, make_pipeline, inventory_schema, sql_backend):
     assert results[0].pipeline_id == created_pipeline.pipeline_id
 
 
-def test_cluster_crawler(
-    ws,
-    make_cluster,
-    inventory_schema,
-    sql_backend
-):
+def test_cluster_crawler(ws, make_cluster, inventory_schema, sql_backend):
     created_cluster = make_cluster(single_node=True, spn_example=1)
     new_cluster = created_cluster.result()
     cluster_crawler = ClustersCrawler(ws=ws, sbe=sql_backend, schema=inventory_schema)
@@ -51,7 +44,6 @@ def test_cluster_crawler(
 
 
 def test_job_crawler(ws, make_job, inventory_schema, sql_backend):
-
     new_job = make_job(spn_example=1)
     job_crawler = JobsCrawler(ws=ws, sbe=sql_backend, schema=inventory_schema)
     jobs = job_crawler.snapshot()
