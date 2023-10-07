@@ -11,7 +11,7 @@ from databricks.labs.ucx.mixins.redash import (
 )
 
 
-@pytest.mark.skip('not working')
+@pytest.mark.skip("not working")
 def test_creating_widgets(ws: WorkspaceClient, make_warehouse, env_or_skip):
     dashboard_widgets_api = DashboardWidgetsAPI(ws.api_client)
     query_visualizations_api = QueryVisualizationsExt(ws.api_client)

@@ -1,6 +1,5 @@
 import logging
 
-
 from databricks.labs.ucx.hive_metastore import TablesCrawler
 
 logger = logging.getLogger(__name__)

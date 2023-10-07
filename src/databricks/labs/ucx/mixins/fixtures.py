@@ -15,7 +15,11 @@ import pytest
 from databricks.sdk import AccountClient, WorkspaceClient
 from databricks.sdk.core import DatabricksError
 from databricks.sdk.service import compute, iam, jobs, pipelines, workspace
-from databricks.sdk.service.catalog import CatalogInfo, SchemaInfo, TableInfo, SecurableType
+from databricks.sdk.service.catalog import (
+    CatalogInfo,
+    SchemaInfo,
+    TableInfo,
+)
 from databricks.sdk.service.sql import CreateWarehouseRequestWarehouseType
 from databricks.sdk.service.workspace import ImportFormat
 
@@ -688,7 +692,7 @@ def inventory_schema(make_schema):
 def make_catalog(ws, sql_backend, make_random):
     def create() -> CatalogInfo:
         name = f"ucx_C{make_random(4)}".lower()
-        sql_backend.execute(f'CREATE CATALOG {name}')
+        sql_backend.execute(f"CREATE CATALOG {name}")
         catalog_info = ws.catalogs.get(name)
         return catalog_info
 

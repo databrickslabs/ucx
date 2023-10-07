@@ -8,7 +8,7 @@ from databricks.labs.ucx.hive_metastore.tables import TablesMigrate
 logger = logging.getLogger(__name__)
 
 
-@pytest.mark.skip('integration testing environments on AWS do not yet have UC IAM properly setup')
+@pytest.mark.skip("integration testing environments on AWS do not yet have UC IAM properly setup")
 def test_migrate_managed_tables(ws, sql_backend, inventory_schema, make_catalog, make_schema, make_table, env_or_skip):
     src_schema = make_schema(catalog_name="hive_metastore")
     src_managed_table = make_table(catalog_name=src_schema.catalog_name, schema_name=src_schema.name)
@@ -25,11 +25,11 @@ def test_migrate_managed_tables(ws, sql_backend, inventory_schema, make_catalog,
     target_tables = list(sql_backend.fetch(f"SHOW TABLES IN {dst_schema.full_name}"))
     assert len(target_tables) == 1
 
-    target_table_properties = ws.tables.get(f'{dst_schema.full_name}.{src_managed_table.name}').properties
+    target_table_properties = ws.tables.get(f"{dst_schema.full_name}.{src_managed_table.name}").properties
     assert target_table_properties["upgraded_from"] == src_managed_table
 
 
-@pytest.mark.skip('integration testing environments on AWS do not yet have UC IAM properly setup')
+@pytest.mark.skip("integration testing environments on AWS do not yet have UC IAM properly setup")
 def test_migrate_tables_with_cache_should_not_create_table(
     ws, sql_backend, inventory_schema, make_random, make_catalog, make_schema, make_table, env_or_skip
 ):
@@ -70,7 +70,7 @@ def test_migrate_tables_with_cache_should_not_create_table(
 
 
 @pytest.mark.skip(reason="Needs Storage credential + External Location in place")
-def test_migrate_external_table(ws, sql_backend,inventory_schema,  make_catalog, make_schema, make_table, env_or_skip):
+def test_migrate_external_table(ws, sql_backend, inventory_schema, make_catalog, make_schema, make_table, env_or_skip):
     src_schema = make_schema(catalog_name="hive_metastore")
     src_external_table = make_table(schema_name=src_schema.name, external=True)
 
