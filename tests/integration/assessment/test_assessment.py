@@ -11,16 +11,12 @@ from databricks.labs.ucx.framework.crawlers import StatementExecutionBackend
 logger = logging.getLogger(__name__)
 
 
-def test_pipeline_crawler(ws, make_pipeline, make_schema, env_or_skip):
-    warehouse_id = env_or_skip("TEST_DEFAULT_WAREHOUSE_ID")
+def test_pipeline_crawler(ws, make_pipeline, inventory_schema, sql_backend):
+
     logger.info("setting up fixtures")
     created_pipeline = make_pipeline(spn_example=1)
 
-    inventory_schema = make_schema(catalog="hive_metastore")
-    _, inventory_schema = inventory_schema.split(".")
-    backend = StatementExecutionBackend(ws, warehouse_id)
-
-    pipeline_crawler = PipelinesCrawler(ws=ws, sbe=backend, schema=inventory_schema)
+    pipeline_crawler = PipelinesCrawler(ws=ws, sbe=sql_backend, schema=inventory_schema)
     pipelines = pipeline_crawler.snapshot()
     results = []
     for pipeline in pipelines:
@@ -36,17 +32,12 @@ def test_pipeline_crawler(ws, make_pipeline, make_schema, env_or_skip):
 def test_cluster_crawler(
     ws,
     make_cluster,
-    make_schema,
-    env_or_skip,
+    inventory_schema,
+    sql_backend
 ):
-    warehouse_id = env_or_skip("TEST_DEFAULT_WAREHOUSE_ID")
     created_cluster = make_cluster(single_node=True, spn_example=1)
     new_cluster = created_cluster.result()
-    inventory_schema = make_schema(catalog="hive_metastore")
-    _, inventory_schema = inventory_schema.split(".")
-
-    backend = StatementExecutionBackend(ws, warehouse_id)
-    cluster_crawler = ClustersCrawler(ws=ws, sbe=backend, schema=inventory_schema)
+    cluster_crawler = ClustersCrawler(ws=ws, sbe=sql_backend, schema=inventory_schema)
     clusters = cluster_crawler.snapshot()
     results = []
     for cluster in clusters:
@@ -59,16 +50,10 @@ def test_cluster_crawler(
     assert results[0].cluster_id == new_cluster.cluster_id
 
 
-def test_job_crawler(ws, make_schema, make_job, env_or_skip):
-    warehouse_id = env_or_skip("TEST_DEFAULT_WAREHOUSE_ID")
+def test_job_crawler(ws, make_job, inventory_schema, sql_backend):
 
     new_job = make_job(spn_example=1)
-
-    inventory_schema = make_schema(catalog="hive_metastore")
-    _, inventory_schema = inventory_schema.split(".")
-
-    backend = StatementExecutionBackend(ws, warehouse_id)
-    job_crawler = JobsCrawler(ws=ws, sbe=backend, schema=inventory_schema)
+    job_crawler = JobsCrawler(ws=ws, sbe=sql_backend, schema=inventory_schema)
     jobs = job_crawler.snapshot()
     results = []
     for job in jobs:
@@ -81,15 +66,10 @@ def test_job_crawler(ws, make_schema, make_job, env_or_skip):
     assert int(results[0].job_id) == new_job.job_id
 
 
-def test_spn_crawler(ws, make_schema, env_or_skip, make_job, make_pipeline):
-    warehouse_id = env_or_skip("TEST_DEFAULT_WAREHOUSE_ID")
-    inventory_schema = make_schema(catalog="hive_metastore")
-    _, inventory_schema = inventory_schema.split(".")
-
-    backend = StatementExecutionBackend(ws, warehouse_id)
+def test_spn_crawler(ws, inventory_schema, make_job, make_pipeline, sql_backend):
     make_job(spn_example=1)
     make_pipeline(spn_example=1)
-    spn_crawler = AzureServicePrincipalCrawler(ws=ws, sbe=backend, schema=inventory_schema)
+    spn_crawler = AzureServicePrincipalCrawler(ws=ws, sbe=sql_backend, schema=inventory_schema)
     spns = spn_crawler.snapshot()
     results = []
     for spn in spns:
