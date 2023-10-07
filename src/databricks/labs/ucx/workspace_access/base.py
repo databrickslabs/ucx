@@ -10,6 +10,7 @@ from databricks.labs.ucx.workspace_access.groups import GroupMigrationState
 logger = Logger(__name__)
 
 
+# TODO: fix order to standard https://github.com/databrickslabs/ucx/issues/411
 @dataclass
 class Permissions:
     object_id: str
@@ -29,12 +30,12 @@ class Crawler:
         """
 
 
+# TODO: this class has to become typing.Protocol and keep only abstract methods
+# See https://www.oreilly.com/library/view/fluent-python-2nd/9781492056348/ch13.html
 class Applier:
     @abstractmethod
     def is_item_relevant(self, item: Permissions, migration_state: GroupMigrationState) -> bool:
-        """
-        This method verifies that the given item is relevant for the given migration state.
-        """
+        """TODO: remove it, see https://github.com/databrickslabs/ucx/issues/410"""
 
     @abstractmethod
     def _get_apply_task(

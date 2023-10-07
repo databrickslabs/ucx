@@ -48,6 +48,13 @@ class GroupMigrationState:
         else:
             return found[0]
 
+    def get_target_principal(self, name: str, destination: typing.Literal["backup", "account"]) -> str | None:
+        for info in self.groups:
+            if info.workspace.display_name != name:
+                continue
+            return getattr(info, destination).display_name
+        return None
+
 
 class GroupManager:
     SYSTEM_GROUPS: typing.ClassVar[list[str]] = ["users", "admins", "account users"]

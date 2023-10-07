@@ -115,7 +115,7 @@ def assess_clusters(cfg: WorkspaceConfig):
     crawler.snapshot()
 
 
-@task("assessment", depends_on=[setup_schema])
+@task("assessment", depends_on=[setup_schema, crawl_grants])
 def crawl_permissions(cfg: WorkspaceConfig):
     """Scans the workspace-local groups and all their permissions. The list is stored in the `$inventory.permissions`
     Delta table.
@@ -143,7 +143,7 @@ def assessment_report(_: WorkspaceConfig):
     dashboard _before_ all tasks have been completed, but then only already completed information is shown."""
 
 
-@task("migrate-groups", depends_on=[crawl_permissions])
+@task("migrate-groups", depends_on=[crawl_permissions], job_cluster="tacl")
 def migrate_permissions(cfg: WorkspaceConfig):
     """Main phase of the group migration process. It does the following:
       - Creates a backup of every workspace-local group, adding a prefix that can be set in the configuration
