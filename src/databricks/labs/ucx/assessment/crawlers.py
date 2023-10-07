@@ -155,6 +155,12 @@ class AzureServicePrincipalCrawler(CrawlerBase):
                 else:
                     tenant_key = "fs.azure.account.oauth2.client.endpoint"
                 tenant_id = self._get_azure_spn_tenant_id(config, tenant_key)
+
+                spn_application_id = "" if spn_application_id is None else spn_application_id
+                secret_scope = "" if secret_scope is None else secret_scope
+                secret_key = "" if secret_key is None else secret_key
+                tenant_id = "" if tenant_id is None else tenant_id
+                storage_account = "" if storage_account is None else storage_account
                 spn_list.append(
                     {
                         "application_id": spn_application_id,

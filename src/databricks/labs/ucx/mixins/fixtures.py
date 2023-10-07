@@ -455,6 +455,7 @@ def make_cluster_policy(ws, make_random):
 def make_cluster(ws, make_random):
     def create(
         *,
+        spn_example=None,
         single_node: bool = False,
         cluster_name: str | None = None,
         spark_version: str | None = None,
@@ -467,8 +468,21 @@ def make_cluster(ws, make_random):
             spark_version = ws.clusters.select_spark_version(latest=True)
         if single_node:
             kwargs["num_workers"] = 0
-            kwargs["spark_conf"] = {"spark.databricks.cluster.profile": "singleNode", "spark.master": "local[*]"}
+            if spn_example:
+                kwargs["spark_conf"] = {
+                    "spark.databricks.cluster.profile": "singleNode",
+                    "spark.master": "local[*]",
+                    "fs.azure.account.auth.type.storage_acct_1.dfs.core.windows.net": "OAuth",
+                    "fs.azure.account.oauth.provider.type.storage_acct_1.dfs.core.windows.net": "org.apache.hadoop.fs"
+                    ".azurebfs.oauth2.ClientCredsTokenProvider",
+                    "fs.azure.account.oauth2.client.id.storage_acct_1.dfs.core.windows.net": "dummy_application_id",
+                    "fs.azure.account.oauth2.client.secret.storage_acct_1.dfs.core.windows.net": "dummy",
+                    "fs.azure.account.oauth2.client.endpoint.storage_acct_1.dfs.core.windows.net": "https://login.microsoftonline.com/directory_12345/oauth2/token",
+                }
+            else:
+                kwargs["spark_conf"] = {"spark.databricks.cluster.profile": "singleNode", "spark.master": "local[*]"}
             kwargs["custom_tags"] = {"ResourceClass": "SingleNode"}
+            kwargs["node_type_id"] = ws.clusters.select_node_type(local_disk=True)
         elif "instance_pool_id" not in kwargs:
             kwargs["node_type_id"] = ws.clusters.select_node_type(local_disk=True)
 
@@ -519,23 +533,50 @@ def make_instance_pool(ws, make_random):
 
 @pytest.fixture
 def make_job(ws, make_random, make_notebook):
-    def create(**kwargs):
+    def create(spn_example=None, **kwargs):
         if "name" not in kwargs:
             kwargs["name"] = f"sdk-{make_random(4)}"
         if "tasks" not in kwargs:
-            kwargs["tasks"] = [
-                jobs.Task(
-                    task_key=make_random(4),
-                    description=make_random(4),
-                    new_cluster=compute.ClusterSpec(
-                        num_workers=1,
-                        node_type_id=ws.clusters.select_node_type(local_disk=True),
-                        spark_version=ws.clusters.select_spark_version(latest=True),
-                    ),
-                    notebook_task=jobs.NotebookTask(notebook_path=make_notebook()),
-                    timeout_seconds=0,
-                )
-            ]
+            if spn_example:
+                kwargs["tasks"] = [
+                    jobs.Task(
+                        task_key=make_random(4),
+                        description=make_random(4),
+                        new_cluster=compute.ClusterSpec(
+                            num_workers=1,
+                            node_type_id=ws.clusters.select_node_type(local_disk=True),
+                            spark_version=ws.clusters.select_spark_version(latest=True),
+                            spark_conf={
+                                "spark.databricks.cluster.profile": "singleNode",
+                                "spark.master": "local[*]",
+                                "fs.azure.account.auth.type.storage_acct_1.dfs.core.windows.net": "OAuth",
+                                "fs.azure.account.oauth.provider.type.storage_acct_1.dfs.core.windows.net": "org"
+                                ".apache.hadoop.fs.azurebfs.oauth2.ClientCredsTokenProvider",
+                                "fs.azure.account.oauth2.client.id.storage_acct_1.dfs.core.windows.net": ""
+                                "dummy_application_id",
+                                "fs.azure.account.oauth2.client.secret.storage_acct_1.dfs.core.windows.net": "dummy",
+                                "fs.azure.account.oauth2.client.endpoint.storage_acct_1.dfs.core.windows.net": "https"
+                                "://login.microsoftonline.com/directory_12345/oauth2/token",
+                            },
+                        ),
+                        notebook_task=jobs.NotebookTask(notebook_path=make_notebook()),
+                        timeout_seconds=0,
+                    )
+                ]
+            else:
+                kwargs["tasks"] = [
+                    jobs.Task(
+                        task_key=make_random(4),
+                        description=make_random(4),
+                        new_cluster=compute.ClusterSpec(
+                            num_workers=1,
+                            node_type_id=ws.clusters.select_node_type(local_disk=True),
+                            spark_version=ws.clusters.select_spark_version(latest=True),
+                        ),
+                        notebook_task=jobs.NotebookTask(notebook_path=make_notebook()),
+                        timeout_seconds=0,
+                    )
+                ]
         return ws.jobs.create(**kwargs)
 
     yield from factory("job", create, lambda item: ws.jobs.delete(item.job_id))
@@ -560,7 +601,7 @@ def make_model(ws, make_random):
 
 @pytest.fixture
 def make_pipeline(ws, make_random, make_notebook):
-    def create(**kwargs) -> pipelines.CreatePipelineResponse:
+    def create(spn_example=None, **kwargs) -> pipelines.CreatePipelineResponse:
         if "name" not in kwargs:
             kwargs["name"] = f"sdk-{make_random(4)}"
         if "libraries" not in kwargs:
@@ -576,6 +617,14 @@ def make_pipeline(ws, make_random, make_notebook):
                     },
                 )
             ]
+        if spn_example:
+            if "configuration" not in kwargs:
+                kwargs["configuration"] = {
+                    "spark.hadoop.fs.azure.account.oauth2.client.id.storage_acct_1.dfs.core.windows.net": ""
+                    "pipeline_dummy_application_id",
+                    "spark.hadoop.fs.azure.account.oauth2.client.endpoint.storage_acct_1.dfs.core.windows.net": ""
+                    "https://login.microsoftonline.com/directory_12345/oauth2/token",
+                }
         return ws.pipelines.create(continuous=False, **kwargs)
 
     yield from factory("delta live table", create, lambda item: ws.pipelines.delete(item.pipeline_id))

@@ -4,7 +4,12 @@ import sys
 
 from databricks.sdk import WorkspaceClient
 
-from databricks.labs.ucx.assessment.crawlers import ClustersCrawler, JobsCrawler
+from databricks.labs.ucx.assessment.crawlers import (
+    AzureServicePrincipalCrawler,
+    ClustersCrawler,
+    JobsCrawler,
+    PipelinesCrawler,
+)
 from databricks.labs.ucx.config import WorkspaceConfig
 from databricks.labs.ucx.framework.crawlers import RuntimeBackend
 from databricks.labs.ucx.framework.tasks import task, trigger
@@ -119,6 +124,34 @@ def assess_clusters(cfg: WorkspaceConfig):
 
 
 @task("assessment", depends_on=[setup_schema])
+def assess_pipelines(cfg: WorkspaceConfig):
+    """This module scans through all the Pipelines and identifies those pipelines which has Azure Service Principals
+    embedded (who has been given access to the Azure storage accounts via spark configurations) in the pipeline
+    configurations.
+    It looks for:
+      - all the pipelines which has Azure Service Principal embedded in the pipeline configuration
+    Subsequently, a list of all the pipelines with matching configurations are stored in the
+    `$inventory.pipelines` table."""
+    ws = WorkspaceClient(config=cfg.to_databricks_config())
+    crawler = PipelinesCrawler(ws, RuntimeBackend(), cfg.inventory_database)
+    crawler.snapshot()
+
+
+@task("assessment", depends_on=[setup_schema])
+def assess_azure_service_principals(cfg: WorkspaceConfig):
+    """This module scans through all the clusters configurations, cluster policies, job cluster configurations,
+    Pipeline configurations, Warehouse configuration and identifies all the Azure Service Principals who has been
+    given access to the Azure storage accounts via spark configurations referred in those entities.
+    It looks in:
+      - all those entities and prepares a list of Azure Service Principal embedded in their configurations
+    Subsequently, the list of all the Azure Service Principals referred in those configurations are saved
+    in the `$inventory.azure_service_principals` table."""
+    ws = WorkspaceClient(config=cfg.to_databricks_config())
+    crawler = AzureServicePrincipalCrawler(ws, RuntimeBackend(), cfg.inventory_database)
+    crawler.snapshot()
+
+
+@task("assessment", depends_on=[setup_schema])
 def crawl_permissions(cfg: WorkspaceConfig):
     """As we commence the intricate migration process from Hive Metastore to the Databricks Unity Catalog, a critical
     element of this transition is the thorough examination and preservation of permissions linked to a wide array of
@@ -139,7 +172,15 @@ def crawl_permissions(cfg: WorkspaceConfig):
 
 @task(
     "assessment",
-    depends_on=[crawl_grants, crawl_permissions, guess_external_locations, assess_jobs, assess_clusters],
+    depends_on=[
+        crawl_grants,
+        crawl_permissions,
+        guess_external_locations,
+        assess_jobs,
+        assess_clusters,
+        assess_pipelines,
+        assess_azure_service_principals,
+    ],
     dashboard="assessment",
 )
 def assessment_report(_: WorkspaceConfig):
