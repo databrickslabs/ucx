@@ -41,15 +41,15 @@ def test_jobs_with_no_inventory_database(
     schema_a = make_schema()
     schema_b = make_schema()
     _ = make_schema()
-    table_a = make_table(schema=schema_a)
-    table_b = make_table(schema=schema_b)
-    make_table(schema=schema_b, external=True)
+    table_a = make_table(schema_name=schema_a.name)
+    table_b = make_table(schema_name=schema_b.name)
+    make_table(schema_name=schema_b.name, external=True)
 
     sql_exec(f"GRANT USAGE ON SCHEMA default TO `{ws_group_a.display_name}`")
     sql_exec(f"GRANT USAGE ON SCHEMA default TO `{ws_group_b.display_name}`")
-    sql_exec(f"GRANT SELECT ON TABLE {table_a} TO `{ws_group_a.display_name}`")
-    sql_exec(f"GRANT SELECT ON TABLE {table_b} TO `{ws_group_b.display_name}`")
-    sql_exec(f"GRANT MODIFY ON SCHEMA {schema_b} TO `{ws_group_b.display_name}`")
+    sql_exec(f"GRANT SELECT ON TABLE {table_a.full_name} TO `{ws_group_a.display_name}`")
+    sql_exec(f"GRANT SELECT ON TABLE {table_b.full_name} TO `{ws_group_b.display_name}`")
+    sql_exec(f"GRANT MODIFY ON SCHEMA {schema_b.full_name} TO `{ws_group_b.display_name}`")
 
     cluster_policy = make_cluster_policy()
     make_cluster_policy_permissions(
@@ -205,9 +205,9 @@ def test_jobs_with_no_inventory_database(
         logger.debug(f"all grants={all_grants}, ")
 
         assert len(all_grants) >= 3, "must have at least three grants"
-        assert all_grants[f"{ws_group_a.display_name}.{table_a}"] == "SELECT"
-        assert all_grants[f"{ws_group_b.display_name}.{table_b}"] == "SELECT"
-        assert all_grants[f"{ws_group_b.display_name}.{schema_b}"] == "MODIFY"
+        assert all_grants[f"{ws_group_a.display_name}.{table_a.full_name}"] == "SELECT"
+        assert all_grants[f"{ws_group_b.display_name}.{table_b.full_name}"] == "SELECT"
+        assert all_grants[f"{ws_group_b.display_name}.{schema_b.full_name}"] == "MODIFY"
 
         permissions = list(
             sql_fetch_all(f"SELECT * FROM hive_metastore.{install._config.inventory_database}.permissions")

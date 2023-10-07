@@ -15,8 +15,11 @@ import pytest
 from databricks.sdk import AccountClient, WorkspaceClient
 from databricks.sdk.core import DatabricksError
 from databricks.sdk.service import compute, iam, jobs, pipelines, workspace
+from databricks.sdk.service.catalog import CatalogInfo, SchemaInfo, TableInfo
 from databricks.sdk.service.sql import CreateWarehouseRequestWarehouseType
 from databricks.sdk.service.workspace import ImportFormat
+
+from databricks.labs.ucx.framework.crawlers import StatementExecutionBackend
 
 _LOG = logging.getLogger(__name__)
 
@@ -668,3 +671,99 @@ def env_or_skip(debug_env) -> Callable[[str], str]:
         return debug_env[var]
 
     return inner
+
+
+@pytest.fixture
+def sql_backend(ws, env_or_skip):
+    warehouse_id = env_or_skip("TEST_DEFAULT_WAREHOUSE_ID")
+    return StatementExecutionBackend(ws, warehouse_id)
+
+
+@pytest.fixture
+def inventory_schema(make_schema):
+    return make_schema(catalog_name="hive_metastore").name
+
+
+@pytest.fixture
+def make_catalog(ws, sql_backend, make_random):
+    def create() -> CatalogInfo:
+        name = f"ucx_C{make_random(4)}".lower()
+        sql_backend.execute(f"CREATE CATALOG {name}")
+        catalog_info = ws.catalogs.get(name)
+        return catalog_info
+
+    yield from factory(
+        "catalog",
+        create,
+        lambda catalog_info: ws.catalogs.delete(catalog_info.full_name, force=True),
+    )
+
+
+@pytest.fixture
+def make_schema(sql_backend, make_random):
+    def create(*, catalog_name: str = "hive_metastore", name: str | None = None) -> SchemaInfo:
+        if name is None:
+            name = f"ucx_S{make_random(4)}"
+        full_name = f"{catalog_name}.{name}".lower()
+        sql_backend.execute(f"CREATE SCHEMA {full_name}")
+        return SchemaInfo(catalog_name=catalog_name, name=name, full_name=full_name)
+
+    yield from factory(
+        "schema",
+        create,
+        lambda schema_info: sql_backend.execute(f"DROP SCHEMA IF EXISTS {schema_info.full_name} CASCADE"),
+    )
+
+
+@pytest.fixture
+def make_table(sql_backend, make_schema, make_random):
+    def create(
+        *,
+        catalog_name="hive_metastore",
+        schema_name: str | None = None,
+        name: str | None = None,
+        ctas: str | None = None,
+        non_delta: bool = False,
+        external: bool = False,
+        view: bool = False,
+        tbl_properties: dict[str, str] | None = None,
+    ) -> TableInfo:
+        if schema_name is None:
+            schema = make_schema(catalog_name=catalog_name)
+            catalog_name = schema.catalog_name
+            schema_name = schema.name
+        if name is None:
+            name = f"ucx_T{make_random(4)}"
+        full_name = f"{catalog_name}.{schema_name}.{name}".lower()
+        ddl = f'CREATE {"VIEW" if view else "TABLE"} {full_name}'
+        if ctas is not None:
+            # temporary (if not view)
+            ddl = f"{ddl} AS {ctas}"
+        elif non_delta:
+            location = "dbfs:/databricks-datasets/iot-stream/data-device"
+            ddl = f"{ddl} USING json LOCATION '{location}'"
+        elif external:
+            # external table
+            url = "s3a://databricks-datasets-oregon/delta-sharing/share/open-datasets.share"
+            share = f"{url}#delta_sharing.default.lending_club"
+            ddl = f"{ddl} USING deltaSharing LOCATION '{share}'"
+        else:
+            # managed table
+            ddl = f"{ddl} (id INT, value STRING)"
+        if tbl_properties:
+            tbl_properties = ",".join([f" '{k}' = '{v}' " for k, v in tbl_properties.items()])
+            ddl = f"{ddl} TBLPROPERTIES ({tbl_properties})"
+
+        sql_backend.execute(ddl)
+        return TableInfo(catalog_name=catalog_name, schema_name=schema_name, name=name, full_name=full_name)
+
+    def remove(table_info: TableInfo):
+        try:
+            sql_backend.execute(f"DROP TABLE IF EXISTS {table_info.full_name}")
+        except RuntimeError as e:
+            if "Cannot drop a view" in str(e):
+                sql_backend.execute(f"DROP VIEW IF EXISTS {table_info.full_name}")
+            else:
+                raise e
+
+    yield from factory("table", create, remove)

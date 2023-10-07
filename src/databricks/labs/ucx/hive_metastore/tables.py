@@ -195,7 +195,7 @@ class TablesMigrate:
         _, errors = Threads.gather("migrate tables", tasks)
         if len(errors) > 0:
             # TODO: https://github.com/databrickslabs/ucx/issues/406
-            logger.error(f"Detected {len(errors)} while migrating tables")
+            logger.error(f"Detected {len(errors)} errors while migrating tables")
 
     def _migrate_table(self, target_catalog, table):
         sql = table.uc_create_sql(target_catalog)

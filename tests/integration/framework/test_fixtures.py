@@ -105,3 +105,23 @@ def test_sql_backend_works(ws, wsfs_wheel):
 def test_env_or_skip(env_or_skip):
     with pytest.raises((Skipped, Failed)):
         env_or_skip("NO_ENV_VAR_HERE")
+
+
+def test_catalog_fixture(make_catalog):
+    logger.info(f"Created new catalog: {make_catalog()}")
+    logger.info(f"Created new catalog: {make_catalog()}")
+
+
+def test_schema_fixture(make_schema):
+    logger.info(f"Created new schema: {make_schema()}")
+    logger.info(f"Created new schema: {make_schema()}")
+
+
+def test_table_fixture(make_table):
+    logger.info(f"Created new managed table in new schema: {make_table()}")
+    logger.info(f'Created new managed table in default schema: {make_table(schema_name="default")}')
+    logger.info(f"Created new external table in new schema: {make_table(external=True)}")
+    logger.info(f"Created new external JSON table in new schema: {make_table(non_delta=True)}")
+    logger.info(f'Created new tmp table in new schema: {make_table(ctas="SELECT 2+2 AS four")}')
+    logger.info(f'Created new view in new schema: {make_table(view=True, ctas="SELECT 2+2 AS four")}')
+    logger.info(f'Created table with properties: {make_table(tbl_properties={"test": "tableproperty"})}')
