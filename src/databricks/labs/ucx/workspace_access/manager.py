@@ -1,10 +1,15 @@
 import logging
+import os
 from collections.abc import Callable, Iterator
 from itertools import groupby
 from typing import Literal
 
+from databricks.sdk import WorkspaceClient
+from databricks.sdk.service import sql
+
 from databricks.labs.ucx.framework.crawlers import CrawlerBase, SqlBackend
 from databricks.labs.ucx.framework.parallel import Threads
+from databricks.labs.ucx.workspace_access import generic, redash, scim, secrets
 from databricks.labs.ucx.workspace_access.base import Applier, Crawler, Permissions
 from databricks.labs.ucx.workspace_access.groups import GroupMigrationState
 
@@ -18,6 +23,74 @@ class PermissionManager(CrawlerBase):
         super().__init__(backend, "hive_metastore", inventory_database, "permissions", Permissions)
         self._crawlers = crawlers
         self._appliers = appliers
+
+    @classmethod
+    def factory(
+        cls,
+        ws: WorkspaceClient,
+        sql_backend: SqlBackend,
+        inventory_database: str,
+        *,
+        num_threads: int | None = None,
+        workspace_start_path: str = "/",
+    ) -> "PermissionManager":
+        if num_threads is None:
+            num_threads = os.cpu_count() * 2
+        generic_acl_listing = [
+            generic.listing_wrapper(ws.clusters.list, "cluster_id", "clusters"),
+            generic.listing_wrapper(ws.cluster_policies.list, "policy_id", "cluster-policies"),
+            generic.listing_wrapper(ws.instance_pools.list, "instance_pool_id", "instance-pools"),
+            generic.listing_wrapper(ws.warehouses.list, "id", "sql/warehouses"),
+            generic.listing_wrapper(ws.jobs.list, "job_id", "jobs"),
+            generic.listing_wrapper(ws.pipelines.list_pipelines, "pipeline_id", "pipelines"),
+            generic.listing_wrapper(generic.experiments_listing(ws), "experiment_id", "experiments"),
+            generic.listing_wrapper(generic.models_listing(ws), "id", "registered-models"),
+            generic.workspace_listing(ws, num_threads=num_threads, start_path=workspace_start_path),
+            generic.authorization_listing(),
+        ]
+        redash_acl_listing = [
+            redash.redash_listing_wrapper(ws.alerts.list, sql.ObjectTypePlural.ALERTS),
+            redash.redash_listing_wrapper(ws.dashboards.list, sql.ObjectTypePlural.DASHBOARDS),
+            redash.redash_listing_wrapper(ws.queries.list, sql.ObjectTypePlural.QUERIES),
+        ]
+        generic_support = generic.GenericPermissionsSupport(ws, generic_acl_listing)
+        sql_support = redash.SqlPermissionsSupport(ws, redash_acl_listing)
+        secrets_support = secrets.SecretScopesSupport(ws)
+        scim_support = scim.ScimSupport(ws)
+        return cls(
+            sql_backend,
+            inventory_database,
+            [generic_support, sql_support, secrets_support, scim_support],
+            cls._object_type_appliers(generic_support, sql_support, secrets_support, scim_support),
+        )
+
+    @staticmethod
+    def _object_type_appliers(generic_support, sql_support, secrets_support, scim_support):
+        return {
+            # SCIM-based API
+            "entitlements": scim_support,
+            "roles": scim_support,
+            # Generic Permissions API
+            "authorization": generic_support,
+            "clusters": generic_support,
+            "cluster-policies": generic_support,
+            "instance-pools": generic_support,
+            "sql/warehouses": generic_support,
+            "jobs": generic_support,
+            "pipelines": generic_support,
+            "experiments": generic_support,
+            "registered-models": generic_support,
+            "notebooks": generic_support,
+            "files": generic_support,
+            "directories": generic_support,
+            "repos": generic_support,
+            # Redash equivalent of Generic Permissions API
+            "alerts": sql_support,
+            "queries": sql_support,
+            "dashboards": sql_support,
+            # Secret Scope ACL API
+            "secrets": secrets_support,
+        }
 
     def inventorize_permissions(self):
         logger.debug("Crawling permissions")
