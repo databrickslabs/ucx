@@ -1,6 +1,8 @@
+import datetime
 import logging
 import os
 import re
+import shutil
 import subprocess
 import sys
 import tempfile
@@ -301,12 +303,23 @@ class WorkspaceInstaller:
                 step_list.append(task.workflow)
         return step_list
 
+    @staticmethod
+    def _remove_extra_indentation(doc: str) -> str:
+        lines = doc.splitlines()
+        stripped = []
+        for line in lines:
+            if line.startswith(" " * 4):
+                stripped.append(line[4:])
+            else:
+                stripped.append(line)
+        return "\n".join(stripped)
+
     def _create_readme(self):
         md = [
             "# UCX - The Unity Catalog Migration Assistant",
             f'To troubleshoot, see [debug notebook]({self._notebook_link(f"{self._install_folder}/DEBUG.py")}).\n',
-            "Here are the URL and descriptions of jobs that trigger's various stages of migration.",
-            "All jobs are defined with necessary cluster configurations and DBR versions.",
+            "Here are the URLs and descriptions of workflows that trigger various stages of migration.",
+            "All jobs are defined with necessary cluster configurations and DBR versions.\n",
         ]
         for step_name in self._step_list():
             if step_name not in self._deployed_steps:
@@ -316,15 +329,20 @@ class WorkspaceInstaller:
             dashboard_link = ""
             if step_name in self._dashboards:
                 dashboard_link = f"{self._ws.config.host}/sql/dashboards/{self._dashboards[step_name]}"
-                dashboard_link = f" (see [{step_name} dashboard]({dashboard_link}) after finish)"
+                dashboard_link = f"Go to the [{step_name} dashboard]({dashboard_link}) after running the jobs."
             job_link = f"[{self._name(step_name)}]({self._ws.config.host}#job/{job_id})"
-            md.append(f"## {job_link}{dashboard_link}\n")
+            md.append("---\n\n")
+            md.append(f"## {job_link}\n\n")
+            md.append(f"{dashboard_link}\n\n")
+            md.append("The workflow consists of the following separate tasks:\n\n")
             for t in self._sorted_tasks():
                 if t.workflow != step_name:
                     continue
-                doc = self._replace_inventory_variable(t.doc)
-                md.append(f" - `{t.name}`:  {doc}")
-                md.append("")
+                doc = self._remove_extra_indentation(t.doc)
+                doc = self._replace_inventory_variable(doc)
+                md.append(f"### `{t.name}`\n\n")
+                md.append(f"{doc}\n")
+                md.append("\n\n")
         preamble = ["# Databricks notebook source", "# MAGIC %md"]
         intro = "\n".join(preamble + [f"# MAGIC {line}" for line in md])
         path = f"{self._install_folder}/README.py"
