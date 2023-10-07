@@ -1,9 +1,21 @@
+import logging
+
 from databricks.sdk.core import DatabricksError
 
-from databricks.labs.ucx.framework.parallel import ThreadedExecution
+from databricks.labs.ucx.framework.parallel import Threads
 
 
-def test_threaded_execution_gather_with_failed_task():
+def _predictable_messages(caplog):
+    res = []
+    for msg in caplog.messages:
+        if "rps" in msg:
+            continue
+        msg = msg.split(". Took ")[0]  # noqa: PLW2901
+        res.append(msg)
+    return sorted(res)
+
+
+def test_gather_with_failed_task(caplog):
     def works():
         return True
 
@@ -11,19 +23,75 @@ def test_threaded_execution_gather_with_failed_task():
         msg = "failed"
         raise DatabricksError(msg)
 
-    tasks = [works, works, fails, works, works]
-    futures = ThreadedExecution.gather("testing", tasks)
-    assert len(futures) == 4
+    tasks = [works, fails, works, fails, works, fails, works, fails]
+    results = Threads.gather("testing", tasks)
+
+    assert [True, True, True, True] == results
+    assert [
+        "More than half 'testing' tasks failed: 50% (4/8)",
+        "testing task failed: failed",
+        "testing task failed: failed",
+        "testing task failed: failed",
+        "testing task failed: failed",
+    ] == _predictable_messages(caplog)
 
 
-def test_threaded_execution_gather_with_failed_task_no_message():
+def test_gather_with_failed_task_no_message(caplog):
+    caplog.set_level(logging.INFO)
+
     def works():
         return True
+
+    def not_really_but_fine():
+        logging.info("did something, but returned None")
 
     def fails():
         msg = "failed"
         raise OSError(1, msg)
 
-    tasks = [works, works, fails, works, works]
-    futures = ThreadedExecution.gather("testing", tasks)
-    assert len(futures) == 4
+    tasks = [works, not_really_but_fine, works, fails, works, works]
+    results = Threads.gather("testing", tasks)
+
+    assert [True, True, True, True] == results
+    assert [
+        "Some 'testing' tasks failed: 17% (1/6)",
+        "did something, but returned None",
+        "testing task failed: [Errno 1] failed",
+    ] == _predictable_messages(caplog)
+
+
+def test_all_none(caplog):
+    caplog.set_level(logging.INFO)
+
+    def not_really_but_fine():
+        logging.info("did something, but returned None")
+
+    tasks = [not_really_but_fine, not_really_but_fine, not_really_but_fine, not_really_but_fine]
+    results = Threads.gather("testing", tasks)
+
+    assert [] == results
+    assert [
+        "Finished 'testing' tasks: non-empty 0% (0/4)",
+        "did something, but returned None",
+        "did something, but returned None",
+        "did something, but returned None",
+        "did something, but returned None",
+    ] == _predictable_messages(caplog)
+
+
+def test_all_failed(caplog):
+    def fails():
+        msg = "failed"
+        raise DatabricksError(msg)
+
+    tasks = [fails, fails, fails, fails]
+    results = Threads.gather("testing", tasks)
+
+    assert [] == results
+    assert [
+        "All 'testing' tasks failed!!!",
+        "testing task failed: failed",
+        "testing task failed: failed",
+        "testing task failed: failed",
+        "testing task failed: failed",
+    ] == _predictable_messages(caplog)

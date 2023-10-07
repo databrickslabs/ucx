@@ -2,83 +2,106 @@ import concurrent
 import datetime as dt
 import functools
 import logging
+import os
+import threading
 from collections.abc import Callable
-from concurrent.futures import ALL_COMPLETED, ThreadPoolExecutor
+from concurrent.futures import ThreadPoolExecutor
 from typing import Generic, TypeVar
 
-ExecutableResult = TypeVar("ExecutableResult")
-ExecutableFunction = Callable[..., ExecutableResult]
+Result = TypeVar("Result")
 logger = logging.getLogger(__name__)
 
 
-class ProgressReporter:
-    def __init__(self, total_executables: int, message_prefix: str | None = "threaded execution - processed: "):
-        self.counter = 0
-        self._total_executables = total_executables
-        self.start_time = dt.datetime.now()
-        self._message_prefix = message_prefix
-
-    def progress_report(self, _):
-        self.counter += 1
-        measuring_time = dt.datetime.now()
-        delta_from_start = measuring_time - self.start_time
-        rps = self.counter / delta_from_start.total_seconds()
-        offset = len(str(self._total_executables))
-        if self.counter % 10 == 0 or self.counter == self._total_executables:
-            logger.info(
-                f"{self._message_prefix}{self.counter:>{offset}d}/{self._total_executables}, rps: {rps:.3f}/sec"
-            )
-
-
-class ThreadedExecution(Generic[ExecutableResult]):
-    def __init__(
-        self,
-        name,
-        executables: list[ExecutableFunction],
-        num_threads: int | None = 4,
-        progress_reporter: ProgressReporter | None = None,
-    ):
+class Threads(Generic[Result]):
+    def __init__(self, name, tasks: list[Callable[..., Result]], num_threads: int):
         self._name = name
+        self._tasks = tasks
+        self._task_fail_error_pct = 50
         self._num_threads = num_threads
-        self._executables = executables
-        self._futures = []
-        _reporter = ProgressReporter(len(executables)) if not progress_reporter else progress_reporter
-        self._done_callback: Callable = _reporter.progress_report
+        self._started = dt.datetime.now()
+        self._lock = threading.Lock()
+        self._completed_cnt = 0
+        self._large_log_every = 3000
+        self._default_log_every = 100
 
     @classmethod
-    def gather(cls, name: str, tasks: list[ExecutableFunction]) -> list[ExecutableResult]:
-        reporter = ProgressReporter(len(tasks), f"{name}: ")
-        return cls(name, tasks, num_threads=4, progress_reporter=reporter).run()
+    def gather(cls, name: str, tasks: list[Callable[..., Result]]) -> list[Result]:
+        num_threads = os.cpu_count() * 2
+        return cls(name, tasks, num_threads=num_threads)._run()
 
-    def run(self) -> list[ExecutableResult]:
-        logger.debug(f"Starting {len(self._executables)} tasks in {self._num_threads} threads")
+    def _run(self) -> list[Result]:
+        given_cnt = len(self._tasks)
+        if given_cnt == 0:
+            return []
+        logger.debug(f"Starting {given_cnt} tasks in {self._num_threads} threads")
 
-        def error_handler(func, name):
-            @functools.wraps(func)
-            def inner(*args, **kwargs):
-                try:
-                    return func(*args, **kwargs)
-                except Exception as ex:
-                    logger.warning(f"{name} task failed: {ex!s}")
-                    return None
+        collected = []
+        failed_cnt = 0
+        for future in self._execute():
+            return_value = future.result()
+            if return_value is None:
+                continue
+            result, err = return_value
+            if err is not None:
+                # TODO: record errors in database
+                failed_cnt += 1
+                continue
+            if result is None:
+                continue
+            collected.append(result)
+        self._on_finish(given_cnt, failed_cnt)
 
-            return inner
-
-        with ThreadPoolExecutor(self._num_threads) as executor:
-            for executable in self._executables:
-                future = executor.submit(error_handler(executable, self._name))
-                future.add_done_callback(self._done_callback)
-                self._futures.append(future)
-
-            results = concurrent.futures.wait(self._futures, return_when=ALL_COMPLETED)
-
-        logger.debug("Collecting the results from threaded execution")
-        collected = [result for future in results.done if (result := future.result())]
-        failed_count = len(self._executables) - len(collected)
-        if failed_count > 0:
-            logger.warning(f"The parallel run of '{self._name}' incurred {failed_count} failed tasks")
         return collected
 
+    def _on_finish(self, given_cnt, failed_cnt):
+        since = dt.datetime.now() - self._started
+        failed_pct = 0
+        if failed_cnt > 0:
+            failed_pct = failed_cnt / given_cnt * 100
+        stats = f"{failed_pct:.0f}% ({failed_cnt}/{given_cnt}). Took {since}"
+        if failed_cnt == given_cnt:
+            logger.critical(f"All '{self._name}' tasks failed!!!")
+        elif failed_pct >= self._task_fail_error_pct:
+            logger.error(f"More than half '{self._name}' tasks failed: {stats}")
+        elif failed_cnt > 0:
+            logger.warning(f"Some '{self._name}' tasks failed: {stats}")
+        else:
+            logger.info(f"Finished '{self._name}' tasks: non-empty {stats}")
 
-def noop():
-    pass
+    def _execute(self):
+        with ThreadPoolExecutor(self._num_threads) as pool:
+            futures = []
+            for task in self._tasks:
+                future = pool.submit(self._wrap_result(task, self._name))
+                future.add_done_callback(self._progress_report)
+                futures.append(future)
+            return concurrent.futures.as_completed(futures)
+
+    def _progress_report(self, _):
+        total_cnt = len(self._tasks)
+        log_every = self._default_log_every
+        if total_cnt > self._large_log_every:
+            log_every = 500
+        elif total_cnt <= self._default_log_every:
+            log_every = 10
+        with self._lock:
+            self._completed_cnt += 1
+            since = dt.datetime.now() - self._started
+            rps = self._completed_cnt / since.total_seconds()
+            if self._completed_cnt % log_every == 0 or self._completed_cnt == total_cnt:
+                msg = f"{self._name} {self._completed_cnt}/{total_cnt}, rps: {rps:.3f}/sec"
+                logger.info(msg)
+
+    @staticmethod
+    def _wrap_result(func, name):
+        """This method emulates GoLang's error return style"""
+
+        @functools.wraps(func)
+        def inner(*args, **kwargs):
+            try:
+                return func(*args, **kwargs), None
+            except Exception as err:
+                logger.error(f"{name} task failed: {err!s}")
+                return None, err
+
+        return inner

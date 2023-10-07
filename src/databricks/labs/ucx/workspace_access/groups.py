@@ -11,7 +11,7 @@ from databricks.sdk.service import iam
 from databricks.sdk.service.iam import Group
 
 from databricks.labs.ucx.config import GroupsConfig
-from databricks.labs.ucx.framework.parallel import ThreadedExecution
+from databricks.labs.ucx.framework.parallel import Threads
 from databricks.labs.ucx.mixins.hardening import rate_limited
 
 logger = logging.getLogger(__name__)
@@ -124,7 +124,7 @@ class GroupManager:
             backup_group = self._get_or_create_backup_group(source_group_name=name, source_group=ws_group)
             return MigrationGroupInfo(workspace=ws_group, backup=backup_group, account=acc_group)
 
-        collected_groups = ThreadedExecution.gather(
+        collected_groups = Threads.gather(
             "get group info", [partial(get_group_info, group_name) for group_name in groups_names]
         )
         for g in collected_groups:
@@ -141,6 +141,8 @@ class GroupManager:
         self._workspace_groups = [g for g in self._workspace_groups if g.id != ws_group.id]
 
         self._reflect_account_group_to_workspace(migration_info.account)
+
+        return True
 
     @retried(on=[DatabricksError])
     @rate_limited(max_requests=5)
@@ -235,7 +237,7 @@ class GroupManager:
         if len(self._migration_state.groups) == 0:
             logger.info("No groups were loaded or initialized, nothing to do")
             return
-        ThreadedExecution.gather(
+        Threads.gather(
             "groups: workspace -> account",
             [partial(self._replace_group, migration_info) for migration_info in self.migration_groups_provider.groups],
         )

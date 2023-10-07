@@ -4,7 +4,7 @@ from itertools import groupby
 from typing import Literal
 
 from databricks.labs.ucx.framework.crawlers import CrawlerBase, SqlBackend
-from databricks.labs.ucx.framework.parallel import ThreadedExecution
+from databricks.labs.ucx.framework.parallel import Threads
 from databricks.labs.ucx.workspace_access.base import Applier, Crawler, Permissions
 from databricks.labs.ucx.workspace_access.groups import GroupMigrationState
 
@@ -23,7 +23,7 @@ class PermissionManager(CrawlerBase):
         logger.debug("Crawling permissions")
         crawler_tasks = list(self._get_crawler_tasks())
         logger.info(f"Starting to crawl permissions. Total tasks: {len(crawler_tasks)}")
-        results = ThreadedExecution.gather("crawl permissions", crawler_tasks)
+        results = Threads.gather("crawl permissions", crawler_tasks)
         items = []
         for item in results:
             if item is None:
@@ -67,7 +67,7 @@ class PermissionManager(CrawlerBase):
             applier_tasks.extend(tasks_for_support)
 
         logger.info(f"Starting to apply permissions on {destination} groups. Total tasks: {len(applier_tasks)}")
-        ThreadedExecution.gather(f"apply {destination} group permissions", applier_tasks)
+        Threads.gather(f"apply {destination} group permissions", applier_tasks)
         logger.info("Permissions were applied")
 
     def cleanup(self):
