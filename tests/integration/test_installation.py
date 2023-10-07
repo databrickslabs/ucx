@@ -205,9 +205,9 @@ def test_jobs_with_no_inventory_database(
         logger.debug(f"all grants={all_grants}, ")
 
         assert len(all_grants) >= 3, "must have at least three grants"
-        assert all_grants[f"{ws_group_a.display_name}.{table_a}"] == "SELECT"
-        assert all_grants[f"{ws_group_b.display_name}.{table_b}"] == "SELECT"
-        assert all_grants[f"{ws_group_b.display_name}.{schema_b}"] == "MODIFY"
+        assert all_grants[f"{ws_group_a.display_name}.{table_a.full_name}"] == "SELECT"
+        assert all_grants[f"{ws_group_b.display_name}.{table_b.full_name}"] == "SELECT"
+        assert all_grants[f"{ws_group_b.display_name}.{schema_b.full_name}"] == "MODIFY"
 
         permissions = list(
             sql_fetch_all(f"SELECT * FROM hive_metastore.{install._config.inventory_database}.permissions")
