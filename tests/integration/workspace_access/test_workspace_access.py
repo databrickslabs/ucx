@@ -13,6 +13,7 @@ logger = logging.getLogger(__name__)
 
 def test_workspace_access_e2e(
     ws: WorkspaceClient,
+    inventory_schema,
     make_schema,
     make_ucx_group,
     make_instance_pool,
@@ -154,7 +155,7 @@ def test_workspace_access_e2e(
 
     config = WorkspaceConfig(
         connect=ConnectConfig.from_databricks_config(ws.config),
-        inventory_database=make_schema(catalog="hive_metastore").split(".")[-1],
+        inventory_database=inventory_schema,
         groups=GroupsConfig(selected=[ws_group.display_name]),
         workspace_start_path=directory,
         log_level="DEBUG",

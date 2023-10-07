@@ -5,8 +5,7 @@ from databricks.labs.ucx.mixins.compute import CommandExecutor
 
 
 @pytest.mark.skip(reason="Needs to have mountpoints already created ")
-def test_mount_listing(ws, wsfs_wheel, make_schema, sql_fetch_all):
-    _, inventory_database = make_schema(catalog="hive_metastore").split(".")
+def test_mount_listing(ws, inventory_schema, wsfs_wheel, make_schema, sql_fetch_all):
     commands = CommandExecutor(ws)
     commands.install_notebook_library(f"/Workspace{wsfs_wheel}")
 
@@ -17,7 +16,7 @@ def test_mount_listing(ws, wsfs_wheel, make_schema, sql_fetch_all):
         from databricks.sdk import WorkspaceClient
         from databricks.labs.ucx.framework.crawlers import RuntimeBackend
         cfg = WorkspaceConfig(
-            inventory_database="{inventory_database}",
+            inventory_database="{inventory_schema}",
             groups=GroupsConfig(auto=True),
             tacl=TaclConfig(databases=["default"]))
         ws = WorkspaceClient(config=cfg.to_databricks_config())
@@ -25,7 +24,7 @@ def test_mount_listing(ws, wsfs_wheel, make_schema, sql_fetch_all):
         mounts.inventorize_mounts()
         """
     )
-    mounts = sql_fetch_all(f"SELECT * FROM hive_metastore.{inventory_database}.mounts")
+    mounts = sql_fetch_all(f"SELECT * FROM hive_metastore.{inventory_schema}.mounts")
     results = []
 
     for mount in mounts:
