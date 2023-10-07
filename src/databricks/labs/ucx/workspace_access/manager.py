@@ -4,7 +4,7 @@ from itertools import groupby
 from typing import Literal
 
 from databricks.labs.ucx.framework.crawlers import CrawlerBase, SqlBackend
-from databricks.labs.ucx.framework.parallel import ThreadedExecution
+from databricks.labs.ucx.framework.parallel import Threads
 from databricks.labs.ucx.workspace_access.base import Applier, Crawler, Permissions
 from databricks.labs.ucx.workspace_access.groups import GroupMigrationState
 
@@ -23,11 +23,12 @@ class PermissionManager(CrawlerBase):
         logger.debug("Crawling permissions")
         crawler_tasks = list(self._get_crawler_tasks())
         logger.info(f"Starting to crawl permissions. Total tasks: {len(crawler_tasks)}")
-        results = ThreadedExecution.gather("crawl permissions", crawler_tasks)
+        results, errors = Threads.gather("crawl permissions", crawler_tasks)
+        if len(errors) > 0:
+            # TODO: https://github.com/databrickslabs/ucx/issues/406
+            logger.error(f"Detected {len(errors)} while crawling permissions")
         items = []
         for item in results:
-            if item is None:
-                continue
             if item.object_type not in self._appliers:
                 msg = f"unknown object_type: {item.object_type}"
                 raise KeyError(msg)
@@ -40,7 +41,7 @@ class PermissionManager(CrawlerBase):
         # list shall be sorted prior to using group by
         if len(migration_state.groups) == 0:
             logger.info("No valid groups selected, nothing to do.")
-            return
+            return True
         items = sorted(self._load_all(), key=lambda i: i.object_type)
         logger.info(
             f"Applying the permissions to {destination} groups. "
@@ -67,8 +68,13 @@ class PermissionManager(CrawlerBase):
             applier_tasks.extend(tasks_for_support)
 
         logger.info(f"Starting to apply permissions on {destination} groups. Total tasks: {len(applier_tasks)}")
-        ThreadedExecution.gather(f"apply {destination} group permissions", applier_tasks)
+        _, errors = Threads.gather(f"apply {destination} group permissions", applier_tasks)
+        if len(errors) > 0:
+            # TODO: https://github.com/databrickslabs/ucx/issues/406
+            logger.error(f"Detected {len(errors)} while applying permissions")
+            return False
         logger.info("Permissions were applied")
+        return True
 
     def cleanup(self):
         logger.info(f"Cleaning up inventory table {self._full_name}")

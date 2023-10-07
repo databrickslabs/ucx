@@ -92,5 +92,6 @@ class SecretScopesSupport(Crawler, Applier):
         def apply_acls():
             for acl in new_acls:
                 self._rate_limited_put_acl(item.object_id, acl.principal, acl.permission)
+            return True
 
         return partial(apply_acls)

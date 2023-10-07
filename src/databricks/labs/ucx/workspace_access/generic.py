@@ -61,6 +61,7 @@ class GenericPermissionsSupport(Crawler, Applier):
     @rate_limited(max_requests=30)
     def _applier_task(self, object_type: str, object_id: str, acl: list[iam.AccessControlRequest]):
         self._ws.permissions.update(object_type, object_id, access_control_list=acl)
+        return True
 
     @rate_limited(max_requests=100)
     def _crawler_task(self, object_type: str, object_id: str) -> Permissions | None:

@@ -59,3 +59,4 @@ class ScimSupport(Crawler, Applier):
         operations = [iam.Patch(op=iam.PatchOp.ADD, path=property_name, value=[e.as_dict() for e in value])]
         schemas = [iam.PatchSchema.URN_IETF_PARAMS_SCIM_API_MESSAGES_2_0_PATCH_OP]
         self._ws.groups.patch(id=group_id, operations=operations, schemas=schemas)
+        return True
