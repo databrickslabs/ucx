@@ -75,6 +75,7 @@ class Grant:
 
     def hive_grant_sql(self) -> str:
         object_type, object_key = self.this_type_and_key()
+        # See https://docs.databricks.com/en/sql/language-manual/security-grant.html
         return f"GRANT {self.action_type} ON {object_type} {object_key} TO `{self.principal}`"
 
     def hive_revoke_sql(self) -> str:
@@ -82,11 +83,11 @@ class Grant:
         return f"REVOKE {self.action_type} ON {object_type} {object_key} FROM `{self.principal}`"
 
     def _set_owner(self, object_type, object_key):
-        return f"ALTER {object_type} {object_key} OWNER TO {self.principal}"
+        return f"ALTER {object_type} {object_key} OWNER TO `{self.principal}`"
 
     def _uc_action(self, action_type):
         def inner(object_type, object_key):
-            return f"GRANT {action_type} ON {object_type} {object_key} TO {self.principal}"
+            return f"GRANT {action_type} ON {object_type} {object_key} TO `{self.principal}`"
 
         return inner
 
