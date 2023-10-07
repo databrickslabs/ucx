@@ -115,7 +115,7 @@ def assess_clusters(cfg: WorkspaceConfig):
     crawler.snapshot()
 
 
-@task("assessment", depends_on=[setup_schema, crawl_grants])
+@task("assessment", depends_on=[crawl_grants])
 def crawl_permissions(cfg: WorkspaceConfig):
     """Scans the workspace-local groups and all their permissions. The list is stored in the `$inventory.permissions`
     Delta table.
