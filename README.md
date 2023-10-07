@@ -39,7 +39,7 @@ Make sure you have Python 3.10 (or greater)
 installed on your workstation, and you've configured authentication for 
 the [Databricks Workspace](https://databricks-sdk-py.readthedocs.io/en/latest/authentication.html#default-authentication-flow).
 
-![install wizard](./examples/ucx-install.gif)
+![install wizard](docs/ucx-install.gif)
 
 The easiest way to install and authenticate is through a [Databricks configuration profile](https://docs.databricks.com/en/dev-tools/auth.html#databricks-client-unified-authentication):
 
