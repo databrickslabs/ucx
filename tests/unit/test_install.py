@@ -324,3 +324,19 @@ def test_create_readme(mocker):
 
     p = re.compile(".*wl_1.*n3.*n1.*wl_2.*n2.*")
     assert p.match(str(args[1]))
+
+
+def test_replace_pydoc(mocker):
+    ws = mocker.Mock()
+    install = WorkspaceInstaller(ws)
+    doc = install._remove_extra_indentation(
+        """Test1
+        Test2
+    Test3"""
+    )
+    assert (
+        doc
+        == """Test1
+    Test2
+Test3"""
+    )
