@@ -28,6 +28,7 @@ from databricks.labs.ucx.workspace_access.secrets import SecretScopesSupport
 from databricks.labs.ucx.workspace_access.verification import VerificationManager
 
 
+# TODO: fully remove this obsolete class later
 class GroupMigrationToolkit:
     def __init__(self, config: WorkspaceConfig, *, warehouse_id=None):
         self._configure_logger(config.log_level)
@@ -65,6 +66,8 @@ class GroupMigrationToolkit:
             self._object_type_appliers(generic_support, sql_support, secrets_support, scim_support),
         )
         self._group_manager = GroupManager(ws, config.groups)
+        # TODO: remove VerificationManager in scope of https://github.com/databrickslabs/ucx/issues/36,
+        # where we probably should add verify() abstract method to every Applier
         self._verification_manager = VerificationManager(ws, secrets_support)
 
     @staticmethod

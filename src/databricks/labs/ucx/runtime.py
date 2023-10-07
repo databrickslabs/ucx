@@ -11,7 +11,8 @@ from databricks.labs.ucx.framework.tasks import task, trigger
 from databricks.labs.ucx.hive_metastore import GrantsCrawler, TablesCrawler
 from databricks.labs.ucx.hive_metastore.data_objects import ExternalLocationCrawler
 from databricks.labs.ucx.hive_metastore.mounts import Mounts
-from databricks.labs.ucx.workspace_access import GroupMigrationToolkit
+from databricks.labs.ucx.workspace_access.groups import GroupManager
+from databricks.labs.ucx.workspace_access.manager import PermissionManager
 
 logger = logging.getLogger(__name__)
 
@@ -132,9 +133,16 @@ def crawl_permissions(cfg: WorkspaceConfig):
     custom access configurations, and any specialized policies governing resource access. The results of this
     meticulous scan are methodically stored within the `$inventory.permissions` table, which serves as a central
     repository for preserving and managing these crucial access control details."""
-    toolkit = GroupMigrationToolkit(cfg)
-    toolkit.cleanup_inventory_table()
-    toolkit.inventorize_permissions()
+    ws = WorkspaceClient(config=cfg.to_databricks_config())
+    permission_manager = PermissionManager.factory(
+        ws,
+        RuntimeBackend(),
+        cfg.inventory_database,
+        num_threads=cfg.num_threads,
+        workspace_start_path=cfg.workspace_start_path,
+    )
+    permission_manager.cleanup()
+    permission_manager.inventorize_permissions()
 
 
 @task(
@@ -188,21 +196,32 @@ def migrate_permissions(cfg: WorkspaceConfig):
     organization.
 
     See [interactive tutorial here](https://app.getreprise.com/launch/myM3VNn/)."""
-    toolkit = GroupMigrationToolkit(cfg)
-    toolkit.prepare_environment()
-    if toolkit.has_groups():
-        toolkit.apply_permissions_to_backup_groups()
-        toolkit.replace_workspace_groups_with_account_groups()
-        toolkit.apply_permissions_to_account_groups()
-    else:
+    ws = WorkspaceClient(config=cfg.to_databricks_config())
+    group_manager = GroupManager(ws, cfg.groups)
+    group_manager.prepare_groups_in_environment()
+    if not group_manager.has_groups():
         logger.info("Skipping group migration as no groups were found.")
+        return
+
+    permission_manager = PermissionManager.factory(
+        ws,
+        RuntimeBackend(),
+        cfg.inventory_database,
+        num_threads=cfg.num_threads,
+        workspace_start_path=cfg.workspace_start_path,
+    )
+
+    permission_manager.apply_group_permissions(group_manager.migration_groups_provider, destination="backup")
+    group_manager.replace_workspace_groups_with_account_groups()
+    permission_manager.apply_group_permissions(group_manager.migration_groups_provider, destination="account")
 
 
 @task("migrate-groups-cleanup", depends_on=[migrate_permissions])
 def delete_backup_groups(cfg: WorkspaceConfig):
     """Removes workspace-level backup groups"""
-    toolkit = GroupMigrationToolkit(cfg)
-    toolkit.delete_backup_groups()
+    ws = WorkspaceClient(config=cfg.to_databricks_config())
+    group_manager = GroupManager(ws, cfg.groups)
+    group_manager.delete_backup_groups()
 
 
 @task("destroy-schema")
