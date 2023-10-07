@@ -2,7 +2,7 @@
 
 [![build](https://github.com/databrickslabs/ucx/actions/workflows/push.yml/badge.svg)](https://github.com/databrickslabs/ucx/actions/workflows/push.yml) [![codecov](https://codecov.io/github/databrickslabs/ucx/graph/badge.svg?token=p0WKAfW5HQ)](https://codecov.io/github/databrickslabs/ucx)
 
-Your best companion for enabling the Unity Catalog. It helps you to migrate all Databricks workspace assets:
+Your best companion for upgrading to Unity Catalog. It helps you to upgrade all Databricks workspace assets:
 Entitlements, AWS instance profiles, Clusters, Cluster policies, Instance Pools, Databricks SQL warehouses, Delta Live 
 Tables, Jobs, MLflow experiments, MLflow registry, SQL Dashboards & Queries, SQL Alerts, Token and Password usage 
 permissions that are set on the workspace level, Secret scopes, Notebooks, Directories, Repos, Files.
@@ -12,10 +12,11 @@ See [contributing instructions](CONTRIBUTING.md) to help improve this project.
 ## Introduction
 UCX will guide you, the Databricks customer through the process of upgrading your account, groups, workspaces, jobs etc to Unity Catalog. 
 
-The upgrade process starts with installing code to run the upgrade assessment as well as modules for upgrading various components of the system. Component upgrades typically involve evolving configuration and metadata contained within your Databricks deployment. There are parts of the upgrade process that will recommend individual code changes for jobs. The upgrade user will be directed to trigger these operations one by one. 
+1. The upgrade process will first install code, libraries, and workflows into your workspace.
+2. After installation, you will run a series of workflows and examine the output.
 
+UCX leverages Databricks Lakehouse platform to upgrade itself, this includes creating jobs, notebooks, deploying code and configuration files. The `install.sh` guides you through the installation.
 
-UCX leverages Databricks Lakehouse platform to upgrade itself, this includes creating jobs, notebooks, deploying code and configuration files. The `install.sh` guides you through this installation.
 By running the installation you install the assessment job and a number of upgrade jobs. The assessment and upgrade jobs are outlined in the custom generated README.py that is created by the installer and displayed to you by the `install.sh`. See interactive installation [tutorial here](https://app.getreprise.com/launch/G6YbWLn/). 
 
 
@@ -32,11 +33,10 @@ For questions, troubleshooting or bug fixes, please see your Databricks account 
 
 ## Installation
 
-As a customer, download the latest release from github onto your laptop/desktop machine. Unzip or untar the release.
+As a customer, download the [latest release](https://github.com/databrickslabs/ucx/releases) from github onto your laptop/desktop machine. Unzip or untar the release.
 
 The `./install.sh` script will guide you through installation process. 
-Make sure you have Python 3.10 (or greater) 
-installed on your workstation, and you've configured authentication for 
+Make sure you have Python 3.10 (or greater) installed on your workstation, and you've configured authentication for 
 the [Databricks Workspace](https://databricks-sdk-py.readthedocs.io/en/latest/authentication.html#default-authentication-flow).
 
 ![install wizard](docs/ucx-install.gif)
