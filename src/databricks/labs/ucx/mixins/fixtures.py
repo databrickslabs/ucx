@@ -15,11 +15,7 @@ import pytest
 from databricks.sdk import AccountClient, WorkspaceClient
 from databricks.sdk.core import DatabricksError
 from databricks.sdk.service import compute, iam, jobs, pipelines, workspace
-from databricks.sdk.service.catalog import (
-    CatalogInfo,
-    SchemaInfo,
-    TableInfo,
-)
+from databricks.sdk.service.catalog import CatalogInfo, SchemaInfo, TableInfo
 from databricks.sdk.service.sql import CreateWarehouseRequestWarehouseType
 from databricks.sdk.service.workspace import ImportFormat
 
