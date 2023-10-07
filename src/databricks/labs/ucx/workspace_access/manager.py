@@ -111,7 +111,7 @@ class PermissionManager(CrawlerBase):
         results, errors = Threads.gather("crawl permissions", crawler_tasks)
         if len(errors) > 0:
             # TODO: https://github.com/databrickslabs/ucx/issues/406
-            logger.error(f"Detected {len(errors)} while crawling permissions")
+            logger.error(f"Detected {len(errors)} errors while crawling permissions")
         items = []
         for item in results:
             if item.object_type not in self._appliers:

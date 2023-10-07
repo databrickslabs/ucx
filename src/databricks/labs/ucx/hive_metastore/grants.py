@@ -52,7 +52,8 @@ class Grant:
         # Must come last, as it has the lowest priority here but is a required parameter
         if catalog is not None:
             return "CATALOG", catalog
-        msg = "invalid grant keys"
+        msg = f"invalid grant keys: catalog={catalog}, database={database}, view={view}, " \
+              f"any_file={any_file}, anonymous_function={anonymous_function}"
         raise ValueError(msg)
 
     @property

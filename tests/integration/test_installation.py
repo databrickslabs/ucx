@@ -185,13 +185,13 @@ def test_jobs_with_no_inventory_database(
         grants_crawler = GrantsCrawler(tables_crawler)
 
         table_a_grants = grants_crawler.for_table_info(table_a)
-        assert "SELECT" == table_a_grants.get(ws_group_a.display_name)
+        assert {"SELECT"} == table_a_grants.get(ws_group_a.display_name)
 
         table_b_grants = grants_crawler.for_table_info(table_b)
-        assert "SELECT" == table_b_grants.get(ws_group_b.display_name)
+        assert {"SELECT"} == table_b_grants.get(ws_group_b.display_name)
 
         schema_b_grants = grants_crawler.for_schema_info(schema_b)
-        assert "MODIFY" == schema_b_grants.get(ws_group_b.display_name)
+        assert {"MODIFY"} == schema_b_grants.get(ws_group_b.display_name)
 
         all_grants = grants_crawler.snapshot()
         logger.debug(f"all grants={all_grants}, ")
