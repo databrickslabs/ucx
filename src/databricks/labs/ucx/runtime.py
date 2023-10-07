@@ -121,9 +121,16 @@ def crawl_permissions(cfg: WorkspaceConfig):
     Delta table.
 
     This is the first step for the _group migration_ process, which is continued in the `migrate-groups` workflow."""
-    toolkit = GroupMigrationToolkit(cfg)
-    toolkit.cleanup_inventory_table()
-    toolkit.inventorize_permissions()
+    ws = WorkspaceClient(config=cfg.to_databricks_config())
+    permission_manager = PermissionManager.factory(
+        ws,
+        RuntimeBackend(),
+        cfg.inventory_database,
+        num_threads=cfg.num_threads,
+        workspace_start_path=cfg.workspace_start_path,
+    )
+    permission_manager.cleanup()
+    permission_manager.inventorize_permissions()
 
 
 @task(
