@@ -1,7 +1,6 @@
 import logging
 
 from databricks.sdk import WorkspaceClient
-from databricks.sdk.service import sql
 
 from databricks.labs.ucx.config import WorkspaceConfig
 from databricks.labs.ucx.framework.crawlers import (
@@ -9,21 +8,8 @@ from databricks.labs.ucx.framework.crawlers import (
     SqlBackend,
     StatementExecutionBackend,
 )
-from databricks.labs.ucx.workspace_access.generic import (
-    GenericPermissionsSupport,
-    authorization_listing,
-    experiments_listing,
-    listing_wrapper,
-    models_listing,
-    workspace_listing,
-)
 from databricks.labs.ucx.workspace_access.groups import GroupManager
 from databricks.labs.ucx.workspace_access.manager import PermissionManager
-from databricks.labs.ucx.workspace_access.redash import (
-    SqlPermissionsSupport,
-    redash_listing_wrapper,
-)
-from databricks.labs.ucx.workspace_access.scim import ScimSupport
 from databricks.labs.ucx.workspace_access.secrets import SecretScopesSupport
 from databricks.labs.ucx.workspace_access.verification import VerificationManager
 
@@ -34,36 +20,15 @@ class GroupMigrationToolkit:
         self._configure_logger(config.log_level)
 
         ws = WorkspaceClient(config=config.to_databricks_config())
-        ws.api_client._session.adapters["https://"].max_retries.total = 20
         self._verify_ws_client(ws)
-        self._ws = ws  # TODO: remove this once notebooks/toolkit.py is removed
 
-        generic_acl_listing = [
-            listing_wrapper(ws.clusters.list, "cluster_id", "clusters"),
-            listing_wrapper(ws.cluster_policies.list, "policy_id", "cluster-policies"),
-            listing_wrapper(ws.instance_pools.list, "instance_pool_id", "instance-pools"),
-            listing_wrapper(ws.warehouses.list, "id", "sql/warehouses"),
-            listing_wrapper(ws.jobs.list, "job_id", "jobs"),
-            listing_wrapper(ws.pipelines.list_pipelines, "pipeline_id", "pipelines"),
-            listing_wrapper(experiments_listing(ws), "experiment_id", "experiments"),
-            listing_wrapper(models_listing(ws), "id", "registered-models"),
-            workspace_listing(ws, num_threads=config.num_threads, start_path=config.workspace_start_path),
-            authorization_listing(),
-        ]
-        redash_acl_listing = [
-            redash_listing_wrapper(ws.alerts.list, sql.ObjectTypePlural.ALERTS),
-            redash_listing_wrapper(ws.dashboards.list, sql.ObjectTypePlural.DASHBOARDS),
-            redash_listing_wrapper(ws.queries.list, sql.ObjectTypePlural.QUERIES),
-        ]
-        generic_support = GenericPermissionsSupport(ws, generic_acl_listing)
-        sql_support = SqlPermissionsSupport(ws, redash_acl_listing)
         secrets_support = SecretScopesSupport(ws)
-        scim_support = ScimSupport(ws)
-        self._permissions_manager = PermissionManager(
+        self._permissions_manager = PermissionManager.factory(
+            ws,
             self._backend(ws, warehouse_id),
             config.inventory_database,
-            [generic_support, sql_support, secrets_support, scim_support],
-            self._object_type_appliers(generic_support, sql_support, secrets_support, scim_support),
+            num_threads=config.num_threads,
+            workspace_start_path=config.workspace_start_path,
         )
         self._group_manager = GroupManager(ws, config.groups)
         # TODO: remove VerificationManager in scope of https://github.com/databrickslabs/ucx/issues/36,

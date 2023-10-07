@@ -23,7 +23,7 @@ class TableAclSupport(Crawler, Applier):
 
     def get_crawler_tasks(self) -> Iterator[Callable[..., Permissions | None]]:
         def inner(grant: Grant) -> Permissions:
-            object_type, object_key = grant.type_and_key()
+            object_type, object_key = grant.this_type_and_key()
             return Permissions(object_type=object_type, object_id=object_key, raw=json.dumps(dataclasses.asdict(grant)))
 
         for grant in self._grants_crawler.snapshot():

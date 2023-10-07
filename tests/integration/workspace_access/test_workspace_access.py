@@ -13,8 +13,10 @@ logger = logging.getLogger(__name__)
 
 def test_workspace_access_e2e(
     ws: WorkspaceClient,
+    sql_backend,
     inventory_schema,
     make_schema,
+    make_table,
     make_ucx_group,
     make_instance_pool,
     make_instance_pool_permissions,
@@ -42,6 +44,17 @@ def test_workspace_access_e2e(
     env_or_skip,
 ):
     ws_group, acc_group = make_ucx_group()
+
+    schema_a = make_schema()
+    schema_b = make_schema()
+    _ = make_schema()
+    table_a = make_table(schema_name=schema_a.name)
+    table_b = make_table(schema_name=schema_b.name)
+    make_table(schema_name=schema_b.name, external=True)
+
+    sql_backend.execute(f"GRANT USAGE ON SCHEMA default TO `{ws_group.display_name}`")
+    sql_backend.execute(f"GRANT SELECT ON TABLE {table_a.full_name} TO `{ws_group.display_name}`")
+    sql_backend.execute(f"GRANT MODIFY ON TABLE {table_b.full_name} TO `{ws_group.display_name}`")
 
     to_verify = set()
 
