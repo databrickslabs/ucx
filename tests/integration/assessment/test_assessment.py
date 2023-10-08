@@ -9,10 +9,30 @@ from databricks.labs.ucx.assessment.crawlers import (
 
 logger = logging.getLogger(__name__)
 
+_PIPELINE_CONF = {
+        "spark.hadoop.fs.azure.account.oauth2.client.id.storage_acct_1.dfs.core.windows.net": ""
+                                                                                              "pipeline_dummy_application_id",
+        "spark.hadoop.fs.azure.account.oauth2.client.endpoint.storage_acct_1.dfs.core.windows.net": ""
+                                                                                                    "https://login"
+                                                                                                    ".microsoftonline.com/directory_12345/oauth2/token",
+    }
+
+_SPARK_CONF = {
+    "spark.databricks.cluster.profile": "singleNode",
+    "spark.master": "local[*]",
+    "fs.azure.account.auth.type.storage_acct_1.dfs.core.windows.net": "OAuth",
+    "fs.azure.account.oauth.provider.type.storage_acct_1.dfs.core.windows.net": "org.apache.hadoop.fs"
+                                                                                ".azurebfs.oauth2.ClientCredsTokenProvider",
+    "fs.azure.account.oauth2.client.id.storage_acct_1.dfs.core.windows.net": "dummy_application_id",
+    "fs.azure.account.oauth2.client.secret.storage_acct_1.dfs.core.windows.net": "dummy",
+    "fs.azure.account.oauth2.client.endpoint.storage_acct_1.dfs.core.windows.net": "https://login"
+                                                                                   ".microsoftonline.com/directory_12345/oauth2/token",
+}
+
 
 def test_pipeline_crawler(ws, make_pipeline, inventory_schema, sql_backend):
     logger.info("setting up fixtures")
-    created_pipeline = make_pipeline(spn_example=1)
+    created_pipeline = make_pipeline(configuration=_PIPELINE_CONF)
 
     pipeline_crawler = PipelinesCrawler(ws=ws, sbe=sql_backend, schema=inventory_schema)
     pipelines = pipeline_crawler.snapshot()
@@ -28,7 +48,7 @@ def test_pipeline_crawler(ws, make_pipeline, inventory_schema, sql_backend):
 
 
 def test_cluster_crawler(ws, make_cluster, inventory_schema, sql_backend):
-    created_cluster = make_cluster(single_node=True, spn_example=1)
+    created_cluster = make_cluster(single_node=True, spark_conf=_SPARK_CONF)
     new_cluster = created_cluster.result()
     cluster_crawler = ClustersCrawler(ws=ws, sbe=sql_backend, schema=inventory_schema)
     clusters = cluster_crawler.snapshot()
@@ -44,7 +64,7 @@ def test_cluster_crawler(ws, make_cluster, inventory_schema, sql_backend):
 
 
 def test_job_crawler(ws, make_job, inventory_schema, sql_backend):
-    new_job = make_job(spn_example=1)
+    new_job = make_job(spark_conf=_SPARK_CONF)
     job_crawler = JobsCrawler(ws=ws, sbe=sql_backend, schema=inventory_schema)
     jobs = job_crawler.snapshot()
     results = []
@@ -59,8 +79,8 @@ def test_job_crawler(ws, make_job, inventory_schema, sql_backend):
 
 
 def test_spn_crawler(ws, inventory_schema, make_job, make_pipeline, sql_backend):
-    make_job(spn_example=1)
-    make_pipeline(spn_example=1)
+    make_job(spark_conf=_SPARK_CONF)
+    make_pipeline(configuration=_PIPELINE_CONF)
     spn_crawler = AzureServicePrincipalCrawler(ws=ws, sbe=sql_backend, schema=inventory_schema)
     spns = spn_crawler.snapshot()
     results = []
