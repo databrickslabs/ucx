@@ -7,6 +7,7 @@ from databricks.sdk import WorkspaceClient
 from databricks.labs.ucx.assessment.crawlers import (
     AzureServicePrincipalCrawler,
     ClustersCrawler,
+    GlobalInitScriptCrawler,
     JobsCrawler,
     PipelinesCrawler,
 )
@@ -145,6 +146,17 @@ def assess_azure_service_principals(cfg: WorkspaceConfig):
     in the `$inventory.azure_service_principals` table."""
     ws = WorkspaceClient(config=cfg.to_databricks_config())
     crawler = AzureServicePrincipalCrawler(ws, RuntimeBackend(), cfg.inventory_database)
+    crawler.snapshot()
+
+
+@task("assessment", depends_on=[setup_schema])
+def assess_global_init_scripts(cfg: WorkspaceConfig):
+    """This module scans through all the global init scripts and identifies if there is an Azure Service Principal
+    who has been given access to the Azure storage accounts via spark configurations referred in those scripts.
+    It looks in:
+      - the list of all the global init scripts are saved in the `$inventory.azure_service_principals` table."""
+    ws = WorkspaceClient(config=cfg.to_databricks_config())
+    crawler = GlobalInitScriptCrawler(ws, RuntimeBackend(), cfg.inventory_database)
     crawler.snapshot()
 
 
