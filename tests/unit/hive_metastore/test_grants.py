@@ -12,7 +12,7 @@ def test_type_and_key_table():
     assert grant == ("TABLE", "hive_metastore.mydb.mytable")
 
     grant = Grant(principal="user", action_type="SELECT", catalog="hive_metastore", database="mydb", table="mytable")
-    assert grant._this_type_and_key()[0] == "TABLE"
+    assert grant.this_type_and_key()[0] == "TABLE"
     assert grant.object_key == "hive_metastore.mydb.mytable"
 
 
@@ -21,7 +21,7 @@ def test_type_and_key_view():
     assert grant == ("VIEW", "hive_metastore.mydb.myview")
 
     grant = Grant(principal="user", action_type="SELECT", catalog="hive_metastore", database="mydb", view="myview")
-    assert grant._this_type_and_key()[0] == "VIEW"
+    assert grant.this_type_and_key()[0] == "VIEW"
     assert grant.object_key == "hive_metastore.mydb.myview"
 
 
@@ -30,7 +30,7 @@ def test_type_and_key_database():
     assert grant == ("DATABASE", "hive_metastore.mydb")
 
     grant = Grant(principal="user", action_type="SELECT", catalog="hive_metastore", database="mydb")
-    assert grant._this_type_and_key()[0] == "DATABASE"
+    assert grant.this_type_and_key()[0] == "DATABASE"
     assert grant.object_key == "hive_metastore.mydb"
 
 
@@ -39,7 +39,7 @@ def test_type_and_key_catalog():
     assert grant == ("CATALOG", "mycatalog")
 
     grant = Grant(principal="user", action_type="SELECT", catalog="mycatalog")
-    assert grant._this_type_and_key()[0] == "CATALOG"
+    assert grant.this_type_and_key()[0] == "CATALOG"
     assert grant.object_key == "mycatalog"
 
 
@@ -48,7 +48,7 @@ def test_type_and_key_any_file():
     assert grant == ("ANY FILE", "")
 
     grant = Grant(principal="user", action_type="SELECT", catalog="hive_metastore", any_file=True)
-    assert grant._this_type_and_key()[0] == "ANY FILE"
+    assert grant.this_type_and_key()[0] == "ANY FILE"
     assert grant.object_key == ""
 
 
@@ -57,7 +57,7 @@ def test_type_and_key_anonymous_function():
     assert grant == ("ANONYMOUS FUNCTION", "")
 
     grant = Grant(principal="user", action_type="SELECT", catalog="hive_metastore", anonymous_function=True)
-    assert grant._this_type_and_key()[0] == "ANONYMOUS FUNCTION"
+    assert grant.this_type_and_key()[0] == "ANONYMOUS FUNCTION"
     assert grant.object_key == ""
 
 
@@ -73,13 +73,13 @@ def test_object_key():
 
 def test_hive_sql():
     grant = Grant(principal="user", action_type="SELECT", catalog="hive_metastore", database="mydb", table="mytable")
-    assert grant.hive_grant_sql() == "GRANT SELECT ON TABLE hive_metastore.mydb.mytable TO user"
-    assert grant.hive_revoke_sql() == "REVOKE SELECT ON TABLE hive_metastore.mydb.mytable FROM user"
+    assert grant.hive_grant_sql() == "GRANT SELECT ON TABLE hive_metastore.mydb.mytable TO `user`"
+    assert grant.hive_revoke_sql() == "REVOKE SELECT ON TABLE hive_metastore.mydb.mytable FROM `user`"
 
 
 def test_hive_revoke_sql():
     grant = Grant(principal="user", action_type="SELECT", catalog="hive_metastore", database="mydb", table="mytable")
-    assert grant.hive_revoke_sql() == "REVOKE SELECT ON TABLE hive_metastore.mydb.mytable FROM user"
+    assert grant.hive_revoke_sql() == "REVOKE SELECT ON TABLE hive_metastore.mydb.mytable FROM `user`"
 
 
 @pytest.mark.parametrize(
@@ -87,15 +87,15 @@ def test_hive_revoke_sql():
     [
         (
             Grant("user", "READ_METADATA", catalog="hive_metastore", database="mydb", table="mytable"),
-            "GRANT BROWSE ON TABLE hive_metastore.mydb.mytable TO user",
+            "GRANT BROWSE ON TABLE hive_metastore.mydb.mytable TO `user`",
         ),
         (
             Grant("me", "OWN", catalog="hive_metastore", database="mydb", table="mytable"),
-            "ALTER TABLE hive_metastore.mydb.mytable OWNER TO me",
+            "ALTER TABLE hive_metastore.mydb.mytable OWNER TO `me`",
         ),
         (
             Grant("me", "USAGE", catalog="hive_metastore", database="mydb"),
-            "GRANT USE SCHEMA ON DATABASE hive_metastore.mydb TO me",
+            "GRANT USE SCHEMA ON DATABASE hive_metastore.mydb TO `me`",
         ),
         (
             Grant("me", "INVALID", catalog="hive_metastore", database="mydb"),

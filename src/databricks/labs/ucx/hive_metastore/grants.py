@@ -1,7 +1,10 @@
 import logging
+from collections import defaultdict
 from collections.abc import Iterator
 from dataclasses import dataclass
 from functools import partial
+
+from databricks.sdk.service.catalog import SchemaInfo, TableInfo
 
 from databricks.labs.ucx.framework.crawlers import CrawlerBase
 from databricks.labs.ucx.framework.parallel import Threads
@@ -46,18 +49,21 @@ class Grant:
             return "ANY FILE", ""
         if anonymous_function:
             return "ANONYMOUS FUNCTION", ""
-        # Must come last, as it has lowest priority here but is a required parameter
+        # Must come last, as it has the lowest priority here but is a required parameter
         if catalog is not None:
             return "CATALOG", catalog
-        msg = "invalid grant keys"
+        msg = (
+            f"invalid grant keys: catalog={catalog}, database={database}, view={view}, "
+            f"any_file={any_file}, anonymous_function={anonymous_function}"
+        )
         raise ValueError(msg)
 
     @property
     def object_key(self) -> str:
-        _, key = self._this_type_and_key()
+        _, key = self.this_type_and_key()
         return key.lower()
 
-    def _this_type_and_key(self):
+    def this_type_and_key(self):
         return self.type_and_key(
             catalog=self.catalog,
             database=self.database,
@@ -68,19 +74,20 @@ class Grant:
         )
 
     def hive_grant_sql(self) -> str:
-        object_type, object_key = self._this_type_and_key()
-        return f"GRANT {self.action_type} ON {object_type} {object_key} TO {self.principal}"
+        object_type, object_key = self.this_type_and_key()
+        # See https://docs.databricks.com/en/sql/language-manual/security-grant.html
+        return f"GRANT {self.action_type} ON {object_type} {object_key} TO `{self.principal}`"
 
     def hive_revoke_sql(self) -> str:
-        object_type, object_key = self._this_type_and_key()
-        return f"REVOKE {self.action_type} ON {object_type} {object_key} FROM {self.principal}"
+        object_type, object_key = self.this_type_and_key()
+        return f"REVOKE {self.action_type} ON {object_type} {object_key} FROM `{self.principal}`"
 
     def _set_owner(self, object_type, object_key):
-        return f"ALTER {object_type} {object_key} OWNER TO {self.principal}"
+        return f"ALTER {object_type} {object_key} OWNER TO `{self.principal}`"
 
     def _uc_action(self, action_type):
         def inner(object_type, object_key):
-            return f"GRANT {action_type} ON {object_type} {object_key} TO {self.principal}"
+            return f"GRANT {action_type} ON {object_type} {object_key} TO `{self.principal}`"
 
         return inner
 
@@ -94,7 +101,7 @@ class Grant:
         # See: https://docs.databricks.com/sql/language-manual/sql-ref-privileges-hms.html
         # See: https://docs.databricks.com/data-governance/unity-catalog/manage-privileges/ownership.html
         # See: https://docs.databricks.com/data-governance/unity-catalog/manage-privileges/privileges.html
-        object_type, object_key = self._this_type_and_key()
+        object_type, object_key = self.this_type_and_key()
         hive_to_uc = {
             ("FUNCTION", "SELECT"): self._uc_action("EXECUTE"),
             ("TABLE", "SELECT"): self._uc_action("SELECT"),
@@ -168,6 +175,19 @@ class GrantsCrawler(CrawlerBase):
             # TODO: https://github.com/databrickslabs/ucx/issues/406
             logger.error(f"Detected {len(errors)} during scanning for grants in {catalog}")
         return [grant for grants in catalog_grants for grant in grants]
+
+    def for_table_info(self, table: TableInfo):
+        # TODO: it does not work yet for views
+        principal_permissions = defaultdict(set)
+        for grant in self._grants(catalog=table.catalog_name, database=table.schema_name, table=table.name):
+            principal_permissions[grant.principal].add(grant.action_type)
+        return principal_permissions
+
+    def for_schema_info(self, schema: SchemaInfo):
+        principal_permissions = defaultdict(set)
+        for grant in self._grants(catalog=schema.catalog_name, database=schema.name):
+            principal_permissions[grant.principal].add(grant.action_type)
+        return principal_permissions
 
     def _grants(
         self,
