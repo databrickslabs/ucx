@@ -1,5 +1,5 @@
--- viz type=table, name=Azure SPNs, columns=application_id,secret_scope,secret_key,tenant_id,storage_account
--- widget title=Azure SPNs, col=0, row=49, size_x=6, size_y=8
+-- viz type=table, name=Azure Service Principals, columns=application_id,secret_scope,secret_key,tenant_id,storage_account
+-- widget title=Azure Service Principals, col=0, row=49, size_x=6, size_y=8
 select
   application_id,
   if(secret_scope = '', "NA", secret_scope) secret_scope,
