@@ -103,7 +103,7 @@ def _get_init_script_data(w, init_script_info):
                 return None
 
 
-def _azure_sp_conf_in_cluster_init(init_script_data: str) -> bool:
+def _azure_sp_conf_in_init_scripts(init_script_data: str) -> bool:
     for conf in _AZURE_SP_CONF:
         if re.search(conf, init_script_data):
             return True
@@ -155,7 +155,7 @@ class GlobalInitScriptCrawler(CrawlerBase):
             )
             if not global_init_script:
                 continue
-            if _azure_sp_conf_in_cluster_init(global_init_script):
+            if _azure_sp_conf_in_init_scripts(global_init_script):
                 failures.append(f"{_AZURE_SP_CONF_FAILURE_MSG} global init script.")
                 global_init_script_info.failures = json.dumps(failures)
 
@@ -449,7 +449,7 @@ class ClustersCrawler(CrawlerBase):
                     init_script_data = _get_init_script_data(self._ws, init_script_info)
                     if not init_script_data:
                         continue
-                    if not _azure_sp_conf_in_cluster_init(init_script_data):
+                    if not _azure_sp_conf_in_init_scripts(init_script_data):
                         continue
                     failures.append(f"{_AZURE_SP_CONF_FAILURE_MSG} cluster.")
 
@@ -538,7 +538,7 @@ class JobsCrawler(CrawlerBase):
                     init_script_data = _get_init_script_data(self._ws, init_script_info)
                     if not init_script_data:
                         continue
-                    if not _azure_sp_conf_in_cluster_init(init_script_data):
+                    if not _azure_sp_conf_in_init_scripts(init_script_data):
                         continue
                     job_assessment[job.job_id].add(f"{_AZURE_SP_CONF_FAILURE_MSG} Job cluster.")
 
