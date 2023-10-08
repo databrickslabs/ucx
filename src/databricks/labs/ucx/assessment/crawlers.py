@@ -1,3 +1,4 @@
+import base64
 import json
 import logging
 import re
@@ -73,6 +74,41 @@ class AzureServicePrincipalInfo:
     storage_account: str
 
 
+@dataclass
+class GlobalInitScriptInfo:
+    script_id: str
+    script_name: str
+    created_by: str
+    enabled: bool
+    success: int
+    failures: str
+
+def _get_init_script_data(w, init_script_info):
+    if init_script_info.dbfs:
+        file_api_format_destination = init_script_info.dbfs.destination.split(":")[1]
+        if file_api_format_destination:
+            try:
+                data = w.dbfs.read(file_api_format_destination).data
+                return base64.b64decode(data).decode('utf-8')
+            except Exception as e:
+                pass
+    if init_script_info.workspace:
+        workspace_file_destination = init_script_info.workspace.destination
+        if workspace_file_destination:
+            try:
+                data = w.workspace.export(workspace_file_destination).content
+                return base64.b64decode(data).decode('utf-8')
+            except Exception as e:
+                pass
+
+
+def _azure_sp_conf_in_cluster_init(init_script_data: str) -> bool:
+    for conf in _AZURE_SP_CONF:
+        if re.search(conf, init_script_data):
+            return True
+    return False
+
+
 def _azure_sp_conf_present_check(config: dict) -> bool:
     for key in config.keys():
         for conf in _AZURE_SP_CONF:
@@ -98,6 +134,39 @@ def spark_version_compatibility(spark_version: str) -> str:
     if (10, 0) <= version < (11, 3):
         return "kinda works"
     return "supported"
+
+
+class GlobalInitScriptCrawler(CrawlerBase):
+    def __init__(self, ws: WorkspaceClient, sbe: SqlBackend, schema):
+        super().__init__(sbe, "hive_metastore", schema, "global_init_scripts", GlobalInitScriptInfo)
+        self._ws = ws
+
+    def _crawl(self) -> list[GlobalInitScriptInfo]:
+        all_global_init_scripts = list(self._ws.global_init_scripts.list())
+        return list(self._assess_global_init_scripts(all_global_init_scripts))
+
+    def _assess_global_init_scripts(self, all_global_init_scripts):
+        for gis in all_global_init_scripts:
+            global_init_script_info = GlobalInitScriptInfo(gis.script_id, gis.name, gis.created_by, gis.enabled, 1, "")
+            failures = []
+            global_init_script = base64.b64decode(self._ws.global_init_scripts.get(gis.script_id).script).decode('utf-8')
+            if not global_init_script:
+                continue
+            if not _azure_sp_conf_in_cluster_init(global_init_script):
+                continue
+            failures.append(f"{_AZURE_SP_CONF_FAILURE_MSG} global init script.")
+
+            global_init_script_info.failures = json.dumps(failures)
+            if len(failures) > 0:
+                global_init_script_info.success = 0
+            yield global_init_script_info
+
+    def snapshot(self) -> list[GlobalInitScriptInfo]:
+        return self._snapshot(self._try_fetch, self._crawl)
+
+    def _try_fetch(self) -> list[GlobalInitScriptInfo]:
+        for row in self._fetch(f"SELECT * FROM {self._schema}.{self._table}"):
+            yield GlobalInitScriptInfo(*row)
 
 
 class AzureServicePrincipalCrawler(CrawlerBase):
@@ -373,6 +442,15 @@ class ClustersCrawler(CrawlerBase):
                 except DatabricksError as err:
                     logger.warning(f"Error retrieving cluster policy {cluster.policy_id}. Error: {err}")
 
+            if cluster.init_scripts:
+                for init_script_info in cluster.init_scripts:
+                    init_script_data = _get_init_script_data(self._ws, init_script_info)
+                    if not init_script_data:
+                        continue
+                    if not _azure_sp_conf_in_cluster_init(init_script_data):
+                        continue
+                    failures.append(f"{_AZURE_SP_CONF_FAILURE_MSG} cluster.")
+
             cluster_info.failures = json.dumps(failures)
             if len(failures) > 0:
                 cluster_info.success = 0
@@ -452,6 +530,15 @@ class JobsCrawler(CrawlerBase):
                             job_assessment[job.job_id].add(f"{_AZURE_SP_CONF_FAILURE_MSG} Job cluster.")
                 except DatabricksError as err:
                     logger.warning(f"Error retrieving cluster policy {cluster_config.policy_id}. Error: {err}")
+
+            if cluster_config.init_scripts:
+                for init_script_info in cluster_config.init_scripts:
+                    init_script_data = _get_init_script_data(self._ws, init_script_info)
+                    if not init_script_data:
+                        continue
+                    if not _azure_sp_conf_in_cluster_init(init_script_data):
+                        continue
+                    job_assessment[job.job_id].add(f"{_AZURE_SP_CONF_FAILURE_MSG} Job cluster.")
 
         for job_key in job_details.keys():
             job_details[job_key].failures = json.dumps(list(job_assessment[job_key]))
