@@ -28,7 +28,7 @@ _AZURE_SP_CONF = [
 ]
 _SECRET_PATTERN = r"{{(secrets.*?)}}"
 _STORAGE_ACCOUNT_EXTRACT_PATTERN = r"(?:id|endpoint)(.*?)dfs"
-_AZURE_SP_CONF_FAILURE_MSG = "Uses azure service principal credentials config in "
+_AZURE_SP_CONF_FAILURE_MSG = "Uses azure service principal credentials config in"
 _SECRET_LIST_LENGTH = 3
 _CLIENT_ENDPOINT_LENGTH = 6
 
@@ -83,23 +83,24 @@ class GlobalInitScriptInfo:
     success: int
     failures: str
 
+
 def _get_init_script_data(w, init_script_info):
     if init_script_info.dbfs:
         file_api_format_destination = init_script_info.dbfs.destination.split(":")[1]
         if file_api_format_destination:
             try:
                 data = w.dbfs.read(file_api_format_destination).data
-                return base64.b64decode(data).decode('utf-8')
-            except Exception as e:
-                pass
+                return base64.b64decode(data).decode("utf-8")
+            except Exception:
+                return None
     if init_script_info.workspace:
         workspace_file_destination = init_script_info.workspace.destination
         if workspace_file_destination:
             try:
                 data = w.workspace.export(workspace_file_destination).content
-                return base64.b64decode(data).decode('utf-8')
-            except Exception as e:
-                pass
+                return base64.b64decode(data).decode("utf-8")
+            except Exception:
+                return None
 
 
 def _azure_sp_conf_in_cluster_init(init_script_data: str) -> bool:
@@ -149,7 +150,9 @@ class GlobalInitScriptCrawler(CrawlerBase):
         for gis in all_global_init_scripts:
             global_init_script_info = GlobalInitScriptInfo(gis.script_id, gis.name, gis.created_by, gis.enabled, 1, "")
             failures = []
-            global_init_script = base64.b64decode(self._ws.global_init_scripts.get(gis.script_id).script).decode('utf-8')
+            global_init_script = base64.b64decode(self._ws.global_init_scripts.get(gis.script_id).script).decode(
+                "utf-8"
+            )
             if not global_init_script:
                 continue
             if not _azure_sp_conf_in_cluster_init(global_init_script):

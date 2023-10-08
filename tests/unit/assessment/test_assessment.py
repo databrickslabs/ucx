@@ -7,6 +7,10 @@ from databricks.sdk.service.compute import (
     ClusterDetails,
     ClusterSource,
     ClusterSpec,
+    DbfsStorageInfo,
+    GlobalInitScriptDetails,
+    InitScriptInfo,
+    WorkspaceStorageInfo,
 )
 from databricks.sdk.service.jobs import (
     BaseJob,
@@ -21,6 +25,7 @@ from databricks.sdk.service.sql import EndpointConfPair
 from databricks.labs.ucx.assessment.crawlers import (
     AzureServicePrincipalCrawler,
     ClustersCrawler,
+    GlobalInitScriptCrawler,
     JobsCrawler,
     PipelineInfo,
     PipelinesCrawler,
@@ -2040,3 +2045,223 @@ def test_azure_service_principal_info_policy_family(mocker):
     assert len(spn_crawler) == 1
     assert spn_crawler[0].application_id == "dummy_appl_id"
     assert spn_crawler[0].tenant_id == "dummy_tenant_id"
+
+
+def test_cluster_init_script(mocker):
+    sample_clusters = [
+        ClusterDetails(
+            autoscale=AutoScale(min_workers=1, max_workers=6),
+            cluster_source=ClusterSource.UI,
+            spark_context_id=5134472582179565315,
+            spark_env_vars=None,
+            spark_version="12.3.x-cpu-ml-scala2.12",
+            cluster_id="0810-225833-atlanta69",
+            cluster_name="Tech Summit FY24 Cluster-1",
+            init_scripts=[
+                InitScriptInfo(
+                    dbfs=DbfsStorageInfo(destination="dbfs:/users/test@test.com/init_scripts/test.sh"),
+                    s3=None,
+                    volumes=None,
+                    workspace=None,
+                ),
+                InitScriptInfo(
+                    dbfs=None,
+                    s3=None,
+                    volumes=None,
+                    workspace=WorkspaceStorageInfo(
+                        destination="/Users/dipankar.kushari@databricks.com/init_script_1.sh"
+                    ),
+                ),
+            ],
+        )
+    ]
+    ws = mocker.Mock()
+    ws.clusters.list.return_value = sample_clusters
+    ws.dbfs.read().data = "JXNoCmVjaG8gIj0="
+    ws.workspace.export().content = (
+        "IyEvYmluL2Jhc2gKCiMgU2V0IGEg"
+        "Y3VzdG9tIFNwYXJrIGNvbmZpZ3VyYXRpb24KZWNobyAic3Bhc"
+        "msuZXhlY3V0b3IubWVtb3J5IDRnIiA+PiAvZGF0YWJyaWNrcy9"
+        "zcGFyay9jb25mL3NwYXJrLWRlZmF1bHRzLmNvbmYKZWNobyAic3Bhc"
+        "msuZHJpdmVyLm1lbW9yeSAyZyIgPj4gL2RhdGFicmlja3Mvc3BhcmsvY2"
+        "9uZi9zcGFyay1kZWZhdWx0cy5jb25mCmVjaG8gInNwYXJrLmhhZG9vcC5mcy"
+        "5henVyZS5hY2NvdW50LmF1dGgudHlwZS5hYmNkZS5kZnMuY29yZS53aW5kb3d"
+        "zLm5ldCBPQXV0aCIgPj4gL2RhdGFicmlja3Mvc3BhcmsvY29uZi9zcGFyay1kZWZ"
+        "hdWx0cy5jb25mCmVjaG8gInNwYXJrLmhhZG9vcC5mcy5henVyZS5hY2NvdW50Lm9"
+        "hdXRoLnByb3ZpZGVyLnR5cGUuYWJjZGUuZGZzLmNvcmUud2luZG93cy5uZXQgb3JnLmF"
+        "wYWNoZS5oYWRvb3AuZnMuYXp1cmViZnMub2F1dGgyLkNsaWVudENyZWRzVG9rZW5Qcm92"
+        "aWRlciIgPj4gL2RhdGFicmlja3Mvc3BhcmsvY29uZi9zcGFyay1kZWZhdWx0cy5jb25mC"
+        "mVjaG8gInNwYXJrLmhhZG9vcC5mcy5henVyZS5hY2NvdW50Lm9hdXRoMi5jbGllbnQuaWQ"
+        "uYWJjZGUuZGZzLmNvcmUud2luZG93cy5uZXQgZHVtbXlfYXBwbGljYXRpb25faWQiID4+IC"
+        "9kYXRhYnJpY2tzL3NwYXJrL2NvbmYvc3BhcmstZGVmYXVsdHMuY29uZgplY2hvICJzcGFya"
+        "y5oYWRvb3AuZnMuYXp1cmUuYWNjb3VudC5vYXV0aDIuY2xpZW50LnNlY3JldC5hYmNkZS5kZnMu"
+        "Y29yZS53aW5kb3dzLm5ldCBkZGRkZGRkZGRkZGRkZGRkZGRkIiA+PiAvZGF0YWJyaWNrcy9zcGFy"
+        "ay9jb25mL3NwYXJrLWRlZmF1bHRzLmNvbmYKZWNobyAic3BhcmsuaGFkb29wLmZzLmF6dXJlLmFj"
+        "Y291bnQub2F1dGgyLmNsaWVudC5lbmRwb2ludC5hYmNkZS5kZnMuY29yZS53aW5kb3dzLm5ldCBod"
+        "HRwczovL2xvZ2luLm1pY3Jvc29mdG9ubGluZS5jb20vZHVtbXlfdGVuYW50X2lkL29hdXRoMi90b2t"
+        "lbiIgPj4gL2RhdGFicmlja3Mvc3BhcmsvY29uZi9zcGFyay1kZWZhdWx0cy5jb25mCg=="
+    )
+    init_crawler = ClustersCrawler(ws, MockBackend(), "ucx").snapshot()
+    assert len(init_crawler) == 1
+
+
+def test_job_cluster_init_script():
+    sample_jobs = [
+        BaseJob(
+            created_time=1694536604319,
+            creator_user_name="anonymous@databricks.com",
+            job_id=536591785949415,
+            settings=JobSettings(
+                compute=None,
+                continuous=None,
+                tasks=[
+                    Task(
+                        task_key="Ingest",
+                        existing_cluster_id="0807-225846-avon493",
+                        notebook_task=NotebookTask(
+                            notebook_path="/Users/foo.bar@databricks.com/Customers/Example/Test/Load"
+                        ),
+                        timeout_seconds=0,
+                    )
+                ],
+                timeout_seconds=0,
+            ),
+        ),
+        BaseJob(
+            created_time=1694536604321,
+            creator_user_name="anonymous@databricks.com",
+            job_id=536591785949416,
+            settings=JobSettings(
+                compute=None,
+                continuous=None,
+                tasks=[
+                    Task(
+                        task_key="Ingest",
+                        existing_cluster_id="0810-229933-chicago99",
+                        notebook_task=NotebookTask(
+                            notebook_path="/Users/foo.bar@databricks.com/Customers/Example/Test/Load"
+                        ),
+                        timeout_seconds=0,
+                    )
+                ],
+                timeout_seconds=0,
+            ),
+        ),
+        BaseJob(
+            created_time=1694536604319,
+            creator_user_name="anonymous@databricks.com",
+            job_id=536591785949417,
+            settings=JobSettings(
+                compute=None,
+                continuous=None,
+                tasks=[
+                    Task(
+                        task_key="Ingest",
+                        existing_cluster_id="0811-929933-maine96",
+                        notebook_task=NotebookTask(
+                            notebook_path="/Users/foo.bar@databricks.com/Customers/Example/Test/Load"
+                        ),
+                        timeout_seconds=0,
+                    )
+                ],
+                timeout_seconds=0,
+            ),
+        ),
+    ]
+
+    sample_clusters = [
+        ClusterDetails(
+            init_scripts=[
+                InitScriptInfo(
+                    dbfs=DbfsStorageInfo(destination="dbfs:/users/test@test.com/init_scripts/test.sh"),
+                    s3=None,
+                    volumes=None,
+                    workspace=None,
+                ),
+                InitScriptInfo(
+                    dbfs=None,
+                    s3=None,
+                    volumes=None,
+                    workspace=WorkspaceStorageInfo(
+                        destination="/Users/dipankar.kushari@databricks.com/init_script_1.sh"
+                    ),
+                ),
+            ],
+            autoscale=AutoScale(min_workers=1, max_workers=6),
+            spark_context_id=5134472582179566666,
+            spark_env_vars=None,
+            spark_version="13.3.x-cpu-ml-scala2.12",
+            cluster_id="0807-225846-avon493",
+            cluster_source=ClusterSource.JOB,
+        )
+    ]
+    ws = Mock()
+    ws.workspace.export().content = "JXNoCmVjaG8gIj0="
+    result_set = JobsCrawler(ws, MockBackend(), "ucx")._assess_jobs(
+        sample_jobs, {c.cluster_id: c for c in sample_clusters}
+    )
+    assert len(result_set) == 3
+
+
+def test_global_init_scripts_no_config(mocker):
+    mock_ws = mocker.Mock()
+    mocker.Mock()
+    mock_ws.global_init_scripts.list.return_value = [
+        GlobalInitScriptDetails(
+            created_at=111,
+            created_by="123@234.com",
+            enabled=False,
+            name="newscript",
+            position=4,
+            script_id="222",
+            updated_at=111,
+            updated_by="2123l@eee.com",
+        )
+    ]
+    mock_ws.global_init_scripts.get().script = "JXNoCmVjaG8gIj0="
+    crawler = GlobalInitScriptCrawler(mock_ws, MockBackend(), schema="UCX")
+    result = crawler._crawl()
+    assert len(result) == 0
+
+
+def test_global_init_scripts_with_config(mocker):
+    mock_ws = mocker.Mock()
+    mocker.Mock()
+    mock_ws.global_init_scripts.list.return_value = [
+        GlobalInitScriptDetails(
+            created_at=111,
+            created_by="123@234.com",
+            enabled=False,
+            name="newscript",
+            position=4,
+            script_id="222",
+            updated_at=111,
+            updated_by="2123l@eee.com",
+        )
+    ]
+    mock_ws.global_init_scripts.get().script = (
+        "IyEvYmluL2Jhc2gKCiMgU2V0IGEgY3"
+        "VzdG9tIFNwYXJrIGNvbmZpZ3VyYXRpb24KZWNobyAic"
+        "3BhcmsuZXhlY3V0b3IubWVtb3J5IDRnIiA+PiAvZGF0YWJyaWN"
+        "rcy9zcGFyay9jb25mL3NwYXJrLWRlZmF1bHRzLmNvbmYKZWNobyAic3Bhcm"
+        "suZHJpdmVyLm1lbW9yeSAyZyIgPj4gL2RhdGFicmlja3Mvc3BhcmsvY29uZi9zcGFy"
+        "ay1kZWZhdWx0cy5jb25mCmVjaG8gInNwYXJrLmhhZG9vcC5mcy5henVyZS5hY2NvdW50LmF1"
+        "dGgudHlwZS5hYmNkZS5kZnMuY29yZS53aW5kb3dzLm5ldCBPQXV0aCIgPj4gL2RhdGFic"
+        "mlja3Mvc3BhcmsvY29uZi9zcGFyay1kZWZhdWx0cy5jb25mCmVjaG8gInNwYXJrLmhhZG9vc"
+        "C5mcy5henVyZS5hY2NvdW50Lm9hdXRoLnByb3ZpZGVyLnR5cGUuYWJjZGUuZGZzLmNvcmUud2l"
+        "uZG93cy5uZXQgb3JnLmFwYWNoZS5oYWRvb3AuZnMuYXp1cmViZnMub2F1dGgyLkNsaWVudENyZ"
+        "WRzVG9rZW5Qcm92aWRlciIgPj4gL2RhdGFicmlja3Mvc3BhcmsvY29uZi9zcGFyay1kZWZhdWx0c"
+        "y5jb25mCmVjaG8gInNwYXJrLmhhZG9vcC5mcy5henVyZS5hY2NvdW50Lm9hdXRoMi5jbGllbnQu"
+        "aWQuYWJjZGUuZGZzLmNvcmUud2luZG93cy5uZXQgZHVtbXlfYXBwbGljYXRpb25faWQiID4+IC9"
+        "kYXRhYnJpY2tzL3NwYXJrL2NvbmYvc3BhcmstZGVmYXVsdHMuY29uZgplY2hvICJzcGFyay5oY"
+        "WRvb3AuZnMuYXp1cmUuYWNjb3VudC5vYXV0aDIuY2xpZW50LnNlY3JldC5hYmNkZS5kZnMuY29y"
+        "ZS53aW5kb3dzLm5ldCBkZGRkZGRkZGRkZGRkZGRkZGRkIiA+PiAvZGF0YWJyaWNrcy9zcGFyay9j"
+        "b25mL3NwYXJrLWRlZmF1bHRzLmNvbmYKZWNobyAic3BhcmsuaGFkb29wLmZzLmF6dXJlLmFjY291"
+        "bnQub2F1dGgyLmNsaWVudC5lbmRwb2ludC5hYmNkZS5kZnMuY29yZS53aW5kb3dzLm5ldCBodHRw"
+        "czovL2xvZ2luLm1pY3Jvc29mdG9ubGluZS5jb20vZHVtbXlfdGVuYW50X2lkL29hdXRoMi90b2tlb"
+        "iIgPj4gL2RhdGFicmlja3Mvc3BhcmsvY29uZi9zcGFyay1kZWZhdWx0cy5jb25mCg=="
+    )
+
+    crawler = GlobalInitScriptCrawler(mock_ws, MockBackend(), schema="UCX")
+    result = crawler._crawl()
+    assert len(result) == 1
