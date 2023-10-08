@@ -470,8 +470,15 @@ def make_cluster(ws, make_random):
             spark_version = ws.clusters.select_spark_version(latest=True)
         if single_node:
             kwargs["num_workers"] = 0
-            kwargs["spark_conf"] = {"spark.databricks.cluster.profile": "singleNode", "spark.master": "local[*]"}
+            if kwargs["spark_conf"]:
+                kwargs["spark_conf"] = {
+                    **kwargs["spark_conf"],
+                    **{"spark.databricks.cluster.profile": "singleNode", "spark.master": "local[*]"},
+                }
+            else:
+                kwargs["spark_conf"] = {"spark.databricks.cluster.profile": "singleNode", "spark.master": "local[*]"}
             kwargs["custom_tags"] = {"ResourceClass": "SingleNode"}
+            kwargs["node_type_id"] = ws.clusters.select_node_type(local_disk=True)
         elif "instance_pool_id" not in kwargs:
             kwargs["node_type_id"] = ws.clusters.select_node_type(local_disk=True)
 
@@ -523,22 +530,42 @@ def make_instance_pool(ws, make_random):
 @pytest.fixture
 def make_job(ws, make_random, make_notebook):
     def create(**kwargs):
+        task_spark_conf = None
         if "name" not in kwargs:
             kwargs["name"] = f"sdk-{make_random(4)}"
+        if kwargs["spark_conf"]:
+            task_spark_conf = kwargs["spark_conf"]
+            kwargs.pop("spark_conf")
         if "tasks" not in kwargs:
-            kwargs["tasks"] = [
-                jobs.Task(
-                    task_key=make_random(4),
-                    description=make_random(4),
-                    new_cluster=compute.ClusterSpec(
-                        num_workers=1,
-                        node_type_id=ws.clusters.select_node_type(local_disk=True),
-                        spark_version=ws.clusters.select_spark_version(latest=True),
-                    ),
-                    notebook_task=jobs.NotebookTask(notebook_path=make_notebook()),
-                    timeout_seconds=0,
-                )
-            ]
+            if task_spark_conf:
+                kwargs["tasks"] = [
+                    jobs.Task(
+                        task_key=make_random(4),
+                        description=make_random(4),
+                        new_cluster=compute.ClusterSpec(
+                            num_workers=1,
+                            node_type_id=ws.clusters.select_node_type(local_disk=True),
+                            spark_version=ws.clusters.select_spark_version(latest=True),
+                            spark_conf=task_spark_conf,
+                        ),
+                        notebook_task=jobs.NotebookTask(notebook_path=make_notebook()),
+                        timeout_seconds=0,
+                    )
+                ]
+            else:
+                kwargs["tasks"] = [
+                    jobs.Task(
+                        task_key=make_random(4),
+                        description=make_random(4),
+                        new_cluster=compute.ClusterSpec(
+                            num_workers=1,
+                            node_type_id=ws.clusters.select_node_type(local_disk=True),
+                            spark_version=ws.clusters.select_spark_version(latest=True),
+                        ),
+                        notebook_task=jobs.NotebookTask(notebook_path=make_notebook()),
+                        timeout_seconds=0,
+                    )
+                ]
         return ws.jobs.create(**kwargs)
 
     yield from factory("job", create, lambda item: ws.jobs.delete(item.job_id))
