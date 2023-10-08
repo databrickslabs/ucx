@@ -120,7 +120,8 @@ def crawl_permissions(cfg: WorkspaceConfig):
     """Scans the workspace-local groups and all their permissions. The list is stored in the `$inventory.permissions`
     Delta table.
 
-    This is the first step for the _group migration_ process, which is continued in the `migrate-groups` workflow."""
+    This is the first step for the _group migration_ process, which is continued in the `migrate-groups` workflow.
+    This step includes preparing Legacy Table ACLs for local group migration."""
     ws = WorkspaceClient(config=cfg.to_databricks_config())
     permission_manager = PermissionManager.factory(
         ws,
@@ -151,6 +152,11 @@ def migrate_permissions(cfg: WorkspaceConfig):
       - Creates an account-level group with the original name of the workspace-local one
       - Assigns the full set of permissions of the original group to the account-level one
 
+    It covers local workspace-local permissions for all entities: Legacy Table ACLs, Entitlements,
+    AWS instance profiles, Clusters, Cluster policies, Instance Pools, Databricks SQL warehouses, Delta Live
+    Tables, Jobs, MLflow experiments, MLflow registry, SQL Dashboards & Queries, SQL Alerts, Token and Password usage
+    permissions, Secret Scopes, Notebooks, Directories, Repos, Files.
+
     See [interactive tutorial here](https://app.getreprise.com/launch/myM3VNn/)."""
     ws = WorkspaceClient(config=cfg.to_databricks_config())
     group_manager = GroupManager(ws, cfg.groups)
@@ -175,7 +181,8 @@ def migrate_permissions(cfg: WorkspaceConfig):
 @task("migrate-groups-cleanup", depends_on=[migrate_permissions])
 def delete_backup_groups(cfg: WorkspaceConfig):
     """Last step of the group migration process. Removes all workspace-level backup groups, along with their
-    permissions."""
+    permissions. Execute this workflow only after you've confirmed that workspace-local migration worked
+    successfully for all the groups involved."""
     ws = WorkspaceClient(config=cfg.to_databricks_config())
     group_manager = GroupManager(ws, cfg.groups)
     group_manager.delete_backup_groups()
