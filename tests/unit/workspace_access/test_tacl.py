@@ -9,6 +9,7 @@ from databricks.labs.ucx.workspace_access.groups import (
     MigrationGroupInfo,
 )
 from databricks.labs.ucx.workspace_access.tacl import TableAclSupport
+
 from ..framework.mocks import MockBackend
 
 
