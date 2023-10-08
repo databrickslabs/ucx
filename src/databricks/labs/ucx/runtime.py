@@ -188,6 +188,7 @@ def crawl_permissions(cfg: WorkspaceConfig):
         assess_clusters,
         assess_pipelines,
         assess_azure_service_principals,
+        assess_global_init_scripts
     ],
     dashboard="assessment",
 )
