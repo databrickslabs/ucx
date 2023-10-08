@@ -155,11 +155,10 @@ class GlobalInitScriptCrawler(CrawlerBase):
             )
             if not global_init_script:
                 continue
-            if not _azure_sp_conf_in_cluster_init(global_init_script):
-                continue
-            failures.append(f"{_AZURE_SP_CONF_FAILURE_MSG} global init script.")
+            if _azure_sp_conf_in_cluster_init(global_init_script):
+                failures.append(f"{_AZURE_SP_CONF_FAILURE_MSG} global init script.")
+                global_init_script_info.failures = json.dumps(failures)
 
-            global_init_script_info.failures = json.dumps(failures)
             if len(failures) > 0:
                 global_init_script_info.success = 0
             yield global_init_script_info
