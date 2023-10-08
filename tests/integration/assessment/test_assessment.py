@@ -10,23 +10,23 @@ from databricks.labs.ucx.assessment.crawlers import (
 logger = logging.getLogger(__name__)
 
 _PIPELINE_CONF = {
-        "spark.hadoop.fs.azure.account.oauth2.client.id.storage_acct_1.dfs.core.windows.net": ""
-                                                                                              "pipeline_dummy_application_id",
-        "spark.hadoop.fs.azure.account.oauth2.client.endpoint.storage_acct_1.dfs.core.windows.net": ""
-                                                                                                    "https://login"
-                                                                                                    ".microsoftonline.com/directory_12345/oauth2/token",
-    }
+    "spark.hadoop.fs.azure.account.oauth2.client.id.storage_acct_1.dfs.core.windows.net": ""
+    "pipeline_dummy_application_id",
+    "spark.hadoop.fs.azure.account.oauth2.client.endpoint.storage_acct_1.dfs.core.windows.net": ""
+    "https://login"
+    ".microsoftonline.com/directory_12345/oauth2/token",
+}
 
 _SPARK_CONF = {
     "spark.databricks.cluster.profile": "singleNode",
     "spark.master": "local[*]",
     "fs.azure.account.auth.type.storage_acct_1.dfs.core.windows.net": "OAuth",
     "fs.azure.account.oauth.provider.type.storage_acct_1.dfs.core.windows.net": "org.apache.hadoop.fs"
-                                                                                ".azurebfs.oauth2.ClientCredsTokenProvider",
+    ".azurebfs.oauth2.ClientCredsTokenProvider",
     "fs.azure.account.oauth2.client.id.storage_acct_1.dfs.core.windows.net": "dummy_application_id",
     "fs.azure.account.oauth2.client.secret.storage_acct_1.dfs.core.windows.net": "dummy",
     "fs.azure.account.oauth2.client.endpoint.storage_acct_1.dfs.core.windows.net": "https://login"
-                                                                                   ".microsoftonline.com/directory_12345/oauth2/token",
+    ".microsoftonline.com/directory_12345/oauth2/token",
 }
 
 
