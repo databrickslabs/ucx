@@ -2221,7 +2221,8 @@ def test_global_init_scripts_no_config(mocker):
     mock_ws.global_init_scripts.get().script = "JXNoCmVjaG8gIj0="
     crawler = GlobalInitScriptCrawler(mock_ws, MockBackend(), schema="UCX")
     result = crawler._crawl()
-    assert len(result) == 0
+    assert len(result) == 1
+    assert result[0].success == 1
 
 
 def test_global_init_scripts_with_config(mocker):
@@ -2265,3 +2266,4 @@ def test_global_init_scripts_with_config(mocker):
     crawler = GlobalInitScriptCrawler(mock_ws, MockBackend(), schema="UCX")
     result = crawler._crawl()
     assert len(result) == 1
+    assert result[0].success == 0
