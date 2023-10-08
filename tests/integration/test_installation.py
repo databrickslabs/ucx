@@ -4,8 +4,8 @@ import random
 from databricks.sdk.service.iam import PermissionLevel
 
 from databricks.labs.ucx.config import GroupsConfig, WorkspaceConfig
-from databricks.labs.ucx.hive_metastore.grants import Grant
-from databricks.labs.ucx.hive_metastore.tables import Table
+from databricks.labs.ucx.hive_metastore.grants import GrantsCrawler
+from databricks.labs.ucx.hive_metastore.tables import TablesCrawler
 from databricks.labs.ucx.install import WorkspaceInstaller
 
 logger = logging.getLogger(__name__)
@@ -13,8 +13,7 @@ logger = logging.getLogger(__name__)
 
 def test_jobs_with_no_inventory_database(
     ws,
-    sql_exec,
-    sql_fetch_all,
+    sql_backend,
     make_cluster_policy,
     make_cluster_policy_permissions,
     make_ucx_group,
@@ -45,11 +44,11 @@ def test_jobs_with_no_inventory_database(
     table_b = make_table(schema_name=schema_b.name)
     make_table(schema_name=schema_b.name, external=True)
 
-    sql_exec(f"GRANT USAGE ON SCHEMA default TO `{ws_group_a.display_name}`")
-    sql_exec(f"GRANT USAGE ON SCHEMA default TO `{ws_group_b.display_name}`")
-    sql_exec(f"GRANT SELECT ON TABLE {table_a.full_name} TO `{ws_group_a.display_name}`")
-    sql_exec(f"GRANT SELECT ON TABLE {table_b.full_name} TO `{ws_group_b.display_name}`")
-    sql_exec(f"GRANT MODIFY ON SCHEMA {schema_b.full_name} TO `{ws_group_b.display_name}`")
+    sql_backend.execute(f"GRANT USAGE ON SCHEMA default TO `{ws_group_a.display_name}`")
+    sql_backend.execute(f"GRANT USAGE ON SCHEMA default TO `{ws_group_b.display_name}`")
+    sql_backend.execute(f"GRANT SELECT ON TABLE {table_a.full_name} TO `{ws_group_a.display_name}`")
+    sql_backend.execute(f"GRANT SELECT ON TABLE {table_b.full_name} TO `{ws_group_b.display_name}`")
+    sql_backend.execute(f"GRANT MODIFY ON SCHEMA {schema_b.full_name} TO `{ws_group_b.display_name}`")
 
     cluster_policy = make_cluster_policy()
     make_cluster_policy_permissions(
@@ -182,38 +181,26 @@ def test_jobs_with_no_inventory_database(
 
         logger.info("validating tacl")
 
-        tables = sql_fetch_all(f"SELECT * FROM hive_metastore.{inventory_database}.tables")
+        tables_crawler = TablesCrawler(sql_backend, install._config.inventory_database)
+        grants_crawler = GrantsCrawler(tables_crawler)
 
-        all_tables = {}
-        for t_row in tables:
-            table = Table(*t_row)
-            all_tables[table.key] = table
+        table_a_grants = grants_crawler.for_table_info(table_a)
+        assert {"SELECT"} == table_a_grants.get(ws_group_a.display_name)
 
-        assert len(all_tables) >= 2, "must have at least two tables"
+        table_b_grants = grants_crawler.for_table_info(table_b)
+        assert {"SELECT"} == table_b_grants.get(ws_group_b.display_name)
 
-        logger.debug(f"all tables={all_tables}, ")
+        schema_b_grants = grants_crawler.for_schema_info(schema_b)
+        assert {"MODIFY"} == schema_b_grants.get(ws_group_b.display_name)
 
-        grants = sql_fetch_all(f"SELECT * FROM hive_metastore.{inventory_database}.grants")
-        all_grants = {}
-        for g_row in grants:
-            grant = Grant(*g_row)
-            if grant.table:
-                all_grants[f"{grant.principal}.{grant.catalog}.{grant.database}.{grant.table}"] = grant.action_type
-            else:
-                all_grants[f"{grant.principal}.{grant.catalog}.{grant.database}"] = grant.action_type
-
+        all_grants = grants_crawler.snapshot()
         logger.debug(f"all grants={all_grants}, ")
 
-        assert len(all_grants) >= 3, "must have at least three grants"
-        assert all_grants[f"{ws_group_a.display_name}.{table_a.full_name}"] == "SELECT"
-        assert all_grants[f"{ws_group_b.display_name}.{table_b.full_name}"] == "SELECT"
-        assert all_grants[f"{ws_group_b.display_name}.{schema_b.full_name}"] == "MODIFY"
-
         permissions = list(
-            sql_fetch_all(f"SELECT * FROM hive_metastore.{install._config.inventory_database}.permissions")
+            sql_backend.fetch(f"SELECT * FROM hive_metastore.{install._config.inventory_database}.permissions")
         )
-        tables = list(sql_fetch_all(f"SELECT * FROM hive_metastore.{install._config.inventory_database}.tables"))
-        grants = list(sql_fetch_all(f"SELECT * FROM hive_metastore.{install._config.inventory_database}.grants"))
+        tables = list(sql_backend.fetch(f"SELECT * FROM hive_metastore.{install._config.inventory_database}.tables"))
+        grants = list(sql_backend.fetch(f"SELECT * FROM hive_metastore.{install._config.inventory_database}.grants"))
 
         assert len(permissions) > 0
         assert len(tables) >= 2

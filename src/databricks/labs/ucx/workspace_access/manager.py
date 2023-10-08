@@ -9,9 +9,11 @@ from databricks.sdk.service import sql
 
 from databricks.labs.ucx.framework.crawlers import CrawlerBase, SqlBackend
 from databricks.labs.ucx.framework.parallel import Threads
+from databricks.labs.ucx.hive_metastore import GrantsCrawler, TablesCrawler
 from databricks.labs.ucx.workspace_access import generic, redash, scim, secrets
 from databricks.labs.ucx.workspace_access.base import Applier, Crawler, Permissions
 from databricks.labs.ucx.workspace_access.groups import GroupMigrationState
+from databricks.labs.ucx.workspace_access.tacl import TableAclSupport
 
 logger = logging.getLogger(__name__)
 
@@ -57,15 +59,18 @@ class PermissionManager(CrawlerBase):
         sql_support = redash.SqlPermissionsSupport(ws, redash_acl_listing)
         secrets_support = secrets.SecretScopesSupport(ws)
         scim_support = scim.ScimSupport(ws)
+        tables_crawler = TablesCrawler(sql_backend, inventory_database)
+        grants_crawler = GrantsCrawler(tables_crawler)
+        tacl_support = TableAclSupport(grants_crawler, sql_backend)
         return cls(
             sql_backend,
             inventory_database,
-            [generic_support, sql_support, secrets_support, scim_support],
-            cls._object_type_appliers(generic_support, sql_support, secrets_support, scim_support),
+            [generic_support, sql_support, secrets_support, scim_support, tacl_support],
+            cls._object_type_appliers(generic_support, sql_support, secrets_support, scim_support, tacl_support),
         )
 
     @staticmethod
-    def _object_type_appliers(generic_support, sql_support, secrets_support, scim_support):
+    def _object_type_appliers(generic_support, sql_support, secrets_support, scim_support, tacl_support):
         return {
             # SCIM-based API
             "entitlements": scim_support,
@@ -90,6 +95,13 @@ class PermissionManager(CrawlerBase):
             "dashboards": sql_support,
             # Secret Scope ACL API
             "secrets": secrets_support,
+            # Legacy Table ACLs
+            "TABLE": tacl_support,
+            "VIEW": tacl_support,
+            "DATABASE": tacl_support,
+            "ANY FILE": tacl_support,
+            "ANONYMOUS FUNCTION": tacl_support,
+            "CATALOG": tacl_support,
         }
 
     def inventorize_permissions(self):
@@ -99,7 +111,7 @@ class PermissionManager(CrawlerBase):
         results, errors = Threads.gather("crawl permissions", crawler_tasks)
         if len(errors) > 0:
             # TODO: https://github.com/databrickslabs/ucx/issues/406
-            logger.error(f"Detected {len(errors)} while crawling permissions")
+            logger.error(f"Detected {len(errors)} errors while crawling permissions")
         items = []
         for item in results:
             if item.object_type not in self._appliers:

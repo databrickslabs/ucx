@@ -160,12 +160,13 @@ def assess_global_init_scripts(cfg: WorkspaceConfig):
     crawler.snapshot()
 
 
-@task("assessment", depends_on=[setup_schema])
+@task("assessment", depends_on=[crawl_grants])
 def crawl_permissions(cfg: WorkspaceConfig):
     """Scans the workspace-local groups and all their permissions. The list is stored in the `$inventory.permissions`
     Delta table.
 
-    This is the first step for the _group migration_ process, which is continued in the `migrate-groups` workflow."""
+    This is the first step for the _group migration_ process, which is continued in the `migrate-groups` workflow.
+    This step includes preparing Legacy Table ACLs for local group migration."""
     ws = WorkspaceClient(config=cfg.to_databricks_config())
     permission_manager = PermissionManager.factory(
         ws,
@@ -197,13 +198,18 @@ def assessment_report(_: WorkspaceConfig):
     dashboard _before_ all tasks have been completed, but then only already completed information is shown."""
 
 
-@task("migrate-groups", depends_on=[crawl_permissions])
+@task("migrate-groups", depends_on=[crawl_permissions], job_cluster="tacl")
 def migrate_permissions(cfg: WorkspaceConfig):
     """Main phase of the group migration process. It does the following:
       - Creates a backup of every workspace-local group, adding a prefix that can be set in the configuration
       - Assigns the full set of permissions of the original group to the backup one
       - Creates an account-level group with the original name of the workspace-local one
       - Assigns the full set of permissions of the original group to the account-level one
+
+    It covers local workspace-local permissions for all entities: Legacy Table ACLs, Entitlements,
+    AWS instance profiles, Clusters, Cluster policies, Instance Pools, Databricks SQL warehouses, Delta Live
+    Tables, Jobs, MLflow experiments, MLflow registry, SQL Dashboards & Queries, SQL Alerts, Token and Password usage
+    permissions, Secret Scopes, Notebooks, Directories, Repos, Files.
 
     See [interactive tutorial here](https://app.getreprise.com/launch/myM3VNn/)."""
     ws = WorkspaceClient(config=cfg.to_databricks_config())
@@ -229,7 +235,8 @@ def migrate_permissions(cfg: WorkspaceConfig):
 @task("migrate-groups-cleanup", depends_on=[migrate_permissions])
 def delete_backup_groups(cfg: WorkspaceConfig):
     """Last step of the group migration process. Removes all workspace-level backup groups, along with their
-    permissions."""
+    permissions. Execute this workflow only after you've confirmed that workspace-local migration worked
+    successfully for all the groups involved."""
     ws = WorkspaceClient(config=cfg.to_databricks_config())
     group_manager = GroupManager(ws, cfg.groups)
     group_manager.delete_backup_groups()
