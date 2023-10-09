@@ -185,6 +185,7 @@ class AzureServicePrincipalCrawler(CrawlerBase):
         split = secret_matched.group(1).split("/")
         if len(split) == _SECRET_LIST_LENGTH:
             secret_scope, secret_key = split[1], split[2]
+            # Add exception handling
             spn_application_id = self._ws.secrets.get_secret(secret_scope, secret_key)
             return spn_application_id
 
