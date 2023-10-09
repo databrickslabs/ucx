@@ -5,7 +5,8 @@ from pathlib import Path
 import pytest
 import yaml
 from databricks.sdk.core import DatabricksError
-from databricks.sdk.service import iam
+from databricks.sdk.errors import OperationFailed
+from databricks.sdk.service import iam, jobs
 from databricks.sdk.service.sql import (
     Dashboard,
     DataSource,
@@ -24,7 +25,6 @@ from databricks.labs.ucx.install import WorkspaceInstaller
 
 
 def mock_ws(mocker):
-    ws = mocker.Mock()
     ws = mocker.patch("databricks.sdk.WorkspaceClient.__init__")
 
     ws.current_user.me = lambda: iam.User(user_name="me@example.com", groups=[iam.ComplexValue(display="admins")])
@@ -44,14 +44,46 @@ def mock_ws(mocker):
     return ws
 
 
-def test_run_for_config(mocker, tmp_path):
-    # run_for_config(ws: WorkspaceClient, config: WorkspaceConfig, *, prefix="ucx") -> "WorkspaceInstaller":
+def test_replace_clusters_for_integration_tests(mocker):
     ws = mock_ws(mocker)
-
-    install = WorkspaceInstaller(ws)
-    wc = WorkspaceConfig(inventory_database="a", groups=GroupsConfig(auto=True))
-    return_value = install.run_for_config(ws, wc)
+    return_value = WorkspaceInstaller.run_for_config(
+        ws, WorkspaceConfig(inventory_database="a", groups=GroupsConfig(auto=True)), override_clusters={"main": "abc"}
+    )
     assert return_value
+
+
+def test_run_workflow_creates_proper_failure(mocker):
+    def run_now(job_id):
+        assert "bar" == job_id
+
+        def result():
+            raise OperationFailed(...)
+
+        waiter = mocker.Mock()
+        waiter.result = result
+        waiter.run_id = "qux"
+        return waiter
+
+    ws = mock_ws(mocker)
+    ws.jobs.run_now = run_now
+    ws.jobs.get_run.return_value = jobs.Run(
+        state=jobs.RunState(state_message="Stuff happens."),
+        tasks=[
+            jobs.RunTask(
+                task_key="stuff",
+                state=jobs.RunState(result_state=jobs.RunResultState.FAILED),
+                run_id=123,
+            )
+        ],
+    )
+    ws.jobs.get_run_output.return_value = jobs.RunOutput(error="does not compute", error_trace="# goes to stderr")
+    installer = WorkspaceInstaller(ws)
+    installer._deployed_steps = {"foo": "bar"}
+
+    with pytest.raises(OperationFailed) as failure:
+        installer.run_workflow("foo")
+
+    assert "Stuff happens: stuff: does not compute" == str(failure.value)
 
 
 def test_install_database_happy(mocker, tmp_path):
