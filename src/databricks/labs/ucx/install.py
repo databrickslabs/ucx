@@ -14,6 +14,7 @@ from typing import Any
 import yaml
 from databricks.sdk import WorkspaceClient
 from databricks.sdk.core import DatabricksError
+from databricks.sdk.errors import OperationFailed
 from databricks.sdk.mixins.compute import SemVer
 from databricks.sdk.service import compute, jobs
 from databricks.sdk.service.sql import EndpointInfoWarehouseType, SpotInstancePolicy
@@ -61,6 +62,35 @@ ws = WorkspaceClient()
 print(__version__)
 """
 
+TEST_RUNNER_NOTEBOOK = """
+# Databricks notebook source
+# MAGIC %pip install /Workspace{remote_wheel}
+dbutils.library.restartPython()
+
+# COMMAND ----------
+
+import logging
+import databricks.labs.ucx.runtime
+
+from pathlib import Path
+from databricks.labs.ucx.__about__ import __version__
+from databricks.labs.ucx.config import WorkspaceConfig
+from databricks.labs.ucx.framework.tasks import _TASKS
+from databricks.labs.ucx.framework.logger import _install
+from databricks.sdk import WorkspaceClient
+
+task_name = dbutils.widgets.get('task')
+current_task = _TASKS[task_name]
+
+_install()
+print('UCX version: ' + __version__)
+logging.getLogger("databricks").setLevel('DEBUG')
+
+cfg = WorkspaceConfig.from_file(Path("/Workspace{config_file}"))
+
+current_task.fn(cfg)
+"""
+
 logger = logging.getLogger(__name__)
 
 
@@ -100,6 +130,29 @@ class WorkspaceInstaller:
         # TODO: rather introduce a method `is_configured`, as we may want to reconfigure workspaces for some reason
         workspace_installer._run_configured()
         return workspace_installer
+
+    def run_workflow(self, step: str):
+        job_id = self._deployed_steps[step]
+        logger.debug(f"starting {step} job: {self._ws.config.host}#job/{job_id}")
+        job_run_waiter = self._ws.jobs.run_now(job_id)
+        try:
+            job_run_waiter.result()
+        except OperationFailed:
+            # currently we don't have any good message from API, so we have to work around it.
+            job_run = self._ws.jobs.get_run(job_run_waiter.run_id)
+            messages = []
+            for run_task in job_run.tasks:
+                if run_task.state.result_state == jobs.RunResultState.TIMEDOUT:
+                    messages.append(f"{run_task.task_key}: The run was stopped after reaching the timeout")
+                    continue
+                if run_task.state.result_state != jobs.RunResultState.FAILED:
+                    continue
+                run_output = self._ws.jobs.get_run_output(run_task.run_id)
+                if logger.isEnabledFor(logging.DEBUG):
+                    sys.stderr.write(run_output.error_trace)
+                messages.append(f"{run_task.task_key}: {run_output.error}")
+            msg = f'{job_run.state.state_message.rstrip(".")}: {", ".join(messages)}'
+            raise OperationFailed(msg) from None
 
     def _create_dashboards(self):
         local_query_files = self._find_project_root() / "src/databricks/labs/ucx/assessment/queries"
@@ -271,10 +324,13 @@ class WorkspaceInstaller:
         remote_wheel = self._upload_wheel()
         self._deployed_steps = self._deployed_steps()
         desired_steps = {t.workflow for t in _TASKS.values()}
+        wheel_runner = None
+        if self._override_clusters:
+            wheel_runner = self._upload_wheel_runner(remote_wheel)
         for step_name in desired_steps:
             settings = self._job_settings(step_name, remote_wheel)
             if self._override_clusters:
-                settings = self._apply_cluster_overrides(settings, self._override_clusters)
+                settings = self._apply_cluster_overrides(settings, self._override_clusters, wheel_runner)
             if step_name in self._deployed_steps:
                 job_id = self._deployed_steps[step_name]
                 logger.info(f"Updating configuration for step={step_name} job_id={job_id}")
@@ -442,8 +498,16 @@ class WorkspaceInstaller:
             "tasks": [self._job_task(task, dbfs_path) for task in tasks],
         }
 
+    def _upload_wheel_runner(self, remote_wheel: str):
+        # TODO: we have to be doing this workaround until ES-897453 is solved in the platform
+        path = f"{self._install_folder}/wheels/wheel-test-runner-{self._version}.py"
+        logger.debug(f"Created runner notebook: {self._notebook_link(path)}")
+        py = TEST_RUNNER_NOTEBOOK.format(remote_wheel=remote_wheel, config_file=self._config_file).encode("utf8")
+        self._ws.workspace.upload(path, py, overwrite=True)
+        return path
+
     @staticmethod
-    def _apply_cluster_overrides(settings: dict[str, any], overrides: dict[str, str]) -> dict:
+    def _apply_cluster_overrides(settings: dict[str, any], overrides: dict[str, str], wheel_runner: str) -> dict:
         settings["job_clusters"] = [_ for _ in settings["job_clusters"] if _.job_cluster_key not in overrides]
         for job_task in settings["tasks"]:
             if job_task.job_cluster_key is None:
@@ -451,6 +515,11 @@ class WorkspaceInstaller:
             if job_task.job_cluster_key in overrides:
                 job_task.existing_cluster_id = overrides[job_task.job_cluster_key]
                 job_task.job_cluster_key = None
+            if job_task.python_wheel_task is not None:
+                job_task.python_wheel_task = None
+                job_task.notebook_task = jobs.NotebookTask(
+                    notebook_path=wheel_runner, base_parameters={"task": job_task.task_key}
+                )
         return settings
 
     def _job_task(self, task: Task, dbfs_path: str) -> jobs.Task:

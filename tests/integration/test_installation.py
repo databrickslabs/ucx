@@ -1,6 +1,8 @@
 import logging
 import random
 
+import pytest
+from databricks.sdk.errors import OperationFailed
 from databricks.sdk.service.iam import PermissionLevel
 
 from databricks.labs.ucx.config import GroupsConfig, WorkspaceConfig
@@ -9,6 +11,37 @@ from databricks.labs.ucx.hive_metastore.tables import TablesCrawler
 from databricks.labs.ucx.install import WorkspaceInstaller
 
 logger = logging.getLogger(__name__)
+
+
+def test_destroying_non_existing_schema_fails_with_correct_message(ws, sql_backend, env_or_skip, make_random):
+    default_cluster_id = env_or_skip("TEST_DEFAULT_CLUSTER_ID")
+    tacl_cluster_id = env_or_skip("TEST_LEGACY_TABLE_ACL_CLUSTER_ID")
+    ws.clusters.ensure_cluster_is_running(default_cluster_id)
+    ws.clusters.ensure_cluster_is_running(tacl_cluster_id)
+
+    backup_group_prefix = "db-temp-"
+    inventory_database = f"ucx_{make_random(4)}"
+    install = WorkspaceInstaller.run_for_config(
+        ws,
+        WorkspaceConfig(
+            inventory_database=inventory_database,
+            groups=GroupsConfig(
+                backup_group_prefix=backup_group_prefix,
+                auto=True,
+            ),
+            log_level="DEBUG",
+        ),
+        prefix=make_random(4),
+        override_clusters={
+            "main": default_cluster_id,
+            "tacl": tacl_cluster_id,
+        },
+    )
+
+    with pytest.raises(OperationFailed) as failure:
+        install.run_workflow("destroy-schema")
+
+    assert "cannot be found" in str(failure.value)
 
 
 def test_jobs_with_no_inventory_database(
@@ -99,8 +132,7 @@ def test_jobs_with_no_inventory_database(
 
     try:
         for step in ["assessment", "migrate-groups", "migrate-groups-cleanup"]:
-            logger.debug(f"starting {step} job: {ws.config.host}#job/{install._deployed_steps[step]}")
-            ws.jobs.run_now(install._deployed_steps[step]).result()
+            install.run_workflow(step)
 
         logger.info("validating group ids")
 
