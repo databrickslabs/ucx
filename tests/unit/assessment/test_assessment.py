@@ -1,5 +1,4 @@
 import json
-import re
 from unittest.mock import Mock
 
 from databricks.sdk.core import DatabricksError
@@ -209,13 +208,13 @@ def test_job_assessment_for_azure_spark_config():
             autoscale=AutoScale(min_workers=1, max_workers=6),
             spark_conf={
                 "spark.hadoop.fs.azure.account.oauth2.client.id.abcde.dfs.core.windows.net": "{{secrets/abcff"
-                                                                                             "/sp_app_client_id}}",
+                "/sp_app_client_id}}",
                 "spark.hadoop.fs.azure.account.oauth2.client.endpoint.abcde.dfs.core.windows.net": "https://login"
-                                                                                                   ".microsoftonline"
-                                                                                                   ".com/dedededede"
-                                                                                                   "/token",
+                ".microsoftonline"
+                ".com/dedededede"
+                "/token",
                 "spark.hadoop.fs.azure.account.oauth2.client.secret.abcde.dfs.core.windows.net": "{{secrets/abcff"
-                                                                                                 "/sp_secret}}",
+                "/sp_secret}}",
             },
             spark_context_id=5134472582179566666,
             spark_env_vars=None,
@@ -587,10 +586,10 @@ def test_azure_spn_info_without_secret(mocker):
             spark_conf={
                 "spark.hadoop.fs.azure.account.oauth2.client.id.abcde.dfs.core.windows.net": "test123456789",
                 "spark.hadoop.fs.azure.account.oauth2.client.endpoint.abcde.dfs.core.windows.net": "https://login"
-                                                                                                   ".microsoftonline"
-                                                                                                   ".com/dedededede/token",
+                ".microsoftonline"
+                ".com/dedededede/token",
                 "spark.hadoop.fs.azure.account.oauth2.client.secret.abcde.dfs.core.windows.net": "{{secrets/abcff"
-                                                                                                 "/sp_secret}}",
+                "/sp_secret}}",
             },
             spark_context_id=5134472582179565315,
             spark_env_vars=None,
@@ -1356,13 +1355,13 @@ def test_azure_spn_info_with_secret(mocker):
             autoscale=AutoScale(min_workers=1, max_workers=6),
             spark_conf={
                 "spark.hadoop.fs.azure.account.oauth2.client.id.abcde.dfs.core.windows.net": "{{secrets/abcff"
-                                                                                             "/sp_app_client_id}}",
+                "/sp_app_client_id}}",
                 "spark.hadoop.fs.azure.account.oauth2.client.endpoint.abcde.dfs.core.windows.net": "https://login"
-                                                                                                   ".microsoftonline"
-                                                                                                   ".com/dedededede"
-                                                                                                   "/token",
+                ".microsoftonline"
+                ".com/dedededede"
+                "/token",
                 "spark.hadoop.fs.azure.account.oauth2.client.secret.abcde.dfs.core.windows.net": "{{secrets/abcff"
-                                                                                                 "/sp_secret}}",
+                "/sp_secret}}",
             },
             spark_context_id=5134472582179565315,
             spark_env_vars=None,
@@ -2274,7 +2273,9 @@ def test_global_init_scripts_with_config(mocker):
 
 
 def mock_get_secret(secret_scope, secret_key):
-    raise DatabricksError("Simulated DatabricksError")
+    msg = "Simulated DatabricksError"
+    raise DatabricksError(msg)
+
 
 def test_azure_spn_info_with_secret_unavailable(mocker):
     ws = mocker.Mock()
@@ -2283,7 +2284,7 @@ def test_azure_spn_info_with_secret_unavailable(mocker):
         "oauth2.client.id.abcde.dfs.core.windows.net": "{{secrets/abcff/sp_app_client_id}}",
         "spark.hadoop.fs.azure.account."
         "oauth2.client.endpoint.abcde.dfs.core.windows.net": "https://login.microsoftonline.com/dedededede"
-                                                             "/token",
+        "/token",
         "spark.hadoop.fs.azure.account."
         "oauth2.client.secret.abcde.dfs.core.windows.net": "{{secrets/abcff/sp_secret}}",
     }
