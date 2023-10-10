@@ -33,7 +33,6 @@ EXTRA_TASK_PARAMS = {
     "job_id": "{{job_id}}",
     "run_id": "{{run_id}}",
     "parent_run_id": "{{parent_run_id}}",
-    "task_key": "{{task_key}}",
 }
 DEBUG_NOTEBOOK = """
 # Databricks notebook source
@@ -446,7 +445,7 @@ class WorkspaceInstaller:
             return "any"
         choices = sorted(choices, key=str.casefold)
         numbered = "\n".join(f"\033[1m[{i}]\033[0m \033[36m{v}\033[0m" for i, v in enumerate(choices))
-        prompt = f"\033[1m{text}\033[0m\n{numbered}\nEnter a number between 0 and {len(choices) - 1}: "
+        prompt = f"\033[1m{text}\033[0m\n{numbered}\nEnter a number between 0 and {len(choices)-1}: "
         attempt = 0
         while attempt < max_attempts:
             attempt += 1
@@ -525,8 +524,7 @@ class WorkspaceInstaller:
             if job_task.python_wheel_task is not None:
                 job_task.python_wheel_task = None
                 job_task.notebook_task = jobs.NotebookTask(
-                    notebook_path=wheel_runner,
-                    base_parameters={"task": job_task.task_key},
+                    notebook_path=wheel_runner, base_parameters={"task": job_task.task_key}
                 )
         return settings
 
