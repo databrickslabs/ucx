@@ -607,9 +607,8 @@ class WorkspaceInstaller:
         if hasattr(self, "__version"):
             return self.__version
         project_root = self._find_project_root()
-        if not (project_root / ".git/config").exists() or self._ws.config.is_gcp():
+        if not (project_root / ".git/config").exists():
             # normal install, downloaded releases won't have the .git folder
-            # Note: GCP currently does not handle PEP0440 version strings in tag values
             return __version__
         try:
             out = subprocess.run(["git", "describe", "--tags"], stdout=subprocess.PIPE, check=True)  # noqa S607
@@ -621,7 +620,7 @@ class WorkspaceInstaller:
             # show that it's a version different from the released one in stats
             bump_patch = dv.patch + 1
             # create something that is both https://semver.org and https://peps.python.org/pep-0440/
-            semver_and_pep0440 = f"{dv.major}.{dv.minor}.{bump_patch}+{new_commits}{datestamp}"
+            semver_and_pep0440 = f"{dv.major}.{dv.minor}.{bump_patch}_{new_commits}{datestamp}"
             # validate the semver
             SemVer.parse(semver_and_pep0440)
             self.__version = semver_and_pep0440
