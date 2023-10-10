@@ -1,4 +1,5 @@
 import json
+import time
 from functools import partial
 
 from databricks.sdk import WorkspaceClient
@@ -78,4 +79,5 @@ class ScimSupport(AclSupport):
                     acl found in the object={group.as_dict()}
                     """
             )
+            time.sleep(1 + _i)
         return False

@@ -1,5 +1,6 @@
 import dataclasses
 import json
+import time
 from collections.abc import Callable
 from dataclasses import dataclass
 from functools import partial
@@ -115,6 +116,7 @@ class RedashPermissionsSupport(AclSupport):
             acl found in the object={remote_permission}
             """
             )
+            time.sleep(1 + _i)
         return False
 
     def _prepare_new_acl(

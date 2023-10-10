@@ -1,6 +1,7 @@
 import datetime
 import json
 import logging
+import time
 from collections.abc import Callable, Iterator
 from dataclasses import dataclass
 from functools import partial
@@ -84,7 +85,9 @@ class GenericPermissionsSupport(AclSupport):
         return any(g in mentioned_groups for g in [info.workspace.display_name for info in migration_state.groups])
 
     @staticmethod
-    def response_to_request(acls: Optional["list[iam.AccessControlResponse]"] = None) -> list[iam.AccessControlRequest]:
+    def _response_to_request(
+        acls: Optional["list[iam.AccessControlResponse]"] = None,
+    ) -> list[iam.AccessControlRequest]:
         results = []
         for acl in acls:
             for permission in acl.all_permissions:
@@ -101,7 +104,7 @@ class GenericPermissionsSupport(AclSupport):
             self._ws.permissions.update(object_type, object_id, access_control_list=acl)
 
             remote_permission = self._safe_get_permissions(object_type, object_id)
-            remote_permission_as_request = self.response_to_request(remote_permission.access_control_list)
+            remote_permission_as_request = self._response_to_request(remote_permission.access_control_list)
             if all(elem in remote_permission_as_request for elem in acl):
                 return True
 
@@ -111,6 +114,7 @@ class GenericPermissionsSupport(AclSupport):
             acl found in the object={remote_permission_as_request}
             """
             )
+            time.sleep(1 + _i)
         return False
 
     @rate_limited(max_requests=100)

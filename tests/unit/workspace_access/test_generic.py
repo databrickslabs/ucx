@@ -237,7 +237,7 @@ def test_response_to_request_mapping():
     object_permissions = iam.ObjectPermissions(access_control_list=[response1, response2, response3])
 
     sup = GenericPermissionsSupport(ws=MagicMock(), listings=[])
-    results = sup.response_to_request(object_permissions.access_control_list)
+    results = sup._response_to_request(object_permissions.access_control_list)
 
     assert results == [
         iam.AccessControlRequest(permission_level=iam.PermissionLevel.CAN_BIND, user_name="test1212"),

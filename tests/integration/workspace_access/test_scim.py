@@ -1,4 +1,3 @@
-
 import pytest
 from databricks.sdk.service import iam
 
