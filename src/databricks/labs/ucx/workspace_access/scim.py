@@ -11,6 +11,7 @@ from databricks.labs.ucx.workspace_access.base import (
     AclSupport,
     Destination,
     Permissions,
+    logger,
 )
 from databricks.labs.ucx.workspace_access.groups import GroupMigrationState
 
@@ -58,7 +59,23 @@ class ScimSupport(AclSupport):
 
     @rate_limited(max_requests=10)
     def _applier_task(self, group_id: str, value: list[iam.ComplexValue], property_name: str):
-        operations = [iam.Patch(op=iam.PatchOp.ADD, path=property_name, value=[e.as_dict() for e in value])]
-        schemas = [iam.PatchSchema.URN_IETF_PARAMS_SCIM_API_MESSAGES_2_0_PATCH_OP]
-        self._ws.groups.patch(id=group_id, operations=operations, schemas=schemas)
-        return True
+        for _i in range(0, 3):
+            operations = [iam.Patch(op=iam.PatchOp.ADD, path=property_name, value=[e.as_dict() for e in value])]
+            schemas = [iam.PatchSchema.URN_IETF_PARAMS_SCIM_API_MESSAGES_2_0_PATCH_OP]
+            self._ws.groups.patch(id=group_id, operations=operations, schemas=schemas)
+
+            group = self._ws.groups.get(group_id)
+            if property_name == "roles" and group.roles:
+                if all(elem in group.roles for elem in value):
+                    return True
+            elif property_name == "entitlements" and group.entitlements:
+                if all(elem in group.entitlements for elem in value):
+                    return True
+
+            logger.warning(
+                f"""Couldn't apply appropriate role for group {group_id}
+                    acl to be applied={[e.as_dict() for e in value]}
+                    acl found in the object={group.as_dict()}
+                    """
+            )
+        return False
