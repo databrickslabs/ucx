@@ -620,7 +620,7 @@ class WorkspaceInstaller:
             # show that it's a version different from the released one in stats
             bump_patch = dv.patch + 1
             # create something that is both https://semver.org and https://peps.python.org/pep-0440/
-            semver_and_pep0440 = f"{dv.major}.{dv.minor}.{bump_patch}_{new_commits}{datestamp}"
+            semver_and_pep0440 = f"{dv.major}.{dv.minor}.{bump_patch}-{new_commits}{datestamp}"
             # validate the semver
             SemVer.parse(semver_and_pep0440)
             self.__version = semver_and_pep0440
