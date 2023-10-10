@@ -490,9 +490,10 @@ class WorkspaceInstaller:
                 on_success=[self._my_username], on_failure=[self._my_username]
             )
         tasks = sorted([t for t in _TASKS.values() if t.workflow == step_name], key=lambda _: _.name)
+        version = self._version if not self._ws.config.is_gcp else self._version.replace("+", "-")
         return {
             "name": self._name(step_name),
-            "tags": {TAG_APP: self._app, TAG_STEP: step_name, "version": f"v{self._version}"},
+            "tags": {TAG_APP: self._app, TAG_STEP: step_name, "version": f"v{version}"},
             "job_clusters": self._job_clusters({t.job_cluster for t in tasks}),
             "email_notifications": email_notifications,
             "tasks": [self._job_task(task, dbfs_path) for task in tasks],
@@ -620,7 +621,7 @@ class WorkspaceInstaller:
             # show that it's a version different from the released one in stats
             bump_patch = dv.patch + 1
             # create something that is both https://semver.org and https://peps.python.org/pep-0440/
-            semver_and_pep0440 = f"{dv.major}.{dv.minor}.{bump_patch}-{new_commits}{datestamp}"
+            semver_and_pep0440 = f"{dv.major}.{dv.minor}.{bump_patch}+{new_commits}{datestamp}"
             # validate the semver
             SemVer.parse(semver_and_pep0440)
             self.__version = semver_and_pep0440
