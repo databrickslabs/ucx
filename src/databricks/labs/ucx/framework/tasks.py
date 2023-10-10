@@ -5,13 +5,8 @@ from dataclasses import dataclass
 from functools import wraps
 from pathlib import Path
 
-from databricks.sdk import WorkspaceClient
-
-import databricks
-from databricks.sdk.runtime.dbutils_stub import dbutils
-
 from databricks.labs.ucx.config import WorkspaceConfig
-from databricks.labs.ucx.framework.logger import NiceFormatter, _install, FileFormatter
+from databricks.labs.ucx.framework.logger import FileFormatter, _install
 
 _TASKS: dict[str, "Task"] = {}
 
@@ -115,10 +110,9 @@ def trigger(*argv):
     md_file = os.path.join(logpath, "README.md")
     if not os.path.isfile(md_file):
         with open(md_file, "a") as f:
-            f.write(f"# Logs for {current_task.workflow}\n")
-            f.write("This folders contains UCX log files.<br/>")
-            f.write(f"[These logs belong to job #{job_id} run #{parent_run_id}]"
-                    f"(/#job/{job_id}/run/{parent_run_id})")
+            f.write(f"# Logs for the {current_task.workflow} workflow\n")
+            f.write("This folders contains UCX log files.<br/>\n")
+            f.write(f"[These logs belong to job #{job_id} run #{parent_run_id}](/#job/{job_id}/run/{parent_run_id})\n")
 
     try:
         logger.info(f"Starting {current_task.workflow} - {task_name}")

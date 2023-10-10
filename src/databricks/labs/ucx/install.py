@@ -29,8 +29,12 @@ from databricks.labs.ucx.runtime import main
 TAG_STEP = "step"
 TAG_APP = "App"
 NUM_USER_ATTEMPTS = 10  # number of attempts user gets at answering a question
-EXTRA_TASK_PARAMS = {"job_id": "{{job_id}}", "run_id": "{{run_id}}", "parent_run_id": "{{parent_run_id}}",
-                     "task_key": "{{task_key}}"}
+EXTRA_TASK_PARAMS = {
+    "job_id": "{{job_id}}",
+    "run_id": "{{run_id}}",
+    "parent_run_id": "{{parent_run_id}}",
+    "task_key": "{{task_key}}",
+}
 DEBUG_NOTEBOOK = """
 # Databricks notebook source
 # MAGIC %md
@@ -121,8 +125,7 @@ class WorkspaceInstaller:
 
     @staticmethod
     def run_for_config(
-            ws: WorkspaceClient, config: WorkspaceConfig, *, prefix="ucx",
-            override_clusters: dict[str, str] | None = None
+        ws: WorkspaceClient, config: WorkspaceConfig, *, prefix="ucx", override_clusters: dict[str, str] | None = None
     ) -> "WorkspaceInstaller":
         workspace_installer = WorkspaceInstaller(ws, prefix=prefix, promtps=False)
         logger.info(f"Installing UCX v{workspace_installer._version} on {ws.config.host}")
@@ -522,7 +525,9 @@ class WorkspaceInstaller:
             if job_task.python_wheel_task is not None:
                 job_task.python_wheel_task = None
                 job_task.notebook_task = jobs.NotebookTask(
-                    notebook_path=wheel_runner, base_parameters={"task": job_task.task_key},)
+                    notebook_path=wheel_runner,
+                    base_parameters={"task": job_task.task_key},
+                )
         return settings
 
     def _job_task(self, task: Task, dbfs_path: str) -> jobs.Task:
@@ -557,8 +562,12 @@ class WorkspaceInstaller:
             notebook_task=jobs.NotebookTask(
                 notebook_path=remote_notebook,
                 # ES-872211: currently, we cannot read WSFS files from Scala context
-                base_parameters={"inventory_database": self._current_config.inventory_database,
-                                 "task": task.name, "config": f"/Workspace{self._config_file}"} | EXTRA_TASK_PARAMS,
+                base_parameters={
+                    "inventory_database": self._current_config.inventory_database,
+                    "task": task.name,
+                    "config": f"/Workspace{self._config_file}",
+                }
+                | EXTRA_TASK_PARAMS,
             ),
         )
 

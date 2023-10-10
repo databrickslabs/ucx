@@ -55,8 +55,7 @@ class NiceFormatter(logging.Formatter):
 
 
 class FileFormatter(logging.Formatter):
-
-    def __init__(self, *, probe_tty: bool = False) -> None:
+    def __init__(self) -> None:
         super().__init__(fmt="%(asctime)s %(levelname)s [%(name)s] %(message)s", datefmt="%H:%M")
 
 
