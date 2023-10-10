@@ -21,6 +21,7 @@ from databricks.sdk.service.jobs import (
 )
 from databricks.sdk.service.pipelines import PipelineState, PipelineStateInfo
 from databricks.sdk.service.sql import EndpointConfPair
+from databricks.sdk.service.workspace import GetSecretResponse
 
 from databricks.labs.ucx.assessment.crawlers import (
     AzureServicePrincipalCrawler,
@@ -2308,7 +2309,7 @@ def test_list_all_pipeline_with_conf_spn_secret_unavlbl(mocker):
     config_dict = {
         "spark.hadoop.fs.azure.account.oauth2.client.id.newstorageacct.dfs.core.windows"
         ".net": "{{secrets/reallyreallyasecret/sasFixedToken}}",
-        "spark.hadoop.fs.azure1.account.oauth2.client."
+        "spark.hadoop.fs.azure.account.oauth2.client."
         "endpoint.newstorageacct.dfs.core.windows.net": "https://"
         "login.microsoftonline.com/directory_12345/oauth2/token",
         "spark.hadoop.fs.azure.sas.fixed.token.abcde.dfs.core.windows.net": "{{secrets/abcde_access/sasFixedToken}}",
@@ -2475,3 +2476,37 @@ def test_job_cluster_init_script_check_dbfs():
         sample_jobs, {c.cluster_id: c for c in sample_clusters}
     )
     assert len(result_set) == 3
+
+def test_list_all_pipeline_with_conf_spn_secret_avlb(mocker):
+    sample_pipelines = [
+        PipelineInfo(
+            creator_name="abcde.defgh@databricks.com",
+            pipeline_name="New DLT Pipeline",
+            pipeline_id="0112eae7-9d11-4b40-a2b8-6c83cb3c7497",
+            success=1,
+            failures="",
+        )
+    ]
+    ws = mocker.Mock()
+    ws.pipelines.list_pipelines.return_value = sample_pipelines
+    config_dict = {
+        "spark.hadoop.fs.azure.account.oauth2.client.id.newstorageacct.dfs.core.windows"
+        ".net": "{{secrets/reallyreallyasecret/sasFixedToken}}",
+        "spark.hadoop.fs.azure.account.oauth2.client."
+        "endpoint.newstorageacct.dfs.core.windows.net": "https://"
+        "login.microsoftonline.com/directory_12345/oauth2/token",
+        "spark.hadoop.fs.azure.sas.fixed.token.abcde.dfs.core.windows.net": "{{secrets/abcde_access/sasFixedToken}}",
+    }
+    ws.pipelines.get().spec.configuration = config_dict
+    ws.secrets.get_secret.return_value = GetSecretResponse(key='username', value='dmlkeWEuYXNob2s=')
+    result_set = AzureServicePrincipalCrawler(ws, MockBackend(), "ucx")._list_all_pipeline_with_spn_in_spark_conf()
+
+    assert len(result_set) > 0
+    assert result_set[0].get("application_id") == 'dmlkeWEuYXNob2s='
+    assert result_set[0].get("tenant_id") == 'directory_12345'
+    assert result_set[0].get("storage_account") == 'newstorageacct'
+
+    # GetSecretResponse(key='baringskey',
+    #                   value='SWduOXlQU3F3QXRtZDVlTThCTGdtQktkSU9lWGJTNll5VTI5N0dkcXVscTlBWFE4T2sxVVYvd3dzT2VjaUpwUyt4WVNVNVgxUVdRYytBU3RSKzhOQ2c9PQ==')
+    # GetSecretResponse(key='jdbc', value='amRiYzpzcWxzZXJ2ZXI6Ly9hYmVzcWxzZXJ2ZXIuZGF0YWJhc2Uud2luZG93cy5uZXQ6MTQzMw==')
+
