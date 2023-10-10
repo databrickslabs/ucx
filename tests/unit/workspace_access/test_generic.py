@@ -1,8 +1,9 @@
 import json
-from unittest.mock import MagicMock
+from unittest.mock import MagicMock, Mock
 
 from databricks.sdk.core import DatabricksError
 from databricks.sdk.service import compute, iam, ml
+from databricks.sdk.service.iam import PermissionLevel
 
 from databricks.labs.ucx.workspace_access.generic import (
     GenericPermissionsSupport,
@@ -205,3 +206,67 @@ def test_experiment_listing():
     for res in results:
         assert res.request_type == "experiments"
         assert res.object_id in ["test", "test2"]
+
+
+def test_load_as_dict():
+    ws = MagicMock()
+
+    cluster_id = "cluster_test"
+    group_name = "group_test"
+
+    ws.clusters.list.return_value = [
+        compute.ClusterDetails(
+            cluster_id=cluster_id,
+        )
+    ]
+
+    sample_permission = iam.ObjectPermissions(
+        object_id=cluster_id,
+        object_type="clusters",
+        access_control_list=[
+            iam.AccessControlResponse(
+                group_name=group_name,
+                all_permissions=[iam.Permission(inherited=False, permission_level=iam.PermissionLevel.CAN_USE)],
+            )
+        ],
+    )
+
+    ws.permissions.get.return_value = sample_permission
+
+    sup = GenericPermissionsSupport(
+        ws=ws,
+        listings=[
+            listing_wrapper(ws.clusters.list, "cluster_id", "clusters"),
+        ],
+    )
+
+    policy_permissions = sup.load_as_dict("clusters", cluster_id)
+    assert PermissionLevel.CAN_USE == policy_permissions[group_name]
+
+
+def test_load_as_dict_no_permissions():
+    ws = MagicMock()
+
+    sup = GenericPermissionsSupport(
+        ws=ws,
+        listings=[],
+    )
+
+    ws.permissions.get.side_effect = Mock(side_effect=DatabricksError(error_code="RESOURCE_DOES_NOT_EXIST"))
+
+    policy_permissions = sup.load_as_dict("clusters", "cluster_test")
+    assert len(policy_permissions) == 0
+
+
+def test_load_as_dict_handle_exception_when_getting_permissions():
+    ws = MagicMock()
+
+    sup = GenericPermissionsSupport(
+        ws=ws,
+        listings=[],
+    )
+
+    ws.permissions.get.side_effect = Mock(side_effect=DatabricksError(error_code="RESOURCE_DOES_NOT_EXIST"))
+
+    policy_permissions = sup.load_as_dict("clusters", "cluster_test")
+    assert len(policy_permissions) == 0

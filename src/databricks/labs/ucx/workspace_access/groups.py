@@ -1,3 +1,4 @@
+import copy
 import json
 import logging
 import typing
@@ -125,10 +126,17 @@ class GroupManager:
     def _set_migration_groups(self, groups_names: list[str]):
         def get_group_info(name: str):
             ws_group = self._get_group(name, "workspace")
-            assert ws_group, f"Group {name} not found on the workspace level"
             acc_group = self._get_group(name, "account")
             assert acc_group, f"Group {name} not found on the account level"
+
             backup_group = self._get_or_create_backup_group(source_group_name=name, source_group=ws_group)
+
+            if (
+                ws_group is None
+            ):  # this can happen upon restart of the tool when the workspace-local group has already been deleted
+                logger.info(f"Group {name} not found on the workspace level")
+                ws_group = self._recreate_ws_group_from_backup(name, backup_group)
+
             return MigrationGroupInfo(workspace=ws_group, backup=backup_group, account=acc_group)
 
         groups_names_ = [partial(get_group_info, group_name) for group_name in groups_names]
@@ -141,13 +149,29 @@ class GroupManager:
 
         logger.info(f"Prepared {len(collected_groups)} groups for migration")
 
+    def _recreate_ws_group_from_backup(self, ws_group_name, backup_group):
+        logger.info(f"Recreating group object {ws_group_name} from backup")
+        assert ws_group_name == self._get_source_ws_group_name_from_backup(
+            backup_group.display_name
+        ), "Workspace-local group and backup have non matching names"
+
+        ws_group = copy.deepcopy(backup_group)
+        ws_group.display_name = ws_group_name
+        ws_group.id = None  # means recreated, not existing in the workspace
+
+        return ws_group
+
+    def _get_source_ws_group_name_from_backup(self, ws_group_display_name):
+        return ws_group_display_name.removeprefix(self.config.backup_group_prefix)
+
     def _replace_group(self, migration_info: MigrationGroupInfo):
         ws_group = migration_info.workspace
 
-        self._delete_workspace_group(ws_group)
-
-        # delete ws_group from the list of workspace groups
-        self._workspace_groups = [g for g in self._workspace_groups if g.id != ws_group.id]
+        if ws_group.id:
+            self._delete_workspace_group(ws_group)
+        else:
+            # the tool was restarted after the backup group was created and ws local group deleted
+            logger.info("Group has already been deleted, nothing to do")
 
         self._reflect_account_group_to_workspace(migration_info.account)
 
@@ -186,7 +210,7 @@ class GroupManager:
             for g in self._workspace_groups
             if g.display_name.startswith(self.config.backup_group_prefix)
             # backup groups are only created for workspace groups that have corresponding account group
-            and g.display_name.removeprefix(self.config.backup_group_prefix) in ac_group_names
+            and self._get_source_ws_group_name_from_backup(g.display_name) in ac_group_names
         ]
 
         logger.info(f"Found {len(backup_groups)} backup groups")
@@ -224,7 +248,9 @@ class GroupManager:
                 "No group listing provided, all available workspace-level groups that have an account-level "
                 "group with the same name will be used"
             )
+
             ws_group_names = {_.display_name for _ in self._workspace_groups}
+            ws_group_names = self._add_missing_ws_groups_from_backup(ws_group_names)
             ac_group_names = {_.display_name for _ in self._account_groups}
             valid_group_names = list(ws_group_names.intersection(ac_group_names))
             logger.info(f"Found {len(valid_group_names)} workspace groups that have corresponding account groups")
@@ -232,13 +258,25 @@ class GroupManager:
         self._set_migration_groups(valid_group_names)
         logger.info("Environment prepared successfully")
 
+    def _add_missing_ws_groups_from_backup(self, ws_group_names):
+        """When the tool is restarted some ws groups might have already been deleted and backup groups created.
+        The function find groups that were previously deleted but for which backup group exists to make sure
+        the migration state can always be recreated and the tool safely restarted.
+        """
+
+        all_ws_group_names = ws_group_names
+        for backup_group in self._get_backup_groups():
+            source_display_name = self._get_source_ws_group_name_from_backup(backup_group.display_name)
+            if source_display_name not in all_ws_group_names:
+                all_ws_group_names.add(source_display_name)
+
+        return all_ws_group_names
+
     def has_groups(self) -> bool:
         return len(self._migration_state.groups) > 0
 
     @property
     def migration_groups_provider(self) -> GroupMigrationState:
-        if len(self._migration_state.groups) == 0:
-            logger.info("No groups were loaded or initialized, nothing to do")
         return self._migration_state
 
     def replace_workspace_groups_with_account_groups(self):

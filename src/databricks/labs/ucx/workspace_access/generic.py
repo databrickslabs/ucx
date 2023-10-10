@@ -74,6 +74,40 @@ class GenericPermissionsSupport(Crawler, Applier):
             raw=json.dumps(permissions.as_dict()),
         )
 
+    def _load_as_request(self, object_type: str, object_id: str) -> list[iam.AccessControlRequest]:
+        loaded = self._safe_get_permissions(object_type, object_id)
+        if loaded is None:
+            return []
+        acl = []
+        for v in loaded.access_control_list:
+            for permission in v.all_permissions:
+                if permission.inherited:
+                    continue
+                acl.append(
+                    iam.AccessControlRequest(
+                        permission_level=permission.permission_level,
+                        service_principal_name=v.service_principal_name,
+                        group_name=v.group_name,
+                        user_name=v.user_name,
+                    )
+                )
+        # sort to return deterministic results
+        return sorted(acl, key=lambda v: f"{v.group_name}:{v.user_name}:{v.service_principal_name}")
+
+    def load_as_dict(self, object_type: str, object_id: str) -> dict[str, iam.PermissionLevel]:
+        result = {}
+        for acl in self._load_as_request(object_type, object_id):
+            result[self._key_for_acl_dict(acl)] = acl.permission_level
+        return result
+
+    @staticmethod
+    def _key_for_acl_dict(acl: iam.AccessControlRequest) -> str:
+        if acl.group_name is not None:
+            return acl.group_name
+        if acl.user_name is not None:
+            return acl.user_name
+        return acl.service_principal_name
+
     # TODO remove after ES-892977 is fixed
     @retried(on=[RetryableError])
     def _safe_get_permissions(self, object_type: str, object_id: str) -> iam.ObjectPermissions | None:
