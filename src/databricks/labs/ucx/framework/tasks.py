@@ -1,11 +1,14 @@
 import logging
+import os
 from collections.abc import Callable
 from dataclasses import dataclass
 from functools import wraps
 from pathlib import Path
 
+from databricks.sdk.runtime.dbutils_stub import dbutils
+
 from databricks.labs.ucx.config import WorkspaceConfig
-from databricks.labs.ucx.framework.logger import _install
+from databricks.labs.ucx.framework.logger import NiceFormatter, _install, FileFormatter
 
 _TASKS: dict[str, "Task"] = {}
 
@@ -29,9 +32,10 @@ def task(workflow, *, depends_on=None, job_cluster="main", notebook: str | None 
         def wrapper(*args, **kwargs):
             # Perform any task-specific logic here
             # For example, you can log when the task is started and completed
-            print(f"Task '{workflow}' is starting...")
+            logger = logging.getLogger(func.__name__)
+            logger.info(f"Task '{workflow}' is starting...")
             result = func(*args, **kwargs)
-            print(f"Task '{workflow}' is completed!")
+            logger.info(f"Task '{workflow}' is completed!")
             return result
 
         deps = []
@@ -76,8 +80,10 @@ def trigger(*argv):
     if "config" not in args:
         msg = "no --config specified"
         raise KeyError(msg)
-
     task_name = args.get("task", "not specified")
+    job_id = args.get("job_id")
+    run_id = dbutils.widgets.get("run_id")
+    task_key = args.get("task_id")
     if task_name not in _TASKS:
         msg = f'task "{task_name}" not found. Valid tasks are: {", ".join(_TASKS.keys())}'
         raise KeyError(msg)
@@ -85,9 +91,28 @@ def trigger(*argv):
     current_task = _TASKS[task_name]
     print(current_task.doc)
 
+    config_path = Path(args["config"])
+    cfg = WorkspaceConfig.from_file(config_path)
     _install()
 
-    cfg = WorkspaceConfig.from_file(Path(args["config"]))
-    logging.getLogger("databricks").setLevel(cfg.log_level)
+    logger = logging.getLogger("databricks")
+    logger.setLevel(cfg.log_level)
+    filepath = os.path.dirname(config_path)
+    logpath = os.path.join(filepath, f"logs/{current_task.workflow}/{run_id}")
+    try:
+        os.makedirs(logpath)
+    except OSError as error:
+        logger.info(f"Failed to create log folder: {error}")
+    logfile = os.path.join(logpath, f"ucx_{task_name}.log")
+    file_handler = logging.FileHandler(logfile)
+    file_handler.setFormatter(FileFormatter())
+    logger.setLevel(cfg.log_level)
+    logger.addHandler(file_handler)
+    logger.info(f"Setup File Logging at {logfile}")
 
-    current_task.fn(cfg)
+    try:
+        current_task.fn(cfg)
+    except Exception as error:
+        logger.error(f"Task failed with:{error}")
+    finally:
+        file_handler.close()

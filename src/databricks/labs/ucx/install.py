@@ -325,6 +325,7 @@ class WorkspaceInstaller:
         self._deployed_steps = self._deployed_steps()
         desired_steps = {t.workflow for t in _TASKS.values()}
         wheel_runner = None
+
         if self._override_clusters:
             wheel_runner = self._upload_wheel_runner(remote_wheel)
         for step_name in desired_steps:

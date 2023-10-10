@@ -54,6 +54,12 @@ class NiceFormatter(logging.Formatter):
         return f"{self.GRAY}{ts}{self.RESET} {level} {color_marker}[{name}] {msg}{self.RESET}"
 
 
+class FileFormatter(logging.Formatter):
+
+    def __init__(self, *, probe_tty: bool = False) -> None:
+        super().__init__(fmt="%(asctime)s %(levelname)s [%(name)s] %(message)s", datefmt="%H:%M")
+
+
 def _install():
     for h in logging.root.handlers:
         logging.root.removeHandler(h)
