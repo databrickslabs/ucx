@@ -207,13 +207,14 @@ def test_job_assessment_for_azure_spark_config():
         ClusterDetails(
             autoscale=AutoScale(min_workers=1, max_workers=6),
             spark_conf={
-                "spark.hadoop.fs.azure.account."
-                "oauth2.client.id.abcde.dfs.core.windows.net": "{{secrets/abcff/sp_app_client_id}}",
-                "spark.hadoop.fs.azure.account."
-                "oauth2.client.endpoint.abcde.dfs.core.windows.net": "https://login.microsoftonline.com/dedededede"
+                "spark.hadoop.fs.azure.account.oauth2.client.id.abcde.dfs.core.windows.net": "{{secrets/abcff"
+                "/sp_app_client_id}}",
+                "spark.hadoop.fs.azure.account.oauth2.client.endpoint.abcde.dfs.core.windows.net": "https://login"
+                ".microsoftonline"
+                ".com/dedededede"
                 "/token",
-                "spark.hadoop.fs.azure.account."
-                "oauth2.client.secret.abcde.dfs.core.windows.net": "{{secrets/abcff/sp_secret}}",
+                "spark.hadoop.fs.azure.account.oauth2.client.secret.abcde.dfs.core.windows.net": "{{secrets/abcff"
+                "/sp_secret}}",
             },
             spark_context_id=5134472582179566666,
             spark_env_vars=None,
@@ -584,10 +585,11 @@ def test_azure_spn_info_without_secret(mocker):
             cluster_source=ClusterSource.UI,
             spark_conf={
                 "spark.hadoop.fs.azure.account.oauth2.client.id.abcde.dfs.core.windows.net": "test123456789",
-                "spark.hadoop.fs.azure.account."
-                "oauth2.client.endpoint.abcde.dfs.core.windows.net": "https://login.microsoftonline.com/dedededede/token",
-                "spark.hadoop.fs.azure.account."
-                "oauth2.client.secret.abcde.dfs.core.windows.net": "{{secrets/abcff/sp_secret}}",
+                "spark.hadoop.fs.azure.account.oauth2.client.endpoint.abcde.dfs.core.windows.net": "https://login"
+                ".microsoftonline"
+                ".com/dedededede/token",
+                "spark.hadoop.fs.azure.account.oauth2.client.secret.abcde.dfs.core.windows.net": "{{secrets/abcff"
+                "/sp_secret}}",
             },
             spark_context_id=5134472582179565315,
             spark_env_vars=None,
@@ -1352,13 +1354,14 @@ def test_azure_spn_info_with_secret(mocker):
             cluster_name="Tech Summit FY24 Cluster",
             autoscale=AutoScale(min_workers=1, max_workers=6),
             spark_conf={
-                "spark.hadoop.fs.azure.account."
-                "oauth2.client.id.abcde.dfs.core.windows.net": "{{secrets/abcff/sp_app_client_id}}",
-                "spark.hadoop.fs.azure.account."
-                "oauth2.client.endpoint.abcde.dfs.core.windows.net": "https://login.microsoftonline.com/dedededede"
+                "spark.hadoop.fs.azure.account.oauth2.client.id.abcde.dfs.core.windows.net": "{{secrets/abcff"
+                "/sp_app_client_id}}",
+                "spark.hadoop.fs.azure.account.oauth2.client.endpoint.abcde.dfs.core.windows.net": "https://login"
+                ".microsoftonline"
+                ".com/dedededede"
                 "/token",
-                "spark.hadoop.fs.azure.account."
-                "oauth2.client.secret.abcde.dfs.core.windows.net": "{{secrets/abcff/sp_secret}}",
+                "spark.hadoop.fs.azure.account.oauth2.client.secret.abcde.dfs.core.windows.net": "{{secrets/abcff"
+                "/sp_secret}}",
             },
             spark_context_id=5134472582179565315,
             spark_env_vars=None,
@@ -1922,7 +1925,6 @@ def test_list_all_pipeline_with_conf_spn_secret(mocker):
         "spark.hadoop.fs.azure.sas.fixed.token.abcde.dfs.core.windows.net": "{{secrets/abcde_access/sasFixedToken}}",
     }
     ws.pipelines.get().spec.configuration = config_dict
-
     result_set = AzureServicePrincipalCrawler(ws, MockBackend(), "ucx")._list_all_pipeline_with_spn_in_spark_conf()
 
     assert len(result_set) == 1
@@ -2267,3 +2269,52 @@ def test_global_init_scripts_with_config(mocker):
     result = crawler._crawl()
     assert len(result) == 1
     assert result[0].success == 0
+
+
+def mock_get_secret(secret_scope, secret_key):
+    msg = f"Secret Scope {secret_scope} does not exist!"
+    raise DatabricksError(msg)
+
+
+def test_azure_spn_info_with_secret_unavailable(mocker):
+    ws = mocker.Mock()
+    spark_conf = {
+        "spark.hadoop.fs.azure.account."
+        "oauth2.client.id.abcde.dfs.core.windows.net": "{{secrets/abcff/sp_app_client_id}}",
+        "spark.hadoop.fs.azure.account."
+        "oauth2.client.endpoint.abcde.dfs.core.windows.net": "https://login.microsoftonline.com/dedededede"
+        "/token",
+        "spark.hadoop.fs.azure.account."
+        "oauth2.client.secret.abcde.dfs.core.windows.net": "{{secrets/abcff/sp_secret}}",
+    }
+    ws.secrets.get_secret = mock_get_secret
+    crawler = AzureServicePrincipalCrawler(ws, MockBackend(), "ucx")._get_azure_spn_list(spark_conf)
+
+    assert crawler == []
+
+
+def test_list_all_pipeline_with_conf_spn_secret_unavlbl(mocker):
+    sample_pipelines = [
+        PipelineInfo(
+            creator_name="abcde.defgh@databricks.com",
+            pipeline_name="New DLT Pipeline",
+            pipeline_id="0112eae7-9d11-4b40-a2b8-6c83cb3c7497",
+            success=1,
+            failures="",
+        )
+    ]
+    ws = mocker.Mock()
+    ws.pipelines.list_pipelines.return_value = sample_pipelines
+    config_dict = {
+        "spark.hadoop.fs.azure.account.oauth2.client.id.newstorageacct.dfs.core.windows"
+        ".net": "{{secrets/reallyreallyasecret/sasFixedToken}}",
+        "spark.hadoop.fs.azure1.account.oauth2.client."
+        "endpoint.newstorageacct.dfs.core.windows.net": "https://"
+        "login.microsoftonline.com/directory_12345/oauth2/token",
+        "spark.hadoop.fs.azure.sas.fixed.token.abcde.dfs.core.windows.net": "{{secrets/abcde_access/sasFixedToken}}",
+    }
+    ws.pipelines.get().spec.configuration = config_dict
+    ws.secrets.get_secret = mock_get_secret
+    result_set = AzureServicePrincipalCrawler(ws, MockBackend(), "ucx")._list_all_pipeline_with_spn_in_spark_conf()
+
+    assert len(result_set) == 0

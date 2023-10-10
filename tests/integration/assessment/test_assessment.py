@@ -17,6 +17,12 @@ _PIPELINE_CONF = {
     ".microsoftonline.com/directory_12345/oauth2/token",
 }
 
+_PIPELINE_CONF_WITH_SECRET = {
+    "fs.azure.account.oauth2.client.id.abcde.dfs.core.windows.net": "{{secrets/reallyasecret123/sp_app_client_id}}",
+    "fs.azure.account.oauth2.client.endpoint.abcde.dfs.core.windows.net": "https://login.microsoftonline.com"
+    "/dummy_application/token",
+}
+
 _SPARK_CONF = {
     "spark.databricks.cluster.profile": "singleNode",
     "spark.master": "local[*]",
@@ -33,6 +39,23 @@ _SPARK_CONF = {
 def test_pipeline_crawler(ws, make_pipeline, inventory_schema, sql_backend):
     logger.info("setting up fixtures")
     created_pipeline = make_pipeline(configuration=_PIPELINE_CONF)
+
+    pipeline_crawler = PipelinesCrawler(ws=ws, sbe=sql_backend, schema=inventory_schema)
+    pipelines = pipeline_crawler.snapshot()
+    results = []
+    for pipeline in pipelines:
+        if pipeline.success != 0:
+            continue
+        if pipeline.pipeline_id == created_pipeline.pipeline_id:
+            results.append(pipeline)
+
+    assert len(results) >= 1
+    assert results[0].pipeline_id == created_pipeline.pipeline_id
+
+
+def test_pipeline_with_secret_conf_crawler(ws, make_pipeline, inventory_schema, sql_backend):
+    logger.info("setting up fixtures")
+    created_pipeline = make_pipeline(configuration=_PIPELINE_CONF_WITH_SECRET)
 
     pipeline_crawler = PipelinesCrawler(ws=ws, sbe=sql_backend, schema=inventory_schema)
     pipelines = pipeline_crawler.snapshot()
@@ -81,6 +104,20 @@ def test_job_crawler(ws, make_job, inventory_schema, sql_backend):
 def test_spn_crawler(ws, inventory_schema, make_job, make_pipeline, sql_backend):
     make_job(spark_conf=_SPARK_CONF)
     make_pipeline(configuration=_PIPELINE_CONF)
+    spn_crawler = AzureServicePrincipalCrawler(ws=ws, sbe=sql_backend, schema=inventory_schema)
+    spns = spn_crawler.snapshot()
+    results = []
+    for spn in spns:
+        results.append(spn)
+
+    assert len(results) >= 2
+    assert results[0].storage_account == "storage_acct_1"
+    assert results[0].tenant_id == "directory_12345"
+
+
+def test_spn_crawler_with_pipeline_secret(ws, inventory_schema, make_job, make_pipeline, sql_backend):
+    make_job(spark_conf=_SPARK_CONF)
+    make_pipeline(configuration=_PIPELINE_CONF_WITH_SECRET)
     spn_crawler = AzureServicePrincipalCrawler(ws=ws, sbe=sql_backend, schema=inventory_schema)
     spns = spn_crawler.snapshot()
     results = []
