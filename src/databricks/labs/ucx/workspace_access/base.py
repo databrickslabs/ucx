@@ -2,7 +2,9 @@ from abc import abstractmethod
 from collections.abc import Callable, Iterator
 from dataclasses import dataclass
 from logging import Logger
-from typing import Literal
+from typing import Literal, Optional
+
+from databricks.sdk.service.iam import AccessControlRequest, AccessControlResponse
 
 from databricks.labs.ucx.workspace_access.groups import GroupMigrationState
 
@@ -38,3 +40,7 @@ class AclSupport:
     @abstractmethod
     def object_types(self) -> set[str]:
         """This method returns a set of strings, that represent object types that are applicable by this instance."""
+            def noop():
+                pass
+
+            return partial(noop)

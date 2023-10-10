@@ -53,3 +53,4 @@ def test_applier():
     negative_item = Permissions(object_id="not-here", object_type="test", raw="test")
     task = applier.get_apply_task(negative_item, migration_state, "backup")
     assert task is None
+

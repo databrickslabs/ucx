@@ -205,3 +205,20 @@ def test_experiment_listing():
     for res in results:
         assert res.request_type == "experiments"
         assert res.object_id in ["test", "test2"]
+
+
+def test_applier_task_should_return_true_if_permission_is_up_to_date():
+    ws = MagicMock()
+    acl = iam.AccessControlResponse(
+        all_permissions=[iam.Permission(permission_level=iam.PermissionLevel.CAN_USE)], group_name="group"
+    )
+
+    ws.permissions.update.return_value = iam.ObjectPermissions(access_control_list=[acl])
+    sup = GenericPermissionsSupport(ws=ws, listings=[])
+
+    resuslt = sup._applier_task(
+        object_type="clusters",
+        object_id="cluster_id",
+        acl=[iam.AccessControlRequest(group_name="group", permission_level=iam.PermissionLevel.CAN_USE)],
+    )
+    assert resuslt
