@@ -1,12 +1,12 @@
 import logging
-import os
+import pathlib
 from collections.abc import Callable
 from dataclasses import dataclass
 from functools import wraps
 from pathlib import Path
 
 from databricks.labs.ucx.config import WorkspaceConfig
-from databricks.labs.ucx.framework.logger import FileFormatter, _install
+from databricks.labs.ucx.framework.logger import _install
 
 _TASKS: dict[str, "Task"] = {}
 
@@ -94,22 +94,25 @@ def trigger(*argv):
 
     logger = logging.getLogger("databricks")
     logger.setLevel(cfg.log_level)
-    filepath = os.path.dirname(config_path)
-    logpath = os.path.join(filepath, f"logs/{current_task.workflow}/{parent_run_id}")
+
+    filepath = pathlib.Path(config_path).parent
+    logpath = filepath.joinpath(f"logs/{current_task.workflow}/{parent_run_id}")
     try:
-        os.makedirs(logpath)
+        logpath.mkdir(parents=True)
     except OSError as error:
         logger.info(f"Failed to create log folder: {error}")
-    logfile = os.path.join(logpath, f"ucx_{task_name}.log")
-    file_handler = logging.FileHandler(logfile)
-    file_handler.setFormatter(FileFormatter())
-    logger.setLevel(cfg.log_level)
+    logfile = logpath.joinpath(f"ucx_{task_name}.log")
+    file_handler = logging.FileHandler(logfile.as_posix())
+    file_handler.setFormatter(
+        logging.Formatter(fmt="%(asctime)s %(levelname)s [%(name)s] %(message)s", datefmt="%H:%M:%S")
+    )
+    file_handler.setLevel(logging.DEBUG)
     logger.addHandler(file_handler)
     logger.info(f"Setup File Logging at {logfile}")
 
-    md_file = os.path.join(logpath, "README.md")
-    if not os.path.isfile(md_file):
-        with open(md_file, "a") as f:
+    md_file = logpath.joinpath("README.md")
+    if not md_file.exists():
+        with md_file.open() as f:
             f.write(f"# Logs for the {current_task.workflow} workflow\n")
             f.write("This folders contains UCX log files.<br/>\n")
             f.write(f"[These logs belong to job #{job_id} run #{parent_run_id}](/#job/{job_id}/run/{parent_run_id})\n")
