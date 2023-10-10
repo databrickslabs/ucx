@@ -208,13 +208,13 @@ def test_job_assessment_for_azure_spark_config():
             autoscale=AutoScale(min_workers=1, max_workers=6),
             spark_conf={
                 "spark.hadoop.fs.azure.account.oauth2.client.id.abcde.dfs.core.windows.net": "{{secrets/abcff"
-                "/sp_app_client_id}}",
+                                                                                             "/sp_app_client_id}}",
                 "spark.hadoop.fs.azure.account.oauth2.client.endpoint.abcde.dfs.core.windows.net": "https://login"
-                ".microsoftonline"
-                ".com/dedededede"
-                "/token",
+                                                                                                   ".microsoftonline"
+                                                                                                   ".com/dedededede"
+                                                                                                   "/token",
                 "spark.hadoop.fs.azure.account.oauth2.client.secret.abcde.dfs.core.windows.net": "{{secrets/abcff"
-                "/sp_secret}}",
+                                                                                                 "/sp_secret}}",
             },
             spark_context_id=5134472582179566666,
             spark_env_vars=None,
@@ -308,7 +308,7 @@ def test_cluster_assessment(mocker):
                 "oauth2.client.id.abcde.dfs.core.windows.net": "{{secrets/abcff/sp_app_client_id}}",
                 "spark.hadoop.fs.azure.account."
                 "oauth2.client.endpoint.abcde.dfs.core.windows.net": "https://login.microsoftonline.com/dedededede"
-                "/token",
+                                                                     "/token",
                 "spark.hadoop.fs.azure.account."
                 "oauth2.client.secret.abcde.dfs.core.windows.net": "{{secrets/abcff/sp_secret}}",
             },
@@ -586,10 +586,10 @@ def test_azure_spn_info_without_secret(mocker):
             spark_conf={
                 "spark.hadoop.fs.azure.account.oauth2.client.id.abcde.dfs.core.windows.net": "test123456789",
                 "spark.hadoop.fs.azure.account.oauth2.client.endpoint.abcde.dfs.core.windows.net": "https://login"
-                ".microsoftonline"
-                ".com/dedededede/token",
+                                                                                                   ".microsoftonline"
+                                                                                                   ".com/dedededede/token",
                 "spark.hadoop.fs.azure.account.oauth2.client.secret.abcde.dfs.core.windows.net": "{{secrets/abcff"
-                "/sp_secret}}",
+                                                                                                 "/sp_secret}}",
             },
             spark_context_id=5134472582179565315,
             spark_env_vars=None,
@@ -629,7 +629,7 @@ def test_azure_service_principal_info_crawl(mocker):
                 "oauth2.client.id.abcde.dfs.core.windows.net": "{{secrets/abcff/sp_app_client_id}}",
                 "spark.hadoop.fs.azure.account."
                 "oauth2.client.endpoint.abcde.dfs.core.windows.net": "https://login.microsoftonline.com/dedededede"
-                "/token",
+                                                                     "/token",
                 "spark.hadoop.fs.azure.account."
                 "oauth2.client.secret.abcde.dfs.core.windows.net": "{{secrets/abcff/sp_secret}}",
             },
@@ -1355,13 +1355,13 @@ def test_azure_spn_info_with_secret(mocker):
             autoscale=AutoScale(min_workers=1, max_workers=6),
             spark_conf={
                 "spark.hadoop.fs.azure.account.oauth2.client.id.abcde.dfs.core.windows.net": "{{secrets/abcff"
-                "/sp_app_client_id}}",
+                                                                                             "/sp_app_client_id}}",
                 "spark.hadoop.fs.azure.account.oauth2.client.endpoint.abcde.dfs.core.windows.net": "https://login"
-                ".microsoftonline"
-                ".com/dedededede"
-                "/token",
+                                                                                                   ".microsoftonline"
+                                                                                                   ".com/dedededede"
+                                                                                                   "/token",
                 "spark.hadoop.fs.azure.account.oauth2.client.secret.abcde.dfs.core.windows.net": "{{secrets/abcff"
-                "/sp_secret}}",
+                                                                                                 "/sp_secret}}",
             },
             spark_context_id=5134472582179565315,
             spark_env_vars=None,
@@ -1426,7 +1426,7 @@ def test_list_all_cluster_with_spn_in_spark_conf_with_secret(mocker):
                 "oauth2.client.id.abcde.dfs.core.windows.net": "{{secrets/abcff/sp_app_client_id}}",
                 "spark.hadoop.fs.azure.account."
                 "oauth2.client.endpoint.abcde.dfs.core.windows.net": "https://login.microsoftonline.com/dedededede"
-                "/token",
+                                                                     "/token",
                 "spark.hadoop.fs.azure.account."
                 "oauth2.client.secret.abcde.dfs.core.windows.net": "{{secrets/abcff/sp_secret}}",
             },
@@ -1552,7 +1552,7 @@ def test_list_all_clusters_spn_in_spark_conf_with_tenant(mocker):
                 "oauth2.client.id.abcde.dfs.core.windows.net": "{{secrets/abcff/sp_app_client_id}}",
                 "spark.hadoop.fs.azure.account."
                 "oauth2.client.endpoint.abcde.dfs.core.windows.net": "https://login.microsoftonline.com/dummy-tenant"
-                "-id/oauth2/token",
+                                                                     "-id/oauth2/token",
                 "spark.hadoop.fs.azure.account."
                 "oauth2.client.secret.abcde.dfs.core.windows.net": "{{secrets/abcff/sp_secret}}",
             },
@@ -1746,13 +1746,13 @@ def test_azure_service_principal_info_dedupe(mocker):
                             spark_conf={
                                 "spark.hadoop.fs.azure.account.auth.type.abcde.dfs.core.windows.net": "OAuth",
                                 "spark.hadoop.fs.azure.account.oauth.provider.type.abcde.dfs.core.windows.net": ""
-                                "org.apache.hadoop.fs.azurebfs.oauth2.ClientCredsTokenProvider",
+                                                                                                                "org.apache.hadoop.fs.azurebfs.oauth2.ClientCredsTokenProvider",
                                 "spark.hadoop.fs.azure.account.oauth2.client.id.abcde.dfs.core.windows.net": ""
-                                "dummy_application_id",
+                                                                                                             "dummy_application_id",
                                 "spark.hadoop.fs.azure.account.oauth2.client.secret.abcde.dfs.core.windows.net": ""
-                                "ddddddddddddddddddd",
+                                                                                                                 "ddddddddddddddddddd",
                                 "spark.hadoop.fs.azure.account.oauth2.client.endpoint.abcde.dfs.core.windows.net": ""
-                                "https://login.microsoftonline.com/dummy_tenant_id/oauth2/token",
+                                                                                                                   "https://login.microsoftonline.com/dummy_tenant_id/oauth2/token",
                             },
                         ),
                     ),
@@ -1842,9 +1842,9 @@ def test_list_all_pipeline_with_conf_spn_in_spark_conf(mocker):
     ws.pipelines.list_pipelines.return_value = sample_pipelines
     config_dict = {
         "spark.hadoop.fs.azure.account.oauth2.client.id.newstorageacct.dfs.core.windows.net": ""
-        "pipeline_dummy_application_id",
+                                                                                              "pipeline_dummy_application_id",
         "spark.hadoop.fs.azure.account.oauth2.client.endpoint.newstorageacct.dfs.core.windows.net": ""
-        "https://login.microsoftonline.com/directory_12345/oauth2/token",
+                                                                                                    "https://login.microsoftonline.com/directory_12345/oauth2/token",
         "spark.hadoop.fs.azure.sas.fixed.token.abcde.dfs.core.windows.net": "{{secrets/abcde_access/sasFixedToken}}",
     }
     ws.pipelines.get().spec.configuration = config_dict
@@ -1890,9 +1890,9 @@ def test_list_all_pipeline_with_conf_spn_tenat(mocker):
     ws.pipelines.list_pipelines.return_value = sample_pipelines
     config_dict = {
         "spark.hadoop.fs.azure.account.oauth2.client.id.newstorageacct.dfs.core.windows.net": ""
-        "pipeline_dummy_application_id",
+                                                                                              "pipeline_dummy_application_id",
         "spark.hadoop.fs.azure1.account.oauth2.client.endpoint.newstorageacct.dfs.core.windows.net": ""
-        "https://login.microsoftonline.com/directory_12345/oauth2/token",
+                                                                                                     "https://login.microsoftonline.com/directory_12345/oauth2/token",
         "spark.hadoop.fs.azure.sas.fixed.token.abcde.dfs.core.windows.net": "{{secrets/abcde_access/sasFixedToken}}",
     }
     ws.pipelines.get().spec.configuration = config_dict
@@ -1921,7 +1921,7 @@ def test_list_all_pipeline_with_conf_spn_secret(mocker):
         ".net": "{{secrets/abcde_access/sasFixedToken}}",
         "spark.hadoop.fs.azure1.account.oauth2.client."
         "endpoint.newstorageacct.dfs.core.windows.net": "https://"
-        "login.microsoftonline.com/directory_12345/oauth2/token",
+                                                        "login.microsoftonline.com/directory_12345/oauth2/token",
         "spark.hadoop.fs.azure.sas.fixed.token.abcde.dfs.core.windows.net": "{{secrets/abcde_access/sasFixedToken}}",
     }
     ws.pipelines.get().spec.configuration = config_dict
@@ -2283,7 +2283,7 @@ def test_azure_spn_info_with_secret_unavailable(mocker):
         "oauth2.client.id.abcde.dfs.core.windows.net": "{{secrets/abcff/sp_app_client_id}}",
         "spark.hadoop.fs.azure.account."
         "oauth2.client.endpoint.abcde.dfs.core.windows.net": "https://login.microsoftonline.com/dedededede"
-        "/token",
+                                                             "/token",
         "spark.hadoop.fs.azure.account."
         "oauth2.client.secret.abcde.dfs.core.windows.net": "{{secrets/abcff/sp_secret}}",
     }
@@ -2310,7 +2310,7 @@ def test_list_all_pipeline_with_conf_spn_secret_unavlbl(mocker):
         ".net": "{{secrets/reallyreallyasecret/sasFixedToken}}",
         "spark.hadoop.fs.azure1.account.oauth2.client."
         "endpoint.newstorageacct.dfs.core.windows.net": "https://"
-        "login.microsoftonline.com/directory_12345/oauth2/token",
+                                                        "login.microsoftonline.com/directory_12345/oauth2/token",
         "spark.hadoop.fs.azure.sas.fixed.token.abcde.dfs.core.windows.net": "{{secrets/abcde_access/sasFixedToken}}",
     }
     ws.pipelines.get().spec.configuration = config_dict
@@ -2318,3 +2318,160 @@ def test_list_all_pipeline_with_conf_spn_secret_unavlbl(mocker):
     result_set = AzureServicePrincipalCrawler(ws, MockBackend(), "ucx")._list_all_pipeline_with_spn_in_spark_conf()
 
     assert len(result_set) == 0
+
+
+def test_cluster_init_script_check_dbfs(mocker):
+    sample_clusters = [
+        ClusterDetails(
+            autoscale=AutoScale(min_workers=1, max_workers=6),
+            cluster_source=ClusterSource.UI,
+            spark_context_id=5134472582179565315,
+            spark_env_vars=None,
+            spark_version="12.3.x-cpu-ml-scala2.12",
+            cluster_id="0810-225833-atlanta69",
+            cluster_name="Tech Summit FY24 Cluster-1",
+            init_scripts=[
+                InitScriptInfo(
+                    dbfs=DbfsStorageInfo(destination="dbfs:"),
+                    s3=None,
+                    volumes=None,
+                    workspace=None,
+                ),
+                InitScriptInfo(
+                    dbfs=DbfsStorageInfo(destination="dbfs"),
+                    s3=None,
+                    volumes=None,
+                    workspace=None,
+                ),
+                InitScriptInfo(
+                    dbfs=DbfsStorageInfo(destination=":/users/test@test.com/init_scripts/test.sh"),
+                    s3=None,
+                    volumes=None,
+                    workspace=None,
+                ),
+                InitScriptInfo(
+                    dbfs=None,
+                    s3=None,
+                    volumes=None,
+                    workspace=WorkspaceStorageInfo(
+                        destination="/Users/dipankar.kushari@databricks.com/init_script_1.sh"
+                    ),
+                ),
+            ],
+        )
+    ]
+    ws = mocker.Mock()
+    ws.clusters.list.return_value = sample_clusters
+    ws.dbfs.read().data = "JXNoCmVjaG8gIj0="
+    init_crawler = ClustersCrawler(ws, MockBackend(), "ucx").snapshot()
+    assert len(init_crawler) == 1
+
+
+def test_job_cluster_init_script_check_dbfs():
+    sample_jobs = [
+        BaseJob(
+            created_time=1694536604319,
+            creator_user_name="anonymous@databricks.com",
+            job_id=536591785949415,
+            settings=JobSettings(
+                compute=None,
+                continuous=None,
+                tasks=[
+                    Task(
+                        task_key="Ingest",
+                        existing_cluster_id="0807-225846-avon493",
+                        notebook_task=NotebookTask(
+                            notebook_path="/Users/foo.bar@databricks.com/Customers/Example/Test/Load"
+                        ),
+                        timeout_seconds=0,
+                    )
+                ],
+                timeout_seconds=0,
+            ),
+        ),
+        BaseJob(
+            created_time=1694536604321,
+            creator_user_name="anonymous@databricks.com",
+            job_id=536591785949416,
+            settings=JobSettings(
+                compute=None,
+                continuous=None,
+                tasks=[
+                    Task(
+                        task_key="Ingest",
+                        existing_cluster_id="0810-229933-chicago99",
+                        notebook_task=NotebookTask(
+                            notebook_path="/Users/foo.bar@databricks.com/Customers/Example/Test/Load"
+                        ),
+                        timeout_seconds=0,
+                    )
+                ],
+                timeout_seconds=0,
+            ),
+        ),
+        BaseJob(
+            created_time=1694536604319,
+            creator_user_name="anonymous@databricks.com",
+            job_id=536591785949417,
+            settings=JobSettings(
+                compute=None,
+                continuous=None,
+                tasks=[
+                    Task(
+                        task_key="Ingest",
+                        existing_cluster_id="0811-929933-maine96",
+                        notebook_task=NotebookTask(
+                            notebook_path="/Users/foo.bar@databricks.com/Customers/Example/Test/Load"
+                        ),
+                        timeout_seconds=0,
+                    )
+                ],
+                timeout_seconds=0,
+            ),
+        ),
+    ]
+
+    sample_clusters = [
+        ClusterDetails(
+            init_scripts=[
+                InitScriptInfo(
+                    dbfs=DbfsStorageInfo(destination="dbfs"),
+                    s3=None,
+                    volumes=None,
+                    workspace=None,
+                ),
+                InitScriptInfo(
+                    dbfs=DbfsStorageInfo(destination="dbfs:"),
+                    s3=None,
+                    volumes=None,
+                    workspace=None,
+                ),
+                InitScriptInfo(
+                    dbfs=DbfsStorageInfo(destination=":/users/test@test.com/init_scripts/test.sh"),
+                    s3=None,
+                    volumes=None,
+                    workspace=None,
+                ),
+                InitScriptInfo(
+                    dbfs=None,
+                    s3=None,
+                    volumes=None,
+                    workspace=WorkspaceStorageInfo(
+                        destination="/Users/dipankar.kushari@databricks.com/init_script_1.sh"
+                    ),
+                ),
+            ],
+            autoscale=AutoScale(min_workers=1, max_workers=6),
+            spark_context_id=5134472582179566666,
+            spark_env_vars=None,
+            spark_version="13.3.x-cpu-ml-scala2.12",
+            cluster_id="0807-225846-avon493",
+            cluster_source=ClusterSource.JOB,
+        )
+    ]
+    ws = Mock()
+    ws.workspace.export().content = "JXNoCmVjaG8gIj0="
+    result_set = JobsCrawler(ws, MockBackend(), "ucx")._assess_jobs(
+        sample_jobs, {c.cluster_id: c for c in sample_clusters}
+    )
+    assert len(result_set) == 3
