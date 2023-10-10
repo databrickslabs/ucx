@@ -2505,8 +2505,3 @@ def test_list_all_pipeline_with_conf_spn_secret_avlb(mocker):
     assert result_set[0].get("application_id") == 'dmlkeWEuYXNob2s='
     assert result_set[0].get("tenant_id") == 'directory_12345'
     assert result_set[0].get("storage_account") == 'newstorageacct'
-
-    # GetSecretResponse(key='baringskey',
-    #                   value='SWduOXlQU3F3QXRtZDVlTThCTGdtQktkSU9lWGJTNll5VTI5N0dkcXVscTlBWFE4T2sxVVYvd3dzT2VjaUpwUyt4WVNVNVgxUVdRYytBU3RSKzhOQ2c9PQ==')
-    # GetSecretResponse(key='jdbc', value='amRiYzpzcWxzZXJ2ZXI6Ly9hYmVzcWxzZXJ2ZXIuZGF0YWJhc2Uud2luZG93cy5uZXQ6MTQzMw==')
-
