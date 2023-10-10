@@ -607,8 +607,9 @@ class WorkspaceInstaller:
         if hasattr(self, "__version"):
             return self.__version
         project_root = self._find_project_root()
-        if not (project_root / ".git/config").exists():
+        if not (project_root / ".git/config").exists() or self._ws.config.is_gcp():
             # normal install, downloaded releases won't have the .git folder
+            # Note: GCP currently does not handle PEP0440 version strings in tag values
             return __version__
         try:
             out = subprocess.run(["git", "describe", "--tags"], stdout=subprocess.PIPE, check=True)  # noqa S607
