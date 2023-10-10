@@ -1,5 +1,5 @@
 import json
-from unittest.mock import MagicMock
+from unittest.mock import MagicMock, call
 
 import pytest
 from databricks.sdk.core import DatabricksError
@@ -62,7 +62,21 @@ def test_crawlers():
 
 def test_apply(migration_state):
     ws = MagicMock()
-    sup = RedashPermissionsSupport(ws=ws, listings=[])
+    ws.dbsql_permissions.get.return_value = sql.GetResponse(
+        object_type=sql.ObjectType.ALERT,
+        object_id="test",
+        access_control_list=[
+            sql.AccessControl(
+                group_name="db-temp-test",
+                permission_level=sql.PermissionLevel.CAN_MANAGE,
+            ),
+            sql.AccessControl(
+                group_name="irrelevant",
+                permission_level=sql.PermissionLevel.CAN_MANAGE,
+            ),
+        ],
+    )
+    sup = SqlPermissionsSupport(ws=ws, listings=[])
     item = Permissions(
         object_id="test",
         object_type="alerts",
@@ -121,3 +135,112 @@ def test_empty_permissions():
     ws.dbsql_permissions.get.side_effect = DatabricksError(error_code="RESOURCE_DOES_NOT_EXIST")
     sup = RedashPermissionsSupport(ws=ws, listings=[])
     assert sup._crawler_task(object_id="test", object_type=sql.ObjectTypePlural.ALERTS) is None
+
+
+def test_applier_task_should_return_true_if_permission_is_up_to_date():
+    ws = MagicMock()
+    acl_grp_1 = sql.AccessControl(group_name="group_1", permission_level=sql.PermissionLevel.CAN_MANAGE)
+    acl_grp_2 = sql.AccessControl(group_name="group_2", permission_level=sql.PermissionLevel.CAN_MANAGE)
+    ws.dbsql_permissions.get.return_value = sql.GetResponse(
+        object_type=sql.ObjectType.QUERY,
+        object_id="test",
+        access_control_list=[acl_grp_1, acl_grp_2],
+    )
+
+    sup = SqlPermissionsSupport(ws=ws, listings=[])
+    result = sup._applier_task(sql.ObjectTypePlural.QUERIES, "test", [acl_grp_1])
+    assert result
+
+
+def test_applier_task_should_return_true_if_permission_is_up_to_date_with_multiple_permissions():
+    ws = MagicMock()
+    acl_1_grp_1 = sql.AccessControl(group_name="group_1", permission_level=sql.PermissionLevel.CAN_MANAGE)
+    acl_2_grp_1 = sql.AccessControl(group_name="group_1", permission_level=sql.PermissionLevel.CAN_RUN)
+    acl_3_grp_1 = sql.AccessControl(group_name="group_1", permission_level=sql.PermissionLevel.CAN_RUN)
+    acl_grp_2 = sql.AccessControl(group_name="group_2", permission_level=sql.PermissionLevel.CAN_MANAGE)
+    ws.dbsql_permissions.get.return_value = sql.GetResponse(
+        object_type=sql.ObjectType.QUERY,
+        object_id="test",
+        access_control_list=[acl_1_grp_1, acl_2_grp_1, acl_3_grp_1, acl_grp_2],
+    )
+
+    sup = SqlPermissionsSupport(ws=ws, listings=[])
+    result = sup._applier_task(sql.ObjectTypePlural.QUERIES, "test", [acl_1_grp_1, acl_2_grp_1])
+    assert result
+
+
+def test_applier_task_should_return_false_if_permission_are_not_up_to_date():
+    ws = MagicMock()
+    ws.dbsql_permissions.get.return_value = sql.GetResponse(
+        object_type=sql.ObjectType.QUERY,
+        object_id="test",
+        access_control_list=[
+            sql.AccessControl(group_name="group_1", permission_level=sql.PermissionLevel.CAN_MANAGE),
+            sql.AccessControl(group_name="group_2", permission_level=sql.PermissionLevel.CAN_RUN),
+        ],
+    )
+
+    sup = SqlPermissionsSupport(ws=ws, listings=[])
+    result = sup._applier_task(
+        sql.ObjectTypePlural.QUERIES,
+        "test",
+        [sql.AccessControl(group_name="group_1", permission_level=sql.PermissionLevel.CAN_RUN)],
+    )
+    assert not result
+
+
+def test_applier_task_should_return_false_if_all_permissions_are_not_up_to_date():
+    ws = MagicMock()
+    ws.dbsql_permissions.get.return_value = sql.GetResponse(
+        object_type=sql.ObjectType.QUERY,
+        object_id="test",
+        access_control_list=[
+            sql.AccessControl(group_name="group_1", permission_level=sql.PermissionLevel.CAN_MANAGE),
+            sql.AccessControl(group_name="group_2", permission_level=sql.PermissionLevel.CAN_RUN),
+        ],
+    )
+
+    sup = SqlPermissionsSupport(ws=ws, listings=[])
+    result = sup._applier_task(
+        sql.ObjectTypePlural.QUERIES,
+        "test",
+        [
+            sql.AccessControl(group_name="group_1", permission_level=sql.PermissionLevel.CAN_RUN),
+            sql.AccessControl(group_name="group_1", permission_level=sql.PermissionLevel.CAN_MANAGE),
+        ],
+    )
+    assert not result
+
+
+def test_applier_task_should_be_called_three_times_if_permission_is_not_up_to_date():
+    ws = MagicMock()
+    ws.dbsql_permissions.get.return_value = sql.GetResponse(
+        object_type=sql.ObjectType.QUERY,
+        object_id="test",
+        access_control_list=[
+            sql.AccessControl(group_name="group_1", permission_level=sql.PermissionLevel.CAN_MANAGE),
+            sql.AccessControl(group_name="group_2", permission_level=sql.PermissionLevel.CAN_RUN),
+        ],
+    )
+
+    sup = SqlPermissionsSupport(ws=ws, listings=[])
+    input_acl = sql.AccessControl(group_name="group_1", permission_level=sql.PermissionLevel.CAN_RUN)
+
+    sup._applier_task(
+        sql.ObjectTypePlural.QUERIES,
+        "test",
+        [input_acl],
+    )
+
+    assert len(ws.dbsql_permissions.set.mock_calls) == 3
+    assert ws.dbsql_permissions.set.mock_calls == [
+        call(object_type=sql.ObjectTypePlural.QUERIES, object_id="test", access_control_list=[input_acl]),
+        call(object_type=sql.ObjectTypePlural.QUERIES, object_id="test", access_control_list=[input_acl]),
+        call(object_type=sql.ObjectTypePlural.QUERIES, object_id="test", access_control_list=[input_acl]),
+    ]
+    assert len(ws.dbsql_permissions.get.mock_calls) == 3
+    assert ws.dbsql_permissions.set.mock_calls == [
+        call(object_type=sql.ObjectTypePlural.QUERIES, object_id="test", access_control_list=[input_acl]),
+        call(object_type=sql.ObjectTypePlural.QUERIES, object_id="test", access_control_list=[input_acl]),
+        call(object_type=sql.ObjectTypePlural.QUERIES, object_id="test", access_control_list=[input_acl]),
+    ]

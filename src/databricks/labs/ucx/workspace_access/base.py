@@ -2,9 +2,7 @@ from abc import abstractmethod
 from collections.abc import Callable, Iterator
 from dataclasses import dataclass
 from logging import Logger
-from typing import Literal, Optional
-
-from databricks.sdk.service.iam import AccessControlRequest, AccessControlResponse
+from typing import Literal
 
 from databricks.labs.ucx.workspace_access.groups import GroupMigrationState
 
