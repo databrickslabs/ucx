@@ -221,6 +221,34 @@ def test_experiment_listing():
         assert res.object_id in ["test", "test2"]
 
 
+def test_response_to_request_mapping():
+    permissions1 = [
+        iam.Permission(permission_level=iam.PermissionLevel.CAN_BIND),
+        iam.Permission(permission_level=iam.PermissionLevel.CAN_MANAGE),
+    ]
+    response1 = iam.AccessControlResponse(all_permissions=permissions1, user_name="test1212")
+
+    permissions2 = [iam.Permission(permission_level=iam.PermissionLevel.CAN_ATTACH_TO)]
+    response2 = iam.AccessControlResponse(all_permissions=permissions2, group_name="data-engineers")
+
+    permissions3 = [iam.Permission(permission_level=iam.PermissionLevel.CAN_MANAGE_PRODUCTION_VERSIONS)]
+    response3 = iam.AccessControlResponse(all_permissions=permissions3, service_principal_name="sp1")
+
+    object_permissions = iam.ObjectPermissions(access_control_list=[response1, response2, response3])
+
+    sup = GenericPermissionsSupport(ws=MagicMock(), listings=[])
+    results = sup.response_to_request(object_permissions.access_control_list)
+
+    assert results == [
+        iam.AccessControlRequest(permission_level=iam.PermissionLevel.CAN_BIND, user_name="test1212"),
+        iam.AccessControlRequest(permission_level=iam.PermissionLevel.CAN_MANAGE, user_name="test1212"),
+        iam.AccessControlRequest(permission_level=iam.PermissionLevel.CAN_ATTACH_TO, group_name="data-engineers"),
+        iam.AccessControlRequest(
+            permission_level=iam.PermissionLevel.CAN_MANAGE_PRODUCTION_VERSIONS, service_principal_name="sp1"
+        ),
+    ]
+
+
 def test_applier_task_should_return_true_if_permission_is_up_to_date():
     ws = MagicMock()
     acl1 = iam.AccessControlResponse(
