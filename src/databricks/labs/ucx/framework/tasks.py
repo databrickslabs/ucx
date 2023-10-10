@@ -5,6 +5,9 @@ from dataclasses import dataclass
 from functools import wraps
 from pathlib import Path
 
+from databricks.sdk import WorkspaceClient
+
+import databricks
 from databricks.sdk.runtime.dbutils_stub import dbutils
 
 from databricks.labs.ucx.config import WorkspaceConfig
@@ -110,13 +113,12 @@ def trigger(*argv):
     logger.info(f"Setup File Logging at {logfile}")
 
     md_file = os.path.join(logpath, "README.md")
-    if os.path.isfile(md_file):
-        f = open(md_file, "a")
-        f.write(f"# Logs for {current_task.workflow}")
-        f.write("This folders contains UCX log files.")
-        f.write(f"[These logs belong to job #{job_id} run #{parent_run_id}]"
-                f"({cfg.host}/#job/{job_id}/run/{parent_run_id})")
-        f.close()
+    if not os.path.isfile(md_file):
+        with open(md_file, "a") as f:
+            f.write(f"# Logs for {current_task.workflow}\n")
+            f.write("This folders contains UCX log files.<br/>")
+            f.write(f"[These logs belong to job #{job_id} run #{parent_run_id}]"
+                    f"(/#job/{job_id}/run/{parent_run_id})")
 
     try:
         logger.info(f"Starting {current_task.workflow} - {task_name}")
