@@ -81,9 +81,8 @@ def trigger(*argv):
         msg = "no --config specified"
         raise KeyError(msg)
     task_name = args.get("task", "not specified")
+    parent_run_id = args.get("parent_run_id", "unknown_run_id")
     job_id = args.get("job_id")
-    run_id = dbutils.widgets.get("run_id")
-    task_key = args.get("task_id")
     if task_name not in _TASKS:
         msg = f'task "{task_name}" not found. Valid tasks are: {", ".join(_TASKS.keys())}'
         raise KeyError(msg)
@@ -98,7 +97,7 @@ def trigger(*argv):
     logger = logging.getLogger("databricks")
     logger.setLevel(cfg.log_level)
     filepath = os.path.dirname(config_path)
-    logpath = os.path.join(filepath, f"logs/{current_task.workflow}/{run_id}")
+    logpath = os.path.join(filepath, f"logs/{current_task.workflow}/{parent_run_id}")
     try:
         os.makedirs(logpath)
     except OSError as error:
@@ -110,9 +109,21 @@ def trigger(*argv):
     logger.addHandler(file_handler)
     logger.info(f"Setup File Logging at {logfile}")
 
+    md_file = os.path.join(logpath, "README.md")
+    if os.path.isfile(md_file):
+        f = open(md_file, "a")
+        f.write(f"# Logs for {current_task.workflow}")
+        f.write("This folders contains UCX log files.")
+        f.write(f"[These logs belong to job #{job_id} run #{parent_run_id}]"
+                f"({cfg.host}/#job/{job_id}/run/{parent_run_id})")
+        f.close()
+
     try:
+        logger.info(f"Starting {current_task.workflow} - {task_name}")
         current_task.fn(cfg)
+        logger.info(f"Completed {current_task.workflow} - {task_name}")
     except Exception as error:
         logger.error(f"Task failed with:{error}")
+        raise
     finally:
         file_handler.close()
