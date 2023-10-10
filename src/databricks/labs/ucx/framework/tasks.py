@@ -114,7 +114,7 @@ def trigger(*argv):
     if not md_file.exists():
         with md_file.open(mode="a") as f:
             f.write(f"# Logs for the {current_task.workflow} workflow\n")
-            f.write("This folders contains UCX log files.<br/>\n")
+            f.write("This folder contains UCX log files.<br/>\n")
             f.write(f"[These logs belong to job #{job_id} run #{parent_run_id}](/#job/{job_id}/run/{parent_run_id})\n")
 
     try:
