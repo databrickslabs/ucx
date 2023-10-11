@@ -10,7 +10,6 @@ from databricks.labs.ucx.workspace_access.base import (
 )
 from databricks.labs.ucx.workspace_access.groups import (
     GroupMigrationState,
-    MigrationGroupInfo,
 )
 
 

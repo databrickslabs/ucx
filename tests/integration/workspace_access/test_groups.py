@@ -6,8 +6,7 @@ from databricks.sdk.service.iam import PermissionLevel
 from databricks.labs.ucx.config import GroupsConfig
 from databricks.labs.ucx.hive_metastore import GrantsCrawler, TablesCrawler
 from databricks.labs.ucx.workspace_access.generic import (
-    GenericPermissionsSupport,
-    listing_wrapper,
+    GenericPermissionsSupport, Listing,
 )
 from databricks.labs.ucx.workspace_access.groups import GroupManager
 from databricks.labs.ucx.workspace_access.manager import PermissionManager
@@ -88,11 +87,9 @@ def test_replace_workspace_groups_with_account_groups(
     group_info = group_manager.migration_state.get_by_workspace_group_name(ws_group.display_name)
 
     generic_permissions = GenericPermissionsSupport(
-        ws, [listing_wrapper(ws.cluster_policies.list, "policy_id", "cluster-policies")]
+        ws, [Listing(ws.cluster_policies.list, "policy_id", "cluster-policies")]
     )
-    permission_manager = PermissionManager(
-        sql_backend, inventory_schema, [generic_permissions], {"cluster-policies": generic_permissions}
-    )
+    permission_manager = PermissionManager(sql_backend, inventory_schema, [generic_permissions])
     tables = TablesCrawler(sql_backend, inventory_schema)
     grants = GrantsCrawler(tables)
 
@@ -167,10 +164,8 @@ def test_recover_from_ws_local_deletion(ws, make_ucx_group):
     group_manager = GroupManager(ws, GroupsConfig(auto=True))
     group_manager.prepare_groups_in_environment()
 
-    migration_state = group_manager.migration_groups_provider
-
     recovered_state = {}
-    for gi in migration_state.groups:
+    for gi in group_manager.migration_state.groups:
         recovered_state[gi.workspace.display_name] = gi.workspace
 
     assert sorted([member.display for member in ws_group.members]) == sorted(

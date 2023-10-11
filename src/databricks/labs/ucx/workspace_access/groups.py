@@ -270,16 +270,23 @@ class GroupManager:
             f"In total, {len(source_groups)} temporary groups found, which do not have corresponding workspace groups"
         )
 
-        for source_group in source_groups:
+        for backup_group in source_groups:
             ws_local_group = self._ws.groups.create(
-                display_name=source_group.display_name.removeprefix(self._backup_group_prefix),
-                meta=source_group.meta,
-                entitlements=source_group.entitlements,
-                roles=source_group.roles,
-                members=source_group.members,
+                display_name=backup_group.display_name.removeprefix(self._backup_group_prefix),
+                meta=backup_group.meta,
+                entitlements=backup_group.entitlements,
+                roles=backup_group.roles,
+                members=backup_group.members,
             )
             self._workspace_groups.append(ws_local_group)
-            self._migration_state.add(ws_local_group)
+
+            account_groups = [_ for _ in self._account_groups if _.display_name == ws_local_group.display_name]
+            if len(account_groups) == 0:
+                logger.error(f"Cannot find matching group on account level: {ws_local_group.display_name}")
+                continue
+
+            account_group = account_groups[0]
+            self._migration_state.add(ws_local_group, backup_group, account_group)
             logger.info(f"Workspace-local group {ws_local_group} successfully recovered")
 
-        logger.info("Workspace-local group deletion recovery completed")
+        logger.info("Workspace-local group recovery completed")
