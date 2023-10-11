@@ -126,8 +126,10 @@ def assess_pipelines(cfg: WorkspaceConfig):
     """This module scans through all the Pipelines and identifies those pipelines which has Azure Service Principals
     embedded (who has been given access to the Azure storage accounts via spark configurations) in the pipeline
     configurations.
+
     It looks for:
       - all the pipelines which has Azure Service Principal embedded in the pipeline configuration
+
     Subsequently, a list of all the pipelines with matching configurations are stored in the
     `$inventory.pipelines` table."""
     ws = WorkspaceClient(config=cfg.to_databricks_config())
@@ -140,8 +142,10 @@ def assess_azure_service_principals(cfg: WorkspaceConfig):
     """This module scans through all the clusters configurations, cluster policies, job cluster configurations,
     Pipeline configurations, Warehouse configuration and identifies all the Azure Service Principals who has been
     given access to the Azure storage accounts via spark configurations referred in those entities.
+
     It looks in:
       - all those entities and prepares a list of Azure Service Principal embedded in their configurations
+
     Subsequently, the list of all the Azure Service Principals referred in those configurations are saved
     in the `$inventory.azure_service_principals` table."""
     ws = WorkspaceClient(config=cfg.to_databricks_config())
@@ -153,6 +157,7 @@ def assess_azure_service_principals(cfg: WorkspaceConfig):
 def assess_global_init_scripts(cfg: WorkspaceConfig):
     """This module scans through all the global init scripts and identifies if there is an Azure Service Principal
     who has been given access to the Azure storage accounts via spark configurations referred in those scripts.
+
     It looks in:
       - the list of all the global init scripts are saved in the `$inventory.azure_service_principals` table."""
     ws = WorkspaceClient(config=cfg.to_databricks_config())
