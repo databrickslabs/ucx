@@ -1,3 +1,4 @@
+import json
 import logging
 import os
 from collections.abc import Callable, Iterator
@@ -80,7 +81,7 @@ class PermissionManager(CrawlerBase):
         if len(migration_state.groups) == 0:
             logger.info("No valid groups selected, nothing to do.")
             return True
-        items = sorted(self._load_all(), key=lambda i: i.object_type)
+        items = sorted(self.load_all(), key=lambda i: i.object_type)
         logger.info(
             f"Applying the permissions to {destination} groups. "
             f"Total groups to apply permissions: {len(migration_state.groups)}. "
@@ -104,6 +105,9 @@ class PermissionManager(CrawlerBase):
             tasks_for_support = [
                 relevant_support.get_apply_task(item, migration_state, destination) for item in items_subset
             ]
+            tasks_for_support = [_ for _ in tasks_for_support if _ is not None]
+            if len(tasks_for_support) == 0:
+                continue
             logger.info(f"Total tasks for {object_type}: {len(tasks_for_support)}")
             applier_tasks.extend(tasks_for_support)
 
@@ -132,15 +136,22 @@ class PermissionManager(CrawlerBase):
         logger.info("Inventory table cleanup complete")
 
     def _save(self, items: list[Permissions]):
+        # keep in mind, that object_type and object_id are not primary keys.
         self._append_records(items)  # TODO: update instead of append
         logger.info("Successfully saved the items to inventory table")
 
-    def _load_all(self) -> list[Permissions]:
+    def load_all(self) -> list[Permissions]:
         logger.info(f"Loading inventory table {self._full_name}")
         return [
             Permissions(object_id, object_type, raw)
             for object_id, object_type, raw in self._fetch(f"SELECT object_id, object_type, raw FROM {self._full_name}")
         ]
+
+    def load_all_for(self, object_type: str, object_id: str, klass: type) -> any:
+        for perm in self.load_all():
+            if object_type == perm.object_type and object_id == perm.object_id:
+                raw = json.loads(perm.raw)
+                yield klass(**raw)
 
     def _get_crawler_tasks(self) -> Iterator[Callable[..., Permissions | None]]:
         for support in self._acl_support:
