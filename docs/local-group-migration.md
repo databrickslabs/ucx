@@ -17,18 +17,12 @@ To deliver this migration, the following steps are performed:
 
 > Please note that inherited permissions will not be inventorized / migrated. We only cover direct permissions.
 
-On a very high-level, the permissions inventorization process is split into two steps:
+On a very high-level, the permissions crawling process is split into two steps:
 
-1. collect all existing permissions into a persistent storage.
-2. apply the collected permissions to the target resources.
+1. collect all existing permissions into a persistent storage - see `workspace_access.AclSupport.get_crawler_tasks`.
+2. apply the collected permissions to the target resources - see `workspace_access.AclSupport.get_apply_task`.
 
-The first step is performed by the `Crawler` and the second by the `Applier`.
-
-Crawler and applier are intrinsically connected to each other due to SerDe (serialization/deserialization) logic.
-
-We implement separate crawlers and applier for each supported resource type.
-
-Please note that `table ACLs` logic is currently handled separately from the logic described in this document.
+We implement `workspace_access.AclSupport` for each supported resource type.
 
 ## Logical objects and relevant APIs
 
@@ -147,7 +141,9 @@ Additional info:
 
 #### Known issues
 
-- Folder names with forward-slash (`/`) in directory name will be skipped by the inventory. Databricks UI no longer allows creating folders with a forward slash. See [this issue](https://github.com/databrickslabs/ucx/issues/230) for more details.
+- Folder names with forward-slash (`/`) in directory name will be skipped by the inventory. Databricks UI no longer 
+allows creating folders with a forward slash. See [this issue](https://github.com/databrickslabs/ucx/issues/230) for 
+more details.
 
 ### Secrets (uses Secrets API)
 
@@ -163,16 +159,16 @@ Additional info:
 - put method: `ws.secrets.put_acl`
 
 
-## Crawler and serialization logic
+## AclSupport and serialization logic
 
 Crawlers are expected to return a list of callable functions that will be later used to get the permissions.
-Each of these functions shall return a `PermissionInventoryItem` that should be serializable into a Delta Table.
+Each of these functions shall return a `workspace_access.Permissions` that should be serializable into a Delta Table.
 The permission payload differs between different crawlers, therefore each crawler should implement a serialization
 method.
 
 ## Applier and deserialization logic
 
-Appliers are expected to accept a list of `PermissionInventoryItem` and generate a list of callables that will apply the
+Appliers are expected to accept a list of `workspace_access.Permissions` and generate a list of callables that will apply the
 given permissions.
 Each applier should implement a deserialization method that will convert the raw payload into a typed one.
 Each permission item should have a crawler type associated with it, so that the applier can use the correct
@@ -189,10 +185,10 @@ We do this inside the `applier`, by returning a `noop` callable if the object is
 To crawl the permissions, we use the following logic:
 1. Go through the list of all crawlers.
 2. Get the list of all objects of the given type.
-3. For each object, generate a callable that will return a `PermissionInventoryItem`.
+3. For each object, generate a callable that will return a `workspace_access.Permissions`.
 4. Execute the callables in parallel
-5. Collect the results into a list of `PermissionInventoryItem`.
-6. Save the list of `PermissionInventoryItem` into a Delta Table.
+5. Collect the results into a list of `workspace_access.Permissions`.
+6. Save the list of `workspace_access.Permissions` into a Delta Table.
 
 ## Applying the permissions
 

@@ -1,7 +1,6 @@
 from abc import abstractmethod
 from collections.abc import Callable, Iterator
 from dataclasses import dataclass
-from functools import partial
 from logging import Logger
 from typing import Literal
 
@@ -21,7 +20,7 @@ class Permissions:
 Destination = Literal["backup", "account"]
 
 
-class Crawler:
+class AclSupport:
     @abstractmethod
     def get_crawler_tasks(self) -> Iterator[Callable[..., Permissions | None]]:
         """
@@ -29,31 +28,13 @@ class Crawler:
         :return:
         """
 
-
-# TODO: this class has to become typing.Protocol and keep only abstract methods
-# See https://www.oreilly.com/library/view/fluent-python-2nd/9781492056348/ch13.html
-class Applier:
     @abstractmethod
-    def is_item_relevant(self, item: Permissions, migration_state: GroupMigrationState) -> bool:
-        """TODO: remove it, see https://github.com/databrickslabs/ucx/issues/410"""
-
-    @abstractmethod
-    def _get_apply_task(
-        self, item: Permissions, migration_state: GroupMigrationState, destination: Destination
-    ) -> partial:
-        """
-        This method should return an instance of ApplierTask.
-        """
-
     def get_apply_task(
         self, item: Permissions, migration_state: GroupMigrationState, destination: Destination
-    ) -> partial:
-        # we explicitly put the relevance check here to avoid "forgotten implementation" in child classes
-        if self.is_item_relevant(item, migration_state):
-            return self._get_apply_task(item, migration_state, destination)
-        else:
+    ) -> Callable[[], None] | None:
+        """This method returns a Callable, that applies permissions to a destination group, based on
+        the group migration state. The callable is required not to have any shared mutable state."""
 
-            def noop():
-                pass
-
-            return partial(noop)
+    @abstractmethod
+    def object_types(self) -> set[str]:
+        """This method returns a set of strings, that represent object types that are applicable by this instance."""

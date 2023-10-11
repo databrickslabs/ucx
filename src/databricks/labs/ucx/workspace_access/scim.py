@@ -8,19 +8,19 @@ from databricks.sdk.service import iam
 
 from databricks.labs.ucx.mixins.hardening import rate_limited
 from databricks.labs.ucx.workspace_access.base import (
-    Applier,
-    Crawler,
+    AclSupport,
     Destination,
     Permissions,
 )
 from databricks.labs.ucx.workspace_access.groups import GroupMigrationState
 
 
-class ScimSupport(Crawler, Applier):
+class ScimSupport(AclSupport):
     def __init__(self, ws: WorkspaceClient):
         self._ws = ws
 
-    def is_item_relevant(self, item: Permissions, migration_state: GroupMigrationState) -> bool:
+    @staticmethod
+    def _is_item_relevant(item: Permissions, migration_state: GroupMigrationState) -> bool:
         return any(g.workspace.id == item.object_id for g in migration_state.groups)
 
     def get_crawler_tasks(self):
@@ -37,17 +37,19 @@ class ScimSupport(Crawler, Applier):
     def _get_groups(self):
         return self._ws.groups.list(attributes="id,displayName,roles,entitlements")
 
-    def _get_apply_task(self, item: Permissions, migration_state: GroupMigrationState, destination: Destination):
+    def object_types(self) -> set[str]:
+        return {"roles", "entitlements"}
+
+    def get_apply_task(self, item: Permissions, migration_state: GroupMigrationState, destination: Destination):
+        if not self._is_item_relevant(item, migration_state):
+            return None
         value = [iam.ComplexValue.from_dict(e) for e in json.loads(item.raw)]
         target_info = [g for g in migration_state.groups if g.workspace.id == item.object_id]
-        if len(target_info) == 0:
-            msg = f"Could not find group with ID {item.object_id}"
-            raise ValueError(msg)
-        else:
-            target_group_id = getattr(target_info[0], destination).id
-            return partial(self._applier_task, group_id=target_group_id, value=value, property_name=item.object_type)
+        target_group_id = getattr(target_info[0], destination).id
+        return partial(self._applier_task, group_id=target_group_id, value=value, property_name=item.object_type)
 
-    def _crawler_task(self, group: iam.Group, property_name: str):
+    @staticmethod
+    def _crawler_task(group: iam.Group, property_name: str):
         return Permissions(
             object_id=group.id,
             object_type=property_name,

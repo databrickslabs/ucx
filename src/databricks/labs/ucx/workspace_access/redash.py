@@ -10,8 +10,7 @@ from databricks.sdk.service import iam, sql
 
 from databricks.labs.ucx.mixins.hardening import rate_limited
 from databricks.labs.ucx.workspace_access.base import (
-    Applier,
-    Crawler,
+    AclSupport,
     Destination,
     Permissions,
     logger,
@@ -28,12 +27,24 @@ class SqlPermissionsInfo:
 # This module is called redash to disambiguate from databricks.sdk.service.sql
 
 
-class SqlPermissionsSupport(Crawler, Applier):
-    def __init__(self, ws: WorkspaceClient, listings: list[Callable[..., list[SqlPermissionsInfo]]]):
+class Listing:
+    def __init__(self, func: Callable[..., list], request_type: sql.ObjectTypePlural):
+        self._func = func
+        self._request_type = request_type
+        self.object_type = request_type.value
+
+    def __iter__(self):
+        for item in self._func():
+            yield SqlPermissionsInfo(item.id, self._request_type)
+
+
+class RedashPermissionsSupport(AclSupport):
+    def __init__(self, ws: WorkspaceClient, listings: list[Listing]):
         self._ws = ws
         self._listings = listings
 
-    def is_item_relevant(self, item: Permissions, migration_state: GroupMigrationState) -> bool:
+    @staticmethod
+    def _is_item_relevant(item: Permissions, migration_state: GroupMigrationState) -> bool:
         mentioned_groups = [
             acl.group_name for acl in sql.GetResponse.from_dict(json.loads(item.raw)).access_control_list
         ]
@@ -41,10 +52,18 @@ class SqlPermissionsSupport(Crawler, Applier):
 
     def get_crawler_tasks(self):
         for listing in self._listings:
-            for item in listing():
+            for item in listing:
                 yield partial(self._crawler_task, item.object_id, item.request_type)
 
-    def _get_apply_task(self, item: Permissions, migration_state: GroupMigrationState, destination: Destination):
+    def object_types(self) -> set[str]:
+        all_object_types = set()
+        for listing in self._listings:
+            all_object_types.add(listing.object_type)
+        return all_object_types
+
+    def get_apply_task(self, item: Permissions, migration_state: GroupMigrationState, destination: Destination):
+        if not self._is_item_relevant(item, migration_state):
+            return None
         new_acl = self._prepare_new_acl(
             sql.GetResponse.from_dict(json.loads(item.raw)).access_control_list,
             migration_state,

@@ -73,8 +73,8 @@ def test_no_group_in_migration_state(migration_state):
         object_type="roles",
         raw=json.dumps([p.as_dict() for p in sample_permissions]),
     )
-    with pytest.raises(ValueError):
-        sup._get_apply_task(item, migration_state, "backup")
+    task = sup.get_apply_task(item, migration_state, "backup")
+    assert task is None
 
 
 def test_non_relevant(migration_state):
@@ -91,8 +91,8 @@ def test_non_relevant(migration_state):
         object_type="roles",
         raw=json.dumps([p.as_dict() for p in sample_permissions]),
     )
-    assert sup.is_item_relevant(relevant_item, migration_state)
-    assert not sup.is_item_relevant(irrelevant_item, migration_state)
+    assert sup._is_item_relevant(relevant_item, migration_state)
+    assert not sup._is_item_relevant(irrelevant_item, migration_state)
 
 
 def compare(s, t):

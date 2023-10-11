@@ -42,6 +42,7 @@ class GroupMigrationState:
         return False
 
     def get_by_workspace_group_name(self, workspace_group_name: str) -> MigrationGroupInfo | None:
+        # TODO: this method is deprecated, replace all usages by get_target_principal()
         found = [g for g in self.groups if g.workspace.display_name == workspace_group_name]
         if len(found) == 0:
             return None

@@ -6,9 +6,9 @@ from databricks.sdk.core import DatabricksError
 from databricks.sdk.service import sql
 
 from databricks.labs.ucx.workspace_access.redash import (
+    Listing,
     Permissions,
-    SqlPermissionsSupport,
-    redash_listing_wrapper,
+    RedashPermissionsSupport,
 )
 
 
@@ -39,12 +39,12 @@ def test_crawlers():
         for ot in [sql.ObjectType.ALERT, sql.ObjectType.QUERY, sql.ObjectType.DASHBOARD]
     ]
 
-    sup = SqlPermissionsSupport(
+    sup = RedashPermissionsSupport(
         ws=ws,
         listings=[
-            redash_listing_wrapper(ws.alerts.list, sql.ObjectTypePlural.ALERTS),
-            redash_listing_wrapper(ws.dashboards.list, sql.ObjectTypePlural.DASHBOARDS),
-            redash_listing_wrapper(ws.queries.list, sql.ObjectTypePlural.QUERIES),
+            Listing(ws.alerts.list, sql.ObjectTypePlural.ALERTS),
+            Listing(ws.dashboards.list, sql.ObjectTypePlural.DASHBOARDS),
+            Listing(ws.queries.list, sql.ObjectTypePlural.QUERIES),
         ],
     )
 
@@ -62,7 +62,7 @@ def test_crawlers():
 
 def test_apply(migration_state):
     ws = MagicMock()
-    sup = SqlPermissionsSupport(ws=ws, listings=[])
+    sup = RedashPermissionsSupport(ws=ws, listings=[])
     item = Permissions(
         object_id="test",
         object_type="alerts",
@@ -104,14 +104,14 @@ def test_apply(migration_state):
 def test_safe_getter_known():
     ws = MagicMock()
     ws.dbsql_permissions.get.side_effect = DatabricksError(error_code="RESOURCE_DOES_NOT_EXIST")
-    sup = SqlPermissionsSupport(ws=ws, listings=[])
+    sup = RedashPermissionsSupport(ws=ws, listings=[])
     assert sup._safe_get_dbsql_permissions(object_type=sql.ObjectTypePlural.ALERTS, object_id="test") is None
 
 
 def test_safe_getter_unknown():
     ws = MagicMock()
     ws.dbsql_permissions.get.side_effect = DatabricksError(error_code="SOMETHING_NON_EXPECTED")
-    sup = SqlPermissionsSupport(ws=ws, listings=[])
+    sup = RedashPermissionsSupport(ws=ws, listings=[])
     with pytest.raises(DatabricksError):
         sup._safe_get_dbsql_permissions(object_type=sql.ObjectTypePlural.ALERTS, object_id="test")
 
@@ -119,5 +119,5 @@ def test_safe_getter_unknown():
 def test_empty_permissions():
     ws = MagicMock()
     ws.dbsql_permissions.get.side_effect = DatabricksError(error_code="RESOURCE_DOES_NOT_EXIST")
-    sup = SqlPermissionsSupport(ws=ws, listings=[])
+    sup = RedashPermissionsSupport(ws=ws, listings=[])
     assert sup._crawler_task(object_id="test", object_type=sql.ObjectTypePlural.ALERTS) is None
