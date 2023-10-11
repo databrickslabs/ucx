@@ -52,3 +52,44 @@ def test_id_validity(ws: WorkspaceClient, make_ucx_group):
     manager = GroupManager(ws, GroupsConfig(selected=[ws_group.display_name]))
     assert ws_group.id == manager._get_group(ws_group.display_name, "workspace").id
     assert acc_group.id == manager._get_group(acc_group.display_name, "account").id
+
+
+def test_recover_from_ws_local_deletion(ws, make_ucx_group):
+    ws_group, _ = make_ucx_group()
+    ws_group_two, _ = make_ucx_group()
+
+    group_manager = GroupManager(ws, GroupsConfig(auto=True))
+    group_manager.prepare_groups_in_environment()
+
+    # simulate disaster
+    ws.groups.delete(ws_group.id)
+    ws.groups.delete(ws_group_two.id)
+
+    # recovery run from a debug notebook
+    group_manager = GroupManager(ws, GroupsConfig(auto=True))
+    group_manager.ws_local_group_deletion_recovery()
+
+    # normal run after from a job
+    group_manager = GroupManager(ws, GroupsConfig(auto=True))
+    group_manager.prepare_groups_in_environment()
+
+    migration_state = group_manager.migration_groups_provider
+
+    recovered_state = {}
+    for gi in migration_state.groups:
+        recovered_state[gi.workspace.display_name] = gi.workspace
+
+    assert sorted([member.display for member in ws_group.members]) == sorted(
+        [member.display for member in recovered_state[ws_group.display_name].members]
+    )
+    assert sorted([member.display for member in ws_group_two.members]) == sorted(
+        [member.display for member in recovered_state[ws_group_two.display_name].members]
+    )
+
+    assert sorted([member.value for member in ws_group.members]) == sorted(
+        [member.value for member in recovered_state[ws_group.display_name].members]
+    )
+
+    assert sorted([member.value for member in ws_group_two.members]) == sorted(
+        [member.value for member in recovered_state[ws_group_two.display_name].members]
+    )

@@ -29,7 +29,11 @@ from databricks.labs.ucx.runtime import main
 TAG_STEP = "step"
 TAG_APP = "App"
 NUM_USER_ATTEMPTS = 10  # number of attempts user gets at answering a question
-
+EXTRA_TASK_PARAMS = {
+    "job_id": "{{job_id}}",
+    "run_id": "{{run_id}}",
+    "parent_run_id": "{{parent_run_id}}",
+}
 DEBUG_NOTEBOOK = """
 # Databricks notebook source
 # MAGIC %md
@@ -69,26 +73,13 @@ dbutils.library.restartPython()
 
 # COMMAND ----------
 
-import logging
-import databricks.labs.ucx.runtime
+from databricks.labs.ucx.runtime import main
 
-from pathlib import Path
-from databricks.labs.ucx.__about__ import __version__
-from databricks.labs.ucx.config import WorkspaceConfig
-from databricks.labs.ucx.framework.tasks import _TASKS
-from databricks.labs.ucx.framework.logger import _install
-from databricks.sdk import WorkspaceClient
-
-task_name = dbutils.widgets.get('task')
-current_task = _TASKS[task_name]
-
-_install()
-print('UCX version: ' + __version__)
-logging.getLogger("databricks").setLevel('DEBUG')
-
-cfg = WorkspaceConfig.from_file(Path("/Workspace{config_file}"))
-
-current_task.fn(cfg)
+main(f'--config=/Workspace{config_file}',
+     f'--task=' + dbutils.widgets.get('task'),
+     f'--job_id=' + dbutils.widgets.get('job_id'),
+     f'--run_id=' + dbutils.widgets.get('run_id'),
+     f'--parent_run_id=' + dbutils.widgets.get('parent_run_id'))
 """
 
 logger = logging.getLogger(__name__)
@@ -162,7 +153,7 @@ class WorkspaceInstaller:
             remote_folder=f"{self._install_folder}/queries",
             name=self._name("UCX Assessment"),
             warehouse_id=self._warehouse_id,
-            query_text_callback=self._replace_inventory_variable,
+            query_text_callback=self._current_config.replace_inventory_variable,
         )
         self._dashboards["assessment"] = dash.create_dashboard()
 
@@ -325,6 +316,7 @@ class WorkspaceInstaller:
         self._deployed_steps = self._deployed_steps()
         desired_steps = {t.workflow for t in _TASKS.values()}
         wheel_runner = None
+
         if self._override_clusters:
             wheel_runner = self._upload_wheel_runner(remote_wheel)
         for step_name in desired_steps:
@@ -359,17 +351,6 @@ class WorkspaceInstaller:
                 step_list.append(task.workflow)
         return step_list
 
-    @staticmethod
-    def _remove_extra_indentation(doc: str) -> str:
-        lines = doc.splitlines()
-        stripped = []
-        for line in lines:
-            if line.startswith(" " * 4):
-                stripped.append(line[4:])
-            else:
-                stripped.append(line)
-        return "\n".join(stripped)
-
     def _create_readme(self):
         md = [
             "# UCX - The Unity Catalog Migration Assistant",
@@ -394,8 +375,7 @@ class WorkspaceInstaller:
             for t in self._sorted_tasks():
                 if t.workflow != step_name:
                     continue
-                doc = self._remove_extra_indentation(t.doc)
-                doc = self._replace_inventory_variable(doc)
+                doc = self._current_config.replace_inventory_variable(t.doc)
                 md.append(f"### `{t.name}`\n\n")
                 md.append(f"{doc}\n")
                 md.append("\n\n")
@@ -490,9 +470,10 @@ class WorkspaceInstaller:
                 on_success=[self._my_username], on_failure=[self._my_username]
             )
         tasks = sorted([t for t in _TASKS.values() if t.workflow == step_name], key=lambda _: _.name)
+        version = self._version if not self._ws.config.is_gcp else self._version.replace("+", "-")
         return {
             "name": self._name(step_name),
-            "tags": {TAG_APP: self._app, TAG_STEP: step_name, "version": f"v{self._version}"},
+            "tags": {TAG_APP: self._app, TAG_STEP: step_name, "version": f"v{version}"},
             "job_clusters": self._job_clusters({t.job_cluster for t in tasks}),
             "email_notifications": email_notifications,
             "tasks": [self._job_task(task, dbfs_path) for task in tasks],
@@ -517,9 +498,8 @@ class WorkspaceInstaller:
                 job_task.job_cluster_key = None
             if job_task.python_wheel_task is not None:
                 job_task.python_wheel_task = None
-                job_task.notebook_task = jobs.NotebookTask(
-                    notebook_path=wheel_runner, base_parameters={"task": job_task.task_key}
-                )
+                params = {"task": job_task.task_key} | EXTRA_TASK_PARAMS
+                job_task.notebook_task = jobs.NotebookTask(notebook_path=wheel_runner, base_parameters=params)
         return settings
 
     def _job_task(self, task: Task, dbfs_path: str) -> jobs.Task:
@@ -554,7 +534,12 @@ class WorkspaceInstaller:
             notebook_task=jobs.NotebookTask(
                 notebook_path=remote_notebook,
                 # ES-872211: currently, we cannot read WSFS files from Scala context
-                base_parameters={"inventory_database": self._current_config.inventory_database},
+                base_parameters={
+                    "inventory_database": self._current_config.inventory_database,
+                    "task": task.name,
+                    "config": f"/Workspace{self._config_file}",
+                }
+                | EXTRA_TASK_PARAMS,
             ),
         )
 
@@ -565,7 +550,7 @@ class WorkspaceInstaller:
             python_wheel_task=jobs.PythonWheelTask(
                 package_name="databricks_labs_ucx",
                 entry_point="runtime",  # [project.entry-points.databricks] in pyproject.toml
-                named_parameters={"task": task.name, "config": f"/Workspace{self._config_file}"},
+                named_parameters={"task": task.name, "config": f"/Workspace{self._config_file}"} | EXTRA_TASK_PARAMS,
             ),
         )
 

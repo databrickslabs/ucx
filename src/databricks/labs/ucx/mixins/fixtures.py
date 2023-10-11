@@ -470,7 +470,7 @@ def make_cluster(ws, make_random):
             spark_version = ws.clusters.select_spark_version(latest=True)
         if single_node:
             kwargs["num_workers"] = 0
-            if kwargs["spark_conf"]:
+            if "spark_conf" in kwargs:
                 kwargs["spark_conf"] = {
                     **kwargs["spark_conf"],
                     **{"spark.databricks.cluster.profile": "singleNode", "spark.master": "local[*]"},
@@ -533,7 +533,7 @@ def make_job(ws, make_random, make_notebook):
         task_spark_conf = None
         if "name" not in kwargs:
             kwargs["name"] = f"sdk-{make_random(4)}"
-        if kwargs["spark_conf"]:
+        if "spark_conf" in kwargs:
             task_spark_conf = kwargs["spark_conf"]
             kwargs.pop("spark_conf")
         if "tasks" not in kwargs:

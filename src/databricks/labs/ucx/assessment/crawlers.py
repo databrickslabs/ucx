@@ -31,6 +31,7 @@ _STORAGE_ACCOUNT_EXTRACT_PATTERN = r"(?:id|endpoint)(.*?)dfs"
 _AZURE_SP_CONF_FAILURE_MSG = "Uses azure service principal credentials config in"
 _SECRET_LIST_LENGTH = 3
 _CLIENT_ENDPOINT_LENGTH = 6
+_INIT_SCRIPT_DBFS_PATH = 2
 
 
 @dataclass
@@ -86,13 +87,14 @@ class GlobalInitScriptInfo:
 
 def _get_init_script_data(w, init_script_info):
     if init_script_info.dbfs:
-        file_api_format_destination = init_script_info.dbfs.destination.split(":")[1]
-        if file_api_format_destination:
-            try:
-                data = w.dbfs.read(file_api_format_destination).data
-                return base64.b64decode(data).decode("utf-8")
-            except Exception:
-                return None
+        if len(init_script_info.dbfs.destination.split(":")) == _INIT_SCRIPT_DBFS_PATH:
+            file_api_format_destination = init_script_info.dbfs.destination.split(":")[1]
+            if file_api_format_destination:
+                try:
+                    data = w.dbfs.read(file_api_format_destination).data
+                    return base64.b64decode(data).decode("utf-8")
+                except Exception:
+                    return None
     if init_script_info.workspace:
         workspace_file_destination = init_script_info.workspace.destination
         if workspace_file_destination:
@@ -185,8 +187,11 @@ class AzureServicePrincipalCrawler(CrawlerBase):
         split = secret_matched.group(1).split("/")
         if len(split) == _SECRET_LIST_LENGTH:
             secret_scope, secret_key = split[1], split[2]
-            spn_application_id = self._ws.secrets.get_secret(secret_scope, secret_key)
-            return spn_application_id
+            try:
+                # Return the decoded secret value in string format
+                return base64.b64decode(self._ws.secrets.get_secret(secret_scope, secret_key).value).decode("utf-8")
+            except DatabricksError as err:
+                logger.warning(f"Error retrieving secret for {secret_matched.group(1)}. Error: {err}")
 
     def _get_azure_spn_tenant_id(self, config: dict, tenant_key: str) -> str:
         matching_key = [key for key in config.keys() if re.search(tenant_key, key)]

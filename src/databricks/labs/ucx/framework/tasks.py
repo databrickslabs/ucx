@@ -23,15 +23,28 @@ class Task:
     dashboard: str = None
 
 
+@staticmethod
+def _remove_extra_indentation(doc: str) -> str:
+    lines = doc.splitlines()
+    stripped = []
+    for line in lines:
+        if line.startswith(" " * 4):
+            stripped.append(line[4:])
+        else:
+            stripped.append(line)
+    return "\n".join(stripped)
+
+
 def task(workflow, *, depends_on=None, job_cluster="main", notebook: str | None = None, dashboard: str | None = None):
     def decorator(func):
         @wraps(func)
         def wrapper(*args, **kwargs):
             # Perform any task-specific logic here
             # For example, you can log when the task is started and completed
-            print(f"Task '{workflow}' is starting...")
+            logger = logging.getLogger(func.__name__)
+            logger.info(f"Task '{workflow}' is starting...")
             result = func(*args, **kwargs)
-            print(f"Task '{workflow}' is completed!")
+            logger.info(f"Task '{workflow}' is completed!")
             return result
 
         deps = []
@@ -58,7 +71,7 @@ def task(workflow, *, depends_on=None, job_cluster="main", notebook: str | None 
             task_id=len(_TASKS),
             workflow=workflow,
             name=func.__name__,
-            doc=func.__doc__,
+            doc=_remove_extra_indentation(func.__doc__),
             fn=func,
             depends_on=deps,
             job_cluster=job_cluster,

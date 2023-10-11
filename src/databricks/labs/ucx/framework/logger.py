@@ -54,10 +54,11 @@ class NiceFormatter(logging.Formatter):
         return f"{self.GRAY}{ts}{self.RESET} {level} {color_marker}[{name}] {msg}{self.RESET}"
 
 
-def _install():
+def _install(level="DEBUG"):
     for h in logging.root.handlers:
         logging.root.removeHandler(h)
     console_handler = logging.StreamHandler(sys.stderr)
     console_handler.setFormatter(NiceFormatter())
-    console_handler.setLevel("DEBUG")
+    console_handler.setLevel(level)
     logging.root.addHandler(console_handler)
+    return console_handler

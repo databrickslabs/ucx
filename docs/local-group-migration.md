@@ -239,3 +239,13 @@ ac_group_names = {_.display_name for _ in account_groups}
 group_names = list(ws_group_names.intersection(ac_group_names))
 print(f"Found {len(group_names)} groups to migrate")
 ```
+
+2. Recover workspace-local groups from backup groups from within a debug notebook:
+
+```python
+from databricks.labs.ucx.workspace_access.groups import  GroupManager
+from databricks.labs.ucx.config import GroupsConfig
+
+group_manager = GroupManager(ws, GroupsConfig(auto=True))
+group_manager.ws_local_group_deletion_recovery()
+```
