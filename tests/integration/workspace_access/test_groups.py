@@ -54,18 +54,22 @@ def test_id_validity(ws: WorkspaceClient, make_ucx_group):
     assert acc_group.id == manager._get_group(acc_group.display_name, "account").id
 
 
-def test_recover_from_ws_local_deletion(ws, make_ucx_recovery_group):
-    ws_group, backup_group = make_ucx_recovery_group()
-    ws_group_two, backup_group_two = make_ucx_recovery_group()
+def test_recover_from_ws_local_deletion(ws, make_ucx_group):
+    ws_group, _ = make_ucx_group()
+    ws_group_two, _ = make_ucx_group()
 
     group_manager = GroupManager(ws, GroupsConfig(auto=True))
     group_manager.prepare_groups_in_environment()
 
+    # simulate disaster
     ws.groups.delete(ws_group.id)
     ws.groups.delete(ws_group_two.id)
 
+    # recovery run from a debug notebook
+    group_manager = GroupManager(ws, GroupsConfig(auto=True))
     group_manager.ws_local_group_deletion_recovery()
 
+    # normal run after from a job
     group_manager = GroupManager(ws, GroupsConfig(auto=True))
     group_manager.prepare_groups_in_environment()
 

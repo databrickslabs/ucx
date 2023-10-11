@@ -274,7 +274,6 @@ class GroupManager:
         logger.info("Backup groups were successfully deleted")
 
     def ws_local_group_deletion_recovery(self):
-        self._workspace_groups = self._list_workspace_groups()
         workspace_groups = {_.display_name for _ in self._workspace_groups}
         source_groups = [
             g
@@ -297,9 +296,6 @@ class GroupManager:
             )
             self._workspace_groups.append(ws_local_group)
             self._migration_state.add(ws_local_group)
-            logger.info(f"Workspace-local group {ws_local_group} successfully created")
-
-            self._ws.groups.delete(source_group.id)
-            logger.info(f"Temporary workspace-local group {ws_local_group} successfully deleted")
+            logger.info(f"Workspace-local group {ws_local_group} successfully recovered")
 
         logger.info("Workspace-local group deletion recovery completed")
