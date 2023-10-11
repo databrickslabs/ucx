@@ -764,7 +764,7 @@ def make_query(ws, make_random):
             name = f"ucx_S{make_random(4)}"
         srcs = ws.data_sources.list()
         query = ws.queries.create(
-            name=name, data_source_id=srcs[0].id, description="test query from Go SDK", query="SHOW TABLES"
+            name=name, data_source_id=srcs[0].id, query="SHOW TABLES"
         )
         return query
 
