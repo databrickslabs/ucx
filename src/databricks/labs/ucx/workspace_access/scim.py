@@ -12,9 +12,11 @@ from databricks.labs.ucx.workspace_access.base import (
     AclSupport,
     Destination,
     Permissions,
-    logger,
 )
 from databricks.labs.ucx.workspace_access.groups import GroupMigrationState
+from logging import Logger
+
+logger = Logger(__name__)
 
 
 class ScimSupport(AclSupport):
