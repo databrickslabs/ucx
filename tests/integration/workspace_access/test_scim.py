@@ -29,18 +29,13 @@ def test_applier_task_should_apply_proper_roles(ws, make_ucx_group):
 
 def test_scim_support_should_replicate_entitlement_to_backup_group(ws, make_ucx_group, make_group):
     # Ws group have allow-cluster-create by default, we want to replicate that
+    # TODO: Refactor group creation and migration state in a fixture
     ws_group, acc_group = make_ucx_group()
     backup_group_name = ws_group.display_name + "-backup"
     backup_group = make_group(display_name=backup_group_name)
 
     migration_state = GroupMigrationState()
-    migration_state.add(
-        group=MigrationGroupInfo(
-            workspace=iam.Group(display_name=ws_group.display_name, id=ws_group.id),
-            account=iam.Group(display_name=acc_group.display_name, id=acc_group.id),
-            backup=iam.Group(display_name=backup_group_name, id=backup_group.id),
-        )
-    )
+    migration_state.add(group=MigrationGroupInfo(workspace=ws_group, account=acc_group, backup=backup_group))
 
     sup = ScimSupport(ws=ws)
 
