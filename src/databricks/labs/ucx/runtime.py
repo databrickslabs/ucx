@@ -18,6 +18,7 @@ from databricks.labs.ucx.hive_metastore import GrantsCrawler, TablesCrawler
 from databricks.labs.ucx.hive_metastore.data_objects import ExternalLocationCrawler
 from databricks.labs.ucx.hive_metastore.mounts import Mounts
 from databricks.labs.ucx.workspace_access.groups import GroupManager
+from databricks.labs.ucx.workspace_access.listing import WorkspaceListing
 from databricks.labs.ucx.workspace_access.manager import PermissionManager
 
 logger = logging.getLogger(__name__)
@@ -201,6 +202,18 @@ def crawl_permissions(cfg: WorkspaceConfig):
 def assessment_report(_: WorkspaceConfig):
     """Refreshes the assessment dashboard after all previous tasks have been completed. Note that you can access the
     dashboard _before_ all tasks have been completed, but then only already completed information is shown."""
+
+
+@task("assessment", depends_on=[setup_schema])
+def workspace_listing(cfg: WorkspaceConfig, start_path: str = "/"):
+    """Scans the workspace for workspace objects. It recursively list all sub directories
+    and compiles a list of directories, notebooks, files, repos and libraries in the workspace.
+
+    Its uses multi-threading to parallelize the listing process to speed up on big workspaces.
+    It accepts starting path as the parameter defaulted to the root path '/'."""
+    ws = WorkspaceClient(config=cfg.to_databricks_config())
+    ws_listing = WorkspaceListing(ws, num_threads=cfg.num_threads)
+    ws_listing.walk(start_path)
 
 
 @task("migrate-groups", depends_on=[crawl_permissions], job_cluster="tacl")
