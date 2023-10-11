@@ -360,6 +360,7 @@ def test_create_readme(mocker):
 
 def test_replace_pydoc(mocker):
     from databricks.labs.ucx.framework.tasks import _remove_extra_indentation
+
     doc = _remove_extra_indentation(
         """Test1
         Test2
