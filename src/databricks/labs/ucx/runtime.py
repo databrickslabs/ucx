@@ -35,7 +35,7 @@ def setup_schema(cfg: WorkspaceConfig):
 def crawl_tables(_: WorkspaceConfig):
     """Iterates over all tables in the Hive Metastore of the current workspace and persists their metadata, such
     as _database name_, _table name_, _table type_, _table location_, etc., in the Delta table named
-    `${inventory_database}.tables`. The `inventory_database` placeholder is set in the configuration file. The metadata
+    `$inventory_database.tables`. Note that the `inventory_database` is set in the configuration file. The metadata
     stored is then used in the subsequent tasks and workflows to, for example,  find all Hive Metastore tables that
     cannot easily be migrated to Unity Catalog."""
 
@@ -47,10 +47,10 @@ def setup_tacl(_: WorkspaceConfig):
 
 @task("assessment", depends_on=[crawl_tables, setup_tacl], job_cluster="tacl")
 def crawl_grants(cfg: WorkspaceConfig):
-    """Scans the previously created Delta table named `${inventory_database}.tables` and issues a `SHOW GRANTS`
+    """Scans the previously created Delta table named `$inventory_database.tables` and issues a `SHOW GRANTS`
     statement for every object to retrieve the permissions it has assigned to it. The permissions include information
     such as the _principal_, _action type_, and the _table_ it applies to. This is persisted in the Delta table
-    `${inventory_database}.grants`. Other, migration related jobs use this inventory table to convert the legacy Table
+    `$inventory_database.grants`. Other, migration related jobs use this inventory table to convert the legacy Table
     ACLs to Unity Catalog  permissions.
 
     Note: This job runs on a separate cluster (named `tacl`) as it requires the proper configuration to have the Table
@@ -126,8 +126,10 @@ def assess_pipelines(cfg: WorkspaceConfig):
     """This module scans through all the Pipelines and identifies those pipelines which has Azure Service Principals
     embedded (who has been given access to the Azure storage accounts via spark configurations) in the pipeline
     configurations.
+
     It looks for:
       - all the pipelines which has Azure Service Principal embedded in the pipeline configuration
+
     Subsequently, a list of all the pipelines with matching configurations are stored in the
     `$inventory.pipelines` table."""
     ws = WorkspaceClient(config=cfg.to_databricks_config())
@@ -140,8 +142,10 @@ def assess_azure_service_principals(cfg: WorkspaceConfig):
     """This module scans through all the clusters configurations, cluster policies, job cluster configurations,
     Pipeline configurations, Warehouse configuration and identifies all the Azure Service Principals who has been
     given access to the Azure storage accounts via spark configurations referred in those entities.
+
     It looks in:
       - all those entities and prepares a list of Azure Service Principal embedded in their configurations
+
     Subsequently, the list of all the Azure Service Principals referred in those configurations are saved
     in the `$inventory.azure_service_principals` table."""
     ws = WorkspaceClient(config=cfg.to_databricks_config())
@@ -153,6 +157,7 @@ def assess_azure_service_principals(cfg: WorkspaceConfig):
 def assess_global_init_scripts(cfg: WorkspaceConfig):
     """This module scans through all the global init scripts and identifies if there is an Azure Service Principal
     who has been given access to the Azure storage accounts via spark configurations referred in those scripts.
+
     It looks in:
       - the list of all the global init scripts are saved in the `$inventory.azure_service_principals` table."""
     ws = WorkspaceClient(config=cfg.to_databricks_config())
