@@ -249,12 +249,14 @@ def destroy_schema(cfg: WorkspaceConfig):
     RuntimeBackend().execute(f"DROP DATABASE {cfg.inventory_database} CASCADE")
 
 
-def main():
-    trigger(*sys.argv)
+def main(*argv):
+    if len(argv) == 0:
+        argv = sys.argv
+    trigger(*argv)
 
 
 if __name__ == "__main__":
     if "DATABRICKS_RUNTIME_VERSION" not in os.environ:
         msg = "Only intended to run in Databricks Runtime"
         raise SystemExit(msg)
-    main()
+    main(*sys.argv)

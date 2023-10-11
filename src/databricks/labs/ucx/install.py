@@ -29,7 +29,11 @@ from databricks.labs.ucx.runtime import main
 TAG_STEP = "step"
 TAG_APP = "App"
 NUM_USER_ATTEMPTS = 10  # number of attempts user gets at answering a question
-
+EXTRA_TASK_PARAMS = {
+    "job_id": "{{job_id}}",
+    "run_id": "{{run_id}}",
+    "parent_run_id": "{{parent_run_id}}",
+}
 DEBUG_NOTEBOOK = """
 # Databricks notebook source
 # MAGIC %md
@@ -69,26 +73,13 @@ dbutils.library.restartPython()
 
 # COMMAND ----------
 
-import logging
-import databricks.labs.ucx.runtime
+from databricks.labs.ucx.runtime import main
 
-from pathlib import Path
-from databricks.labs.ucx.__about__ import __version__
-from databricks.labs.ucx.config import WorkspaceConfig
-from databricks.labs.ucx.framework.tasks import _TASKS
-from databricks.labs.ucx.framework.logger import _install
-from databricks.sdk import WorkspaceClient
-
-task_name = dbutils.widgets.get('task')
-current_task = _TASKS[task_name]
-
-_install()
-print('UCX version: ' + __version__)
-logging.getLogger("databricks").setLevel('DEBUG')
-
-cfg = WorkspaceConfig.from_file(Path("/Workspace{config_file}"))
-
-current_task.fn(cfg)
+main(f'--config=/Workspace{config_file}',
+     f'--task=' + dbutils.widgets.get('task'),
+     f'--job_id=' + dbutils.widgets.get('job_id'),
+     f'--run_id=' + dbutils.widgets.get('run_id'),
+     f'--parent_run_id=' + dbutils.widgets.get('parent_run_id'))
 """
 
 logger = logging.getLogger(__name__)
@@ -325,6 +316,7 @@ class WorkspaceInstaller:
         self._deployed_steps = self._deployed_steps()
         desired_steps = {t.workflow for t in _TASKS.values()}
         wheel_runner = None
+
         if self._override_clusters:
             wheel_runner = self._upload_wheel_runner(remote_wheel)
         for step_name in desired_steps:
@@ -518,9 +510,8 @@ class WorkspaceInstaller:
                 job_task.job_cluster_key = None
             if job_task.python_wheel_task is not None:
                 job_task.python_wheel_task = None
-                job_task.notebook_task = jobs.NotebookTask(
-                    notebook_path=wheel_runner, base_parameters={"task": job_task.task_key}
-                )
+                params = {"task": job_task.task_key} | EXTRA_TASK_PARAMS
+                job_task.notebook_task = jobs.NotebookTask(notebook_path=wheel_runner, base_parameters=params)
         return settings
 
     def _job_task(self, task: Task, dbfs_path: str) -> jobs.Task:
@@ -555,7 +546,12 @@ class WorkspaceInstaller:
             notebook_task=jobs.NotebookTask(
                 notebook_path=remote_notebook,
                 # ES-872211: currently, we cannot read WSFS files from Scala context
-                base_parameters={"inventory_database": self._current_config.inventory_database},
+                base_parameters={
+                    "inventory_database": self._current_config.inventory_database,
+                    "task": task.name,
+                    "config": f"/Workspace{self._config_file}",
+                }
+                | EXTRA_TASK_PARAMS,
             ),
         )
 
@@ -566,7 +562,7 @@ class WorkspaceInstaller:
             python_wheel_task=jobs.PythonWheelTask(
                 package_name="databricks_labs_ucx",
                 entry_point="runtime",  # [project.entry-points.databricks] in pyproject.toml
-                named_parameters={"task": task.name, "config": f"/Workspace{self._config_file}"},
+                named_parameters={"task": task.name, "config": f"/Workspace{self._config_file}"} | EXTRA_TASK_PARAMS,
             ),
         )
 
