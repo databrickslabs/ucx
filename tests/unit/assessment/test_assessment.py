@@ -37,6 +37,7 @@ from databricks.labs.ucx.mixins.sql import Row
 from tests.unit.framework.mocks import MockBackend
 
 _SECRET_PATTERN = r"{{(secrets.*?)}}"
+_SECRET_VALUE = b"SGVsbG8sIFdvcmxkIQ=="
 
 
 def test_external_locations():
@@ -812,6 +813,7 @@ def test_azure_service_principal_info_crawl(mocker):
         ),
     ]
     ws.pipelines.get().spec.configuration = config_dict
+    ws.secrets.get_secret.return_value = GetSecretResponse(key="username", value=_SECRET_VALUE)
     ws.cluster_policies.get().policy_family_definition_overrides = None
     ws.jobs.list.return_value = sample_jobs
     spn_crawler = AzureServicePrincipalCrawler(ws, MockBackend(), "ucx")._crawl()
@@ -1440,6 +1442,7 @@ def test_list_all_cluster_with_spn_in_spark_conf_with_secret(mocker):
 
     ws = mocker.Mock()
     ws.clusters.list.return_value = sample_clusters
+    ws.secrets.get_secret.return_value = GetSecretResponse(key="username", value=_SECRET_VALUE)
     ws.cluster_policies.get().policy_family_definition_overrides = None
     crawler = AzureServicePrincipalCrawler(ws, MockBackend(), "ucx")._list_all_cluster_with_spn_in_spark_conf()
     result_set = list(crawler)
@@ -1536,6 +1539,7 @@ def test_list_all_wh_config_with_spn_and_secret(mocker):
         ),
     ]
     mocker.Mock().secrets.get_secret()
+    ws.secrets.get_secret.return_value = GetSecretResponse(key="username", value=_SECRET_VALUE)
     result_set = AzureServicePrincipalCrawler(ws, MockBackend(), "ucx")._list_all_spn_in_sql_warehouses_spark_conf()
 
     assert len(result_set) == 2
@@ -1567,6 +1571,7 @@ def test_list_all_clusters_spn_in_spark_conf_with_tenant(mocker):
     ws = mocker.Mock()
     ws.clusters.list.return_value = sample_clusters
     ws.cluster_policies.get().policy_family_definition_overrides = None
+    ws.secrets.get_secret.return_value = GetSecretResponse(key="username", value=_SECRET_VALUE)
     result_set = AzureServicePrincipalCrawler(ws, MockBackend(), "ucx")._list_all_cluster_with_spn_in_spark_conf()
 
     assert len(result_set) == 1
@@ -1701,6 +1706,7 @@ def test_azure_service_principal_info_policy_conf(mocker):
             value="https://login.microsoftonline.com/dummy_tenant_id2/oauth2/token",
         ),
     ]
+    ws.secrets.get_secret.return_value = GetSecretResponse(key="username", value=_SECRET_VALUE)
     spn_crawler = AzureServicePrincipalCrawler(ws, MockBackend(), "ucx")._crawl()
 
     assert len(spn_crawler) == 4
@@ -1777,6 +1783,7 @@ def test_azure_service_principal_info_dedupe(mocker):
     config_dict = {}
     ws.pipelines.get().spec.configuration = config_dict
     ws.jobs.list.return_value = sample_jobs
+    ws.secrets.get_secret.return_value = GetSecretResponse(key="username", value=_SECRET_VALUE)
     ws.cluster_policies.get().definition = json.dumps(
         {
             "spark_conf.fs.azure.account.auth.type": {"type": "fixed", "value": "OAuth", "hidden": "true"},
@@ -1926,6 +1933,7 @@ def test_list_all_pipeline_with_conf_spn_secret(mocker):
         "spark.hadoop.fs.azure.sas.fixed.token.abcde.dfs.core.windows.net": "{{secrets/abcde_access/sasFixedToken}}",
     }
     ws.pipelines.get().spec.configuration = config_dict
+    ws.secrets.get_secret.return_value = GetSecretResponse(key="username", value=_SECRET_VALUE)
     result_set = AzureServicePrincipalCrawler(ws, MockBackend(), "ucx")._list_all_pipeline_with_spn_in_spark_conf()
 
     assert len(result_set) == 1
@@ -2499,10 +2507,10 @@ def test_list_all_pipeline_with_conf_spn_secret_avlb(mocker):
         "spark.hadoop.fs.azure.sas.fixed.token.abcde.dfs.core.windows.net": "{{secrets/abcde_access/sasFixedToken}}",
     }
     ws.pipelines.get().spec.configuration = config_dict
-    ws.secrets.get_secret.return_value = GetSecretResponse(key="username", value="dmlkeWEuYXNob2s=")
+    ws.secrets.get_secret.return_value = GetSecretResponse(key="username", value=_SECRET_VALUE)
     result_set = AzureServicePrincipalCrawler(ws, MockBackend(), "ucx")._list_all_pipeline_with_spn_in_spark_conf()
 
     assert len(result_set) > 0
-    assert result_set[0].get("application_id") == "dmlkeWEuYXNob2s="
+    assert result_set[0].get("application_id") == "Hello, World!"
     assert result_set[0].get("tenant_id") == "directory_12345"
     assert result_set[0].get("storage_account") == "newstorageacct"
