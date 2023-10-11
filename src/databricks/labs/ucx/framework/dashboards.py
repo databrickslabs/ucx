@@ -367,12 +367,17 @@ class DashboardFromFiles:
                 "dateTimeFormat": date_time_format,
                 "showDataLabels": show_data_labels,
                 "columnConfigurationMap": {
-                    "x": {"column": column_x},
-                    "y": [{"column": column_y, "transform": "COUNT"}],
+                    "x": {"column": column_x, "id": "col_x"},
+                    "y": [{"column": column_y, "id": "col_y", "transform": "COUNT"}],
                 },
                 "isAggregationOn": is_aggregation_on,
             },
-            # "query_plan": {"selects": [{"column": "database"}, {"column": "delta_tables"}]},
+            "query_plan": {
+                "selects": [
+                    {"column": column_x},
+                    {"column": column_y}
+                ]
+            },
         }
 
     @staticmethod
