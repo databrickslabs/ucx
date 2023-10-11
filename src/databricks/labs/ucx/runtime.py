@@ -203,12 +203,55 @@ def assessment_report(_: WorkspaceConfig):
     dashboard _before_ all tasks have been completed, but then only already completed information is shown."""
 
 
-@task("migrate-groups", depends_on=[crawl_permissions], job_cluster="tacl")
-def migrate_permissions(cfg: WorkspaceConfig):
-    """Main phase of the group migration process. It does the following:
+@task("002-apply-permissions-to-backup-groups", depends_on=[crawl_permissions], job_cluster="tacl")
+def apply_permissions_to_backup_groups(cfg: WorkspaceConfig):
+    """Second phase of the workspace-local group migration process. It does the following:
       - Creates a backup of every workspace-local group, adding a prefix that can be set in the configuration
       - Assigns the full set of permissions of the original group to the backup one
-      - Creates an account-level group with the original name of the workspace-local one
+
+    It covers local workspace-local permissions for all entities: Legacy Table ACLs, Entitlements,
+    AWS instance profiles, Clusters, Cluster policies, Instance Pools, Databricks SQL warehouses, Delta Live
+    Tables, Jobs, MLflow experiments, MLflow registry, SQL Dashboards & Queries, SQL Alerts, Token and Password usage
+    permissions, Secret Scopes, Notebooks, Directories, Repos, Files.
+
+    See [interactive tutorial here](https://app.getreprise.com/launch/myM3VNn/)."""
+    ws = WorkspaceClient(config=cfg.to_databricks_config())
+    group_manager = GroupManager(ws, cfg.groups)
+    group_manager.prepare_groups_in_environment()
+    if not group_manager.has_groups():
+        logger.info("Skipping group migration as no groups were found.")
+        return
+
+    permission_manager = PermissionManager.factory(
+        ws,
+        RuntimeBackend(),
+        cfg.inventory_database,
+        num_threads=cfg.num_threads,
+        workspace_start_path=cfg.workspace_start_path,
+    )
+    permission_manager.apply_group_permissions(group_manager.migration_state, destination="backup")
+
+
+@task("003-replace-workspace-local-with-account-groups", depends_on=[apply_permissions_to_backup_groups])
+def replace_workspace_groups_with_account_groups(cfg: WorkspaceConfig):
+    """Third phase of the workspace-local group migration process. It does the following:
+    - Creates an account-level group with the original name of the workspace-local one"""
+    ws = WorkspaceClient(config=cfg.to_databricks_config())
+    group_manager = GroupManager(ws, cfg.groups)
+    group_manager.prepare_groups_in_environment()
+    if not group_manager.has_groups():
+        logger.info("Skipping group migration as no groups were found.")
+        return
+    group_manager.replace_workspace_groups_with_account_groups()
+
+
+@task(
+    "004-apply-permissions-to-account-groups",
+    depends_on=[replace_workspace_groups_with_account_groups],
+    job_cluster="tacl",
+)
+def replace_workspace_groups_with_account_groups(cfg: WorkspaceConfig):
+    """Fourth phase of the workspace-local group migration process. It does the following:
       - Assigns the full set of permissions of the original group to the account-level one
 
     It covers local workspace-local permissions for all entities: Legacy Table ACLs, Entitlements,
@@ -231,13 +274,10 @@ def migrate_permissions(cfg: WorkspaceConfig):
         num_threads=cfg.num_threads,
         workspace_start_path=cfg.workspace_start_path,
     )
-
-    permission_manager.apply_group_permissions(group_manager.migration_state, destination="backup")
-    group_manager.replace_workspace_groups_with_account_groups()
     permission_manager.apply_group_permissions(group_manager.migration_state, destination="account")
 
 
-@task("migrate-groups-cleanup", depends_on=[migrate_permissions])
+@task("005-remove-workspace-local-backup-groups", depends_on=[replace_workspace_groups_with_account_groups])
 def delete_backup_groups(cfg: WorkspaceConfig):
     """Last step of the group migration process. Removes all workspace-level backup groups, along with their
     permissions. Execute this workflow only after you've confirmed that workspace-local migration worked
