@@ -73,26 +73,13 @@ dbutils.library.restartPython()
 
 # COMMAND ----------
 
-import logging
-import databricks.labs.ucx.runtime
+from databricks.labs.ucx.runtime import main
 
-from pathlib import Path
-from databricks.labs.ucx.__about__ import __version__
-from databricks.labs.ucx.config import WorkspaceConfig
-from databricks.labs.ucx.framework.tasks import _TASKS
-from databricks.labs.ucx.framework.logger import _install
-from databricks.sdk import WorkspaceClient
-
-task_name = dbutils.widgets.get('task')
-current_task = _TASKS[task_name]
-
-_install()
-print('UCX version: ' + __version__)
-logging.getLogger("databricks").setLevel('DEBUG')
-
-cfg = WorkspaceConfig.from_file(Path("/Workspace{config_file}"))
-
-current_task.fn(cfg)
+main(f'--config=/Workspace{config_file}',
+     f'--task=' + dbutils.widgets.get('task'),
+     f'--job_id=' + dbutils.widgets.get('job_id'),
+     f'--run_id=' + dbutils.widgets.get('run_id'),
+     f'--parent_run_id=' + dbutils.widgets.get('parent_run_id'))
 """
 
 logger = logging.getLogger(__name__)
@@ -523,9 +510,8 @@ class WorkspaceInstaller:
                 job_task.job_cluster_key = None
             if job_task.python_wheel_task is not None:
                 job_task.python_wheel_task = None
-                job_task.notebook_task = jobs.NotebookTask(
-                    notebook_path=wheel_runner, base_parameters={"task": job_task.task_key}
-                )
+                params = {"task": job_task.task_key} | EXTRA_TASK_PARAMS
+                job_task.notebook_task = jobs.NotebookTask(notebook_path=wheel_runner, base_parameters=params)
         return settings
 
     def _job_task(self, task: Task, dbfs_path: str) -> jobs.Task:
