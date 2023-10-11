@@ -16,6 +16,8 @@ def _predictable_messages(caplog):
 
 
 def test_gather_with_failed_task(caplog):
+    caplog.set_level(logging.INFO)
+
     def works():
         return True
 
@@ -29,7 +31,7 @@ def test_gather_with_failed_task(caplog):
     assert [True, True, True, True] == results
     assert 4 == len(errors)
     assert [
-        "More than half 'testing' tasks failed: 50% (4/8)",
+        "More than half 'testing' tasks failed: 50% results available (4/8)",
         "testing task failed: failed",
         "testing task failed: failed",
         "testing task failed: failed",
@@ -56,7 +58,7 @@ def test_gather_with_failed_task_no_message(caplog):
     assert [True, True, True, True] == results
     assert 1 == len(errors)
     assert [
-        "Some 'testing' tasks failed: 17% (1/6)",
+        "Some 'testing' tasks failed: 67% results available (4/6)",
         "did something, but returned None",
         "testing task failed: [Errno 1] failed",
     ] == _predictable_messages(caplog)
@@ -74,7 +76,7 @@ def test_all_none(caplog):
     assert [] == results
     assert [] == errors
     assert [
-        "Finished 'testing' tasks: non-empty 0% (0/4)",
+        "Finished 'testing' tasks: 0% results available (0/4)",
         "did something, but returned None",
         "did something, but returned None",
         "did something, but returned None",
@@ -83,6 +85,8 @@ def test_all_none(caplog):
 
 
 def test_all_failed(caplog):
+    caplog.set_level(logging.INFO)
+
     def fails():
         msg = "failed"
         raise DatabricksError(msg)
@@ -99,3 +103,17 @@ def test_all_failed(caplog):
         "testing task failed: failed",
         "testing task failed: failed",
     ] == _predictable_messages(caplog)
+
+
+def test_all_works(caplog):
+    caplog.set_level(logging.INFO)
+
+    def works():
+        return True
+
+    tasks = [works, works, works, works]
+    results, errors = Threads.gather("testing", tasks)
+
+    assert [True, True, True, True] == results
+    assert 0 == len(errors)
+    assert ["Finished 'testing' tasks: 100% results available (4/4)"] == _predictable_messages(caplog)

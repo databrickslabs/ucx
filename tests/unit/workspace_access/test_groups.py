@@ -228,7 +228,7 @@ def test_prepare_groups_in_environment_should_not_throw_when_account_group_doesn
     manager = GroupManager(client, group_conf)
 
     manager.prepare_groups_in_environment()
-    assert len(manager.migration_groups_provider.groups) == 0
+    assert len(manager.migration_state.groups) == 0
 
 
 def test_prepare_groups_in_environment_should_throw_when_workspace_group_doesnt_exist():
