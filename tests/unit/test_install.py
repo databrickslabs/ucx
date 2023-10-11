@@ -359,16 +359,8 @@ def test_create_readme(mocker):
 
 
 def test_replace_pydoc(mocker):
-    ws = mocker.Mock()
-    ws.current_user.me = lambda: iam.User(user_name="me@example.com", groups=[iam.ComplexValue(display="admins")])
-    ws.config.host = "https://foo"
-    config_bytes = yaml.dump(WorkspaceConfig(inventory_database="a", groups=GroupsConfig(auto=True)).as_dict()).encode(
-        "utf8"
-    )
-    ws.workspace.download = lambda _: io.BytesIO(config_bytes)
-
-    install = WorkspaceInstaller(ws)
-    doc = install._current_config.remove_extra_indentation(
+    from databricks.labs.ucx.framework.tasks import _remove_extra_indentation
+    doc = _remove_extra_indentation(
         """Test1
         Test2
     Test3"""
