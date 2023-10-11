@@ -250,7 +250,7 @@ def replace_workspace_groups_with_account_groups(cfg: WorkspaceConfig):
     depends_on=[replace_workspace_groups_with_account_groups],
     job_cluster="tacl",
 )
-def replace_workspace_groups_with_account_groups(cfg: WorkspaceConfig):
+def apply_permissions_to_account_groups(cfg: WorkspaceConfig):
     """Fourth phase of the workspace-local group migration process. It does the following:
       - Assigns the full set of permissions of the original group to the account-level one
 
@@ -277,7 +277,7 @@ def replace_workspace_groups_with_account_groups(cfg: WorkspaceConfig):
     permission_manager.apply_group_permissions(group_manager.migration_state, destination="account")
 
 
-@task("005-remove-workspace-local-backup-groups", depends_on=[replace_workspace_groups_with_account_groups])
+@task("005-remove-workspace-local-backup-groups", depends_on=[apply_permissions_to_account_groups])
 def delete_backup_groups(cfg: WorkspaceConfig):
     """Last step of the group migration process. Removes all workspace-level backup groups, along with their
     permissions. Execute this workflow only after you've confirmed that workspace-local migration worked
