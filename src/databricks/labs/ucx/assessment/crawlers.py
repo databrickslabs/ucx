@@ -188,7 +188,8 @@ class AzureServicePrincipalCrawler(CrawlerBase):
         if len(split) == _SECRET_LIST_LENGTH:
             secret_scope, secret_key = split[1], split[2]
             try:
-                return self._ws.secrets.get_secret(secret_scope, secret_key)
+                # Return the decoded secret value in string format
+                return base64.b64decode(self._ws.secrets.get_secret(secret_scope, secret_key).value).decode("utf-8")
             except DatabricksError as err:
                 logger.warning(f"Error retrieving secret for {secret_matched.group(1)}. Error: {err}")
 

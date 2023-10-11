@@ -115,7 +115,20 @@ def test_spn_crawler(ws, inventory_schema, make_job, make_pipeline, sql_backend)
     assert results[0].tenant_id == "directory_12345"
 
 
-def test_spn_crawler_with_pipeline_secret(ws, inventory_schema, make_job, make_pipeline, sql_backend):
+def test_spn_crawler_no_config(ws, inventory_schema, make_job, make_pipeline, sql_backend, make_cluster):
+    make_job()
+    make_pipeline()
+    make_cluster(single_node=True)
+    spn_crawler = AzureServicePrincipalCrawler(ws=ws, sbe=sql_backend, schema=inventory_schema)
+    spns = spn_crawler.snapshot()
+    results = []
+    for spn in spns:
+        results.append(spn)
+
+    assert len(results) >= 1
+
+
+def test_spn_crawler_with_pipeline_unavlbl_secret(ws, inventory_schema, make_job, make_pipeline, sql_backend):
     make_job(spark_conf=_SPARK_CONF)
     make_pipeline(configuration=_PIPELINE_CONF_WITH_SECRET)
     spn_crawler = AzureServicePrincipalCrawler(ws=ws, sbe=sql_backend, schema=inventory_schema)
@@ -127,3 +140,29 @@ def test_spn_crawler_with_pipeline_secret(ws, inventory_schema, make_job, make_p
     assert len(results) >= 2
     assert results[0].storage_account == "storage_acct_1"
     assert results[0].tenant_id == "directory_12345"
+
+
+def test_spn_crawler_with_available_secrets(
+    ws, inventory_schema, make_job, make_pipeline, sql_backend, make_secret_scope
+):
+    secret_scope = make_secret_scope()
+    secret_key = "spn_client_id"
+    ws.secrets.put_secret(scope=secret_scope, key=secret_key, string_value="New_Application_Id")
+    _pipeline_conf_with_avlbl_secret = {}
+    _pipeline_conf_with_avlbl_secret["fs.azure.account.oauth2.client.id.SA1.dfs.core.windows.net"] = (
+        "{" + (f"{{secrets/{secret_scope}/{secret_key}}}") + "}"
+    )
+    _pipeline_conf_with_avlbl_secret[
+        "fs.azure.account.oauth2.client.endpoint.SA1.dfs.core.windows.net"
+    ] = "https://login.microsoftonline.com/dummy_tenant/oauth2/token"
+    make_job()
+    make_pipeline(configuration=_pipeline_conf_with_avlbl_secret)
+    spn_crawler = AzureServicePrincipalCrawler(ws=ws, sbe=sql_backend, schema=inventory_schema)
+    spns = spn_crawler.snapshot()
+    results = []
+    for spn in spns:
+        results.append(spn)
+
+    ws.secrets.delete_secret(scope=secret_scope, key=secret_key)
+
+    assert len(results) >= 2

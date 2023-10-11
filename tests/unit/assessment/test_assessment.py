@@ -21,6 +21,7 @@ from databricks.sdk.service.jobs import (
 )
 from databricks.sdk.service.pipelines import PipelineState, PipelineStateInfo
 from databricks.sdk.service.sql import EndpointConfPair
+from databricks.sdk.service.workspace import GetSecretResponse
 
 from databricks.labs.ucx.assessment.crawlers import (
     AzureServicePrincipalCrawler,
@@ -36,6 +37,7 @@ from databricks.labs.ucx.mixins.sql import Row
 from tests.unit.framework.mocks import MockBackend
 
 _SECRET_PATTERN = r"{{(secrets.*?)}}"
+_SECRET_VALUE = b"SGVsbG8sIFdvcmxkIQ=="
 
 
 def test_external_locations():
@@ -811,6 +813,7 @@ def test_azure_service_principal_info_crawl(mocker):
         ),
     ]
     ws.pipelines.get().spec.configuration = config_dict
+    ws.secrets.get_secret.return_value = GetSecretResponse(key="username", value=_SECRET_VALUE)
     ws.cluster_policies.get().policy_family_definition_overrides = None
     ws.jobs.list.return_value = sample_jobs
     spn_crawler = AzureServicePrincipalCrawler(ws, MockBackend(), "ucx")._crawl()
@@ -1439,6 +1442,7 @@ def test_list_all_cluster_with_spn_in_spark_conf_with_secret(mocker):
 
     ws = mocker.Mock()
     ws.clusters.list.return_value = sample_clusters
+    ws.secrets.get_secret.return_value = GetSecretResponse(key="username", value=_SECRET_VALUE)
     ws.cluster_policies.get().policy_family_definition_overrides = None
     crawler = AzureServicePrincipalCrawler(ws, MockBackend(), "ucx")._list_all_cluster_with_spn_in_spark_conf()
     result_set = list(crawler)
@@ -1535,6 +1539,7 @@ def test_list_all_wh_config_with_spn_and_secret(mocker):
         ),
     ]
     mocker.Mock().secrets.get_secret()
+    ws.secrets.get_secret.return_value = GetSecretResponse(key="username", value=_SECRET_VALUE)
     result_set = AzureServicePrincipalCrawler(ws, MockBackend(), "ucx")._list_all_spn_in_sql_warehouses_spark_conf()
 
     assert len(result_set) == 2
@@ -1566,6 +1571,7 @@ def test_list_all_clusters_spn_in_spark_conf_with_tenant(mocker):
     ws = mocker.Mock()
     ws.clusters.list.return_value = sample_clusters
     ws.cluster_policies.get().policy_family_definition_overrides = None
+    ws.secrets.get_secret.return_value = GetSecretResponse(key="username", value=_SECRET_VALUE)
     result_set = AzureServicePrincipalCrawler(ws, MockBackend(), "ucx")._list_all_cluster_with_spn_in_spark_conf()
 
     assert len(result_set) == 1
@@ -1700,6 +1706,7 @@ def test_azure_service_principal_info_policy_conf(mocker):
             value="https://login.microsoftonline.com/dummy_tenant_id2/oauth2/token",
         ),
     ]
+    ws.secrets.get_secret.return_value = GetSecretResponse(key="username", value=_SECRET_VALUE)
     spn_crawler = AzureServicePrincipalCrawler(ws, MockBackend(), "ucx")._crawl()
 
     assert len(spn_crawler) == 4
@@ -1776,6 +1783,7 @@ def test_azure_service_principal_info_dedupe(mocker):
     config_dict = {}
     ws.pipelines.get().spec.configuration = config_dict
     ws.jobs.list.return_value = sample_jobs
+    ws.secrets.get_secret.return_value = GetSecretResponse(key="username", value=_SECRET_VALUE)
     ws.cluster_policies.get().definition = json.dumps(
         {
             "spark_conf.fs.azure.account.auth.type": {"type": "fixed", "value": "OAuth", "hidden": "true"},
@@ -1925,6 +1933,7 @@ def test_list_all_pipeline_with_conf_spn_secret(mocker):
         "spark.hadoop.fs.azure.sas.fixed.token.abcde.dfs.core.windows.net": "{{secrets/abcde_access/sasFixedToken}}",
     }
     ws.pipelines.get().spec.configuration = config_dict
+    ws.secrets.get_secret.return_value = GetSecretResponse(key="username", value=_SECRET_VALUE)
     result_set = AzureServicePrincipalCrawler(ws, MockBackend(), "ucx")._list_all_pipeline_with_spn_in_spark_conf()
 
     assert len(result_set) == 1
@@ -2308,7 +2317,7 @@ def test_list_all_pipeline_with_conf_spn_secret_unavlbl(mocker):
     config_dict = {
         "spark.hadoop.fs.azure.account.oauth2.client.id.newstorageacct.dfs.core.windows"
         ".net": "{{secrets/reallyreallyasecret/sasFixedToken}}",
-        "spark.hadoop.fs.azure1.account.oauth2.client."
+        "spark.hadoop.fs.azure.account.oauth2.client."
         "endpoint.newstorageacct.dfs.core.windows.net": "https://"
         "login.microsoftonline.com/directory_12345/oauth2/token",
         "spark.hadoop.fs.azure.sas.fixed.token.abcde.dfs.core.windows.net": "{{secrets/abcde_access/sasFixedToken}}",
@@ -2475,3 +2484,33 @@ def test_job_cluster_init_script_check_dbfs():
         sample_jobs, {c.cluster_id: c for c in sample_clusters}
     )
     assert len(result_set) == 3
+
+
+def test_list_all_pipeline_with_conf_spn_secret_avlb(mocker):
+    sample_pipelines = [
+        PipelineInfo(
+            creator_name="abcde.defgh@databricks.com",
+            pipeline_name="New DLT Pipeline",
+            pipeline_id="0112eae7-9d11-4b40-a2b8-6c83cb3c7497",
+            success=1,
+            failures="",
+        )
+    ]
+    ws = mocker.Mock()
+    ws.pipelines.list_pipelines.return_value = sample_pipelines
+    config_dict = {
+        "spark.hadoop.fs.azure.account.oauth2.client.id.newstorageacct.dfs.core.windows"
+        ".net": "{{secrets/reallyreallyasecret/sasFixedToken}}",
+        "spark.hadoop.fs.azure.account.oauth2.client."
+        "endpoint.newstorageacct.dfs.core.windows.net": "https://"
+        "login.microsoftonline.com/directory_12345/oauth2/token",
+        "spark.hadoop.fs.azure.sas.fixed.token.abcde.dfs.core.windows.net": "{{secrets/abcde_access/sasFixedToken}}",
+    }
+    ws.pipelines.get().spec.configuration = config_dict
+    ws.secrets.get_secret.return_value = GetSecretResponse(key="username", value=_SECRET_VALUE)
+    result_set = AzureServicePrincipalCrawler(ws, MockBackend(), "ucx")._list_all_pipeline_with_spn_in_spark_conf()
+
+    assert len(result_set) > 0
+    assert result_set[0].get("application_id") == "Hello, World!"
+    assert result_set[0].get("tenant_id") == "directory_12345"
+    assert result_set[0].get("storage_account") == "newstorageacct"
