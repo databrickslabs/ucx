@@ -1,15 +1,11 @@
 import pytest
 from databricks.sdk.service import iam
 
+from databricks.labs.ucx.workspace_access.groups import (
+    GroupMigrationState,
+    MigrationGroupInfo,
+)
 from databricks.labs.ucx.workspace_access.scim import ScimSupport
-import pytest
-from databricks.sdk.service import iam
-from databricks.labs.ucx.mixins.fixtures import ws, make_query, make_user, make_group
-from databricks.labs.ucx.workspace_access.groups import GroupMigrationState, MigrationGroupInfo
-from databricks.labs.ucx.workspace_access.redash import SqlPermissionsSupport
-from databricks.labs.ucx.workspace_access import generic, redash, scim, secrets
-from databricks.sdk.service import sql
-from databricks.sdk.service.sql import ObjectTypePlural
 
 
 def test_applier_task_should_apply_proper_entitlements_to_ws_groups(ws, make_ucx_group):
@@ -31,9 +27,8 @@ def test_applier_task_should_apply_proper_roles(ws, make_ucx_group):
     assert result
 
 
-
 def test_scim_support_should_replicate_entitlement_to_backup_group(ws, make_ucx_group, make_group):
-    #Ws group have allow-cluster-create by default, we want to replicate that
+    # Ws group have allow-cluster-create by default, we want to replicate that
     ws_group, acc_group = make_ucx_group()
     backup_group_name = ws_group.display_name + "-backup"
     backup_group = make_group(display_name=backup_group_name)
@@ -65,6 +60,6 @@ def test_scim_support_should_replicate_entitlement_to_backup_group(ws, make_ucx_
 
     # Validate that allow-cluster-create entitlement has been applied properly to the backup group
     assert len(backup_group_entitlement) == 1
-    assert backup_group_entitlement == [iam.ComplexValue(display=None, primary=None, type=None, value='allow-cluster-create')]
-
-
+    assert backup_group_entitlement == [
+        iam.ComplexValue(display=None, primary=None, type=None, value="allow-cluster-create")
+    ]

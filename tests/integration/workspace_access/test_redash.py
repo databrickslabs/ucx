@@ -1,14 +1,14 @@
-from databricks.labs.ucx.workspace_access.scim import ScimSupport
-import pytest
-from databricks.sdk.service import iam
-from databricks.labs.ucx.mixins.fixtures import ws, make_query, make_user, make_group
-from databricks.labs.ucx.workspace_access.groups import GroupMigrationState, MigrationGroupInfo
-from databricks.labs.ucx.workspace_access.redash import SqlPermissionsSupport
-from databricks.labs.ucx.workspace_access import generic, redash, scim, secrets
-from databricks.sdk.service import sql
+from databricks.sdk.service import iam, sql
 from databricks.sdk.service.sql import ObjectTypePlural
 
-def test_one_asset_should_have_permission_recplicated_to_backup_group(ws,make_query, make_ucx_group, make_group):
+from databricks.labs.ucx.workspace_access import redash
+from databricks.labs.ucx.workspace_access.groups import (
+    GroupMigrationState,
+    MigrationGroupInfo,
+)
+
+
+def test_one_asset_should_have_permission_recplicated_to_backup_group(ws, make_query, make_ucx_group, make_group):
     ws_group, acc_group = make_ucx_group()
     backup_group_name = ws_group.display_name + "-backup"
     backup_group = make_group(display_name=backup_group_name)
@@ -23,11 +23,13 @@ def test_one_asset_should_have_permission_recplicated_to_backup_group(ws,make_qu
         )
     )
 
-    ws.dbsql_permissions.set(object_type=ObjectTypePlural.QUERIES,
-                      object_id=query.id,
-                      access_control_list=[
-                          sql.AccessControl(group_name=ws_group.display_name, permission_level=sql.PermissionLevel.CAN_RUN)
-                      ])
+    ws.dbsql_permissions.set(
+        object_type=ObjectTypePlural.QUERIES,
+        object_id=query.id,
+        access_control_list=[
+            sql.AccessControl(group_name=ws_group.display_name, permission_level=sql.PermissionLevel.CAN_RUN)
+        ],
+    )
 
     redash_acl_listing = [redash.redash_listing_wrapper(ws.queries.list, sql.ObjectTypePlural.QUERIES)]
     sql_support = redash.SqlPermissionsSupport(ws, redash_acl_listing)
@@ -42,14 +44,15 @@ def test_one_asset_should_have_permission_recplicated_to_backup_group(ws,make_qu
     # Validate that no errors has been thrown when applying permission to backup group
     assert value
 
-    applied_permissions = ws.dbsql_permissions.get(object_type=ObjectTypePlural.QUERIES,object_id=query.id)
+    applied_permissions = ws.dbsql_permissions.get(object_type=ObjectTypePlural.QUERIES, object_id=query.id)
 
-    # Validate that permissions has been applied properly to the backup group and the old group permission has been revoked
+    # Validate that permissions has been applied properly to the backup group
+    # and the old group permission has been revoked
     assert len(applied_permissions.access_control_list) == 3
     assert applied_permissions.access_control_list == [
         sql.AccessControl(user_name=ws.current_user.me().user_name, permission_level=sql.PermissionLevel.CAN_MANAGE),
         sql.AccessControl(group_name=backup_group_name, permission_level=sql.PermissionLevel.CAN_RUN),
-        sql.AccessControl(group_name="admins", permission_level=sql.PermissionLevel.CAN_MANAGE)
+        sql.AccessControl(group_name="admins", permission_level=sql.PermissionLevel.CAN_MANAGE),
     ]
 
 
@@ -68,12 +71,13 @@ def test_one_asset_should_have_permission_recplicated_to_account_group(ws, make_
         )
     )
 
-    ws.dbsql_permissions.set(object_type=ObjectTypePlural.QUERIES,
-                             object_id=query.id,
-                             access_control_list=[
-                                 sql.AccessControl(group_name=ws_group.display_name,
-                                                   permission_level=sql.PermissionLevel.CAN_RUN)
-                             ])
+    ws.dbsql_permissions.set(
+        object_type=ObjectTypePlural.QUERIES,
+        object_id=query.id,
+        access_control_list=[
+            sql.AccessControl(group_name=ws_group.display_name, permission_level=sql.PermissionLevel.CAN_RUN)
+        ],
+    )
 
     redash_acl_listing = [redash.redash_listing_wrapper(ws.queries.list, sql.ObjectTypePlural.QUERIES)]
     sql_support = redash.SqlPermissionsSupport(ws, redash_acl_listing)
@@ -90,10 +94,11 @@ def test_one_asset_should_have_permission_recplicated_to_account_group(ws, make_
 
     applied_permissions = ws.dbsql_permissions.get(object_type=ObjectTypePlural.QUERIES, object_id=query.id)
 
-    # Validate that permissions has been applied properly to the account group and the old group permission has been revoked
+    # Validate that permissions has been applied properly to the account group
+    # and the old group permission has been revoked
     assert len(applied_permissions.access_control_list) == 3
     assert applied_permissions.access_control_list == [
         sql.AccessControl(user_name=ws.current_user.me().user_name, permission_level=sql.PermissionLevel.CAN_MANAGE),
         sql.AccessControl(group_name=acc_group.display_name, permission_level=sql.PermissionLevel.CAN_RUN),
-        sql.AccessControl(group_name="admins", permission_level=sql.PermissionLevel.CAN_MANAGE)
+        sql.AccessControl(group_name="admins", permission_level=sql.PermissionLevel.CAN_MANAGE),
     ]

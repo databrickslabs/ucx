@@ -756,16 +756,16 @@ def make_schema(ws, sql_backend, make_random) -> Callable[..., SchemaInfo]:
         lambda schema_info: sql_backend.execute(f"DROP SCHEMA IF EXISTS {schema_info.full_name} CASCADE"),
     )
 
+
 @pytest.fixture
 def make_query(ws, make_random):
     def create(*, name: str | None = None) -> Query:
         if name is None:
             name = f"ucx_S{make_random(4)}"
         srcs = ws.data_sources.list()
-        query = ws.queries.create(name=name,
-                                  data_source_id=srcs[0].id,
-                                  description="test query from Go SDK",
-                                  query="SHOW TABLES")
+        query = ws.queries.create(
+            name=name, data_source_id=srcs[0].id, description="test query from Go SDK", query="SHOW TABLES"
+        )
         return query
 
     yield from factory(
@@ -773,6 +773,7 @@ def make_query(ws, make_random):
         create,
         lambda query: ws.queries.delete(query_id=query.id),
     )
+
 
 @pytest.fixture
 def make_table(ws, sql_backend, make_schema, make_random) -> Callable[..., TableInfo]:
