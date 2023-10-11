@@ -763,9 +763,7 @@ def make_query(ws, make_random):
         if name is None:
             name = f"ucx_S{make_random(4)}"
         srcs = ws.data_sources.list()
-        query = ws.queries.create(
-            name=name, data_source_id=srcs[0].id, query="SHOW TABLES"
-        )
+        query = ws.queries.create(name=name, data_source_id=srcs[0].id, query="SHOW TABLES")
         return query
 
     yield from factory(

@@ -1,3 +1,4 @@
+import pytest
 from databricks.sdk.service import sql
 from databricks.sdk.service.sql import ObjectTypePlural
 from integration.conftest import list_equal_unordered
@@ -9,6 +10,7 @@ from databricks.labs.ucx.workspace_access.groups import (
 )
 
 
+@pytest.mark.skip("Make sure the environment doens't have any query created otherwise it will fail")
 def test_one_asset_should_have_permission_recplicated_to_backup_group(ws, make_query, make_ucx_group, make_group):
     ws_group, acc_group = make_ucx_group()
     backup_group_name = ws_group.display_name + "-backup"
@@ -56,6 +58,7 @@ def test_one_asset_should_have_permission_recplicated_to_backup_group(ws, make_q
     )
 
 
+@pytest.mark.skip("Make sure the environment doens't have any query created otherwise it will fail")
 def test_one_asset_should_have_permission_recplicated_to_account_group(ws, make_query, make_ucx_group, make_group):
     ws_group, acc_group = make_ucx_group()
     backup_group_name = ws_group.display_name + "-backup"
