@@ -250,6 +250,8 @@ def destroy_schema(cfg: WorkspaceConfig):
 
 
 def main(*argv):
+    if len(argv) == 0:
+        argv = sys.argv
     trigger(*argv)
 
 

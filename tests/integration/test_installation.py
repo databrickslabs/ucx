@@ -52,6 +52,7 @@ def test_logs_are_available(ws, sql_backend, env_or_skip, make_random):
         ws,
         WorkspaceConfig(
             inventory_database=f"ucx_{make_random(4)}",
+            instance_pool_id=env_or_skip("TEST_INSTANCE_POOL_ID"),
             groups=GroupsConfig(auto=True),
             log_level="INFO",
         ),
@@ -63,6 +64,7 @@ def test_logs_are_available(ws, sql_backend, env_or_skip, make_random):
 
     with pytest.raises(OperationFailed):
         install.run_workflow("destroy-schema")
+        assert True
 
     workflow_run_logs = list(ws.workspace.list(f"{install._install_folder}/logs"))
     assert len(workflow_run_logs) == 1
