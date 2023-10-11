@@ -40,7 +40,7 @@ class WorkspaceListing:
         delta_from_start = measuring_time - self.start_time
         rps = self._counter / delta_from_start.total_seconds()
         directory_count = len([r for r in self.results if r.object_type == ObjectType.DIRECTORY])
-        
+
         results_iterator = groupby(self.results, key=lambda x: x.object_type)
         if self._counter % 10 == 0:
             logger.info(f"Made {self._counter} workspace listing calls, collected {len(self.results)} objects, ")
@@ -57,12 +57,11 @@ class WorkspaceListing:
                 self._ws.workspace.list(path=obj.path, recursive=False), key=lambda x: x.object_type
             )
             for object_type, objects in grouped_iterator:
-
                 if object_type == ObjectType.DIRECTORY:
-                    objs=list(objects)
-                    directories.extend(objs)        
+                    objs = list(objects)
+                    directories.extend(objs)
                     if ObjectType.DIRECTORY in self.object_types:
-                        others.extend(objs)                                
+                        others.extend(objs)
                 elif object_type in self.object_types:
                     others.extend(list(objects))
                 else:

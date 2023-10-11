@@ -1,9 +1,8 @@
 import datetime as dt
 from unittest.mock import MagicMock, Mock, patch
-import pytest
+
 from databricks.sdk.service import workspace
 from databricks.sdk.service.workspace import ObjectInfo, ObjectType
-from databricks.sdk.core import DatabricksError
 
 from databricks.labs.ucx.workspace_access.generic import workspace_listing
 from databricks.labs.ucx.workspace_access.listing import WorkspaceListing
@@ -126,7 +125,9 @@ def test_walk_with_nested_folders_should_return_nested_objects():
 
 
 def test_walk_with_three_level_nested_folders_returns_three_levels():
-    rootobj = ObjectInfo(path="/rootPath", )
+    rootobj = ObjectInfo(
+        path="/rootPath",
+    )
     file = ObjectInfo(path="/rootPath/file1", object_type=ObjectType.FILE)
     nested_folder = ObjectInfo(path="/rootPath/nested_folder", object_type=ObjectType.DIRECTORY)
     nested_notebook = ObjectInfo(path="/rootPath/nested_folder/notebook", object_type=ObjectType.NOTEBOOK)
@@ -155,6 +156,8 @@ def test_walk_with_three_level_nested_folders_returns_three_levels():
     assert compare(
         listing.results, [rootobj, file, nested_folder, nested_notebook, second_nested_folder, second_nested_notebook]
     )
+
+
 def test_walk_with_wrong_object_type():
     rootobj = ObjectInfo(path="/rootPath")
     notebook = ObjectInfo(path="/rootPath/notebook1")
@@ -165,4 +168,3 @@ def test_walk_with_wrong_object_type():
 
     listing = WorkspaceListing(client, 1)
     listing.walk("/rootPath1")
-
