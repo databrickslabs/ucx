@@ -51,13 +51,7 @@ def test_tacl_applier(mocker):
         ),
     )
     migration_state = GroupMigrationState()
-    migration_state.add(
-        MigrationGroupInfo(
-            workspace=Group(display_name="abc"),
-            backup=Group(display_name="tmp-backup-abc"),
-            account=Group(display_name="account-abc"),
-        )
-    )
+    migration_state.add(Group(display_name="abc"), Group(display_name="tmp-backup-abc"), Group(display_name="account-abc"))
     task = table_acl_support.get_apply_task(permissions, migration_state, "backup")
     task()
 
@@ -83,13 +77,10 @@ def test_tacl_applier_no_target_principal(mocker):
     )
     migration_state = GroupMigrationState()
     migration_state.add(
-        MigrationGroupInfo(
-            workspace=Group(display_name="abc"),
-            backup=Group(display_name="tmp-backup-abc"),
-            account=Group(display_name="account-abc"),
-        )
-    )
+        Group(display_name="abc"),
+        Group(display_name="tmp-backup-abc"),
+        Group(display_name="account-abc"))
     task = table_acl_support.get_apply_task(permissions, migration_state, "backup")
-    task()
+    assert task is None
 
     assert [] == sql_backend.queries

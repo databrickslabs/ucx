@@ -179,7 +179,7 @@ def test_workspace_access_e2e(
     toolkit = GroupMigrationToolkit(config, warehouse_id=warehouse_id)
     toolkit.prepare_environment()
 
-    group_migration_state = toolkit._group_manager.migration_groups_provider
+    group_migration_state = toolkit._group_manager.migration_state
     for _info in group_migration_state.groups:
         _ws = ws.groups.get(id=_info.workspace.id)
         _backup = ws.groups.get(id=_info.backup.id)

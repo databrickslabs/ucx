@@ -447,7 +447,7 @@ def make_cluster_policy(ws, make_random):
             name = f"sdk-{make_random(4)}"
         if "definition" not in kwargs:
             kwargs["definition"] = json.dumps(
-                {"spark_conf.spark.databricks.delta.preview.enabled": {"type": "fixed", "value": True}}
+                {"spark_conf.spark.databricks.delta.preview.enabled": {"type": "fixed", "value": "true"}}
             )
         return ws.cluster_policies.create(name, **kwargs)
 
@@ -471,15 +471,14 @@ def make_cluster(ws, make_random):
         if single_node:
             kwargs["num_workers"] = 0
             if "spark_conf" in kwargs:
-                kwargs["spark_conf"] = {
-                    **kwargs["spark_conf"],
-                    **{"spark.databricks.cluster.profile": "singleNode", "spark.master": "local[*]"},
+                kwargs["spark_conf"] = kwargs["spark_conf"] | {
+                    "spark.databricks.cluster.profile": "singleNode",
+                    "spark.master": "local[*]",
                 }
             else:
                 kwargs["spark_conf"] = {"spark.databricks.cluster.profile": "singleNode", "spark.master": "local[*]"}
             kwargs["custom_tags"] = {"ResourceClass": "SingleNode"}
-            kwargs["node_type_id"] = ws.clusters.select_node_type(local_disk=True)
-        elif "instance_pool_id" not in kwargs:
+        if "instance_pool_id" not in kwargs:
             kwargs["node_type_id"] = ws.clusters.select_node_type(local_disk=True)
 
         return ws.clusters.create(
@@ -712,7 +711,7 @@ def inventory_schema(make_schema):
 
 
 @pytest.fixture
-def make_catalog(ws, sql_backend, make_random):
+def make_catalog(ws, sql_backend, make_random) -> Callable[..., CatalogInfo]:
     def create() -> CatalogInfo:
         name = f"ucx_C{make_random(4)}".lower()
         sql_backend.execute(f"CREATE CATALOG {name}")
@@ -727,7 +726,7 @@ def make_catalog(ws, sql_backend, make_random):
 
 
 @pytest.fixture
-def make_schema(sql_backend, make_random):
+def make_schema(sql_backend, make_random) -> Callable[..., SchemaInfo]:
     def create(*, catalog_name: str = "hive_metastore", name: str | None = None) -> SchemaInfo:
         if name is None:
             name = f"ucx_S{make_random(4)}"
@@ -743,7 +742,7 @@ def make_schema(sql_backend, make_random):
 
 
 @pytest.fixture
-def make_table(sql_backend, make_schema, make_random):
+def make_table(sql_backend, make_schema, make_random) -> Callable[..., TableInfo]:
     def create(
         *,
         catalog_name="hive_metastore",

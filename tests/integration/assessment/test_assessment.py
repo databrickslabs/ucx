@@ -72,18 +72,17 @@ def test_pipeline_with_secret_conf_crawler(ws, make_pipeline, inventory_schema, 
 
 def test_cluster_crawler(ws, make_cluster, inventory_schema, sql_backend):
     created_cluster = make_cluster(single_node=True, spark_conf=_SPARK_CONF)
-    new_cluster = created_cluster.result()
     cluster_crawler = ClustersCrawler(ws=ws, sbe=sql_backend, schema=inventory_schema)
     clusters = cluster_crawler.snapshot()
     results = []
     for cluster in clusters:
         if cluster.success != 0:
             continue
-        if cluster.cluster_id == new_cluster.cluster_id:
+        if cluster.cluster_id == created_cluster.cluster_id:
             results.append(cluster)
 
     assert len(results) >= 1
-    assert results[0].cluster_id == new_cluster.cluster_id
+    assert results[0].cluster_id == created_cluster.cluster_id
 
 
 def test_job_crawler(ws, make_job, inventory_schema, sql_backend):

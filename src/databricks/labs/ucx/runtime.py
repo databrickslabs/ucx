@@ -245,9 +245,9 @@ def migrate_permissions(cfg: WorkspaceConfig):
         workspace_start_path=cfg.workspace_start_path,
     )
 
-    permission_manager.apply_group_permissions(group_manager.migration_groups_provider, destination="backup")
+    permission_manager.apply_group_permissions(group_manager.migration_state, destination="backup")
     group_manager.replace_workspace_groups_with_account_groups()
-    permission_manager.apply_group_permissions(group_manager.migration_groups_provider, destination="account")
+    permission_manager.apply_group_permissions(group_manager.migration_state, destination="account")
 
 
 @task("migrate-groups-cleanup", depends_on=[migrate_permissions])

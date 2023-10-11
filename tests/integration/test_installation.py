@@ -85,6 +85,7 @@ def test_jobs_with_no_inventory_database(
 ):
     default_cluster_id = env_or_skip("TEST_DEFAULT_CLUSTER_ID")
     tacl_cluster_id = env_or_skip("TEST_LEGACY_TABLE_ACL_CLUSTER_ID")
+    logger.info(f"ensuring default ({default_cluster_id}) and tacl ({tacl_cluster_id}) clusters are running")
     ws.clusters.ensure_cluster_is_running(default_cluster_id)
     ws.clusters.ensure_cluster_is_running(tacl_cluster_id)
 

@@ -1,22 +1,40 @@
+from collections.abc import Callable, Iterator
 from functools import partial
 
 from databricks.sdk.service import iam
 
-from databricks.labs.ucx.workspace_access.base import Applier, Permissions
+from databricks.labs.ucx.workspace_access.base import (
+    AclSupport,
+    Destination,
+    Permissions,
+)
 from databricks.labs.ucx.workspace_access.groups import (
     GroupMigrationState,
-    MigrationGroupInfo,
 )
 
 
 def test_applier():
-    class SampleApplier(Applier):
-        def is_item_relevant(self, item: Permissions, migration_state: GroupMigrationState) -> bool:
+    class SampleApplier(AclSupport):
+        def __init__(self):
+            self.called = False
+
+        def get_crawler_tasks(self) -> Iterator[Callable[..., Permissions | None]]:
+            return []
+
+        def object_types(self) -> set[str]:
+            return {"test"}
+
+        @staticmethod
+        def _is_item_relevant(item: Permissions, migration_state: GroupMigrationState) -> bool:
             workspace_groups = [info.workspace.display_name for info in migration_state.groups]
             return item.object_id in workspace_groups
 
-        def _get_apply_task(self, _, __, ___):
+        def get_apply_task(self, item: Permissions, migration_state: GroupMigrationState, _: Destination):
+            if not self._is_item_relevant(item, migration_state):
+                return None
+
             def test_task():
+                self.called = True
                 print("here!")
 
             return partial(test_task)
@@ -25,16 +43,15 @@ def test_applier():
     positive_item = Permissions(object_id="test", object_type="test", raw="test")
     migration_state = GroupMigrationState()
     migration_state.add(
-        group=MigrationGroupInfo(
-            workspace=iam.Group(display_name="test", id="test"),
-            account=iam.Group(display_name="test", id="test-acc"),
-            backup=iam.Group(display_name="db-temp-test", id="test-backup"),
-        )
+        iam.Group(display_name="test", id="test"),
+        iam.Group(display_name="db-temp-test", id="test-backup"),
+        iam.Group(display_name="test", id="test-acc"),
     )
 
     task = applier.get_apply_task(positive_item, migration_state, "backup")
-    assert task.func.__name__ == "test_task"
+    task()
+    assert applier.called
 
     negative_item = Permissions(object_id="not-here", object_type="test", raw="test")
-    new_task = applier.get_apply_task(negative_item, migration_state, "backup")
-    new_task.func()
+    task = applier.get_apply_task(negative_item, migration_state, "backup")
+    assert task is None

@@ -8,15 +8,14 @@ from databricks.sdk.service import iam, workspace
 
 from databricks.labs.ucx.mixins.hardening import rate_limited
 from databricks.labs.ucx.workspace_access.base import (
-    Applier,
-    Crawler,
+    AclSupport,
     Destination,
     Permissions,
 )
 from databricks.labs.ucx.workspace_access.groups import GroupMigrationState
 
 
-class SecretScopesSupport(Crawler, Applier):
+class SecretScopesSupport(AclSupport):
     def __init__(self, ws: WorkspaceClient):
         self._ws = ws
 
@@ -34,7 +33,33 @@ class SecretScopesSupport(Crawler, Applier):
         for scope in scopes:
             yield partial(_crawler_task, scope)
 
-    def is_item_relevant(self, item: Permissions, migration_state: GroupMigrationState) -> bool:
+    def object_types(self) -> set[str]:
+        return {"secrets"}
+
+    def get_apply_task(self, item: Permissions, migration_state: GroupMigrationState, destination: Destination):
+        if not self._is_item_relevant(item, migration_state):
+            return None
+
+        acls = [workspace.AclItem.from_dict(acl) for acl in json.loads(item.raw)]
+        new_acls = []
+
+        for acl in acls:
+            if acl.principal in [i.workspace.display_name for i in migration_state.groups]:
+                source_info = migration_state.get_by_workspace_group_name(acl.principal)
+                target: iam.Group = getattr(source_info, destination)
+                new_acls.append(workspace.AclItem(principal=target.display_name, permission=acl.permission))
+            else:
+                new_acls.append(acl)
+
+        def apply_acls():
+            for acl in new_acls:
+                self._rate_limited_put_acl(item.object_id, acl.principal, acl.permission)
+            return True
+
+        return partial(apply_acls)
+
+    @staticmethod
+    def _is_item_relevant(item: Permissions, migration_state: GroupMigrationState) -> bool:
         acls = [workspace.AclItem.from_dict(acl) for acl in json.loads(item.raw)]
         mentioned_groups = [acl.principal for acl in acls]
         return any(g in mentioned_groups for g in [info.workspace.display_name for info in migration_state.groups])
@@ -74,24 +99,3 @@ class SecretScopesSupport(Crawler, Applier):
     def _rate_limited_put_acl(self, object_id: str, principal: str, permission: workspace.AclPermission):
         self._ws.secrets.put_acl(object_id, principal, permission)
         self._inflight_check(scope_name=object_id, group_name=principal, expected_permission=permission)
-
-    def _get_apply_task(
-        self, item: Permissions, migration_state: GroupMigrationState, destination: Destination
-    ) -> partial:
-        acls = [workspace.AclItem.from_dict(acl) for acl in json.loads(item.raw)]
-        new_acls = []
-
-        for acl in acls:
-            if acl.principal in [i.workspace.display_name for i in migration_state.groups]:
-                source_info = migration_state.get_by_workspace_group_name(acl.principal)
-                target: iam.Group = getattr(source_info, destination)
-                new_acls.append(workspace.AclItem(principal=target.display_name, permission=acl.permission))
-            else:
-                new_acls.append(acl)
-
-        def apply_acls():
-            for acl in new_acls:
-                self._rate_limited_put_acl(item.object_id, acl.principal, acl.permission)
-            return True
-
-        return partial(apply_acls)

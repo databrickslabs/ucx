@@ -48,24 +48,22 @@ class Threads(Generic[Result]):
             if result is None:
                 continue
             collected.append(result)
-        self._on_finish(given_cnt, len(errors))
+        self._on_finish(given_cnt, len(collected), len(errors))
 
         return collected, errors
 
-    def _on_finish(self, given_cnt, failed_cnt):
+    def _on_finish(self, given_cnt: int, collected_cnt: int, failed_cnt: int):
         since = dt.datetime.now() - self._started
-        failed_pct = 0
-        if failed_cnt > 0:
-            failed_pct = failed_cnt / given_cnt * 100
-        stats = f"{failed_pct:.0f}% ({failed_cnt}/{given_cnt}). Took {since}"
+        success_pct = collected_cnt / given_cnt * 100
+        stats = f"{success_pct:.0f}% results available ({collected_cnt}/{given_cnt}). Took {since}"
         if failed_cnt == given_cnt:
             logger.critical(f"All '{self._name}' tasks failed!!!")
-        elif failed_pct >= self._task_fail_error_pct:
+        elif failed_cnt > 0 and success_pct <= self._task_fail_error_pct:
             logger.error(f"More than half '{self._name}' tasks failed: {stats}")
         elif failed_cnt > 0:
             logger.warning(f"Some '{self._name}' tasks failed: {stats}")
         else:
-            logger.info(f"Finished '{self._name}' tasks: non-empty {stats}")
+            logger.info(f"Finished '{self._name}' tasks: {stats}")
 
     def _execute(self):
         with ThreadPoolExecutor(self._num_threads) as pool:
