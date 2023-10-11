@@ -91,13 +91,7 @@ class PermissionManager(CrawlerBase):
             support: list(items_subset) for support, items_subset in groupby(items, key=lambda i: i.object_type)
         }
 
-        appliers = {}
-        for support in self._acl_support:
-            for object_type in support.object_types():
-                if object_type in appliers:
-                    msg = f"{object_type} is already supported by {type(appliers[object_type]).__name__}"
-                    raise KeyError(msg)
-                appliers[object_type] = support
+        appliers = self._appliers()
 
         # we first check that all supports are valid.
         for object_type in supports_to_items:
@@ -121,6 +115,16 @@ class PermissionManager(CrawlerBase):
             return False
         logger.info("Permissions were applied")
         return True
+
+    def _appliers(self) -> dict[str, AclSupport]:
+        appliers = {}
+        for support in self._acl_support:
+            for object_type in support.object_types():
+                if object_type in appliers:
+                    msg = f"{object_type} is already supported by {type(appliers[object_type]).__name__}"
+                    raise KeyError(msg)
+                appliers[object_type] = support
+        return appliers
 
     def cleanup(self):
         logger.info(f"Cleaning up inventory table {self._full_name}")

@@ -38,7 +38,7 @@ class Listing:
         self._object_type = object_type
 
     def object_types(self) -> set[str]:
-        return set(self._object_type)
+        return {self._object_type}
 
     def __iter__(self):
         started = datetime.datetime.now()

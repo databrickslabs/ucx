@@ -159,4 +159,32 @@ def test_unregistered_support():
 def test_factory(mocker):
     ws = mocker.Mock()
     b = MockBackend()
-    PermissionManager.factory(ws, b, "test")
+    permission_manager = PermissionManager.factory(ws, b, "test")
+    appliers = permission_manager._appliers()
+    assert {
+        "sql/warehouses",
+        "registered-models",
+        "instance-pools",
+        "jobs",
+        "directories",
+        "experiments",
+        "clusters",
+        "notebooks",
+        "repos",
+        "files",
+        "authorization",
+        "pipelines",
+        "cluster-policies",
+        "dashboards",
+        "queries",
+        "alerts",
+        "secrets",
+        "entitlements",
+        "roles",
+        "ANONYMOUS FUNCTION",
+        "CATALOG",
+        "TABLE",
+        "ANY FILE",
+        "VIEW",
+        "DATABASE",
+    } == appliers.keys()
