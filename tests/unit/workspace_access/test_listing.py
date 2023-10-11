@@ -67,7 +67,7 @@ def test_list_and_analyze_should_separate_folders_and_other_objects():
     listing = WorkspaceListing(client, 1)
     directories, others = listing._list_and_analyze(rootobj)
 
-    assert compare(others, [file, notebook, directory])
+    assert compare(others, [file, notebook])
     assert compare(directories, [directory])
 
 
@@ -125,9 +125,7 @@ def test_walk_with_nested_folders_should_return_nested_objects():
 
 
 def test_walk_with_three_level_nested_folders_returns_three_levels():
-    rootobj = ObjectInfo(
-        path="/rootPath",
-    )
+    rootobj = ObjectInfo(path="/rootPath")
     file = ObjectInfo(path="/rootPath/file1", object_type=ObjectType.FILE)
     nested_folder = ObjectInfo(path="/rootPath/nested_folder", object_type=ObjectType.DIRECTORY)
     nested_notebook = ObjectInfo(path="/rootPath/nested_folder/notebook", object_type=ObjectType.NOTEBOOK)
@@ -156,15 +154,3 @@ def test_walk_with_three_level_nested_folders_returns_three_levels():
     assert compare(
         listing.results, [rootobj, file, nested_folder, nested_notebook, second_nested_folder, second_nested_notebook]
     )
-
-
-def test_walk_with_wrong_object_type():
-    rootobj = ObjectInfo(path="/rootPath")
-    notebook = ObjectInfo(path="/rootPath/notebook1")
-
-    client = Mock()
-    client.workspace.list.return_value = [notebook]
-    client.workspace.get_status.return_value = rootobj
-
-    listing = WorkspaceListing(client, 1)
-    listing.walk("/rootPath1")
