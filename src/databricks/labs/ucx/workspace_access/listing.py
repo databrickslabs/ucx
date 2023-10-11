@@ -1,6 +1,5 @@
 import datetime as dt
 import logging
-from collections.abc import Iterator
 from concurrent.futures import FIRST_COMPLETED, ThreadPoolExecutor, wait
 from itertools import groupby
 
@@ -18,7 +17,16 @@ class WorkspaceListing:
         num_threads: int,
         *,
         with_directories: bool = True,
+        object_types: list | None = None,
     ):
+        if object_types is None:
+            self.object_types = [
+                ObjectType.DIRECTORY,
+                ObjectType.NOTEBOOK,
+                ObjectType.REPO,
+                ObjectType.FILE,
+                ObjectType.LIBRARY,
+            ]
         self.start_time = None
         self._ws = ws
         self.results: list[ObjectInfo] = []
@@ -32,30 +40,35 @@ class WorkspaceListing:
         delta_from_start = measuring_time - self.start_time
         rps = self._counter / delta_from_start.total_seconds()
         directory_count = len([r for r in self.results if r.object_type == ObjectType.DIRECTORY])
-        other_count = len([r for r in self.results if r.object_type != ObjectType.DIRECTORY])
+        
+        results_iterator = groupby(self.results, key=lambda x: x.object_type)
         if self._counter % 10 == 0:
-            logger.info(
-                f"Made {self._counter} workspace listing calls, "
-                f"collected {len(self.results)} objects ({directory_count} dirs and {other_count} other objects),"
-                f" rps: {rps:.3f}/sec"
-            )
-
-    def _list_workspace(self, path: str) -> Iterator[ObjectType]:
-        # TODO: remove, use SDK
-        return self._ws.workspace.list(path=path, recursive=False)
+            logger.info(f"Made {self._counter} workspace listing calls, collected {len(self.results)} objects, ")
+            logger.info(directory_count)
+            for obj_type, objects in results_iterator:
+                logger.info(f"collected {len(list(objects))} {obj_type} objects")
+            logger.info(f" rps: {rps:.3f}/sec")
 
     def _list_and_analyze(self, obj: ObjectInfo) -> (list[ObjectInfo], list[ObjectInfo]):
         directories = []
         others = []
         try:
             grouped_iterator = groupby(
-                self._list_workspace(obj.path), key=lambda x: x.object_type == ObjectType.DIRECTORY
+                self._ws.workspace.list(path=obj.path, recursive=False), key=lambda x: x.object_type
             )
-            for is_directory, objects in grouped_iterator:
-                if is_directory:
-                    directories.extend(list(objects))
-                else:
+            for object_type, objects in grouped_iterator:
+
+                if object_type == ObjectType.DIRECTORY:
+                    objs=list(objects)
+                    directories.extend(objs)        
+                    if ObjectType.DIRECTORY in self.object_types:
+                        others.extend(objs)                                
+                elif object_type in self.object_types:
                     others.extend(list(objects))
+                else:
+                    logger.error(
+                        f"{object_type} not a valid type, please choose from {[obj.name for obj in ObjectType]}."
+                    )
             logger.debug(f"Listed {obj.path}, found {len(directories)} sub-directories and {len(others)} other objects")
         except DatabricksError as err:
             # See https://github.com/databrickslabs/ucx/issues/230
@@ -80,7 +93,6 @@ class WorkspaceListing:
                 for future in futures_done:
                     futures_to_objects.pop(future)
                     directories, others = future.result()
-                    self.results.extend(directories)
                     self.results.extend(others)
 
                     if directories:
