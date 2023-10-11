@@ -473,7 +473,7 @@ def make_cluster(ws, make_random):
             if "spark_conf" in kwargs:
                 kwargs["spark_conf"] = kwargs["spark_conf"] | {
                     "spark.databricks.cluster.profile": "singleNode",
-                    "spark.master": "local[*]"
+                    "spark.master": "local[*]",
                 }
             else:
                 kwargs["spark_conf"] = {"spark.databricks.cluster.profile": "singleNode", "spark.master": "local[*]"}
