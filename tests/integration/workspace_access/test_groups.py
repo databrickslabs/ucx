@@ -6,7 +6,8 @@ from databricks.sdk.service.iam import PermissionLevel
 from databricks.labs.ucx.config import GroupsConfig
 from databricks.labs.ucx.hive_metastore import GrantsCrawler, TablesCrawler
 from databricks.labs.ucx.workspace_access.generic import (
-    GenericPermissionsSupport, Listing,
+    GenericPermissionsSupport,
+    Listing,
 )
 from databricks.labs.ucx.workspace_access.groups import GroupManager
 from databricks.labs.ucx.workspace_access.manager import PermissionManager
