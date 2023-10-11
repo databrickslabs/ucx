@@ -35,7 +35,7 @@ def setup_schema(cfg: WorkspaceConfig):
 def crawl_tables(_: WorkspaceConfig):
     """Iterates over all tables in the Hive Metastore of the current workspace and persists their metadata, such
     as _database name_, _table name_, _table type_, _table location_, etc., in the Delta table named
-    `${inventory_database}.tables`. The `inventory_database` placeholder is set in the configuration file. The metadata
+    `$inventory_database.tables`. Note that the `inventory_database` is set in the configuration file. The metadata
     stored is then used in the subsequent tasks and workflows to, for example,  find all Hive Metastore tables that
     cannot easily be migrated to Unity Catalog."""
 
@@ -47,10 +47,10 @@ def setup_tacl(_: WorkspaceConfig):
 
 @task("assessment", depends_on=[crawl_tables, setup_tacl], job_cluster="tacl")
 def crawl_grants(cfg: WorkspaceConfig):
-    """Scans the previously created Delta table named `${inventory_database}.tables` and issues a `SHOW GRANTS`
+    """Scans the previously created Delta table named `$inventory_database.tables` and issues a `SHOW GRANTS`
     statement for every object to retrieve the permissions it has assigned to it. The permissions include information
     such as the _principal_, _action type_, and the _table_ it applies to. This is persisted in the Delta table
-    `${inventory_database}.grants`. Other, migration related jobs use this inventory table to convert the legacy Table
+    `$inventory_database.grants`. Other, migration related jobs use this inventory table to convert the legacy Table
     ACLs to Unity Catalog  permissions.
 
     Note: This job runs on a separate cluster (named `tacl`) as it requires the proper configuration to have the Table

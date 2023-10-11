@@ -153,7 +153,7 @@ class WorkspaceInstaller:
             remote_folder=f"{self._install_folder}/queries",
             name=self._name("UCX Assessment"),
             warehouse_id=self._warehouse_id,
-            query_text_callback=self._replace_inventory_variable,
+            query_text_callback=self._current_config.replace_inventory_variable,
         )
         self._dashboards["assessment"] = dash.create_dashboard()
 
@@ -351,17 +351,6 @@ class WorkspaceInstaller:
                 step_list.append(task.workflow)
         return step_list
 
-    @staticmethod
-    def _remove_extra_indentation(doc: str) -> str:
-        lines = doc.splitlines()
-        stripped = []
-        for line in lines:
-            if line.startswith(" " * 4):
-                stripped.append(line[4:])
-            else:
-                stripped.append(line)
-        return "\n".join(stripped)
-
     def _create_readme(self):
         md = [
             "# UCX - The Unity Catalog Migration Assistant",
@@ -386,8 +375,7 @@ class WorkspaceInstaller:
             for t in self._sorted_tasks():
                 if t.workflow != step_name:
                     continue
-                doc = self._remove_extra_indentation(t.doc)
-                doc = self._replace_inventory_variable(doc)
+                doc = self._current_config.replace_inventory_variable(t.doc)
                 md.append(f"### `{t.name}`\n\n")
                 md.append(f"{doc}\n")
                 md.append("\n\n")
