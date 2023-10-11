@@ -4,13 +4,12 @@ from unittest.mock import MagicMock, Mock, patch
 from databricks.sdk.service import workspace
 from databricks.sdk.service.workspace import ObjectInfo, ObjectType
 
-from databricks.labs.ucx.workspace_access.generic import workspace_listing
-from databricks.labs.ucx.workspace_access.listing import WorkspaceListing
+from databricks.labs.ucx.workspace_access import generic, listing
 
 
 def test_logging_calls():
     ws = MagicMock()
-    workspace_listing = WorkspaceListing(ws=ws, num_threads=1)
+    workspace_listing = listing.WorkspaceListing(ws=ws, num_threads=1)
     workspace_listing.start_time = dt.datetime.now()
     workspace_listing._counter = 9
     # with patch.object(logger, "info") as mock_info:
@@ -19,8 +18,8 @@ def test_logging_calls():
 
 
 def test_workspace_listing():
-    listing = MagicMock(spec=WorkspaceListing)
-    listing.walk.return_value = [
+    listing_instance = MagicMock(spec=listing.WorkspaceListing)
+    listing_instance.walk.return_value = [
         workspace.ObjectInfo(object_id=1, object_type=workspace.ObjectType.NOTEBOOK),
         workspace.ObjectInfo(object_id=2, object_type=workspace.ObjectType.DIRECTORY),
         workspace.ObjectInfo(object_id=3, object_type=workspace.ObjectType.LIBRARY),
@@ -29,10 +28,10 @@ def test_workspace_listing():
         workspace.ObjectInfo(object_id=6, object_type=None),  # MLflow Experiment
     ]
 
-    with patch("databricks.labs.ucx.workspace_access.listing.WorkspaceListing", return_value=listing):
-        results = workspace_listing(ws=MagicMock())()
+    with patch("databricks.labs.ucx.workspace_access.listing.WorkspaceListing", return_value=listing_instance):
+        results = generic.WorkspaceListing(ws=MagicMock())
         assert len(list(results)) == 4
-        listing.walk.assert_called_once()
+        listing_instance.walk.assert_called_once()
         for res in results:
             assert res.request_type in [
                 "notebooks",
@@ -40,7 +39,7 @@ def test_workspace_listing():
                 "repos",
                 "files",
             ]
-            assert res.object_id in [1, 2, 4, 5]
+            assert int(res.object_id) in [1, 2, 4, 5]
 
 
 # Helper to compare an unordered list of objects
@@ -64,8 +63,8 @@ def test_list_and_analyze_should_separate_folders_and_other_objects():
     client = Mock()
     client.workspace.list.return_value = [file, directory, notebook]
 
-    listing = WorkspaceListing(client, 1)
-    directories, others = listing._list_and_analyze(rootobj)
+    listing_instance = listing.WorkspaceListing(client, 1)
+    directories, others = listing_instance._list_and_analyze(rootobj)
 
     assert compare(others, [file, notebook])
     assert compare(directories, [directory])
@@ -78,11 +77,11 @@ def test_walk_with_an_empty_folder_should_return_it():
     client.workspace.list.return_value = []
     client.workspace.get_status.return_value = rootobj
 
-    listing = WorkspaceListing(client, 1)
-    listing.walk("/rootPath")
+    listing_instance = listing.WorkspaceListing(client, 1)
+    listing_instance.walk("/rootPath")
 
-    assert len(listing.results) == 1
-    assert listing.results == [rootobj]
+    assert len(listing_instance.results) == 1
+    assert listing_instance.results == [rootobj]
 
 
 def test_walk_with_two_files_should_return_rootpath_and_two_files():
@@ -94,11 +93,11 @@ def test_walk_with_two_files_should_return_rootpath_and_two_files():
     client.workspace.list.return_value = [file, notebook]
     client.workspace.get_status.return_value = rootobj
 
-    listing = WorkspaceListing(client, 1)
-    listing.walk("/rootPath")
+    listing_instance = listing.WorkspaceListing(client, 1)
+    listing_instance.walk("/rootPath")
 
-    assert len(listing.results) == 3
-    assert compare(listing.results, [rootobj, file, notebook])
+    assert len(listing_instance.results) == 3
+    assert compare(listing_instance.results, [rootobj, file, notebook])
 
 
 def test_walk_with_nested_folders_should_return_nested_objects():
@@ -117,11 +116,11 @@ def test_walk_with_nested_folders_should_return_nested_objects():
     client.workspace.list.side_effect = my_side_effect
     client.workspace.get_status.return_value = rootobj
 
-    listing = WorkspaceListing(client, 1)
-    listing.walk("/rootPath")
+    listing_instance = listing.WorkspaceListing(client, 1)
+    listing_instance.walk("/rootPath")
 
-    assert len(listing.results) == 4
-    assert compare(listing.results, [rootobj, file, nested_folder, nested_notebook])
+    assert len(listing_instance.results) == 4
+    assert compare(listing_instance.results, [rootobj, file, nested_folder, nested_notebook])
 
 
 def test_walk_with_three_level_nested_folders_returns_three_levels():
@@ -147,10 +146,11 @@ def test_walk_with_three_level_nested_folders_returns_three_levels():
     client = Mock()
     client.workspace.list.side_effect = my_side_effect
     client.workspace.get_status.return_value = rootobj
-    listing = WorkspaceListing(client, 2)
-    listing.walk("/rootPath")
+    listing_instance = listing.WorkspaceListing(client, 2)
+    listing_instance.walk("/rootPath")
 
-    assert len(listing.results) == 6
+    assert len(listing_instance.results) == 6
     assert compare(
-        listing.results, [rootobj, file, nested_folder, nested_notebook, second_nested_folder, second_nested_notebook]
+        listing_instance.results,
+        [rootobj, file, nested_folder, nested_notebook, second_nested_folder, second_nested_notebook],
     )

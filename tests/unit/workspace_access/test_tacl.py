@@ -90,6 +90,6 @@ def test_tacl_applier_no_target_principal(mocker):
         )
     )
     task = table_acl_support.get_apply_task(permissions, migration_state, "backup")
-    task()
+    assert task is None
 
     assert [] == sql_backend.queries

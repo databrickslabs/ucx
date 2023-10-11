@@ -1,3 +1,4 @@
+import datetime
 import json
 import logging
 from collections.abc import Callable, Iterator
@@ -11,8 +12,7 @@ from databricks.sdk.service import iam, ml, workspace
 
 from databricks.labs.ucx.mixins.hardening import rate_limited
 from databricks.labs.ucx.workspace_access.base import (
-    Applier,
-    Crawler,
+    AclSupport,
     Destination,
     Permissions,
 )
@@ -31,17 +31,49 @@ class RetryableError(DatabricksError):
     pass
 
 
-class GenericPermissionsSupport(Crawler, Applier):
-    def __init__(self, ws: WorkspaceClient, listings: list[Callable[..., Iterator[GenericPermissionsInfo]]]):
+class Listing:
+    def __init__(self, func: Callable[..., list], id_attribute: str, object_type: str):
+        self._func = func
+        self._id_attribute = id_attribute
+        self._object_type = object_type
+
+    def object_types(self) -> set[str]:
+        return set(self._object_type)
+
+    def __iter__(self):
+        started = datetime.datetime.now()
+        for item in self._func():
+            yield GenericPermissionsInfo(getattr(item, self._id_attribute), self._object_type)
+        since = datetime.datetime.now() - started
+        logger.info(f"Listed {self._object_type} in {since}")
+
+
+class GenericPermissionsSupport(AclSupport):
+    def __init__(self, ws: WorkspaceClient, listings: list[Listing]):
         self._ws = ws
         self._listings = listings
 
     def get_crawler_tasks(self):
         for listing in self._listings:
-            for info in listing():
+            for info in listing:
                 yield partial(self._crawler_task, info.request_type, info.object_id)
 
-    def is_item_relevant(self, item: Permissions, migration_state: GroupMigrationState) -> bool:
+    def object_types(self) -> set[str]:
+        all_object_types = set()
+        for listing in self._listings:
+            for object_type in listing.object_types():
+                all_object_types.add(object_type)
+        return all_object_types
+
+    def get_apply_task(self, item: Permissions, migration_state: GroupMigrationState, destination: Destination):
+        if not self._is_item_relevant(item, migration_state):
+            return None
+        object_permissions = iam.ObjectPermissions.from_dict(json.loads(item.raw))
+        new_acl = self._prepare_new_acl(object_permissions, migration_state, destination)
+        return partial(self._applier_task, item.object_type, item.object_id, new_acl)
+
+    @staticmethod
+    def _is_item_relevant(item: Permissions, migration_state: GroupMigrationState) -> bool:
         # passwords and tokens are represented on the workspace-level
         if item.object_id in ("tokens", "passwords"):
             return True
@@ -49,14 +81,6 @@ class GenericPermissionsSupport(Crawler, Applier):
             acl.group_name for acl in iam.ObjectPermissions.from_dict(json.loads(item.raw)).access_control_list
         ]
         return any(g in mentioned_groups for g in [info.workspace.display_name for info in migration_state.groups])
-
-    def _get_apply_task(
-        self, item: Permissions, migration_state: GroupMigrationState, destination: Destination
-    ) -> partial:
-        new_acl = self._prepare_new_acl(
-            iam.ObjectPermissions.from_dict(json.loads(item.raw)), migration_state, destination
-        )
-        return partial(self._applier_task, item.object_type, item.object_id, new_acl)
 
     @rate_limited(max_requests=30)
     def _applier_task(self, object_type: str, object_id: str, acl: list[iam.AccessControlRequest]):
@@ -121,20 +145,17 @@ class GenericPermissionsSupport(Crawler, Applier):
         return acl_requests
 
 
-def listing_wrapper(
-    func: Callable[..., list], id_attribute: str, object_type: str
-) -> Callable[..., Iterator[GenericPermissionsInfo]]:
-    def wrapper() -> Iterator[GenericPermissionsInfo]:
-        for item in func():
-            yield GenericPermissionsInfo(
-                object_id=getattr(item, id_attribute),
-                request_type=object_type,
-            )
+class WorkspaceListing(Listing):
+    def __init__(self, ws: WorkspaceClient, num_threads=20, start_path: str | None = "/"):
+        super().__init__(..., ..., ...)
+        self._ws = ws
+        self._num_threads = num_threads
+        self._start_path = start_path
 
-    return wrapper
+    def object_types(self) -> set[str]:
+        return {"notebooks", "directories", "repos", "files"}
 
-
-def workspace_listing(ws: WorkspaceClient, num_threads=20, start_path: str | None = "/"):
+    @staticmethod
     def _convert_object_type_to_request_type(_object: workspace.ObjectInfo) -> str | None:
         match _object.object_type:
             case workspace.ObjectType.NOTEBOOK:
@@ -151,16 +172,14 @@ def workspace_listing(ws: WorkspaceClient, num_threads=20, start_path: str | Non
             case None:
                 return None
 
-    def inner():
+    def __iter__(self):
         from databricks.labs.ucx.workspace_access.listing import WorkspaceListing
 
-        ws_listing = WorkspaceListing(ws, num_threads=num_threads, with_directories=False)
-        for _object in ws_listing.walk(start_path):
-            request_type = _convert_object_type_to_request_type(_object)
+        ws_listing = WorkspaceListing(self._ws, num_threads=self._num_threads, with_directories=False)
+        for _object in ws_listing.walk(self._start_path):
+            request_type = self._convert_object_type_to_request_type(_object)
             if request_type:
                 yield GenericPermissionsInfo(object_id=str(_object.object_id), request_type=request_type)
-
-    return inner
 
 
 def models_listing(ws: WorkspaceClient):
@@ -193,12 +212,6 @@ def experiments_listing(ws: WorkspaceClient):
     return inner
 
 
-def authorization_listing():
-    def inner():
-        for _value in ["passwords", "tokens"]:
-            yield GenericPermissionsInfo(
-                object_id=_value,
-                request_type="authorization",
-            )
-
-    return inner
+def tokens_and_passwords():
+    for _value in ["passwords", "tokens"]:
+        yield GenericPermissionsInfo(_value, "authorization")

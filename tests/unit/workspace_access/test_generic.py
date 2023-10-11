@@ -6,11 +6,11 @@ from databricks.sdk.service import compute, iam, ml
 
 from databricks.labs.ucx.workspace_access.generic import (
     GenericPermissionsSupport,
+    Listing,
     Permissions,
-    authorization_listing,
     experiments_listing,
-    listing_wrapper,
     models_listing,
+    tokens_and_passwords,
 )
 
 
@@ -38,7 +38,7 @@ def test_crawler():
     sup = GenericPermissionsSupport(
         ws=ws,
         listings=[
-            listing_wrapper(ws.clusters.list, "cluster_id", "clusters"),
+            Listing(ws.clusters.list, "cluster_id", "clusters"),
         ],
     )
 
@@ -96,7 +96,7 @@ def test_apply(migration_state):
 
 def test_relevance():
     sup = GenericPermissionsSupport(ws=MagicMock(), listings=[])  # no listings since only apply is tested
-    result = sup.is_item_relevant(
+    result = sup._is_item_relevant(
         item=Permissions(object_id="passwords", object_type="passwords", raw="some-stuff"),
         migration_state=MagicMock(),
     )
@@ -127,7 +127,7 @@ def test_no_permissions():
     sup = GenericPermissionsSupport(
         ws=ws,
         listings=[
-            listing_wrapper(ws.clusters.list, "cluster_id", "clusters"),
+            Listing(ws.clusters.list, "cluster_id", "clusters"),
         ],
     )
     tasks = list(sup.get_crawler_tasks())
@@ -153,7 +153,7 @@ def test_passwords_tokens_crawler(migration_state):
         iam.ObjectPermissions(object_id="tokens", object_type="authorization", access_control_list=basic_acl),
     ]
 
-    sup = GenericPermissionsSupport(ws=ws, listings=[authorization_listing()])
+    sup = GenericPermissionsSupport(ws=ws, listings=[Listing(tokens_and_passwords, "object_id", "authorization")])
     tasks = list(sup.get_crawler_tasks())
     assert len(tasks) == 2
     auth_items = [task() for task in tasks]
@@ -182,8 +182,8 @@ def test_models_listing():
         )
     )
 
-    wrapped = listing_wrapper(models_listing(ws), id_attribute="id", object_type="registered-models")
-    result = list(wrapped())
+    wrapped = Listing(models_listing(ws), id_attribute="id", object_type="registered-models")
+    result = list(wrapped)
     assert len(result) == 1
     assert result[0].object_id == "some-id"
     assert result[0].request_type == "registered-models"
@@ -199,8 +199,8 @@ def test_experiment_listing():
             experiment_id="test4", tags=[ml.ExperimentTag(key="mlflow.experiment.sourceType", value="REPO_NOTEBOOK")]
         ),
     ]
-    wrapped = listing_wrapper(experiments_listing(ws), id_attribute="experiment_id", object_type="experiments")
-    results = list(wrapped())
+    wrapped = Listing(experiments_listing(ws), id_attribute="experiment_id", object_type="experiments")
+    results = list(wrapped)
     assert len(results) == 2
     for res in results:
         assert res.request_type == "experiments"
