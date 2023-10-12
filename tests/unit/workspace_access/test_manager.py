@@ -6,9 +6,7 @@ from databricks.sdk.service import iam
 from databricks.sdk.service.iam import Group, ResourceMeta
 
 from databricks.labs.ucx.mixins.sql import Row
-from databricks.labs.ucx.workspace_access.groups import (
-    GroupMigrationState,
-)
+from databricks.labs.ucx.workspace_access.groups import GroupMigrationState
 from databricks.labs.ucx.workspace_access.manager import PermissionManager, Permissions
 
 from ..framework.mocks import MockBackend
