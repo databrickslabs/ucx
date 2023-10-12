@@ -96,10 +96,6 @@ def test_jobs_with_no_inventory_database(
     ws_group_b, acc_group_b = make_ucx_group()
     ws_group_c, acc_group_c = make_ucx_group()
 
-    members_src_a = sorted([_.display for _ in ws.groups.get(id=ws_group_a.id).members])
-    members_src_b = sorted([_.display for _ in ws.groups.get(id=ws_group_b.id).members])
-    members_src_c = sorted([_.display for _ in ws.groups.get(id=ws_group_c.id).members])
-
     schema_a = make_schema()
     schema_b = make_schema()
     _ = make_schema()

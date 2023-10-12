@@ -118,13 +118,17 @@ class GroupManager:
                 continue
             if g.meta.resource_type != resource_type:
                 continue
+            if g.members is None:
+                continue
             for m in g.members:
                 membership[g.display_name].add(m.display)
         return membership
 
-    def get_account_group_membership(self):
+    def get_account_membership(self):
         membership = collections.defaultdict(set)
         for g in self._account_groups:
+            if g.members is None:
+                continue
             for m in g.members:
                 membership[g.display_name].add(m.display)
         return membership
