@@ -11,6 +11,7 @@ from databricks.labs.ucx.config import GroupsConfig, WorkspaceConfig
 from databricks.labs.ucx.hive_metastore.grants import GrantsCrawler
 from databricks.labs.ucx.hive_metastore.tables import TablesCrawler
 from databricks.labs.ucx.install import WorkspaceInstaller
+from databricks.labs.ucx.workspace_access.groups import GroupManager
 
 logger = logging.getLogger(__name__)
 
@@ -169,58 +170,27 @@ def test_jobs_with_no_inventory_database(
             install.run_workflow(step)
 
         @retried(on=[AssertionError], timeout=timedelta(minutes=1))
-        def validate_group_ids():
-            logger.info("validating group ids")
-            dst_ws_group_a = ws.groups.list(filter=f"displayName eq {ws_group_a.display_name}")[0]
-            assert (
-                ws_group_a.id != dst_ws_group_a.id
-            ), f"Group id for target group {ws_group_a.display_name} should differ from group id of source group"
+        def validate_groups():
+            group_manager = GroupManager(ws, GroupsConfig(auto=True))
+            ws_membership = group_manager.get_workspace_membership('WorkspaceGroup')
+            acc_membership = group_manager.get_workspace_membership('Group')
 
-            dst_ws_group_b = ws.groups.list(filter=f"displayName eq {ws_group_b.display_name}")[0]
-            assert (
-                ws_group_b.id != dst_ws_group_b.id
-            ), f"Group id for target group {ws_group_b.display_name} should differ from group id of source group"
+            logger.info("validating replaced account groups")
+            assert acc_group_a.display_name in acc_membership, f"{acc_group_a.display_name} not found in workspace"
+            assert acc_group_b.display_name in acc_membership, f"{acc_group_b.display_name} not found in workspace"
+            assert acc_group_c.display_name in acc_membership, f"{acc_group_c.display_name} not found in workspace"
 
-            dst_ws_group_c = ws.groups.list(filter=f"displayName eq {ws_group_c.display_name}")[0]
-            assert (
-                ws_group_c.id != dst_ws_group_c.id
-            ), f"Group id for target group {ws_group_c.display_name} should differ from group id of source group"
+            logger.info("validating replaced group members")
+            for g in (ws_group_a, ws_group_b, ws_group_c):
+                for m in g.members:
+                    assert m.display in acc_membership[g.display_name], f"{m.display} not in {g.display_name}"
 
-            logger.info("validating clean up of backup groups")
+            logger.info("validating backup groups")
+            assert (backup_group_prefix + ws_group_a.display_name) in ws_membership
+            assert (backup_group_prefix + ws_group_b.display_name) in ws_membership
+            assert (backup_group_prefix + ws_group_c.display_name) in ws_membership
 
-            backup_ws_group_a_iter = ws.groups.list(
-                filter=f"displayName eq { backup_group_prefix + ws_group_a.display_name}"
-            )
-            assert all(
-                False for _ in backup_ws_group_a_iter
-            ), f"Backup group {backup_group_prefix + ws_group_a.display_name} was not deleted"
-
-            backup_ws_group_b_iter = ws.groups.list(
-                filter=f"displayName eq { backup_group_prefix + ws_group_b.display_name}"
-            )
-            assert all(
-                False for _ in backup_ws_group_b_iter
-            ), f"Backup group {backup_group_prefix + ws_group_b.display_name} was not deleted"
-
-            backup_ws_group_c_iter = ws.groups.list(
-                filter=f"displayName eq { backup_group_prefix + ws_group_c.display_name}"
-            )
-            assert all(
-                False for _ in backup_ws_group_c_iter
-            ), f"Backup group {backup_group_prefix + ws_group_c.display_name} was not deleted"
-
-            logger.info("validating group members")
-
-            members_dst_a = sorted([_.display for _ in ws.groups.get(id=dst_ws_group_a.id).members])
-            assert members_dst_a == members_src_a, f"Members from {ws_group_a.display_name} were not migrated correctly"
-
-            members_dst_b = sorted([_.display for _ in ws.groups.get(id=dst_ws_group_b.id).members])
-            assert members_dst_b == members_src_b, f"Members in {ws_group_b.display_name} were not migrated correctly"
-
-            members_dst_c = sorted([_.display for _ in ws.groups.get(id=dst_ws_group_c.id).members])
-            assert members_dst_c == members_src_c, f"Members in {ws_group_c.display_name} were not migrated correctly"
-
-        validate_group_ids()
+        validate_groups()
 
         @retried(on=[AssertionError], timeout=timedelta(minutes=1))
         def validate_permissions():
