@@ -1,8 +1,10 @@
 import logging
 import random
+from datetime import timedelta
 
 import pytest
 from databricks.sdk.errors import OperationFailed
+from databricks.sdk.retries import retried
 from databricks.sdk.service.iam import PermissionLevel
 
 from databricks.labs.ucx.config import GroupsConfig, WorkspaceConfig
@@ -135,7 +137,6 @@ def test_jobs_with_no_inventory_database(
         [_ for _ in jp_src.access_control_list if _.group_name == ws_group_b.display_name],
         key=lambda p: p.group_name,
     )
-    logger.info(f"cluster_policy={cluster_policy}, job={job}, ")
 
     backup_group_prefix = "db-temp-"
     inventory_database = f"ucx_{make_random(4)}"
@@ -158,112 +159,133 @@ def test_jobs_with_no_inventory_database(
     )
 
     try:
-        for step in ["assessment", "migrate-groups", "migrate-groups-cleanup"]:
+        required_workflows = [
+            "assessment",
+            "002-apply-permissions-to-backup-groups",
+            "003-replace-workspace-local-with-account-groups",
+            "004-apply-permissions-to-account-groups",
+        ]
+        for step in required_workflows:
             install.run_workflow(step)
 
-        logger.info("validating group ids")
+        @retried(on=[AssertionError], timeout=timedelta(minutes=1))
+        def validate_group_ids():
+            logger.info("validating group ids")
+            dst_ws_group_a = ws.groups.list(filter=f"displayName eq {ws_group_a.display_name}")[0]
+            assert (
+                ws_group_a.id != dst_ws_group_a.id
+            ), f"Group id for target group {ws_group_a.display_name} should differ from group id of source group"
 
-        dst_ws_group_a = ws.groups.list(filter=f"displayName eq {ws_group_a.display_name}")[0]
-        assert (
-            ws_group_a.id != dst_ws_group_a.id
-        ), f"Group id for target group {ws_group_a.display_name} should differ from group id of source group"
+            dst_ws_group_b = ws.groups.list(filter=f"displayName eq {ws_group_b.display_name}")[0]
+            assert (
+                ws_group_b.id != dst_ws_group_b.id
+            ), f"Group id for target group {ws_group_b.display_name} should differ from group id of source group"
 
-        dst_ws_group_b = ws.groups.list(filter=f"displayName eq {ws_group_b.display_name}")[0]
-        assert (
-            ws_group_b.id != dst_ws_group_b.id
-        ), f"Group id for target group {ws_group_b.display_name} should differ from group id of source group"
+            dst_ws_group_c = ws.groups.list(filter=f"displayName eq {ws_group_c.display_name}")[0]
+            assert (
+                ws_group_c.id != dst_ws_group_c.id
+            ), f"Group id for target group {ws_group_c.display_name} should differ from group id of source group"
 
-        dst_ws_group_c = ws.groups.list(filter=f"displayName eq {ws_group_c.display_name}")[0]
-        assert (
-            ws_group_c.id != dst_ws_group_c.id
-        ), f"Group id for target group {ws_group_c.display_name} should differ from group id of source group"
+            logger.info("validating clean up of backup groups")
 
-        logger.info("validating clean up of backup groups")
+            backup_ws_group_a_iter = ws.groups.list(
+                filter=f"displayName eq { backup_group_prefix + ws_group_a.display_name}"
+            )
+            assert all(
+                False for _ in backup_ws_group_a_iter
+            ), f"Backup group {backup_group_prefix + ws_group_a.display_name} was not deleted"
 
-        backup_ws_group_a_iter = ws.groups.list(
-            filter=f"displayName eq { backup_group_prefix + ws_group_a.display_name}"
-        )
-        assert all(
-            False for _ in backup_ws_group_a_iter
-        ), f"Backup group {backup_group_prefix + ws_group_a.display_name} was not deleted"
+            backup_ws_group_b_iter = ws.groups.list(
+                filter=f"displayName eq { backup_group_prefix + ws_group_b.display_name}"
+            )
+            assert all(
+                False for _ in backup_ws_group_b_iter
+            ), f"Backup group {backup_group_prefix + ws_group_b.display_name} was not deleted"
 
-        backup_ws_group_b_iter = ws.groups.list(
-            filter=f"displayName eq { backup_group_prefix + ws_group_b.display_name}"
-        )
-        assert all(
-            False for _ in backup_ws_group_b_iter
-        ), f"Backup group {backup_group_prefix + ws_group_b.display_name} was not deleted"
+            backup_ws_group_c_iter = ws.groups.list(
+                filter=f"displayName eq { backup_group_prefix + ws_group_c.display_name}"
+            )
+            assert all(
+                False for _ in backup_ws_group_c_iter
+            ), f"Backup group {backup_group_prefix + ws_group_c.display_name} was not deleted"
 
-        backup_ws_group_c_iter = ws.groups.list(
-            filter=f"displayName eq { backup_group_prefix + ws_group_c.display_name}"
-        )
-        assert all(
-            False for _ in backup_ws_group_c_iter
-        ), f"Backup group {backup_group_prefix + ws_group_c.display_name} was not deleted"
+            logger.info("validating group members")
 
-        logger.info("validating group members")
+            members_dst_a = sorted([_.display for _ in ws.groups.get(id=dst_ws_group_a.id).members])
+            assert members_dst_a == members_src_a, f"Members from {ws_group_a.display_name} were not migrated correctly"
 
-        members_dst_a = sorted([_.display for _ in ws.groups.get(id=dst_ws_group_a.id).members])
-        assert members_dst_a == members_src_a, f"Members from {ws_group_a.display_name} were not migrated correctly"
+            members_dst_b = sorted([_.display for _ in ws.groups.get(id=dst_ws_group_b.id).members])
+            assert members_dst_b == members_src_b, f"Members in {ws_group_b.display_name} were not migrated correctly"
 
-        members_dst_b = sorted([_.display for _ in ws.groups.get(id=dst_ws_group_b.id).members])
-        assert members_dst_b == members_src_b, f"Members in {ws_group_b.display_name} were not migrated correctly"
+            members_dst_c = sorted([_.display for _ in ws.groups.get(id=dst_ws_group_c.id).members])
+            assert members_dst_c == members_src_c, f"Members in {ws_group_c.display_name} were not migrated correctly"
 
-        members_dst_c = sorted([_.display for _ in ws.groups.get(id=dst_ws_group_c.id).members])
-        assert members_dst_c == members_src_c, f"Members in {ws_group_c.display_name} were not migrated correctly"
+        validate_group_ids()
 
-        logger.info("validating permissions")
+        @retried(on=[AssertionError], timeout=timedelta(minutes=1))
+        def validate_permissions():
+            logger.info("validating permissions")
 
-        cp_dst = ws.permissions.get("cluster-policies", cluster_policy.policy_id)
-        cluster_policy_dst_permissions = sorted(
-            [_ for _ in cp_dst.access_control_list if _.group_name == ws_group_a.display_name],
-            key=lambda p: p.group_name,
-        )
-        assert len(cluster_policy_dst_permissions) == len(
-            cluster_policy_src_permissions
-        ), "Target permissions were not applied correctly for cluster policies"
-        assert [t.all_permissions for t in cluster_policy_dst_permissions] == [
-            s.all_permissions for s in cluster_policy_src_permissions
-        ], "Target permissions were not applied correctly for cluster policies"
+            cp_dst = ws.permissions.get("cluster-policies", cluster_policy.policy_id)
+            cluster_policy_dst_permissions = sorted(
+                [_ for _ in cp_dst.access_control_list if _.group_name == ws_group_a.display_name],
+                key=lambda p: p.group_name,
+            )
+            assert len(cluster_policy_dst_permissions) == len(
+                cluster_policy_src_permissions
+            ), "Target permissions were not applied correctly for cluster policies"
+            assert [t.all_permissions for t in cluster_policy_dst_permissions] == [
+                s.all_permissions for s in cluster_policy_src_permissions
+            ], "Target permissions were not applied correctly for cluster policies"
 
-        jp_dst = ws.permissions.get("jobs", job.job_id)
-        job_dst_permissions = sorted(
-            [_ for _ in jp_dst.access_control_list if _.group_name == ws_group_b.display_name],
-            key=lambda p: p.group_name,
-        )
-        assert len(job_dst_permissions) == len(
-            job_src_permissions
-        ), f"Target permissions were not applied correctly for jobs/{job.job_id}"
-        assert [t.all_permissions for t in job_dst_permissions] == [
-            s.all_permissions for s in job_src_permissions
-        ], f"Target permissions were not applied correctly for jobs/{job.job_id}"
+            jp_dst = ws.permissions.get("jobs", job.job_id)
+            job_dst_permissions = sorted(
+                [_ for _ in jp_dst.access_control_list if _.group_name == ws_group_b.display_name],
+                key=lambda p: p.group_name,
+            )
+            assert len(job_dst_permissions) == len(
+                job_src_permissions
+            ), f"Target permissions were not applied correctly for jobs/{job.job_id}"
+            assert [t.all_permissions for t in job_dst_permissions] == [
+                s.all_permissions for s in job_src_permissions
+            ], f"Target permissions were not applied correctly for jobs/{job.job_id}"
 
-        logger.info("validating tacl")
+        validate_permissions()
 
-        tables_crawler = TablesCrawler(sql_backend, install._config.inventory_database)
-        grants_crawler = GrantsCrawler(tables_crawler)
+        @retried(on=[AssertionError], timeout=timedelta(minutes=1))
+        def validate_tacl():
+            logger.info("validating tacl")
 
-        table_a_grants = grants_crawler.for_table_info(table_a)
-        assert {"SELECT"} == table_a_grants.get(ws_group_a.display_name)
+            tables_crawler = TablesCrawler(sql_backend, install._config.inventory_database)
+            grants_crawler = GrantsCrawler(tables_crawler)
 
-        table_b_grants = grants_crawler.for_table_info(table_b)
-        assert {"SELECT"} == table_b_grants.get(ws_group_b.display_name)
+            table_a_grants = grants_crawler.for_table_info(table_a)
+            assert {"SELECT"} == table_a_grants.get(ws_group_a.display_name)
 
-        schema_b_grants = grants_crawler.for_schema_info(schema_b)
-        assert {"MODIFY"} == schema_b_grants.get(ws_group_b.display_name)
+            table_b_grants = grants_crawler.for_table_info(table_b)
+            assert {"SELECT"} == table_b_grants.get(ws_group_b.display_name)
 
-        all_grants = grants_crawler.snapshot()
-        logger.debug(f"all grants={all_grants}, ")
+            schema_b_grants = grants_crawler.for_schema_info(schema_b)
+            assert {"MODIFY"} == schema_b_grants.get(ws_group_b.display_name)
 
-        permissions = list(
-            sql_backend.fetch(f"SELECT * FROM hive_metastore.{install._config.inventory_database}.permissions")
-        )
-        tables = list(sql_backend.fetch(f"SELECT * FROM hive_metastore.{install._config.inventory_database}.tables"))
-        grants = list(sql_backend.fetch(f"SELECT * FROM hive_metastore.{install._config.inventory_database}.grants"))
+            all_grants = grants_crawler.snapshot()
+            logger.debug(f"all grants={all_grants}, ")
 
-        assert len(permissions) > 0
-        assert len(tables) >= 2
-        assert len(grants) >= 5
+            permissions = list(
+                sql_backend.fetch(f"SELECT * FROM hive_metastore.{install._config.inventory_database}.permissions")
+            )
+            tables = list(
+                sql_backend.fetch(f"SELECT * FROM hive_metastore.{install._config.inventory_database}.tables")
+            )
+            grants = list(
+                sql_backend.fetch(f"SELECT * FROM hive_metastore.{install._config.inventory_database}.grants")
+            )
+
+            assert len(permissions) > 0
+            assert len(tables) >= 2
+            assert len(grants) >= 5
+
+        validate_tacl()
     finally:
         logger.debug(f"cleaning up install folder: {install._install_folder}")
         ws.workspace.delete(install._install_folder, recursive=True)
