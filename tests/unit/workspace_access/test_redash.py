@@ -76,7 +76,7 @@ def test_apply(migration_state):
             ),
         ],
     )
-    sup = SqlPermissionsSupport(ws=ws, listings=[])
+    sup = RedashPermissionsSupport(ws=ws, listings=[])
     item = Permissions(
         object_id="test",
         object_type="alerts",
@@ -147,7 +147,7 @@ def test_applier_task_should_return_true_if_permission_is_up_to_date():
         access_control_list=[acl_grp_1, acl_grp_2],
     )
 
-    sup = SqlPermissionsSupport(ws=ws, listings=[])
+    sup = RedashPermissionsSupport(ws=ws, listings=[])
     result = sup._applier_task(sql.ObjectTypePlural.QUERIES, "test", [acl_grp_1])
     assert result
 
@@ -164,7 +164,7 @@ def test_applier_task_should_return_true_if_permission_is_up_to_date_with_multip
         access_control_list=[acl_1_grp_1, acl_2_grp_1, acl_3_grp_1, acl_grp_2],
     )
 
-    sup = SqlPermissionsSupport(ws=ws, listings=[])
+    sup = RedashPermissionsSupport(ws=ws, listings=[])
     result = sup._applier_task(sql.ObjectTypePlural.QUERIES, "test", [acl_1_grp_1, acl_2_grp_1])
     assert result
 
@@ -180,7 +180,7 @@ def test_applier_task_should_return_false_if_permission_are_not_up_to_date():
         ],
     )
 
-    sup = SqlPermissionsSupport(ws=ws, listings=[])
+    sup = RedashPermissionsSupport(ws=ws, listings=[])
     result = sup._applier_task(
         sql.ObjectTypePlural.QUERIES,
         "test",
@@ -200,7 +200,7 @@ def test_applier_task_should_return_false_if_all_permissions_are_not_up_to_date(
         ],
     )
 
-    sup = SqlPermissionsSupport(ws=ws, listings=[])
+    sup = RedashPermissionsSupport(ws=ws, listings=[])
     result = sup._applier_task(
         sql.ObjectTypePlural.QUERIES,
         "test",
@@ -223,7 +223,7 @@ def test_applier_task_should_be_called_three_times_if_permission_is_not_up_to_da
         ],
     )
 
-    sup = SqlPermissionsSupport(ws=ws, listings=[])
+    sup = RedashPermissionsSupport(ws=ws, listings=[])
     input_acl = sql.AccessControl(group_name="group_1", permission_level=sql.PermissionLevel.CAN_RUN)
 
     sup._applier_task(
