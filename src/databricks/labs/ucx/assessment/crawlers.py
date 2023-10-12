@@ -10,6 +10,7 @@ from databricks.sdk.service.compute import ClusterSource
 from databricks.sdk.service.jobs import BaseJob
 
 from databricks.labs.ucx.framework.crawlers import CrawlerBase, SqlBackend
+from databricks.labs.ucx.workspace_access.listing import WorkspaceListing
 
 logger = logging.getLogger(__name__)
 
@@ -83,6 +84,14 @@ class GlobalInitScriptInfo:
     enabled: bool
     success: int
     failures: str
+
+
+@dataclass
+class WorkspaceObjectInfo:
+    object_type: str
+    object_id: int
+    path: str
+    language: str
 
 
 def _get_init_script_data(w, init_script_info):
@@ -559,3 +568,29 @@ class JobsCrawler(CrawlerBase):
     def _try_fetch(self) -> list[JobInfo]:
         for row in self._fetch(f"SELECT * FROM {self._schema}.{self._table}"):
             yield JobInfo(*row)
+
+
+class WorkspaceObjectCrawler(CrawlerBase):
+    def __init__(self, ws: WorkspaceClient, sbe: SqlBackend, schema, num_threads: int = 20, start_path: str = "/"):
+        super().__init__(sbe, "hive_metastore", schema, "workspace_objects", WorkspaceObjectInfo)
+        self._ws = ws
+        self._num_threads = num_threads
+        self._start_path = start_path
+
+    def _crawl(self) -> list[WorkspaceObjectInfo]:
+        ws_listing = WorkspaceListing(ws=self._ws, num_threads=self._num_threads)
+        return list(self._assess_workspace_listing(ws_listing))
+
+    def _assess_workspace_listing(self, ws_listing: WorkspaceListing):
+        for _object in ws_listing.walk(self._start_path):
+            workspace_object_info = WorkspaceObjectInfo(
+                _object.object_type.name, _object.object_id, _object.path, _object.language
+            )
+            yield workspace_object_info
+
+    def snapshot(self) -> list[WorkspaceObjectInfo]:
+        return self._snapshot(self._try_fetch, self._crawl)
+
+    def _try_fetch(self) -> list[WorkspaceObjectInfo]:
+        for row in self._fetch(f"SELECT * FROM {self._schema}.{self._table}"):
+            yield WorkspaceObjectInfo(*row)

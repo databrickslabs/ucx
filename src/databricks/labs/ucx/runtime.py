@@ -10,6 +10,7 @@ from databricks.labs.ucx.assessment.crawlers import (
     GlobalInitScriptCrawler,
     JobsCrawler,
     PipelinesCrawler,
+    WorkspaceObjectCrawler,
 )
 from databricks.labs.ucx.config import WorkspaceConfig
 from databricks.labs.ucx.framework.crawlers import RuntimeBackend
@@ -18,7 +19,6 @@ from databricks.labs.ucx.hive_metastore import GrantsCrawler, TablesCrawler
 from databricks.labs.ucx.hive_metastore.data_objects import ExternalLocationCrawler
 from databricks.labs.ucx.hive_metastore.mounts import Mounts
 from databricks.labs.ucx.workspace_access.groups import GroupManager
-from databricks.labs.ucx.workspace_access.listing import WorkspaceListing
 from databricks.labs.ucx.workspace_access.manager import PermissionManager
 
 logger = logging.getLogger(__name__)
@@ -205,15 +205,15 @@ def assessment_report(_: WorkspaceConfig):
 
 
 @task("assessment", depends_on=[setup_schema])
-def workspace_listing(cfg: WorkspaceConfig, start_path: str = "/"):
+def workspace_listing(cfg: WorkspaceConfig):
     """Scans the workspace for workspace objects. It recursively list all sub directories
     and compiles a list of directories, notebooks, files, repos and libraries in the workspace.
 
     Its uses multi-threading to parallelize the listing process to speed up on big workspaces.
     It accepts starting path as the parameter defaulted to the root path '/'."""
     ws = WorkspaceClient(config=cfg.to_databricks_config())
-    ws_listing = WorkspaceListing(ws, num_threads=cfg.num_threads)
-    ws_listing.walk(start_path)
+    crawler = WorkspaceObjectCrawler(ws, RuntimeBackend(), cfg.inventory_database)
+    crawler.snapshot()
 
 
 @task("migrate-groups", depends_on=[crawl_permissions], job_cluster="tacl")

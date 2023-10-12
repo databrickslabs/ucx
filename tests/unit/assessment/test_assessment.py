@@ -21,7 +21,8 @@ from databricks.sdk.service.jobs import (
 )
 from databricks.sdk.service.pipelines import PipelineState, PipelineStateInfo
 from databricks.sdk.service.sql import EndpointConfPair
-from databricks.sdk.service.workspace import GetSecretResponse
+from databricks.sdk.service.workspace import GetSecretResponse, ObjectInfo, ObjectType
+from pyspark.sql import Row as PysparkRow
 
 from databricks.labs.ucx.assessment.crawlers import (
     AzureServicePrincipalCrawler,
@@ -30,10 +31,13 @@ from databricks.labs.ucx.assessment.crawlers import (
     JobsCrawler,
     PipelineInfo,
     PipelinesCrawler,
+    WorkspaceObjectCrawler,
+    WorkspaceObjectInfo,
 )
 from databricks.labs.ucx.hive_metastore.data_objects import ExternalLocationCrawler
 from databricks.labs.ucx.hive_metastore.mounts import Mount
 from databricks.labs.ucx.mixins.sql import Row
+from databricks.labs.ucx.workspace_access.listing import WorkspaceListing
 from tests.unit.framework.mocks import MockBackend
 
 _SECRET_PATTERN = r"{{(secrets.*?)}}"
@@ -2514,3 +2518,100 @@ def test_list_all_pipeline_with_conf_spn_secret_avlb(mocker):
     assert result_set[0].get("application_id") == "Hello, World!"
     assert result_set[0].get("tenant_id") == "directory_12345"
     assert result_set[0].get("storage_account") == "newstorageacct"
+
+
+def test_workspaceobject_try_fetch(mocker):
+    sample_objects = iter(
+        [
+            PysparkRow(
+                object_type="NOTEBOOK",
+                object_id=123,
+                path="/rootobj/notebook1",
+                language="PYTHON",
+            ),
+            PysparkRow(
+                object_type="DIRECTORY",
+                object_id=456,
+                path="/rootobj/folder1",
+                language="",
+            ),
+        ]
+    )
+    ws = Mock()
+    crawler = WorkspaceObjectCrawler(ws, MockBackend(), "ucx")
+    crawler._fetch = Mock(return_value=sample_objects)
+    result_set = list(crawler._try_fetch())
+
+    assert len(result_set) == 2
+    assert result_set[0] == WorkspaceObjectInfo("NOTEBOOK", 123, "/rootobj/notebook1", "PYTHON")
+
+
+def test_workspaceobject_assessment(mocker):
+    sample_objects = [
+        ObjectInfo(
+            object_type=ObjectType.NOTEBOOK,
+            path="/rootobj/notebook1",
+            language="PYTHON",
+            created_at=0,
+            modified_at=0,
+            object_id=123,
+            size=0,
+        ),
+        ObjectInfo(
+            object_type=ObjectType.DIRECTORY,
+            path="/rootobj/folder1",
+            language="",
+            created_at=0,
+            modified_at=0,
+            object_id=456,
+            size=0,
+        ),
+    ]
+    ws = Mock()
+    ws_listing = WorkspaceListing(ws=ws, num_threads=2)
+    ws_listing.walk = Mock(return_value=sample_objects)
+    crawler = WorkspaceObjectCrawler(ws, MockBackend(), "ucx")._assess_workspace_listing(ws_listing)
+    result_set = list(crawler)
+
+    assert len(result_set) == 2
+    assert result_set[0] == WorkspaceObjectInfo("NOTEBOOK", 123, "/rootobj/notebook1", "PYTHON")
+
+
+def test_workspace_snapshot():
+    sample_objects = [
+        WorkspaceObjectInfo(
+            object_type="NOTEBOOK",
+            object_id=123,
+            path="/rootobj/notebook1",
+            language="PYTHON",
+        ),
+        WorkspaceObjectInfo(
+            object_type="DIRECTORY",
+            object_id=456,
+            path="/rootobj/folder1",
+            language="",
+        ),
+    ]
+    mock_ws = Mock()
+    crawler = WorkspaceObjectCrawler(mock_ws, MockBackend(), "ucx")
+    crawler._try_fetch = Mock(return_value=[])
+    crawler._crawl = Mock(return_value=sample_objects)
+
+    result_set = crawler.snapshot()
+
+    assert len(result_set) == 2
+    assert result_set[0] == WorkspaceObjectInfo("NOTEBOOK", 123, "/rootobj/notebook1", "PYTHON")
+
+def test_workspaceobject_crawl(mocker):
+    sample_object = WorkspaceObjectInfo(
+            object_type="NOTEBOOK",
+            object_id=123,
+            path="/rootobj/notebook1",
+            language="PYTHON",
+        )
+    ws = Mock()
+    crawler = WorkspaceObjectCrawler(ws, MockBackend(), "ucx")
+    crawler._assess_workspace_listing = Mock(return_value= iter([sample_object]))
+    result_set = crawler._crawl()
+    assert len(result_set) == 1
+    assert result_set[0] == WorkspaceObjectInfo("NOTEBOOK", 123, "/rootobj/notebook1", "PYTHON")
