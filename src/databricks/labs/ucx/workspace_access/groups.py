@@ -1,3 +1,4 @@
+import collections
 import json
 import logging
 import typing
@@ -110,6 +111,28 @@ class GroupManager:
             self._delete_workspace_group(group)
         logger.info("Backup groups were successfully deleted")
 
+    def get_workspace_membership(self, resource_type: str = "WorkspaceGroup"):
+        membership = collections.defaultdict(set)
+        for g in self._ws.groups.list(attributes=self._SCIM_ATTRIBUTES):
+            if g.display_name in self._SYSTEM_GROUPS:
+                continue
+            if g.meta.resource_type != resource_type:
+                continue
+            if g.members is None:
+                continue
+            for m in g.members:
+                membership[g.display_name].add(m.display)
+        return membership
+
+    def get_account_membership(self):
+        membership = collections.defaultdict(set)
+        for g in self._account_groups:
+            if g.members is None:
+                continue
+            for m in g.members:
+                membership[g.display_name].add(m.display)
+        return membership
+
     def _list_workspace_groups(self) -> list[iam.Group]:
         logger.info("Listing workspace groups...")
         workspace_groups = [
@@ -159,7 +182,7 @@ class GroupManager:
             entitlements=source_group.entitlements,
             roles=source_group.roles,
             members=source_group.members,
-        )
+        )  # TODO: there still could be a corner case, where we get `Group with name db-temp-XXX already exists.`
         self._workspace_groups.append(backup_group)
         logger.info(f"Backup group {backup_group_name} successfully created")
 
