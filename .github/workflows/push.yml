@@ -72,12 +72,13 @@ jobs:
           cat src/databricks/labs/ucx/__about__.py
 
       - name: Build PEX archive
-        run: hatch run pex:build
+        run: |
+          hatch run pex:build
+          mv ucx-installer-gh$GITHUB_RUN_ID-py${{ matrix.pyVersion }}
 
       - uses: actions/upload-artifact@v3
         with:
-          name: ucx-installer-gh${{ GITHUB_RUN_ID }}-py${{ matrix.pyVersion }}
-          path: ucx-installer
+          path: ucx-installer-*
 
   fmt:
     runs-on: ubuntu-latest
