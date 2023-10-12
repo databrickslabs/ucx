@@ -199,7 +199,7 @@ def test_workspace_access_e2e(
 
     toolkit.replace_workspace_groups_with_account_groups()
 
-    workspace_acc_membership = toolkit._group_manager.get_workspace_membership('Group')
+    workspace_acc_membership = toolkit._group_manager.get_workspace_membership("Group")
     assert acc_group.display_name in workspace_acc_membership
 
     toolkit.apply_permissions_to_account_groups()
@@ -209,6 +209,6 @@ def test_workspace_access_e2e(
     toolkit.delete_backup_groups()
 
     workspace_membership = toolkit._group_manager.get_workspace_membership()
-    assert f'db-temp-{ws_group.display_name}' not in workspace_membership
+    assert f"db-temp-{ws_group.display_name}" not in workspace_membership
 
     toolkit.cleanup_inventory_table()
