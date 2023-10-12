@@ -62,13 +62,14 @@ jobs:
           cache-dependency-path: '**/pyproject.toml'
           python-version: ${{ matrix.pyVersion }}
 
-      - run: pip install hatch==$HATCH_VERSION
+      - name: Install build tooling (hatch)
+        run: pip install hatch==$HATCH_VERSION
 
       - name: Bump build version
         run: |
           hatch version patch
           sed -i "s/\(__version__ = \"[0-9.]*\)/\1+gh$GITHUB_RUN_ID/" src/databricks/labs/ucx/__about__.py
-          echo src/databricks/labs/ucx/__about__.py
+          cat src/databricks/labs/ucx/__about__.py
 
       - name: Build PEX archive
         run: hatch run pex:build
