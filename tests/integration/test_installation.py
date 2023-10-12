@@ -87,6 +87,7 @@ def test_jobs_with_no_inventory_database(
     make_table,
     env_or_skip,
 ):
+    inventory_database = f"ucx_{make_random(4)}"
     default_cluster_id = env_or_skip("TEST_DEFAULT_CLUSTER_ID")
     tacl_cluster_id = env_or_skip("TEST_LEGACY_TABLE_ACL_CLUSTER_ID")
     logger.info(f"ensuring default ({default_cluster_id}) and tacl ({tacl_cluster_id}) clusters are running")
@@ -110,16 +111,17 @@ def test_jobs_with_no_inventory_database(
     sql_backend.execute(f"GRANT SELECT ON TABLE {table_b.full_name} TO `{ws_group_b.display_name}`")
     sql_backend.execute(f"GRANT MODIFY ON SCHEMA {schema_b.full_name} TO `{ws_group_b.display_name}`")
 
+    tables_crawler = TablesCrawler(sql_backend, inventory_database)
+    grants_crawler = GrantsCrawler(tables_crawler)
+    src_table_a_grants = grants_crawler.for_table_info(table_a)
+    src_table_b_grants = grants_crawler.for_table_info(table_b)
+    src_schema_b_grants = grants_crawler.for_schema_info(schema_b)
+
     cluster_policy = make_cluster_policy()
     make_cluster_policy_permissions(
         object_id=cluster_policy.policy_id,
         permission_level=PermissionLevel.CAN_USE,
         group_name=ws_group_a.display_name,
-    )
-    cpp_src = ws.permissions.get("cluster-policies", cluster_policy.policy_id)
-    sorted(
-        [_ for _ in cpp_src.access_control_list if _.group_name == ws_group_a.display_name],
-        key=lambda p: p.group_name,
     )
 
     job = make_job()
@@ -130,14 +132,12 @@ def test_jobs_with_no_inventory_database(
         ),
         group_name=ws_group_b.display_name,
     )
-    jp_src = ws.permissions.get("jobs", job.job_id)
-    sorted(
-        [_ for _ in jp_src.access_control_list if _.group_name == ws_group_b.display_name],
-        key=lambda p: p.group_name,
-    )
+
+    generic_permissions = GenericPermissionsSupport(ws, [])
+    src_policy_permissions = generic_permissions.load_as_dict("cluster-policies", cluster_policy.policy_id)
+    src_job_permissions = generic_permissions.load_as_dict("jobs", job.job_id)
 
     backup_group_prefix = "db-temp-"
-    inventory_database = f"ucx_{make_random(4)}"
     install = WorkspaceInstaller.run_for_config(
         ws,
         WorkspaceConfig(
@@ -187,53 +187,27 @@ def test_jobs_with_no_inventory_database(
         @retried(on=[AssertionError], timeout=timedelta(minutes=1))
         def validate_permissions():
             logger.info("validating permissions")
-
-            generic_permissions = GenericPermissionsSupport(ws, [])
             policy_permissions = generic_permissions.load_as_dict("cluster-policies", cluster_policy.policy_id)
             job_permissions = generic_permissions.load_as_dict("jobs", job.job_id)
-
-            assert acc_group_a.display_name in policy_permissions
-            assert acc_group_b.display_name in policy_permissions
-            assert acc_group_c.display_name in policy_permissions
-
-            assert acc_group_a.display_name in job_permissions
-            assert acc_group_b.display_name in job_permissions
-            assert acc_group_c.display_name in job_permissions
+            assert src_policy_permissions == policy_permissions
+            assert src_job_permissions == job_permissions
 
         validate_permissions()
 
         @retried(on=[AssertionError], timeout=timedelta(minutes=1))
         def validate_tacl():
             logger.info("validating tacl")
-
-            tables_crawler = TablesCrawler(sql_backend, install._config.inventory_database)
-            grants_crawler = GrantsCrawler(tables_crawler)
-
             table_a_grants = grants_crawler.for_table_info(table_a)
-            assert {"SELECT"} == table_a_grants.get(ws_group_a.display_name)
+            assert table_a_grants == src_table_a_grants
 
             table_b_grants = grants_crawler.for_table_info(table_b)
-            assert {"SELECT"} == table_b_grants.get(ws_group_b.display_name)
+            assert table_b_grants == src_table_b_grants
 
             schema_b_grants = grants_crawler.for_schema_info(schema_b)
-            assert {"MODIFY"} == schema_b_grants.get(ws_group_b.display_name)
+            assert schema_b_grants == src_schema_b_grants
 
             all_grants = grants_crawler.snapshot()
-            logger.debug(f"all grants={all_grants}, ")
-
-            permissions = list(
-                sql_backend.fetch(f"SELECT * FROM hive_metastore.{install._config.inventory_database}.permissions")
-            )
-            tables = list(
-                sql_backend.fetch(f"SELECT * FROM hive_metastore.{install._config.inventory_database}.tables")
-            )
-            grants = list(
-                sql_backend.fetch(f"SELECT * FROM hive_metastore.{install._config.inventory_database}.grants")
-            )
-
-            assert len(permissions) > 0
-            assert len(tables) >= 2
-            assert len(grants) >= 5
+            assert len(all_grants) >= 5
 
         validate_tacl()
     finally:
