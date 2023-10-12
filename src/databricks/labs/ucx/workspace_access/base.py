@@ -38,7 +38,3 @@ class AclSupport:
     @abstractmethod
     def object_types(self) -> set[str]:
         """This method returns a set of strings, that represent object types that are applicable by this instance."""
-            def noop():
-                pass
-
-            return partial(noop)
