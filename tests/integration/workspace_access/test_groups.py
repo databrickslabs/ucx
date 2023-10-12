@@ -186,7 +186,7 @@ def test_id_validity(ws: WorkspaceClient, make_ucx_group):
 
 
 def test_recover_from_ws_local_deletion(ws, make_ucx_group):
-    ws_group, _ = make_ucx_group()
+    ws_group, acc_group = make_ucx_group()
     ws_group_two, _ = make_ucx_group()
 
     group_manager = GroupManager(ws, GroupsConfig(auto=True))
@@ -195,6 +195,7 @@ def test_recover_from_ws_local_deletion(ws, make_ucx_group):
     # simulate disaster
     ws.groups.delete(ws_group.id)
     ws.groups.delete(ws_group_two.id)
+    group_manager._reflect_account_group_to_workspace(acc_group)
 
     # recovery run from a debug notebook
     group_manager = GroupManager(ws, GroupsConfig(auto=True))
@@ -208,15 +209,8 @@ def test_recover_from_ws_local_deletion(ws, make_ucx_group):
     for gi in group_manager.migration_state.groups:
         recovered_state[gi.workspace.display_name] = gi.workspace
 
-    assert sorted([member.display for member in ws_group.members]) == sorted(
-        [member.display for member in recovered_state[ws_group.display_name].members]
-    )
     assert sorted([member.display for member in ws_group_two.members]) == sorted(
         [member.display for member in recovered_state[ws_group_two.display_name].members]
-    )
-
-    assert sorted([member.value for member in ws_group.members]) == sorted(
-        [member.value for member in recovered_state[ws_group.display_name].members]
     )
 
     assert sorted([member.value for member in ws_group_two.members]) == sorted(

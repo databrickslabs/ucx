@@ -258,6 +258,12 @@ class GroupManager:
         return valid_group_names
 
     def ws_local_group_deletion_recovery(self):
+        account_groups_reflected_on_the_workspace = {
+            g.display_name
+            for g in self._ws.groups.list(attributes="id,displayName,meta")
+            if g.meta.resource_type == "Group" and g.display_name not in self._SYSTEM_GROUPS
+        }
+
         workspace_groups = {_.display_name for _ in self._workspace_groups}
         source_groups = [
             g
@@ -271,8 +277,12 @@ class GroupManager:
         )
 
         for backup_group in source_groups:
+            source_groups_name = backup_group.display_name.removeprefix(self._backup_group_prefix)
+            if source_groups_name in account_groups_reflected_on_the_workspace:
+                logger.info(f"Group {source_groups_name} already exists on the workspace level, skipping")
+                continue
             ws_local_group = self._ws.groups.create(
-                display_name=backup_group.display_name.removeprefix(self._backup_group_prefix),
+                display_name=source_groups_name,
                 meta=backup_group.meta,
                 entitlements=backup_group.entitlements,
                 roles=backup_group.roles,
