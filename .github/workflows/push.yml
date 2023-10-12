@@ -76,7 +76,9 @@ jobs:
         run: echo "current=$(hatch version)" >> $GITHUB_OUTPUT
 
       - name: Build PEX archive
-        run: hatch run pex:build
+        run: |
+          hatch run pex:build
+          chmod +x ucx-installer 
 
       - uses: actions/upload-artifact@v3
         with:
