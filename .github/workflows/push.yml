@@ -73,7 +73,7 @@ jobs:
 
       - name: Get artifact version
         id: version
-        run: echo "::set-output name=current::$(hatch version)"
+        run: echo "current=$(hatch version)" >> $GITHUB_OUTPUT
 
       - name: Build PEX archive
         run: hatch run pex:build
