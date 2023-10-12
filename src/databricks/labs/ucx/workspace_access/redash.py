@@ -1,5 +1,6 @@
 import dataclasses
 import json
+import time
 from collections.abc import Callable
 from dataclasses import dataclass
 from functools import partial
@@ -104,8 +105,21 @@ class RedashPermissionsSupport(AclSupport):
         Please note that we only have SET option (DBSQL Permissions API doesn't support UPDATE operation).
         This affects the way how we prepare the new ACL request.
         """
-        self._ws.dbsql_permissions.set(object_type=object_type, object_id=object_id, access_control_list=acl)
-        return True
+        for _i in range(0, 3):
+            self._ws.dbsql_permissions.set(object_type=object_type, object_id=object_id, access_control_list=acl)
+
+            remote_permission = self._safe_get_dbsql_permissions(object_type, object_id)
+            if all(elem in remote_permission.access_control_list for elem in acl):
+                return True
+
+            logger.warning(
+                f"""Couldn't apply appropriate permission for object type {object_type} with id {object_id}
+            acl to be applied={acl}
+            acl found in the object={remote_permission}
+            """
+            )
+            time.sleep(1 + _i)
+        return False
 
     def _prepare_new_acl(
         self, acl: list[sql.AccessControl], migration_state: GroupMigrationState, destination: Destination
