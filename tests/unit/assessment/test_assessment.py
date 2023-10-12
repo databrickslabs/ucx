@@ -22,7 +22,6 @@ from databricks.sdk.service.jobs import (
 from databricks.sdk.service.pipelines import PipelineState, PipelineStateInfo
 from databricks.sdk.service.sql import EndpointConfPair
 from databricks.sdk.service.workspace import GetSecretResponse, ObjectInfo, ObjectType
-from pyspark.sql import Row as PysparkRow
 
 from databricks.labs.ucx.assessment.crawlers import (
     AzureServicePrincipalCrawler,
@@ -2520,21 +2519,16 @@ def test_list_all_pipeline_with_conf_spn_secret_avlb(mocker):
     assert result_set[0].get("storage_account") == "newstorageacct"
 
 
-def test_workspaceobject_try_fetch(mocker):
+def test_workspaceobject_try_fetch():
+    columns = ["object_type", "object_id", "path", "language"]
+    row1 = Row(("NOTEBOOK", 123, "/rootobj/notebook1", "PYTHON"))
+    row1.__columns__ = columns
+    row2 = Row(("DIRECTORY", 456, "/rootobj/folder1", ""))
+    row2.__columns__ = columns
     sample_objects = iter(
         [
-            PysparkRow(
-                object_type="NOTEBOOK",
-                object_id=123,
-                path="/rootobj/notebook1",
-                language="PYTHON",
-            ),
-            PysparkRow(
-                object_type="DIRECTORY",
-                object_id=456,
-                path="/rootobj/folder1",
-                language="",
-            ),
+            row1,
+            row2,
         ]
     )
     ws = Mock()
@@ -2546,7 +2540,7 @@ def test_workspaceobject_try_fetch(mocker):
     assert result_set[0] == WorkspaceObjectInfo("NOTEBOOK", 123, "/rootobj/notebook1", "PYTHON")
 
 
-def test_workspaceobject_assessment(mocker):
+def test_workspaceobject_assessment():
     sample_objects = [
         ObjectInfo(
             object_type=ObjectType.NOTEBOOK,
@@ -2603,7 +2597,7 @@ def test_workspace_snapshot():
     assert result_set[0] == WorkspaceObjectInfo("NOTEBOOK", 123, "/rootobj/notebook1", "PYTHON")
 
 
-def test_workspaceobject_crawl(mocker):
+def test_workspaceobject_crawl():
     sample_object = WorkspaceObjectInfo(
         object_type="NOTEBOOK",
         object_id=123,

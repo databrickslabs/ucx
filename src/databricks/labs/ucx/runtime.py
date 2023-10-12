@@ -185,6 +185,18 @@ def crawl_permissions(cfg: WorkspaceConfig):
     permission_manager.inventorize_permissions()
 
 
+@task("assessment", depends_on=[setup_schema])
+def workspace_listing(cfg: WorkspaceConfig):
+    """Scans the workspace for workspace objects. It recursively list all sub directories
+    and compiles a list of directories, notebooks, files, repos and libraries in the workspace.
+
+    Its uses multi-threading to parallelize the listing process to speed up on big workspaces.
+    It accepts starting path as the parameter defaulted to the root path '/'."""
+    ws = WorkspaceClient(config=cfg.to_databricks_config())
+    crawler = WorkspaceObjectCrawler(ws, RuntimeBackend(), cfg.inventory_database)
+    crawler.snapshot()
+
+
 @task(
     "assessment",
     depends_on=[
@@ -196,24 +208,13 @@ def crawl_permissions(cfg: WorkspaceConfig):
         assess_pipelines,
         assess_azure_service_principals,
         assess_global_init_scripts,
+        workspace_listing,
     ],
     dashboard="assessment",
 )
 def assessment_report(_: WorkspaceConfig):
     """Refreshes the assessment dashboard after all previous tasks have been completed. Note that you can access the
     dashboard _before_ all tasks have been completed, but then only already completed information is shown."""
-
-
-@task("assessment", depends_on=[setup_schema])
-def workspace_listing(cfg: WorkspaceConfig):
-    """Scans the workspace for workspace objects. It recursively list all sub directories
-    and compiles a list of directories, notebooks, files, repos and libraries in the workspace.
-
-    Its uses multi-threading to parallelize the listing process to speed up on big workspaces.
-    It accepts starting path as the parameter defaulted to the root path '/'."""
-    ws = WorkspaceClient(config=cfg.to_databricks_config())
-    crawler = WorkspaceObjectCrawler(ws, RuntimeBackend(), cfg.inventory_database)
-    crawler.snapshot()
 
 
 @task("002-apply-permissions-to-backup-groups", depends_on=[crawl_permissions], job_cluster="tacl")
