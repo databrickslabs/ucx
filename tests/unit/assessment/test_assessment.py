@@ -2602,16 +2602,17 @@ def test_workspace_snapshot():
     assert len(result_set) == 2
     assert result_set[0] == WorkspaceObjectInfo("NOTEBOOK", 123, "/rootobj/notebook1", "PYTHON")
 
+
 def test_workspaceobject_crawl(mocker):
     sample_object = WorkspaceObjectInfo(
-            object_type="NOTEBOOK",
-            object_id=123,
-            path="/rootobj/notebook1",
-            language="PYTHON",
-        )
+        object_type="NOTEBOOK",
+        object_id=123,
+        path="/rootobj/notebook1",
+        language="PYTHON",
+    )
     ws = Mock()
     crawler = WorkspaceObjectCrawler(ws, MockBackend(), "ucx")
-    crawler._assess_workspace_listing = Mock(return_value= iter([sample_object]))
+    crawler._assess_workspace_listing = Mock(return_value=iter([sample_object]))
     result_set = crawler._crawl()
     assert len(result_set) == 1
     assert result_set[0] == WorkspaceObjectInfo("NOTEBOOK", 123, "/rootobj/notebook1", "PYTHON")

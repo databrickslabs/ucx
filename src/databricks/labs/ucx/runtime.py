@@ -216,9 +216,6 @@ def workspace_listing(cfg: WorkspaceConfig):
     crawler.snapshot()
 
 
-@task("migrate-groups", depends_on=[crawl_permissions], job_cluster="tacl")
-def migrate_permissions(cfg: WorkspaceConfig):
-    """Main phase of the group migration process. It does the following:
 @task("002-apply-permissions-to-backup-groups", depends_on=[crawl_permissions], job_cluster="tacl")
 def apply_permissions_to_backup_groups(cfg: WorkspaceConfig):
     """Second phase of the workspace-local group migration process. It does the following:
