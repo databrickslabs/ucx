@@ -20,16 +20,6 @@ def debug_env_name():
     return "ucws"
 
 
-def list_equal_unordered(s, t):
-    t = list(t)  # make a mutable copy
-    try:
-        for elem in s:
-            t.remove(elem)
-    except ValueError:
-        return False
-    return not t
-
-
 def account_host(self: databricks.sdk.core.Config) -> str:
     if self.is_azure:
         return "https://accounts.azuredatabricks.net"

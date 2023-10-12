@@ -16,7 +16,7 @@ from databricks.sdk import AccountClient, WorkspaceClient
 from databricks.sdk.core import DatabricksError
 from databricks.sdk.service import compute, iam, jobs, pipelines, workspace
 from databricks.sdk.service.catalog import CatalogInfo, SchemaInfo, TableInfo
-from databricks.sdk.service.sql import CreateWarehouseRequestWarehouseType, Query
+from databricks.sdk.service.sql import CreateWarehouseRequestWarehouseType
 from databricks.sdk.service.workspace import ImportFormat
 
 from databricks.labs.ucx.framework.crawlers import StatementExecutionBackend
@@ -758,23 +758,7 @@ def make_schema(ws, sql_backend, make_random) -> Callable[..., SchemaInfo]:
 
 
 @pytest.fixture
-def make_query(ws, make_random):
-    def create(*, name: str | None = None) -> Query:
-        if name is None:
-            name = f"ucx_S{make_random(4)}"
-        srcs = ws.data_sources.list()
-        query = ws.queries.create(name=name, data_source_id=srcs[0].id, query="SHOW TABLES")
-        return query
-
-    yield from factory(
-        "query",
-        create,
-        lambda query: ws.queries.delete(query_id=query.id),
-    )
-
-
-@pytest.fixture
-def make_table(ws, sql_backend, make_schema, make_random) -> Callable[..., TableInfo]:
+def make_table(sql_backend, make_schema, make_random) -> Callable[..., TableInfo]:
     def create(
         *,
         catalog_name="hive_metastore",
