@@ -287,7 +287,7 @@ def delete_backup_groups(cfg: WorkspaceConfig):
     group_manager.delete_backup_groups()
 
 
-@task("destroy-schema")
+@task("099-destroy-schema")
 def destroy_schema(cfg: WorkspaceConfig):
     """This _clean-up_ workflow allows to removes the `$inventory` database, with all the inventory tables created by
     the previous workflow runs. Use this to reset the entire state and start with the assessment step again."""

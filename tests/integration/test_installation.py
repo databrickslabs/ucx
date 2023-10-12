@@ -11,6 +11,7 @@ from databricks.labs.ucx.config import GroupsConfig, WorkspaceConfig
 from databricks.labs.ucx.hive_metastore.grants import GrantsCrawler
 from databricks.labs.ucx.hive_metastore.tables import TablesCrawler
 from databricks.labs.ucx.install import WorkspaceInstaller
+from databricks.labs.ucx.workspace_access.generic import GenericPermissionsSupport
 from databricks.labs.ucx.workspace_access.groups import GroupManager
 
 logger = logging.getLogger(__name__)
@@ -42,7 +43,7 @@ def test_destroying_non_existing_schema_fails_with_correct_message(ws, sql_backe
     )
 
     with pytest.raises(OperationFailed) as failure:
-        install.run_workflow("destroy-schema")
+        install.run_workflow("099-destroy-schema")
 
     assert "cannot be found" in str(failure.value)
 
@@ -66,7 +67,7 @@ def test_logs_are_available(ws, sql_backend, env_or_skip, make_random):
     )
 
     with pytest.raises(OperationFailed):
-        install.run_workflow("destroy-schema")
+        install.run_workflow("099-destroy-schema")
         assert True
 
     workflow_run_logs = list(ws.workspace.list(f"{install._install_folder}/logs"))
@@ -161,6 +162,7 @@ def test_jobs_with_no_inventory_database(
             "002-apply-permissions-to-backup-groups",
             "003-replace-workspace-local-with-account-groups",
             "004-apply-permissions-to-account-groups",
+            "005-remove-workspace-local-backup-groups"
         ]
         for step in required_workflows:
             install.run_workflow(step)
@@ -168,7 +170,6 @@ def test_jobs_with_no_inventory_database(
         @retried(on=[AssertionError], timeout=timedelta(minutes=1))
         def validate_groups():
             group_manager = GroupManager(ws, GroupsConfig(auto=True))
-            ws_membership = group_manager.get_workspace_membership('WorkspaceGroup')
             acc_membership = group_manager.get_workspace_membership('Group')
 
             logger.info("validating replaced account groups")
@@ -181,40 +182,23 @@ def test_jobs_with_no_inventory_database(
                 for m in g.members:
                     assert m.display in acc_membership[g.display_name], f"{m.display} not in {g.display_name}"
 
-            logger.info("validating backup groups")
-            assert (backup_group_prefix + ws_group_a.display_name) in ws_membership
-            assert (backup_group_prefix + ws_group_b.display_name) in ws_membership
-            assert (backup_group_prefix + ws_group_c.display_name) in ws_membership
-
         validate_groups()
 
         @retried(on=[AssertionError], timeout=timedelta(minutes=1))
         def validate_permissions():
             logger.info("validating permissions")
 
-            cp_dst = ws.permissions.get("cluster-policies", cluster_policy.policy_id)
-            cluster_policy_dst_permissions = sorted(
-                [_ for _ in cp_dst.access_control_list if _.group_name == ws_group_a.display_name],
-                key=lambda p: p.group_name,
-            )
-            assert len(cluster_policy_dst_permissions) == len(
-                cluster_policy_src_permissions
-            ), "Target permissions were not applied correctly for cluster policies"
-            assert [t.all_permissions for t in cluster_policy_dst_permissions] == [
-                s.all_permissions for s in cluster_policy_src_permissions
-            ], "Target permissions were not applied correctly for cluster policies"
+            generic_permissions = GenericPermissionsSupport(ws, [])
+            policy_permissions = generic_permissions.load_as_dict("cluster-policies", cluster_policy.policy_id)
+            job_permissions = generic_permissions.load_as_dict("jobs", job.job_id)
 
-            jp_dst = ws.permissions.get("jobs", job.job_id)
-            job_dst_permissions = sorted(
-                [_ for _ in jp_dst.access_control_list if _.group_name == ws_group_b.display_name],
-                key=lambda p: p.group_name,
-            )
-            assert len(job_dst_permissions) == len(
-                job_src_permissions
-            ), f"Target permissions were not applied correctly for jobs/{job.job_id}"
-            assert [t.all_permissions for t in job_dst_permissions] == [
-                s.all_permissions for s in job_src_permissions
-            ], f"Target permissions were not applied correctly for jobs/{job.job_id}"
+            assert acc_group_a.display_name in policy_permissions
+            assert acc_group_b.display_name in policy_permissions
+            assert acc_group_c.display_name in policy_permissions
+
+            assert acc_group_a.display_name in job_permissions
+            assert acc_group_b.display_name in job_permissions
+            assert acc_group_c.display_name in job_permissions
 
         validate_permissions()
 
