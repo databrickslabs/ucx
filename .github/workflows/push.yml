@@ -65,12 +65,13 @@ jobs:
       - run: pip install hatch==$HATCH_VERSION
 
       - name: Bump build version
-        run: \
+        run: |
           hatch version patch
           sed -i "s/\(__version__ = \"[0-9.]*\)/\1+gh$GITHUB_RUN_ID/" src/databricks/labs/ucx/__about__.py
           echo src/databricks/labs/ucx/__about__.py
 
-      - run: hatch run pex:build
+      - name: Build PEX archive
+        run: hatch run pex:build
 
       - uses: actions/upload-artifact@v3
         with:
