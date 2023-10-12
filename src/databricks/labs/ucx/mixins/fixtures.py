@@ -21,7 +21,7 @@ from databricks.sdk.service.workspace import ImportFormat
 
 from databricks.labs.ucx.framework.crawlers import StatementExecutionBackend
 
-_LOG = logging.getLogger(__name__)
+logger = logging.getLogger(__name__)
 
 
 def factory(name, create, remove):
@@ -29,19 +29,19 @@ def factory(name, create, remove):
 
     def inner(**kwargs):
         x = create(**kwargs)
-        _LOG.debug(f"added {name} fixture: {x}")
+        logger.debug(f"added {name} fixture: {x}")
         cleanup.append(x)
         return x
 
     yield inner
-    _LOG.debug(f"clearing {len(cleanup)} {name} fixtures")
+    logger.debug(f"clearing {len(cleanup)} {name} fixtures")
     for x in cleanup:
         try:
-            _LOG.debug(f"removing {name} fixture: {x}")
+            logger.debug(f"removing {name} fixture: {x}")
             remove(x)
         except DatabricksError as e:
             # TODO: fix on the databricks-labs-pytester level
-            _LOG.debug(f"ignoring error while {name} {x} teardown: {e}")
+            logger.debug(f"ignoring error while {name} {x} teardown: {e}")
 
 
 @pytest.fixture
@@ -122,7 +122,7 @@ def acc(product_info, debug_env) -> AccountClient:
     # Use variables from Unified Auth
     # See https://databricks-sdk-py.readthedocs.io/en/latest/authentication.html
     product_name, product_version = product_info
-    _LOG.debug(f"Running with {len(debug_env)} env variables")
+    logger.debug(f"Running with {len(debug_env)} env variables")
     return AccountClient(
         host=debug_env["DATABRICKS_HOST"],
         account_id=debug_env["DATABRICKS_ACCOUNT_ID"],
@@ -408,7 +408,7 @@ def _scim_values(ids: list[str]) -> list[iam.ComplexValue]:
     return [iam.ComplexValue(value=x) for x in ids]
 
 
-def _make_group(name, interface, make_random):
+def _make_group(name, cfg, interface, make_random):
     def create(
         *,
         members: list[str] | None = None,
@@ -425,19 +425,24 @@ def _make_group(name, interface, make_random):
         if entitlements is not None:
             kwargs["entitlements"] = _scim_values(entitlements)
         # TODO: REQUEST_LIMIT_EXCEEDED: GetUserPermissionsRequest RPC token bucket limit has been exceeded.
-        return interface.create(**kwargs)
+        group = interface.create(**kwargs)
+        if cfg.is_account_client:
+            logger.info(f"Account group {group.display_name}: {cfg.host}/users/groups/{group.id}/members")
+        else:
+            logger.info(f"Workspace group {group.display_name}: {cfg.host}#setting/accounts/groups/{group.id}")
+        return group
 
     yield from factory(name, create, lambda item: interface.delete(item.id))
 
 
 @pytest.fixture
 def make_group(ws, make_random):
-    yield from _make_group("workspace group", ws.groups, make_random)
+    yield from _make_group("workspace group", ws.config, ws.groups, make_random)
 
 
 @pytest.fixture
 def make_acc_group(acc, make_random):
-    yield from _make_group("account group", acc.groups, make_random)
+    yield from _make_group("account group", acc.config, acc.groups, make_random)
 
 
 @pytest.fixture
@@ -449,7 +454,11 @@ def make_cluster_policy(ws, make_random):
             kwargs["definition"] = json.dumps(
                 {"spark_conf.spark.databricks.delta.preview.enabled": {"type": "fixed", "value": "true"}}
             )
-        return ws.cluster_policies.create(name, **kwargs)
+        cluster_policy = ws.cluster_policies.create(name, **kwargs)
+        logger.info(
+            f"Cluster policy: {ws.config.host}#setting/clusters/cluster-policies/view/{cluster_policy.policy_id}"
+        )
+        return cluster_policy
 
     yield from factory("cluster policy", create, lambda item: ws.cluster_policies.delete(item.policy_id))
 
@@ -565,7 +574,9 @@ def make_job(ws, make_random, make_notebook):
                         timeout_seconds=0,
                     )
                 ]
-        return ws.jobs.create(**kwargs)
+        job = ws.jobs.create(**kwargs)
+        logger.info(f"Job: {ws.config.host}#job/{job.job_id}")
+        return job
 
     yield from factory("job", create, lambda item: ws.jobs.delete(item.job_id))
 
@@ -726,13 +737,18 @@ def make_catalog(ws, sql_backend, make_random) -> Callable[..., CatalogInfo]:
 
 
 @pytest.fixture
-def make_schema(sql_backend, make_random) -> Callable[..., SchemaInfo]:
+def make_schema(ws, sql_backend, make_random) -> Callable[..., SchemaInfo]:
     def create(*, catalog_name: str = "hive_metastore", name: str | None = None) -> SchemaInfo:
         if name is None:
             name = f"ucx_S{make_random(4)}"
         full_name = f"{catalog_name}.{name}".lower()
         sql_backend.execute(f"CREATE SCHEMA {full_name}")
-        return SchemaInfo(catalog_name=catalog_name, name=name, full_name=full_name)
+        schema_info = SchemaInfo(catalog_name=catalog_name, name=name, full_name=full_name)
+        logger.info(
+            f"Schema {schema_info.full_name}: "
+            f"{ws.config.host}/explore/data/{schema_info.catalog_name}/{schema_info.name}"
+        )
+        return schema_info
 
     yield from factory(
         "schema",
@@ -742,7 +758,7 @@ def make_schema(sql_backend, make_random) -> Callable[..., SchemaInfo]:
 
 
 @pytest.fixture
-def make_table(sql_backend, make_schema, make_random) -> Callable[..., TableInfo]:
+def make_table(ws, sql_backend, make_schema, make_random) -> Callable[..., TableInfo]:
     def create(
         *,
         catalog_name="hive_metastore",
@@ -781,7 +797,12 @@ def make_table(sql_backend, make_schema, make_random) -> Callable[..., TableInfo
             ddl = f"{ddl} TBLPROPERTIES ({tbl_properties})"
 
         sql_backend.execute(ddl)
-        return TableInfo(catalog_name=catalog_name, schema_name=schema_name, name=name, full_name=full_name)
+        table_info = TableInfo(catalog_name=catalog_name, schema_name=schema_name, name=name, full_name=full_name)
+        logger.info(
+            f"Table {table_info.full_name}: "
+            f"{ws.config.host}/explore/data/{table_info.catalog_name}/{table_info.schema_name}/{table_info.name}"
+        )
+        return table_info
 
     def remove(table_info: TableInfo):
         try:

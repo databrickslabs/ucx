@@ -1,3 +1,4 @@
+import collections
 import json
 import logging
 import typing
@@ -110,6 +111,28 @@ class GroupManager:
             self._delete_workspace_group(group)
         logger.info("Backup groups were successfully deleted")
 
+    def get_workspace_membership(self, resource_type: str = "WorkspaceGroup"):
+        membership = collections.defaultdict(set)
+        for g in self._ws.groups.list(attributes=self._SCIM_ATTRIBUTES):
+            if g.display_name in self._SYSTEM_GROUPS:
+                continue
+            if g.meta.resource_type != resource_type:
+                continue
+            if g.members is None:
+                continue
+            for m in g.members:
+                membership[g.display_name].add(m.display)
+        return membership
+
+    def get_account_membership(self):
+        membership = collections.defaultdict(set)
+        for g in self._account_groups:
+            if g.members is None:
+                continue
+            for m in g.members:
+                membership[g.display_name].add(m.display)
+        return membership
+
     def _list_workspace_groups(self) -> list[iam.Group]:
         logger.info("Listing workspace groups...")
         workspace_groups = [
@@ -159,7 +182,7 @@ class GroupManager:
             entitlements=source_group.entitlements,
             roles=source_group.roles,
             members=source_group.members,
-        )
+        )  # TODO: there still could be a corner case, where we get `Group with name db-temp-XXX already exists.`
         self._workspace_groups.append(backup_group)
         logger.info(f"Backup group {backup_group_name} successfully created")
 
@@ -258,6 +281,12 @@ class GroupManager:
         return valid_group_names
 
     def ws_local_group_deletion_recovery(self):
+        account_groups_reflected_on_the_workspace = {
+            g.display_name
+            for g in self._ws.groups.list(attributes="id,displayName,meta")
+            if g.meta.resource_type == "Group" and g.display_name not in self._SYSTEM_GROUPS
+        }
+
         workspace_groups = {_.display_name for _ in self._workspace_groups}
         source_groups = [
             g
@@ -271,8 +300,12 @@ class GroupManager:
         )
 
         for backup_group in source_groups:
+            source_groups_name = backup_group.display_name.removeprefix(self._backup_group_prefix)
+            if source_groups_name in account_groups_reflected_on_the_workspace:
+                logger.info(f"Group {source_groups_name} already exists on the workspace level, skipping")
+                continue
             ws_local_group = self._ws.groups.create(
-                display_name=backup_group.display_name.removeprefix(self._backup_group_prefix),
+                display_name=source_groups_name,
                 meta=backup_group.meta,
                 entitlements=backup_group.entitlements,
                 roles=backup_group.roles,

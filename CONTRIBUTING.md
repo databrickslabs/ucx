@@ -129,7 +129,7 @@ hatch env create
 
 To install development dependencies, including testing and database connection packages, use the following command:
 ```shell
-hatch run pip install -e '.[test,dbconnect]'
+hatch run pip install -e '.[test]'
 ```
 
 To ensure your integrated development environment (IDE) uses the newly created virtual environment, you can retrieve the Python path with this command:

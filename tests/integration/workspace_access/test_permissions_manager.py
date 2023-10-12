@@ -11,6 +11,6 @@ def test_permissions_save_and_load(ws, sql_backend, inventory_schema, env_or_ski
     ]
 
     pi._save(saved)
-    loaded = pi._load_all()
+    loaded = pi.load_all()
 
     assert saved == loaded

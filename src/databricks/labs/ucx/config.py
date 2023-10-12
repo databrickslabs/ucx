@@ -224,6 +224,7 @@ class WorkspaceConfig(_Config["WorkspaceConfig"]):
             log_level=raw.get("log_level", "INFO"),
             database_to_catalog_mapping=raw.get("database_to_catalog_mapping", None),
             default_catalog=raw.get("default_catalog", "main"),
+            workspace_start_path=raw.get("workspace_start_path", "/"),
         )
 
     def to_workspace_client(self) -> WorkspaceClient:
