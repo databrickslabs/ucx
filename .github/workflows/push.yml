@@ -74,7 +74,7 @@ jobs:
       - name: Build PEX archive
         run: |
           hatch run pex:build
-          mv ucx-installer-gh$GITHUB_RUN_ID-py${{ matrix.pyVersion }}
+          mv ucx-installer ucx-installer-gh$GITHUB_RUN_ID-py${{ matrix.pyVersion }}
 
       - uses: actions/upload-artifact@v3
         with:
