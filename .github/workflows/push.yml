@@ -46,6 +46,31 @@ jobs:
       - name: Publish test coverage
         uses: codecov/codecov-action@v1
 
+  installer:
+    strategy:
+      matrix:
+        pyVersion: [ '3.10', '3.11', '3.12' ]
+    runs-on: ubuntu-latest
+      steps:
+      - name: Checkout
+        uses: actions/checkout@v3
+
+      - name: Install Python
+        uses: actions/setup-python@v4
+        with:
+          cache: 'pip'
+          cache-dependency-path: '**/pyproject.toml'
+          python-version: ${{ matrix.pyVersion }}
+
+      - run: pip install hatch==$HATCH_VERSION
+
+      - run: hatch run pex:build
+
+      - uses: actions/upload-artifact@v3
+        with:
+          name: ucx-installer-py${{ matrix.pyVersion }}
+          path: ucx-installer
+
   fmt:
     runs-on: ubuntu-latest
     steps:
