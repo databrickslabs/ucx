@@ -6,10 +6,7 @@ from databricks.sdk.service import iam
 from databricks.sdk.service.iam import Group, ResourceMeta
 
 from databricks.labs.ucx.mixins.sql import Row
-from databricks.labs.ucx.workspace_access.groups import (
-    GroupMigrationState,
-    MigrationGroupInfo,
-)
+from databricks.labs.ucx.workspace_access.groups import GroupMigrationState
 from databricks.labs.ucx.workspace_access.manager import PermissionManager, Permissions
 
 from ..framework.mocks import MockBackend
@@ -130,14 +127,12 @@ def test_manager_apply(mocker):
     )
 
     pm = PermissionManager(b, "test_database", [mock_applier])
-    group_migration_state: GroupMigrationState = MagicMock()
-    group_migration_state.groups = [
-        MigrationGroupInfo(
-            Group(display_name="group", meta=ResourceMeta(resource_type="WorkspaceGroup")),
-            Group(display_name="group_backup", meta=ResourceMeta(resource_type="WorkspaceGroup")),
-            Group(display_name="group", meta=ResourceMeta(resource_type="AccountGroup")),
-        )
-    ]
+    group_migration_state = GroupMigrationState()
+    group_migration_state.add(
+        Group(display_name="group", meta=ResourceMeta(resource_type="WorkspaceGroup")),
+        Group(display_name="group_backup", meta=ResourceMeta(resource_type="WorkspaceGroup")),
+        Group(display_name="group", meta=ResourceMeta(resource_type="Group")),
+    )
 
     pm.apply_group_permissions(group_migration_state, "backup")
 

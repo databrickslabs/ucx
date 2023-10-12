@@ -79,10 +79,11 @@ class GenericPermissionsSupport(AclSupport):
         # passwords and tokens are represented on the workspace-level
         if item.object_id in ("tokens", "passwords"):
             return True
-        mentioned_groups = [
-            acl.group_name for acl in iam.ObjectPermissions.from_dict(json.loads(item.raw)).access_control_list
-        ]
-        return any(g in mentioned_groups for g in [info.workspace.display_name for info in migration_state.groups])
+        object_permissions = iam.ObjectPermissions.from_dict(json.loads(item.raw))
+        for acl in object_permissions.access_control_list:
+            if migration_state.is_in_scope(acl.group_name):
+                return True
+        return False
 
     @staticmethod
     def _response_to_request(
@@ -184,28 +185,26 @@ class GenericPermissionsSupport(AclSupport):
     ) -> list[iam.AccessControlRequest]:
         _acl = permissions.access_control_list
         acl_requests = []
-
+        coord = f"{permissions.object_type}/{permissions.object_id}"
         for _item in _acl:
-            # TODO: we have a double iteration over migration_state.groups
-            #  (also by migration_state.get_by_workspace_group_name).
-            #  Has to be be fixed by iterating just on .groups
-            if _item.group_name in [g.workspace.display_name for g in migration_state.groups]:
-                migration_info = migration_state.get_by_workspace_group_name(_item.group_name)
-                assert migration_info is not None, f"Group {_item.group_name} is not in the migration groups provider"
-                destination_group: iam.Group = getattr(migration_info, destination)
-                _item.group_name = destination_group.display_name
-                _reqs = [
+            if not migration_state.is_in_scope(_item.group_name):
+                logger.debug(f"Skipping {_item} for {coord} because it is not in scope")
+                continue
+            new_group_name = migration_state.get_target_principal(_item.group_name, destination)
+            if new_group_name is None:
+                logger.debug(f"Skipping {_item.group_name} for {coord} because it has no target principal")
+                continue
+            for p in _item.all_permissions:
+                if p.inherited:
+                    continue
+                acl_requests.append(
                     iam.AccessControlRequest(
-                        group_name=_item.group_name,
+                        group_name=new_group_name,
                         service_principal_name=_item.service_principal_name,
                         user_name=_item.user_name,
                         permission_level=p.permission_level,
                     )
-                    for p in _item.all_permissions
-                    if not p.inherited
-                ]
-                acl_requests.extend(_reqs)
-
+                )
         return acl_requests
 
 

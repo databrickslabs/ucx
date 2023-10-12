@@ -118,7 +118,7 @@ def test_account_groups_should_not_be_considered():
     group_conf = GroupsConfig(selected=[""])
     gm = GroupManager(client, group_conf)
     assert gm._list_workspace_groups() == [users_group]
-    assert gm._list_account_groups() == [account_admins_group]
+    assert gm._list_account_groups(client) == [account_admins_group]
 
 
 def test_if_only_account_groups_it_should_return_empty_value():
@@ -132,7 +132,7 @@ def test_if_only_account_groups_it_should_return_empty_value():
     group_conf = GroupsConfig(auto=True)
     gm = GroupManager(client, group_conf)
     assert gm._list_workspace_groups() == []
-    assert gm._list_account_groups() == [account_admins_group]
+    assert gm._list_account_groups(client) == [account_admins_group]
 
 
 def test_backup_group_should_be_created_with_name_defined_in_conf():

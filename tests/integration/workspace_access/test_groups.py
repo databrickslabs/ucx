@@ -111,58 +111,66 @@ def test_replace_workspace_groups_with_account_groups(
     permission_manager.apply_group_permissions(group_manager.migration_state, destination="backup")
 
     @retried(on=[AssertionError], timeout=timedelta(seconds=30))
-    def check_table_permissions_for_backup_group():
+    def check_permissions_for_backup_group():
+        logger.info("check_permissions_for_backup_group()")
+
         table_permissions = grants.for_table_info(dummy_table)
         assert group_info.workspace.display_name in table_permissions
         assert group_info.backup.display_name in table_permissions
         assert "SELECT" in table_permissions[group_info.workspace.display_name]
         assert "SELECT" in table_permissions[group_info.backup.display_name]
 
-    check_table_permissions_for_backup_group()
+        policy_permissions = generic_permissions.load_as_dict("cluster-policies", cluster_policy.policy_id)
+        assert PermissionLevel.CAN_USE == policy_permissions[group_info.workspace.display_name]
+        assert PermissionLevel.CAN_USE == policy_permissions[group_info.backup.display_name]
 
-    policy_permissions = generic_permissions.load_as_dict("cluster-policies", cluster_policy.policy_id)
-    assert PermissionLevel.CAN_USE == policy_permissions[group_info.workspace.display_name]
-    assert PermissionLevel.CAN_USE == policy_permissions[group_info.backup.display_name]
+    check_permissions_for_backup_group()
 
     group_manager.replace_workspace_groups_with_account_groups()
 
-    @retried(on=[AssertionError], timeout=timedelta(seconds=30))
-    def check_table_permissions_for_account_group():
+    @retried(on=[AssertionError], timeout=timedelta(minutes=1))
+    def check_permissions_after_replace():
+        logger.info("check_permissions_after_replace()")
+
         table_permissions = grants.for_table_info(dummy_table)
         assert group_info.account.display_name in table_permissions
         assert group_info.backup.display_name in table_permissions
         assert "SELECT" in table_permissions[group_info.backup.display_name]
 
-    check_table_permissions_for_account_group()
+        policy_permissions = generic_permissions.load_as_dict("cluster-policies", cluster_policy.policy_id)
+        assert group_info.workspace.display_name not in policy_permissions
+        assert PermissionLevel.CAN_USE == policy_permissions[group_info.backup.display_name]
 
-    policy_permissions = generic_permissions.load_as_dict("cluster-policies", cluster_policy.policy_id)
-    assert group_info.workspace.display_name not in policy_permissions
-    assert PermissionLevel.CAN_USE == policy_permissions[group_info.backup.display_name]
+    check_permissions_after_replace()
 
     permission_manager.apply_group_permissions(group_manager.migration_state, destination="account")
 
     @retried(on=[AssertionError], timeout=timedelta(seconds=30))
-    def check_table_permissions_for_account_group():
+    def check_permissions_for_account_group():
+        logger.info("check_permissions_for_account_group()")
+
         table_permissions = grants.for_table_info(dummy_table)
         assert group_info.account.display_name in table_permissions
         assert group_info.backup.display_name in table_permissions
         assert "SELECT" in table_permissions[group_info.backup.display_name]
         assert "SELECT" in table_permissions[group_info.account.display_name]
 
-    check_table_permissions_for_account_group()
+        policy_permissions = generic_permissions.load_as_dict("cluster-policies", cluster_policy.policy_id)
+        assert PermissionLevel.CAN_USE == policy_permissions[group_info.account.display_name]
+        assert PermissionLevel.CAN_USE == policy_permissions[group_info.backup.display_name]
 
-    policy_permissions = generic_permissions.load_as_dict("cluster-policies", cluster_policy.policy_id)
-    assert PermissionLevel.CAN_USE == policy_permissions[group_info.account.display_name]
-    assert PermissionLevel.CAN_USE == policy_permissions[group_info.backup.display_name]
+    check_permissions_for_account_group()
 
     for _info in group_manager.migration_state.groups:
         ws.groups.delete(_info.backup.id)
 
-    policy_permissions = generic_permissions.load_as_dict("cluster-policies", cluster_policy.policy_id)
-    assert group_info.backup.display_name not in policy_permissions
-
     @retried(on=[AssertionError], timeout=timedelta(seconds=30))
     def check_table_permissions_after_backup_delete():
+        logger.info("check_table_permissions_after_backup_delete()")
+
+        policy_permissions = generic_permissions.load_as_dict("cluster-policies", cluster_policy.policy_id)
+        assert group_info.backup.display_name not in policy_permissions
+
         table_permissions = grants.for_table_info(dummy_table)
         assert group_info.backup.display_name not in table_permissions
         assert group_info.account.display_name in table_permissions

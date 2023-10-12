@@ -8,6 +8,7 @@ from databricks.sdk.retries import retried
 from databricks.sdk.service.iam import PermissionLevel
 
 from databricks.labs.ucx.config import GroupsConfig, WorkspaceConfig
+from databricks.labs.ucx.framework.parallel import Threads
 from databricks.labs.ucx.hive_metastore.grants import GrantsCrawler
 from databricks.labs.ucx.hive_metastore.tables import TablesCrawler
 from databricks.labs.ucx.install import WorkspaceInstaller
@@ -182,7 +183,7 @@ def test_jobs_with_no_inventory_database(
                 for m in g.members:
                     assert m.display in acc_membership[g.display_name], f"{m.display} not in {g.display_name}"
 
-        validate_groups()
+            return True
 
         @retried(on=[AssertionError], timeout=timedelta(minutes=1))
         def validate_permissions():
@@ -192,24 +193,25 @@ def test_jobs_with_no_inventory_database(
             assert src_policy_permissions == policy_permissions
             assert src_job_permissions == job_permissions
 
-        validate_permissions()
+            return True
 
         @retried(on=[AssertionError], timeout=timedelta(minutes=1))
         def validate_tacl():
             logger.info("validating tacl")
             table_a_grants = grants_crawler.for_table_info(table_a)
-            assert table_a_grants == src_table_a_grants
-
             table_b_grants = grants_crawler.for_table_info(table_b)
-            assert table_b_grants == src_table_b_grants
-
             schema_b_grants = grants_crawler.for_schema_info(schema_b)
-            assert schema_b_grants == src_schema_b_grants
-
             all_grants = grants_crawler.snapshot()
+
+            assert table_a_grants == src_table_a_grants
+            assert table_b_grants == src_table_b_grants
+            assert schema_b_grants == src_schema_b_grants
             assert len(all_grants) >= 5
 
-        validate_tacl()
+            return True
+
+        _, errors = Threads.gather("validating results", [validate_tacl, validate_permissions, validate_groups])
+        assert len(errors) == 0
     finally:
         logger.debug(f"cleaning up install folder: {install._install_folder}")
         ws.workspace.delete(install._install_folder, recursive=True)

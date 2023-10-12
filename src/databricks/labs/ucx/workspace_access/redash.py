@@ -7,7 +7,7 @@ from functools import partial
 
 from databricks.sdk import WorkspaceClient
 from databricks.sdk.core import DatabricksError
-from databricks.sdk.service import iam, sql
+from databricks.sdk.service import sql
 
 from databricks.labs.ucx.mixins.hardening import rate_limited
 from databricks.labs.ucx.workspace_access.base import (
@@ -46,10 +46,12 @@ class RedashPermissionsSupport(AclSupport):
 
     @staticmethod
     def _is_item_relevant(item: Permissions, migration_state: GroupMigrationState) -> bool:
-        mentioned_groups = [
-            acl.group_name for acl in sql.GetResponse.from_dict(json.loads(item.raw)).access_control_list
-        ]
-        return any(g in mentioned_groups for g in [info.workspace.display_name for info in migration_state.groups])
+        object_permissions = sql.GetResponse.from_dict(json.loads(item.raw))
+        for acl in object_permissions.access_control_list:
+            if not migration_state.is_in_scope(acl.group_name):
+                continue
+            return True
+        return False
 
     def get_crawler_tasks(self):
         for listing in self._listings:
@@ -126,20 +128,18 @@ class RedashPermissionsSupport(AclSupport):
         Please note the comment above on how we apply these permissions.
         """
         acl_requests: list[sql.AccessControl] = []
-
-        for acl_request in acl:
-            if acl_request.group_name in [g.workspace.display_name for g in migration_state.groups]:
-                migration_info = migration_state.get_by_workspace_group_name(acl_request.group_name)
-                assert (
-                    migration_info is not None
-                ), f"Group {acl_request.group_name} is not in the migration groups provider"
-                destination_group: iam.Group = getattr(migration_info, destination)
-                new_acl_request = dataclasses.replace(acl_request, group_name=destination_group.display_name)
-                acl_requests.append(new_acl_request)
-            else:
-                # no changes shall be applied
-                acl_requests.append(acl_request)
-
+        for access_control in acl:
+            if not migration_state.is_in_scope(access_control.group_name):
+                logger.debug(f"Skipping redash item for `{access_control.group_name}`: not in scope")
+                acl_requests.append(access_control)
+                continue
+            target_principal = migration_state.get_target_principal(access_control.group_name, destination)
+            if target_principal is None:
+                logger.debug(f"Skipping redash item for `{access_control.group_name}`: no target principal")
+                acl_requests.append(access_control)
+                continue
+            new_acl_request = dataclasses.replace(access_control, group_name=target_principal)
+            acl_requests.append(new_acl_request)
         return acl_requests
 
 

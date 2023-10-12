@@ -25,7 +25,8 @@ class ScimSupport(AclSupport):
 
     @staticmethod
     def _is_item_relevant(item: Permissions, migration_state: GroupMigrationState) -> bool:
-        return any(g.workspace.id == item.object_id for g in migration_state.groups)
+        # TODO: This mean that we can lose entitlements, if we don't store the `$inventory.groups`
+        return migration_state.is_id_in_scope(item.object_id)
 
     def get_crawler_tasks(self):
         groups = self._get_groups()
@@ -48,8 +49,7 @@ class ScimSupport(AclSupport):
         if not self._is_item_relevant(item, migration_state):
             return None
         value = [iam.ComplexValue.from_dict(e) for e in json.loads(item.raw)]
-        target_info = [g for g in migration_state.groups if g.workspace.id == item.object_id]
-        target_group_id = getattr(target_info[0], destination).id
+        target_group_id = migration_state.get_target_id(item.object_id, destination)
         return partial(self._applier_task, group_id=target_group_id, value=value, property_name=item.object_type)
 
     @staticmethod
