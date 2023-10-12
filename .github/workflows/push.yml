@@ -71,14 +71,17 @@ jobs:
           sed -i "s/\(__version__ = \"[0-9.]*\)/\1+gh$GITHUB_RUN_ID/" src/databricks/labs/ucx/__about__.py
           cat src/databricks/labs/ucx/__about__.py
 
+      - name: Get artifact version
+        id: version
+        run: echo "current=$(hatch version)"
+
       - name: Build PEX archive
-        run: |
-          hatch run pex:build
-          mv ucx-installer ucx-installer-gh$GITHUB_RUN_ID-py${{ matrix.pyVersion }}
+        run: hatch run pex:build
 
       - uses: actions/upload-artifact@v3
         with:
-          path: ucx-installer-*
+          name: ucx-installer-v${{ steps.version.outputs.current }}-py${{ matrix.pyVersion }}
+          path: ucx-installer
 
   fmt:
     runs-on: ubuntu-latest
