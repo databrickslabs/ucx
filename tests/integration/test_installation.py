@@ -117,7 +117,7 @@ def test_jobs_with_no_inventory_database(
         group_name=ws_group_a.display_name,
     )
     cpp_src = ws.permissions.get("cluster-policies", cluster_policy.policy_id)
-    cluster_policy_src_permissions = sorted(
+    sorted(
         [_ for _ in cpp_src.access_control_list if _.group_name == ws_group_a.display_name],
         key=lambda p: p.group_name,
     )
@@ -131,7 +131,7 @@ def test_jobs_with_no_inventory_database(
         group_name=ws_group_b.display_name,
     )
     jp_src = ws.permissions.get("jobs", job.job_id)
-    job_src_permissions = sorted(
+    sorted(
         [_ for _ in jp_src.access_control_list if _.group_name == ws_group_b.display_name],
         key=lambda p: p.group_name,
     )
@@ -162,7 +162,7 @@ def test_jobs_with_no_inventory_database(
             "002-apply-permissions-to-backup-groups",
             "003-replace-workspace-local-with-account-groups",
             "004-apply-permissions-to-account-groups",
-            "005-remove-workspace-local-backup-groups"
+            "005-remove-workspace-local-backup-groups",
         ]
         for step in required_workflows:
             install.run_workflow(step)
@@ -170,7 +170,7 @@ def test_jobs_with_no_inventory_database(
         @retried(on=[AssertionError], timeout=timedelta(minutes=1))
         def validate_groups():
             group_manager = GroupManager(ws, GroupsConfig(auto=True))
-            acc_membership = group_manager.get_workspace_membership('Group')
+            acc_membership = group_manager.get_workspace_membership("Group")
 
             logger.info("validating replaced account groups")
             assert acc_group_a.display_name in acc_membership, f"{acc_group_a.display_name} not found in workspace"
