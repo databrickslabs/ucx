@@ -76,7 +76,7 @@ jobs:
 
       - uses: actions/upload-artifact@v3
         with:
-          name: ucx-installer-gh${{ env.GITHUB_RUN_ID }}-py${{ matrix.pyVersion }}
+          name: ucx-installer-gh${{ GITHUB_RUN_ID }}-py${{ matrix.pyVersion }}
           path: ucx-installer
 
   fmt:
