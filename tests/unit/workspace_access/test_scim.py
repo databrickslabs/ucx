@@ -15,6 +15,19 @@ def test_applier_task_should_return_true_if_roles_are_properly_applied():
     assert result
 
 
+def test_applier_task_should_return_true_if_entitlements_are_properly_applied():
+    ws = MagicMock()
+    ws.groups.get.return_value = Group(
+        id="1", roles=[iam.ComplexValue(value="role1")], entitlements=[iam.ComplexValue(value="allow-cluster-create")]
+    )
+    sup = ScimSupport(ws=ws)
+
+    result = sup._applier_task(
+        group_id="1", value=[iam.ComplexValue(value="allow-cluster-create")], property_name="entitlements"
+    )
+    assert result
+
+
 def test_applier_task_should_return_false_if_roles_are_not_properly_applied():
     ws = MagicMock()
     ws.groups.get.return_value = Group(id="1", roles=[iam.ComplexValue(value="role2")])
