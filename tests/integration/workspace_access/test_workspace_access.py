@@ -200,7 +200,7 @@ def test_workspace_access_e2e(
     toolkit.replace_workspace_groups_with_account_groups()
 
     new_groups = [
-        _ for _ in ws.groups.list(attributes="displayName,meta") if group_migration_state.is_in_scope("account", _)
+        _ for _ in ws.groups.list(attributes="displayName,meta") if group_migration_state.is_in_scope(_.display_name)
     ]
     assert len(new_groups) == len(group_migration_state.groups)
     assert all(g.meta.resource_type == "Group" for g in new_groups)
@@ -212,7 +212,7 @@ def test_workspace_access_e2e(
     toolkit.delete_backup_groups()
 
     backup_groups = [
-        _ for _ in ws.groups.list(attributes="displayName,meta") if group_migration_state.is_in_scope("backup", _)
+        _ for _ in ws.groups.list(attributes="displayName,meta") if group_migration_state.is_in_scope(_.display_name)
     ]
     assert len(backup_groups) == 0
 

@@ -24,20 +24,49 @@ class MigrationGroupInfo:
     backup: Group
     account: Group
 
+    def is_name_match(self, name: str) -> bool:
+        if self.workspace is not None:
+            return name == self.workspace.display_name
+        if self.account is not None:
+            return name == self.account.display_name
+        if self.backup is not None:
+            return name == self.backup.display_name
+        return False
+
+    def is_id_match(self, group_id: str) -> bool:
+        if self.workspace is not None:
+            return group_id == self.workspace.id
+        if self.account is not None:
+            return group_id == self.account.id
+        if self.backup is not None:
+            return group_id == self.backup.id
+        return False
+
 
 class GroupMigrationState:
     """Holds migration state of workspace-to-account groups"""
 
-    def __init__(self):
+    def __init__(self, backup_group_prefix: str = "db-temp-"):
         self.groups: list[MigrationGroupInfo] = []
+        self._backup_group_prefix = backup_group_prefix
 
     def add(self, ws_group: Group, backup_group: Group, acc_group: Group):
         mgi = MigrationGroupInfo(workspace=ws_group, backup=backup_group, account=acc_group)
         self.groups.append(mgi)
 
-    def is_in_scope(self, attr: str, group: Group) -> bool:
+    def is_in_scope(self, name: str) -> bool:
+        if name is None:
+            return False
         for info in self.groups:
-            if getattr(info, attr).id == group.id:
+            if info.is_name_match(name):
+                return True
+        return False
+
+    def is_id_in_scope(self, group_id: str) -> bool:
+        if group_id is None:
+            return False
+        for info in self.groups:
+            if info.is_id_match(group_id):
                 return True
         return False
 
@@ -51,9 +80,24 @@ class GroupMigrationState:
 
     def get_target_principal(self, name: str, destination: typing.Literal["backup", "account"]) -> str | None:
         for info in self.groups:
-            if info.workspace.display_name != name:
+            # TODO: this logic has to be changed, once we crawl all wslocal accgroups into a table
+            group_for_match = info.workspace
+            if group_for_match is None:
+                group_for_match = info.account
+            if group_for_match.display_name != name:
                 continue
             return getattr(info, destination).display_name
+        return None
+
+    def get_target_id(self, group_id: str, destination: typing.Literal["backup", "account"]) -> str | None:
+        for info in self.groups:
+            # TODO: this logic has to be changed, once we crawl all wslocal accgroups into a table
+            group_for_match = info.workspace
+            if group_for_match is None:
+                group_for_match = info.account
+            if group_for_match.id != group_id:
+                continue
+            return getattr(info, destination).id
         return None
 
     def __len__(self):
@@ -69,9 +113,42 @@ class GroupManager:
         # TODO: remove groups param in favor of _include_group_names and _backup_group_prefix
         self._include_group_names = groups.selected
         self._backup_group_prefix = groups.backup_group_prefix
-        self._migration_state: GroupMigrationState = GroupMigrationState()
-        self._account_groups = self._list_account_groups()
+        self._migration_state = GroupMigrationState(backup_group_prefix=groups.backup_group_prefix)
+        self._account_groups = self._list_account_groups(ws, self._SCIM_ATTRIBUTES)
         self._workspace_groups = self._list_workspace_groups()
+
+    @classmethod
+    def prepare_apply_permissions_to_account_groups(cls, ws: WorkspaceClient, backup_group_prefix: str = "db-temp-"):
+        scim_attributes = "id,displayName,meta"
+
+        account_groups_by_name = {}
+        for g in cls._list_account_groups(ws, scim_attributes):
+            account_groups_by_name[g.display_name] = g
+
+        workspace_groups_by_name = {}
+        account_groups_in_workspace_by_name = {}
+        for g in ws.groups.list(attributes=scim_attributes):
+            if g.display_name in cls._SYSTEM_GROUPS:
+                continue
+            if g.meta.resource_type == "WorkspaceGroup":
+                workspace_groups_by_name[g.display_name] = g
+            else:
+                account_groups_in_workspace_by_name[g.display_name] = g
+
+        migration_state = GroupMigrationState(backup_group_prefix=backup_group_prefix)
+        for display_name in account_groups_by_name.keys():
+            if display_name not in account_groups_in_workspace_by_name:
+                logger.info(f"Skipping account group `{display_name}`: not added to a workspace")
+                continue
+            backup_group_name = f"{backup_group_prefix}{display_name}"
+            if backup_group_name not in workspace_groups_by_name:
+                logger.info(f"Skipping account group `{display_name}`: no backup group in workspace")
+                continue
+            backup_group = workspace_groups_by_name[backup_group_name]
+            account_group = account_groups_in_workspace_by_name[display_name]
+            migration_state.add(None, backup_group, account_group)
+
+        return migration_state
 
     def prepare_groups_in_environment(self):
         logger.info(
@@ -143,19 +220,22 @@ class GroupManager:
         logger.info(f"Found {len(workspace_groups)} workspace groups")
         return sorted(workspace_groups, key=lambda _: _.display_name)
 
-    def _list_account_groups(self) -> list[iam.Group]:
+    @classmethod
+    def _list_account_groups(
+        cls, ws: WorkspaceClient, attributes: str = "id,displayName,meta,members"
+    ) -> list[iam.Group]:
         # TODO: we should avoid using this method, as it's not documented
         # get account-level groups even if they're not (yet) assigned to a workspace
         logger.info("Listing account groups...")
         account_groups = [
             iam.Group.from_dict(r)
-            for r in self._ws.api_client.do(
+            for r in ws.api_client.do(
                 "get",
                 "/api/2.0/account/scim/v2/Groups",
-                query={"attributes": self._SCIM_ATTRIBUTES},
+                query={"attributes": attributes},
             ).get("Resources", [])
         ]
-        account_groups = [g for g in account_groups if g.display_name not in self._SYSTEM_GROUPS]
+        account_groups = [g for g in account_groups if g.display_name not in cls._SYSTEM_GROUPS]
         logger.info(f"Found {len(account_groups)} account groups")
         return sorted(account_groups, key=lambda _: _.display_name)
 
@@ -166,7 +246,7 @@ class GroupManager:
                 return group
 
     @retried(on=[DatabricksError])
-    @rate_limited(max_requests=5)
+    @rate_limited(max_requests=20)
     def _get_or_create_backup_group(self, source_group_name: str, source_group: iam.Group) -> iam.Group:
         backup_group_name = f"{self._backup_group_prefix}{source_group_name}"
         backup_group = self._get_group(backup_group_name, "workspace")
@@ -199,10 +279,11 @@ class GroupManager:
         logger.info(f"Prepared {len(self._migration_state)} groups for migration")
 
     def _replace_group(self, migration_info: MigrationGroupInfo):
-        ws_group = migration_info.workspace
-        self._delete_workspace_group(ws_group)
-        # delete ws_group from the list of workspace groups
-        self._workspace_groups = [g for g in self._workspace_groups if g.id != ws_group.id]
+        if migration_info.workspace is not None:
+            ws_group = migration_info.workspace
+            self._delete_workspace_group(ws_group)
+            # delete ws_group from the list of workspace groups
+            self._workspace_groups = [g for g in self._workspace_groups if g.id != ws_group.id]
         self._reflect_account_group_to_workspace(migration_info.account)
 
     @retried(on=[DatabricksError])
