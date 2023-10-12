@@ -1,10 +1,11 @@
 import json
+import logging
 import random
 import time
 from functools import partial
 
 from databricks.sdk import WorkspaceClient
-from databricks.sdk.service import iam, workspace
+from databricks.sdk.service import workspace
 
 from databricks.labs.ucx.mixins.hardening import rate_limited
 from databricks.labs.ucx.workspace_access.base import (
@@ -13,6 +14,8 @@ from databricks.labs.ucx.workspace_access.base import (
     Permissions,
 )
 from databricks.labs.ucx.workspace_access.groups import GroupMigrationState
+
+logger = logging.getLogger(__name__)
 
 
 class SecretScopesSupport(AclSupport):
@@ -44,12 +47,14 @@ class SecretScopesSupport(AclSupport):
         new_acls = []
 
         for acl in acls:
-            if acl.principal in [i.workspace.display_name for i in migration_state.groups]:
-                source_info = migration_state.get_by_workspace_group_name(acl.principal)
-                target: iam.Group = getattr(source_info, destination)
-                new_acls.append(workspace.AclItem(principal=target.display_name, permission=acl.permission))
-            else:
+            if not migration_state.is_in_scope(acl.principal):
                 new_acls.append(acl)
+                continue
+            target_principal = migration_state.get_target_principal(acl.principal, destination)
+            if target_principal is None:
+                logger.debug(f"Skipping {acl.principal} because of no target principal")
+                continue
+            new_acls.append(workspace.AclItem(principal=target_principal, permission=acl.permission))
 
         def apply_acls():
             for acl in new_acls:
@@ -60,9 +65,11 @@ class SecretScopesSupport(AclSupport):
 
     @staticmethod
     def _is_item_relevant(item: Permissions, migration_state: GroupMigrationState) -> bool:
-        acls = [workspace.AclItem.from_dict(acl) for acl in json.loads(item.raw)]
-        mentioned_groups = [acl.principal for acl in acls]
-        return any(g in mentioned_groups for g in [info.workspace.display_name for info in migration_state.groups])
+        for acl in json.loads(item.raw):
+            acl_item = workspace.AclItem.from_dict(acl)
+            if migration_state.is_in_scope(acl_item.principal):
+                return True
+        return False
 
     def secret_scope_permission(self, scope_name: str, group_name: str) -> workspace.AclPermission | None:
         for acl in self._ws.secrets.list_acls(scope=scope_name):

@@ -2,6 +2,7 @@ import logging
 from collections.abc import Callable
 from dataclasses import dataclass
 from functools import wraps
+from logging.handlers import TimedRotatingFileHandler
 from pathlib import Path
 
 from databricks.labs.ucx.__about__ import __version__
@@ -118,7 +119,12 @@ def trigger(*argv):
     log_path.mkdir(parents=True, exist_ok=True)
 
     log_file = log_path / f"{task_name}.log"
-    file_handler = logging.FileHandler(log_file.as_posix())
+
+    # files are available in the workspace only once their handlers are closed,
+    # so we rotate files log every 10 minutes.
+    #
+    # See https://docs.python.org/3/library/logging.handlers.html#logging.handlers.TimedRotatingFileHandler
+    file_handler = TimedRotatingFileHandler(log_file.as_posix(), when="M", interval=10)
     log_format = "%(asctime)s %(levelname)s [%(name)s] {%(threadName)s} %(message)s"
     log_formatter = logging.Formatter(fmt=log_format, datefmt="%H:%M:%S")
     file_handler.setFormatter(log_formatter)
@@ -128,7 +134,7 @@ def trigger(*argv):
     databricks_logger.removeHandler(console_handler)
     databricks_logger.addHandler(file_handler)
 
-    ucx_logger.info(f"See debug logs at {log_file}")
+    ucx_logger.info(f"After job finishes, see debug logs at {log_file}")
 
     log_readme = log_path.joinpath("README.md")
     if not log_readme.exists():

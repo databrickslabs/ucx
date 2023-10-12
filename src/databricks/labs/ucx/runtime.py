@@ -274,9 +274,9 @@ def apply_permissions_to_account_groups(cfg: WorkspaceConfig):
 
     See [interactive tutorial here](https://app.getreprise.com/launch/myM3VNn/)."""
     ws = WorkspaceClient(config=cfg.to_databricks_config())
-    group_manager = GroupManager(ws, cfg.groups)
-    group_manager.prepare_groups_in_environment()
-    if not group_manager.has_groups():
+
+    migration_state = GroupManager.prepare_apply_permissions_to_account_groups(ws, cfg.groups.backup_group_prefix)
+    if len(migration_state) == 0:
         logger.info("Skipping group migration as no groups were found.")
         return
 
@@ -287,7 +287,7 @@ def apply_permissions_to_account_groups(cfg: WorkspaceConfig):
         num_threads=cfg.num_threads,
         workspace_start_path=cfg.workspace_start_path,
     )
-    permission_manager.apply_group_permissions(group_manager.migration_state, destination="account")
+    permission_manager.apply_group_permissions(migration_state, destination="account")
 
 
 @task("005-remove-workspace-local-backup-groups", depends_on=[apply_permissions_to_account_groups])
