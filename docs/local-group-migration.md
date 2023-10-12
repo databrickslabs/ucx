@@ -262,3 +262,58 @@ tacl = TableAclSupport(grants, sql_backend)
 permission_manager = PermissionManager(sql_backend, inventory_schema, [tacl])
 permission_manager.inventorize_permissions()
 ```
+
+4. Create a migration state just for account groups
+
+```python
+from databricks.labs.ucx.workspace_access.manager import PermissionManager
+from databricks.labs.ucx.workspace_access.groups import GroupMigrationState
+from databricks.labs.ucx.framework.crawlers import StatementExecutionBackend
+
+collected_groups = []
+...
+
+migration_state = GroupMigrationState()
+for group in collected_groups:
+    migration_state.add(None, None, group)
+
+sql_backend = StatementExecutionBackend(ws, cfg.warehouse_id)
+
+permission_manager = PermissionManager.factory(ws, sql_backend, cfg.inventory_database)
+permission_manager.apply_group_permissions(migration_state, destination="account")
+```
+
+5. recovering permissions from a debug notebook with logs
+
+```python
+import logging
+from logging.handlers import TimedRotatingFileHandler
+
+databricks_logger = logging.getLogger("databricks")
+databricks_logger.setLevel(logging.DEBUG)
+
+ucx_logger = logging.getLogger("databricks.labs.ucx")
+ucx_logger.setLevel(logging.DEBUG)
+
+log_file = "/Workspace/Users/jaf2bh@bosch.com/recovery.log"
+
+# files are available in the workspace only once their handlers are closed,
+# so we rotate files log every 10 minutes.
+#
+# See https://docs.python.org/3/library/logging.handlers.html#logging.handlers.TimedRotatingFileHandler
+file_handler = TimedRotatingFileHandler(log_file, when="M", interval=5)
+log_format = "%(asctime)s %(levelname)s [%(name)s] {%(threadName)s} %(message)s"
+log_formatter = logging.Formatter(fmt=log_format, datefmt="%H:%M:%S")
+file_handler.setFormatter(log_formatter)
+file_handler.setLevel(logging.DEBUG)
+databricks_logger.addHandler(file_handler)
+
+sql_backend = StatementExecutionBackend(ws, cfg.warehouse_id)
+
+try:
+    permission_manager = PermissionManager.factory(ws, sql_backend, cfg.inventory_database)
+    permission_manager.apply_group_permissions(migration_state, destination="account")
+finally:
+    # IMPORTANT!!!!
+    file_handler.close()
+```
