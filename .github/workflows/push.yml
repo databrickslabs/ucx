@@ -49,7 +49,7 @@ jobs:
   installer:
     strategy:
       matrix:
-        pyVersion: [ '3.10', '3.11', '3.12' ]
+        pyVersion: [ '3.10', '3.11' ]
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
