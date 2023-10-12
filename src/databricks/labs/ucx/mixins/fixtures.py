@@ -758,7 +758,7 @@ def make_schema(ws, sql_backend, make_random) -> Callable[..., SchemaInfo]:
 
 
 @pytest.fixture
-def make_table(sql_backend, make_schema, make_random) -> Callable[..., TableInfo]:
+def make_table(ws, sql_backend, make_schema, make_random) -> Callable[..., TableInfo]:
     def create(
         *,
         catalog_name="hive_metastore",
