@@ -1,5 +1,43 @@
 # Version changelog
 
+## 0.4.0
+
+* Added exception handling for secret scope not found. ([#418](https://github.com/databricks/ucx/pull/418)).
+* Added a crawler for creating an inventory of Azure Service Principals ([#326](https://github.com/databricks/ucx/pull/326)).
+* Added check if account group already exists during failure recovery ([#446](https://github.com/databricks/ucx/pull/446)).
+* Added checking for index out of range. ([#429](https://github.com/databricks/ucx/pull/429)).
+* Added hyperlink to UCX releases in the main readme ([#408](https://github.com/databricks/ucx/pull/408)).
+* Added integration test to check backup groups get deleted ([#387](https://github.com/databricks/ucx/pull/387)).
+* Added logging of errors during threadpool operations. ([#376](https://github.com/databricks/ucx/pull/376)).
+* Added recovery mode for workspace-local groups from temporary groups ([#435](https://github.com/databricks/ucx/pull/435)).
+* Added support for migrating Legacy Table ACLs from workspace-local to account-level groups ([#412](https://github.com/databricks/ucx/pull/412)).
+* Added detection for installations of unreleased versions ([#399](https://github.com/databricks/ucx/pull/399)).
+* Decoupled `PermissionsManager` from `GroupMigrationToolkit` ([#407](https://github.com/databricks/ucx/pull/407)).
+* Enabled debug logging for every job task run through a file, which is accessible from both workspace UI and Databricks CLI ([#426](https://github.com/databricks/ucx/pull/426)).
+* Ensured that table exists, even when crawlers produce zero records ([#373](https://github.com/databricks/ucx/pull/373)).
+* Extended test suite for HMS->HMS TACL migration ([#439](https://github.com/databricks/ucx/pull/439)).
+* Fixed handling of secret scope responses ([#431](https://github.com/databricks/ucx/pull/431)).
+* Fixed `crawl_permissions` task to respect 'workspace_start_path' config ([#444](https://github.com/databricks/ucx/pull/444)).
+* Fixed broken logic in `parallel` module and applied hardened error handling design for parallel code ([#405](https://github.com/databricks/ucx/pull/405)).
+* Fixed codecov.io reporting ([#403](https://github.com/databricks/ucx/pull/403)).
+* Fixed integration tests for crawlers ([#379](https://github.com/databricks/ucx/pull/379)).
+* Improved README.py and logging messages ([#433](https://github.com/databricks/ucx/pull/433)).
+* Improved cleanup for workspace backup groups by adding more retries on errors ([#375](https://github.com/databricks/ucx/pull/375)).
+* Improved dashboard queries to show unsupported storage types. ([#398](https://github.com/databricks/ucx/pull/398)).
+* Improved documentation for readme notebook ([#257](https://github.com/databricks/ucx/pull/257)).
+* Improved test coverage for installer ([#371](https://github.com/databricks/ucx/pull/371)).
+* Introduced deterministic `env_or_skip` fixture for integration tests ([#396](https://github.com/databricks/ucx/pull/396)).
+* Made HMS & UC fixtures return `CatalogInfo`, `SchemaInfo`, and `TableInfo` ([#409](https://github.com/databricks/ucx/pull/409)).
+* Merge `workspace_access.Crawler` and `workspace_access.Applier` interfaces to `workspace_access.AclSupport` ([#436](https://github.com/databricks/ucx/pull/436)).
+* Moved examples to docs ([#404](https://github.com/databricks/ucx/pull/404)).
+* Properly isolated integration testing for workflows on an existing shared cluster ([#414](https://github.com/databricks/ucx/pull/414)).
+* Removed thread pool for any IAM Group removals and additions ([#394](https://github.com/databricks/ucx/pull/394)).
+* Replace plus char with minus in version tag for GCP dev installation of UCX ([#420](https://github.com/databricks/ucx/pull/420)).
+* Run integration tests on shared clusters for a faster devloop ([#397](https://github.com/databricks/ucx/pull/397)).
+* Show difference between serverless and PRO warehouses during installation ([#385](https://github.com/databricks/ucx/pull/385)).
+* Split `migrate-groups` workflow into three different stages for reliability ([#442](https://github.com/databricks/ucx/pull/442)).
+* Use groups instead of usernames in code owners file ([#389](https://github.com/databricks/ucx/pull/389)).
+
 ## 0.3.0
 
 * Added `inventory_database` name check during installation ([#275](https://github.com/databricks/ucx/pull/275)).
