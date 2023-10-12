@@ -1,4 +1,5 @@
 import json
+import unittest.mock
 from unittest.mock import MagicMock
 
 from databricks.sdk.core import DatabricksError
@@ -55,6 +56,11 @@ def test_crawler():
 
 def test_apply(migration_state):
     ws = MagicMock()
+
+    acl1 = iam.AccessControlResponse(
+        all_permissions=[iam.Permission(permission_level=iam.PermissionLevel.CAN_USE)], group_name="db-temp-test"
+    )
+    ws.permissions.get.return_value = iam.ObjectPermissions(access_control_list=[acl1])
     sup = GenericPermissionsSupport(ws=ws, listings=[])  # no listings since only apply is tested
 
     item = Permissions(
@@ -148,9 +154,17 @@ def test_passwords_tokens_crawler(migration_state):
         )
     ]
 
+    temp_acl = [
+        iam.AccessControlResponse(
+            group_name="db-temp-test",
+            all_permissions=[iam.Permission(inherited=False, permission_level=iam.PermissionLevel.CAN_USE)],
+        )
+    ]
     ws.permissions.get.side_effect = [
         iam.ObjectPermissions(object_id="passwords", object_type="authorization", access_control_list=basic_acl),
         iam.ObjectPermissions(object_id="tokens", object_type="authorization", access_control_list=basic_acl),
+        iam.ObjectPermissions(object_id="passwords", object_type="authorization", access_control_list=temp_acl),
+        iam.ObjectPermissions(object_id="tokens", object_type="authorization", access_control_list=temp_acl),
     ]
 
     sup = GenericPermissionsSupport(ws=ws, listings=[Listing(tokens_and_passwords, "object_id", "authorization")])
@@ -205,3 +219,156 @@ def test_experiment_listing():
     for res in results:
         assert res.request_type == "experiments"
         assert res.object_id in ["test", "test2"]
+
+
+def test_response_to_request_mapping():
+    permissions1 = [
+        iam.Permission(permission_level=iam.PermissionLevel.CAN_BIND),
+        iam.Permission(permission_level=iam.PermissionLevel.CAN_MANAGE),
+    ]
+    response1 = iam.AccessControlResponse(all_permissions=permissions1, user_name="test1212")
+
+    permissions2 = [iam.Permission(permission_level=iam.PermissionLevel.CAN_ATTACH_TO)]
+    response2 = iam.AccessControlResponse(all_permissions=permissions2, group_name="data-engineers")
+
+    permissions3 = [iam.Permission(permission_level=iam.PermissionLevel.CAN_MANAGE_PRODUCTION_VERSIONS)]
+    response3 = iam.AccessControlResponse(all_permissions=permissions3, service_principal_name="sp1")
+
+    object_permissions = iam.ObjectPermissions(access_control_list=[response1, response2, response3])
+
+    sup = GenericPermissionsSupport(ws=MagicMock(), listings=[])
+    results = sup._response_to_request(object_permissions.access_control_list)
+
+    assert results == [
+        iam.AccessControlRequest(permission_level=iam.PermissionLevel.CAN_BIND, user_name="test1212"),
+        iam.AccessControlRequest(permission_level=iam.PermissionLevel.CAN_MANAGE, user_name="test1212"),
+        iam.AccessControlRequest(permission_level=iam.PermissionLevel.CAN_ATTACH_TO, group_name="data-engineers"),
+        iam.AccessControlRequest(
+            permission_level=iam.PermissionLevel.CAN_MANAGE_PRODUCTION_VERSIONS, service_principal_name="sp1"
+        ),
+    ]
+
+
+def test_applier_task_should_return_true_if_permission_is_up_to_date():
+    ws = MagicMock()
+    acl1 = iam.AccessControlResponse(
+        all_permissions=[iam.Permission(permission_level=iam.PermissionLevel.CAN_USE)], group_name="group"
+    )
+    acl2 = iam.AccessControlResponse(
+        all_permissions=[iam.Permission(permission_level=iam.PermissionLevel.CAN_RUN)], group_name="group2"
+    )
+    ws.permissions.get.return_value = iam.ObjectPermissions(access_control_list=[acl1, acl2])
+
+    sup = GenericPermissionsSupport(ws=ws, listings=[])
+    result = sup._applier_task(
+        object_type="clusters",
+        object_id="cluster_id",
+        acl=[iam.AccessControlRequest(group_name="group", permission_level=iam.PermissionLevel.CAN_USE)],
+    )
+    assert result
+
+
+def test_applier_task_should_return_true_if_permission_is_up_to_date_with_multiple_permissions():
+    ws = MagicMock()
+    acl = iam.AccessControlResponse(
+        all_permissions=[
+            iam.Permission(permission_level=iam.PermissionLevel.CAN_USE),
+            iam.Permission(permission_level=iam.PermissionLevel.CAN_ATTACH_TO),
+            iam.Permission(permission_level=iam.PermissionLevel.CAN_RUN),
+        ],
+        group_name="group",
+    )
+
+    ws.permissions.get.return_value = iam.ObjectPermissions(access_control_list=[acl])
+    sup = GenericPermissionsSupport(ws=ws, listings=[])
+
+    result = sup._applier_task(
+        object_type="clusters",
+        object_id="cluster_id",
+        acl=[
+            iam.AccessControlRequest(group_name="group", permission_level=iam.PermissionLevel.CAN_USE),
+            iam.AccessControlRequest(group_name="group", permission_level=iam.PermissionLevel.CAN_ATTACH_TO),
+        ],
+    )
+    assert result
+
+
+def test_applier_task_should_return_false_if_permission_couldnt_be_applied():
+    ws = MagicMock()
+    acl = iam.AccessControlResponse(all_permissions=[], group_name="group")
+
+    ws.permissions.update.return_value = iam.ObjectPermissions(access_control_list=[acl])
+    ws.permissions.get.return_value = iam.ObjectPermissions(access_control_list=[acl])
+    sup = GenericPermissionsSupport(ws=ws, listings=[])
+
+    result = sup._applier_task(
+        object_type="clusters",
+        object_id="cluster_id",
+        acl=[iam.AccessControlRequest(group_name="group", permission_level=iam.PermissionLevel.CAN_USE)],
+    )
+    assert not result
+
+
+def test_applier_task_should_return_false_if_all_permission_couldnt_be_applied():
+    ws = MagicMock()
+    group_1_acl = iam.AccessControlResponse(
+        all_permissions=[
+            iam.Permission(permission_level=iam.PermissionLevel.CAN_USE),
+            iam.Permission(permission_level=iam.PermissionLevel.CAN_ATTACH_TO),
+            iam.Permission(permission_level=iam.PermissionLevel.CAN_RUN),
+        ],
+        group_name="group_1",
+    )
+    group_2_acl = iam.AccessControlResponse(
+        all_permissions=[
+            iam.Permission(permission_level=iam.PermissionLevel.CAN_USE),
+            iam.Permission(permission_level=iam.PermissionLevel.CAN_MANAGE),
+        ],
+        group_name="group_2",
+    )
+    ws.permissions.update.return_value = iam.ObjectPermissions(access_control_list=[group_1_acl, group_2_acl])
+    ws.permissions.get.return_value = iam.ObjectPermissions(access_control_list=[group_1_acl, group_2_acl])
+    sup = GenericPermissionsSupport(ws=ws, listings=[])
+
+    result = sup._applier_task(
+        object_type="clusters",
+        object_id="cluster_id",
+        acl=[
+            iam.AccessControlRequest(group_name="group_1", permission_level=iam.PermissionLevel.CAN_USE),
+            iam.AccessControlRequest(group_name="group_1", permission_level=iam.PermissionLevel.CAN_MANAGE),
+        ],
+    )
+    assert not result
+
+
+def test_applier_task_should_be_called_three_times_if_permission_couldnt_be_applied():
+    ws = MagicMock()
+    acl = iam.AccessControlResponse(all_permissions=[], group_name="group")
+
+    ws.permissions.update.return_value = iam.ObjectPermissions(access_control_list=[acl])
+    ws.permissions.get.return_value = iam.ObjectPermissions(access_control_list=[acl])
+    sup = GenericPermissionsSupport(ws=ws, listings=[])
+
+    input_acl = [iam.AccessControlRequest(group_name="group", permission_level=iam.PermissionLevel.CAN_USE)]
+    sup._applier_task(
+        object_type="clusters",
+        object_id="cluster_id",
+        acl=input_acl,
+    )
+
+    assert len(ws.permissions.update.mock_calls) == 3
+    assert ws.permissions.update.has_calls(
+        [
+            unittest.mock.call(object_type="clusters", object_id="cluster_id", acl=input_acl),
+            unittest.mock.call(object_type="clusters", object_id="cluster_id", acl=input_acl),
+            unittest.mock.call(object_type="clusters", object_id="cluster_id", acl=input_acl),
+        ]
+    )
+    assert len(ws.permissions.get.mock_calls) == 3
+    assert ws.permissions.get.has_calls(
+        [
+            unittest.mock.call(object_type="clusters", object_id="cluster_id"),
+            unittest.mock.call(object_type="clusters", object_id="cluster_id"),
+            unittest.mock.call(object_type="clusters", object_id="cluster_id"),
+        ]
+    )

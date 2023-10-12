@@ -1,9 +1,11 @@
 import datetime
 import json
 import logging
+import time
 from collections.abc import Callable, Iterator
 from dataclasses import dataclass
 from functools import partial
+from typing import Optional
 
 from databricks.sdk import WorkspaceClient
 from databricks.sdk.core import DatabricksError
@@ -83,10 +85,38 @@ class GenericPermissionsSupport(AclSupport):
                 return True
         return False
 
+    @staticmethod
+    def _response_to_request(
+        acls: Optional["list[iam.AccessControlResponse]"] = None,
+    ) -> list[iam.AccessControlRequest]:
+        results = []
+        for acl in acls:
+            for permission in acl.all_permissions:
+                results.append(
+                    iam.AccessControlRequest(
+                        acl.group_name, permission.permission_level, acl.service_principal_name, acl.user_name
+                    )
+                )
+        return results
+
     @rate_limited(max_requests=30)
     def _applier_task(self, object_type: str, object_id: str, acl: list[iam.AccessControlRequest]):
-        self._ws.permissions.update(object_type, object_id, access_control_list=acl)
-        return True
+        for _i in range(0, 3):
+            self._ws.permissions.update(object_type, object_id, access_control_list=acl)
+
+            remote_permission = self._safe_get_permissions(object_type, object_id)
+            remote_permission_as_request = self._response_to_request(remote_permission.access_control_list)
+            if all(elem in remote_permission_as_request for elem in acl):
+                return True
+
+            logger.warning(
+                f"""Couldn't apply appropriate permission for object type {object_type} with id {object_id}
+            acl to be applied={acl}
+            acl found in the object={remote_permission_as_request}
+            """
+            )
+            time.sleep(1 + _i)
+        return False
 
     @rate_limited(max_requests=100)
     def _crawler_task(self, object_type: str, object_id: str) -> Permissions | None:

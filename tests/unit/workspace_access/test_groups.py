@@ -47,8 +47,9 @@ def test_scim_crawler():
 
 def test_scim_apply(migration_state):
     ws = MagicMock()
-    sup = ScimSupport(ws=ws)
     sample_permissions = [iam.ComplexValue(value="role1"), iam.ComplexValue(value="role2")]
+    ws.groups.get.return_value = Group(id="test-backup", roles=sample_permissions)
+    sup = ScimSupport(ws=ws)
     item = Permissions(
         object_id="test-ws",
         object_type="roles",
