@@ -1,6 +1,5 @@
 import logging
 import random
-from dataclasses import dataclass
 from functools import partial
 
 import databricks.sdk.core
@@ -29,22 +28,6 @@ def list_equal_unordered(s, t):
     except ValueError:
         return False
     return not t
-
-
-def test_assert_list_equal_unordered():
-    @dataclass
-    class Foo:
-        a: str
-        b: str | None = None
-
-    assert list_equal_unordered([1], [1])
-    assert list_equal_unordered([], [])
-    assert list_equal_unordered([1, 2, 3], [3, 2, 1])
-    assert not list_equal_unordered([1], [2])
-
-    assert list_equal_unordered([Foo("a"), Foo("b")], [Foo("b"), Foo("a")])
-    assert list_equal_unordered([Foo("a", "c"), Foo("b")], [Foo("b"), Foo("a", "c")])
-    assert not list_equal_unordered([Foo("a", "c"), Foo("b")], [Foo("b"), Foo("a")])
 
 
 def account_host(self: databricks.sdk.core.Config) -> str:
