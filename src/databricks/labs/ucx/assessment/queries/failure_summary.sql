@@ -1,5 +1,5 @@
 -- viz type=table, name=Failure Summary, columns=issue,component,issue_count,issue_percentage_jobs,issue_percentage_clusters,issue_percentage_gis,issue_percentage_pipelines
--- widget title = Failure Summary, col=4, row=0, size_x=5, size_y=3
+-- widget title = Failure Summary, col=0, row=65, size_x=6, size_y=8
 WITH failuretab (failures, component) AS (
     SELECT
         failures,
