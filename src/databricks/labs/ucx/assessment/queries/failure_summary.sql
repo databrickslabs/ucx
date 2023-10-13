@@ -5,28 +5,28 @@ WITH failuretab (failures, component) AS (
         failures,
         "jobs" AS component
     FROM
-        jobs
+        $inventory.jobs
     UNION
     ALL
     SELECT
         failures,
         "clusters" AS component
     FROM
-        clusters
+        $inventory.clusters
     UNION
     ALL
     SELECT
         failures,
         "global init scripts" AS component
     FROM
-        global_init_scripts
+        $inventory.global_init_scripts
     UNION
     ALL
     SELECT
         failures,
         "pipelines" AS component
     FROM
-        pipelines
+        $inventory.pipelines
 )
 SELECT
     issue,
