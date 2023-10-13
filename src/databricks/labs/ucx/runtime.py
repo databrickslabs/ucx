@@ -322,7 +322,6 @@ def crawl_permissions(cfg: WorkspaceConfig):
         assess_azure_service_principals,
         assess_global_init_scripts,
     ],
-    dashboard="assessment",
 )
 def setup_view(cfg: WorkspaceConfig):
     """Creates a database view for capturing the following failures in the assessment process. \
@@ -332,22 +331,13 @@ def setup_view(cfg: WorkspaceConfig):
     - Azure service principal credentials config
     """
     backend = RuntimeBackend()
-    view_ddl = f"CREATE OR REPLACE VIEW hive_metastore.{cfg.inventory_database}." + _get_view_definition(cfg)
-    backend.execute(view_ddl)
+    db_view_ddl = f"CREATE OR REPLACE VIEW hive_metastore.{cfg.inventory_database}." + _get_view_definition(cfg)
+    backend.execute(db_view_ddl)
 
 
 @task(
     "assessment",
-    depends_on=[
-        crawl_grants,
-        crawl_permissions,
-        guess_external_locations,
-        assess_jobs,
-        assess_clusters,
-        assess_pipelines,
-        assess_azure_service_principals,
-        assess_global_init_scripts,
-    ],
+    depends_on=[crawl_grants, crawl_permissions, guess_external_locations, setup_view],
     dashboard="assessment",
 )
 def assessment_report(_: WorkspaceConfig):
