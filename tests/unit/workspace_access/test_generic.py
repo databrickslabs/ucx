@@ -1,25 +1,23 @@
 import json
 import unittest.mock
-from unittest.mock import MagicMock,Mock,patch
-from tests.unit.framework.mocks import MockBackend
-
+from unittest.mock import MagicMock, Mock, patch
 
 from databricks.sdk.core import DatabricksError
 from databricks.sdk.service import compute, iam, ml
 from databricks.sdk.service.workspace import ObjectInfo, ObjectType
-from databricks.labs.ucx.mixins.sql import Row
 
-from databricks.labs.ucx.workspace_access import listing
+from databricks.labs.ucx.mixins.sql import Row
 from databricks.labs.ucx.workspace_access.generic import (
     GenericPermissionsSupport,
     Listing,
     Permissions,
+    WorkspaceListing,
+    WorkspaceObjectInfo,
     experiments_listing,
     models_listing,
     tokens_and_passwords,
-    WorkspaceListing,
-    WorkspaceObjectInfo
 )
+from tests.unit.framework.mocks import MockBackend
 
 
 def test_crawler():
