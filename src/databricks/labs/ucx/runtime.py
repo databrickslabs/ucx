@@ -33,7 +33,7 @@ def _get_view_definition(cfg: WorkspaceConfig) -> str:
         UNION ALL
         SELECT
           failures,
-          "clusters' AS component
+          "clusters" AS component
         FROM
           hive_metastore.{cfg.inventory_database}.clusters
         UNION ALL
