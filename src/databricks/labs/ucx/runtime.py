@@ -23,6 +23,135 @@ from databricks.labs.ucx.workspace_access.manager import PermissionManager
 logger = logging.getLogger(__name__)
 
 
+def _get_view_definition(cfg: WorkspaceConfig) -> str:
+    return f"""vw_failure_summary AS WITH failuretab (failures, component) AS (
+        SELECT
+          failures,
+          "jobs" AS component
+        FROM
+          hive_metastore.{cfg.inventory_database}.jobs
+        UNION ALL
+        SELECT
+          failures,
+          "clusters' AS component
+        FROM
+          hive_metastore.{cfg.inventory_database}.clusters
+        UNION ALL
+        SELECT
+          failures,
+          "global init scripts" AS component
+        FROM
+          hive_metastore.{cfg.inventory_database}.global_init_scripts
+        UNION ALL
+        SELECT
+          failures,
+          "pipelines" AS component
+        FROM
+          hive_metastore.{cfg.inventory_database}.pipelines
+      )
+    SELECT
+      issue,
+      component,
+      COUNT(*) AS issue_count,
+      IF (
+        component = 'jobs',
+        round(
+          issue_count / (
+            SELECT
+              count(*)
+            FROM
+              hive_metastore.{cfg.inventory_database}.jobs
+          ),
+          2
+        ) * 100,
+        'NA'
+      ) AS issue_percentage_jobs,
+      IF (
+        component = 'clusters',
+        round(
+          issue_count / (
+            SELECT
+              count(*)
+            FROM
+              hive_metastore.{cfg.inventory_database}.clusters
+          ),
+          2
+        ) * 100,
+        'NA'
+      ) AS issue_percentage_clusters,
+      IF (
+        component = 'global init scripts',
+        round(
+          issue_count / (
+            SELECT
+              count(*)
+            FROM
+              hive_metastore.{cfg.inventory_database}.global_init_scripts
+          ),
+          2
+        ) * 100,
+        'NA'
+      ) AS issue_percentage_gis,
+      IF (
+        component = 'pipelines',
+        round(
+          issue_count / (
+            SELECT
+              count(*)
+            FROM
+              hive_metastore.{cfg.inventory_database}.pipelines
+          ),
+          2
+        ) * 100,
+        'NA'
+      ) AS issue_percentage_pipelines
+    FROM
+      (
+        SELECT
+          explode(from_json(failures, 'array<string>')) AS failure,
+          substring_index(failure, ":", 1) issue,
+          component,
+          IF (
+            locate("not supported DBR:", failure) > 0,
+            TRUE,
+            FALSE
+          ) AS incomp_dbr_present_or_not,
+          IF (
+            locate("unsupported config:", failure) > 0,
+            TRUE,
+            FALSE
+          ) AS unsup_config_present_or_not,
+          IF (
+            locate("using DBFS mount in configuration:", failure) > 0,
+            TRUE,
+            FALSE
+          ) AS dbfs_mount_present_or_not,
+          IF (
+            locate(
+              "Uses azure service principal credentials config in",
+              failure
+            ) > 0,
+            TRUE,
+            FALSE
+          ) AS azure_spn_present_or_not
+        FROM
+          failuretab
+      )
+    WHERE
+      (
+        incomp_dbr_present_or_not IS TRUE
+        OR unsup_config_present_or_not IS TRUE
+        OR dbfs_mount_present_or_not IS TRUE
+        OR azure_spn_present_or_not IS TRUE
+      )
+    GROUP BY
+      issue,
+      component
+    ORDER BY
+      issue,
+      component ; """
+
+
 @task("assessment")
 def setup_schema(cfg: WorkspaceConfig):
     """Creates a database for the UCX migration intermediate state. The name comes from the configuration file
@@ -182,6 +311,29 @@ def crawl_permissions(cfg: WorkspaceConfig):
     )
     permission_manager.cleanup()
     permission_manager.inventorize_permissions()
+
+
+@task(
+    "assessment",
+    depends_on=[
+        assess_jobs,
+        assess_clusters,
+        assess_pipelines,
+        assess_azure_service_principals,
+        assess_global_init_scripts,
+    ],
+    dashboard="assessment",
+)
+def setup_view(cfg: WorkspaceConfig):
+    """Creates a database view for capturing the following failures in the assessment process. \
+    - DBR version is not supported
+    - Unsupported config
+    - DBFS mount in configuration
+    - Azure service principal credentials config
+    """
+    backend = RuntimeBackend()
+    view_ddl = f"CREATE OR REPLACE VIEW hive_metastore.{cfg.inventory_database}." + _get_view_definition(cfg)
+    backend.execute(view_ddl)
 
 
 @task(
