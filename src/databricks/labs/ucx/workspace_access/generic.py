@@ -33,7 +33,7 @@ class GenericPermissionsInfo:
 @dataclass
 class WorkspaceObjectInfo:
     object_type: str
-    object_id: int
+    object_id: str
     path: str
     language: str
 
@@ -250,7 +250,7 @@ class WorkspaceListing(Listing, CrawlerBase):
         ws_listing = WorkspaceListing(self._ws, num_threads=self._num_threads, with_directories=False)
         for _object in ws_listing.walk(self._start_path):
             workspace_object_info = WorkspaceObjectInfo(
-                _object.object_type.name, _object.object_id, _object.path, _object.language
+                _object.object_type.name, str(_object.object_id), _object.path, _object.language
             )
             yield workspace_object_info
 

@@ -5,8 +5,8 @@ from databricks.labs.ucx.assessment.crawlers import (
     ClustersCrawler,
     JobsCrawler,
     PipelinesCrawler,
-    WorkspaceObjectCrawler,
 )
+from databricks.labs.ucx.workspace_access.generic import WorkspaceListing
 
 logger = logging.getLogger(__name__)
 
@@ -170,13 +170,14 @@ def test_spn_crawler_with_available_secrets(
 
 def test_workspace_object_crawler(ws, make_notebook, make_directory, inventory_schema, sql_backend):
     new_notebook = make_notebook()
-    make_directory()
-    workspace_crawler = WorkspaceObjectCrawler(ws=ws, sbe=sql_backend, schema=inventory_schema)
-    results = workspace_crawler.snapshot()
+    new_directory = make_directory()
+    workspace_listing = WorkspaceListing(ws=ws, sql_backend=sql_backend, inventory_database=inventory_schema)
+    listing_results = workspace_listing.snapshot()
     results = []
-    for _result in results:
-        results.append(_result)
+    for _result in listing_results:
+        if _result.path == new_notebook or _result.path == new_directory:
+            results.append(_result)
 
     assert len(results) == 2
-    assert int(results[0].object_id) == new_notebook.object_id
-    assert int(results[1].object_type) == "DIRECTORY"
+    assert results[0].path == new_notebook or results[0].path == new_directory
+    assert results[1].object_type == "DIRECTORY" or results[1].object_type == "NOTEBOOK"
