@@ -39,7 +39,7 @@ SELECT
                 SELECT
                     count(*)
                 FROM
-                    jobs
+                    $inventory.jobs
             ),
             2
         ) * 100,
@@ -52,7 +52,7 @@ SELECT
                 SELECT
                     count(*)
                 FROM
-                    clusters
+                    $inventory.clusters
             ),
             2
         ) * 100,
@@ -65,7 +65,7 @@ SELECT
                 SELECT
                     count(*)
                 FROM
-                    global_init_scripts
+                    $inventory.global_init_scripts
             ),
             2
         ) * 100,
@@ -78,7 +78,7 @@ SELECT
                 SELECT
                     count(*)
                 FROM
-                    pipelines
+                    $inventory.pipelines
             ),
             2
         ) * 100,
