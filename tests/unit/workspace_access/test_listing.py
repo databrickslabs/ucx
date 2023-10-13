@@ -3,7 +3,6 @@ from unittest.mock import MagicMock, Mock, patch
 
 from databricks.sdk.service.workspace import ObjectInfo, ObjectType
 
-from databricks.labs.ucx.assessment.crawlers import WorkspaceObjectInfo
 from databricks.labs.ucx.workspace_access import generic, listing
 
 
@@ -19,17 +18,15 @@ def test_logging_calls():
 
 def test_workspace_listing():
     listing_instance = [
-        WorkspaceObjectInfo(object_type="NOTEBOOK", object_id=1, path="", language="PYTHON"),
-        WorkspaceObjectInfo(object_type="DIRECTORY", object_id=2, path="", language=""),
-        WorkspaceObjectInfo(object_type="LIBRARY", object_id=3, path="", language=""),
-        WorkspaceObjectInfo(object_type="REPO", object_id=4, path="", language=""),
-        WorkspaceObjectInfo(object_type="FILE", object_id=5, path="", language=""),
-        WorkspaceObjectInfo(object_type=None, object_id=6, path="", language=""),  # MLflow Experiment
+        generic.WorkspaceObjectInfo(object_type="NOTEBOOK", object_id=1, path="", language="PYTHON"),
+        generic.WorkspaceObjectInfo(object_type="DIRECTORY", object_id=2, path="", language=""),
+        generic.WorkspaceObjectInfo(object_type="LIBRARY", object_id=3, path="", language=""),
+        generic.WorkspaceObjectInfo(object_type="REPO", object_id=4, path="", language=""),
+        generic.WorkspaceObjectInfo(object_type="FILE", object_id=5, path="", language=""),
+        generic.WorkspaceObjectInfo(object_type=None, object_id=6, path="", language=""),  # MLflow Experiment
     ]
 
-    with patch(
-        "databricks.labs.ucx.assessment.crawlers.WorkspaceObjectCrawler.snapshot", return_value=listing_instance
-    ):
+    with patch("databricks.labs.ucx.workspace_access.generic.WorkspaceListing.snapshot", return_value=listing_instance):
         results = generic.WorkspaceListing(ws=MagicMock(), sql_backend=MagicMock(), inventory_database=MagicMock())
         assert len(list(results)) == 4
         for res in results:

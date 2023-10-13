@@ -12,11 +12,7 @@ from databricks.sdk.core import DatabricksError
 from databricks.sdk.retries import retried
 from databricks.sdk.service import iam, ml
 
-from databricks.labs.ucx.assessment.crawlers import (
-    WorkspaceObjectCrawler,
-    WorkspaceObjectInfo,
-)
-from databricks.labs.ucx.framework.crawlers import SqlBackend
+from databricks.labs.ucx.framework.crawlers import CrawlerBase, SqlBackend
 from databricks.labs.ucx.mixins.hardening import rate_limited
 from databricks.labs.ucx.workspace_access.base import (
     AclSupport,
@@ -32,6 +28,14 @@ logger = logging.getLogger(__name__)
 class GenericPermissionsInfo:
     object_id: str
     request_type: str
+
+
+@dataclass
+class WorkspaceObjectInfo:
+    object_type: str
+    object_id: int
+    path: str
+    language: str
 
 
 class RetryableError(DatabricksError):
@@ -213,7 +217,7 @@ class GenericPermissionsSupport(AclSupport):
         return acl_requests
 
 
-class WorkspaceListing(Listing):
+class WorkspaceListing(Listing, CrawlerBase):
     def __init__(
         self,
         ws: WorkspaceClient,
@@ -222,12 +226,40 @@ class WorkspaceListing(Listing):
         num_threads=20,
         start_path: str | None = "/",
     ):
-        super().__init__(..., ..., ...)
+        Listing.__init__(self, ..., ..., ...)
+        CrawlerBase.__init__(
+            self,
+            backend=sql_backend,
+            catalog="hive_metastore",
+            schema=inventory_database,
+            table="workspace_objects",
+            klass=WorkspaceObjectInfo,
+        )
         self._ws = ws
         self._num_threads = num_threads
         self._start_path = start_path
         self._sql_backend = sql_backend
         self._inventory_database = inventory_database
+
+    def _crawl(self) -> list[WorkspaceObjectInfo]:
+        return list(self._assess_workspace_listing())
+
+    def _assess_workspace_listing(self):
+        from databricks.labs.ucx.workspace_access.listing import WorkspaceListing
+
+        ws_listing = WorkspaceListing(self._ws, num_threads=self._num_threads, with_directories=False)
+        for _object in ws_listing.walk(self._start_path):
+            workspace_object_info = WorkspaceObjectInfo(
+                _object.object_type.name, _object.object_id, _object.path, _object.language
+            )
+            yield workspace_object_info
+
+    def snapshot(self) -> list[WorkspaceObjectInfo]:
+        return self._snapshot(self._try_fetch, self._crawl)
+
+    def _try_fetch(self) -> list[WorkspaceObjectInfo]:
+        for row in self._fetch(f"SELECT * FROM {self._schema}.{self._table}"):
+            yield WorkspaceObjectInfo(*row)
 
     def object_types(self) -> set[str]:
         return {"notebooks", "directories", "repos", "files"}
@@ -250,14 +282,7 @@ class WorkspaceListing(Listing):
                 return None
 
     def __iter__(self):
-        crawler = WorkspaceObjectCrawler(
-            self._ws,
-            sbe=self._sql_backend,
-            schema=self._inventory_database,
-            num_threads=self._num_threads,
-            start_path=self._start_path,
-        )
-        for _object in crawler.snapshot():
+        for _object in self.snapshot():
             request_type = self._convert_object_type_to_request_type(_object)
             if request_type:
                 yield GenericPermissionsInfo(object_id=str(_object.object_id), request_type=request_type)
