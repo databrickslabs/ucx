@@ -56,53 +56,45 @@ def _get_view_definition(cfg: WorkspaceConfig) -> str:
       IF (
         component = 'jobs',
         round(
-          issue_count / (
+          (issue_count / (
             SELECT
               count(*)
             FROM
               hive_metastore.{cfg.inventory_database}.jobs
-          ),
-          2
-        ) * 100,
+        ) * 100) , 2),
         'NA'
       ) AS jobs_issue_percentage,
       IF (
         component = 'clusters',
         round(
-          issue_count / (
+          (issue_count / (
             SELECT
               count(*)
             FROM
               hive_metastore.{cfg.inventory_database}.clusters
-          ),
-          2
-        ) * 100,
+        ) * 100), 2),
         'NA'
       ) AS clusters_issue_percentage,
       IF (
         component = 'global init scripts',
         round(
-          issue_count / (
+          (issue_count / (
             SELECT
               count(*)
             FROM
               hive_metastore.{cfg.inventory_database}.global_init_scripts
-          ),
-          2
-        ) * 100,
+        ) * 100), 2),
         'NA'
       ) AS gis_issue_percentage,
       IF (
         component = 'pipelines',
         round(
-          issue_count / (
+          (issue_count / (
             SELECT
               count(*)
             FROM
               hive_metastore.{cfg.inventory_database}.pipelines
-          ),
-          2
-        ) * 100,
+        ) * 100) , 2),
         'NA'
       ) AS pipelines_issue_percentage
     FROM
