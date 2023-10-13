@@ -65,7 +65,7 @@ def _get_view_definition(cfg: WorkspaceConfig) -> str:
           2
         ) * 100,
         'NA'
-      ) AS issue_percentage_jobs,
+      ) AS jobs_issue_percentage,
       IF (
         component = 'clusters',
         round(
@@ -78,7 +78,7 @@ def _get_view_definition(cfg: WorkspaceConfig) -> str:
           2
         ) * 100,
         'NA'
-      ) AS issue_percentage_clusters,
+      ) AS clusters_issue_percentage,
       IF (
         component = 'global init scripts',
         round(
@@ -91,7 +91,7 @@ def _get_view_definition(cfg: WorkspaceConfig) -> str:
           2
         ) * 100,
         'NA'
-      ) AS issue_percentage_gis,
+      ) AS gis_issue_percentage,
       IF (
         component = 'pipelines',
         round(
@@ -104,7 +104,7 @@ def _get_view_definition(cfg: WorkspaceConfig) -> str:
           2
         ) * 100,
         'NA'
-      ) AS issue_percentage_pipelines
+      ) AS pipelines_issue_percentage
     FROM
       (
         SELECT
