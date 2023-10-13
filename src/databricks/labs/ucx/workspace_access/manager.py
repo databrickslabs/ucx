@@ -46,7 +46,13 @@ class PermissionManager(CrawlerBase):
             generic.Listing(generic.experiments_listing(ws), "experiment_id", "experiments"),
             generic.Listing(generic.models_listing(ws), "id", "registered-models"),
             generic.Listing(generic.tokens_and_passwords, "object_id", "authorization"),
-            generic.WorkspaceListing(ws, num_threads=num_threads, start_path=workspace_start_path),
+            generic.WorkspaceListing(
+                ws,
+                sql_backend=sql_backend,
+                inventory_database=inventory_database,
+                num_threads=num_threads,
+                start_path=workspace_start_path,
+            ),
         ]
         redash_acl_listing = [
             redash.Listing(ws.alerts.list, sql.ObjectTypePlural.ALERTS),

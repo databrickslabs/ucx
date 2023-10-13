@@ -10,8 +10,13 @@ from typing import Optional
 from databricks.sdk import WorkspaceClient
 from databricks.sdk.core import DatabricksError
 from databricks.sdk.retries import retried
-from databricks.sdk.service import iam, ml, workspace
+from databricks.sdk.service import iam, ml
 
+from databricks.labs.ucx.assessment.crawlers import (
+    WorkspaceObjectCrawler,
+    WorkspaceObjectInfo,
+)
+from databricks.labs.ucx.framework.crawlers import SqlBackend
 from databricks.labs.ucx.mixins.hardening import rate_limited
 from databricks.labs.ucx.workspace_access.base import (
     AclSupport,
@@ -209,37 +214,50 @@ class GenericPermissionsSupport(AclSupport):
 
 
 class WorkspaceListing(Listing):
-    def __init__(self, ws: WorkspaceClient, num_threads=20, start_path: str | None = "/"):
+    def __init__(
+        self,
+        ws: WorkspaceClient,
+        sql_backend: SqlBackend,
+        inventory_database: str,
+        num_threads=20,
+        start_path: str | None = "/",
+    ):
         super().__init__(..., ..., ...)
         self._ws = ws
         self._num_threads = num_threads
         self._start_path = start_path
+        self._sql_backend = sql_backend
+        self._inventory_database = inventory_database
 
     def object_types(self) -> set[str]:
         return {"notebooks", "directories", "repos", "files"}
 
     @staticmethod
-    def _convert_object_type_to_request_type(_object: workspace.ObjectInfo) -> str | None:
+    def _convert_object_type_to_request_type(_object: WorkspaceObjectInfo) -> str | None:
         match _object.object_type:
-            case workspace.ObjectType.NOTEBOOK:
+            case "NOTEBOOK":
                 return "notebooks"
-            case workspace.ObjectType.DIRECTORY:
+            case "DIRECTORY":
                 return "directories"
-            case workspace.ObjectType.LIBRARY:
+            case "LIBRARY":
                 return None
-            case workspace.ObjectType.REPO:
+            case "REPO":
                 return "repos"
-            case workspace.ObjectType.FILE:
+            case "FILE":
                 return "files"
             # silent handler for experiments - they'll be inventorized by the experiments manager
             case None:
                 return None
 
     def __iter__(self):
-        from databricks.labs.ucx.workspace_access.listing import WorkspaceListing
-
-        ws_listing = WorkspaceListing(self._ws, num_threads=self._num_threads, with_directories=False)
-        for _object in ws_listing.walk(self._start_path):
+        crawler = WorkspaceObjectCrawler(
+            self._ws,
+            sbe=self._sql_backend,
+            schema=self._inventory_database,
+            num_threads=self._num_threads,
+            start_path=self._start_path,
+        )
+        for _object in crawler.snapshot():
             request_type = self._convert_object_type_to_request_type(_object)
             if request_type:
                 yield GenericPermissionsInfo(object_id=str(_object.object_id), request_type=request_type)
