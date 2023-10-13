@@ -16,7 +16,8 @@ from databricks.labs.ucx.workspace_access.base import (
     Permissions,
 )
 from databricks.labs.ucx.workspace_access.generic import RetryableError
-from databricks.labs.ucx.workspace_access.groups import GroupMigrationState
+from databricks.labs.ucx.workspace_access.groups import MigrationState
+
 
 logger = logging.getLogger(__name__)
 
@@ -27,9 +28,8 @@ class ScimSupport(AclSupport):
         self._verify_timeout = verify_timeout
 
     @staticmethod
-    def _is_item_relevant(item: Permissions, migration_state: GroupMigrationState) -> bool:
-        # TODO: This mean that we can lose entitlements, if we don't store the `$inventory.groups`
-        return migration_state.is_id_in_scope(item.object_id)
+    def _is_item_relevant(item: Permissions, migration_state: MigrationState) -> bool:
+        return any(g.workspace.id == item.object_id for g in migration_state.groups)
 
     def get_crawler_tasks(self):
         for g in self._get_groups():
@@ -46,7 +46,7 @@ class ScimSupport(AclSupport):
     def object_types(self) -> set[str]:
         return {"roles", "entitlements"}
 
-    def get_apply_task(self, item: Permissions, migration_state: GroupMigrationState, destination: Destination):
+    def get_apply_task(self, item: Permissions, migration_state: MigrationState, destination: Destination):
         if not self._is_item_relevant(item, migration_state):
             return None
         value = [iam.ComplexValue.from_dict(e) for e in json.loads(item.raw)]

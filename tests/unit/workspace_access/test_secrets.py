@@ -5,7 +5,7 @@ from unittest.mock import MagicMock, call
 import pytest
 from databricks.sdk.service import workspace
 
-from databricks.labs.ucx.workspace_access.groups import GroupMigrationState
+from databricks.labs.ucx.workspace_access.groups import MigrationState
 from databricks.labs.ucx.workspace_access.secrets import (
     Permissions,
     SecretScopesSupport,
@@ -39,7 +39,7 @@ def test_secret_scopes_crawler():
     assert item.raw == '[{"permission": "MANAGE", "principal": "test"}]'
 
 
-def test_secret_scopes_apply(migration_state: GroupMigrationState):
+def test_secret_scopes_apply(migration_state: MigrationState):
     ws = MagicMock()
     sup = SecretScopesSupport(ws=ws)
     item = Permissions(

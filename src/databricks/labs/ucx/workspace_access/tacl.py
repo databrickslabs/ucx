@@ -13,7 +13,7 @@ from databricks.labs.ucx.workspace_access.base import (
     Destination,
     Permissions,
 )
-from databricks.labs.ucx.workspace_access.groups import GroupMigrationState
+from databricks.labs.ucx.workspace_access.groups import MigrationState
 
 
 class TableAclSupport(AclSupport):
@@ -87,7 +87,7 @@ class TableAclSupport(AclSupport):
     def object_types(self) -> set[str]:
         return {"TABLE", "DATABASE", "VIEW", "CATALOG", "ANONYMOUS FUNCTION", "ANY FILE"}
 
-    def get_apply_task(self, item: Permissions, migration_state: GroupMigrationState, destination: Destination):
+    def get_apply_task(self, item: Permissions, migration_state: MigrationState, destination: Destination):
         grant = Grant(**json.loads(item.raw))
         target_principal = migration_state.get_target_principal(grant.principal, destination)
         if target_principal is None:

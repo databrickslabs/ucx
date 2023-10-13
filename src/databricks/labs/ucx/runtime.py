@@ -194,10 +194,22 @@ def crawl_permissions(cfg: WorkspaceConfig):
     permission_manager.inventorize_permissions()
 
 
+@task("assessment")
+def crawl_groups(cfg: WorkspaceConfig):
+    """Scans all groups for the local group migration scope"""
+    sql_backend = RuntimeBackend()
+    ws = WorkspaceClient(config=cfg.to_databricks_config())
+    group_manager = GroupManager(
+        sql_backend, ws, cfg.inventory_database, cfg.include_group_names, cfg.renamed_group_prefix
+    )
+    group_manager.snapshot()
+
+
 @task(
     "assessment",
     depends_on=[
         crawl_grants,
+        crawl_groups,
         crawl_permissions,
         guess_external_locations,
         assess_jobs,
@@ -214,55 +226,29 @@ def assessment_report(_: WorkspaceConfig):
     dashboard _before_ all tasks have been completed, but then only already completed information is shown."""
 
 
-@task("002-apply-permissions-to-backup-groups", depends_on=[crawl_permissions], job_cluster="tacl")
-def apply_permissions_to_backup_groups(cfg: WorkspaceConfig):
-    """Second phase of the workspace-local group migration process. It does the following:
-      - Creates a backup of every workspace-local group, adding a prefix that can be set in the configuration
-      - Assigns the full set of permissions of the original group to the backup one
-
-    It covers local workspace-local permissions for all entities: Legacy Table ACLs, Entitlements,
-    AWS instance profiles, Clusters, Cluster policies, Instance Pools, Databricks SQL warehouses, Delta Live
-    Tables, Jobs, MLflow experiments, MLflow registry, SQL Dashboards & Queries, SQL Alerts, Token and Password usage
-    permissions, Secret Scopes, Notebooks, Directories, Repos, Files.
-
-    See [interactive tutorial here](https://app.getreprise.com/launch/myM3VNn/)."""
+@task("migrate-groups", depends_on=[crawl_groups])
+def rename_workspace_local_groups(cfg: WorkspaceConfig):
+    """Renames workspace local groups by adding `ucx-renamed-` prefix."""
+    sql_backend = RuntimeBackend()
     ws = WorkspaceClient(config=cfg.to_databricks_config())
-    group_manager = GroupManager(ws, cfg.groups)
-    group_manager.prepare_groups_in_environment()
-    if not group_manager.has_groups():
-        logger.info("Skipping group migration as no groups were found.")
-        return
-
-    backend = RuntimeBackend()
-    permission_manager = PermissionManager.factory(
-        ws,
-        backend,
-        cfg.inventory_database,
-        num_threads=cfg.num_threads,
-        workspace_start_path=cfg.workspace_start_path,
+    group_manager = GroupManager(
+        sql_backend, ws, cfg.inventory_database, cfg.include_group_names, cfg.renamed_group_prefix
     )
-    permission_manager.apply_group_permissions(group_manager.migration_state, destination="backup")
-    group_manager.migration_state.persist_migration_state(backend, cfg.inventory_database)
+    group_manager.rename_groups()
 
 
-@task("003-replace-workspace-local-with-account-groups", depends_on=[apply_permissions_to_backup_groups])
-def replace_workspace_groups_with_account_groups(cfg: WorkspaceConfig):
-    """Third phase of the workspace-local group migration process. It does the following:
-    - Creates an account-level group with the original name of the workspace-local one"""
+@task("migrate-groups", depends_on=[rename_workspace_local_groups])
+def reflect_account_groups_on_workspace(cfg: WorkspaceConfig):
+    """Adds matching account groups to this workspace."""
+    sql_backend = RuntimeBackend()
     ws = WorkspaceClient(config=cfg.to_databricks_config())
-    group_manager = GroupManager(ws, cfg.groups)
-    remote_state = GroupMigrationState().fetch_migration_state(RuntimeBackend(), cfg.inventory_database)
-    if len(remote_state.groups) == 0:
-        logger.info("Skipping group migration as no groups were found.")
-        return
-    group_manager.replace_workspace_groups_with_account_groups(remote_state)
+    group_manager = GroupManager(
+        sql_backend, ws, cfg.inventory_database, cfg.include_group_names, cfg.renamed_group_prefix
+    )
+    group_manager.reflect_account_groups_on_workspace()
 
 
-@task(
-    "004-apply-permissions-to-account-groups",
-    depends_on=[replace_workspace_groups_with_account_groups],
-    job_cluster="tacl",
-)
+@task("migrate-groups", depends_on=[reflect_account_groups_on_workspace], job_cluster="tacl")
 def apply_permissions_to_account_groups(cfg: WorkspaceConfig):
     """Fourth phase of the workspace-local group migration process. It does the following:
       - Assigns the full set of permissions of the original group to the account-level one
@@ -301,7 +287,7 @@ def delete_backup_groups(cfg: WorkspaceConfig):
     successfully for all the groups involved."""
     ws = WorkspaceClient(config=cfg.to_databricks_config())
     group_manager = GroupManager(ws, cfg.groups)
-    group_manager.delete_backup_groups()
+    group_manager.delete_original_workspace_groups()
 
 
 @task("099-destroy-schema")

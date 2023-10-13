@@ -110,4 +110,4 @@ class GroupMigrationToolkit:
         self._verification_manager.verify(self._group_manager.migration_state, "account", to_verify)
 
     def delete_backup_groups(self):
-        self._group_manager.delete_backup_groups()
+        self._group_manager.delete_original_workspace_groups()

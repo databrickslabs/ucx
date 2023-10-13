@@ -13,7 +13,7 @@ from databricks.labs.ucx.workspace_access.base import (
     Destination,
     Permissions,
 )
-from databricks.labs.ucx.workspace_access.groups import GroupMigrationState
+from databricks.labs.ucx.workspace_access.groups import MigrationState
 
 logger = logging.getLogger(__name__)
 
@@ -42,7 +42,7 @@ class SecretScopesSupport(AclSupport):
     def object_types(self) -> set[str]:
         return {"secrets"}
 
-    def get_apply_task(self, item: Permissions, migration_state: GroupMigrationState, destination: Destination):
+    def get_apply_task(self, item: Permissions, migration_state: MigrationState, destination: Destination):
         if not self._is_item_relevant(item, migration_state):
             return None
 
@@ -67,12 +67,11 @@ class SecretScopesSupport(AclSupport):
         return partial(apply_acls)
 
     @staticmethod
-    def _is_item_relevant(item: Permissions, migration_state: GroupMigrationState) -> bool:
-        for acl in json.loads(item.raw):
-            acl_item = workspace.AclItem.from_dict(acl)
-            if migration_state.is_in_scope(acl_item.principal):
-                return True
-        return False
+    def _is_item_relevant(item: Permissions, migration_state: MigrationState) -> bool:
+        acls = [workspace.AclItem.from_dict(acl) for acl in json.loads(item.raw)]
+        mentioned_groups = [acl.principal for acl in acls]
+        return any(g in mentioned_groups for g in [info.workspace.display_name for info in migration_state.groups])
+
 
     def secret_scope_permission(self, scope_name: str, group_name: str) -> workspace.AclPermission | None:
         for acl in self._ws.secrets.list_acls(scope=scope_name):

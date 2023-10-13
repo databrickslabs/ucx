@@ -20,7 +20,7 @@ from databricks.labs.ucx.workspace_access.base import (
     Destination,
     Permissions,
 )
-from databricks.labs.ucx.workspace_access.groups import GroupMigrationState
+from databricks.labs.ucx.workspace_access.groups import MigrationState
 
 logger = logging.getLogger(__name__)
 
@@ -81,7 +81,7 @@ class GenericPermissionsSupport(AclSupport):
                 all_object_types.add(object_type)
         return all_object_types
 
-    def get_apply_task(self, item: Permissions, migration_state: GroupMigrationState, destination: Destination):
+    def get_apply_task(self, item: Permissions, migration_state: MigrationState, destination: Destination):
         if not self._is_item_relevant(item, migration_state):
             return None
         object_permissions = iam.ObjectPermissions.from_dict(json.loads(item.raw))
@@ -89,7 +89,7 @@ class GenericPermissionsSupport(AclSupport):
         return partial(self._applier_task, item.object_type, item.object_id, new_acl)
 
     @staticmethod
-    def _is_item_relevant(item: Permissions, migration_state: GroupMigrationState) -> bool:
+    def _is_item_relevant(item: Permissions, migration_state: MigrationState) -> bool:
         # passwords and tokens are represented on the workspace-level
         if item.object_id in ("tokens", "passwords"):
             return True
@@ -239,7 +239,7 @@ class GenericPermissionsSupport(AclSupport):
                 raise RetryableError(message=msg) from e
 
     def _prepare_new_acl(
-        self, permissions: iam.ObjectPermissions, migration_state: GroupMigrationState, destination: Destination
+        self, permissions: iam.ObjectPermissions, migration_state: MigrationState, destination: Destination
     ) -> list[iam.AccessControlRequest]:
         _acl = permissions.access_control_list
         acl_requests = []

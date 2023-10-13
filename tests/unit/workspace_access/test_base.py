@@ -8,7 +8,7 @@ from databricks.labs.ucx.workspace_access.base import (
     Destination,
     Permissions,
 )
-from databricks.labs.ucx.workspace_access.groups import GroupMigrationState
+from databricks.labs.ucx.workspace_access.groups import MigrationState
 
 
 def test_applier():
@@ -23,11 +23,11 @@ def test_applier():
             return {"test"}
 
         @staticmethod
-        def _is_item_relevant(item: Permissions, migration_state: GroupMigrationState) -> bool:
+        def _is_item_relevant(item: Permissions, migration_state: MigrationState) -> bool:
             workspace_groups = [info.workspace.display_name for info in migration_state.groups]
             return item.object_id in workspace_groups
 
-        def get_apply_task(self, item: Permissions, migration_state: GroupMigrationState, _: Destination):
+        def get_apply_task(self, item: Permissions, migration_state: MigrationState, _: Destination):
             if not self._is_item_relevant(item, migration_state):
                 return None
 
@@ -39,7 +39,7 @@ def test_applier():
 
     applier = SampleApplier()
     positive_item = Permissions(object_id="test", object_type="test", raw="test")
-    migration_state = GroupMigrationState()
+    migration_state = MigrationState()
     migration_state.add(
         iam.Group(display_name="test", id="test"),
         iam.Group(display_name="db-temp-test", id="test-backup"),

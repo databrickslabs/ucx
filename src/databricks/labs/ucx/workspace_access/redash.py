@@ -18,8 +18,9 @@ from databricks.labs.ucx.workspace_access.base import (
     Destination,
     Permissions,
 )
+
 from databricks.labs.ucx.workspace_access.generic import RetryableError
-from databricks.labs.ucx.workspace_access.groups import GroupMigrationState
+from databricks.labs.ucx.workspace_access.groups import MigrationState
 
 logger = logging.getLogger(__name__)
 
@@ -53,13 +54,11 @@ class RedashPermissionsSupport(AclSupport):
         self._verify_timeout = verify_timeout
 
     @staticmethod
-    def _is_item_relevant(item: Permissions, migration_state: GroupMigrationState) -> bool:
-        object_permissions = sql.GetResponse.from_dict(json.loads(item.raw))
-        for acl in object_permissions.access_control_list:
-            if not migration_state.is_in_scope(acl.group_name):
-                continue
-            return True
-        return False
+    def _is_item_relevant(item: Permissions, migration_state: MigrationState) -> bool:
+        mentioned_groups = [
+            acl.group_name for acl in sql.GetResponse.from_dict(json.loads(item.raw)).access_control_list
+        ]
+        return any(g in mentioned_groups for g in [info.workspace.display_name for info in migration_state.groups])
 
     def get_crawler_tasks(self):
         for listing in self._listings:
@@ -72,7 +71,7 @@ class RedashPermissionsSupport(AclSupport):
             all_object_types.add(listing.object_type)
         return all_object_types
 
-    def get_apply_task(self, item: Permissions, migration_state: GroupMigrationState, destination: Destination):
+    def get_apply_task(self, item: Permissions, migration_state: MigrationState, destination: Destination):
         if not self._is_item_relevant(item, migration_state):
             return None
         new_acl = self._prepare_new_acl(
@@ -140,7 +139,7 @@ class RedashPermissionsSupport(AclSupport):
         return retried_check(object_id, object_id, acl)
 
     def _prepare_new_acl(
-        self, acl: list[sql.AccessControl], migration_state: GroupMigrationState, destination: Destination
+        self, acl: list[sql.AccessControl], migration_state: MigrationState, destination: Destination
     ) -> list[sql.AccessControl]:
         """
         Please note the comment above on how we apply these permissions.

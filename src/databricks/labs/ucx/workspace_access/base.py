@@ -4,7 +4,7 @@ from dataclasses import dataclass
 from logging import Logger
 from typing import Literal
 
-from databricks.labs.ucx.workspace_access.groups import GroupMigrationState
+from databricks.labs.ucx.workspace_access.groups import MigrationState
 
 logger = Logger(__name__)
 
@@ -30,7 +30,7 @@ class AclSupport:
 
     @abstractmethod
     def get_apply_task(
-        self, item: Permissions, migration_state: GroupMigrationState, destination: Destination
+        self, item: Permissions, migration_state: MigrationState, destination: Destination
     ) -> Callable[[], None] | None:
         """This method returns a Callable, that applies permissions to a destination group, based on
         the group migration state. The callable is required not to have any shared mutable state."""

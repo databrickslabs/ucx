@@ -426,7 +426,7 @@ def test_delete_backup_groups():
 
     group_conf = GroupsConfig(backup_group_prefix="dbr_backup_", auto=True)
     manager = GroupManager(client, group_conf)
-    manager.delete_backup_groups()
+    manager.delete_original_workspace_groups()
     client.groups.delete.assert_called_with(id=backup_group_id)
 
 
@@ -454,7 +454,7 @@ def test_delete_selected_backup_groups():
 
     group_conf = GroupsConfig(backup_group_prefix="dbr_backup_", selected=["de"])
     manager = GroupManager(client, group_conf)
-    manager.delete_backup_groups()
+    manager.delete_original_workspace_groups()
     client.groups.delete.assert_called_with(id=backup_group_id)
 
 

@@ -13,33 +13,31 @@ from databricks.sdk.service.iam import (
 )
 from databricks.sdk.service import iam
 
+from databricks.sdk.service.iam import PermissionLevel
 
-from databricks.labs.ucx.config import GroupsConfig
 from databricks.labs.ucx.hive_metastore import GrantsCrawler, TablesCrawler
 from databricks.labs.ucx.hive_metastore.grants import Grant
 from databricks.labs.ucx.workspace_access.generic import (
     GenericPermissionsSupport,
     Listing,
 )
-from databricks.labs.ucx.workspace_access.groups import (
-    GroupManager,
-    GroupMigrationState,
-)
+from databricks.labs.ucx.workspace_access.groups import GroupManager
 from databricks.labs.ucx.workspace_access.manager import PermissionManager
 from databricks.labs.ucx.workspace_access.tacl import TableAclSupport
 
 logger = logging.getLogger(__name__)
 
+
 def test_renaming_groups(
-        ws,
-        sql_backend,
-        inventory_schema,
-        make_ucx_group,
-        make_group,
-        make_acc_group,
-        make_cluster_policy,
-        make_cluster_policy_permissions,
-        make_table,
+    ws,
+    sql_backend,
+    inventory_schema,
+    make_ucx_group,
+    make_group,
+    make_acc_group,
+    make_cluster_policy,
+    make_cluster_policy_permissions,
+    make_table,
 ):
     ws_group, acc_group = make_ucx_group()
     cluster_policy = make_cluster_policy()
@@ -52,9 +50,10 @@ def test_renaming_groups(
     dummy_table = make_table()
     sql_backend.execute(f"GRANT SELECT ON TABLE {dummy_table.full_name} TO `{ws_group.display_name}`")
 
-    ws.groups.patch(ws_group.id, operations=[
-        iam.Patch(op=iam.PatchOp.REPLACE, path='displayName', value=f'UPDATED_{ws_group.display_name}')
-    ])
+    ws.groups.patch(
+        ws_group.id,
+        operations=[iam.Patch(op=iam.PatchOp.REPLACE, path="displayName", value=f"UPDATED_{ws_group.display_name}")],
+    )
 
     # group_manager = GroupManager(ws, GroupsConfig(auto=True))
     # group_manager.prepare_groups_in_environment()
@@ -63,16 +62,15 @@ def test_renaming_groups(
 
     generic_permissions = GenericPermissionsSupport(ws, [])
 
-    xxx = generic_permissions.load_as_dict('cluster-policies', cluster_policy.policy_id)
+    generic_permissions.load_as_dict("cluster-policies", cluster_policy.policy_id)
 
     tables = TablesCrawler(sql_backend, inventory_schema)
     grants = GrantsCrawler(tables)
-    yyy = grants.for_table_info(dummy_table)
+    grants.for_table_info(dummy_table)
 
     tacl = TableAclSupport(grants, sql_backend)
 
-    permission_manager = PermissionManager(sql_backend, inventory_schema, [generic_permissions, tacl])
-
+    PermissionManager(sql_backend, inventory_schema, [generic_permissions, tacl])
 
 
 def test_prepare_environment(ws, make_ucx_group):
