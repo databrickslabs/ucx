@@ -246,7 +246,6 @@ class GroupManager:
                 return group
 
     @retried(on=[DatabricksError])
-    @rate_limited(max_requests=20)
     def _get_or_create_backup_group(self, source_group_name: str, source_group: iam.Group) -> iam.Group:
         backup_group_name = f"{self._backup_group_prefix}{source_group_name}"
         backup_group = self._get_group(backup_group_name, "workspace")
