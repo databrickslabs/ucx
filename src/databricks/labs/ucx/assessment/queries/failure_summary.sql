@@ -35,53 +35,45 @@ SELECT
     IF (
         component = 'jobs',
         round(
-            issue_count / (
+            (issue_count / (
                 SELECT
                     count(*)
                 FROM
                     $inventory.jobs
-            ),
-            2
-        ) * 100,
+            ) * 100) , 2),
         'NA'
     ) AS issue_percentage_jobs,
     IF (
         component = 'clusters',
         round(
-            issue_count / (
+            (issue_count / (
                 SELECT
                     count(*)
                 FROM
                     $inventory.clusters
-            ),
-            2
-        ) * 100,
+            ) * 100) , 2),
         'NA'
     ) AS issue_percentage_clusters,
     IF (
         component = 'global init scripts',
         round(
-            issue_count / (
+            (issue_count / (
                 SELECT
                     count(*)
                 FROM
                     $inventory.global_init_scripts
-            ),
-            2
-        ) * 100,
+        ) * 100) , 2),
         'NA'
     ) AS issue_percentage_gis,
     IF (
         component = 'pipelines',
         round(
-            issue_count / (
+            (issue_count / (
                 SELECT
                     count(*)
                 FROM
                     $inventory.pipelines
-            ),
-            2
-        ) * 100,
+        ) * 100) , 2),
         'NA'
     ) AS issue_percentage_pipelines
 FROM
