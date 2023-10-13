@@ -1,4 +1,4 @@
--- viz type=table, name=Failure Summary, columns=issue,component,issue_count,issue_percentage_jobs,issue_percentage_clusters,issue_percentage_gis,issue_percentage_pipelines
+-- viz type=table, name=Failure Summary, columns=issue,component,issue_count,jobs_issue_percentage,clusters_issue_percentage,gis_issue_percentage,pipelines_issue_percentage
 -- widget title = Failure Summary, col=0, row=65, size_x=6, size_y=8
 WITH failuretab (failures, component) AS (
     SELECT
@@ -42,7 +42,7 @@ SELECT
                     $inventory.jobs
             ) * 100) , 2),
         'NA'
-    ) AS issue_percentage_jobs,
+    ) AS jobs_issue_percentage,
     IF (
         component = 'clusters',
         round(
@@ -53,7 +53,7 @@ SELECT
                     $inventory.clusters
             ) * 100) , 2),
         'NA'
-    ) AS issue_percentage_clusters,
+    ) AS clusters_issue_percentage,
     IF (
         component = 'global init scripts',
         round(
@@ -64,7 +64,7 @@ SELECT
                     $inventory.global_init_scripts
         ) * 100) , 2),
         'NA'
-    ) AS issue_percentage_gis,
+    ) AS gis_issue_percentage,
     IF (
         component = 'pipelines',
         round(
@@ -75,7 +75,7 @@ SELECT
                     $inventory.pipelines
         ) * 100) , 2),
         'NA'
-    ) AS issue_percentage_pipelines
+    ) AS pipelines_issue_percentage
 FROM
     (
         SELECT
