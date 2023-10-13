@@ -175,9 +175,9 @@ def test_workspace_object_crawler(ws, make_notebook, make_directory, inventory_s
     listing_results = workspace_listing.snapshot()
     results = []
     for _result in listing_results:
-        if _result.path == new_notebook or _result.path == new_directory:
+        if _result.path in [new_notebook, new_directory]:
             results.append(_result)
 
     assert len(results) == 2
-    assert results[0].path == new_notebook or results[0].path == new_directory
-    assert results[1].object_type == "DIRECTORY" or results[1].object_type == "NOTEBOOK"
+    assert results[0].path in [new_notebook, new_directory]
+    assert results[1].object_type in ["DIRECTORY", "NOTEBOOK"]
