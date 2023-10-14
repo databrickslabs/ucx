@@ -1,6 +1,7 @@
 import logging
 
 from databricks.labs.ucx.assessment.crawlers import (
+    AWSInstanceProfileCrawler,
     AzureServicePrincipalCrawler,
     ClustersCrawler,
     JobsCrawler,
@@ -99,6 +100,14 @@ def test_job_crawler(ws, make_job, inventory_schema, sql_backend):
     assert len(results) >= 1
     assert int(results[0].job_id) == new_job.job_id
 
+def test_instance_profile_crawler(ws, inventory_schema, make_job, make_pipeline, sql_backend):
+    crawler = AWSInstanceProfileCrawler(ws=ws, sbe=sql_backend, schema=inventory_schema)
+    ips = crawler.snapshot()
+    results = []
+    for ip in ips:
+        results.append(ip)
+
+    assert len(results) >= 2
 
 def test_spn_crawler(ws, inventory_schema, make_job, make_pipeline, sql_backend):
     make_job(spark_conf=_SPARK_CONF)

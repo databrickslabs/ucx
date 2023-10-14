@@ -193,6 +193,8 @@ class GlobalInitScriptCrawler(CrawlerBase):
 
 
 class AWSInstanceProfileCrawler(CrawlerBase):
+    """Crawl AWS workspace for Instance profiles
+    """
     def __init__(self, ws: WorkspaceClient, sbe: SqlBackend, schema):
         super().__init__(sbe, "hive_metastore", schema, "aws_instance_profiles", AWSInstanceProfileInfo)
         self._ws = ws
@@ -206,6 +208,13 @@ class AWSInstanceProfileCrawler(CrawlerBase):
                 instance_profile_arn=ips.instance_profile_arn,
                 is_meta_instance_profile=ips.is_meta_instance_profile,
             )
+
+    def snapshot(self) -> list[AWSInstanceProfileInfo]:
+        return self._snapshot(self._try_fetch, self._crawl)
+    
+    def _try_fetch(self) -> list[AWSInstanceProfileInfo]:
+        for row in self._fetch(f"SELECT * FROM {self._schema}.{self._table}"):
+            yield AWSInstanceProfileInfo(*row)
 
 
 class AzureServicePrincipalCrawler(CrawlerBase):
