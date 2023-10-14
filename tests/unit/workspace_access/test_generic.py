@@ -427,20 +427,20 @@ def test_workspaceobject_assess():
         result_set = list(crawler)
 
     assert len(result_set) == 2
-    assert result_set[0] == WorkspaceObjectInfo("NOTEBOOK", 123, "/rootobj/notebook1", "PYTHON")
+    assert result_set[0] == WorkspaceObjectInfo("NOTEBOOK", "123", "/rootobj/notebook1", "PYTHON")
 
 
 def test_workspace_snapshot():
     sample_objects = [
         WorkspaceObjectInfo(
             object_type="NOTEBOOK",
-            object_id=123,
+            object_id="123",
             path="/rootobj/notebook1",
             language="PYTHON",
         ),
         WorkspaceObjectInfo(
             object_type="DIRECTORY",
-            object_id=456,
+            object_id="456",
             path="/rootobj/folder1",
             language="",
         ),
@@ -453,13 +453,13 @@ def test_workspace_snapshot():
     result_set = crawler.snapshot()
 
     assert len(result_set) == 2
-    assert result_set[0] == WorkspaceObjectInfo("NOTEBOOK", 123, "/rootobj/notebook1", "PYTHON")
+    assert result_set[0] == WorkspaceObjectInfo("NOTEBOOK", "123", "/rootobj/notebook1", "PYTHON")
 
 
 def test_workspaceobject_crawl():
     sample_object = WorkspaceObjectInfo(
         object_type="NOTEBOOK",
-        object_id=123,
+        object_id="123",
         path="/rootobj/notebook1",
         language="PYTHON",
     )
@@ -468,4 +468,4 @@ def test_workspaceobject_crawl():
     crawler._assess_workspace_listing = Mock(return_value=iter([sample_object]))
     result_set = crawler._crawl()
     assert len(result_set) == 1
-    assert result_set[0] == WorkspaceObjectInfo("NOTEBOOK", 123, "/rootobj/notebook1", "PYTHON")
+    assert result_set[0] == WorkspaceObjectInfo("NOTEBOOK", "123", "/rootobj/notebook1", "PYTHON")
