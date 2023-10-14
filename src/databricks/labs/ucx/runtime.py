@@ -24,8 +24,8 @@ logger = logging.getLogger(__name__)
 
 
 def _get_view_definition(hms_db: str) -> str:
-    return f"""CREATE OR REPLACE VIEW hive_metastore.{hms_db}.vw_failure_summary 
-    AS 
+    return f"""CREATE OR REPLACE VIEW hive_metastore.{hms_db}.vw_failure_summary
+    AS
     WITH failuretab (failure, issue, object_type) AS (
       SELECT
           explode(from_json(failures, 'array<string>')) AS failure,
@@ -45,7 +45,7 @@ def _get_view_definition(hms_db: str) -> str:
           "clusters" AS object_type
         FROM
           hive_metastore.{hms_db}.clusters
-        WHERE failures IS NOT NULL and failures != '[]' 
+        WHERE failures IS NOT NULL and failures != '[]'
         UNION ALL
         SELECT
           failures,
@@ -264,7 +264,7 @@ def crawl_permissions(cfg: WorkspaceConfig):
         assess_pipelines,
         assess_azure_service_principals,
         assess_global_init_scripts,
-        crawl_tables
+        crawl_tables,
     ],
 )
 def setup_view(cfg: WorkspaceConfig):
