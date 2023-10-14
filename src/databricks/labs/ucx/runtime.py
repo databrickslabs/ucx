@@ -174,7 +174,9 @@ def workspace_listing(cfg: WorkspaceConfig):
     It uses multi-threading to parallelize the listing process to speed up execution on big workspaces.
     It accepts starting path as the parameter defaulted to the root path '/'."""
     ws = WorkspaceClient(config=cfg.to_databricks_config())
-    crawler = WorkspaceListing(ws, RuntimeBackend(), cfg.inventory_database)
+    crawler = WorkspaceListing(
+        ws, RuntimeBackend(), cfg.inventory_database, num_threads=cfg.num_threads, start_path=cfg.workspace_start_path
+    )
     crawler.snapshot()
 
 

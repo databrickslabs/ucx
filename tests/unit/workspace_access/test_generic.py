@@ -400,7 +400,7 @@ def test_workspaceobject_try_fetch():
     assert result_set[0] == WorkspaceObjectInfo("NOTEBOOK", 123, "/rootobj/notebook1", "PYTHON")
 
 
-def test_workspaceobject_assess():
+def test_workspaceobject_crawl():
     sample_objects = [
         ObjectInfo(
             object_type=ObjectType.NOTEBOOK,
@@ -423,7 +423,7 @@ def test_workspaceobject_assess():
     ]
     ws = Mock()
     with patch("databricks.labs.ucx.workspace_access.listing.WorkspaceListing.walk", return_value=sample_objects):
-        crawler = WorkspaceListing(ws, MockBackend(), "ucx")._assess_workspace_listing()
+        crawler = WorkspaceListing(ws, MockBackend(), "ucx")._crawl()
         result_set = list(crawler)
 
     assert len(result_set) == 2
@@ -453,19 +453,4 @@ def test_workspace_snapshot():
     result_set = crawler.snapshot()
 
     assert len(result_set) == 2
-    assert result_set[0] == WorkspaceObjectInfo("NOTEBOOK", "123", "/rootobj/notebook1", "PYTHON")
-
-
-def test_workspaceobject_crawl():
-    sample_object = WorkspaceObjectInfo(
-        object_type="NOTEBOOK",
-        object_id="123",
-        path="/rootobj/notebook1",
-        language="PYTHON",
-    )
-    ws = Mock()
-    crawler = WorkspaceListing(ws, MockBackend(), "ucx")
-    crawler._assess_workspace_listing = Mock(return_value=iter([sample_object]))
-    result_set = crawler._crawl()
-    assert len(result_set) == 1
     assert result_set[0] == WorkspaceObjectInfo("NOTEBOOK", "123", "/rootobj/notebook1", "PYTHON")

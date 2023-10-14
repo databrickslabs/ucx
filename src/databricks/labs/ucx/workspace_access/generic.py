@@ -242,17 +242,11 @@ class WorkspaceListing(Listing, CrawlerBase):
         self._inventory_database = inventory_database
 
     def _crawl(self) -> list[WorkspaceObjectInfo]:
-        return list(self._assess_workspace_listing())
-
-    def _assess_workspace_listing(self):
         from databricks.labs.ucx.workspace_access.listing import WorkspaceListing
 
         ws_listing = WorkspaceListing(self._ws, num_threads=self._num_threads, with_directories=False)
         for _object in ws_listing.walk(self._start_path):
-            workspace_object_info = WorkspaceObjectInfo(
-                _object.object_type.name, str(_object.object_id), _object.path, _object.language
-            )
-            yield workspace_object_info
+            yield WorkspaceObjectInfo(_object.object_type.name, str(_object.object_id), _object.path, _object.language)
 
     def snapshot(self) -> list[WorkspaceObjectInfo]:
         return self._snapshot(self._try_fetch, self._crawl)

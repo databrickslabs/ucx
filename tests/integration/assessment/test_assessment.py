@@ -168,16 +168,17 @@ def test_spn_crawler_with_available_secrets(
     assert len(results) >= 2
 
 
-def test_workspace_object_crawler(ws, make_notebook, make_directory, inventory_schema, sql_backend):
-    new_notebook = make_notebook()
+def test_workspace_object_crawler(ws, make_directory, inventory_schema, sql_backend):
     new_directory = make_directory()
-    workspace_listing = WorkspaceListing(ws=ws, sql_backend=sql_backend, inventory_database=inventory_schema)
+    workspace_listing = WorkspaceListing(
+        ws=ws, sql_backend=sql_backend, inventory_database=inventory_schema, start_path=new_directory
+    )
     listing_results = workspace_listing.snapshot()
     results = []
     for _result in listing_results:
-        if _result.path in [new_notebook, new_directory]:
+        if _result.path == new_directory:
             results.append(_result)
 
-    assert len(results) == 2
-    assert results[0].path in [new_notebook, new_directory]
-    assert results[1].object_type in ["DIRECTORY", "NOTEBOOK"]
+    assert len(results) == 1
+    assert results[0].path == new_directory
+    assert results[0].object_type == "DIRECTORY"
