@@ -268,10 +268,12 @@ def crawl_permissions(cfg: WorkspaceConfig):
 )
 def setup_view(cfg: WorkspaceConfig):
     """Creates a database view for capturing the following failures as part of the assessment process:
-    - DBR version is not supported
+    - Unsupported DBR version
     - Unsupported config
-    - DBFS mount in configuration
-    - Azure service principal credentials config
+    - DBFS mount used in configuration
+    - Azure service principal credentials used in config
+    - Unsupported storage type (WASBS, ADL) used in table location
+    - Table scan failure
     """
     backend = RuntimeBackend()
     hms_db = cfg.replace_inventory_variable(cfg.inventory_database)
