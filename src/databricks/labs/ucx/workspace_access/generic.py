@@ -10,8 +10,9 @@ from typing import Optional
 from databricks.sdk import WorkspaceClient
 from databricks.sdk.core import DatabricksError
 from databricks.sdk.retries import retried
-from databricks.sdk.service import iam, ml, workspace
+from databricks.sdk.service import iam, ml
 
+from databricks.labs.ucx.framework.crawlers import CrawlerBase, SqlBackend
 from databricks.labs.ucx.mixins.hardening import rate_limited
 from databricks.labs.ucx.workspace_access.base import (
     AclSupport,
@@ -27,6 +28,14 @@ logger = logging.getLogger(__name__)
 class GenericPermissionsInfo:
     object_id: str
     request_type: str
+
+
+@dataclass
+class WorkspaceObjectInfo:
+    object_type: str
+    object_id: str
+    path: str
+    language: str
 
 
 class RetryableError(DatabricksError):
@@ -208,38 +217,66 @@ class GenericPermissionsSupport(AclSupport):
         return acl_requests
 
 
-class WorkspaceListing(Listing):
-    def __init__(self, ws: WorkspaceClient, num_threads=20, start_path: str | None = "/"):
-        super().__init__(..., ..., ...)
+class WorkspaceListing(Listing, CrawlerBase):
+    def __init__(
+        self,
+        ws: WorkspaceClient,
+        sql_backend: SqlBackend,
+        inventory_database: str,
+        num_threads=20,
+        start_path: str | None = "/",
+    ):
+        Listing.__init__(self, ..., ..., ...)
+        CrawlerBase.__init__(
+            self,
+            backend=sql_backend,
+            catalog="hive_metastore",
+            schema=inventory_database,
+            table="workspace_objects",
+            klass=WorkspaceObjectInfo,
+        )
         self._ws = ws
         self._num_threads = num_threads
         self._start_path = start_path
+        self._sql_backend = sql_backend
+        self._inventory_database = inventory_database
+
+    def _crawl(self) -> list[WorkspaceObjectInfo]:
+        from databricks.labs.ucx.workspace_access.listing import WorkspaceListing
+
+        ws_listing = WorkspaceListing(self._ws, num_threads=self._num_threads, with_directories=False)
+        for _object in ws_listing.walk(self._start_path):
+            yield WorkspaceObjectInfo(_object.object_type.name, str(_object.object_id), _object.path, _object.language)
+
+    def snapshot(self) -> list[WorkspaceObjectInfo]:
+        return self._snapshot(self._try_fetch, self._crawl)
+
+    def _try_fetch(self) -> list[WorkspaceObjectInfo]:
+        for row in self._fetch(f"SELECT * FROM {self._schema}.{self._table}"):
+            yield WorkspaceObjectInfo(*row)
 
     def object_types(self) -> set[str]:
         return {"notebooks", "directories", "repos", "files"}
 
     @staticmethod
-    def _convert_object_type_to_request_type(_object: workspace.ObjectInfo) -> str | None:
+    def _convert_object_type_to_request_type(_object: WorkspaceObjectInfo) -> str | None:
         match _object.object_type:
-            case workspace.ObjectType.NOTEBOOK:
+            case "NOTEBOOK":
                 return "notebooks"
-            case workspace.ObjectType.DIRECTORY:
+            case "DIRECTORY":
                 return "directories"
-            case workspace.ObjectType.LIBRARY:
+            case "LIBRARY":
                 return None
-            case workspace.ObjectType.REPO:
+            case "REPO":
                 return "repos"
-            case workspace.ObjectType.FILE:
+            case "FILE":
                 return "files"
             # silent handler for experiments - they'll be inventorized by the experiments manager
             case None:
                 return None
 
     def __iter__(self):
-        from databricks.labs.ucx.workspace_access.listing import WorkspaceListing
-
-        ws_listing = WorkspaceListing(self._ws, num_threads=self._num_threads, with_directories=False)
-        for _object in ws_listing.walk(self._start_path):
+        for _object in self.snapshot():
             request_type = self._convert_object_type_to_request_type(_object)
             if request_type:
                 yield GenericPermissionsInfo(object_id=str(_object.object_id), request_type=request_type)
