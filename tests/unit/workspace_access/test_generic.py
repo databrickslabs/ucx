@@ -1,6 +1,6 @@
 import json
 import unittest.mock
-from unittest.mock import MagicMock
+from unittest.mock import MagicMock, Mock, patch
 
 from databricks.sdk.core import DatabricksError
 from databricks.sdk.service import compute, iam, ml
