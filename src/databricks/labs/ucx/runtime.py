@@ -26,124 +26,73 @@ logger = logging.getLogger(__name__)
 def _get_view_definition(hms_db: str) -> str:
     return f"""CREATE OR REPLACE VIEW hive_metastore.{hms_db}.vw_failure_summary 
     AS 
-    WITH failuretab (failures, object_type) AS (
+    WITH failuretab (failure, issue, object_type) AS (
+      SELECT
+          explode(from_json(failures, 'array<string>')) AS failure,
+          substring_index(failure, ":", 1) issue,
+          object_type
+        FROM
+        (
         SELECT
           failures,
           "jobs" AS object_type
         FROM
           hive_metastore.{hms_db}.jobs
+        WHERE failures IS NOT NULL and failures != '[]'
         UNION ALL
         SELECT
           failures,
           "clusters" AS object_type
         FROM
           hive_metastore.{hms_db}.clusters
+        WHERE failures IS NOT NULL and failures != '[]' 
         UNION ALL
         SELECT
           failures,
           "global init scripts" AS object_type
         FROM
           hive_metastore.{hms_db}.global_init_scripts
+        WHERE failures IS NOT NULL and failures != '[]'
         UNION ALL
         SELECT
           failures,
           "pipelines" AS object_type
         FROM
           hive_metastore.{hms_db}.pipelines
+        WHERE failures IS NOT NULL and failures != '[]'
+        UNION ALL
+        SELECT
+          concat('["', CASE
+           WHEN STARTSWITH(location, "wasb") THEN "Unsupported Storage Type"
+           WHEN STARTSWITH(location, "adl") THEN "Unsupported Storage Type"
+       END , '"]') AS failures,
+          IF(object_type IN ("MANAGED", "EXTERNAL"), "Table", "View") AS object_type
+        FROM
+          hive_metastore.{hms_db}.tables
+      WHERE location IS NOT NULL AND location != ""
+      UNION ALL
+      SELECT concat('["', CASE
+           WHEN STARTSWITH(error, "ignoring table because") THEN "Table Scan Failure"
+       END , '"]') AS failures,
+       "Table" AS object_type
+      FROM   hive_metastore.{hms_db}.table_failures
+      WHERE  error IS NOT NULL AND error != ""
       )
+    )
     SELECT
       issue,
       object_type,
-      COUNT(*) AS issue_count,
-      IF (
-        object_type = 'jobs',
-        round(
-          (issue_count / (
-            SELECT
-              count(*)
-            FROM
-              hive_metastore.{hms_db}.jobs
-        ) * 100) , 2),
-        'NA'
-      ) AS jobs_issue_percentage,
-      IF (
-        object_type = 'clusters',
-        round(
-          (issue_count / (
-            SELECT
-              count(*)
-            FROM
-              hive_metastore.{hms_db}.clusters
-        ) * 100), 2),
-        'NA'
-      ) AS clusters_issue_percentage,
-      IF (
-        object_type = 'global init scripts',
-        round(
-          (issue_count / (
-            SELECT
-              count(*)
-            FROM
-              hive_metastore.{hms_db}.global_init_scripts
-        ) * 100), 2),
-        'NA'
-      ) AS gis_issue_percentage,
-      IF (
-        object_type = 'pipelines',
-        round(
-          (issue_count / (
-            SELECT
-              count(*)
-            FROM
-              hive_metastore.{hms_db}.pipelines
-        ) * 100) , 2),
-        'NA'
-      ) AS pipelines_issue_percentage
+      COUNT(*) AS issue_count
     FROM
-      (
-        SELECT
-          explode(from_json(failures, 'array<string>')) AS failure,
-          substring_index(failure, ":", 1) issue,
-          object_type,
-          IF (
-            locate("not supported DBR:", failure) > 0,
-            TRUE,
-            FALSE
-          ) AS incomp_dbr_present_or_not,
-          IF (
-            locate("unsupported config:", failure) > 0,
-            TRUE,
-            FALSE
-          ) AS unsup_config_present_or_not,
-          IF (
-            locate("using DBFS mount in configuration:", failure) > 0,
-            TRUE,
-            FALSE
-          ) AS dbfs_mount_present_or_not,
-          IF (
-            locate(
-              "Uses azure service principal credentials config in",
-              failure
-            ) > 0,
-            TRUE,
-            FALSE
-          ) AS azure_spn_present_or_not
-        FROM
-          failuretab
-      )
+      failuretab
     WHERE
-      (
-        incomp_dbr_present_or_not IS TRUE
-        OR unsup_config_present_or_not IS TRUE
-        OR dbfs_mount_present_or_not IS TRUE
-        OR azure_spn_present_or_not IS TRUE
-      )
+      failure IS NOT NULL OR failure != ""
     GROUP BY
       issue,
       object_type
     ORDER BY
       issue,
-      object_type ; """
+      object_type ;"""
 
 
 @task("assessment")
