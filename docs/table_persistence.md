@@ -15,6 +15,7 @@ Table Utilization:
 | clusters           | RW                  |
 | external_locations | RW                  |                      | RO                      |
 | workspace          | RW                  | RO                   |                         |                        | RO           |
+| workspace_objects  |                     | RW                   |                         |                        |              |
 
 **RW** - Read/Write the job that generates the table
 **RO** - Read Only
@@ -120,4 +121,15 @@ Holds a list of all external locations that will be required for the migration.
 |-----------|----------|-------------|----------|
 |external_location|string|External Location URL|
 
+
+#### _$inventory_.workspace_objects
+Holds a list of all workspace objects (notebooks, directories, files, repos and libraries) from the workspace.
+This is used by the permission crawler.
+
+| Column      | Datatype | Description                                               | Comments |
+|-------------|----------|-----------------------------------------------------------|----------|
+| object_id   | string   | unique id of the object                                   |
+| object_type | string   | type of object (NOTEBOOK, DIRECTORY, REPO, FILE, LIBRARY) |
+| path        | string   | full path of the object in the workspace                  |
+| language    | string   | language of the object (applicable for notebooks only)    |
 

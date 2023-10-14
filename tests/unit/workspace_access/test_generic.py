@@ -1,18 +1,23 @@
 import json
 import unittest.mock
-from unittest.mock import MagicMock
+from unittest.mock import MagicMock, Mock, patch
 
 from databricks.sdk.core import DatabricksError
 from databricks.sdk.service import compute, iam, ml
+from databricks.sdk.service.workspace import ObjectInfo, ObjectType
 
+from databricks.labs.ucx.mixins.sql import Row
 from databricks.labs.ucx.workspace_access.generic import (
     GenericPermissionsSupport,
     Listing,
     Permissions,
+    WorkspaceListing,
+    WorkspaceObjectInfo,
     experiments_listing,
     models_listing,
     tokens_and_passwords,
 )
+from tests.unit.framework.mocks import MockBackend
 
 
 def test_crawler():
@@ -372,3 +377,141 @@ def test_applier_task_should_be_called_three_times_if_permission_couldnt_be_appl
             unittest.mock.call(object_type="clusters", object_id="cluster_id"),
         ]
     )
+
+
+def test_load_as_dict():
+    ws = MagicMock()
+
+    cluster_id = "cluster_test"
+    group_name = "group_test"
+
+    ws.clusters.list.return_value = [
+        compute.ClusterDetails(
+            cluster_id=cluster_id,
+        )
+    ]
+
+    sample_permission = iam.ObjectPermissions(
+        object_id=cluster_id,
+        object_type="clusters",
+        access_control_list=[
+            iam.AccessControlResponse(
+                group_name=group_name,
+                all_permissions=[iam.Permission(inherited=False, permission_level=iam.PermissionLevel.CAN_USE)],
+            )
+        ],
+    )
+
+    ws.permissions.get.return_value = sample_permission
+    sup = GenericPermissionsSupport(ws=ws, listings=[Listing(ws.clusters.list, "cluster_id", "clusters")])
+
+    policy_permissions = sup.load_as_dict("clusters", cluster_id)
+
+    assert iam.PermissionLevel.CAN_USE == policy_permissions[group_name]
+
+
+def test_load_as_dict_no_permissions():
+    ws = MagicMock()
+
+    sup = GenericPermissionsSupport(
+        ws=ws,
+        listings=[],
+    )
+
+    ws.permissions.get.side_effect = Mock(side_effect=DatabricksError(error_code="RESOURCE_DOES_NOT_EXIST"))
+
+    policy_permissions = sup.load_as_dict("clusters", "cluster_test")
+
+    assert len(policy_permissions) == 0
+
+
+def test_load_as_dict_handle_exception_when_getting_permissions():
+    ws = MagicMock()
+
+    sup = GenericPermissionsSupport(
+        ws=ws,
+        listings=[],
+    )
+
+    ws.permissions.get.side_effect = Mock(side_effect=DatabricksError(error_code="RESOURCE_DOES_NOT_EXIST"))
+
+    policy_permissions = sup.load_as_dict("clusters", "cluster_test")
+
+    assert len(policy_permissions) == 0
+
+
+def test_workspaceobject_try_fetch():
+    columns = ["object_type", "object_id", "path", "language"]
+    row1 = Row(("NOTEBOOK", 123, "/rootobj/notebook1", "PYTHON"))
+    row1.__columns__ = columns
+    row2 = Row(("DIRECTORY", 456, "/rootobj/folder1", ""))
+    row2.__columns__ = columns
+    sample_objects = iter(
+        [
+            row1,
+            row2,
+        ]
+    )
+    ws = Mock()
+    crawler = WorkspaceListing(ws, MockBackend(), "ucx")
+    crawler._fetch = Mock(return_value=sample_objects)
+    result_set = list(crawler._try_fetch())
+
+    assert len(result_set) == 2
+    assert result_set[0] == WorkspaceObjectInfo("NOTEBOOK", 123, "/rootobj/notebook1", "PYTHON")
+
+
+def test_workspaceobject_crawl():
+    sample_objects = [
+        ObjectInfo(
+            object_type=ObjectType.NOTEBOOK,
+            path="/rootobj/notebook1",
+            language="PYTHON",
+            created_at=0,
+            modified_at=0,
+            object_id=123,
+            size=0,
+        ),
+        ObjectInfo(
+            object_type=ObjectType.DIRECTORY,
+            path="/rootobj/folder1",
+            language="",
+            created_at=0,
+            modified_at=0,
+            object_id=456,
+            size=0,
+        ),
+    ]
+    ws = Mock()
+    with patch("databricks.labs.ucx.workspace_access.listing.WorkspaceListing.walk", return_value=sample_objects):
+        crawler = WorkspaceListing(ws, MockBackend(), "ucx")._crawl()
+        result_set = list(crawler)
+
+    assert len(result_set) == 2
+    assert result_set[0] == WorkspaceObjectInfo("NOTEBOOK", "123", "/rootobj/notebook1", "PYTHON")
+
+
+def test_workspace_snapshot():
+    sample_objects = [
+        WorkspaceObjectInfo(
+            object_type="NOTEBOOK",
+            object_id="123",
+            path="/rootobj/notebook1",
+            language="PYTHON",
+        ),
+        WorkspaceObjectInfo(
+            object_type="DIRECTORY",
+            object_id="456",
+            path="/rootobj/folder1",
+            language="",
+        ),
+    ]
+    mock_ws = Mock()
+    crawler = WorkspaceListing(mock_ws, MockBackend(), "ucx")
+    crawler._try_fetch = Mock(return_value=[])
+    crawler._crawl = Mock(return_value=sample_objects)
+
+    result_set = crawler.snapshot()
+
+    assert len(result_set) == 2
+    assert result_set[0] == WorkspaceObjectInfo("NOTEBOOK", "123", "/rootobj/notebook1", "PYTHON")

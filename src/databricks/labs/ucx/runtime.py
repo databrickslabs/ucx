@@ -17,6 +17,7 @@ from databricks.labs.ucx.framework.tasks import task, trigger
 from databricks.labs.ucx.hive_metastore import GrantsCrawler, TablesCrawler
 from databricks.labs.ucx.hive_metastore.data_objects import ExternalLocationCrawler
 from databricks.labs.ucx.hive_metastore.mounts import Mounts
+from databricks.labs.ucx.workspace_access.generic import WorkspaceListing
 from databricks.labs.ucx.workspace_access.groups import GroupManager
 from databricks.labs.ucx.workspace_access.manager import PermissionManager
 
@@ -237,7 +238,21 @@ def assess_global_init_scripts(cfg: WorkspaceConfig):
     crawler.snapshot()
 
 
-@task("assessment", depends_on=[crawl_grants])
+@task("assessment", depends_on=[setup_schema])
+def workspace_listing(cfg: WorkspaceConfig):
+    """Scans the workspace for workspace objects. It recursively list all sub directories
+    and compiles a list of directories, notebooks, files, repos and libraries in the workspace.
+
+    It uses multi-threading to parallelize the listing process to speed up execution on big workspaces.
+    It accepts starting path as the parameter defaulted to the root path '/'."""
+    ws = WorkspaceClient(config=cfg.to_databricks_config())
+    crawler = WorkspaceListing(
+        ws, RuntimeBackend(), cfg.inventory_database, num_threads=cfg.num_threads, start_path=cfg.workspace_start_path
+    )
+    crawler.snapshot()
+
+
+@task("assessment", depends_on=[crawl_grants, workspace_listing])
 def crawl_permissions(cfg: WorkspaceConfig):
     """Scans the workspace-local groups and all their permissions. The list is stored in the `$inventory.permissions`
     Delta table.

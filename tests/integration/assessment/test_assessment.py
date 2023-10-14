@@ -6,6 +6,7 @@ from databricks.labs.ucx.assessment.crawlers import (
     JobsCrawler,
     PipelinesCrawler,
 )
+from databricks.labs.ucx.workspace_access.generic import WorkspaceListing
 
 logger = logging.getLogger(__name__)
 
@@ -165,3 +166,19 @@ def test_spn_crawler_with_available_secrets(
     ws.secrets.delete_secret(scope=secret_scope, key=secret_key)
 
     assert len(results) >= 2
+
+
+def test_workspace_object_crawler(ws, make_directory, inventory_schema, sql_backend):
+    new_directory = make_directory()
+    workspace_listing = WorkspaceListing(
+        ws=ws, sql_backend=sql_backend, inventory_database=inventory_schema, start_path=new_directory
+    )
+    listing_results = workspace_listing.snapshot()
+    results = []
+    for _result in listing_results:
+        if _result.path == new_directory:
+            results.append(_result)
+
+    assert len(results) == 1
+    assert results[0].path == new_directory
+    assert results[0].object_type == "DIRECTORY"

@@ -1,7 +1,6 @@
 import datetime as dt
 from unittest.mock import MagicMock, Mock, patch
 
-from databricks.sdk.service import workspace
 from databricks.sdk.service.workspace import ObjectInfo, ObjectType
 
 from databricks.labs.ucx.workspace_access import generic, listing
@@ -18,20 +17,18 @@ def test_logging_calls():
 
 
 def test_workspace_listing():
-    listing_instance = MagicMock(spec=listing.WorkspaceListing)
-    listing_instance.walk.return_value = [
-        workspace.ObjectInfo(object_id=1, object_type=workspace.ObjectType.NOTEBOOK),
-        workspace.ObjectInfo(object_id=2, object_type=workspace.ObjectType.DIRECTORY),
-        workspace.ObjectInfo(object_id=3, object_type=workspace.ObjectType.LIBRARY),
-        workspace.ObjectInfo(object_id=4, object_type=workspace.ObjectType.REPO),
-        workspace.ObjectInfo(object_id=5, object_type=workspace.ObjectType.FILE),
-        workspace.ObjectInfo(object_id=6, object_type=None),  # MLflow Experiment
+    listing_instance = [
+        generic.WorkspaceObjectInfo(object_type="NOTEBOOK", object_id=1, path="", language="PYTHON"),
+        generic.WorkspaceObjectInfo(object_type="DIRECTORY", object_id=2, path="", language=""),
+        generic.WorkspaceObjectInfo(object_type="LIBRARY", object_id=3, path="", language=""),
+        generic.WorkspaceObjectInfo(object_type="REPO", object_id=4, path="", language=""),
+        generic.WorkspaceObjectInfo(object_type="FILE", object_id=5, path="", language=""),
+        generic.WorkspaceObjectInfo(object_type=None, object_id=6, path="", language=""),  # MLflow Experiment
     ]
 
-    with patch("databricks.labs.ucx.workspace_access.listing.WorkspaceListing", return_value=listing_instance):
-        results = generic.WorkspaceListing(ws=MagicMock())
+    with patch("databricks.labs.ucx.workspace_access.generic.WorkspaceListing.snapshot", return_value=listing_instance):
+        results = generic.WorkspaceListing(ws=MagicMock(), sql_backend=MagicMock(), inventory_database=MagicMock())
         assert len(list(results)) == 4
-        listing_instance.walk.assert_called_once()
         for res in results:
             assert res.request_type in [
                 "notebooks",
