@@ -32,7 +32,12 @@ You will need account, unity catalog and workspace administrative authority to c
 For questions, troubleshooting or bug fixes, please see your Databricks account team or submit an issue to the [Databricks UCX github repo](https://github.com/databrickslabs/ucx)
 
 ## Installation
+### Prerequisites
+1. Get trained on UC [[free instructor-led training 2x week](https://customer-academy.databricks.com/learn/course/1683/data-governance-with-unity-catalog?generated_by=302876&hash=4eab6668f83636ba44d109880002b293e8dda6dd)] [[full training schedule](https://files.training.databricks.com/static/ilt-sessions/half-day-workshops/index.html)]
+2. [[AWS](https://docs.databricks.com/en/administration-guide/users-groups/best-practices.html)] [[Azure](https://learn.microsoft.com/en-us/azure/databricks/administration-guide/users-groups/best-practices)] [[GCP](https://docs.gcp.databricks.com/administration-guide/users-groups/best-practices.html)] Account level Identity Setup
+3. [[AWS](https://docs.databricks.com/en/data-governance/unity-catalog/create-metastore.html)] [[Azure](https://learn.microsoft.com/en-us/azure/databricks/data-governance/unity-catalog/create-metastore)] [[GCP](https://docs.gcp.databricks.com/data-governance/unity-catalog/create-metastore.html)] Unity Catalog Metastore Created (per region)
 
+### Download & Install
 As a customer, download the [latest release](https://github.com/databrickslabs/ucx/releases) from github onto your laptop/desktop machine. Unzip or untar the release.
 
 The `./install.sh` script will guide you through installation process. 
@@ -57,7 +62,7 @@ export DATABRICKS_HOST=https://adb-123....azuredatabricks.net/
 ./install.sh
 ```
 
-Please follow the instructions in `./install.sh`, which will open a notebook with the description of all jobs to trigger. The journey starts with assessment. 
+Please follow the instructions in `./install.sh`, which will deploy UCX to your workspace and open a notebook with the description of all jobs to trigger. The journey starts with assessment. 
 
 ## Star History
 
