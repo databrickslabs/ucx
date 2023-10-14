@@ -171,7 +171,7 @@ def workspace_listing(cfg: WorkspaceConfig):
     """Scans the workspace for workspace objects. It recursively list all sub directories
     and compiles a list of directories, notebooks, files, repos and libraries in the workspace.
 
-    Its uses multi-threading to parallelize the listing process to speed up on big workspaces.
+    It uses multi-threading to parallelize the listing process to speed up execution on big workspaces.
     It accepts starting path as the parameter defaulted to the root path '/'."""
     ws = WorkspaceClient(config=cfg.to_databricks_config())
     crawler = WorkspaceListing(ws, RuntimeBackend(), cfg.inventory_database)
