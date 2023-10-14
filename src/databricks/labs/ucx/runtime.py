@@ -23,77 +23,79 @@ from databricks.labs.ucx.workspace_access.manager import PermissionManager
 logger = logging.getLogger(__name__)
 
 
-def _get_view_definition(cfg: WorkspaceConfig) -> str:
-    return f"""vw_failure_summary AS WITH failuretab (failures, component) AS (
+def _get_view_definition(hms_db: str) -> str:
+    return f"""CREATE OR REPLACE VIEW hive_metastore.{hms_db}.vw_failure_summary 
+    AS 
+    WITH failuretab (failures, object_type) AS (
         SELECT
           failures,
-          "jobs" AS component
+          "jobs" AS object_type
         FROM
-          hive_metastore.{cfg.inventory_database}.jobs
+          hive_metastore.{hms_db}.jobs
         UNION ALL
         SELECT
           failures,
-          "clusters" AS component
+          "clusters" AS object_type
         FROM
-          hive_metastore.{cfg.inventory_database}.clusters
+          hive_metastore.{hms_db}.clusters
         UNION ALL
         SELECT
           failures,
-          "global init scripts" AS component
+          "global init scripts" AS object_type
         FROM
-          hive_metastore.{cfg.inventory_database}.global_init_scripts
+          hive_metastore.{hms_db}.global_init_scripts
         UNION ALL
         SELECT
           failures,
-          "pipelines" AS component
+          "pipelines" AS object_type
         FROM
-          hive_metastore.{cfg.inventory_database}.pipelines
+          hive_metastore.{hms_db}.pipelines
       )
     SELECT
       issue,
-      component,
+      object_type,
       COUNT(*) AS issue_count,
       IF (
-        component = 'jobs',
+        object_type = 'jobs',
         round(
           (issue_count / (
             SELECT
               count(*)
             FROM
-              hive_metastore.{cfg.inventory_database}.jobs
+              hive_metastore.{hms_db}.jobs
         ) * 100) , 2),
         'NA'
       ) AS jobs_issue_percentage,
       IF (
-        component = 'clusters',
+        object_type = 'clusters',
         round(
           (issue_count / (
             SELECT
               count(*)
             FROM
-              hive_metastore.{cfg.inventory_database}.clusters
+              hive_metastore.{hms_db}.clusters
         ) * 100), 2),
         'NA'
       ) AS clusters_issue_percentage,
       IF (
-        component = 'global init scripts',
+        object_type = 'global init scripts',
         round(
           (issue_count / (
             SELECT
               count(*)
             FROM
-              hive_metastore.{cfg.inventory_database}.global_init_scripts
+              hive_metastore.{hms_db}.global_init_scripts
         ) * 100), 2),
         'NA'
       ) AS gis_issue_percentage,
       IF (
-        component = 'pipelines',
+        object_type = 'pipelines',
         round(
           (issue_count / (
             SELECT
               count(*)
             FROM
-              hive_metastore.{cfg.inventory_database}.pipelines
+              hive_metastore.{hms_db}.pipelines
         ) * 100) , 2),
         'NA'
       ) AS pipelines_issue_percentage
@@ -102,7 +104,7 @@ def _get_view_definition(cfg: WorkspaceConfig) -> str:
         SELECT
           explode(from_json(failures, 'array<string>')) AS failure,
           substring_index(failure, ":", 1) issue,
-          component,
+          object_type,
           IF (
             locate("not supported DBR:", failure) > 0,
             TRUE,
@@ -138,10 +140,10 @@ def _get_view_definition(cfg: WorkspaceConfig) -> str:
       )
     GROUP BY
       issue,
-      component
+      object_type
     ORDER BY
       issue,
-      component ; """
+      object_type ; """
 
 
 @task("assessment")
@@ -323,7 +325,8 @@ def setup_view(cfg: WorkspaceConfig):
     - Azure service principal credentials config
     """
     backend = RuntimeBackend()
-    db_view_ddl = f"CREATE OR REPLACE VIEW hive_metastore.{cfg.inventory_database}." + _get_view_definition(cfg)
+    hms_db = cfg.replace_inventory_variable(cfg.inventory_database)
+    db_view_ddl = _get_view_definition(hms_db)
     backend.execute(db_view_ddl)
 
 
