@@ -10,6 +10,7 @@ from databricks.sdk.service.compute import (
     DbfsStorageInfo,
     GlobalInitScriptDetails,
     InitScriptInfo,
+    InstanceProfile,
     WorkspaceStorageInfo,
 )
 from databricks.sdk.service.jobs import (
@@ -24,6 +25,8 @@ from databricks.sdk.service.sql import EndpointConfPair
 from databricks.sdk.service.workspace import GetSecretResponse
 
 from databricks.labs.ucx.assessment.crawlers import (
+    AWSInstanceProfileCrawler,
+    AWSInstanceProfileInfo,
     AzureServicePrincipalCrawler,
     ClustersCrawler,
     GlobalInitScriptCrawler,
@@ -38,6 +41,33 @@ from tests.unit.framework.mocks import MockBackend
 
 _SECRET_PATTERN = r"{{(secrets.*?)}}"
 _SECRET_VALUE = b"SGVsbG8sIFdvcmxkIQ=="
+
+
+def test_aws_instance_profiles():
+    mock_ws = Mock()
+
+    sample_instance_profiles = [
+        InstanceProfile(
+            instance_profile_arn="arn:aws:iam::399933399933:instance-profile/S3_Access_Role",
+            iam_role_arn="arn:aws:iam::399933399933:role/S3_Access_Role",
+            is_meta_instance_profile=True,
+        ),
+        InstanceProfile(
+            instance_profile_arn="arn:aws:iam::488844499944:instance-profile/Prod-InstanceProfile-Role",
+            iam_role_arn=None,
+            is_meta_instance_profile=False,
+        ),
+    ]
+    mock_ws.instance_profiles.list.return_value = sample_instance_profiles
+
+    crawler = AWSInstanceProfileCrawler(mock_ws, MockBackend(), "test")
+
+    result_set = list(crawler._crawl())
+    assert len(result_set) == 2
+    assert isinstance(result_set[0], AWSInstanceProfileInfo)
+    assert result_set[0].instance_profile_arn == "arn:aws:iam::399933399933:instance-profile/S3_Access_Role"
+    assert result_set[0].iam_role_arn == "arn:aws:iam::399933399933:role/S3_Access_Role"
+    assert result_set[0].is_meta_instance_profile is True
 
 
 def test_external_locations():
