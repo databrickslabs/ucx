@@ -318,7 +318,7 @@ def crawl_permissions(cfg: WorkspaceConfig):
     ],
 )
 def setup_view(cfg: WorkspaceConfig):
-    """Creates a database view for capturing the following failures in the assessment process.
+    """Creates a database view for capturing the following failures as part of the assessment process:
     - DBR version is not supported
     - Unsupported config
     - DBFS mount in configuration
