@@ -70,14 +70,14 @@ class AWSInstanceProfileInfo:
     # This field is required if your role name and
     # instance profile name do not match and you want to use
     # the instance profile with Databricks SQL Serverless.
-    iam_role_arn: str
+    iam_role_arn: str = None
     # Boolean flag indicating whether the instance profile should only be
     # used in credential passthrough scenarios.
     # If true, it means the instance profile contains an meta IAM role
     # which could assume a wide range of roles. Therefore it should
     # always be used with authorization. This field is optional,
     # the default value is false.
-    is_meta_instance_profile: bool
+    is_meta_instance_profile: bool = False
 
 
 @dataclass
