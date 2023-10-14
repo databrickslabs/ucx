@@ -83,6 +83,12 @@ for the latest reference of environment variables related to authentication.
 - `TEST_USER_ISOLATION_CLUSTER_ID`: This environment variable contains the identifier for the cluster used in testing
   user isolation. The value is a unique cluster ID, like "0825-164947-...".
 
+Use the following command to run the integration tests:
+
+```shell
+make integration
+```
+
 We'd like to encourage you to leverage the extensive set of [pytest fixtures](https://docs.pytest.org/en/latest/explanation/fixtures.html#about-fixtures). 
 These fixtures follow a consistent naming pattern, starting with "make_". These functions can be called multiple 
 times to _create and clean up objects as needed_ for your tests. Reusing these fixtures helps maintain clean and consistent 
@@ -114,22 +120,17 @@ However, it's possible that this limitation may be addressed in the future.
 
 ## Local Setup
 
-This section provides a step-by-step guide to set up and start working on the project. These steps will help you set up 
-your project environment and dependencies for efficient development.
+This section provides a step-by-step guide to set up and start working on the project. These steps will help you set up your project environment and dependencies for efficient development.
 
-To begin, you'll need to install [Hatch](https://github.com/pypa/hatch). You can do this with the following command:
+To begin, run `make dev` to install [Hatch](https://github.com/pypa/hatch), create the default environment and install development dependencies, assuming you've already cloned the github repo.
+
 ```shell
-pip install hatch
+make dev
 ```
 
-Next, create a virtual environment for your project using Hatch:
+Verify installation with 
 ```shell
-hatch env create
-```
-
-To install development dependencies, including testing and database connection packages, use the following command:
-```shell
-hatch run pip install -e '.[test]'
+make test
 ```
 
 To ensure your integrated development environment (IDE) uses the newly created virtual environment, you can retrieve the Python path with this command:
@@ -175,6 +176,8 @@ Here are the example steps to submit your first contribution:
 15. announce PR for the review
 
 ## Troubleshooting
+
+If you encounter any package dependency errors after `git pull`, run `make clean`
 
 ### Environment Issues
 
