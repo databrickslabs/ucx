@@ -24,76 +24,102 @@ from databricks.labs.ucx.workspace_access.manager import PermissionManager
 logger = logging.getLogger(__name__)
 
 
-def _get_view_definition(hms_db: str) -> str:
-    return f"""CREATE OR REPLACE VIEW hive_metastore.{hms_db}.vw_failure_summary
-    AS
-    WITH failuretab (failure, issue, object_type) AS (
+def _get_view_definition(hms_db) -> str:
+    return f"""CREATE
+OR REPLACE VIEW {hms_db}.vw_failure_summary AS WITH failuretab (failure, issue, object_type) AS (
+  SELECT
+    explode(from_json(failures, 'array<string>')) AS failure,
+    substring_index(failure, ":", 1) issue,
+    object_type
+  FROM
+    (
       SELECT
-          explode(from_json(failures, 'array<string>')) AS failure,
-          substring_index(failure, ":", 1) issue,
-          object_type
-        FROM
-        (
-        SELECT
-          failures,
-          "jobs" AS object_type
-        FROM
-          hive_metastore.{hms_db}.jobs
-        WHERE failures IS NOT NULL and failures != '[]'
-        UNION ALL
-        SELECT
-          failures,
-          "clusters" AS object_type
-        FROM
-          hive_metastore.{hms_db}.clusters
-        WHERE failures IS NOT NULL and failures != '[]'
-        UNION ALL
-        SELECT
-          failures,
-          "global init scripts" AS object_type
-        FROM
-          hive_metastore.{hms_db}.global_init_scripts
-        WHERE failures IS NOT NULL and failures != '[]'
-        UNION ALL
-        SELECT
-          failures,
-          "pipelines" AS object_type
-        FROM
-          hive_metastore.{hms_db}.pipelines
-        WHERE failures IS NOT NULL and failures != '[]'
-        UNION ALL
-        SELECT
-          concat('["', CASE
-           WHEN STARTSWITH(location, "wasb") THEN "Unsupported Storage Type"
-           WHEN STARTSWITH(location, "adl") THEN "Unsupported Storage Type"
-       END , '"]') AS failures,
-          IF(object_type IN ("MANAGED", "EXTERNAL"), "Table", "View") AS object_type
-        FROM
-          hive_metastore.{hms_db}.tables
-      WHERE location IS NOT NULL AND location != ""
+        failures,
+        "jobs" AS object_type
+      FROM
+        {hms_db}.jobs
+      WHERE
+        failures IS NOT NULL
+        AND failures != '[]'
       UNION ALL
-      SELECT concat('["', CASE
-           WHEN STARTSWITH(error, "ignoring table because") THEN "Table Scan Failure"
-       END , '"]') AS failures,
-       "Table" AS object_type
-      FROM   hive_metastore.{hms_db}.table_failures
-      WHERE  error IS NOT NULL AND error != ""
-      )
+      SELECT
+        failures,
+        "clusters" AS object_type
+      FROM
+        {hms_db}.clusters
+      WHERE
+        failures IS NOT NULL
+        AND failures != '[]'
+      UNION ALL
+      SELECT
+        failures,
+        "global init scripts" AS object_type
+      FROM
+        {hms_db}.global_init_scripts
+      WHERE
+        failures IS NOT NULL
+        AND failures != '[]'
+      UNION ALL
+      SELECT
+        failures,
+        "pipelines" AS object_type
+      FROM
+        {hms_db}.pipelines
+      WHERE
+        failures IS NOT NULL
+        AND failures != '[]'
+      UNION ALL
+      SELECT
+        concat(
+          '["',
+          CASE
+            WHEN STARTSWITH(location, "wasb") THEN "Unsupported Storage Type"
+            WHEN STARTSWITH(location, "adl") THEN "Unsupported Storage Type"
+            WHEN STARTSWITH(location, "dbfs:/mnt") THEN "DBFS Mount"
+            WHEN STARTSWITH(location, "/dbfs/mnt") THEN "DBFS Mount"
+            WHEN STARTSWITH(location, "dbfs:/") THEN "DBFS Root"
+            WHEN STARTSWITH(location, "/dbfs/") THEN "DBFS Root"
+          END,
+          '","',
+          IF(table_format != "delta", "Non Delta", ""),
+          '"]'
+        ) AS failures,
+        IF(
+          object_type IN ("MANAGED", "EXTERNAL"),
+          "Table",
+          "View"
+        ) AS object_type
+      FROM
+        {hms_db}.tables
+      WHERE
+        location IS NOT NULL
+        AND location != ""
+      UNION ALL
+      SELECT
+        concat('["', error, '"]') AS failures,
+        "Table" AS object_type
+      FROM
+        {hms_db}.table_failures
+      WHERE
+        error IS NOT NULL
+        AND error != ""
     )
-    SELECT
-      issue,
-      object_type,
-      COUNT(*) AS issue_count
-    FROM
-      failuretab
-    WHERE
-      failure IS NOT NULL OR failure != ""
-    GROUP BY
-      issue,
-      object_type
-    ORDER BY
-      issue,
-      object_type ;"""
+)
+SELECT
+  issue,
+  object_type,
+  COUNT(*) AS issue_count
+FROM
+  failuretab
+WHERE
+  failure IS NOT NULL
+  AND failure != ""
+GROUP BY
+  issue,
+  object_type
+ORDER BY
+  issue,
+  object_type;"""
 
 
 @task("assessment")
@@ -292,9 +318,7 @@ def setup_view(cfg: WorkspaceConfig):
     - Table scan failure
     """
     backend = RuntimeBackend()
-    hms_db = cfg.replace_inventory_variable(cfg.inventory_database)
-    db_view_ddl = _get_view_definition(hms_db)
-    backend.execute(db_view_ddl)
+    backend.execute(cfg.replace_inventory_variable(_get_view_definition("$inventory")))
 
 
 @task(
