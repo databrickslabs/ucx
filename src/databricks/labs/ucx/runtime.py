@@ -24,102 +24,106 @@ from databricks.labs.ucx.workspace_access.manager import PermissionManager
 logger = logging.getLogger(__name__)
 
 
-def _get_view_definition(hms_db) -> str:
+def _get_view_definition() -> str:
     return f"""CREATE
-OR REPLACE VIEW {hms_db}.vw_failure_summary AS WITH failuretab (failure, issue, object_type) AS (
+OR REPLACE VIEW {$inventory}.failure_details AS WITH failuretab (object_type, object_id, failures) AS (
   SELECT
-    explode(from_json(failures, 'array<string>')) AS failure,
-    substring_index(failure, ":", 1) issue,
-    object_type
+    object_type,
+    object_id,
+    failures
   FROM
     (
       SELECT
-        failures,
-        "jobs" AS object_type
+        "jobs" AS object_type,
+        job_id AS object_id,
+        failures
       FROM
-        {hms_db}.jobs
+        {$inventory}.jobs
       WHERE
         failures IS NOT NULL
         AND failures != '[]'
       UNION ALL
       SELECT
-        failures,
-        "clusters" AS object_type
+        "clusters" AS object_type,
+        cluster_id AS object_id,
+        failures
       FROM
-        {hms_db}.clusters
+        {$inventory}.clusters
       WHERE
         failures IS NOT NULL
         AND failures != '[]'
       UNION ALL
       SELECT
-        failures,
-        "global init scripts" AS object_type
+        "global init scripts" AS object_type,
+        script_id AS object_id,
+        failures
       FROM
-        {hms_db}.global_init_scripts
+        {$inventory}.global_init_scripts
       WHERE
         failures IS NOT NULL
         AND failures != '[]'
       UNION ALL
       SELECT
-        failures,
-        "pipelines" AS object_type
+        "pipelines" AS object_type,
+        pipeline_id AS object_id,
+        failures
       FROM
-        {hms_db}.pipelines
+        {$inventory}.pipelines
       WHERE
         failures IS NOT NULL
         AND failures != '[]'
       UNION ALL
       SELECT
-        concat(
-          '["',
-          CASE
-            WHEN STARTSWITH(location, "wasb") THEN "Unsupported Storage Type"
-            WHEN STARTSWITH(location, "adl") THEN "Unsupported Storage Type"
-            WHEN STARTSWITH(location, "dbfs:/mnt") THEN "DBFS Mount"
-            WHEN STARTSWITH(location, "/dbfs/mnt") THEN "DBFS Mount"
-            WHEN STARTSWITH(location, "dbfs:/") THEN "DBFS Root"
-            WHEN STARTSWITH(location, "/dbfs/") THEN "DBFS Root"
-          END,
-          '","',
-          IF(table_format != "delta", "Non Delta", ""),
-          '"]'
-        ) AS failures,
-        IF(
-          object_type IN ("MANAGED", "EXTERNAL"),
-          "Table",
-          "View"
-        ) AS object_type
+        "Table" as object_type,
+        concat(catalog, '.', database, '.', name) AS object_id,
+        TO_JSON(
+          ARRAY(
+            CASE
+              WHEN STARTSWITH(location, "wasb") THEN "Unsupported Storage Type"
+              WHEN STARTSWITH(location, "adl") THEN "Unsupported Storage Type"
+              WHEN STARTSWITH(location, "dbfs:/mnt") THEN "DBFS Mount"
+              WHEN STARTSWITH(location, "/dbfs/mnt") THEN "DBFS Mount"
+              WHEN STARTSWITH(location, "dbfs:/") THEN "DBFS Root"
+              WHEN STARTSWITH(location, "/dbfs/") THEN "DBFS Root"
+            END,
+            IF(table_format != "delta", "Non Delta", "")
+          )
+        ) AS failures
       FROM
-        {hms_db}.tables
+        {$inventory}.tables
       WHERE
-        location IS NOT NULL
-        AND location != ""
+        object_type IN ("MANAGED", "EXTERNAL")
       UNION ALL
       SELECT
-        concat('["', error, '"]') AS failures,
-        "Table" AS object_type
+        CASE
+          WHEN instr(error, "ignoring database") > 0 THEN "Database"
+          WHEN instr(error, "ignoring table") > 0 THEN "Table"
+        END AS object_type,
+        CASE
+          WHEN instr(error, "ignoring database") > 0 THEN concat(catalog, '.', database)
+          WHEN instr(error, "ignoring table") > 0 THEN concat(catalog, '.', database, '.', name)
+        END AS object_id,
+        TO_JSON(ARRAY(error)) AS failures
       FROM
-        {hms_db}.table_failures
+        {$inventory}.table_failures
       WHERE
         error IS NOT NULL
         AND error != ""
     )
 )
 SELECT
-  issue,
   object_type,
-  COUNT(*) AS issue_count
+  object_id,
+  failures
 FROM
   failuretab
 WHERE
-  failure IS NOT NULL
-  AND failure != ""
-GROUP BY
-  issue,
-  object_type
+  failures IS NOT NULL
+  AND failures != ""
 ORDER BY
-  issue,
-  object_type;"""
+  object_id,
+  object_type,
+  failures;"""
 
 
 @task("assessment")
@@ -319,7 +323,7 @@ def setup_view(cfg: WorkspaceConfig):
     - Table scan failure
     """
     backend = RuntimeBackend()
-    backend.execute(cfg.replace_inventory_variable(_get_view_definition("$inventory")))
+    backend.execute(cfg.replace_inventory_variable(_get_view_definition()))
 
 
 @task(
