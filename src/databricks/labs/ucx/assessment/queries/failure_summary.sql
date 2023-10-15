@@ -3,6 +3,21 @@
 SELECT
   issue,
   object_type,
-  issue_count
+  COUNT(*) AS issue_count
 FROM
-  $inventory.vw_failure_summary;
+  (
+    SELECT
+      EXPLODE(FROM_JSON(failures, 'array<string>')) AS indv_failure,
+      SUBSTRING_INDEX(indv_failure, ":", 1) issue,
+      object_type
+    from
+      $inventory.failure_details
+  )
+WHERE
+  indv_failure IS NOT NULL
+  AND indv_failure != ""
+GROUP BY
+  issue,
+  object_type
+ORDER BY
+  3 DESC;
