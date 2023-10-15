@@ -82,6 +82,24 @@ def test_aws_instance_profiles():
     assert result_set[1].is_meta_instance_profile is False
 
 
+def test_aws_instance_profiles_try_fetch(mocker):
+    sample_instance_profiles = [
+        {
+            "instance_profile_arn": "arn:aws:iam::999999999999:instance-profile/S3_Access_Role",
+            "iam_role_arn": "arn:aws:iam::999999999999:role/S3_Access_Role",
+            "is_meta_instance_profile": "true",
+        }
+    ]
+    mock_ws = Mock()
+    crawler = AWSInstanceProfileCrawler(mock_ws, MockBackend(), "ucx")
+    crawler._fetch = Mock(return_value=sample_instance_profiles)
+    crawler._crawl = Mock(return_value=sample_instance_profiles)
+
+    result_set = crawler.snapshot()
+
+    assert len(result_set) == 1
+
+
 def test_external_locations():
     crawler = ExternalLocationCrawler(Mock(), MockBackend(), "test")
     row_factory = type("Row", (Row,), {"__columns__": ["location"]})
