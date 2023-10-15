@@ -26,7 +26,7 @@ logger = logging.getLogger(__name__)
 
 def _get_view_definition() -> str:
     return f"""CREATE
-OR REPLACE VIEW {$inventory}.failure_details AS WITH failuretab (object_type, object_id, failures) AS (
+OR REPLACE VIEW {"$inventory"}.failure_details AS WITH failuretab (object_type, object_id, failures) AS (
   SELECT
     object_type,
     object_id,
@@ -38,7 +38,7 @@ OR REPLACE VIEW {$inventory}.failure_details AS WITH failuretab (object_type, ob
         job_id AS object_id,
         failures
       FROM
-        {$inventory}.jobs
+        {"$inventory"}.jobs
       WHERE
         failures IS NOT NULL
         AND failures != '[]'
@@ -48,7 +48,7 @@ OR REPLACE VIEW {$inventory}.failure_details AS WITH failuretab (object_type, ob
         cluster_id AS object_id,
         failures
       FROM
-        {$inventory}.clusters
+        {"$inventory"}.clusters
       WHERE
         failures IS NOT NULL
         AND failures != '[]'
@@ -58,7 +58,7 @@ OR REPLACE VIEW {$inventory}.failure_details AS WITH failuretab (object_type, ob
         script_id AS object_id,
         failures
       FROM
-        {$inventory}.global_init_scripts
+        {"$inventory"}.global_init_scripts
       WHERE
         failures IS NOT NULL
         AND failures != '[]'
@@ -68,7 +68,7 @@ OR REPLACE VIEW {$inventory}.failure_details AS WITH failuretab (object_type, ob
         pipeline_id AS object_id,
         failures
       FROM
-        {$inventory}.pipelines
+        {"$inventory"}.pipelines
       WHERE
         failures IS NOT NULL
         AND failures != '[]'
@@ -90,7 +90,7 @@ OR REPLACE VIEW {$inventory}.failure_details AS WITH failuretab (object_type, ob
           )
         ) AS failures
       FROM
-        {$inventory}.tables
+        {"$inventory"}.tables
       WHERE
         object_type IN ("MANAGED", "EXTERNAL")
       UNION ALL
@@ -105,7 +105,7 @@ OR REPLACE VIEW {$inventory}.failure_details AS WITH failuretab (object_type, ob
         END AS object_id,
         TO_JSON(ARRAY(error)) AS failures
       FROM
-        {$inventory}.table_failures
+        {"$inventory"}.table_failures
       WHERE
         error IS NOT NULL
         AND error != ""
