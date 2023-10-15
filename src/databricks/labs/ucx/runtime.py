@@ -309,7 +309,7 @@ def crawl_permissions(cfg: WorkspaceConfig):
     ],
 )
 def setup_view(cfg: WorkspaceConfig):
-    """Creates a database view for capturing following summary as part of the assessment process:
+    """Creates a database view for capturing following summaries as part of the assessment process:
     - Unsupported DBR version
     - Unsupported config
     - DBFS mount used in configuration
