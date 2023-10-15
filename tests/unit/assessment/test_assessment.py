@@ -48,12 +48,12 @@ def test_aws_instance_profiles():
 
     sample_instance_profiles = [
         InstanceProfile(
-            instance_profile_arn="arn:aws:iam::399933399933:instance-profile/S3_Access_Role",
-            iam_role_arn="arn:aws:iam::399933399933:role/S3_Access_Role",
+            instance_profile_arn="arn:aws:iam::999999999999:instance-profile/S3_Access_Role",
+            iam_role_arn="arn:aws:iam::999999999999:role/S3_Access_Role",
             is_meta_instance_profile=True,
         ),
         InstanceProfile(
-            instance_profile_arn="arn:aws:iam::488844499944:instance-profile/Prod-InstanceProfile-Role",
+            instance_profile_arn="arn:aws:iam::999999999999:instance-profile/Prod-InstanceProfile-Role",
             iam_role_arn=None,
             is_meta_instance_profile=False,
         ),
@@ -65,19 +65,19 @@ def test_aws_instance_profiles():
     result_set = list(crawler._crawl())
     assert len(result_set) == 2
     assert isinstance(result_set[0], AWSInstanceProfileInfo)
-    assert result_set[0].instance_profile_arn == "arn:aws:iam::399933399933:instance-profile/S3_Access_Role"
-    assert result_set[0].iam_role_arn == "arn:aws:iam::399933399933:role/S3_Access_Role"
+    assert result_set[0].instance_profile_arn == "arn:aws:iam::999999999999:instance-profile/S3_Access_Role"
+    assert result_set[0].iam_role_arn == "arn:aws:iam::999999999999:role/S3_Access_Role"
     assert result_set[0].is_meta_instance_profile is True
 
     # Check .snapshot
     crawler._try_fetch = Mock(return_value=[])
     result_set = crawler.snapshot()
     assert len(result_set) == 2
-    assert result_set[0].instance_profile_arn == "arn:aws:iam::399933399933:instance-profile/S3_Access_Role"
-    assert result_set[0].iam_role_arn == "arn:aws:iam::399933399933:role/S3_Access_Role"
+    assert result_set[0].instance_profile_arn == "arn:aws:iam::999999999999:instance-profile/S3_Access_Role"
+    assert result_set[0].iam_role_arn == "arn:aws:iam::999999999999:role/S3_Access_Role"
     assert result_set[0].is_meta_instance_profile is True
     
-    assert result_set[1].instance_profile_arn == "arn:aws:iam::488844499944:instance-profile/Prod-InstanceProfile-Role"
+    assert result_set[1].instance_profile_arn == "arn:aws:iam::999999999999:instance-profile/Prod-InstanceProfile-Role"
     assert result_set[1].iam_role_arn == None
     assert result_set[1].is_meta_instance_profile is False
  
