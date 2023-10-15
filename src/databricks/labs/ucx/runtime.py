@@ -4,8 +4,8 @@ import sys
 
 from databricks.sdk import WorkspaceClient
 
+from databricks.labs.ucx.assessment.aws_instance_profiles import AWSInstanceProfileCrawler
 from databricks.labs.ucx.assessment.crawlers import (
-    AWSInstanceProfileCrawler,
     AzureServicePrincipalCrawler,
     ClustersCrawler,
     GlobalInitScriptCrawler,
@@ -140,13 +140,9 @@ def assess_pipelines(cfg: WorkspaceConfig):
 
 
 @task("assessment", depends_on=[setup_schema])
-def assess_aws_instance_profiles(cfg: WorkspaceConfig):
-    """This module scans through all the workspace instance profiles.
-
-    It looks in:
-      - all those entities and prepares a list of AWS Instance Profiles embedded in their configurations
-
-    Subsequently, the list of all the AWS Instance Profiles referred in those configurations are saved
+def crawl_aws_instance_profiles(cfg: WorkspaceConfig):
+    """This module scans through all the workspace instance profiles
+    and returns the list of all the AWS Instance Profiles which is saved
     in the `$inventory.aws_instance_profiles` table."""
     ws = WorkspaceClient(config=cfg.to_databricks_config())
     crawler = AWSInstanceProfileCrawler(ws, RuntimeBackend(), cfg.inventory_database)
@@ -223,7 +219,7 @@ def crawl_permissions(cfg: WorkspaceConfig):
         assess_jobs,
         assess_clusters,
         assess_pipelines,
-        assess_aws_instance_profiles,
+        crawl_aws_instance_profiles,
         assess_azure_service_principals,
         assess_global_init_scripts,
     ],

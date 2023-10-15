@@ -1,7 +1,7 @@
 import logging
 
+from databricks.labs.ucx.assessment.aws_instance_profiles import AWSInstanceProfileCrawler
 from databricks.labs.ucx.assessment.crawlers import (
-    AWSInstanceProfileCrawler,
     AzureServicePrincipalCrawler,
     ClustersCrawler,
     JobsCrawler,

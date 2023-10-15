@@ -24,9 +24,9 @@ from databricks.sdk.service.pipelines import PipelineState, PipelineStateInfo
 from databricks.sdk.service.sql import EndpointConfPair
 from databricks.sdk.service.workspace import GetSecretResponse
 
+from databricks.labs.ucx.assessment.aws_instance_profiles import AWSInstanceProfileCrawler,AWSInstanceProfileInfo
+    
 from databricks.labs.ucx.assessment.crawlers import (
-    AWSInstanceProfileCrawler,
-    AWSInstanceProfileInfo,
     AzureServicePrincipalCrawler,
     ClustersCrawler,
     GlobalInitScriptCrawler,
