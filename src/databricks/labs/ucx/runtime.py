@@ -74,25 +74,35 @@ OR REPLACE VIEW {"$inventory"}.failure_details AS WITH failuretab (object_type, 
         AND failures != '[]'
       UNION ALL
       SELECT
-        "Table" as object_type,
-        concat(catalog, '.', database, '.', name) AS object_id,
-        TO_JSON(
-          ARRAY(
-            CASE
-              WHEN STARTSWITH(location, "wasb") THEN "Unsupported Storage Type"
-              WHEN STARTSWITH(location, "adl") THEN "Unsupported Storage Type"
-              WHEN STARTSWITH(location, "dbfs:/mnt") THEN "DBFS Mount"
-              WHEN STARTSWITH(location, "/dbfs/mnt") THEN "DBFS Mount"
-              WHEN STARTSWITH(location, "dbfs:/") THEN "DBFS Root"
-              WHEN STARTSWITH(location, "/dbfs/") THEN "DBFS Root"
-            END,
-            IF(table_format != "delta", "Non Delta", "")
-          )
-        ) AS failures
+        object_type,
+        object_id,
+        failures
       FROM
-        {"$inventory"}.tables
+        (
+          SELECT
+            "Table" as object_type,
+            CONCAT(catalog, '.', database, '.', name) AS object_id,
+            TO_JSON(
+              ARRAY(
+                CASE
+                  WHEN STARTSWITH(location, "wasb") THEN "Unsupported Storage Type"
+                  WHEN STARTSWITH(location, "adl") THEN "Unsupported Storage Type"
+                  WHEN STARTSWITH(location, "dbfs:/mnt") THEN "DBFS Mount"
+                  WHEN STARTSWITH(location, "/dbfs/mnt") THEN "DBFS Mount"
+                  WHEN STARTSWITH(location, "dbfs:/") THEN "DBFS Root"
+                  WHEN STARTSWITH(location, "/dbfs/") THEN "DBFS Root"
+                  ELSE NULL
+                END,
+                IF(table_format != "delta", "Non Delta", NULL)
+              )
+            ) AS failures
+          FROM
+            {"$inventory"}.tables
+          WHERE
+            object_type IN ("MANAGED", "EXTERNAL")
+        )
       WHERE
-        object_type IN ("MANAGED", "EXTERNAL")
+        failures != '[null,null]'
       UNION ALL
       SELECT
         CASE
