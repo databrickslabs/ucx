@@ -76,11 +76,11 @@ def test_aws_instance_profiles():
     assert result_set[0].instance_profile_arn == "arn:aws:iam::999999999999:instance-profile/S3_Access_Role"
     assert result_set[0].iam_role_arn == "arn:aws:iam::999999999999:role/S3_Access_Role"
     assert result_set[0].is_meta_instance_profile is True
-    
+
     assert result_set[1].instance_profile_arn == "arn:aws:iam::999999999999:instance-profile/Prod-InstanceProfile-Role"
-    assert result_set[1].iam_role_arn == None
+    assert result_set[1].iam_role_arn is None
     assert result_set[1].is_meta_instance_profile is False
- 
+
 
 def test_external_locations():
     crawler = ExternalLocationCrawler(Mock(), MockBackend(), "test")

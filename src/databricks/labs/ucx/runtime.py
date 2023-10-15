@@ -5,8 +5,8 @@ import sys
 from databricks.sdk import WorkspaceClient
 
 from databricks.labs.ucx.assessment.crawlers import (
-    AzureServicePrincipalCrawler,
     AWSInstanceProfileCrawler,
+    AzureServicePrincipalCrawler,
     ClustersCrawler,
     GlobalInitScriptCrawler,
     JobsCrawler,
@@ -137,6 +137,7 @@ def assess_pipelines(cfg: WorkspaceConfig):
     ws = WorkspaceClient(config=cfg.to_databricks_config())
     crawler = PipelinesCrawler(ws, RuntimeBackend(), cfg.inventory_database)
     crawler.snapshot()
+
 
 @task("assessment", depends_on=[setup_schema])
 def assess_aws_instance_profiles(cfg: WorkspaceConfig):
