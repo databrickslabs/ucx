@@ -313,14 +313,16 @@ def crawl_permissions(cfg: WorkspaceConfig):
     ],
 )
 def setup_view(cfg: WorkspaceConfig):
-    """Creates a database view for capturing following summaries as part of the assessment process:
+    """Creates a database view for capturing following details as part of the assessment process:
     - Unsupported DBR version
     - Unsupported config
     - DBFS mount used in configuration
     - Azure service principal credentials used in config
     - Unsupported storage type (WASBS, ADL) used in table location
-    - Non Delta table
-    - Table scan failure
+    - DBFS root and DBFS Mount location used in table location
+    - Non Delta tables
+    - Table scan failures
+    - Database scan failures
     """
     backend = RuntimeBackend()
     backend.execute(cfg.replace_inventory_variable(_get_view_definition()))
