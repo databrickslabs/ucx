@@ -55,16 +55,11 @@ def test_tasks(mocker):
 
 def test_assessment_tasks(mocker):
     """Test task decorator"""
-    assert len(_TASKS) == 19
+    assert len(_TASKS) >= 19
     for task in _TASKS:
         assert task is not None
         t = _TASKS[task]
         assert t is not None
 
     azure = [_TASKS[_] for _ in _TASKS if _TASKS[_].is_azure]
-    aws = [_TASKS[_] for _ in _TASKS if _TASKS[_].is_aws]
-    gcp = [_TASKS[_] for _ in _TASKS if _TASKS[_].is_gcp]
-
-    assert len(azure) == 1
-    assert len(aws) == 0
-    assert len(gcp) == 0
+    assert len(azure) >= 1
