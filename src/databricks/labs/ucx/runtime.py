@@ -24,6 +24,118 @@ from databricks.labs.ucx.workspace_access.manager import PermissionManager
 logger = logging.getLogger(__name__)
 
 
+def _get_view_definition() -> str:
+    return """CREATE
+OR REPLACE VIEW $inventory.failure_details AS WITH failuretab (object_type, object_id, failures) AS (
+  SELECT
+    object_type,
+    object_id,
+    failures
+  FROM
+    (
+      SELECT
+        "jobs" AS object_type,
+        job_id AS object_id,
+        failures
+      FROM
+        $inventory.jobs
+      WHERE
+        failures IS NOT NULL
+        AND failures != '[]'
+      UNION ALL
+      SELECT
+        "clusters" AS object_type,
+        cluster_id AS object_id,
+        failures
+      FROM
+        $inventory.clusters
+      WHERE
+        failures IS NOT NULL
+        AND failures != '[]'
+      UNION ALL
+      SELECT
+        "global init scripts" AS object_type,
+        script_id AS object_id,
+        failures
+      FROM
+        $inventory.global_init_scripts
+      WHERE
+        failures IS NOT NULL
+        AND failures != '[]'
+      UNION ALL
+      SELECT
+        "pipelines" AS object_type,
+        pipeline_id AS object_id,
+        failures
+      FROM
+        $inventory.pipelines
+      WHERE
+        failures IS NOT NULL
+        AND failures != '[]'
+      UNION ALL
+      SELECT
+        object_type,
+        object_id,
+        failures
+      FROM
+        (
+          SELECT
+            "Table" as object_type,
+            CONCAT(catalog, '.', database, '.', name) AS object_id,
+            TO_JSON(
+              ARRAY(
+                CASE
+                  WHEN STARTSWITH(location, "wasb") THEN "Unsupported Storage Type"
+                  WHEN STARTSWITH(location, "adl") THEN "Unsupported Storage Type"
+                  WHEN STARTSWITH(location, "dbfs:/mnt") THEN "DBFS Mount"
+                  WHEN STARTSWITH(location, "/dbfs/mnt") THEN "DBFS Mount"
+                  WHEN STARTSWITH(location, "dbfs:/") THEN "DBFS Root"
+                  WHEN STARTSWITH(location, "/dbfs/") THEN "DBFS Root"
+                  ELSE NULL
+                END,
+                IF(table_format != "delta", "Non Delta", NULL)
+              )
+            ) AS failures
+          FROM
+            $inventory.tables
+          WHERE
+            object_type IN ("MANAGED", "EXTERNAL")
+        )
+      WHERE
+        failures != '[null,null]'
+      UNION ALL
+      SELECT
+        CASE
+          WHEN instr(error, "ignoring database") > 0 THEN "Database"
+          WHEN instr(error, "ignoring table") > 0 THEN "Table"
+        END AS object_type,
+        CASE
+          WHEN instr(error, "ignoring database") > 0 THEN concat(catalog, '.', database)
+          WHEN instr(error, "ignoring table") > 0 THEN concat(catalog, '.', database, '.', name)
+        END AS object_id,
+        TO_JSON(ARRAY(error)) AS failures
+      FROM
+        $inventory.table_failures
+      WHERE
+        error IS NOT NULL
+        AND error != ""
+    )
+)
+SELECT
+  object_type,
+  object_id,
+  failures
+FROM
+  failuretab
+WHERE
+  failures IS NOT NULL
+  AND failures != ""
+ORDER BY
+  object_id,
+  object_type,
+  failures;"""
+
+
 @task("assessment")
 def setup_schema(cfg: WorkspaceConfig):
     """Creates a database for the UCX migration intermediate state. The name comes from the configuration file
@@ -202,15 +314,33 @@ def crawl_permissions(cfg: WorkspaceConfig):
 @task(
     "assessment",
     depends_on=[
-        crawl_grants,
-        crawl_permissions,
-        guess_external_locations,
         assess_jobs,
         assess_clusters,
         assess_pipelines,
         assess_azure_service_principals,
         assess_global_init_scripts,
+        crawl_tables,
     ],
+)
+def setup_view(cfg: WorkspaceConfig):
+    """Creates a database view for capturing following details as part of the assessment process:
+    - Unsupported DBR version
+    - Unsupported config
+    - DBFS mount used in configuration
+    - Azure service principal credentials used in config
+    - Unsupported storage type (WASBS, ADL) used in table location
+    - DBFS root and DBFS Mount location used in table location
+    - Non Delta tables
+    - Table scan failures
+    - Database scan failures
+    """
+    backend = RuntimeBackend()
+    backend.execute(cfg.replace_inventory_variable(_get_view_definition()))
+
+
+@task(
+    "assessment",
+    depends_on=[crawl_grants, crawl_permissions, guess_external_locations, setup_view],
     dashboard="assessment",
 )
 def assessment_report(_: WorkspaceConfig):
