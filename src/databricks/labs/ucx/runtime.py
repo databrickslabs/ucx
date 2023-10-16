@@ -25,7 +25,7 @@ logger = logging.getLogger(__name__)
 
 
 def _get_view_definition() -> str:
-    return f"""CREATE
+    return """CREATE
 OR REPLACE VIEW $inventory.failure_details AS WITH failuretab (object_type, object_id, failures) AS (
   SELECT
     object_type,
