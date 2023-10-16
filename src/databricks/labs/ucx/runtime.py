@@ -138,7 +138,7 @@ def assess_pipelines(cfg: WorkspaceConfig):
     crawler.snapshot()
 
 
-@task("assessment", depends_on=[setup_schema])
+@task("assessment", depends_on=[setup_schema], is_azure=True)
 def assess_azure_service_principals(cfg: WorkspaceConfig):
     """This module scans through all the clusters configurations, cluster policies, job cluster configurations,
     Pipeline configurations, Warehouse configuration and identifies all the Azure Service Principals who has been

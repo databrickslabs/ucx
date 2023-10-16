@@ -254,6 +254,8 @@ def test_main_with_existing_conf_does_not_recreate_config(mocker):
     ws.current_user.me = lambda: iam.User(user_name="me@example.com", groups=[iam.ComplexValue(display="admins")])
     ws.config.host = "https://foo"
     ws.config.is_aws = True
+    ws.config.is_azure = False
+    ws.config.is_gcp = False
     config_bytes = yaml.dump(WorkspaceConfig(inventory_database="a", groups=GroupsConfig(auto=True)).as_dict()).encode(
         "utf8"
     )
@@ -272,6 +274,23 @@ def test_main_with_existing_conf_does_not_recreate_config(mocker):
 
     webbrowser_open.assert_called_with("https://foo/#workspace/Users/me@example.com/.ucx/README.py")
     # ws.workspace.mkdirs.assert_called_with("/Users/me@example.com/.ucx")
+
+
+def test_cloud_match(mocker):
+    ws = mocker.Mock()
+    from databricks.labs.ucx.framework.tasks import Task
+
+    tasks = [
+        Task(task_id=0, workflow="wl_1", name="n3", doc="d3", fn=lambda: None, is_aws=True),
+        Task(task_id=1, workflow="wl_2", name="n2", doc="d2", fn=lambda: None, is_azure=True),
+        Task(task_id=2, workflow="wl_1", name="n1", doc="d1", fn=lambda: None, is_gcp=True),
+    ]
+
+    with mocker.patch.object(WorkspaceInstaller, attribute="_sorted_tasks", return_value=tasks):
+        install = WorkspaceInstaller(ws)
+        steps = install._step_list()
+    assert len(steps) == 2
+    assert steps[0] == "wl_1" and steps[1] == "wl_2"
 
 
 def test_query_metadata(mocker):

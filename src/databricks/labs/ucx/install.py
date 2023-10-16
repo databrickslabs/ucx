@@ -23,7 +23,7 @@ from databricks.sdk.service.workspace import ImportFormat
 from databricks.labs.ucx.__about__ import __version__
 from databricks.labs.ucx.config import GroupsConfig, WorkspaceConfig
 from databricks.labs.ucx.framework.dashboards import DashboardFromFiles
-from databricks.labs.ucx.framework.tasks import _TASKS, Task
+from databricks.labs.ucx.framework.tasks import _TASKS, Task, cloud_compatible
 from databricks.labs.ucx.runtime import main
 
 TAG_STEP = "step"
@@ -314,7 +314,7 @@ class WorkspaceInstaller:
         logger.debug(f"Creating jobs from tasks in {main.__name__}")
         remote_wheel = self._upload_wheel()
         self._deployed_steps = self._deployed_steps()
-        desired_steps = {t.workflow for t in _TASKS.values()}
+        desired_steps = {t.workflow for t in _TASKS.values() if cloud_compatible(self._ws.config, t)}
         wheel_runner = None
 
         if self._override_clusters:

@@ -24,6 +24,24 @@ class Task:
     notebook: str = None
     dashboard: str = None
 
+    # if all are False or all are True, then task is for all clouds
+    is_aws: bool = False
+    is_azure: bool = False
+    is_gcp: bool = False
+
+
+@staticmethod
+def cloud_compatible(config: WorkspaceConfig, task: Task) -> bool:
+    """Test compatibility between workspace config and task"""
+    return any(
+        [
+            config.is_aws == task.is_aws,
+            config.is_azure == task.is_azure,
+            config.is_gcp == task.is_gcp,
+            (task.is_aws is False and task.is_azure is False and task.is_gcp is False),
+        ]
+    )
+
 
 @staticmethod
 def _remove_extra_indentation(doc: str) -> str:
@@ -37,7 +55,17 @@ def _remove_extra_indentation(doc: str) -> str:
     return "\n".join(stripped)
 
 
-def task(workflow, *, depends_on=None, job_cluster="main", notebook: str | None = None, dashboard: str | None = None):
+def task(
+    workflow,
+    *,
+    depends_on=None,
+    job_cluster="main",
+    notebook: str | None = None,
+    dashboard: str | None = None,
+    is_azure: bool = False,
+    is_aws: bool = False,
+    is_gcp: bool = False,
+):
     def decorator(func):
         @wraps(func)
         def wrapper(*args, **kwargs):
@@ -79,6 +107,9 @@ def task(workflow, *, depends_on=None, job_cluster="main", notebook: str | None 
             job_cluster=job_cluster,
             notebook=notebook,
             dashboard=dashboard,
+            is_aws=is_aws,
+            is_azure=is_azure,
+            is_gcp=is_gcp,
         )
 
         return wrapper
