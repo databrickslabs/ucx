@@ -170,7 +170,7 @@ branch = true
 parallel = true
 
 [tool.coverage.report]
-omit = ["src/databricks/labs/ucx/mixins/*", "*/working-copy/*"]
+omit = ["src/databricks/labs/ucx/mixins/*", "*/working-copy/*", "*/fresh_wheel_file/*"]
 exclude_lines = [
     "no cov",
     "if __name__ == .__main__.:",

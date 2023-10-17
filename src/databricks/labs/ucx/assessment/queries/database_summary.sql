@@ -31,7 +31,7 @@ FROM
               WHEN STARTSWITH(location, "adl") THEN 1
               ELSE 0
           END AS is_unsupported,
-          IF(UPPER(format) = "DELTA", 1, 0) AS is_delta
+          IF(format = "DELTA", 1, 0) AS is_delta
    FROM $inventory.tables)
 GROUP BY `database`
 ORDER BY `database`

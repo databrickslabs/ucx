@@ -465,7 +465,9 @@ class WorkspaceInstaller:
 
     def _job_settings(self, step_name: str, dbfs_path: str):
         email_notifications = None
-        if "@" in self._my_username:
+        if not self._override_clusters and "@" in self._my_username:
+            # set email notifications only if we're running the real
+            # installation and not the integration test.
             email_notifications = jobs.JobEmailNotifications(
                 on_success=[self._my_username], on_failure=[self._my_username]
             )

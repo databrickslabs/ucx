@@ -1,4 +1,5 @@
 import json
+from datetime import timedelta
 from unittest.mock import MagicMock, call
 
 import pytest
@@ -83,13 +84,11 @@ def test_secret_scopes_apply(migration_state: GroupMigrationState):
 
 def test_secret_scopes_apply_failed():
     ws = MagicMock()
-    sup = SecretScopesSupport(ws=ws)
+    sup = SecretScopesSupport(ws, timedelta(seconds=1))
     expected_permission = workspace.AclPermission.MANAGE
-    with pytest.raises(ValueError) as e:
-        sup._inflight_check(
-            group_name="db-temp-test", scope_name="test", expected_permission=expected_permission, num_retries=2
-        )
-        assert "Failed to apply permissions" in str(e.value)
+    with pytest.raises(TimeoutError) as e:
+        sup._rate_limited_put_acl("test", "db-temp-test", expected_permission)
+    assert "Timed out after" in str(e.value)
 
 
 def test_secret_scopes_apply_incorrect():
@@ -101,10 +100,7 @@ def test_secret_scopes_apply_incorrect():
         )
     ]
 
-    sup = SecretScopesSupport(ws=ws)
+    sup = SecretScopesSupport(ws, timedelta(seconds=1))
     expected_permission = workspace.AclPermission.MANAGE
-    with pytest.raises(ValueError) as e:
-        sup._inflight_check(
-            group_name="db-temp-test", scope_name="test", expected_permission=expected_permission, num_retries=2
-        )
-        assert "not equal to expected permission" in str(e.value)
+    with pytest.raises(TimeoutError):
+        sup._rate_limited_put_acl("test", "db-temp-test", expected_permission)

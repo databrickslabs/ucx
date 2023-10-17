@@ -4,7 +4,7 @@ from unittest.mock import MagicMock, Mock, patch
 
 from databricks.sdk.core import DatabricksError
 from databricks.sdk.service import compute, iam, ml
-from databricks.sdk.service.workspace import ObjectInfo, ObjectType
+from databricks.sdk.service.workspace import Language, ObjectInfo, ObjectType
 
 from databricks.labs.ucx.mixins.sql import Row
 from databricks.labs.ucx.workspace_access.generic import (
@@ -466,7 +466,7 @@ def test_workspaceobject_crawl():
         ObjectInfo(
             object_type=ObjectType.NOTEBOOK,
             path="/rootobj/notebook1",
-            language="PYTHON",
+            language=Language.PYTHON,
             created_at=0,
             modified_at=0,
             object_id=123,
@@ -475,7 +475,6 @@ def test_workspaceobject_crawl():
         ObjectInfo(
             object_type=ObjectType.DIRECTORY,
             path="/rootobj/folder1",
-            language="",
             created_at=0,
             modified_at=0,
             object_id=456,
