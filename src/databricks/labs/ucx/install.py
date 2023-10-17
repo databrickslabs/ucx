@@ -691,8 +691,12 @@ class WorkspaceInstaller:
         return deployed_steps
 
 
-if __name__ == "__main__":
+def installer_main():
     ws = WorkspaceClient(product="ucx", product_version=__version__)
     logger.setLevel("INFO")
     installer = WorkspaceInstaller(ws)
     installer.run()
+
+
+if __name__ == "__main__":
+    installer_main()

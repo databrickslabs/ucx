@@ -49,6 +49,12 @@ Source = "https://github.com/databricks/ucx"
 [tool.hatch.version]
 path = "src/databricks/labs/ucx/__about__.py"
 
+[tool.hatch.envs.pex]
+dependencies = ["pex"]
+
+[tool.hatch.envs.pex.scripts]
+build = "pex . -e databricks.labs.ucx.install:installer_main --interpreter-constraint '>=3.10' --output ucx-installer"
+
 [tool.hatch.envs.unit]
 dependencies = [
     "databricks-labs-ucx[test]"
