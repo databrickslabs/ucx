@@ -1,5 +1,6 @@
 import dataclasses
 import json
+import logging
 import time
 from collections.abc import Callable
 from dataclasses import dataclass
@@ -14,9 +15,10 @@ from databricks.labs.ucx.workspace_access.base import (
     AclSupport,
     Destination,
     Permissions,
-    logger,
 )
 from databricks.labs.ucx.workspace_access.groups import GroupMigrationState
+
+logger = logging.getLogger(__name__)
 
 
 @dataclass

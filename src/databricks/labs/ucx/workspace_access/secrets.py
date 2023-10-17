@@ -1,10 +1,10 @@
 import json
 import logging
-import random
-import time
+from datetime import timedelta
 from functools import partial
 
 from databricks.sdk import WorkspaceClient
+from databricks.sdk.retries import retried
 from databricks.sdk.service import workspace
 
 from databricks.labs.ucx.mixins.hardening import rate_limited
@@ -19,8 +19,11 @@ logger = logging.getLogger(__name__)
 
 
 class SecretScopesSupport(AclSupport):
-    def __init__(self, ws: WorkspaceClient):
+    def __init__(self, ws: WorkspaceClient, verify_timeout: timedelta | None = None):
         self._ws = ws
+        if verify_timeout is None:
+            verify_timeout = timedelta(minutes=1)
+        self._verify_timeout = verify_timeout
 
     def get_crawler_tasks(self):
         scopes = self._ws.secrets.list_scopes()
@@ -77,32 +80,18 @@ class SecretScopesSupport(AclSupport):
                 return acl.permission
         return None
 
-    def _inflight_check(
-        self, scope_name: str, group_name: str, expected_permission: workspace.AclPermission, num_retries: int = 5
-    ):
+    def _inflight_check(self, scope_name: str, group_name: str, expected_permission: workspace.AclPermission):
         # in-flight check for the applied permissions
         # the api might be inconsistent, therefore we need to check that the permissions were applied
-        # TODO: add mixin to SDK
-        retries_left = num_retries
-        while retries_left > 0:
-            time.sleep(random.random() * 2)
-            applied_permission = self.secret_scope_permission(scope_name=scope_name, group_name=group_name)
-            if applied_permission:
-                if applied_permission == expected_permission:
-                    return
-                else:
-                    msg = (
-                        f"Applied permission {applied_permission} is not "
-                        f"equal to expected permission {expected_permission}"
-                    )
-                    raise ValueError(msg)
-
-            retries_left -= 1
-
-        msg = f"Failed to apply permissions for {group_name} on scope {scope_name} in {num_retries} retries"
-        raise ValueError(msg)
+        applied_permission = self.secret_scope_permission(scope_name, group_name)
+        if applied_permission != expected_permission:
+            msg = f"Applied permission {applied_permission} is not equal to expected permission {expected_permission}"
+            raise ValueError(msg)
+        return True
 
     @rate_limited(max_requests=30)
     def _rate_limited_put_acl(self, object_id: str, principal: str, permission: workspace.AclPermission):
         self._ws.secrets.put_acl(object_id, principal, permission)
-        self._inflight_check(scope_name=object_id, group_name=principal, expected_permission=permission)
+        retry_on_value_error = retried(on=[ValueError], timeout=self._verify_timeout)
+        retried_check = retry_on_value_error(self._inflight_check)
+        retried_check(object_id, principal, permission)

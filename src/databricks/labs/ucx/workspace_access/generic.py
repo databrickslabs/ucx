@@ -35,7 +35,7 @@ class WorkspaceObjectInfo:
     object_type: str
     object_id: str
     path: str
-    language: str
+    language: str = None
 
 
 class RetryableError(DatabricksError):
@@ -245,8 +245,16 @@ class WorkspaceListing(Listing, CrawlerBase):
         from databricks.labs.ucx.workspace_access.listing import WorkspaceListing
 
         ws_listing = WorkspaceListing(self._ws, num_threads=self._num_threads, with_directories=False)
-        for _object in ws_listing.walk(self._start_path):
-            yield WorkspaceObjectInfo(_object.object_type.name, str(_object.object_id), _object.path, _object.language)
+        for obj in ws_listing.walk(self._start_path):
+            if obj is None:
+                continue
+            raw = obj.as_dict()
+            yield WorkspaceObjectInfo(
+                object_type=raw["object_type"],
+                object_id=str(raw["object_id"]),
+                path=raw["path"],
+                language=raw.get("language", None),
+            )
 
     def snapshot(self) -> list[WorkspaceObjectInfo]:
         return self._snapshot(self._try_fetch, self._crawl)

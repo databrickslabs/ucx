@@ -8,6 +8,8 @@ from collections.abc import Callable
 from concurrent.futures import ThreadPoolExecutor
 from typing import Generic, TypeVar
 
+MIN_THREADS = 8
+
 Result = TypeVar("Result")
 logger = logging.getLogger(__name__)
 
@@ -27,6 +29,8 @@ class Threads(Generic[Result]):
     @classmethod
     def gather(cls, name: str, tasks: list[Callable[..., Result]]) -> (list[Result], list[Exception]):
         num_threads = os.cpu_count() * 2
+        if num_threads < MIN_THREADS:
+            num_threads = MIN_THREADS
         return cls(name, tasks, num_threads=num_threads)._run()
 
     def _run(self) -> (list[Result], list[Exception]):
