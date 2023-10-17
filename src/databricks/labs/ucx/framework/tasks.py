@@ -24,7 +24,7 @@ class Task:
     notebook: str = None
     dashboard: str = None
 
-    # if all are False or all are True, then task is for all clouds
+    # if all are False then task is for all clouds
     is_aws: bool = False
     is_azure: bool = False
     is_gcp: bool = False
