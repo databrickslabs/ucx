@@ -14,6 +14,6 @@ SELECT `database`,
            WHEN STARTSWITH(location, "adl") THEN "UNSUPPORTED"
            ELSE "EXTERNAL"
        END AS storage,
-       IF(format = "delta", "Yes", "No") AS is_delta,
+       IF(format = "DELTA", "Yes", "No") AS is_delta,
        location
 FROM $inventory.tables
