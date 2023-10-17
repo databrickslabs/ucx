@@ -158,18 +158,15 @@ class GrantsCrawler(CrawlerBase):
         Returns:
         list[Grant]: A list of Grant objects representing the grants found in hive_metastore.
         """
-        seen_databases = set()
         catalog = "hive_metastore"
         tasks = [partial(self._grants, catalog=catalog)]
+        # scan all databases, even empty ones
+        for row in self._fetch(f"SHOW DATABASES FROM {catalog}"):
+            tasks.append(partial(self._grants, catalog=catalog, database=row.databaseName))
         for table in self._tc.snapshot():
-            if table.database not in seen_databases:
-                tasks.append(partial(self._grants, catalog=catalog, database=table.database))
-                seen_databases.add(table.database)
             fn = partial(self._grants, catalog=catalog, database=table.database)
-            if table.kind == "VIEW":
-                tasks.append(partial(fn, view=table.name))
-            else:
-                tasks.append(partial(fn, table=table.name))
+            # views are recognized as tables
+            tasks.append(partial(fn, table=table.name))
         catalog_grants, errors = Threads.gather(f"listing grants for {catalog}", tasks)
         if len(errors) > 0:
             # TODO: https://github.com/databrickslabs/ucx/issues/406
