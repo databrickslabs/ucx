@@ -1,6 +1,7 @@
 import dataclasses
 import json
 import logging
+import os
 from collections.abc import Callable
 from dataclasses import dataclass
 from json import JSONDecodeError
@@ -23,6 +24,7 @@ logger = logging.getLogger(__name__)
 
 @dataclass
 class SimpleQuery:
+    dashboard_ref: str
     name: str
     query: str
     viz: dict[str, str]
@@ -30,15 +32,15 @@ class SimpleQuery:
 
     @property
     def query_key(self):
-        return f"{self.name}:query_id"
+        return f"{self.dashboard_ref}_{self.name}:query_id"
 
     @property
     def viz_key(self):
-        return f"{self.name}:viz_id"
+        return f"{self.dashboard_ref}_{self.name}:viz_id"
 
     @property
     def widget_key(self):
-        return f"{self.name}:widget_id"
+        return f"{self.dashboard_ref}_{self.name}:widget_id"
 
     @property
     def viz_type(self) -> str:
@@ -80,14 +82,14 @@ class DashboardFromFiles:
         ws: WorkspaceClient,
         local_folder: Path,
         remote_folder: str,
-        name: str,
+        name_prefix: str,
         query_text_callback: Callable[[str], str] | None = None,
         warehouse_id: str | None = None,
     ):
         self._ws = ws
         self._local_folder = local_folder
         self._remote_folder = remote_folder
-        self._name = name
+        self._name_prefix = name_prefix
         self._query_text_callback = query_text_callback
         self._warehouse_id = warehouse_id
         self._state = {}
@@ -97,36 +99,60 @@ class DashboardFromFiles:
     def _query_state(self):
         return f"{self._remote_folder}/state.json"
 
-    @property
-    def dashboard_link(self):
-        return f"{self._ws.config.host}/sql/dashboards/{self._state['dashboard_id']}"
+    def dashboard_link(self, dashboard_ref: str):
+        dashboard_id = self._state[f"{dashboard_ref}:dashboard_id"]
+        return f"{self._ws.config.host}/sql/dashboards/{dashboard_id}"
 
-    def create_dashboard(self) -> str:
-        desired_queries = self._desired_queries()
-        parent = self._installed_query_state()
-        data_source_id = self._dashboard_data_source()
-        self._install_dashboard(parent)
-        for query in desired_queries:
-            self._install_query(query, data_source_id, parent)
-            self._install_viz(query)
-            self._install_widget(query)
-        self._store_query_state(desired_queries)
-        return self._state["dashboard_id"]
+    def create_dashboards(self) -> dict:
+        dashboards = {}
+        queries_per_dashboard = {}
+        # Iterate over dashboards for each step, represented as first-level folders
+        step_folders = [f for f in self._local_folder.glob("*") if f.is_dir()]
+        for step_folder in step_folders:
+            logger.debug(f"Reading step folder {step_folder}...")
+            dashboard_folders = [f for f in step_folder.glob("*") if f.is_dir()]
+            # Create separate dashboards per step, represented as second-level folders
+            for dashboard_folder in dashboard_folders:
+                logger.debug(f"Reading dashboard folder {dashboard_folder}...")
+                main_name = os.path.basename(step_folder).title()
+                sub_name = os.path.basename(dashboard_folder).title()
+                dashboard_name = f"{self._name_prefix} {main_name} ({sub_name})"
+                dashboard_ref = f"{os.path.basename(step_folder)}_{os.path.basename(dashboard_folder)}".lower()
+                desired_queries = self._desired_queries(dashboard_folder, dashboard_ref)
+                parent_folder_id = self._installed_query_state()
+                data_source_id = self._dashboard_data_source()
+                self._install_dashboard(dashboard_name, parent_folder_id, dashboard_ref)
+                for query in desired_queries:
+                    self._install_query(query, dashboard_name, data_source_id, parent_folder_id)
+                    self._install_viz(query)
+                    self._install_widget(query, dashboard_ref)
+                queries_per_dashboard[dashboard_ref] = desired_queries
+                dashboards[dashboard_ref] = self._state[f"{dashboard_ref}:dashboard_id"]
+        self._store_query_state(queries_per_dashboard)
+        return dashboards
 
     def validate(self):
-        for query in self._desired_queries():
-            try:
-                self._get_viz_options(query)
-                self._get_widget_options(query)
-            except Exception as err:
-                msg = f"Error in {query.name}: {err}"
-                raise AssertionError(msg) from err
+        step_folders = [f for f in self._local_folder.glob("*") if f.is_dir()]
+        for step_folder in step_folders:
+            logger.info(f"Reading step folder {step_folder}...")
+            dashboard_folders = [f for f in step_folder.glob("*") if f.is_dir()]
+            # Create separate dashboards per step, represented as second-level folders
+            for dashboard_folder in dashboard_folders:
+                dashboard_ref = f"{os.path.basename(step_folder)}_{os.path.basename(dashboard_folder)}".lower()
+                for query in self._desired_queries(dashboard_folder, dashboard_ref):
+                    try:
+                        self._get_viz_options(query)
+                        self._get_widget_options(query)
+                    except Exception as err:
+                        msg = f"Error in {query.name}: {err}"
+                        raise AssertionError(msg) from err
 
-    def _install_widget(self, query: SimpleQuery):
+    def _install_widget(self, query: SimpleQuery, dashboard_ref: str):
+        dashboard_id = self._state[f"{dashboard_ref}:dashboard_id"]
         widget_options = self._get_widget_options(query)
         # widgets are cleaned up every dashboard redeploy
         widget = self._ws.dashboard_widgets.create(
-            self._state["dashboard_id"], widget_options, 1, visualization_id=self._state[query.viz_key]
+            dashboard_id, widget_options, 1, visualization_id=self._state[query.viz_key]
         )
         self._state[query.widget_key] = widget.id
 
@@ -149,9 +175,9 @@ class DashboardFromFiles:
             self._state = json.load(self._ws.workspace.download(self._query_state))
             to_remove = []
             for k, v in self._state.items():
+                _, name = k.split(":")
                 if k == "dashboard_id":
                     continue
-                _, name = k.split(":")
                 if name != "query_id":
                     continue
                 try:
@@ -165,17 +191,20 @@ class DashboardFromFiles:
                 raise err
             self._ws.workspace.mkdirs(self._remote_folder)
         except JSONDecodeError:
+            logger.warning(f"JSON state file corrupt: {self._query_state}")
             self._state = {}  # noop
         object_info = self._ws.workspace.get_status(self._remote_folder)
         parent = f"folders/{object_info.object_id}"
         return parent
 
-    def _store_query_state(self, desired_queries: list[SimpleQuery]):
-        desired_keys = ["dashboard_id"]
-        for query in desired_queries:
-            desired_keys.append(query.query_key)
-            desired_keys.append(query.viz_key)
-            desired_keys.append(query.widget_key)
+    def _store_query_state(self, queries: dict[str, list[SimpleQuery]]):
+        desired_keys = []
+        for ref, qrs in queries.items():
+            desired_keys.append(f"{ref}:dashboard_id")
+            for query in qrs:
+                desired_keys.append(query.query_key)
+                desired_keys.append(query.viz_key)
+                desired_keys.append(query.widget_key)
         destructors = {
             "query_id": self._ws.queries.delete,
             "viz_id": self._ws.query_visualizations.delete,
@@ -196,27 +225,29 @@ class DashboardFromFiles:
         state_dump = json.dumps(new_state, indent=2).encode("utf8")
         self._ws.workspace.upload(self._query_state, state_dump, format=ImportFormat.AUTO, overwrite=True)
 
-    def _install_dashboard(self, parent: str):
-        if "dashboard_id" in self._state:
-            for widget in self._ws.dashboards.get(self._state["dashboard_id"]).widgets:
+    def _install_dashboard(self, dashboard_name: str, parent_folder_id: str, dashboard_ref: str):
+        dashboard_id = f"{dashboard_ref}:dashboard_id"
+        if dashboard_id in self._state:
+            for widget in self._ws.dashboards.get(self._state[dashboard_id]).widgets:
                 self._ws.dashboard_widgets.delete(widget.id)
             return
-        dash = self._ws.dashboards.create(self._name, run_as_role=RunAsRole.VIEWER, parent=parent)
+        dash = self._ws.dashboards.create(dashboard_name, run_as_role=RunAsRole.VIEWER, parent=parent_folder_id)
         self._ws.dbsql_permissions.set(
             ObjectTypePlural.DASHBOARDS,
             dash.id,
             access_control_list=[AccessControl(group_name="users", permission_level=PermissionLevel.CAN_VIEW)],
         )
-        self._state["dashboard_id"] = dash.id
+        self._state[dashboard_id] = dash.id
 
-    def _desired_queries(self) -> list[SimpleQuery]:
+    def _desired_queries(self, local_folder: Path, dashboard_ref: str) -> list[SimpleQuery]:
         desired_queries = []
-        for f in self._local_folder.glob("*.sql"):
+        for f in local_folder.glob("*.sql"):
             text = f.read_text("utf8")
             if self._query_text_callback is not None:
                 text = self._query_text_callback(text)
             desired_queries.append(
                 SimpleQuery(
+                    dashboard_ref=dashboard_ref,
                     name=f.name,
                     query=text,
                     viz=self._parse_magic_comment(f, "-- viz ", text),
@@ -240,8 +271,12 @@ class DashboardFromFiles:
         viz_args = viz_types[query.viz_type](**query.viz_args)
         return viz_args
 
-    def _install_query(self, query: SimpleQuery, data_source_id: str, parent: str):
-        query_meta = {"data_source_id": data_source_id, "name": f"{self._name} - {query.name}", "query": query.query}
+    def _install_query(self, query: SimpleQuery, dashboard_name: str, data_source_id: str, parent: str):
+        query_meta = {
+            "data_source_id": data_source_id,
+            "name": f"{dashboard_name} - {query.name}",
+            "query": query.query,
+        }
         if query.query_key in self._state:
             return self._ws.queries.update(self._state[query.query_key], **query_meta)
 

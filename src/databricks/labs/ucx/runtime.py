@@ -341,7 +341,7 @@ def setup_view(cfg: WorkspaceConfig):
 @task(
     "assessment",
     depends_on=[crawl_grants, crawl_permissions, guess_external_locations, setup_view],
-    dashboard="assessment",
+    dashboard="assessment_main",
 )
 def assessment_report(_: WorkspaceConfig):
     """Refreshes the assessment dashboard after all previous tasks have been completed. Note that you can access the

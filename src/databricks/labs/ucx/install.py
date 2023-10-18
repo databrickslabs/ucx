@@ -146,16 +146,16 @@ class WorkspaceInstaller:
             raise OperationFailed(msg) from None
 
     def _create_dashboards(self):
-        local_query_files = self._find_project_root() / "src/databricks/labs/ucx/assessment/queries"
+        local_query_files = self._find_project_root() / "src/databricks/labs/ucx/queries"
         dash = DashboardFromFiles(
             self._ws,
             local_folder=local_query_files,
             remote_folder=f"{self._install_folder}/queries",
-            name=self._name("UCX Assessment"),
+            name_prefix=self._name("UCX "),
             warehouse_id=self._warehouse_id,
             query_text_callback=self._current_config.replace_inventory_variable,
         )
-        self._dashboards["assessment"] = dash.create_dashboard()
+        self._dashboards = dash.create_dashboards()
 
     @property
     def _warehouse_id(self) -> str:
@@ -366,11 +366,11 @@ class WorkspaceInstaller:
             dashboard_link = ""
             if step_name in self._dashboards:
                 dashboard_link = f"{self._ws.config.host}/sql/dashboards/{self._dashboards[step_name]}"
-                dashboard_link = f"Go to the [{step_name} dashboard]({dashboard_link}) after running the jobs."
+                dashboard_link = f"Go to the [{step_name} dashboard]({dashboard_link}) after running the jobs.\n\n"
             job_link = f"[{self._name(step_name)}]({self._ws.config.host}#job/{job_id})"
             md.append("---\n\n")
             md.append(f"## {job_link}\n\n")
-            md.append(f"{dashboard_link}\n\n")
+            md.append(f"{dashboard_link}")
             md.append("The workflow consists of the following separate tasks:\n\n")
             for t in self._sorted_tasks():
                 if t.workflow != step_name:

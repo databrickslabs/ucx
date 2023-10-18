@@ -35,10 +35,10 @@ def test_dashboard(mocker):
         ws,
         local_folder=local_query_files,
         remote_folder="/users/not_a_real_user/queries",
-        name="Assessment",
+        name_prefix="Assessment",
         warehouse_id="000000",
         query_text_callback=installer._current_config.replace_inventory_variable,
     )
-    dashboard = dash.create_dashboard()
+    dashboard = dash.create_dashboards()
     assert dashboard is not None
     assert dashboard == "abc"
