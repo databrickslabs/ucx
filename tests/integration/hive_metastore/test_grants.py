@@ -15,9 +15,11 @@ def test_all_grants_in_databases(sql_backend, inventory_schema, make_schema, mak
     table_b = make_table(schema_name=schema_b.name)
     view_c = make_table(schema_name=schema_a.name, view=True, ctas="SELECT id FROM range(10)")
     view_d = make_table(schema_name=schema_a.name, view=True, ctas="SELECT id FROM range(10)")
+    table_e = make_table(schema_name="default")
 
     sql_backend.execute(f"GRANT USAGE ON SCHEMA default TO `{group_a.display_name}`")
     sql_backend.execute(f"GRANT USAGE ON SCHEMA default TO `{group_b.display_name}`")
+    sql_backend.execute(f"GRANT MODIFY ON TABLE {table_e.full_name} TO `{group_b.display_name}`")
     sql_backend.execute(f"GRANT SELECT ON TABLE {table_a.full_name} TO `{group_a.display_name}`")
     sql_backend.execute(f"GRANT SELECT ON TABLE {table_b.full_name} TO `{group_b.display_name}`")
     sql_backend.execute(f"GRANT MODIFY ON SCHEMA {schema_b.full_name} TO `{group_b.display_name}`")
@@ -42,3 +44,4 @@ def test_all_grants_in_databases(sql_backend, inventory_schema, make_schema, mak
     assert all_grants[f"{group_b.display_name}.{empty_schema.full_name}"] == "MODIFY"
     assert all_grants[f"{group_b.display_name}.{view_c.full_name}"] == "MODIFY"
     assert all_grants[f"{group_b.display_name}.{view_d.full_name}"] == "MODIFY"
+    assert all_grants[f"{group_b.display_name}.{table_e.full_name}"] == "MODIFY"
