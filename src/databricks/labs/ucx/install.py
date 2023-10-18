@@ -368,7 +368,7 @@ class WorkspaceInstaller:
             dashboards_per_step = [d for d in self._dashboards.keys() if d.startswith(step_name)]
             for dash in dashboards_per_step:
                 if len(dashboard_link) == 0:
-                    dashboard_link += f"Go to the one of the following dashboards after running the job:\n"
+                    dashboard_link += "Go to the one of the following dashboards after running the job:\n"
                 first, second = dash.replace("_", " ").title().split()
                 dashboard_url = f"{self._ws.config.host}/sql/dashboards/{self._dashboards[dash]}"
                 dashboard_link += f"  - [{first} ({second}) dashboard]({dashboard_url})\n"
