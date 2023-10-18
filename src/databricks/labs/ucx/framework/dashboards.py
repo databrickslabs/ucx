@@ -118,6 +118,7 @@ class DashboardFromFiles:
                 sub_name = os.path.basename(dashboard_folder).title()
                 dashboard_name = f"{self._name_prefix} {main_name} ({sub_name})"
                 dashboard_ref = f"{os.path.basename(step_folder)}_{os.path.basename(dashboard_folder)}".lower()
+                logger.info(f"Creating dashboard {dashboard_name}...")
                 desired_queries = self._desired_queries(dashboard_folder, dashboard_ref)
                 parent_folder_id = self._installed_query_state()
                 data_source_id = self._dashboard_data_source()
