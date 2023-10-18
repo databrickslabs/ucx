@@ -9,6 +9,7 @@ permissions that are set on the workspace level, Secret scopes, Notebooks, Direc
 
 See [contributing instructions](CONTRIBUTING.md) to help improve this project.
 
+
 ## Introduction
 UCX will guide you, the Databricks customer through the process of upgrading your account, groups, workspaces, jobs etc to Unity Catalog. 
 
