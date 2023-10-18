@@ -1,7 +1,6 @@
 import dataclasses
 import json
 import logging
-import os
 from collections.abc import Callable
 from dataclasses import dataclass
 from json import JSONDecodeError
@@ -114,10 +113,10 @@ class DashboardFromFiles:
             # Create separate dashboards per step, represented as second-level folders
             for dashboard_folder in dashboard_folders:
                 logger.debug(f"Reading dashboard folder {dashboard_folder}...")
-                main_name = os.path.basename(step_folder).title()
-                sub_name = os.path.basename(dashboard_folder).title()
+                main_name = step_folder.stem.title()
+                sub_name = dashboard_folder.stem.title()
                 dashboard_name = f"{self._name_prefix} {main_name} ({sub_name})"
-                dashboard_ref = f"{os.path.basename(step_folder)}_{os.path.basename(dashboard_folder)}".lower()
+                dashboard_ref = f"{step_folder.stem}_{dashboard_folder.stem}".lower()
                 logger.info(f"Creating dashboard {dashboard_name}...")
                 desired_queries = self._desired_queries(dashboard_folder, dashboard_ref)
                 parent_folder_id = self._installed_query_state()
@@ -139,7 +138,7 @@ class DashboardFromFiles:
             dashboard_folders = [f for f in step_folder.glob("*") if f.is_dir()]
             # Create separate dashboards per step, represented as second-level folders
             for dashboard_folder in dashboard_folders:
-                dashboard_ref = f"{os.path.basename(step_folder)}_{os.path.basename(dashboard_folder)}".lower()
+                dashboard_ref = f"{step_folder.stem}_{dashboard_folder.stem}".lower()
                 for query in self._desired_queries(dashboard_folder, dashboard_ref):
                     try:
                         self._get_viz_options(query)

@@ -42,3 +42,4 @@ def test_dashboard(mocker):
     dashboards = dash.create_dashboards()
     assert dashboards is not None
     assert dashboards["assessment_main"] == "abc"
+    assert dashboards["assessment_azure"] == "abc"
