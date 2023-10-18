@@ -1,5 +1,21 @@
 # Version changelog
 
+## 0.5.0
+
+* Added `make install-dev` and a stronger `make clean` for easier dev on-boarding and release upgrades ([#458](https://github.com/databricks/ucx/pull/458)).
+* Added failure summary in the assessment dashboard ([#455](https://github.com/databricks/ucx/pull/455)).
+* Added test for checking grants in default schema ([#470](https://github.com/databricks/ucx/pull/470)).
+* Added unit tests for generic permissions ([#457](https://github.com/databricks/ucx/pull/457)).
+* Enabled integration tests via OIDC for every pull request ([#378](https://github.com/databricks/ucx/pull/378)).
+* Added check if permissions are up to date ([#421](https://github.com/databricks/ucx/pull/421)).
+* Fixed casing in `all_tables.sql` query. ([#464](https://github.com/databricks/ucx/pull/464)).
+* Fixed missed scans for empty databases and views in `crawl_grants` ([#469](https://github.com/databricks/ucx/pull/469)).
+* Improved logging colors for dark terminal backgrounds ([#468](https://github.com/databricks/ucx/pull/468)).
+* Improved local group migration state handling and made log files flush every 10 minutes ([#449](https://github.com/databricks/ucx/pull/449)).
+* Moved workspace listing as a separate task for an assessment workflow ([#437](https://github.com/databricks/ucx/pull/437)).
+* Removed rate limit for get or create backup group to speed up the prepare environment ([#453](https://github.com/databricks/ucx/pull/453)).
+* Updated databricks-sdk requirement from ~=0.10.0 to ~=0.11.0 ([#448](https://github.com/databricks/ucx/pull/448)).
+
 ## 0.4.0
 
 * Added exception handling for secret scope not found. ([#418](https://github.com/databricks/ucx/pull/418)).
