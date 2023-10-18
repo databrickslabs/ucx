@@ -15,7 +15,7 @@ def test_all_grants_in_databases(sql_backend, inventory_schema, make_schema, mak
     table_b = make_table(schema_name=schema_b.name)
     view_c = make_table(schema_name=schema_a.name, view=True, ctas="SELECT id FROM range(10)")
     view_d = make_table(schema_name=schema_a.name, view=True, ctas="SELECT id FROM range(10)")
-    table_e = make_table(schema_name='default')
+    table_e = make_table(schema_name="default")
 
     sql_backend.execute(f"GRANT USAGE ON SCHEMA default TO `{group_a.display_name}`")
     sql_backend.execute(f"GRANT USAGE ON SCHEMA default TO `{group_b.display_name}`")
