@@ -1,7 +1,7 @@
 import logging
 
 from databricks.sdk.core import DatabricksError
-from unit.framework.mocks import MockBackend
+from .mocks import MockBackend
 
 from databricks.labs.ucx.framework.failures import FailureReporter, ObjectFailure
 from databricks.labs.ucx.framework.parallel import Threads
