@@ -8,6 +8,7 @@ from functools import partial
 from databricks.sdk import WorkspaceClient
 
 from databricks.labs.ucx.framework.crawlers import CrawlerBase, SqlBackend
+from databricks.labs.ucx.framework.logger import FailureReporter, ObjectFailure
 from databricks.labs.ucx.framework.parallel import Threads
 from databricks.labs.ucx.mixins.sql import Row
 
@@ -83,6 +84,7 @@ class TablesCrawler(CrawlerBase):
             schema: The schema name for the inventory persistence.
         """
         super().__init__(backend, "hive_metastore", schema, "tables", Table)
+        self._failure_reporter = FailureReporter(backend, "hive_metastore", schema)
 
     def _all_databases(self) -> Iterator[Row]:
         yield from self._fetch("SHOW DATABASES")
@@ -130,8 +132,10 @@ class TablesCrawler(CrawlerBase):
                 tasks.append(partial(self._describe, catalog, database, table))
         catalog_tables, errors = Threads.gather(f"listing tables in {catalog}", tasks)
         if len(errors) > 0:
-            # TODO: https://github.com/databrickslabs/ucx/issues/406
-            logger.error(f"Detected {len(errors)} while scanning tables in {catalog}")
+            for _e in errors:
+                failure = ObjectFailure("tables", "table", "table_name")
+                self._failure_reporter.report(failure)
+        logger.error(f"Detected {len(errors)} while scanning tables in {catalog}")
         return catalog_tables
 
     def _describe(self, catalog: str, database: str, table: str) -> Table | None:
