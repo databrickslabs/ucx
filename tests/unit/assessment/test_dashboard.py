@@ -30,15 +30,16 @@ def test_dashboard(mocker):
     ws.query_visualizations.create.return_value = Visualization(id="abc")
     ws.dashboard_widgets.create.return_value = Widget(id="abc")
     installer = WorkspaceInstaller(ws)
-    local_query_files = installer._find_project_root() / "src/databricks/labs/ucx/assessment/queries"
+    local_query_files = installer._find_project_root() / "src/databricks/labs/ucx/queries"
     dash = DashboardFromFiles(
         ws,
         local_folder=local_query_files,
         remote_folder="/users/not_a_real_user/queries",
-        name="Assessment",
+        name_prefix="Assessment",
         warehouse_id="000000",
         query_text_callback=installer._current_config.replace_inventory_variable,
     )
-    dashboard = dash.create_dashboard()
-    assert dashboard is not None
-    assert dashboard == "abc"
+    dashboards = dash.create_dashboards()
+    assert dashboards is not None
+    assert dashboards["assessment_main"] == "abc"
+    assert dashboards["assessment_azure"] == "abc"

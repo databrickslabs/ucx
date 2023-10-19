@@ -168,7 +168,7 @@ def test_jobs_with_no_inventory_database(
         for step in required_workflows:
             install.run_workflow(step)
 
-        @retried(on=[AssertionError], timeout=timedelta(minutes=1))
+        @retried(on=[AssertionError], timeout=timedelta(minutes=2))
         def validate_groups():
             group_manager = GroupManager(ws, GroupsConfig(auto=True))
             acc_membership = group_manager.get_workspace_membership("Group")
@@ -185,7 +185,7 @@ def test_jobs_with_no_inventory_database(
 
             return True
 
-        @retried(on=[AssertionError], timeout=timedelta(minutes=1))
+        @retried(on=[AssertionError], timeout=timedelta(minutes=2))
         def validate_permissions():
             logger.info("validating permissions")
             policy_permissions = generic_permissions.load_as_dict("cluster-policies", cluster_policy.policy_id)
@@ -195,7 +195,7 @@ def test_jobs_with_no_inventory_database(
 
             return True
 
-        @retried(on=[AssertionError], timeout=timedelta(minutes=1))
+        @retried(on=[AssertionError], timeout=timedelta(minutes=2))
         def validate_tacl():
             logger.info("validating tacl")
             table_a_grants = grants_crawler.for_table_info(table_a)

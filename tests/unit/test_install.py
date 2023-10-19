@@ -277,7 +277,7 @@ def test_main_with_existing_conf_does_not_recreate_config(mocker):
 def test_query_metadata(mocker):
     ws = mocker.Mock()
     install = WorkspaceInstaller(ws)
-    local_query_files = install._find_project_root() / "src/databricks/labs/ucx/assessment/queries"
+    local_query_files = install._find_project_root() / "src/databricks/labs/ucx/queries"
     DashboardFromFiles(ws, local_query_files, "any", "any").validate()
 
 
