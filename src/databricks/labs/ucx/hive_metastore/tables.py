@@ -8,7 +8,11 @@ from functools import partial
 from databricks.sdk import WorkspaceClient
 
 from databricks.labs.ucx.framework.crawlers import CrawlerBase, SqlBackend
-from databricks.labs.ucx.framework.logger import FailureReporter, ObjectFailure
+from databricks.labs.ucx.framework.failures import (
+    FailureReporter,
+    ObjectFailure,
+    ObjectFailureError,
+)
 from databricks.labs.ucx.framework.parallel import Threads
 from databricks.labs.ucx.mixins.sql import Row
 
@@ -133,7 +137,12 @@ class TablesCrawler(CrawlerBase):
         catalog_tables, errors = Threads.gather(f"listing tables in {catalog}", tasks)
         if len(errors) > 0:
             for _e in errors:
-                failure = ObjectFailure("tables", "table", "table_name")
+                object_type = None
+                object_id = None
+                if isinstance(_e, ObjectFailureError):
+                    object_type = _e.object_type
+                    object_id = _e.object_id
+                failure = ObjectFailure(object_type=object_type, object_id=object_id, error_info=str(_e))
                 self._failure_reporter.report(failure)
         logger.error(f"Detected {len(errors)} while scanning tables in {catalog}")
         return catalog_tables
@@ -160,9 +169,8 @@ class TablesCrawler(CrawlerBase):
                 upgraded_to=self._parse_table_props(describe.get("Table Properties", "")).get("upgraded_to", None),
             )
         except Exception as e:
-            # TODO: https://github.com/databrickslabs/ucx/issues/406
             logger.error(f"Couldn't fetch information for table {full_name} : {e}")
-            return None
+            raise ObjectFailureError(object_type="table", object_id=full_name, root_cause=e) from None
 
 
 class TablesMigrate:

@@ -1,4 +1,5 @@
 import logging
+import os
 from collections.abc import Callable
 from dataclasses import dataclass
 from functools import wraps
@@ -25,7 +26,6 @@ class Task:
     dashboard: str = None
 
 
-@staticmethod
 def _remove_extra_indentation(doc: str) -> str:
     lines = doc.splitlines()
     stripped = []
@@ -86,6 +86,13 @@ def task(workflow, *, depends_on=None, job_cluster="main", notebook: str | None 
     return decorator
 
 
+# Global keys to allow value retrieval later on
+WORKFLOW_NAME_ENVKEY = "_WORKFLOW_NAME"
+TASK_NAME_ENVKEY = "_TASK_NAME"
+PARENT_RUN_ID_ENVKEY = "_PARENT_RUN_ID"
+JOB_ID_ENVKEY = "_JOB_ID"
+
+
 def trigger(*argv):
     args = dict(a[2:].split("=") for a in argv if "--" == a[0:2])
     if "config" not in args:
@@ -93,9 +100,12 @@ def trigger(*argv):
         raise KeyError(msg)
 
     task_name = args.get("task", "not specified")
+    os.environ[TASK_NAME_ENVKEY] = str(task_name)
     # `{{parent_run_id}}` is the run of entire workflow, whereas `{{run_id}}` is the run of a task
     workflow_run_id = args.get("parent_run_id", "unknown_run_id")
+    os.environ[PARENT_RUN_ID_ENVKEY] = str(workflow_run_id)
     job_id = args.get("job_id")
+    os.environ[JOB_ID_ENVKEY] = str(job_id)
     if task_name not in _TASKS:
         msg = f'task "{task_name}" not found. Valid tasks are: {", ".join(_TASKS.keys())}'
         raise KeyError(msg)
@@ -104,6 +114,7 @@ def trigger(*argv):
 
     current_task = _TASKS[task_name]
     print(current_task.doc)
+    os.environ[WORKFLOW_NAME_ENVKEY] = str(current_task.workflow)
 
     config_path = Path(args["config"])
     cfg = WorkspaceConfig.from_file(config_path)

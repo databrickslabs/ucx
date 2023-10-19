@@ -1,9 +1,5 @@
 import logging
 import sys
-from dataclasses import dataclass
-from datetime import datetime
-
-from databricks.labs.ucx.framework.crawlers import SqlBackend
 
 logger = logging.getLogger(__name__)
 
@@ -60,33 +56,6 @@ class NiceFormatter(logging.Formatter):
         elif record.levelno in (logging.ERROR, logging.FATAL):
             color_marker = self.RED + self.BOLD
         return f"{self.GRAY}{ts}{self.RESET} {level} {color_marker}[{name}] {msg}{self.RESET}"
-
-
-@dataclass
-class ObjectFailure:
-    step_name: str
-    object_type: str
-    object_id: str
-    event_time: datetime.now()
-
-
-class FailureReporter:
-    _buffer: list[ObjectFailure]
-
-    def __init__(self, backend: SqlBackend, catalog: str, schema: str, table: str = "failures"):
-        self._backend = backend
-        self._catalog = catalog
-        self._schema = schema
-        self._table = table
-
-    def report(self, failure: ObjectFailure):
-        self._buffer.append(failure)
-
-    def flush(self):
-        full_name = f"{self._catalog}.{self._schema}.{self._table}"
-        logger.debug(f"Persisting {len(self._buffer)} new records in {full_name}")
-        self._backend.save_table(full_name, self._buffer, ObjectFailure, mode="append")
-        self._buffer.clear()
 
 
 def _install(level="DEBUG"):
