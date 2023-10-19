@@ -42,7 +42,7 @@ class MockBackend(SqlBackend):
 
     def save_table(self, full_name: str, rows: list[any], klass, mode: str = "append"):
         if klass.__class__ == type:
-            self._save_table.append((full_name, rows, mode))
+            self._save_table.append((full_name, rows.copy(), mode))
 
     def rows_written_for(self, full_name: str, mode: str) -> list[any]:
         rows = []
