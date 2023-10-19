@@ -9,6 +9,7 @@ from databricks.sdk import WorkspaceClient
 from databricks.sdk.service import sql
 
 from databricks.labs.ucx.framework.crawlers import CrawlerBase, SqlBackend
+from databricks.labs.ucx.framework.failures import FailureReporter, ObjectFailure
 from databricks.labs.ucx.framework.parallel import Threads
 from databricks.labs.ucx.hive_metastore import GrantsCrawler, TablesCrawler
 from databricks.labs.ucx.workspace_access import generic, redash, scim, secrets
@@ -23,6 +24,7 @@ class PermissionManager(CrawlerBase):
     def __init__(self, backend: SqlBackend, inventory_database: str, crawlers: list[AclSupport]):
         super().__init__(backend, "hive_metastore", inventory_database, "permissions", Permissions)
         self._acl_support = crawlers
+        self._failure_reporter = FailureReporter(backend, "hive_metastore", inventory_database)
 
     @classmethod
     def factory(
@@ -76,7 +78,8 @@ class PermissionManager(CrawlerBase):
         logger.info(f"Starting to crawl permissions. Total tasks: {len(crawler_tasks)}")
         items, errors = Threads.gather("crawl permissions", crawler_tasks)
         if len(errors) > 0:
-            # TODO: https://github.com/databrickslabs/ucx/issues/406
+            for _e in errors:
+                self._failure_reporter.report(ObjectFailure.make(_e))
             logger.error(f"Detected {len(errors)} errors while crawling permissions")
         logger.info(f"Total crawled permissions: {len(items)}")
         self._save(items)

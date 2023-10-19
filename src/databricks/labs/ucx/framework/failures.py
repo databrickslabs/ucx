@@ -52,8 +52,15 @@ class ObjectFailure:
     object_id: str | None = None
     error_info: str | None = None
 
-    def set_error_info(self, exception: Exception):
-        self.error_info = str(exception)
+    @staticmethod
+    def make(error: Exception):
+        object_type = error.object_type if isinstance(error, ObjectFailureError) else None
+        object_id = error.object_id if isinstance(error, ObjectFailureError) else None
+        return ObjectFailure(object_type=object_type, object_id=object_id, error_info=str(error))
+
+
+def set_error_info(self, exception: Exception):
+    self.error_info = str(exception)
 
 
 class FailureReporter:

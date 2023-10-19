@@ -8,4 +8,3 @@ def test_logger():
     logger.warning("This is a warning message")
     logger.error("This is an error message", exc_info=KeyError(123))
     logger.critical("This is a critical message")
-

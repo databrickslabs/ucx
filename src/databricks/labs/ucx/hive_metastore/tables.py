@@ -137,14 +137,8 @@ class TablesCrawler(CrawlerBase):
         catalog_tables, errors = Threads.gather(f"listing tables in {catalog}", tasks)
         if len(errors) > 0:
             for _e in errors:
-                object_type = None
-                object_id = None
-                if isinstance(_e, ObjectFailureError):
-                    object_type = _e.object_type
-                    object_id = _e.object_id
-                failure = ObjectFailure(object_type=object_type, object_id=object_id, error_info=str(_e))
-                self._failure_reporter.report(failure)
-        logger.error(f"Detected {len(errors)} while scanning tables in {catalog}")
+                self._failure_reporter.report(ObjectFailure.make(_e))
+            logger.error(f"Detected {len(errors)} while scanning tables in {catalog}")
         return catalog_tables
 
     def _describe(self, catalog: str, database: str, table: str) -> Table | None:
@@ -170,7 +164,7 @@ class TablesCrawler(CrawlerBase):
             )
         except Exception as e:
             logger.error(f"Couldn't fetch information for table {full_name} : {e}")
-            raise ObjectFailureError(object_type="table", object_id=full_name, root_cause=e) from None
+            raise ObjectFailureError(object_type="table", object_id=full_name, root_cause=e) from e
 
 
 class TablesMigrate:
@@ -188,6 +182,7 @@ class TablesMigrate:
         self._database_to_catalog_mapping = database_to_catalog_mapping
         self._default_catalog = self._init_default_catalog(default_catalog)
         self._seen_tables = {}
+        self._failure_reporter = FailureReporter(backend, "hive_metastore", "ucx")
 
     @staticmethod
     def _init_default_catalog(default_catalog):
@@ -206,23 +201,27 @@ class TablesMigrate:
             tasks.append(partial(self._migrate_table, target_catalog, table))
         _, errors = Threads.gather("migrate tables", tasks)
         if len(errors) > 0:
-            # TODO: https://github.com/databrickslabs/ucx/issues/406
+            for _e in errors:
+                self._failure_reporter.report(ObjectFailure.make(_e))
             logger.error(f"Detected {len(errors)} errors while migrating tables")
 
     def _migrate_table(self, target_catalog, table):
-        sql = table.uc_create_sql(target_catalog)
-        logger.debug(f"Migrating table {table.key} to using SQL query: {sql}")
-        target = f"{target_catalog}.{table.database}.{table.name}".lower()
+        try:
+            sql = table.uc_create_sql(target_catalog)
+            logger.debug(f"Migrating table {table.key} to using SQL query: {sql}")
+            target = f"{target_catalog}.{table.database}.{table.name}".lower()
 
-        if self._table_already_upgraded(target):
-            logger.info(f"Table {table.key} already upgraded to {self._seen_tables[target]}")
-        elif table.object_type == "MANAGED":
-            self._backend.execute(sql)
-            self._backend.execute(table.sql_alter_to(target_catalog))
-            self._backend.execute(table.sql_alter_from(target_catalog))
-            self._seen_tables[target] = table.key
-        else:
-            logger.info(f"Table {table.key} is a {table.object_type} and is not supported for migration yet ")
+            if self._table_already_upgraded(target):
+                logger.info(f"Table {table.key} already upgraded to {self._seen_tables[target]}")
+            elif table.object_type == "MANAGED":
+                self._backend.execute(sql)
+                self._backend.execute(table.sql_alter_to(target_catalog))
+                self._backend.execute(table.sql_alter_from(target_catalog))
+                self._seen_tables[target] = table.key
+            else:
+                logger.info(f"Table {table.key} is a {table.object_type} and is not supported for migration yet ")
+        except Exception as e:
+            raise ObjectFailureError(object_type="table", object_id=table.key, root_cause=e) from e
         return True
 
     def _init_seen_tables(self):

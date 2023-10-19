@@ -7,6 +7,11 @@ from functools import partial
 from databricks.sdk.service.catalog import SchemaInfo, TableInfo
 
 from databricks.labs.ucx.framework.crawlers import CrawlerBase
+from databricks.labs.ucx.framework.failures import (
+    FailureReporter,
+    ObjectFailure,
+    ObjectFailureError,
+)
 from databricks.labs.ucx.framework.parallel import Threads
 from databricks.labs.ucx.hive_metastore.tables import TablesCrawler
 
@@ -128,6 +133,7 @@ class GrantsCrawler(CrawlerBase):
     def __init__(self, tc: TablesCrawler):
         super().__init__(tc._backend, tc._catalog, tc._schema, "grants", Grant)
         self._tc = tc
+        self._failure_reporter = FailureReporter(tc._backend, tc._catalog, tc._schema)
 
     def snapshot(self) -> list[Grant]:
         return self._snapshot(partial(self._try_load), partial(self._crawl))
@@ -169,7 +175,8 @@ class GrantsCrawler(CrawlerBase):
             tasks.append(partial(fn, table=table.name))
         catalog_grants, errors = Threads.gather(f"listing grants for {catalog}", tasks)
         if len(errors) > 0:
-            # TODO: https://github.com/databrickslabs/ucx/issues/406
+            for _e in errors:
+                self._failure_reporter.report(ObjectFailure.make(_e))
             logger.error(f"Detected {len(errors)} during scanning for grants in {catalog}")
         return [grant for grants in catalog_grants for grant in grants]
 
@@ -254,6 +261,5 @@ class GrantsCrawler(CrawlerBase):
                     anonymous_function=anonymous_function,
                 )
         except Exception as e:
-            # TODO: https://github.com/databrickslabs/ucx/issues/406
             logger.error(f"Couldn't fetch grants for object {on_type} {key}: {e}")
-            return []
+            raise ObjectFailureError(object_type=on_type, object_id=key, root_cause=e) from None
