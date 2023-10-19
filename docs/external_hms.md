@@ -27,6 +27,7 @@ The UCX toolkit by default relies on the internal workspace HMS as a source for 
 - We cannot support multiple HMS
 - Using an external HMS to persist UCX tables will break functionality for a second workspace using UCX
 - We should consider using a pattern similar to our integration testing to rename the target database to allow persisting from multiple workspaces. For example WS1 --> UCX_ABC, WS2 --> UCX_DEF.
+- With external HMS it is likely that some of the tables will not be accessible by some of the workspaces. We may need to migrate certain databases from certain workspaces.
 
 ### Suggested flow
 1. Start the installer.
