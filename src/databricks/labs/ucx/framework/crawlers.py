@@ -34,7 +34,6 @@ class SqlBackend(ABC):
         int: "INT",
         bool: "BOOLEAN",
         float: "FLOAT",
-        str | None: "STRING",
     }
 
     @classmethod
@@ -45,7 +44,7 @@ class SqlBackend(ABC):
                 msg = f"Cannot auto-convert {f.type}"
                 raise SyntaxError(msg)
             not_null = " NOT NULL"
-            if f.default is None or f.type == str | None:
+            if f.default is None:
                 not_null = ""
             spark_type = cls._builtin_type_mapping[f.type]
             fields.append(f"{f.name} {spark_type}{not_null}")
@@ -102,7 +101,7 @@ class StatementExecutionBackend(SqlBackend):
                 data.append("NULL")
             elif f.type == bool:
                 data.append("TRUE" if value else "FALSE")
-            elif f.type in (str, str | None):
+            elif f.type == str:
                 value = str(value).replace("'", "''")
                 data.append(f"'{value}'")
             elif f.type == int:
