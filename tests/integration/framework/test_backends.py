@@ -33,7 +33,7 @@ def test_sql_backend_with_none_rows_should_be_filtered(sql_backend, inventory_sc
     ]
 
 
-def test_sql_backend_should_be_backwards_compatible(sql_backend, inventory_schema):
+def test_sql_backend_should_not_be_backwards_compatible(sql_backend, inventory_schema):
     @dataclass
     class OldJobInfo:
         job_id: str
