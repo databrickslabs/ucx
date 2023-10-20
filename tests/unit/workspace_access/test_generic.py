@@ -490,6 +490,33 @@ def test_workspaceobject_crawl():
     assert result_set[0] == WorkspaceObjectInfo("NOTEBOOK", "123", "/rootobj/notebook1", "PYTHON")
 
 
+def test_workspaceobject_withexperiment_crawl():
+    sample_objects = [
+        ObjectInfo(
+            object_type=ObjectType.NOTEBOOK,
+            path="/rootobj/notebook1",
+            language=Language.PYTHON,
+            created_at=0,
+            modified_at=0,
+            object_id=123,
+            size=0,
+        ),
+        ObjectInfo(
+            path="/rootobj/experiment1",
+            created_at=0,
+            modified_at=0,
+            object_id=456,
+        ),
+    ]
+    ws = Mock()
+    with patch("databricks.labs.ucx.workspace_access.listing.WorkspaceListing.walk", return_value=sample_objects):
+        crawler = WorkspaceListing(ws, MockBackend(), "ucx")._crawl()
+        result_set = list(crawler)
+
+    assert len(result_set) == 1
+    assert result_set[0] == WorkspaceObjectInfo("NOTEBOOK", "123", "/rootobj/notebook1", "PYTHON")
+
+
 def test_workspace_snapshot():
     sample_objects = [
         WorkspaceObjectInfo(
