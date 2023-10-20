@@ -79,8 +79,8 @@ class AzureServicePrincipalInfo:
 class GlobalInitScriptInfo:
     script_id: str
     script_name: str
-    enabled: bool
     created_by: str
+    enabled: bool
     success: int
     failures: str
 
@@ -155,10 +155,10 @@ class GlobalInitScriptCrawler(CrawlerBase):
                     f"Script {gis.name} have Unknown creator, it means that the original creator has been deleted"
                     f" and should be re-created"
                 )
-                global_init_script_info = GlobalInitScriptInfo(gis.script_id, gis.name, gis.enabled, "", 1, "")
+                global_init_script_info = GlobalInitScriptInfo(gis.script_id, gis.name, "", gis.enabled, 1, "")
             else:
                 global_init_script_info = GlobalInitScriptInfo(
-                    gis.script_id, gis.name, gis.enabled, gis.created_by, 1, ""
+                    gis.script_id, gis.name, gis.created_by, gis.enabled, 1, ""
                 )
             failures = []
             global_init_script = base64.b64decode(self._ws.global_init_scripts.get(gis.script_id).script).decode(
