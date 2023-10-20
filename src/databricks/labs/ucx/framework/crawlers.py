@@ -29,12 +29,7 @@ class SqlBackend(ABC):
         ddl = f"CREATE TABLE IF NOT EXISTS {full_name} ({self._schema_for(klass)}) USING DELTA"
         self.execute(ddl)
 
-    _builtin_type_mapping: ClassVar[dict[type, str]] = {
-        str: "STRING",
-        int: "INT",
-        bool: "BOOLEAN",
-        float: "FLOAT",
-    }
+    _builtin_type_mapping: ClassVar[dict[type, str]] = {str: "STRING", int: "INT", bool: "BOOLEAN", float: "FLOAT"}
 
     @classmethod
     def _schema_for(cls, klass):
