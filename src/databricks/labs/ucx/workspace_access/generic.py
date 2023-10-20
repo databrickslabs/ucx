@@ -246,7 +246,7 @@ class WorkspaceListing(Listing, CrawlerBase):
 
         ws_listing = WorkspaceListing(self._ws, num_threads=self._num_threads, with_directories=False)
         for obj in ws_listing.walk(self._start_path):
-            if obj is None:
+            if obj is None or obj.object_type is None:
                 continue
             raw = obj.as_dict()
             yield WorkspaceObjectInfo(
