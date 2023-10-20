@@ -29,7 +29,13 @@ class SqlBackend(ABC):
         ddl = f"CREATE TABLE IF NOT EXISTS {full_name} ({self._schema_for(klass)}) USING DELTA"
         self.execute(ddl)
 
-    _builtin_type_mapping: ClassVar[dict[type, str]] = {str: "STRING", int: "INT", bool: "BOOLEAN", float: "FLOAT"}
+    _builtin_type_mapping: ClassVar[dict[type, str]] = {
+        str: "STRING",
+        int: "INT",
+        bool: "BOOLEAN",
+        float: "FLOAT",
+        str | None: "STRING",
+    }
 
     @classmethod
     def _schema_for(cls, klass):
@@ -39,7 +45,7 @@ class SqlBackend(ABC):
                 msg = f"Cannot auto-convert {f.type}"
                 raise SyntaxError(msg)
             not_null = " NOT NULL"
-            if f.default is None:
+            if f.default is None or f.type == str | None:
                 not_null = ""
             spark_type = cls._builtin_type_mapping[f.type]
             fields.append(f"{f.name} {spark_type}{not_null}")
@@ -96,7 +102,7 @@ class StatementExecutionBackend(SqlBackend):
                 data.append("NULL")
             elif f.type == bool:
                 data.append("TRUE" if value else "FALSE")
-            elif f.type == str:
+            elif f.type in (str, str | None):
                 value = str(value).replace("'", "''")
                 data.append(f"'{value}'")
             elif f.type == int:
