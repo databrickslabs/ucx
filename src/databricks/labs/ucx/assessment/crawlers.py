@@ -38,7 +38,7 @@ _INIT_SCRIPT_DBFS_PATH = 2
 class JobInfo:
     job_id: str
     job_name: str
-    creator: str | None
+    creator: str
     success: int
     failures: str
 
@@ -47,7 +47,7 @@ class JobInfo:
 class ClusterInfo:
     cluster_id: str
     cluster_name: str
-    creator: str | None
+    creator: str
     success: int
     failures: str
 
@@ -56,7 +56,7 @@ class ClusterInfo:
 class PipelineInfo:
     pipeline_id: str
     pipeline_name: str
-    creator_name: str | None
+    creator_name: str
     success: int
     failures: str
 
@@ -80,7 +80,7 @@ class GlobalInitScriptInfo:
     script_id: str
     script_name: str
     enabled: bool
-    created_by: str | None
+    created_by: str
     success: int
     failures: str
 
@@ -155,7 +155,11 @@ class GlobalInitScriptCrawler(CrawlerBase):
                     f"Script {gis.name} have Unknown creator, it means that the original creator has been deleted"
                     f" and should be re-created"
                 )
-            global_init_script_info = GlobalInitScriptInfo(gis.script_id, gis.name, gis.created_by, gis.enabled, 1, "")
+                global_init_script_info = GlobalInitScriptInfo(gis.script_id, gis.name, gis.enabled, "", 1, "")
+            else:
+                global_init_script_info = GlobalInitScriptInfo(
+                    gis.script_id, gis.name, gis.enabled, gis.created_by, 1, ""
+                )
             failures = []
             global_init_script = base64.b64decode(self._ws.global_init_scripts.get(gis.script_id).script).decode(
                 "utf-8"
@@ -394,7 +398,9 @@ class PipelinesCrawler(CrawlerBase):
                     f"Pipeline {pipeline.name} have Unknown creator, it means that the original creator "
                     f"has been deleted and should be re-created"
                 )
-            pipeline_info = PipelineInfo(pipeline.pipeline_id, pipeline.name, pipeline.creator_user_name, 1, "")
+                pipeline_info = PipelineInfo(pipeline.pipeline_id, pipeline.name, "", 1, "")
+            else:
+                pipeline_info = PipelineInfo(pipeline.pipeline_id, pipeline.name, pipeline.creator_user_name, 1, "")
             failures = []
             pipeline_config = self._ws.pipelines.get(pipeline.pipeline_id).spec.configuration
             if pipeline_config:
@@ -432,7 +438,9 @@ class ClustersCrawler(CrawlerBase):
                     f"Cluster {cluster.cluster_id} have Unknown creator, it means that the original creator "
                     f"has been deleted and should be re-created"
                 )
-            cluster_info = ClusterInfo(cluster.cluster_id, cluster.cluster_name, cluster.creator_user_name, 1, "")
+                cluster_info = ClusterInfo(cluster.cluster_id, cluster.cluster_name, "", 1, "")
+            else:
+                cluster_info = ClusterInfo(cluster.cluster_id, cluster.cluster_name, cluster.creator_user_name, 1, "")
             support_status = spark_version_compatibility(cluster.spark_version)
             failures = []
             if support_status != "supported":
@@ -525,7 +533,9 @@ class JobsCrawler(CrawlerBase):
                     f"Job {job.job_id} have Unknown creator, it means that the original creator has been deleted "
                     f"and should be re-created"
                 )
-            job_details[job.job_id] = JobInfo(str(job.job_id), job.settings.name, job.creator_user_name, 1, "")
+                job_details[job.job_id] = JobInfo(str(job.job_id), job.settings.name, "", 1, "")
+            else:
+                job_details[job.job_id] = JobInfo(str(job.job_id), job.settings.name, job.creator_user_name, 1, "")
 
         for job, cluster_config in self._get_cluster_configs_from_all_jobs(all_jobs, all_clusters_by_id):
             support_status = spark_version_compatibility(cluster_config.spark_version)
