@@ -248,13 +248,15 @@ class WorkspaceListing(Listing, CrawlerBase):
         for obj in ws_listing.walk(self._start_path):
             if obj is None:
                 continue
-            raw = obj.as_dict()
-            yield WorkspaceObjectInfo(
-                object_type=raw["object_type"],
-                object_id=str(raw["object_id"]),
-                path=raw["path"],
-                language=raw.get("language", None),
-            )
+            request_type = self._convert_object_type_to_request_type(obj)
+            if request_type:
+                raw = obj.as_dict()
+                yield WorkspaceObjectInfo(
+                    object_type=raw["object_type"],
+                    object_id=str(raw["object_id"]),
+                    path=raw["path"],
+                    language=raw.get("language", None),
+                )
 
     def snapshot(self) -> list[WorkspaceObjectInfo]:
         return self._snapshot(self._try_fetch, self._crawl)
