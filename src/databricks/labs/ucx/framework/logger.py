@@ -1,8 +1,6 @@
 import logging
 import sys
 
-logger = logging.getLogger(__name__)
-
 
 class NiceFormatter(logging.Formatter):
     BOLD = "\033[1m"
