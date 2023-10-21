@@ -2,6 +2,7 @@ import json
 from unittest.mock import MagicMock
 
 import pytest
+from databricks.sdk.core import DatabricksError
 from databricks.sdk.service import iam
 from databricks.sdk.service.iam import Group, ResourceMeta
 
@@ -47,18 +48,51 @@ def permissions_row(*data):
     return row
 
 
+def make_row(data, columns):
+    row = Row(data)
+    row.__columns__ = columns
+    return row
+
+
 def test_load_all():
+    data_cols = ["database", "tableName", "isTemporary"]
     b = MockBackend(
         rows={
             "SELECT": [
                 permissions_row("object1", "clusters", "test acl"),
-            ]
+            ],
+            "SHOW.*": [
+                make_row(("test_database", "azure_service_principals", "false"), data_cols),
+                make_row(("test_database", "global_init_scripts", "false"), data_cols),
+                make_row(("test_database", "permissions", "false"), data_cols),
+            ],
         }
     )
     pi = PermissionManager(b, "test_database", [])
 
     output = pi.load_all()
     assert output[0] == Permissions("object1", "clusters", "test acl")
+
+
+def test_load_all_no_table_present():
+    data_cols = ["database", "tableName", "isTemporary"]
+    b = MockBackend(
+        rows={
+            "SELECT": [
+                permissions_row("object1", "clusters", "test acl"),
+            ],
+            "SHOW.*": [
+                make_row(("test_database", "azure_service_principals", "false"), data_cols),
+                make_row(("test_database", "global_init_scripts", "false"), data_cols),
+                make_row(("test_database", "jobs", "false"), data_cols),
+            ],
+        }
+    )
+
+    pi = PermissionManager(b, "test_database", [])
+
+    with pytest.raises(DatabricksError):
+        pi.load_all()
 
 
 def test_manager_inventorize(b, mocker):
@@ -74,6 +108,7 @@ def test_manager_inventorize(b, mocker):
 
 
 def test_manager_apply(mocker):
+    data_cols = ["database", "tableName", "isTemporary"]
     b = MockBackend(
         rows={
             "SELECT": [
@@ -113,7 +148,12 @@ def test_manager_apply(mocker):
                         ).as_dict()
                     ),
                 ),
-            ]
+            ],
+            "SHOW.*": [
+                make_row(("test_database", "azure_service_principals", "false"), data_cols),
+                make_row(("test_database", "global_init_scripts", "false"), data_cols),
+                make_row(("test_database", "permissions", "false"), data_cols),
+            ],
         }
     )
 
