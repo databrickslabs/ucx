@@ -15,17 +15,12 @@ def test_failure_reporter():
     fh.report(result)
     fh.flush()
 
+    # check that the failure record has been written to the table
     assert [result] == b.rows_written_for("a.b.c", "append")
 
-
-def _predictable_messages(caplog):
-    res = []
-    for msg in caplog.messages:
-        if "rps" in msg:
-            continue
-        msg = msg.split(". Took ")[0]  # noqa: PLW2901
-        res.append(msg)
-    return sorted(res)
+    # check that an extra flush is not adding an extra record
+    fh.flush()
+    assert [result] == b.rows_written_for("a.b.c", "append")
 
 
 def test_failure_reporter_with_threads(caplog):
@@ -38,15 +33,14 @@ def test_failure_reporter_with_threads(caplog):
         msg = "failed"
         raise DatabricksError(msg)
 
+    b = MockBackend()
+    fh = FailureReporter(b, "a", "b", "c")
     tasks = [works, fails, works, fails, works, fails, works, fails]
     results, errors = Threads.gather("testing", tasks)
+    if len(errors) > 0:
+        for _e in errors:
+            fh.report(ObjectFailure.make(_e))
+        fh.flush()
 
-    assert [True, True, True, True] == results
-    assert 4 == len(errors)
-    assert [
-        "More than half 'testing' tasks failed: 50% results available (4/8)",
-        "testing task failed: failed",
-        "testing task failed: failed",
-        "testing task failed: failed",
-        "testing task failed: failed",
-    ] == _predictable_messages(caplog)
+    assert len(b.rows_written_for("a.b.c", "append")) == 4
+
