@@ -148,10 +148,10 @@ class PermissionManager(CrawlerBase):
 
     def load_all(self) -> list[Permissions]:
         logger.info(f"Loading inventory table {self._full_name}")
-        if self._table not in [d.tableName for d in self._fetch(f"SHOW TABLES IN {self._catalog}.{self._schema}")]:
+        if list(self._fetch(f"SELECT COUNT(*) as cnt FROM {self._full_name}"))[0][0] == 0:
             msg = (
-                f"table {self._full_name} not present for fetching permission info. "
-                f"Please ensure correct table name is set or assessment job is run successfully"
+                f"table {self._full_name} is empty for fetching permission info. "
+                f"Please ensure assessment job is run successfully and permissions populated"
             )
             raise RuntimeError(msg)
         return [

@@ -54,16 +54,13 @@ def make_row(data, columns):
 
 
 def test_load_all():
-    data_cols = ["database", "tableName", "isTemporary"]
     b = MockBackend(
         rows={
-            "SELECT": [
+            "SELECT object_id": [
                 permissions_row("object1", "clusters", "test acl"),
             ],
-            "SHOW.*": [
-                make_row(("test_database", "azure_service_principals", "false"), data_cols),
-                make_row(("test_database", "global_init_scripts", "false"), data_cols),
-                make_row(("test_database", "permissions", "false"), data_cols),
+            "SELECT COUNT": [
+                make_row([12], ["cnt"]),
             ],
         }
     )
@@ -73,17 +70,14 @@ def test_load_all():
     assert output[0] == Permissions("object1", "clusters", "test acl")
 
 
-def test_load_all_no_table_present():
-    data_cols = ["database", "tableName", "isTemporary"]
+def test_load_all_no_rows_present():
     b = MockBackend(
         rows={
-            "SELECT": [
+            "SELECT object_id": [
                 permissions_row("object1", "clusters", "test acl"),
             ],
-            "SHOW.*": [
-                make_row(("test_database", "azure_service_principals", "false"), data_cols),
-                make_row(("test_database", "global_init_scripts", "false"), data_cols),
-                make_row(("test_database", "jobs", "false"), data_cols),
+            "SELECT COUNT": [
+                make_row([0], ["cnt"]),
             ],
         }
     )
@@ -107,10 +101,9 @@ def test_manager_inventorize(b, mocker):
 
 
 def test_manager_apply(mocker):
-    data_cols = ["database", "tableName", "isTemporary"]
     b = MockBackend(
         rows={
-            "SELECT": [
+            "SELECT object_id": [
                 permissions_row(
                     "test",
                     "clusters",
@@ -148,10 +141,8 @@ def test_manager_apply(mocker):
                     ),
                 ),
             ],
-            "SHOW.*": [
-                make_row(("test_database", "azure_service_principals", "false"), data_cols),
-                make_row(("test_database", "global_init_scripts", "false"), data_cols),
-                make_row(("test_database", "permissions", "false"), data_cols),
+            "SELECT COUNT": [
+                make_row([12], ["cnt"]),
             ],
         }
     )
