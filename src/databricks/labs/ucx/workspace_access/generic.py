@@ -13,6 +13,7 @@ from databricks.sdk.retries import retried
 from databricks.sdk.service import iam, ml
 
 from databricks.labs.ucx.framework.crawlers import CrawlerBase, SqlBackend
+from databricks.labs.ucx.framework.failures import ObjectFailureError
 from databricks.labs.ucx.mixins.hardening import rate_limited
 from databricks.labs.ucx.workspace_access.base import (
     AclSupport,
@@ -110,22 +111,25 @@ class GenericPermissionsSupport(AclSupport):
 
     @rate_limited(max_requests=30)
     def _applier_task(self, object_type: str, object_id: str, acl: list[iam.AccessControlRequest]):
-        for _i in range(0, 3):
-            self._ws.permissions.update(object_type, object_id, access_control_list=acl)
+        try:
+            for _i in range(0, 3):
+                self._ws.permissions.update(object_type, object_id, access_control_list=acl)
 
-            remote_permission = self._safe_get_permissions(object_type, object_id)
-            remote_permission_as_request = self._response_to_request(remote_permission.access_control_list)
-            if all(elem in remote_permission_as_request for elem in acl):
-                return True
+                remote_permission = self._safe_get_permissions(object_type, object_id)
+                remote_permission_as_request = self._response_to_request(remote_permission.access_control_list)
+                if all(elem in remote_permission_as_request for elem in acl):
+                    return True
 
-            logger.warning(
-                f"""Couldn't apply appropriate permission for object type {object_type} with id {object_id}
-            acl to be applied={acl}
-            acl found in the object={remote_permission_as_request}
-            """
-            )
-            time.sleep(1 + _i)
-        return False
+                logger.warning(
+                    f"""Couldn't apply appropriate permission for object type {object_type} with id {object_id}
+                acl to be applied={acl}
+                acl found in the object={remote_permission_as_request}
+                """
+                )
+                time.sleep(1 + _i)
+            return False
+        except Exception as e:
+            raise ObjectFailureError(object_type=object_type, object_id=object_id, root_cause=e) from e
 
     @rate_limited(max_requests=100)
     def _crawler_task(self, object_type: str, object_id: str) -> Permissions | None:

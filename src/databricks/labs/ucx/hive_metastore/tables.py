@@ -138,6 +138,7 @@ class TablesCrawler(CrawlerBase):
         if len(errors) > 0:
             for _e in errors:
                 self._failure_reporter.report(ObjectFailure.make(_e))
+            self._failure_reporter.flush()
             logger.error(f"Detected {len(errors)} while scanning tables in {catalog}")
         return catalog_tables
 
@@ -203,6 +204,7 @@ class TablesMigrate:
         if len(errors) > 0:
             for _e in errors:
                 self._failure_reporter.report(ObjectFailure.make(_e))
+            self._failure_reporter.flush()
             logger.error(f"Detected {len(errors)} errors while migrating tables")
 
     def _migrate_table(self, target_catalog, table):

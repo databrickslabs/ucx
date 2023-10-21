@@ -10,6 +10,7 @@ from databricks.sdk import WorkspaceClient
 from databricks.sdk.core import DatabricksError
 from databricks.sdk.service import sql
 
+from databricks.labs.ucx.framework.failures import ObjectFailureError
 from databricks.labs.ucx.mixins.hardening import rate_limited
 from databricks.labs.ucx.workspace_access.base import (
     AclSupport,
@@ -107,21 +108,24 @@ class RedashPermissionsSupport(AclSupport):
         Please note that we only have SET option (DBSQL Permissions API doesn't support UPDATE operation).
         This affects the way how we prepare the new ACL request.
         """
-        for _i in range(0, 3):
-            self._ws.dbsql_permissions.set(object_type=object_type, object_id=object_id, access_control_list=acl)
+        try:
+            for _i in range(0, 3):
+                self._ws.dbsql_permissions.set(object_type=object_type, object_id=object_id, access_control_list=acl)
 
-            remote_permission = self._safe_get_dbsql_permissions(object_type, object_id)
-            if all(elem in remote_permission.access_control_list for elem in acl):
-                return True
+                remote_permission = self._safe_get_dbsql_permissions(object_type, object_id)
+                if all(elem in remote_permission.access_control_list for elem in acl):
+                    return True
 
-            logger.warning(
-                f"""Couldn't apply appropriate permission for object type {object_type} with id {object_id}
-            acl to be applied={acl}
-            acl found in the object={remote_permission}
-            """
-            )
-            time.sleep(1 + _i)
-        return False
+                logger.warning(
+                    f"""Couldn't apply appropriate permission for object type {object_type} with id {object_id}
+                acl to be applied={acl}
+                acl found in the object={remote_permission}
+                """
+                )
+                time.sleep(1 + _i)
+            return False
+        except Exception as e:
+            raise ObjectFailureError(object_type=str(object_type), object_id=object_id, root_cause=e) from e
 
     def _prepare_new_acl(
         self, acl: list[sql.AccessControl], migration_state: GroupMigrationState, destination: Destination

@@ -123,7 +123,9 @@ class PermissionManager(CrawlerBase):
         logger.info(f"Starting to apply permissions on {destination} groups. Total tasks: {len(applier_tasks)}")
         _, errors = Threads.gather(f"apply {destination} group permissions", applier_tasks)
         if len(errors) > 0:
-            # TODO: https://github.com/databrickslabs/ucx/issues/406
+            for _e in errors:
+                self._failure_reporter.report(ObjectFailure.make(_e))
+            self._failure_reporter.flush()
             logger.error(f"Detected {len(errors)} while applying permissions")
             return False
         logger.info("Permissions were applied")

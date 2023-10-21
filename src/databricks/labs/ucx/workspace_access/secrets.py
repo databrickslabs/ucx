@@ -7,6 +7,7 @@ from databricks.sdk import WorkspaceClient
 from databricks.sdk.retries import retried
 from databricks.sdk.service import workspace
 
+from databricks.labs.ucx.framework.failures import ObjectFailureError
 from databricks.labs.ucx.mixins.hardening import rate_limited
 from databricks.labs.ucx.workspace_access.base import (
     AclSupport,
@@ -46,18 +47,21 @@ class SecretScopesSupport(AclSupport):
         if not self._is_item_relevant(item, migration_state):
             return None
 
-        acls = [workspace.AclItem.from_dict(acl) for acl in json.loads(item.raw)]
-        new_acls = []
+        try:
+            acls = [workspace.AclItem.from_dict(acl) for acl in json.loads(item.raw)]
+            new_acls = []
 
-        for acl in acls:
-            if not migration_state.is_in_scope(acl.principal):
-                new_acls.append(acl)
-                continue
-            target_principal = migration_state.get_target_principal(acl.principal, destination)
-            if target_principal is None:
-                logger.debug(f"Skipping {acl.principal} because of no target principal")
-                continue
-            new_acls.append(workspace.AclItem(principal=target_principal, permission=acl.permission))
+            for acl in acls:
+                if not migration_state.is_in_scope(acl.principal):
+                    new_acls.append(acl)
+                    continue
+                target_principal = migration_state.get_target_principal(acl.principal, destination)
+                if target_principal is None:
+                    logger.debug(f"Skipping {acl.principal} because of no target principal")
+                    continue
+                new_acls.append(workspace.AclItem(principal=target_principal, permission=acl.permission))
+        except Exception as e:
+            raise ObjectFailureError(object_type=item.object_type, object_id=item.object_id, root_cause=e) from e
 
         def apply_acls():
             for acl in new_acls:
