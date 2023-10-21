@@ -2,7 +2,6 @@ import json
 from unittest.mock import MagicMock
 
 import pytest
-from databricks.sdk.core import DatabricksError
 from databricks.sdk.service import iam
 from databricks.sdk.service.iam import Group, ResourceMeta
 
@@ -91,7 +90,7 @@ def test_load_all_no_table_present():
 
     pi = PermissionManager(b, "test_database", [])
 
-    with pytest.raises(DatabricksError):
+    with pytest.raises(RuntimeError):
         pi.load_all()
 
 

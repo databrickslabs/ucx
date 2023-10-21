@@ -6,7 +6,6 @@ from itertools import groupby
 from typing import Literal
 
 from databricks.sdk import WorkspaceClient
-from databricks.sdk.core import DatabricksError
 from databricks.sdk.service import sql
 
 from databricks.labs.ucx.framework.crawlers import CrawlerBase, SqlBackend
@@ -150,12 +149,8 @@ class PermissionManager(CrawlerBase):
     def load_all(self) -> list[Permissions]:
         logger.info(f"Loading inventory table {self._full_name}")
         if self._table not in [d.tableName for d in self._fetch(f"SHOW TABLES IN {self._catalog}.{self._schema}")]:
-            logger.error(
-                f"table {self._full_name} not present for fetching permission info. "
-                f"Please ensure correct table name is set or assessment step is run"
-            )
             msg = f"table {self._full_name} not found error"
-            raise DatabricksError(msg)
+            raise RuntimeError(msg)
         return [
             Permissions(object_id, object_type, raw)
             for object_id, object_type, raw in self._fetch(f"SELECT object_id, object_type, raw FROM {self._full_name}")
