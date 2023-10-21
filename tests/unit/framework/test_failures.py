@@ -1,10 +1,11 @@
 import logging
 
 from databricks.sdk.core import DatabricksError
-from .mocks import MockBackend
 
 from databricks.labs.ucx.framework.failures import FailureReporter, ObjectFailure
 from databricks.labs.ucx.framework.parallel import Threads
+
+from .mocks import MockBackend
 
 
 def test_failure_reporter():
@@ -43,4 +44,3 @@ def test_failure_reporter_with_threads(caplog):
         fh.flush()
 
     assert len(b.rows_written_for("a.b.c", "append")) == 4
-
