@@ -435,7 +435,7 @@ def test_cluster_assessment_cluster_policy_not_found(mocker):
         )
     ]
     ws = Mock()
-    ws.cluster_policies.get.side_effect = DatabricksError(error="NO_POLICY", error_code="NO_POLICY")
+    ws.cluster_policies.get.side_effect = DatabricksError(error="NO_POLICY", error_code="RESOURCE_DOES_NOT_EXIST")
     crawler = ClustersCrawler(ws, MockBackend(), "ucx")._assess_clusters(sample_clusters1)
     list(crawler)
 
