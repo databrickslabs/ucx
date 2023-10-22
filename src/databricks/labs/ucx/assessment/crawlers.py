@@ -334,7 +334,12 @@ class AzureServicePrincipalCrawler(CrawlerBase):
         try:
             return self._ws.cluster_policies.get(policy_id)
         except DatabricksError as err:
-            logger.warning(f"Error retrieving cluster policy {policy_id}. The cluster policy was deleted. Error: {err}")
+            if err.error_code == "RESOURCE_DOES_NOT_EXIST":
+                logger.warning(
+                    f"Error retrieving cluster policy {policy_id}. The cluster policy was deleted. Error: {err}"
+                )
+            else:
+                raise err
 
         return None
 
@@ -471,7 +476,12 @@ class ClustersCrawler(CrawlerBase):
         try:
             return self._ws.cluster_policies.get(policy_id)
         except DatabricksError as err:
-            logger.warning(f"Error retrieving cluster policy {policy_id}. The cluster policy was deleted. Error: {err}")
+            if err.error_code == "RESOURCE_DOES_NOT_EXIST":
+                logger.warning(
+                    f"Error retrieving cluster policy {policy_id}. The cluster policy was deleted. Error: {err}"
+                )
+            else:
+                raise err
 
         return None
 
@@ -568,7 +578,12 @@ class JobsCrawler(CrawlerBase):
         try:
             return self._ws.cluster_policies.get(policy_id)
         except DatabricksError as err:
-            logger.warning(f"Error retrieving cluster policy {policy_id}. The cluster policy was deleted. Error: {err}")
+            if err.error_code == "RESOURCE_DOES_NOT_EXIST":
+                logger.warning(
+                    f"Error retrieving cluster policy {policy_id}. The cluster policy was deleted. Error: {err}"
+                )
+            else:
+                raise err
 
         return None
 
