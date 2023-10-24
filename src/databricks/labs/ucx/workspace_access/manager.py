@@ -148,6 +148,12 @@ class PermissionManager(CrawlerBase):
 
     def load_all(self) -> list[Permissions]:
         logger.info(f"Loading inventory table {self._full_name}")
+        if list(self._fetch(f"SELECT COUNT(*) as cnt FROM {self._full_name}"))[0][0] == 0:  # noqa: RUF015
+            msg = (
+                f"table {self._full_name} is empty for fetching permission info. "
+                f"Please ensure assessment job is run successfully and permissions populated"
+            )
+            raise RuntimeError(msg)
         return [
             Permissions(object_id, object_type, raw)
             for object_id, object_type, raw in self._fetch(f"SELECT object_id, object_type, raw FROM {self._full_name}")

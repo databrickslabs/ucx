@@ -47,18 +47,45 @@ def permissions_row(*data):
     return row
 
 
+def make_row(data, columns):
+    row = Row(data)
+    row.__columns__ = columns
+    return row
+
+
 def test_load_all():
     b = MockBackend(
         rows={
-            "SELECT": [
+            "SELECT object_id": [
                 permissions_row("object1", "clusters", "test acl"),
-            ]
+            ],
+            "SELECT COUNT": [
+                make_row([12], ["cnt"]),
+            ],
         }
     )
     pi = PermissionManager(b, "test_database", [])
 
     output = pi.load_all()
     assert output[0] == Permissions("object1", "clusters", "test acl")
+
+
+def test_load_all_no_rows_present():
+    b = MockBackend(
+        rows={
+            "SELECT object_id": [
+                permissions_row("object1", "clusters", "test acl"),
+            ],
+            "SELECT COUNT": [
+                make_row([0], ["cnt"]),
+            ],
+        }
+    )
+
+    pi = PermissionManager(b, "test_database", [])
+
+    with pytest.raises(RuntimeError):
+        pi.load_all()
 
 
 def test_manager_inventorize(b, mocker):
@@ -76,7 +103,7 @@ def test_manager_inventorize(b, mocker):
 def test_manager_apply(mocker):
     b = MockBackend(
         rows={
-            "SELECT": [
+            "SELECT object_id": [
                 permissions_row(
                     "test",
                     "clusters",
@@ -113,7 +140,10 @@ def test_manager_apply(mocker):
                         ).as_dict()
                     ),
                 ),
-            ]
+            ],
+            "SELECT COUNT": [
+                make_row([12], ["cnt"]),
+            ],
         }
     )
 
