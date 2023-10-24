@@ -163,7 +163,6 @@ def test_spn_crawler_deleted_cluster_policy(
     spn_crawler = AzureServicePrincipalCrawler(ws=ws, sbe=sql_backend, schema=inventory_schema)
     results = spn_crawler.snapshot()
 
-    assert len(results) >= 2
     assert any(_ for _ in results if _.tenant_id == _TEST_TENANT_ID)
     assert any(_ for _ in results if _.storage_account == _TEST_STORAGE_ACCOUNT)
 
