@@ -1,5 +1,7 @@
 import logging
 
+from databricks.sdk.service import compute, jobs
+
 from databricks.labs.ucx.assessment.crawlers import (
     AzureServicePrincipalCrawler,
     ClustersCrawler,
@@ -8,14 +10,18 @@ from databricks.labs.ucx.assessment.crawlers import (
 )
 from databricks.labs.ucx.workspace_access.generic import WorkspaceListing
 
+_TEST_STORAGE_ACCOUNT = "storage_acct_1"
+
+_TEST_TENANT_ID = "directory_12345"
+
 logger = logging.getLogger(__name__)
 
 _PIPELINE_CONF = {
-    "spark.hadoop.fs.azure.account.oauth2.client.id.storage_acct_1.dfs.core.windows.net": ""
+    f"spark.hadoop.fs.azure.account.oauth2.client.id.{_TEST_STORAGE_ACCOUNT}.dfs.core.windows.net": ""
     "pipeline_dummy_application_id",
-    "spark.hadoop.fs.azure.account.oauth2.client.endpoint.storage_acct_1.dfs.core.windows.net": ""
+    f"spark.hadoop.fs.azure.account.oauth2.client.endpoint.{_TEST_STORAGE_ACCOUNT}.dfs.core.windows.net": ""
     "https://login"
-    ".microsoftonline.com/directory_12345/oauth2/token",
+    f".microsoftonline.com/{_TEST_TENANT_ID}/oauth2/token",
 }
 
 _PIPELINE_CONF_WITH_SECRET = {
@@ -27,13 +33,13 @@ _PIPELINE_CONF_WITH_SECRET = {
 _SPARK_CONF = {
     "spark.databricks.cluster.profile": "singleNode",
     "spark.master": "local[*]",
-    "fs.azure.account.auth.type.storage_acct_1.dfs.core.windows.net": "OAuth",
-    "fs.azure.account.oauth.provider.type.storage_acct_1.dfs.core.windows.net": "org.apache.hadoop.fs"
+    f"fs.azure.account.auth.type.{_TEST_STORAGE_ACCOUNT}.dfs.core.windows.net": "OAuth",
+    f"fs.azure.account.oauth.provider.type.{_TEST_STORAGE_ACCOUNT}.dfs.core.windows.net": "org.apache.hadoop.fs"
     ".azurebfs.oauth2.ClientCredsTokenProvider",
-    "fs.azure.account.oauth2.client.id.storage_acct_1.dfs.core.windows.net": "dummy_application_id",
-    "fs.azure.account.oauth2.client.secret.storage_acct_1.dfs.core.windows.net": "dummy",
-    "fs.azure.account.oauth2.client.endpoint.storage_acct_1.dfs.core.windows.net": "https://login"
-    ".microsoftonline.com/directory_12345/oauth2/token",
+    f"fs.azure.account.oauth2.client.id.{_TEST_STORAGE_ACCOUNT}.dfs.core.windows.net": "dummy_application_id",
+    f"fs.azure.account.oauth2.client.secret.{_TEST_STORAGE_ACCOUNT}.dfs.core.windows.net": "dummy",
+    f"fs.azure.account.oauth2.client.endpoint.{_TEST_STORAGE_ACCOUNT}.dfs.core.windows.net": "https://login"
+    f".microsoftonline.com/{_TEST_TENANT_ID}/oauth2/token",
 }
 
 
@@ -111,8 +117,8 @@ def test_spn_crawler(ws, inventory_schema, make_job, make_pipeline, sql_backend)
         results.append(spn)
 
     assert len(results) >= 2
-    assert results[0].storage_account == "storage_acct_1"
-    assert results[0].tenant_id == "directory_12345"
+    assert results[0].storage_account == _TEST_STORAGE_ACCOUNT
+    assert results[0].tenant_id == _TEST_TENANT_ID
 
 
 def test_spn_crawler_no_config(ws, inventory_schema, make_job, make_pipeline, sql_backend, make_cluster):
@@ -123,14 +129,52 @@ def test_spn_crawler_no_config(ws, inventory_schema, make_job, make_pipeline, sq
     spn_crawler.snapshot()
 
 
+def test_spn_crawler_deleted_cluster_policy(
+    ws,
+    inventory_schema,
+    sql_backend,
+    make_job,
+    make_cluster,
+    make_cluster_policy,
+    make_random,
+    make_notebook,
+):
+    cluster_policy_id = make_cluster_policy().policy_id
+    make_job(
+        name=f"sdk-{make_random(4)}",
+        tasks=[
+            jobs.Task(
+                task_key=make_random(4),
+                description=make_random(4),
+                new_cluster=compute.ClusterSpec(
+                    num_workers=1,
+                    node_type_id=ws.clusters.select_node_type(local_disk=True),
+                    spark_version=ws.clusters.select_spark_version(latest=True),
+                    spark_conf=_SPARK_CONF,
+                    policy_id=cluster_policy_id,
+                ),
+                notebook_task=jobs.NotebookTask(notebook_path=make_notebook()),
+                timeout_seconds=0,
+            )
+        ],
+    )
+    make_cluster(single_node=True, spark_conf=_SPARK_CONF, policy_id=cluster_policy_id)
+    ws.cluster_policies.delete(policy_id=cluster_policy_id)
+    spn_crawler = AzureServicePrincipalCrawler(ws=ws, sbe=sql_backend, schema=inventory_schema)
+    results = spn_crawler.snapshot()
+
+    assert any(_ for _ in results if _.tenant_id == _TEST_TENANT_ID)
+    assert any(_ for _ in results if _.storage_account == _TEST_STORAGE_ACCOUNT)
+
+
 def test_spn_crawler_with_pipeline_unavailable_secret(ws, inventory_schema, make_job, make_pipeline, sql_backend):
     make_job(spark_conf=_SPARK_CONF)
     make_pipeline(configuration=_PIPELINE_CONF_WITH_SECRET)
     spn_crawler = AzureServicePrincipalCrawler(ws=ws, sbe=sql_backend, schema=inventory_schema)
     results = spn_crawler.snapshot()
 
-    assert any(_ for _ in results if _.tenant_id == "directory_12345")
-    assert any(_ for _ in results if _.storage_account == "storage_acct_1")
+    assert any(_ for _ in results if _.tenant_id == _TEST_TENANT_ID)
+    assert any(_ for _ in results if _.storage_account == _TEST_STORAGE_ACCOUNT)
 
 
 def test_spn_crawler_with_available_secrets(
