@@ -11,6 +11,7 @@ from databricks.sdk import WorkspaceClient
 from databricks.sdk.core import DatabricksError
 from databricks.sdk.retries import retried
 from databricks.sdk.service import iam, ml
+from databricks.sdk.service.iam import PermissionLevel
 
 from databricks.labs.ucx.framework.crawlers import CrawlerBase, SqlBackend
 from databricks.labs.ucx.mixins.hardening import rate_limited
@@ -130,13 +131,26 @@ class GenericPermissionsSupport(AclSupport):
     @rate_limited(max_requests=100)
     def _crawler_task(self, object_type: str, object_id: str) -> Permissions | None:
         permissions = self._safe_get_permissions(object_type, object_id)
-        if not permissions:
+        if not self._object_have_owner(permissions):
             return None
         return Permissions(
             object_id=object_id,
             object_type=object_type,
             raw=json.dumps(permissions.as_dict()),
         )
+
+    def _object_have_owner(self, permissions: iam.ObjectPermissions | None):
+        if not permissions:
+            return False
+        for acl in permissions.access_control_list:
+            for perm in acl.all_permissions:
+                if perm.permission_level == PermissionLevel.IS_OWNER:
+                    return True
+        logger.warning(
+            "Object doesn't have any Owner and cannot be migrated to account level groups, "
+            "consider setting a new owner or deleting this object"
+        )
+        return False
 
     def _load_as_request(self, object_type: str, object_id: str) -> list[iam.AccessControlRequest]:
         loaded = self._safe_get_permissions(object_type, object_id)

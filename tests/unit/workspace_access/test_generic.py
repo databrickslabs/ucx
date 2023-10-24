@@ -4,6 +4,12 @@ from unittest.mock import MagicMock, Mock, patch
 
 from databricks.sdk.core import DatabricksError
 from databricks.sdk.service import compute, iam, ml
+from databricks.sdk.service.iam import (
+    AccessControlResponse,
+    ObjectPermissions,
+    Permission,
+    PermissionLevel,
+)
 from databricks.sdk.service.workspace import Language, ObjectInfo, ObjectType
 
 from databricks.labs.ucx.mixins.sql import Row
@@ -34,7 +40,10 @@ def test_crawler():
         access_control_list=[
             iam.AccessControlResponse(
                 group_name="test",
-                all_permissions=[iam.Permission(inherited=False, permission_level=iam.PermissionLevel.CAN_USE)],
+                all_permissions=[
+                    iam.Permission(inherited=False, permission_level=iam.PermissionLevel.CAN_USE),
+                    iam.Permission(inherited=False, permission_level=iam.PermissionLevel.IS_OWNER),
+                ],
             )
         ],
     )
@@ -155,14 +164,20 @@ def test_passwords_tokens_crawler(migration_state):
     basic_acl = [
         iam.AccessControlResponse(
             group_name="test",
-            all_permissions=[iam.Permission(inherited=False, permission_level=iam.PermissionLevel.CAN_USE)],
+            all_permissions=[
+                iam.Permission(inherited=False, permission_level=iam.PermissionLevel.CAN_USE),
+                iam.Permission(inherited=False, permission_level=iam.PermissionLevel.IS_OWNER),
+            ],
         )
     ]
 
     temp_acl = [
         iam.AccessControlResponse(
             group_name="db-temp-test",
-            all_permissions=[iam.Permission(inherited=False, permission_level=iam.PermissionLevel.CAN_USE)],
+            all_permissions=[
+                iam.Permission(inherited=False, permission_level=iam.PermissionLevel.CAN_USE),
+                iam.Permission(inherited=False, permission_level=iam.PermissionLevel.IS_OWNER),
+            ],
         )
     ]
     ws.permissions.get.side_effect = [
@@ -185,7 +200,8 @@ def test_passwords_tokens_crawler(migration_state):
             item.object_type,
             item.object_id,
             access_control_list=[
-                iam.AccessControlRequest(group_name="db-temp-test", permission_level=iam.PermissionLevel.CAN_USE)
+                iam.AccessControlRequest(group_name="db-temp-test", permission_level=iam.PermissionLevel.CAN_USE),
+                iam.AccessControlRequest(group_name="db-temp-test", permission_level=iam.PermissionLevel.IS_OWNER),
             ],
         )
         ws.permissions.update.reset_mock()
@@ -541,3 +557,65 @@ def test_workspace_snapshot():
 
     assert len(result_set) == 2
     assert result_set[0] == WorkspaceObjectInfo("NOTEBOOK", "123", "/rootobj/notebook1", "PYTHON")
+
+
+def test_assets_without_owner_should_be_ignored():
+    ws = MagicMock()
+
+    from databricks.sdk.service.compute import ClusterDetails
+
+    ws.clusters.list.return_value = [
+        ClusterDetails(
+            cluster_id="1234",
+        )
+    ]
+    ws.permissions.get.return_value = ObjectPermissions(
+        object_id="123",
+        object_type="cluster",
+        access_control_list=[
+            AccessControlResponse(
+                group_name="de", all_permissions=[Permission(permission_level=PermissionLevel.CAN_USE)]
+            )
+        ],
+    )
+
+    sup = GenericPermissionsSupport(ws=ws, listings=[Listing(ws.clusters.list, "cluster_id", "clusters")])
+    tasks = list(sup.get_crawler_tasks())
+    task = tasks[0]()
+    assert task is None
+
+
+def test_assets_with_owner_should_be_considered_for_migration():
+    ws = MagicMock()
+
+    from databricks.sdk.service.compute import ClusterDetails
+
+    ws.clusters.list.return_value = [
+        ClusterDetails(
+            cluster_id="1234",
+        )
+    ]
+    ws.permissions.get.return_value = ObjectPermissions(
+        object_id="123",
+        object_type="cluster",
+        access_control_list=[
+            AccessControlResponse(
+                group_name="de", all_permissions=[Permission(permission_level=PermissionLevel.CAN_USE)]
+            ),
+            AccessControlResponse(
+                group_name="ds", all_permissions=[Permission(permission_level=PermissionLevel.IS_OWNER)]
+            ),
+        ],
+    )
+
+    sup = GenericPermissionsSupport(ws=ws, listings=[Listing(ws.clusters.list, "cluster_id", "clusters")])
+    tasks = list(sup.get_crawler_tasks())
+    task = tasks[0]()
+    assert task == Permissions(
+        object_id="1234",
+        object_type="clusters",
+        raw='{"access_control_list": ['
+        '{"all_permissions": [{"permission_level": "CAN_USE"}], "group_name": "de"}, '
+        '{"all_permissions": [{"permission_level": "IS_OWNER"}], "group_name": "ds"}], '
+        '"object_id": "123", "object_type": "cluster"}',
+    )

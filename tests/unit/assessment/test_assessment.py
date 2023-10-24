@@ -2560,7 +2560,7 @@ def test_job_crawler_with_no_owner_should_have_empty_creator_name():
     ws.clusters.list.return_value = sample_clusters
     JobsCrawler(ws, mockbackend, "ucx").snapshot()
     result = mockbackend.rows_written_for("hive_metastore.ucx.jobs", "append")
-    assert result == [JobInfo(job_id="536591785949415", job_name=None, creator="", success=1, failures="[]")]
+    assert result == [JobInfo(job_id="536591785949415", job_name=None, creator=None, success=1, failures="[]")]
 
 
 def test_cluster_without_owner_should_have_empty_creator_name(mocker):
@@ -2585,7 +2585,7 @@ def test_cluster_without_owner_should_have_empty_creator_name(mocker):
         ClusterInfo(
             cluster_id="0810-225833-atlanta69",
             cluster_name="Tech Summit FY24 Cluster-1",
-            creator="",
+            creator=None,
             success=1,
             failures="[]",
         )
@@ -2616,7 +2616,7 @@ def test_pipeline_without_owners_should_have_empty_creator_name():
         PipelineInfo(
             pipeline_id="0112eae7-9d11-4b40-a2b8-6c83cb3c7407",
             pipeline_name="New DLT Pipeline",
-            creator_name="",
+            creator_name=None,
             success=1,
             failures="[]",
         )
@@ -2646,6 +2646,6 @@ def test_init_script_without_config_should_have_empty_creator_name(mocker):
 
     assert result == [
         GlobalInitScriptInfo(
-            script_id="222", script_name="newscript", enabled=False, created_by="", success=1, failures=""
+            script_id="222", script_name="newscript", enabled=False, created_by=None, success=1, failures=""
         ),
     ]
