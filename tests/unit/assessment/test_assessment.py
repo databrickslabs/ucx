@@ -560,8 +560,7 @@ def test_cluster_assessment_with_spn_cluster_policy_not_found(mocker):
             spark_context_id=5134472582179565315,
             spark_env_vars=None,
             spark_conf={
-                "spark.hadoop.fs.azure.account.oauth2.client.id.abcde.dfs"
-                ".core.windows.net": "1234567890",
+                "spark.hadoop.fs.azure.account.oauth2.client.id.abcde.dfs.core.windows.net": "1234567890",
                 "spark.databricks.delta.formatCheck.enabled": "false",
             },
             spark_version="9.3.x-cpu-ml-scala2.12",
