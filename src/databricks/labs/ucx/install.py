@@ -1,4 +1,5 @@
 import datetime
+import json
 import logging
 import os
 import re
@@ -287,12 +288,45 @@ class WorkspaceInstaller:
             groups_config_args["selected"] = [x.strip() for x in selected_groups.split(",")]
         else:
             groups_config_args["auto"] = True
+
+        # Checking for external HMS
+        instance_profile = None
+        spark_conf_dict = {}
+        ext_hms_confs = list(self._get_ext_hms_confs())
+        if (
+            self._prompts
+            and len(ext_hms_confs) > 0
+            and self._question(
+                "We have identified one or more cluster policies set up for an external metastore. "
+                "Would you like to set UCX to connect to the external metastore.",
+                default="no",
+            )
+            == "yes"
+        ):
+            logger.info("Setting up an external metastore")
+            cluster_policies = {conf.name: conf.definition for conf in ext_hms_confs}
+            instance_profile = ""
+            if len(cluster_policies) > 1:
+                cluster_policy = json.loads(
+                    self._choice_from_dict("Select a Cluster Policy from The List", cluster_policies)
+                )
+                if cluster_policy.get("aws_attributes.instance_profile_arn") is not None:
+                    instance_profile = cluster_policy.get("aws_attributes.instance_profile_arn").get("value")
+                    logger.info(f"Instance Profile is Set to {instance_profile}")
+                for key in cluster_policy.keys():
+                    if key.startswith("spark_conf.sql.hive.metastore") or \
+                            key.startswith("spark_conf.spark.hadoop.javax.jdo.option") or \
+                            key.startswith("spark_conf.spark.databricks.hive.metastore"):
+                        spark_conf_dict[key[11:]] = cluster_policy[key]["value"]
+
         self._config = WorkspaceConfig(
             inventory_database=inventory_database,
             groups=GroupsConfig(**groups_config_args),
             warehouse_id=warehouse_id,
             log_level=log_level,
             num_threads=num_threads,
+            instance_profile=instance_profile,
+            spark_conf=spark_conf_dict,
         )
 
         self._write_config()
@@ -698,6 +732,22 @@ class WorkspaceInstaller:
                 continue
             deployed_steps[tags.get(TAG_STEP, "_")] = j.job_id
         return deployed_steps
+
+    def _instance_profiles(self):
+        return {"No Instance Profile": None} | {
+            profile.instance_profile_arn: profile.instance_profile_arn for profile in self._ws.instance_profiles.list()
+        }
+
+    def _get_ext_hms_confs(self):
+        for conf in self._ws.cluster_policies.list():
+            def_json = json.loads(conf.definition)
+            glue_node = def_json.get("spark_conf.spark.databricks.hive.metastore.glueCatalog.enabled")
+            if glue_node is not None and glue_node.get("value") == "true":
+                yield conf
+            for key in def_json.keys():
+                if key.startswith("spark_config.spark.sql.hive.metastore"):
+                    yield conf
+                    break
 
 
 if __name__ == "__main__":
