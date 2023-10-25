@@ -36,28 +36,28 @@ _INIT_SCRIPT_DBFS_PATH = 2
 
 @dataclass
 class JobInfo:
-    job_id: str
-    job_name: str
     success: int
     failures: str
+    job_id: str = None
+    job_name: str = None
     creator: str = None
 
 
 @dataclass
 class ClusterInfo:
-    cluster_id: str
-    cluster_name: str
     success: int
     failures: str
+    cluster_id: str = None
+    cluster_name: str = None
     creator: str = None
 
 
 @dataclass
 class PipelineInfo:
-    pipeline_id: str
-    pipeline_name: str
     success: int
     failures: str
+    pipeline_id: str = None
+    pipeline_name: str = None
     creator_name: str = None
 
 
@@ -66,23 +66,23 @@ class AzureServicePrincipalInfo:
     # fs.azure.account.oauth2.client.id
     application_id: str
     # fs.azure.account.oauth2.client.secret: {{secrets/${local.secret_scope}/${local.secret_key}}}
-    secret_scope: str
+    secret_scope: str = None
     # fs.azure.account.oauth2.client.secret: {{secrets/${local.secret_scope}/${local.secret_key}}}
-    secret_key: str
+    secret_key: str = None
     # fs.azure.account.oauth2.client.endpoint: "https://login.microsoftonline.com/${local.tenant_id}/oauth2/token"
-    tenant_id: str
+    tenant_id: str = None
     # Azure Storage account to which the SP has been given access
-    storage_account: str
+    storage_account: str = None
 
 
 @dataclass
 class GlobalInitScriptInfo:
-    script_id: str
-    script_name: str
-    enabled: bool
     success: int
     failures: str
+    script_id: str = None
+    script_name: str = None
     created_by: str = None
+    enabled: bool = None
 
 
 def _get_init_script_data(w, init_script_info):
@@ -155,7 +155,14 @@ class GlobalInitScriptCrawler(CrawlerBase):
                     f"Script {gis.name} have Unknown creator, it means that the original creator has been deleted"
                     f" and should be re-created"
                 )
-            global_init_script_info = GlobalInitScriptInfo(gis.script_id, gis.name, gis.enabled, 1, "", gis.created_by)
+            global_init_script_info = GlobalInitScriptInfo(
+                script_id=gis.script_id,
+                script_name=gis.name,
+                created_by=gis.created_by,
+                enabled=gis.enabled,
+                success=1,
+                failures="",
+            )
             failures = []
             global_init_script = base64.b64decode(self._ws.global_init_scripts.get(gis.script_id).script).decode(
                 "utf-8"
@@ -394,7 +401,13 @@ class PipelinesCrawler(CrawlerBase):
                     f"Pipeline {pipeline.name} have Unknown creator, it means that the original creator "
                     f"has been deleted and should be re-created"
                 )
-            pipeline_info = PipelineInfo(pipeline.pipeline_id, pipeline.name, 1, "", pipeline.creator_user_name)
+            pipeline_info = PipelineInfo(
+                pipeline_id=pipeline.pipeline_id,
+                pipeline_name=pipeline.name,
+                creator_name=pipeline.creator_user_name,
+                success=1,
+                failures="",
+            )
 
             failures = []
             pipeline_config = self._ws.pipelines.get(pipeline.pipeline_id).spec.configuration
@@ -434,11 +447,11 @@ class ClustersCrawler(CrawlerBase):
                     f"has been deleted and should be re-created"
                 )
             cluster_info = ClusterInfo(
-                cluster.cluster_id,
-                cluster.cluster_name,
-                1,
-                "",
-                cluster.creator_user_name,
+                cluster_id=cluster.cluster_id,
+                cluster_name=cluster.cluster_name,
+                creator=cluster.creator_user_name,
+                success=1,
+                failures="",
             )
             support_status = spark_version_compatibility(cluster.spark_version)
             failures = []
@@ -532,7 +545,14 @@ class JobsCrawler(CrawlerBase):
                     f"Job {job.job_id} have Unknown creator, it means that the original creator has been deleted "
                     f"and should be re-created"
                 )
-            job_details[job.job_id] = JobInfo(str(job.job_id), job.settings.name, 1, "", job.creator_user_name)
+
+            job_details[job.job_id] = JobInfo(
+                job_id=str(job.job_id),
+                job_name=job.settings.name,
+                creator=job.creator_user_name,
+                success=1,
+                failures="",
+            )
 
         for job, cluster_config in self._get_cluster_configs_from_all_jobs(all_jobs, all_clusters_by_id):
             support_status = spark_version_compatibility(cluster_config.spark_version)
