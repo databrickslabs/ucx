@@ -113,9 +113,6 @@ class WorkspaceInstaller:
     def run_for_config(
         ws: WorkspaceClient, config: WorkspaceConfig, *, prefix="ucx", override_clusters: dict[str, str] | None = None
     ) -> "WorkspaceInstaller":
-    def run_for_config(
-        ws: WorkspaceClient, config: WorkspaceConfig, *, prefix="ucx", override_clusters: dict[str, str] | None = None
-    ) -> "WorkspaceInstaller":
         logger.info(f"Installing UCX v{__version__} on {ws.config.host}")
         workspace_installer = WorkspaceInstaller(ws, prefix=prefix, promtps=False)
         logger.info(f"Installing UCX v{workspace_installer._version} on {ws.config.host}")
