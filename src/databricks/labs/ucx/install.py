@@ -108,7 +108,7 @@ class WorkspaceInstaller:
         self._install_spark_config_for_hms_lineage()
         self._create_dashboards()
         self._create_jobs()
-        readme = f'{self._notebook_link(f"{self._install_folder}/README.py")}'
+        readme = f'{self.notebook_link(f"{self._install_folder}/README.py")}'
         msg = f"Installation completed successfully! Please refer to the {readme} notebook for next steps."
         logger.info(msg)
 
@@ -249,14 +249,14 @@ class WorkspaceInstaller:
         return f"/Users/{self._my_username}/.{self._prefix}"
 
     @property
-    def _config_file(self):
+    def config_file(self):
         return f"{self._install_folder}/config.yml"
 
     @property
     def _current_config(self):
         if hasattr(self, "_config"):
             return self._config
-        with self._ws.workspace.download(self._config_file) as f:
+        with self._ws.workspace.download(self.config_file) as f:
             self._config = WorkspaceConfig.from_bytes(f.read())
         return self._config
 
@@ -279,9 +279,9 @@ class WorkspaceInstaller:
         return inventory_database
 
     def _configure(self):
-        ws_file_url = self._notebook_link(self._config_file)
+        ws_file_url = self.notebook_link(self.config_file)
         try:
-            self._ws.workspace.get_status(self._config_file)
+            self._ws.workspace.get_status(self.config_file)
             logger.info(f"UCX is already configured. See {ws_file_url}")
             if self._prompts and self._question("Open config file in the browser", default="yes") == "yes":
                 webbrowser.open(ws_file_url)
@@ -377,13 +377,13 @@ class WorkspaceInstaller:
             self._ws.workspace.mkdirs(self._install_folder)
 
         config_bytes = yaml.dump(self._config.as_dict()).encode("utf8")
-        logger.info(f"Creating configuration file: {self._config_file}")
-        self._ws.workspace.upload(self._config_file, config_bytes, format=ImportFormat.AUTO)
+        logger.info(f"Creating configuration file: {self.config_file}")
+        self._ws.workspace.upload(self.config_file, config_bytes, format=ImportFormat.AUTO)
 
     def _create_jobs(self):
         logger.debug(f"Creating jobs from tasks in {main.__name__}")
         remote_wheel = self._upload_wheel()
-        self._deployed_steps = self._deployed_steps()
+        self._deployed_steps = self.deployed_steps()
         desired_steps = {t.workflow for t in _TASKS.values()}
         wheel_runner = None
 
@@ -424,7 +424,7 @@ class WorkspaceInstaller:
     def _create_readme(self):
         md = [
             "# UCX - The Unity Catalog Migration Assistant",
-            f'To troubleshoot, see [debug notebook]({self._notebook_link(f"{self._install_folder}/DEBUG.py")}).\n',
+            f'To troubleshoot, see [debug notebook]({self.notebook_link(f"{self._install_folder}/DEBUG.py")}).\n',
             "Here are the URLs and descriptions of workflows that trigger various stages of migration.",
             "All jobs are defined with necessary cluster configurations and DBR versions.\n",
         ]
@@ -457,7 +457,7 @@ class WorkspaceInstaller:
         intro = "\n".join(preamble + [f"# MAGIC {line}" for line in md])
         path = f"{self._install_folder}/README.py"
         self._ws.workspace.upload(path, intro.encode("utf8"), overwrite=True)
-        url = self._notebook_link(path)
+        url = self.notebook_link(path)
         logger.info(f"Created README notebook with job overview: {url}")
         msg = "Open job overview in README notebook in your home directory ?"
         if self._prompts and self._question(msg, default="yes") == "yes":
@@ -467,22 +467,22 @@ class WorkspaceInstaller:
         return text.replace("$inventory", f"hive_metastore.{self._current_config.inventory_database}")
 
     def _create_debug(self, remote_wheel: str):
-        readme_link = self._notebook_link(f"{self._install_folder}/README.py")
+        readme_link = self.notebook_link(f"{self._install_folder}/README.py")
         job_links = ", ".join(
             f"[{self._name(step_name)}]({self._ws.config.host}#job/{job_id})"
             for step_name, job_id in self._deployed_steps.items()
         )
         path = f"{self._install_folder}/DEBUG.py"
-        logger.debug(f"Created debug notebook: {self._notebook_link(path)}")
+        logger.debug(f"Created debug notebook: {self.notebook_link(path)}")
         self._ws.workspace.upload(
             path,
             DEBUG_NOTEBOOK.format(
-                remote_wheel=remote_wheel, readme_link=readme_link, job_links=job_links, config_file=self._config_file
+                remote_wheel=remote_wheel, readme_link=readme_link, job_links=job_links, config_file=self.config_file
             ).encode("utf8"),
             overwrite=True,
         )
 
-    def _notebook_link(self, path: str) -> str:
+    def notebook_link(self, path: str) -> str:
         return f"{self._ws.config.host}/#workspace{path}"
 
     def _choice_from_dict(self, text: str, choices: dict[str, Any]) -> Any:
@@ -569,8 +569,8 @@ class WorkspaceInstaller:
     def _upload_wheel_runner(self, remote_wheel: str):
         # TODO: we have to be doing this workaround until ES-897453 is solved in the platform
         path = f"{self._install_folder}/wheels/wheel-test-runner-{self._version}.py"
-        logger.debug(f"Created runner notebook: {self._notebook_link(path)}")
-        py = TEST_RUNNER_NOTEBOOK.format(remote_wheel=remote_wheel, config_file=self._config_file).encode("utf8")
+        logger.debug(f"Created runner notebook: {self.notebook_link(path)}")
+        py = TEST_RUNNER_NOTEBOOK.format(remote_wheel=remote_wheel, config_file=self.config_file).encode("utf8")
         self._ws.workspace.upload(path, py, overwrite=True)
         return path
 
@@ -624,7 +624,7 @@ class WorkspaceInstaller:
                 base_parameters={
                     "inventory_database": self._current_config.inventory_database,
                     "task": task.name,
-                    "config": f"/Workspace{self._config_file}",
+                    "config": f"/Workspace{self.config_file}",
                 }
                 | EXTRA_TASK_PARAMS,
             ),
@@ -637,7 +637,7 @@ class WorkspaceInstaller:
             python_wheel_task=jobs.PythonWheelTask(
                 package_name="databricks_labs_ucx",
                 entry_point="runtime",  # [project.entry-points.databricks] in pyproject.toml
-                named_parameters={"task": task.name, "config": f"/Workspace{self._config_file}"} | EXTRA_TASK_PARAMS,
+                named_parameters={"task": task.name, "config": f"/Workspace{self.config_file}"} | EXTRA_TASK_PARAMS,
             ),
         )
 
@@ -774,7 +774,7 @@ class WorkspaceInstaller:
             )
         return replace(spec, gcp_attributes=compute.GcpAttributes(availability=compute.GcpAvailability.ON_DEMAND_GCP))
 
-    def _deployed_steps(self):
+    def deployed_steps(self):
         deployed_steps = {}
         logger.debug(f"Fetching all jobs to determine already deployed steps for app={self._app}")
         for j in self._ws.jobs.list():
