@@ -15,7 +15,6 @@ from typing import Any
 import yaml
 from databricks.sdk import WorkspaceClient
 from databricks.sdk.core import DatabricksError
-from databricks.sdk.mixins.compute import SemVer
 from databricks.sdk.errors import OperationFailed
 from databricks.sdk.mixins.compute import SemVer
 from databricks.sdk.service import compute, jobs
@@ -292,32 +291,34 @@ class WorkspaceInstaller:
         # Checking for external HMS
         instance_profile = None
         spark_conf_dict = {}
-        ext_hms_confs = list(self._get_ext_hms_confs())
-        if (
-            self._prompts
-            and len(ext_hms_confs) > 0
-            and self._question(
-                "We have identified one or more cluster policies set up for an external metastore. "
-                "Would you like to set UCX to connect to the external metastore.",
-                default="no",
-            )
-            == "yes"
-        ):
-            logger.info("Setting up an external metastore")
-            cluster_policies = {conf.name: conf.definition for conf in ext_hms_confs}
-            instance_profile = ""
-            if len(cluster_policies) > 1:
-                cluster_policy = json.loads(
-                    self._choice_from_dict("Select a Cluster Policy from The List", cluster_policies)
+        if self._prompts:
+            ext_hms_confs = list(self._get_ext_hms_confs())
+            if (
+                len(ext_hms_confs) > 0
+                and self._question(
+                    "We have identified one or more cluster policies set up for an external metastore. "
+                    "Would you like to set UCX to connect to the external metastore.",
+                    default="no",
                 )
-                if cluster_policy.get("aws_attributes.instance_profile_arn") is not None:
-                    instance_profile = cluster_policy.get("aws_attributes.instance_profile_arn").get("value")
-                    logger.info(f"Instance Profile is Set to {instance_profile}")
-                for key in cluster_policy.keys():
-                    if key.startswith("spark_conf.sql.hive.metastore") or \
-                            key.startswith("spark_conf.spark.hadoop.javax.jdo.option") or \
-                            key.startswith("spark_conf.spark.databricks.hive.metastore"):
-                        spark_conf_dict[key[11:]] = cluster_policy[key]["value"]
+                == "yes"
+            ):
+                logger.info("Setting up an external metastore")
+                cluster_policies = {conf.name: conf.definition for conf in ext_hms_confs}
+                instance_profile = ""
+                if len(cluster_policies) >= 1:
+                    cluster_policy = json.loads(
+                        self._choice_from_dict("Select a Cluster Policy from The List", cluster_policies)
+                    )
+                    if cluster_policy.get("aws_attributes.instance_profile_arn") is not None:
+                        instance_profile = cluster_policy.get("aws_attributes.instance_profile_arn").get("value")
+                        logger.info(f"Instance Profile is Set to {instance_profile}")
+                    for key in cluster_policy.keys():
+                        if (
+                            key.startswith("spark_conf.sql.hive.metastore")
+                            or key.startswith("spark_conf.spark.hadoop.javax.jdo.option")
+                            or key.startswith("spark_conf.spark.databricks.hive.metastore")
+                        ):
+                            spark_conf_dict[key[11:]] = cluster_policy[key]["value"]
 
         self._config = WorkspaceConfig(
             inventory_database=inventory_database,
@@ -599,15 +600,22 @@ class WorkspaceInstaller:
 
     def _job_clusters(self, names: set[str]):
         clusters = []
+        spark_conf = {
+            "spark.databricks.cluster.profile": "singleNode",
+            "spark.master": "local[*]",
+        }
+        if self._config.spark_conf is not None:
+            spark_conf = spark_conf | self._config.spark_conf
         spec = self._cluster_node_type(
             compute.ClusterSpec(
                 spark_version=self._ws.clusters.select_spark_version(latest=True),
                 data_security_mode=compute.DataSecurityMode.NONE,
-                spark_conf={"spark.databricks.cluster.profile": "singleNode", "spark.master": "local[*]"},
+                spark_conf=spark_conf,
                 custom_tags={"ResourceClass": "SingleNode"},
                 num_workers=0,
             )
         )
+
         if "main" in names:
             clusters.append(
                 jobs.JobCluster(
@@ -714,7 +722,13 @@ class WorkspaceInstaller:
             return replace(spec, instance_pool_id=cfg.instance_pool_id)
         spec = replace(spec, node_type_id=self._ws.clusters.select_node_type(local_disk=True))
         if self._ws.config.is_aws:
-            return replace(spec, aws_attributes=compute.AwsAttributes(availability=compute.AwsAvailability.ON_DEMAND))
+            if cfg.instance_profile is not None:
+                aws_attributes = compute.AwsAttributes(
+                    availability=compute.AwsAvailability.ON_DEMAND, instance_profile_arn=cfg.instance_profile
+                )
+            else:
+                aws_attributes = compute.AwsAttributes(availability=compute.AwsAvailability.ON_DEMAND)
+            return replace(spec, aws_attributes=aws_attributes)
         if self._ws.config.is_azure:
             return replace(
                 spec, azure_attributes=compute.AzureAttributes(availability=compute.AzureAvailability.ON_DEMAND_AZURE)
