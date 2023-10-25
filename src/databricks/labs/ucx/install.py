@@ -1,6 +1,7 @@
 import datetime
 import logging
 import os
+import json
 import re
 import shutil
 import subprocess
@@ -287,27 +288,6 @@ class WorkspaceInstaller:
         else:
             groups_config_args["auto"] = True
 
-        instance_profile = None
-        spark_conf_list = []
-        # Options for external metastore
-        if (
-            self._prompts
-            and self._question("Do you need to configure an external Hive Metastore (Glue)", default="no") == "yes"
-        ):
-            logger.info("Setting up an external metastore")
-            instance_profiles = self._instance_profiles()
-            instance_profile = ""
-            if len(instance_profiles) > 1:
-                instance_profile = self._choice_from_dict("Select Instance Profile from List", instance_profiles)
-
-            spark_conf = self._question(
-                "Please enter a comma-separated list of spark config options.",
-                default="",
-            )
-            if spark_conf != "":
-                spark_conf_list = [x.strip() for x in spark_conf.split(",")]
-
-
         # Checking for external HMS
         instance_profile = None
         spark_conf_dict = {}
@@ -347,7 +327,7 @@ class WorkspaceInstaller:
             log_level=log_level,
             num_threads=num_threads,
             instance_profile=instance_profile,
-            spark_config=spark_conf_list,
+            spark_conf=spark_conf_dict,
         )
 
         self._write_config()
@@ -631,12 +611,6 @@ class WorkspaceInstaller:
 
     def _job_clusters(self, names: set[str]):
         clusters = []
-        spark_conf = {"spark.databricks.cluster.profile": "singleNode", "spark.master": "local[*]"}
-        for conf in self._config.spark_conf:
-            sp_conf = conf.split(" ")
-            if len(sp_conf) > 1:
-                continue
-            spark_conf[sp_conf[0]] = sp_conf[1]
         spark_conf = {
             "spark.databricks.cluster.profile": "singleNode",
             "spark.master": "local[*]",
