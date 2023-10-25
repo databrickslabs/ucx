@@ -287,14 +287,14 @@ class GroupManager:
         self._reflect_account_group_to_workspace(migration_info.account)
 
     @retried(on=[DatabricksError])
-    @rate_limited(max_requests=5)
+    @rate_limited(max_requests=35)
     def _delete_workspace_group(self, ws_group: iam.Group) -> None:
         logger.info(f"Deleting the workspace-level group {ws_group.display_name} with id {ws_group.id}")
         self._ws.groups.delete(id=ws_group.id)
         logger.info(f"Workspace-level group {ws_group.display_name} with id {ws_group.id} was deleted")
 
     @retried(on=[DatabricksError])
-    @rate_limited(max_requests=10)
+    @rate_limited(max_requests=5)
     def _reflect_account_group_to_workspace(self, acc_group: iam.Group) -> None:
         logger.info(f"Reflecting group {acc_group.display_name} to workspace")
 
