@@ -200,7 +200,6 @@ class GenericPermissionsSupport(AclSupport):
                 "PERMISSION_DENIED",
                 "FEATURE_DISABLED",
                 "RESOURCE_DOES_NOT_EXIST",
-                "INTERNAL_SERVER_ERROR",
             ]:
                 logger.warning(f"Could not update permissions for {object_type} {object_id} due to {e.error_code}")
                 return None

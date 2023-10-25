@@ -99,7 +99,6 @@ class ScimSupport(AclSupport):
                 "PERMISSION_DENIED",
                 "FEATURE_DISABLED",
                 "RESOURCE_DOES_NOT_EXIST",
-                "INTERNAL_SERVER_ERROR",
             ]:
                 logger.warning(f"Could not apply changes to group {id} due to {e.error_code}")
                 return None
@@ -120,7 +119,6 @@ class ScimSupport(AclSupport):
                 "PERMISSION_DENIED",
                 "FEATURE_DISABLED",
                 "RESOURCE_DOES_NOT_EXIST",
-                "INTERNAL_SERVER_ERROR",
             ]:
                 logger.warning(f"Could not get details of group {id} due to {e.error_code}")
                 return None

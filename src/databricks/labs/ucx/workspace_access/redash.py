@@ -158,7 +158,6 @@ class RedashPermissionsSupport(AclSupport):
                 "UNAUTHORIZED",
                 "PERMISSION_DENIED",
                 "NOT_FOUND",
-                "INTERNAL_ERROR",
             ]:
                 logger.warning(f"Could not update permissions for {object_type} {object_id} due to {e.error_code}")
                 return None
