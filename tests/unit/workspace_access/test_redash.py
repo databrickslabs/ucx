@@ -232,15 +232,11 @@ def test_applier_task_should_be_called_three_times_if_permission_is_not_up_to_da
         [input_acl],
     )
 
-    assert len(ws.dbsql_permissions.set.mock_calls) == 3
+    assert len(ws.dbsql_permissions.set.mock_calls) == 1
     assert ws.dbsql_permissions.set.mock_calls == [
-        call(object_type=sql.ObjectTypePlural.QUERIES, object_id="test", access_control_list=[input_acl]),
-        call(object_type=sql.ObjectTypePlural.QUERIES, object_id="test", access_control_list=[input_acl]),
         call(object_type=sql.ObjectTypePlural.QUERIES, object_id="test", access_control_list=[input_acl]),
     ]
-    assert len(ws.dbsql_permissions.get.mock_calls) == 3
+    assert len(ws.dbsql_permissions.get.mock_calls) == 1
     assert ws.dbsql_permissions.set.mock_calls == [
-        call(object_type=sql.ObjectTypePlural.QUERIES, object_id="test", access_control_list=[input_acl]),
-        call(object_type=sql.ObjectTypePlural.QUERIES, object_id="test", access_control_list=[input_acl]),
         call(object_type=sql.ObjectTypePlural.QUERIES, object_id="test", access_control_list=[input_acl]),
     ]

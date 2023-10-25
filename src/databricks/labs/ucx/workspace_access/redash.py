@@ -5,10 +5,13 @@ import time
 from collections.abc import Callable
 from dataclasses import dataclass
 from functools import partial
+from typing import List, Optional
 
 from databricks.sdk import WorkspaceClient
 from databricks.sdk.core import DatabricksError
+from databricks.sdk.retries import retried
 from databricks.sdk.service import sql
+from databricks.sdk.service.sql import ObjectTypePlural, AccessControl, SetResponse
 
 from databricks.labs.ucx.mixins.hardening import rate_limited
 from databricks.labs.ucx.workspace_access.base import (
@@ -16,6 +19,7 @@ from databricks.labs.ucx.workspace_access.base import (
     Destination,
     Permissions,
 )
+from databricks.labs.ucx.workspace_access.generic import RetryableError
 from databricks.labs.ucx.workspace_access.groups import GroupMigrationState
 
 logger = logging.getLogger(__name__)
@@ -107,20 +111,18 @@ class RedashPermissionsSupport(AclSupport):
         Please note that we only have SET option (DBSQL Permissions API doesn't support UPDATE operation).
         This affects the way how we prepare the new ACL request.
         """
-        for _i in range(0, 3):
-            self._ws.dbsql_permissions.set(object_type=object_type, object_id=object_id, access_control_list=acl)
+        self._safe_set_permissions(object_type=object_type, object_id=object_id, acl=acl)
 
-            remote_permission = self._safe_get_dbsql_permissions(object_type, object_id)
-            if all(elem in remote_permission.access_control_list for elem in acl):
-                return True
+        remote_permission = self._safe_get_dbsql_permissions(object_type, object_id)
+        if all(elem in remote_permission.access_control_list for elem in acl):
+            return True
 
-            logger.warning(
-                f"""Couldn't apply appropriate permission for object type {object_type} with id {object_id}
-            acl to be applied={acl}
-            acl found in the object={remote_permission}
-            """
-            )
-            time.sleep(1 + _i)
+        logger.warning(
+            f"""Couldn't apply appropriate permission for object type {object_type} with id {object_id}
+        acl to be applied={acl}
+        acl found in the object={remote_permission}
+        """
+        )
         return False
 
     def _prepare_new_acl(
@@ -143,6 +145,27 @@ class RedashPermissionsSupport(AclSupport):
             new_acl_request = dataclasses.replace(access_control, group_name=target_principal)
             acl_requests.append(new_acl_request)
         return acl_requests
+
+    @retried(on=[RetryableError])
+    def _safe_set_permissions(
+            self, object_type: ObjectTypePlural, object_id: str, acl: Optional[List[AccessControl]] = None
+    ) -> SetResponse | None:
+        try:
+            return self._ws.dbsql_permissions.set(object_type=object_type, object_id=object_id, access_control_list=acl)
+        except DatabricksError as e:
+            if e.error_code in [
+                "BAD_REQUEST",
+                "UNAUTHORIZED",
+                "PERMISSION_DENIED",
+                "NOT_FOUND",
+                "INTERNAL_ERROR",
+            ]:
+                logger.warning(f"Could not update permissions for {object_type} {object_id} due to {e.error_code}")
+                return None
+            else:
+                raise RetryableError() from e
+
+
 
 
 def redash_listing_wrapper(
