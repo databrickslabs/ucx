@@ -38,3 +38,7 @@ class AclSupport:
     @abstractmethod
     def object_types(self) -> set[str]:
         """This method returns a set of strings, that represent object types that are applicable by this instance."""
+
+    @abstractmethod
+    def concurrency_support_for_apply_task(self) -> bool:
+        return True

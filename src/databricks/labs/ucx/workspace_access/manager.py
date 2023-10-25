@@ -93,11 +93,46 @@ class PermissionManager(CrawlerBase):
             f"Total groups to apply permissions: {len(migration_state)}. "
             f"Total permissions found: {len(items)}"
         )
-        applier_tasks = []
+
         supports_to_items = {
             support: list(items_subset) for support, items_subset in groupby(items, key=lambda i: i.object_type)
         }
 
+        applier_tasks, applier_tasks_no_concurrency = self._get_appliers(
+            destination, migration_state, supports_to_items
+        )
+
+        logger.info(
+            f"Starting to apply permissions on {destination} groups. Total tasks: "
+            f"{len(applier_tasks) + len(applier_tasks_no_concurrency)}"
+        )
+
+        _, errors = Threads.gather(f"apply {destination} group permissions", applier_tasks)
+
+        logger.debug(f"Starting {len(applier_tasks_no_concurrency)} tasks serially")
+        for applier in applier_tasks_no_concurrency:
+            try:
+                logger.debug(f"Starting task for {applier.object_types}")
+                applier()
+            except Exception as err:
+                logger.error(f"Task for {applier.object_types} failed: {err!s}", exc_info=err)
+                errors.append(err)
+
+        if len(errors) > 0:
+            # TODO: https://github.com/databrickslabs/ucx/issues/406
+            logger.error(f"Detected {len(errors)} while applying permissions")
+            return False
+
+        logger.info("Permissions were applied")
+
+        return True
+
+    def _get_appliers(
+        self,
+        destination: Literal["backup", "account"],
+        migration_state: GroupMigrationState,
+        supports_to_items: dict[str, list[Permissions]],
+    ) -> (list[Callable[[], None]], list[Callable[[], None]]):
         appliers = self._appliers()
 
         # we first check that all supports are valid.
@@ -106,34 +141,38 @@ class PermissionManager(CrawlerBase):
                 msg = f"Could not find support for {object_type}. Please check the inventory table."
                 raise ValueError(msg)
 
-        for object_type, items_subset in supports_to_items.items():
-            relevant_support = appliers[object_type]
-            tasks_for_support = [
-                relevant_support.get_apply_task(item, migration_state, destination) for item in items_subset
-            ]
-            tasks_for_support = [_ for _ in tasks_for_support if _ is not None]
-            if len(tasks_for_support) == 0:
-                continue
-            logger.info(f"Total tasks for {object_type}: {len(tasks_for_support)}")
-            applier_tasks.extend(tasks_for_support)
+        applier_tasks = []
+        applier_tasks_no_concurrency_support = []
 
-        logger.info(f"Starting to apply permissions on {destination} groups. Total tasks: {len(applier_tasks)}")
-        _, errors = Threads.gather(f"apply {destination} group permissions", applier_tasks)
-        if len(errors) > 0:
-            # TODO: https://github.com/databrickslabs/ucx/issues/406
-            logger.error(f"Detected {len(errors)} while applying permissions")
-            return False
-        logger.info("Permissions were applied")
-        return True
+        for object_type, items_subset in supports_to_items.items():
+            applier = appliers[object_type]
+
+            tasks = [
+                task
+                for task in (applier.get_apply_task(item, migration_state, destination) for item in items_subset)
+                if task is not None
+            ]
+
+            if len(tasks) == 0:
+                continue
+
+            logger.info(f"Total tasks for {object_type}: {len(tasks)}")
+
+            if applier.concurrency_support_for_apply_task():
+                applier_tasks.extend(tasks)
+            else:
+                applier_tasks_no_concurrency_support.extend(tasks)
+
+        return applier_tasks, applier_tasks_no_concurrency_support
 
     def _appliers(self) -> dict[str, AclSupport]:
         appliers = {}
-        for support in self._acl_support:
-            for object_type in support.object_types():
+        for applier in self._acl_support:
+            for object_type in applier.object_types():
                 if object_type in appliers:
                     msg = f"{object_type} is already supported by {type(appliers[object_type]).__name__}"
                     raise KeyError(msg)
-                appliers[object_type] = support
+                appliers[object_type] = applier
         return appliers
 
     def cleanup(self):

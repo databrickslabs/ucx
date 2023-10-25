@@ -41,3 +41,7 @@ class TableAclSupport(AclSupport):
         sql = target_grant.hive_grant_sql()
         # this has to be executed on tacl cluster, otherwise - use SQLExecutionAPI backend & Warehouse
         return partial(self._sql_backend.execute, sql)
+
+    # TODO: enable once Table ACL Grants concurrency issue is fixed: https://databricks.atlassian.net/browse/ES-908737
+    def concurrency_support_for_apply_task(self):
+        return False
