@@ -109,7 +109,7 @@ class GenericPermissionsSupport(AclSupport):
 
     @rate_limited(max_requests=30)
     def _applier_task(self, object_type: str, object_id: str, acl: list[iam.AccessControlRequest]):
-        self._safe_update_permissions(object_type, object_id, access_control_list=acl)
+        self._safe_update_permissions(object_type, object_id, acl=acl)
 
         remote_permission = self._safe_get_permissions(object_type, object_id)
         remote_permission_as_request = self._response_to_request(remote_permission.access_control_list)
@@ -186,7 +186,6 @@ class GenericPermissionsSupport(AclSupport):
             else:
                 raise RetryableError() from e
 
-    # TODO remove after ES-892977 is fixed
     @retried(on=[RetryableError])
     def _safe_update_permissions(
         self, object_type: str, object_id: str, acl: list[iam.AccessControlRequest]

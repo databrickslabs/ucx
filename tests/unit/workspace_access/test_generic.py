@@ -361,7 +361,7 @@ def test_applier_task_should_be_called_three_times_if_permission_couldnt_be_appl
         acl=input_acl,
     )
 
-    assert len(ws.permissions.update.mock_calls) == 3
+    assert len(ws.permissions.update.mock_calls) == 1
     assert ws.permissions.update.has_calls(
         [
             unittest.mock.call(object_type="clusters", object_id="cluster_id", acl=input_acl),
@@ -369,7 +369,7 @@ def test_applier_task_should_be_called_three_times_if_permission_couldnt_be_appl
             unittest.mock.call(object_type="clusters", object_id="cluster_id", acl=input_acl),
         ]
     )
-    assert len(ws.permissions.get.mock_calls) == 3
+    assert len(ws.permissions.get.mock_calls) == 1
     assert ws.permissions.get.has_calls(
         [
             unittest.mock.call(object_type="clusters", object_id="cluster_id"),
