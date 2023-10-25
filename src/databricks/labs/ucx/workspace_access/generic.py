@@ -1,7 +1,6 @@
 import datetime
 import json
 import logging
-import time
 from collections.abc import Callable, Iterator
 from dataclasses import dataclass
 from functools import partial
@@ -110,21 +109,19 @@ class GenericPermissionsSupport(AclSupport):
 
     @rate_limited(max_requests=30)
     def _applier_task(self, object_type: str, object_id: str, acl: list[iam.AccessControlRequest]):
-        for _i in range(0, 3):
-            self._ws.permissions.update(object_type, object_id, access_control_list=acl)
+        self._safe_update_permissions(object_type, object_id, access_control_list=acl)
 
-            remote_permission = self._safe_get_permissions(object_type, object_id)
-            remote_permission_as_request = self._response_to_request(remote_permission.access_control_list)
-            if all(elem in remote_permission_as_request for elem in acl):
-                return True
+        remote_permission = self._safe_get_permissions(object_type, object_id)
+        remote_permission_as_request = self._response_to_request(remote_permission.access_control_list)
+        if all(elem in remote_permission_as_request for elem in acl):
+            return True
 
-            logger.warning(
-                f"""Couldn't apply appropriate permission for object type {object_type} with id {object_id}
-            acl to be applied={acl}
-            acl found in the object={remote_permission_as_request}
-            """
-            )
-            time.sleep(1 + _i)
+        logger.warning(
+            f"""Couldn't apply appropriate permission for object type {object_type} with id {object_id}
+        acl to be applied={acl}
+        acl found in the object={remote_permission_as_request}
+        """
+        )
         return False
 
     @rate_limited(max_requests=100)
@@ -185,6 +182,28 @@ class GenericPermissionsSupport(AclSupport):
                 "FEATURE_DISABLED",
             ]:
                 logger.warning(f"Could not get permissions for {object_type} {object_id} due to {e.error_code}")
+                return None
+            else:
+                raise RetryableError() from e
+
+    # TODO remove after ES-892977 is fixed
+    @retried(on=[RetryableError])
+    def _safe_update_permissions(
+        self, object_type: str, object_id: str, acl: list[iam.AccessControlRequest]
+    ) -> iam.ObjectPermissions | None:
+        try:
+            return self._ws.permissions.update(object_type, object_id, access_control_list=acl)
+        except DatabricksError as e:
+            if e.error_code in [
+                "BAD_REQUEST",
+                "INVALID_PARAMETER_VALUE",
+                "UNAUTHORIZED",
+                "PERMISSION_DENIED",
+                "FEATURE_DISABLED",
+                "RESOURCE_DOES_NOT_EXIST",
+                "INTERNAL_SERVER_ERROR",
+            ]:
+                logger.warning(f"Could not update permissions for {object_type} {object_id} due to {e.error_code}")
                 return None
             else:
                 raise RetryableError() from e
