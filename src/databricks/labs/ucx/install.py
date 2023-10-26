@@ -317,6 +317,7 @@ class WorkspaceInstaller:
                             key.startswith("spark_conf.sql.hive.metastore")
                             or key.startswith("spark_conf.spark.hadoop.javax.jdo.option")
                             or key.startswith("spark_conf.spark.databricks.hive.metastore")
+                            or key.startswith("spark_conf.spark.hadoop.hive.metastore.glue")
                         ):
                             spark_conf_dict[key[11:]] = cluster_policy[key]["value"]
 
