@@ -304,7 +304,7 @@ class WorkspaceInstaller:
             ):
                 logger.info("Setting up an external metastore")
                 cluster_policies = {conf.name: conf.definition for conf in ext_hms_confs}
-                instance_profile = ""
+                instance_profile = None
                 if len(cluster_policies) >= 1:
                     cluster_policy = json.loads(
                         self._choice_from_dict("Select a Cluster Policy from The List", cluster_policies)
