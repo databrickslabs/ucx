@@ -109,6 +109,7 @@ def test_jobs_with_no_inventory_database(
     sql_backend.execute(f"GRANT USAGE ON SCHEMA default TO `{ws_group_a.display_name}`")
     sql_backend.execute(f"GRANT USAGE ON SCHEMA default TO `{ws_group_b.display_name}`")
     sql_backend.execute(f"GRANT SELECT ON TABLE {table_a.full_name} TO `{ws_group_a.display_name}`")
+    sql_backend.execute(f"GRANT MODIFY ON TABLE {table_a.full_name} TO `{ws_group_a.display_name}`")
     sql_backend.execute(f"GRANT SELECT ON TABLE {table_b.full_name} TO `{ws_group_b.display_name}`")
     sql_backend.execute(f"GRANT MODIFY ON SCHEMA {schema_b.full_name} TO `{ws_group_b.display_name}`")
 
