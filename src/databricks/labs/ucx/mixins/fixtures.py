@@ -810,9 +810,8 @@ def make_table(ws, sql_backend, make_schema, make_random) -> Callable[..., Table
         except RuntimeError as e:
             if "Cannot drop a view" in str(e):
                 sql_backend.execute(f"DROP VIEW IF EXISTS {table_info.full_name}")
-            if "SCHEMA_NOT_FOUND" in str(e):
+            elif "SCHEMA_NOT_FOUND" in str(e):
                 logger.warning("Schema was already dropped while executing the test", exc_info=e)
-                pass
             else:
                 raise e
 
