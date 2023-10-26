@@ -89,7 +89,7 @@ class SecretScopesSupport(AclSupport):
             raise ValueError(msg)
         return True
 
-    @rate_limited(max_requests=30)
+    @rate_limited(max_requests=1100, burst_period_seconds=60)
     def _rate_limited_put_acl(self, object_id: str, principal: str, permission: workspace.AclPermission):
         self._ws.secrets.put_acl(object_id, principal, permission)
         retry_on_value_error = retried(on=[ValueError], timeout=self._verify_timeout)
