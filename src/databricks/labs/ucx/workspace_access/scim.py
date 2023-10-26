@@ -1,5 +1,6 @@
 import json
 import logging
+from datetime import timedelta
 from functools import partial
 
 from databricks.sdk import WorkspaceClient
@@ -21,8 +22,9 @@ logger = logging.getLogger(__name__)
 
 
 class ScimSupport(AclSupport):
-    def __init__(self, ws: WorkspaceClient):
+    def __init__(self, ws: WorkspaceClient, verify_timeout: timedelta | None = timedelta(minutes=20)):
         self._ws = ws
+        self._verify_timeout = verify_timeout
 
     @staticmethod
     def _is_item_relevant(item: Permissions, migration_state: GroupMigrationState) -> bool:
@@ -61,29 +63,37 @@ class ScimSupport(AclSupport):
             raw=json.dumps([e.as_dict() for e in getattr(group, property_name)]),
         )
 
+    def _inflight_check(self, group_id: str, value: list[iam.ComplexValue], property_name: str):
+        # in-flight check for the applied permissions
+        # the api might be inconsistent, therefore we need to check that the permissions were applied
+        set_retry_on_value_error = retried(on=[RetryableError], timeout=self._verify_timeout)
+        set_retried_check = set_retry_on_value_error(self._safe_get_group)
+        group = set_retried_check(group_id)
+        if property_name == "roles" and group.roles:
+            if all(elem in group.roles for elem in value):
+                return True
+        if property_name == "entitlements" and group.entitlements:
+            if all(elem in group.entitlements for elem in value):
+                return True
+        msg = f"""Couldn't apply appropriate role for group {group_id}
+                acl to be applied={[e.as_dict() for e in value]}
+                acl found in the object={group.as_dict()}
+                """
+        raise ValueError(msg)
+
     @rate_limited(max_requests=10, burst_period_seconds=60)
     def _applier_task(self, group_id: str, value: list[iam.ComplexValue], property_name: str):
         operations = [iam.Patch(op=iam.PatchOp.ADD, path=property_name, value=[e.as_dict() for e in value])]
         schemas = [iam.PatchSchema.URN_IETF_PARAMS_SCIM_API_MESSAGES_2_0_PATCH_OP]
-        self._safe_patch_group(group_id=group_id, operations=operations, schemas=schemas)
 
-        group = self._safe_get_group(group_id=group_id)
-        if property_name == "roles" and group.roles:
-            if all(elem in group.roles for elem in value):
-                return True
-        elif property_name == "entitlements" and group.entitlements:
-            if all(elem in group.entitlements for elem in value):
-                return True
+        patch_retry_on_value_error = retried(on=[RetryableError], timeout=self._verify_timeout)
+        patch_retried_check = patch_retry_on_value_error(self._safe_patch_group)
+        patch_retried_check(group_id=group_id, operations=operations, schemas=schemas)
 
-        logger.warning(
-            f"""Couldn't apply appropriate role for group {group_id}
-                acl to be applied={[e.as_dict() for e in value]}
-                acl found in the object={group.as_dict()}
-                """
-        )
-        return False
+        retry_on_value_error = retried(on=[ValueError], timeout=self._verify_timeout)
+        retried_check = retry_on_value_error(self._inflight_check)
+        return retried_check(group_id, value, property_name)
 
-    @retried(on=[RetryableError])
     def _safe_patch_group(
         self, group_id: str, operations: list[Patch] | None = None, schemas: list[PatchSchema] | None = None
     ):
@@ -103,7 +113,6 @@ class ScimSupport(AclSupport):
             else:
                 raise RetryableError() from e
 
-    @retried(on=[RetryableError])
     def _safe_get_group(self, group_id: str) -> Group | None:
         try:
             return self._ws.groups.get(group_id)
