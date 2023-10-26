@@ -1,17 +1,15 @@
 import dataclasses
 import json
 import logging
-import time
 from collections.abc import Callable
 from dataclasses import dataclass
 from functools import partial
-from typing import List, Optional
 
 from databricks.sdk import WorkspaceClient
 from databricks.sdk.core import DatabricksError
 from databricks.sdk.retries import retried
 from databricks.sdk.service import sql
-from databricks.sdk.service.sql import ObjectTypePlural, AccessControl, SetResponse
+from databricks.sdk.service.sql import ObjectTypePlural, SetResponse
 
 from databricks.labs.ucx.mixins.hardening import rate_limited
 from databricks.labs.ucx.workspace_access.base import (
@@ -148,7 +146,7 @@ class RedashPermissionsSupport(AclSupport):
 
     @retried(on=[RetryableError])
     def _safe_set_permissions(
-            self, object_type: ObjectTypePlural, object_id: str, acl: Optional[List[AccessControl]] = None
+        self, object_type: ObjectTypePlural, object_id: str, acl: list[sql.AccessControl] | None
     ) -> SetResponse | None:
         try:
             return self._ws.dbsql_permissions.set(object_type=object_type, object_id=object_id, access_control_list=acl)
@@ -163,8 +161,6 @@ class RedashPermissionsSupport(AclSupport):
                 return None
             else:
                 raise RetryableError() from e
-
-
 
 
 def redash_listing_wrapper(

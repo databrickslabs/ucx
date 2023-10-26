@@ -7,7 +7,6 @@ from databricks.sdk.service import compute, iam, ml
 from databricks.sdk.service.workspace import Language, ObjectInfo, ObjectType
 
 from databricks.labs.ucx.mixins.sql import Row
-
 from databricks.labs.ucx.workspace_access.generic import (
     GenericPermissionsSupport,
     Listing,

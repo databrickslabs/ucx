@@ -1,14 +1,12 @@
 import json
 import logging
-import time
 from functools import partial
-from typing import Optional, List
 
 from databricks.sdk import WorkspaceClient
 from databricks.sdk.core import DatabricksError
 from databricks.sdk.retries import retried
 from databricks.sdk.service import iam
-from databricks.sdk.service.iam import Patch, PatchSchema, Group
+from databricks.sdk.service.iam import Group, Patch, PatchSchema
 
 from databricks.labs.ucx.mixins.hardening import rate_limited
 from databricks.labs.ucx.workspace_access.base import (
@@ -67,9 +65,9 @@ class ScimSupport(AclSupport):
     def _applier_task(self, group_id: str, value: list[iam.ComplexValue], property_name: str):
         operations = [iam.Patch(op=iam.PatchOp.ADD, path=property_name, value=[e.as_dict() for e in value])]
         schemas = [iam.PatchSchema.URN_IETF_PARAMS_SCIM_API_MESSAGES_2_0_PATCH_OP]
-        self._safe_patch_group(id=group_id, operations=operations, schemas=schemas)
+        self._safe_patch_group(group_id=group_id, operations=operations, schemas=schemas)
 
-        group = self._safe_get_group(id=group_id)
+        group = self._safe_get_group(group_id=group_id)
         if property_name == "roles" and group.roles:
             if all(elem in group.roles for elem in value):
                 return True
@@ -87,10 +85,10 @@ class ScimSupport(AclSupport):
 
     @retried(on=[RetryableError])
     def _safe_patch_group(
-            self, id: str, operations: Optional[List[Patch]] = None, schemas: Optional[List[PatchSchema]] = None
-    ) -> None:
+        self, group_id: str, operations: list[Patch] | None = None, schemas: list[PatchSchema] | None = None
+    ):
         try:
-            return self._ws.groups.patch(id=id, operations=operations, schemas=schemas)
+            return self._ws.groups.patch(id=group_id, operations=operations, schemas=schemas)
         except DatabricksError as e:
             if e.error_code in [
                 "BAD_REQUEST",
@@ -100,17 +98,15 @@ class ScimSupport(AclSupport):
                 "FEATURE_DISABLED",
                 "RESOURCE_DOES_NOT_EXIST",
             ]:
-                logger.warning(f"Could not apply changes to group {id} due to {e.error_code}")
+                logger.warning(f"Could not apply changes to group {group_id} due to {e.error_code}")
                 return None
             else:
                 raise RetryableError() from e
 
     @retried(on=[RetryableError])
-    def _safe_get_group(
-            self, id: str
-    ) -> Group | None:
+    def _safe_get_group(self, group_id: str) -> Group | None:
         try:
-            return self._ws.groups.get(id)
+            return self._ws.groups.get(group_id)
         except DatabricksError as e:
             if e.error_code in [
                 "BAD_REQUEST",
@@ -120,10 +116,7 @@ class ScimSupport(AclSupport):
                 "FEATURE_DISABLED",
                 "RESOURCE_DOES_NOT_EXIST",
             ]:
-                logger.warning(f"Could not get details of group {id} due to {e.error_code}")
+                logger.warning(f"Could not get details of group {group_id} due to {e.error_code}")
                 return None
             else:
                 raise RetryableError() from e
-
-
-

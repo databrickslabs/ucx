@@ -46,7 +46,7 @@ def test_safe_patch_group_when_error_non_retriable():
         iam.Patch(op=iam.PatchOp.ADD, path="roles", value=[e.as_dict() for e in [iam.ComplexValue(value="role1")]])
     ]
     schemas = [iam.PatchSchema.URN_IETF_PARAMS_SCIM_API_MESSAGES_2_0_PATCH_OP]
-    result = sup._safe_patch_group(id="1", operations=operations, schemas=schemas)
+    result = sup._safe_patch_group(group_id="1", operations=operations, schemas=schemas)
     assert result is None
 
 
@@ -54,5 +54,5 @@ def test_safe_get_group_when_error_non_retriable():
     ws = MagicMock()
     ws.groups.get.side_effect = DatabricksError(error_code="PERMISSION_DENIED")
     sup = ScimSupport(ws=ws)
-    result = sup._safe_get_group(id="1")
+    result = sup._safe_get_group(group_id="1")
     assert result is None
