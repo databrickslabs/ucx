@@ -2,6 +2,7 @@ import base64
 import json
 from unittest.mock import Mock
 
+import pytest
 from databricks.sdk.core import DatabricksError
 from databricks.sdk.service.compute import (
     AutoScale,
@@ -439,9 +440,29 @@ def test_cluster_assessment_cluster_policy_not_found(mocker):
         )
     ]
     ws = Mock()
-    ws.cluster_policies.get.side_effect = DatabricksError(error="NO_POLICY", error_code="NO_POLICY")
+    ws.cluster_policies.get.side_effect = DatabricksError(error="NO_POLICY", error_code="RESOURCE_DOES_NOT_EXIST")
     crawler = ClustersCrawler(ws, MockBackend(), "ucx")._assess_clusters(sample_clusters1)
-    list(crawler)
+    assert len(list(crawler)) == 1
+
+
+def test_cluster_assessment_cluster_policy_exception(mocker):
+    sample_clusters1 = [
+        ClusterDetails(
+            cluster_name="cluster1",
+            autoscale=AutoScale(min_workers=1, max_workers=6),
+            spark_context_id=5134472582179565315,
+            spark_env_vars=None,
+            policy_id="D96308F1BF0003A8",
+            spark_version="13.3.x-cpu-ml-scala2.12",
+            cluster_id="0915-190044-3dqy6751",
+        )
+    ]
+    ws = Mock()
+    ws.cluster_policies.get.side_effect = DatabricksError(error="NO_POLICY", error_code="UNKNOWN")
+    crawler = ClustersCrawler(ws, MockBackend(), "ucx")._assess_clusters(sample_clusters1)
+
+    with pytest.raises(DatabricksError):
+        list(crawler)
 
 
 def test_pipeline_assessment_with_config(mocker):
@@ -533,6 +554,135 @@ def test_pipeline_list_with_no_config():
     crawler = AzureServicePrincipalCrawler(mock_ws, MockBackend(), "ucx")._list_all_pipeline_with_spn_in_spark_conf()
 
     assert len(crawler) == 0
+
+
+def test_cluster_assessment_with_spn_cluster_policy_not_found(mocker):
+    sample_clusters = [
+        ClusterDetails(
+            autoscale=AutoScale(min_workers=1, max_workers=6),
+            cluster_source=ClusterSource.UI,
+            spark_context_id=5134472582179565315,
+            spark_env_vars=None,
+            spark_conf={
+                "spark.hadoop.fs.azure.account.oauth2.client.id.abcde.dfs.core.windows.net": "1234567890",
+                "spark.databricks.delta.formatCheck.enabled": "false",
+            },
+            spark_version="9.3.x-cpu-ml-scala2.12",
+            cluster_id="0810-225833-atlanta69",
+            cluster_name="Tech Summit FY24 Cluster-1",
+            policy_id="bdqwbdqiwd1111",
+        )
+    ]
+    ws = mocker.Mock()
+    ws.clusters.list.return_value = sample_clusters
+    ws.cluster_policies.get.side_effect = DatabricksError(error="NO_POLICY", error_code="RESOURCE_DOES_NOT_EXIST")
+    crawler = AzureServicePrincipalCrawler(ws, MockBackend(), "ucx")._list_all_cluster_with_spn_in_spark_conf()
+    assert len(crawler) == 1
+
+
+def test_cluster_assessment_with_spn_cluster_policy_exception(mocker):
+    sample_clusters = [
+        ClusterDetails(
+            autoscale=AutoScale(min_workers=1, max_workers=6),
+            cluster_source=ClusterSource.UI,
+            spark_context_id=5134472582179565315,
+            spark_env_vars=None,
+            spark_version="9.3.x-cpu-ml-scala2.12",
+            cluster_id="0810-225833-atlanta69",
+            cluster_name="Tech Summit FY24 Cluster-1",
+            policy_id="bdqwbdqiwd1111",
+        )
+    ]
+    ws = mocker.Mock()
+    ws.clusters.list.return_value = sample_clusters
+    ws.cluster_policies.get.side_effect = DatabricksError(error="NO_POLICY", error_code="UNKNOWN")
+
+    with pytest.raises(DatabricksError):
+        AzureServicePrincipalCrawler(ws, MockBackend(), "ucx")._list_all_cluster_with_spn_in_spark_conf()
+
+
+def test_jobs_assessment_with_spn_cluster_policy_not_found(mocker):
+    sample_jobs = [
+        BaseJob(
+            created_time=1694536604319,
+            creator_user_name="anonymous@databricks.com",
+            job_id=536591785949415,
+            settings=JobSettings(
+                compute=None,
+                continuous=None,
+                tasks=[
+                    Task(
+                        task_key="Ingest",
+                        new_cluster=ClusterSpec(
+                            autoscale=None,
+                            node_type_id="Standard_DS3_v2",
+                            num_workers=2,
+                            spark_conf={
+                                "spark.hadoop.fs.azure.account.oauth2.client.id.abcde.dfs"
+                                ".core.windows.net": "1234567890",
+                                "spark.databricks.delta.formatCheck.enabled": "false",
+                            },
+                            policy_id="bdqwbdqiwd1111",
+                        ),
+                        notebook_task=NotebookTask(
+                            notebook_path="/Users/foo.bar@databricks.com/Customers/Example/Test/Load"
+                        ),
+                        timeout_seconds=0,
+                    )
+                ],
+                timeout_seconds=0,
+            ),
+        )
+    ]
+    ws = mocker.Mock()
+    ws.clusters.list.return_value = []
+    ws.jobs.list.return_value = sample_jobs
+    ws.cluster_policies.get.side_effect = DatabricksError(error="NO_POLICY", error_code="RESOURCE_DOES_NOT_EXIST")
+    crawler = AzureServicePrincipalCrawler(ws, MockBackend(), "ucx")._list_all_jobs_with_spn_in_spark_conf()
+    assert len(crawler) == 1
+
+
+def test_jobs_assessment_with_spn_cluster_policy_exception(mocker):
+    sample_jobs = [
+        BaseJob(
+            created_time=1694536604319,
+            creator_user_name="anonymous@databricks.com",
+            job_id=536591785949415,
+            settings=JobSettings(
+                compute=None,
+                continuous=None,
+                tasks=[
+                    Task(
+                        task_key="Ingest",
+                        new_cluster=ClusterSpec(
+                            autoscale=None,
+                            node_type_id="Standard_DS3_v2",
+                            num_workers=2,
+                            spark_conf={
+                                "spark.hadoop.fs.azure.account.oauth2.client.id.abcde.dfs"
+                                ".core.windows.net": "1234567890",
+                                "spark.databricks.delta.formatCheck.enabled": "false",
+                            },
+                            policy_id="bdqwbdqiwd1111",
+                        ),
+                        notebook_task=NotebookTask(
+                            notebook_path="/Users/foo.bar@databricks.com/Customers/Example/Test/Load"
+                        ),
+                        timeout_seconds=0,
+                    )
+                ],
+                timeout_seconds=0,
+            ),
+        )
+    ]
+
+    ws = mocker.Mock()
+    ws.clusters.list.return_value = []
+    ws.jobs.list.return_value = sample_jobs
+    ws.cluster_policies.get.side_effect = DatabricksError(error="NO_POLICY", error_code="UNKNOWN")
+
+    with pytest.raises(DatabricksError):
+        AzureServicePrincipalCrawler(ws, MockBackend(), "ucx")._list_all_jobs_with_spn_in_spark_conf()
 
 
 def test_azure_spn_info_without_matching_spark_conf(mocker):

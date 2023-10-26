@@ -6,7 +6,7 @@ from dataclasses import dataclass
 
 from databricks.sdk import WorkspaceClient
 from databricks.sdk.core import DatabricksError
-from databricks.sdk.service.compute import ClusterSource
+from databricks.sdk.service.compute import ClusterSource, Policy
 from databricks.sdk.service.jobs import BaseJob
 
 from databricks.labs.ucx.framework.crawlers import CrawlerBase, SqlBackend
@@ -295,30 +295,65 @@ class AzureServicePrincipalCrawler(CrawlerBase):
         return relevant_service_principals
 
     def _list_all_jobs_with_spn_in_spark_conf(self) -> list:
-        azure_spn_list_with_data_access_from_jobs = []
+        azure_spn_list = []
         all_jobs = list(self._ws.jobs.list(expand_tasks=True))
         all_clusters_by_id = {c.cluster_id: c for c in self._ws.clusters.list()}
+
         for _job, cluster_config in self._get_cluster_configs_from_all_jobs(all_jobs, all_clusters_by_id):
-            if cluster_config.spark_conf:
-                if _azure_sp_conf_present_check(cluster_config.spark_conf):
-                    temp_list = self._get_azure_spn_list(cluster_config.spark_conf)
+            azure_spn_list += self._get_azure_spn_with_data_access(cluster_config)
+
+        return azure_spn_list
+
+    def _list_all_cluster_with_spn_in_spark_conf(self) -> list:
+        azure_spn_list = []
+
+        for cluster_config in self._ws.clusters.list():
+            if cluster_config.cluster_source != ClusterSource.JOB:
+                azure_spn_list += self._get_azure_spn_with_data_access(cluster_config)
+
+        return azure_spn_list
+
+    def _get_azure_spn_with_data_access(self, cluster_config):
+        azure_spn_list = []
+
+        if cluster_config.spark_conf:
+            if _azure_sp_conf_present_check(cluster_config.spark_conf):
+                temp_list = self._get_azure_spn_list(cluster_config.spark_conf)
+                if temp_list:
+                    azure_spn_list += temp_list
+
+        if cluster_config.policy_id:
+            policy = self._safe_get_cluster_policy(cluster_config.policy_id)
+
+            if policy is None:
+                return azure_spn_list
+
+            if policy.definition:
+                if _azure_sp_conf_present_check(json.loads(policy.definition)):
+                    temp_list = self._get_azure_spn_list(json.loads(policy.definition))
                     if temp_list:
-                        azure_spn_list_with_data_access_from_jobs += temp_list
+                        azure_spn_list += temp_list
 
-            if cluster_config.policy_id:
-                policy = self._ws.cluster_policies.get(cluster_config.policy_id)
-                if policy.definition:
-                    if _azure_sp_conf_present_check(json.loads(policy.definition)):
-                        temp_list = self._get_azure_spn_list(json.loads(policy.definition))
-                        if temp_list:
-                            azure_spn_list_with_data_access_from_jobs += temp_list
+            if policy.policy_family_definition_overrides:
+                if _azure_sp_conf_present_check(json.loads(policy.policy_family_definition_overrides)):
+                    temp_list = self._get_azure_spn_list(json.loads(policy.policy_family_definition_overrides))
+                    if temp_list:
+                        azure_spn_list += temp_list
 
-                if policy.policy_family_definition_overrides:
-                    if _azure_sp_conf_present_check(json.loads(policy.policy_family_definition_overrides)):
-                        temp_list = self._get_azure_spn_list(json.loads(policy.policy_family_definition_overrides))
-                        if temp_list:
-                            azure_spn_list_with_data_access_from_jobs += temp_list
-        return azure_spn_list_with_data_access_from_jobs
+        return azure_spn_list
+
+    def _safe_get_cluster_policy(self, policy_id: str) -> Policy | None:
+        try:
+            return self._ws.cluster_policies.get(policy_id)
+        except DatabricksError as err:
+            if err.error_code == "RESOURCE_DOES_NOT_EXIST":
+                logger.warning(
+                    f"Error retrieving cluster policy {policy_id}. The cluster policy was deleted. Error: {err}"
+                )
+            else:
+                raise err
+
+        return None
 
     def _list_all_spn_in_sql_warehouses_spark_conf(self) -> list:
         warehouse_config_list = self._ws.warehouses.get_workspace_warehouse_config().data_access_config
@@ -340,31 +375,6 @@ class AzureServicePrincipalCrawler(CrawlerBase):
                 if temp_list:
                     azure_spn_list_with_data_access_from_pipeline += temp_list
         return azure_spn_list_with_data_access_from_pipeline
-
-    def _list_all_cluster_with_spn_in_spark_conf(self) -> list:
-        azure_spn_list_with_data_access_from_cluster = []
-        for cluster in self._ws.clusters.list():
-            if cluster.cluster_source != ClusterSource.JOB:
-                if cluster.spark_conf:
-                    if _azure_sp_conf_present_check(cluster.spark_conf):
-                        temp_list = self._get_azure_spn_list(cluster.spark_conf)
-                        if temp_list:
-                            azure_spn_list_with_data_access_from_cluster += temp_list
-
-                if cluster.policy_id:
-                    policy = self._ws.cluster_policies.get(cluster.policy_id)
-                    if policy.definition:
-                        if _azure_sp_conf_present_check(json.loads(policy.definition)):
-                            temp_list = self._get_azure_spn_list(json.loads(policy.definition))
-                            if temp_list:
-                                azure_spn_list_with_data_access_from_cluster += temp_list
-
-                    if policy.policy_family_definition_overrides:
-                        if _azure_sp_conf_present_check(json.loads(policy.policy_family_definition_overrides)):
-                            temp_list = self._get_azure_spn_list(json.loads(policy.policy_family_definition_overrides))
-                            if temp_list:
-                                azure_spn_list_with_data_access_from_cluster += temp_list
-        return azure_spn_list_with_data_access_from_cluster
 
     def _assess_service_principals(self, relevant_service_principals: list):
         for spn in relevant_service_principals:
@@ -473,16 +483,15 @@ class ClustersCrawler(CrawlerBase):
 
             # Checking if Azure cluster config is present in cluster policies
             if cluster.policy_id:
-                try:
-                    policy = self._ws.cluster_policies.get(cluster.policy_id)
+                policy = self._safe_get_cluster_policy(cluster.policy_id)
+
+                if policy is not None:
                     if policy.definition:
                         if _azure_sp_conf_present_check(json.loads(policy.definition)):
                             failures.append(f"{_AZURE_SP_CONF_FAILURE_MSG} cluster.")
                     if policy.policy_family_definition_overrides:
                         if _azure_sp_conf_present_check(json.loads(policy.policy_family_definition_overrides)):
                             failures.append(f"{_AZURE_SP_CONF_FAILURE_MSG} cluster.")
-                except DatabricksError as err:
-                    logger.warning(f"Error retrieving cluster policy {cluster.policy_id}. Error: {err}")
 
             if cluster.init_scripts:
                 for init_script_info in cluster.init_scripts:
@@ -497,6 +506,19 @@ class ClustersCrawler(CrawlerBase):
             if len(failures) > 0:
                 cluster_info.success = 0
             yield cluster_info
+
+    def _safe_get_cluster_policy(self, policy_id: str) -> Policy | None:
+        try:
+            return self._ws.cluster_policies.get(policy_id)
+        except DatabricksError as err:
+            if err.error_code == "RESOURCE_DOES_NOT_EXIST":
+                logger.warning(
+                    f"Error retrieving cluster policy {policy_id}. The cluster policy was deleted. Error: {err}"
+                )
+            else:
+                raise err
+
+        return None
 
     def snapshot(self) -> list[ClusterInfo]:
         return self._snapshot(self._try_fetch, self._crawl)
@@ -574,16 +596,15 @@ class JobsCrawler(CrawlerBase):
 
             # Checking if Azure cluster config is present in cluster policies
             if cluster_config.policy_id:
-                try:
-                    policy = self._ws.cluster_policies.get(cluster_config.policy_id)
+                policy = self._safe_get_cluster_policy(cluster_config.policy_id)
+
+                if policy is not None:
                     if policy.definition:
                         if _azure_sp_conf_present_check(json.loads(policy.definition)):
                             job_assessment[job.job_id].add(f"{_AZURE_SP_CONF_FAILURE_MSG} Job cluster.")
                     if policy.policy_family_definition_overrides:
                         if _azure_sp_conf_present_check(json.loads(policy.policy_family_definition_overrides)):
                             job_assessment[job.job_id].add(f"{_AZURE_SP_CONF_FAILURE_MSG} Job cluster.")
-                except DatabricksError as err:
-                    logger.warning(f"Error retrieving cluster policy {cluster_config.policy_id}. Error: {err}")
 
             if cluster_config.init_scripts:
                 for init_script_info in cluster_config.init_scripts:
@@ -599,6 +620,19 @@ class JobsCrawler(CrawlerBase):
             if len(job_assessment[job_key]) > 0:
                 job_details[job_key].success = 0
         return list(job_details.values())
+
+    def _safe_get_cluster_policy(self, policy_id: str) -> Policy | None:
+        try:
+            return self._ws.cluster_policies.get(policy_id)
+        except DatabricksError as err:
+            if err.error_code == "RESOURCE_DOES_NOT_EXIST":
+                logger.warning(
+                    f"Error retrieving cluster policy {policy_id}. The cluster policy was deleted. Error: {err}"
+                )
+            else:
+                raise err
+
+        return None
 
     def snapshot(self) -> list[JobInfo]:
         return self._snapshot(self._try_fetch, self._crawl)
