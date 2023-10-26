@@ -1,5 +1,8 @@
 import json
-from unittest.mock import MagicMock
+from datetime import timedelta
+from functools import wraps
+from importlib import reload
+from unittest.mock import MagicMock, patch
 
 import pytest
 from databricks.sdk.core import DatabricksError
@@ -169,7 +172,7 @@ def test_applier_task_should_return_true_if_permission_is_up_to_date_with_multip
     assert result
 
 
-def test_applier_task_should_return_false_if_permission_are_not_up_to_date():
+def test_applier_task_failed():
     ws = MagicMock()
     ws.dbsql_permissions.get.return_value = sql.GetResponse(
         object_type=sql.ObjectType.QUERY,
@@ -180,13 +183,15 @@ def test_applier_task_should_return_false_if_permission_are_not_up_to_date():
         ],
     )
 
-    sup = RedashPermissionsSupport(ws=ws, listings=[])
-    result = sup._applier_task(
-        sql.ObjectTypePlural.QUERIES,
-        "test",
-        [sql.AccessControl(group_name="group_1", permission_level=sql.PermissionLevel.CAN_RUN)],
-    )
-    assert not result
+    sup = RedashPermissionsSupport(ws=ws, listings=[], verify_timeout=timedelta(seconds=1))
+    with pytest.raises(TimeoutError) as e:
+        result = sup._applier_task(
+            sql.ObjectTypePlural.QUERIES,
+            "test",
+            [sql.AccessControl(group_name="group_1", permission_level=sql.PermissionLevel.CAN_RUN)],
+        )
+    assert "Timed out after" in str(e.value)
+
 
 
 def test_applier_task_should_return_false_if_all_permissions_are_not_up_to_date():
@@ -200,16 +205,19 @@ def test_applier_task_should_return_false_if_all_permissions_are_not_up_to_date(
         ],
     )
 
-    sup = RedashPermissionsSupport(ws=ws, listings=[])
-    result = sup._applier_task(
-        sql.ObjectTypePlural.QUERIES,
-        "test",
-        [
-            sql.AccessControl(group_name="group_1", permission_level=sql.PermissionLevel.CAN_RUN),
-            sql.AccessControl(group_name="group_1", permission_level=sql.PermissionLevel.CAN_MANAGE),
-        ],
-    )
-    assert not result
+    sup = RedashPermissionsSupport(ws=ws, listings=[], verify_timeout=timedelta(seconds=1))
+    with pytest.raises(TimeoutError) as e:
+        result = sup._applier_task(
+            sql.ObjectTypePlural.QUERIES,
+            "test",
+            [
+                sql.AccessControl(group_name="group_1", permission_level=sql.PermissionLevel.CAN_RUN),
+                sql.AccessControl(group_name="group_1", permission_level=sql.PermissionLevel.CAN_MANAGE),
+            ],
+        )
+    assert "Timed out after" in str(e.value)
+
+
 
 
 def test_safe_set_permissions_when_error_non_retriable():
@@ -219,3 +227,5 @@ def test_safe_set_permissions_when_error_non_retriable():
     acl = [sql.AccessControl(group_name="group_1", permission_level=sql.PermissionLevel.CAN_MANAGE)]
     result = sup._safe_set_permissions(sql.ObjectTypePlural.QUERIES, "test", acl)
     assert result is None
+
+

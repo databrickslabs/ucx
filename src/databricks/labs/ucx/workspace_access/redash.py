@@ -3,6 +3,7 @@ import json
 import logging
 from collections.abc import Callable
 from dataclasses import dataclass
+from datetime import timedelta
 from functools import partial
 
 from databricks.sdk import WorkspaceClient
@@ -44,9 +45,10 @@ class Listing:
 
 
 class RedashPermissionsSupport(AclSupport):
-    def __init__(self, ws: WorkspaceClient, listings: list[Listing]):
+    def __init__(self, ws: WorkspaceClient, listings: list[Listing], verify_timeout: timedelta | None = timedelta(minutes=20)):
         self._ws = ws
         self._listings = listings
+        self._verify_timeout = verify_timeout
 
     @staticmethod
     def _is_item_relevant(item: Permissions, migration_state: GroupMigrationState) -> bool:
@@ -103,28 +105,41 @@ class RedashPermissionsSupport(AclSupport):
                 raw=json.dumps(permissions.as_dict()),
             )
 
+    def _inflight_check(self, object_type: sql.ObjectTypePlural, object_id: str, acl: list[sql.AccessControl]):
+        # in-flight check for the applied permissions
+        # the api might be inconsistent, therefore we need to check that the permissions were applied
+
+        # remote_permission = self._safe_get_dbsql_permissions(object_type, object_id)
+        remote_permission = self._ws.dbsql_permissions.get(object_type, object_id)
+        if all(elem in remote_permission.access_control_list for elem in acl):
+            return True
+        else:
+            msg = f"""
+            Couldn't apply appropriate permission for object type {object_type} with id {object_id}
+            acl to be applied={acl}
+            acl found in the object={remote_permission}
+            """
+            raise ValueError(msg)
+
+
     @rate_limited(max_requests=30)
     def _applier_task(self, object_type: sql.ObjectTypePlural, object_id: str, acl: list[sql.AccessControl]):
         """
         Please note that we only have SET option (DBSQL Permissions API doesn't support UPDATE operation).
         This affects the way how we prepare the new ACL request.
         """
-        self._safe_set_permissions(object_type=object_type, object_id=object_id, acl=acl)
 
-        remote_permission = self._safe_get_dbsql_permissions(object_type, object_id)
-        if all(elem in remote_permission.access_control_list for elem in acl):
-            return True
+        set_retry_on_value_error = retried(on=[RetryableError], timeout=self._verify_timeout)
+        set_retried_check = set_retry_on_value_error(self._safe_set_permissions)
+        set_retried_check(object_type, object_id, acl)
 
-        logger.warning(
-            f"""Couldn't apply appropriate permission for object type {object_type} with id {object_id}
-        acl to be applied={acl}
-        acl found in the object={remote_permission}
-        """
-        )
-        return False
+        retry_on_value_error = retried(on=[ValueError], timeout=self._verify_timeout)
+        retried_check = retry_on_value_error(self._inflight_check)
+        return retried_check(object_id, object_id, acl)
+
 
     def _prepare_new_acl(
-        self, acl: list[sql.AccessControl], migration_state: GroupMigrationState, destination: Destination
+            self, acl: list[sql.AccessControl], migration_state: GroupMigrationState, destination: Destination
     ) -> list[sql.AccessControl]:
         """
         Please note the comment above on how we apply these permissions.
@@ -146,7 +161,7 @@ class RedashPermissionsSupport(AclSupport):
 
     @retried(on=[RetryableError])
     def _safe_set_permissions(
-        self, object_type: ObjectTypePlural, object_id: str, acl: list[sql.AccessControl] | None
+            self, object_type: ObjectTypePlural, object_id: str, acl: list[sql.AccessControl] | None
     ) -> SetResponse | None:
         try:
             return self._ws.dbsql_permissions.set(object_type=object_type, object_id=object_id, access_control_list=acl)
@@ -164,7 +179,7 @@ class RedashPermissionsSupport(AclSupport):
 
 
 def redash_listing_wrapper(
-    func: Callable[..., list], object_type: sql.ObjectTypePlural
+        func: Callable[..., list], object_type: sql.ObjectTypePlural
 ) -> Callable[..., list[SqlPermissionsInfo]]:
     def wrapper() -> list[SqlPermissionsInfo]:
         for item in func():
