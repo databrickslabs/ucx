@@ -3,6 +3,7 @@ import json
 import logging
 from collections.abc import Callable, Iterator
 from dataclasses import dataclass
+from datetime import timedelta
 from functools import partial
 from typing import Optional
 
@@ -59,9 +60,12 @@ class Listing:
 
 
 class GenericPermissionsSupport(AclSupport):
-    def __init__(self, ws: WorkspaceClient, listings: list[Listing]):
+    def __init__(
+        self, ws: WorkspaceClient, listings: list[Listing], verify_timeout: timedelta | None = timedelta(minutes=20)
+    ):
         self._ws = ws
         self._listings = listings
+        self._verify_timeout = verify_timeout
 
     def get_crawler_tasks(self):
         for listing in self._listings:
@@ -107,22 +111,31 @@ class GenericPermissionsSupport(AclSupport):
                 )
         return results
 
-    @rate_limited(max_requests=30)
-    def _applier_task(self, object_type: str, object_id: str, acl: list[iam.AccessControlRequest]):
-        self._safe_update_permissions(object_type, object_id, acl=acl)
-
-        remote_permission = self._safe_get_permissions(object_type, object_id)
+    def _inflight_check(self, object_type: str, object_id: str, acl: list[iam.AccessControlRequest]):
+        # in-flight check for the applied permissions
+        # the api might be inconsistent, therefore we need to check that the permissions were applied
+        set_retry_on_value_error = retried(on=[RetryableError], timeout=self._verify_timeout)
+        set_retried_check = set_retry_on_value_error(self._safe_get_permissions)
+        remote_permission = set_retried_check(object_type, object_id)
         remote_permission_as_request = self._response_to_request(remote_permission.access_control_list)
         if all(elem in remote_permission_as_request for elem in acl):
             return True
+        else:
+            msg = f"""Couldn't apply appropriate permission for object type {object_type} with id {object_id}
+                acl to be applied={acl}
+                acl found in the object={remote_permission_as_request}
+                """
+            raise ValueError(msg)
 
-        logger.warning(
-            f"""Couldn't apply appropriate permission for object type {object_type} with id {object_id}
-        acl to be applied={acl}
-        acl found in the object={remote_permission_as_request}
-        """
-        )
-        return False
+    @rate_limited(max_requests=30)
+    def _applier_task(self, object_type: str, object_id: str, acl: list[iam.AccessControlRequest]):
+        update_retry_on_value_error = retried(on=[RetryableError], timeout=self._verify_timeout)
+        update_retried_check = update_retry_on_value_error(self._safe_update_permissions)
+        update_retried_check(object_type, object_id, acl)
+
+        retry_on_value_error = retried(on=[ValueError], timeout=self._verify_timeout)
+        retried_check = retry_on_value_error(self._inflight_check)
+        return retried_check(object_id, object_id, acl)
 
     @rate_limited(max_requests=100)
     def _crawler_task(self, object_type: str, object_id: str) -> Permissions | None:
@@ -170,7 +183,6 @@ class GenericPermissionsSupport(AclSupport):
         return acl.service_principal_name
 
     # TODO remove after ES-892977 is fixed
-    @retried(on=[RetryableError])
     def _safe_get_permissions(self, object_type: str, object_id: str) -> iam.ObjectPermissions | None:
         try:
             return self._ws.permissions.get(object_type, object_id)
@@ -186,7 +198,6 @@ class GenericPermissionsSupport(AclSupport):
             else:
                 raise RetryableError() from e
 
-    @retried(on=[RetryableError])
     def _safe_update_permissions(
         self, object_type: str, object_id: str, acl: list[iam.AccessControlRequest]
     ) -> iam.ObjectPermissions | None:

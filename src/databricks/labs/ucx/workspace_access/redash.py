@@ -45,7 +45,9 @@ class Listing:
 
 
 class RedashPermissionsSupport(AclSupport):
-    def __init__(self, ws: WorkspaceClient, listings: list[Listing], verify_timeout: timedelta | None = timedelta(minutes=20)):
+    def __init__(
+        self, ws: WorkspaceClient, listings: list[Listing], verify_timeout: timedelta | None = timedelta(minutes=20)
+    ):
         self._ws = ws
         self._listings = listings
         self._verify_timeout = verify_timeout
@@ -121,7 +123,6 @@ class RedashPermissionsSupport(AclSupport):
             """
             raise ValueError(msg)
 
-
     @rate_limited(max_requests=30)
     def _applier_task(self, object_type: sql.ObjectTypePlural, object_id: str, acl: list[sql.AccessControl]):
         """
@@ -137,9 +138,8 @@ class RedashPermissionsSupport(AclSupport):
         retried_check = retry_on_value_error(self._inflight_check)
         return retried_check(object_id, object_id, acl)
 
-
     def _prepare_new_acl(
-            self, acl: list[sql.AccessControl], migration_state: GroupMigrationState, destination: Destination
+        self, acl: list[sql.AccessControl], migration_state: GroupMigrationState, destination: Destination
     ) -> list[sql.AccessControl]:
         """
         Please note the comment above on how we apply these permissions.
@@ -160,7 +160,7 @@ class RedashPermissionsSupport(AclSupport):
         return acl_requests
 
     def _safe_set_permissions(
-            self, object_type: ObjectTypePlural, object_id: str, acl: list[sql.AccessControl] | None
+        self, object_type: ObjectTypePlural, object_id: str, acl: list[sql.AccessControl] | None
     ) -> SetResponse | None:
         try:
             return self._ws.dbsql_permissions.set(object_type=object_type, object_id=object_id, access_control_list=acl)
@@ -178,7 +178,7 @@ class RedashPermissionsSupport(AclSupport):
 
 
 def redash_listing_wrapper(
-        func: Callable[..., list], object_type: sql.ObjectTypePlural
+    func: Callable[..., list], object_type: sql.ObjectTypePlural
 ) -> Callable[..., list[SqlPermissionsInfo]]:
     def wrapper() -> list[SqlPermissionsInfo]:
         for item in func():
