@@ -1,5 +1,5 @@
 import json
-from unittest.mock import MagicMock, call
+from unittest.mock import MagicMock
 
 import pytest
 from databricks.sdk.core import DatabricksError
@@ -212,31 +212,10 @@ def test_applier_task_should_return_false_if_all_permissions_are_not_up_to_date(
     assert not result
 
 
-def test_applier_task_should_be_called_three_times_if_permission_is_not_up_to_date():
+def test_safe_set_permissions_when_error_non_retriable():
     ws = MagicMock()
-    ws.dbsql_permissions.get.return_value = sql.GetResponse(
-        object_type=sql.ObjectType.QUERY,
-        object_id="test",
-        access_control_list=[
-            sql.AccessControl(group_name="group_1", permission_level=sql.PermissionLevel.CAN_MANAGE),
-            sql.AccessControl(group_name="group_2", permission_level=sql.PermissionLevel.CAN_RUN),
-        ],
-    )
-
+    ws.dbsql_permissions.set.side_effect = DatabricksError(error_code="PERMISSION_DENIED")
     sup = RedashPermissionsSupport(ws=ws, listings=[])
-    input_acl = sql.AccessControl(group_name="group_1", permission_level=sql.PermissionLevel.CAN_RUN)
-
-    sup._applier_task(
-        sql.ObjectTypePlural.QUERIES,
-        "test",
-        [input_acl],
-    )
-
-    assert len(ws.dbsql_permissions.set.mock_calls) == 1
-    assert ws.dbsql_permissions.set.mock_calls == [
-        call(object_type=sql.ObjectTypePlural.QUERIES, object_id="test", access_control_list=[input_acl]),
-    ]
-    assert len(ws.dbsql_permissions.get.mock_calls) == 1
-    assert ws.dbsql_permissions.set.mock_calls == [
-        call(object_type=sql.ObjectTypePlural.QUERIES, object_id="test", access_control_list=[input_acl]),
-    ]
+    acl = [sql.AccessControl(group_name="group_1", permission_level=sql.PermissionLevel.CAN_MANAGE)]
+    result = sup._safe_set_permissions(sql.ObjectTypePlural.QUERIES, "test", acl)
+    assert result is None

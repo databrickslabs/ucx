@@ -7,6 +7,7 @@ from databricks.sdk.service import compute, iam, ml
 from databricks.sdk.service.workspace import Language, ObjectInfo, ObjectType
 
 from databricks.labs.ucx.mixins.sql import Row
+
 from databricks.labs.ucx.workspace_access.generic import (
     GenericPermissionsSupport,
     Listing,
@@ -125,6 +126,15 @@ def test_safe_get():
     # ws.permissions.get.side_effect = DatabricksError(error_code="SOMETHING_UNEXPECTED")
     # with pytest.raises(DatabricksError):
     #     sup._safe_get_permissions("clusters", "test")
+
+
+def test_safe_update_permissions_when_error_non_retriable():
+    ws = MagicMock()
+    ws.permissions.update.side_effect = DatabricksError(error_code="RESOURCE_DOES_NOT_EXIST")
+    sup = GenericPermissionsSupport(ws=ws, listings=[])
+    acl = [iam.AccessControlRequest(group_name="group", permission_level=iam.PermissionLevel.CAN_USE)]
+    result = sup._safe_update_permissions("clusters", "test", acl)
+    assert result is None
 
 
 def test_no_permissions():
@@ -346,7 +356,7 @@ def test_applier_task_should_return_false_if_all_permission_couldnt_be_applied()
     assert not result
 
 
-def test_applier_task_should_be_called_three_times_if_permission_couldnt_be_applied():
+def test_applier_task_retry_when_error_retriable():
     ws = MagicMock()
     acl = iam.AccessControlResponse(all_permissions=[], group_name="group")
 
