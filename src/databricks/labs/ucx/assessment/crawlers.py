@@ -36,27 +36,27 @@ _INIT_SCRIPT_DBFS_PATH = 2
 
 @dataclass
 class JobInfo:
+    job_id: str
     success: int
     failures: str
-    job_id: str = None
     job_name: str = None
     creator: str = None
 
 
 @dataclass
 class ClusterInfo:
+    cluster_id: str
     success: int
     failures: str
-    cluster_id: str = None
     cluster_name: str = None
     creator: str = None
 
 
 @dataclass
 class PipelineInfo:
+    pipeline_id: str
     success: int
     failures: str
-    pipeline_id: str = None
     pipeline_name: str = None
     creator_name: str = None
 
@@ -77,9 +77,9 @@ class AzureServicePrincipalInfo:
 
 @dataclass
 class GlobalInitScriptInfo:
+    script_id: str
     success: int
     failures: str
-    script_id: str = None
     script_name: str = None
     created_by: str = None
     enabled: bool = None
@@ -161,7 +161,7 @@ class GlobalInitScriptCrawler(CrawlerBase):
                 created_by=gis.created_by,
                 enabled=gis.enabled,
                 success=1,
-                failures="",
+                failures="[]",
             )
             failures = []
             global_init_script = base64.b64decode(self._ws.global_init_scripts.get(gis.script_id).script).decode(
@@ -406,7 +406,7 @@ class PipelinesCrawler(CrawlerBase):
                 pipeline_name=pipeline.name,
                 creator_name=pipeline.creator_user_name,
                 success=1,
-                failures="",
+                failures="[]",
             )
 
             failures = []
@@ -451,7 +451,7 @@ class ClustersCrawler(CrawlerBase):
                 cluster_name=cluster.cluster_name,
                 creator=cluster.creator_user_name,
                 success=1,
-                failures="",
+                failures="[]",
             )
             support_status = spark_version_compatibility(cluster.spark_version)
             failures = []
@@ -551,7 +551,7 @@ class JobsCrawler(CrawlerBase):
                 job_name=job.settings.name,
                 creator=job.creator_user_name,
                 success=1,
-                failures="",
+                failures="[]",
             )
 
         for job, cluster_config in self._get_cluster_configs_from_all_jobs(all_jobs, all_clusters_by_id):

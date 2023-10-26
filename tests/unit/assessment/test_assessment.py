@@ -2646,6 +2646,6 @@ def test_init_script_without_config_should_have_empty_creator_name(mocker):
 
     assert result == [
         GlobalInitScriptInfo(
-            script_id="222", script_name="newscript", enabled=False, created_by=None, success=1, failures=""
+            script_id="222", script_name="newscript", enabled=False, created_by=None, success=1, failures="[]"
         ),
     ]
