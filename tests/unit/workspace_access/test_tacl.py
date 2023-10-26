@@ -30,6 +30,56 @@ def test_tacl_crawler():
     assert "catalog_a.database_b.table_c" == x.object_id
 
 
+def test_tacl_crawler_multiple_permissions():
+    sql_backend = MockBackend(
+        rows={
+            "SELECT \\* FROM hive_metastore.test.grants": [
+                ("foo@example.com", "SELECT", "catalog_a", "database_b", "table_c", None, False, False),
+                ("foo@example.com", "MODIFY", "catalog_a", "database_b", "table_c", None, False, False),
+                # different table name (object_id)
+                ("foo@example.com", "SELECT", "catalog_a", "database_b", "table_d", None, False, False),
+                # different principal
+                ("foo2@example.com", "SELECT", "catalog_a", "database_b", "table_c", None, False, False),
+            ]
+        }
+    )
+    tables_crawler = TablesCrawler(sql_backend, "test")
+    grants_crawler = GrantsCrawler(tables_crawler)
+    table_acl_support = TableAclSupport(grants_crawler, sql_backend)
+
+    crawler_tasks = table_acl_support.get_crawler_tasks()
+
+    permissions = next(crawler_tasks)()
+
+    assert "TABLE" == permissions.object_type
+    assert "catalog_a.database_b.table_c" == permissions.object_id
+    assert (
+        '{"principal": "foo@example.com", "action_type": "MODIFY, SELECT", '
+        '"catalog": "catalog_a", "database": "database_b", "table": "table_c", '
+        '"view": null, "any_file": false, "anonymous_function": false}' == permissions.raw
+    )
+
+    permissions = next(crawler_tasks)()
+
+    assert "TABLE" == permissions.object_type
+    assert "catalog_a.database_b.table_d" == permissions.object_id
+    assert (
+        '{"principal": "foo@example.com", "action_type": "SELECT", '
+        '"catalog": "catalog_a", "database": "database_b", "table": "table_d", '
+        '"view": null, "any_file": false, "anonymous_function": false}' == permissions.raw
+    )
+
+    permissions = next(crawler_tasks)()
+
+    assert "TABLE" == permissions.object_type
+    assert "catalog_a.database_b.table_c" == permissions.object_id
+    assert (
+        '{"principal": "foo2@example.com", "action_type": "SELECT", '
+        '"catalog": "catalog_a", "database": "database_b", "table": "table_c", '
+        '"view": null, "any_file": false, "anonymous_function": false}' == permissions.raw
+    )
+
+
 def test_tacl_applier(mocker):
     sql_backend = MockBackend()
     table_acl_support = TableAclSupport(mocker.Mock(), sql_backend)
@@ -55,6 +105,33 @@ def test_tacl_applier(mocker):
     task()
 
     assert ["GRANT SELECT ON TABLE catalog_a.database_b.table_c TO `tmp-backup-abc`"] == sql_backend.queries
+
+
+def test_tacl_applier_multiple_actions(mocker):
+    sql_backend = MockBackend()
+    table_acl_support = TableAclSupport(mocker.Mock(), sql_backend)
+
+    permissions = Permissions(
+        object_type="TABLE",
+        object_id="catalog_a.database_b.table_c",
+        raw=json.dumps(
+            {
+                "principal": "abc",
+                "action_type": "SELECT, MODIFY",
+                "catalog": "catalog_a",
+                "database": "database_b",
+                "table": "table_c",
+            }
+        ),
+    )
+    migration_state = GroupMigrationState()
+    migration_state.add(
+        Group(display_name="abc"), Group(display_name="tmp-backup-abc"), Group(display_name="account-abc")
+    )
+    task = table_acl_support.get_apply_task(permissions, migration_state, "backup")
+    task()
+
+    assert ["GRANT SELECT, MODIFY ON TABLE catalog_a.database_b.table_c TO `tmp-backup-abc`"] == sql_backend.queries
 
 
 def test_tacl_applier_no_target_principal(mocker):

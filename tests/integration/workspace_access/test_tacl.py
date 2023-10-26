@@ -1,3 +1,4 @@
+import json
 import logging
 
 from databricks.sdk.service.iam import PermissionLevel
@@ -33,7 +34,7 @@ def test_recover_permissions_from_grants(
     )
 
     dummy_table = make_table()
-    sql_backend.execute(f"GRANT SELECT ON TABLE {dummy_table.full_name} TO `{ws_group.display_name}`")
+    sql_backend.execute(f"GRANT SELECT, MODIFY ON TABLE {dummy_table.full_name} TO `{ws_group.display_name}`")
 
     generic_permissions = GenericPermissionsSupport(
         ws, [Listing(ws.cluster_policies.list, "policy_id", "cluster-policies")]
@@ -58,8 +59,25 @@ def test_recover_permissions_from_grants(
     # simulate: normal flow
     permission_manager = PermissionManager(sql_backend, inventory_schema, [generic_permissions, tacl])
     object_types = set()
-    for perm in permission_manager.load_all():
+    permissions_list = permission_manager.load_all()
+    for perm in permissions_list:
         object_types.add(perm.object_type)
+
     assert "TABLE" in object_types
     assert "DATABASE" in object_types
     assert "cluster-policies" in object_types
+
+    actual_raw_permissions = next(
+        obj.raw
+        for obj in permissions_list
+        if obj.object_id == dummy_table.full_name
+        and obj.object_type == "TABLE"
+        and json.loads(obj.raw)["principal"] == ws_group.display_name
+    )
+
+    assert (
+        f'{{"principal": "{ws_group.display_name}", "action_type": "MODIFY, SELECT", '
+        f'"catalog": "{dummy_table.catalog_name.lower()}", "database": "{dummy_table.schema_name.lower()}", '
+        f'"table": "{dummy_table.name.lower()}", "view": null, "any_file": false, "anonymous_function": false}}'
+        == actual_raw_permissions
+    )

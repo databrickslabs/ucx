@@ -1,3 +1,4 @@
+import collections
 import dataclasses
 import functools
 import json
@@ -21,12 +22,21 @@ class TableAclSupport(AclSupport):
         self._sql_backend = sql_backend
 
     def get_crawler_tasks(self) -> Iterator[Callable[..., Permissions | None]]:
-        def inner(grant: Grant) -> Permissions:
-            object_type, object_key = grant.this_type_and_key()
-            return Permissions(object_type=object_type, object_id=object_key, raw=json.dumps(dataclasses.asdict(grant)))
-
+        # optimization to fold all action types (grants)
+        # for the same principal, object_id and object_type into one grant
+        folded = collections.defaultdict(lambda: {"action_type": set()})
         for grant in self._grants_crawler.snapshot():
-            yield functools.partial(inner, grant)
+            key = (grant.principal, grant.this_type_and_key())
+            folded[key]["action_type"].add(grant.action_type)
+            grant_dict = dataclasses.asdict(grant)
+            grant_dict["action_type"] = ", ".join(sorted(folded[key]["action_type"]))
+            folded[key]["grant_folded"] = grant_dict
+
+        def inner(obj_type: str, obj_key: str, grant_folded: dict) -> Permissions:
+            return Permissions(object_type=obj_type, object_id=obj_key, raw=json.dumps(grant_folded))
+
+        for (_principal, (object_type, object_key)), grant_data in folded.items():
+            yield functools.partial(inner, object_type, object_key, grant_data["grant_folded"])
 
     def object_types(self) -> set[str]:
         return {"TABLE", "DATABASE", "VIEW", "CATALOG", "ANONYMOUS FUNCTION", "ANY FILE"}
