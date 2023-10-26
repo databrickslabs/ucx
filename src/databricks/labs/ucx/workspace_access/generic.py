@@ -114,9 +114,9 @@ class GenericPermissionsSupport(AclSupport):
     def _inflight_check(self, object_type: str, object_id: str, acl: list[iam.AccessControlRequest]):
         # in-flight check for the applied permissions
         # the api might be inconsistent, therefore we need to check that the permissions were applied
-        set_retry_on_value_error = retried(on=[RetryableError], timeout=self._verify_timeout)
-        set_retried_check = set_retry_on_value_error(self._safe_get_permissions)
-        remote_permission = set_retried_check(object_type, object_id)
+        retry_on_value_error = retried(on=[RetryableError], timeout=self._verify_timeout)
+        retried_check = retry_on_value_error(self._safe_get_permissions)
+        remote_permission = retried_check(object_type, object_id)
         remote_permission_as_request = self._response_to_request(remote_permission.access_control_list)
         if all(elem in remote_permission_as_request for elem in acl):
             return True

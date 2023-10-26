@@ -66,9 +66,9 @@ class ScimSupport(AclSupport):
     def _inflight_check(self, group_id: str, value: list[iam.ComplexValue], property_name: str):
         # in-flight check for the applied permissions
         # the api might be inconsistent, therefore we need to check that the permissions were applied
-        set_retry_on_value_error = retried(on=[RetryableError], timeout=self._verify_timeout)
-        set_retried_check = set_retry_on_value_error(self._safe_get_group)
-        group = set_retried_check(group_id)
+        retry_on_value_error = retried(on=[RetryableError], timeout=self._verify_timeout)
+        retried_check = retry_on_value_error(self._safe_get_group)
+        group = retried_check(group_id)
         if property_name == "roles" and group.roles:
             if all(elem in group.roles for elem in value):
                 return True

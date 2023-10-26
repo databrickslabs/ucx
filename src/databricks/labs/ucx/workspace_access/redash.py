@@ -110,9 +110,9 @@ class RedashPermissionsSupport(AclSupport):
     def _inflight_check(self, object_type: sql.ObjectTypePlural, object_id: str, acl: list[sql.AccessControl]):
         # in-flight check for the applied permissions
         # the api might be inconsistent, therefore we need to check that the permissions were applied
-        set_retry_on_value_error = retried(on=[RetryableError], timeout=self._verify_timeout)
-        set_retried_check = set_retry_on_value_error(self._safe_get_dbsql_permissions)
-        remote_permission = set_retried_check(object_type, object_id)
+        retry_on_value_error = retried(on=[RetryableError], timeout=self._verify_timeout)
+        retried_check = retry_on_value_error(self._safe_get_dbsql_permissions)
+        remote_permission = retried_check(object_type, object_id)
         if all(elem in remote_permission.access_control_list for elem in acl):
             return True
         else:
