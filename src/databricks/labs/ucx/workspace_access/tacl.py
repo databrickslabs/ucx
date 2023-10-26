@@ -22,8 +22,21 @@ class TableAclSupport(AclSupport):
         self._sql_backend = sql_backend
 
     def get_crawler_tasks(self) -> Iterator[Callable[..., Permissions | None]]:
-        # optimization to fold all action types (grants)
-        # for the same principal, object_id and object_type into one grant
+        # TableAcl grant/revoke operations are not atomic. When granting the permissions,
+        # the service would first get all existing permissions, append with the new permissions,
+        # and set the full list in the database. If there are concurrent grant requests,
+        # both requests might succeed and emit the audit logs, but what actually happens could be that
+        # the new permission list from one request overrides the other one, causing permissions loss.
+        # More info here: https://databricks.atlassian.net/browse/ES-908737
+        #
+        # Below optimization mitigates the issue by folding all action types (grants)
+        # for the same principal, object_id and object_type into one grant with comma separated list of action types.
+        #
+        # For example, the following table grants:
+        # * GRANT SELECT ON TABLE hive_metastore.db_a.table_a TO group_a
+        # * GRANT MODIFY ON TABLE hive_metastore.db_a.table_a TO group_a
+        # will be folded and executed in one statement/transaction:
+        # * GRANT SELECT, MODIFY ON TABLE hive_metastore.db_a.table_a TO group_a
         folded = collections.defaultdict(lambda: {"action_type": set()})
         for grant in self._grants_crawler.snapshot():
             key = (grant.principal, grant.this_type_and_key())
