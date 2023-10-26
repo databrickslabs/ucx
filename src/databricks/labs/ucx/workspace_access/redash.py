@@ -93,7 +93,7 @@ class RedashPermissionsSupport(AclSupport):
                 logger.warning(f"Could not get permissions for {object_type} {object_id} due to {e.error_code}")
                 return None
             else:
-                raise e
+                raise RetryableError() from e
 
     @rate_limited(max_requests=100)
     def _crawler_task(self, object_id: str, object_type: sql.ObjectTypePlural) -> Permissions | None:
@@ -108,9 +108,9 @@ class RedashPermissionsSupport(AclSupport):
     def _inflight_check(self, object_type: sql.ObjectTypePlural, object_id: str, acl: list[sql.AccessControl]):
         # in-flight check for the applied permissions
         # the api might be inconsistent, therefore we need to check that the permissions were applied
-
-        # remote_permission = self._safe_get_dbsql_permissions(object_type, object_id)
-        remote_permission = self._ws.dbsql_permissions.get(object_type, object_id)
+        set_retry_on_value_error = retried(on=[RetryableError], timeout=self._verify_timeout)
+        set_retried_check = set_retry_on_value_error(self._safe_get_dbsql_permissions)
+        remote_permission = set_retried_check(object_type, object_id)
         if all(elem in remote_permission.access_control_list for elem in acl):
             return True
         else:
@@ -159,7 +159,6 @@ class RedashPermissionsSupport(AclSupport):
             acl_requests.append(new_acl_request)
         return acl_requests
 
-    @retried(on=[RetryableError])
     def _safe_set_permissions(
             self, object_type: ObjectTypePlural, object_id: str, acl: list[sql.AccessControl] | None
     ) -> SetResponse | None:
