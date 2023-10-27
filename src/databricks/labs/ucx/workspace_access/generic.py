@@ -61,7 +61,7 @@ class Listing:
 
 class GenericPermissionsSupport(AclSupport):
     def __init__(
-        self, ws: WorkspaceClient, listings: list[Listing], verify_timeout: timedelta | None = timedelta(minutes=20)
+        self, ws: WorkspaceClient, listings: list[Listing], verify_timeout: timedelta | None = timedelta(minutes=1)
     ):
         self._ws = ws
         self._listings = listings

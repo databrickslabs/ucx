@@ -22,7 +22,7 @@ logger = logging.getLogger(__name__)
 
 
 class ScimSupport(AclSupport):
-    def __init__(self, ws: WorkspaceClient, verify_timeout: timedelta | None = timedelta(minutes=20)):
+    def __init__(self, ws: WorkspaceClient, verify_timeout: timedelta | None = timedelta(minutes=1)):
         self._ws = ws
         self._verify_timeout = verify_timeout
 
