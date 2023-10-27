@@ -31,8 +31,8 @@ class Threads(Generic[Result]):
             -> (list[Result], list[Exception]):
         if num_threads is None:
             num_threads = os.cpu_count() * 2
-        if num_threads < MIN_THREADS:
-            num_threads = MIN_THREADS
+            if num_threads < MIN_THREADS:
+                num_threads = MIN_THREADS
         return cls(name, tasks, num_threads=num_threads)._run()
 
     def _run(self) -> (list[Result], list[Exception]):
