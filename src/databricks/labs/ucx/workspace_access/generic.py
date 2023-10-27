@@ -130,13 +130,13 @@ class GenericPermissionsSupport(AclSupport):
 
     @rate_limited(max_requests=100)
     def _crawler_task(self, object_type: str, object_id: str) -> Permissions | None:
-        objects_with_permissions = ["jobs", "pipeline"]
+        objects_with_owner_permission = ["jobs", "pipeline"]
 
         permissions = self._safe_get_permissions(object_type, object_id)
         if not permissions:
             logger.warning(f"Object {object_type} {object_id} doesn't have any permissions")
             return None
-        if not self._object_have_owner(permissions) and object_type in objects_with_permissions:
+        if not self._object_have_owner(permissions) and object_type in objects_with_owner_permission:
             logger.warning(
                 f"Object {object_type} {object_id} doesn't have any Owner and cannot be migrated "
                 f"to account level groups, consider setting a new owner or deleting this object"
