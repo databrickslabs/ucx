@@ -216,7 +216,42 @@ def test_applier_task_failed_when_all_permissions_not_up_to_date():
     assert "Timed out after" in str(e.value)
 
 
-def test_safe_set_permissions_when_error_non_retriable():
+def test_applier_task_when_get_error_non_retriable():
+    ws = MagicMock()
+    error_code = "PERMISSION_DENIED"
+    ws.dbsql_permissions.get.side_effect = DatabricksError(error_code=error_code)
+
+    sup = RedashPermissionsSupport(ws=ws, listings=[], verify_timeout=timedelta(seconds=1))
+    result = sup._applier_task(
+        sql.ObjectTypePlural.QUERIES,
+        "test",
+        [
+            sql.AccessControl(group_name="group_1", permission_level=sql.PermissionLevel.CAN_RUN),
+            sql.AccessControl(group_name="group_1", permission_level=sql.PermissionLevel.CAN_MANAGE),
+        ],
+    )
+    assert result is False
+
+
+def test_applier_task_when_get_error_retriable():
+    ws = MagicMock()
+    error_code = "INTERNAL_SERVER_ERROR"
+    ws.dbsql_permissions.get.side_effect = DatabricksError(error_code=error_code)
+
+    sup = RedashPermissionsSupport(ws=ws, listings=[], verify_timeout=timedelta(seconds=1))
+    with pytest.raises(TimeoutError) as e:
+        sup._applier_task(
+            sql.ObjectTypePlural.QUERIES,
+            "test",
+            [
+                sql.AccessControl(group_name="group_1", permission_level=sql.PermissionLevel.CAN_RUN),
+                sql.AccessControl(group_name="group_1", permission_level=sql.PermissionLevel.CAN_MANAGE),
+            ],
+        )
+    assert "Timed out after" in str(e.value)
+
+
+def test_safe_set_permissions_when_get_error_non_retriable():
     ws = MagicMock()
     ws.dbsql_permissions.set.side_effect = DatabricksError(error_code="PERMISSION_DENIED")
     sup = RedashPermissionsSupport(ws=ws, listings=[], verify_timeout=timedelta(seconds=1))

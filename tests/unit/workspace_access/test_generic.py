@@ -358,6 +358,61 @@ def test_applier_task_failed_when_all_permissions_not_up_to_date():
     assert "Timed out after" in str(e.value)
 
 
+def test_applier_task_failed_when_get_error_retriable():
+    ws = MagicMock()
+    group_1_acl = iam.AccessControlResponse(
+        all_permissions=[
+            iam.Permission(permission_level=iam.PermissionLevel.CAN_USE),
+        ],
+        group_name="group_1",
+    )
+    group_2_acl = iam.AccessControlResponse(
+        all_permissions=[
+            iam.Permission(permission_level=iam.PermissionLevel.CAN_USE),
+        ],
+        group_name="group_2",
+    )
+    ws.permissions.update.return_value = iam.ObjectPermissions(access_control_list=[group_1_acl, group_2_acl])
+    ws.permissions.get.side_effect = DatabricksError(error_code="INTERNAL_SERVER_ERROR")
+    sup = GenericPermissionsSupport(ws=ws, listings=[], verify_timeout=timedelta(seconds=1))
+    with pytest.raises(TimeoutError) as e:
+        sup._applier_task(
+            object_type="clusters",
+            object_id="cluster_id",
+            acl=[
+                iam.AccessControlRequest(group_name="group_1", permission_level=iam.PermissionLevel.CAN_USE),
+            ],
+        )
+    assert "Timed out" in str(e.value)
+
+
+def test_applier_task_failed_when_get_error_non_retriable():
+    ws = MagicMock()
+    group_1_acl = iam.AccessControlResponse(
+        all_permissions=[
+            iam.Permission(permission_level=iam.PermissionLevel.CAN_USE),
+        ],
+        group_name="group_1",
+    )
+    group_2_acl = iam.AccessControlResponse(
+        all_permissions=[
+            iam.Permission(permission_level=iam.PermissionLevel.CAN_USE),
+        ],
+        group_name="group_2",
+    )
+    ws.permissions.update.return_value = iam.ObjectPermissions(access_control_list=[group_1_acl, group_2_acl])
+    ws.permissions.get.side_effect = DatabricksError(error_code="PERMISSION_DENIED")
+    sup = GenericPermissionsSupport(ws=ws, listings=[], verify_timeout=timedelta(seconds=1))
+    result = sup._applier_task(
+        object_type="clusters",
+        object_id="cluster_id",
+        acl=[
+            iam.AccessControlRequest(group_name="group_1", permission_level=iam.PermissionLevel.CAN_USE),
+        ],
+    )
+    assert result is False
+
+
 def test_safe_update_permissions_when_error_non_retriable():
     ws = MagicMock()
     ws.permissions.update.side_effect = DatabricksError(error_code="PERMISSION_DENIED")

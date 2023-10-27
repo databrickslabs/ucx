@@ -54,6 +54,29 @@ def test_applier_task_should_return_false_if_entitlements_are_not_properly_appli
     assert "Timed out after" in str(e.value)
 
 
+def test_applier_task_when_get_error_retriable():
+    ws = MagicMock()
+    ws.groups.get.side_effect = DatabricksError(error_code="INTERNAL_SERVER_ERROR")
+    sup = ScimSupport(ws=ws, verify_timeout=timedelta(seconds=1))
+    group_id = "1"
+    with pytest.raises(TimeoutError) as e:
+        sup._applier_task(
+            group_id=group_id, value=[iam.ComplexValue(value="forbidden-cluster-create")], property_name="entitlements"
+        )
+    assert "Timed out" in str(e.value)
+
+
+def test_applier_task_when_get_error_non_retriable():
+    ws = MagicMock()
+    ws.groups.get.side_effect = DatabricksError(error_code="PERMISSION_DENIED")
+    sup = ScimSupport(ws=ws, verify_timeout=timedelta(seconds=1))
+    group_id = "1"
+    result = sup._applier_task(
+        group_id=group_id, value=[iam.ComplexValue(value="forbidden-cluster-create")], property_name="entitlements"
+    )
+    assert result is False
+
+
 def test_safe_patch_group_when_error_non_retriable():
     ws = MagicMock()
     ws.groups.patch.side_effect = DatabricksError(error_code="PERMISSION_DENIED")
@@ -82,7 +105,8 @@ def test_safe_patch_group_when_error_retriable():
 
 def test_safe_get_group_when_error_non_retriable():
     ws = MagicMock()
-    ws.groups.get.side_effect = DatabricksError(error_code="PERMISSION_DENIED")
+    error_code = "PERMISSION_DENIED"
+    ws.groups.get.side_effect = DatabricksError(error_code=error_code)
     sup = ScimSupport(ws=ws, verify_timeout=timedelta(seconds=1))
     result = sup._safe_get_group(group_id="1")
     assert result is None

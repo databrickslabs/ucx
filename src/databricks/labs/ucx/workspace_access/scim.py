@@ -66,20 +66,20 @@ class ScimSupport(AclSupport):
     def _inflight_check(self, group_id: str, value: list[iam.ComplexValue], property_name: str):
         # in-flight check for the applied permissions
         # the api might be inconsistent, therefore we need to check that the permissions were applied
-        retry_on_value_error = retried(on=[RetryableError], timeout=self._verify_timeout)
-        retried_check = retry_on_value_error(self._safe_get_group)
-        group = retried_check(group_id)
-        if property_name == "roles" and group.roles:
-            if all(elem in group.roles for elem in value):
-                return True
-        if property_name == "entitlements" and group.entitlements:
-            if all(elem in group.entitlements for elem in value):
-                return True
-        msg = f"""Couldn't apply appropriate role for group {group_id}
-                acl to be applied={[e.as_dict() for e in value]}
-                acl found in the object={group.as_dict()}
-                """
-        raise ValueError(msg)
+        group = self._safe_get_group(group_id)
+        if group:
+            if property_name == "roles" and group.roles:
+                if all(elem in group.roles for elem in value):
+                    return True
+            if property_name == "entitlements" and group.entitlements:
+                if all(elem in group.entitlements for elem in value):
+                    return True
+            msg = f"""Couldn't apply appropriate role for group {group_id}
+                            acl to be applied={[e.as_dict() for e in value]}
+                            acl found in the object={group.as_dict()}
+                            """
+            raise ValueError(msg)
+        return False
 
     @rate_limited(max_requests=10, burst_period_seconds=60)
     def _applier_task(self, group_id: str, value: list[iam.ComplexValue], property_name: str):
@@ -90,7 +90,7 @@ class ScimSupport(AclSupport):
         patch_retried_check = patch_retry_on_value_error(self._safe_patch_group)
         patch_retried_check(group_id=group_id, operations=operations, schemas=schemas)
 
-        retry_on_value_error = retried(on=[ValueError], timeout=self._verify_timeout)
+        retry_on_value_error = retried(on=[ValueError, RetryableError], timeout=self._verify_timeout)
         retried_check = retry_on_value_error(self._inflight_check)
         return retried_check(group_id, value, property_name)
 
@@ -111,7 +111,7 @@ class ScimSupport(AclSupport):
                 logger.warning(f"Could not apply changes to group {group_id} due to {e.error_code}")
                 return None
             else:
-                msg = f"{e.error_code} can be retried, doing another attempt..."
+                msg = f"{e.error_code} can be retried for group {group_id}, doing another attempt..."
                 raise RetryableError(message=msg) from e
 
     def _safe_get_group(self, group_id: str) -> Group | None:
@@ -129,5 +129,5 @@ class ScimSupport(AclSupport):
                 logger.warning(f"Could not get details of group {group_id} due to {e.error_code}")
                 return None
             else:
-                msg = f"{e.error_code} can be retried, doing another attempt..."
+                msg = f"{e.error_code} can be retried for group {group_id}, doing another attempt..."
                 raise RetryableError(message=msg) from e

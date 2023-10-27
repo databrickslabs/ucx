@@ -111,18 +111,18 @@ class RedashPermissionsSupport(AclSupport):
     def _inflight_check(self, object_type: sql.ObjectTypePlural, object_id: str, acl: list[sql.AccessControl]):
         # in-flight check for the applied permissions
         # the api might be inconsistent, therefore we need to check that the permissions were applied
-        retry_on_value_error = retried(on=[RetryableError], timeout=self._verify_timeout)
-        retried_check = retry_on_value_error(self._safe_get_dbsql_permissions)
-        remote_permission = retried_check(object_type, object_id)
-        if all(elem in remote_permission.access_control_list for elem in acl):
-            return True
-        else:
-            msg = f"""
-            Couldn't apply appropriate permission for object type {object_type} with id {object_id}
-            acl to be applied={acl}
-            acl found in the object={remote_permission}
-            """
-            raise ValueError(msg)
+        remote_permission = self._safe_get_dbsql_permissions(object_type, object_id)
+        if remote_permission:
+            if all(elem in remote_permission.access_control_list for elem in acl):
+                return True
+            else:
+                msg = f"""
+                Couldn't apply appropriate permission for object type {object_type} with id {object_id}
+                acl to be applied={acl}
+                acl found in the object={remote_permission}
+                """
+                raise ValueError(msg)
+        return False
 
     @rate_limited(max_requests=30)
     def _applier_task(self, object_type: sql.ObjectTypePlural, object_id: str, acl: list[sql.AccessControl]):
@@ -135,7 +135,7 @@ class RedashPermissionsSupport(AclSupport):
         set_retried_check = set_retry_on_value_error(self._safe_set_permissions)
         set_retried_check(object_type, object_id, acl)
 
-        retry_on_value_error = retried(on=[ValueError], timeout=self._verify_timeout)
+        retry_on_value_error = retried(on=[ValueError, RetryableError], timeout=self._verify_timeout)
         retried_check = retry_on_value_error(self._inflight_check)
         return retried_check(object_id, object_id, acl)
 
@@ -175,7 +175,7 @@ class RedashPermissionsSupport(AclSupport):
                 logger.warning(f"Could not update permissions for {object_type} {object_id} due to {e.error_code}")
                 return None
             else:
-                msg = f"{e.error_code} can be retried, doing another attempt..."
+                msg = f"{e.error_code} can be retried for {object_type} {object_id}, doing another attempt..."
                 raise RetryableError(message=msg) from e
 
 
