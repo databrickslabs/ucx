@@ -16,6 +16,7 @@ from databricks.labs.ucx.framework.crawlers import RuntimeBackend
 from databricks.labs.ucx.framework.tasks import task, trigger
 from databricks.labs.ucx.hive_metastore import GrantsCrawler, TablesCrawler
 from databricks.labs.ucx.hive_metastore.data_objects import ExternalLocationCrawler
+from databricks.labs.ucx.hive_metastore.hms_lineage import HiveMetastoreLineageEnabler
 from databricks.labs.ucx.hive_metastore.mounts import Mounts
 from databricks.labs.ucx.workspace_access.generic import WorkspaceListing
 from databricks.labs.ucx.workspace_access.groups import GroupManager
@@ -185,6 +186,14 @@ def crawl_mounts(cfg: WorkspaceConfig):
     ws = WorkspaceClient(config=cfg.to_databricks_config())
     mounts = Mounts(backend=RuntimeBackend(), ws=ws, inventory_database=cfg.inventory_database)
     mounts.inventorize_mounts()
+
+
+@task("assessment", depends_on=[setup_schema])
+def enable_hms_lineage(cfg: WorkspaceConfig):
+    """Enables the HMS Lineage by adding Spark Configuration via Global Init Script and SQL Warehouse Configurations."""
+    ws = WorkspaceClient(config=cfg.to_databricks_config())
+    hms_lineage = HiveMetastoreLineageEnabler(ws=ws)
+    hms_lineage.add_spark_config_for_hms_lineage()
 
 
 @task("assessment", depends_on=[crawl_mounts, crawl_tables])
