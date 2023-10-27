@@ -42,7 +42,7 @@ class TableAclSupport(AclSupport):
             key = (grant.principal, grant.this_type_and_key())
             folded_actions[key].add(grant.action_type)
 
-            # use one of the grant objects for all actions per principal, object type and id
+            # use one of the grants with actions folded per principal, object type and id
             grant_dict = dataclasses.asdict(grant)
             grant_dict["action_type"] = ", ".join(sorted(folded_actions[key]))
             grant_folded_actions[key] = grant_dict
