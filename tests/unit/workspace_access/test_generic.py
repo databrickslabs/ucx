@@ -4,6 +4,7 @@ from unittest.mock import MagicMock, Mock, patch
 
 from databricks.sdk.core import DatabricksError
 from databricks.sdk.service import compute, iam, ml
+from databricks.sdk.service.compute import ClusterDetails
 from databricks.sdk.service.iam import (
     AccessControlResponse,
     ObjectPermissions,
@@ -559,63 +560,52 @@ def test_workspace_snapshot():
     assert result_set[0] == WorkspaceObjectInfo("NOTEBOOK", "123", "/rootobj/notebook1", "PYTHON")
 
 
-def test_assets_without_owner_should_be_ignored():
+def test_eligibles_assets_without_owner_should_be_ignored():
     ws = MagicMock()
-
-    from databricks.sdk.service.compute import ClusterDetails
-
     ws.clusters.list.return_value = [
         ClusterDetails(
             cluster_id="1234",
         )
     ]
-    ws.permissions.get.return_value = ObjectPermissions(
-        object_id="123",
-        object_type="cluster",
-        access_control_list=[
-            AccessControlResponse(
-                group_name="de", all_permissions=[Permission(permission_level=PermissionLevel.CAN_USE)]
+
+    def perms(object_type: str, object_id: str):
+        if object_type == "clusters":
+            return ObjectPermissions(
+                object_id=object_id,
+                object_type=object_type,
+                access_control_list=[
+                    AccessControlResponse(
+                        group_name="de", all_permissions=[Permission(permission_level=PermissionLevel.CAN_USE)]
+                    )
+                ],
             )
+        elif object_type == "pipelines":
+            return ObjectPermissions(
+                object_id=object_id,
+                object_type=object_type,
+                access_control_list=[
+                    AccessControlResponse(
+                        group_name="de", all_permissions=[Permission(permission_level=PermissionLevel.CAN_USE)]
+                    )
+                ],
+            )
+
+    ws.permissions.get.side_effect = perms
+
+    sup = GenericPermissionsSupport(
+        ws=ws,
+        listings=[
+            Listing(ws.clusters.list, "cluster_id", "clusters"),
+            Listing(ws.pipelines.list, "pipeline_id", "pipelines"),
         ],
     )
-
-    sup = GenericPermissionsSupport(ws=ws, listings=[Listing(ws.clusters.list, "cluster_id", "clusters")])
-    tasks = list(sup.get_crawler_tasks())
-    task = tasks[0]()
-    assert task is None
-
-
-def test_assets_with_owner_should_be_considered_for_migration():
-    ws = MagicMock()
-
-    from databricks.sdk.service.compute import ClusterDetails
-
-    ws.clusters.list.return_value = [
-        ClusterDetails(
-            cluster_id="1234",
-        )
-    ]
-    ws.permissions.get.return_value = ObjectPermissions(
-        object_id="123",
-        object_type="cluster",
-        access_control_list=[
-            AccessControlResponse(
-                group_name="de", all_permissions=[Permission(permission_level=PermissionLevel.CAN_USE)]
-            ),
-            AccessControlResponse(
-                group_name="ds", all_permissions=[Permission(permission_level=PermissionLevel.IS_OWNER)]
-            ),
-        ],
-    )
-
-    sup = GenericPermissionsSupport(ws=ws, listings=[Listing(ws.clusters.list, "cluster_id", "clusters")])
-    tasks = list(sup.get_crawler_tasks())
-    task = tasks[0]()
-    assert task == Permissions(
+    executables = list(sup.get_crawler_tasks())
+    tasks = [task() for task in executables]
+    assert len(tasks) == 1
+    assert tasks[0] == Permissions(
         object_id="1234",
         object_type="clusters",
-        raw='{"access_control_list": ['
-        '{"all_permissions": [{"permission_level": "CAN_USE"}], "group_name": "de"}, '
-        '{"all_permissions": [{"permission_level": "IS_OWNER"}], "group_name": "ds"}], '
-        '"object_id": "123", "object_type": "cluster"}',
+        raw='{"access_control_list": [{"all_permissions": ['
+        '{"permission_level": "CAN_USE"}], "group_name": "de"}],'
+        ' "object_id": "1234", "object_type": "clusters"}',
     )
