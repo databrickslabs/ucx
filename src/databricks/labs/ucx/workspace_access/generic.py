@@ -130,7 +130,7 @@ class GenericPermissionsSupport(AclSupport):
 
     @rate_limited(max_requests=100)
     def _crawler_task(self, object_type: str, object_id: str) -> Permissions | None:
-        objects_with_owner_permission = ["jobs", "pipeline"]
+        objects_with_owner_permission = ["jobs", "pipelines"]
 
         permissions = self._safe_get_permissions(object_type, object_id)
         if not permissions:
