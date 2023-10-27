@@ -5,20 +5,12 @@ install_hook: src/databricks/labs/ucx/install.py
 entrypoint: src/databricks/labs/ucx/cli.py
 min_python: 3.10
 commands:
-  - name: me
-    description: dummy
-
   - name: open-remote-config
     description: Opens remote configuration in the browser
 
-  - name: jobs
-    description: Show current jobs
-
-  - name: logs
-    description: Display debug logs from the run
-    flags:
-      - name: step
-        description: name of the step
-      - name: run-id
-        default: latest
-        description: job run ID
+  - name: workflows
+    description: Show deployed workflows and their state
+    table_template: |-
+      Step\tState\tStarted
+      {{range .}}{{.step}}\t{{.state}}\t{{.started}}
+      {{end}}

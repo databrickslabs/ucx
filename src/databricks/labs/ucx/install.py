@@ -283,8 +283,6 @@ class WorkspaceInstaller:
         try:
             self._ws.workspace.get_status(self.config_file)
             logger.info(f"UCX is already configured. See {ws_file_url}")
-            if self._prompts and self._question("Open config file in the browser", default="yes") == "yes":
-                webbrowser.open(ws_file_url)
             return
         except DatabricksError as err:
             if err.error_code != "RESOURCE_DOES_NOT_EXIST":
@@ -819,6 +817,17 @@ class WorkspaceInstaller:
             ):
                 spark_conf_dict[key[11:]] = cluster_policy[key]["value"]
         return instance_profile, spark_conf_dict
+
+    def latest_job_status(self) -> list[dict]:
+        latest_status = []
+        for step, job_id in self.deployed_steps().items():
+            job_runs = list(self._ws.jobs.list_runs(job_id=job_id, limit=1))
+            latest_status.append({
+                'step': step,
+                'state': 'UNKNOWN' if not job_runs else str(job_runs[0].state.result_state),
+                'started': '' if not job_runs else job_runs[0].start_time
+            })
+        return latest_status
 
 
 if __name__ == "__main__":

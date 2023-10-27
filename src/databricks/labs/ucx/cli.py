@@ -6,12 +6,14 @@ from databricks.sdk import WorkspaceClient
 
 from databricks.labs.ucx.install import WorkspaceInstaller
 
+logger = logging.getLogger('databricks.labs.ucx')
+
 
 def jobs():
     ws = WorkspaceClient()
     installer = WorkspaceInstaller(ws)
-    for step, job_id in installer.deployed_steps().items():
-        print(step, job_id)
+    logger.info('Fetching deployed jobs...')
+    print(json.dumps(installer.latest_job_status()))
 
 
 def open_remote_config():
@@ -22,17 +24,9 @@ def open_remote_config():
     webbrowser.open(ws_file_url)
 
 
-def me():
-    ws = WorkspaceClient()
-    my_user = ws.current_user.me()
-    greeting = input("How to greet you? ")
-    print(f'{greeting}, {my_user.user_name}!')
-
-
 MAPPING = {
     'open-remote-config': open_remote_config,
     'jobs': jobs,
-    'me': me,
 }
 
 
