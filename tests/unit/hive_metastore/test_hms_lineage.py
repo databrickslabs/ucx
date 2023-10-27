@@ -1,5 +1,3 @@
-from unittest.mock import Mock
-
 from databricks.labs.ucx.hive_metastore.hms_lineage import HiveMetastoreLineageEnabler
 
 
