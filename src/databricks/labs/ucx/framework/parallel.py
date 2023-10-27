@@ -27,8 +27,9 @@ class Threads(Generic[Result]):
         self._default_log_every = 100
 
     @classmethod
-    def gather(cls, name: str, tasks: list[Callable[..., Result]], num_threads: int = None) \
-            -> (list[Result], list[Exception]):
+    def gather(
+        cls, name: str, tasks: list[Callable[..., Result]], num_threads: int | None = None
+    ) -> (list[Result], list[Exception]):
         if num_threads is None:
             num_threads = os.cpu_count() * 2
             if num_threads < MIN_THREADS:
