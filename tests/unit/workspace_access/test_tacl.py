@@ -37,6 +37,7 @@ def test_tacl_crawler_multiple_permissions():
             "SELECT \\* FROM hive_metastore.test.grants": [
                 ("foo@example.com", "SELECT", "catalog_a", "database_b", "table_c", None, False, False),
                 ("foo@example.com", "MODIFY", "catalog_a", "database_b", "table_c", None, False, False),
+                ("foo@example.com", "OWN", "catalog_a", "database_b", "table_c", None, False, False),
                 # different table name (object_id)
                 ("foo@example.com", "SELECT", "catalog_a", "database_b", "table_d", None, False, False),
                 # different principal
@@ -58,7 +59,7 @@ def test_tacl_crawler_multiple_permissions():
     assert "catalog_a.database_b.table_c" == permissions.object_id
     assert Grant(
         principal="foo@example.com",
-        action_type="MODIFY, SELECT",
+        action_type="MODIFY, OWN, SELECT",
         catalog="catalog_a",
         database="database_b",
         table="table_c",
