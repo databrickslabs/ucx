@@ -41,10 +41,7 @@ def test_crawler():
         access_control_list=[
             iam.AccessControlResponse(
                 group_name="test",
-                all_permissions=[
-                    iam.Permission(inherited=False, permission_level=iam.PermissionLevel.CAN_USE),
-                    iam.Permission(inherited=False, permission_level=iam.PermissionLevel.IS_OWNER),
-                ],
+                all_permissions=[iam.Permission(inherited=False, permission_level=iam.PermissionLevel.CAN_USE)],
             )
         ],
     )
@@ -167,7 +164,6 @@ def test_passwords_tokens_crawler(migration_state):
             group_name="test",
             all_permissions=[
                 iam.Permission(inherited=False, permission_level=iam.PermissionLevel.CAN_USE),
-                iam.Permission(inherited=False, permission_level=iam.PermissionLevel.IS_OWNER),
             ],
         )
     ]
@@ -177,7 +173,6 @@ def test_passwords_tokens_crawler(migration_state):
             group_name="db-temp-test",
             all_permissions=[
                 iam.Permission(inherited=False, permission_level=iam.PermissionLevel.CAN_USE),
-                iam.Permission(inherited=False, permission_level=iam.PermissionLevel.IS_OWNER),
             ],
         )
     ]
@@ -202,7 +197,6 @@ def test_passwords_tokens_crawler(migration_state):
             item.object_id,
             access_control_list=[
                 iam.AccessControlRequest(group_name="db-temp-test", permission_level=iam.PermissionLevel.CAN_USE),
-                iam.AccessControlRequest(group_name="db-temp-test", permission_level=iam.PermissionLevel.IS_OWNER),
             ],
         )
         ws.permissions.update.reset_mock()
