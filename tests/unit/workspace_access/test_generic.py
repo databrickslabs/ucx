@@ -656,5 +656,4 @@ def test_eligibles_assets_without_owner_should_be_ignored():
         if task is not None:
             tasks.append(task)
     assert len(tasks) == 1
-    # DLT Pipelines without owners must be skipped
     assert tasks[0].object_type == "clusters"
