@@ -4,6 +4,7 @@ import logging
 from databricks.sdk.service.iam import PermissionLevel
 
 from databricks.labs.ucx.hive_metastore import GrantsCrawler, TablesCrawler
+from databricks.labs.ucx.hive_metastore.grants import Grant
 from databricks.labs.ucx.workspace_access.generic import (
     GenericPermissionsSupport,
     Listing,
@@ -75,9 +76,13 @@ def test_recover_permissions_from_grants(
         and json.loads(obj.raw)["principal"] == ws_group.display_name
     )
 
-    assert (
-        f'{{"principal": "{ws_group.display_name}", "action_type": "MODIFY, SELECT", '
-        f'"catalog": "{dummy_table.catalog_name.lower()}", "database": "{dummy_table.schema_name.lower()}", '
-        f'"table": "{dummy_table.name.lower()}", "view": null, "any_file": false, "anonymous_function": false}}'
-        == actual_raw_permissions
-    )
+    assert Grant(
+        principal=ws_group.display_name,
+        action_type="MODIFY, SELECT",
+        catalog=dummy_table.catalog_name.lower(),
+        database=dummy_table.schema_name.lower(),
+        table=dummy_table.name.lower(),
+        view=None,
+        any_file=False,
+        anonymous_function=False,
+    ) == Grant(**json.loads(actual_raw_permissions))

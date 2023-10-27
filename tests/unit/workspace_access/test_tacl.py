@@ -3,6 +3,7 @@ import json
 from databricks.sdk.service.iam import Group
 
 from databricks.labs.ucx.hive_metastore import GrantsCrawler, TablesCrawler
+from databricks.labs.ucx.hive_metastore.grants import Grant
 from databricks.labs.ucx.workspace_access.base import Permissions
 from databricks.labs.ucx.workspace_access.groups import GroupMigrationState
 from databricks.labs.ucx.workspace_access.tacl import TableAclSupport
@@ -40,6 +41,8 @@ def test_tacl_crawler_multiple_permissions():
                 ("foo@example.com", "SELECT", "catalog_a", "database_b", "table_d", None, False, False),
                 # different principal
                 ("foo2@example.com", "SELECT", "catalog_a", "database_b", "table_c", None, False, False),
+                # duplicate
+                ("foo2@example.com", "SELECT", "catalog_a", "database_b", "table_c", None, False, False),
             ]
         }
     )
@@ -53,31 +56,46 @@ def test_tacl_crawler_multiple_permissions():
 
     assert "TABLE" == permissions.object_type
     assert "catalog_a.database_b.table_c" == permissions.object_id
-    assert (
-        '{"principal": "foo@example.com", "action_type": "MODIFY, SELECT", '
-        '"catalog": "catalog_a", "database": "database_b", "table": "table_c", '
-        '"view": null, "any_file": false, "anonymous_function": false}' == permissions.raw
-    )
+    assert Grant(
+        principal="foo@example.com",
+        action_type="MODIFY, SELECT",
+        catalog="catalog_a",
+        database="database_b",
+        table="table_c",
+        view=None,
+        any_file=False,
+        anonymous_function=False,
+    ) == Grant(**json.loads(permissions.raw))
 
     permissions = next(crawler_tasks)()
 
     assert "TABLE" == permissions.object_type
     assert "catalog_a.database_b.table_d" == permissions.object_id
-    assert (
-        '{"principal": "foo@example.com", "action_type": "SELECT", '
-        '"catalog": "catalog_a", "database": "database_b", "table": "table_d", '
-        '"view": null, "any_file": false, "anonymous_function": false}' == permissions.raw
-    )
+    assert Grant(
+        principal="foo@example.com",
+        action_type="SELECT",
+        catalog="catalog_a",
+        database="database_b",
+        table="table_d",
+        view=None,
+        any_file=False,
+        anonymous_function=False,
+    ) == Grant(**json.loads(permissions.raw))
 
     permissions = next(crawler_tasks)()
 
     assert "TABLE" == permissions.object_type
     assert "catalog_a.database_b.table_c" == permissions.object_id
-    assert (
-        '{"principal": "foo2@example.com", "action_type": "SELECT", '
-        '"catalog": "catalog_a", "database": "database_b", "table": "table_c", '
-        '"view": null, "any_file": false, "anonymous_function": false}' == permissions.raw
-    )
+    assert Grant(
+        principal="foo2@example.com",
+        action_type="SELECT",
+        catalog="catalog_a",
+        database="database_b",
+        table="table_c",
+        view=None,
+        any_file=False,
+        anonymous_function=False,
+    ) == Grant(**json.loads(permissions.raw))
 
 
 def test_tacl_applier(mocker):

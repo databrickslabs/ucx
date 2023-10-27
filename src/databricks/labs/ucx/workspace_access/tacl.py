@@ -1,6 +1,5 @@
 import collections
 import dataclasses
-import functools
 import json
 from collections.abc import Callable, Iterator
 from functools import partial
@@ -37,19 +36,21 @@ class TableAclSupport(AclSupport):
         # * GRANT MODIFY ON TABLE hive_metastore.db_a.table_a TO group_a
         # will be folded and executed in one statement/transaction:
         # * GRANT SELECT, MODIFY ON TABLE hive_metastore.db_a.table_a TO group_a
-        folded = collections.defaultdict(lambda: {"action_type": set()})
+        folded_actions = collections.defaultdict(set)
+        grant_folded_actions = {}
         for grant in self._grants_crawler.snapshot():
             key = (grant.principal, grant.this_type_and_key())
-            folded[key]["action_type"].add(grant.action_type)
+            folded_actions[key].add(grant.action_type)
+
+            # use one of the grant objects for all actions per principal, object type and id
             grant_dict = dataclasses.asdict(grant)
-            grant_dict["action_type"] = ", ".join(sorted(folded[key]["action_type"]))
-            folded[key]["grant_folded"] = grant_dict
+            grant_dict["action_type"] = ", ".join(sorted(folded_actions[key]))
+            grant_folded_actions[key] = grant_dict
 
-        def inner(obj_type: str, obj_key: str, grant_folded: dict) -> Permissions:
-            return Permissions(object_type=obj_type, object_id=obj_key, raw=json.dumps(grant_folded))
-
-        for (_principal, (object_type, object_key)), grant_data in folded.items():
-            yield functools.partial(inner, object_type, object_key, grant_data["grant_folded"])
+        for (_principal, (object_type, object_id)), grant in grant_folded_actions.items():
+            yield lambda ot=object_type, oi=object_id, g=grant: Permissions(
+                object_type=ot, object_id=oi, raw=json.dumps(g)
+            )
 
     def object_types(self) -> set[str]:
         return {"TABLE", "DATABASE", "VIEW", "CATALOG", "ANONYMOUS FUNCTION", "ANY FILE"}
