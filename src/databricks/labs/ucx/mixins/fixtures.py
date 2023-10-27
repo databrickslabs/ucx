@@ -161,7 +161,7 @@ def _permissions_mapping():
                 PermissionLevel.CAN_VIEW,
                 PermissionLevel.CAN_RUN,
                 PermissionLevel.CAN_MANAGE,
-                PermissionLevel.IS_OWNER  # cannot be a group
+                PermissionLevel.IS_OWNER,  # cannot be a group
             ],
             _simple,
         ),

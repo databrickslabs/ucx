@@ -1,5 +1,4 @@
 import logging
-import random
 from datetime import timedelta
 
 import pytest
@@ -115,8 +114,7 @@ def test_jobs_with_no_inventory_database(
     )
     sql_backend.execute(f"GRANT SELECT ON TABLE {table_a.full_name} TO `{ws_group_a.display_name}`")
     sql_backend.execute(
-        f"GRANT SELECT, MODIFY, READ_METADATA ON TABLE "
-        f"{table_b.full_name} TO `{ws_group_b.display_name}`"
+        f"GRANT SELECT, MODIFY, READ_METADATA ON TABLE {table_b.full_name} TO `{ws_group_b.display_name}`"
     )
     sql_backend.execute(f"ALTER TABLE {table_b.full_name} OWNER TO `{ws_group_b.display_name}`")
 
