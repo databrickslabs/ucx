@@ -1,3 +1,4 @@
+import base64
 import json
 from unittest.mock import Mock
 
@@ -26,8 +27,11 @@ from databricks.sdk.service.workspace import GetSecretResponse
 
 from databricks.labs.ucx.assessment.crawlers import (
     AzureServicePrincipalCrawler,
+    ClusterInfo,
     ClustersCrawler,
     GlobalInitScriptCrawler,
+    GlobalInitScriptInfo,
+    JobInfo,
     JobsCrawler,
     PipelineInfo,
     PipelinesCrawler,
@@ -2664,3 +2668,134 @@ def test_list_all_pipeline_with_conf_spn_secret_avlb(mocker):
     assert result_set[0].get("application_id") == "Hello, World!"
     assert result_set[0].get("tenant_id") == "directory_12345"
     assert result_set[0].get("storage_account") == "newstorageacct"
+
+
+def test_job_crawler_with_no_owner_should_have_empty_creator_name():
+    sample_jobs = [
+        BaseJob(
+            created_time=1694536604319,
+            creator_user_name=None,
+            job_id=536591785949415,
+            settings=JobSettings(
+                compute=None,
+                continuous=None,
+                tasks=[
+                    Task(
+                        task_key="Ingest",
+                        existing_cluster_id="0807-225846-avon493",
+                        notebook_task=NotebookTask(
+                            notebook_path="/Users/foo.bar@databricks.com/Customers/Example/Test/Load"
+                        ),
+                        timeout_seconds=0,
+                    )
+                ],
+                timeout_seconds=0,
+            ),
+        )
+    ]
+
+    sample_clusters = [
+        ClusterDetails(
+            autoscale=AutoScale(min_workers=1, max_workers=6),
+            spark_context_id=5134472582179566666,
+            spark_env_vars=None,
+            spark_version="13.3.x-cpu-ml-scala2.12",
+            cluster_id="0807-225846-avon493",
+            cluster_source=ClusterSource.JOB,
+        )
+    ]
+    ws = Mock()
+    mockbackend = MockBackend()
+    ws.jobs.list.return_value = sample_jobs
+    ws.clusters.list.return_value = sample_clusters
+    JobsCrawler(ws, mockbackend, "ucx").snapshot()
+    result = mockbackend.rows_written_for("hive_metastore.ucx.jobs", "append")
+    assert result == [JobInfo(job_id="536591785949415", job_name=None, creator=None, success=1, failures="[]")]
+
+
+def test_cluster_without_owner_should_have_empty_creator_name(mocker):
+    sample_clusters = [
+        ClusterDetails(
+            autoscale=AutoScale(min_workers=1, max_workers=6),
+            cluster_source=ClusterSource.UI,
+            spark_context_id=5134472582179565315,
+            spark_env_vars=None,
+            spark_version="12.3.x-cpu-ml-scala2.12",
+            cluster_id="0810-225833-atlanta69",
+            cluster_name="Tech Summit FY24 Cluster-1",
+        )
+    ]
+    ws = mocker.Mock()
+    mockbackend = MockBackend()
+
+    ws.clusters.list.return_value = sample_clusters
+    ClustersCrawler(ws, mockbackend, "ucx").snapshot()
+    result = mockbackend.rows_written_for("hive_metastore.ucx.clusters", "append")
+    assert result == [
+        ClusterInfo(
+            cluster_id="0810-225833-atlanta69",
+            cluster_name="Tech Summit FY24 Cluster-1",
+            creator=None,
+            success=1,
+            failures="[]",
+        )
+    ]
+
+
+def test_pipeline_without_owners_should_have_empty_creator_name():
+    sample_pipelines = [
+        PipelineStateInfo(
+            cluster_id=None,
+            creator_user_name=None,
+            latest_updates=None,
+            name="New DLT Pipeline",
+            pipeline_id="0112eae7-9d11-4b40-a2b8-6c83cb3c7407",
+            run_as_user_name="abcde.defgh@databricks.com",
+            state=PipelineState.IDLE,
+        )
+    ]
+
+    ws = Mock()
+    ws.pipelines.list_pipelines.return_value = sample_pipelines
+    ws.pipelines.get().spec.configuration = {}
+    mockbackend = MockBackend()
+    PipelinesCrawler(ws, mockbackend, "ucx").snapshot()
+    result = mockbackend.rows_written_for("hive_metastore.ucx.pipelines", "append")
+
+    assert result == [
+        PipelineInfo(
+            pipeline_id="0112eae7-9d11-4b40-a2b8-6c83cb3c7407",
+            pipeline_name="New DLT Pipeline",
+            creator_name=None,
+            success=1,
+            failures="[]",
+        )
+    ]
+
+
+def test_init_script_without_config_should_have_empty_creator_name(mocker):
+    mock_ws = mocker.Mock()
+    mocker.Mock()
+    mock_ws.global_init_scripts.list.return_value = [
+        GlobalInitScriptDetails(
+            created_at=111,
+            created_by=None,
+            enabled=False,
+            name="newscript",
+            position=4,
+            script_id="222",
+            updated_at=111,
+            updated_by="2123l@eee.com",
+        )
+    ]
+    mock_ws.global_init_scripts.get().script = base64.b64encode(b"hello world")
+    mockbackend = MockBackend()
+    crawler = GlobalInitScriptCrawler(mock_ws, mockbackend, schema="ucx")
+    result = crawler.snapshot()
+    result = mockbackend.rows_written_for("hive_metastore.ucx.global_init_scripts", "append")
+
+    assert result == [
+        GlobalInitScriptInfo(
+            script_id="222", script_name="newscript", enabled=False, created_by=None, success=1, failures="[]"
+        ),
+    ]
