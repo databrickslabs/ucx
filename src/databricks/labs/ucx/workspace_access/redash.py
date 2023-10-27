@@ -95,7 +95,8 @@ class RedashPermissionsSupport(AclSupport):
                 logger.warning(f"Could not get permissions for {object_type} {object_id} due to {e.error_code}")
                 return None
             else:
-                raise RetryableError() from e
+                msg = f"{e.error_code} can be retried, doing another attempt..."
+                raise RetryableError(message=msg) from e
 
     @rate_limited(max_requests=100)
     def _crawler_task(self, object_id: str, object_type: sql.ObjectTypePlural) -> Permissions | None:
@@ -174,7 +175,8 @@ class RedashPermissionsSupport(AclSupport):
                 logger.warning(f"Could not update permissions for {object_type} {object_id} due to {e.error_code}")
                 return None
             else:
-                raise RetryableError() from e
+                msg = f"{e.error_code} can be retried, doing another attempt..."
+                raise RetryableError(message=msg) from e
 
 
 def redash_listing_wrapper(

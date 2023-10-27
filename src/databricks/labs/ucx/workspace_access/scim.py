@@ -111,7 +111,8 @@ class ScimSupport(AclSupport):
                 logger.warning(f"Could not apply changes to group {group_id} due to {e.error_code}")
                 return None
             else:
-                raise RetryableError() from e
+                msg = f"{e.error_code} can be retried, doing another attempt..."
+                raise RetryableError(message=msg) from e
 
     def _safe_get_group(self, group_id: str) -> Group | None:
         try:
@@ -128,4 +129,5 @@ class ScimSupport(AclSupport):
                 logger.warning(f"Could not get details of group {group_id} due to {e.error_code}")
                 return None
             else:
-                raise RetryableError() from e
+                msg = f"{e.error_code} can be retried, doing another attempt..."
+                raise RetryableError(message=msg) from e

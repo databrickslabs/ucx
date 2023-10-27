@@ -227,8 +227,10 @@ def test_safe_set_permissions_when_error_non_retriable():
 
 def test_safe_set_permissions_when_error_retriable():
     ws = MagicMock()
-    ws.dbsql_permissions.set.side_effect = DatabricksError(error_code="INTERNAL_SERVER_ERROR")
+    error_code = "INTERNAL_SERVER_ERROR"
+    ws.dbsql_permissions.set.side_effect = DatabricksError(error_code=error_code)
     sup = RedashPermissionsSupport(ws=ws, listings=[], verify_timeout=timedelta(seconds=1))
     acl = [sql.AccessControl(group_name="group_1", permission_level=sql.PermissionLevel.CAN_MANAGE)]
-    with pytest.raises(RetryableError):
+    with pytest.raises(RetryableError) as e:
         sup._safe_set_permissions(sql.ObjectTypePlural.QUERIES, "test", acl)
+    assert error_code in str(e)

@@ -68,14 +68,16 @@ def test_safe_patch_group_when_error_non_retriable():
 
 def test_safe_patch_group_when_error_retriable():
     ws = MagicMock()
-    ws.groups.patch.side_effect = DatabricksError(error_code="INTERNAL_SERVER_ERROR")
+    error_code = "INTERNAL_SERVER_ERROR"
+    ws.groups.patch.side_effect = DatabricksError(error_code=error_code)
     sup = ScimSupport(ws=ws, verify_timeout=timedelta(seconds=1))
     operations = [
         iam.Patch(op=iam.PatchOp.ADD, path="roles", value=[e.as_dict() for e in [iam.ComplexValue(value="role1")]])
     ]
     schemas = [iam.PatchSchema.URN_IETF_PARAMS_SCIM_API_MESSAGES_2_0_PATCH_OP]
-    with pytest.raises(RetryableError):
+    with pytest.raises(RetryableError) as e:
         sup._safe_patch_group(group_id="1", operations=operations, schemas=schemas)
+    assert error_code in str(e)
 
 
 def test_safe_get_group_when_error_non_retriable():
@@ -88,7 +90,9 @@ def test_safe_get_group_when_error_non_retriable():
 
 def test_safe_get_group_when_error_retriable():
     ws = MagicMock()
-    ws.groups.get.side_effect = DatabricksError(error_code="INTERNAL_SERVER_ERROR")
+    error_code = "INTERNAL_SERVER_ERROR"
+    ws.groups.get.side_effect = DatabricksError(error_code=error_code)
     sup = ScimSupport(ws=ws, verify_timeout=timedelta(seconds=1))
-    with pytest.raises(RetryableError):
+    with pytest.raises(RetryableError) as e:
         sup._safe_get_group(group_id="1")
+    assert error_code in str(e)

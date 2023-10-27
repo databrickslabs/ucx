@@ -39,7 +39,8 @@ class WorkspaceObjectInfo:
 
 
 class RetryableError(DatabricksError):
-    pass
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
 
 
 class Listing:
@@ -196,7 +197,8 @@ class GenericPermissionsSupport(AclSupport):
                 logger.warning(f"Could not get permissions for {object_type} {object_id} due to {e.error_code}")
                 return None
             else:
-                raise RetryableError() from e
+                msg = f"{e.error_code} can be retried, doing another attempt..."
+                raise RetryableError(message=msg) from e
 
     def _safe_update_permissions(
         self, object_type: str, object_id: str, acl: list[iam.AccessControlRequest]
@@ -215,7 +217,8 @@ class GenericPermissionsSupport(AclSupport):
                 logger.warning(f"Could not update permissions for {object_type} {object_id} due to {e.error_code}")
                 return None
             else:
-                raise RetryableError() from e
+                msg = f"{e.error_code} can be retried, doing another attempt..."
+                raise RetryableError(message=msg) from e
 
     def _prepare_new_acl(
         self, permissions: iam.ObjectPermissions, migration_state: GroupMigrationState, destination: Destination

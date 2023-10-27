@@ -129,6 +129,16 @@ def test_safe_get_permissions_when_error_non_retriable():
     #     sup._safe_get_permissions("clusters", "test")
 
 
+def test_safe_get_permissions_when_error_retriable():
+    ws = MagicMock()
+    error_code = "INTERNAL_SERVER_ERROR"
+    ws.permissions.get.side_effect = DatabricksError(error_code=error_code)
+    sup = GenericPermissionsSupport(ws=ws, listings=[])
+    with pytest.raises(RetryableError) as e:
+        sup._safe_get_permissions("clusters", "test")
+    assert error_code in str(e)
+
+
 def test_no_permissions():
     ws = MagicMock()
     ws.clusters.list.return_value = [
@@ -364,16 +374,18 @@ def test_safe_update_permissions_when_error_non_retriable():
 
 def test_safe_update_permissions_when_error_retriable():
     ws = MagicMock()
-    ws.permissions.update.side_effect = DatabricksError(error_code="INTERNAL_SERVER_ERROR")
+    error_code = "INTERNAL_SERVER_ERROR"
+    ws.permissions.update.side_effect = DatabricksError(error_code=error_code)
 
     sup = GenericPermissionsSupport(ws=ws, listings=[], verify_timeout=timedelta(seconds=1))
 
-    with pytest.raises(RetryableError):
+    with pytest.raises(RetryableError) as e:
         sup._safe_update_permissions(
             object_type="clusters",
             object_id="cluster_id",
             acl=[iam.AccessControlRequest(group_name="group", permission_level=iam.PermissionLevel.CAN_USE)],
         )
+    assert error_code in str(e)
 
 
 def test_load_as_dict():
