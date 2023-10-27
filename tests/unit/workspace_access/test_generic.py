@@ -162,18 +162,14 @@ def test_passwords_tokens_crawler(migration_state):
     basic_acl = [
         iam.AccessControlResponse(
             group_name="test",
-            all_permissions=[
-                iam.Permission(inherited=False, permission_level=iam.PermissionLevel.CAN_USE),
-            ],
+            all_permissions=[iam.Permission(inherited=False, permission_level=iam.PermissionLevel.CAN_USE)],
         )
     ]
 
     temp_acl = [
         iam.AccessControlResponse(
             group_name="db-temp-test",
-            all_permissions=[
-                iam.Permission(inherited=False, permission_level=iam.PermissionLevel.CAN_USE),
-            ],
+            all_permissions=[iam.Permission(inherited=False, permission_level=iam.PermissionLevel.CAN_USE)],
         )
     ]
     ws.permissions.get.side_effect = [
@@ -196,7 +192,7 @@ def test_passwords_tokens_crawler(migration_state):
             item.object_type,
             item.object_id,
             access_control_list=[
-                iam.AccessControlRequest(group_name="db-temp-test", permission_level=iam.PermissionLevel.CAN_USE),
+                iam.AccessControlRequest(group_name="db-temp-test", permission_level=iam.PermissionLevel.CAN_USE)
             ],
         )
         ws.permissions.update.reset_mock()
