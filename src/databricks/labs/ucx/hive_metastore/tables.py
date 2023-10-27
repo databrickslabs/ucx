@@ -8,11 +8,7 @@ from functools import partial
 from databricks.sdk import WorkspaceClient
 
 from databricks.labs.ucx.framework.crawlers import CrawlerBase, SqlBackend
-from databricks.labs.ucx.framework.failures import (
-    FailureReporter,
-    ObjectFailure,
-    ObjectFailureError,
-)
+from databricks.labs.ucx.framework.failures import FailureReporter, ObjectFailureError
 from databricks.labs.ucx.framework.parallel import Threads
 from databricks.labs.ucx.mixins.sql import Row
 
@@ -136,9 +132,7 @@ class TablesCrawler(CrawlerBase):
                 tasks.append(partial(self._describe, catalog, database, table))
         catalog_tables, errors = Threads.gather(f"listing tables in {catalog}", tasks)
         if len(errors) > 0:
-            for _e in errors:
-                self._failure_reporter.report(ObjectFailure.make(_e))
-            self._failure_reporter.flush()
+            self._failure_reporter.report(errors)
             logger.error(f"Detected {len(errors)} while scanning tables in {catalog}")
         return catalog_tables
 
@@ -165,7 +159,8 @@ class TablesCrawler(CrawlerBase):
             )
         except Exception as e:
             logger.error(f"Couldn't fetch information for table {full_name} : {e}")
-            raise ObjectFailureError(object_type="table", object_id=full_name, root_cause=e) from e
+            msg = "table"
+            raise ObjectFailureError(msg, full_name, e) from e
 
 
 class TablesMigrate:
@@ -202,9 +197,7 @@ class TablesMigrate:
             tasks.append(partial(self._migrate_table, target_catalog, table))
         _, errors = Threads.gather("migrate tables", tasks)
         if len(errors) > 0:
-            for _e in errors:
-                self._failure_reporter.report(ObjectFailure.make(_e))
-            self._failure_reporter.flush()
+            self._failure_reporter.report(errors)
             logger.error(f"Detected {len(errors)} errors while migrating tables")
 
     def _migrate_table(self, target_catalog, table):
@@ -223,7 +216,8 @@ class TablesMigrate:
             else:
                 logger.info(f"Table {table.key} is a {table.object_type} and is not supported for migration yet ")
         except Exception as e:
-            raise ObjectFailureError(object_type="table", object_id=table.key, root_cause=e) from e
+            msg = "table"
+            raise ObjectFailureError(msg, table.key, e) from e
         return True
 
     def _init_seen_tables(self):

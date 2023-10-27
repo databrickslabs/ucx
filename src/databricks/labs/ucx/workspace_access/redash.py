@@ -125,7 +125,7 @@ class RedashPermissionsSupport(AclSupport):
                 time.sleep(1 + _i)
             return False
         except Exception as e:
-            raise ObjectFailureError(object_type=str(object_type), object_id=object_id, root_cause=e) from e
+            raise ObjectFailureError(object_type.value, object_id, e) from e
 
     def _prepare_new_acl(
         self, acl: list[sql.AccessControl], migration_state: GroupMigrationState, destination: Destination

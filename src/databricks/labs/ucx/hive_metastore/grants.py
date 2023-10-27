@@ -6,11 +6,7 @@ from functools import partial
 from databricks.sdk.service.catalog import SchemaInfo, TableInfo
 
 from databricks.labs.ucx.framework.crawlers import CrawlerBase
-from databricks.labs.ucx.framework.failures import (
-    FailureReporter,
-    ObjectFailure,
-    ObjectFailureError,
-)
+from databricks.labs.ucx.framework.failures import FailureReporter, ObjectFailureError
 from databricks.labs.ucx.framework.parallel import Threads
 from databricks.labs.ucx.hive_metastore.tables import TablesCrawler
 
@@ -174,9 +170,7 @@ class GrantsCrawler(CrawlerBase):
             tasks.append(partial(fn, table=table.name))
         catalog_grants, errors = Threads.gather(f"listing grants for {catalog}", tasks)
         if len(errors) > 0:
-            for _e in errors:
-                self._failure_reporter.report(ObjectFailure.make(_e))
-            self._failure_reporter.flush()
+            self._failure_reporter.report(errors)
             logger.error(f"Detected {len(errors)} during scanning for grants in {catalog}")
         return [grant for grants in catalog_grants for grant in grants]
 
@@ -268,4 +262,4 @@ class GrantsCrawler(CrawlerBase):
                 return grants
         except Exception as e:
             logger.error(f"Couldn't fetch grants for object {on_type} {key}: {e}")
-            raise ObjectFailureError(object_type=on_type, object_id=key, root_cause=e) from None
+            raise ObjectFailureError(on_type, key, e) from e

@@ -86,4 +86,4 @@ class ScimSupport(AclSupport):
                 time.sleep(1 + _i)
             return False
         except Exception as e:
-            raise ObjectFailureError(object_type=group_id, object_id=property_name, root_cause=e) from e
+            raise ObjectFailureError(property_name, property_name, e) from e

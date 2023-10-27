@@ -129,7 +129,7 @@ class GenericPermissionsSupport(AclSupport):
                 time.sleep(1 + _i)
             return False
         except Exception as e:
-            raise ObjectFailureError(object_type=object_type, object_id=object_id, root_cause=e) from e
+            raise ObjectFailureError(object_type, object_id, e) from e
 
     @rate_limited(max_requests=100)
     def _crawler_task(self, object_type: str, object_id: str) -> Permissions | None:
