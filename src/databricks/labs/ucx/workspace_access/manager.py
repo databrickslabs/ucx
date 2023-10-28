@@ -118,9 +118,8 @@ class PermissionManager(CrawlerBase):
             applier_tasks.extend(tasks_for_support)
 
         logger.info(f"Starting to apply permissions on {destination} groups. Total tasks: {len(applier_tasks)}")
-        # run with 1 thread to temp bugfix TableACL grants issue in the platform
-        # see: https://databricks.atlassian.net/browse/ES-908737
-        _, errors = Threads.gather(f"apply {destination} group permissions", applier_tasks, num_threads=1)
+
+        _, errors = Threads.gather(f"apply {destination} group permissions", applier_tasks)
         if len(errors) > 0:
             # TODO: https://github.com/databrickslabs/ucx/issues/406
             logger.error(f"Detected {len(errors)} while applying permissions")
