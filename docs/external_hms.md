@@ -18,7 +18,7 @@ The UCX toolkit by default relies on the internal workspace HMS as a source for 
   - Init scripts
 
 ### Design Decisions
-- We should set up a single HMS for UCX
+- Should we set up a single HMS for UCX?
 - We should suggest copying the setup from an existing Cluster/Cluster policy
 - We shouldn't override the set up for the DB Warehouses (that may break functionality)
 - We should allow overriding cluster settings and instance profile setting to accommodate novel settings.
