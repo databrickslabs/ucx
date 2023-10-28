@@ -11,7 +11,7 @@ The UCX toolkit by default relies on the internal workspace HMS as a source for 
 - In reality most customers use a single (internal or external) HMS within a workspace.
 - When migrating from an external HMS we have to consider that it is used by more than one workspace.
 - Integration with external HMS has to be set on all DB Warehouses together.
-- HMS connectivity is set, usually, on cluster policy.
+- HMS connectivity is set, usually, on cluster policy. As well as global SQL Warehouse config
 - Typically external HMS setup relies on:
   - Spark Config
   - Instance Profiles
