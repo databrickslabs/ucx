@@ -44,6 +44,16 @@ def test_tacl_crawler_multiple_permissions():
                 ("foo2@example.com", "SELECT", "catalog_a", "database_b", "table_c", None, False, False),
                 # duplicate
                 ("foo2@example.com", "SELECT", "catalog_a", "database_b", "table_c", None, False, False),
+                # view
+                ("foo3@example.com", "SELECT", "catalog_a", "database_b", None, "view_c", False, False),
+                # database
+                ("foo3@example.com", "SELECT", "catalog_a", "database_b", None, None, False, False),
+                # catalog
+                ("foo3@example.com", "SELECT", "catalog_a", None, None, None, False, False),
+                # any file
+                ("foo3@example.com", "SELECT", None, None, None, None, True, False),
+                # function
+                ("foo3@example.com", "SELECT", None, None, None, None, False, True),
             ]
         }
     )
@@ -96,6 +106,81 @@ def test_tacl_crawler_multiple_permissions():
         view=None,
         any_file=False,
         anonymous_function=False,
+    ) == Grant(**json.loads(permissions.raw))
+
+    permissions = next(crawler_tasks)()
+
+    assert "VIEW" == permissions.object_type
+    assert "catalog_a.database_b.view_c" == permissions.object_id
+    assert Grant(
+        principal="foo3@example.com",
+        action_type="SELECT",
+        catalog="catalog_a",
+        database="database_b",
+        table=None,
+        view="view_c",
+        any_file=False,
+        anonymous_function=False,
+    ) == Grant(**json.loads(permissions.raw))
+
+    permissions = next(crawler_tasks)()
+
+    assert "DATABASE" == permissions.object_type
+    assert "catalog_a.database_b" == permissions.object_id
+    assert Grant(
+        principal="foo3@example.com",
+        action_type="SELECT",
+        catalog="catalog_a",
+        database="database_b",
+        table=None,
+        view=None,
+        any_file=False,
+        anonymous_function=False,
+    ) == Grant(**json.loads(permissions.raw))
+
+    permissions = next(crawler_tasks)()
+
+    assert "CATALOG" == permissions.object_type
+    assert "catalog_a" == permissions.object_id
+    assert Grant(
+        principal="foo3@example.com",
+        action_type="SELECT",
+        catalog="catalog_a",
+        database=None,
+        table=None,
+        view=None,
+        any_file=False,
+        anonymous_function=False,
+    ) == Grant(**json.loads(permissions.raw))
+
+    permissions = next(crawler_tasks)()
+
+    assert "ANY FILE" == permissions.object_type
+    assert permissions.object_id == ""
+    assert Grant(
+        principal="foo3@example.com",
+        action_type="SELECT",
+        catalog="",
+        database=None,
+        table=None,
+        view=None,
+        any_file=True,
+        anonymous_function=False,
+    ) == Grant(**json.loads(permissions.raw))
+
+    permissions = next(crawler_tasks)()
+
+    assert "ANONYMOUS FUNCTION" == permissions.object_type
+    assert permissions.object_id == ""
+    assert Grant(
+        principal="foo3@example.com",
+        action_type="SELECT",
+        catalog="",
+        database=None,
+        table=None,
+        view=None,
+        any_file=False,
+        anonymous_function=True,
     ) == Grant(**json.loads(permissions.raw))
 
 
