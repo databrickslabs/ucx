@@ -1,5 +1,6 @@
 import collections
 import dataclasses
+import functools
 import json
 from collections.abc import Callable, Iterator
 from functools import partial
@@ -36,21 +37,43 @@ class TableAclSupport(AclSupport):
         # * GRANT MODIFY ON TABLE hive_metastore.db_a.table_a TO group_a
         # will be folded and executed in one statement/transaction:
         # * GRANT SELECT, MODIFY ON TABLE hive_metastore.db_a.table_a TO group_a
+
         folded_actions = collections.defaultdict(set)
-        grant_folded_actions = {}
         for grant in self._grants_crawler.snapshot():
             key = (grant.principal, grant.this_type_and_key())
             folded_actions[key].add(grant.action_type)
 
-            # use one of the grants with actions folded per principal, object type and id
-            grant_dict = dataclasses.asdict(grant)
-            grant_dict["action_type"] = ", ".join(sorted(folded_actions[key]))
-            grant_folded_actions[key] = grant_dict
+        def inner(object_type: str, object_id: str, grant: Grant) -> Permissions:
+            return Permissions(object_type=object_type, object_id=object_id, raw=json.dumps(dataclasses.asdict(grant)))
 
-        for (_principal, (object_type, object_id)), grant in grant_folded_actions.items():
-            yield lambda ot=object_type, oi=object_id, g=grant: Permissions(
-                object_type=ot, object_id=oi, raw=json.dumps(g)
-            )
+        for (principal, (object_type, object_id)), actions in folded_actions.items():
+            grant = self._from_reduced(object_type, object_id, principal, ", ".join(sorted(actions)))
+            yield functools.partial(inner, object_type=object_type, object_id=object_id, grant=grant)
+
+    def _from_reduced(self, object_type: str, object_id: str, principal: str, action_type: str):
+        match object_type:
+            case "TABLE":
+                catalog, database, table = object_id.split(".")
+                return Grant(
+                    principal=principal, action_type=action_type, catalog=catalog, database=database, table=table
+                )
+            case "VIEW":
+                catalog, database, view = object_id.split(".")
+                return Grant(
+                    principal=principal, action_type=action_type, catalog=catalog, database=database, view=view
+                )
+            case "DATABASE":
+                catalog, database = object_id.split(".")
+                return Grant(principal=principal, action_type=action_type, catalog=catalog, database=database)
+            case "CATALOG":
+                catalog = object_id
+                return Grant(principal=principal, action_type=action_type, catalog=catalog)
+            case "ANONYMOUS FUNCTION":
+                catalog = object_id
+                return Grant(principal=principal, action_type=action_type, catalog=catalog, anonymous_function=True)
+            case "ANY FILE":
+                catalog = object_id
+                return Grant(principal=principal, action_type=action_type, catalog=catalog, any_file=True)
 
     def object_types(self) -> set[str]:
         return {"TABLE", "DATABASE", "VIEW", "CATALOG", "ANONYMOUS FUNCTION", "ANY FILE"}
