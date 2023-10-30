@@ -45,14 +45,22 @@ class SqlBackend(ABC):
             fields.append(f"{f.name} {spark_type}{not_null}")
         return ", ".join(fields)
 
+    from dataclasses import dataclass, fields, asdict
+
     @classmethod
-    def _filter_none_rows(cls, rows):
+    def _filter_none_rows(cls, rows, klass):
         if len(rows) == 0:
             return rows
+
         results = []
+        class_fields = dataclasses.fields(klass)
         for row in rows:
             if row is None:
                 continue
+            for field in class_fields:
+                if field.default is not None and getattr(row, field.name) is None:
+                    raise ValueError(f"Not null constraint violated for column {field.name}, "
+                                     f"row = {dataclasses.asdict(row)}")
             results.append(row)
         return results
 
@@ -75,7 +83,7 @@ class StatementExecutionBackend(SqlBackend):
         if mode == "overwrite":
             msg = "Overwrite mode is not yet supported"
             raise NotImplementedError(msg)
-        rows = self._filter_none_rows(rows)
+        rows = self._filter_none_rows(rows, klass)
         self.create_table(full_name, klass)
         if len(rows) == 0:
             return
@@ -126,7 +134,7 @@ class RuntimeBackend(SqlBackend):
         return self._spark.sql(sql).collect()
 
     def save_table(self, full_name: str, rows: list[any], klass: dataclasses.dataclass, mode: str = "append"):
-        rows = self._filter_none_rows(rows)
+        rows = self._filter_none_rows(rows, klass)
 
         if len(rows) == 0:
             self.create_table(full_name, klass)
