@@ -2,6 +2,7 @@ import base64
 import time
 
 from databricks.sdk import WorkspaceClient
+from databricks.sdk.service.compute import CreateResponse
 
 
 class HiveMetastoreLineageEnabler:
@@ -22,18 +23,16 @@ EOF
 fi"""
         return base64.b64encode(_init_script_content.encode()).decode()
 
-    def _add_global_init_script(self):
-        self._ws.global_init_scripts.create(
+    def _add_global_init_script(self) -> CreateResponse:
+        created_script = self._ws.global_init_scripts.create(
             name=f"hms-lineage-{time.time_ns()}", script=self._get_init_script_content(), enabled=True
         )
+        return created_script
 
     def add_spark_config_for_hms_lineage(self):
-        self._add_global_init_script()
+        created_script = self._add_global_init_script()
         self._add_sql_wh_config()
+        return created_script.script_id
 
     def _add_sql_wh_config(self):
         pass
-
-    #     self._ws.warehouses.set_workspace_warehouse_config([EndpointConfPair(
-    #         key="spark.hadoop.fs.azure.account.auth.type.storage_acct1.dfs.core.windows.net", value="OAuth"
-    #     )])

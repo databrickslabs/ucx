@@ -14,7 +14,8 @@ def test_add_spark_config_for_hms_lineage(mocker):
        }
     EOF
     fi"""
-    ws.global_init_scripts.create.return_value = "abcde"
 
     hmle = HiveMetastoreLineageEnabler(ws)
-    hmle.add_spark_config_for_hms_lineage()
+    script_id = hmle.add_spark_config_for_hms_lineage()
+
+    assert script_id != ""
