@@ -2,8 +2,10 @@ import datetime
 import json
 import logging
 import os
+import random
 import re
 import shutil
+import string
 import subprocess
 import sys
 import tempfile
@@ -236,6 +238,23 @@ class WorkspaceInstaller:
                     raise SystemExit(msg)
         return inventory_database
 
+    def _configure_default_catalog(self):
+
+        charset = string.ascii_uppercase + string.ascii_lowercase + string.digits
+        counter = 0
+        workspace_id = "".join(random.choices(charset, k=4))
+        while True:
+            default_catalog = self._question("Select a Default Catalog for table migration", default=f"ucx_{workspace_id}")
+            if re.match(r"^\w+$", default_catalog):
+                break
+            else:
+                print(f"{default_catalog} is not a valid catalog name")
+                counter = counter + 1
+                if counter > NUM_USER_ATTEMPTS:
+                    msg = "Exceeded max tries to get a valid catalog name, try again later."
+                    raise SystemExit(msg)
+        return default_catalog
+
     def _configure(self):
         ws_file_url = self._notebook_link(self._config_file)
         try:
@@ -250,6 +269,7 @@ class WorkspaceInstaller:
 
         logger.info("Please answer a couple of questions to configure Unity Catalog migration")
         inventory_database = self._configure_inventory_database()
+        default_catalog = self._configure_default_catalog()
 
         def warehouse_type(_):
             return _.warehouse_type.value if not _.enable_serverless_compute else "SERVERLESS"
@@ -321,6 +341,7 @@ class WorkspaceInstaller:
         )
 
         self._write_config()
+        self._write_mapping_conf_file(default_catalog)
         msg = "Open config file in the browser and continue installing?"
         if self._prompts and self._question(msg, default="yes") == "yes":
             webbrowser.open(ws_file_url)
@@ -778,9 +799,11 @@ class WorkspaceInstaller:
                 spark_conf_dict[key[11:]] = cluster_policy[key]["value"]
         return instance_profile, spark_conf_dict
 
-    def _write_mapping_conf_file(default_catalog: string):
-        return None
-
+    def _write_mapping_conf_file(self, default_catalog: str):
+        mapping = "element,target,notes\n"
+        mapping += f"<root>,{default_catalog},Default Mapping created by UCX Install\n"
+        path = f"{self._install_folder}/table_upgrade_map.csv"
+        self._ws.workspace.upload(path, mapping.encode("utf8"), format=ImportFormat.AUTO, overwrite=True)
 
 if __name__ == "__main__":
     ws = WorkspaceClient(product="ucx", product_version=__version__)
