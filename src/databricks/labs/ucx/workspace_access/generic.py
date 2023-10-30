@@ -299,9 +299,9 @@ class WorkspaceListing(Listing, CrawlerBase):
                 continue
             raw = obj.as_dict()
             yield WorkspaceObjectInfo(
-                object_type=raw["object_type"],
-                object_id=str(raw["object_id"]),
-                path=raw["path"],
+                object_type=raw.get("object_type", "Missing Object Type"),
+                object_id=str(raw.get("object_id", "Missing Object ID")),
+                path=raw.get("path", "Missing Path"),
                 language=raw.get("language", None),
             )
 
