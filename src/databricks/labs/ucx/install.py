@@ -778,6 +778,9 @@ class WorkspaceInstaller:
                 spark_conf_dict[key[11:]] = cluster_policy[key]["value"]
         return instance_profile, spark_conf_dict
 
+    def _write_mapping_conf_file(default_catalog: string):
+        return None
+
 
 if __name__ == "__main__":
     ws = WorkspaceClient(product="ucx", product_version=__version__)
