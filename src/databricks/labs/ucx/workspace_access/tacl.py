@@ -1,3 +1,4 @@
+import collections
 import dataclasses
 import functools
 import json
@@ -21,12 +22,58 @@ class TableAclSupport(AclSupport):
         self._sql_backend = sql_backend
 
     def get_crawler_tasks(self) -> Iterator[Callable[..., Permissions | None]]:
-        def inner(grant: Grant) -> Permissions:
-            object_type, object_key = grant.this_type_and_key()
-            return Permissions(object_type=object_type, object_id=object_key, raw=json.dumps(dataclasses.asdict(grant)))
+        # TableAcl grant/revoke operations are not atomic. When granting the permissions,
+        # the service would first get all existing permissions, append with the new permissions,
+        # and set the full list in the database. If there are concurrent grant requests,
+        # both requests might succeed and emit the audit logs, but what actually happens could be that
+        # the new permission list from one request overrides the other one, causing permissions loss.
+        # More info here: https://databricks.atlassian.net/browse/ES-908737
+        #
+        # Below optimization mitigates the issue by folding all action types (grants)
+        # for the same principal, object_id and object_type into one grant with comma separated list of action types.
+        #
+        # For example, the following table grants:
+        # * GRANT SELECT ON TABLE hive_metastore.db_a.table_a TO group_a
+        # * GRANT MODIFY ON TABLE hive_metastore.db_a.table_a TO group_a
+        # will be folded and executed in one statement/transaction:
+        # * GRANT SELECT, MODIFY ON TABLE hive_metastore.db_a.table_a TO group_a
 
+        folded_actions = collections.defaultdict(set)
         for grant in self._grants_crawler.snapshot():
-            yield functools.partial(inner, grant)
+            key = (grant.principal, grant.this_type_and_key())
+            folded_actions[key].add(grant.action_type)
+
+        def inner(object_type: str, object_id: str, grant: Grant) -> Permissions:
+            return Permissions(object_type=object_type, object_id=object_id, raw=json.dumps(dataclasses.asdict(grant)))
+
+        for (principal, (object_type, object_id)), actions in folded_actions.items():
+            grant = self._from_reduced(object_type, object_id, principal, ", ".join(sorted(actions)))
+            yield functools.partial(inner, object_type=object_type, object_id=object_id, grant=grant)
+
+    def _from_reduced(self, object_type: str, object_id: str, principal: str, action_type: str):
+        match object_type:
+            case "TABLE":
+                catalog, database, table = object_id.split(".")
+                return Grant(
+                    principal=principal, action_type=action_type, catalog=catalog, database=database, table=table
+                )
+            case "VIEW":
+                catalog, database, view = object_id.split(".")
+                return Grant(
+                    principal=principal, action_type=action_type, catalog=catalog, database=database, view=view
+                )
+            case "DATABASE":
+                catalog, database = object_id.split(".")
+                return Grant(principal=principal, action_type=action_type, catalog=catalog, database=database)
+            case "CATALOG":
+                catalog = object_id
+                return Grant(principal=principal, action_type=action_type, catalog=catalog)
+            case "ANONYMOUS FUNCTION":
+                catalog = object_id
+                return Grant(principal=principal, action_type=action_type, catalog=catalog, anonymous_function=True)
+            case "ANY FILE":
+                catalog = object_id
+                return Grant(principal=principal, action_type=action_type, catalog=catalog, any_file=True)
 
     def object_types(self) -> set[str]:
         return {"TABLE", "DATABASE", "VIEW", "CATALOG", "ANONYMOUS FUNCTION", "ANY FILE"}

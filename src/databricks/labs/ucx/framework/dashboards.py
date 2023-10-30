@@ -175,10 +175,9 @@ class DashboardFromFiles:
             self._state = json.load(self._ws.workspace.download(self._query_state))
             to_remove = []
             for k, v in self._state.items():
-                _, name = k.split(":")
-                if k == "dashboard_id":
+                if k.endswith("dashboard_id"):
                     continue
-                if name != "query_id":
+                if not k.endswith("query_id"):
                     continue
                 try:
                     self._ws.queries.get(v)
@@ -215,7 +214,7 @@ class DashboardFromFiles:
             if k in desired_keys:
                 new_state[k] = v
                 continue
-            _, name = k.split(":")
+            name = k if ":" not in k else k.split(":")[-1]
             if name not in destructors:
                 continue
             try:

@@ -5,6 +5,15 @@ from unittest.mock import MagicMock, Mock, patch
 import pytest
 from databricks.sdk.core import DatabricksError
 from databricks.sdk.service import compute, iam, ml
+from databricks.sdk.service.compute import ClusterDetails
+from databricks.sdk.service.iam import (
+    AccessControlResponse,
+    ObjectPermissions,
+    Permission,
+    PermissionLevel,
+)
+from databricks.sdk.service.jobs import BaseJob
+from databricks.sdk.service.pipelines import PipelineStateInfo
 from databricks.sdk.service.workspace import Language, ObjectInfo, ObjectType
 
 from databricks.labs.ucx.mixins.sql import Row
@@ -605,3 +614,110 @@ def test_workspace_snapshot():
 
     assert len(result_set) == 2
     assert result_set[0] == WorkspaceObjectInfo("NOTEBOOK", "123", "/rootobj/notebook1", "PYTHON")
+
+
+def test_eligibles_assets_with_owner_should_be_accepted():
+    ws = MagicMock()
+    ws.jobs.list.return_value = [BaseJob(job_id=13)]
+    ws.pipelines.list_pipelines.return_value = [PipelineStateInfo(pipeline_id="12")]
+
+    def perms(object_type: str, object_id: str):
+        if object_type == "jobs":
+            return ObjectPermissions(
+                object_id=object_id,
+                object_type=object_type,
+                access_control_list=[
+                    AccessControlResponse(
+                        group_name="de", all_permissions=[Permission(permission_level=PermissionLevel.IS_OWNER)]
+                    ),
+                    AccessControlResponse(
+                        group_name="ds", all_permissions=[Permission(permission_level=PermissionLevel.CAN_USE)]
+                    ),
+                ],
+            )
+        elif object_type == "pipelines":
+            return ObjectPermissions(
+                object_id=object_id,
+                object_type=object_type,
+                access_control_list=[
+                    AccessControlResponse(
+                        group_name="de", all_permissions=[Permission(permission_level=PermissionLevel.IS_OWNER)]
+                    ),
+                    AccessControlResponse(
+                        group_name="de", all_permissions=[Permission(permission_level=PermissionLevel.CAN_RUN)]
+                    ),
+                ],
+            )
+
+    ws.permissions.get.side_effect = perms
+
+    sup = GenericPermissionsSupport(
+        ws=ws,
+        listings=[
+            Listing(ws.jobs.list, "job_id", "jobs"),
+            Listing(ws.pipelines.list_pipelines, "pipeline_id", "pipelines"),
+        ],
+    )
+    tasks = []
+    for executable in list(sup.get_crawler_tasks()):
+        task = executable()
+        if task is not None:
+            tasks.append(task)
+    assert len(tasks) == 2
+
+
+def test_eligibles_assets_without_owner_should_be_ignored():
+    ws = MagicMock()
+    ws.clusters.list.return_value = [ClusterDetails(cluster_id="1234")]
+    ws.jobs.list.return_value = [BaseJob(job_id=13)]
+    ws.pipelines.list_pipelines.return_value = [PipelineStateInfo(pipeline_id="12")]
+
+    def perms(object_type: str, object_id: str):
+        if object_type == "clusters":
+            return ObjectPermissions(
+                object_id=object_id,
+                object_type=object_type,
+                access_control_list=[
+                    AccessControlResponse(
+                        group_name="de", all_permissions=[Permission(permission_level=PermissionLevel.CAN_USE)]
+                    )
+                ],
+            )
+        elif object_type == "pipelines":
+            return ObjectPermissions(
+                object_id=object_id,
+                object_type=object_type,
+                access_control_list=[
+                    AccessControlResponse(
+                        group_name="de", all_permissions=[Permission(permission_level=PermissionLevel.CAN_USE)]
+                    )
+                ],
+            )
+        elif object_type == "jobs":
+            return ObjectPermissions(
+                object_id=object_id,
+                object_type=object_type,
+                access_control_list=[
+                    AccessControlResponse(
+                        group_name="ds", all_permissions=[Permission(permission_level=PermissionLevel.CAN_USE)]
+                    ),
+                ],
+            )
+
+    ws.permissions.get.side_effect = perms
+
+    sup = GenericPermissionsSupport(
+        ws=ws,
+        listings=[
+            Listing(ws.clusters.list, "cluster_id", "clusters"),
+            Listing(ws.jobs.list, "job_id", "jobs"),
+            Listing(ws.pipelines.list_pipelines, "pipeline_id", "pipelines"),
+        ],
+    )
+    tasks = []
+    for executable in list(sup.get_crawler_tasks()):
+        task = executable()
+        if task is not None:
+            tasks.append(task)
+    assert len(tasks) == 1
+    assert tasks[0].object_type == "clusters"

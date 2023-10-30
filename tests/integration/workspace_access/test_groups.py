@@ -84,7 +84,7 @@ def test_replace_workspace_groups_with_account_groups(
     logger.info(f"Cluster policy: {ws.config.host}#setting/clusters/cluster-policies/view/{cluster_policy.policy_id}")
 
     dummy_table = make_table()
-    sql_backend.execute(f"GRANT SELECT ON TABLE {dummy_table.full_name} TO `{ws_group.display_name}`")
+    sql_backend.execute(f"GRANT SELECT, MODIFY ON TABLE {dummy_table.full_name} TO `{ws_group.display_name}`")
 
     group_manager = GroupManager(ws, GroupsConfig(auto=True))
     group_manager.prepare_groups_in_environment()
@@ -106,6 +106,7 @@ def test_replace_workspace_groups_with_account_groups(
 
     table_permissions = grants.for_table_info(dummy_table)
     assert ws_group.display_name in table_permissions
+    assert "MODIFY" in table_permissions[ws_group.display_name]
     assert "SELECT" in table_permissions[ws_group.display_name]
 
     permission_manager.apply_group_permissions(group_manager.migration_state, destination="backup")
@@ -117,7 +118,9 @@ def test_replace_workspace_groups_with_account_groups(
         table_permissions = grants.for_table_info(dummy_table)
         assert group_info.workspace.display_name in table_permissions
         assert group_info.backup.display_name in table_permissions
+        assert "MODIFY" in table_permissions[group_info.workspace.display_name]
         assert "SELECT" in table_permissions[group_info.workspace.display_name]
+        assert "MODIFY" in table_permissions[group_info.backup.display_name]
         assert "SELECT" in table_permissions[group_info.backup.display_name]
 
         policy_permissions = generic_permissions.load_as_dict("cluster-policies", cluster_policy.policy_id)
@@ -135,6 +138,7 @@ def test_replace_workspace_groups_with_account_groups(
         table_permissions = grants.for_table_info(dummy_table)
         assert group_info.account.display_name in table_permissions
         assert group_info.backup.display_name in table_permissions
+        assert "MODIFY" in table_permissions[group_info.backup.display_name]
         assert "SELECT" in table_permissions[group_info.backup.display_name]
 
         policy_permissions = generic_permissions.load_as_dict("cluster-policies", cluster_policy.policy_id)
@@ -152,7 +156,9 @@ def test_replace_workspace_groups_with_account_groups(
         table_permissions = grants.for_table_info(dummy_table)
         assert group_info.account.display_name in table_permissions
         assert group_info.backup.display_name in table_permissions
+        assert "MODIFY" in table_permissions[group_info.backup.display_name]
         assert "SELECT" in table_permissions[group_info.backup.display_name]
+        assert "MODIFY" in table_permissions[group_info.account.display_name]
         assert "SELECT" in table_permissions[group_info.account.display_name]
 
         policy_permissions = generic_permissions.load_as_dict("cluster-policies", cluster_policy.policy_id)
@@ -173,6 +179,7 @@ def test_replace_workspace_groups_with_account_groups(
 
         table_permissions = grants.for_table_info(dummy_table)
         assert group_info.account.display_name in table_permissions
+        assert "MODIFY" in table_permissions[group_info.account.display_name]
         assert "SELECT" in table_permissions[group_info.account.display_name]
 
     check_table_permissions_after_backup_delete()

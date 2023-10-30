@@ -157,7 +157,12 @@ def _permissions_mapping():
         (
             "pipeline",
             "pipelines",
-            [PermissionLevel.CAN_VIEW, PermissionLevel.CAN_RUN, PermissionLevel.CAN_MANAGE, PermissionLevel.IS_OWNER],
+            [
+                PermissionLevel.CAN_VIEW,
+                PermissionLevel.CAN_RUN,
+                PermissionLevel.CAN_MANAGE,
+                PermissionLevel.IS_OWNER,  # cannot be a group
+            ],
             _simple,
         ),
         (
@@ -166,8 +171,8 @@ def _permissions_mapping():
             [
                 PermissionLevel.CAN_VIEW,
                 PermissionLevel.CAN_MANAGE_RUN,
-                PermissionLevel.IS_OWNER,
                 PermissionLevel.CAN_MANAGE,
+                PermissionLevel.IS_OWNER,  # cannot be a group
             ],
             _simple,
         ),
@@ -810,6 +815,8 @@ def make_table(ws, sql_backend, make_schema, make_random) -> Callable[..., Table
         except RuntimeError as e:
             if "Cannot drop a view" in str(e):
                 sql_backend.execute(f"DROP VIEW IF EXISTS {table_info.full_name}")
+            elif "SCHEMA_NOT_FOUND" in str(e):
+                logger.warning("Schema was already dropped while executing the test", exc_info=e)
             else:
                 raise e
 
