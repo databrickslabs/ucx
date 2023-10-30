@@ -486,9 +486,12 @@ class WorkspaceInstaller:
             remote_wheel = f"{self._install_folder}/wheels/{local_wheel.name}"
             remote_dirname = os.path.dirname(remote_wheel)
             with local_wheel.open("rb") as f:
-                self._ws.dbfs.mkdirs(remote_dirname)
-                logger.info(f"Uploading wheel to dbfs:{remote_wheel}")
-                self._ws.dbfs.upload(remote_wheel, f, overwrite=True)
+                try:
+                    self._ws.dbfs.mkdirs(remote_dirname)
+                    logger.info(f"Uploading wheel to dbfs:{remote_wheel}")
+                    self._ws.dbfs.upload(remote_wheel, f, overwrite=True)
+                except DatabricksError as err:
+                    logger.warn(f"Uploading wheel files to DBFS failed, perhaps DBFS is protected. {err}")
             with local_wheel.open("rb") as f:
                 self._ws.workspace.mkdirs(remote_dirname)
                 logger.info(f"Uploading wheel to /Workspace{remote_wheel}")
@@ -780,7 +783,21 @@ class WorkspaceInstaller:
 
 
 if __name__ == "__main__":
-    ws = WorkspaceClient(product="ucx", product_version=__version__)
     logger.setLevel("INFO")
+
+    ws = WorkspaceClient(product="ucx", product_version=__version__)
+
+    logger.info(f"Connecting to {ws.config.host}")
+    default_cluster_id = ws.config.cluster_id
+    tacl_cluster_id = os.environ.get("DATABRICKS_LEGACY_TABLE_ACL_CLUSTER_ID", None)
+    
+    if default_cluster_id:
+        logger.info(f"Ensure classic 'No Isolation Shared' cluster is running {default_cluster_id}")
+        ws.clusters.ensure_cluster_is_running(default_cluster_id)
+    
+    if tacl_cluster_id:
+        logger.info(f"Ensure Legacy TACL cluster is running {tacl_cluster_id}")
+        ws.clusters.ensure_cluster_is_running(tacl_cluster_id)
+
     installer = WorkspaceInstaller(ws)
     installer.run()
