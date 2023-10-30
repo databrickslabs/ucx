@@ -136,7 +136,7 @@ class GenericPermissionsSupport(AclSupport):
 
         retry_on_value_error = retried(on=[ValueError, RetryableError], timeout=self._verify_timeout)
         retried_check = retry_on_value_error(self._inflight_check)
-        return retried_check(object_id, object_id, acl)
+        return retried_check(object_type, object_id, acl)
 
     @rate_limited(max_requests=100)
     def _crawler_task(self, object_type: str, object_id: str) -> Permissions | None:
@@ -193,6 +193,7 @@ class GenericPermissionsSupport(AclSupport):
                 "RESOURCE_NOT_FOUND",
                 "PERMISSION_DENIED",
                 "FEATURE_DISABLED",
+                "BAD_REQUEST",
             ]:
                 logger.warning(f"Could not get permissions for {object_type} {object_id} due to {e.error_code}")
                 return None
