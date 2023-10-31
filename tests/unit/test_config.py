@@ -38,14 +38,35 @@ def set_directory(path: Path):
         os.chdir(origin)
 
 
+def test_workspace_config(tmp_path: Path):
+    with set_directory(tmp_path):
+        mc = partial(
+            WorkspaceConfig,
+            database_to_catalog_mapping={"db1": "cat1", "db2": "cat2"},
+            groups=GroupsConfig(auto=True),
+            instance_profile="arn:aws:iam::111222333:instance-profile/foo-instance-profile",
+            inventory_database="abc",
+            log_level="INFO",
+            num_threads=10,
+            spark_conf={"key1": "val1", "key2": "val2"},
+            override_clusters={"main": "abcd-192345-eadeadbeaf", "tacl": "efgh-999999-eadeadbeaf"},
+        )
+        config: WorkspaceConfig = mc()
+        assert config.override_clusters is not None
+
+
 def test_reader(tmp_path: Path):
     with set_directory(tmp_path):
         mc = partial(
             WorkspaceConfig,
-            inventory_database="abc",
-            groups=GroupsConfig(auto=True),
             database_to_catalog_mapping={"db1": "cat1", "db2": "cat2"},
+            groups=GroupsConfig(auto=True),
+            instance_profile="arn:aws:iam::111222333:instance-profile/foo-instance-profile",
+            inventory_database="abc",
+            log_level="INFO",
+            num_threads=10,
             spark_conf={"key1": "val1", "key2": "val2"},
+            override_clusters={"main": "abcd-192345-eadeadbeaf", "tacl": "efgh-999999-eadeadbeaf"},
         )
 
         config: WorkspaceConfig = mc()

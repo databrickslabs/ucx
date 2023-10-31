@@ -95,8 +95,8 @@ class WorkspaceInstaller:
         self._prefix = prefix
         self._prompts = promtps
         self._this_file = Path(__file__)
-        self._override_clusters = None
         self._dashboards = {}
+        self._override_clusters = None
 
     def run(self):
         logger.info(f"Installing UCX v{self._version}")
@@ -288,6 +288,15 @@ class WorkspaceInstaller:
         else:
             groups_config_args["auto"] = True
 
+        # Checking for override clusters
+        if os.environ.get("DATABRICKS_CLUSTER_ID", None) and os.environ.get(
+            "DATABRICKS_LEGACY_TABLE_ACL_CLUSTER_ID", None
+        ):
+            self._override_clusters = {
+                "main": os.environ.get("DATABRICKS_CLUSTER_ID", None),
+                "tacl": os.environ.get("DATABRICKS_LEGACY_TABLE_ACL_CLUSTER_ID", None),
+            }
+
         # Checking for external HMS
         instance_profile = None
         spark_conf_dict = {}
@@ -318,6 +327,7 @@ class WorkspaceInstaller:
             num_threads=num_threads,
             instance_profile=instance_profile,
             spark_conf=spark_conf_dict,
+            override_clusters=self._override_clusters,
         )
 
         self._write_config()
@@ -525,6 +535,7 @@ class WorkspaceInstaller:
             if job_task.job_cluster_key in overrides:
                 job_task.existing_cluster_id = overrides[job_task.job_cluster_key]
                 job_task.job_cluster_key = None
+
         return settings
 
     def _upload_wheel_runner(self, remote_wheel: str):
@@ -592,6 +603,7 @@ class WorkspaceInstaller:
         )
 
     def _job_wheel_task(self, jobs_task: jobs.Task, task: Task, dbfs_path: str) -> jobs.Task:
+        # assert 0==1, "message"
         return replace(
             jobs_task,
             libraries=[compute.Library(whl=f"dbfs:{dbfs_path}")],
@@ -788,16 +800,6 @@ if __name__ == "__main__":
     ws = WorkspaceClient(product="ucx", product_version=__version__)
 
     logger.info(f"Connecting to {ws.config.host}")
-    default_cluster_id = ws.config.cluster_id
-    tacl_cluster_id = os.environ.get("DATABRICKS_LEGACY_TABLE_ACL_CLUSTER_ID", None)
-    
-    if default_cluster_id:
-        logger.info(f"Ensure classic 'No Isolation Shared' cluster is running {default_cluster_id}")
-        ws.clusters.ensure_cluster_is_running(default_cluster_id)
-    
-    if tacl_cluster_id:
-        logger.info(f"Ensure Legacy TACL cluster is running {tacl_cluster_id}")
-        ws.clusters.ensure_cluster_is_running(tacl_cluster_id)
 
     installer = WorkspaceInstaller(ws)
     installer.run()

@@ -198,36 +198,36 @@ class AccountConfig(_Config["AccountConfig"]):
 
 @dataclass
 class WorkspaceConfig(_Config["WorkspaceConfig"]):
-    inventory_database: str
-    groups: GroupsConfig
-    instance_pool_id: str = None
-    warehouse_id: str = None
-    connect: ConnectConfig | None = None
-    num_threads: int | None = 10
-    log_level: str | None = "INFO"
+    connect: ConnectConfig = None
     database_to_catalog_mapping: dict[str, str] = None
     default_catalog: str = "ucx_default"
-
-    # Starting path for notebooks and directories crawler
-    workspace_start_path: str = "/"
+    groups: GroupsConfig = None
+    instance_pool_id: str = None
     instance_profile: str = None
+    inventory_database: str = None
+    log_level: str = "INFO"
+    num_threads: int = 10
+    override_clusters: dict[Any, Any] = None
     spark_conf: dict[str, str] = None
+    warehouse_id: str = None
+    workspace_start_path: str = "/"  # Starting path for notebooks and directories crawler
 
     @classmethod
     def from_dict(cls, raw: dict):
         cls._verify_version(raw)
         return cls(
-            inventory_database=raw.get("inventory_database"),
+            database_to_catalog_mapping=raw.get("database_to_catalog_mapping", None),
+            default_catalog=raw.get("default_catalog", "main"),
             groups=GroupsConfig.from_dict(raw.get("groups", {})),
             connect=ConnectConfig.from_dict(raw.get("connect", {})),
             instance_pool_id=raw.get("instance_pool_id", None),
-            warehouse_id=raw.get("warehouse_id", None),
-            num_threads=raw.get("num_threads", 10),
-            log_level=raw.get("log_level", "INFO"),
-            database_to_catalog_mapping=raw.get("database_to_catalog_mapping", None),
             instance_profile=raw.get("instance_profile", None),
+            inventory_database=raw.get("inventory_database"),
+            log_level=raw.get("log_level", "INFO"),
+            num_threads=raw.get("num_threads", 10),
+            override_clusters=raw.get("override_clusters", None),
             spark_conf=raw.get("spark_conf", None),
-            default_catalog=raw.get("default_catalog", "main"),
+            warehouse_id=raw.get("warehouse_id", None),
             workspace_start_path=raw.get("workspace_start_path", "/"),
         )
 
