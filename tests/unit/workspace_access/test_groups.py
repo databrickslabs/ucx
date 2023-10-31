@@ -45,22 +45,54 @@ def test_scim_crawler():
             assert item.raw is not None
 
 
-def test_scim_apply(migration_state):
+@pytest.mark.parametrize(
+    "item",
+    [
+        Permissions(
+            object_id="test-ws",
+            object_type="roles",
+            raw=json.dumps(
+                [
+                    iam.ComplexValue(value="role1").as_dict(),
+                    iam.ComplexValue(value="role2").as_dict(),
+                ]
+            ),
+        ),
+        Permissions(
+            object_id="test-ws",
+            object_type="entitlements",
+            raw=json.dumps(
+                [
+                    iam.ComplexValue(value="sql-access").as_dict(),
+                    iam.ComplexValue(value="workspace-admin").as_dict(),
+                ]
+            ),
+        ),
+    ],
+    ids=["roles", "entitlements"],
+)
+def test_scim_apply(item, migration_state):
     ws = MagicMock()
-    sample_permissions = [iam.ComplexValue(value="role1"), iam.ComplexValue(value="role2")]
-    ws.groups.get.return_value = Group(id="test-backup", roles=sample_permissions)
-    sup = ScimSupport(ws=ws)
-    item = Permissions(
-        object_id="test-ws",
-        object_type="roles",
-        raw=json.dumps([p.as_dict() for p in sample_permissions]),
+    value_payload: list[dict] = json.loads(item.raw)
+    ws.groups.get.return_value = Group(
+        **{"id": "test-backup", item.object_type: [iam.ComplexValue.from_dict(value) for value in value_payload]}
     )
+    sup = ScimSupport(ws=ws)
 
-    task = sup.get_apply_task(item, migration_state, "backup")
-    task()
+    apply_to_backup_task = sup.get_apply_task(item, migration_state, "backup")
+    apply_to_backup_task()
+
     ws.groups.patch.assert_called_once_with(
         id="test-backup",
-        operations=[iam.Patch(op=iam.PatchOp.ADD, path="roles", value=[p.as_dict() for p in sample_permissions])],
+        operations=[iam.Patch(op=iam.PatchOp.ADD, path=item.object_type, value=value_payload)],
+        schemas=[iam.PatchSchema.URN_IETF_PARAMS_SCIM_API_MESSAGES_2_0_PATCH_OP],
+    )
+
+    apply_to_account_task = sup.get_apply_task(item, migration_state, "account")
+    apply_to_account_task()
+    ws.groups.patch.assert_called_with(
+        id="test-acc",
+        operations=[iam.Patch(op=iam.PatchOp.ADD, path=item.object_type, value=value_payload)],
         schemas=[iam.PatchSchema.URN_IETF_PARAMS_SCIM_API_MESSAGES_2_0_PATCH_OP],
     )
 
