@@ -556,7 +556,7 @@ class WorkspaceInstaller:
             if job_task.job_cluster_key in overrides:
                 job_task.existing_cluster_id = overrides[job_task.job_cluster_key]
                 job_task.job_cluster_key = None
-                job_task.libraries = None # Job libraries not loading from Workspace FS
+                job_task.libraries = None  # Job libraries not loading from Workspace FS
             if job_task.python_wheel_task is not None:
                 job_task.python_wheel_task = None
                 params = {"task": job_task.task_key} | EXTRA_TASK_PARAMS

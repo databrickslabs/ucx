@@ -394,6 +394,7 @@ def test_step_list(mocker):
     assert len(steps) == 2
     assert steps[0] == "wl_1" and steps[1] == "wl_2"
 
+
 def test_step_run(mocker):
     ws = mock_ws(mocker)
     from databricks.labs.ucx.framework.tasks import Task
@@ -407,11 +408,12 @@ def test_step_run(mocker):
     with mocker.patch.object(WorkspaceInstaller, attribute="_sorted_tasks", return_value=tasks):
         install = WorkspaceInstaller(ws)
         steps = install._step_list()
-        install._override_clusters = {
-            'main':'clusterid1',
-            'tacl':'clusterid_tacl'
-        }
+        assert len(steps) == 2
+        assert steps[0] == "wl_1" and steps[1] == "wl_2"
+    
+        install._override_clusters = {"main": "clusterid1", "tacl": "clusterid_tacl"}
         install.run()
+
 
 def test_create_readme(mocker):
     mocker.patch("builtins.input", return_value="yes")
