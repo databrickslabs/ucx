@@ -166,3 +166,25 @@ def test_enable_gscript_for_hms_lineage(mocker):
 
     assert script_id is not None
     assert script_id == "12C100F8BB38B002"
+
+
+def test_add_spark_config_no_matching_gscript_for_hms_lineage(mocker):
+    ws = mocker.Mock()
+    ginit_scripts = [
+        GlobalInitScriptDetails(
+            created_at=1695045723722,
+            created_by="test@abc.com",
+            enabled=False,
+            name="test123",
+            position=0,
+            script_id="12345",
+            updated_at=1695046359612,
+            updated_by="test@abc.com",
+        )
+    ]
+    ws.global_init_scripts.list.return_value = ginit_scripts
+    ws.global_init_scripts.get.return_value = None
+    hmle = HiveMetastoreLineageEnabler(ws)
+    script_id = hmle.check_lineage_spark_config_exists()
+
+    assert script_id is None
