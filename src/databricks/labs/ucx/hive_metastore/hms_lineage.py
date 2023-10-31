@@ -12,9 +12,10 @@ class HiveMetastoreLineageEnabler:
     def check_lineage_spark_config_exists(self) -> GlobalInitScriptDetailsWithContent:
         for script in self._ws.global_init_scripts.list():
             gscript = self._ws.global_init_scripts.get(script_id=script.script_id)
-            if gscript:
-                if "spark.databricks.dataLineage.enabled" in base64.b64decode(gscript.script).decode("utf-8"):
-                    return gscript
+            if not gscript:
+                continue
+            if "spark.databricks.dataLineage.enabled" in base64.b64decode(gscript.script).decode("utf-8"):
+                return gscript
 
     def _get_init_script_content(self):
         _init_script_content = """if [[ $DB_IS_DRIVER = "TRUE" ]]; then
