@@ -236,6 +236,19 @@ class WorkspaceInstaller:
                     raise SystemExit(msg)
         return inventory_database
 
+    def _configure_override_clusters(self):
+        """User may override standard job clusters with interactive clusters"""
+        default_val = ""
+        cluster_id = self._question("Pick default and we'll create a compatible job cluster (recommended) or enter pre-existing HMS Legacy cluster ID", default=default_val)
+        tacl_cluster_id = self._question("Pick default and we'll create a compatible job cluster (recommended) or enter pre-existing Table Access Control cluster ID", default=default_val)
+        overrides = None
+        if cluster_id != default_val and tacl_cluster_id != default_val:
+            overrides =  {
+                    "main": cluster_id,
+                    "tacl": tacl_cluster_id,
+                }
+        return overrides
+
     def _configure(self):
         ws_file_url = self._notebook_link(self._config_file)
         try:
@@ -288,15 +301,6 @@ class WorkspaceInstaller:
         else:
             groups_config_args["auto"] = True
 
-        # Checking for override clusters
-        if os.environ.get("DATABRICKS_CLUSTER_ID", None) and os.environ.get(
-            "DATABRICKS_LEGACY_TABLE_ACL_CLUSTER_ID", None
-        ):
-            self._override_clusters = {
-                "main": os.environ.get("DATABRICKS_CLUSTER_ID", None),
-                "tacl": os.environ.get("DATABRICKS_LEGACY_TABLE_ACL_CLUSTER_ID", None),
-            }
-
         # Checking for external HMS
         instance_profile = None
         spark_conf_dict = {}
@@ -318,6 +322,8 @@ class WorkspaceInstaller:
                         self._choice_from_dict("Select a Cluster Policy from The List", cluster_policies)
                     )
                     instance_profile, spark_conf_dict = self._get_ext_hms_conf_from_policy(cluster_policy)
+
+        self._override_clusters = self._configure_override_clusters()
 
         self._config = WorkspaceConfig(
             inventory_database=inventory_database,
