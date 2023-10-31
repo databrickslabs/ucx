@@ -118,8 +118,9 @@ class WorkspaceInstaller:
             and self._question(
                 "Do you want to enable HMS Lineage "
                 "(HMS Lineage feature creates one system table named "
-                "system.hms_to_uc_migration.table_access and helps in HMS to UC migration "
-                "process)",
+                "system.hms_to_uc_migration.table_access and "
+                "helps in your migration process from HMS to UC by allowing you to programmatically query HMS "
+                "lineage data)",
                 default="yes",
             )
             == "yes"
