@@ -1,6 +1,7 @@
 import os
 import sys
 from dataclasses import dataclass
+from unittest import mock
 
 import pytest
 from databricks.sdk.service import sql
@@ -163,8 +164,6 @@ def test_statement_execution_backend_save_table_in_batches_of_two(mocker):
 
 
 def test_runtime_backend_execute(mocker):
-    from unittest import mock
-
     with mock.patch.dict(os.environ, {"DATABRICKS_RUNTIME_VERSION": "14.0"}):
         pyspark_sql_session = mocker.Mock()
         sys.modules["pyspark.sql.session"] = pyspark_sql_session
@@ -177,8 +176,6 @@ def test_runtime_backend_execute(mocker):
 
 
 def test_runtime_backend_fetch(mocker):
-    from unittest import mock
-
     with mock.patch.dict(os.environ, {"DATABRICKS_RUNTIME_VERSION": "14.0"}):
         pyspark_sql_session = mocker.Mock()
         sys.modules["pyspark.sql.session"] = pyspark_sql_session
@@ -194,8 +191,6 @@ def test_runtime_backend_fetch(mocker):
 
 
 def test_runtime_backend_save_table(mocker):
-    from unittest import mock
-
     with mock.patch.dict(os.environ, {"DATABRICKS_RUNTIME_VERSION": "14.0"}):
         pyspark_sql_session = mocker.Mock()
         sys.modules["pyspark.sql.session"] = pyspark_sql_session
@@ -212,17 +207,28 @@ def test_runtime_backend_save_table(mocker):
 
 
 def test_runtime_backend_save_table_with_row_containing_none_with_nullable_class(mocker):
-    from unittest import mock
+    with mock.patch.dict(os.environ, {"DATABRICKS_RUNTIME_VERSION": "14.0"}):
+        pyspark_sql_session = mocker.Mock()
+        sys.modules["pyspark.sql.session"] = pyspark_sql_session
+
+        rb = RuntimeBackend()
+
+        rb.save_table("a.b.c", [Baz("aaa", "ccc"), Baz("bbb", None)], Baz)
+
+        rb._spark.createDataFrame.assert_called_with(
+            [Baz(first="aaa", second="ccc"), Baz(first="bbb", second=None)],
+            "first STRING NOT NULL, second STRING",
+        )
+        rb._spark.createDataFrame().write.saveAsTable.assert_called_with("a.b.c", mode="append")
+
+
+def test_save_table_with_not_null_constraint_violated(mocker):
     @dataclass
     class TestClass:
-        id: str
+        key: str
         value: str = None
 
-    rows = [
-        TestClass("1", "test"),
-        TestClass("2", None),
-        TestClass(None, "value")
-    ]
+    rows = [TestClass("1", "test"), TestClass("2", None), TestClass(None, "value")]
 
     with mock.patch.dict(os.environ, {"DATABRICKS_RUNTIME_VERSION": "14.0"}):
         pyspark_sql_session = mocker.Mock()
@@ -233,4 +239,6 @@ def test_runtime_backend_save_table_with_row_containing_none_with_nullable_class
         with pytest.raises(Exception) as exc_info:
             rb.save_table("a.b.c", rows, TestClass)
 
-        assert str(exc_info.value) == "Not null constraint violated for column id, row = {'id': None, 'value': 'value'}"
+        assert (
+            str(exc_info.value) == "Not null constraint violated for column key, row = {'key': None, 'value': 'value'}"
+        )

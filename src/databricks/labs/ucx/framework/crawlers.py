@@ -45,7 +45,7 @@ class SqlBackend(ABC):
             fields.append(f"{f.name} {spark_type}{not_null}")
         return ", ".join(fields)
 
-    from dataclasses import dataclass, fields, asdict
+    from dataclasses import asdict, dataclass, fields
 
     @classmethod
     def _filter_none_rows(cls, rows, klass):
@@ -58,9 +58,12 @@ class SqlBackend(ABC):
             if row is None:
                 continue
             for field in class_fields:
+                if not hasattr(row, field.name):
+                    logger.debug(f"Field {field.name} not present in row {dataclasses.asdict(row)}")
+                    continue
                 if field.default is not None and getattr(row, field.name) is None:
-                    raise ValueError(f"Not null constraint violated for column {field.name}, "
-                                     f"row = {dataclasses.asdict(row)}")
+                    msg = f"Not null constraint violated for column {field.name}, row = {dataclasses.asdict(row)}"
+                    raise ValueError(msg)
             results.append(row)
         return results
 
