@@ -1,12 +1,14 @@
 import io
 import os.path
 from pathlib import Path
+from typing import Any
 
 import pytest
 import yaml
 from databricks.sdk.core import DatabricksError
 from databricks.sdk.errors import OperationFailed
 from databricks.sdk.service import iam, jobs
+from databricks.sdk.service.compute import Policy
 from databricks.sdk.service.sql import (
     Dashboard,
     DataSource,
@@ -122,6 +124,7 @@ def test_save_config(mocker):
     ws.warehouses.list = lambda **_: [
         EndpointInfo(id="abc", warehouse_type=EndpointInfoWarehouseType.PRO, state=State.RUNNING)
     ]
+    ws.cluster_policies.list = lambda: []
 
     install = WorkspaceInstaller(ws)
     install._choice = lambda _1, _2: "None (abc, PRO, RUNNING)"
@@ -154,6 +157,7 @@ def test_save_config_with_error(mocker):
     ws.current_user.me = lambda: iam.User(user_name="me@example.com", groups=[iam.ComplexValue(display="admins")])
     ws.config.host = "https://foo"
     ws.workspace.get_status = not_found
+    ws.cluster_policies.list = lambda: []
 
     install = WorkspaceInstaller(ws)
     with pytest.raises(DatabricksError) as e_info:
@@ -179,6 +183,7 @@ def test_save_config_auto_groups(mocker):
     ws.warehouses.list = lambda **_: [
         EndpointInfo(id="abc", warehouse_type=EndpointInfoWarehouseType.PRO, state=State.RUNNING)
     ]
+    ws.cluster_policies.list = lambda: []
 
     install = WorkspaceInstaller(ws)
     install._question = mock_question
@@ -220,6 +225,7 @@ def test_save_config_strip_group_names(mocker):
     ws.warehouses.list = lambda **_: [
         EndpointInfo(id="abc", warehouse_type=EndpointInfoWarehouseType.PRO, state=State.RUNNING)
     ]
+    ws.cluster_policies.list = lambda: []
 
     install = WorkspaceInstaller(ws)
     install._question = mock_question
@@ -238,6 +244,73 @@ groups:
 inventory_database: '42'
 log_level: '42'
 num_threads: 42
+version: 1
+warehouse_id: abc
+workspace_start_path: /
+""",
+        format=ImportFormat.AUTO,
+    )
+
+
+def test_save_config_with_glue(mocker):
+    policy_def = b"""
+{
+  "aws_attributes.instance_profile_arn": {
+    "type": "fixed",
+    "value": "arn:aws:iam::111222333:instance-profile/foo-instance-profile",
+    "hidden": false
+  },
+  "spark_conf.spark.databricks.hive.metastore.glueCatalog.enabled": {
+    "type": "fixed",
+    "value": "true",
+    "hidden": true
+  }
+}
+            """
+
+    def not_found(_):
+        raise DatabricksError(error_code="RESOURCE_DOES_NOT_EXIST")
+
+    def mock_question(text: str, *, default: str | None = None) -> str:
+        if "external metastore" in text:
+            return "yes"
+        else:
+            return "42"
+
+    def mock_choice_from_dict(text: str, choices: dict[str, Any]) -> Any:
+        if "Select a Cluster" in text:
+            return policy_def
+        if "warehouse" in text:
+            return "abc"
+
+    mocker.patch("builtins.input", return_value="42")
+    ws = mocker.Mock()
+    ws.current_user.me = lambda: iam.User(user_name="me@example.com", groups=[iam.ComplexValue(display="admins")])
+    ws.config.host = "https://foo"
+    ws.workspace.get_status = not_found
+    ws.warehouses.list = lambda **_: [
+        EndpointInfo(id="abc", warehouse_type=EndpointInfoWarehouseType.PRO, state=State.RUNNING)
+    ]
+    ws.cluster_policies.list = lambda: [Policy(definition=policy_def.decode("utf-8"))]
+
+    install = WorkspaceInstaller(ws)
+    install._question = mock_question
+    install._choice_from_dict = mock_choice_from_dict
+    install._configure()
+
+    ws.workspace.upload.assert_called_with(
+        "/Users/me@example.com/.ucx/config.yml",
+        b"""default_catalog: ucx_default
+groups:
+  backup_group_prefix: '42'
+  selected:
+  - '42'
+instance_profile: arn:aws:iam::111222333:instance-profile/foo-instance-profile
+inventory_database: '42'
+log_level: '42'
+num_threads: 42
+spark_conf:
+  spark.databricks.hive.metastore.glueCatalog.enabled: 'true'
 version: 1
 warehouse_id: abc
 workspace_start_path: /

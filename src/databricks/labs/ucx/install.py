@@ -1,4 +1,5 @@
 import datetime
+import json
 import logging
 import os
 import re
@@ -130,6 +131,7 @@ class WorkspaceInstaller:
     def run_for_config(
         ws: WorkspaceClient, config: WorkspaceConfig, *, prefix="ucx", override_clusters: dict[str, str] | None = None
     ) -> "WorkspaceInstaller":
+        logger.info(f"Installing UCX v{__version__} on {ws.config.host}")
         workspace_installer = WorkspaceInstaller(ws, prefix=prefix, promtps=False)
         logger.info(f"Installing UCX v{workspace_installer._version} on {ws.config.host}")
         workspace_installer._config = config
@@ -302,12 +304,37 @@ class WorkspaceInstaller:
             groups_config_args["selected"] = [x.strip() for x in selected_groups.split(",")]
         else:
             groups_config_args["auto"] = True
+
+        # Checking for external HMS
+        instance_profile = None
+        spark_conf_dict = {}
+        if self._prompts:
+            policies_with_external_hms = list(self._get_cluster_policies_with_external_hive_metastores())
+            if (
+                len(policies_with_external_hms) > 0
+                and self._question(
+                    "We have identified one or more cluster policies set up for an external metastore. "
+                    "Would you like to set UCX to connect to the external metastore.",
+                    default="no",
+                )
+                == "yes"
+            ):
+                logger.info("Setting up an external metastore")
+                cluster_policies = {conf.name: conf.definition for conf in policies_with_external_hms}
+                if len(cluster_policies) >= 1:
+                    cluster_policy = json.loads(
+                        self._choice_from_dict("Select a Cluster Policy from The List", cluster_policies)
+                    )
+                    instance_profile, spark_conf_dict = self._get_ext_hms_conf_from_policy(cluster_policy)
+
         self._config = WorkspaceConfig(
             inventory_database=inventory_database,
             groups=GroupsConfig(**groups_config_args),
             warehouse_id=warehouse_id,
             log_level=log_level,
             num_threads=num_threads,
+            instance_profile=instance_profile,
+            spark_conf=spark_conf_dict,
         )
 
         self._write_config()
@@ -503,6 +530,17 @@ class WorkspaceInstaller:
             "tasks": [self._job_task(task, dbfs_path) for task in tasks],
         }
 
+    @staticmethod
+    def _apply_cluster_overrides(settings: dict[str, any], overrides: dict[str, str]) -> dict:
+        settings["job_clusters"] = [_ for _ in settings["job_clusters"] if _.job_cluster_key not in overrides]
+        for job_task in settings["tasks"]:
+            if job_task.job_cluster_key is None:
+                continue
+            if job_task.job_cluster_key in overrides:
+                job_task.existing_cluster_id = overrides[job_task.job_cluster_key]
+                job_task.job_cluster_key = None
+        return settings
+
     def _upload_wheel_runner(self, remote_wheel: str):
         # TODO: we have to be doing this workaround until ES-897453 is solved in the platform
         path = f"{self._install_folder}/wheels/wheel-test-runner-{self._version}.py"
@@ -580,15 +618,24 @@ class WorkspaceInstaller:
 
     def _job_clusters(self, names: set[str]):
         clusters = []
+        spark_conf = {
+            "spark.databricks.cluster.profile": "singleNode",
+            "spark.master": "local[*]",
+        }
+        if self._config.spark_conf is not None:
+            spark_conf = spark_conf | self._config.spark_conf
         spec = self._cluster_node_type(
             compute.ClusterSpec(
                 spark_version=self._ws.clusters.select_spark_version(latest=True),
                 data_security_mode=compute.DataSecurityMode.NONE,
-                spark_conf={"spark.databricks.cluster.profile": "singleNode", "spark.master": "local[*]"},
+                spark_conf=spark_conf,
                 custom_tags={"ResourceClass": "SingleNode"},
                 num_workers=0,
             )
         )
+        if self._ws.config.is_aws:
+            aws_attributes = replace(spec.aws_attributes, instance_profile_arn=self._config.instance_profile)
+            spec = replace(spec, aws_attributes=aws_attributes)
         if "main" in names:
             clusters.append(
                 jobs.JobCluster(
@@ -713,6 +760,40 @@ class WorkspaceInstaller:
                 continue
             deployed_steps[tags.get(TAG_STEP, "_")] = j.job_id
         return deployed_steps
+
+    def _instance_profiles(self):
+        return {"No Instance Profile": None} | {
+            profile.instance_profile_arn: profile.instance_profile_arn for profile in self._ws.instance_profiles.list()
+        }
+
+    def _get_cluster_policies_with_external_hive_metastores(self):
+        for policy in self._ws.cluster_policies.list():
+            def_json = json.loads(policy.definition)
+            glue_node = def_json.get("spark_conf.spark.databricks.hive.metastore.glueCatalog.enabled")
+            if glue_node is not None and glue_node.get("value") == "true":
+                yield policy
+                continue
+            for key in def_json.keys():
+                if key.startswith("spark_config.spark.sql.hive.metastore"):
+                    yield policy
+                    break
+
+    @staticmethod
+    def _get_ext_hms_conf_from_policy(cluster_policy):
+        spark_conf_dict = {}
+        instance_profile = None
+        if cluster_policy.get("aws_attributes.instance_profile_arn") is not None:
+            instance_profile = cluster_policy.get("aws_attributes.instance_profile_arn").get("value")
+            logger.info(f"Instance Profile is Set to {instance_profile}")
+        for key in cluster_policy.keys():
+            if (
+                key.startswith("spark_conf.sql.hive.metastore")
+                or key.startswith("spark_conf.spark.hadoop.javax.jdo.option")
+                or key.startswith("spark_conf.spark.databricks.hive.metastore")
+                or key.startswith("spark_conf.spark.hadoop.hive.metastore.glue")
+            ):
+                spark_conf_dict[key[11:]] = cluster_policy[key]["value"]
+        return instance_profile, spark_conf_dict
 
 
 if __name__ == "__main__":

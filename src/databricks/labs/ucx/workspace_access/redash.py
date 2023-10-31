@@ -1,14 +1,16 @@
 import dataclasses
 import json
 import logging
-import time
 from collections.abc import Callable
 from dataclasses import dataclass
+from datetime import timedelta
 from functools import partial
 
 from databricks.sdk import WorkspaceClient
 from databricks.sdk.core import DatabricksError
+from databricks.sdk.retries import retried
 from databricks.sdk.service import sql
+from databricks.sdk.service.sql import ObjectTypePlural, SetResponse
 
 from databricks.labs.ucx.mixins.hardening import rate_limited
 from databricks.labs.ucx.workspace_access.base import (
@@ -16,6 +18,7 @@ from databricks.labs.ucx.workspace_access.base import (
     Destination,
     Permissions,
 )
+from databricks.labs.ucx.workspace_access.generic import RetryableError
 from databricks.labs.ucx.workspace_access.groups import GroupMigrationState
 
 logger = logging.getLogger(__name__)
@@ -42,9 +45,12 @@ class Listing:
 
 
 class RedashPermissionsSupport(AclSupport):
-    def __init__(self, ws: WorkspaceClient, listings: list[Listing]):
+    def __init__(
+        self, ws: WorkspaceClient, listings: list[Listing], verify_timeout: timedelta | None = timedelta(minutes=1)
+    ):
         self._ws = ws
         self._listings = listings
+        self._verify_timeout = verify_timeout
 
     @staticmethod
     def _is_item_relevant(item: Permissions, migration_state: GroupMigrationState) -> bool:
@@ -89,7 +95,8 @@ class RedashPermissionsSupport(AclSupport):
                 logger.warning(f"Could not get permissions for {object_type} {object_id} due to {e.error_code}")
                 return None
             else:
-                raise e
+                msg = f"{e.error_code} can be retried, doing another attempt..."
+                raise RetryableError(message=msg) from e
 
     @rate_limited(max_requests=100)
     def _crawler_task(self, object_id: str, object_type: sql.ObjectTypePlural) -> Permissions | None:
@@ -101,27 +108,36 @@ class RedashPermissionsSupport(AclSupport):
                 raw=json.dumps(permissions.as_dict()),
             )
 
+    def _inflight_check(self, object_type: sql.ObjectTypePlural, object_id: str, acl: list[sql.AccessControl]):
+        # in-flight check for the applied permissions
+        # the api might be inconsistent, therefore we need to check that the permissions were applied
+        remote_permission = self._safe_get_dbsql_permissions(object_type, object_id)
+        if remote_permission:
+            if all(elem in remote_permission.access_control_list for elem in acl):
+                return True
+            else:
+                msg = f"""
+                Couldn't apply appropriate permission for object type {object_type} with id {object_id}
+                acl to be applied={acl}
+                acl found in the object={remote_permission}
+                """
+                raise ValueError(msg)
+        return False
+
     @rate_limited(max_requests=30)
     def _applier_task(self, object_type: sql.ObjectTypePlural, object_id: str, acl: list[sql.AccessControl]):
         """
         Please note that we only have SET option (DBSQL Permissions API doesn't support UPDATE operation).
         This affects the way how we prepare the new ACL request.
         """
-        for _i in range(0, 3):
-            self._ws.dbsql_permissions.set(object_type=object_type, object_id=object_id, access_control_list=acl)
 
-            remote_permission = self._safe_get_dbsql_permissions(object_type, object_id)
-            if all(elem in remote_permission.access_control_list for elem in acl):
-                return True
+        set_retry_on_value_error = retried(on=[RetryableError], timeout=self._verify_timeout)
+        set_retried_check = set_retry_on_value_error(self._safe_set_permissions)
+        set_retried_check(object_type, object_id, acl)
 
-            logger.warning(
-                f"""Couldn't apply appropriate permission for object type {object_type} with id {object_id}
-            acl to be applied={acl}
-            acl found in the object={remote_permission}
-            """
-            )
-            time.sleep(1 + _i)
-        return False
+        retry_on_value_error = retried(on=[ValueError, RetryableError], timeout=self._verify_timeout)
+        retried_check = retry_on_value_error(self._inflight_check)
+        return retried_check(object_id, object_id, acl)
 
     def _prepare_new_acl(
         self, acl: list[sql.AccessControl], migration_state: GroupMigrationState, destination: Destination
@@ -143,6 +159,24 @@ class RedashPermissionsSupport(AclSupport):
             new_acl_request = dataclasses.replace(access_control, group_name=target_principal)
             acl_requests.append(new_acl_request)
         return acl_requests
+
+    def _safe_set_permissions(
+        self, object_type: ObjectTypePlural, object_id: str, acl: list[sql.AccessControl] | None
+    ) -> SetResponse | None:
+        try:
+            return self._ws.dbsql_permissions.set(object_type=object_type, object_id=object_id, access_control_list=acl)
+        except DatabricksError as e:
+            if e.error_code in [
+                "BAD_REQUEST",
+                "UNAUTHORIZED",
+                "PERMISSION_DENIED",
+                "NOT_FOUND",
+            ]:
+                logger.warning(f"Could not update permissions for {object_type} {object_id} due to {e.error_code}")
+                return None
+            else:
+                msg = f"{e.error_code} can be retried for {object_type} {object_id}, doing another attempt..."
+                raise RetryableError(message=msg) from e
 
 
 def redash_listing_wrapper(

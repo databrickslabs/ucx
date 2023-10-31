@@ -118,6 +118,7 @@ class PermissionManager(CrawlerBase):
             applier_tasks.extend(tasks_for_support)
 
         logger.info(f"Starting to apply permissions on {destination} groups. Total tasks: {len(applier_tasks)}")
+
         _, errors = Threads.gather(f"apply {destination} group permissions", applier_tasks)
         if len(errors) > 0:
             # TODO: https://github.com/databrickslabs/ucx/issues/406

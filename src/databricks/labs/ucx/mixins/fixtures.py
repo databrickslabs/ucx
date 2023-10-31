@@ -157,7 +157,12 @@ def _permissions_mapping():
         (
             "pipeline",
             "pipelines",
-            [PermissionLevel.CAN_VIEW, PermissionLevel.CAN_RUN, PermissionLevel.CAN_MANAGE, PermissionLevel.IS_OWNER],
+            [
+                PermissionLevel.CAN_VIEW,
+                PermissionLevel.CAN_RUN,
+                PermissionLevel.CAN_MANAGE,
+                PermissionLevel.IS_OWNER,  # cannot be a group
+            ],
             _simple,
         ),
         (
@@ -166,8 +171,8 @@ def _permissions_mapping():
             [
                 PermissionLevel.CAN_VIEW,
                 PermissionLevel.CAN_MANAGE_RUN,
-                PermissionLevel.IS_OWNER,
                 PermissionLevel.CAN_MANAGE,
+                PermissionLevel.IS_OWNER,  # cannot be a group
             ],
             _simple,
         ),

@@ -1,9 +1,9 @@
 import datetime
 import json
 import logging
-import time
 from collections.abc import Callable, Iterator
 from dataclasses import dataclass
+from datetime import timedelta
 from functools import partial
 from typing import Optional
 
@@ -11,6 +11,7 @@ from databricks.sdk import WorkspaceClient
 from databricks.sdk.core import DatabricksError
 from databricks.sdk.retries import retried
 from databricks.sdk.service import iam, ml
+from databricks.sdk.service.iam import PermissionLevel
 
 from databricks.labs.ucx.framework.crawlers import CrawlerBase, SqlBackend
 from databricks.labs.ucx.mixins.hardening import rate_limited
@@ -39,7 +40,8 @@ class WorkspaceObjectInfo:
 
 
 class RetryableError(DatabricksError):
-    pass
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
 
 
 class Listing:
@@ -60,9 +62,12 @@ class Listing:
 
 
 class GenericPermissionsSupport(AclSupport):
-    def __init__(self, ws: WorkspaceClient, listings: list[Listing]):
+    def __init__(
+        self, ws: WorkspaceClient, listings: list[Listing], verify_timeout: timedelta | None = timedelta(minutes=1)
+    ):
         self._ws = ws
         self._listings = listings
+        self._verify_timeout = verify_timeout
 
     def get_crawler_tasks(self):
         for listing in self._listings:
@@ -108,35 +113,58 @@ class GenericPermissionsSupport(AclSupport):
                 )
         return results
 
-    @rate_limited(max_requests=30)
-    def _applier_task(self, object_type: str, object_id: str, acl: list[iam.AccessControlRequest]):
-        for _i in range(0, 3):
-            self._ws.permissions.update(object_type, object_id, access_control_list=acl)
-
-            remote_permission = self._safe_get_permissions(object_type, object_id)
+    def _inflight_check(self, object_type: str, object_id: str, acl: list[iam.AccessControlRequest]):
+        # in-flight check for the applied permissions
+        # the api might be inconsistent, therefore we need to check that the permissions were applied
+        remote_permission = self._safe_get_permissions(object_type, object_id)
+        if remote_permission:
             remote_permission_as_request = self._response_to_request(remote_permission.access_control_list)
             if all(elem in remote_permission_as_request for elem in acl):
                 return True
-
-            logger.warning(
-                f"""Couldn't apply appropriate permission for object type {object_type} with id {object_id}
-            acl to be applied={acl}
-            acl found in the object={remote_permission_as_request}
-            """
-            )
-            time.sleep(1 + _i)
+            else:
+                msg = f"""Couldn't apply appropriate permission for object type {object_type} with id {object_id}
+                    acl to be applied={acl}
+                    acl found in the object={remote_permission_as_request}
+                    """
+                raise ValueError(msg)
         return False
+
+    @rate_limited(max_requests=30)
+    def _applier_task(self, object_type: str, object_id: str, acl: list[iam.AccessControlRequest]):
+        update_retry_on_value_error = retried(on=[RetryableError], timeout=self._verify_timeout)
+        update_retried_check = update_retry_on_value_error(self._safe_update_permissions)
+        update_retried_check(object_type, object_id, acl)
+
+        retry_on_value_error = retried(on=[ValueError, RetryableError], timeout=self._verify_timeout)
+        retried_check = retry_on_value_error(self._inflight_check)
+        return retried_check(object_type, object_id, acl)
 
     @rate_limited(max_requests=100)
     def _crawler_task(self, object_type: str, object_id: str) -> Permissions | None:
+        objects_with_owner_permission = ["jobs", "pipelines"]
+
         permissions = self._safe_get_permissions(object_type, object_id)
         if not permissions:
+            logger.warning(f"Object {object_type} {object_id} doesn't have any permissions")
+            return None
+        if not self._object_have_owner(permissions) and object_type in objects_with_owner_permission:
+            logger.warning(
+                f"Object {object_type} {object_id} doesn't have any Owner and cannot be migrated "
+                f"to account level groups, consider setting a new owner or deleting this object"
+            )
             return None
         return Permissions(
             object_id=object_id,
             object_type=object_type,
             raw=json.dumps(permissions.as_dict()),
         )
+
+    def _object_have_owner(self, permissions: iam.ObjectPermissions | None):
+        for acl in permissions.access_control_list:
+            for perm in acl.all_permissions:
+                if perm.permission_level == PermissionLevel.IS_OWNER:
+                    return True
+        return False
 
     def _load_as_request(self, object_type: str, object_id: str) -> list[iam.AccessControlRequest]:
         loaded = self._safe_get_permissions(object_type, object_id)
@@ -173,7 +201,6 @@ class GenericPermissionsSupport(AclSupport):
         return acl.service_principal_name
 
     # TODO remove after ES-892977 is fixed
-    @retried(on=[RetryableError])
     def _safe_get_permissions(self, object_type: str, object_id: str) -> iam.ObjectPermissions | None:
         try:
             return self._ws.permissions.get(object_type, object_id)
@@ -183,11 +210,33 @@ class GenericPermissionsSupport(AclSupport):
                 "RESOURCE_NOT_FOUND",
                 "PERMISSION_DENIED",
                 "FEATURE_DISABLED",
+                "BAD_REQUEST",
             ]:
                 logger.warning(f"Could not get permissions for {object_type} {object_id} due to {e.error_code}")
                 return None
             else:
-                raise RetryableError() from e
+                msg = f"{e.error_code} can be retried for {object_type} {object_id}, doing another attempt..."
+                raise RetryableError(message=msg) from e
+
+    def _safe_update_permissions(
+        self, object_type: str, object_id: str, acl: list[iam.AccessControlRequest]
+    ) -> iam.ObjectPermissions | None:
+        try:
+            return self._ws.permissions.update(object_type, object_id, access_control_list=acl)
+        except DatabricksError as e:
+            if e.error_code in [
+                "BAD_REQUEST",
+                "INVALID_PARAMETER_VALUE",
+                "UNAUTHORIZED",
+                "PERMISSION_DENIED",
+                "FEATURE_DISABLED",
+                "RESOURCE_DOES_NOT_EXIST",
+            ]:
+                logger.warning(f"Could not update permissions for {object_type} {object_id} due to {e.error_code}")
+                return None
+            else:
+                msg = f"{e.error_code} can be retried for {object_type} {object_id}, doing another attempt..."
+                raise RetryableError(message=msg) from e
 
     def _prepare_new_acl(
         self, permissions: iam.ObjectPermissions, migration_state: GroupMigrationState, destination: Destination
