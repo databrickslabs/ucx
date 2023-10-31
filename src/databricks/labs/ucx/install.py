@@ -126,7 +126,29 @@ class WorkspaceInstaller:
             == "yes"
         ):
             hms_lineage = HiveMetastoreLineageEnabler(ws=self._ws)
-            hms_lineage.add_spark_config_for_hms_lineage()
+            gscript = hms_lineage.check_lineage_spark_config_exists()
+            if not gscript:
+                logger.info("Creating Global Init Script...")
+                hms_lineage.add_global_init_script()
+            elif gscript:
+                if gscript.enabled:
+                    logger.info(
+                        "Global Init Script with Required Spark Config already exists and enabled. Skipped "
+                        "creating a new one."
+                    )
+                elif not gscript.enabled:
+                    if (
+                        self._prompts
+                        and self._question(
+                            "Your Global Init Script with required spark config is disabled, Do you want to enable it",
+                            default="yes",
+                        )
+                        == "yes"
+                    ):
+                        logger.info("Enabling Global Init Script...")
+                        hms_lineage.enable_global_init_script(gscript)
+                    else:
+                        logger.info("No changes to Global Init Script is made.")
 
     @staticmethod
     def run_for_config(
@@ -470,7 +492,7 @@ class WorkspaceInstaller:
             return "any"
         choices = sorted(choices, key=str.casefold)
         numbered = "\n".join(f"\033[1m[{i}]\033[0m \033[36m{v}\033[0m" for i, v in enumerate(choices))
-        prompt = f"\033[1m{text}\033[0m\n{numbered}\nEnter a number between 0 and {len(choices)-1}: "
+        prompt = f"\033[1m{text}\033[0m\n{numbered}\nEnter a number between 0 and {len(choices) - 1}: "
         attempt = 0
         while attempt < max_attempts:
             attempt += 1
