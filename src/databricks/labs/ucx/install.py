@@ -349,7 +349,7 @@ class WorkspaceInstaller:
         self._ws.workspace.upload(self._config_file, config_bytes, format=ImportFormat.AUTO)
 
     def _create_jobs(self):
-        logger.debug(f"Creating jobs from tasks in {main.__name__}")
+        logger.info(f"Creating jobs from tasks in {main.__name__}")
         remote_wheel = self._upload_wheel()
         self._deployed_steps = self._deployed_steps()
         desired_steps = {t.workflow for t in _TASKS.values()}
@@ -501,7 +501,7 @@ class WorkspaceInstaller:
                     logger.info(f"Uploading wheel to dbfs:{remote_wheel}")
                     self._ws.dbfs.upload(remote_wheel, f, overwrite=True)
                 except DatabricksError as err:
-                    logger.warn(f"Uploading wheel files to DBFS failed, perhaps DBFS is protected. {err}")
+                    logger.warning(f"Uploading wheel files to DBFS failed, perhaps DBFS is protected. {err}")
             with local_wheel.open("rb") as f:
                 self._ws.workspace.mkdirs(remote_dirname)
                 logger.info(f"Uploading wheel to /Workspace{remote_wheel}")
@@ -548,6 +548,7 @@ class WorkspaceInstaller:
 
     @staticmethod
     def _apply_cluster_overrides(settings: dict[str, any], overrides: dict[str, str], wheel_runner: str) -> dict:
+        logger.info("Applying cluster overrides")
         settings["job_clusters"] = [_ for _ in settings["job_clusters"] if _.job_cluster_key not in overrides]
         for job_task in settings["tasks"]:
             if job_task.job_cluster_key is None:
@@ -555,6 +556,7 @@ class WorkspaceInstaller:
             if job_task.job_cluster_key in overrides:
                 job_task.existing_cluster_id = overrides[job_task.job_cluster_key]
                 job_task.job_cluster_key = None
+                job_task.libraries = None # Job libraries not loading from Workspace FS
             if job_task.python_wheel_task is not None:
                 job_task.python_wheel_task = None
                 params = {"task": job_task.task_key} | EXTRA_TASK_PARAMS
@@ -603,7 +605,6 @@ class WorkspaceInstaller:
         )
 
     def _job_wheel_task(self, jobs_task: jobs.Task, task: Task, dbfs_path: str) -> jobs.Task:
-        # assert 0==1, "message"
         return replace(
             jobs_task,
             libraries=[compute.Library(whl=f"dbfs:{dbfs_path}")],
