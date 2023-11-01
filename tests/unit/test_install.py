@@ -2,6 +2,7 @@ import io
 import os.path
 from pathlib import Path
 from typing import Any
+from unittest.mock import MagicMock, patch
 
 import pytest
 import yaml
@@ -325,6 +326,9 @@ workspace_start_path: /
 
 def test_main_with_existing_conf_does_not_recreate_config(mocker):
     mocker.patch("builtins.input", return_value="yes")
+    mock_file = MagicMock()
+    mocker.patch("builtins.open", return_value=mock_file)
+    mocker.patch("base64.b64encode")
     webbrowser_open = mocker.patch("webbrowser.open")
     ws = mocker.patch("databricks.sdk.WorkspaceClient.__init__")
 
@@ -342,7 +346,6 @@ def test_main_with_existing_conf_does_not_recreate_config(mocker):
     ws.queries.create.return_value = Query(id="abc")
     ws.query_visualizations.create.return_value = Visualization(id="abc")
     ws.dashboard_widgets.create.return_value = Widget(id="abc")
-
     install = WorkspaceInstaller(ws)
     install._build_wheel = lambda _: Path(__file__)
     install.run()
@@ -562,40 +565,26 @@ def test_global_init_script_exists_disabled_not_enabled(mocker):
     install._install_spark_config_for_hms_lineage()
 
 
-def test_global_init_script_create_new(mocker):
+@patch("builtins.open", new_callable=MagicMock)
+@patch("base64.b64encode")
+@patch("builtins.input", new_callable=MagicMock)
+def test_global_init_script_create_new(mock_open, mocker, mock_input):
+    expected_content = """if [[ $DB_IS_DRIVER = "TRUE" ]]; then
+      driver_conf=${DB_HOME}/driver/conf/spark-branch.conf
+      if [ ! -e $driver_conf ] ; then
+        touch $driver_conf
+      fi
+    cat << EOF >>  $driver_conf
+      [driver] {
+       "spark.databricks.dataLineage.enabled" = true
+       }
+    EOF
+    fi
+        """
+    mock_file = MagicMock()
+    mock_file.read.return_value = expected_content
+    mock_open.return_value = mock_file
     ws = mocker.Mock()
-    ginit_scripts = [
-        GlobalInitScriptDetails(
-            created_at=1695045723722,
-            created_by="test@abc.com",
-            enabled=True,
-            name="test123",
-            position=0,
-            script_id="12345",
-            updated_at=1695046359612,
-            updated_by="test@abc.com",
-        )
-    ]
-    ws.global_init_scripts.list.return_value = ginit_scripts
-    ws.global_init_scripts.get.return_value = GlobalInitScriptDetailsWithContent(
-        created_at=1695045723722,
-        created_by="test@abc.com",
-        enabled=True,
-        name="test123",
-        position=0,
-        script="JXNoCmVjaG8gIj09PT0gQmVnaW4gb2YgdGhlIGd"
-        "sb2JhbCBpbml0IHNjcmlwdCIKCmVjaG8gIj09PT0"
-        "gTGlzdCBWb2x1bWUsIGl0IHdvbid0IHdvcmsiCmxzIC9Wb2x1bWVzL3lhbmd3"
-        "YW5nX2RlbW8vZGVmYXVsdC92b2wxL21zb2RiY3NxbDE3LmRlYiAKc3VkbyB"
-        "jcCAvVm9sdW1lcy95YW5nd2FuZ19kZW1vL2RlZmF1bHQvdm9sMS9tc29kYmNzcWw"
-        "xNy5kZWIgLi8KCmVjaG8gIj09PT0gTGlzdCBEQkZTIgpscyAvZGJmcy9GaWxlU3R"
-        "vcmUvbXNvZGJjc3FsMTcuZGViCnN1ZG8gY3AgL2RiZnMvRmlsZVN0b3JlL21zb2RiY3N"
-        "xbDE3LmRlYiAuLwoKc3VkbyBBQ0NFUFRfRVVMQT1ZIGFwdCBpbnN0YWxsIC15IC4vbXNvZ"
-        "GJjc3FsMTcuZGViCgplY2hvICI9PT09IEZpbmlzaGVkIEluc3RhbGwgLmRlYiI=",
-        script_id="12C100F8BB38B002",
-        updated_at=1695046359612,
-        updated_by="test@abc.com",
-    )
     install = WorkspaceInstaller(ws)
-    mocker.patch("builtins.input", return_value="yes")
+    mock_input.return_value = "yes"
     install._install_spark_config_for_hms_lineage()

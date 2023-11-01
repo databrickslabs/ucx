@@ -4,6 +4,10 @@ import time
 from databricks.sdk import WorkspaceClient
 from databricks.sdk.service.compute import GlobalInitScriptDetailsWithContent
 
+from databricks.labs.ucx.hive_metastore.hms_lineage_global_init_script import (
+    global_init_script,
+)
+
 
 class HiveMetastoreLineageEnabler:
     def __init__(self, ws: WorkspaceClient):
@@ -18,18 +22,10 @@ class HiveMetastoreLineageEnabler:
                 return gscript
 
     def _get_init_script_content(self):
-        _init_script_content = """if [[ $DB_IS_DRIVER = "TRUE" ]]; then
-  driver_conf=${DB_HOME}/driver/conf/spark-branch.conf
-  if [ ! -e $driver_conf ] ; then
-    touch $driver_conf
-  fi
-cat << EOF >>  $driver_conf
-  [driver] {
-   "spark.databricks.dataLineage.enabled" = true
-   }
-EOF
-fi"""
-        return base64.b64encode(_init_script_content.encode()).decode()
+        try:
+            return base64.b64encode(global_init_script.encode()).decode()
+        except Exception:
+            print("The init script content was not found.")
 
     def add_global_init_script(self) -> str:
         created_script = self._ws.global_init_scripts.create(

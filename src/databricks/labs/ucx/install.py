@@ -113,42 +113,44 @@ class WorkspaceInstaller:
         logger.info(msg)
 
     def _install_spark_config_for_hms_lineage(self):
-        if (
-            self._prompts
-            and self._question(
-                "Do you want to enable HMS Lineage "
-                "(HMS Lineage feature creates one system table named "
-                "system.hms_to_uc_migration.table_access and "
-                "helps in your migration process from HMS to UC by allowing you to programmatically query HMS "
-                "lineage data)",
-                default="yes",
-            )
-            == "yes"
-        ):
-            hms_lineage = HiveMetastoreLineageEnabler(ws=self._ws)
-            gscript = hms_lineage.check_lineage_spark_config_exists()
-            if not gscript:
+        hms_lineage = HiveMetastoreLineageEnabler(ws=self._ws)
+        logger.info(
+            "Enabling HMS Lineage: "
+            "HMS Lineage feature creates one system table named "
+            "system.hms_to_uc_migration.table_access and "
+            "helps in your migration process from HMS to UC by allowing you to programmatically query HMS "
+            "lineage data."
+            ""
+            ""
+        )
+        logger.info("Checking if Global Init Script with Required Spark Config already exists and enabled.")
+        gscript = hms_lineage.check_lineage_spark_config_exists()
+        if gscript:
+            if gscript.enabled:
+                logger.info("Already exists and enabled. Skipped creating a new one.")
+            elif not gscript.enabled:
+                if (
+                    self._prompts
+                    and self._question(
+                        "Your Global Init Script with required spark config is disabled, Do you want to enable it",
+                        default="yes",
+                    )
+                    == "yes"
+                ):
+                    logger.info("Enabling Global Init Script...")
+                    hms_lineage.enable_global_init_script(gscript)
+                else:
+                    logger.info("No change to Global Init Script is made.")
+        elif not gscript:
+            if (
+                self._prompts
+                and self._question(
+                    "No Global Init Script with Required Spark Config exists, Do you want to create one ", default="yes"
+                )
+                == "yes"
+            ):
                 logger.info("Creating Global Init Script...")
                 hms_lineage.add_global_init_script()
-            elif gscript:
-                if gscript.enabled:
-                    logger.info(
-                        "Global Init Script with Required Spark Config already exists and enabled. Skipped "
-                        "creating a new one."
-                    )
-                elif not gscript.enabled:
-                    if (
-                        self._prompts
-                        and self._question(
-                            "Your Global Init Script with required spark config is disabled, Do you want to enable it",
-                            default="yes",
-                        )
-                        == "yes"
-                    ):
-                        logger.info("Enabling Global Init Script...")
-                        hms_lineage.enable_global_init_script(gscript)
-                    else:
-                        logger.info("No changes to Global Init Script is made.")
 
     @staticmethod
     def run_for_config(

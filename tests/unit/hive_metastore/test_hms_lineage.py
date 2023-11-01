@@ -1,3 +1,5 @@
+from unittest.mock import MagicMock, patch
+
 from databricks.sdk.service.compute import (
     GlobalInitScriptDetails,
     GlobalInitScriptDetailsWithContent,
@@ -134,8 +136,25 @@ def test_add_spark_config_no_gscript_for_hms_lineage(mocker):
     assert script_id is None
 
 
-def test_add_spark_config_for_hms_lineage(mocker):
+@patch("builtins.open", new_callable=MagicMock)
+@patch("base64.b64encode")
+def test_get_init_script_content(mock_open, mocker):
+    expected_content = """if [[ $DB_IS_DRIVER = "TRUE" ]]; then
+  driver_conf=${DB_HOME}/driver/conf/spark-branch.conf
+  if [ ! -e $driver_conf ] ; then
+    touch $driver_conf
+  fi
+cat << EOF >>  $driver_conf
+  [driver] {
+   "spark.databricks.dataLineage.enabled" = true
+   }
+EOF
+fi
+    """
     ws = mocker.Mock()
+    mock_file = MagicMock()
+    mock_file.read.return_value = expected_content
+    mock_open.return_value = mock_file
     hmle = HiveMetastoreLineageEnabler(ws)
     script_id = hmle.add_global_init_script()
 
