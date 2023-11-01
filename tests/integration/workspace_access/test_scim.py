@@ -9,8 +9,9 @@ from databricks.labs.ucx.workspace_access.manager import PermissionManager
 from databricks.labs.ucx.workspace_access.scim import ScimSupport
 
 
-def _patch_by_id(ws: WorkspaceClient, group_id: str, path: Literal["roles", "entitlements"],
-                 value: list[iam.ComplexValue]):
+def _patch_by_id(
+    ws: WorkspaceClient, group_id: str, path: Literal["roles", "entitlements"], value: list[iam.ComplexValue]
+):
     ws.groups.patch(
         group_id,
         operations=[
