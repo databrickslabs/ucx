@@ -30,6 +30,7 @@ from databricks.labs.ucx.runtime import main
 TAG_STEP = "step"
 TAG_APP = "App"
 NUM_USER_ATTEMPTS = 10  # number of attempts user gets at answering a question
+CLUSTER_ID_LENGTH = 20  # number of characters in a valid cluster_id
 EXTRA_TASK_PARAMS = {
     "job_id": "{{job_id}}",
     "run_id": "{{run_id}}",
@@ -236,6 +237,10 @@ class WorkspaceInstaller:
                     raise SystemExit(msg)
         return inventory_database
 
+    def _valid_cluster_id(self, cluster_id: str) -> bool:
+        """Lite validation of user supplied cluster id"""
+        return CLUSTER_ID_LENGTH == len(cluster_id)
+
     def _configure_override_clusters(self):
         """User may override standard job clusters with interactive clusters"""
         default_val = ""
@@ -249,7 +254,11 @@ class WorkspaceInstaller:
             default=default_val,
         )
         overrides = None
-        if default_val not in (cluster_id, tacl_cluster_id):
+        if (
+            default_val not in (cluster_id, tacl_cluster_id)
+            and self._valid_cluster_id(cluster_id)
+            and self._valid_cluster_id(tacl_cluster_id)
+        ):
             overrides = {
                 "main": cluster_id,
                 "tacl": tacl_cluster_id,
