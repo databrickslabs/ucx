@@ -18,7 +18,10 @@ from databricks.labs.ucx.hive_metastore import GrantsCrawler, TablesCrawler
 from databricks.labs.ucx.hive_metastore.data_objects import ExternalLocationCrawler
 from databricks.labs.ucx.hive_metastore.mounts import Mounts
 from databricks.labs.ucx.workspace_access.generic import WorkspaceListing
-from databricks.labs.ucx.workspace_access.groups import GroupManager
+from databricks.labs.ucx.workspace_access.groups import (
+    GroupManager,
+    GroupMigrationState,
+)
 from databricks.labs.ucx.workspace_access.manager import PermissionManager
 
 logger = logging.getLogger(__name__)
@@ -367,14 +370,16 @@ def apply_permissions_to_backup_groups(cfg: WorkspaceConfig):
         logger.info("Skipping group migration as no groups were found.")
         return
 
+    backend = RuntimeBackend()
     permission_manager = PermissionManager.factory(
         ws,
-        RuntimeBackend(),
+        backend,
         cfg.inventory_database,
         num_threads=cfg.num_threads,
         workspace_start_path=cfg.workspace_start_path,
     )
     permission_manager.apply_group_permissions(group_manager.migration_state, destination="backup")
+    group_manager.migration_state.persist_migration_state(backend, cfg.inventory_database)
 
 
 @task("003-replace-workspace-local-with-account-groups", depends_on=[apply_permissions_to_backup_groups])
@@ -406,8 +411,9 @@ def apply_permissions_to_account_groups(cfg: WorkspaceConfig):
 
     See [interactive tutorial here](https://app.getreprise.com/launch/myM3VNn/)."""
     ws = WorkspaceClient(config=cfg.to_databricks_config())
+    backend = RuntimeBackend()
 
-    migration_state = GroupManager.prepare_apply_permissions_to_account_groups(ws, cfg.groups.backup_group_prefix)
+    migration_state = GroupMigrationState().fetch_migration_state(backend, cfg.inventory_database)
     if len(migration_state) == 0:
         logger.info("Skipping group migration as no groups were found.")
         return

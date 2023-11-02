@@ -3,11 +3,17 @@ from unittest.mock import MagicMock, Mock
 
 import pytest
 from databricks.sdk.service import iam
-from databricks.sdk.service.iam import Group, ResourceMeta
+from databricks.sdk.service.iam import ComplexValue, Group, ResourceMeta
 
 from databricks.labs.ucx.config import GroupsConfig
-from databricks.labs.ucx.workspace_access.groups import GroupManager, MigrationGroupInfo
+from databricks.labs.ucx.workspace_access.groups import (
+    GroupManager,
+    GroupMigrationState,
+    MigrationGroupInfo,
+    MigrationGroupInfoMock,
+)
 from databricks.labs.ucx.workspace_access.scim import Permissions, ScimSupport
+from tests.unit.framework.mocks import MockBackend
 
 
 def test_scim_crawler():
@@ -450,3 +456,91 @@ def test_delete_selected_backup_groups():
     manager = GroupManager(client, group_conf)
     manager.delete_backup_groups()
     client.groups.delete.assert_called_with(id=backup_group_id)
+
+
+def test_migration_state_should_be_saved_with_proper_values():
+    workspace = Group(
+        display_name="workspace", entitlements=[ComplexValue(display="entitlements", value="allow-cluster-create")]
+    )
+    backup = Group(display_name="db-temp-workspace", meta=ResourceMeta("test"))
+    account = Group(display_name="account")
+    schema = "test_schema"
+
+    state = GroupMigrationState()
+    state.add(workspace, backup, account)
+    backend = MockBackend()
+
+    state.persist_migration_state(backend, schema)
+    rows = backend.rows_written_for(f"hive_metastore.{schema}.migration_state", "append")
+    assert rows == [
+        MigrationGroupInfoMock(
+            workspace='{"displayName": "workspace", "entitlements": ['
+            '{"display": "entitlements", "value": "allow-cluster-create"}'
+            ']}',
+            backup='{"displayName": "db-temp-workspace", "meta": {"resourceType": "test"}}',
+            account='{"displayName": "account"}',
+        )
+    ]
+
+
+def test_migration_state_should_be_saved_without_schema():
+    account = Group(display_name="account", schemas=[iam.GroupSchema.URN_IETF_PARAMS_SCIM_SCHEMAS_CORE_2_0_GROUP])
+    schema = "test_schema"
+
+    state = GroupMigrationState()
+    state.add(None, None, account)
+    backend = MockBackend()
+
+    state.persist_migration_state(backend, schema)
+    rows = backend.rows_written_for(f"hive_metastore.{schema}.migration_state", "append")
+    assert rows == [MigrationGroupInfoMock(workspace=None, backup=None, account='{"displayName": "account"}')]
+
+
+def test_migration_state_should_not_filter_any_rows():
+    schema = "test_schema"
+    workspace = Group("workspace")
+    backup = Group("db-temp-workspace")
+    account = Group("workspace")
+
+    state = GroupMigrationState()
+    state.add(workspace, backup, account)
+    state.add(workspace, backup, None)
+    state.add(workspace, None, account)
+    state.add(None, None, account)
+    state.add(None, None, None)
+
+    backend = MockBackend()
+    state.persist_migration_state(backend, schema)
+    rows = backend.rows_written_for(f"hive_metastore.{schema}.migration_state", "append")
+
+    assert len(rows) == 5
+
+
+def test_fetch_migration_state_should_return_all():
+    schema = "test_schema"
+
+    rows = {
+        "SELECT": [
+            (
+                '{"displayName": "workspace", "entitlements": ['
+                '{"display": "entitlements", "value": "allow-cluster-create"}'
+                ']}',
+                '{"displayName": "db-temp-workspace", "meta": {"resourceType": "test"}}',
+                '{"displayName": "account"}',
+            ),
+        ]
+    }
+
+    backend = MockBackend(rows=rows)
+    rows = GroupMigrationState().fetch_migration_state(backend, schema)
+
+    state = GroupMigrationState()
+    state.add(
+        ws_group=Group(
+            display_name="workspace", entitlements=[ComplexValue(display="entitlements", value="allow-cluster-create")]
+        ),
+        backup_group=Group(display_name="db-temp-workspace", meta=ResourceMeta(resource_type="test")),
+        acc_group=Group(display_name="account"),
+    )
+
+    assert rows.groups == state.groups

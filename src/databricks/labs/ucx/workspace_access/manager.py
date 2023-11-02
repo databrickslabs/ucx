@@ -13,7 +13,7 @@ from databricks.labs.ucx.framework.parallel import Threads
 from databricks.labs.ucx.hive_metastore import GrantsCrawler, TablesCrawler
 from databricks.labs.ucx.workspace_access import generic, redash, scim, secrets
 from databricks.labs.ucx.workspace_access.base import AclSupport, Permissions
-from databricks.labs.ucx.workspace_access.groups import GroupMigrationState, MigrationGroupInfo
+from databricks.labs.ucx.workspace_access.groups import GroupMigrationState
 from databricks.labs.ucx.workspace_access.tacl import TableAclSupport
 
 logger = logging.getLogger(__name__)

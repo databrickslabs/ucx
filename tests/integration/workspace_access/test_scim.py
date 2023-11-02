@@ -1,5 +1,3 @@
-from typing import Literal
-
 from databricks.sdk import WorkspaceClient
 from databricks.sdk.service import iam
 
@@ -51,7 +49,8 @@ def test_scim(ws: WorkspaceClient, make_ucx_group, sql_backend, inventory_schema
     # Task 4 - apply_permissions_to_account_groups
     migration_state = group_manager.migration_state.fetch_migration_state(sql_backend, inventory_schema)
     pi.apply_group_permissions(migration_state, destination="account")
-    assert [iam.ComplexValue(display=None, primary=None, type=None, value='databricks-sql-access'),
-            iam.ComplexValue(display=None, primary=None, type=None, value='allow-cluster-create')] == ws.groups.get(acc_group.id).entitlements
+    assert [
+        iam.ComplexValue(display=None, primary=None, type=None, value="databricks-sql-access"),
+        iam.ComplexValue(display=None, primary=None, type=None, value="allow-cluster-create"),
+    ] == ws.groups.get(acc_group.id).entitlements
     assert len(ws.groups.get(acc_group.id).members) == len(ws_group.members)
-

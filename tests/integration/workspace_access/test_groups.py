@@ -3,7 +3,12 @@ from datetime import timedelta
 
 from databricks.sdk import WorkspaceClient
 from databricks.sdk.retries import retried
-from databricks.sdk.service.iam import PermissionLevel, Group, ComplexValue, ResourceMeta
+from databricks.sdk.service.iam import (
+    ComplexValue,
+    Group,
+    PermissionLevel,
+    ResourceMeta,
+)
 
 from databricks.labs.ucx.config import GroupsConfig
 from databricks.labs.ucx.hive_metastore import GrantsCrawler, TablesCrawler
@@ -12,7 +17,10 @@ from databricks.labs.ucx.workspace_access.generic import (
     GenericPermissionsSupport,
     Listing,
 )
-from databricks.labs.ucx.workspace_access.groups import GroupManager, GroupMigrationState
+from databricks.labs.ucx.workspace_access.groups import (
+    GroupManager,
+    GroupMigrationState,
+)
 from databricks.labs.ucx.workspace_access.manager import PermissionManager
 from databricks.labs.ucx.workspace_access.tacl import TableAclSupport
 
@@ -235,7 +243,9 @@ def test_recover_from_ws_local_deletion(ws, make_ucx_group):
 def test_migration_state_should_be_saved_with_proper_values(sql_backend, make_schema):
     inventory_database = make_schema()
 
-    workspace = Group(display_name="workspace", entitlements=[ComplexValue(display="entitlements", value="allow-cluster-create")])
+    workspace = Group(
+        display_name="workspace", entitlements=[ComplexValue(display="entitlements", value="allow-cluster-create")]
+    )
     backup = Group(display_name="db-temp-workspace", meta=ResourceMeta("test"))
     account = Group(display_name="account")
 
