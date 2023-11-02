@@ -410,7 +410,7 @@ def test_step_run(mocker):
         steps = install._step_list()
         assert len(steps) == 2
         assert steps[0] == "wl_1" and steps[1] == "wl_2"
-    
+
         install._override_clusters = {"main": "clusterid1", "tacl": "clusterid_tacl"}
         install.run()
 

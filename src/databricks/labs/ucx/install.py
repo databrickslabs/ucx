@@ -239,14 +239,21 @@ class WorkspaceInstaller:
     def _configure_override_clusters(self):
         """User may override standard job clusters with interactive clusters"""
         default_val = ""
-        cluster_id = self._question("Pick default and we'll create a compatible job cluster (recommended) or enter pre-existing HMS Legacy cluster ID", default=default_val)
-        tacl_cluster_id = self._question("Pick default and we'll create a compatible job cluster (recommended) or enter pre-existing Table Access Control cluster ID", default=default_val)
+        preamble = "Pick default and we'll create a compatible job cluster (recommended) or "
+        cluster_id = self._question(
+            preamble + "enter pre-existing HMS Legacy cluster ID",
+            default=default_val,
+        )
+        tacl_cluster_id = self._question(
+            preamble + "enter pre-existing Table Access Control cluster ID",
+            default=default_val,
+        )
         overrides = None
-        if cluster_id != default_val and tacl_cluster_id != default_val:
-            overrides =  {
-                    "main": cluster_id,
-                    "tacl": tacl_cluster_id,
-                }
+        if default_val not in (cluster_id, tacl_cluster_id):
+            overrides = {
+                "main": cluster_id,
+                "tacl": tacl_cluster_id,
+            }
         return overrides
 
     def _configure(self):
