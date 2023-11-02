@@ -7,6 +7,7 @@ import shutil
 import subprocess
 import sys
 import tempfile
+import time
 import webbrowser
 from dataclasses import replace
 from pathlib import Path
@@ -306,7 +307,7 @@ class WorkspaceInstaller:
         )
         if warehouse_id == "create_new":
             new_warehouse = self._ws.warehouses.create(
-                name="Unity Catalog Migration",
+                name=f"Unity Catalog Migration {time.time_ns()}",
                 spot_instance_policy=SpotInstancePolicy.COST_OPTIMIZED,
                 warehouse_type=EndpointInfoWarehouseType.PRO,
                 cluster_size="Small",
