@@ -88,6 +88,16 @@ def test_run_workflow_creates_proper_failure(mocker):
     assert "Stuff happens: stuff: does not compute" == str(failure.value)
 
 
+def test_install_override_clusters(mocker, tmp_path):
+    ws = mocker.Mock()
+    install = WorkspaceInstaller(ws)
+    cluster_id = "9999-999999-abcdefgh"
+    mocker.patch("builtins.input", return_value=cluster_id)
+    res = install._configure_override_clusters()
+    assert res["main"] == cluster_id
+    assert res["tacl"] == cluster_id
+
+
 def test_install_database_happy(mocker, tmp_path):
     ws = mocker.Mock()
     install = WorkspaceInstaller(ws)
