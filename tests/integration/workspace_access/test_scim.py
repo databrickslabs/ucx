@@ -9,22 +9,6 @@ from databricks.labs.ucx.workspace_access.manager import PermissionManager
 from databricks.labs.ucx.workspace_access.scim import ScimSupport
 
 
-def _patch_by_id(
-    ws: WorkspaceClient, group_id: str, path: Literal["roles", "entitlements"], value: list[iam.ComplexValue]
-):
-    ws.groups.patch(
-        group_id,
-        operations=[
-            iam.Patch(
-                op=iam.PatchOp.ADD,
-                path=path,
-                value=[_.as_dict() for _ in value],
-            )
-        ],
-        schemas=[iam.PatchSchema.URN_IETF_PARAMS_SCIM_API_MESSAGES_2_0_PATCH_OP],
-    )
-
-
 def test_scim(ws: WorkspaceClient, make_ucx_group, sql_backend, inventory_schema):
     """
     This test does the following:
@@ -34,8 +18,17 @@ def test_scim(ws: WorkspaceClient, make_ucx_group, sql_backend, inventory_schema
     :return:
     """
     ws_group, acc_group = make_ucx_group()
-
-    _patch_by_id(ws, ws_group.id, "entitlements", [iam.ComplexValue(value="databricks-sql-access")])
+    ws.groups.patch(
+        ws_group.id,
+        operations=[
+            iam.Patch(
+                op=iam.PatchOp.ADD,
+                path="entitlements",
+                value=[iam.ComplexValue(value="databricks-sql-access").as_dict()],
+            )
+        ],
+        schemas=[iam.PatchSchema.URN_IETF_PARAMS_SCIM_API_MESSAGES_2_0_PATCH_OP],
+    )
     groups_config = GroupsConfig(selected=[ws_group.display_name])
 
     # Task 1 - crawl_permissions
@@ -48,6 +41,7 @@ def test_scim(ws: WorkspaceClient, make_ucx_group, sql_backend, inventory_schema
     group_manager = GroupManager(ws, groups_config)
     group_manager.prepare_groups_in_environment()
     pi.apply_group_permissions(group_manager.migration_state, destination="backup")
+    group_manager.migration_state.persist_migration_state(sql_backend, inventory_schema)
 
     # Task 3 - replace the groups in the workspace with the account groups
     group_manager = GroupManager(ws, groups_config)
@@ -55,6 +49,9 @@ def test_scim(ws: WorkspaceClient, make_ucx_group, sql_backend, inventory_schema
     group_manager.replace_workspace_groups_with_account_groups()
 
     # Task 4 - apply_permissions_to_account_groups
-    migration_state = GroupManager.prepare_apply_permissions_to_account_groups(ws, groups_config.backup_group_prefix)
+    migration_state = group_manager.migration_state.fetch_migration_state(sql_backend, inventory_schema)
     pi.apply_group_permissions(migration_state, destination="account")
-    assert iam.ComplexValue(value="databricks-sql-access") in ws.groups.get(acc_group.id).entitlements
+    assert [iam.ComplexValue(display=None, primary=None, type=None, value='databricks-sql-access'),
+            iam.ComplexValue(display=None, primary=None, type=None, value='allow-cluster-create')] == ws.groups.get(acc_group.id).entitlements
+    assert len(ws.groups.get(acc_group.id).members) == len(ws_group.members)
+

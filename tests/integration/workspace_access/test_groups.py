@@ -3,7 +3,7 @@ from datetime import timedelta
 
 from databricks.sdk import WorkspaceClient
 from databricks.sdk.retries import retried
-from databricks.sdk.service.iam import PermissionLevel
+from databricks.sdk.service.iam import PermissionLevel, Group, ComplexValue, ResourceMeta
 
 from databricks.labs.ucx.config import GroupsConfig
 from databricks.labs.ucx.hive_metastore import GrantsCrawler, TablesCrawler
@@ -12,7 +12,7 @@ from databricks.labs.ucx.workspace_access.generic import (
     GenericPermissionsSupport,
     Listing,
 )
-from databricks.labs.ucx.workspace_access.groups import GroupManager
+from databricks.labs.ucx.workspace_access.groups import GroupManager, GroupMigrationState
 from databricks.labs.ucx.workspace_access.manager import PermissionManager
 from databricks.labs.ucx.workspace_access.tacl import TableAclSupport
 
@@ -230,3 +230,39 @@ def test_recover_from_ws_local_deletion(ws, make_ucx_group):
     assert sorted([member.value for member in ws_group_two.members]) == sorted(
         [member.value for member in recovered_state[ws_group_two.display_name].members]
     )
+
+
+def test_migration_state_should_be_saved_with_proper_values(sql_backend, make_schema):
+    inventory_database = make_schema()
+
+    workspace = Group(display_name="workspace", entitlements=[ComplexValue(display="entitlements", value="allow-cluster-create")])
+    backup = Group(display_name="db-temp-workspace", meta=ResourceMeta("test"))
+    account = Group(display_name="account")
+
+    state = GroupMigrationState()
+    state.add(workspace, backup, account)
+
+    state.persist_migration_state(sql_backend, inventory_database.name)
+    new_state = state.fetch_migration_state(sql_backend, inventory_database.name)
+
+    assert new_state.groups == state.groups
+
+
+def test_migration_state_should_be_saved_without_missing_anything(sql_backend, make_schema):
+    inventory_database = make_schema()
+
+    workspace = Group("workspace")
+    backup = Group("db-temp-workspace")
+    account = Group("workspace")
+
+    state = GroupMigrationState()
+    state.add(workspace, backup, account)
+    state.add(workspace, backup, None)
+    state.add(workspace, None, account)
+    state.add(None, None, account)
+    state.add(None, None, None)
+
+    state.persist_migration_state(sql_backend, inventory_database.name)
+    new_state = state.fetch_migration_state(sql_backend, inventory_database.name)
+
+    assert len(new_state.groups) == len(state.groups)

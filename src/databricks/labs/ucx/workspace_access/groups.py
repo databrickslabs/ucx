@@ -11,7 +11,10 @@ from databricks.sdk.service import iam
 from databricks.sdk.service.iam import Group
 
 from databricks.labs.ucx.config import GroupsConfig
+from databricks.labs.ucx.framework.crawlers import SqlBackend
 from databricks.labs.ucx.mixins.hardening import rate_limited
+import ast
+from dataclasses import replace
 
 logger = logging.getLogger(__name__)
 
@@ -19,10 +22,33 @@ GroupLevel = typing.Literal["workspace", "account"]
 
 
 @dataclass
+class MigrationGroupInfoMock:
+    workspace: str = None
+    backup: str = None
+    account: str = None
+
+
+@dataclass
 class MigrationGroupInfo:
-    workspace: Group
-    backup: Group
-    account: Group
+    workspace: Group = None
+    backup: Group = None
+    account: Group = None
+
+    @classmethod
+    def from_payload(cls, raw: str):
+        parsed = json.loads(raw)
+        return cls(
+            workspace=iam.Group.from_dict(parsed["workspace"]),
+            backup=iam.Group.from_dict(parsed["backup"]),
+            account=iam.Group.from_dict(parsed["account"])
+        )
+
+    def to_payload(self):
+        return json.dumps({
+            "workspace": self.workspace.as_dict(),
+            "backup": self.backup.as_dict(),
+            "account": self.account.as_dict()
+        })
 
     def is_name_match(self, name: str) -> bool:
         if self.workspace is not None:
@@ -53,6 +79,35 @@ class GroupMigrationState:
     def add(self, ws_group: Group, backup_group: Group, acc_group: Group):
         mgi = MigrationGroupInfo(workspace=ws_group, backup=backup_group, account=acc_group)
         self.groups.append(mgi)
+
+    def persist_migration_state(self, backend: SqlBackend, inventory_database: str):
+        rows = []
+        for group in self.groups:
+            account = self.group_to_str(group.account) if group.account else None
+            backup = self.group_to_str(group.backup) if group.backup else None
+            workspace = self.group_to_str(group.workspace) if group.workspace else None
+            rows.append(MigrationGroupInfoMock(workspace, backup, account))
+
+        backend.save_table(f"hive_metastore.{inventory_database}.migration_state", rows, MigrationGroupInfoMock)
+
+    def group_to_str(self, group:Group):
+        if group.schemas:
+            # TODO: Remove this when https://github.com/databricks/databricks-sdk-py/issues/420 is done
+            group = replace(group, schemas=None)
+        return json.dumps(group.as_dict())
+
+    def fetch_migration_state(self, backend:SqlBackend, inventory_database: str):
+        migration_group_infos = backend.fetch(
+            f"SELECT * FROM hive_metastore.{inventory_database}.migration_state")
+
+        state = GroupMigrationState()
+        for info in migration_group_infos:
+            workspace = Group().from_dict(ast.literal_eval(info.workspace)) if info.workspace else None
+            backup = Group().from_dict(ast.literal_eval(info.backup)) if info.backup else None
+            account = Group().from_dict(ast.literal_eval(info.account)) if info.account else None
+            state.add(workspace, backup, account)
+
+        return state
 
     def is_in_scope(self, name: str) -> bool:
         if name is None:
