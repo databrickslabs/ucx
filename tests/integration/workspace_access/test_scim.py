@@ -36,15 +36,25 @@ def test_scim(ws: WorkspaceClient, make_ucx_group, sql_backend, inventory_schema
     ws_group, acc_group = make_ucx_group()
 
     _patch_by_id(ws, ws_group.id, "entitlements", [iam.ComplexValue(value="databricks-sql-access")])
+    groups_config = GroupsConfig(selected=[ws_group.display_name])
 
-    group_manager = GroupManager(ws, GroupsConfig(selected=[ws_group.display_name]))
-    group_manager.prepare_groups_in_environment()
-
+    # Task 1 - crawl_permissions
     scim_support = ScimSupport(ws)
     pi = PermissionManager(sql_backend, inventory_schema, [scim_support])
     pi.cleanup()
     pi.inventorize_permissions()
+
+    # Task 2 - apply_permissions_to_backup_groups
+    group_manager = GroupManager(ws, groups_config)
+    group_manager.prepare_groups_in_environment()
     pi.apply_group_permissions(group_manager.migration_state, destination="backup")
+
+    # Task 3 - replace the groups in the workspace with the account groups
+    group_manager = GroupManager(ws, groups_config)
+    group_manager.prepare_groups_in_environment()
     group_manager.replace_workspace_groups_with_account_groups()
-    pi.apply_group_permissions(group_manager.migration_state, destination="account")
+
+    # Task 4 - apply_permissions_to_account_groups
+    migration_state = GroupManager.prepare_apply_permissions_to_account_groups(ws, groups_config.backup_group_prefix)
+    pi.apply_group_permissions(migration_state, destination="account")
     assert iam.ComplexValue(value="databricks-sql-access") in ws.groups.get(acc_group.id).entitlements
