@@ -137,7 +137,7 @@ def test_replace_workspace_groups_with_account_groups(
 
     check_permissions_for_backup_group()
 
-    group_manager.replace_workspace_groups_with_account_groups()
+    group_manager.replace_workspace_groups_with_account_groups(group_manager.migration_state)
 
     @retried(on=[AssertionError], timeout=timedelta(minutes=1))
     def check_permissions_after_replace():

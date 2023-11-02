@@ -445,7 +445,7 @@ def delete_backup_groups(cfg: WorkspaceConfig):
 def destroy_schema(cfg: WorkspaceConfig):
     """This _clean-up_ workflow allows to removes the `$inventory` database, with all the inventory tables created by
     the previous workflow runs. Use this to reset the entire state and start with the assessment step again."""
-    RuntimeBackend().execute(f"DROP DATABASE IF EXISTS {cfg.inventory_database} CASCADE")
+    RuntimeBackend().execute(f"DROP DATABASE {cfg.inventory_database} CASCADE")
 
 
 def main(*argv):
