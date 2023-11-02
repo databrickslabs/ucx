@@ -388,11 +388,11 @@ def replace_workspace_groups_with_account_groups(cfg: WorkspaceConfig):
     - Creates an account-level group with the original name of the workspace-local one"""
     ws = WorkspaceClient(config=cfg.to_databricks_config())
     group_manager = GroupManager(ws, cfg.groups)
-    group_manager.prepare_groups_in_environment()
+    remote_state = GroupMigrationState().fetch_migration_state(RuntimeBackend(), cfg.inventory_database)
     if not group_manager.has_groups():
         logger.info("Skipping group migration as no groups were found.")
         return
-    group_manager.replace_workspace_groups_with_account_groups()
+    group_manager.replace_workspace_groups_with_account_groups(remote_state)
 
 
 @task(
@@ -413,7 +413,10 @@ def apply_permissions_to_account_groups(cfg: WorkspaceConfig):
     ws = WorkspaceClient(config=cfg.to_databricks_config())
     backend = RuntimeBackend()
 
-    migration_state = GroupMigrationState().fetch_migration_state(backend, cfg.inventory_database)
+    remote_state = GroupMigrationState().fetch_migration_state(backend, cfg.inventory_database)
+    migration_state = GroupManager.prepare_apply_permissions_to_account_groups(
+        ws, remote_state, cfg.groups.backup_group_prefix
+    )
     if len(migration_state) == 0:
         logger.info("Skipping group migration as no groups were found.")
         return

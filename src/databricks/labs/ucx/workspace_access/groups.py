@@ -155,12 +155,18 @@ class GroupManager:
         self._workspace_groups = self._list_workspace_groups()
 
     @classmethod
-    def prepare_apply_permissions_to_account_groups(cls, ws: WorkspaceClient, backup_group_prefix: str = "db-temp-"):
+    def prepare_apply_permissions_to_account_groups(
+        cls, ws: WorkspaceClient, remote_state: GroupMigrationState, backup_group_prefix: str = "db-temp-"
+    ):
         scim_attributes = "id,displayName,meta"
 
         account_groups_by_name = {}
         for g in cls._list_account_groups(ws, scim_attributes):
             account_groups_by_name[g.display_name] = g
+
+        remote_state_by_backup_group = {}
+        for g in remote_state.groups:
+            remote_state_by_backup_group[(g.backup.display_name, g.account.display_name)] = g
 
         workspace_groups_by_name = {}
         account_groups_in_workspace_by_name = {}
@@ -181,9 +187,13 @@ class GroupManager:
             if backup_group_name not in workspace_groups_by_name:
                 logger.info(f"Skipping account group `{display_name}`: no backup group in workspace")
                 continue
+            if (backup_group_name, display_name) not in remote_state_by_backup_group:
+                logger.info(f"Skipping account group `{display_name}`: not present in the state")
+                continue
+            workspace_group = remote_state_by_backup_group[(backup_group_name, display_name)].workspace
             backup_group = workspace_groups_by_name[backup_group_name]
             account_group = account_groups_in_workspace_by_name[display_name]
-            migration_state.add(None, backup_group, account_group)
+            migration_state.add(workspace_group, backup_group, account_group)
 
         return migration_state
 
@@ -205,12 +215,12 @@ class GroupManager:
             logger.info("No groups were loaded or initialized, nothing to do")
         return self._migration_state
 
-    def replace_workspace_groups_with_account_groups(self):
+    def replace_workspace_groups_with_account_groups(self, migration_state: GroupMigrationState):
         logger.info("Replacing the workspace groups with account-level groups")
-        if len(self._migration_state) == 0:
+        if len(migration_state) == 0:
             logger.info("No groups were loaded or initialized, nothing to do")
             return
-        for migration_info in self.migration_state.groups:
+        for migration_info in migration_state.groups:
             self._replace_group(migration_info)
         logger.info("Workspace groups were successfully replaced with account-level groups")
 

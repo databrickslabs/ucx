@@ -2,7 +2,10 @@ from databricks.sdk import WorkspaceClient
 from databricks.sdk.service import iam
 
 from databricks.labs.ucx.config import GroupsConfig
-from databricks.labs.ucx.workspace_access.groups import GroupManager
+from databricks.labs.ucx.workspace_access.groups import (
+    GroupManager,
+    GroupMigrationState,
+)
 from databricks.labs.ucx.workspace_access.manager import PermissionManager
 from databricks.labs.ucx.workspace_access.scim import ScimSupport
 
@@ -43,11 +46,14 @@ def test_scim(ws: WorkspaceClient, make_ucx_group, sql_backend, inventory_schema
 
     # Task 3 - replace the groups in the workspace with the account groups
     group_manager = GroupManager(ws, groups_config)
-    group_manager.prepare_groups_in_environment()
-    group_manager.replace_workspace_groups_with_account_groups()
+    remote_state = GroupMigrationState().fetch_migration_state(sql_backend, inventory_schema)
+    group_manager.replace_workspace_groups_with_account_groups(remote_state)
 
     # Task 4 - apply_permissions_to_account_groups
-    migration_state = group_manager.migration_state.fetch_migration_state(sql_backend, inventory_schema)
+    remote_state = group_manager.migration_state.fetch_migration_state(sql_backend, inventory_schema)
+    migration_state = GroupManager.prepare_apply_permissions_to_account_groups(
+        ws, remote_state, groups_config.backup_group_prefix
+    )
     pi.apply_group_permissions(migration_state, destination="account")
     assert [
         iam.ComplexValue(display=None, primary=None, type=None, value="databricks-sql-access"),

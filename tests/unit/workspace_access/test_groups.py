@@ -358,9 +358,9 @@ def test_replace_workspace_groups_with_account_groups_should_call_delete_and_do(
     group_conf = GroupsConfig(backup_group_prefix="dbr_backup_", auto=True)
     manager = GroupManager(client, group_conf)
 
-    group_info = MigrationGroupInfo(workspace=ws_de_group, account=acc_de_group, backup=backup_de_group)
-    manager._migration_state.groups = [group_info]
-    manager.replace_workspace_groups_with_account_groups()
+    state = GroupMigrationState()
+    state.add(ws_group=ws_de_group, acc_group=acc_de_group, backup_group=backup_de_group)
+    manager.replace_workspace_groups_with_account_groups(state)
 
     client.groups.delete.assert_called_with(id=test_ws_group_id)
     client.api_client.do.assert_called_with(
@@ -544,3 +544,97 @@ def test_fetch_migration_state_should_return_all():
     )
 
     assert rows.groups == state.groups
+
+
+def test_fetch_all():
+    ws = MagicMock()
+
+    group_conf = GroupsConfig(backup_group_prefix="dbr_backup_", auto=True)
+    workspace = Group(display_name="data_engs", meta=ResourceMeta(resource_type="WorkspaceGroup"))
+    backup = Group(display_name="dbr_backup_data_engs", meta=ResourceMeta(resource_type="WorkspaceGroup"))
+    account = Group(display_name="data_engs", meta=ResourceMeta(resource_type="Group"))
+    remote_state = GroupMigrationState()
+    remote_state.add(workspace, backup, account)
+
+    ws.groups.list.return_value = [backup, account]
+    ws.api_client.do.return_value = {
+        "Resources": [g.as_dict() for g in [account]],
+    }
+
+    manager = GroupManager(ws, group_conf)
+    new_state = manager.prepare_apply_permissions_to_account_groups(ws, remote_state, group_conf.backup_group_prefix)
+
+    assert len(new_state) == 1
+
+
+def test_group_present_in_state_but_not_in_workspace():
+    ws = MagicMock()
+
+    group_conf = GroupsConfig(backup_group_prefix="dbr_backup_", auto=True)
+    workspace = Group(display_name="data_engs", meta=ResourceMeta(resource_type="WorkspaceGroup"))
+    backup = Group(display_name="dbr_backup_data_engs", meta=ResourceMeta(resource_type="WorkspaceGroup"))
+    account = Group(display_name="data_engs", meta=ResourceMeta(resource_type="Group"))
+    remote_state = GroupMigrationState()
+    remote_state.add(workspace, backup, account)
+
+    ws.groups.list.return_value = [backup]
+    ws.api_client.do.return_value = {
+        "Resources": [g.as_dict() for g in [account]],
+    }
+
+    manager = GroupManager(ws, group_conf)
+    new_state = manager.prepare_apply_permissions_to_account_groups(ws, remote_state, group_conf.backup_group_prefix)
+
+    assert len(new_state) == 0
+
+
+def test_group_not_synced_in_workspace_properly():
+    ws = MagicMock()
+
+    group_conf = GroupsConfig(backup_group_prefix="dbr_backup_", auto=True)
+    workspace = Group(display_name="data_engs", meta=ResourceMeta(resource_type="WorkspaceGroup"))
+    backup = Group(display_name="dbr_backup_data_engs", meta=ResourceMeta(resource_type="WorkspaceGroup"))
+    account = Group(display_name="data_engs", meta=ResourceMeta(resource_type="Group"))
+
+    workspace_ds = Group(display_name="data_science", meta=ResourceMeta(resource_type="WorkspaceGroup"))
+    backup_ds = Group(display_name="dbr_backup_data_science", meta=ResourceMeta(resource_type="WorkspaceGroup"))
+    account_ds = Group(display_name="data_science", meta=ResourceMeta(resource_type="Group"))
+
+    remote_state = GroupMigrationState()
+    remote_state.add(workspace, backup, account)
+    remote_state.add(workspace_ds, backup_ds, account_ds)
+
+    ws.groups.list.return_value = [backup_ds, account_ds]
+    ws.api_client.do.return_value = {
+        "Resources": [g.as_dict() for g in [account, account_ds]],
+    }
+
+    manager = GroupManager(ws, group_conf)
+    new_state = manager.prepare_apply_permissions_to_account_groups(ws, remote_state, group_conf.backup_group_prefix)
+
+    assert new_state.groups[0].workspace.display_name == "data_science"
+
+
+def test_group_not_present_in_remote_state():
+    ws = MagicMock()
+
+    group_conf = GroupsConfig(backup_group_prefix="dbr_backup_", auto=True)
+    backup = Group(display_name="dbr_backup_data_engs", meta=ResourceMeta(resource_type="WorkspaceGroup"))
+    account = Group(display_name="data_engs", meta=ResourceMeta(resource_type="Group"))
+
+    workspace_ds = Group(display_name="data_science", meta=ResourceMeta(resource_type="WorkspaceGroup"))
+    backup_ds = Group(display_name="dbr_backup_data_science", meta=ResourceMeta(resource_type="WorkspaceGroup"))
+    account_ds = Group(display_name="data_science", meta=ResourceMeta(resource_type="Group"))
+
+    remote_state = GroupMigrationState()
+    remote_state.add(workspace_ds, backup_ds, account_ds)
+
+    ws.groups.list.return_value = [backup, account, backup_ds, account_ds]
+    ws.api_client.do.return_value = {
+        "Resources": [g.as_dict() for g in [account, account_ds]],
+    }
+
+    manager = GroupManager(ws, group_conf)
+    new_state = manager.prepare_apply_permissions_to_account_groups(ws, remote_state, group_conf.backup_group_prefix)
+
+    assert len(new_state) == 1
