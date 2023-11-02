@@ -556,18 +556,6 @@ class WorkspaceInstaller:
             "write_protected_dbfs": self._write_protected_dbfs,
         }
 
-    @staticmethod
-    def _apply_cluster_overrides(settings: dict[str, any], overrides: dict[str, str]) -> dict:
-        settings["job_clusters"] = [_ for _ in settings["job_clusters"] if _.job_cluster_key not in overrides]
-        for job_task in settings["tasks"]:
-            if job_task.job_cluster_key is None:
-                continue
-            if job_task.job_cluster_key in overrides:
-                job_task.existing_cluster_id = overrides[job_task.job_cluster_key]
-                job_task.job_cluster_key = None
-
-        return settings
-
     def _upload_wheel_runner(self, remote_wheel: str):
         # TODO: we have to be doing this workaround until ES-897453 is solved in the platform
         path = f"{self._install_folder}/wheels/wheel-test-runner-{self._version}.py"
