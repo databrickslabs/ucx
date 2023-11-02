@@ -574,9 +574,9 @@ class WorkspaceInstaller:
             if job_task.job_cluster_key in overrides:
                 job_task.existing_cluster_id = overrides[job_task.job_cluster_key]
                 job_task.job_cluster_key = None
-                if settings[
-                    "write_protected_dbfs"
-                ]:  # If DBFS is write protected, libraries need to be installed on override cluster
+                if settings.get(
+                    "write_protected_dbfs", None
+                ):  # If DBFS is write protected, libraries need to be installed on override cluster
                     job_task.libraries = None
             if job_task.python_wheel_task is not None:
                 job_task.python_wheel_task = None
