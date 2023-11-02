@@ -1,0 +1,40 @@
+import base64
+import time
+
+from databricks.sdk import WorkspaceClient
+from databricks.sdk.service.compute import GlobalInitScriptDetailsWithContent
+
+from databricks.labs.ucx.hive_metastore.hms_lineage_global_init_script import (
+    global_init_script,
+)
+
+
+class HiveMetastoreLineageEnabler:
+    def __init__(self, ws: WorkspaceClient):
+        self._ws = ws
+
+    def check_lineage_spark_config_exists(self) -> GlobalInitScriptDetailsWithContent:
+        for script in self._ws.global_init_scripts.list():
+            gscript = self._ws.global_init_scripts.get(script_id=script.script_id)
+            if not gscript:
+                continue
+            if "spark.databricks.dataLineage.enabled" in base64.b64decode(gscript.script).decode("utf-8"):
+                return gscript
+
+    def _get_init_script_content(self):
+        try:
+            return base64.b64encode(global_init_script.encode()).decode()
+        except Exception:
+            print("The init script content was not found.")
+
+    def add_global_init_script(self) -> str:
+        created_script = self._ws.global_init_scripts.create(
+            name=f"hms-lineage-{time.time_ns()}", script=self._get_init_script_content(), enabled=True
+        )
+        return created_script.script_id
+
+    def enable_global_init_script(self, gscript: GlobalInitScriptDetailsWithContent) -> str:
+        self._ws.global_init_scripts.update(
+            script_id=gscript.script_id, name=gscript.name, script=gscript.script, enabled=True
+        )
+        return gscript.script_id

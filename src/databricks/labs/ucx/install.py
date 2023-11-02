@@ -25,6 +25,7 @@ from databricks.labs.ucx.__about__ import __version__
 from databricks.labs.ucx.config import GroupsConfig, WorkspaceConfig
 from databricks.labs.ucx.framework.dashboards import DashboardFromFiles
 from databricks.labs.ucx.framework.tasks import _TASKS, Task
+from databricks.labs.ucx.hive_metastore.hms_lineage import HiveMetastoreLineageEnabler
 from databricks.labs.ucx.runtime import main
 
 TAG_STEP = "step"
@@ -104,11 +105,52 @@ class WorkspaceInstaller:
         self._run_configured()
 
     def _run_configured(self):
+        self._install_spark_config_for_hms_lineage()
         self._create_dashboards()
         self._create_jobs()
         readme = f'{self._notebook_link(f"{self._install_folder}/README.py")}'
         msg = f"Installation completed successfully! Please refer to the {readme} notebook for next steps."
         logger.info(msg)
+
+    def _install_spark_config_for_hms_lineage(self):
+        hms_lineage = HiveMetastoreLineageEnabler(ws=self._ws)
+        logger.info(
+            "Enabling HMS Lineage: "
+            "HMS Lineage feature creates one system table named "
+            "system.hms_to_uc_migration.table_access and "
+            "helps in your migration process from HMS to UC by allowing you to programmatically query HMS "
+            "lineage data."
+            ""
+            ""
+        )
+        logger.info("Checking if Global Init Script with Required Spark Config already exists and enabled.")
+        gscript = hms_lineage.check_lineage_spark_config_exists()
+        if gscript:
+            if gscript.enabled:
+                logger.info("Already exists and enabled. Skipped creating a new one.")
+            elif not gscript.enabled:
+                if (
+                    self._prompts
+                    and self._question(
+                        "Your Global Init Script with required spark config is disabled, Do you want to enable it",
+                        default="yes",
+                    )
+                    == "yes"
+                ):
+                    logger.info("Enabling Global Init Script...")
+                    hms_lineage.enable_global_init_script(gscript)
+                else:
+                    logger.info("No change to Global Init Script is made.")
+        elif not gscript:
+            if (
+                self._prompts
+                and self._question(
+                    "No Global Init Script with Required Spark Config exists, Do you want to create one ", default="yes"
+                )
+                == "yes"
+            ):
+                logger.info("Creating Global Init Script...")
+                hms_lineage.add_global_init_script()
 
     @staticmethod
     def run_for_config(
@@ -452,7 +494,7 @@ class WorkspaceInstaller:
             return "any"
         choices = sorted(choices, key=str.casefold)
         numbered = "\n".join(f"\033[1m[{i}]\033[0m \033[36m{v}\033[0m" for i, v in enumerate(choices))
-        prompt = f"\033[1m{text}\033[0m\n{numbered}\nEnter a number between 0 and {len(choices)-1}: "
+        prompt = f"\033[1m{text}\033[0m\n{numbered}\nEnter a number between 0 and {len(choices) - 1}: "
         attempt = 0
         while attempt < max_attempts:
             attempt += 1
