@@ -98,6 +98,7 @@ class WorkspaceInstaller:
         self._this_file = Path(__file__)
         self._dashboards = {}
         self._override_clusters = None
+        self._write_protected_dbfs = False
 
     def run(self):
         logger.info(f"Installing UCX v{self._version}")
@@ -519,11 +520,17 @@ class WorkspaceInstaller:
             remote_dirname = os.path.dirname(remote_wheel)
             with local_wheel.open("rb") as f:
                 try:
-                    self._ws.dbfs.mkdirs(remote_dirname)
                     logger.info(f"Uploading wheel to dbfs:{remote_wheel}")
+                    self._ws.dbfs.mkdirs(remote_dirname)
                     self._ws.dbfs.upload(remote_wheel, f, overwrite=True)
                 except DatabricksError as err:
-                    logger.warning(f"Uploading wheel files to DBFS failed, perhaps DBFS is protected. {err}")
+                    logger.warning(f"Uploading wheel file to DBFS failed, DBFS is probably write protected. {err}")
+                    if self._override_clusters:
+                        # assume DBFS is write protected
+                        self._write_protected_dbfs = True
+                    else:
+                        logger.error("Recommend adding override clusters with attached wheel file as python library.")
+                        raise err
             with local_wheel.open("rb") as f:
                 self._ws.workspace.mkdirs(remote_dirname)
                 logger.info(f"Uploading wheel to /Workspace{remote_wheel}")
@@ -546,6 +553,7 @@ class WorkspaceInstaller:
             "job_clusters": self._job_clusters({t.job_cluster for t in tasks}),
             "email_notifications": email_notifications,
             "tasks": [self._job_task(task, dbfs_path) for task in tasks],
+            "write_protected_dbfs": self._write_protected_dbfs,
         }
 
     @staticmethod
@@ -578,7 +586,10 @@ class WorkspaceInstaller:
             if job_task.job_cluster_key in overrides:
                 job_task.existing_cluster_id = overrides[job_task.job_cluster_key]
                 job_task.job_cluster_key = None
-                job_task.libraries = None  # Job libraries not loading from Workspace FS
+                if settings[
+                    "write_protected_dbfs"
+                ]:  # If DBFS is write protected, libraries need to be installed on override cluster
+                    job_task.libraries = None
             if job_task.python_wheel_task is not None:
                 job_task.python_wheel_task = None
                 params = {"task": job_task.task_key} | EXTRA_TASK_PARAMS
