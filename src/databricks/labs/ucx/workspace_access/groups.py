@@ -2,7 +2,7 @@ import collections
 import json
 import logging
 import typing
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 
 from databricks.sdk import WorkspaceClient
 from databricks.sdk.core import DatabricksError
@@ -11,6 +11,7 @@ from databricks.sdk.service import iam
 from databricks.sdk.service.iam import Group
 
 from databricks.labs.ucx.config import GroupsConfig
+from databricks.labs.ucx.framework.crawlers import SqlBackend
 from databricks.labs.ucx.mixins.hardening import rate_limited
 
 logger = logging.getLogger(__name__)
@@ -18,11 +19,19 @@ logger = logging.getLogger(__name__)
 GroupLevel = typing.Literal["workspace", "account"]
 
 
+# TODO: This class is used to persist MigrationGroupInfo, but Group is a not supported type for backend.save_table()
+@dataclass
+class MigrationGroupInfoMock:
+    workspace: str = None
+    backup: str = None
+    account: str = None
+
+
 @dataclass
 class MigrationGroupInfo:
-    workspace: Group
-    backup: Group
-    account: Group
+    workspace: Group = None
+    backup: Group = None
+    account: Group = None
 
     def is_name_match(self, name: str) -> bool:
         if self.workspace is not None:
@@ -53,6 +62,36 @@ class GroupMigrationState:
     def add(self, ws_group: Group, backup_group: Group, acc_group: Group):
         mgi = MigrationGroupInfo(workspace=ws_group, backup=backup_group, account=acc_group)
         self.groups.append(mgi)
+
+    def persist_migration_state(self, backend: SqlBackend, inventory_database: str):
+        rows = []
+        for group in self.groups:
+            account = self.group_to_str(group.account) if group.account else None
+            backup = self.group_to_str(group.backup) if group.backup else None
+            workspace = self.group_to_str(group.workspace) if group.workspace else None
+            rows.append(MigrationGroupInfoMock(workspace, backup, account))
+        logger.info(f"Persisting {len(rows)} to migration state hive_metastore.{inventory_database}.migration_state")
+        backend.save_table(f"hive_metastore.{inventory_database}.migration_state", rows, MigrationGroupInfoMock)
+
+    def group_to_str(self, group: Group):
+        if group.schemas:
+            # TODO: Remove this when https://github.com/databricks/databricks-sdk-py/issues/420 is done
+            group = replace(group, schemas=None)
+        return json.dumps(group.as_dict())
+
+    def fetch_migration_state(self, backend: SqlBackend, inventory_database: str):
+        migration_group_infos = backend.fetch(f"SELECT * FROM hive_metastore.{inventory_database}.migration_state")
+
+        state = GroupMigrationState()
+        for workspace, backup, account in migration_group_infos:
+            workspace_group = Group().from_dict(json.loads(workspace)) if workspace else None
+            backup_group = Group().from_dict(json.loads(backup)) if backup else None
+            account_group = Group().from_dict(json.loads(account)) if account else None
+            state.add(workspace_group, backup_group, account_group)
+        logger.info(
+            f"{len(list(state.groups))} found to migration state hive_metastore.{inventory_database}.migration_state"
+        )
+        return state
 
     def is_in_scope(self, name: str) -> bool:
         if name is None:
@@ -118,12 +157,18 @@ class GroupManager:
         self._workspace_groups = self._list_workspace_groups()
 
     @classmethod
-    def prepare_apply_permissions_to_account_groups(cls, ws: WorkspaceClient, backup_group_prefix: str = "db-temp-"):
+    def prepare_apply_permissions_to_account_groups(
+        cls, ws: WorkspaceClient, remote_state: GroupMigrationState, backup_group_prefix: str = "db-temp-"
+    ):
         scim_attributes = "id,displayName,meta"
 
         account_groups_by_name = {}
         for g in cls._list_account_groups(ws, scim_attributes):
             account_groups_by_name[g.display_name] = g
+
+        remote_state_by_backup_group = {}
+        for g in remote_state.groups:
+            remote_state_by_backup_group[(g.backup.display_name, g.account.display_name)] = g
 
         workspace_groups_by_name = {}
         account_groups_in_workspace_by_name = {}
@@ -144,9 +189,13 @@ class GroupManager:
             if backup_group_name not in workspace_groups_by_name:
                 logger.info(f"Skipping account group `{display_name}`: no backup group in workspace")
                 continue
+            if (backup_group_name, display_name) not in remote_state_by_backup_group:
+                logger.info(f"Skipping account group `{display_name}`: not present in the state")
+                continue
+            workspace_group = remote_state_by_backup_group[(backup_group_name, display_name)].workspace
             backup_group = workspace_groups_by_name[backup_group_name]
             account_group = account_groups_in_workspace_by_name[display_name]
-            migration_state.add(None, backup_group, account_group)
+            migration_state.add(workspace_group, backup_group, account_group)
 
         return migration_state
 
@@ -168,12 +217,12 @@ class GroupManager:
             logger.info("No groups were loaded or initialized, nothing to do")
         return self._migration_state
 
-    def replace_workspace_groups_with_account_groups(self):
+    def replace_workspace_groups_with_account_groups(self, migration_state: GroupMigrationState):
         logger.info("Replacing the workspace groups with account-level groups")
-        if len(self._migration_state) == 0:
+        if len(migration_state) == 0:
             logger.info("No groups were loaded or initialized, nothing to do")
             return
-        for migration_info in self.migration_state.groups:
+        for migration_info in migration_state.groups:
             self._replace_group(migration_info)
         logger.info("Workspace groups were successfully replaced with account-level groups")
 

@@ -3,11 +3,17 @@ from unittest.mock import MagicMock, Mock
 
 import pytest
 from databricks.sdk.service import iam
-from databricks.sdk.service.iam import Group, ResourceMeta
+from databricks.sdk.service.iam import ComplexValue, Group, ResourceMeta
 
 from databricks.labs.ucx.config import GroupsConfig
-from databricks.labs.ucx.workspace_access.groups import GroupManager, MigrationGroupInfo
+from databricks.labs.ucx.workspace_access.groups import (
+    GroupManager,
+    GroupMigrationState,
+    MigrationGroupInfo,
+    MigrationGroupInfoMock,
+)
 from databricks.labs.ucx.workspace_access.scim import Permissions, ScimSupport
+from tests.unit.framework.mocks import MockBackend
 
 
 def test_scim_crawler():
@@ -45,22 +51,54 @@ def test_scim_crawler():
             assert item.raw is not None
 
 
-def test_scim_apply(migration_state):
+@pytest.mark.parametrize(
+    "item",
+    [
+        Permissions(
+            object_id="test-ws",
+            object_type="roles",
+            raw=json.dumps(
+                [
+                    iam.ComplexValue(value="role1").as_dict(),
+                    iam.ComplexValue(value="role2").as_dict(),
+                ]
+            ),
+        ),
+        Permissions(
+            object_id="test-ws",
+            object_type="entitlements",
+            raw=json.dumps(
+                [
+                    iam.ComplexValue(value="sql-access").as_dict(),
+                    iam.ComplexValue(value="workspace-admin").as_dict(),
+                ]
+            ),
+        ),
+    ],
+    ids=["roles", "entitlements"],
+)
+def test_scim_apply(item, migration_state):
     ws = MagicMock()
-    sample_permissions = [iam.ComplexValue(value="role1"), iam.ComplexValue(value="role2")]
-    ws.groups.get.return_value = Group(id="test-backup", roles=sample_permissions)
-    sup = ScimSupport(ws=ws)
-    item = Permissions(
-        object_id="test-ws",
-        object_type="roles",
-        raw=json.dumps([p.as_dict() for p in sample_permissions]),
+    value_payload: list[dict] = json.loads(item.raw)
+    ws.groups.get.return_value = Group(
+        **{"id": "test-backup", item.object_type: [iam.ComplexValue.from_dict(value) for value in value_payload]}
     )
+    sup = ScimSupport(ws=ws)
 
-    task = sup.get_apply_task(item, migration_state, "backup")
-    task()
+    apply_to_backup_task = sup.get_apply_task(item, migration_state, "backup")
+    apply_to_backup_task()
+
     ws.groups.patch.assert_called_once_with(
         id="test-backup",
-        operations=[iam.Patch(op=iam.PatchOp.ADD, path="roles", value=[p.as_dict() for p in sample_permissions])],
+        operations=[iam.Patch(op=iam.PatchOp.ADD, path=item.object_type, value=value_payload)],
+        schemas=[iam.PatchSchema.URN_IETF_PARAMS_SCIM_API_MESSAGES_2_0_PATCH_OP],
+    )
+
+    apply_to_account_task = sup.get_apply_task(item, migration_state, "account")
+    apply_to_account_task()
+    ws.groups.patch.assert_called_with(
+        id="test-acc",
+        operations=[iam.Patch(op=iam.PatchOp.ADD, path=item.object_type, value=value_payload)],
         schemas=[iam.PatchSchema.URN_IETF_PARAMS_SCIM_API_MESSAGES_2_0_PATCH_OP],
     )
 
@@ -320,9 +358,9 @@ def test_replace_workspace_groups_with_account_groups_should_call_delete_and_do(
     group_conf = GroupsConfig(backup_group_prefix="dbr_backup_", auto=True)
     manager = GroupManager(client, group_conf)
 
-    group_info = MigrationGroupInfo(workspace=ws_de_group, account=acc_de_group, backup=backup_de_group)
-    manager._migration_state.groups = [group_info]
-    manager.replace_workspace_groups_with_account_groups()
+    state = GroupMigrationState()
+    state.add(ws_group=ws_de_group, acc_group=acc_de_group, backup_group=backup_de_group)
+    manager.replace_workspace_groups_with_account_groups(state)
 
     client.groups.delete.assert_called_with(id=test_ws_group_id)
     client.api_client.do.assert_called_with(
@@ -418,3 +456,185 @@ def test_delete_selected_backup_groups():
     manager = GroupManager(client, group_conf)
     manager.delete_backup_groups()
     client.groups.delete.assert_called_with(id=backup_group_id)
+
+
+def test_migration_state_should_be_saved_with_proper_values():
+    workspace = Group(
+        display_name="workspace", entitlements=[ComplexValue(display="entitlements", value="allow-cluster-create")]
+    )
+    backup = Group(display_name="db-temp-workspace", meta=ResourceMeta("test"))
+    account = Group(display_name="account")
+    schema = "test_schema"
+
+    state = GroupMigrationState()
+    state.add(workspace, backup, account)
+    backend = MockBackend()
+
+    state.persist_migration_state(backend, schema)
+    rows = backend.rows_written_for(f"hive_metastore.{schema}.migration_state", "append")
+    assert rows == [
+        MigrationGroupInfoMock(
+            workspace='{"displayName": "workspace", "entitlements": ['
+            '{"display": "entitlements", "value": "allow-cluster-create"}'
+            ']}',
+            backup='{"displayName": "db-temp-workspace", "meta": {"resourceType": "test"}}',
+            account='{"displayName": "account"}',
+        )
+    ]
+
+
+def test_migration_state_should_be_saved_without_schema():
+    account = Group(display_name="account", schemas=[iam.GroupSchema.URN_IETF_PARAMS_SCIM_SCHEMAS_CORE_2_0_GROUP])
+    schema = "test_schema"
+
+    state = GroupMigrationState()
+    state.add(None, None, account)
+    backend = MockBackend()
+
+    state.persist_migration_state(backend, schema)
+    rows = backend.rows_written_for(f"hive_metastore.{schema}.migration_state", "append")
+    assert rows == [MigrationGroupInfoMock(workspace=None, backup=None, account='{"displayName": "account"}')]
+
+
+def test_migration_state_should_not_filter_any_rows():
+    schema = "test_schema"
+    workspace = Group("workspace")
+    backup = Group("db-temp-workspace")
+    account = Group("workspace")
+
+    state = GroupMigrationState()
+    state.add(workspace, backup, account)
+    state.add(workspace, backup, None)
+    state.add(workspace, None, account)
+    state.add(None, None, account)
+    state.add(None, None, None)
+
+    backend = MockBackend()
+    state.persist_migration_state(backend, schema)
+    rows = backend.rows_written_for(f"hive_metastore.{schema}.migration_state", "append")
+
+    assert len(rows) == 5
+
+
+def test_fetch_migration_state_should_return_all():
+    schema = "test_schema"
+
+    rows = {
+        "SELECT": [
+            (
+                '{"displayName": "workspace", "entitlements": ['
+                '{"display": "entitlements", "value": "allow-cluster-create"}'
+                ']}',
+                '{"displayName": "db-temp-workspace", "meta": {"resourceType": "test"}}',
+                '{"displayName": "account"}',
+            ),
+        ]
+    }
+
+    backend = MockBackend(rows=rows)
+    rows = GroupMigrationState().fetch_migration_state(backend, schema)
+
+    state = GroupMigrationState()
+    state.add(
+        ws_group=Group(
+            display_name="workspace", entitlements=[ComplexValue(display="entitlements", value="allow-cluster-create")]
+        ),
+        backup_group=Group(display_name="db-temp-workspace", meta=ResourceMeta(resource_type="test")),
+        acc_group=Group(display_name="account"),
+    )
+
+    assert rows.groups == state.groups
+
+
+def test_fetch_all():
+    ws = MagicMock()
+
+    group_conf = GroupsConfig(backup_group_prefix="dbr_backup_", auto=True)
+    workspace = Group(display_name="data_engs", meta=ResourceMeta(resource_type="WorkspaceGroup"))
+    backup = Group(display_name="dbr_backup_data_engs", meta=ResourceMeta(resource_type="WorkspaceGroup"))
+    account = Group(display_name="data_engs", meta=ResourceMeta(resource_type="Group"))
+    remote_state = GroupMigrationState()
+    remote_state.add(workspace, backup, account)
+
+    ws.groups.list.return_value = [backup, account]
+    ws.api_client.do.return_value = {
+        "Resources": [g.as_dict() for g in [account]],
+    }
+
+    manager = GroupManager(ws, group_conf)
+    new_state = manager.prepare_apply_permissions_to_account_groups(ws, remote_state, group_conf.backup_group_prefix)
+
+    assert len(new_state) == 1
+
+
+def test_group_present_in_state_but_not_in_workspace():
+    ws = MagicMock()
+
+    group_conf = GroupsConfig(backup_group_prefix="dbr_backup_", auto=True)
+    workspace = Group(display_name="data_engs", meta=ResourceMeta(resource_type="WorkspaceGroup"))
+    backup = Group(display_name="dbr_backup_data_engs", meta=ResourceMeta(resource_type="WorkspaceGroup"))
+    account = Group(display_name="data_engs", meta=ResourceMeta(resource_type="Group"))
+    remote_state = GroupMigrationState()
+    remote_state.add(workspace, backup, account)
+
+    ws.groups.list.return_value = [backup]
+    ws.api_client.do.return_value = {
+        "Resources": [g.as_dict() for g in [account]],
+    }
+
+    manager = GroupManager(ws, group_conf)
+    new_state = manager.prepare_apply_permissions_to_account_groups(ws, remote_state, group_conf.backup_group_prefix)
+
+    assert len(new_state) == 0
+
+
+def test_group_not_synced_in_workspace_properly():
+    ws = MagicMock()
+
+    group_conf = GroupsConfig(backup_group_prefix="dbr_backup_", auto=True)
+    workspace = Group(display_name="data_engs", meta=ResourceMeta(resource_type="WorkspaceGroup"))
+    backup = Group(display_name="dbr_backup_data_engs", meta=ResourceMeta(resource_type="WorkspaceGroup"))
+    account = Group(display_name="data_engs", meta=ResourceMeta(resource_type="Group"))
+
+    workspace_ds = Group(display_name="data_science", meta=ResourceMeta(resource_type="WorkspaceGroup"))
+    backup_ds = Group(display_name="dbr_backup_data_science", meta=ResourceMeta(resource_type="WorkspaceGroup"))
+    account_ds = Group(display_name="data_science", meta=ResourceMeta(resource_type="Group"))
+
+    remote_state = GroupMigrationState()
+    remote_state.add(workspace, backup, account)
+    remote_state.add(workspace_ds, backup_ds, account_ds)
+
+    ws.groups.list.return_value = [backup_ds, account_ds]
+    ws.api_client.do.return_value = {
+        "Resources": [g.as_dict() for g in [account, account_ds]],
+    }
+
+    manager = GroupManager(ws, group_conf)
+    new_state = manager.prepare_apply_permissions_to_account_groups(ws, remote_state, group_conf.backup_group_prefix)
+
+    assert new_state.groups[0].workspace.display_name == "data_science"
+
+
+def test_group_not_present_in_remote_state():
+    ws = MagicMock()
+
+    group_conf = GroupsConfig(backup_group_prefix="dbr_backup_", auto=True)
+    backup = Group(display_name="dbr_backup_data_engs", meta=ResourceMeta(resource_type="WorkspaceGroup"))
+    account = Group(display_name="data_engs", meta=ResourceMeta(resource_type="Group"))
+
+    workspace_ds = Group(display_name="data_science", meta=ResourceMeta(resource_type="WorkspaceGroup"))
+    backup_ds = Group(display_name="dbr_backup_data_science", meta=ResourceMeta(resource_type="WorkspaceGroup"))
+    account_ds = Group(display_name="data_science", meta=ResourceMeta(resource_type="Group"))
+
+    remote_state = GroupMigrationState()
+    remote_state.add(workspace_ds, backup_ds, account_ds)
+
+    ws.groups.list.return_value = [backup, account, backup_ds, account_ds]
+    ws.api_client.do.return_value = {
+        "Resources": [g.as_dict() for g in [account, account_ds]],
+    }
+
+    manager = GroupManager(ws, group_conf)
+    new_state = manager.prepare_apply_permissions_to_account_groups(ws, remote_state, group_conf.backup_group_prefix)
+
+    assert len(new_state) == 1
