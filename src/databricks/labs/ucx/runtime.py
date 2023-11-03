@@ -423,7 +423,7 @@ def apply_permissions_to_account_groups(cfg: WorkspaceConfig):
 
     permission_manager = PermissionManager.factory(
         ws,
-        RuntimeBackend(),
+        backend,
         cfg.inventory_database,
         num_threads=cfg.num_threads,
         workspace_start_path=cfg.workspace_start_path,
