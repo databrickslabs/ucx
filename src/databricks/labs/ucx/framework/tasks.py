@@ -134,7 +134,7 @@ def trigger(*argv):
     databricks_logger.removeHandler(console_handler)
     databricks_logger.addHandler(file_handler)
 
-    ucx_logger.info(f"After job finishes, see debug logs at {log_file}")
+    ucx_logger.info(f"UCX v{__version__} After job finishes, see debug logs at {log_file}")
 
     log_readme = log_path.joinpath("README.md")
     if not log_readme.exists():
