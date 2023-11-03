@@ -70,7 +70,7 @@ class GroupMigrationState:
             backup = self.group_to_str(group.backup) if group.backup else None
             workspace = self.group_to_str(group.workspace) if group.workspace else None
             rows.append(MigrationGroupInfoMock(workspace, backup, account))
-
+        logger.info(f"Persisting {len(rows)} to migration state hive_metastore.{inventory_database}.migration_state")
         backend.save_table(f"hive_metastore.{inventory_database}.migration_state", rows, MigrationGroupInfoMock)
 
     def group_to_str(self, group: Group):
@@ -88,7 +88,9 @@ class GroupMigrationState:
             backup_group = Group().from_dict(json.loads(backup)) if backup else None
             account_group = Group().from_dict(json.loads(account)) if account else None
             state.add(workspace_group, backup_group, account_group)
-
+        logger.info(
+            f"{len(list(state.groups))} found to migration state hive_metastore.{inventory_database}.migration_state"
+        )
         return state
 
     def is_in_scope(self, name: str) -> bool:
