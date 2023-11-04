@@ -100,8 +100,8 @@ class GroupMigrationToolkit:
     def verify_permissions_on_backup_groups(self, to_verify):
         self._verification_manager.verify(self._group_manager.migration_state, "backup", to_verify)
 
-    def replace_workspace_groups_with_account_groups(self):
-        self._group_manager.replace_workspace_groups_with_account_groups()
+    def replace_workspace_groups_with_account_groups(self, migration_state):
+        self._group_manager.replace_workspace_groups_with_account_groups(migration_state)
 
     def apply_permissions_to_account_groups(self):
         self._permissions_manager.apply_group_permissions(self._group_manager.migration_state, destination="account")

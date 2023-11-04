@@ -197,7 +197,7 @@ def test_workspace_access_e2e(
 
     toolkit.verify_permissions_on_backup_groups(to_verify)
 
-    toolkit.replace_workspace_groups_with_account_groups()
+    toolkit.replace_workspace_groups_with_account_groups(group_migration_state)
 
     workspace_acc_membership = toolkit._group_manager.get_workspace_membership("Group")
     assert acc_group.display_name in workspace_acc_membership
