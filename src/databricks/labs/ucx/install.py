@@ -426,6 +426,8 @@ class WorkspaceInstaller:
             settings = self._job_settings(step_name, remote_wheel)
             if self._override_clusters:
                 settings = self._apply_cluster_overrides(settings, self._override_clusters, wheel_runner)
+            if settings.get("write_protected_dbfs", None):
+                del settings["write_protected_dbfs"]
             if step_name in self._deployed_steps:
                 job_id = self._deployed_steps[step_name]
                 logger.info(f"Updating configuration for step={step_name} job_id={job_id}")
@@ -616,11 +618,6 @@ class WorkspaceInstaller:
             if job_task.job_cluster_key in overrides:
                 job_task.existing_cluster_id = overrides[job_task.job_cluster_key]
                 job_task.job_cluster_key = None
-                if settings.get(
-                    "write_protected_dbfs", None
-                ):  # If DBFS is write protected, libraries need to be installed on override cluster
-                    job_task.libraries = None
-                    del settings["write_protected_dbfs"]
             if job_task.python_wheel_task is not None:
                 job_task.python_wheel_task = None
                 params = {"task": job_task.task_key} | EXTRA_TASK_PARAMS
