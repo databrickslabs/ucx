@@ -1,5 +1,5 @@
 -- viz type=table, name=Pipelines, columns=pipeline_id,pipeline_name,creator_name,Azure_SPN_Present,failures
--- widget title=Pipelines, col=0, row=41, size_x=6, size_y=8
+-- widget title=Pipelines, col=0, row=53, size_x=6, size_y=8
 select
        pipeline_id,
        pipeline_name,

@@ -1,5 +1,5 @@
--- viz type=table, name=Failure Summary, columns=issue,object_type,issue_count
--- widget title=Failure Summary, col=0, row=65, size_x=6, size_y=8
+-- viz type=table, name=Issue Summary, columns=issue,object_type,issue_count
+-- widget title=Automatic Upgrade Issue Summary, col=2, row=0, size_x=3, size_y=15
 SELECT
   issue,
   object_type,

@@ -1,5 +1,5 @@
 -- viz type=table, name=Table Types, columns=database,name,type,format,table_view,storage,is_delta,location
--- widget title=Table Types, col=0, row=3, size_x=6, size_y=6
+-- widget title=Table Types, col=0, row=23, size_x=6, size_y=6
 SELECT `database`,
        name,
        object_type AS type,

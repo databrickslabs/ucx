@@ -1,5 +1,5 @@
 -- viz type=table, name=Database Summary, columns=database,tables,views,dbfs_root,delta_tables,upgrade
--- widget title=Database Summary, col=0, row=9, size_x=6, size_y=8
+-- widget title=Database Summary, col=0, row=15, size_x=6, size_y=8
 SELECT `database`,
        SUM(is_table) AS tables,
        SUM(is_view) AS views,
