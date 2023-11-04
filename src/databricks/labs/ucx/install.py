@@ -620,6 +620,7 @@ class WorkspaceInstaller:
                     "write_protected_dbfs", None
                 ):  # If DBFS is write protected, libraries need to be installed on override cluster
                     job_task.libraries = None
+                    del settings["write_protected_dbfs"]
             if job_task.python_wheel_task is not None:
                 job_task.python_wheel_task = None
                 params = {"task": job_task.task_key} | EXTRA_TASK_PARAMS
