@@ -426,8 +426,6 @@ class WorkspaceInstaller:
             settings = self._job_settings(step_name, remote_wheel)
             if self._override_clusters:
                 settings = self._apply_cluster_overrides(settings, self._override_clusters, wheel_runner)
-            if settings.get("write_protected_dbfs", None):
-                del settings["write_protected_dbfs"]
             if step_name in self._deployed_steps:
                 job_id = self._deployed_steps[step_name]
                 logger.info(f"Updating configuration for step={step_name} job_id={job_id}")
@@ -597,7 +595,6 @@ class WorkspaceInstaller:
             "job_clusters": self._job_clusters({t.job_cluster for t in tasks}),
             "email_notifications": email_notifications,
             "tasks": [self._job_task(task, dbfs_path) for task in tasks],
-            "write_protected_dbfs": self._write_protected_dbfs,
         }
 
     def _upload_wheel_runner(self, remote_wheel: str):
@@ -666,15 +663,16 @@ class WorkspaceInstaller:
         )
 
     def _job_wheel_task(self, jobs_task: jobs.Task, task: Task, dbfs_path: str) -> jobs.Task:
-        return replace(
-            jobs_task,
-            libraries=[compute.Library(whl=f"dbfs:{dbfs_path}")],
-            python_wheel_task=jobs.PythonWheelTask(
-                package_name="databricks_labs_ucx",
-                entry_point="runtime",  # [project.entry-points.databricks] in pyproject.toml
-                named_parameters={"task": task.name, "config": f"/Workspace{self._config_file}"} | EXTRA_TASK_PARAMS,
-            ),
+        python_wheel_task = jobs.PythonWheelTask(
+            package_name="databricks_labs_ucx",
+            entry_point="runtime",  # [project.entry-points.databricks] in pyproject.toml
+            named_parameters={"task": task.name, "config": f"/Workspace{self._config_file}"} | EXTRA_TASK_PARAMS,
         )
+        libraries = ([compute.Library(whl=f"dbfs:{dbfs_path}")],)
+        if self._write_protected_dbfs:
+            return replace(jobs_task, python_wheel_task=python_wheel_task)
+        else:
+            return replace(jobs_task, libraries=libraries, python_wheel_task=python_wheel_task)
 
     def _job_clusters(self, names: set[str]):
         clusters = []

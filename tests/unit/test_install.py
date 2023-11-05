@@ -103,6 +103,32 @@ def test_install_override_clusters(mocker, tmp_path):
     assert res["tacl"] == cluster_id
 
     install._configure()
+    install.run()
+
+
+def test_install_dbfs_write_protect(mocker, tmp_path):
+    "Verify flag isn't in jobs create api call"
+    ws = mock_ws(mocker)
+    install = WorkspaceInstaller(ws)
+    cluster_id = "9999-999999-abcdefgh"
+    mocker.patch("builtins.input", return_value=cluster_id)
+    res = install._configure_override_clusters()
+    assert res["main"] == cluster_id
+    assert res["tacl"] == cluster_id
+
+    jobs_mock = MagicMock()
+
+    def jobs_create(*args, **kwargs):
+        assert "write_protected_dbfs" not in args, f"{args}"
+        assert "write_protected_dbfs" not in kwargs, f"{kwargs}"
+        return MagicMock(job_id="bar")
+
+
+    jobs_mock.create = jobs_create
+    ws.jobs = jobs_mock
+
+    install._configure()
+    install.run()
 
 
 def test_install_database_happy(mocker, tmp_path):
