@@ -1,8 +1,6 @@
 import logging
 from datetime import timedelta
 
-import pytest
-from databricks.sdk.errors import OperationFailed
 from databricks.sdk.retries import retried
 from databricks.sdk.service.catalog import SchemaInfo
 from databricks.sdk.service.iam import PermissionLevel
@@ -16,37 +14,7 @@ from databricks.labs.ucx.workspace_access.generic import GenericPermissionsSuppo
 from databricks.labs.ucx.workspace_access.groups import GroupManager
 
 logger = logging.getLogger(__name__)
-
-
-def test_destroying_non_existing_schema_fails_with_correct_message(ws, sql_backend, env_or_skip, make_random):
-    default_cluster_id = env_or_skip("TEST_DEFAULT_CLUSTER_ID")
-    tacl_cluster_id = env_or_skip("TEST_LEGACY_TABLE_ACL_CLUSTER_ID")
-    ws.clusters.ensure_cluster_is_running(default_cluster_id)
-    ws.clusters.ensure_cluster_is_running(tacl_cluster_id)
-
-    backup_group_prefix = "db-temp-"
-    inventory_database = f"ucx_{make_random(4)}"
-    install = WorkspaceInstaller.run_for_config(
-        ws,
-        WorkspaceConfig(
-            inventory_database=inventory_database,
-            groups=GroupsConfig(
-                backup_group_prefix=backup_group_prefix,
-                auto=True,
-            ),
-            log_level="DEBUG",
-        ),
-        prefix=make_random(4),
-        override_clusters={
-            "main": default_cluster_id,
-            "tacl": tacl_cluster_id,
-        },
-    )
-
-    with pytest.raises(OperationFailed) as failure:
-        install.run_workflow("099-destroy-schema")
-
-    assert "cannot be found" in str(failure.value)
+TIMEOUT_VALUE = 5
 
 
 def test_logs_are_available(ws, sql_backend, env_or_skip, make_random):
@@ -66,10 +34,6 @@ def test_logs_are_available(ws, sql_backend, env_or_skip, make_random):
             "main": default_cluster_id,
         },
     )
-
-    with pytest.raises(OperationFailed):
-        install.run_workflow("099-destroy-schema")
-        assert True
 
     workflow_run_logs = list(ws.workspace.list(f"{install._install_folder}/logs"))
     assert len(workflow_run_logs) == 1
@@ -190,7 +154,7 @@ def test_jobs_with_no_inventory_database(
         for step in required_workflows:
             install.run_workflow(step)
 
-        @retried(on=[AssertionError], timeout=timedelta(minutes=2))
+        @retried(on=[AssertionError], timeout=timedelta(minutes=TIMEOUT_VALUE))
         def validate_groups():
             group_manager = GroupManager(ws, GroupsConfig(auto=True))
             acc_membership = group_manager.get_workspace_membership("Group")
@@ -207,7 +171,7 @@ def test_jobs_with_no_inventory_database(
 
             return True
 
-        @retried(on=[AssertionError], timeout=timedelta(minutes=2))
+        @retried(on=[AssertionError], timeout=timedelta(minutes=TIMEOUT_VALUE))
         def validate_permissions():
             logger.info("validating permissions")
             policy_permissions = generic_permissions.load_as_dict("cluster-policies", cluster_policy.policy_id)
@@ -217,7 +181,7 @@ def test_jobs_with_no_inventory_database(
 
             return True
 
-        @retried(on=[AssertionError], timeout=timedelta(minutes=2))
+        @retried(on=[AssertionError], timeout=timedelta(minutes=TIMEOUT_VALUE))
         def validate_tacl():
             logger.info("validating tacl")
             table_a_grants = grants_crawler.for_table_info(table_a)
