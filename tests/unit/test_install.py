@@ -123,7 +123,6 @@ def test_install_dbfs_write_protect(mocker, tmp_path):
         assert "write_protected_dbfs" not in kwargs, f"{kwargs}"
         return MagicMock(job_id="bar")
 
-
     jobs_mock.create = jobs_create
     ws.jobs = jobs_mock
 
