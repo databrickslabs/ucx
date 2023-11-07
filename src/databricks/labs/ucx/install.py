@@ -24,6 +24,7 @@ from databricks.sdk.service.workspace import ImportFormat
 from databricks.labs.ucx.__about__ import __version__
 from databricks.labs.ucx.config import GroupsConfig, WorkspaceConfig
 from databricks.labs.ucx.framework.dashboards import DashboardFromFiles
+from databricks.labs.ucx.framework.install_state import InstallState
 from databricks.labs.ucx.framework.tasks import _TASKS, Task
 from databricks.labs.ucx.hive_metastore.hms_lineage import HiveMetastoreLineageEnabler
 from databricks.labs.ucx.runtime import main
@@ -98,6 +99,7 @@ class WorkspaceInstaller:
         self._this_file = Path(__file__)
         self._override_clusters = None
         self._dashboards = {}
+        self._state = InstallState(ws, self._install_folder)
 
     def run(self):
         logger.info(f"Installing UCX v{self._version}")
@@ -167,7 +169,7 @@ class WorkspaceInstaller:
         return workspace_installer
 
     def run_workflow(self, step: str):
-        job_id = self._deployed_steps[step]
+        job_id = self._state.jobs[step]
         logger.debug(f"starting {step} job: {self._ws.config.host}#job/{job_id}")
         job_run_waiter = self._ws.jobs.run_now(job_id)
         try:
@@ -194,6 +196,7 @@ class WorkspaceInstaller:
         local_query_files = self._find_project_root() / "src/databricks/labs/ucx/queries"
         dash = DashboardFromFiles(
             self._ws,
+            state=self._state,
             local_folder=local_query_files,
             remote_folder=f"{self._install_folder}/queries",
             name_prefix=self._name("UCX "),
@@ -261,7 +264,7 @@ class WorkspaceInstaller:
         return self._config
 
     def _name(self, name: str) -> str:
-        return f"[{self._prefix.upper()}][{self._short_name}] {name}"
+        return f"[{self._prefix.upper()}] {name}"
 
     def _configure_inventory_database(self):
         counter = 0
@@ -379,9 +382,11 @@ class WorkspaceInstaller:
         self._ws.workspace.upload(self.config_file, config_bytes, format=ImportFormat.AUTO)
 
     def _create_jobs(self):
+        if not self._state.jobs:
+            for step, job_id in self._deployed_steps_pre_v06().items():
+                self._state.jobs[step] = job_id
         logger.debug(f"Creating jobs from tasks in {main.__name__}")
         remote_wheel = self._upload_wheel()
-        self._deployed_steps = self.deployed_steps()
         desired_steps = {t.workflow for t in _TASKS.values()}
         wheel_runner = None
 
@@ -391,21 +396,35 @@ class WorkspaceInstaller:
             settings = self._job_settings(step_name, remote_wheel)
             if self._override_clusters:
                 settings = self._apply_cluster_overrides(settings, self._override_clusters, wheel_runner)
-            if step_name in self._deployed_steps:
-                job_id = self._deployed_steps[step_name]
+            if step_name in self._state.jobs:
+                job_id = self._state.jobs[step_name]
                 logger.info(f"Updating configuration for step={step_name} job_id={job_id}")
                 self._ws.jobs.reset(job_id, jobs.JobSettings(**settings))
             else:
                 logger.info(f"Creating new job configuration for step={step_name}")
-                self._deployed_steps[step_name] = self._ws.jobs.create(**settings).job_id
+                self._state.jobs[step_name] = self._ws.jobs.create(**settings).job_id
 
-        for step_name, job_id in self._deployed_steps.items():
+        for step_name, job_id in self._state.jobs.items():
             if step_name not in desired_steps:
                 logger.info(f"Removing job_id={job_id}, as it is no longer needed")
                 self._ws.jobs.delete(job_id)
 
+        self._state.save()
         self._create_readme()
         self._create_debug(remote_wheel)
+
+    def _deployed_steps_pre_v06(self):
+        deployed_steps = {}
+        logger.debug(f"Fetching all jobs to determine already deployed steps for app={self._app}")
+        for j in self._ws.jobs.list():
+            tags = j.settings.tags
+            if tags is None:
+                continue
+            if tags.get(TAG_APP, None) != self._app:
+                continue
+            step = tags.get(TAG_STEP, "_")
+            deployed_steps[step] = j.job_id
+        return deployed_steps
 
     @staticmethod
     def _sorted_tasks() -> list[Task]:
@@ -427,10 +446,10 @@ class WorkspaceInstaller:
             "All jobs are defined with necessary cluster configurations and DBR versions.\n",
         ]
         for step_name in self._step_list():
-            if step_name not in self._deployed_steps:
+            if step_name not in self._state.jobs:
                 logger.warning(f"Skipping step '{step_name}' since it was not deployed.")
                 continue
-            job_id = self._deployed_steps[step_name]
+            job_id = self._state.jobs[step_name]
             dashboard_link = ""
             dashboards_per_step = [d for d in self._dashboards.keys() if d.startswith(step_name)]
             for dash in dashboards_per_step:
@@ -458,7 +477,7 @@ class WorkspaceInstaller:
         url = self.notebook_link(path)
         logger.info(f"Created README notebook with job overview: {url}")
         msg = "Open job overview in README notebook in your home directory ?"
-        if self._prompts and self._question(msg, default="yes") == "yes":
+        if self._prompts and self._question(msg, default="no") == "yes":
             webbrowser.open(url)
 
     def _replace_inventory_variable(self, text: str) -> str:
@@ -468,7 +487,7 @@ class WorkspaceInstaller:
         readme_link = self.notebook_link(f"{self._install_folder}/README.py")
         job_links = ", ".join(
             f"[{self._name(step_name)}]({self._ws.config.host}#job/{job_id})"
-            for step_name, job_id in self._deployed_steps.items()
+            for step_name, job_id in self._state.jobs.items()
         )
         path = f"{self._install_folder}/DEBUG.py"
         logger.debug(f"Created debug notebook: {self.notebook_link(path)}")
@@ -547,22 +566,11 @@ class WorkspaceInstaller:
         version = self._version if not self._ws.config.is_gcp else self._version.replace("+", "-")
         return {
             "name": self._name(step_name),
-            "tags": {TAG_APP: self._app, TAG_STEP: step_name, "version": f"v{version}"},
+            "tags": {TAG_APP: self._app, "version": f"v{version}"},
             "job_clusters": self._job_clusters({t.job_cluster for t in tasks}),
             "email_notifications": email_notifications,
             "tasks": [self._job_task(task, dbfs_path) for task in tasks],
         }
-
-    @staticmethod
-    def _apply_cluster_overrides(settings: dict[str, any], overrides: dict[str, str]) -> dict:
-        settings["job_clusters"] = [_ for _ in settings["job_clusters"] if _.job_cluster_key not in overrides]
-        for job_task in settings["tasks"]:
-            if job_task.job_cluster_key is None:
-                continue
-            if job_task.job_cluster_key in overrides:
-                job_task.existing_cluster_id = overrides[job_task.job_cluster_key]
-                job_task.job_cluster_key = None
-        return settings
 
     def _upload_wheel_runner(self, remote_wheel: str):
         # TODO: we have to be doing this workaround until ES-897453 is solved in the platform
@@ -772,18 +780,6 @@ class WorkspaceInstaller:
             )
         return replace(spec, gcp_attributes=compute.GcpAttributes(availability=compute.GcpAvailability.ON_DEMAND_GCP))
 
-    def deployed_steps(self):
-        deployed_steps = {}
-        logger.debug(f"Fetching all jobs to determine already deployed steps for app={self._app}")
-        for j in self._ws.jobs.list():
-            tags = j.settings.tags
-            if tags is None:
-                continue
-            if tags.get(TAG_APP, None) != self._app:
-                continue
-            deployed_steps[tags.get(TAG_STEP, "_")] = j.job_id
-        return deployed_steps
-
     def _instance_profiles(self):
         return {"No Instance Profile": None} | {
             profile.instance_profile_arn: profile.instance_profile_arn for profile in self._ws.instance_profiles.list()
@@ -820,7 +816,7 @@ class WorkspaceInstaller:
 
     def latest_job_status(self) -> list[dict]:
         latest_status = []
-        for step, job_id in self.deployed_steps().items():
+        for step, job_id in self._state.jobs.items():
             job_runs = list(self._ws.jobs.list_runs(job_id=job_id, limit=1))
             latest_status.append(
                 {
