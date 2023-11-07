@@ -1,0 +1,19 @@
+---
+name: ucx
+description: Unity Catalog Migration Toolkit (UCX)
+install:
+  warehouse_types:
+    - PRO
+  script: src/databricks/labs/ucx/install.py
+entrypoint: src/databricks/labs/ucx/cli.py
+min_python: 3.10
+commands:
+  - name: open-remote-config
+    description: Opens remote configuration in the browser
+
+  - name: workflows
+    description: Show deployed workflows and their state
+    table_template: |-
+      Step\tState\tStarted
+      {{range .}}{{.step}}\t{{.state}}\t{{.started}}
+      {{end}}
