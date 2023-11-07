@@ -149,3 +149,4 @@ dev/cleanup.py
 .vscode
 
 .python-version
+.databricks-login.json
