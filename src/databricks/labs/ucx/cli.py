@@ -9,7 +9,7 @@ from databricks.labs.ucx.install import WorkspaceInstaller
 logger = logging.getLogger('databricks.labs.ucx')
 
 
-def jobs():
+def workflows():
     ws = WorkspaceClient()
     installer = WorkspaceInstaller(ws)
     logger.info('Fetching deployed jobs...')
@@ -26,7 +26,7 @@ def open_remote_config():
 
 MAPPING = {
     'open-remote-config': open_remote_config,
-    'jobs': jobs,
+    'workflows': workflows,
 }
 
 
