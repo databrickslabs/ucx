@@ -34,9 +34,9 @@ class GenericPermissionsInfo:
 @dataclass
 class WorkspaceObjectInfo:
     path: str
-    object_type: Optional[str] = None
-    object_id: Optional[str] = None
-    language: Optional[str] = None
+    object_type: str = None
+    object_id: str = None
+    language: str = None
 
 
 class RetryableError(DatabricksError):
