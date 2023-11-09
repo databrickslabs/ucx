@@ -12,6 +12,7 @@ from databricks.sdk.service.sql import (
 
 from databricks.labs.ucx.config import GroupsConfig, WorkspaceConfig
 from databricks.labs.ucx.framework.dashboards import DashboardFromFiles
+from databricks.labs.ucx.framework.install_state import InstallState
 from databricks.labs.ucx.install import WorkspaceInstaller
 
 
@@ -33,6 +34,7 @@ def test_dashboard(mocker):
     local_query_files = installer._find_project_root() / "src/databricks/labs/ucx/queries"
     dash = DashboardFromFiles(
         ws,
+        InstallState(ws, "/users/not_a_real_user"),
         local_folder=local_query_files,
         remote_folder="/users/not_a_real_user/queries",
         name_prefix="Assessment",

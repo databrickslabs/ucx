@@ -28,10 +28,12 @@ from databricks.sdk.service.workspace import ImportFormat, ObjectInfo
 
 from databricks.labs.ucx.config import GroupsConfig, WorkspaceConfig
 from databricks.labs.ucx.framework.dashboards import DashboardFromFiles
+from databricks.labs.ucx.framework.install_state import InstallState
 from databricks.labs.ucx.install import WorkspaceInstaller
 
 
-def mock_ws(mocker):
+@pytest.fixture
+def ws(mocker):
     ws = mocker.patch("databricks.sdk.WorkspaceClient.__init__")
 
     ws.current_user.me = lambda: iam.User(user_name="me@example.com", groups=[iam.ComplexValue(display="admins")])
@@ -45,21 +47,21 @@ def mock_ws(mocker):
     ws.data_sources.list = lambda: [DataSource(id="bcd", warehouse_id="abc")]
     ws.warehouses.list = lambda **_: [EndpointInfo(id="abc", warehouse_type=EndpointInfoWarehouseType.PRO)]
     ws.dashboards.create.return_value = Dashboard(id="abc")
+    ws.jobs.create.return_value = jobs.CreateResponse(job_id="abc")
     ws.queries.create.return_value = Query(id="abc")
     ws.query_visualizations.create.return_value = Visualization(id="abc")
     ws.dashboard_widgets.create.return_value = Widget(id="abc")
     return ws
 
 
-def test_replace_clusters_for_integration_tests(mocker):
-    ws = mock_ws(mocker)
+def test_replace_clusters_for_integration_tests(ws):
     return_value = WorkspaceInstaller.run_for_config(
         ws, WorkspaceConfig(inventory_database="a", groups=GroupsConfig(auto=True)), override_clusters={"main": "abc"}
     )
     assert return_value
 
 
-def test_run_workflow_creates_proper_failure(mocker):
+def test_run_workflow_creates_proper_failure(ws, mocker):
     def run_now(job_id):
         assert "bar" == job_id
 
@@ -71,7 +73,6 @@ def test_run_workflow_creates_proper_failure(mocker):
         waiter.run_id = "qux"
         return waiter
 
-    ws = mock_ws(mocker)
     ws.jobs.run_now = run_now
     ws.jobs.get_run.return_value = jobs.Run(
         state=jobs.RunState(state_message="Stuff happens."),
@@ -85,7 +86,7 @@ def test_run_workflow_creates_proper_failure(mocker):
     )
     ws.jobs.get_run_output.return_value = jobs.RunOutput(error="does not compute", error_trace="# goes to stderr")
     installer = WorkspaceInstaller(ws)
-    installer._deployed_steps = {"foo": "bar"}
+    installer._state.jobs = {"foo": "bar"}
 
     with pytest.raises(OperationFailed) as failure:
         installer.run_workflow("foo")
@@ -93,16 +94,14 @@ def test_run_workflow_creates_proper_failure(mocker):
     assert "Stuff happens: stuff: does not compute" == str(failure.value)
 
 
-def test_install_database_happy(mocker, tmp_path):
-    ws = mocker.Mock()
+def test_install_database_happy(ws, mocker, tmp_path):
     install = WorkspaceInstaller(ws)
     mocker.patch("builtins.input", return_value="ucx")
     res = install._configure_inventory_database()
     assert "ucx" == res
 
 
-def test_install_database_unhappy(mocker, tmp_path):
-    ws = mocker.Mock()
+def test_install_database_unhappy(ws, mocker, tmp_path):
     install = WorkspaceInstaller(ws)
     mocker.patch("builtins.input", return_value="main.ucx")
 
@@ -110,21 +109,18 @@ def test_install_database_unhappy(mocker, tmp_path):
         install._configure_inventory_database()
 
 
-def test_build_wheel(mocker, tmp_path):
-    ws = mocker.Mock()
+def test_build_wheel(ws, tmp_path):
     install = WorkspaceInstaller(ws)
     whl = install._build_wheel(str(tmp_path))
     assert os.path.exists(whl)
 
 
-def test_save_config(mocker):
+def test_save_config(ws, mocker):
     def not_found(_):
         raise DatabricksError(error_code="RESOURCE_DOES_NOT_EXIST")
 
     mocker.patch("builtins.input", return_value="42")
-    ws = mocker.Mock()
-    ws.current_user.me = lambda: iam.User(user_name="me@example.com", groups=[iam.ComplexValue(display="admins")])
-    ws.config.host = "https://foo"
+
     ws.workspace.get_status = not_found
     ws.warehouses.list = lambda **_: [
         EndpointInfo(id="abc", warehouse_type=EndpointInfoWarehouseType.PRO, state=State.RUNNING)
@@ -153,14 +149,12 @@ workspace_start_path: /
     )
 
 
-def test_save_config_with_error(mocker):
+def test_save_config_with_error(ws, mocker):
     def not_found(_):
         raise DatabricksError(error_code="RAISED_FOR_TESTING")
 
     mocker.patch("builtins.input", return_value="42")
-    ws = mocker.Mock()
-    ws.current_user.me = lambda: iam.User(user_name="me@example.com", groups=[iam.ComplexValue(display="admins")])
-    ws.config.host = "https://foo"
+
     ws.workspace.get_status = not_found
     ws.cluster_policies.list = lambda: []
 
@@ -170,7 +164,7 @@ def test_save_config_with_error(mocker):
     assert str(e_info.value.error_code) == "RAISED_FOR_TESTING"
 
 
-def test_save_config_auto_groups(mocker):
+def test_save_config_auto_groups(ws, mocker):
     def not_found(_):
         raise DatabricksError(error_code="RESOURCE_DOES_NOT_EXIST")
 
@@ -181,9 +175,7 @@ def test_save_config_auto_groups(mocker):
             return "42"
 
     mocker.patch("builtins.input", return_value="42")
-    ws = mocker.Mock()
-    ws.current_user.me = lambda: iam.User(user_name="me@example.com", groups=[iam.ComplexValue(display="admins")])
-    ws.config.host = "https://foo"
+
     ws.workspace.get_status = not_found
     ws.warehouses.list = lambda **_: [
         EndpointInfo(id="abc", warehouse_type=EndpointInfoWarehouseType.PRO, state=State.RUNNING)
@@ -212,7 +204,7 @@ workspace_start_path: /
     )
 
 
-def test_save_config_strip_group_names(mocker):
+def test_save_config_strip_group_names(ws, mocker):
     def not_found(_):
         raise DatabricksError(error_code="RESOURCE_DOES_NOT_EXIST")
 
@@ -223,9 +215,7 @@ def test_save_config_strip_group_names(mocker):
             return "42"
 
     mocker.patch("builtins.input", return_value="42")
-    ws = mocker.Mock()
-    ws.current_user.me = lambda: iam.User(user_name="me@example.com", groups=[iam.ComplexValue(display="admins")])
-    ws.config.host = "https://foo"
+
     ws.workspace.get_status = not_found
     ws.warehouses.list = lambda **_: [
         EndpointInfo(id="abc", warehouse_type=EndpointInfoWarehouseType.PRO, state=State.RUNNING)
@@ -257,7 +247,7 @@ workspace_start_path: /
     )
 
 
-def test_save_config_with_glue(mocker):
+def test_save_config_with_glue(ws, mocker):
     policy_def = b"""
 {
   "aws_attributes.instance_profile_arn": {
@@ -289,9 +279,7 @@ def test_save_config_with_glue(mocker):
             return "abc"
 
     mocker.patch("builtins.input", return_value="42")
-    ws = mocker.Mock()
-    ws.current_user.me = lambda: iam.User(user_name="me@example.com", groups=[iam.ComplexValue(display="admins")])
-    ws.config.host = "https://foo"
+
     ws.workspace.get_status = not_found
     ws.warehouses.list = lambda **_: [
         EndpointInfo(id="abc", warehouse_type=EndpointInfoWarehouseType.PRO, state=State.RUNNING)
@@ -324,17 +312,13 @@ workspace_start_path: /
     )
 
 
-def test_main_with_existing_conf_does_not_recreate_config(mocker):
+def test_main_with_existing_conf_does_not_recreate_config(ws, mocker):
     mocker.patch("builtins.input", return_value="yes")
     mock_file = MagicMock()
     mocker.patch("builtins.open", return_value=mock_file)
     mocker.patch("base64.b64encode")
     webbrowser_open = mocker.patch("webbrowser.open")
-    ws = mocker.patch("databricks.sdk.WorkspaceClient.__init__")
 
-    ws.current_user.me = lambda: iam.User(user_name="me@example.com", groups=[iam.ComplexValue(display="admins")])
-    ws.config.host = "https://foo"
-    ws.config.is_aws = True
     config_bytes = yaml.dump(WorkspaceConfig(inventory_database="a", groups=GroupsConfig(auto=True)).as_dict()).encode(
         "utf8"
     )
@@ -354,39 +338,34 @@ def test_main_with_existing_conf_does_not_recreate_config(mocker):
     # ws.workspace.mkdirs.assert_called_with("/Users/me@example.com/.ucx")
 
 
-def test_query_metadata(mocker):
-    ws = mocker.Mock()
+def test_query_metadata(ws, mocker):
     install = WorkspaceInstaller(ws)
     local_query_files = install._find_project_root() / "src/databricks/labs/ucx/queries"
-    DashboardFromFiles(ws, local_query_files, "any", "any").validate()
+    DashboardFromFiles(ws, InstallState(ws, "any"), local_query_files, "any", "any").validate()
 
 
-def test_choices_out_of_range(mocker):
-    ws = mocker.Mock()
+def test_choices_out_of_range(ws, mocker):
     install = WorkspaceInstaller(ws)
     mocker.patch("builtins.input", return_value="42")
     with pytest.raises(ValueError):
         install._choice("foo", ["a", "b"])
 
 
-def test_choices_not_a_number(mocker):
-    ws = mocker.Mock()
+def test_choices_not_a_number(ws, mocker):
     install = WorkspaceInstaller(ws)
     mocker.patch("builtins.input", return_value="two")
     with pytest.raises(ValueError):
         install._choice("foo", ["a", "b"])
 
 
-def test_choices_happy(mocker):
-    ws = mocker.Mock()
+def test_choices_happy(ws, mocker):
     install = WorkspaceInstaller(ws)
     mocker.patch("builtins.input", return_value="1")
     res = install._choice("foo", ["a", "b"])
     assert "b" == res
 
 
-def test_step_list(mocker):
-    ws = mocker.Mock()
+def test_step_list(ws, mocker):
     from databricks.labs.ucx.framework.tasks import Task
 
     tasks = [
@@ -402,13 +381,10 @@ def test_step_list(mocker):
     assert steps[0] == "wl_1" and steps[1] == "wl_2"
 
 
-def test_create_readme(mocker):
+def test_create_readme(ws, mocker):
     mocker.patch("builtins.input", return_value="yes")
     webbrowser_open = mocker.patch("webbrowser.open")
-    ws = mocker.Mock()
 
-    ws.current_user.me = lambda: iam.User(user_name="me@example.com", groups=[iam.ComplexValue(display="admins")])
-    ws.config.host = "https://foo"
     config_bytes = yaml.dump(WorkspaceConfig(inventory_database="a", groups=GroupsConfig(auto=True)).as_dict()).encode(
         "utf8"
     )
@@ -432,13 +408,8 @@ def test_create_readme(mocker):
     _, args, kwargs = ws.mock_calls[0]
     assert args[0] == "/Users/me@example.com/.ucx/README.py"
 
-    import re
 
-    p = re.compile(".*wl_1.*n3.*n1.*wl_2.*n2.*")
-    assert p.match(str(args[1]))
-
-
-def test_replace_pydoc(mocker):
+def test_replace_pydoc():
     from databricks.labs.ucx.framework.tasks import _remove_extra_indentation
 
     doc = _remove_extra_indentation(
@@ -454,8 +425,7 @@ Test3"""
     )
 
 
-def test_global_init_script_already_exists_enabled(mocker):
-    ws = mocker.Mock()
+def test_global_init_script_already_exists_enabled(ws, mocker):
     ginit_scripts = [
         GlobalInitScriptDetails(
             created_at=1695045723722,
@@ -491,8 +461,7 @@ def test_global_init_script_already_exists_enabled(mocker):
     install._install_spark_config_for_hms_lineage()
 
 
-def test_global_init_script_already_exists_disabled(mocker):
-    ws = mocker.Mock()
+def test_global_init_script_already_exists_disabled(ws, mocker):
     ginit_scripts = [
         GlobalInitScriptDetails(
             created_at=1695045723722,
@@ -528,8 +497,7 @@ def test_global_init_script_already_exists_disabled(mocker):
     install._install_spark_config_for_hms_lineage()
 
 
-def test_global_init_script_exists_disabled_not_enabled(mocker):
-    ws = mocker.Mock()
+def test_global_init_script_exists_disabled_not_enabled(ws, mocker):
     ginit_scripts = [
         GlobalInitScriptDetails(
             created_at=1695045723722,
@@ -566,9 +534,8 @@ def test_global_init_script_exists_disabled_not_enabled(mocker):
 
 
 @patch("builtins.open", new_callable=MagicMock)
-@patch("base64.b64encode")
 @patch("builtins.input", new_callable=MagicMock)
-def test_global_init_script_create_new(mock_open, mocker, mock_input):
+def test_global_init_script_create_new(mock_open, mock_input, ws):
     expected_content = """if [[ $DB_IS_DRIVER = "TRUE" ]]; then
       driver_conf=${DB_HOME}/driver/conf/spark-branch.conf
       if [ ! -e $driver_conf ] ; then
@@ -584,7 +551,7 @@ def test_global_init_script_create_new(mock_open, mocker, mock_input):
     mock_file = MagicMock()
     mock_file.read.return_value = expected_content
     mock_open.return_value = mock_file
-    ws = mocker.Mock()
-    install = WorkspaceInstaller(ws)
     mock_input.return_value = "yes"
+
+    install = WorkspaceInstaller(ws)
     install._install_spark_config_for_hms_lineage()

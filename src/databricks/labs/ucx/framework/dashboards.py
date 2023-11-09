@@ -3,6 +3,7 @@ import json
 import logging
 from collections.abc import Callable
 from dataclasses import dataclass
+from json import JSONDecodeError
 from pathlib import Path
 
 from databricks.sdk import WorkspaceClient
@@ -179,6 +180,8 @@ class DashboardFromFiles:
             if err.error_code != "RESOURCE_DOES_NOT_EXIST":
                 raise err
             self._ws.workspace.mkdirs(self._remote_folder)
+            return {}
+        except JSONDecodeError:
             return {}
 
     def _remote_folder_object(self) -> workspace.ObjectInfo:

@@ -402,7 +402,8 @@ class WorkspaceInstaller:
                 self._ws.jobs.reset(job_id, jobs.JobSettings(**settings))
             else:
                 logger.info(f"Creating new job configuration for step={step_name}")
-                self._state.jobs[step_name] = self._ws.jobs.create(**settings).job_id
+                job_id = self._ws.jobs.create(**settings).job_id
+                self._state.jobs[step_name] = job_id
 
         for step_name, job_id in self._state.jobs.items():
             if step_name not in desired_steps:
