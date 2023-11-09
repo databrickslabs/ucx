@@ -310,7 +310,7 @@ class WorkspaceListing(Listing, CrawlerBase):
 
     def _try_fetch(self) -> list[WorkspaceObjectInfo]:
         for row in self._fetch(f"SELECT * FROM {self._schema}.{self._table}"):
-            yield WorkspaceObjectInfo(*row)
+            yield WorkspaceObjectInfo(path=row["path"],object_type=row["object_type"],object_id=row["object_id"],language=row["language"])
 
     def object_types(self) -> set[str]:
         return {"notebooks", "directories", "repos", "files"}

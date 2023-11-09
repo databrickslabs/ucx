@@ -531,7 +531,7 @@ def test_workspaceobject_try_fetch():
     result_set = list(crawler._try_fetch())
 
     assert len(result_set) == 2
-    assert result_set[0] == WorkspaceObjectInfo("NOTEBOOK", 123, "/rootobj/notebook1", "PYTHON")
+    assert result_set[0] == WorkspaceObjectInfo("/rootobj/notebook1", "NOTEBOOK", 123, "PYTHON")
 
 
 def test_workspaceobject_crawl():
@@ -560,7 +560,7 @@ def test_workspaceobject_crawl():
         result_set = list(crawler)
 
     assert len(result_set) == 2
-    assert result_set[0] == WorkspaceObjectInfo("NOTEBOOK", "123", "/rootobj/notebook1", "PYTHON")
+    assert result_set[0] == WorkspaceObjectInfo( "/rootobj/notebook1", "NOTEBOOK", 123, "PYTHON")
 
 
 def test_workspaceobject_withexperiment_crawl():
@@ -587,7 +587,7 @@ def test_workspaceobject_withexperiment_crawl():
         result_set = list(crawler)
 
     assert len(result_set) == 1
-    assert result_set[0] == WorkspaceObjectInfo("NOTEBOOK", "123", "/rootobj/notebook1", "PYTHON")
+    assert result_set[0] == WorkspaceObjectInfo("/rootobj/notebook1", "NOTEBOOK", 123, "PYTHON")
 
 
 def test_workspace_snapshot():
@@ -613,7 +613,7 @@ def test_workspace_snapshot():
     result_set = crawler.snapshot()
 
     assert len(result_set) == 2
-    assert result_set[0] == WorkspaceObjectInfo("NOTEBOOK", "123", "/rootobj/notebook1", "PYTHON")
+    assert result_set[0] == WorkspaceObjectInfo("/rootobj/notebook1", "NOTEBOOK", "123", "PYTHON")
 
 
 def test_eligibles_assets_with_owner_should_be_accepted():
