@@ -22,6 +22,9 @@ class Mounts(CrawlerBase):
     def inventorize_mounts(self):
         self._append_records(self._list_mounts())
 
+    def _deduplicate_mount_points(self):
+        pass
+
     def _list_mounts(self):
         mounts = []
         for mount_point, source, _ in self._dbutils.fs.mounts():
