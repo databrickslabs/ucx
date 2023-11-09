@@ -206,12 +206,3 @@ def test_workspace_object_crawler(ws, make_notebook, inventory_schema, sql_backe
 
     assert notebook in workspace_objects
     assert "NOTEBOOK" == workspace_objects[notebook].object_type
-
-
-def test_ta_mere():
-    from databricks.sdk import WorkspaceClient
-    import time
-
-    w = WorkspaceClient(host="https://e2-demo-field-eng.cloud.databricks.com/", token="dapi012a0d29fe0ba512dc16a23ad75745cc")
-
-    w.groups.list("id,displayName,meta,members,roles,entitlements")
