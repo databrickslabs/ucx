@@ -50,7 +50,7 @@ class ScimSupport(AclSupport):
         if not self._is_item_relevant(item, migration_state):
             return None
         value = [iam.ComplexValue.from_dict(e) for e in json.loads(item.raw)]
-        target_group_id = migration_state.get_target_id(item.object_id, destination)
+        target_group_id = migration_state.get_target_id(item.object_id)
         return partial(self._applier_task, group_id=target_group_id, value=value, property_name=item.object_type)
 
     @staticmethod

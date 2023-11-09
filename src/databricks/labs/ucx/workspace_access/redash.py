@@ -18,6 +18,7 @@ from databricks.labs.ucx.workspace_access.base import (
     Destination,
     Permissions,
 )
+from databricks.labs.ucx.workspace_access.generic import RetryableError
 
 from databricks.labs.ucx.workspace_access.generic import RetryableError
 from databricks.labs.ucx.workspace_access.groups import MigrationState
@@ -58,7 +59,7 @@ class RedashPermissionsSupport(AclSupport):
         mentioned_groups = [
             acl.group_name for acl in sql.GetResponse.from_dict(json.loads(item.raw)).access_control_list
         ]
-        return any(g in mentioned_groups for g in [info.workspace.display_name for info in migration_state.groups])
+        return any(g in mentioned_groups for g in [info.name_in_workspace for info in migration_state.groups])
 
     def get_crawler_tasks(self):
         for listing in self._listings:
@@ -150,7 +151,7 @@ class RedashPermissionsSupport(AclSupport):
                 logger.debug(f"Skipping redash item for `{access_control.group_name}`: not in scope")
                 acl_requests.append(access_control)
                 continue
-            target_principal = migration_state.get_target_principal(access_control.group_name, destination)
+            target_principal = migration_state.get_target_principal(access_control.group_name)
             if target_principal is None:
                 logger.debug(f"Skipping redash item for `{access_control.group_name}`: no target principal")
                 acl_requests.append(access_control)

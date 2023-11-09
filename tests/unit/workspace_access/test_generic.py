@@ -74,7 +74,7 @@ def test_apply(migration_state):
     ws = MagicMock()
 
     acl1 = iam.AccessControlResponse(
-        all_permissions=[iam.Permission(permission_level=iam.PermissionLevel.CAN_USE)], group_name="db-temp-test"
+        all_permissions=[iam.Permission(permission_level=iam.PermissionLevel.CAN_USE)], group_name="test"
     )
     ws.permissions.get.return_value = iam.ObjectPermissions(access_control_list=[acl1])
     sup = GenericPermissionsSupport(ws=ws, listings=[])  # no listings since only apply is tested
@@ -108,7 +108,7 @@ def test_apply(migration_state):
 
     expected_acl_payload = [
         iam.AccessControlRequest(
-            group_name="db-temp-test",
+            group_name="test",
             permission_level=iam.PermissionLevel.CAN_USE,
         )
     ]
@@ -182,7 +182,7 @@ def test_passwords_tokens_crawler(migration_state):
 
     temp_acl = [
         iam.AccessControlResponse(
-            group_name="db-temp-test",
+            group_name="test",
             all_permissions=[iam.Permission(inherited=False, permission_level=iam.PermissionLevel.CAN_USE)],
         )
     ]
@@ -206,7 +206,7 @@ def test_passwords_tokens_crawler(migration_state):
             item.object_type,
             item.object_id,
             access_control_list=[
-                iam.AccessControlRequest(group_name="db-temp-test", permission_level=iam.PermissionLevel.CAN_USE)
+                iam.AccessControlRequest(group_name="test", permission_level=iam.PermissionLevel.CAN_USE)
             ],
         )
         ws.permissions.update.reset_mock()

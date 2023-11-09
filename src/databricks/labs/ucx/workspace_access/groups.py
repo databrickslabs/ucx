@@ -53,6 +53,8 @@ class MigrationState:
 
     def __init__(self, groups: list[MigratedGroup]):
         self._name_to_group: dict[str, MigratedGroup] = {_.name_in_workspace: _ for _ in groups}
+        self._id_to_group: dict[str, MigratedGroup] = {_.id_in_workspace: _ for _ in groups}
+        self.groups: list[MigratedGroup] = groups
 
     def get_target_principal(self, name: str) -> str | None:
         mg = self._name_to_group.get(name)
@@ -60,16 +62,18 @@ class MigrationState:
             return None
         return mg.name_in_account
 
-    def get_target_id(self, group_id: str, destination: typing.Literal["backup", "account"]) -> str | None:
-        for info in self.groups:
-            # TODO: this logic has to be changed, once we crawl all wslocal accgroups into a table
-            group_for_match = info.workspace
-            if group_for_match is None:
-                group_for_match = info.account
-            if group_for_match.id != group_id:
-                continue
-            return getattr(info, destination).id
-        return None
+    def is_in_scope(self, name: str) -> bool:
+        if name is None:
+            return False
+        else:
+            return name in self._name_to_group
+
+    def get_target_id(self, group_id: str) -> str | None:
+        group = self._id_to_group.get(group_id)
+        if group:
+            return group.external_id
+        else:
+            return None
 
     def __len__(self):
         return len(self._name_to_group)
@@ -90,7 +94,6 @@ class GroupManager(CrawlerBase):
         self._ws = ws
         self._include_group_names = include_group_names
         self._renamed_group_prefix = renamed_group_prefix
-        self._migration_state: MigrationState = MigrationState()
 
     def snapshot(self) -> list[MigratedGroup]:
         return self._snapshot(self._fetcher, self._crawler)
@@ -115,6 +118,12 @@ class GroupManager(CrawlerBase):
         if len(errors) > 0:
             msg = f"During rename of workspace groups got {len(errors)} errors. See debug logs"
             raise RuntimeWarning(msg)
+
+    def _rename_group(self, group_id: str, new_group_name: str):
+        ops = [iam.Patch(iam.PatchOp.REPLACE, "displayName", new_group_name)]
+        self._ws.groups.patch(group_id, operations=ops)
+        return True
+
     def reflect_account_groups_on_workspace(self):
         tasks = []
         account_groups_in_account = self._account_groups_in_account()
@@ -176,7 +185,8 @@ class GroupManager(CrawlerBase):
             yield MigratedGroup(*row)
 
     def _crawler(self) -> typing.Iterator[MigratedGroup]:
-        workspace_groups = self._list_workspace_groups("WorkspaceGroup", "id,displayName,meta,members")
+        attributes = "id,displayName,meta,members,roles,entitlements"
+        workspace_groups = self._list_workspace_groups("WorkspaceGroup", attributes)
         account_groups_in_account = self._account_groups_in_account()
         names_in_scope = self._get_valid_group_names_to_migrate(workspace_groups, account_groups_in_account)
         for g in workspace_groups:
@@ -190,27 +200,22 @@ class GroupManager(CrawlerBase):
                 name_in_account=g.display_name,
                 temporary_name=temporary_name,
                 external_id=g.external_id,
-                members=json.dumps(g.members),
-                roles=json.dumps(g.roles),
-                entitlements=json.dumps(g.entitlements),
+                members=json.dumps([gg.as_dict() for gg in g.members]) if g.members else None,
+                roles=json.dumps([gg.as_dict() for gg in g.roles]) if g.roles else None,
+                entitlements=json.dumps([gg.as_dict() for gg in g.entitlements]) if g.entitlements else None,
             )
 
     def _workspace_groups_in_workspace(self) -> dict[str, str]:
         by_name = {}
-        for g in self._list_workspace_groups("WorkspaceGroup", "id,displayName,meta"):
+        for g in self._list_workspace_groups("WorkspaceGroup", "id,displayName"):
             by_name[g.display_name] = g.id
         return by_name
 
     def _account_groups_in_workspace(self) -> dict[str, str]:
         by_name = {}
-        for g in self._list_workspace_groups("Group", "id,displayName,meta"):
+        for g in self._list_workspace_groups("Group", "id,displayName"):
             by_name[g.display_name] = g.id
         return by_name
-
-    def _rename_group(self, group_id: str, new_group_name: str):
-        ops = [iam.Patch(iam.PatchOp.REPLACE, "displayName", new_group_name)]
-        self._ws.groups.patch(group_id, operations=ops)
-        return True
 
     def _account_groups_in_account(self) -> dict[str, str]:
         by_name = {}
@@ -236,13 +241,13 @@ class GroupManager(CrawlerBase):
         logger.info(f"Listing account groups with {scim_attributes}...")
         account_groups = [
             iam.Group.from_dict(r)
-            for r in ws.api_client.do(
+            for r in self._ws.api_client.do(
                 "get",
                 "/api/2.0/account/scim/v2/Groups",
                 query={"attributes": scim_attributes},
             ).get("Resources", [])
         ]
-        account_groups = [g for g in account_groups if g.display_name not in cls._SYSTEM_GROUPS]
+        account_groups = [g for g in account_groups if g.display_name not in self._SYSTEM_GROUPS]
         logger.info(f"Found {len(account_groups)} account groups")
         return sorted(account_groups, key=lambda _: _.display_name)
 
@@ -294,12 +299,13 @@ class GroupManager(CrawlerBase):
         cls, group_names: list[str], workspace_groups: list[iam.Group], account_groups_in_account: dict[str, str]
     ) -> set[str]:
         valid_group_names = set()
+        ws_group_names = {_.display_name for _ in workspace_groups}
         logger.info("Using the provided group listing")
         for name in group_names:
             if name in cls._SYSTEM_GROUPS:
                 logger.info(f"Cannot migrate system group {name}. {name} will be skipped.")
                 continue
-            if name not in workspace_groups:
+            if name not in ws_group_names:
                 logger.info(f"Group {name} not found on the workspace level. {name} will be skipped.")
                 continue
             if name not in account_groups_in_account:

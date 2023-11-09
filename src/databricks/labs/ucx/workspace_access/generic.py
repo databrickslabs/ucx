@@ -248,7 +248,7 @@ class GenericPermissionsSupport(AclSupport):
             if not migration_state.is_in_scope(_item.group_name):
                 logger.debug(f"Skipping {_item} for {coord} because it is not in scope")
                 continue
-            new_group_name = migration_state.get_target_principal(_item.group_name, destination)
+            new_group_name = migration_state.get_target_principal(_item.group_name)
             if new_group_name is None:
                 logger.debug(f"Skipping {_item.group_name} for {coord} because it has no target principal")
                 continue

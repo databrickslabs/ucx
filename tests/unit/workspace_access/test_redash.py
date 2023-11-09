@@ -69,7 +69,7 @@ def test_apply(migration_state):
         object_id="test",
         access_control_list=[
             sql.AccessControl(
-                group_name="db-temp-test",
+                group_name="test",
                 permission_level=sql.PermissionLevel.CAN_MANAGE,
             ),
             sql.AccessControl(
@@ -104,7 +104,7 @@ def test_apply(migration_state):
     assert ws.dbsql_permissions.set.call_count == 1
     expected_payload = [
         sql.AccessControl(
-            group_name="db-temp-test",
+            group_name="test",
             permission_level=sql.PermissionLevel.CAN_MANAGE,
         ),
         sql.AccessControl(

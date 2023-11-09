@@ -5,7 +5,7 @@ from databricks.sdk import WorkspaceClient
 from databricks.sdk.service import workspace
 from databricks.sdk.service.iam import PermissionLevel
 
-from databricks.labs.ucx.config import ConnectConfig, GroupsConfig, WorkspaceConfig
+from databricks.labs.ucx.config import ConnectConfig, WorkspaceConfig
 from databricks.labs.ucx.workspace_access import GroupMigrationToolkit
 
 logger = logging.getLogger(__name__)

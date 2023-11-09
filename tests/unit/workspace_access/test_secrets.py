@@ -62,7 +62,7 @@ def test_secret_scopes_apply(migration_state: MigrationState):
     # positive case - permissions are applied correctly
     ws.secrets.list_acls.return_value = [
         workspace.AclItem(
-            principal="db-temp-test",
+            principal="test",
             permission=workspace.AclPermission.MANAGE,
         ),
         workspace.AclItem(
@@ -76,7 +76,7 @@ def test_secret_scopes_apply(migration_state: MigrationState):
     assert ws.secrets.put_acl.call_count == 2
 
     calls = [
-        call("test", "db-temp-test", workspace.AclPermission.MANAGE),
+        call("test", "test", workspace.AclPermission.MANAGE),
         call("test", "irrelevant", workspace.AclPermission.MANAGE),
     ]
     ws.secrets.put_acl.assert_has_calls(calls, any_order=False)

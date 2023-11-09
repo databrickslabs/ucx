@@ -53,7 +53,7 @@ class SecretScopesSupport(AclSupport):
             if not migration_state.is_in_scope(acl.principal):
                 new_acls.append(acl)
                 continue
-            target_principal = migration_state.get_target_principal(acl.principal, destination)
+            target_principal = migration_state.get_target_principal(acl.principal)
             if target_principal is None:
                 logger.debug(f"Skipping {acl.principal} because of no target principal")
                 continue
@@ -70,7 +70,7 @@ class SecretScopesSupport(AclSupport):
     def _is_item_relevant(item: Permissions, migration_state: MigrationState) -> bool:
         acls = [workspace.AclItem.from_dict(acl) for acl in json.loads(item.raw)]
         mentioned_groups = [acl.principal for acl in acls]
-        return any(g in mentioned_groups for g in [info.workspace.display_name for info in migration_state.groups])
+        return any(g in mentioned_groups for g in [info.name_in_workspace for info in migration_state.groups])
 
 
     def secret_scope_permission(self, scope_name: str, group_name: str) -> workspace.AclPermission | None:

@@ -19,8 +19,7 @@ from databricks.labs.ucx.hive_metastore.data_objects import ExternalLocationCraw
 from databricks.labs.ucx.hive_metastore.mounts import Mounts
 from databricks.labs.ucx.workspace_access.generic import WorkspaceListing
 from databricks.labs.ucx.workspace_access.groups import (
-    GroupManager,
-    GroupMigrationState,
+    GroupManager
 )
 from databricks.labs.ucx.workspace_access.manager import PermissionManager
 

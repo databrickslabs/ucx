@@ -5,7 +5,7 @@ from databricks.sdk.service.iam import Group
 from databricks.labs.ucx.hive_metastore import GrantsCrawler, TablesCrawler
 from databricks.labs.ucx.hive_metastore.grants import Grant
 from databricks.labs.ucx.workspace_access.base import Permissions
-from databricks.labs.ucx.workspace_access.groups import MigrationState
+from databricks.labs.ucx.workspace_access.groups import MigrationState, MigratedGroup
 from databricks.labs.ucx.workspace_access.tacl import TableAclSupport
 
 from ..framework.mocks import MockBackend
@@ -216,14 +216,13 @@ def test_tacl_applier(mocker):
             }
         ),
     )
-    migration_state = MigrationState()
-    migration_state.add(
-        Group(display_name="abc"), Group(display_name="tmp-backup-abc"), Group(display_name="account-abc")
-    )
+    grp = [MigratedGroup(id_in_workspace=None, name_in_workspace="abc", name_in_account="account-abc",
+                         temporary_name="tmp-backup-abc", members=None, entitlements=None, external_id=None, roles=None)]
+    migration_state = MigrationState(grp)
     task = table_acl_support.get_apply_task(permissions, migration_state, "backup")
     task()
 
-    assert ["GRANT SELECT ON TABLE catalog_a.database_b.table_c TO `tmp-backup-abc`"] == sql_backend.queries
+    assert ["GRANT SELECT ON TABLE catalog_a.database_b.table_c TO `account-abc`"] == sql_backend.queries
 
 
 def test_tacl_applier_multiple_actions(mocker):
@@ -243,14 +242,14 @@ def test_tacl_applier_multiple_actions(mocker):
             }
         ),
     )
-    migration_state = GroupMigrationState()
-    migration_state.add(
-        Group(display_name="abc"), Group(display_name="tmp-backup-abc"), Group(display_name="account-abc")
-    )
+    grp = [MigratedGroup(id_in_workspace=None, name_in_workspace="abc", name_in_account="account-abc",
+                         temporary_name="tmp-backup-abc", members=None, entitlements=None, external_id=None,
+                         roles=None)]
+    migration_state = MigrationState(grp)
     task = table_acl_support.get_apply_task(permissions, migration_state, "backup")
     task()
 
-    assert ["GRANT SELECT, MODIFY ON TABLE catalog_a.database_b.table_c TO `tmp-backup-abc`"] == sql_backend.queries
+    assert ["GRANT SELECT, MODIFY ON TABLE catalog_a.database_b.table_c TO `account-abc`"] == sql_backend.queries
 
 
 def test_tacl_applier_no_target_principal(mocker):
@@ -270,10 +269,10 @@ def test_tacl_applier_no_target_principal(mocker):
             }
         ),
     )
-    migration_state = MigrationState()
-    migration_state.add(
-        Group(display_name="abc"), Group(display_name="tmp-backup-abc"), Group(display_name="account-abc")
-    )
+    grp = [MigratedGroup(id_in_workspace=None, name_in_workspace="abc", name_in_account="account-abc",
+                         temporary_name="tmp-backup-abc", members=None, entitlements=None, external_id=None,
+                         roles=None)]
+    migration_state = MigrationState(grp)
     task = table_acl_support.get_apply_task(permissions, migration_state, "backup")
     assert task is None
 

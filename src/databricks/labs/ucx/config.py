@@ -102,16 +102,6 @@ class _Config(Generic[T]):
     def from_file(cls, config_file: Path) -> T:
         return cls.from_bytes(config_file.read_text())
 
-    @classmethod
-    def _verify_version(cls, raw):
-        stored_version = raw.pop("version", None)
-        if stored_version != _CONFIG_VERSION:
-            msg = (
-                f"Unsupported config version: {stored_version}. "
-                f"UCX v{__version__} expects config version to be {_CONFIG_VERSION}"
-            )
-            raise ValueError(msg)
-
     def __post_init__(self):
         if self.connect is None:
             self.connect = ConnectConfig()
@@ -202,7 +192,6 @@ class WorkspaceConfig(_Config["WorkspaceConfig"]):
     @classmethod
     def from_dict(cls, raw: dict):
         raw = cls._migrate_from_v1(raw)
-        cls._verify_version(raw)
         return cls(**raw)
 
     def to_workspace_client(self) -> WorkspaceClient:

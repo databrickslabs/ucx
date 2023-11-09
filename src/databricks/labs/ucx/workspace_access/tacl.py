@@ -89,7 +89,7 @@ class TableAclSupport(AclSupport):
 
     def get_apply_task(self, item: Permissions, migration_state: MigrationState, destination: Destination):
         grant = Grant(**json.loads(item.raw))
-        target_principal = migration_state.get_target_principal(grant.principal, destination)
+        target_principal = migration_state.get_target_principal(grant.principal)
         if target_principal is None:
             # this is a grant for user, service principal, or irrelevant group
             return None

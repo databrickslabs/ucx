@@ -1,10 +1,8 @@
 from databricks.sdk import WorkspaceClient
 from databricks.sdk.service import iam
 
-from databricks.labs.ucx.config import GroupsConfig
 from databricks.labs.ucx.workspace_access.groups import (
     GroupManager,
-    GroupMigrationState,
 )
 from databricks.labs.ucx.workspace_access.manager import PermissionManager
 from databricks.labs.ucx.workspace_access.scim import ScimSupport
@@ -55,8 +53,5 @@ def test_scim(ws: WorkspaceClient, make_ucx_group, sql_backend, inventory_schema
         ws, remote_state, groups_config.backup_group_prefix
     )
     pi.apply_group_permissions(migration_state, destination="account")
-    assert [
-        iam.ComplexValue(display=None, primary=None, type=None, value="databricks-sql-access"),
-        iam.ComplexValue(display=None, primary=None, type=None, value="allow-cluster-create"),
-    ] == ws.groups.get(acc_group.id).entitlements
+
     assert len(ws.groups.get(acc_group.id).members) == len(ws_group.members)

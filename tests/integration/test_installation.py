@@ -7,7 +7,7 @@ from databricks.sdk.retries import retried
 from databricks.sdk.service.catalog import SchemaInfo
 from databricks.sdk.service.iam import PermissionLevel
 
-from databricks.labs.ucx.config import GroupsConfig, WorkspaceConfig
+from databricks.labs.ucx.config import WorkspaceConfig
 from databricks.labs.ucx.framework.parallel import Threads
 from databricks.labs.ucx.hive_metastore.grants import GrantsCrawler
 from databricks.labs.ucx.hive_metastore.tables import TablesCrawler

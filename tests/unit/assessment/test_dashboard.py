@@ -10,7 +10,7 @@ from databricks.sdk.service.sql import (
     Widget,
 )
 
-from databricks.labs.ucx.config import GroupsConfig, WorkspaceConfig
+from databricks.labs.ucx.config import WorkspaceConfig
 from databricks.labs.ucx.framework.dashboards import DashboardFromFiles
 from databricks.labs.ucx.framework.install_state import InstallState
 from databricks.labs.ucx.install import WorkspaceInstaller
@@ -21,7 +21,7 @@ def test_dashboard(mocker):
     ws.current_user.me = lambda: iam.User(user_name="me@example.com", groups=[iam.ComplexValue(display="admins")])
     ws.config.host = "https://foo"
     ws.config.is_aws = True
-    config_bytes = yaml.dump(WorkspaceConfig(inventory_database="a", groups=GroupsConfig(auto=True)).as_dict()).encode(
+    config_bytes = yaml.dump(WorkspaceConfig(inventory_database="a").as_dict()).encode(
         "utf8"
     )
     ws.workspace.download = lambda _: io.BytesIO(config_bytes)
