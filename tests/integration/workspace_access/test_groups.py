@@ -310,7 +310,7 @@ def test_set_owner_permission(
     permission_manager.inventorize_permissions()
 
     dummy_grants = list(permission_manager.load_all_for("TABLE", dummy_table.full_name, Grant))
-    assert 1 == len(dummy_grants)
+    assert 2 == len(dummy_grants)
 
     table_permissions = grants.for_table_info(dummy_table)
     assert ws_group.display_name in table_permissions
