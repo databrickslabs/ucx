@@ -55,10 +55,9 @@ class TableAclSupport(AclSupport):
             grant = self._from_reduced(object_type, object_id, principal, ", ".join(sorted(actions)))
             yield functools.partial(inner, object_type=object_type, object_id=object_id, grant=grant)
 
-        for (principal, (object_type, object_id)) in own_permissions:
+        for principal, (object_type, object_id) in own_permissions:
             grant = self._from_reduced(object_type, object_id, principal, "OWN")
             yield functools.partial(inner, object_type=object_type, object_id=object_id, grant=grant)
-
 
     def _from_reduced(self, object_type: str, object_id: str, principal: str, action_type: str):
         match object_type:
@@ -95,7 +94,7 @@ class TableAclSupport(AclSupport):
             # this is a grant for user, service principal, or irrelevant group
             return None
         target_grant = dataclasses.replace(grant, principal=target_principal)
-        if grant.action_type.upper() == 'OWN':
+        if grant.action_type.upper() == "OWN":
             sql = target_grant.hive_chown_sql()
         else:
             sql = target_grant.hive_grant_sql()

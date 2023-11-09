@@ -290,8 +290,7 @@ def test_set_owner_permission(
 ):
     ws_group, _ = make_ucx_group()
 
-
-    logger.info(f"Testing setting ownership on table.")
+    logger.info("Testing setting ownership on table.")
     dummy_table = make_table()
     logger.info(f"Table name {dummy_table.full_name} group name {ws_group.display_name}")
     sql_backend.execute(f"GRANT SELECT, MODIFY ON TABLE {dummy_table.full_name} TO `{ws_group.display_name}`")
