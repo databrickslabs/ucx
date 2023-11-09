@@ -11,7 +11,7 @@ def test_list_mounts_should_return_a_list_of_mount_without_encryption_type():
     client.dbutils.fs.mounts.return_value = [
         MountInfo("mp_1", "path_1", "info_1"),
         MountInfo("mp_2", "path_2", "info_2"),
-        MountInfo("mp_3", "path_3", "info_3")
+        MountInfo("mp_3", "path_3", "info_3"),
     ]
 
     backend = MockBackend()
@@ -28,7 +28,7 @@ def test_list_mounts_should_return_a_deduped_list_of_mount_without_encryption_ty
     client.dbutils.fs.mounts.return_value = [
         MountInfo("mp_1", "path_1", "info_1"),
         MountInfo("mp_2", "path_2", "info_2"),
-        MountInfo("mp_2", "path_2", "info_2")
+        MountInfo("mp_2", "path_2", "info_2"),
     ]
 
     backend = MockBackend()
