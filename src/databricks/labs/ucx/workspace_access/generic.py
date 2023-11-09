@@ -300,7 +300,7 @@ class WorkspaceListing(Listing, CrawlerBase):
             raw = obj.as_dict()
             yield WorkspaceObjectInfo(
                 object_type=raw.get("object_type", None),
-                object_id=raw.get("object_id", None),
+                object_id=str(raw.get("object_id", None)),
                 path=raw.get("path", None),
                 language=raw.get("language", None),
             )
@@ -310,7 +310,9 @@ class WorkspaceListing(Listing, CrawlerBase):
 
     def _try_fetch(self) -> list[WorkspaceObjectInfo]:
         for row in self._fetch(f"SELECT * FROM {self._schema}.{self._table}"):
-            yield WorkspaceObjectInfo(path=row["path"],object_type=row["object_type"],object_id=row["object_id"],language=row["language"])
+            yield WorkspaceObjectInfo(
+                path=row["path"], object_type=row["object_type"], object_id=row["object_id"], language=row["language"]
+            )
 
     def object_types(self) -> set[str]:
         return {"notebooks", "directories", "repos", "files"}

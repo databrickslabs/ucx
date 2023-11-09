@@ -560,7 +560,7 @@ def test_workspaceobject_crawl():
         result_set = list(crawler)
 
     assert len(result_set) == 2
-    assert result_set[0] == WorkspaceObjectInfo( "/rootobj/notebook1", "NOTEBOOK", 123, "PYTHON")
+    assert result_set[0] == WorkspaceObjectInfo("/rootobj/notebook1", "NOTEBOOK", "123", "PYTHON")
 
 
 def test_workspaceobject_withexperiment_crawl():
@@ -587,7 +587,7 @@ def test_workspaceobject_withexperiment_crawl():
         result_set = list(crawler)
 
     assert len(result_set) == 1
-    assert result_set[0] == WorkspaceObjectInfo("/rootobj/notebook1", "NOTEBOOK", 123, "PYTHON")
+    assert result_set[0] == WorkspaceObjectInfo("/rootobj/notebook1", "NOTEBOOK", "123", "PYTHON")
 
 
 def test_workspace_snapshot():
