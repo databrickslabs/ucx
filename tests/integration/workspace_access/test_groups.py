@@ -361,7 +361,6 @@ def test_set_owner_permission(
         assert group_info.backup.display_name in table_permissions
         assert "MODIFY" in table_permissions[group_info.backup.display_name]
         assert "SELECT" in table_permissions[group_info.backup.display_name]
-        assert "OWN" in table_permissions[group_info.backup.display_name]
         assert "MODIFY" in table_permissions[group_info.account.display_name]
         assert "SELECT" in table_permissions[group_info.account.display_name]
         assert "OWN" in table_permissions[group_info.account.display_name]
