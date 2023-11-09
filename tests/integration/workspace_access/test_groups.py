@@ -329,10 +329,9 @@ def test_set_owner_permission(
         assert group_info.backup.display_name in table_permissions
         assert "MODIFY" in table_permissions[group_info.workspace.display_name]
         assert "SELECT" in table_permissions[group_info.workspace.display_name]
-        assert "OWN" in table_permissions[group_info.workspace.display_name]
         assert "MODIFY" in table_permissions[group_info.backup.display_name]
         assert "SELECT" in table_permissions[group_info.backup.display_name]
-        assert "OWN" in table_permissions[ws_group.display_name]
+        assert "OWN" in table_permissions[group_info.backup.display_name]
 
     check_permissions_for_backup_group()
 
