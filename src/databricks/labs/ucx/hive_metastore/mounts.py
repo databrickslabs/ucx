@@ -19,6 +19,17 @@ class Mounts(CrawlerBase):
         super().__init__(backend, "hive_metastore", inventory_database, "mounts", Mount)
         self._dbutils = ws.dbutils
 
+    def _deduplicate_mounts(self, mounts: list) -> list:
+        seen = set()
+        deduplicated_mounts = []
+
+        for obj in mounts:
+            obj_tuple = (obj.name, obj.source)
+            if obj_tuple not in seen:
+                seen.add(obj_tuple)
+                deduplicated_mounts.append(obj)
+        return deduplicated_mounts
+
     def inventorize_mounts(self):
         self._append_records(self._list_mounts())
 
@@ -26,7 +37,7 @@ class Mounts(CrawlerBase):
         mounts = []
         for mount_point, source, _ in self._dbutils.fs.mounts():
             mounts.append(Mount(mount_point, source))
-        return mounts
+        return self._deduplicate_mounts(mounts)
 
     def snapshot(self) -> list[Mount]:
         return self._snapshot(self._try_fetch, self._list_mounts)
