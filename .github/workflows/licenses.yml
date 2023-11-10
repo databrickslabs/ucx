@@ -1,0 +1,31 @@
+name: licenses
+
+# TODO: trigger only on pyproject.toml changes
+
+on:
+  pull_request:
+    types: [opened, synchronize]
+  push:
+    # Always run on push to main. The build cache can only be reused
+    # if it was saved by a run from the repository's default branch.
+    # The run result will be identical to that from the merge queue
+    # because the commit is identical, yet we need to perform it to
+    # seed the build cache.
+    branches:
+      - main
+
+env:
+  HATCH_VERSION: 1.7.0
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v3
+
+      - name: Unshallow
+        run: git fetch --prune --unshallow
+
+      - name: License Checker
+        uses: andersy005/gh-action-py-liccheck@v2023.03.13
