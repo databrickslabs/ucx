@@ -45,7 +45,7 @@ jobs:
         with:
           requirements: 'requirements.txt'
           fail: 'Copyleft'
-          exclude: '(?i)^(pylint|aio[-_]*).*'
+          exclude: '(?i)^(pylint|certifi|aio[-_]*).*'
 
       - name: Print report
         if: ${{ always() }}
