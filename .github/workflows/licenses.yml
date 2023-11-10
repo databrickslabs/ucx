@@ -27,5 +27,17 @@ jobs:
       - name: Unshallow
         run: git fetch --prune --unshallow
 
+      - name: Install Python
+        uses: actions/setup-python@v4
+        with:
+          cache: 'pip'
+          cache-dependency-path: '**/pyproject.toml'
+          python-version: '3.10'
+
+      - name: Get explicit and transitive dependencies
+        run: |
+          pip install .
+          pip freeze > requirements.txt
+
       - name: License Checker
         uses: andersy005/gh-action-py-liccheck@v2023.03.13
