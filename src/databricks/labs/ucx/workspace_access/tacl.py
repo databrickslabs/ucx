@@ -37,17 +37,26 @@ class TableAclSupport(AclSupport):
         # * GRANT MODIFY ON TABLE hive_metastore.db_a.table_a TO group_a
         # will be folded and executed in one statement/transaction:
         # * GRANT SELECT, MODIFY ON TABLE hive_metastore.db_a.table_a TO group_a
+        # The exception is OWN permission which are set with ALTER table
 
         folded_actions = collections.defaultdict(set)
+        own_permissions = set()
         for grant in self._grants_crawler.snapshot():
             key = (grant.principal, grant.this_type_and_key())
-            folded_actions[key].add(grant.action_type)
+            if grant.action_type.upper() == "OWN":
+                own_permissions.add(key)
+            else:
+                folded_actions[key].add(grant.action_type)
 
         def inner(object_type: str, object_id: str, grant: Grant) -> Permissions:
             return Permissions(object_type=object_type, object_id=object_id, raw=json.dumps(dataclasses.asdict(grant)))
 
         for (principal, (object_type, object_id)), actions in folded_actions.items():
             grant = self._from_reduced(object_type, object_id, principal, ", ".join(sorted(actions)))
+            yield functools.partial(inner, object_type=object_type, object_id=object_id, grant=grant)
+
+        for principal, (object_type, object_id) in own_permissions:
+            grant = self._from_reduced(object_type, object_id, principal, "OWN")
             yield functools.partial(inner, object_type=object_type, object_id=object_id, grant=grant)
 
     def _from_reduced(self, object_type: str, object_id: str, principal: str, action_type: str):

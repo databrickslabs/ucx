@@ -69,7 +69,7 @@ def test_tacl_crawler_multiple_permissions():
     assert "catalog_a.database_b.table_c" == permissions.object_id
     assert Grant(
         principal="foo@example.com",
-        action_type="MODIFY, OWN, SELECT",
+        action_type="MODIFY, SELECT",
         catalog="catalog_a",
         database="database_b",
         table="table_c",
@@ -181,6 +181,21 @@ def test_tacl_crawler_multiple_permissions():
         view=None,
         any_file=False,
         anonymous_function=True,
+    ) == Grant(**json.loads(permissions.raw))
+
+    permissions = next(crawler_tasks)()
+
+    assert "TABLE" == permissions.object_type
+    assert "catalog_a.database_b.table_c" == permissions.object_id
+    assert Grant(
+        principal="foo@example.com",
+        action_type="OWN",
+        catalog="catalog_a",
+        database="database_b",
+        table="table_c",
+        view=None,
+        any_file=False,
+        anonymous_function=False,
     ) == Grant(**json.loads(permissions.raw))
 
 

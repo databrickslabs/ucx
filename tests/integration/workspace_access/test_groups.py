@@ -276,3 +276,107 @@ def test_migration_state_should_be_saved_without_missing_anything(sql_backend, m
     new_state = state.fetch_migration_state(sql_backend, inventory_database.name)
 
     assert len(new_state.groups) == len(state.groups)
+
+
+def test_set_owner_permission(
+    ws,
+    sql_backend,
+    inventory_schema,
+    make_ucx_group,
+    make_group,
+    make_acc_group,
+    make_cluster_policy,
+    make_table,
+):
+    ws_group, _ = make_ucx_group()
+
+    logger.info("Testing setting ownership on table.")
+    dummy_table = make_table()
+    logger.info(f"Table name {dummy_table.full_name} group name {ws_group.display_name}")
+    sql_backend.execute(f"GRANT SELECT, MODIFY ON TABLE {dummy_table.full_name} TO `{ws_group.display_name}`")
+    sql_backend.execute(f"ALTER {dummy_table.full_name} OWNER TO `{ws_group.display_name}`")
+
+    group_manager = GroupManager(ws, GroupsConfig(auto=True))
+    group_manager.prepare_groups_in_environment()
+
+    group_info = group_manager.migration_state.get_by_workspace_group_name(ws_group.display_name)
+
+    tables = TablesCrawler(sql_backend, inventory_schema)
+    grants = GrantsCrawler(tables)
+    tacl = TableAclSupport(grants, sql_backend)
+    permission_manager = PermissionManager(sql_backend, inventory_schema, [tacl])
+
+    permission_manager.inventorize_permissions()
+
+    dummy_grants = list(permission_manager.load_all_for("TABLE", dummy_table.full_name, Grant))
+    assert 2 == len(dummy_grants)
+
+    table_permissions = grants.for_table_info(dummy_table)
+    assert ws_group.display_name in table_permissions
+    assert "MODIFY" in table_permissions[ws_group.display_name]
+    assert "SELECT" in table_permissions[ws_group.display_name]
+    assert "OWN" in table_permissions[ws_group.display_name]
+
+    permission_manager.apply_group_permissions(group_manager.migration_state, destination="backup")
+
+    @retried(on=[AssertionError], timeout=timedelta(seconds=30))
+    def check_permissions_for_backup_group():
+        logger.info("check_permissions_for_backup_group()")
+
+        table_permissions = grants.for_table_info(dummy_table)
+        assert group_info.workspace.display_name in table_permissions
+        assert group_info.backup.display_name in table_permissions
+        assert "MODIFY" in table_permissions[group_info.workspace.display_name]
+        assert "SELECT" in table_permissions[group_info.workspace.display_name]
+        assert "MODIFY" in table_permissions[group_info.backup.display_name]
+        assert "SELECT" in table_permissions[group_info.backup.display_name]
+        assert "OWN" in table_permissions[group_info.backup.display_name]
+
+    check_permissions_for_backup_group()
+
+    group_manager.replace_workspace_groups_with_account_groups(group_manager.migration_state)
+
+    @retried(on=[AssertionError], timeout=timedelta(minutes=1))
+    def check_permissions_after_replace():
+        logger.info("check_permissions_after_replace()")
+
+        table_permissions = grants.for_table_info(dummy_table)
+        assert group_info.account.display_name in table_permissions
+        assert group_info.backup.display_name in table_permissions
+        assert "MODIFY" in table_permissions[group_info.backup.display_name]
+        assert "SELECT" in table_permissions[group_info.backup.display_name]
+        assert "OWN" in table_permissions[group_info.backup.display_name]
+
+    check_permissions_after_replace()
+
+    permission_manager.apply_group_permissions(group_manager.migration_state, destination="account")
+
+    @retried(on=[AssertionError], timeout=timedelta(seconds=30))
+    def check_permissions_for_account_group():
+        logger.info("check_permissions_for_account_group()")
+
+        table_permissions = grants.for_table_info(dummy_table)
+        assert group_info.account.display_name in table_permissions
+        assert group_info.backup.display_name in table_permissions
+        assert "MODIFY" in table_permissions[group_info.backup.display_name]
+        assert "SELECT" in table_permissions[group_info.backup.display_name]
+        assert "MODIFY" in table_permissions[group_info.account.display_name]
+        assert "SELECT" in table_permissions[group_info.account.display_name]
+        assert "OWN" in table_permissions[group_info.account.display_name]
+
+    check_permissions_for_account_group()
+
+    for _info in group_manager.migration_state.groups:
+        ws.groups.delete(_info.backup.id)
+
+    @retried(on=[AssertionError], timeout=timedelta(minutes=1))
+    def check_table_permissions_after_backup_delete():
+        logger.info("check_table_permissions_after_backup_delete()")
+
+        table_permissions = grants.for_table_info(dummy_table)
+        assert group_info.account.display_name in table_permissions
+        assert "MODIFY" in table_permissions[group_info.account.display_name]
+        assert "SELECT" in table_permissions[group_info.account.display_name]
+        assert "OWN" in table_permissions[group_info.account.display_name]
+
+    check_table_permissions_after_backup_delete()
