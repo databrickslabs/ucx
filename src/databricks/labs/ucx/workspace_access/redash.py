@@ -129,7 +129,7 @@ class RedashPermissionsSupport(AclSupport):
 
         retry_on_value_error = retried(on=[ValueError, RetryableError], timeout=self._verify_timeout)
         retried_check = retry_on_value_error(self._inflight_check)
-        return retried_check(object_id, object_id, acl)
+        return retried_check(object_type, object_id, acl)
 
     def _prepare_new_acl(
         self, acl: list[sql.AccessControl], migration_state: MigrationState

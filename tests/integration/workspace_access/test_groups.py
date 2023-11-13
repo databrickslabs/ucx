@@ -16,6 +16,9 @@ from databricks.labs.ucx.workspace_access.generic import (
 from databricks.labs.ucx.workspace_access.groups import GroupManager
 from databricks.labs.ucx.workspace_access.manager import PermissionManager
 from databricks.labs.ucx.workspace_access.tacl import TableAclSupport
+from databricks.labs.ucx.workspace_access.redash import RedashPermissionsSupport
+from databricks.labs.ucx.workspace_access import redash
+from databricks.sdk.service import sql
 
 logger = logging.getLogger(__name__)
 
@@ -304,7 +307,7 @@ def test_set_owner_permission(ws, sql_backend, inventory_schema, make_ucx_group,
 
     permission_manager.apply_group_permissions(state)
 
-    @retried(on=[AssertionError], timeout=timedelta(minutes=1))
+    @retried(on=[AssertionError], timeout=timedelta(seconds=30))
     def check_permissions_for_account_group():
         logger.info("check_permissions_for_account_group()")
 
@@ -333,3 +336,64 @@ def test_set_owner_permission(ws, sql_backend, inventory_schema, make_ucx_group,
         assert "OWN" in table_permissions[group_info.name_in_account]
 
     check_table_permissions_after_backup_delete()
+
+
+def test_query_permission(
+        ws,
+        sql_backend,
+        inventory_schema,
+        make_table,
+        make_query,
+        make_ucx_group,
+        make_group):
+    # @retried(on=[AssertionError], timeout=timedelta(seconds=30))
+    def check_permission_for_sql_object(sup: RedashPermissionsSupport, group_name: str, obj_id: str, permission_level, exists: bool = True):
+        permissions = sup._safe_get_dbsql_permissions(sql.ObjectTypePlural.QUERIES, obj_id)
+        for permission in permissions.access_control_list:
+            if permission.group_name == group_name:
+                assert (permission_level == permission.permission_level) == exists
+                return
+        assert not exists
+
+    logger.info("Testing setting ownership on SQL Query.")
+    query = make_query()
+    ws_group, _ = make_ucx_group()
+    group_manager = GroupManager(ws, GroupsConfig(auto=True))
+    group_manager.prepare_groups_in_environment()
+
+    group_info = group_manager.migration_state.get_by_workspace_group_name(ws_group.display_name)
+
+    # Setting a test case of a query with permissions
+    sup = RedashPermissionsSupport(ws=ws, listings=[], verify_timeout=timedelta(seconds=1))
+    acl = [sql.AccessControl(group_name=ws_group.display_name, permission_level=sql.PermissionLevel.CAN_VIEW)]
+    result = sup._safe_set_permissions(sql.ObjectTypePlural.QUERIES, query.id, acl)
+    assert result is not None
+
+    check_permission_for_sql_object(sup, group_info.account.display_name, query.id, sql.PermissionLevel.CAN_VIEW)
+
+    # Attempting Switching Access on Query object
+    redash_acl_listing = [
+        redash.Listing(ws.alerts.list, sql.ObjectTypePlural.ALERTS),
+        redash.Listing(ws.dashboards.list, sql.ObjectTypePlural.DASHBOARDS),
+        redash.Listing(ws.queries.list, sql.ObjectTypePlural.QUERIES),
+    ]
+    sql_support = redash.RedashPermissionsSupport(ws, redash_acl_listing)
+    permission_manager = PermissionManager(sql_backend, inventory_schema, [sql_support])
+    permission_manager.inventorize_permissions()
+
+    permission_manager.apply_group_permissions(group_manager.migration_state, destination="backup")
+
+    # Checking permission on both primary and backup group.
+    check_permission_for_sql_object(sup, group_info.account.display_name, query.id, sql.PermissionLevel.CAN_VIEW, False)
+    check_permission_for_sql_object(sup, group_info.backup.display_name, query.id, sql.PermissionLevel.CAN_VIEW)
+
+    group_manager.replace_workspace_groups_with_account_groups(group_manager.migration_state)
+    permission_manager.apply_group_permissions(group_manager.migration_state, destination="account")
+    check_permission_for_sql_object(sup, group_info.account.display_name, query.id, sql.PermissionLevel.CAN_VIEW)
+    check_permission_for_sql_object(sup, group_info.backup.display_name, query.id, sql.PermissionLevel.CAN_VIEW, False)
+
+    for _info in group_manager.migration_state.groups:
+        ws.groups.delete(_info.backup.id)
+
+    assert len(query.name) > 0
+
