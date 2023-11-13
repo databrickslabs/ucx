@@ -94,9 +94,6 @@ class TableAclSupport(AclSupport):
             # this is a grant for user, service principal, or irrelevant group
             return None
         target_grant = dataclasses.replace(grant, principal=target_principal)
-        if grant.action_type.upper() == "OWN":
-            sql = target_grant.hive_chown_sql()
-        else:
-            sql = target_grant.hive_grant_sql()
+        sql = target_grant.hive_grant_sql()
         # this has to be executed on tacl cluster, otherwise - use SQLExecutionAPI backend & Warehouse
         return partial(self._sql_backend.execute, sql)
