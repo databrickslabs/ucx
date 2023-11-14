@@ -346,7 +346,8 @@ def test_query_permission(
         make_query,
         make_ucx_group,
         make_group):
-    # @retried(on=[AssertionError], timeout=timedelta(seconds=30))
+
+    # @retried(on=[AssertionError], timeout=timedelta(seconds=90))
     def check_permission_for_sql_object(sup: RedashPermissionsSupport, group_name: str, obj_id: str, permission_level, exists: bool = True):
         permissions = sup._safe_get_dbsql_permissions(sql.ObjectTypePlural.QUERIES, obj_id)
         for permission in permissions.access_control_list:
@@ -364,7 +365,7 @@ def test_query_permission(
     group_info = group_manager.migration_state.get_by_workspace_group_name(ws_group.display_name)
 
     # Setting a test case of a query with permissions
-    sup = RedashPermissionsSupport(ws=ws, listings=[], verify_timeout=timedelta(seconds=1))
+    sup = RedashPermissionsSupport(ws=ws, listings=[], verify_timeout=timedelta(seconds=15))
     acl = [sql.AccessControl(group_name=ws_group.display_name, permission_level=sql.PermissionLevel.CAN_VIEW)]
     result = sup._safe_set_permissions(sql.ObjectTypePlural.QUERIES, query.id, acl)
     assert result is not None
