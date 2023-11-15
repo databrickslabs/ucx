@@ -6,7 +6,7 @@ from databricks.labs.ucx.workspace_access.manager import PermissionManager
 from databricks.labs.ucx.workspace_access.scim import ScimSupport
 
 
-def test_scim(ws: WorkspaceClient, make_ucx_group, sql_backend, inventory_schema):
+def test_scim(ws: WorkspaceClient, make_ucx_group, sql_backend, inventory_schema, make_pipeline):
     """
     This test does the following:
     * create a ws group with roles and entitlements
@@ -26,6 +26,7 @@ def test_scim(ws: WorkspaceClient, make_ucx_group, sql_backend, inventory_schema
         ],
         schemas=[iam.PatchSchema.URN_IETF_PARAMS_SCIM_API_MESSAGES_2_0_PATCH_OP],
     )
+    make_pipeline()
 
     # Task 1 - crawl_permissions
     scim_support = ScimSupport(ws)

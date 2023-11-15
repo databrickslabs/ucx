@@ -41,7 +41,7 @@ class ScimSupport(AclSupport):
     # TODO remove after ES-892977 is fixed
     @retried(on=[DatabricksError])
     def _get_groups(self):
-        return self._ws.groups.list(attributes="id,displayName,roles,entitlements")
+        return list(self._ws.groups.list(attributes="id,displayName,roles,entitlements"))
 
     def object_types(self) -> set[str]:
         return {"roles", "entitlements"}
