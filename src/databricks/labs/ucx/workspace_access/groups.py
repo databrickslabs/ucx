@@ -171,7 +171,7 @@ class GroupManager(CrawlerBase):
         tasks = []
         workspace_groups_in_workspace = self._workspace_groups_in_workspace()
         for mg in self.snapshot():
-            if mg.name_in_workspace not in workspace_groups_in_workspace:
+            if mg.temporary_name not in workspace_groups_in_workspace:
                 logger.info(f"Skipping {mg.name_in_workspace}: no longer in workspace")
                 continue
             tasks.append(functools.partial(self._delete_workspace_group, mg.id_in_workspace))
