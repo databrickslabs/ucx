@@ -720,7 +720,7 @@ class WorkspaceInstaller:
                 num_workers=0,
             )
         )
-        if self._ws.config.is_aws:
+        if self._ws.config.is_aws and spec.aws_attributes is not None:
             aws_attributes = replace(spec.aws_attributes, instance_profile_arn=self._config.instance_profile)
             spec = replace(spec, aws_attributes=aws_attributes)
         if "main" in names:

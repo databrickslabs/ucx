@@ -29,12 +29,7 @@ def test_job_failure_propagates_correct_error_message_and_logs(ws, sql_backend, 
     install = WorkspaceInstaller.run_for_config(
         ws,
         WorkspaceConfig(
-            inventory_database=inventory_database,
-            groups=GroupsConfig(
-                backup_group_prefix=backup_group_prefix,
-                auto=True,
-            ),
-            log_level="DEBUG",
+            inventory_database=inventory_database, log_level="DEBUG", renamed_group_prefix=backup_group_prefix
         ),
         sql_backend=sql_backend,
         prefix=make_random(4),
@@ -147,10 +142,8 @@ def test_jobs_with_no_inventory_database(
         WorkspaceConfig(
             inventory_database=inventory_database,
             instance_pool_id=env_or_skip("TEST_INSTANCE_POOL_ID"),
-            groups=GroupsConfig(
-                selected=[ws_group_a.display_name, ws_group_b.display_name, ws_group_c.display_name],
-                backup_group_prefix=backup_group_prefix,
-            ),
+            include_group_names=[ws_group_a.display_name, ws_group_b.display_name, ws_group_c.display_name],
+            renamed_group_prefix=backup_group_prefix,
             log_level="DEBUG",
         ),
         sql_backend=sql_backend,
@@ -162,19 +155,13 @@ def test_jobs_with_no_inventory_database(
     )
 
     try:
-        required_workflows = [
-            "assessment",
-            "002-apply-permissions-to-backup-groups",
-            "003-replace-workspace-local-with-account-groups",
-            "004-apply-permissions-to-account-groups",
-            "005-remove-workspace-local-backup-groups",
-        ]
+        required_workflows = ["assessment", "migrate-groups", "remove-workspace-local-backup-groups"]
         for step in required_workflows:
             install.run_workflow(step)
 
         @retried(on=[AssertionError], timeout=timedelta(minutes=2))
         def validate_groups():
-            group_manager = GroupManager(ws, GroupsConfig(auto=True))
+            group_manager = GroupManager(sql_backend, ws, inventory_database)
             acc_membership = group_manager.get_workspace_membership("Group")
 
             logger.info("validating replaced account groups")

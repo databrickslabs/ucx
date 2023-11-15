@@ -1,9 +1,7 @@
 from databricks.sdk import WorkspaceClient
 from databricks.sdk.service import iam
 
-from databricks.labs.ucx.workspace_access.groups import (
-    GroupManager,
-)
+from databricks.labs.ucx.workspace_access.groups import GroupManager
 from databricks.labs.ucx.workspace_access.manager import PermissionManager
 from databricks.labs.ucx.workspace_access.scim import ScimSupport
 
@@ -28,7 +26,6 @@ def test_scim(ws: WorkspaceClient, make_ucx_group, sql_backend, inventory_schema
         ],
         schemas=[iam.PatchSchema.URN_IETF_PARAMS_SCIM_API_MESSAGES_2_0_PATCH_OP],
     )
-    groups_config = GroupsConfig(selected=[ws_group.display_name])
 
     # Task 1 - crawl_permissions
     scim_support = ScimSupport(ws)
@@ -36,22 +33,28 @@ def test_scim(ws: WorkspaceClient, make_ucx_group, sql_backend, inventory_schema
     pi.cleanup()
     pi.inventorize_permissions()
 
-    # Task 2 - apply_permissions_to_backup_groups
-    group_manager = GroupManager(ws, groups_config)
-    group_manager.prepare_groups_in_environment()
-    pi.apply_group_permissions(group_manager.migration_state, destination="backup")
-    group_manager.migration_state.persist_migration_state(sql_backend, inventory_schema)
+    # Task 2 - crawl_groups
+    group_manager = GroupManager(sql_backend, ws, inventory_schema, include_group_names=[ws_group.display_name])
+    group_manager.snapshot()
 
-    # Task 3 - replace the groups in the workspace with the account groups
-    group_manager = GroupManager(ws, groups_config)
-    remote_state = GroupMigrationState().fetch_migration_state(sql_backend, inventory_schema)
-    group_manager.replace_workspace_groups_with_account_groups(remote_state)
+    # Task 2 - apply_permissions_to_backup_groups
+    group_manager = GroupManager(sql_backend, ws, inventory_schema, include_group_names=[ws_group.display_name])
+    group_manager.rename_groups()
+
+    # Task 3 - reflect_account_groups_on_workspace
+    group_manager = GroupManager(sql_backend, ws, inventory_schema, include_group_names=[ws_group.display_name])
+    group_manager.reflect_account_groups_on_workspace()
 
     # Task 4 - apply_permissions_to_account_groups
-    remote_state = group_manager.migration_state.fetch_migration_state(sql_backend, inventory_schema)
-    migration_state = GroupManager.prepare_apply_permissions_to_account_groups(
-        ws, remote_state, groups_config.backup_group_prefix
-    )
-    pi.apply_group_permissions(migration_state, destination="account")
+    group_manager = GroupManager(sql_backend, ws, inventory_schema, include_group_names=[ws_group.display_name])
+    migration_state = group_manager.get_migration_state()
+    permission_manager = PermissionManager.factory(ws, sql_backend, inventory_database=inventory_schema)
+    permission_manager.apply_group_permissions(migration_state, destination="account")
 
-    assert len(ws.groups.get(acc_group.id).members) == len(ws_group.members)
+    old_group = ws.groups.get(ws_group.id)
+    reflected_group = ws.groups.get(acc_group.id)
+
+    assert reflected_group.display_name == ws_group.display_name
+    assert reflected_group.id == acc_group.id
+    assert len(reflected_group.members) == len(old_group.members)
+    assert len(reflected_group.entitlements) == len(old_group.entitlements)

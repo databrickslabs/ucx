@@ -29,7 +29,7 @@ class ScimSupport(AclSupport):
 
     @staticmethod
     def _is_item_relevant(item: Permissions, migration_state: MigrationState) -> bool:
-        return any(g.workspace.id == item.object_id for g in migration_state.groups)
+        return any(g.id_in_workspace == item.object_id for g in migration_state.groups)
 
     def get_crawler_tasks(self):
         for g in self._get_groups():

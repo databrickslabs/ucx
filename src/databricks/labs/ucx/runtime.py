@@ -18,9 +18,7 @@ from databricks.labs.ucx.hive_metastore import GrantsCrawler, TablesCrawler
 from databricks.labs.ucx.hive_metastore.data_objects import ExternalLocationCrawler
 from databricks.labs.ucx.hive_metastore.mounts import Mounts
 from databricks.labs.ucx.workspace_access.generic import WorkspaceListing
-from databricks.labs.ucx.workspace_access.groups import (
-    GroupManager
-)
+from databricks.labs.ucx.workspace_access.groups import GroupManager
 from databricks.labs.ucx.workspace_access.manager import PermissionManager
 
 logger = logging.getLogger(__name__)
@@ -258,13 +256,11 @@ def apply_permissions_to_account_groups(cfg: WorkspaceConfig):
     permissions, Secret Scopes, Notebooks, Directories, Repos, Files.
 
     See [interactive tutorial here](https://app.getreprise.com/launch/myM3VNn/)."""
-    ws = WorkspaceClient(config=cfg.to_databricks_config())
     backend = RuntimeBackend()
+    ws = WorkspaceClient(config=cfg.to_databricks_config())
+    group_manager = GroupManager(backend, ws, cfg.inventory_database, cfg.include_group_names, cfg.renamed_group_prefix)
 
-    remote_state = GroupMigrationState().fetch_migration_state(backend, cfg.inventory_database)
-    migration_state = GroupManager.prepare_apply_permissions_to_account_groups(
-        ws, remote_state, cfg.groups.backup_group_prefix
-    )
+    migration_state = group_manager.get_migration_state()
     if len(migration_state.groups) == 0:
         logger.info("Skipping group migration as no groups were found.")
         return
@@ -279,13 +275,14 @@ def apply_permissions_to_account_groups(cfg: WorkspaceConfig):
     permission_manager.apply_group_permissions(migration_state, destination="account")
 
 
-@task("005-remove-workspace-local-backup-groups", depends_on=[apply_permissions_to_account_groups])
+@task("remove-workspace-local-backup-groups", depends_on=[apply_permissions_to_account_groups])
 def delete_backup_groups(cfg: WorkspaceConfig):
     """Last step of the group migration process. Removes all workspace-level backup groups, along with their
     permissions. Execute this workflow only after you've confirmed that workspace-local migration worked
     successfully for all the groups involved."""
+    backend = RuntimeBackend()
     ws = WorkspaceClient(config=cfg.to_databricks_config())
-    group_manager = GroupManager(ws, cfg.groups)
+    group_manager = GroupManager(backend, ws, cfg.inventory_database, cfg.include_group_names, cfg.renamed_group_prefix)
     group_manager.delete_original_workspace_groups()
 
 

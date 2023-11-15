@@ -4,7 +4,7 @@ import functools
 import json
 import logging
 import typing
-from dataclasses import dataclass, replace
+from dataclasses import dataclass
 
 from databricks.sdk import WorkspaceClient
 from databricks.sdk.core import DatabricksError
@@ -32,10 +32,10 @@ class MigratedGroup:
     name_in_workspace: str
     name_in_account: str
     temporary_name: str
-    members: str
-    entitlements: str
-    external_id: str
-    roles: str
+    members: str = None
+    entitlements: str = None
+    external_id: str = None
+    roles: str = None
 
     def as_account_group_without_id(self) -> iam.Group:
         raw = dataclasses.asdict(self)
@@ -199,7 +199,7 @@ class GroupManager(CrawlerBase):
                 name_in_workspace=g.display_name,
                 name_in_account=g.display_name,
                 temporary_name=temporary_name,
-                external_id=g.external_id,
+                external_id=account_groups_in_account[g.display_name],
                 members=json.dumps([gg.as_dict() for gg in g.members]) if g.members else None,
                 roles=json.dumps([gg.as_dict() for gg in g.roles]) if g.roles else None,
                 entitlements=json.dumps([gg.as_dict() for gg in g.entitlements]) if g.entitlements else None,
@@ -207,13 +207,13 @@ class GroupManager(CrawlerBase):
 
     def _workspace_groups_in_workspace(self) -> dict[str, str]:
         by_name = {}
-        for g in self._list_workspace_groups("WorkspaceGroup", "id,displayName"):
+        for g in self._list_workspace_groups("WorkspaceGroup", "id,displayName,meta"):
             by_name[g.display_name] = g.id
         return by_name
 
     def _account_groups_in_workspace(self) -> dict[str, str]:
         by_name = {}
-        for g in self._list_workspace_groups("Group", "id,displayName"):
+        for g in self._list_workspace_groups("Group", "id,displayName,meta"):
             by_name[g.display_name] = g.id
         return by_name
 

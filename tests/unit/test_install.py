@@ -41,9 +41,7 @@ def ws(mocker):
     ws.current_user.me = lambda: iam.User(user_name="me@example.com", groups=[iam.ComplexValue(display="admins")])
     ws.config.host = "https://foo"
     ws.config.is_aws = True
-    config_bytes = yaml.dump(WorkspaceConfig(inventory_database="a").as_dict()).encode(
-        "utf8"
-    )
+    config_bytes = yaml.dump(WorkspaceConfig(inventory_database="a").as_dict()).encode("utf8")
     ws.workspace.download = lambda _: io.BytesIO(config_bytes)
     ws.workspace.get_status = lambda _: ObjectInfo(object_id=123)
     ws.data_sources.list = lambda: [DataSource(id="bcd", warehouse_id="abc")]
@@ -402,9 +400,7 @@ def test_create_readme(ws, mocker):
 
     ws.current_user.me = lambda: iam.User(user_name="me@example.com", groups=[iam.ComplexValue(display="admins")])
     ws.config.host = "https://foo"
-    config_bytes = yaml.dump(WorkspaceConfig(inventory_database="a").as_dict()).encode(
-        "utf8"
-    )
+    config_bytes = yaml.dump(WorkspaceConfig(inventory_database="a").as_dict()).encode("utf8")
     ws.workspace.download = lambda _: io.BytesIO(config_bytes)
 
     from databricks.labs.ucx.framework.tasks import Task

@@ -21,9 +21,7 @@ def test_dashboard(mocker):
     ws.current_user.me = lambda: iam.User(user_name="me@example.com", groups=[iam.ComplexValue(display="admins")])
     ws.config.host = "https://foo"
     ws.config.is_aws = True
-    config_bytes = yaml.dump(WorkspaceConfig(inventory_database="a").as_dict()).encode(
-        "utf8"
-    )
+    config_bytes = yaml.dump(WorkspaceConfig(inventory_database="a").as_dict()).encode("utf8")
     ws.workspace.download = lambda _: io.BytesIO(config_bytes)
     ws.data_sources.list = lambda: [DataSource(id="bcd", warehouse_id="000000")]
     ws.dashboards.create.return_value = Dashboard(id="abc")
