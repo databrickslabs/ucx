@@ -88,9 +88,6 @@ class GroupMigrationToolkit:
         ucx_logger = logging.getLogger("databricks.labs.ucx")
         ucx_logger.setLevel(level)
 
-    def has_groups(self) -> bool:
-        return self._group_manager.has_groups()
-
     def cleanup_inventory_table(self):
         self._permissions_manager.cleanup()
 

@@ -6,6 +6,7 @@ from databricks.sdk.errors import NotFound, OperationFailed
 from databricks.sdk.retries import retried
 from databricks.sdk.service.catalog import SchemaInfo
 from databricks.sdk.service.iam import PermissionLevel
+from integration.conftest import get_workspace_membership
 
 from databricks.labs.ucx.config import WorkspaceConfig
 from databricks.labs.ucx.framework.parallel import Threads
@@ -13,7 +14,6 @@ from databricks.labs.ucx.hive_metastore.grants import GrantsCrawler
 from databricks.labs.ucx.hive_metastore.tables import TablesCrawler
 from databricks.labs.ucx.install import WorkspaceInstaller
 from databricks.labs.ucx.workspace_access.generic import GenericPermissionsSupport
-from databricks.labs.ucx.workspace_access.groups import GroupManager
 
 logger = logging.getLogger(__name__)
 
@@ -161,8 +161,7 @@ def test_jobs_with_no_inventory_database(
 
         @retried(on=[AssertionError], timeout=timedelta(minutes=2))
         def validate_groups():
-            group_manager = GroupManager(sql_backend, ws, inventory_database)
-            acc_membership = group_manager.get_workspace_membership("Group")
+            acc_membership = get_workspace_membership(ws, "Group")
 
             logger.info("validating replaced account groups")
             assert acc_group_a.display_name in acc_membership, f"{acc_group_a.display_name} not found in workspace"

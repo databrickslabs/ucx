@@ -1,4 +1,3 @@
-import collections
 import dataclasses
 import functools
 import json
@@ -105,7 +104,9 @@ class GroupManager(CrawlerBase):
         tasks = []
         account_groups_in_workspace = self._account_groups_in_workspace()
         workspace_groups_in_workspace = self._workspace_groups_in_workspace()
-        for mg in self.snapshot():
+        groups_to_migrate = self.get_migration_state().groups
+
+        for mg in groups_to_migrate:
             if mg.name_in_account in account_groups_in_workspace:
                 logger.info(f"Skipping {mg.name_in_account}: already in workspace")
                 continue
@@ -128,7 +129,9 @@ class GroupManager(CrawlerBase):
         tasks = []
         account_groups_in_account = self._account_groups_in_account()
         account_groups_in_workspace = self._account_groups_in_workspace()
-        for mg in self.snapshot():
+        groups_to_migrate = self.get_migration_state().groups
+
+        for mg in groups_to_migrate:
             if mg.name_in_account in account_groups_in_workspace:
                 logger.info(f"Skipping {mg.name_in_account}: already in workspace")
                 continue
@@ -144,19 +147,6 @@ class GroupManager(CrawlerBase):
 
     def get_migration_state(self) -> MigrationState:
         return MigrationState(self.snapshot())
-
-    def get_workspace_membership(self, resource_type: str = "WorkspaceGroup"):
-        membership = collections.defaultdict(set)
-        for g in self._ws.groups.list(attributes="id,displayName,meta,members"):
-            if g.display_name in self._SYSTEM_GROUPS:
-                continue
-            if g.meta.resource_type != resource_type:
-                continue
-            if g.members is None:
-                continue
-            for m in g.members:
-                membership[g.display_name].add(m.display)
-        return membership
 
     def delete_original_workspace_groups(self):
         tasks = []

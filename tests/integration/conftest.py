@@ -1,3 +1,4 @@
+import collections
 import logging
 import random
 from functools import partial
@@ -18,6 +19,20 @@ logger = logging.getLogger(__name__)
 @pytest.fixture
 def debug_env_name():
     return "ucws"
+
+
+def get_workspace_membership(ws, resource_type: str = "WorkspaceGroup"):
+    membership = collections.defaultdict(set)
+    for g in ws.groups.list(attributes="id,displayName,meta,members"):
+        if g.display_name in ["users", "admins", "account users"]:
+            continue
+        if g.meta.resource_type != resource_type:
+            continue
+        if g.members is None:
+            continue
+        for m in g.members:
+            membership[g.display_name].add(m.display)
+    return membership
 
 
 def account_host(self: databricks.sdk.core.Config) -> str:

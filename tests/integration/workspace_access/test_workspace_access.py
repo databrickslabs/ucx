@@ -4,6 +4,7 @@ import random
 from databricks.sdk import WorkspaceClient
 from databricks.sdk.service import workspace
 from databricks.sdk.service.iam import PermissionLevel
+from integration.conftest import get_workspace_membership
 
 from databricks.labs.ucx.config import ConnectConfig, WorkspaceConfig
 from databricks.labs.ucx.workspace_access import GroupMigrationToolkit
@@ -188,7 +189,7 @@ def test_workspace_access_e2e(
 
     toolkit.replace_workspace_groups_with_account_groups()
 
-    workspace_acc_membership = toolkit._group_manager.get_workspace_membership("Group")
+    workspace_acc_membership = get_workspace_membership(ws, "Group")
     assert acc_group.display_name in workspace_acc_membership
 
     toolkit.apply_permissions_to_account_groups()
@@ -197,7 +198,7 @@ def test_workspace_access_e2e(
 
     toolkit.delete_backup_groups()
 
-    workspace_membership = toolkit._group_manager.get_workspace_membership()
+    workspace_membership = get_workspace_membership(ws)
     assert f"db-temp-{ws_group.display_name}" not in workspace_membership
 
     toolkit.cleanup_inventory_table()
