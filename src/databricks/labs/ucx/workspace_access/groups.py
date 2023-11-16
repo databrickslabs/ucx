@@ -158,15 +158,6 @@ class GroupManager(CrawlerBase):
                 membership[g.display_name].add(m.display)
         return membership
 
-    def get_account_membership(self):
-        membership = collections.defaultdict(set)
-        for g in self._list_account_groups("id,displayName,members"):
-            if g.members is None:
-                continue
-            for m in g.members:
-                membership[g.display_name].add(m.display)
-        return membership
-
     def delete_original_workspace_groups(self):
         tasks = []
         workspace_groups_in_workspace = self._workspace_groups_in_workspace()
