@@ -2,7 +2,7 @@ import logging
 from datetime import timedelta
 
 import pytest
-from databricks.sdk.errors import OperationFailed, NotFound
+from databricks.sdk.errors import NotFound, OperationFailed
 from databricks.sdk.retries import retried
 from databricks.sdk.service.catalog import SchemaInfo
 from databricks.sdk.service.iam import PermissionLevel
