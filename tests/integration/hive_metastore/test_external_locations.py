@@ -13,11 +13,23 @@ def test_external_locations(ws, sql_backend, inventory_schema, env_or_skip):
         Table("hive_metastore", "foo", "bar", "MANAGED", "delta", location="s3://test_location/test1/table1"),
         Table("hive_metastore", "foo", "bar", "EXTERNAL", "delta", location="s3://test_location/test2/table2"),
         Table("hive_metastore", "foo", "bar", "EXTERNAL", "delta", location="dbfs:/mnt/foo/test3/table3"),
+        Table(
+            "hive_metastore",
+            "foo",
+            "bar",
+            "EXTERNAL",
+            "delta",
+            location="jdbc://databricks/",
+            storage_properties="[personalAccessToken=*********(redacted), \
+            httpPath=/sql/1.0/warehouses/65b52fb5bd86a7be, host=dbc-test1-aa11.cloud.databricks.com, \
+            dbtable=samples.nyctaxi.trips]",
+        ),
     ]
     sql_backend.save_table(f"{inventory_schema}.tables", tables, Table)
     sql_backend.save_table(f"{inventory_schema}.mounts", [Mount("/mnt/foo", "s3://bar")], Mount)
 
     crawler = ExternalLocationCrawler(ws, sql_backend, inventory_schema)
     results = crawler.snapshot()
-    assert len(results) == 2
+    assert len(results) == 4
     assert results[1].location == "s3://bar/test3/"
+    assert results[3].location == "jdbc:databricks://dbc-test1-aa11.cloud.databricks.com"

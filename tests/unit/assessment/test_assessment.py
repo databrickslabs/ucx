@@ -48,22 +48,30 @@ _SECRET_VALUE = b"SGVsbG8sIFdvcmxkIQ=="
 
 def test_external_locations():
     crawler = ExternalLocationCrawler(Mock(), MockBackend(), "test")
-    row_factory = type("Row", (Row,), {"__columns__": ["location"]})
+    row_factory = type("Row", (Row,), {"__columns__": ["location", "storage_properties"]})
     sample_locations = [
-        row_factory(["s3://us-east-1-dev-account-staging-uc-ext-loc-bucket-1/Location/Table"]),
-        row_factory(["s3://us-east-1-dev-account-staging-uc-ext-loc-bucket-1/Location/Table2"]),
-        row_factory(["s3://us-east-1-dev-account-staging-uc-ext-loc-bucket-23/testloc/Table3"]),
-        row_factory(["s3://us-east-1-dev-account-staging-uc-ext-loc-bucket-23/anotherloc/Table4"]),
-        row_factory(["dbfs:/mnt/ucx/database1/table1"]),
-        row_factory(["dbfs:/mnt/ucx/database2/table2"]),
-        row_factory(["DatabricksRootmntDatabricksRoot"]),
+        row_factory(["s3://us-east-1-dev-account-staging-uc-ext-loc-bucket-1/Location/Table", ""]),
+        row_factory(["s3://us-east-1-dev-account-staging-uc-ext-loc-bucket-1/Location/Table2", ""]),
+        row_factory(["s3://us-east-1-dev-account-staging-uc-ext-loc-bucket-23/testloc/Table3", ""]),
+        row_factory(["s3://us-east-1-dev-account-staging-uc-ext-loc-bucket-23/anotherloc/Table4", ""]),
+        row_factory(["dbfs:/mnt/ucx/database1/table1", ""]),
+        row_factory(["dbfs:/mnt/ucx/database2/table2", ""]),
+        row_factory(["DatabricksRootmntDatabricksRoot", ""]),
+        row_factory(
+            [
+                "jdbc:databricks://",
+                "[personalAccessToken=*********(redacted), \
+        httpPath=/sql/1.0/warehouses/65b52fb5bd86a7be, host=dbc-test1-aa11.cloud.databricks.com, \
+        dbtable=samples.nyctaxi.trips]",
+            ]
+        ),
     ]
     sample_mounts = [Mount("/mnt/ucx", "s3://us-east-1-ucx-container")]
     result_set = crawler._external_locations(sample_locations, sample_mounts)
     assert len(result_set) == 3
     assert result_set[0].location == "s3://us-east-1-dev-account-staging-uc-ext-loc-bucket-1/Location/"
     assert result_set[1].location == "s3://us-east-1-dev-account-staging-uc-ext-loc-bucket-23/"
-    assert result_set[2].location == "s3://us-east-1-ucx-container/"
+    assert result_set[2].location == "jdbc:databricks://dbc-test1-aa11.cloud.databricks.com"
 
 
 def test_job_assessment():

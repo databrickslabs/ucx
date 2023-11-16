@@ -1,4 +1,6 @@
+import logging
 import os
+import re
 import typing
 from dataclasses import dataclass
 
@@ -7,6 +9,8 @@ from databricks.sdk import WorkspaceClient
 from databricks.labs.ucx.framework.crawlers import CrawlerBase, SqlBackend
 from databricks.labs.ucx.hive_metastore.mounts import Mounts
 from databricks.labs.ucx.mixins.sql import Row
+
+logger = logging.getLogger(__name__)
 
 
 @dataclass
@@ -50,10 +54,33 @@ class ExternalLocationCrawler(CrawlerBase):
                         loc += 1
                     if not dupe:
                         external_locations.append(ExternalLocation(os.path.dirname(location) + "/"))
+                if location.startswith("jdbc"):
+                    pattern = r"(\w+)=(.*?)(?=\s*,|\s*\])"
+
+                    # Find all matches in the input string
+                    # Storage properties is of the format
+                    # "[personalAccessToken=*********(redacted), \
+                    #  httpPath=/sql/1.0/warehouses/65b52fb5bd86a7be, host=dbc-test1-aa11.cloud.databricks.com, \
+                    #  dbtable=samples.nyctaxi.trips]"
+                    matches = re.findall(pattern, table.storage_properties)
+
+                    # Create a dictionary from the matches
+                    result_dict = dict(matches)
+
+                    # Fetch the value of host from the newly created dict
+                    host = result_dict.get("host", "")
+                    logger.debug(f"Storage Properties is {table.storage_properties}")
+                    logger.debug(f"Host is {host}")
+                    jdbc_location = f"jdbc:databricks://{host}"
+                    external_locations.append(ExternalLocation(jdbc_location))
         return external_locations
 
     def _external_location_list(self):
-        tables = list(self._backend.fetch(f"SELECT location FROM {self._schema}.tables WHERE location IS NOT NULL"))
+        tables = list(
+            self._backend.fetch(
+                f"SELECT location, storage_properties FROM {self._schema}.tables WHERE location IS NOT NULL"
+            )
+        )
         mounts = Mounts(self._backend, self._ws, self._schema).snapshot()
         return self._external_locations(list(tables), list(mounts))
 
