@@ -32,13 +32,11 @@ class ScimSupport(AclSupport):
         return migration_state.is_id_in_scope(item.object_id)
 
     def get_crawler_tasks(self):
-        groups = self._get_groups()
-        with_roles = [g for g in groups if g.roles and len(g.roles) > 0]
-        with_entitlements = [g for g in groups if g.entitlements and len(g.entitlements) > 0]
-        for g in with_roles:
-            yield partial(self._crawler_task, g, "roles")
-        for g in with_entitlements:
-            yield partial(self._crawler_task, g, "entitlements")
+        for g in self._get_groups():
+            if g.roles and len(g.roles) > 0:
+                yield partial(self._crawler_task, g, "roles")
+            if g.entitlements and len(g.entitlements) > 0:
+                yield partial(self._crawler_task, g, "entitlements")
 
     # TODO remove after ES-892977 is fixed
     @retried(on=[DatabricksError])
