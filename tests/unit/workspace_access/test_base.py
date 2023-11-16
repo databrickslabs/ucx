@@ -1,11 +1,7 @@
 from collections.abc import Callable, Iterator
 from functools import partial
 
-from databricks.labs.ucx.workspace_access.base import (
-    AclSupport,
-    Destination,
-    Permissions,
-)
+from databricks.labs.ucx.workspace_access.base import AclSupport, Permissions
 from databricks.labs.ucx.workspace_access.groups import MigratedGroup, MigrationState
 
 
@@ -25,7 +21,7 @@ def test_applier():
             workspace_groups = [info.name_in_workspace for info in migration_state.groups]
             return item.object_id in workspace_groups
 
-        def get_apply_task(self, item: Permissions, migration_state: MigrationState, _: Destination):
+        def get_apply_task(self, item: Permissions, migration_state: MigrationState):
             if not self._is_item_relevant(item, migration_state):
                 return None
 
@@ -52,10 +48,10 @@ def test_applier():
         ]
     )
 
-    task = applier.get_apply_task(positive_item, migration_state, "backup")
+    task = applier.get_apply_task(positive_item, migration_state)
     task()
     assert applier.called
 
     negative_item = Permissions(object_id="not-here", object_type="test", raw="test")
-    task = applier.get_apply_task(negative_item, migration_state, "backup")
+    task = applier.get_apply_task(negative_item, migration_state)
     assert task is None

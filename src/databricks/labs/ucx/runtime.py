@@ -272,7 +272,7 @@ def apply_permissions_to_account_groups(cfg: WorkspaceConfig):
         num_threads=cfg.num_threads,
         workspace_start_path=cfg.workspace_start_path,
     )
-    permission_manager.apply_group_permissions(migration_state, destination="account")
+    permission_manager.apply_group_permissions(migration_state)
 
 
 @task("remove-workspace-local-backup-groups", depends_on=[apply_permissions_to_account_groups])

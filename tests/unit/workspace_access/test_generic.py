@@ -102,7 +102,7 @@ def test_apply(migration_state):
         ),
     )
 
-    _task = sup.get_apply_task(item, migration_state, "backup")
+    _task = sup.get_apply_task(item, migration_state)
     _task()
     ws.permissions.update.assert_called_once()
 
@@ -200,7 +200,7 @@ def test_passwords_tokens_crawler(migration_state):
     for item in auth_items:
         assert item.object_id in ["tokens", "passwords"]
         assert item.object_type == "authorization"
-        applier = sup.get_apply_task(item, migration_state, "backup")
+        applier = sup.get_apply_task(item, migration_state)
         applier()
         ws.permissions.update.assert_called_once_with(
             item.object_type,

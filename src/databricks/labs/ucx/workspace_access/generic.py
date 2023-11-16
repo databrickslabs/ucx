@@ -15,11 +15,7 @@ from databricks.sdk.service.iam import PermissionLevel
 
 from databricks.labs.ucx.framework.crawlers import CrawlerBase, SqlBackend
 from databricks.labs.ucx.mixins.hardening import rate_limited
-from databricks.labs.ucx.workspace_access.base import (
-    AclSupport,
-    Destination,
-    Permissions,
-)
+from databricks.labs.ucx.workspace_access.base import AclSupport, Permissions
 from databricks.labs.ucx.workspace_access.groups import MigrationState
 
 logger = logging.getLogger(__name__)
@@ -81,11 +77,11 @@ class GenericPermissionsSupport(AclSupport):
                 all_object_types.add(object_type)
         return all_object_types
 
-    def get_apply_task(self, item: Permissions, migration_state: MigrationState, destination: Destination):
+    def get_apply_task(self, item: Permissions, migration_state: MigrationState):
         if not self._is_item_relevant(item, migration_state):
             return None
         object_permissions = iam.ObjectPermissions.from_dict(json.loads(item.raw))
-        new_acl = self._prepare_new_acl(object_permissions, migration_state, destination)
+        new_acl = self._prepare_new_acl(object_permissions, migration_state)
         return partial(self._applier_task, item.object_type, item.object_id, new_acl)
 
     @staticmethod
@@ -239,7 +235,7 @@ class GenericPermissionsSupport(AclSupport):
                 raise RetryableError(message=msg) from e
 
     def _prepare_new_acl(
-        self, permissions: iam.ObjectPermissions, migration_state: MigrationState, destination: Destination
+        self, permissions: iam.ObjectPermissions, migration_state: MigrationState
     ) -> list[iam.AccessControlRequest]:
         _acl = permissions.access_control_list
         acl_requests = []

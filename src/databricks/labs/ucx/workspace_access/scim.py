@@ -10,11 +10,7 @@ from databricks.sdk.service import iam
 from databricks.sdk.service.iam import Group, Patch, PatchSchema
 
 from databricks.labs.ucx.mixins.hardening import rate_limited
-from databricks.labs.ucx.workspace_access.base import (
-    AclSupport,
-    Destination,
-    Permissions,
-)
+from databricks.labs.ucx.workspace_access.base import AclSupport, Permissions
 from databricks.labs.ucx.workspace_access.generic import RetryableError
 from databricks.labs.ucx.workspace_access.groups import MigrationState
 
@@ -46,7 +42,7 @@ class ScimSupport(AclSupport):
     def object_types(self) -> set[str]:
         return {"roles", "entitlements"}
 
-    def get_apply_task(self, item: Permissions, migration_state: MigrationState, destination: Destination):
+    def get_apply_task(self, item: Permissions, migration_state: MigrationState):
         if not self._is_item_relevant(item, migration_state):
             return None
         value = [iam.ComplexValue.from_dict(e) for e in json.loads(item.raw)]

@@ -8,11 +8,7 @@ from functools import partial
 from databricks.labs.ucx.framework.crawlers import SqlBackend
 from databricks.labs.ucx.hive_metastore import GrantsCrawler
 from databricks.labs.ucx.hive_metastore.grants import Grant
-from databricks.labs.ucx.workspace_access.base import (
-    AclSupport,
-    Destination,
-    Permissions,
-)
+from databricks.labs.ucx.workspace_access.base import AclSupport, Permissions
 from databricks.labs.ucx.workspace_access.groups import MigrationState
 
 
@@ -87,7 +83,7 @@ class TableAclSupport(AclSupport):
     def object_types(self) -> set[str]:
         return {"TABLE", "DATABASE", "VIEW", "CATALOG", "ANONYMOUS FUNCTION", "ANY FILE"}
 
-    def get_apply_task(self, item: Permissions, migration_state: MigrationState, destination: Destination):
+    def get_apply_task(self, item: Permissions, migration_state: MigrationState):
         grant = Grant(**json.loads(item.raw))
         target_principal = migration_state.get_target_principal(grant.principal)
         if target_principal is None:

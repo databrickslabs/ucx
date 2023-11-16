@@ -151,9 +151,7 @@ def test_manager_apply(mocker):
     mock_applier = mocker.Mock()
     mock_applier.object_types = lambda: {"clusters", "cluster-policies"}
     # this emulates a real applier and call to an API
-    mock_applier.get_apply_task = lambda item, _, dst: lambda: applied_items.add(
-        f"{item.object_id} {item.object_id} {dst}"
-    )
+    mock_applier.get_apply_task = lambda item, _: lambda: applied_items.add(f"{item.object_id} {item.object_id}")
 
     pm = PermissionManager(b, "test_database", [mock_applier])
     group_migration_state = MigrationState(
@@ -171,9 +169,9 @@ def test_manager_apply(mocker):
         ]
     )
 
-    pm.apply_group_permissions(group_migration_state, "backup")
+    pm.apply_group_permissions(group_migration_state)
 
-    assert {"test2 test2 backup", "test test backup"} == applied_items
+    assert {"test2 test2", "test test"} == applied_items
 
 
 def test_unregistered_support():
@@ -185,7 +183,7 @@ def test_unregistered_support():
         }
     )
     pm = PermissionManager(b, "test", [])
-    pm.apply_group_permissions(migration_state=MagicMock(), destination="backup")
+    pm.apply_group_permissions(migration_state=MagicMock())
 
 
 def test_factory(mocker):

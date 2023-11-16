@@ -227,7 +227,7 @@ def test_tacl_applier(mocker):
         )
     ]
     migration_state = MigrationState(grp)
-    task = table_acl_support.get_apply_task(permissions, migration_state, "backup")
+    task = table_acl_support.get_apply_task(permissions, migration_state)
     task()
 
     assert ["GRANT SELECT ON TABLE catalog_a.database_b.table_c TO `account-abc`"] == sql_backend.queries
@@ -263,7 +263,7 @@ def test_tacl_applier_multiple_actions(mocker):
         )
     ]
     migration_state = MigrationState(grp)
-    task = table_acl_support.get_apply_task(permissions, migration_state, "backup")
+    task = table_acl_support.get_apply_task(permissions, migration_state)
     task()
 
     assert ["GRANT SELECT, MODIFY ON TABLE catalog_a.database_b.table_c TO `account-abc`"] == sql_backend.queries
@@ -299,7 +299,7 @@ def test_tacl_applier_no_target_principal(mocker):
         )
     ]
     migration_state = MigrationState(grp)
-    task = table_acl_support.get_apply_task(permissions, migration_state, "backup")
+    task = table_acl_support.get_apply_task(permissions, migration_state)
     assert task is None
 
     assert [] == sql_backend.queries

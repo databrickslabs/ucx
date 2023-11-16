@@ -13,11 +13,7 @@ from databricks.sdk.service import sql
 from databricks.sdk.service.sql import ObjectTypePlural, SetResponse
 
 from databricks.labs.ucx.mixins.hardening import rate_limited
-from databricks.labs.ucx.workspace_access.base import (
-    AclSupport,
-    Destination,
-    Permissions,
-)
+from databricks.labs.ucx.workspace_access.base import AclSupport, Permissions
 from databricks.labs.ucx.workspace_access.generic import RetryableError
 from databricks.labs.ucx.workspace_access.groups import MigrationState
 
@@ -70,13 +66,11 @@ class RedashPermissionsSupport(AclSupport):
             all_object_types.add(listing.object_type)
         return all_object_types
 
-    def get_apply_task(self, item: Permissions, migration_state: MigrationState, destination: Destination):
+    def get_apply_task(self, item: Permissions, migration_state: MigrationState):
         if not self._is_item_relevant(item, migration_state):
             return None
         new_acl = self._prepare_new_acl(
-            sql.GetResponse.from_dict(json.loads(item.raw)).access_control_list,
-            migration_state,
-            destination,
+            sql.GetResponse.from_dict(json.loads(item.raw)).access_control_list, migration_state
         )
         return partial(
             self._applier_task,
@@ -138,7 +132,7 @@ class RedashPermissionsSupport(AclSupport):
         return retried_check(object_id, object_id, acl)
 
     def _prepare_new_acl(
-        self, acl: list[sql.AccessControl], migration_state: MigrationState, destination: Destination
+        self, acl: list[sql.AccessControl], migration_state: MigrationState
     ) -> list[sql.AccessControl]:
         """
         Please note the comment above on how we apply these permissions.

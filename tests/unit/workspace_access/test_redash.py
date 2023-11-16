@@ -99,7 +99,7 @@ def test_apply(migration_state):
             ).as_dict()
         ),
     )
-    task = sup.get_apply_task(item, migration_state, "backup")
+    task = sup.get_apply_task(item, migration_state)
     task()
     assert ws.dbsql_permissions.set.call_count == 1
     expected_payload = [

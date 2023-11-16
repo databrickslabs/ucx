@@ -169,10 +169,10 @@ def test_workspace_access_e2e(
     config = WorkspaceConfig(
         connect=ConnectConfig.from_databricks_config(ws.config),
         inventory_database=inventory_schema,
-        groups=GroupsConfig(selected=[ws_group.display_name]),
         workspace_start_path=directory,
         log_level="DEBUG",
         num_threads=8,
+        include_group_names=[ws_group.display_name],
     )
 
     warehouse_id = env_or_skip("TEST_DEFAULT_WAREHOUSE_ID")

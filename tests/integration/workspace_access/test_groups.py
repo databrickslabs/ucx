@@ -4,10 +4,7 @@ from datetime import timedelta
 import pytest
 from databricks.sdk.errors import NotFound
 from databricks.sdk.retries import retried
-from databricks.sdk.service.iam import (
-    PermissionLevel,
-    ResourceMeta,
-)
+from databricks.sdk.service.iam import PermissionLevel, ResourceMeta
 
 from databricks.labs.ucx.hive_metastore import GrantsCrawler, TablesCrawler
 from databricks.labs.ucx.hive_metastore.grants import Grant
@@ -77,8 +74,8 @@ def test_reflect_account_groups_on_workspace(ws, make_ucx_group, sql_backend, in
 
     reflected_group = ws.groups.get(acc_group.id)
     assert reflected_group.display_name == ws_group.display_name == acc_group.display_name
-    assert set(info.display for info in reflected_group.members) == set(info.display for info in ws_group.members)
-    assert set(info.display for info in reflected_group.members) == set(info.display for info in acc_group.members)
+    assert {info.display for info in reflected_group.members} == {info.display for info in ws_group.members}
+    assert {info.display for info in reflected_group.members} == {info.display for info in acc_group.members}
     assert reflected_group.meta == ResourceMeta(resource_type="Group")
     assert not reflected_group.roles  # Cannot create roles currently
     assert not reflected_group.entitlements  # Entitlements aren't reflected there

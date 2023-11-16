@@ -8,11 +8,7 @@ from databricks.sdk.retries import retried
 from databricks.sdk.service import workspace
 
 from databricks.labs.ucx.mixins.hardening import rate_limited
-from databricks.labs.ucx.workspace_access.base import (
-    AclSupport,
-    Destination,
-    Permissions,
-)
+from databricks.labs.ucx.workspace_access.base import AclSupport, Permissions
 from databricks.labs.ucx.workspace_access.groups import MigrationState
 
 logger = logging.getLogger(__name__)
@@ -42,7 +38,7 @@ class SecretScopesSupport(AclSupport):
     def object_types(self) -> set[str]:
         return {"secrets"}
 
-    def get_apply_task(self, item: Permissions, migration_state: MigrationState, destination: Destination):
+    def get_apply_task(self, item: Permissions, migration_state: MigrationState):
         if not self._is_item_relevant(item, migration_state):
             return None
 

@@ -35,7 +35,8 @@ def test_snapshot_with_group_created_in_account_console_should_be_considered():
             temporary_name="ucx-renamed-de",
             members='[{"display": "test-user-1", "value": "20"}, {"display": "test-user-2", "value": "21"}]',
             external_id="1234",
-            roles='[{"value": "arn:aws:iam::123456789098:instance-profile/ip1"}, {"value": "arn:aws:iam::123456789098:instance-profile/ip2"}]',
+            roles='[{"value": "arn:aws:iam::123456789098:instance-profile/ip1"}, '
+            '{"value": "arn:aws:iam::123456789098:instance-profile/ip2"}]',
             entitlements='[{"value": "allow-cluster-create"}, {"value": "allow-instance-pool-create"}]',
         )
     ]

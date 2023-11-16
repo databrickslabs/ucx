@@ -71,7 +71,7 @@ def test_secret_scopes_apply(migration_state: MigrationState):
         ),
     ]
 
-    task = sup.get_apply_task(item, migration_state, "backup")
+    task = sup.get_apply_task(item, migration_state)
     task()
     assert ws.secrets.put_acl.call_count == 2
 
