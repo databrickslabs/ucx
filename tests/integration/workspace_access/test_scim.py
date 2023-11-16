@@ -50,7 +50,7 @@ def test_scim(ws: WorkspaceClient, make_ucx_group, sql_backend, inventory_schema
     group_manager = GroupManager(sql_backend, ws, inventory_schema, include_group_names=[ws_group.display_name])
     migration_state = group_manager.get_migration_state()
     permission_manager = PermissionManager.factory(ws, sql_backend, inventory_database=inventory_schema)
-    permission_manager.apply_group_permissions(migration_state, destination="account")
+    permission_manager.apply_group_permissions(migration_state)
 
     old_group = ws.groups.get(ws_group.id)
     reflected_group = ws.groups.get(acc_group.id)

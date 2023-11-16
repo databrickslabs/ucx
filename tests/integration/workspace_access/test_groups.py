@@ -201,7 +201,7 @@ def test_replace_workspace_groups_with_account_groups(
 
     check_permissions_after_replace()
 
-    permission_manager.apply_group_permissions(state, destination="account")
+    permission_manager.apply_group_permissions(state)
 
     @retried(on=[AssertionError], timeout=timedelta(seconds=30))
     def check_permissions_for_account_group():
@@ -307,7 +307,7 @@ def test_set_owner_permission(
 
     check_permissions_after_replace()
 
-    permission_manager.apply_group_permissions(state, destination="account")
+    permission_manager.apply_group_permissions(state)
 
     @retried(on=[AssertionError], timeout=timedelta(seconds=30))
     def check_permissions_for_account_group():
