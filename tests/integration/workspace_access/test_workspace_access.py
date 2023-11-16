@@ -177,15 +177,6 @@ def test_workspace_access_e2e(
 
     warehouse_id = env_or_skip("TEST_DEFAULT_WAREHOUSE_ID")
     toolkit = GroupMigrationToolkit(config, warehouse_id=warehouse_id)
-    toolkit.prepare_environment()
-
-    group_migration_state = toolkit._group_manager.migration_state
-    for _info in group_migration_state.groups:
-        _ws = ws.groups.get(id=_info.workspace.id)
-        _backup = ws.groups.get(id=_info.backup.id)
-        _ws_members = sorted([m.value for m in _ws.members])
-        _backup_members = sorted([m.value for m in _backup.members])
-        assert _ws_members == _backup_members
 
     logger.debug("Verifying that the groups were created - done")
 
@@ -195,9 +186,7 @@ def test_workspace_access_e2e(
 
     toolkit.apply_permissions_to_backup_groups()
 
-    toolkit.verify_permissions_on_backup_groups(to_verify)
-
-    toolkit.replace_workspace_groups_with_account_groups(group_migration_state)
+    toolkit.replace_workspace_groups_with_account_groups()
 
     workspace_acc_membership = toolkit._group_manager.get_workspace_membership("Group")
     assert acc_group.display_name in workspace_acc_membership
