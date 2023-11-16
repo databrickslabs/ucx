@@ -18,7 +18,7 @@ from databricks.labs.ucx.workspace_access.groups import GroupManager
 logger = logging.getLogger(__name__)
 
 
-def test_destroying_non_existing_schema_fails_with_correct_message(ws, sql_backend, env_or_skip, make_random):
+def test_job_failure_propagates_correct_error_message_and_logs(ws, sql_backend, env_or_skip, make_random):
     default_cluster_id = env_or_skip("TEST_DEFAULT_CLUSTER_ID")
     tacl_cluster_id = env_or_skip("TEST_LEGACY_TABLE_ACL_CLUSTER_ID")
     ws.clusters.ensure_cluster_is_running(default_cluster_id)
@@ -44,34 +44,12 @@ def test_destroying_non_existing_schema_fails_with_correct_message(ws, sql_backe
         },
     )
 
+    sql_backend.execute(f"DROP DATABASE {inventory_database}")
+
     with pytest.raises(OperationFailed) as failure:
         install.run_workflow("099-destroy-schema")
 
     assert "cannot be found" in str(failure.value)
-
-
-def test_logs_are_available(ws, sql_backend, env_or_skip, make_random):
-    default_cluster_id = env_or_skip("TEST_DEFAULT_CLUSTER_ID")
-    ws.clusters.ensure_cluster_is_running(default_cluster_id)
-
-    install = WorkspaceInstaller.run_for_config(
-        ws,
-        WorkspaceConfig(
-            inventory_database=f"ucx_{make_random(4)}",
-            instance_pool_id=env_or_skip("TEST_INSTANCE_POOL_ID"),
-            groups=GroupsConfig(auto=True),
-            log_level="INFO",
-        ),
-        sql_backend=sql_backend,
-        prefix=make_random(4),
-        override_clusters={
-            "main": default_cluster_id,
-        },
-    )
-
-    with pytest.raises(OperationFailed):
-        install.run_workflow("099-destroy-schema")
-        assert True
 
     workflow_run_logs = list(ws.workspace.list(f"{install._install_folder}/logs"))
     assert len(workflow_run_logs) == 1
