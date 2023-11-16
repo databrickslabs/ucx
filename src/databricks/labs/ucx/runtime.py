@@ -27,127 +27,7 @@ from databricks.labs.ucx.workspace_access.manager import PermissionManager
 logger = logging.getLogger(__name__)
 
 
-def _get_view_definition() -> str:
-    return """CREATE
-OR REPLACE VIEW $inventory.failure_details AS WITH failuretab (object_type, object_id, failures) AS (
-  SELECT
-    object_type,
-    object_id,
-    failures
-  FROM
-    (
-      SELECT
-        "jobs" AS object_type,
-        job_id AS object_id,
-        failures
-      FROM
-        $inventory.jobs
-      WHERE
-        failures IS NOT NULL
-        AND failures != '[]'
-      UNION ALL
-      SELECT
-        "clusters" AS object_type,
-        cluster_id AS object_id,
-        failures
-      FROM
-        $inventory.clusters
-      WHERE
-        failures IS NOT NULL
-        AND failures != '[]'
-      UNION ALL
-      SELECT
-        "global init scripts" AS object_type,
-        script_id AS object_id,
-        failures
-      FROM
-        $inventory.global_init_scripts
-      WHERE
-        failures IS NOT NULL
-        AND failures != '[]'
-      UNION ALL
-      SELECT
-        "pipelines" AS object_type,
-        pipeline_id AS object_id,
-        failures
-      FROM
-        $inventory.pipelines
-      WHERE
-        failures IS NOT NULL
-        AND failures != '[]'
-      UNION ALL
-      SELECT
-        object_type,
-        object_id,
-        failures
-      FROM
-        (
-          SELECT
-            "Table" as object_type,
-            CONCAT(catalog, '.', database, '.', name) AS object_id,
-            TO_JSON(
-              ARRAY(
-                CASE
-                  WHEN STARTSWITH(location, "wasb") THEN "Unsupported Storage Type"
-                  WHEN STARTSWITH(location, "adl") THEN "Unsupported Storage Type"
-                  WHEN STARTSWITH(location, "dbfs:/mnt") THEN "DBFS Mount"
-                  WHEN STARTSWITH(location, "/dbfs/mnt") THEN "DBFS Mount"
-                  WHEN STARTSWITH(location, "dbfs:/") THEN "DBFS Root"
-                  WHEN STARTSWITH(location, "/dbfs/") THEN "DBFS Root"
-                  ELSE NULL
-                END,
-                IF(table_format != "delta", "Non Delta", NULL)
-              )
-            ) AS failures
-          FROM
-            $inventory.tables
-          WHERE
-            object_type IN ("MANAGED", "EXTERNAL")
-        )
-      WHERE
-        failures != '[null,null]'
-      UNION ALL
-      SELECT
-        CASE
-          WHEN instr(error, "ignoring database") > 0 THEN "Database"
-          WHEN instr(error, "ignoring table") > 0 THEN "Table"
-        END AS object_type,
-        CASE
-          WHEN instr(error, "ignoring database") > 0 THEN concat(catalog, '.', database)
-          WHEN instr(error, "ignoring table") > 0 THEN concat(catalog, '.', database, '.', name)
-        END AS object_id,
-        TO_JSON(ARRAY(error)) AS failures
-      FROM
-        $inventory.table_failures
-      WHERE
-        error IS NOT NULL
-        AND error != ""
-    )
-)
-SELECT
-  object_type,
-  object_id,
-  failures
-FROM
-  failuretab
-WHERE
-  failures IS NOT NULL
-  AND failures != ""
-ORDER BY
-  object_id,
-  object_type,
-  failures;"""
-
-
-@task("assessment")
-def setup_schema(cfg: WorkspaceConfig):
-    """Creates a database for the UCX migration intermediate state. The name comes from the configuration file
-    and is set with the `inventory_database` key."""
-    backend = RuntimeBackend()
-    backend.execute(f"CREATE SCHEMA IF NOT EXISTS hive_metastore.{cfg.inventory_database}")
-
-
-@task("assessment", depends_on=[setup_schema], notebook="hive_metastore/tables.scala")
+@task("assessment", notebook="hive_metastore/tables.scala")
 def crawl_tables(_: WorkspaceConfig):
     """Iterates over all tables in the Hive Metastore of the current workspace and persists their metadata, such
     as _database name_, _table name_, _table type_, _table location_, etc., in the Delta table named
@@ -177,7 +57,7 @@ def crawl_grants(cfg: WorkspaceConfig):
     grants.snapshot()
 
 
-@task("assessment", depends_on=[setup_schema])
+@task("assessment")
 def crawl_mounts(cfg: WorkspaceConfig):
     """Defines the scope of the _mount points_ intended for migration into Unity Catalog. As these objects are not
     compatible with the Unity Catalog paradigm, a key component of the migration process involves transferring them
@@ -205,7 +85,7 @@ def guess_external_locations(cfg: WorkspaceConfig):
     crawler.snapshot()
 
 
-@task("assessment", depends_on=[setup_schema])
+@task("assessment")
 def assess_jobs(cfg: WorkspaceConfig):
     """Scans through all the jobs and identifies those that are not compatible with UC. The list of all the jobs is
     stored in the `$inventory.jobs` table.
@@ -221,7 +101,7 @@ def assess_jobs(cfg: WorkspaceConfig):
     crawler.snapshot()
 
 
-@task("assessment", depends_on=[setup_schema])
+@task("assessment")
 def assess_clusters(cfg: WorkspaceConfig):
     """Scan through all the clusters and identifies those that are not compatible with UC. The list of all the clusters
     is stored in the`$inventory.clusters` table.
@@ -237,7 +117,7 @@ def assess_clusters(cfg: WorkspaceConfig):
     crawler.snapshot()
 
 
-@task("assessment", depends_on=[setup_schema])
+@task("assessment")
 def assess_pipelines(cfg: WorkspaceConfig):
     """This module scans through all the Pipelines and identifies those pipelines which has Azure Service Principals
     embedded (who has been given access to the Azure storage accounts via spark configurations) in the pipeline
@@ -253,7 +133,7 @@ def assess_pipelines(cfg: WorkspaceConfig):
     crawler.snapshot()
 
 
-@task("assessment", depends_on=[setup_schema])
+@task("assessment")
 def assess_azure_service_principals(cfg: WorkspaceConfig):
     """This module scans through all the clusters configurations, cluster policies, job cluster configurations,
     Pipeline configurations, Warehouse configuration and identifies all the Azure Service Principals who has been
@@ -269,7 +149,7 @@ def assess_azure_service_principals(cfg: WorkspaceConfig):
     crawler.snapshot()
 
 
-@task("assessment", depends_on=[setup_schema])
+@task("assessment")
 def assess_global_init_scripts(cfg: WorkspaceConfig):
     """This module scans through all the global init scripts and identifies if there is an Azure Service Principal
     who has been given access to the Azure storage accounts via spark configurations referred in those scripts.
@@ -281,7 +161,7 @@ def assess_global_init_scripts(cfg: WorkspaceConfig):
     crawler.snapshot()
 
 
-@task("assessment", depends_on=[setup_schema])
+@task("assessment")
 def workspace_listing(cfg: WorkspaceConfig):
     """Scans the workspace for workspace objects. It recursively list all sub directories
     and compiles a list of directories, notebooks, files, repos and libraries in the workspace.
@@ -317,6 +197,9 @@ def crawl_permissions(cfg: WorkspaceConfig):
 @task(
     "assessment",
     depends_on=[
+        crawl_grants,
+        crawl_permissions,
+        guess_external_locations,
         assess_jobs,
         assess_clusters,
         assess_pipelines,
@@ -324,26 +207,6 @@ def crawl_permissions(cfg: WorkspaceConfig):
         assess_global_init_scripts,
         crawl_tables,
     ],
-)
-def setup_view(cfg: WorkspaceConfig):
-    """Creates a database view for capturing following details as part of the assessment process:
-    - Unsupported DBR version
-    - Unsupported config
-    - DBFS mount used in configuration
-    - Azure service principal credentials used in config
-    - Unsupported storage type (WASBS, ADL) used in table location
-    - DBFS root and DBFS Mount location used in table location
-    - Non Delta tables
-    - Table scan failures
-    - Database scan failures
-    """
-    backend = RuntimeBackend()
-    backend.execute(cfg.replace_inventory_variable(_get_view_definition()))
-
-
-@task(
-    "assessment",
-    depends_on=[crawl_grants, crawl_permissions, guess_external_locations, setup_view],
     dashboard="assessment_main",
 )
 def assessment_report(_: WorkspaceConfig):

@@ -23,12 +23,30 @@ from databricks.sdk.service.sql import EndpointInfoWarehouseType, SpotInstancePo
 from databricks.sdk.service.workspace import ImportFormat
 
 from databricks.labs.ucx.__about__ import __version__
+from databricks.labs.ucx.assessment.crawlers import (
+    AzureServicePrincipalInfo,
+    ClusterInfo,
+    GlobalInitScriptInfo,
+    JobInfo,
+    PipelineInfo,
+)
 from databricks.labs.ucx.config import GroupsConfig, WorkspaceConfig
+from databricks.labs.ucx.framework.crawlers import (
+    SchemaDeployer,
+    SqlBackend,
+    StatementExecutionBackend,
+)
 from databricks.labs.ucx.framework.dashboards import DashboardFromFiles
 from databricks.labs.ucx.framework.install_state import InstallState
 from databricks.labs.ucx.framework.tasks import _TASKS, Task
 from databricks.labs.ucx.hive_metastore.hms_lineage import HiveMetastoreLineageEnabler
+from databricks.labs.ucx.hive_metastore.data_objects import ExternalLocation
+from databricks.labs.ucx.hive_metastore.grants import Grant
+from databricks.labs.ucx.hive_metastore.mounts import Mount
+from databricks.labs.ucx.hive_metastore.tables import Table, TableError
 from databricks.labs.ucx.runtime import main
+from databricks.labs.ucx.workspace_access.base import Permissions
+from databricks.labs.ucx.workspace_access.generic import WorkspaceObjectInfo
 
 TAG_STEP = "step"
 TAG_APP = "App"
@@ -89,12 +107,36 @@ main(f'--config=/Workspace{config_file}',
 logger = logging.getLogger(__name__)
 
 
+def deploy_schema(sql_backend: SqlBackend, inventory_schema: str):
+    from databricks.labs import ucx
+
+    deployer = SchemaDeployer(sql_backend, inventory_schema, ucx)
+    deployer.deploy_schema()
+    deployer.deploy_table("azure_service_principals", AzureServicePrincipalInfo)
+    deployer.deploy_table("clusters", ClusterInfo)
+    deployer.deploy_table("global_init_scripts", GlobalInitScriptInfo)
+    deployer.deploy_table("jobs", JobInfo)
+    deployer.deploy_table("pipelines", PipelineInfo)
+    deployer.deploy_table("external_locations", ExternalLocation)
+    deployer.deploy_table("mounts", Mount)
+    deployer.deploy_table("grants", Grant)
+    deployer.deploy_table("tables", Table)
+    deployer.deploy_table("table_failures", TableError)
+    deployer.deploy_table("workspace_objects", WorkspaceObjectInfo)
+    deployer.deploy_table("permissions", Permissions)
+    deployer.deploy_view("objects", "queries/views/objects.sql")
+    deployer.deploy_view("grant_detail", "queries/views/grant_detail.sql")
+
+
 class WorkspaceInstaller:
-    def __init__(self, ws: WorkspaceClient, *, prefix: str = "ucx", promtps: bool = True):
+    def __init__(
+        self, ws: WorkspaceClient, *, prefix: str = "ucx", promtps: bool = True, sql_backend: SqlBackend = None
+    ):
         if "DATABRICKS_RUNTIME_VERSION" in os.environ:
             msg = "WorkspaceInstaller is not supposed to be executed in Databricks Runtime"
             raise SystemExit(msg)
         self._ws = ws
+        self._sql_backend = sql_backend
         self._prefix = prefix
         self._prompts = promtps
         self._this_file = Path(__file__)
@@ -111,9 +153,16 @@ class WorkspaceInstaller:
         self._install_spark_config_for_hms_lineage()
         self._create_dashboards()
         self._create_jobs()
+        self._create_database()
+        readme = f'{self._notebook_link(f"{self._install_folder}/README.py")}'
         readme = f'{self.notebook_link(f"{self._install_folder}/README.py")}'
         msg = f"Installation completed successfully! Please refer to the {readme} notebook for next steps."
         logger.info(msg)
+
+    def _create_database(self):
+        if self._sql_backend is None:
+            self._sql_backend = StatementExecutionBackend(self._ws, self._current_config.warehouse_id)
+        deploy_schema(self._sql_backend, self._current_config.inventory_database)
 
     def _install_spark_config_for_hms_lineage(self):
         hms_lineage = HiveMetastoreLineageEnabler(ws=self._ws)
@@ -157,10 +206,15 @@ class WorkspaceInstaller:
 
     @staticmethod
     def run_for_config(
-        ws: WorkspaceClient, config: WorkspaceConfig, *, prefix="ucx", override_clusters: dict[str, str] | None = None
+        ws: WorkspaceClient,
+        config: WorkspaceConfig,
+        *,
+        prefix="ucx",
+        override_clusters: dict[str, str] | None = None,
+        sql_backend: SqlBackend = None,
     ) -> "WorkspaceInstaller":
         logger.info(f"Installing UCX v{__version__} on {ws.config.host}")
-        workspace_installer = WorkspaceInstaller(ws, prefix=prefix, promtps=False)
+        workspace_installer = WorkspaceInstaller(ws, prefix=prefix, promtps=False, sql_backend=sql_backend)
         logger.info(f"Installing UCX v{workspace_installer._version} on {ws.config.host}")
         workspace_installer._config = config
         workspace_installer._write_config()

@@ -36,6 +36,7 @@ def test_destroying_non_existing_schema_fails_with_correct_message(ws, sql_backe
             ),
             log_level="DEBUG",
         ),
+        sql_backend=sql_backend,
         prefix=make_random(4),
         override_clusters={
             "main": default_cluster_id,
@@ -61,6 +62,7 @@ def test_logs_are_available(ws, sql_backend, env_or_skip, make_random):
             groups=GroupsConfig(auto=True),
             log_level="INFO",
         ),
+        sql_backend=sql_backend,
         prefix=make_random(4),
         override_clusters={
             "main": default_cluster_id,
@@ -172,6 +174,7 @@ def test_jobs_with_no_inventory_database(
             ),
             log_level="DEBUG",
         ),
+        sql_backend=sql_backend,
         prefix=make_random(4),
         override_clusters={
             "main": default_cluster_id,

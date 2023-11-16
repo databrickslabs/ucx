@@ -1,10 +1,8 @@
--- viz type=table, name=Table Types, columns=database,name,type,format,table_view,storage,is_delta,location
--- widget title=Table Types, col=0, row=3, size_x=6, size_y=6
-SELECT `database`,
-       name,
+-- viz type=table, name=Table Types, search_by=name, columns=name,type,format,storage,is_delta,location
+-- widget title=Table Types, row=1, col=3, size_x=3, size_y=8
+SELECT CONCAT(`database`, '.', name) AS name,
        object_type AS type,
        UPPER(table_format) AS format,
-       IF(object_type IN ("MANAGED", "EXTERNAL"), "TABLE", "VIEW") AS table_view,
        CASE
            WHEN STARTSWITH(location, "dbfs:/mnt") THEN "DBFS MOUNT"
            WHEN STARTSWITH(location, "/dbfs/mnt") THEN "DBFS MOUNT"

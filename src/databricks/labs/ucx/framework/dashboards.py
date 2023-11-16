@@ -316,6 +316,7 @@ class DashboardFromFiles:
         condensed=True,
         with_row_number=False,
         description: str | None = None,
+        search_by: str | None = None,
     ) -> dict:
         return {
             "type": "TABLE",
@@ -326,7 +327,9 @@ class DashboardFromFiles:
                 "condensed": condensed,
                 "withRowNumber": with_row_number,
                 "version": 2,
-                "columns": [VizColumn(name=x, title=x).as_dict() for x in columns.split(",")],
+                "columns": [
+                    VizColumn(name=x, title=x, allowSearch=x == search_by).as_dict() for x in columns.split(",")
+                ],
             },
         }
 
