@@ -3,10 +3,7 @@ from unittest.mock import MagicMock
 from databricks.sdk.service import iam
 from databricks.sdk.service.iam import ComplexValue, Group, ResourceMeta
 
-from databricks.labs.ucx.workspace_access.groups import (
-    GroupManager,
-    MigratedGroup,
-)
+from databricks.labs.ucx.workspace_access.groups import GroupManager, MigratedGroup
 from tests.unit.framework.mocks import MockBackend
 
 
@@ -37,7 +34,7 @@ def test_snapshot_with_group_created_in_account_console_should_be_considered():
             name_in_account="de",
             temporary_name="ucx-renamed-de",
             members='[{"display": "test-user-1", "value": "20"}, {"display": "test-user-2", "value": "21"}]',
-            external_id='1234',
+            external_id="1234",
             roles='[{"value": "arn:aws:iam::123456789098:instance-profile/ip1"}, {"value": "arn:aws:iam::123456789098:instance-profile/ip2"}]',
             entitlements='[{"value": "allow-cluster-create"}, {"value": "allow-instance-pool-create"}]',
         )
@@ -155,7 +152,7 @@ def test_snapshot_should_consider_groups_defined_in_conf():
             name_in_account="de",
             temporary_name="ucx-renamed-de",
             members=None,
-            external_id='11',
+            external_id="11",
             roles=None,
             entitlements=None,
         )
@@ -181,7 +178,7 @@ def test_snapshot_should_rename_groups_defined_in_conf():
             name_in_account="de",
             temporary_name="test-group-de",
             members=None,
-            external_id='11',
+            external_id="11",
             roles=None,
             entitlements=None,
         ),

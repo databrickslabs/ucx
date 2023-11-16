@@ -1,7 +1,6 @@
 from collections.abc import Callable, Iterator
 from functools import partial
 
-
 from databricks.labs.ucx.workspace_access.base import (
     AclSupport,
     Destination,
