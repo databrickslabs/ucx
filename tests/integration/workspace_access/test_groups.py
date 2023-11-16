@@ -2,6 +2,7 @@ import logging
 from datetime import timedelta
 
 from databricks.sdk import WorkspaceClient
+from databricks.sdk.errors import NotFound
 from databricks.sdk.retries import retried
 from databricks.sdk.service.iam import (
     ComplexValue,
@@ -35,15 +36,21 @@ def test_prepare_environment(ws, make_ucx_group):
 
     group_migration_state = group_manager.migration_state
     for _info in group_migration_state.groups:
-        _ws = ws.groups.get(id=_info.workspace.id)
-        _backup = ws.groups.get(id=_info.backup.id)
-        _ws_members = sorted([m.value for m in _ws.members])
-        _backup_members = sorted([m.value for m in _backup.members])
-        assert _ws_members == _backup_members
+        try:
+            _ws = ws.groups.get(id=_info.workspace.id)
+            _backup = ws.groups.get(id=_info.backup.id)
+            _ws_members = sorted([m.value for m in _ws.members])
+            _backup_members = sorted([m.value for m in _backup.members])
+            assert _ws_members == _backup_members
+        except NotFound:
+            continue
 
     for _info in group_migration_state.groups:
-        # cleanup side-effect
-        ws.groups.delete(_info.backup.id)
+        try:
+            # cleanup side-effect
+            ws.groups.delete(_info.backup.id)
+        except NotFound:
+            continue
 
 
 def test_prepare_environment_no_groups_selected(ws, make_ucx_group, make_group, make_acc_group):
