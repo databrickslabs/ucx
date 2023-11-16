@@ -1,6 +1,5 @@
 import logging
 from collections import defaultdict
-from collections.abc import Iterator
 from dataclasses import dataclass
 from functools import partial
 
@@ -198,7 +197,7 @@ class GrantsCrawler(CrawlerBase):
         view: str | None = None,
         any_file: bool = False,
         anonymous_function: bool = False,
-    ) -> Iterator[Grant]:
+    ) -> list[Grant]:
         """
         Fetches and yields grant information for the specified database objects.
 
@@ -239,6 +238,7 @@ class GrantsCrawler(CrawlerBase):
             anonymous_function=anonymous_function,
         )
         try:
+            grants = []
             object_type_normalization = {"SCHEMA": "DATABASE", "CATALOG$": "CATALOG"}
             for row in self._fetch(f"SHOW GRANTS ON {on_type} {key}"):
                 (principal, action_type, object_type, _) = row
@@ -246,16 +246,21 @@ class GrantsCrawler(CrawlerBase):
                     object_type = object_type_normalization[object_type]
                 if on_type != object_type:
                     continue
-                yield Grant(
-                    principal=principal,
-                    action_type=action_type,
-                    table=table,
-                    view=view,
-                    database=database,
-                    catalog=catalog,
-                    any_file=any_file,
-                    anonymous_function=anonymous_function,
+                # we have to return concrete list, as with yield we're executing
+                # everything on the main thread.
+                grants.append(
+                    Grant(
+                        principal=principal,
+                        action_type=action_type,
+                        table=table,
+                        view=view,
+                        database=database,
+                        catalog=catalog,
+                        any_file=any_file,
+                        anonymous_function=anonymous_function,
+                    )
                 )
+                return grants
         except Exception as e:
             # TODO: https://github.com/databrickslabs/ucx/issues/406
             logger.error(f"Couldn't fetch grants for object {on_type} {key}: {e}")

@@ -31,6 +31,8 @@ from databricks.labs.ucx.framework.dashboards import DashboardFromFiles
 from databricks.labs.ucx.framework.install_state import InstallState
 from databricks.labs.ucx.install import WorkspaceInstaller
 
+from ..unit.framework.mocks import MockBackend
+
 
 @pytest.fixture
 def ws(mocker):
@@ -56,7 +58,10 @@ def ws(mocker):
 
 def test_replace_clusters_for_integration_tests(ws):
     return_value = WorkspaceInstaller.run_for_config(
-        ws, WorkspaceConfig(inventory_database="a", groups=GroupsConfig(auto=True)), override_clusters={"main": "abc"}
+        ws,
+        WorkspaceConfig(inventory_database="a", groups=GroupsConfig(auto=True)),
+        override_clusters={"main": "abc"},
+        sql_backend=MockBackend(),
     )
     assert return_value
 
@@ -330,7 +335,7 @@ def test_main_with_existing_conf_does_not_recreate_config(ws, mocker):
     ws.queries.create.return_value = Query(id="abc")
     ws.query_visualizations.create.return_value = Visualization(id="abc")
     ws.dashboard_widgets.create.return_value = Widget(id="abc")
-    install = WorkspaceInstaller(ws)
+    install = WorkspaceInstaller(ws, sql_backend=MockBackend())
     install._build_wheel = lambda _: Path(__file__)
     install.run()
 
