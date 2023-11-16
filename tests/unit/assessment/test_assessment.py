@@ -68,10 +68,10 @@ def test_external_locations():
     ]
     sample_mounts = [Mount("/mnt/ucx", "s3://us-east-1-ucx-container")]
     result_set = crawler._external_locations(sample_locations, sample_mounts)
-    assert len(result_set) == 3
+    assert len(result_set) == 4
     assert result_set[0].location == "s3://us-east-1-dev-account-staging-uc-ext-loc-bucket-1/Location/"
     assert result_set[1].location == "s3://us-east-1-dev-account-staging-uc-ext-loc-bucket-23/"
-    assert result_set[2].location == "jdbc:databricks://dbc-test1-aa11.cloud.databricks.com"
+    assert result_set[3].location == "jdbc:databricks://dbc-test1-aa11.cloud.databricks.com"
 
 
 def test_job_assessment():
