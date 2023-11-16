@@ -212,7 +212,6 @@ class WorkspaceInstaller:
         override_clusters: dict[str, str] | None = None,
         sql_backend: SqlBackend = None,
     ) -> "WorkspaceInstaller":
-        logger.info(f"Installing UCX v{__version__} on {ws.config.host}")
         workspace_installer = WorkspaceInstaller(ws, prefix=prefix, promtps=False, sql_backend=sql_backend)
         logger.info(f"Installing UCX v{workspace_installer._version} on {ws.config.host}")
         workspace_installer._config = config
