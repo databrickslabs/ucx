@@ -44,7 +44,7 @@ def test_job_failure_propagates_correct_error_message_and_logs(ws, sql_backend, 
         },
     )
 
-    sql_backend.execute(f"DROP DATABASE {inventory_database}")
+    sql_backend.execute(f"DROP SCHEMA {inventory_database} CASCADE")
 
     with pytest.raises(OperationFailed) as failure:
         install.run_workflow("099-destroy-schema")
