@@ -154,7 +154,6 @@ class WorkspaceInstaller:
         self._create_dashboards()
         self._create_jobs()
         self._create_database()
-        readme = f'{self._notebook_link(f"{self._install_folder}/README.py")}'
         readme = f'{self.notebook_link(f"{self._install_folder}/README.py")}'
         msg = f"Installation completed successfully! Please refer to the {readme} notebook for next steps."
         logger.info(msg)
