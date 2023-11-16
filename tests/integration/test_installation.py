@@ -2,7 +2,7 @@ import logging
 from datetime import timedelta
 
 import pytest
-from databricks.sdk.errors import OperationFailed
+from databricks.sdk.errors import NotFound, OperationFailed
 from databricks.sdk.retries import retried
 from databricks.sdk.service.catalog import SchemaInfo
 from databricks.sdk.service.iam import PermissionLevel
@@ -77,6 +77,7 @@ def test_logs_are_available(ws, sql_backend, env_or_skip, make_random):
     assert len(workflow_run_logs) == 1
 
 
+@retried(on=[NotFound], timeout=timedelta(minutes=15))
 def test_jobs_with_no_inventory_database(
     ws,
     sql_backend,
@@ -247,6 +248,6 @@ def test_jobs_with_no_inventory_database(
         logger.debug(f"cleaning up install folder: {install._install_folder}")
         ws.workspace.delete(install._install_folder, recursive=True)
 
-        for step, job_id in install._deployed_steps.items():
+        for step, job_id in install._state.jobs.items():
             logger.debug(f"cleaning up {step} job_id={job_id}")
             ws.jobs.delete(job_id)
