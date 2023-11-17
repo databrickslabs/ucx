@@ -68,7 +68,6 @@ class SecretScopesSupport(AclSupport):
         mentioned_groups = [acl.principal for acl in acls]
         return any(g in mentioned_groups for g in [info.name_in_workspace for info in migration_state.groups])
 
-
     def secret_scope_permission(self, scope_name: str, group_name: str) -> workspace.AclPermission | None:
         for acl in self._ws.secrets.list_acls(scope=scope_name):
             if acl.principal == group_name:

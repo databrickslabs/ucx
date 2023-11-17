@@ -30,12 +30,12 @@ from databricks.labs.ucx.assessment.crawlers import (
     JobInfo,
     PipelineInfo,
 )
+from databricks.labs.ucx.config import WorkspaceConfig
 from databricks.labs.ucx.framework.crawlers import (
     SchemaDeployer,
     SqlBackend,
     StatementExecutionBackend,
 )
-from databricks.labs.ucx.config import WorkspaceConfig
 from databricks.labs.ucx.framework.dashboards import DashboardFromFiles
 from databricks.labs.ucx.framework.install_state import InstallState
 from databricks.labs.ucx.framework.tasks import _TASKS, Task

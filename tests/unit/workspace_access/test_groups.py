@@ -367,7 +367,7 @@ def test_delete_original_workspace_groups_should_delete_relected_acc_groups_in_w
     wsclient.groups.list.return_value = [temp_group, reflected_group]
 
     GroupManager(backend, wsclient, inventory_database="inv").delete_original_workspace_groups()
-    wsclient.groups.delete.assert_called_with(ws_id)
+    wsclient.groups.delete.assert_called_with(id=ws_id)
 
 
 def test_delete_original_workspace_groups_should_not_delete_groups_not_renamed():

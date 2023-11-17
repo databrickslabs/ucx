@@ -1,6 +1,7 @@
 import json
 import logging
 from datetime import timedelta
+
 import pytest
 from databricks.sdk.errors import NotFound
 from databricks.sdk.retries import retried
@@ -115,6 +116,7 @@ def test_delete_ws_groups_should_not_delete_non_reflected_acc_groups(ws, make_uc
     group_manager.delete_original_workspace_groups()
 
     assert ws.groups.get(ws_group.id).display_name == "ucx-temp-" + ws_group.display_name
+
 
 def test_replace_workspace_groups_with_account_groups(
     ws,
@@ -236,7 +238,7 @@ def test_replace_workspace_groups_with_account_groups(
         assert "SELECT" in table_permissions[group_info.name_in_account]
 
     check_table_permissions_after_backup_delete()
- 
+
 
 @retried(on=[NotFound], timeout=timedelta(minutes=10))
 def test_set_owner_permission(

@@ -5,6 +5,7 @@ from databricks.labs.ucx.workspace_access.groups import GroupManager
 from databricks.labs.ucx.workspace_access.manager import PermissionManager
 from databricks.labs.ucx.workspace_access.scim import ScimSupport
 
+
 # TODO: (nfx) databricks.sdk.errors.mapping.ResourceConflict: None Group with name db-temp-ucx_QSFR already exists.
 def test_scim(ws: WorkspaceClient, make_ucx_group, sql_backend, inventory_schema, make_pipeline):
     """

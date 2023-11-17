@@ -14,7 +14,6 @@ from databricks.labs.ucx.workspace_access.base import AclSupport, Permissions
 from databricks.labs.ucx.workspace_access.generic import RetryableError
 from databricks.labs.ucx.workspace_access.groups import MigrationState
 
-
 logger = logging.getLogger(__name__)
 
 
