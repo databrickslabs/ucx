@@ -15,7 +15,7 @@ from typing import Any
 
 import yaml
 from databricks.sdk import WorkspaceClient
-from databricks.sdk.errors import NotFound, OperationFailed
+from databricks.sdk.errors import InvalidParameterValue, NotFound, OperationFailed
 from databricks.sdk.mixins.compute import SemVer
 from databricks.sdk.service import compute, jobs
 from databricks.sdk.service.sql import EndpointInfoWarehouseType, SpotInstancePolicy
@@ -457,23 +457,34 @@ class WorkspaceInstaller:
             settings = self._job_settings(step_name, remote_wheel)
             if self._override_clusters:
                 settings = self._apply_cluster_overrides(settings, self._override_clusters, wheel_runner)
-            if step_name in self._state.jobs:
-                job_id = self._state.jobs[step_name]
-                logger.info(f"Updating configuration for step={step_name} job_id={job_id}")
-                self._ws.jobs.reset(job_id, jobs.JobSettings(**settings))
-            else:
-                logger.info(f"Creating new job configuration for step={step_name}")
-                job_id = self._ws.jobs.create(**settings).job_id
-                self._state.jobs[step_name] = job_id
+            self._deploy_workflow(step_name, settings)
 
         for step_name, job_id in self._state.jobs.items():
             if step_name not in desired_steps:
-                logger.info(f"Removing job_id={job_id}, as it is no longer needed")
-                self._ws.jobs.delete(job_id)
+                try:
+                    logger.info(f"Removing job_id={job_id}, as it is no longer needed")
+                    self._ws.jobs.delete(job_id)
+                except InvalidParameterValue:
+                    logger.warning(f"step={step_name} does not exist anymore for some reason")
+                    continue
 
         self._state.save()
         self._create_readme()
         self._create_debug(remote_wheel)
+
+    def _deploy_workflow(self, step_name: str, settings):
+        if step_name in self._state.jobs:
+            try:
+                job_id = self._state.jobs[step_name]
+                logger.info(f"Updating configuration for step={step_name} job_id={job_id}")
+                return self._ws.jobs.reset(job_id, jobs.JobSettings(**settings))
+            except InvalidParameterValue:
+                del self._state.jobs[step_name]
+                logger.warning(f"step={step_name} does not exist anymore for some reason")
+                return self._deploy_workflow(step_name, settings)
+        logger.info(f"Creating new job configuration for step={step_name}")
+        job_id = self._ws.jobs.create(**settings).job_id
+        self._state.jobs[step_name] = job_id
 
     def _deployed_steps_pre_v06(self):
         deployed_steps = {}
