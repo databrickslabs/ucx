@@ -26,7 +26,7 @@ from databricks.sdk.service.sql import (
 )
 from databricks.sdk.service.workspace import ImportFormat, ObjectInfo
 
-from databricks.labs.ucx.config import GroupsConfig, WorkspaceConfig
+from databricks.labs.ucx.config import WorkspaceConfig
 from databricks.labs.ucx.framework.dashboards import DashboardFromFiles
 from databricks.labs.ucx.framework.install_state import InstallState
 from databricks.labs.ucx.install import WorkspaceInstaller
@@ -41,9 +41,7 @@ def ws(mocker):
     ws.current_user.me = lambda: iam.User(user_name="me@example.com", groups=[iam.ComplexValue(display="admins")])
     ws.config.host = "https://foo"
     ws.config.is_aws = True
-    config_bytes = yaml.dump(WorkspaceConfig(inventory_database="a", groups=GroupsConfig(auto=True)).as_dict()).encode(
-        "utf8"
-    )
+    config_bytes = yaml.dump(WorkspaceConfig(inventory_database="a").as_dict()).encode("utf8")
     ws.workspace.download = lambda _: io.BytesIO(config_bytes)
     ws.workspace.get_status = lambda _: ObjectInfo(object_id=123)
     ws.data_sources.list = lambda: [DataSource(id="bcd", warehouse_id="abc")]
@@ -59,7 +57,7 @@ def ws(mocker):
 def test_replace_clusters_for_integration_tests(ws):
     return_value = WorkspaceInstaller.run_for_config(
         ws,
-        WorkspaceConfig(inventory_database="a", groups=GroupsConfig(auto=True)),
+        WorkspaceConfig(inventory_database="a"),
         override_clusters={"main": "abc"},
         sql_backend=MockBackend(),
     )
@@ -139,14 +137,13 @@ def test_save_config(ws, mocker):
     ws.workspace.upload.assert_called_with(
         "/Users/me@example.com/.ucx/config.yml",
         b"""default_catalog: ucx_default
-groups:
-  backup_group_prefix: '42'
-  selected:
-  - '42'
+include_group_names:
+- '42'
 inventory_database: '42'
 log_level: '42'
 num_threads: 42
-version: 1
+renamed_group_prefix: '42'
+version: 2
 warehouse_id: abc
 workspace_start_path: /
 """,
@@ -195,13 +192,11 @@ def test_save_config_auto_groups(ws, mocker):
     ws.workspace.upload.assert_called_with(
         "/Users/me@example.com/.ucx/config.yml",
         b"""default_catalog: ucx_default
-groups:
-  auto: true
-  backup_group_prefix: '42'
 inventory_database: '42'
 log_level: '42'
 num_threads: 42
-version: 1
+renamed_group_prefix: '42'
+version: 2
 warehouse_id: abc
 workspace_start_path: /
 """,
@@ -235,16 +230,15 @@ def test_save_config_strip_group_names(ws, mocker):
     ws.workspace.upload.assert_called_with(
         "/Users/me@example.com/.ucx/config.yml",
         b"""default_catalog: ucx_default
-groups:
-  backup_group_prefix: '42'
-  selected:
-  - g1
-  - g2
-  - g99
+include_group_names:
+- g1
+- g2
+- g99
 inventory_database: '42'
 log_level: '42'
 num_threads: 42
-version: 1
+renamed_group_prefix: '42'
+version: 2
 warehouse_id: abc
 workspace_start_path: /
 """,
@@ -299,17 +293,16 @@ def test_save_config_with_glue(ws, mocker):
     ws.workspace.upload.assert_called_with(
         "/Users/me@example.com/.ucx/config.yml",
         b"""default_catalog: ucx_default
-groups:
-  backup_group_prefix: '42'
-  selected:
-  - '42'
+include_group_names:
+- '42'
 instance_profile: arn:aws:iam::111222333:instance-profile/foo-instance-profile
 inventory_database: '42'
 log_level: '42'
 num_threads: 42
+renamed_group_prefix: '42'
 spark_conf:
   spark.databricks.hive.metastore.glueCatalog.enabled: 'true'
-version: 1
+version: 2
 warehouse_id: abc
 workspace_start_path: /
 """,
@@ -324,9 +317,24 @@ def test_main_with_existing_conf_does_not_recreate_config(ws, mocker):
     mocker.patch("base64.b64encode")
     webbrowser_open = mocker.patch("webbrowser.open")
 
-    config_bytes = yaml.dump(WorkspaceConfig(inventory_database="a", groups=GroupsConfig(auto=True)).as_dict()).encode(
-        "utf8"
-    )
+    ws.current_user.me = lambda: iam.User(user_name="me@example.com", groups=[iam.ComplexValue(display="admins")])
+    ws.config.host = "https://foo"
+    ws.config.is_aws = True
+    config_bytes = b"""default_catalog: ucx_default
+include_group_names:
+- '42'
+instance_profile: arn:aws:iam::111222333:instance-profile/foo-instance-profile
+inventory_database: '42'
+log_level: '42'
+num_threads: 42
+renamed_group_prefix: '42'
+spark_conf:
+  spark.databricks.hive.metastore.glueCatalog.enabled: 'true'
+version: 1
+warehouse_id: abc
+workspace_start_path: /
+"""
+
     ws.workspace.download = lambda _: io.BytesIO(config_bytes)
     ws.workspace.get_status = lambda _: ObjectInfo(object_id=123)
     ws.data_sources.list = lambda: [DataSource(id="bcd", warehouse_id="abc")]
@@ -390,9 +398,9 @@ def test_create_readme(ws, mocker):
     mocker.patch("builtins.input", return_value="yes")
     webbrowser_open = mocker.patch("webbrowser.open")
 
-    config_bytes = yaml.dump(WorkspaceConfig(inventory_database="a", groups=GroupsConfig(auto=True)).as_dict()).encode(
-        "utf8"
-    )
+    ws.current_user.me = lambda: iam.User(user_name="me@example.com", groups=[iam.ComplexValue(display="admins")])
+    ws.config.host = "https://foo"
+    config_bytes = yaml.dump(WorkspaceConfig(inventory_database="a").as_dict()).encode("utf8")
     ws.workspace.download = lambda _: io.BytesIO(config_bytes)
 
     from databricks.labs.ucx.framework.tasks import Task

@@ -3,7 +3,6 @@ import logging
 import os
 from collections.abc import Callable, Iterator
 from itertools import groupby
-from typing import Literal
 
 from databricks.sdk import WorkspaceClient
 from databricks.sdk.service import sql
@@ -13,7 +12,7 @@ from databricks.labs.ucx.framework.parallel import Threads
 from databricks.labs.ucx.hive_metastore import GrantsCrawler, TablesCrawler
 from databricks.labs.ucx.workspace_access import generic, redash, scim, secrets
 from databricks.labs.ucx.workspace_access.base import AclSupport, Permissions
-from databricks.labs.ucx.workspace_access.groups import GroupMigrationState
+from databricks.labs.ucx.workspace_access.groups import MigrationState
 from databricks.labs.ucx.workspace_access.tacl import TableAclSupport
 
 logger = logging.getLogger(__name__)
@@ -82,14 +81,14 @@ class PermissionManager(CrawlerBase):
         self._save(items)
         logger.info(f"Saved {len(items)} to {self._full_name}")
 
-    def apply_group_permissions(self, migration_state: GroupMigrationState, destination: Literal["backup", "account"]):
+    def apply_group_permissions(self, migration_state: MigrationState):
         # list shall be sorted prior to using group by
         if len(migration_state) == 0:
             logger.info("No valid groups selected, nothing to do.")
             return True
         items = sorted(self.load_all(), key=lambda i: i.object_type)
         logger.info(
-            f"Applying the permissions to {destination} groups. "
+            f"Applying the permissions to account groups. "
             f"Total groups to apply permissions: {len(migration_state)}. "
             f"Total permissions found: {len(items)}"
         )
@@ -108,18 +107,16 @@ class PermissionManager(CrawlerBase):
 
         for object_type, items_subset in supports_to_items.items():
             relevant_support = appliers[object_type]
-            tasks_for_support = [
-                relevant_support.get_apply_task(item, migration_state, destination) for item in items_subset
-            ]
+            tasks_for_support = [relevant_support.get_apply_task(item, migration_state) for item in items_subset]
             tasks_for_support = [_ for _ in tasks_for_support if _ is not None]
             if len(tasks_for_support) == 0:
                 continue
             logger.info(f"Total tasks for {object_type}: {len(tasks_for_support)}")
             applier_tasks.extend(tasks_for_support)
 
-        logger.info(f"Starting to apply permissions on {destination} groups. Total tasks: {len(applier_tasks)}")
+        logger.info(f"Starting to apply permissions on account groups. Total tasks: {len(applier_tasks)}")
 
-        _, errors = Threads.gather(f"apply {destination} group permissions", applier_tasks)
+        _, errors = Threads.gather("apply account group permissions", applier_tasks)
         if len(errors) > 0:
             # TODO: https://github.com/databrickslabs/ucx/issues/406
             logger.error(f"Detected {len(errors)} while applying permissions")

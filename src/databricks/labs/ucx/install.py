@@ -30,7 +30,7 @@ from databricks.labs.ucx.assessment.crawlers import (
     JobInfo,
     PipelineInfo,
 )
-from databricks.labs.ucx.config import GroupsConfig, WorkspaceConfig
+from databricks.labs.ucx.config import WorkspaceConfig
 from databricks.labs.ucx.framework.crawlers import (
     SchemaDeployer,
     SqlBackend,
@@ -379,10 +379,11 @@ class WorkspaceInstaller:
         groups_config_args = {
             "backup_group_prefix": backup_group_prefix,
         }
+
         if selected_groups != "<ALL>":
             groups_config_args["selected"] = [x.strip() for x in selected_groups.split(",")]
         else:
-            groups_config_args["auto"] = True
+            groups_config_args["selected"] = None
 
         # Checking for external HMS
         instance_profile = None
@@ -408,7 +409,8 @@ class WorkspaceInstaller:
 
         self._config = WorkspaceConfig(
             inventory_database=inventory_database,
-            groups=GroupsConfig(**groups_config_args),
+            include_group_names=groups_config_args["selected"],
+            renamed_group_prefix=groups_config_args["backup_group_prefix"],
             warehouse_id=warehouse_id,
             log_level=log_level,
             num_threads=num_threads,
@@ -718,7 +720,7 @@ class WorkspaceInstaller:
                 num_workers=0,
             )
         )
-        if self._ws.config.is_aws:
+        if self._ws.config.is_aws and spec.aws_attributes is not None:
             aws_attributes = replace(spec.aws_attributes, instance_profile_arn=self._config.instance_profile)
             spec = replace(spec, aws_attributes=aws_attributes)
         if "main" in names:

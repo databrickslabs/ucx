@@ -5,7 +5,7 @@ from unittest.mock import MagicMock, call
 import pytest
 from databricks.sdk.service import workspace
 
-from databricks.labs.ucx.workspace_access.groups import GroupMigrationState
+from databricks.labs.ucx.workspace_access.groups import MigrationState
 from databricks.labs.ucx.workspace_access.secrets import (
     Permissions,
     SecretScopesSupport,
@@ -39,7 +39,7 @@ def test_secret_scopes_crawler():
     assert item.raw == '[{"permission": "MANAGE", "principal": "test"}]'
 
 
-def test_secret_scopes_apply(migration_state: GroupMigrationState):
+def test_secret_scopes_apply(migration_state: MigrationState):
     ws = MagicMock()
     sup = SecretScopesSupport(ws=ws)
     item = Permissions(
@@ -62,7 +62,7 @@ def test_secret_scopes_apply(migration_state: GroupMigrationState):
     # positive case - permissions are applied correctly
     ws.secrets.list_acls.return_value = [
         workspace.AclItem(
-            principal="db-temp-test",
+            principal="test",
             permission=workspace.AclPermission.MANAGE,
         ),
         workspace.AclItem(
@@ -71,12 +71,12 @@ def test_secret_scopes_apply(migration_state: GroupMigrationState):
         ),
     ]
 
-    task = sup.get_apply_task(item, migration_state, "backup")
+    task = sup.get_apply_task(item, migration_state)
     task()
     assert ws.secrets.put_acl.call_count == 2
 
     calls = [
-        call("test", "db-temp-test", workspace.AclPermission.MANAGE),
+        call("test", "test", workspace.AclPermission.MANAGE),
         call("test", "irrelevant", workspace.AclPermission.MANAGE),
     ]
     ws.secrets.put_acl.assert_has_calls(calls, any_order=False)

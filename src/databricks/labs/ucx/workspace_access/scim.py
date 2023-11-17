@@ -10,13 +10,9 @@ from databricks.sdk.service import iam
 from databricks.sdk.service.iam import Group, Patch, PatchSchema
 
 from databricks.labs.ucx.mixins.hardening import rate_limited
-from databricks.labs.ucx.workspace_access.base import (
-    AclSupport,
-    Destination,
-    Permissions,
-)
+from databricks.labs.ucx.workspace_access.base import AclSupport, Permissions
 from databricks.labs.ucx.workspace_access.generic import RetryableError
-from databricks.labs.ucx.workspace_access.groups import GroupMigrationState
+from databricks.labs.ucx.workspace_access.groups import MigrationState
 
 logger = logging.getLogger(__name__)
 
@@ -27,9 +23,8 @@ class ScimSupport(AclSupport):
         self._verify_timeout = verify_timeout
 
     @staticmethod
-    def _is_item_relevant(item: Permissions, migration_state: GroupMigrationState) -> bool:
-        # TODO: This mean that we can lose entitlements, if we don't store the `$inventory.groups`
-        return migration_state.is_id_in_scope(item.object_id)
+    def _is_item_relevant(item: Permissions, migration_state: MigrationState) -> bool:
+        return any(g.id_in_workspace == item.object_id for g in migration_state.groups)
 
     def get_crawler_tasks(self):
         for g in self._get_groups():
@@ -41,16 +36,16 @@ class ScimSupport(AclSupport):
     # TODO remove after ES-892977 is fixed
     @retried(on=[DatabricksError])
     def _get_groups(self):
-        return self._ws.groups.list(attributes="id,displayName,roles,entitlements")
+        return list(self._ws.groups.list(attributes="id,displayName,roles,entitlements"))
 
     def object_types(self) -> set[str]:
         return {"roles", "entitlements"}
 
-    def get_apply_task(self, item: Permissions, migration_state: GroupMigrationState, destination: Destination):
+    def get_apply_task(self, item: Permissions, migration_state: MigrationState):
         if not self._is_item_relevant(item, migration_state):
             return None
         value = [iam.ComplexValue.from_dict(e) for e in json.loads(item.raw)]
-        target_group_id = migration_state.get_target_id(item.object_id, destination)
+        target_group_id = migration_state.get_target_id(item.object_id)
         return partial(self._applier_task, group_id=target_group_id, value=value, property_name=item.object_type)
 
     @staticmethod
