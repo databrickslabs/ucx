@@ -146,8 +146,25 @@ class WorkspaceInstaller:
 
     def run(self):
         logger.info(f"Installing UCX v{self._version}")
-        self._configure()
+
+        self.check_and_configure()
         self._run_configured()
+
+    def check_and_configure(self):
+        try:
+            ws_file_url = self.notebook_link(self.config_file)
+            self._ws.workspace.get_status(self.config_file)
+            if "version: 1" in self._raw_previous_config():
+                logger.info("old version detected, attempting to migrate to new config")
+                self._config = self._current_config
+                self._write_config(overwrite=True)
+            elif "version: 2" in self._raw_previous_config():
+                logger.info(f"UCX is already configured. See {ws_file_url}")
+            else:
+                self._configure()
+        except DatabricksError as err:
+            if err.error_code != "RESOURCE_DOES_NOT_EXIST":
+                raise err
 
     def _run_configured(self):
         self._install_spark_config_for_hms_lineage()
@@ -215,7 +232,7 @@ class WorkspaceInstaller:
         workspace_installer = WorkspaceInstaller(ws, prefix=prefix, promtps=False, sql_backend=sql_backend)
         logger.info(f"Installing UCX v{workspace_installer._version} on {ws.config.host}")
         workspace_installer._config = config
-        workspace_installer._write_config()
+        workspace_installer._write_config(overwrite=False)
         workspace_installer._override_clusters = override_clusters
         # TODO: rather introduce a method `is_configured`, as we may want to reconfigure workspaces for some reason
         workspace_installer._run_configured()
@@ -316,6 +333,10 @@ class WorkspaceInstaller:
             self._config = WorkspaceConfig.from_bytes(f.read())
         return self._config
 
+    def _raw_previous_config(self):
+        with self._ws.workspace.download(self.config_file) as f:
+            return str(f.read())
+
     def _name(self, name: str) -> str:
         return f"[{self._prefix.upper()}] {name}"
 
@@ -336,13 +357,6 @@ class WorkspaceInstaller:
 
     def _configure(self):
         ws_file_url = self.notebook_link(self.config_file)
-        try:
-            self._ws.workspace.get_status(self.config_file)
-            logger.info(f"UCX is already configured. See {ws_file_url}")
-            return
-        except DatabricksError as err:
-            if err.error_code != "RESOURCE_DOES_NOT_EXIST":
-                raise err
 
         logger.info("Please answer a couple of questions to configure Unity Catalog migration")
         inventory_database = self._configure_inventory_database()
@@ -418,12 +432,12 @@ class WorkspaceInstaller:
             spark_conf=spark_conf_dict,
         )
 
-        self._write_config()
+        self._write_config(overwrite=False)
         msg = "Open config file in the browser and continue installing?"
         if self._prompts and self._question(msg, default="yes") == "yes":
             webbrowser.open(ws_file_url)
 
-    def _write_config(self):
+    def _write_config(self, overwrite):
         try:
             self._ws.workspace.get_status(self._install_folder)
         except DatabricksError as err:
@@ -434,7 +448,7 @@ class WorkspaceInstaller:
 
         config_bytes = yaml.dump(self._config.as_dict()).encode("utf8")
         logger.info(f"Creating configuration file: {self.config_file}")
-        self._ws.workspace.upload(self.config_file, config_bytes, format=ImportFormat.AUTO)
+        self._ws.workspace.upload(self.config_file, config_bytes, format=ImportFormat.AUTO, overwrite=overwrite)
 
     def _create_jobs(self):
         if not self._state.jobs:

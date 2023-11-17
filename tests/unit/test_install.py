@@ -148,6 +148,56 @@ warehouse_id: abc
 workspace_start_path: /
 """,
         format=ImportFormat.AUTO,
+        overwrite=False,
+    )
+
+
+def test_migrate_from_v1(ws, mocker):
+    mocker.patch("builtins.input", return_value="yes")
+    mock_file = MagicMock()
+    mocker.patch("builtins.open", return_value=mock_file)
+    mocker.patch("base64.b64encode")
+
+    ws.current_user.me = lambda: iam.User(user_name="me@example.com", groups=[iam.ComplexValue(display="admins")])
+    ws.config.host = "https://foo"
+    ws.config.is_aws = True
+    config_bytes = b"""default_catalog: ucx_default
+groups:
+  auto: true
+  backup_group_prefix: db-temp-
+inventory_database: ucx
+log_level: INFO
+num_threads: 8
+version: 1
+warehouse_id: abc
+workspace_start_path: /
+    """
+    ws.workspace.download = lambda _: io.BytesIO(config_bytes)
+    ws.workspace.get_status = lambda _: ObjectInfo(object_id=123)
+    mocker.patch("builtins.input", return_value="42")
+
+    ws.warehouses.list = lambda **_: [
+        EndpointInfo(id="abc", warehouse_type=EndpointInfoWarehouseType.PRO, state=State.RUNNING)
+    ]
+    ws.cluster_policies.list = lambda: []
+
+    install = WorkspaceInstaller(ws)
+    install._choice = lambda _1, _2: "None (abc, PRO, RUNNING)"
+    install.check_and_configure()
+
+    ws.workspace.upload.assert_called_with(
+        "/Users/me@example.com/.ucx/config.yml",
+        b"""default_catalog: ucx_default
+inventory_database: ucx
+log_level: INFO
+num_threads: 8
+renamed_group_prefix: db-temp-
+version: 2
+warehouse_id: abc
+workspace_start_path: /
+""",
+        format=ImportFormat.AUTO,
+        overwrite=True,
     )
 
 
@@ -162,7 +212,7 @@ def test_save_config_with_error(ws, mocker):
 
     install = WorkspaceInstaller(ws)
     with pytest.raises(DatabricksError) as e_info:
-        install._configure()
+        install.check_and_configure()
     assert str(e_info.value.error_code) == "RAISED_FOR_TESTING"
 
 
@@ -201,6 +251,7 @@ warehouse_id: abc
 workspace_start_path: /
 """,
         format=ImportFormat.AUTO,
+        overwrite=False,
     )
 
 
@@ -243,6 +294,7 @@ warehouse_id: abc
 workspace_start_path: /
 """,
         format=ImportFormat.AUTO,
+        overwrite=False,
     )
 
 
@@ -307,6 +359,7 @@ warehouse_id: abc
 workspace_start_path: /
 """,
         format=ImportFormat.AUTO,
+        overwrite=False,
     )
 
 
@@ -330,7 +383,7 @@ num_threads: 42
 renamed_group_prefix: '42'
 spark_conf:
   spark.databricks.hive.metastore.glueCatalog.enabled: 'true'
-version: 1
+version: 2
 warehouse_id: abc
 workspace_start_path: /
 """
