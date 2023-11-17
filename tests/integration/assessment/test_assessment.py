@@ -1,5 +1,8 @@
 import logging
+from datetime import timedelta
 
+from databricks.sdk.errors import NotFound
+from databricks.sdk.retries import retried
 from databricks.sdk.service import compute, jobs
 
 from databricks.labs.ucx.assessment.crawlers import (
@@ -121,6 +124,7 @@ def test_spn_crawler(ws, inventory_schema, make_job, make_pipeline, sql_backend)
     assert results[0].tenant_id == _TEST_TENANT_ID
 
 
+@retried(on=[NotFound], timeout=timedelta(minutes=5))
 def test_spn_crawler_no_config(ws, inventory_schema, make_job, make_pipeline, sql_backend, make_cluster):
     make_job()
     make_pipeline()
@@ -167,6 +171,7 @@ def test_spn_crawler_deleted_cluster_policy(
     assert any(_ for _ in results if _.storage_account == _TEST_STORAGE_ACCOUNT)
 
 
+@retried(on=[NotFound], timeout=timedelta(minutes=5))
 def test_spn_crawler_with_pipeline_unavailable_secret(ws, inventory_schema, make_job, make_pipeline, sql_backend):
     make_job(spark_conf=_SPARK_CONF)
     make_pipeline(configuration=_PIPELINE_CONF_WITH_SECRET)

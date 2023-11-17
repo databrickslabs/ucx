@@ -110,13 +110,11 @@ def test_delete_ws_groups_should_not_delete_current_ws_groups(ws, make_ucx_group
 
 def test_delete_ws_groups_should_not_delete_non_reflected_acc_groups(ws, make_ucx_group, sql_backend, inventory_schema):
     ws_group, acc_group = make_ucx_group()
-
     group_manager = GroupManager(sql_backend, ws, inventory_schema, [ws_group.display_name], "ucx-temp-")
     group_manager.rename_groups()
     group_manager.delete_original_workspace_groups()
 
     assert ws.groups.get(ws_group.id).display_name == "ucx-temp-" + ws_group.display_name
-
 
 def test_replace_workspace_groups_with_account_groups(
     ws,
@@ -154,6 +152,8 @@ def test_replace_workspace_groups_with_account_groups(
     permission_manager.inventorize_permissions()
 
     dummy_grants = list(permission_manager.load_all_for("TABLE", dummy_table.full_name, Grant))
+    # TODO: (nfx) where 1 = len([Grant(principal='ucx_BjI1', action_type='MODIFY', catalog='hive_metastore',
+    #  database='ucx_s4ygj', table='ucx_tstdr', view=None, any_file=False, anonymous_function=False)])
     assert 2 == len(dummy_grants)
 
     table_permissions = grants.for_table_info(dummy_table)
@@ -236,8 +236,9 @@ def test_replace_workspace_groups_with_account_groups(
         assert "SELECT" in table_permissions[group_info.name_in_account]
 
     check_table_permissions_after_backup_delete()
+ 
 
-
+@retried(on=[NotFound], timeout=timedelta(minutes=10))
 def test_set_owner_permission(
     ws,
     sql_backend,
@@ -266,6 +267,8 @@ def test_set_owner_permission(
     permission_manager.inventorize_permissions()
 
     dummy_grants = list(permission_manager.load_all_for("TABLE", dummy_table.full_name, Grant))
+    # TODO (nfx) where 1 = len([Grant(principal='ucx_Z1Ga', action_type='MODIFY', catalog='hive_metastore',
+    #  database='ucx_syubc', table='ucx_tiinm', view=None, any_file=False, anonymous_function=False)])
     assert 2 == len(dummy_grants)
 
     table_permissions = grants.for_table_info(dummy_table)
