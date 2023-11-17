@@ -118,6 +118,22 @@ in turn, contributes to the overall reliability and quality of our software.
 Currently, VSCode IDE is not supported, as it does not offer interactive debugging single integration tests. 
 However, it's possible that this limitation may be addressed in the future.
 
+### Flaky tests
+
+You can add `@retried` decorator to deal with [flaky tests](https://docs.pytest.org/en/latest/explanation/flaky.html):
+
+```python
+from datetime import timedelta
+
+from databricks.sdk.errors import NotFound
+from databricks.sdk.retries import retried
+
+@retried(on=[NotFound], timeout=timedelta(minutes=5))
+def test_something(ws):
+    ...
+
+```
+
 ## Local Setup
 
 This section provides a step-by-step guide to set up and start working on the project. These steps will help you set up your project environment and dependencies for efficient development.

@@ -26,19 +26,8 @@ classifiers = [
     "Programming Language :: Python :: 3.11",
     "Programming Language :: Python :: Implementation :: CPython",
 ]
-dependencies = [
-    "databricks-sdk~=0.13.0",
-    "PyYAML>=6.0.0,<7.0.0",
-]
-
-[project.optional-dependencies]
-test = [
-    "coverage[toml]>=6.5",
-    "pytest",
-    "pytest-xdist",
-    "pytest-cov>=4.0.0,<5.0.0",
-    "pytest-mock>=3.0.0,<4.0.0",
-]
+dependencies = ["databricks-sdk~=0.13.0",
+                "PyYAML>=6.0.0,<7.0.0"]
 
 [project.entry-points.databricks]
 runtime = "databricks.labs.ucx.runtime:main"
@@ -50,51 +39,41 @@ Source = "https://github.com/databricks/ucx"
 [tool.hatch.version]
 path = "src/databricks/labs/ucx/__about__.py"
 
-[tool.hatch.envs.unit]
+[tool.hatch.envs.default]
 dependencies = [
-    "databricks-labs-ucx[test]"
-]
-
-[tool.hatch.envs.unit.scripts]
-test = "pytest --cov src --cov-report=xml tests/unit"
-test-cov-report = "pytest --cov src tests/unit --cov-report=html"
-
-[tool.hatch.envs.integration]
-dependencies = [
-    "databricks-labs-ucx[test]",
-]
-
-[tool.hatch.envs.integration.scripts]
-test = "pytest --cov src tests/integration"
-parallel = "pytest -n auto --cov src tests/integration"
-
-[tool.hatch.envs.lint]
-detached = true
-dependencies = [
+    "coverage[toml]>=6.5",
+    "pytest",
+    "pytest-xdist",
+    "pytest-cov>=4.0.0,<5.0.0",
+    "pytest-mock>=3.0.0,<4.0.0",
     "black>=23.1.0",
     "ruff>=0.0.243",
-    "isort>=2.5.0"
-]
-[tool.hatch.envs.lint.scripts]
-fmt = [
-    "isort .",
-    "black .",
-    "ruff  . --fix",
-]
-verify = [
-    "black --check .",
-    "isort . --check-only",
-    "ruff .",
+    "isort>=2.5.0",
 ]
 
+python="3.10"
+
+# store virtual env as the child of this folder. Helps VSCode (and PyCharm) to run better
+path = ".venv"
+
+[tool.hatch.envs.default.scripts]
+test        = "pytest -n auto --cov src --cov-report=xml tests/unit"
+coverage    = "pytest -n auto --cov src tests/unit --cov-report=html"
+integration = "pytest -n 10 --cov src tests/integration"
+fmt         = ["isort .",
+               "black .",
+               "ruff  . --fix"]
+verify      = ["black --check .",
+               "isort . --check-only",
+               "ruff ."]
+
 [tool.isort]
-skip_glob = [
-    "notebooks/*.py"
-]
+skip_glob = ["notebooks/*.py"]
 profile = "black"
 
 [tool.pytest.ini_options]
 addopts = "-s -p no:warnings -vv --cache-clear"
+cache_dir = ".venv/pytest-cache"
 
 [tool.black]
 target-version = ["py310"]
@@ -102,6 +81,7 @@ line-length = 120
 skip-string-normalization = true
 
 [tool.ruff]
+cache-dir = ".venv/ruff-cache"
 target-version = "py310"
 line-length = 120
 select = [

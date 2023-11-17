@@ -7,7 +7,7 @@ from json import JSONDecodeError
 from pathlib import Path
 
 from databricks.sdk import WorkspaceClient
-from databricks.sdk.core import DatabricksError
+from databricks.sdk.errors import DatabricksError, NotFound
 from databricks.sdk.service import workspace
 from databricks.sdk.service.sql import (
     AccessControl,
@@ -171,14 +171,12 @@ class DashboardFromFiles:
                     continue
                 try:
                     self._ws.queries.get(v)
-                except DatabricksError:
+                except NotFound:
                     to_remove.append(k)
             for key in to_remove:
                 del state[key]
             return state
-        except DatabricksError as err:
-            if err.error_code != "RESOURCE_DOES_NOT_EXIST":
-                raise err
+        except NotFound:
             self._ws.workspace.mkdirs(self._remote_folder)
             return {}
         except JSONDecodeError:
@@ -187,9 +185,7 @@ class DashboardFromFiles:
     def _remote_folder_object(self) -> workspace.ObjectInfo:
         try:
             return self._ws.workspace.get_status(self._remote_folder)
-        except DatabricksError as err:
-            if err.error_code != "RESOURCE_DOES_NOT_EXIST":
-                raise err
+        except NotFound:
             self._ws.workspace.mkdirs(self._remote_folder)
             return self._remote_folder_object()
 

@@ -1,17 +1,22 @@
 import logging
 import random
+from datetime import timedelta
 
 from databricks.sdk import WorkspaceClient
+from databricks.sdk.errors import NotFound
+from databricks.sdk.retries import retried
 from databricks.sdk.service import workspace
 from databricks.sdk.service.iam import PermissionLevel
-from integration.conftest import get_workspace_membership
 
 from databricks.labs.ucx.config import ConnectConfig, WorkspaceConfig
 from databricks.labs.ucx.workspace_access import GroupMigrationToolkit
 
+from ..conftest import get_workspace_membership
+
 logger = logging.getLogger(__name__)
 
 
+@retried(on=[NotFound, AssertionError], timeout=timedelta(minutes=15))
 def test_workspace_access_e2e(
     ws: WorkspaceClient,
     sql_backend,

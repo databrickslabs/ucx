@@ -5,7 +5,7 @@ import re
 from dataclasses import dataclass
 
 from databricks.sdk import WorkspaceClient
-from databricks.sdk.core import DatabricksError
+from databricks.sdk.errors import DatabricksError, NotFound
 from databricks.sdk.service.compute import ClusterSource, Policy
 from databricks.sdk.service.jobs import BaseJob
 
@@ -345,15 +345,9 @@ class AzureServicePrincipalCrawler(CrawlerBase):
     def _safe_get_cluster_policy(self, policy_id: str) -> Policy | None:
         try:
             return self._ws.cluster_policies.get(policy_id)
-        except DatabricksError as err:
-            if err.error_code == "RESOURCE_DOES_NOT_EXIST":
-                logger.warning(
-                    f"Error retrieving cluster policy {policy_id}. The cluster policy was deleted. Error: {err}"
-                )
-            else:
-                raise err
-
-        return None
+        except NotFound:
+            logger.warning(f"The cluster policy was deleted: {policy_id}")
+            return None
 
     def _list_all_spn_in_sql_warehouses_spark_conf(self) -> list:
         warehouse_config_list = self._ws.warehouses.get_workspace_warehouse_config().data_access_config
@@ -510,15 +504,9 @@ class ClustersCrawler(CrawlerBase):
     def _safe_get_cluster_policy(self, policy_id: str) -> Policy | None:
         try:
             return self._ws.cluster_policies.get(policy_id)
-        except DatabricksError as err:
-            if err.error_code == "RESOURCE_DOES_NOT_EXIST":
-                logger.warning(
-                    f"Error retrieving cluster policy {policy_id}. The cluster policy was deleted. Error: {err}"
-                )
-            else:
-                raise err
-
-        return None
+        except NotFound:
+            logger.warning(f"The cluster policy was deleted: {policy_id}")
+            return None
 
     def snapshot(self) -> list[ClusterInfo]:
         return self._snapshot(self._try_fetch, self._crawl)
@@ -624,15 +612,9 @@ class JobsCrawler(CrawlerBase):
     def _safe_get_cluster_policy(self, policy_id: str) -> Policy | None:
         try:
             return self._ws.cluster_policies.get(policy_id)
-        except DatabricksError as err:
-            if err.error_code == "RESOURCE_DOES_NOT_EXIST":
-                logger.warning(
-                    f"Error retrieving cluster policy {policy_id}. The cluster policy was deleted. Error: {err}"
-                )
-            else:
-                raise err
-
-        return None
+        except NotFound:
+            logger.warning(f"The cluster policy was deleted: {policy_id}")
+            return None
 
     def snapshot(self) -> list[JobInfo]:
         return self._snapshot(self._try_fetch, self._crawl)

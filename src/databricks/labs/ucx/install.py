@@ -15,7 +15,6 @@ from typing import Any
 
 import yaml
 from databricks.sdk import WorkspaceClient
-from databricks.sdk.core import DatabricksError
 from databricks.sdk.errors import NotFound, OperationFailed
 from databricks.sdk.mixins.compute import SemVer
 from databricks.sdk.service import compute, jobs
@@ -47,6 +46,7 @@ from databricks.labs.ucx.hive_metastore.tables import Table, TableError
 from databricks.labs.ucx.runtime import main
 from databricks.labs.ucx.workspace_access.base import Permissions
 from databricks.labs.ucx.workspace_access.generic import WorkspaceObjectInfo
+from databricks.labs.ucx.workspace_access.groups import MigratedGroup
 
 TAG_STEP = "step"
 TAG_APP = "App"
@@ -120,6 +120,7 @@ def deploy_schema(sql_backend: SqlBackend, inventory_schema: str):
     deployer.deploy_table("external_locations", ExternalLocation)
     deployer.deploy_table("mounts", Mount)
     deployer.deploy_table("grants", Grant)
+    deployer.deploy_table("groups", MigratedGroup)
     deployer.deploy_table("tables", Table)
     deployer.deploy_table("table_failures", TableError)
     deployer.deploy_table("workspace_objects", WorkspaceObjectInfo)
@@ -146,7 +147,6 @@ class WorkspaceInstaller:
 
     def run(self):
         logger.info(f"Installing UCX v{self._version}")
-
         self._configure()
         self._run_configured()
 
@@ -350,9 +350,8 @@ class WorkspaceInstaller:
             elif "version: 2" in self._raw_previous_config():
                 logger.info(f"UCX is already configured. See {ws_file_url}")
                 return
-        except NotFound as err:
-            if err.error_code != "RESOURCE_DOES_NOT_EXIST":
-                raise err
+        except NotFound:
+            pass
         logger.info("Please answer a couple of questions to configure Unity Catalog migration")
         inventory_database = self._configure_inventory_database()
 
@@ -435,9 +434,7 @@ class WorkspaceInstaller:
     def _write_config(self, overwrite):
         try:
             self._ws.workspace.get_status(self._install_folder)
-        except DatabricksError as err:
-            if err.error_code != "RESOURCE_DOES_NOT_EXIST":
-                raise err
+        except NotFound:
             logger.debug(f"Creating install folder: {self._install_folder}")
             self._ws.workspace.mkdirs(self._install_folder)
 

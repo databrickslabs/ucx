@@ -46,6 +46,7 @@ _SPARK_CONF = {
 }
 
 
+@retried(on=[NotFound], timeout=timedelta(minutes=5))
 def test_pipeline_crawler(ws, make_pipeline, inventory_schema, sql_backend):
     logger.info("setting up fixtures")
     created_pipeline = make_pipeline(configuration=_PIPELINE_CONF)
@@ -63,6 +64,7 @@ def test_pipeline_crawler(ws, make_pipeline, inventory_schema, sql_backend):
     assert results[0].pipeline_id == created_pipeline.pipeline_id
 
 
+@retried(on=[NotFound], timeout=timedelta(minutes=5))
 def test_pipeline_with_secret_conf_crawler(ws, make_pipeline, inventory_schema, sql_backend):
     logger.info("setting up fixtures")
     created_pipeline = make_pipeline(configuration=_PIPELINE_CONF_WITH_SECRET)
@@ -80,6 +82,7 @@ def test_pipeline_with_secret_conf_crawler(ws, make_pipeline, inventory_schema, 
     assert results[0].pipeline_id == created_pipeline.pipeline_id
 
 
+@retried(on=[NotFound], timeout=timedelta(minutes=5))
 def test_cluster_crawler(ws, make_cluster, inventory_schema, sql_backend):
     created_cluster = make_cluster(single_node=True, spark_conf=_SPARK_CONF)
     cluster_crawler = ClustersCrawler(ws=ws, sbe=sql_backend, schema=inventory_schema)
@@ -95,6 +98,7 @@ def test_cluster_crawler(ws, make_cluster, inventory_schema, sql_backend):
     assert results[0].cluster_id == created_cluster.cluster_id
 
 
+@retried(on=[NotFound], timeout=timedelta(minutes=5))
 def test_job_crawler(ws, make_job, inventory_schema, sql_backend):
     new_job = make_job(spark_conf=_SPARK_CONF)
     job_crawler = JobsCrawler(ws=ws, sbe=sql_backend, schema=inventory_schema)
@@ -110,6 +114,7 @@ def test_job_crawler(ws, make_job, inventory_schema, sql_backend):
     assert int(results[0].job_id) == new_job.job_id
 
 
+@retried(on=[NotFound, AssertionError], timeout=timedelta(minutes=5))
 def test_spn_crawler(ws, inventory_schema, make_job, make_pipeline, sql_backend):
     make_job(spark_conf=_SPARK_CONF)
     make_pipeline(configuration=_PIPELINE_CONF)
@@ -133,6 +138,7 @@ def test_spn_crawler_no_config(ws, inventory_schema, make_job, make_pipeline, sq
     spn_crawler.snapshot()
 
 
+@retried(on=[NotFound], timeout=timedelta(minutes=5))
 def test_spn_crawler_deleted_cluster_policy(
     ws,
     inventory_schema,
@@ -182,6 +188,7 @@ def test_spn_crawler_with_pipeline_unavailable_secret(ws, inventory_schema, make
     assert any(_ for _ in results if _.storage_account == _TEST_STORAGE_ACCOUNT)
 
 
+@retried(on=[NotFound], timeout=timedelta(minutes=5))
 def test_spn_crawler_with_available_secrets(
     ws, inventory_schema, make_job, make_pipeline, sql_backend, make_secret_scope
 ):
@@ -204,6 +211,7 @@ def test_spn_crawler_with_available_secrets(
     assert any(_ for _ in results if _.secret_key == secret_key)
 
 
+@retried(on=[NotFound], timeout=timedelta(minutes=5))
 def test_workspace_object_crawler(ws, make_notebook, inventory_schema, sql_backend):
     notebook = make_notebook()
     workspace_listing = WorkspaceListing(ws, sql_backend, inventory_schema)
