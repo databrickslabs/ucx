@@ -248,19 +248,18 @@ class GrantsCrawler(CrawlerBase):
                     continue
                 # we have to return concrete list, as with yield we're executing
                 # everything on the main thread.
-                grants.append(
-                    Grant(
-                        principal=principal,
-                        action_type=action_type,
-                        table=table,
-                        view=view,
-                        database=database,
-                        catalog=catalog,
-                        any_file=any_file,
-                        anonymous_function=anonymous_function,
-                    )
+                grant = Grant(
+                    principal=principal,
+                    action_type=action_type,
+                    table=table,
+                    view=view,
+                    database=database,
+                    catalog=catalog,
+                    any_file=any_file,
+                    anonymous_function=anonymous_function,
                 )
-                return grants
+                grants.append(grant)
+            return grants
         except Exception as e:
             # TODO: https://github.com/databrickslabs/ucx/issues/406
             logger.error(f"Couldn't fetch grants for object {on_type} {key}: {e}")

@@ -3,7 +3,7 @@ import logging
 from json import JSONDecodeError
 
 from databricks.sdk import WorkspaceClient
-from databricks.sdk.core import DatabricksError
+from databricks.sdk.errors import NotFound
 from databricks.sdk.service.workspace import ImportFormat
 
 logger = logging.getLogger(__name__)
@@ -32,10 +32,8 @@ class InstallState:
                 msg = f"expected state $version={self._version}, got={version}"
                 raise ValueError(msg)
             return raw
-        except DatabricksError as err:
-            if err.error_code == "RESOURCE_DOES_NOT_EXIST":
-                return default_state
-            raise err
+        except NotFound:
+            return default_state
         except JSONDecodeError:
             logger.warning(f"JSON state file corrupt: {self._state_file}")
             return default_state

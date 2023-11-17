@@ -118,13 +118,12 @@ def test_delete_ws_groups_should_not_delete_non_reflected_acc_groups(ws, make_uc
     assert ws.groups.get(ws_group.id).display_name == "ucx-temp-" + ws_group.display_name
 
 
+@retried(on=[NotFound, TimeoutError], timeout=timedelta(minutes=10))
 def test_replace_workspace_groups_with_account_groups(
     ws,
     sql_backend,
     inventory_schema,
     make_ucx_group,
-    make_group,
-    make_acc_group,
     make_cluster_policy,
     make_cluster_policy_permissions,
     make_table,
@@ -138,24 +137,26 @@ def test_replace_workspace_groups_with_account_groups(
     )
     logger.info(f"Cluster policy: {ws.config.host}#setting/clusters/cluster-policies/view/{cluster_policy.policy_id}")
 
+    tables = TablesCrawler(sql_backend, inventory_schema)
+    grants = GrantsCrawler(tables)
+
     dummy_table = make_table()
     sql_backend.execute(f"GRANT SELECT, MODIFY ON TABLE {dummy_table.full_name} TO `{ws_group.display_name}`")
+    res = grants.for_table_info(dummy_table)
+    assert len(res[ws_group.display_name]) == 2
 
     group_manager = GroupManager(sql_backend, ws, inventory_schema, [ws_group.display_name], "ucx-temp-")
 
     generic_permissions = GenericPermissionsSupport(
         ws, [Listing(ws.cluster_policies.list, "policy_id", "cluster-policies")]
     )
-    tables = TablesCrawler(sql_backend, inventory_schema)
-    grants = GrantsCrawler(tables)
+
     tacl = TableAclSupport(grants, sql_backend)
     permission_manager = PermissionManager(sql_backend, inventory_schema, [generic_permissions, tacl])
 
     permission_manager.inventorize_permissions()
 
     dummy_grants = list(permission_manager.load_all_for("TABLE", dummy_table.full_name, Grant))
-    # TODO: (nfx) where 1 = len([Grant(principal='ucx_BjI1', action_type='MODIFY', catalog='hive_metastore',
-    #  database='ucx_s4ygj', table='ucx_tstdr', view=None, any_file=False, anonymous_function=False)])
     assert 2 == len(dummy_grants)
 
     table_permissions = grants.for_table_info(dummy_table)
@@ -240,17 +241,8 @@ def test_replace_workspace_groups_with_account_groups(
     check_table_permissions_after_backup_delete()
 
 
-@retried(on=[NotFound], timeout=timedelta(minutes=10))
-def test_set_owner_permission(
-    ws,
-    sql_backend,
-    inventory_schema,
-    make_ucx_group,
-    make_group,
-    make_acc_group,
-    make_cluster_policy,
-    make_table,
-):
+@retried(on=[NotFound, TimeoutError], timeout=timedelta(minutes=15))
+def test_set_owner_permission(ws, sql_backend, inventory_schema, make_ucx_group, make_table):
     ws_group, _ = make_ucx_group()
 
     logger.info("Testing setting ownership on table.")
@@ -269,8 +261,6 @@ def test_set_owner_permission(
     permission_manager.inventorize_permissions()
 
     dummy_grants = list(permission_manager.load_all_for("TABLE", dummy_table.full_name, Grant))
-    # TODO (nfx) where 1 = len([Grant(principal='ucx_Z1Ga', action_type='MODIFY', catalog='hive_metastore',
-    #  database='ucx_syubc', table='ucx_tiinm', view=None, any_file=False, anonymous_function=False)])
     assert 2 == len(dummy_grants)
 
     table_permissions = grants.for_table_info(dummy_table)
@@ -314,7 +304,7 @@ def test_set_owner_permission(
 
     permission_manager.apply_group_permissions(state)
 
-    @retried(on=[AssertionError], timeout=timedelta(seconds=30))
+    @retried(on=[AssertionError], timeout=timedelta(minutes=1))
     def check_permissions_for_account_group():
         logger.info("check_permissions_for_account_group()")
 

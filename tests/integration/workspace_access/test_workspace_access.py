@@ -4,10 +4,11 @@ import random
 from databricks.sdk import WorkspaceClient
 from databricks.sdk.service import workspace
 from databricks.sdk.service.iam import PermissionLevel
-from integration.conftest import get_workspace_membership
 
 from databricks.labs.ucx.config import ConnectConfig, WorkspaceConfig
 from databricks.labs.ucx.workspace_access import GroupMigrationToolkit
+
+from ..conftest import get_workspace_membership
 
 logger = logging.getLogger(__name__)
 

@@ -9,7 +9,7 @@ from databricks.labs.ucx.hive_metastore import GrantsCrawler, TablesCrawler
 logger = logging.getLogger(__name__)
 
 
-@retried(on=[NotFound], timeout=timedelta(minutes=10))
+@retried(on=[NotFound, TimeoutError], timeout=timedelta(minutes=15))
 def test_all_grants_in_databases(sql_backend, inventory_schema, make_schema, make_table, make_group):
     group_a = make_group()
     group_b = make_group()

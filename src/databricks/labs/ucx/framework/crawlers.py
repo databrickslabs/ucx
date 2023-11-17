@@ -7,6 +7,7 @@ from collections.abc import Iterator
 from typing import ClassVar
 
 from databricks.sdk import WorkspaceClient
+from databricks.sdk.errors import NotFound
 
 from databricks.labs.ucx.mixins.sql import StatementExecutionExt
 
@@ -234,9 +235,8 @@ class CrawlerBase:
             cached_results = list(fetcher())
             if len(cached_results) > 0:
                 return cached_results
-        except Exception as err:
-            if "TABLE_OR_VIEW_NOT_FOUND" not in str(err):
-                raise err
+        except NotFound:
+            pass
         logger.debug(f"[{self._full_name}] crawling new batch for {self._table}")
         loaded_records = list(loader())
         self._append_records(loaded_records)

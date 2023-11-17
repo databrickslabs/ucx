@@ -6,7 +6,6 @@ from databricks.sdk.errors import NotFound, OperationFailed
 from databricks.sdk.retries import retried
 from databricks.sdk.service.catalog import SchemaInfo
 from databricks.sdk.service.iam import PermissionLevel
-from integration.conftest import get_workspace_membership
 
 from databricks.labs.ucx.config import WorkspaceConfig
 from databricks.labs.ucx.framework.parallel import Threads
@@ -15,10 +14,12 @@ from databricks.labs.ucx.hive_metastore.tables import TablesCrawler
 from databricks.labs.ucx.install import WorkspaceInstaller
 from databricks.labs.ucx.workspace_access.generic import GenericPermissionsSupport
 
+from .conftest import get_workspace_membership
+
 logger = logging.getLogger(__name__)
 
 
-@retried(on=[NotFound], timeout=timedelta(minutes=10))
+@retried(on=[NotFound, TimeoutError], timeout=timedelta(minutes=15))
 def test_job_failure_propagates_correct_error_message_and_logs(ws, sql_backend, env_or_skip, make_random):
     default_cluster_id = env_or_skip("TEST_DEFAULT_CLUSTER_ID")
     tacl_cluster_id = env_or_skip("TEST_LEGACY_TABLE_ACL_CLUSTER_ID")
@@ -53,7 +54,7 @@ def test_job_failure_propagates_correct_error_message_and_logs(ws, sql_backend, 
     assert len(workflow_run_logs) == 1
 
 
-@retried(on=[NotFound], timeout=timedelta(minutes=15))
+@retried(on=[NotFound, TimeoutError], timeout=timedelta(minutes=15))
 def test_jobs_with_no_inventory_database(
     ws,
     sql_backend,

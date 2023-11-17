@@ -96,7 +96,7 @@ class StatementExecutionExt(StatementExecutionAPI):
             return
         if "SCHEMA_NOT_FOUND" in status.error.message:
             raise NotFound(status.error.message)
-        if "TABLE_NOT_FOUND" in status.error.message:
+        if "TABLE_OR_VIEW_NOT_FOUND" in status.error.message:
             raise NotFound(status.error.message)
         mapping = {
             ServiceErrorCode.ABORTED: errors.Aborted,

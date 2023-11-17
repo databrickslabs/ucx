@@ -1,12 +1,16 @@
 import collections
+import functools
 import logging
 import random
+from datetime import timedelta
 from functools import partial
 
 import databricks.sdk.core
 import pytest
 from databricks.sdk import AccountClient
 from databricks.sdk.core import Config
+from databricks.sdk.errors import NotFound
+from databricks.sdk.retries import retried
 
 from databricks.labs.ucx.mixins.fixtures import *  # noqa: F403
 
@@ -14,6 +18,10 @@ logging.getLogger("tests").setLevel("DEBUG")
 logging.getLogger("databricks.labs.ucx").setLevel("DEBUG")
 
 logger = logging.getLogger(__name__)
+
+
+retry_on_not_found = functools.partial(retried, on=[NotFound], timeout=timedelta(minutes=5))
+long_retry_on_not_found = functools.partial(retry_on_not_found, timeout=timedelta(minutes=15))
 
 
 @pytest.fixture
