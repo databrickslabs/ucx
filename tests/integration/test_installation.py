@@ -18,6 +18,7 @@ from databricks.labs.ucx.workspace_access.groups import GroupManager
 logger = logging.getLogger(__name__)
 
 
+@retried(on=[NotFound], timeout=timedelta(minutes=10))
 def test_job_failure_propagates_correct_error_message_and_logs(ws, sql_backend, env_or_skip, make_random):
     default_cluster_id = env_or_skip("TEST_DEFAULT_CLUSTER_ID")
     tacl_cluster_id = env_or_skip("TEST_LEGACY_TABLE_ACL_CLUSTER_ID")
