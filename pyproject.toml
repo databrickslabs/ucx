@@ -59,7 +59,7 @@ path = ".venv"
 [tool.hatch.envs.default.scripts]
 test        = "pytest -n auto --cov src --cov-report=xml tests/unit"
 coverage    = "pytest -n auto --cov src tests/unit --cov-report=html"
-integration = "pytest -n auto --cov src tests/integration"
+integration = "pytest -n 10 --cov src tests/integration"
 fmt         = ["isort .",
                "black .",
                "ruff  . --fix"]

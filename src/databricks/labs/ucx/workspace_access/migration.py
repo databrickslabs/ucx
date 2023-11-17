@@ -42,34 +42,6 @@ class GroupMigrationToolkit:
         self._verification_manager = VerificationManager(ws, secrets_support)
 
     @staticmethod
-    def _object_type_appliers(generic_support, sql_support, secrets_support, scim_support):
-        return {
-            # SCIM-based API
-            "entitlements": scim_support,
-            "roles": scim_support,
-            # Generic Permissions API
-            "authorization": generic_support,
-            "clusters": generic_support,
-            "cluster-policies": generic_support,
-            "instance-pools": generic_support,
-            "sql/warehouses": generic_support,
-            "jobs": generic_support,
-            "pipelines": generic_support,
-            "experiments": generic_support,
-            "registered-models": generic_support,
-            "notebooks": generic_support,
-            "files": generic_support,
-            "directories": generic_support,
-            "repos": generic_support,
-            # Redash equivalent of Generic Permissions API
-            "alerts": sql_support,
-            "queries": sql_support,
-            "dashboards": sql_support,
-            # Secret Scope ACL API
-            "secrets": secrets_support,
-        }
-
-    @staticmethod
     def _backend(ws: WorkspaceClient, warehouse_id: str | None = None) -> SqlBackend:
         if warehouse_id is None:
             return RuntimeBackend()

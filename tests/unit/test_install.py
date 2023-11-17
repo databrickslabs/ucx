@@ -6,7 +6,6 @@ from unittest.mock import MagicMock, patch
 
 import pytest
 import yaml
-from databricks.sdk.core import DatabricksError
 from databricks.sdk.errors import NotFound, OperationFailed
 from databricks.sdk.service import iam, jobs
 from databricks.sdk.service.compute import (

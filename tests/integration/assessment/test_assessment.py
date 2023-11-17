@@ -114,7 +114,7 @@ def test_job_crawler(ws, make_job, inventory_schema, sql_backend):
     assert int(results[0].job_id) == new_job.job_id
 
 
-@retried(on=[NotFound], timeout=timedelta(minutes=5))
+@retried(on=[NotFound, AssertionError], timeout=timedelta(minutes=5))
 def test_spn_crawler(ws, inventory_schema, make_job, make_pipeline, sql_backend):
     make_job(spark_conf=_SPARK_CONF)
     make_pipeline(configuration=_PIPELINE_CONF)

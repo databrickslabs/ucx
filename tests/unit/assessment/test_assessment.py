@@ -4,7 +4,7 @@ from unittest.mock import Mock
 
 import pytest
 from databricks.sdk.core import DatabricksError
-from databricks.sdk.errors import NotFound, InternalError
+from databricks.sdk.errors import InternalError, NotFound
 from databricks.sdk.service.compute import (
     AutoScale,
     ClusterDetails,
