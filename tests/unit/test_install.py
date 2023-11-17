@@ -7,7 +7,7 @@ from unittest.mock import MagicMock, patch
 import pytest
 import yaml
 from databricks.sdk.core import DatabricksError
-from databricks.sdk.errors import OperationFailed
+from databricks.sdk.errors import NotFound, OperationFailed
 from databricks.sdk.service import iam, jobs
 from databricks.sdk.service.compute import (
     GlobalInitScriptDetails,
@@ -41,8 +41,6 @@ def ws(mocker):
     ws.current_user.me = lambda: iam.User(user_name="me@example.com", groups=[iam.ComplexValue(display="admins")])
     ws.config.host = "https://foo"
     ws.config.is_aws = True
-    config_bytes = yaml.dump(WorkspaceConfig(inventory_database="a").as_dict()).encode("utf8")
-    ws.workspace.download = lambda _: io.BytesIO(config_bytes)
     ws.workspace.get_status = lambda _: ObjectInfo(object_id=123)
     ws.data_sources.list = lambda: [DataSource(id="bcd", warehouse_id="abc")]
     ws.warehouses.list = lambda **_: [EndpointInfo(id="abc", warehouse_type=EndpointInfoWarehouseType.PRO)]
@@ -55,6 +53,8 @@ def ws(mocker):
 
 
 def test_replace_clusters_for_integration_tests(ws):
+    config_bytes = yaml.dump(WorkspaceConfig(inventory_database="a").as_dict()).encode("utf8")
+    ws.workspace.download = lambda _: io.BytesIO(config_bytes)
     return_value = WorkspaceInstaller.run_for_config(
         ws,
         WorkspaceConfig(inventory_database="a"),
@@ -148,22 +148,127 @@ warehouse_id: abc
 workspace_start_path: /
 """,
         format=ImportFormat.AUTO,
+        overwrite=False,
+    )
+
+
+def test_migrate_from_v1(ws, mocker):
+    mocker.patch("builtins.input", return_value="yes")
+    mock_file = MagicMock()
+    mocker.patch("builtins.open", return_value=mock_file)
+    mocker.patch("base64.b64encode")
+
+    ws.current_user.me = lambda: iam.User(user_name="me@example.com", groups=[iam.ComplexValue(display="admins")])
+    ws.config.host = "https://foo"
+    ws.config.is_aws = True
+    config_bytes = b"""default_catalog: ucx_default
+groups:
+  auto: true
+  backup_group_prefix: db-temp-
+inventory_database: ucx
+log_level: INFO
+num_threads: 8
+version: 1
+warehouse_id: abc
+workspace_start_path: /
+    """
+    ws.workspace.download = lambda _: io.BytesIO(config_bytes)
+    ws.workspace.get_status = lambda _: ObjectInfo(object_id=123)
+    mocker.patch("builtins.input", return_value="42")
+
+    ws.warehouses.list = lambda **_: [
+        EndpointInfo(id="abc", warehouse_type=EndpointInfoWarehouseType.PRO, state=State.RUNNING)
+    ]
+    ws.cluster_policies.list = lambda: []
+
+    install = WorkspaceInstaller(ws)
+    install._choice = lambda _1, _2: "None (abc, PRO, RUNNING)"
+    install._configure()
+
+    ws.workspace.upload.assert_called_with(
+        "/Users/me@example.com/.ucx/config.yml",
+        b"""default_catalog: ucx_default
+inventory_database: ucx
+log_level: INFO
+num_threads: 8
+renamed_group_prefix: db-temp-
+version: 2
+warehouse_id: abc
+workspace_start_path: /
+""",
+        format=ImportFormat.AUTO,
+        overwrite=True,
+    )
+
+
+def test_migrate_from_v1_selected_groups(ws, mocker):
+    mocker.patch("builtins.input", return_value="yes")
+    mock_file = MagicMock()
+    mocker.patch("builtins.open", return_value=mock_file)
+    mocker.patch("base64.b64encode")
+
+    ws.current_user.me = lambda: iam.User(user_name="me@example.com", groups=[iam.ComplexValue(display="admins")])
+    ws.config.host = "https://foo"
+    ws.config.is_aws = True
+    config_bytes = b"""default_catalog: ucx_default
+groups:
+  backup_group_prefix: 'backup_baguette_prefix'
+  selected:
+  - '42'
+  - '100'
+inventory_database: '42'
+log_level: '42'
+num_threads: 42
+version: 1
+warehouse_id: abc
+workspace_start_path: /
+    """
+    ws.workspace.download = lambda _: io.BytesIO(config_bytes)
+    ws.workspace.get_status = lambda _: ObjectInfo(object_id=123)
+    mocker.patch("builtins.input", return_value="42")
+
+    ws.warehouses.list = lambda **_: [
+        EndpointInfo(id="abc", warehouse_type=EndpointInfoWarehouseType.PRO, state=State.RUNNING)
+    ]
+    ws.cluster_policies.list = lambda: []
+
+    install = WorkspaceInstaller(ws)
+    install._choice = lambda _1, _2: "None (abc, PRO, RUNNING)"
+    install._configure()
+
+    ws.workspace.upload.assert_called_with(
+        "/Users/me@example.com/.ucx/config.yml",
+        b"""default_catalog: ucx_default
+include_group_names:
+- '42'
+- '100'
+inventory_database: '42'
+log_level: '42'
+num_threads: 42
+renamed_group_prefix: backup_baguette_prefix
+version: 2
+warehouse_id: abc
+workspace_start_path: /
+""",
+        format=ImportFormat.AUTO,
+        overwrite=True,
     )
 
 
 def test_save_config_with_error(ws, mocker):
     def not_found(_):
-        raise DatabricksError(error_code="RAISED_FOR_TESTING")
+        raise NotFound(message="File not found")
 
     mocker.patch("builtins.input", return_value="42")
 
-    ws.workspace.get_status = not_found
+    ws.workspace.download = not_found
     ws.cluster_policies.list = lambda: []
 
     install = WorkspaceInstaller(ws)
-    with pytest.raises(DatabricksError) as e_info:
+    with pytest.raises(NotFound) as e_info:
         install._configure()
-    assert str(e_info.value.error_code) == "RAISED_FOR_TESTING"
+
+    assert str(e_info.value.args[0]) == "File not found"
 
 
 def test_save_config_auto_groups(ws, mocker):
@@ -201,6 +306,7 @@ warehouse_id: abc
 workspace_start_path: /
 """,
         format=ImportFormat.AUTO,
+        overwrite=False,
     )
 
 
@@ -243,6 +349,7 @@ warehouse_id: abc
 workspace_start_path: /
 """,
         format=ImportFormat.AUTO,
+        overwrite=False,
     )
 
 
@@ -307,6 +414,7 @@ warehouse_id: abc
 workspace_start_path: /
 """,
         format=ImportFormat.AUTO,
+        overwrite=False,
     )
 
 
@@ -330,7 +438,7 @@ num_threads: 42
 renamed_group_prefix: '42'
 spark_conf:
   spark.databricks.hive.metastore.glueCatalog.enabled: 'true'
-version: 1
+version: 2
 warehouse_id: abc
 workspace_start_path: /
 """
