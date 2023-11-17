@@ -312,7 +312,7 @@ class GroupManager:
             roles=source_group.roles,
             members=source_group.members,
         )  # TODO: there still could be a corner case, where we get `Group with name db-temp-XXX already exists.`
-        # TODO: except ResourceConflict: ... find group
+        # TODO: (nfx) except ResourceConflict: ... find group
         self._workspace_groups.append(backup_group)
         logger.info(f"Backup group {backup_group_name} successfully created")
 
