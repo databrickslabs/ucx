@@ -207,7 +207,7 @@ class WorkspaceConfig(_Config["WorkspaceConfig"]):
             return raw
         if stored_version == 1:
             raw["include_group_names"] = (
-                raw.get("groups", {"selected": []})["selected"] if "selected" in raw["groups"] else ""
+                raw.get("groups", {"selected": []})["selected"] if "selected" in raw["groups"] else None
             )
             raw["renamed_group_prefix"] = raw.get("groups", {"backup_group_prefix": "db-temp-"})["backup_group_prefix"]
             raw.pop("groups", None)
