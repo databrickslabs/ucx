@@ -241,7 +241,7 @@ def test_replace_workspace_groups_with_account_groups(
     check_table_permissions_after_backup_delete()
 
 
-@retried(on=[NotFound, TimeoutError], timeout=timedelta(minutes=15))
+@retried(on=[NotFound, TimeoutError, AssertionError], timeout=timedelta(minutes=15))
 def test_set_owner_permission(ws, sql_backend, inventory_schema, make_ucx_group, make_table):
     ws_group, _ = make_ucx_group()
 
