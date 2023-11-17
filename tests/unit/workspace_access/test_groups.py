@@ -1,6 +1,8 @@
 from unittest.mock import MagicMock
 
 import pytest
+from _pytest.outcomes import fail
+from databricks.sdk.errors import DatabricksError
 from databricks.sdk.service import iam
 from databricks.sdk.service.iam import ComplexValue, Group, ResourceMeta
 
@@ -267,6 +269,24 @@ def test_rename_groups_should_filter_already_renamed_groups():
     wsclient.groups.patch.assert_not_called()
 
 
+def test_rename_groups_should_fail_if_error_is_thrown():
+    backend = MockBackend()
+    wsclient = MagicMock()
+    group1 = Group(id="1", display_name="de", meta=ResourceMeta(resource_type="WorkspaceGroup"))
+    wsclient.groups.list.return_value = [
+        group1,
+    ]
+    account_admins_group_1 = Group(id="11", display_name="de")
+    wsclient.api_client.do.return_value = {
+        "Resources": [g.as_dict() for g in [account_admins_group_1]],
+    }
+    wsclient.groups.patch.side_effect = RuntimeError("Something bad")
+    gm = GroupManager(backend, wsclient, inventory_database="inv", renamed_group_prefix="test-group-")
+    with pytest.raises(RuntimeWarning) as e:
+        gm.rename_groups()
+    assert e.value.args[0] == "During rename of workspace groups got 1 errors. See debug logs"
+
+
 def test_reflect_account_groups_on_workspace_should_be_called_for_eligible_groups():
     backend = MockBackend(rows={"SELECT": [("1", "de", "de", "test-group-de", "", "", "", "")]})
     wsclient = MagicMock()
@@ -303,7 +323,7 @@ def test_reflect_account_groups_on_workspace_should_filter_account_groups_in_wor
 def test_reflect_account_groups_on_workspace_should_filter_account_groups_not_in_account():
     backend = MockBackend(rows={"SELECT": [("1", "de", "de", "test-group-de", "", "", "", "")]})
     wsclient = MagicMock()
-    group1 = Group(id="1", display_name="de", meta=ResourceMeta(resource_type="Group"))
+    group1 = Group(id="1", display_name="de", meta=ResourceMeta(resource_type="WorkspaceGroup"))
     wsclient.groups.list.return_value = [group1]
     account_group1 = Group(id="11", display_name="ds")
     wsclient.api_client.do.return_value = {
@@ -313,6 +333,27 @@ def test_reflect_account_groups_on_workspace_should_filter_account_groups_not_in
 
     with pytest.raises(AssertionError):
         wsclient.api_client.do.assert_called_with("PUT")
+
+
+def test_reflect_account_should_fail_if_error_is_thrown():
+    backend = MockBackend(rows={"SELECT": [("1", "de", "de", "test-group-de", "", "", "", "")]})
+    wsclient = MagicMock()
+    account_group = Group(id="1", display_name="de")
+
+    def do_side_effect(*args, **kwargs):
+        if args[0] == "get":
+            return {"Resources": [g.as_dict() for g in [account_group]]}
+        else:
+            raise RuntimeError()
+
+    wsclient.api_client.do.side_effect = do_side_effect
+
+    group1 = Group(id="1", display_name="test-dfd-de", meta=ResourceMeta(resource_type="WorkspaceGroup"))
+    wsclient.groups.list.return_value = [group1]
+    gm = GroupManager(backend, wsclient, inventory_database="inv")
+
+    with pytest.raises(RuntimeWarning):
+        gm.reflect_account_groups_on_workspace()
 
 
 def test_delete_original_workspace_groups_should_delete_relected_acc_groups_in_workspace():
@@ -349,8 +390,44 @@ def test_delete_original_workspace_groups_should_not_delete_groups_not_reflected
     backend = MockBackend(rows={"SELECT": [(ws_id, "de", "de", "test-group-de", account_id, "", "", "")]})
     wsclient = MagicMock()
 
-    temp_group = Group(id=ws_id, display_name="de", meta=ResourceMeta(resource_type="WorkspaceGroup"))
+    temp_group = Group(id=ws_id, display_name="test-group-de", meta=ResourceMeta(resource_type="WorkspaceGroup"))
     wsclient.groups.list.return_value = [temp_group]
 
     GroupManager(backend, wsclient, inventory_database="inv").delete_original_workspace_groups()
     wsclient.groups.delete.assert_not_called()
+
+
+def test_delete_original_workspace_groups_should_not_fail_if_target_group_doesnt_exist():
+    account_id = "11"
+    ws_id = "1"
+    backend = MockBackend(rows={"SELECT": [(ws_id, "de", "de", "test-group-de", account_id, "", "", "")]})
+    wsclient = MagicMock()
+
+    temp_group = Group(id=ws_id, display_name="test-group-de", meta=ResourceMeta(resource_type="WorkspaceGroup"))
+    reflected_group = Group(id=account_id, display_name="de", meta=ResourceMeta(resource_type="Group"))
+    wsclient.groups.list.return_value = [temp_group, reflected_group]
+
+    wsclient.groups.delete.side_effect = DatabricksError(message="None Group with id 100 not found")
+    gm = GroupManager(backend, wsclient, inventory_database="inv")
+
+    try:
+        gm.delete_original_workspace_groups()
+    except DatabricksError:
+        fail("delete_original_workspace_groups() raised DatabricksError unexpectedly!")
+
+
+def test_delete_original_workspace_groups_should_fail_if_delete_does_not_work():
+    account_id = "11"
+    ws_id = "1"
+    backend = MockBackend(rows={"SELECT": [(ws_id, "de", "de", "test-group-de", account_id, "", "", "")]})
+    wsclient = MagicMock()
+
+    temp_group = Group(id=ws_id, display_name="test-group-de", meta=ResourceMeta(resource_type="WorkspaceGroup"))
+    reflected_group = Group(id=account_id, display_name="de", meta=ResourceMeta(resource_type="Group"))
+    wsclient.groups.list.return_value = [temp_group, reflected_group]
+
+    wsclient.groups.delete.side_effect = RuntimeError("Something bad")
+    gm = GroupManager(backend, wsclient, inventory_database="inv")
+
+    with pytest.raises(RuntimeWarning):
+        gm.delete_original_workspace_groups()

@@ -29,7 +29,9 @@ def test_job_failure_propagates_correct_error_message_and_logs(ws, sql_backend, 
     install = WorkspaceInstaller.run_for_config(
         ws,
         WorkspaceConfig(
-            inventory_database=inventory_database, log_level="DEBUG", renamed_group_prefix=backup_group_prefix
+            inventory_database=inventory_database,
+            renamed_group_prefix=backup_group_prefix,
+            log_level="DEBUG",
         ),
         sql_backend=sql_backend,
         prefix=make_random(4),

@@ -1,4 +1,3 @@
-import dataclasses
 import functools
 import json
 import logging
@@ -35,16 +34,6 @@ class MigratedGroup:
     entitlements: str = None
     external_id: str = None
     roles: str = None
-
-    def as_account_group_without_id(self) -> iam.Group:
-        raw = dataclasses.asdict(self)
-        return iam.Group(
-            display_name=self.name_in_account,
-            external_id=self.external_id,
-            entitlements=iam._repeated(raw, 'entitlements', iam.ComplexValue),  # noqa
-            members=iam._repeated(raw, 'members', iam.ComplexValue),  # noqa
-            roles=iam._repeated(raw, 'roles', iam.ComplexValue),  # noqa
-        )
 
 
 class MigrationState:
