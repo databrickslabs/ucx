@@ -7,7 +7,7 @@ from unittest.mock import MagicMock, patch
 import pytest
 import yaml
 from databricks.sdk.core import DatabricksError
-from databricks.sdk.errors import OperationFailed
+from databricks.sdk.errors import NotFound, OperationFailed
 from databricks.sdk.service import iam, jobs
 from databricks.sdk.service.compute import (
     GlobalInitScriptDetails,
@@ -41,8 +41,6 @@ def ws(mocker):
     ws.current_user.me = lambda: iam.User(user_name="me@example.com", groups=[iam.ComplexValue(display="admins")])
     ws.config.host = "https://foo"
     ws.config.is_aws = True
-    config_bytes = yaml.dump(WorkspaceConfig(inventory_database="a").as_dict()).encode("utf8")
-    ws.workspace.download = lambda _: io.BytesIO(config_bytes)
     ws.workspace.get_status = lambda _: ObjectInfo(object_id=123)
     ws.data_sources.list = lambda: [DataSource(id="bcd", warehouse_id="abc")]
     ws.warehouses.list = lambda **_: [EndpointInfo(id="abc", warehouse_type=EndpointInfoWarehouseType.PRO)]
@@ -55,6 +53,8 @@ def ws(mocker):
 
 
 def test_replace_clusters_for_integration_tests(ws):
+    config_bytes = yaml.dump(WorkspaceConfig(inventory_database="a").as_dict()).encode("utf8")
+    ws.workspace.download = lambda _: io.BytesIO(config_bytes)
     return_value = WorkspaceInstaller.run_for_config(
         ws,
         WorkspaceConfig(inventory_database="a"),
@@ -183,7 +183,7 @@ workspace_start_path: /
 
     install = WorkspaceInstaller(ws)
     install._choice = lambda _1, _2: "None (abc, PRO, RUNNING)"
-    install.check_and_configure()
+    install._configure()
 
     ws.workspace.upload.assert_called_with(
         "/Users/me@example.com/.ucx/config.yml",
@@ -203,17 +203,18 @@ workspace_start_path: /
 
 def test_save_config_with_error(ws, mocker):
     def not_found(_):
-        raise DatabricksError(error_code="RAISED_FOR_TESTING")
+        raise NotFound(message="File not found")
 
     mocker.patch("builtins.input", return_value="42")
 
-    ws.workspace.get_status = not_found
+    ws.workspace.download = not_found
     ws.cluster_policies.list = lambda: []
 
     install = WorkspaceInstaller(ws)
-    with pytest.raises(DatabricksError) as e_info:
-        install.check_and_configure()
-    assert str(e_info.value.error_code) == "RAISED_FOR_TESTING"
+    with pytest.raises(NotFound) as e_info:
+        install._configure()
+
+    assert str(e_info.value.args[0]) == "File not found"
 
 
 def test_save_config_auto_groups(ws, mocker):

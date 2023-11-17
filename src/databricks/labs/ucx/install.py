@@ -16,7 +16,7 @@ from typing import Any
 import yaml
 from databricks.sdk import WorkspaceClient
 from databricks.sdk.core import DatabricksError
-from databricks.sdk.errors import OperationFailed
+from databricks.sdk.errors import NotFound, OperationFailed
 from databricks.sdk.mixins.compute import SemVer
 from databricks.sdk.service import compute, jobs
 from databricks.sdk.service.sql import EndpointInfoWarehouseType, SpotInstancePolicy
@@ -342,17 +342,17 @@ class WorkspaceInstaller:
     def _configure(self):
         ws_file_url = self.notebook_link(self.config_file)
         try:
-            ws_file_url = self.notebook_link(self.config_file)
             if "version: 1" in self._raw_previous_config():
                 logger.info("old version detected, attempting to migrate to new config")
                 self._config = self._current_config
                 self._write_config(overwrite=True)
+                return
             elif "version: 2" in self._raw_previous_config():
                 logger.info(f"UCX is already configured. See {ws_file_url}")
                 return
-        except DatabricksError as err:
+        except NotFound as err:
             if err.error_code != "RESOURCE_DOES_NOT_EXIST":
-                    raise err
+                raise err
         logger.info("Please answer a couple of questions to configure Unity Catalog migration")
         inventory_database = self._configure_inventory_database()
 
