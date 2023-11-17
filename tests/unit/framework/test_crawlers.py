@@ -4,6 +4,7 @@ from dataclasses import dataclass
 from unittest import mock
 
 import pytest
+from databricks.sdk.errors import NotFound
 from databricks.sdk.service import sql
 
 from databricks.labs.ucx.framework.crawlers import (
@@ -60,7 +61,7 @@ def test_snapshot_appends_to_new_table():
 
     def fetcher():
         msg = ".. TABLE_OR_VIEW_NOT_FOUND .."
-        raise RuntimeError(msg)
+        raise NotFound(msg)
 
     result = cb._snapshot(fetcher=fetcher, loader=lambda: [Foo(first="first", second=True)])
 

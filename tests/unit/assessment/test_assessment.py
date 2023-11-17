@@ -4,6 +4,7 @@ from unittest.mock import Mock
 
 import pytest
 from databricks.sdk.core import DatabricksError
+from databricks.sdk.errors import NotFound, InternalError
 from databricks.sdk.service.compute import (
     AutoScale,
     ClusterDetails,
@@ -440,7 +441,7 @@ def test_cluster_assessment_cluster_policy_not_found(mocker):
         )
     ]
     ws = Mock()
-    ws.cluster_policies.get.side_effect = DatabricksError(error="NO_POLICY", error_code="RESOURCE_DOES_NOT_EXIST")
+    ws.cluster_policies.get.side_effect = NotFound("NO_POLICY")
     crawler = ClustersCrawler(ws, MockBackend(), "ucx")._assess_clusters(sample_clusters1)
     assert len(list(crawler)) == 1
 
@@ -458,7 +459,7 @@ def test_cluster_assessment_cluster_policy_exception(mocker):
         )
     ]
     ws = Mock()
-    ws.cluster_policies.get.side_effect = DatabricksError(error="NO_POLICY", error_code="UNKNOWN")
+    ws.cluster_policies.get.side_effect = InternalError(...)
     crawler = ClustersCrawler(ws, MockBackend(), "ucx")._assess_clusters(sample_clusters1)
 
     with pytest.raises(DatabricksError):
@@ -575,7 +576,7 @@ def test_cluster_assessment_with_spn_cluster_policy_not_found(mocker):
     ]
     ws = mocker.Mock()
     ws.clusters.list.return_value = sample_clusters
-    ws.cluster_policies.get.side_effect = DatabricksError(error="NO_POLICY", error_code="RESOURCE_DOES_NOT_EXIST")
+    ws.cluster_policies.get.side_effect = NotFound("NO_POLICY")
     crawler = AzureServicePrincipalCrawler(ws, MockBackend(), "ucx")._list_all_cluster_with_spn_in_spark_conf()
     assert len(crawler) == 1
 
@@ -595,7 +596,7 @@ def test_cluster_assessment_with_spn_cluster_policy_exception(mocker):
     ]
     ws = mocker.Mock()
     ws.clusters.list.return_value = sample_clusters
-    ws.cluster_policies.get.side_effect = DatabricksError(error="NO_POLICY", error_code="UNKNOWN")
+    ws.cluster_policies.get.side_effect = InternalError(...)
 
     with pytest.raises(DatabricksError):
         AzureServicePrincipalCrawler(ws, MockBackend(), "ucx")._list_all_cluster_with_spn_in_spark_conf()
@@ -637,7 +638,7 @@ def test_jobs_assessment_with_spn_cluster_policy_not_found(mocker):
     ws = mocker.Mock()
     ws.clusters.list.return_value = []
     ws.jobs.list.return_value = sample_jobs
-    ws.cluster_policies.get.side_effect = DatabricksError(error="NO_POLICY", error_code="RESOURCE_DOES_NOT_EXIST")
+    ws.cluster_policies.get.side_effect = NotFound("NO_POLICY")
     crawler = AzureServicePrincipalCrawler(ws, MockBackend(), "ucx")._list_all_jobs_with_spn_in_spark_conf()
     assert len(crawler) == 1
 
@@ -679,7 +680,7 @@ def test_jobs_assessment_with_spn_cluster_policy_exception(mocker):
     ws = mocker.Mock()
     ws.clusters.list.return_value = []
     ws.jobs.list.return_value = sample_jobs
-    ws.cluster_policies.get.side_effect = DatabricksError(error="NO_POLICY", error_code="UNKNOWN")
+    ws.cluster_policies.get.side_effect = InternalError(...)
 
     with pytest.raises(DatabricksError):
         AzureServicePrincipalCrawler(ws, MockBackend(), "ucx")._list_all_jobs_with_spn_in_spark_conf()

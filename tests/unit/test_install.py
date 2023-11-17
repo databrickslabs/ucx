@@ -120,7 +120,7 @@ def test_build_wheel(ws, tmp_path):
 
 def test_save_config(ws, mocker):
     def not_found(_):
-        raise DatabricksError(error_code="RESOURCE_DOES_NOT_EXIST")
+        raise NotFound(...)
 
     mocker.patch("builtins.input", return_value="42")
 
@@ -255,25 +255,9 @@ workspace_start_path: /
     )
 
 
-def test_save_config_with_error(ws, mocker):
-    def not_found(_):
-        raise NotFound(message="File not found")
-
-    mocker.patch("builtins.input", return_value="42")
-
-    ws.workspace.download = not_found
-    ws.cluster_policies.list = lambda: []
-
-    install = WorkspaceInstaller(ws)
-    with pytest.raises(NotFound) as e_info:
-        install._configure()
-
-    assert str(e_info.value.args[0]) == "File not found"
-
-
 def test_save_config_auto_groups(ws, mocker):
     def not_found(_):
-        raise DatabricksError(error_code="RESOURCE_DOES_NOT_EXIST")
+        raise NotFound(...)
 
     def mock_question(text: str, *, default: str | None = None) -> str:
         if "workspace group names" in text:
@@ -312,7 +296,7 @@ workspace_start_path: /
 
 def test_save_config_strip_group_names(ws, mocker):
     def not_found(_):
-        raise DatabricksError(error_code="RESOURCE_DOES_NOT_EXIST")
+        raise NotFound(...)
 
     def mock_question(text: str, *, default: str | None = None) -> str:
         if "workspace group names" in text:
@@ -370,7 +354,7 @@ def test_save_config_with_glue(ws, mocker):
             """
 
     def not_found(_):
-        raise DatabricksError(error_code="RESOURCE_DOES_NOT_EXIST")
+        raise NotFound(...)
 
     def mock_question(text: str, *, default: str | None = None) -> str:
         if "external metastore" in text:
