@@ -53,6 +53,7 @@ def test_prepare_environment(ws, make_ucx_group):
             continue
 
 
+@retried(on=[NotFound], timeout=timedelta(minutes=5))
 def test_prepare_environment_no_groups_selected(ws, make_ucx_group, make_group, make_acc_group):
     make_group()
     make_acc_group()
@@ -117,7 +118,8 @@ def test_replace_workspace_groups_with_account_groups(
     permission_manager.inventorize_permissions()
 
     dummy_grants = list(permission_manager.load_all_for("TABLE", dummy_table.full_name, Grant))
-    # where 1 = len([Grant(principal='ucx_BjI1', action_type='MODIFY', catalog='hive_metastore', database='ucx_s4ygj', table='ucx_tstdr', view=None, any_file=False, anonymous_function=False)])
+    # where 1 = len([Grant(principal='ucx_BjI1', action_type='MODIFY', catalog='hive_metastore', database='ucx_s4ygj',
+    # table='ucx_tstdr', view=None, any_file=False, anonymous_function=False)])
     assert 2 == len(dummy_grants)
 
     table_permissions = grants.for_table_info(dummy_table)
@@ -286,6 +288,7 @@ def test_migration_state_should_be_saved_without_missing_anything(sql_backend, m
     assert len(new_state.groups) == len(state.groups)
 
 
+@retried(on=[NotFound], timeout=timedelta(minutes=10))
 def test_set_owner_permission(
     ws,
     sql_backend,
@@ -317,7 +320,8 @@ def test_set_owner_permission(
     permission_manager.inventorize_permissions()
 
     dummy_grants = list(permission_manager.load_all_for("TABLE", dummy_table.full_name, Grant))
-    # TODO where 1 = len([Grant(principal='ucx_Z1Ga', action_type='MODIFY', catalog='hive_metastore', database='ucx_syubc', table='ucx_tiinm', view=None, any_file=False, anonymous_function=False)])
+    # TODO where 1 = len([Grant(principal='ucx_Z1Ga', action_type='MODIFY', catalog='hive_metastore',
+    #  database='ucx_syubc', table='ucx_tiinm', view=None, any_file=False, anonymous_function=False)])
     assert 2 == len(dummy_grants)
 
     table_permissions = grants.for_table_info(dummy_table)

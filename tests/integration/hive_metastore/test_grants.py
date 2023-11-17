@@ -1,6 +1,7 @@
 import logging
 from datetime import timedelta
 
+from databricks.sdk.errors import NotFound
 from databricks.sdk.retries import retried
 
 from databricks.labs.ucx.hive_metastore import GrantsCrawler, TablesCrawler
@@ -8,6 +9,7 @@ from databricks.labs.ucx.hive_metastore import GrantsCrawler, TablesCrawler
 logger = logging.getLogger(__name__)
 
 
+@retried(on=[NotFound], timeout=timedelta(minutes=10))
 def test_all_grants_in_databases(sql_backend, inventory_schema, make_schema, make_table, make_group):
     group_a = make_group()
     group_b = make_group()

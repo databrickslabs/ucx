@@ -13,9 +13,10 @@ from databricks.sdk.service.sql import (
     ExecuteStatementResponse,
     Format,
     ResultData,
+    ServiceErrorCode,
     StatementExecutionAPI,
     StatementState,
-    StatementStatus, ServiceErrorCode,
+    StatementStatus,
 )
 
 MAX_SLEEP_PER_ATTEMPT = 10
@@ -93,9 +94,9 @@ class StatementExecutionExt(StatementExecutionAPI):
     def _raise_if_needed(status: StatementStatus):
         if status.state not in [StatementState.FAILED, StatementState.CANCELED, StatementState.CLOSED]:
             return
-        if 'SCHEMA_NOT_FOUND' in status.error.message:
+        if "SCHEMA_NOT_FOUND" in status.error.message:
             raise NotFound(status.error.message)
-        if 'TABLE_NOT_FOUND' in status.error.message:
+        if "TABLE_NOT_FOUND" in status.error.message:
             raise NotFound(status.error.message)
         mapping = {
             ServiceErrorCode.ABORTED: errors.Aborted,

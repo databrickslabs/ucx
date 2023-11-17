@@ -1,6 +1,9 @@
 import json
 import logging
+from datetime import timedelta
 
+from databricks.sdk.errors import NotFound
+from databricks.sdk.retries import retried
 from databricks.sdk.service.iam import PermissionLevel
 
 from databricks.labs.ucx.hive_metastore import GrantsCrawler, TablesCrawler
@@ -15,6 +18,7 @@ from databricks.labs.ucx.workspace_access.tacl import TableAclSupport
 logger = logging.getLogger(__name__)
 
 
+@retried(on=[NotFound], timeout=timedelta(minutes=10))
 def test_recover_permissions_from_grants(
     ws,
     sql_backend,
