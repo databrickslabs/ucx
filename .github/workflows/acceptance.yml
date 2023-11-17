@@ -41,7 +41,7 @@ jobs:
           subscription-id: ${{ secrets.ARM_SUBSCRIPTION_ID }}
 
       - name: Run integration tests
-        run: hatch run integration:test
+        run: hatch run integration
         env:
           CLOUD_ENV: "${{ vars.CLOUD_ENV }}"
           DATABRICKS_HOST: "${{ secrets.DATABRICKS_HOST }}"
