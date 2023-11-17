@@ -201,6 +201,60 @@ workspace_start_path: /
     )
 
 
+def test_migrate_from_v1_selected_groups(ws, mocker):
+    mocker.patch("builtins.input", return_value="yes")
+    mock_file = MagicMock()
+    mocker.patch("builtins.open", return_value=mock_file)
+    mocker.patch("base64.b64encode")
+
+    ws.current_user.me = lambda: iam.User(user_name="me@example.com", groups=[iam.ComplexValue(display="admins")])
+    ws.config.host = "https://foo"
+    ws.config.is_aws = True
+    config_bytes = b"""default_catalog: ucx_default
+groups:
+  backup_group_prefix: 'backup_baguette_prefix'
+  selected:
+  - '42'
+  - '100'
+inventory_database: '42'
+log_level: '42'
+num_threads: 42
+version: 1
+warehouse_id: abc
+workspace_start_path: /
+    """
+    ws.workspace.download = lambda _: io.BytesIO(config_bytes)
+    ws.workspace.get_status = lambda _: ObjectInfo(object_id=123)
+    mocker.patch("builtins.input", return_value="42")
+
+    ws.warehouses.list = lambda **_: [
+        EndpointInfo(id="abc", warehouse_type=EndpointInfoWarehouseType.PRO, state=State.RUNNING)
+    ]
+    ws.cluster_policies.list = lambda: []
+
+    install = WorkspaceInstaller(ws)
+    install._choice = lambda _1, _2: "None (abc, PRO, RUNNING)"
+    install._configure()
+
+    ws.workspace.upload.assert_called_with(
+        "/Users/me@example.com/.ucx/config.yml",
+        b"""default_catalog: ucx_default
+include_group_names:
+- '42'
+- '100'
+inventory_database: '42'
+log_level: '42'
+num_threads: 42
+renamed_group_prefix: backup_baguette_prefix
+version: 2
+warehouse_id: abc
+workspace_start_path: /
+""",
+        format=ImportFormat.AUTO,
+        overwrite=True,
+    )
+
+
 def test_save_config_with_error(ws, mocker):
     def not_found(_):
         raise NotFound(message="File not found")
