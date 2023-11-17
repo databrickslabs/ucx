@@ -8,4 +8,4 @@ def test_deploys_database(sql_backend, inventory_schema):
     deployer = SchemaDeployer(sql_backend, inventory_schema, ucx)
     deployer.deploy_schema()
     deployer.deploy_table("grants", Grant)
-    deployer.deploy_view("grant_detail", "assessment/views/grant_detail.sql")
+    deployer.deploy_view("grant_detail", "queries/views/grant_detail.sql")

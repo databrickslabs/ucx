@@ -1,4 +1,7 @@
 import logging
+from datetime import timedelta
+
+from databricks.sdk.retries import retried
 
 from databricks.labs.ucx.hive_metastore import GrantsCrawler, TablesCrawler
 
@@ -36,6 +39,7 @@ def test_all_grants_in_databases(sql_backend, inventory_schema, make_schema, mak
         all_grants[f"{grant.principal}.{grant.object_key}"] = grant.action_type
 
     assert len(all_grants) >= 8, "must have at least three grants"
+    # TODO: E       KeyError: 'sdk-xH7i.hive_metastore.default'
     assert all_grants[f"{group_a.display_name}.hive_metastore.default"] == "USAGE"
     assert all_grants[f"{group_b.display_name}.hive_metastore.default"] == "USAGE"
     assert all_grants[f"{group_a.display_name}.{table_a.full_name}"] == "SELECT"
