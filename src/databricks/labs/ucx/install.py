@@ -46,6 +46,7 @@ from databricks.labs.ucx.hive_metastore.tables import Table, TableError
 from databricks.labs.ucx.runtime import main
 from databricks.labs.ucx.workspace_access.base import Permissions
 from databricks.labs.ucx.workspace_access.generic import WorkspaceObjectInfo
+from databricks.labs.ucx.workspace_access.groups import MigratedGroup
 
 TAG_STEP = "step"
 TAG_APP = "App"
@@ -119,6 +120,7 @@ def deploy_schema(sql_backend: SqlBackend, inventory_schema: str):
     deployer.deploy_table("external_locations", ExternalLocation)
     deployer.deploy_table("mounts", Mount)
     deployer.deploy_table("grants", Grant)
+    deployer.deploy_table("groups", MigratedGroup)
     deployer.deploy_table("tables", Table)
     deployer.deploy_table("table_failures", TableError)
     deployer.deploy_table("workspace_objects", WorkspaceObjectInfo)

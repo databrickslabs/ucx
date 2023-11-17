@@ -16,14 +16,6 @@ from databricks.labs.ucx.mixins.hardening import rate_limited
 logger = logging.getLogger(__name__)
 
 
-# TODO: This class is used to persist MigrationGroupInfo, but Group is a not supported type for backend.save_table()
-@dataclass
-class MigrationGroupInfoMock:
-    workspace: str = None
-    backup: str = None
-    account: str = None
-
-
 @dataclass
 class MigratedGroup:
     id_in_workspace: str

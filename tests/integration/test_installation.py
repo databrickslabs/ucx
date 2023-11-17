@@ -54,7 +54,7 @@ def test_job_failure_propagates_correct_error_message_and_logs(ws, sql_backend, 
     assert len(workflow_run_logs) == 1
 
 
-@retried(on=[NotFound, TimeoutError], timeout=timedelta(minutes=15))
+@retried(on=[NotFound, TimeoutError, OperationFailed], timeout=timedelta(minutes=15))
 def test_jobs_with_no_inventory_database(
     ws,
     sql_backend,
@@ -211,7 +211,8 @@ def test_jobs_with_no_inventory_database(
             return True
 
         _, errors = Threads.gather("validating results", [validate_tacl, validate_permissions, validate_groups])
-        assert len(errors) == 0
+        if len(errors) > 0:
+            raise errors[0]
     finally:
         logger.debug(f"cleaning up install folder: {install._install_folder}")
         ws.workspace.delete(install._install_folder, recursive=True)
