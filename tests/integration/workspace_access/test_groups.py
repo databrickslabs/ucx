@@ -389,6 +389,7 @@ def test_query_permission(
     check_permission_for_sql_object(sup, group_info.backup.display_name, query.id, sql.PermissionLevel.CAN_VIEW)
 
     group_manager.replace_workspace_groups_with_account_groups(group_manager.migration_state)
+    logging.getLogger("databricks").setLevel("DEBUG")
     permission_manager.apply_group_permissions(group_manager.migration_state, destination="account")
     check_permission_for_sql_object(sup, group_info.account.display_name, query.id, sql.PermissionLevel.CAN_VIEW)
     check_permission_for_sql_object(sup, group_info.backup.display_name, query.id, sql.PermissionLevel.CAN_VIEW, False)

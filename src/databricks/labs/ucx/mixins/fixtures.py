@@ -837,6 +837,7 @@ def make_query(ws, make_table, make_random):
             description="TEST QUERY FOR UCX",
             query=f"SELECT * FROM {table.schema_name}.{table.name}",
         )
+        logger.info(f"Query Created {query_name}: {ws.config.host}/sql/editor/{query.id}")
         return query
 
     def remove(query: Query):
