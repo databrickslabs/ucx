@@ -776,7 +776,7 @@ class WorkspaceInstaller:
             dv = SemVer.parse(git_detached_version)
             datestamp = datetime.datetime.now().strftime("%Y%m%d%H%M%S")
             # new commits on main branch since the last tag
-            new_commits = dv.pre_release.split("-")[0]
+            new_commits = dv.pre_release.split("-")[0] if dv.pre_release else None
             # show that it's a version different from the released one in stats
             bump_patch = dv.patch + 1
             # create something that is both https://semver.org and https://peps.python.org/pep-0440/
