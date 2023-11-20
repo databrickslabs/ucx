@@ -900,7 +900,7 @@ class WorkspaceInstaller:
                     }
                 )
             except InvalidParameterValue as e:
-                logger.warning(f'skipping {step}: {e}')
+                logger.warning(f"skipping {step}: {e}")
                 continue
         return latest_status
 
