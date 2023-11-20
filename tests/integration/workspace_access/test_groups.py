@@ -3,21 +3,22 @@ import logging
 from datetime import timedelta
 
 import pytest
-from databricks.sdk.retries import retried
-from databricks.sdk.service.iam import PermissionLevel, ResourceMeta
 from databricks.sdk.errors import NotFound
+from databricks.sdk.retries import retried
+from databricks.sdk.service import sql
+from databricks.sdk.service.iam import PermissionLevel, ResourceMeta
+
 from databricks.labs.ucx.hive_metastore import GrantsCrawler, TablesCrawler
 from databricks.labs.ucx.hive_metastore.grants import Grant
+from databricks.labs.ucx.workspace_access import redash
 from databricks.labs.ucx.workspace_access.generic import (
     GenericPermissionsSupport,
     Listing,
 )
 from databricks.labs.ucx.workspace_access.groups import GroupManager
 from databricks.labs.ucx.workspace_access.manager import PermissionManager
-from databricks.labs.ucx.workspace_access.tacl import TableAclSupport
 from databricks.labs.ucx.workspace_access.redash import RedashPermissionsSupport
-from databricks.labs.ucx.workspace_access import redash
-from databricks.sdk.service import sql
+from databricks.labs.ucx.workspace_access.tacl import TableAclSupport
 
 logger = logging.getLogger(__name__)
 
@@ -337,23 +338,22 @@ def test_set_owner_permission(ws, sql_backend, inventory_schema, make_ucx_group,
     check_table_permissions_after_backup_delete()
 
 
-def test_query_permission(
-        ws,
-        sql_backend,
-        inventory_schema,
-        make_table,
-        make_query,
-        make_ucx_group,
-        make_group):
-
+def test_query_permission(ws, sql_backend, inventory_schema, make_table, make_query, make_ucx_group, make_group):
     @retried(on=[AssertionError], timeout=timedelta(seconds=600))
-    def check_permission_in_sql_object(sup: RedashPermissionsSupport, group_name: str, obj_id: str,
-                                       permission_level, *, omit: bool = False):
+    def check_permission_in_sql_object(
+        sup: RedashPermissionsSupport, group_name: str, obj_id: str, permission_level, *, omit: bool = False
+    ):
         permissions = sup._safe_get_dbsql_permissions(sql.ObjectTypePlural.QUERIES, obj_id)
-        assert (not omit) == (len([permission for
-                    permission in permissions.access_control_list
-                    if
-                    permission.group_name == group_name and permission.permission_level == permission_level]) > 0)
+        assert (not omit) == (
+            len(
+                [
+                    permission
+                    for permission in permissions.access_control_list
+                    if permission.group_name == group_name and permission.permission_level == permission_level
+                ]
+            )
+            > 0
+        )
 
     logger.info("Testing setting ownership on SQL Query.")
     query = make_query()
@@ -397,4 +397,3 @@ def test_query_permission(
     check_permission_in_sql_object(sup, group_info.temporary_name, query.id, sql.PermissionLevel.CAN_VIEW, omit=True)
     group_manager.delete_original_workspace_groups()
     assert len(query.name) > 0
-

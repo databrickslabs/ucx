@@ -158,8 +158,11 @@ class RedashPermissionsSupport(AclSupport):
         self, object_type: ObjectTypePlural, object_id: str, acl: list[sql.AccessControl] | None
     ) -> SetResponse | None:
         def hash_permissions(permissions: list[sql.AccessControl]):
-            return set([hash((permission.permission_level, permission.user_name, permission.group_name))
-                        for permission in permissions])
+            return {
+                hash((permission.permission_level, permission.user_name, permission.group_name))
+                for permission in permissions
+            }
+
         try:
             res = self._ws.dbsql_permissions.set(object_type=object_type, object_id=object_id, access_control_list=acl)
             if hash_permissions(acl).issubset(hash_permissions(res.access_control_list)):
