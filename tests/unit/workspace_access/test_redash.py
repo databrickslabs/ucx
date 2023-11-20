@@ -78,6 +78,20 @@ def test_apply(migration_state):
             ),
         ],
     )
+    ws.dbsql_permissions.set.return_value = sql.GetResponse(
+        object_type=sql.ObjectType.ALERT,
+        object_id="test",
+        access_control_list=[
+            sql.AccessControl(
+                group_name="test",
+                permission_level=sql.PermissionLevel.CAN_MANAGE,
+            ),
+            sql.AccessControl(
+                group_name="irrelevant",
+                permission_level=sql.PermissionLevel.CAN_MANAGE,
+            ),
+        ],
+    )
     sup = RedashPermissionsSupport(ws=ws, listings=[])
     item = Permissions(
         object_id="test",
@@ -148,6 +162,11 @@ def test_applier_task_should_return_true_if_permission_is_up_to_date():
         object_id="test",
         access_control_list=[acl_grp_1, acl_grp_2],
     )
+    ws.dbsql_permissions.set.return_value = sql.GetResponse(
+        object_type=sql.ObjectType.QUERY,
+        object_id="test",
+        access_control_list=[acl_grp_1, acl_grp_2],
+    )
 
     sup = RedashPermissionsSupport(ws=ws, listings=[])
     result = sup._applier_task(sql.ObjectTypePlural.QUERIES, "test", [acl_grp_1])
@@ -161,6 +180,11 @@ def test_applier_task_should_return_true_if_permission_is_up_to_date_with_multip
     acl_3_grp_1 = sql.AccessControl(group_name="group_1", permission_level=sql.PermissionLevel.CAN_RUN)
     acl_grp_2 = sql.AccessControl(group_name="group_2", permission_level=sql.PermissionLevel.CAN_MANAGE)
     ws.dbsql_permissions.get.return_value = sql.GetResponse(
+        object_type=sql.ObjectType.QUERY,
+        object_id="test",
+        access_control_list=[acl_1_grp_1, acl_2_grp_1, acl_3_grp_1, acl_grp_2],
+    )
+    ws.dbsql_permissions.set.return_value = sql.GetResponse(
         object_type=sql.ObjectType.QUERY,
         object_id="test",
         access_control_list=[acl_1_grp_1, acl_2_grp_1, acl_3_grp_1, acl_grp_2],
