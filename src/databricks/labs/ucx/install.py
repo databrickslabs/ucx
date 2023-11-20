@@ -51,6 +51,8 @@ from databricks.labs.ucx.workspace_access.groups import MigratedGroup
 TAG_STEP = "step"
 TAG_APP = "App"
 NUM_USER_ATTEMPTS = 10  # number of attempts user gets at answering a question
+CLUSTER_ID_LENGTH = 20  # number of characters in a valid cluster_id
+
 EXTRA_TASK_PARAMS = {
     "job_id": "{{job_id}}",
     "run_id": "{{run_id}}",
@@ -343,6 +345,34 @@ class WorkspaceInstaller:
                     raise SystemExit(msg)
         return inventory_database
 
+    def _valid_cluster_id(self, cluster_id: str) -> bool:
+        """Lite validation of user supplied cluster id"""
+        return CLUSTER_ID_LENGTH == len(cluster_id)
+
+    def _configure_override_clusters(self):
+        """User may override standard job clusters with interactive clusters"""
+        default_val = ""
+        preamble = "Pick default and we'll create a compatible job cluster (recommended) or "
+        cluster_id = self._question(
+            preamble + "enter pre-existing HMS Legacy cluster ID",
+            default=default_val,
+        )
+        tacl_cluster_id = self._question(
+            preamble + "enter pre-existing Table Access Control cluster ID",
+            default=default_val,
+        )
+        overrides = None
+        if (
+            default_val not in (cluster_id, tacl_cluster_id)
+            and self._valid_cluster_id(cluster_id)
+            and self._valid_cluster_id(tacl_cluster_id)
+        ):
+            overrides = {
+                "main": cluster_id,
+                "tacl": tacl_cluster_id,
+            }
+        return overrides
+
     def _configure(self):
         ws_file_url = self.notebook_link(self.config_file)
         try:
@@ -418,6 +448,8 @@ class WorkspaceInstaller:
                         self._choice_from_dict("Select a Cluster Policy from The List", cluster_policies)
                     )
                     instance_profile, spark_conf_dict = self._get_ext_hms_conf_from_policy(cluster_policy)
+
+        self._override_clusters = self._configure_override_clusters()
 
         self._config = WorkspaceConfig(
             inventory_database=inventory_database,
@@ -622,9 +654,20 @@ class WorkspaceInstaller:
             remote_wheel = f"{self._install_folder}/wheels/{local_wheel.name}"
             remote_dirname = os.path.dirname(remote_wheel)
             with local_wheel.open("rb") as f:
-                self._ws.dbfs.mkdirs(remote_dirname)
-                logger.info(f"Uploading wheel to dbfs:{remote_wheel}")
-                self._ws.dbfs.upload(remote_wheel, f, overwrite=True)
+                try:
+                    self._ws.dbfs.mkdirs(remote_dirname)
+                    logger.info(f"Uploading wheel to dbfs:{remote_wheel}")
+                    self._ws.dbfs.upload(remote_wheel, f, overwrite=True)
+                except OperationFailed as err:
+                    logger.warning(f"Uploading wheel file to DBFS failed, DBFS is probably write protected. {err}")
+                    # assume DBFS is write protected
+                    self._write_protected_dbfs = True
+                    if not self._override_clusters:
+                        logger.error("Recommend adding override clusters with attached wheel file as python library.")
+                        raise err
+                    else:
+                        logger.warning(f"Continuing with override clusters {self._override_clusters}")
+
             with local_wheel.open("rb") as f:
                 self._ws.workspace.mkdirs(remote_dirname)
                 logger.info(f"Uploading wheel to /Workspace{remote_wheel}")
@@ -666,6 +709,7 @@ class WorkspaceInstaller:
             if job_task.job_cluster_key in overrides:
                 job_task.existing_cluster_id = overrides[job_task.job_cluster_key]
                 job_task.job_cluster_key = None
+                job_task.libraries = None
             if job_task.python_wheel_task is not None:
                 job_task.python_wheel_task = None
                 params = {"task": job_task.task_key} | EXTRA_TASK_PARAMS
@@ -729,7 +773,7 @@ class WorkspaceInstaller:
             "spark.databricks.cluster.profile": "singleNode",
             "spark.master": "local[*]",
         }
-        if self._config.spark_conf is not None:
+        if self._current_config.spark_conf is not None:
             spark_conf = spark_conf | self._config.spark_conf
         spec = self._cluster_node_type(
             compute.ClusterSpec(
