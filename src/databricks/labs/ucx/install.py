@@ -890,14 +890,18 @@ class WorkspaceInstaller:
     def latest_job_status(self) -> list[dict]:
         latest_status = []
         for step, job_id in self._state.jobs.items():
-            job_runs = list(self._ws.jobs.list_runs(job_id=job_id, limit=1))
-            latest_status.append(
-                {
-                    "step": step,
-                    "state": "UNKNOWN" if not job_runs else str(job_runs[0].state.result_state),
-                    "started": "" if not job_runs else job_runs[0].start_time,
-                }
-            )
+            try:
+                job_runs = list(self._ws.jobs.list_runs(job_id=job_id, limit=1))
+                latest_status.append(
+                    {
+                        "step": step,
+                        "state": "UNKNOWN" if not job_runs else str(job_runs[0].state.result_state),
+                        "started": "<never run>" if not job_runs else job_runs[0].start_time,
+                    }
+                )
+            except InvalidParameterValue as e:
+                logger.warning(f"skipping {step}: {e}")
+                continue
         return latest_status
 
 
