@@ -44,6 +44,8 @@ def metadataForAllTables(databases: Seq[String], queue: ConcurrentLinkedQueue[Ta
             case (key, value) =>
               if (key == "personalAccessToken")
                 s"$key=$redactedKey(redacted)"
+              else if (key.equalsIgnoreCase("password"))
+                s"$key=$redactedKey(redacted)"
               else
                 s"$key=$value"
           }.mkString("[", ", ", "]")
