@@ -36,8 +36,10 @@ class ExternalLocationCrawler(CrawlerBase):
                         if location[5:].startswith(mount.name):
                             location = location[5:].replace(mount.name, mount.source)
                             break
-                if not location.startswith("dbfs") and (
-                    self._prefix_size[0] < location.find(":/") < self._prefix_size[1]
+                if (
+                    not location.startswith("dbfs")
+                    and (self._prefix_size[0] < location.find(":/") < self._prefix_size[1])
+                    and not location.startswith("jdbc")
                 ):
                     dupe = False
                     loc = 0
@@ -69,9 +71,18 @@ class ExternalLocationCrawler(CrawlerBase):
 
                     # Fetch the value of host from the newly created dict
                     host = result_dict.get("host", "")
-                    logger.debug(f"Storage Properties is {table.storage_properties}")
-                    logger.debug(f"Host is {host}")
-                    jdbc_location = f"jdbc:databricks://{host}"
+                    port = result_dict.get("port", "")
+                    database = result_dict.get("database", "")
+                    httppath = result_dict.get("httpPath", "")
+
+                    # dbtable = result_dict.get("dbtable", "")
+
+                    # currently supporting databricks and mysql external tables
+                    # add other jdbc types
+                    if "databricks" in location.lower():
+                        jdbc_location = f"jdbc:databricks://{host};httpPath={httppath}"
+                    elif "mysql" in location.lower():
+                        jdbc_location = f"jdbc:mysql://{host}:{port}/{database}"
                     external_locations.append(ExternalLocation(jdbc_location))
         return external_locations
 
