@@ -88,7 +88,7 @@ def test_external_locations():
                 "[database=test_db, host=somemysql.us-east-1.rds.amazonaws.com, \
             port=3306, dbtable=movies, user=*********(redacted), password=*********(redacted)]",
             ]
-        )
+        ),
     ]
     sample_mounts = [Mount("/mnt/ucx", "s3://us-east-1-ucx-container")]
     result_set = crawler._external_locations(sample_locations, sample_mounts)
@@ -99,10 +99,7 @@ def test_external_locations():
         result_set[3].location
         == "jdbc:databricks://dbc-test1-aa11.cloud.databricks.com;httpPath=/sql/1.0/warehouses/65b52fb5bd86a7be"
     )
-    assert (
-        result_set[4].location
-        == "jdbc:mysql://somemysql.us-east-1.rds.amazonaws.com:3306/test_db"
-    )
+    assert result_set[4].location == "jdbc:mysql://somemysql.us-east-1.rds.amazonaws.com:3306/test_db"
 
 
 def test_job_assessment():

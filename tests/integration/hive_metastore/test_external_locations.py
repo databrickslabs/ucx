@@ -46,7 +46,4 @@ def test_external_locations(ws, sql_backend, inventory_schema, env_or_skip):
         results[2].location
         == "jdbc:databricks://dbc-test1-aa11.cloud.databricks.com;httpPath=/sql/1.0/warehouses/65b52fb5bd86a7be"
     )
-    assert (
-            results[3].location
-            == "jdbc:mysql://somemysql.us-east-1.rds.amazonaws.com:3306/test_db"
-    )
+    assert results[3].location == "jdbc:mysql://somemysql.us-east-1.rds.amazonaws.com:3306/test_db"
