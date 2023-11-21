@@ -705,7 +705,6 @@ class WorkspaceInstaller:
                 notebook_path=remote_notebook,
                 # ES-872211: currently, we cannot read WSFS files from Scala context
                 base_parameters={
-                    "inventory_database": self._current_config.inventory_database,
                     "task": task.name,
                     "config": f"/Workspace{self.config_file}",
                 }
