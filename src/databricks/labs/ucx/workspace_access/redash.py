@@ -152,6 +152,8 @@ class RedashPermissionsSupport(AclSupport):
             acl_requests.append(new_acl_request)
         return acl_requests
 
+    @retried(on=[RetryableError], timeout=timedelta(minutes=12))
+    @rate_limited(burst_period_seconds=30)
     def _safe_set_permissions(
         self, object_type: ObjectTypePlural, object_id: str, acl: list[sql.AccessControl] | None
     ) -> SetResponse | None:

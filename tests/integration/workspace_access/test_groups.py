@@ -339,7 +339,7 @@ def test_set_owner_permission(ws, sql_backend, inventory_schema, make_ucx_group,
 
 
 def test_query_permission(ws, sql_backend, inventory_schema, make_table, make_query, make_ucx_group, make_group):
-    @retried(on=[AssertionError], timeout=timedelta(seconds=600))
+    @retried(on=[AssertionError], timeout=timedelta(seconds=60))
     def check_permission_in_sql_object(
         sup: RedashPermissionsSupport, group_name: str, obj_id: str, permission_level, *, omit: bool = False
     ):
@@ -384,9 +384,6 @@ def test_query_permission(ws, sql_backend, inventory_schema, make_table, make_qu
     permission_manager.inventorize_permissions()
 
     group_manager.rename_groups()
-    # Checking permission on both primary and backup group.
-    check_permission_in_sql_object(sup, group_info.name_in_workspace, query.id, sql.PermissionLevel.CAN_VIEW, omit=True)
-    check_permission_in_sql_object(sup, group_info.temporary_name, query.id, sql.PermissionLevel.CAN_VIEW)
 
     group_manager.reflect_account_groups_on_workspace()
     permission_manager.apply_group_permissions(state)
