@@ -247,7 +247,7 @@ def test_applier_task_when_set_error_non_retriable():
 
     sup = RedashPermissionsSupport(ws=ws, listings=[], verify_timeout=timedelta(seconds=1))
     with pytest.raises(TimeoutError) as e:
-        result = sup._applier_task(
+        sup._applier_task(
             sql.ObjectTypePlural.QUERIES,
             "test",
             [
@@ -256,6 +256,7 @@ def test_applier_task_when_set_error_non_retriable():
             ],
         )
     assert "Timed out after" in str(e.value)
+
 
 def test_applier_task_when_set_error_retriable():
     ws = MagicMock()
