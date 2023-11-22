@@ -129,7 +129,7 @@ class RedashPermissionsSupport(AclSupport):
 
         retry_on_value_error = retried(on=[ValueError, RetryableError], timeout=self._verify_timeout)
         retried_check = retry_on_value_error(self._inflight_check)
-        return retried_check(object_id, object_id, acl)
+        return retried_check(object_type, object_id, acl)
 
     def _prepare_new_acl(
         self, acl: list[sql.AccessControl], migration_state: MigrationState
@@ -152,11 +152,27 @@ class RedashPermissionsSupport(AclSupport):
             acl_requests.append(new_acl_request)
         return acl_requests
 
+    @retried(on=[RetryableError], timeout=timedelta(minutes=12))
+    @rate_limited(burst_period_seconds=30)
     def _safe_set_permissions(
         self, object_type: ObjectTypePlural, object_id: str, acl: list[sql.AccessControl] | None
     ) -> SetResponse | None:
+        def hash_permissions(permissions: list[sql.AccessControl]):
+            return {
+                hash((permission.permission_level, permission.user_name, permission.group_name))
+                for permission in permissions
+            }
+
         try:
-            return self._ws.dbsql_permissions.set(object_type=object_type, object_id=object_id, access_control_list=acl)
+            res = self._ws.dbsql_permissions.set(object_type=object_type, object_id=object_id, access_control_list=acl)
+            if hash_permissions(acl).issubset(hash_permissions(res.access_control_list)):
+                return res
+            else:
+                msg = (
+                    f"Failed to set permission and will be retried for {object_type} {object_id}, "
+                    f"doing another attempt..."
+                )
+                raise RetryableError(message=msg)
         except DatabricksError as e:
             if e.error_code in [
                 "BAD_REQUEST",
