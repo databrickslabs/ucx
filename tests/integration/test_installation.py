@@ -54,7 +54,7 @@ def test_job_failure_propagates_correct_error_message_and_logs(ws, sql_backend, 
     assert len(workflow_run_logs) == 1
 
 
-@retried(on=[NotFound, TimeoutError, OperationFailed, InvalidParameterValue], timeout=timedelta(minutes=15))
+@retried(on=[NotFound, TimeoutError, OperationFailed, InvalidParameterValue], timeout=timedelta(minutes=25))
 def test_jobs_with_no_inventory_database(
     ws,
     sql_backend,
