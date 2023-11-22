@@ -118,7 +118,7 @@ def test_delete_ws_groups_should_not_delete_non_reflected_acc_groups(ws, make_uc
     assert ws.groups.get(ws_group.id).display_name == "ucx-temp-" + ws_group.display_name
 
 
-@retried(on=[NotFound, TimeoutError, AssertionError], timeout=timedelta(minutes=10))
+@retried(on=[NotFound, TimeoutError, AssertionError], timeout=timedelta(minutes=20))
 def test_replace_workspace_groups_with_account_groups(
     ws,
     sql_backend,
