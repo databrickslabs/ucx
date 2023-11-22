@@ -54,7 +54,7 @@ def metadataForAllTables(databases: Seq[String], queue: ConcurrentLinkedQueue[Ta
 }
 
 def getInventoryDatabase(): String={
-  dbutils.widgets.text("config", "/Workspace/Users/hari.selvarajan@databricks.com/.ucx/config.yml")
+  dbutils.widgets.text("config", "./config.yml")
   val configFile = dbutils.widgets.get("config")
   val fs = FileSystem.get(new java.net.URI("file:/Workspace"), sc.hadoopConfiguration)
   val file = fs.open(new Path(configFile))
