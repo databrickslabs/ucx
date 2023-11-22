@@ -92,6 +92,10 @@ def user_pool(ws):
 
 @pytest.fixture
 def make_ucx_group(make_random, make_group, make_acc_group, user_pool):
+    assert (
+        len(user_pool) >= 1
+    ), "must have 'test-user-*' test users with id, userName and displayName in your test workspace"
+
     def inner():
         display_name = f"ucx_{make_random(4)}"
         members = [_.id for _ in random.choices(user_pool, k=random.randint(1, 40))]
