@@ -239,7 +239,7 @@ class WorkspaceInstaller:
                 if run_task.state.result_state != jobs.RunResultState.FAILED:
                     continue
                 run_output = self._ws.jobs.get_run_output(run_task.run_id)
-                if logger.isEnabledFor(logging.DEBUG):
+                if logger.isEnabledFor(logging.DEBUG) and run_output.error_trace is not None:
                     sys.stderr.write(run_output.error_trace)
                 messages.append(f"{run_task.task_key}: {run_output.error}")
             msg = f'{job_run.state.state_message.rstrip(".")}: {", ".join(messages)}'
