@@ -84,15 +84,30 @@ def test_external_locations():
         ),
         row_factory(
             [
-                "jdbc:MYSQL://",
+                "jdbc:/MYSQL",
                 "[database=test_db, host=somemysql.us-east-1.rds.amazonaws.com, \
             port=3306, dbtable=movies, user=*********(redacted), password=*********(redacted)]",
+            ]
+        ),
+        row_factory(
+            [
+                "jdbc:providerknown:/",
+                "[database=test_db, host=somedb.us-east-1.rds.amazonaws.com, \
+            port=1234, dbtable=sometable, user=*********(redacted), password=*********(redacted), \
+            provider=providerknown]",
+            ]
+        ),
+        row_factory(
+            [
+                "jdbc:providerunknown:/",
+                "[database=test_db, host=somedb.us-east-1.rds.amazonaws.com, \
+            port=1234, dbtable=sometable, user=*********(redacted), password=*********(redacted)]",
             ]
         ),
     ]
     sample_mounts = [Mount("/mnt/ucx", "s3://us-east-1-ucx-container")]
     result_set = crawler._external_locations(sample_locations, sample_mounts)
-    assert len(result_set) == 5
+    assert len(result_set) == 7
     assert result_set[0].location == "s3://us-east-1-dev-account-staging-uc-ext-loc-bucket-1/Location/"
     assert result_set[1].location == "s3://us-east-1-dev-account-staging-uc-ext-loc-bucket-23/"
     assert (
@@ -100,6 +115,8 @@ def test_external_locations():
         == "jdbc:databricks://dbc-test1-aa11.cloud.databricks.com;httpPath=/sql/1.0/warehouses/65b52fb5bd86a7be"
     )
     assert result_set[4].location == "jdbc:mysql://somemysql.us-east-1.rds.amazonaws.com:3306/test_db"
+    assert result_set[5].location == "jdbc:providerknown://somedb.us-east-1.rds.amazonaws.com:1234/test_db"
+    assert result_set[6].location == "jdbc:providerunknown://somedb.us-east-1.rds.amazonaws.com:1234/test_db"
 
 
 def test_job_assessment():
