@@ -240,8 +240,12 @@ class WorkspaceInstaller:
                     continue
                 run_output = self._ws.jobs.get_run_output(run_task.run_id)
                 if logger.isEnabledFor(logging.DEBUG):
-                    sys.stderr.write(run_output.error_trace)
-                messages.append(f"{run_task.task_key}: {run_output.error}")
+                    if run_output and run_output.error_trace:
+                        sys.stderr.write(run_output.error_trace)
+                if run_output and run_output.error:
+                    messages.append(f"{run_task.task_key}: {run_output.error}")
+                else:
+                    messages.append(f"{run_task.task_key}: output unavailable")
             msg = f'{job_run.state.state_message.rstrip(".")}: {", ".join(messages)}'
             raise OperationFailed(msg) from None
 
