@@ -53,14 +53,19 @@ def metadataForAllTables(databases: Seq[String], queue: ConcurrentLinkedQueue[Ta
   }).toList.toDF
 }
 
-dbutils.widgets.text("config", "config.yml")
-val configFile = dbutils.widgets.get("config")
-val fs = FileSystem.get(new java.net.URI("file:/Workspace"), sc.hadoopConfiguration)
-val file = fs.open(new Path(configFile))
-val configContents = org.apache.commons.io.IOUtils.toString(file, java.nio.charset.StandardCharsets.UTF_8)
-val configObj = new Yaml().load(configContents).asInstanceOf[java.util.Map[String, Any]]
-val inventoryDatabase = obj.get("inventory_database")
+def getInventoryDatabase(): String={
+  dbutils.widgets.text("config", "/Workspace/Users/hari.selvarajan@databricks.com/.ucx/config.yml")
+  val configFile = dbutils.widgets.get("config")
+  val fs = FileSystem.get(new java.net.URI("file:/Workspace"), sc.hadoopConfiguration)
+  val file = fs.open(new Path(configFile))
+  val configContents = org.apache.commons.io.IOUtils.toString(file, java.nio.charset.StandardCharsets.UTF_8)
+  val configObj = new Yaml().load(configContents).asInstanceOf[java.util.Map[String, Any]]
+  val inventoryDatabase = configObj.get("inventory_database").toString()
+  return inventoryDatabase
 
+}
+
+val inventoryDatabase = getInventoryDatabase()
 val df = metadataForAllTables(spark.sharedState.externalCatalog.listDatabases(), failures)
 df.write.mode("overwrite").option("overwriteSchema", "true").saveAsTable(s"$inventoryDatabase.tables")
 
