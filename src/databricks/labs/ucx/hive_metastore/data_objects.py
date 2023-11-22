@@ -74,7 +74,7 @@ class ExternalLocationCrawler(CrawlerBase):
                     port = result_dict.get("port", "")
                     database = result_dict.get("database", "")
                     httppath = result_dict.get("httpPath", "")
-
+                    provider = result_dict.get("provider", "")
                     # dbtable = result_dict.get("dbtable", "")
 
                     # currently supporting databricks and mysql external tables
@@ -83,7 +83,12 @@ class ExternalLocationCrawler(CrawlerBase):
                         jdbc_location = f"jdbc:databricks://{host};httpPath={httppath}"
                     elif "mysql" in location.lower():
                         jdbc_location = f"jdbc:mysql://{host}:{port}/{database}"
+                    elif not provider == "":
+                        jdbc_location = f"jdbc:{provider.lower()}://{host}:{port}/{database}"
+                    else:
+                        jdbc_location = f"{location.lower()}/{host}:{port}/{database}"
                     external_locations.append(ExternalLocation(jdbc_location))
+
         return external_locations
 
     def _external_location_list(self):
