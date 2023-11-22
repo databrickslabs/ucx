@@ -64,6 +64,9 @@ export DATABRICKS_HOST=https://adb-123....azuredatabricks.net/
 ```
 
 Please follow the instructions in `./install.sh`, which will deploy UCX to your workspace and open a notebook with the description of all jobs to trigger. The journey starts with assessment. 
+### Special Consideration - External Metastores
+If your Databricks Workspace relies on an external Hive Metastore (such as glue), make sure to read the [External HMS Document](docs/external_hms_glue.md).
+
 
 ## Star History
 
