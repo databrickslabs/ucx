@@ -657,9 +657,11 @@ def make_warehouse(ws, make_random):
 
 
 def _is_in_debug() -> bool:
+    logger.info(os.path.basename(sys.argv[0]))
     return os.path.basename(sys.argv[0]) in [
         "_jb_pytest_runner.py",
         "testlauncher.py",
+        "-c"
     ]
 
 
@@ -676,9 +678,11 @@ def debug_env_name():
 @pytest.fixture
 def debug_env(monkeypatch, debug_env_name) -> MutableMapping[str, str]:
     if not _is_in_debug():
+        logger.info("heyyy")
         return os.environ
     conf_file = pathlib.Path.home() / ".databricks/debug-env.json"
     if not conf_file.exists():
+        logger.info("mdddrrr")
         return os.environ
     with conf_file.open("r") as f:
         conf = json.load(f)
