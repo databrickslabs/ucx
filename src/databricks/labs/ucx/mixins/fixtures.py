@@ -20,6 +20,7 @@ from databricks.sdk.service.sql import CreateWarehouseRequestWarehouseType
 from databricks.sdk.service.workspace import ImportFormat
 
 from databricks.labs.ucx.framework.crawlers import StatementExecutionBackend
+from databricks.sdk.service import sql
 
 logger = logging.getLogger(__name__)
 
@@ -774,6 +775,7 @@ def make_table(ws, sql_backend, make_schema, make_random) -> Callable[..., Table
         external: bool = False,
         view: bool = False,
         tbl_properties: dict[str, str] | None = None,
+        function: bool = False,
     ) -> TableInfo:
         if schema_name is None:
             schema = make_schema(catalog_name=catalog_name)
@@ -782,10 +784,21 @@ def make_table(ws, sql_backend, make_schema, make_random) -> Callable[..., Table
         if name is None:
             name = f"ucx_T{make_random(4)}"
         full_name = f"{catalog_name}.{schema_name}.{name}".lower()
-        ddl = f'CREATE {"VIEW" if view else "TABLE"} {full_name}'
+
+        type = ""
+        if function:
+            type = "FUNCTION"
+        elif view:
+            type = "VIEW"
+        else:
+            type = "TABLE"
+
+        ddl = f'CREATE {type} {full_name}'
         if ctas is not None:
             # temporary (if not view)
             ddl = f"{ddl} AS {ctas}"
+        elif function:
+            ddl = f"{ddl}() RETURNS INT NOT DETERMINISTIC CONTAINS SQL RETURN (rand() * 6)::INT + 1;"
         elif non_delta:
             location = "dbfs:/databricks-datasets/iot-stream/data-device"
             ddl = f"{ddl} USING json LOCATION '{location}'"
@@ -821,3 +834,46 @@ def make_table(ws, sql_backend, make_schema, make_random) -> Callable[..., Table
                 raise e
 
     yield from factory("table", create, remove)
+
+
+@pytest.fixture
+def make_query(ws, sql_backend, make_random):
+    def create(*, name: str | None = None):
+        if name is None:
+            name = f"ucx_T{make_random(4)}"
+
+        return ws.queries.create(name=name, query="SHOW TABLES")
+
+    yield from factory(
+        "query",
+        create,
+        lambda query: ws.queries.delete(query.id),
+    )
+
+@pytest.fixture
+def make_alert(ws, sql_backend, make_random):
+    def create(query_id, *, name: str | None = None):
+        if name is None:
+            name = f"ucx_T{make_random(4)}"
+        return ws.alerts.create(options=sql.AlertOptions(column="1", op="==", value="1"),
+                            name=name,
+                            query_id=query_id)
+    yield from factory(
+        "alert",
+        create,
+        lambda alert: ws.alerts.delete(alert.id),
+    )
+
+@pytest.fixture
+def make_dashboard(ws, sql_backend, make_random):
+    def create(*, name: str | None = None):
+        if name is None:
+            name = f"ucx_T{make_random(4)}"
+        return ws.dashboards.create(name=name)
+    yield from factory(
+        "dashboard",
+        create,
+        lambda dashboard: ws.dashboards.delete(dashboard.id),
+    )
+
+

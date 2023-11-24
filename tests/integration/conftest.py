@@ -92,10 +92,12 @@ def user_pool(ws):
 
 @pytest.fixture
 def make_ucx_group(make_random, make_group, make_acc_group, user_pool):
-    def inner():
+    def inner(*, entitlements=None):
         display_name = f"ucx_{make_random(4)}"
         members = [_.id for _ in random.choices(user_pool, k=random.randint(1, 40))]
-        ws_group = make_group(display_name=display_name, members=members, entitlements=["allow-cluster-create"])
+        if entitlements is None:
+            entitlements = ["allow-cluster-create"]
+        ws_group = make_group(display_name=display_name, members=members, entitlements=entitlements)
         acc_group = make_acc_group(display_name=display_name, members=members)
         return ws_group, acc_group
 

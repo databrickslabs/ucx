@@ -227,7 +227,7 @@ class WorkspaceInstaller:
         logger.debug(f"starting {step} job: {self._ws.config.host}#job/{job_id}")
         job_run_waiter = self._ws.jobs.run_now(job_id)
         try:
-            job_run_waiter.result()
+            job_run_waiter.result(timeout=datetime.timedelta(days=1))
         except OperationFailed:
             # currently we don't have any good message from API, so we have to work around it.
             job_run = self._ws.jobs.get_run(job_run_waiter.run_id)
