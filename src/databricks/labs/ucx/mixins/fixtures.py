@@ -14,13 +14,12 @@ from typing import BinaryIO, Optional
 import pytest
 from databricks.sdk import AccountClient, WorkspaceClient
 from databricks.sdk.core import DatabricksError
-from databricks.sdk.service import compute, iam, jobs, pipelines, workspace
+from databricks.sdk.service import compute, iam, jobs, pipelines, sql, workspace
 from databricks.sdk.service.catalog import CatalogInfo, SchemaInfo, TableInfo
 from databricks.sdk.service.sql import CreateWarehouseRequestWarehouseType
 from databricks.sdk.service.workspace import ImportFormat
 
 from databricks.labs.ucx.framework.crawlers import StatementExecutionBackend
-from databricks.sdk.service import sql
 
 logger = logging.getLogger(__name__)
 
@@ -793,7 +792,7 @@ def make_table(ws, sql_backend, make_schema, make_random) -> Callable[..., Table
         else:
             type = "TABLE"
 
-        ddl = f'CREATE {type} {full_name}'
+        ddl = f"CREATE {type} {full_name}"
         if ctas is not None:
             # temporary (if not view)
             ddl = f"{ddl} AS {ctas}"
@@ -850,19 +849,20 @@ def make_query(ws, sql_backend, make_random):
         lambda query: ws.queries.delete(query.id),
     )
 
+
 @pytest.fixture
 def make_alert(ws, sql_backend, make_random):
     def create(query_id, *, name: str | None = None):
         if name is None:
             name = f"ucx_T{make_random(4)}"
-        return ws.alerts.create(options=sql.AlertOptions(column="1", op="==", value="1"),
-                            name=name,
-                            query_id=query_id)
+        return ws.alerts.create(options=sql.AlertOptions(column="1", op="==", value="1"), name=name, query_id=query_id)
+
     yield from factory(
         "alert",
         create,
         lambda alert: ws.alerts.delete(alert.id),
     )
+
 
 @pytest.fixture
 def make_dashboard(ws, sql_backend, make_random):
@@ -870,10 +870,9 @@ def make_dashboard(ws, sql_backend, make_random):
         if name is None:
             name = f"ucx_T{make_random(4)}"
         return ws.dashboards.create(name=name)
+
     yield from factory(
         "dashboard",
         create,
         lambda dashboard: ws.dashboards.delete(dashboard.id),
     )
-
-

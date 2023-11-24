@@ -1,0 +1,52 @@
+name: performance
+
+on:
+  pull_request:
+    types: [opened, synchronize]
+
+permissions:
+  id-token: write
+  contents: read
+  pull-requests: write
+
+env:
+  HATCH_VERSION: 1.7.0
+
+jobs:
+  integration:
+    environment: account-admin
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v2.5.0
+
+      - name: Unshallow
+        run: git fetch --prune --unshallow
+
+      - name: Install Python
+        uses: actions/setup-python@v4
+        with:
+          cache: 'pip'
+          cache-dependency-path: '**/pyproject.toml'
+          python-version: '3.10'
+
+      - name: Install hatch
+        run: pip install hatch==$HATCH_VERSION
+
+      - uses: azure/login@v1
+        with:
+          client-id: ${{ secrets.ARM_CLIENT_ID }}
+          tenant-id: ${{ secrets.ARM_TENANT_ID }}
+          subscription-id: ${{ secrets.ARM_SUBSCRIPTION_ID }}
+
+      - name: Run perf test
+        run: hatch run performance
+        env:
+          CLOUD_ENV: "${{ vars.CLOUD_ENV }}"
+          DATABRICKS_HOST: "${{ secrets.DATABRICKS_HOST }}"
+          DATABRICKS_ACCOUNT_ID: "${{ secrets.DATABRICKS_ACCOUNT_ID }}"
+          DATABRICKS_CLUSTER_ID: "${{ vars.DATABRICKS_CLUSTER_ID }}"
+          TEST_DEFAULT_CLUSTER_ID: "${{ vars.TEST_DEFAULT_CLUSTER_ID }}"
+          TEST_DEFAULT_WAREHOUSE_ID: "${{ vars.TEST_DEFAULT_WAREHOUSE_ID }}"
+          TEST_INSTANCE_POOL_ID: "${{ vars.TEST_INSTANCE_POOL_ID }}"
+          TEST_LEGACY_TABLE_ACL_CLUSTER_ID: "${{ vars.TEST_LEGACY_TABLE_ACL_CLUSTER_ID }}"

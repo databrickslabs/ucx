@@ -22,6 +22,9 @@ test:
 integration:
 	hatch run integration
 
+performance:
+	hatch run performance
+
 coverage:
 	hatch run coverage && open htmlcov/index.html
 
