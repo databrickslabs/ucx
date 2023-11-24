@@ -41,7 +41,6 @@ class PersistedGroup:
 
 verificationErrors = []
 
-
 def test_performance(
     ws,
     make_cluster_policy,
@@ -283,8 +282,9 @@ def test_performance(
         owner = groups[random.randint(1, len(groups) - 1)][0].display_name
         transfer_ownership(sql_backend, "SCHEMA", schema.name, owner)
 
-        for group, permission in schema_permissions.items():
-            to_persist.append(ObjectPermission(group, "SCHEMA", schema.name, permission))
+        for group, permissions in schema_permissions.items():
+            for permission in permissions:
+                to_persist.append(ObjectPermission(group, "SCHEMA", schema.name, permission))
         to_persist.append(ObjectPermission(owner, "SCHEMA", schema.name, "OWNER"))
 
         if random.randint(1, NB_OF_TEST_WS_OBJECTS) < 8:
