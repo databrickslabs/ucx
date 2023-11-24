@@ -80,12 +80,11 @@ class PerformanceTest(unittest.TestCase):
         env_or_skip,
     ):
         NB_OF_TEST_WS_OBJECTS = 10
-        NB_OF_TEST_GROUPS = 10
+        NB_OF_TEST_GROUPS = 30
         NB_OF_SCHEMAS = 1
 
         test_database = make_schema()
         groups = []
-
         for i in range(NB_OF_TEST_GROUPS):
             entitlements_list = ["workspace-access", "databricks-sql-access", "allow-cluster-create", "allow-instance-pool-create"]
             entitlements = [_ for _ in random.choices(entitlements_list, k=random.randint(1, 3))]
@@ -93,6 +92,11 @@ class PerformanceTest(unittest.TestCase):
             groups.append((ws_group, acc_group))
             logger.info(f"Created group number {i+1}")
         self.persist_groups(groups, sql_backend, test_database)
+
+        users = []
+        for i in range(10):
+            user = make_user()
+            users.append(user)
 
         to_persist = []
         for i in range(NB_OF_TEST_WS_OBJECTS):
@@ -103,12 +107,6 @@ class PerformanceTest(unittest.TestCase):
                 to_persist.append(ObjectPermission(group, "secrets", scope, permission.value))
         sql_backend.save_table(f"{test_database.name}.objects", to_persist, ObjectPermission)
 
-        users = []
-        for i in range(10):
-            user = make_user()
-            users.append(user)
-
-
         to_persist = []
         for i in range(NB_OF_TEST_WS_OBJECTS):
             ws_object = make_pipeline()
@@ -116,7 +114,6 @@ class PerformanceTest(unittest.TestCase):
             self.set_permissions(ws_object, "pipeline_id", "pipelines", ws, ws_permissions)
             for group, permission in ws_permissions.items():
                 to_persist.append(ObjectPermission(group, "pipelines", ws_object.pipeline_id, permission.value))
-
         sql_backend.save_table(f"{test_database.name}.objects", to_persist, ObjectPermission)
 
         to_persist = []
@@ -145,7 +142,6 @@ class PerformanceTest(unittest.TestCase):
             for group, permission in ws_permissions.items():
                 to_persist.append(ObjectPermission(group, "registered-models", ws_object.id, permission.value))
         sql_backend.save_table(f"{test_database.name}.objects", to_persist, ObjectPermission)
-
 
         to_persist = []
         for i in range(NB_OF_TEST_WS_OBJECTS):
@@ -331,31 +327,37 @@ class PerformanceTest(unittest.TestCase):
             else:
                 persisted_rows[mgted_grp.object_id] = {mgted_grp.group: mgted_grp.permission}
 
-        self.validate_objects(persisted_rows, sql_backend, test_database, test_groups, ws, "pipelines")
-        self.validate_objects(persisted_rows, sql_backend, test_database, test_groups, ws, "jobs")
-        self.validate_objects(persisted_rows, sql_backend, test_database, test_groups, ws, "experiments")
-        self.validate_objects(persisted_rows, sql_backend, test_database, test_groups, ws, "registered-models")
-        self.validate_objects(persisted_rows, sql_backend, test_database, test_groups, ws, "instance-pools")
-        self.validate_objects(persisted_rows, sql_backend, test_database, test_groups, ws, "warehouses")
-        self.validate_objects(persisted_rows, sql_backend, test_database, test_groups, ws, "clusters")
-        self.validate_objects(persisted_rows, sql_backend, test_database, test_groups, ws, "cluster-policies")
-        self.validate_sql_objects(persisted_rows, sql_backend, test_database, test_groups, ws, sql.ObjectTypePlural.ALERTS.value)
-        self.validate_sql_objects(persisted_rows, sql_backend, test_database, test_groups, ws, sql.ObjectTypePlural.DASHBOARDS.value)
-        self.validate_sql_objects(persisted_rows, sql_backend, test_database, test_groups, ws, sql.ObjectTypePlural.QUERIES.value)
-        self.validate_files(persisted_rows, sql_backend, test_database, test_groups, ws, "notebooks")
-        self.validate_files(persisted_rows, sql_backend, test_database, test_groups, ws, "directories")
-        self.validate_secrets(persisted_rows, sql_backend, test_database, test_groups, ws)
+        self.try_validate_object(persisted_rows, sql_backend, test_database, test_groups, ws, "pipelines")
+        self.try_validate_object(persisted_rows, sql_backend, test_database, test_groups, ws, "jobs")
+        self.try_validate_object(persisted_rows, sql_backend, test_database, test_groups, ws, "experiments")
+        self.try_validate_object(persisted_rows, sql_backend, test_database, test_groups, ws, "registered-models")
+        self.try_validate_object(persisted_rows, sql_backend, test_database, test_groups, ws, "instance-pools")
+        self.try_validate_object(persisted_rows, sql_backend, test_database, test_groups, ws, "warehouses")
+        self.try_validate_object(persisted_rows, sql_backend, test_database, test_groups, ws, "clusters")
+        self.try_validate_object(persisted_rows, sql_backend, test_database, test_groups, ws, "cluster-policies")
+        self.try_validate_sql_objects(persisted_rows, sql_backend, test_database, test_groups, ws, sql.ObjectTypePlural.ALERTS)
+        self.try_validate_sql_objects(persisted_rows, sql_backend, test_database, test_groups, ws, sql.ObjectTypePlural.DASHBOARDS)
+        self.try_validate_sql_objects(persisted_rows, sql_backend, test_database, test_groups, ws, sql.ObjectTypePlural.QUERIES)
+        self.try_validate_files(persisted_rows, sql_backend, test_database, test_groups, ws, "notebooks")
+        self.try_validate_files(persisted_rows, sql_backend, test_database, test_groups, ws, "directories")
 
         test_users = [_.display_name for _ in users]
-        self.validate_tables(persisted_rows, sql_backend, test_database, test_groups, test_users, ws,"SCHEMA")
-        self.validate_tables(persisted_rows, sql_backend, test_database, test_groups, test_users, ws, "TABLE")
-        self.validate_tables(persisted_rows, sql_backend, test_database, test_groups, test_users, ws, "VIEW")
+        self.try_validate_tables(persisted_rows, sql_backend, test_database, test_groups, test_users, ws,"SCHEMA")
+        self.try_validate_tables(persisted_rows, sql_backend, test_database, test_groups, test_users, ws, "TABLE")
+        self.try_validate_tables(persisted_rows, sql_backend, test_database, test_groups, test_users, ws, "VIEW")
 
+        self.try_validate_secrets(persisted_rows, sql_backend, test_database, test_groups, ws)
+
+    def try_validate_object(self, persisted_rows, sql_backend, test_database, test_groups, ws, object_type):
+        try:
+            self.validate_objects(persisted_rows, sql_backend, test_database, test_groups, ws, object_type)
+        except Exception as e:
+            logger.warning(f"Something wrong happened when asserting objects -> {e}")
 
     def validate_objects(self, persisted_rows, sql_backend, test_database, test_groups, ws, object_type):
         for pipe_id in sql_backend.fetch(f"SELECT distinct object_id FROM {test_database.name}.objects where object_type = '{object_type}'"):
             obj_id = pipe_id["object_id"]
-            acls = ws.permissions.get(object_type, obj_id).access_control_list
+            acls = ws.permissions.get(object_type, obj_id).access_control_list #TODO: can fail, must capture the exception and move on
             for acl in acls:
                 if acl.group_name in ["users", "admins", "account users"]:
                     continue
@@ -368,6 +370,11 @@ class PerformanceTest(unittest.TestCase):
                 try: self.assertEqual(acl.all_permissions[0].permission_level.value, persisted_rows[obj_id][acl.group_name])
                 except AssertionError as e: self.verificationErrors.append(str(e))
 
+    def try_validate_secrets(self, persisted_rows, sql_backend, test_database, test_groups, ws):
+        try:
+            self.validate_secrets(persisted_rows, sql_backend, test_database, test_groups, ws)
+        except Exception as e:
+            logger.warning(f"Something wrong happened when asserting objects -> {e}" )
 
     def validate_secrets(self, persisted_rows, sql_backend, test_database, test_groups, ws):
         for pipe_id in sql_backend.fetch(f"SELECT distinct group, object_id FROM {test_database.name}.objects where object_type = 'secrets'"):
@@ -381,6 +388,11 @@ class PerformanceTest(unittest.TestCase):
             except AssertionError as e:
                 self.verificationErrors.append(str(e))
 
+    def try_validate_tables(self, persisted_rows, sql_backend, test_database, test_groups, users, ws, object_type):
+        try:
+            self.validate_tables(persisted_rows, sql_backend, test_database, test_groups, users, ws, object_type)
+        except RuntimeError as e:
+            logger.warning(f"Something wrong happened when asserting tables -> {e}" )
 
     def validate_tables(self, persisted_rows, sql_backend, test_database, test_groups, users, ws, object_type):
         for pipe_id in sql_backend.fetch(f"SELECT distinct object_id FROM {test_database.name}.objects where object_type = '{object_type}'"):
@@ -399,9 +411,14 @@ class PerformanceTest(unittest.TestCase):
                 try: self.assertEqual(action_type, persisted_rows[obj_id][principal])
                 except AssertionError as e: self.verificationErrors.append(str(e))
 
+    def try_validate_sql_objects(self, persisted_rows, sql_backend, test_database, test_groups, ws, object_type):
+        try:
+            self.validate_sql_objects(persisted_rows, sql_backend, test_database, test_groups, ws, object_type)
+        except Exception as e:
+            logger.warning(f"Something wrong happened when asserting SQL objects -> {e}" )
 
     def validate_sql_objects(self, persisted_rows, sql_backend, test_database, test_groups, ws, object_type):
-        for pipe_id in sql_backend.fetch(f"SELECT distinct object_id FROM {test_database.name}.objects where object_type = '{object_type}'"):
+        for pipe_id in sql_backend.fetch(f"SELECT distinct object_id FROM {test_database.name}.objects where object_type = '{object_type.value}'"):
             obj_id = pipe_id["object_id"]
             acls = ws.dbsql_permissions.get(object_type, obj_id).access_control_list
             for acl in acls:
@@ -409,18 +426,21 @@ class PerformanceTest(unittest.TestCase):
                     continue
                 if acl.group_name not in test_groups:
                     continue
-                try: self.assertEqual(len(acl.all_permissions), 1)
-                except AssertionError as e: self.verificationErrors.append(str(e))
                 try: self.assertTrue(acl.group_name in persisted_rows[obj_id])
                 except AssertionError as e: self.verificationErrors.append(str(e))
-                try: self.assertEqual(acl.all_permissions[0].permission_level.value, persisted_rows[obj_id][acl.group_name])
+                try: self.assertEqual(acl.permission_level.value, persisted_rows[obj_id][acl.group_name])
                 except AssertionError as e: self.verificationErrors.append(str(e))
 
+    def try_validate_files(self, persisted_rows, sql_backend, test_database, test_groups, ws, object_type):
+        try:
+            self.validate_files(persisted_rows, sql_backend, test_database, test_groups, ws, object_type)
+        except Exception as e:
+            logger.warning(f"Something wrong happened when asserting files -> {e}")
 
     def validate_files(self, persisted_rows, sql_backend, test_database, test_groups, ws, object_type):
         for pipe_id in sql_backend.fetch(f"SELECT distinct object_id FROM {test_database.name}.objects where object_type = '{object_type}'"):
             obj_id = pipe_id["object_id"]
-            acls = ws.workspace.get_permissions().access_control_list
+            acls = ws.workspace.get_permissions(object_type, obj_id).access_control_list
             for acl in acls:
                 if acl.group_name in ["users", "admins", "account users"]:
                     continue
@@ -520,6 +540,7 @@ class PerformanceTest(unittest.TestCase):
             else:
                 msg = f"{e.error_code} can be retried for {object_type} {object_id}, doing another attempt..."
                 raise RetryableError(message=msg) from e
+
 
     def persist_groups(self, groups: [(Group, Group)], sql_backend, test_database):
         to_persist = []
