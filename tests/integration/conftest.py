@@ -1,11 +1,16 @@
+import collections
+import functools
 import logging
 import random
+from datetime import timedelta
 from functools import partial
 
 import databricks.sdk.core
 import pytest
 from databricks.sdk import AccountClient
 from databricks.sdk.core import Config
+from databricks.sdk.errors import NotFound
+from databricks.sdk.retries import retried
 
 from databricks.labs.ucx.mixins.fixtures import *  # noqa: F403
 
@@ -15,9 +20,27 @@ logging.getLogger("databricks.labs.ucx").setLevel("DEBUG")
 logger = logging.getLogger(__name__)
 
 
+retry_on_not_found = functools.partial(retried, on=[NotFound], timeout=timedelta(minutes=5))
+long_retry_on_not_found = functools.partial(retry_on_not_found, timeout=timedelta(minutes=15))
+
+
 @pytest.fixture
 def debug_env_name():
     return "ucws"
+
+
+def get_workspace_membership(ws, resource_type: str = "WorkspaceGroup"):
+    membership = collections.defaultdict(set)
+    for g in ws.groups.list(attributes="id,displayName,meta,members"):
+        if g.display_name in ["users", "admins", "account users"]:
+            continue
+        if g.meta.resource_type != resource_type:
+            continue
+        if g.members is None:
+            continue
+        for m in g.members:
+            membership[g.display_name].add(m.display)
+    return membership
 
 
 def account_host(self: databricks.sdk.core.Config) -> str:
@@ -69,6 +92,10 @@ def user_pool(ws):
 
 @pytest.fixture
 def make_ucx_group(make_random, make_group, make_acc_group, user_pool):
+    assert (
+        len(user_pool) >= 1
+    ), "must have 'test-user-*' test users with id, userName and displayName in your test workspace"
+
     def inner():
         display_name = f"ucx_{make_random(4)}"
         members = [_.id for _ in random.choices(user_pool, k=random.randint(1, 40))]

@@ -2,9 +2,8 @@ from abc import abstractmethod
 from collections.abc import Callable, Iterator
 from dataclasses import dataclass
 from logging import Logger
-from typing import Literal
 
-from databricks.labs.ucx.workspace_access.groups import GroupMigrationState
+from databricks.labs.ucx.workspace_access.groups import MigrationState
 
 logger = Logger(__name__)
 
@@ -17,9 +16,6 @@ class Permissions:
     raw: str
 
 
-Destination = Literal["backup", "account"]
-
-
 class AclSupport:
     @abstractmethod
     def get_crawler_tasks(self) -> Iterator[Callable[..., Permissions | None]]:
@@ -29,9 +25,7 @@ class AclSupport:
         """
 
     @abstractmethod
-    def get_apply_task(
-        self, item: Permissions, migration_state: GroupMigrationState, destination: Destination
-    ) -> Callable[[], None] | None:
+    def get_apply_task(self, item: Permissions, migration_state: MigrationState) -> Callable[[], None] | None:
         """This method returns a Callable, that applies permissions to a destination group, based on
         the group migration state. The callable is required not to have any shared mutable state."""
 

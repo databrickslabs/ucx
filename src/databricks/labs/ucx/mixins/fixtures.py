@@ -16,7 +16,11 @@ from databricks.sdk import AccountClient, WorkspaceClient
 from databricks.sdk.core import DatabricksError
 from databricks.sdk.service import compute, iam, jobs, pipelines, workspace
 from databricks.sdk.service.catalog import CatalogInfo, SchemaInfo, TableInfo
-from databricks.sdk.service.sql import CreateWarehouseRequestWarehouseType
+from databricks.sdk.service.sql import (
+    CreateWarehouseRequestWarehouseType,
+    Query,
+    QueryInfo,
+)
 from databricks.sdk.service.workspace import ImportFormat
 
 from databricks.labs.ucx.framework.crawlers import StatementExecutionBackend
@@ -157,7 +161,12 @@ def _permissions_mapping():
         (
             "pipeline",
             "pipelines",
-            [PermissionLevel.CAN_VIEW, PermissionLevel.CAN_RUN, PermissionLevel.CAN_MANAGE, PermissionLevel.IS_OWNER],
+            [
+                PermissionLevel.CAN_VIEW,
+                PermissionLevel.CAN_RUN,
+                PermissionLevel.CAN_MANAGE,
+                PermissionLevel.IS_OWNER,  # cannot be a group
+            ],
             _simple,
         ),
         (
@@ -166,8 +175,8 @@ def _permissions_mapping():
             [
                 PermissionLevel.CAN_VIEW,
                 PermissionLevel.CAN_MANAGE_RUN,
-                PermissionLevel.IS_OWNER,
                 PermissionLevel.CAN_MANAGE,
+                PermissionLevel.IS_OWNER,  # cannot be a group
             ],
             _simple,
         ),
@@ -810,7 +819,31 @@ def make_table(ws, sql_backend, make_schema, make_random) -> Callable[..., Table
         except RuntimeError as e:
             if "Cannot drop a view" in str(e):
                 sql_backend.execute(f"DROP VIEW IF EXISTS {table_info.full_name}")
+            elif "SCHEMA_NOT_FOUND" in str(e):
+                logger.warning("Schema was already dropped while executing the test", exc_info=e)
             else:
                 raise e
 
     yield from factory("table", create, remove)
+
+
+@pytest.fixture
+def make_query(ws, make_table, make_random):
+    def create() -> QueryInfo:
+        table = make_table()
+        query_name = f"ucx_query_Q{make_random(4)}"
+        query = ws.queries.create(
+            name=f"{query_name}",
+            description="TEST QUERY FOR UCX",
+            query=f"SELECT * FROM {table.schema_name}.{table.name}",
+        )
+        logger.info(f"Query Created {query_name}: {ws.config.host}/sql/editor/{query.id}")
+        return query
+
+    def remove(query: Query):
+        try:
+            ws.queries.delete(query_id=query.id)
+        except RuntimeError as e:
+            logger.info(f"Can't drop query {e}")
+
+    yield from factory("query", create, remove)

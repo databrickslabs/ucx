@@ -1,75 +1,132 @@
+import json
 import logging
 from datetime import timedelta
 
-from databricks.sdk import WorkspaceClient
+import pytest
+from databricks.sdk.errors import NotFound
 from databricks.sdk.retries import retried
-from databricks.sdk.service.iam import PermissionLevel
+from databricks.sdk.service import sql
+from databricks.sdk.service.iam import PermissionLevel, ResourceMeta
 
-from databricks.labs.ucx.config import GroupsConfig
 from databricks.labs.ucx.hive_metastore import GrantsCrawler, TablesCrawler
 from databricks.labs.ucx.hive_metastore.grants import Grant
+from databricks.labs.ucx.workspace_access import redash
 from databricks.labs.ucx.workspace_access.generic import (
     GenericPermissionsSupport,
     Listing,
 )
 from databricks.labs.ucx.workspace_access.groups import GroupManager
 from databricks.labs.ucx.workspace_access.manager import PermissionManager
+from databricks.labs.ucx.workspace_access.redash import RedashPermissionsSupport
 from databricks.labs.ucx.workspace_access.tacl import TableAclSupport
 
 logger = logging.getLogger(__name__)
 
 
-def test_prepare_environment(ws, make_ucx_group):
+def test_prepare_environment(ws, make_ucx_group, sql_backend, inventory_schema):
     ws_group, acc_group = make_ucx_group()
 
-    group_manager = GroupManager(ws, GroupsConfig(selected=[ws_group.display_name]))
-    group_manager.prepare_groups_in_environment()
+    group_manager = GroupManager(sql_backend, ws, inventory_schema, [ws_group.display_name], "ucx-temp-")
+    group_migration_state = group_manager.snapshot()
 
-    group_migration_state = group_manager.migration_state
-    for _info in group_migration_state.groups:
-        _ws = ws.groups.get(id=_info.workspace.id)
-        _backup = ws.groups.get(id=_info.backup.id)
-        _ws_members = sorted([m.value for m in _ws.members])
-        _backup_members = sorted([m.value for m in _backup.members])
-        assert _ws_members == _backup_members
-
-    for _info in group_migration_state.groups:
-        # cleanup side-effect
-        ws.groups.delete(_info.backup.id)
+    assert len(group_migration_state) == 1
+    assert group_migration_state[0].id_in_workspace == ws_group.id
+    assert group_migration_state[0].external_id == acc_group.id
+    assert group_migration_state[0].name_in_workspace == ws_group.display_name
+    assert group_migration_state[0].name_in_account == acc_group.display_name
+    assert group_migration_state[0].temporary_name == "ucx-temp-" + ws_group.display_name
+    assert len(group_migration_state[0].members) == len(json.dumps([gg.as_dict() for gg in ws_group.members]))
+    assert not group_migration_state[0].roles
+    assert len(group_migration_state[0].entitlements) == len(json.dumps([gg.as_dict() for gg in ws_group.entitlements]))
 
 
-def test_prepare_environment_no_groups_selected(ws, make_ucx_group, make_group, make_acc_group):
-    make_group()
-    make_acc_group()
-    for_test = [make_ucx_group(), make_ucx_group()]
+def test_prepare_environment_no_groups_selected(ws, make_ucx_group, sql_backend, inventory_schema):
+    ws_group, acc_group = make_ucx_group()
 
-    group_manager = GroupManager(ws, GroupsConfig(auto=True))
-    group_manager.prepare_groups_in_environment()
+    group_manager = GroupManager(sql_backend, ws, inventory_schema)
+    group_migration_state = group_manager.snapshot()
 
-    group_migration_state = group_manager.migration_state
-    for _info in group_migration_state.groups:
-        _ws = ws.groups.get(id=_info.workspace.id)
-        _backup = ws.groups.get(id=_info.backup.id)
-        # https://github.com/databricks/databricks-sdk-py/pull/361 may fix the NPE gotcha with empty members
-        _ws_members = sorted([m.value for m in _ws.members]) if _ws.members is not None else []
-        _backup_members = sorted([m.value for m in _backup.members]) if _backup.members is not None else []
-        assert _ws_members == _backup_members
-
-    for g, _ in for_test:
-        assert group_migration_state.get_by_workspace_group_name(g.display_name) is not None
-
-    for _info in group_migration_state.groups:
-        # cleanup side-effect
-        ws.groups.delete(_info.backup.id)
+    names = {info.name_in_workspace: info for info in group_migration_state}
+    assert ws_group.display_name in names
 
 
+def test_rename_groups(ws, make_ucx_group, sql_backend, inventory_schema):
+    ws_group, acc_group = make_ucx_group()
+
+    group_manager = GroupManager(sql_backend, ws, inventory_schema, [ws_group.display_name], "ucx-temp-")
+    group_manager.rename_groups()
+
+    assert ws.groups.get(ws_group.id).display_name == "ucx-temp-" + ws_group.display_name
+
+
+def test_reflect_account_groups_on_workspace_throws_when_group_already_exists(
+    ws, make_ucx_group, sql_backend, inventory_schema
+):
+    ws_group, acc_group = make_ucx_group()
+
+    group_manager = GroupManager(sql_backend, ws, inventory_schema, [ws_group.display_name], "ucx-temp-")
+    with pytest.raises(RuntimeWarning):
+        group_manager.reflect_account_groups_on_workspace()
+
+
+def test_reflect_account_groups_on_workspace(ws, make_ucx_group, sql_backend, inventory_schema):
+    ws_group, acc_group = make_ucx_group()
+
+    group_manager = GroupManager(sql_backend, ws, inventory_schema, [ws_group.display_name], "ucx-temp-")
+    group_manager.rename_groups()
+    group_manager.reflect_account_groups_on_workspace()
+
+    reflected_group = ws.groups.get(acc_group.id)
+    assert reflected_group.display_name == ws_group.display_name == acc_group.display_name
+    assert {info.display for info in reflected_group.members} == {info.display for info in ws_group.members}
+    assert {info.display for info in reflected_group.members} == {info.display for info in acc_group.members}
+    assert reflected_group.meta == ResourceMeta(resource_type="Group")
+    assert not reflected_group.roles  # Cannot create roles currently
+    assert not reflected_group.entitlements  # Entitlements aren't reflected there
+
+    assert (
+        ws.groups.get(ws_group.id).display_name == "ucx-temp-" + ws_group.display_name
+    )  # At this time previous ws level groups aren't deleted
+
+
+def test_delete_ws_groups_should_delete_renamed_and_reflected_groups_only(
+    ws, make_ucx_group, sql_backend, inventory_schema
+):
+    ws_group, acc_group = make_ucx_group()
+
+    group_manager = GroupManager(sql_backend, ws, inventory_schema, [ws_group.display_name], "ucx-temp-")
+    group_manager.rename_groups()
+    group_manager.reflect_account_groups_on_workspace()
+    group_manager.delete_original_workspace_groups()
+
+    with pytest.raises(NotFound):
+        ws.groups.get(ws_group.id)
+
+
+def test_delete_ws_groups_should_not_delete_current_ws_groups(ws, make_ucx_group, sql_backend, inventory_schema):
+    ws_group, acc_group = make_ucx_group()
+
+    group_manager = GroupManager(sql_backend, ws, inventory_schema, [ws_group.display_name], "ucx-temp-")
+    group_manager.delete_original_workspace_groups()
+
+    assert ws.groups.get(ws_group.id).display_name == ws_group.display_name
+
+
+def test_delete_ws_groups_should_not_delete_non_reflected_acc_groups(ws, make_ucx_group, sql_backend, inventory_schema):
+    ws_group, acc_group = make_ucx_group()
+    group_manager = GroupManager(sql_backend, ws, inventory_schema, [ws_group.display_name], "ucx-temp-")
+    group_manager.rename_groups()
+    group_manager.delete_original_workspace_groups()
+
+    assert ws.groups.get(ws_group.id).display_name == "ucx-temp-" + ws_group.display_name
+
+
+@retried(on=[NotFound, TimeoutError, AssertionError], timeout=timedelta(minutes=20))
 def test_replace_workspace_groups_with_account_groups(
     ws,
     sql_backend,
     inventory_schema,
     make_ucx_group,
-    make_group,
-    make_acc_group,
     make_cluster_policy,
     make_cluster_policy_permissions,
     make_table,
@@ -83,19 +140,20 @@ def test_replace_workspace_groups_with_account_groups(
     )
     logger.info(f"Cluster policy: {ws.config.host}#setting/clusters/cluster-policies/view/{cluster_policy.policy_id}")
 
+    tables = TablesCrawler(sql_backend, inventory_schema)
+    grants = GrantsCrawler(tables)
+
     dummy_table = make_table()
-    sql_backend.execute(f"GRANT SELECT ON TABLE {dummy_table.full_name} TO `{ws_group.display_name}`")
+    sql_backend.execute(f"GRANT SELECT, MODIFY ON TABLE {dummy_table.full_name} TO `{ws_group.display_name}`")
+    res = grants.for_table_info(dummy_table)
+    assert len(res[ws_group.display_name]) == 2
 
-    group_manager = GroupManager(ws, GroupsConfig(auto=True))
-    group_manager.prepare_groups_in_environment()
-
-    group_info = group_manager.migration_state.get_by_workspace_group_name(ws_group.display_name)
+    group_manager = GroupManager(sql_backend, ws, inventory_schema, [ws_group.display_name], "ucx-temp-")
 
     generic_permissions = GenericPermissionsSupport(
         ws, [Listing(ws.cluster_policies.list, "policy_id", "cluster-policies")]
     )
-    tables = TablesCrawler(sql_backend, inventory_schema)
-    grants = GrantsCrawler(tables)
+
     tacl = TableAclSupport(grants, sql_backend)
     permission_manager = PermissionManager(sql_backend, inventory_schema, [generic_permissions, tacl])
 
@@ -106,120 +164,233 @@ def test_replace_workspace_groups_with_account_groups(
 
     table_permissions = grants.for_table_info(dummy_table)
     assert ws_group.display_name in table_permissions
+    assert "MODIFY" in table_permissions[ws_group.display_name]
     assert "SELECT" in table_permissions[ws_group.display_name]
 
-    permission_manager.apply_group_permissions(group_manager.migration_state, destination="backup")
+    state = group_manager.get_migration_state()
+    assert len(state) == 1
+
+    group_manager.rename_groups()
+
+    group_info = state.groups[0]
 
     @retried(on=[AssertionError], timeout=timedelta(seconds=30))
     def check_permissions_for_backup_group():
         logger.info("check_permissions_for_backup_group()")
 
         table_permissions = grants.for_table_info(dummy_table)
-        assert group_info.workspace.display_name in table_permissions
-        assert group_info.backup.display_name in table_permissions
-        assert "SELECT" in table_permissions[group_info.workspace.display_name]
-        assert "SELECT" in table_permissions[group_info.backup.display_name]
+        assert group_info.name_in_workspace not in table_permissions
+        assert group_info.temporary_name in table_permissions
+        assert "MODIFY" in table_permissions[group_info.temporary_name]
+        assert "SELECT" in table_permissions[group_info.temporary_name]
 
         policy_permissions = generic_permissions.load_as_dict("cluster-policies", cluster_policy.policy_id)
-        assert PermissionLevel.CAN_USE == policy_permissions[group_info.workspace.display_name]
-        assert PermissionLevel.CAN_USE == policy_permissions[group_info.backup.display_name]
+        assert PermissionLevel.CAN_USE == policy_permissions[group_info.temporary_name]
 
     check_permissions_for_backup_group()
 
-    group_manager.replace_workspace_groups_with_account_groups()
+    group_manager.reflect_account_groups_on_workspace()
 
     @retried(on=[AssertionError], timeout=timedelta(minutes=1))
     def check_permissions_after_replace():
         logger.info("check_permissions_after_replace()")
 
         table_permissions = grants.for_table_info(dummy_table)
-        assert group_info.account.display_name in table_permissions
-        assert group_info.backup.display_name in table_permissions
-        assert "SELECT" in table_permissions[group_info.backup.display_name]
+        assert group_info.name_in_account not in table_permissions
+        assert group_info.temporary_name in table_permissions
+        assert "MODIFY" in table_permissions[group_info.temporary_name]
+        assert "SELECT" in table_permissions[group_info.temporary_name]
 
         policy_permissions = generic_permissions.load_as_dict("cluster-policies", cluster_policy.policy_id)
-        assert group_info.workspace.display_name not in policy_permissions
-        assert PermissionLevel.CAN_USE == policy_permissions[group_info.backup.display_name]
+        assert group_info.name_in_workspace not in policy_permissions
+        assert PermissionLevel.CAN_USE == policy_permissions[group_info.temporary_name]
 
     check_permissions_after_replace()
 
-    permission_manager.apply_group_permissions(group_manager.migration_state, destination="account")
+    permission_manager.apply_group_permissions(state)
 
     @retried(on=[AssertionError], timeout=timedelta(seconds=30))
     def check_permissions_for_account_group():
         logger.info("check_permissions_for_account_group()")
 
         table_permissions = grants.for_table_info(dummy_table)
-        assert group_info.account.display_name in table_permissions
-        assert group_info.backup.display_name in table_permissions
-        assert "SELECT" in table_permissions[group_info.backup.display_name]
-        assert "SELECT" in table_permissions[group_info.account.display_name]
+        assert group_info.name_in_account in table_permissions
+        assert group_info.temporary_name in table_permissions
+        assert "MODIFY" in table_permissions[group_info.temporary_name]
+        assert "SELECT" in table_permissions[group_info.temporary_name]
+        assert "MODIFY" in table_permissions[group_info.name_in_account]
+        assert "SELECT" in table_permissions[group_info.name_in_account]
 
         policy_permissions = generic_permissions.load_as_dict("cluster-policies", cluster_policy.policy_id)
-        assert PermissionLevel.CAN_USE == policy_permissions[group_info.account.display_name]
-        assert PermissionLevel.CAN_USE == policy_permissions[group_info.backup.display_name]
+        assert PermissionLevel.CAN_USE == policy_permissions[group_info.name_in_account]
+        assert PermissionLevel.CAN_USE == policy_permissions[group_info.temporary_name]
 
     check_permissions_for_account_group()
 
-    for _info in group_manager.migration_state.groups:
-        ws.groups.delete(_info.backup.id)
+    group_manager.delete_original_workspace_groups()
 
     @retried(on=[AssertionError], timeout=timedelta(minutes=1))
     def check_table_permissions_after_backup_delete():
         logger.info("check_table_permissions_after_backup_delete()")
 
         policy_permissions = generic_permissions.load_as_dict("cluster-policies", cluster_policy.policy_id)
-        assert group_info.backup.display_name not in policy_permissions
+        assert group_info.temporary_name not in policy_permissions
 
         table_permissions = grants.for_table_info(dummy_table)
-        assert group_info.account.display_name in table_permissions
-        assert "SELECT" in table_permissions[group_info.account.display_name]
+        assert group_info.name_in_account in table_permissions
+        assert "MODIFY" in table_permissions[group_info.name_in_account]
+        assert "SELECT" in table_permissions[group_info.name_in_account]
 
     check_table_permissions_after_backup_delete()
 
 
-def test_group_listing(ws: WorkspaceClient, make_ucx_group):
-    ws_group, acc_group = make_ucx_group()
-    manager = GroupManager(ws, GroupsConfig(selected=[ws_group.display_name]))
-    assert ws_group.display_name in [g.display_name for g in manager._workspace_groups]
-    assert acc_group.display_name in [g.display_name for g in manager._account_groups]
+@retried(on=[NotFound, TimeoutError, AssertionError], timeout=timedelta(minutes=15))
+def test_set_owner_permission(ws, sql_backend, inventory_schema, make_ucx_group, make_table):
+    ws_group, _ = make_ucx_group()
+
+    logger.info("Testing setting ownership on table.")
+    dummy_table = make_table()
+    logger.info(f"Table name {dummy_table.full_name} group name {ws_group.display_name}")
+    sql_backend.execute(f"GRANT SELECT, MODIFY ON TABLE {dummy_table.full_name} TO `{ws_group.display_name}`")
+    sql_backend.execute(f"ALTER {dummy_table.full_name} OWNER TO `{ws_group.display_name}`")
+
+    group_manager = GroupManager(sql_backend, ws, inventory_schema, [ws_group.display_name], "ucx-temp-")
+
+    tables = TablesCrawler(sql_backend, inventory_schema)
+    grants = GrantsCrawler(tables)
+    tacl = TableAclSupport(grants, sql_backend)
+    permission_manager = PermissionManager(sql_backend, inventory_schema, [tacl])
+
+    permission_manager.inventorize_permissions()
+
+    dummy_grants = list(permission_manager.load_all_for("TABLE", dummy_table.full_name, Grant))
+    assert 2 == len(dummy_grants)
+
+    table_permissions = grants.for_table_info(dummy_table)
+    assert ws_group.display_name in table_permissions
+    assert "MODIFY" in table_permissions[ws_group.display_name]
+    assert "SELECT" in table_permissions[ws_group.display_name]
+    assert "OWN" in table_permissions[ws_group.display_name]
+
+    state = group_manager.get_migration_state()
+    assert len(state.groups) == 1
+
+    group_manager.rename_groups()
+
+    group_info = state.groups[0]
+
+    @retried(on=[AssertionError], timeout=timedelta(seconds=30))
+    def check_permissions_for_backup_group():
+        logger.info("check_permissions_for_backup_group()")
+
+        table_permissions = grants.for_table_info(dummy_table)
+        assert group_info.name_in_workspace not in table_permissions
+        assert "MODIFY" in table_permissions[group_info.temporary_name]
+        assert "SELECT" in table_permissions[group_info.temporary_name]
+        assert "OWN" in table_permissions[group_info.temporary_name]
+
+    check_permissions_for_backup_group()
+
+    group_manager.reflect_account_groups_on_workspace()
+
+    @retried(on=[AssertionError], timeout=timedelta(minutes=1))
+    def check_permissions_after_replace():
+        logger.info("check_permissions_after_replace()")
+
+        table_permissions = grants.for_table_info(dummy_table)
+        assert group_info.name_in_account not in table_permissions
+        assert "MODIFY" in table_permissions[group_info.temporary_name]
+        assert "SELECT" in table_permissions[group_info.temporary_name]
+        assert "OWN" in table_permissions[group_info.temporary_name]
+
+    check_permissions_after_replace()
+
+    permission_manager.apply_group_permissions(state)
+
+    @retried(on=[AssertionError], timeout=timedelta(seconds=30))
+    def check_permissions_for_account_group():
+        logger.info("check_permissions_for_account_group()")
+
+        table_permissions = grants.for_table_info(dummy_table)
+        assert group_info.name_in_account in table_permissions
+        assert group_info.temporary_name in table_permissions
+        assert "MODIFY" in table_permissions[group_info.temporary_name]
+        assert "SELECT" in table_permissions[group_info.temporary_name]
+        assert "MODIFY" in table_permissions[group_info.name_in_account]
+        assert "SELECT" in table_permissions[group_info.name_in_account]
+        assert "OWN" in table_permissions[group_info.name_in_account]
+
+    check_permissions_for_account_group()
+
+    group_manager.delete_original_workspace_groups()
+
+    @retried(on=[AssertionError], timeout=timedelta(minutes=1))
+    def check_table_permissions_after_backup_delete():
+        logger.info("check_table_permissions_after_backup_delete()")
+
+        table_permissions = grants.for_table_info(dummy_table)
+        assert group_info.name_in_account in table_permissions
+        assert group_info.temporary_name not in table_permissions
+        assert "MODIFY" in table_permissions[group_info.name_in_account]
+        assert "SELECT" in table_permissions[group_info.name_in_account]
+        assert "OWN" in table_permissions[group_info.name_in_account]
+
+    check_table_permissions_after_backup_delete()
 
 
-def test_id_validity(ws: WorkspaceClient, make_ucx_group):
-    ws_group, acc_group = make_ucx_group()
-    manager = GroupManager(ws, GroupsConfig(selected=[ws_group.display_name]))
-    assert ws_group.id == manager._get_group(ws_group.display_name, "workspace").id
-    assert acc_group.id == manager._get_group(acc_group.display_name, "account").id
+def test_query_permission(ws, sql_backend, inventory_schema, make_table, make_query, make_ucx_group, make_group):
+    @retried(on=[AssertionError], timeout=timedelta(seconds=60))
+    def check_permission_in_sql_object(
+        sup: RedashPermissionsSupport, group_name: str, obj_id: str, permission_level, *, omit: bool = False
+    ):
+        permissions = sup._safe_get_dbsql_permissions(sql.ObjectTypePlural.QUERIES, obj_id)
+        assert (not omit) == (
+            len(
+                [
+                    permission
+                    for permission in permissions.access_control_list
+                    if permission.group_name == group_name and permission.permission_level == permission_level
+                ]
+            )
+            > 0
+        )
 
+    logger.info("Testing setting ownership on SQL Query.")
+    query = make_query()
+    ws_group, _ = make_ucx_group()
+    group_manager = GroupManager(sql_backend, ws, inventory_schema, [ws_group.display_name], "ucx-temp-")
 
-def test_recover_from_ws_local_deletion(ws, make_ucx_group):
-    ws_group, acc_group = make_ucx_group()
-    ws_group_two, _ = make_ucx_group()
+    state = group_manager.get_migration_state()
+    assert len(state) == 1
 
-    group_manager = GroupManager(ws, GroupsConfig(auto=True))
-    group_manager.prepare_groups_in_environment()
+    group_info = state.groups[0]
 
-    # simulate disaster
-    ws.groups.delete(ws_group.id)
-    ws.groups.delete(ws_group_two.id)
-    group_manager._reflect_account_group_to_workspace(acc_group)
+    # Setting a test case of a query with permissions
+    sup = RedashPermissionsSupport(ws=ws, listings=[], verify_timeout=timedelta(seconds=15))
+    acl = [sql.AccessControl(group_name=ws_group.display_name, permission_level=sql.PermissionLevel.CAN_VIEW)]
+    result = sup._safe_set_permissions(sql.ObjectTypePlural.QUERIES, query.id, acl)
+    assert result is not None
 
-    # recovery run from a debug notebook
-    group_manager = GroupManager(ws, GroupsConfig(auto=True))
-    group_manager.ws_local_group_deletion_recovery()
+    check_permission_in_sql_object(sup, group_info.name_in_workspace, query.id, sql.PermissionLevel.CAN_VIEW)
 
-    # normal run after from a job
-    group_manager = GroupManager(ws, GroupsConfig(auto=True))
-    group_manager.prepare_groups_in_environment()
+    # Attempting Switching Access on Query object
+    redash_acl_listing = [
+        redash.Listing(ws.alerts.list, sql.ObjectTypePlural.ALERTS),
+        redash.Listing(ws.dashboards.list, sql.ObjectTypePlural.DASHBOARDS),
+        redash.Listing(ws.queries.list, sql.ObjectTypePlural.QUERIES),
+    ]
+    sql_support = redash.RedashPermissionsSupport(ws, redash_acl_listing)
+    permission_manager = PermissionManager(sql_backend, inventory_schema, [sql_support])
+    permission_manager.inventorize_permissions()
 
-    recovered_state = {}
-    for gi in group_manager.migration_state.groups:
-        recovered_state[gi.workspace.display_name] = gi.workspace
+    group_manager.rename_groups()
 
-    assert sorted([member.display for member in ws_group_two.members]) == sorted(
-        [member.display for member in recovered_state[ws_group_two.display_name].members]
-    )
+    group_manager.reflect_account_groups_on_workspace()
+    permission_manager.apply_group_permissions(state)
 
-    assert sorted([member.value for member in ws_group_two.members]) == sorted(
-        [member.value for member in recovered_state[ws_group_two.display_name].members]
-    )
+    logging.getLogger("databricks").setLevel("DEBUG")
+    permission_manager.apply_group_permissions(state)
+    check_permission_in_sql_object(sup, group_info.name_in_workspace, query.id, sql.PermissionLevel.CAN_VIEW)
+    check_permission_in_sql_object(sup, group_info.temporary_name, query.id, sql.PermissionLevel.CAN_VIEW, omit=True)
+    group_manager.delete_original_workspace_groups()
+    assert len(query.name) > 0

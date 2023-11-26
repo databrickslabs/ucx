@@ -5,12 +5,15 @@ import time
 from collections.abc import Iterator
 from datetime import timedelta
 
+from databricks.sdk import errors
+from databricks.sdk.errors import NotFound
 from databricks.sdk.service.sql import (
     ColumnInfoTypeName,
     Disposition,
     ExecuteStatementResponse,
     Format,
     ResultData,
+    ServiceErrorCode,
     StatementExecutionAPI,
     StatementState,
     StatementStatus,
@@ -91,10 +94,28 @@ class StatementExecutionExt(StatementExecutionAPI):
     def _raise_if_needed(status: StatementStatus):
         if status.state not in [StatementState.FAILED, StatementState.CANCELED, StatementState.CLOSED]:
             return
-        msg = status.state.value
-        if status.error is not None:
-            msg = f"{msg}: {status.error.error_code.value} {status.error.message}"
-        raise RuntimeError(msg)
+        if "SCHEMA_NOT_FOUND" in status.error.message:
+            raise NotFound(status.error.message)
+        if "TABLE_OR_VIEW_NOT_FOUND" in status.error.message:
+            raise NotFound(status.error.message)
+        mapping = {
+            ServiceErrorCode.ABORTED: errors.Aborted,
+            ServiceErrorCode.ALREADY_EXISTS: errors.AlreadyExists,
+            ServiceErrorCode.BAD_REQUEST: errors.BadRequest,
+            ServiceErrorCode.CANCELLED: errors.Cancelled,
+            ServiceErrorCode.DEADLINE_EXCEEDED: errors.DeadlineExceeded,
+            ServiceErrorCode.INTERNAL_ERROR: errors.InternalError,
+            ServiceErrorCode.IO_ERROR: errors.InternalError,
+            ServiceErrorCode.NOT_FOUND: errors.NotFound,
+            ServiceErrorCode.RESOURCE_EXHAUSTED: errors.ResourceExhausted,
+            ServiceErrorCode.SERVICE_UNDER_MAINTENANCE: errors.TemporarilyUnavailable,
+            ServiceErrorCode.TEMPORARILY_UNAVAILABLE: errors.TemporarilyUnavailable,
+            ServiceErrorCode.UNAUTHENTICATED: errors.Unauthenticated,
+            ServiceErrorCode.UNKNOWN: errors.Unknown,
+            ServiceErrorCode.WORKSPACE_TEMPORARILY_UNAVAILABLE: errors.TemporarilyUnavailable,
+        }
+        error_class = mapping.get(status.error.error_code, errors.Unknown)
+        raise error_class(status.error.message)
 
     def execute(
         self,

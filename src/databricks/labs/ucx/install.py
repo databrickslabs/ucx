@@ -1,4 +1,5 @@
 import datetime
+import json
 import logging
 import os
 import re
@@ -6,6 +7,7 @@ import shutil
 import subprocess
 import sys
 import tempfile
+import time
 import webbrowser
 from dataclasses import replace
 from pathlib import Path
@@ -13,18 +15,39 @@ from typing import Any
 
 import yaml
 from databricks.sdk import WorkspaceClient
-from databricks.sdk.core import DatabricksError
-from databricks.sdk.errors import OperationFailed
+from databricks.sdk.errors import InvalidParameterValue, NotFound, OperationFailed
 from databricks.sdk.mixins.compute import SemVer
 from databricks.sdk.service import compute, jobs
 from databricks.sdk.service.sql import EndpointInfoWarehouseType, SpotInstancePolicy
 from databricks.sdk.service.workspace import ImportFormat
 
 from databricks.labs.ucx.__about__ import __version__
-from databricks.labs.ucx.config import GroupsConfig, WorkspaceConfig
+from databricks.labs.ucx.assessment.crawlers import (
+    AzureServicePrincipalInfo,
+    ClusterInfo,
+    GlobalInitScriptInfo,
+    JobInfo,
+    PipelineInfo,
+)
+from databricks.labs.ucx.config import WorkspaceConfig
+from databricks.labs.ucx.framework.crawlers import (
+    SchemaDeployer,
+    SqlBackend,
+    StatementExecutionBackend,
+)
 from databricks.labs.ucx.framework.dashboards import DashboardFromFiles
+
+from databricks.labs.ucx.framework.install_state import InstallState
 from databricks.labs.ucx.framework.tasks import _TASKS, Task, cloud_compatible
+from databricks.labs.ucx.hive_metastore.data_objects import ExternalLocation
+from databricks.labs.ucx.hive_metastore.grants import Grant
+from databricks.labs.ucx.hive_metastore.hms_lineage import HiveMetastoreLineageEnabler
+from databricks.labs.ucx.hive_metastore.mounts import Mount
+from databricks.labs.ucx.hive_metastore.tables import Table, TableError
 from databricks.labs.ucx.runtime import main
+from databricks.labs.ucx.workspace_access.base import Permissions
+from databricks.labs.ucx.workspace_access.generic import WorkspaceObjectInfo
+from databricks.labs.ucx.workspace_access.groups import MigratedGroup
 
 TAG_STEP = "step"
 TAG_APP = "App"
@@ -85,17 +108,43 @@ main(f'--config=/Workspace{config_file}',
 logger = logging.getLogger(__name__)
 
 
+def deploy_schema(sql_backend: SqlBackend, inventory_schema: str):
+    from databricks.labs import ucx
+
+    deployer = SchemaDeployer(sql_backend, inventory_schema, ucx)
+    deployer.deploy_schema()
+    deployer.deploy_table("azure_service_principals", AzureServicePrincipalInfo)
+    deployer.deploy_table("clusters", ClusterInfo)
+    deployer.deploy_table("global_init_scripts", GlobalInitScriptInfo)
+    deployer.deploy_table("jobs", JobInfo)
+    deployer.deploy_table("pipelines", PipelineInfo)
+    deployer.deploy_table("external_locations", ExternalLocation)
+    deployer.deploy_table("mounts", Mount)
+    deployer.deploy_table("grants", Grant)
+    deployer.deploy_table("groups", MigratedGroup)
+    deployer.deploy_table("tables", Table)
+    deployer.deploy_table("table_failures", TableError)
+    deployer.deploy_table("workspace_objects", WorkspaceObjectInfo)
+    deployer.deploy_table("permissions", Permissions)
+    deployer.deploy_view("objects", "queries/views/objects.sql")
+    deployer.deploy_view("grant_detail", "queries/views/grant_detail.sql")
+
+
 class WorkspaceInstaller:
-    def __init__(self, ws: WorkspaceClient, *, prefix: str = "ucx", promtps: bool = True):
+    def __init__(
+        self, ws: WorkspaceClient, *, prefix: str = "ucx", promtps: bool = True, sql_backend: SqlBackend = None
+    ):
         if "DATABRICKS_RUNTIME_VERSION" in os.environ:
             msg = "WorkspaceInstaller is not supposed to be executed in Databricks Runtime"
             raise SystemExit(msg)
         self._ws = ws
+        self._sql_backend = sql_backend
         self._prefix = prefix
         self._prompts = promtps
         self._this_file = Path(__file__)
         self._override_clusters = None
         self._dashboards = {}
+        self._state = InstallState(ws, self._install_folder)
 
     def run(self):
         logger.info(f"Installing UCX v{self._version}")
@@ -103,27 +152,79 @@ class WorkspaceInstaller:
         self._run_configured()
 
     def _run_configured(self):
+        self._install_spark_config_for_hms_lineage()
         self._create_dashboards()
         self._create_jobs()
-        readme = f'{self._notebook_link(f"{self._install_folder}/README.py")}'
+        self._create_database()
+        readme = f'{self.notebook_link(f"{self._install_folder}/README.py")}'
         msg = f"Installation completed successfully! Please refer to the {readme} notebook for next steps."
         logger.info(msg)
 
+    def _create_database(self):
+        if self._sql_backend is None:
+            self._sql_backend = StatementExecutionBackend(self._ws, self._current_config.warehouse_id)
+        deploy_schema(self._sql_backend, self._current_config.inventory_database)
+
+    def _install_spark_config_for_hms_lineage(self):
+        hms_lineage = HiveMetastoreLineageEnabler(ws=self._ws)
+        logger.info(
+            "Enabling HMS Lineage: "
+            "HMS Lineage feature creates one system table named "
+            "system.hms_to_uc_migration.table_access and "
+            "helps in your migration process from HMS to UC by allowing you to programmatically query HMS "
+            "lineage data."
+            ""
+            ""
+        )
+        logger.info("Checking if Global Init Script with Required Spark Config already exists and enabled.")
+        gscript = hms_lineage.check_lineage_spark_config_exists()
+        if gscript:
+            if gscript.enabled:
+                logger.info("Already exists and enabled. Skipped creating a new one.")
+            elif not gscript.enabled:
+                if (
+                    self._prompts
+                    and self._question(
+                        "Your Global Init Script with required spark config is disabled, Do you want to enable it",
+                        default="yes",
+                    )
+                    == "yes"
+                ):
+                    logger.info("Enabling Global Init Script...")
+                    hms_lineage.enable_global_init_script(gscript)
+                else:
+                    logger.info("No change to Global Init Script is made.")
+        elif not gscript:
+            if (
+                self._prompts
+                and self._question(
+                    "No Global Init Script with Required Spark Config exists, Do you want to create one ", default="yes"
+                )
+                == "yes"
+            ):
+                logger.info("Creating Global Init Script...")
+                hms_lineage.add_global_init_script()
+
     @staticmethod
     def run_for_config(
-        ws: WorkspaceClient, config: WorkspaceConfig, *, prefix="ucx", override_clusters: dict[str, str] | None = None
+        ws: WorkspaceClient,
+        config: WorkspaceConfig,
+        *,
+        prefix="ucx",
+        override_clusters: dict[str, str] | None = None,
+        sql_backend: SqlBackend = None,
     ) -> "WorkspaceInstaller":
-        workspace_installer = WorkspaceInstaller(ws, prefix=prefix, promtps=False)
+        workspace_installer = WorkspaceInstaller(ws, prefix=prefix, promtps=False, sql_backend=sql_backend)
         logger.info(f"Installing UCX v{workspace_installer._version} on {ws.config.host}")
         workspace_installer._config = config
-        workspace_installer._write_config()
+        workspace_installer._write_config(overwrite=False)
         workspace_installer._override_clusters = override_clusters
         # TODO: rather introduce a method `is_configured`, as we may want to reconfigure workspaces for some reason
         workspace_installer._run_configured()
         return workspace_installer
 
     def run_workflow(self, step: str):
-        job_id = self._deployed_steps[step]
+        job_id = self._state.jobs[step]
         logger.debug(f"starting {step} job: {self._ws.config.host}#job/{job_id}")
         job_run_waiter = self._ws.jobs.run_now(job_id)
         try:
@@ -140,22 +241,28 @@ class WorkspaceInstaller:
                     continue
                 run_output = self._ws.jobs.get_run_output(run_task.run_id)
                 if logger.isEnabledFor(logging.DEBUG):
-                    sys.stderr.write(run_output.error_trace)
-                messages.append(f"{run_task.task_key}: {run_output.error}")
+                    if run_output and run_output.error_trace:
+                        sys.stderr.write(run_output.error_trace)
+                if run_output and run_output.error:
+                    messages.append(f"{run_task.task_key}: {run_output.error}")
+                else:
+                    messages.append(f"{run_task.task_key}: output unavailable")
             msg = f'{job_run.state.state_message.rstrip(".")}: {", ".join(messages)}'
             raise OperationFailed(msg) from None
 
     def _create_dashboards(self):
-        local_query_files = self._find_project_root() / "src/databricks/labs/ucx/assessment/queries"
+        logger.info("Creating dashboards...")
+        local_query_files = self._find_project_root() / "src/databricks/labs/ucx/queries"
         dash = DashboardFromFiles(
             self._ws,
+            state=self._state,
             local_folder=local_query_files,
             remote_folder=f"{self._install_folder}/queries",
-            name=self._name("UCX Assessment"),
+            name_prefix=self._name("UCX "),
             warehouse_id=self._warehouse_id,
             query_text_callback=self._current_config.replace_inventory_variable,
         )
-        self._dashboards["assessment"] = dash.create_dashboard()
+        self._dashboards = dash.create_dashboards()
 
     @property
     def _warehouse_id(self) -> str:
@@ -204,19 +311,23 @@ class WorkspaceInstaller:
         return f"/Users/{self._my_username}/.{self._prefix}"
 
     @property
-    def _config_file(self):
+    def config_file(self):
         return f"{self._install_folder}/config.yml"
 
     @property
     def _current_config(self):
         if hasattr(self, "_config"):
             return self._config
-        with self._ws.workspace.download(self._config_file) as f:
+        with self._ws.workspace.download(self.config_file) as f:
             self._config = WorkspaceConfig.from_bytes(f.read())
         return self._config
 
+    def _raw_previous_config(self):
+        with self._ws.workspace.download(self.config_file) as f:
+            return str(f.read())
+
     def _name(self, name: str) -> str:
-        return f"[{self._prefix.upper()}][{self._short_name}] {name}"
+        return f"[{self._prefix.upper()}] {name}"
 
     def _configure_inventory_database(self):
         counter = 0
@@ -234,17 +345,18 @@ class WorkspaceInstaller:
         return inventory_database
 
     def _configure(self):
-        ws_file_url = self._notebook_link(self._config_file)
+        ws_file_url = self.notebook_link(self.config_file)
         try:
-            self._ws.workspace.get_status(self._config_file)
-            logger.info(f"UCX is already configured. See {ws_file_url}")
-            if self._prompts and self._question("Open config file in the browser", default="yes") == "yes":
-                webbrowser.open(ws_file_url)
-            return
-        except DatabricksError as err:
-            if err.error_code != "RESOURCE_DOES_NOT_EXIST":
-                raise err
-
+            if "version: 1" in self._raw_previous_config():
+                logger.info("old version detected, attempting to migrate to new config")
+                self._config = self._current_config
+                self._write_config(overwrite=True)
+                return
+            elif "version: 2" in self._raw_previous_config():
+                logger.info(f"UCX is already configured. See {ws_file_url}")
+                return
+        except NotFound:
+            pass
         logger.info("Please answer a couple of questions to configure Unity Catalog migration")
         inventory_database = self._configure_inventory_database()
 
@@ -261,7 +373,7 @@ class WorkspaceInstaller:
         )
         if warehouse_id == "create_new":
             new_warehouse = self._ws.warehouses.create(
-                name="Unity Catalog Migration",
+                name=f"Unity Catalog Migration {time.time_ns()}",
                 spot_instance_policy=SpotInstancePolicy.COST_OPTIMIZED,
                 warehouse_type=EndpointInfoWarehouseType.PRO,
                 cluster_size="Small",
@@ -270,7 +382,7 @@ class WorkspaceInstaller:
             warehouse_id = new_warehouse.id
 
         selected_groups = self._question(
-            "Comma-separated list of workspace group names to migrate. If not specified, we'll wse all "
+            "Comma-separated list of workspace group names to migrate. If not specified, we'll use all "
             "account-level groups with matching names to workspace-level groups.",
             default="<ALL>",
         )
@@ -280,41 +392,69 @@ class WorkspaceInstaller:
         groups_config_args = {
             "backup_group_prefix": backup_group_prefix,
         }
+
         if selected_groups != "<ALL>":
             groups_config_args["selected"] = [x.strip() for x in selected_groups.split(",")]
         else:
-            groups_config_args["auto"] = True
+            groups_config_args["selected"] = None
+
+        # Checking for external HMS
+        instance_profile = None
+        spark_conf_dict = {}
+        if self._prompts:
+            policies_with_external_hms = list(self._get_cluster_policies_with_external_hive_metastores())
+            if (
+                len(policies_with_external_hms) > 0
+                and self._question(
+                    "We have identified one or more cluster policies set up for an external metastore. "
+                    "Would you like to set UCX to connect to the external metastore.",
+                    default="no",
+                )
+                == "yes"
+            ):
+                logger.info("Setting up an external metastore")
+                cluster_policies = {conf.name: conf.definition for conf in policies_with_external_hms}
+                if len(cluster_policies) >= 1:
+                    cluster_policy = json.loads(
+                        self._choice_from_dict("Select a Cluster Policy from The List", cluster_policies)
+                    )
+                    instance_profile, spark_conf_dict = self._get_ext_hms_conf_from_policy(cluster_policy)
+
         self._config = WorkspaceConfig(
             inventory_database=inventory_database,
-            groups=GroupsConfig(**groups_config_args),
+            include_group_names=groups_config_args["selected"],
+            renamed_group_prefix=groups_config_args["backup_group_prefix"],
             warehouse_id=warehouse_id,
             log_level=log_level,
             num_threads=num_threads,
+            instance_profile=instance_profile,
+            spark_conf=spark_conf_dict,
         )
 
-        self._write_config()
+        self._write_config(overwrite=False)
         msg = "Open config file in the browser and continue installing?"
         if self._prompts and self._question(msg, default="yes") == "yes":
             webbrowser.open(ws_file_url)
 
-    def _write_config(self):
+    def _write_config(self, overwrite):
         try:
             self._ws.workspace.get_status(self._install_folder)
-        except DatabricksError as err:
-            if err.error_code != "RESOURCE_DOES_NOT_EXIST":
-                raise err
+        except NotFound:
             logger.debug(f"Creating install folder: {self._install_folder}")
             self._ws.workspace.mkdirs(self._install_folder)
 
         config_bytes = yaml.dump(self._config.as_dict()).encode("utf8")
-        logger.info(f"Creating configuration file: {self._config_file}")
-        self._ws.workspace.upload(self._config_file, config_bytes, format=ImportFormat.AUTO)
+        logger.info(f"Creating configuration file: {self.config_file}")
+        self._ws.workspace.upload(self.config_file, config_bytes, format=ImportFormat.AUTO, overwrite=overwrite)
 
     def _create_jobs(self):
+        if not self._state.jobs:
+            for step, job_id in self._deployed_steps_pre_v06().items():
+                self._state.jobs[step] = job_id
         logger.debug(f"Creating jobs from tasks in {main.__name__}")
         remote_wheel = self._upload_wheel()
-        self._deployed_steps = self._deployed_steps()
         desired_steps = {t.workflow for t in _TASKS.values() if cloud_compatible(self._ws.config, t)}
+
         wheel_runner = None
 
         if self._override_clusters:
@@ -323,21 +463,47 @@ class WorkspaceInstaller:
             settings = self._job_settings(step_name, remote_wheel)
             if self._override_clusters:
                 settings = self._apply_cluster_overrides(settings, self._override_clusters, wheel_runner)
-            if step_name in self._deployed_steps:
-                job_id = self._deployed_steps[step_name]
-                logger.info(f"Updating configuration for step={step_name} job_id={job_id}")
-                self._ws.jobs.reset(job_id, jobs.JobSettings(**settings))
-            else:
-                logger.info(f"Creating new job configuration for step={step_name}")
-                self._deployed_steps[step_name] = self._ws.jobs.create(**settings).job_id
+            self._deploy_workflow(step_name, settings)
 
-        for step_name, job_id in self._deployed_steps.items():
+        for step_name, job_id in self._state.jobs.items():
             if step_name not in desired_steps:
-                logger.info(f"Removing job_id={job_id}, as it is no longer needed")
-                self._ws.jobs.delete(job_id)
+                try:
+                    logger.info(f"Removing job_id={job_id}, as it is no longer needed")
+                    self._ws.jobs.delete(job_id)
+                except InvalidParameterValue:
+                    logger.warning(f"step={step_name} does not exist anymore for some reason")
+                    continue
 
+        self._state.save()
         self._create_readme()
         self._create_debug(remote_wheel)
+
+    def _deploy_workflow(self, step_name: str, settings):
+        if step_name in self._state.jobs:
+            try:
+                job_id = self._state.jobs[step_name]
+                logger.info(f"Updating configuration for step={step_name} job_id={job_id}")
+                return self._ws.jobs.reset(job_id, jobs.JobSettings(**settings))
+            except InvalidParameterValue:
+                del self._state.jobs[step_name]
+                logger.warning(f"step={step_name} does not exist anymore for some reason")
+                return self._deploy_workflow(step_name, settings)
+        logger.info(f"Creating new job configuration for step={step_name}")
+        job_id = self._ws.jobs.create(**settings).job_id
+        self._state.jobs[step_name] = job_id
+
+    def _deployed_steps_pre_v06(self):
+        deployed_steps = {}
+        logger.debug(f"Fetching all jobs to determine already deployed steps for app={self._app}")
+        for j in self._ws.jobs.list():
+            tags = j.settings.tags
+            if tags is None:
+                continue
+            if tags.get(TAG_APP, None) != self._app:
+                continue
+            step = tags.get(TAG_STEP, "_")
+            deployed_steps[step] = j.job_id
+        return deployed_steps
 
     @staticmethod
     def _sorted_tasks() -> list[Task]:
@@ -354,24 +520,28 @@ class WorkspaceInstaller:
     def _create_readme(self):
         md = [
             "# UCX - The Unity Catalog Migration Assistant",
-            f'To troubleshoot, see [debug notebook]({self._notebook_link(f"{self._install_folder}/DEBUG.py")}).\n',
+            f'To troubleshoot, see [debug notebook]({self.notebook_link(f"{self._install_folder}/DEBUG.py")}).\n',
             "Here are the URLs and descriptions of workflows that trigger various stages of migration.",
             "All jobs are defined with necessary cluster configurations and DBR versions.\n",
         ]
         for step_name in self._step_list():
-            if step_name not in self._deployed_steps:
+            if step_name not in self._state.jobs:
                 logger.warning(f"Skipping step '{step_name}' since it was not deployed.")
                 continue
-            job_id = self._deployed_steps[step_name]
+            job_id = self._state.jobs[step_name]
             dashboard_link = ""
-            if step_name in self._dashboards:
-                dashboard_link = f"{self._ws.config.host}/sql/dashboards/{self._dashboards[step_name]}"
-                dashboard_link = f"Go to the [{step_name} dashboard]({dashboard_link}) after running the jobs."
+            dashboards_per_step = [d for d in self._dashboards.keys() if d.startswith(step_name)]
+            for dash in dashboards_per_step:
+                if len(dashboard_link) == 0:
+                    dashboard_link += "Go to the one of the following dashboards after running the job:\n"
+                first, second = dash.replace("_", " ").title().split()
+                dashboard_url = f"{self._ws.config.host}/sql/dashboards/{self._dashboards[dash]}"
+                dashboard_link += f"  - [{first} ({second}) dashboard]({dashboard_url})\n"
             job_link = f"[{self._name(step_name)}]({self._ws.config.host}#job/{job_id})"
             md.append("---\n\n")
             md.append(f"## {job_link}\n\n")
-            md.append(f"{dashboard_link}\n\n")
-            md.append("The workflow consists of the following separate tasks:\n\n")
+            md.append(f"{dashboard_link}")
+            md.append("\nThe workflow consists of the following separate tasks:\n\n")
             for t in self._sorted_tasks():
                 if t.workflow != step_name:
                     continue
@@ -383,32 +553,32 @@ class WorkspaceInstaller:
         intro = "\n".join(preamble + [f"# MAGIC {line}" for line in md])
         path = f"{self._install_folder}/README.py"
         self._ws.workspace.upload(path, intro.encode("utf8"), overwrite=True)
-        url = self._notebook_link(path)
+        url = self.notebook_link(path)
         logger.info(f"Created README notebook with job overview: {url}")
         msg = "Open job overview in README notebook in your home directory ?"
-        if self._prompts and self._question(msg, default="yes") == "yes":
+        if self._prompts and self._question(msg, default="no") == "yes":
             webbrowser.open(url)
 
     def _replace_inventory_variable(self, text: str) -> str:
         return text.replace("$inventory", f"hive_metastore.{self._current_config.inventory_database}")
 
     def _create_debug(self, remote_wheel: str):
-        readme_link = self._notebook_link(f"{self._install_folder}/README.py")
+        readme_link = self.notebook_link(f"{self._install_folder}/README.py")
         job_links = ", ".join(
             f"[{self._name(step_name)}]({self._ws.config.host}#job/{job_id})"
-            for step_name, job_id in self._deployed_steps.items()
+            for step_name, job_id in self._state.jobs.items()
         )
         path = f"{self._install_folder}/DEBUG.py"
-        logger.debug(f"Created debug notebook: {self._notebook_link(path)}")
+        logger.debug(f"Created debug notebook: {self.notebook_link(path)}")
         self._ws.workspace.upload(
             path,
             DEBUG_NOTEBOOK.format(
-                remote_wheel=remote_wheel, readme_link=readme_link, job_links=job_links, config_file=self._config_file
+                remote_wheel=remote_wheel, readme_link=readme_link, job_links=job_links, config_file=self.config_file
             ).encode("utf8"),
             overwrite=True,
         )
 
-    def _notebook_link(self, path: str) -> str:
+    def notebook_link(self, path: str) -> str:
         return f"{self._ws.config.host}/#workspace{path}"
 
     def _choice_from_dict(self, text: str, choices: dict[str, Any]) -> Any:
@@ -420,7 +590,7 @@ class WorkspaceInstaller:
             return "any"
         choices = sorted(choices, key=str.casefold)
         numbered = "\n".join(f"\033[1m[{i}]\033[0m \033[36m{v}\033[0m" for i, v in enumerate(choices))
-        prompt = f"\033[1m{text}\033[0m\n{numbered}\nEnter a number between 0 and {len(choices)-1}: "
+        prompt = f"\033[1m{text}\033[0m\n{numbered}\nEnter a number between 0 and {len(choices) - 1}: "
         attempt = 0
         while attempt < max_attempts:
             attempt += 1
@@ -475,7 +645,7 @@ class WorkspaceInstaller:
         version = self._version if not self._ws.config.is_gcp else self._version.replace("+", "-")
         return {
             "name": self._name(step_name),
-            "tags": {TAG_APP: self._app, TAG_STEP: step_name, "version": f"v{version}"},
+            "tags": {TAG_APP: self._app, "version": f"v{version}"},
             "job_clusters": self._job_clusters({t.job_cluster for t in tasks}),
             "email_notifications": email_notifications,
             "tasks": [self._job_task(task, dbfs_path) for task in tasks],
@@ -484,8 +654,8 @@ class WorkspaceInstaller:
     def _upload_wheel_runner(self, remote_wheel: str):
         # TODO: we have to be doing this workaround until ES-897453 is solved in the platform
         path = f"{self._install_folder}/wheels/wheel-test-runner-{self._version}.py"
-        logger.debug(f"Created runner notebook: {self._notebook_link(path)}")
-        py = TEST_RUNNER_NOTEBOOK.format(remote_wheel=remote_wheel, config_file=self._config_file).encode("utf8")
+        logger.debug(f"Created runner notebook: {self.notebook_link(path)}")
+        py = TEST_RUNNER_NOTEBOOK.format(remote_wheel=remote_wheel, config_file=self.config_file).encode("utf8")
         self._ws.workspace.upload(path, py, overwrite=True)
         return path
 
@@ -537,9 +707,8 @@ class WorkspaceInstaller:
                 notebook_path=remote_notebook,
                 # ES-872211: currently, we cannot read WSFS files from Scala context
                 base_parameters={
-                    "inventory_database": self._current_config.inventory_database,
                     "task": task.name,
-                    "config": f"/Workspace{self._config_file}",
+                    "config": f"/Workspace{self.config_file}",
                 }
                 | EXTRA_TASK_PARAMS,
             ),
@@ -552,21 +721,30 @@ class WorkspaceInstaller:
             python_wheel_task=jobs.PythonWheelTask(
                 package_name="databricks_labs_ucx",
                 entry_point="runtime",  # [project.entry-points.databricks] in pyproject.toml
-                named_parameters={"task": task.name, "config": f"/Workspace{self._config_file}"} | EXTRA_TASK_PARAMS,
+                named_parameters={"task": task.name, "config": f"/Workspace{self.config_file}"} | EXTRA_TASK_PARAMS,
             ),
         )
 
     def _job_clusters(self, names: set[str]):
         clusters = []
+        spark_conf = {
+            "spark.databricks.cluster.profile": "singleNode",
+            "spark.master": "local[*]",
+        }
+        if self._config.spark_conf is not None:
+            spark_conf = spark_conf | self._config.spark_conf
         spec = self._cluster_node_type(
             compute.ClusterSpec(
                 spark_version=self._ws.clusters.select_spark_version(latest=True),
                 data_security_mode=compute.DataSecurityMode.NONE,
-                spark_conf={"spark.databricks.cluster.profile": "singleNode", "spark.master": "local[*]"},
+                spark_conf=spark_conf,
                 custom_tags={"ResourceClass": "SingleNode"},
                 num_workers=0,
             )
         )
+        if self._ws.config.is_aws and spec.aws_attributes is not None:
+            aws_attributes = replace(spec.aws_attributes, instance_profile_arn=self._config.instance_profile)
+            spec = replace(spec, aws_attributes=aws_attributes)
         if "main" in names:
             clusters.append(
                 jobs.JobCluster(
@@ -603,7 +781,7 @@ class WorkspaceInstaller:
             dv = SemVer.parse(git_detached_version)
             datestamp = datetime.datetime.now().strftime("%Y%m%d%H%M%S")
             # new commits on main branch since the last tag
-            new_commits = dv.pre_release.split("-")[0]
+            new_commits = dv.pre_release.split("-")[0] if dv.pre_release else None
             # show that it's a version different from the released one in stats
             bump_patch = dv.patch + 1
             # create something that is both https://semver.org and https://peps.python.org/pep-0440/
@@ -680,17 +858,56 @@ class WorkspaceInstaller:
             )
         return replace(spec, gcp_attributes=compute.GcpAttributes(availability=compute.GcpAvailability.ON_DEMAND_GCP))
 
-    def _deployed_steps(self):
-        deployed_steps = {}
-        logger.debug(f"Fetching all jobs to determine already deployed steps for app={self._app}")
-        for j in self._ws.jobs.list():
-            tags = j.settings.tags
-            if tags is None:
+    def _instance_profiles(self):
+        return {"No Instance Profile": None} | {
+            profile.instance_profile_arn: profile.instance_profile_arn for profile in self._ws.instance_profiles.list()
+        }
+
+    def _get_cluster_policies_with_external_hive_metastores(self):
+        for policy in self._ws.cluster_policies.list():
+            def_json = json.loads(policy.definition)
+            glue_node = def_json.get("spark_conf.spark.databricks.hive.metastore.glueCatalog.enabled")
+            if glue_node is not None and glue_node.get("value") == "true":
+                yield policy
                 continue
-            if tags.get(TAG_APP, None) != self._app:
+            for key in def_json.keys():
+                if key.startswith("spark_config.spark.sql.hive.metastore"):
+                    yield policy
+                    break
+
+    @staticmethod
+    def _get_ext_hms_conf_from_policy(cluster_policy):
+        spark_conf_dict = {}
+        instance_profile = None
+        if cluster_policy.get("aws_attributes.instance_profile_arn") is not None:
+            instance_profile = cluster_policy.get("aws_attributes.instance_profile_arn").get("value")
+            logger.info(f"Instance Profile is Set to {instance_profile}")
+        for key in cluster_policy.keys():
+            if (
+                key.startswith("spark_conf.sql.hive.metastore")
+                or key.startswith("spark_conf.spark.hadoop.javax.jdo.option")
+                or key.startswith("spark_conf.spark.databricks.hive.metastore")
+                or key.startswith("spark_conf.spark.hadoop.hive.metastore.glue")
+            ):
+                spark_conf_dict[key[11:]] = cluster_policy[key]["value"]
+        return instance_profile, spark_conf_dict
+
+    def latest_job_status(self) -> list[dict]:
+        latest_status = []
+        for step, job_id in self._state.jobs.items():
+            try:
+                job_runs = list(self._ws.jobs.list_runs(job_id=job_id, limit=1))
+                latest_status.append(
+                    {
+                        "step": step,
+                        "state": "UNKNOWN" if not job_runs else str(job_runs[0].state.result_state),
+                        "started": "<never run>" if not job_runs else job_runs[0].start_time,
+                    }
+                )
+            except InvalidParameterValue as e:
+                logger.warning(f"skipping {step}: {e}")
                 continue
-            deployed_steps[tags.get(TAG_STEP, "_")] = j.job_id
-        return deployed_steps
+        return latest_status
 
 
 if __name__ == "__main__":

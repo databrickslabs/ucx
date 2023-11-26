@@ -1,13 +1,14 @@
-# UCX - Unity Catalog Migration Toolkit
-
-[![build](https://github.com/databrickslabs/ucx/actions/workflows/push.yml/badge.svg)](https://github.com/databrickslabs/ucx/actions/workflows/push.yml) [![codecov](https://codecov.io/github/databrickslabs/ucx/graph/badge.svg?token=p0WKAfW5HQ)](https://codecov.io/github/databrickslabs/ucx)
+# ![UCX by Dataricks Labs](docs/logo-no-background.png)
 
 Your best companion for upgrading to Unity Catalog. It helps you to upgrade all Databricks workspace assets:
 Legacy Table ACLs, Entitlements, AWS instance profiles, Clusters, Cluster policies, Instance Pools, Databricks SQL warehouses, Delta Live 
 Tables, Jobs, MLflow experiments, MLflow registry, SQL Dashboards & Queries, SQL Alerts, Token and Password usage 
 permissions that are set on the workspace level, Secret scopes, Notebooks, Directories, Repos, Files.
 
+[![build](https://github.com/databrickslabs/ucx/actions/workflows/push.yml/badge.svg)](https://github.com/databrickslabs/ucx/actions/workflows/push.yml) [![codecov](https://codecov.io/github/databrickslabs/ucx/graph/badge.svg?token=p0WKAfW5HQ)](https://codecov.io/github/databrickslabs/ucx)
+
 See [contributing instructions](CONTRIBUTING.md) to help improve this project.
+
 
 ## Introduction
 UCX will guide you, the Databricks customer through the process of upgrading your account, groups, workspaces, jobs etc to Unity Catalog. 
@@ -63,6 +64,9 @@ export DATABRICKS_HOST=https://adb-123....azuredatabricks.net/
 ```
 
 Please follow the instructions in `./install.sh`, which will deploy UCX to your workspace and open a notebook with the description of all jobs to trigger. The journey starts with assessment. 
+### Special Consideration - External Metastores
+If your Databricks Workspace relies on an external Hive Metastore (such as glue), make sure to read the [External HMS Document](docs/external_hms_glue.md).
+
 
 ## Star History
 

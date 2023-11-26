@@ -16,7 +16,7 @@ class NiceFormatter(logging.Formatter):
     def __init__(self, *, probe_tty: bool = False) -> None:
         super().__init__(fmt="%(asctime)s %(levelname)s [%(name)s] %(message)s", datefmt="%H:%M")
         self._levels = {
-            logging.NOTSET: self._bold(f"{self.BLACK}TRACE"),
+            logging.NOTSET: self._bold("TRACE"),
             logging.DEBUG: self._bold(f"{self.CYAN}DEBUG"),
             logging.INFO: self._bold(f"{self.GREEN} INFO"),
             logging.WARNING: self._bold(f"{self.YELLOW} WARN"),
@@ -34,8 +34,10 @@ class NiceFormatter(logging.Formatter):
             return super().format(record)
         ts = self.formatTime(record, datefmt="%H:%M")
         level = self._levels[record.levelno]
-        # databricks.labs.ucx.foo -> d.l.ucx.foo
-        name = ".".join(part if i > 1 else part[0] for i, part in enumerate(record.name.split(".")))
+        # databricks.labs.ucx.foo.bar -> d.l.u.foo.bar
+        module_split = record.name.split(".")
+        last_two_modules = len(module_split) - 2
+        name = ".".join(part if i >= last_two_modules else part[0] for i, part in enumerate(module_split))
         msg = record.msg
         if record.exc_info and not record.exc_text:
             record.exc_text = self.formatException(record.exc_info)
@@ -48,7 +50,7 @@ class NiceFormatter(logging.Formatter):
 
         color_marker = self.GRAY
         if record.levelno in (logging.INFO, logging.WARNING):
-            color_marker = self.BLACK + self.BOLD
+            color_marker = self.BOLD
         elif record.levelno in (logging.ERROR, logging.FATAL):
             color_marker = self.RED + self.BOLD
         return f"{self.GRAY}{ts}{self.RESET} {level} {color_marker}[{name}] {msg}{self.RESET}"

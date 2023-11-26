@@ -5,14 +5,13 @@ from pathlib import Path
 
 import yaml
 
-from databricks.labs.ucx.config import GroupsConfig, WorkspaceConfig
+from databricks.labs.ucx.config import WorkspaceConfig
 
 
 def test_initialization():
     mc = partial(
         WorkspaceConfig,
         inventory_database="abc",
-        groups=GroupsConfig(auto=True),
     )
     mc()
 
@@ -43,7 +42,8 @@ def test_reader(tmp_path: Path):
         mc = partial(
             WorkspaceConfig,
             inventory_database="abc",
-            groups=GroupsConfig(auto=True),
+            database_to_catalog_mapping={"db1": "cat1", "db2": "cat2"},
+            spark_conf={"key1": "val1", "key2": "val2"},
         )
 
         config: WorkspaceConfig = mc()

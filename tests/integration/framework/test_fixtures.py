@@ -1,7 +1,10 @@
 import logging
+from datetime import timedelta
 
 import pytest
 from _pytest.outcomes import Failed, Skipped
+from databricks.sdk.errors import NotFound
+from databricks.sdk.retries import retried
 from databricks.sdk.service.workspace import AclPermission
 
 from databricks.labs.ucx.mixins.compute import CommandExecutor
@@ -73,6 +76,7 @@ def test_pipeline(make_pipeline):
     logger.info(f"created {make_pipeline()}")
 
 
+@retried(on=[NotFound], timeout=timedelta(minutes=5))
 def test_this_wheel_installs(ws, wsfs_wheel):
     commands = CommandExecutor(ws)
 

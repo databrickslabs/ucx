@@ -5,7 +5,7 @@ from concurrent.futures import FIRST_COMPLETED, ThreadPoolExecutor, wait
 from itertools import groupby
 
 from databricks.sdk import WorkspaceClient
-from databricks.sdk.core import DatabricksError
+from databricks.sdk.errors import NotFound
 from databricks.sdk.service.workspace import ObjectInfo, ObjectType
 
 logger = logging.getLogger(__name__)
@@ -57,10 +57,8 @@ class WorkspaceListing:
                 else:
                     others.extend(list(objects))
             logger.debug(f"Listed {obj.path}, found {len(directories)} sub-directories and {len(others)} other objects")
-        except DatabricksError as err:
+        except NotFound:
             # See https://github.com/databrickslabs/ucx/issues/230
-            if err.error_code != "RESOURCE_DOES_NOT_EXIST":
-                raise err
             logger.warning(f"{obj.path} is not listable. Ignoring")
         return directories, others
 

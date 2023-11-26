@@ -1,11 +1,13 @@
 import dataclasses
 import logging
 import os
+import pkgutil
 from abc import ABC, abstractmethod
 from collections.abc import Iterator
 from typing import ClassVar
 
 from databricks.sdk import WorkspaceClient
+from databricks.sdk.errors import NotFound
 
 from databricks.labs.ucx.mixins.sql import StatementExecutionExt
 
@@ -45,14 +47,25 @@ class SqlBackend(ABC):
             fields.append(f"{f.name} {spark_type}{not_null}")
         return ", ".join(fields)
 
+    from dataclasses import asdict, dataclass, fields
+
     @classmethod
-    def _filter_none_rows(cls, rows):
+    def _filter_none_rows(cls, rows, klass):
         if len(rows) == 0:
             return rows
+
         results = []
+        class_fields = dataclasses.fields(klass)
         for row in rows:
             if row is None:
                 continue
+            for field in class_fields:
+                if not hasattr(row, field.name):
+                    logger.debug(f"Field {field.name} not present in row {dataclasses.asdict(row)}")
+                    continue
+                if field.default is not None and getattr(row, field.name) is None:
+                    msg = f"Not null constraint violated for column {field.name}, row = {dataclasses.asdict(row)}"
+                    raise ValueError(msg)
             results.append(row)
         return results
 
@@ -75,7 +88,7 @@ class StatementExecutionBackend(SqlBackend):
         if mode == "overwrite":
             msg = "Overwrite mode is not yet supported"
             raise NotImplementedError(msg)
-        rows = self._filter_none_rows(rows)
+        rows = self._filter_none_rows(rows, klass)
         self.create_table(full_name, klass)
         if len(rows) == 0:
             return
@@ -126,7 +139,7 @@ class RuntimeBackend(SqlBackend):
         return self._spark.sql(sql).collect()
 
     def save_table(self, full_name: str, rows: list[any], klass: dataclasses.dataclass, mode: str = "append"):
-        rows = self._filter_none_rows(rows)
+        rows = self._filter_none_rows(rows, klass)
 
         if len(rows) == 0:
             self.create_table(full_name, klass)
@@ -222,9 +235,8 @@ class CrawlerBase:
             cached_results = list(fetcher())
             if len(cached_results) > 0:
                 return cached_results
-        except Exception as err:
-            if "TABLE_OR_VIEW_NOT_FOUND" not in str(err):
-                raise err
+        except NotFound:
+            pass
         logger.debug(f"[{self._full_name}] crawling new batch for {self._table}")
         loaded_records = list(loader())
         self._append_records(loaded_records)
@@ -233,3 +245,30 @@ class CrawlerBase:
     def _append_records(self, items):
         logger.debug(f"[{self._full_name}] found {len(items)} new records for {self._table}")
         self._backend.save_table(self._full_name, items, self._klass, mode="append")
+
+
+class SchemaDeployer:
+    def __init__(self, sql_backend: SqlBackend, inventory_schema: str, mod: any):
+        self._sql_backend = sql_backend
+        self._inventory_schema = inventory_schema
+        self._module = mod
+
+    def deploy_schema(self):
+        logger.info(f"Ensuring {self._inventory_schema} database exists")
+        self._sql_backend.execute(f"CREATE SCHEMA IF NOT EXISTS hive_metastore.{self._inventory_schema}")
+
+    def deploy_table(self, name: str, klass: type):
+        logger.info(f"Ensuring {self._inventory_schema}.{name} table exists")
+        self._sql_backend.create_table(f"hive_metastore.{self._inventory_schema}.{name}", klass)
+
+    def deploy_view(self, name: str, relative_filename: str):
+        query = self._load(relative_filename)
+        logger.info(f"Ensuring {self._inventory_schema}.{name} view matches {relative_filename} contents")
+        ddl = f"CREATE OR REPLACE VIEW hive_metastore.{self._inventory_schema}.{name} AS {query}"
+        self._sql_backend.execute(ddl)
+
+    def _load(self, relative_filename: str) -> str:
+        data = pkgutil.get_data(self._module.__name__, relative_filename)
+        sql = data.decode("utf-8")
+        sql = sql.replace("$inventory", f"hive_metastore.{self._inventory_schema}")
+        return sql

@@ -77,6 +77,11 @@ def test_hive_sql():
     assert grant.hive_revoke_sql() == "REVOKE SELECT ON TABLE hive_metastore.mydb.mytable FROM `user`"
 
 
+def test_hive_own_sql():
+    grant = Grant(principal="user", action_type="OWN", catalog="hive_metastore", database="mydb", table="mytable")
+    assert grant.hive_grant_sql() == "ALTER hive_metastore.mydb.mytable OWNER TO `user`"
+
+
 def test_hive_revoke_sql():
     grant = Grant(principal="user", action_type="SELECT", catalog="hive_metastore", database="mydb", table="mytable")
     assert grant.hive_revoke_sql() == "REVOKE SELECT ON TABLE hive_metastore.mydb.mytable FROM `user`"
@@ -148,7 +153,10 @@ def test_crawler_no_data():
 def test_crawler_crawl():
     b = MockBackend(
         rows={
-            "SHOW DATABASES": [("database_one",), ("database_two",)],
+            "SHOW DATABASES": [
+                make_row(("database_one",), ["databaseName"]),
+                make_row(("database_two",), ["databaseName"]),
+            ],
             "SHOW TABLES FROM hive_metastore.database_one": [
                 ("database_one", "table_one", "true"),
                 ("database_one", "table_two", "true"),
@@ -197,8 +205,8 @@ def test_grants_returning_error_when_describing():
     errors = {"SHOW GRANTS ON TABLE hive_metastore.test_database.table1": "error"}
     rows = {
         "SHOW DATABASES": [
-            ("test_database",),
-            ("other_database",),
+            make_row(("test_database",), ["databaseName"]),
+            make_row(("other_database",), ["databaseName"]),
         ],
         "SHOW TABLES FROM hive_metastore.test_database": [
             ("test_database", "table1", False),

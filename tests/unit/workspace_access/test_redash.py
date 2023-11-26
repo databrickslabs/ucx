@@ -1,10 +1,12 @@
 import json
-from unittest.mock import MagicMock, call
+from datetime import timedelta
+from unittest.mock import MagicMock
 
 import pytest
 from databricks.sdk.core import DatabricksError
 from databricks.sdk.service import sql
 
+from databricks.labs.ucx.workspace_access.generic import RetryableError
 from databricks.labs.ucx.workspace_access.redash import (
     Listing,
     Permissions,
@@ -67,7 +69,21 @@ def test_apply(migration_state):
         object_id="test",
         access_control_list=[
             sql.AccessControl(
-                group_name="db-temp-test",
+                group_name="test",
+                permission_level=sql.PermissionLevel.CAN_MANAGE,
+            ),
+            sql.AccessControl(
+                group_name="irrelevant",
+                permission_level=sql.PermissionLevel.CAN_MANAGE,
+            ),
+        ],
+    )
+    ws.dbsql_permissions.set.return_value = sql.GetResponse(
+        object_type=sql.ObjectType.ALERT,
+        object_id="test",
+        access_control_list=[
+            sql.AccessControl(
+                group_name="test",
                 permission_level=sql.PermissionLevel.CAN_MANAGE,
             ),
             sql.AccessControl(
@@ -97,12 +113,12 @@ def test_apply(migration_state):
             ).as_dict()
         ),
     )
-    task = sup.get_apply_task(item, migration_state, "backup")
+    task = sup.get_apply_task(item, migration_state)
     task()
     assert ws.dbsql_permissions.set.call_count == 1
     expected_payload = [
         sql.AccessControl(
-            group_name="db-temp-test",
+            group_name="test",
             permission_level=sql.PermissionLevel.CAN_MANAGE,
         ),
         sql.AccessControl(
@@ -126,7 +142,7 @@ def test_safe_getter_unknown():
     ws = MagicMock()
     ws.dbsql_permissions.get.side_effect = DatabricksError(error_code="SOMETHING_NON_EXPECTED")
     sup = RedashPermissionsSupport(ws=ws, listings=[])
-    with pytest.raises(DatabricksError):
+    with pytest.raises(RetryableError):
         sup._safe_get_dbsql_permissions(object_type=sql.ObjectTypePlural.ALERTS, object_id="test")
 
 
@@ -142,6 +158,11 @@ def test_applier_task_should_return_true_if_permission_is_up_to_date():
     acl_grp_1 = sql.AccessControl(group_name="group_1", permission_level=sql.PermissionLevel.CAN_MANAGE)
     acl_grp_2 = sql.AccessControl(group_name="group_2", permission_level=sql.PermissionLevel.CAN_MANAGE)
     ws.dbsql_permissions.get.return_value = sql.GetResponse(
+        object_type=sql.ObjectType.QUERY,
+        object_id="test",
+        access_control_list=[acl_grp_1, acl_grp_2],
+    )
+    ws.dbsql_permissions.set.return_value = sql.GetResponse(
         object_type=sql.ObjectType.QUERY,
         object_id="test",
         access_control_list=[acl_grp_1, acl_grp_2],
@@ -163,13 +184,18 @@ def test_applier_task_should_return_true_if_permission_is_up_to_date_with_multip
         object_id="test",
         access_control_list=[acl_1_grp_1, acl_2_grp_1, acl_3_grp_1, acl_grp_2],
     )
+    ws.dbsql_permissions.set.return_value = sql.GetResponse(
+        object_type=sql.ObjectType.QUERY,
+        object_id="test",
+        access_control_list=[acl_1_grp_1, acl_2_grp_1, acl_3_grp_1, acl_grp_2],
+    )
 
     sup = RedashPermissionsSupport(ws=ws, listings=[])
     result = sup._applier_task(sql.ObjectTypePlural.QUERIES, "test", [acl_1_grp_1, acl_2_grp_1])
     assert result
 
 
-def test_applier_task_should_return_false_if_permission_are_not_up_to_date():
+def test_applier_task_failed():
     ws = MagicMock()
     ws.dbsql_permissions.get.return_value = sql.GetResponse(
         object_type=sql.ObjectType.QUERY,
@@ -180,16 +206,17 @@ def test_applier_task_should_return_false_if_permission_are_not_up_to_date():
         ],
     )
 
-    sup = RedashPermissionsSupport(ws=ws, listings=[])
-    result = sup._applier_task(
-        sql.ObjectTypePlural.QUERIES,
-        "test",
-        [sql.AccessControl(group_name="group_1", permission_level=sql.PermissionLevel.CAN_RUN)],
-    )
-    assert not result
+    sup = RedashPermissionsSupport(ws=ws, listings=[], verify_timeout=timedelta(seconds=1))
+    with pytest.raises(TimeoutError) as e:
+        sup._applier_task(
+            sql.ObjectTypePlural.QUERIES,
+            "test",
+            [sql.AccessControl(group_name="group_1", permission_level=sql.PermissionLevel.CAN_RUN)],
+        )
+    assert "Timed out after" in str(e.value)
 
 
-def test_applier_task_should_return_false_if_all_permissions_are_not_up_to_date():
+def test_applier_task_failed_when_all_permissions_not_up_to_date():
     ws = MagicMock()
     ws.dbsql_permissions.get.return_value = sql.GetResponse(
         object_type=sql.ObjectType.QUERY,
@@ -200,47 +227,70 @@ def test_applier_task_should_return_false_if_all_permissions_are_not_up_to_date(
         ],
     )
 
-    sup = RedashPermissionsSupport(ws=ws, listings=[])
-    result = sup._applier_task(
-        sql.ObjectTypePlural.QUERIES,
-        "test",
-        [
-            sql.AccessControl(group_name="group_1", permission_level=sql.PermissionLevel.CAN_RUN),
-            sql.AccessControl(group_name="group_1", permission_level=sql.PermissionLevel.CAN_MANAGE),
-        ],
-    )
-    assert not result
+    sup = RedashPermissionsSupport(ws=ws, listings=[], verify_timeout=timedelta(seconds=1))
+    with pytest.raises(TimeoutError) as e:
+        sup._applier_task(
+            sql.ObjectTypePlural.QUERIES,
+            "test",
+            [
+                sql.AccessControl(group_name="group_1", permission_level=sql.PermissionLevel.CAN_RUN),
+                sql.AccessControl(group_name="group_1", permission_level=sql.PermissionLevel.CAN_MANAGE),
+            ],
+        )
+    assert "Timed out after" in str(e.value)
 
 
-def test_applier_task_should_be_called_three_times_if_permission_is_not_up_to_date():
+def test_applier_task_when_set_error_non_retriable():
     ws = MagicMock()
-    ws.dbsql_permissions.get.return_value = sql.GetResponse(
-        object_type=sql.ObjectType.QUERY,
-        object_id="test",
-        access_control_list=[
-            sql.AccessControl(group_name="group_1", permission_level=sql.PermissionLevel.CAN_MANAGE),
-            sql.AccessControl(group_name="group_2", permission_level=sql.PermissionLevel.CAN_RUN),
-        ],
-    )
+    error_code = "PERMISSION_DENIED"
+    ws.dbsql_permissions.set.side_effect = DatabricksError(error_code=error_code)
 
-    sup = RedashPermissionsSupport(ws=ws, listings=[])
-    input_acl = sql.AccessControl(group_name="group_1", permission_level=sql.PermissionLevel.CAN_RUN)
+    sup = RedashPermissionsSupport(ws=ws, listings=[], verify_timeout=timedelta(seconds=1))
+    with pytest.raises(TimeoutError) as e:
+        sup._applier_task(
+            sql.ObjectTypePlural.QUERIES,
+            "test",
+            [
+                sql.AccessControl(group_name="group_1", permission_level=sql.PermissionLevel.CAN_RUN),
+                sql.AccessControl(group_name="group_1", permission_level=sql.PermissionLevel.CAN_MANAGE),
+            ],
+        )
+    assert "Timed out after" in str(e.value)
 
-    sup._applier_task(
-        sql.ObjectTypePlural.QUERIES,
-        "test",
-        [input_acl],
-    )
 
-    assert len(ws.dbsql_permissions.set.mock_calls) == 3
-    assert ws.dbsql_permissions.set.mock_calls == [
-        call(object_type=sql.ObjectTypePlural.QUERIES, object_id="test", access_control_list=[input_acl]),
-        call(object_type=sql.ObjectTypePlural.QUERIES, object_id="test", access_control_list=[input_acl]),
-        call(object_type=sql.ObjectTypePlural.QUERIES, object_id="test", access_control_list=[input_acl]),
-    ]
-    assert len(ws.dbsql_permissions.get.mock_calls) == 3
-    assert ws.dbsql_permissions.set.mock_calls == [
-        call(object_type=sql.ObjectTypePlural.QUERIES, object_id="test", access_control_list=[input_acl]),
-        call(object_type=sql.ObjectTypePlural.QUERIES, object_id="test", access_control_list=[input_acl]),
-        call(object_type=sql.ObjectTypePlural.QUERIES, object_id="test", access_control_list=[input_acl]),
-    ]
+def test_applier_task_when_set_error_retriable():
+    ws = MagicMock()
+    error_code = "INTERNAL_SERVER_ERROR"
+    ws.dbsql_permissions.set.side_effect = DatabricksError(error_code=error_code)
+
+    sup = RedashPermissionsSupport(ws=ws, listings=[], verify_timeout=timedelta(seconds=1))
+    with pytest.raises(TimeoutError) as e:
+        sup._applier_task(
+            sql.ObjectTypePlural.QUERIES,
+            "test",
+            [
+                sql.AccessControl(group_name="group_1", permission_level=sql.PermissionLevel.CAN_RUN),
+                sql.AccessControl(group_name="group_1", permission_level=sql.PermissionLevel.CAN_MANAGE),
+            ],
+        )
+    assert "Timed out after" in str(e.value)
+
+
+def test_safe_set_permissions_when_error_non_retriable():
+    ws = MagicMock()
+    ws.dbsql_permissions.set.side_effect = DatabricksError(error_code="PERMISSION_DENIED")
+    sup = RedashPermissionsSupport(ws=ws, listings=[], verify_timeout=timedelta(seconds=1))
+    acl = [sql.AccessControl(group_name="group_1", permission_level=sql.PermissionLevel.CAN_MANAGE)]
+    result = sup._safe_set_permissions(sql.ObjectTypePlural.QUERIES, "test", acl)
+    assert result is None
+
+
+def test_safe_set_permissions_when_error_retriable():
+    ws = MagicMock()
+    error_code = "INTERNAL_SERVER_ERROR"
+    ws.dbsql_permissions.set.side_effect = DatabricksError(error_code=error_code)
+    sup = RedashPermissionsSupport(ws=ws, listings=[], verify_timeout=timedelta(seconds=1))
+    acl = [sql.AccessControl(group_name="group_1", permission_level=sql.PermissionLevel.CAN_MANAGE)]
+    with pytest.raises(TimeoutError) as e:
+        sup._safe_set_permissions(sql.ObjectTypePlural.QUERIES, "test", acl)
+    assert "Timed out after" in str(e.value)

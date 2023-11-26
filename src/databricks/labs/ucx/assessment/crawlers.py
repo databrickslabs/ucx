@@ -5,8 +5,8 @@ import re
 from dataclasses import dataclass
 
 from databricks.sdk import WorkspaceClient
-from databricks.sdk.core import DatabricksError
-from databricks.sdk.service.compute import ClusterSource
+from databricks.sdk.errors import DatabricksError, NotFound
+from databricks.sdk.service.compute import ClusterSource, Policy
 from databricks.sdk.service.jobs import BaseJob
 
 from databricks.labs.ucx.framework.crawlers import CrawlerBase, SqlBackend
@@ -37,28 +37,28 @@ _INIT_SCRIPT_DBFS_PATH = 2
 @dataclass
 class JobInfo:
     job_id: str
-    job_name: str
-    creator: str
     success: int
     failures: str
+    job_name: str = None
+    creator: str = None
 
 
 @dataclass
 class ClusterInfo:
     cluster_id: str
-    cluster_name: str
-    creator: str
     success: int
     failures: str
+    cluster_name: str = None
+    creator: str = None
 
 
 @dataclass
 class PipelineInfo:
     pipeline_id: str
-    pipeline_name: str
-    creator_name: str
     success: int
     failures: str
+    pipeline_name: str = None
+    creator_name: str = None
 
 
 @dataclass
@@ -78,11 +78,11 @@ class AzureServicePrincipalInfo:
 @dataclass
 class GlobalInitScriptInfo:
     script_id: str
-    script_name: str
-    created_by: str
-    enabled: bool
     success: int
     failures: str
+    script_name: str = None
+    created_by: str = None
+    enabled: bool = None
 
 
 def _get_init_script_data(w, init_script_info):
@@ -125,13 +125,23 @@ def spark_version_compatibility(spark_version: str) -> str:
     first_comp_custom_x = 2
     dbr_version_components = spark_version.split("-")
     first_components = dbr_version_components[0].split(".")
+    if "custom" in spark_version:
+        # custom runtime
+        return "unsupported"
+    if "dlt" in spark_version:
+        # shouldn't hit this? Does show up in cluster list
+        return "dlt"
     if len(first_components) != first_comp_custom_rt:
         # custom runtime
         return "unsupported"
     if first_components[first_comp_custom_x] != "x":
         # custom runtime
         return "unsupported"
-    version = int(first_components[0]), int(first_components[1])
+
+    try:
+        version = int(first_components[0]), int(first_components[1])
+    except ValueError:
+        version = 0, 0
     if version < (10, 0):
         return "unsupported"
     if (10, 0) <= version < (11, 3):
@@ -150,7 +160,19 @@ class GlobalInitScriptCrawler(CrawlerBase):
 
     def _assess_global_init_scripts(self, all_global_init_scripts):
         for gis in all_global_init_scripts:
-            global_init_script_info = GlobalInitScriptInfo(gis.script_id, gis.name, gis.created_by, gis.enabled, 1, "")
+            if not gis.created_by:
+                logger.warning(
+                    f"Script {gis.name} have Unknown creator, it means that the original creator has been deleted"
+                    f" and should be re-created"
+                )
+            global_init_script_info = GlobalInitScriptInfo(
+                script_id=gis.script_id,
+                script_name=gis.name,
+                created_by=gis.created_by,
+                enabled=gis.enabled,
+                success=1,
+                failures="[]",
+            )
             failures = []
             global_init_script = base64.b64decode(self._ws.global_init_scripts.get(gis.script_id).script).decode(
                 "utf-8"
@@ -283,30 +305,59 @@ class AzureServicePrincipalCrawler(CrawlerBase):
         return relevant_service_principals
 
     def _list_all_jobs_with_spn_in_spark_conf(self) -> list:
-        azure_spn_list_with_data_access_from_jobs = []
+        azure_spn_list = []
         all_jobs = list(self._ws.jobs.list(expand_tasks=True))
         all_clusters_by_id = {c.cluster_id: c for c in self._ws.clusters.list()}
+
         for _job, cluster_config in self._get_cluster_configs_from_all_jobs(all_jobs, all_clusters_by_id):
-            if cluster_config.spark_conf:
-                if _azure_sp_conf_present_check(cluster_config.spark_conf):
-                    temp_list = self._get_azure_spn_list(cluster_config.spark_conf)
+            azure_spn_list += self._get_azure_spn_with_data_access(cluster_config)
+
+        return azure_spn_list
+
+    def _list_all_cluster_with_spn_in_spark_conf(self) -> list:
+        azure_spn_list = []
+
+        for cluster_config in self._ws.clusters.list():
+            if cluster_config.cluster_source != ClusterSource.JOB:
+                azure_spn_list += self._get_azure_spn_with_data_access(cluster_config)
+
+        return azure_spn_list
+
+    def _get_azure_spn_with_data_access(self, cluster_config):
+        azure_spn_list = []
+
+        if cluster_config.spark_conf:
+            if _azure_sp_conf_present_check(cluster_config.spark_conf):
+                temp_list = self._get_azure_spn_list(cluster_config.spark_conf)
+                if temp_list:
+                    azure_spn_list += temp_list
+
+        if cluster_config.policy_id:
+            policy = self._safe_get_cluster_policy(cluster_config.policy_id)
+
+            if policy is None:
+                return azure_spn_list
+
+            if policy.definition:
+                if _azure_sp_conf_present_check(json.loads(policy.definition)):
+                    temp_list = self._get_azure_spn_list(json.loads(policy.definition))
                     if temp_list:
-                        azure_spn_list_with_data_access_from_jobs += temp_list
+                        azure_spn_list += temp_list
 
-            if cluster_config.policy_id:
-                policy = self._ws.cluster_policies.get(cluster_config.policy_id)
-                if policy.definition:
-                    if _azure_sp_conf_present_check(json.loads(policy.definition)):
-                        temp_list = self._get_azure_spn_list(json.loads(policy.definition))
-                        if temp_list:
-                            azure_spn_list_with_data_access_from_jobs += temp_list
+            if policy.policy_family_definition_overrides:
+                if _azure_sp_conf_present_check(json.loads(policy.policy_family_definition_overrides)):
+                    temp_list = self._get_azure_spn_list(json.loads(policy.policy_family_definition_overrides))
+                    if temp_list:
+                        azure_spn_list += temp_list
 
-                if policy.policy_family_definition_overrides:
-                    if _azure_sp_conf_present_check(json.loads(policy.policy_family_definition_overrides)):
-                        temp_list = self._get_azure_spn_list(json.loads(policy.policy_family_definition_overrides))
-                        if temp_list:
-                            azure_spn_list_with_data_access_from_jobs += temp_list
-        return azure_spn_list_with_data_access_from_jobs
+        return azure_spn_list
+
+    def _safe_get_cluster_policy(self, policy_id: str) -> Policy | None:
+        try:
+            return self._ws.cluster_policies.get(policy_id)
+        except NotFound:
+            logger.warning(f"The cluster policy was deleted: {policy_id}")
+            return None
 
     def _list_all_spn_in_sql_warehouses_spark_conf(self) -> list:
         warehouse_config_list = self._ws.warehouses.get_workspace_warehouse_config().data_access_config
@@ -328,31 +379,6 @@ class AzureServicePrincipalCrawler(CrawlerBase):
                 if temp_list:
                     azure_spn_list_with_data_access_from_pipeline += temp_list
         return azure_spn_list_with_data_access_from_pipeline
-
-    def _list_all_cluster_with_spn_in_spark_conf(self) -> list:
-        azure_spn_list_with_data_access_from_cluster = []
-        for cluster in self._ws.clusters.list():
-            if cluster.cluster_source != ClusterSource.JOB:
-                if cluster.spark_conf:
-                    if _azure_sp_conf_present_check(cluster.spark_conf):
-                        temp_list = self._get_azure_spn_list(cluster.spark_conf)
-                        if temp_list:
-                            azure_spn_list_with_data_access_from_cluster += temp_list
-
-                if cluster.policy_id:
-                    policy = self._ws.cluster_policies.get(cluster.policy_id)
-                    if policy.definition:
-                        if _azure_sp_conf_present_check(json.loads(policy.definition)):
-                            temp_list = self._get_azure_spn_list(json.loads(policy.definition))
-                            if temp_list:
-                                azure_spn_list_with_data_access_from_cluster += temp_list
-
-                    if policy.policy_family_definition_overrides:
-                        if _azure_sp_conf_present_check(json.loads(policy.policy_family_definition_overrides)):
-                            temp_list = self._get_azure_spn_list(json.loads(policy.policy_family_definition_overrides))
-                            if temp_list:
-                                azure_spn_list_with_data_access_from_cluster += temp_list
-        return azure_spn_list_with_data_access_from_cluster
 
     def _assess_service_principals(self, relevant_service_principals: list):
         for spn in relevant_service_principals:
@@ -384,7 +410,19 @@ class PipelinesCrawler(CrawlerBase):
 
     def _assess_pipelines(self, all_pipelines):
         for pipeline in all_pipelines:
-            pipeline_info = PipelineInfo(pipeline.pipeline_id, pipeline.name, pipeline.creator_user_name, 1, "")
+            if not pipeline.creator_user_name:
+                logger.warning(
+                    f"Pipeline {pipeline.name} have Unknown creator, it means that the original creator "
+                    f"has been deleted and should be re-created"
+                )
+            pipeline_info = PipelineInfo(
+                pipeline_id=pipeline.pipeline_id,
+                pipeline_name=pipeline.name,
+                creator_name=pipeline.creator_user_name,
+                success=1,
+                failures="[]",
+            )
+
             failures = []
             pipeline_config = self._ws.pipelines.get(pipeline.pipeline_id).spec.configuration
             if pipeline_config:
@@ -417,7 +455,18 @@ class ClustersCrawler(CrawlerBase):
         for cluster in all_clusters:
             if cluster.cluster_source == ClusterSource.JOB:
                 continue
-            cluster_info = ClusterInfo(cluster.cluster_id, cluster.cluster_name, cluster.creator_user_name, 1, "")
+            if not cluster.creator_user_name:
+                logger.warning(
+                    f"Cluster {cluster.cluster_id} have Unknown creator, it means that the original creator "
+                    f"has been deleted and should be re-created"
+                )
+            cluster_info = ClusterInfo(
+                cluster_id=cluster.cluster_id,
+                cluster_name=cluster.cluster_name,
+                creator=cluster.creator_user_name,
+                success=1,
+                failures="[]",
+            )
             support_status = spark_version_compatibility(cluster.spark_version)
             failures = []
             if support_status != "supported":
@@ -438,16 +487,15 @@ class ClustersCrawler(CrawlerBase):
 
             # Checking if Azure cluster config is present in cluster policies
             if cluster.policy_id:
-                try:
-                    policy = self._ws.cluster_policies.get(cluster.policy_id)
+                policy = self._safe_get_cluster_policy(cluster.policy_id)
+
+                if policy is not None:
                     if policy.definition:
                         if _azure_sp_conf_present_check(json.loads(policy.definition)):
                             failures.append(f"{_AZURE_SP_CONF_FAILURE_MSG} cluster.")
                     if policy.policy_family_definition_overrides:
                         if _azure_sp_conf_present_check(json.loads(policy.policy_family_definition_overrides)):
                             failures.append(f"{_AZURE_SP_CONF_FAILURE_MSG} cluster.")
-                except DatabricksError as err:
-                    logger.warning(f"Error retrieving cluster policy {cluster.policy_id}. Error: {err}")
 
             if cluster.init_scripts:
                 for init_script_info in cluster.init_scripts:
@@ -462,6 +510,13 @@ class ClustersCrawler(CrawlerBase):
             if len(failures) > 0:
                 cluster_info.success = 0
             yield cluster_info
+
+    def _safe_get_cluster_policy(self, policy_id: str) -> Policy | None:
+        try:
+            return self._ws.cluster_policies.get(policy_id)
+        except NotFound:
+            logger.warning(f"The cluster policy was deleted: {policy_id}")
+            return None
 
     def snapshot(self) -> list[ClusterInfo]:
         return self._snapshot(self._try_fetch, self._crawl)
@@ -505,7 +560,19 @@ class JobsCrawler(CrawlerBase):
         job_details = {}
         for job in all_jobs:
             job_assessment[job.job_id] = set()
-            job_details[job.job_id] = JobInfo(str(job.job_id), job.settings.name, job.creator_user_name, 1, "")
+            if not job.creator_user_name:
+                logger.warning(
+                    f"Job {job.job_id} have Unknown creator, it means that the original creator has been deleted "
+                    f"and should be re-created"
+                )
+
+            job_details[job.job_id] = JobInfo(
+                job_id=str(job.job_id),
+                job_name=job.settings.name,
+                creator=job.creator_user_name,
+                success=1,
+                failures="[]",
+            )
 
         for job, cluster_config in self._get_cluster_configs_from_all_jobs(all_jobs, all_clusters_by_id):
             support_status = spark_version_compatibility(cluster_config.spark_version)
@@ -527,16 +594,15 @@ class JobsCrawler(CrawlerBase):
 
             # Checking if Azure cluster config is present in cluster policies
             if cluster_config.policy_id:
-                try:
-                    policy = self._ws.cluster_policies.get(cluster_config.policy_id)
+                policy = self._safe_get_cluster_policy(cluster_config.policy_id)
+
+                if policy is not None:
                     if policy.definition:
                         if _azure_sp_conf_present_check(json.loads(policy.definition)):
                             job_assessment[job.job_id].add(f"{_AZURE_SP_CONF_FAILURE_MSG} Job cluster.")
                     if policy.policy_family_definition_overrides:
                         if _azure_sp_conf_present_check(json.loads(policy.policy_family_definition_overrides)):
                             job_assessment[job.job_id].add(f"{_AZURE_SP_CONF_FAILURE_MSG} Job cluster.")
-                except DatabricksError as err:
-                    logger.warning(f"Error retrieving cluster policy {cluster_config.policy_id}. Error: {err}")
 
             if cluster_config.init_scripts:
                 for init_script_info in cluster_config.init_scripts:
@@ -552,6 +618,13 @@ class JobsCrawler(CrawlerBase):
             if len(job_assessment[job_key]) > 0:
                 job_details[job_key].success = 0
         return list(job_details.values())
+
+    def _safe_get_cluster_policy(self, policy_id: str) -> Policy | None:
+        try:
+            return self._ws.cluster_policies.get(policy_id)
+        except NotFound:
+            logger.warning(f"The cluster policy was deleted: {policy_id}")
+            return None
 
     def snapshot(self) -> list[JobInfo]:
         return self._snapshot(self._try_fetch, self._crawl)

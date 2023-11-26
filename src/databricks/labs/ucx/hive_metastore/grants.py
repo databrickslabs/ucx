@@ -1,6 +1,5 @@
 import logging
 from collections import defaultdict
-from collections.abc import Iterator
 from dataclasses import dataclass
 from functools import partial
 
@@ -76,7 +75,10 @@ class Grant:
     def hive_grant_sql(self) -> str:
         object_type, object_key = self.this_type_and_key()
         # See https://docs.databricks.com/en/sql/language-manual/security-grant.html
-        return f"GRANT {self.action_type} ON {object_type} {object_key} TO `{self.principal}`"
+        if self.action_type.upper() == "OWN":
+            return f"ALTER {object_key} OWNER TO `{self.principal}`"
+        else:
+            return f"GRANT {self.action_type} ON {object_type} {object_key} TO `{self.principal}`"
 
     def hive_revoke_sql(self) -> str:
         object_type, object_key = self.this_type_and_key()
@@ -158,18 +160,15 @@ class GrantsCrawler(CrawlerBase):
         Returns:
         list[Grant]: A list of Grant objects representing the grants found in hive_metastore.
         """
-        seen_databases = set()
         catalog = "hive_metastore"
         tasks = [partial(self._grants, catalog=catalog)]
+        # scan all databases, even empty ones
+        for row in self._fetch(f"SHOW DATABASES FROM {catalog}"):
+            tasks.append(partial(self._grants, catalog=catalog, database=row.databaseName))
         for table in self._tc.snapshot():
-            if table.database not in seen_databases:
-                tasks.append(partial(self._grants, catalog=catalog, database=table.database))
-                seen_databases.add(table.database)
             fn = partial(self._grants, catalog=catalog, database=table.database)
-            if table.kind == "VIEW":
-                tasks.append(partial(fn, view=table.name))
-            else:
-                tasks.append(partial(fn, table=table.name))
+            # views are recognized as tables
+            tasks.append(partial(fn, table=table.name))
         catalog_grants, errors = Threads.gather(f"listing grants for {catalog}", tasks)
         if len(errors) > 0:
             # TODO: https://github.com/databrickslabs/ucx/issues/406
@@ -198,7 +197,7 @@ class GrantsCrawler(CrawlerBase):
         view: str | None = None,
         any_file: bool = False,
         anonymous_function: bool = False,
-    ) -> Iterator[Grant]:
+    ) -> list[Grant]:
         """
         Fetches and yields grant information for the specified database objects.
 
@@ -239,6 +238,7 @@ class GrantsCrawler(CrawlerBase):
             anonymous_function=anonymous_function,
         )
         try:
+            grants = []
             object_type_normalization = {"SCHEMA": "DATABASE", "CATALOG$": "CATALOG"}
             for row in self._fetch(f"SHOW GRANTS ON {on_type} {key}"):
                 (principal, action_type, object_type, _) = row
@@ -246,7 +246,9 @@ class GrantsCrawler(CrawlerBase):
                     object_type = object_type_normalization[object_type]
                 if on_type != object_type:
                     continue
-                yield Grant(
+                # we have to return concrete list, as with yield we're executing
+                # everything on the main thread.
+                grant = Grant(
                     principal=principal,
                     action_type=action_type,
                     table=table,
@@ -256,6 +258,8 @@ class GrantsCrawler(CrawlerBase):
                     any_file=any_file,
                     anonymous_function=anonymous_function,
                 )
+                grants.append(grant)
+            return grants
         except Exception as e:
             # TODO: https://github.com/databrickslabs/ucx/issues/406
             logger.error(f"Couldn't fetch grants for object {on_type} {key}: {e}")
