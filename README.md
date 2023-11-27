@@ -54,6 +54,7 @@ export DATABRICKS_CONFIG_PROFILE=ABC
 ./install.sh
 ```
 
+
 You can also specify environment variables in a more direct way, like in this example for installing 
 on an Azure Databricks Workspace using the Azure CLI authentication:
 
