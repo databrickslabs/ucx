@@ -125,13 +125,23 @@ def spark_version_compatibility(spark_version: str) -> str:
     first_comp_custom_x = 2
     dbr_version_components = spark_version.split("-")
     first_components = dbr_version_components[0].split(".")
+    if "custom" in spark_version:
+        # custom runtime
+        return "unsupported"
+    if "dlt" in spark_version:
+        # shouldn't hit this? Does show up in cluster list
+        return "dlt"
     if len(first_components) != first_comp_custom_rt:
         # custom runtime
         return "unsupported"
     if first_components[first_comp_custom_x] != "x":
         # custom runtime
         return "unsupported"
-    version = int(first_components[0]), int(first_components[1])
+
+    try:
+        version = int(first_components[0]), int(first_components[1])
+    except ValueError:
+        version = 0, 0
     if version < (10, 0):
         return "unsupported"
     if (10, 0) <= version < (11, 3):

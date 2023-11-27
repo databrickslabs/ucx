@@ -4,7 +4,7 @@ clean:
 	rm -fr .venv clean htmlcov .mypy_cache .pytest_cache .ruff_cache .coverage coverage.xml
 
 .venv/bin/python:
-	pip install hatch
+	if ! command -v hatch &> /dev/null; then pip install hatch ; fi
 	hatch env create
 
 dev: .venv/bin/python

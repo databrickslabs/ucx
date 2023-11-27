@@ -1,5 +1,12 @@
 # Version changelog
 
+## 0.6.1
+
+ * Added a logo for UCX ([#605](https://github.com/databricks/ucx/pull/605)).
+ * Check if the `hatch` is already installed, and install only if it isn't installed yet ([#603](https://github.com/databricks/ucx/pull/603)).
+ * Fixed installation check for git pre-release versions ([#600](https://github.com/databricks/ucx/pull/600)).
+ * Temporarily remove SQL warehouse requirement from `labs.yml` ([#604](https://github.com/databricks/ucx/pull/604)).
+
 ## 0.6.0
 
 **Breaking changes** (existing installations need to reinstall UCX and re-run assessment jobs)

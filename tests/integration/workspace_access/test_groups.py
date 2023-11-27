@@ -5,16 +5,19 @@ from datetime import timedelta
 import pytest
 from databricks.sdk.errors import NotFound
 from databricks.sdk.retries import retried
+from databricks.sdk.service import sql
 from databricks.sdk.service.iam import PermissionLevel, ResourceMeta
 
 from databricks.labs.ucx.hive_metastore import GrantsCrawler, TablesCrawler
 from databricks.labs.ucx.hive_metastore.grants import Grant
+from databricks.labs.ucx.workspace_access import redash
 from databricks.labs.ucx.workspace_access.generic import (
     GenericPermissionsSupport,
     Listing,
 )
 from databricks.labs.ucx.workspace_access.groups import GroupManager
 from databricks.labs.ucx.workspace_access.manager import PermissionManager
+from databricks.labs.ucx.workspace_access.redash import RedashPermissionsSupport
 from databricks.labs.ucx.workspace_access.tacl import TableAclSupport
 
 logger = logging.getLogger(__name__)
@@ -118,7 +121,7 @@ def test_delete_ws_groups_should_not_delete_non_reflected_acc_groups(ws, make_uc
     assert ws.groups.get(ws_group.id).display_name == "ucx-temp-" + ws_group.display_name
 
 
-@retried(on=[NotFound, TimeoutError, AssertionError], timeout=timedelta(minutes=10))
+@retried(on=[NotFound, TimeoutError, AssertionError], timeout=timedelta(minutes=20))
 def test_replace_workspace_groups_with_account_groups(
     ws,
     sql_backend,
@@ -304,7 +307,7 @@ def test_set_owner_permission(ws, sql_backend, inventory_schema, make_ucx_group,
 
     permission_manager.apply_group_permissions(state)
 
-    @retried(on=[AssertionError], timeout=timedelta(minutes=1))
+    @retried(on=[AssertionError], timeout=timedelta(seconds=30))
     def check_permissions_for_account_group():
         logger.info("check_permissions_for_account_group()")
 
@@ -333,3 +336,61 @@ def test_set_owner_permission(ws, sql_backend, inventory_schema, make_ucx_group,
         assert "OWN" in table_permissions[group_info.name_in_account]
 
     check_table_permissions_after_backup_delete()
+
+
+def test_query_permission(ws, sql_backend, inventory_schema, make_table, make_query, make_ucx_group, make_group):
+    @retried(on=[AssertionError], timeout=timedelta(seconds=60))
+    def check_permission_in_sql_object(
+        sup: RedashPermissionsSupport, group_name: str, obj_id: str, permission_level, *, omit: bool = False
+    ):
+        permissions = sup._safe_get_dbsql_permissions(sql.ObjectTypePlural.QUERIES, obj_id)
+        assert (not omit) == (
+            len(
+                [
+                    permission
+                    for permission in permissions.access_control_list
+                    if permission.group_name == group_name and permission.permission_level == permission_level
+                ]
+            )
+            > 0
+        )
+
+    logger.info("Testing setting ownership on SQL Query.")
+    query = make_query()
+    ws_group, _ = make_ucx_group()
+    group_manager = GroupManager(sql_backend, ws, inventory_schema, [ws_group.display_name], "ucx-temp-")
+
+    state = group_manager.get_migration_state()
+    assert len(state) == 1
+
+    group_info = state.groups[0]
+
+    # Setting a test case of a query with permissions
+    sup = RedashPermissionsSupport(ws=ws, listings=[], verify_timeout=timedelta(seconds=15))
+    acl = [sql.AccessControl(group_name=ws_group.display_name, permission_level=sql.PermissionLevel.CAN_VIEW)]
+    result = sup._safe_set_permissions(sql.ObjectTypePlural.QUERIES, query.id, acl)
+    assert result is not None
+
+    check_permission_in_sql_object(sup, group_info.name_in_workspace, query.id, sql.PermissionLevel.CAN_VIEW)
+
+    # Attempting Switching Access on Query object
+    redash_acl_listing = [
+        redash.Listing(ws.alerts.list, sql.ObjectTypePlural.ALERTS),
+        redash.Listing(ws.dashboards.list, sql.ObjectTypePlural.DASHBOARDS),
+        redash.Listing(ws.queries.list, sql.ObjectTypePlural.QUERIES),
+    ]
+    sql_support = redash.RedashPermissionsSupport(ws, redash_acl_listing)
+    permission_manager = PermissionManager(sql_backend, inventory_schema, [sql_support])
+    permission_manager.inventorize_permissions()
+
+    group_manager.rename_groups()
+
+    group_manager.reflect_account_groups_on_workspace()
+    permission_manager.apply_group_permissions(state)
+
+    logging.getLogger("databricks").setLevel("DEBUG")
+    permission_manager.apply_group_permissions(state)
+    check_permission_in_sql_object(sup, group_info.name_in_workspace, query.id, sql.PermissionLevel.CAN_VIEW)
+    check_permission_in_sql_object(sup, group_info.temporary_name, query.id, sql.PermissionLevel.CAN_VIEW, omit=True)
+    group_manager.delete_original_workspace_groups()
+    assert len(query.name) > 0

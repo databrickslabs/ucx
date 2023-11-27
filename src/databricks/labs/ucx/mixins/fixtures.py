@@ -16,7 +16,11 @@ from databricks.sdk import AccountClient, WorkspaceClient
 from databricks.sdk.core import DatabricksError
 from databricks.sdk.service import compute, iam, jobs, pipelines, sql, workspace
 from databricks.sdk.service.catalog import CatalogInfo, SchemaInfo, TableInfo
-from databricks.sdk.service.sql import CreateWarehouseRequestWarehouseType
+from databricks.sdk.service.sql import (
+    CreateWarehouseRequestWarehouseType,
+    Query,
+    QueryInfo,
+)
 from databricks.sdk.service.workspace import ImportFormat
 
 from databricks.labs.ucx.framework.crawlers import StatementExecutionBackend
@@ -840,19 +844,29 @@ def make_table(ws, sql_backend, make_schema, make_random) -> Callable[..., Table
 
 
 @pytest.fixture
-def make_query(ws, sql_backend, make_random):
-    def create(*, name: str | None = None):
-        if name is None:
-            name = f"ucx_T{make_random(4)}"
+def make_query(ws, make_table, make_random):
+    def create(*, query_name: str | None = None, query: str | None = None) -> QueryInfo:
+        if query_name is None:
+            query_name = f"ucx_query_Q{make_random(4)}"
+        if query is None:
+            table = make_table()
+            query = f"SELECT * FROM {table.schema_name}.{table.name}"
 
-        return ws.queries.create(name=name, query="SHOW TABLES")
+        dbsql_query = ws.queries.create(
+            name=f"{query_name}",
+            description="TEST QUERY FOR UCX",
+            query=query,
+        )
+        logger.info(f"Query Created {query_name}: {ws.config.host}/sql/editor/{dbsql_query.id}")
+        return dbsql_query
 
-    yield from factory(
-        "query",
-        create,
-        lambda query: ws.queries.delete(query.id),
-    )
+    def remove(query: Query):
+        try:
+            ws.queries.delete(query_id=query.id)
+        except RuntimeError as e:
+            logger.info(f"Can't drop query {e}")
 
+    yield from factory("query", create, remove)
 
 @pytest.fixture
 def make_alert(ws, sql_backend, make_random):

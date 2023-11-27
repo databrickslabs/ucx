@@ -240,8 +240,12 @@ class WorkspaceInstaller:
                     continue
                 run_output = self._ws.jobs.get_run_output(run_task.run_id)
                 if logger.isEnabledFor(logging.DEBUG):
-                    sys.stderr.write(run_output.error_trace)
-                messages.append(f"{run_task.task_key}: {run_output.error}")
+                    if run_output and run_output.error_trace:
+                        sys.stderr.write(run_output.error_trace)
+                if run_output and run_output.error:
+                    messages.append(f"{run_task.task_key}: {run_output.error}")
+                else:
+                    messages.append(f"{run_task.task_key}: output unavailable")
             msg = f'{job_run.state.state_message.rstrip(".")}: {", ".join(messages)}'
             raise OperationFailed(msg) from None
 
@@ -701,7 +705,6 @@ class WorkspaceInstaller:
                 notebook_path=remote_notebook,
                 # ES-872211: currently, we cannot read WSFS files from Scala context
                 base_parameters={
-                    "inventory_database": self._current_config.inventory_database,
                     "task": task.name,
                     "config": f"/Workspace{self.config_file}",
                 }
@@ -890,14 +893,18 @@ class WorkspaceInstaller:
     def latest_job_status(self) -> list[dict]:
         latest_status = []
         for step, job_id in self._state.jobs.items():
-            job_runs = list(self._ws.jobs.list_runs(job_id=job_id, limit=1))
-            latest_status.append(
-                {
-                    "step": step,
-                    "state": "UNKNOWN" if not job_runs else str(job_runs[0].state.result_state),
-                    "started": "" if not job_runs else job_runs[0].start_time,
-                }
-            )
+            try:
+                job_runs = list(self._ws.jobs.list_runs(job_id=job_id, limit=1))
+                latest_status.append(
+                    {
+                        "step": step,
+                        "state": "UNKNOWN" if not job_runs else str(job_runs[0].state.result_state),
+                        "started": "<never run>" if not job_runs else job_runs[0].start_time,
+                    }
+                )
+            except InvalidParameterValue as e:
+                logger.warning(f"skipping {step}: {e}")
+                continue
         return latest_status
 
 
