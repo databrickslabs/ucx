@@ -452,7 +452,8 @@ class WorkspaceInstaller:
                 self._state.jobs[step] = job_id
         logger.debug(f"Creating jobs from tasks in {main.__name__}")
         remote_wheel = self._upload_wheel()
-        desired_steps = {t.workflow for t in _TASKS.values()}
+        desired_steps = {t.workflow for t in _TASKS.values() if t.cloud_compatible(self._ws.config)}
+
         wheel_runner = None
 
         if self._override_clusters:
