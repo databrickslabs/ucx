@@ -277,4 +277,5 @@ Coverage HTML written to dir htmlcov
 $ 
 ```
 
+
 Note: The initial `hatch env show` is just to list the environments managed by Hatch and is not needed.
