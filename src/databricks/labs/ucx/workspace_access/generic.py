@@ -15,12 +15,8 @@ from databricks.sdk.service.iam import PermissionLevel
 
 from databricks.labs.ucx.framework.crawlers import CrawlerBase, SqlBackend
 from databricks.labs.ucx.mixins.hardening import rate_limited
-from databricks.labs.ucx.workspace_access.base import (
-    AclSupport,
-    Destination,
-    Permissions,
-)
-from databricks.labs.ucx.workspace_access.groups import GroupMigrationState
+from databricks.labs.ucx.workspace_access.base import AclSupport, Permissions
+from databricks.labs.ucx.workspace_access.groups import MigrationState
 
 logger = logging.getLogger(__name__)
 
@@ -33,9 +29,9 @@ class GenericPermissionsInfo:
 
 @dataclass
 class WorkspaceObjectInfo:
-    object_type: str
-    object_id: str
     path: str
+    object_type: str = None
+    object_id: str = None
     language: str = None
 
 
@@ -81,15 +77,15 @@ class GenericPermissionsSupport(AclSupport):
                 all_object_types.add(object_type)
         return all_object_types
 
-    def get_apply_task(self, item: Permissions, migration_state: GroupMigrationState, destination: Destination):
+    def get_apply_task(self, item: Permissions, migration_state: MigrationState):
         if not self._is_item_relevant(item, migration_state):
             return None
         object_permissions = iam.ObjectPermissions.from_dict(json.loads(item.raw))
-        new_acl = self._prepare_new_acl(object_permissions, migration_state, destination)
+        new_acl = self._prepare_new_acl(object_permissions, migration_state)
         return partial(self._applier_task, item.object_type, item.object_id, new_acl)
 
     @staticmethod
-    def _is_item_relevant(item: Permissions, migration_state: GroupMigrationState) -> bool:
+    def _is_item_relevant(item: Permissions, migration_state: MigrationState) -> bool:
         # passwords and tokens are represented on the workspace-level
         if item.object_id in ("tokens", "passwords"):
             return True
@@ -239,7 +235,7 @@ class GenericPermissionsSupport(AclSupport):
                 raise RetryableError(message=msg) from e
 
     def _prepare_new_acl(
-        self, permissions: iam.ObjectPermissions, migration_state: GroupMigrationState, destination: Destination
+        self, permissions: iam.ObjectPermissions, migration_state: MigrationState
     ) -> list[iam.AccessControlRequest]:
         _acl = permissions.access_control_list
         acl_requests = []
@@ -248,7 +244,7 @@ class GenericPermissionsSupport(AclSupport):
             if not migration_state.is_in_scope(_item.group_name):
                 logger.debug(f"Skipping {_item} for {coord} because it is not in scope")
                 continue
-            new_group_name = migration_state.get_target_principal(_item.group_name, destination)
+            new_group_name = migration_state.get_target_principal(_item.group_name)
             if new_group_name is None:
                 logger.debug(f"Skipping {_item.group_name} for {coord} because it has no target principal")
                 continue
@@ -299,9 +295,9 @@ class WorkspaceListing(Listing, CrawlerBase):
                 continue
             raw = obj.as_dict()
             yield WorkspaceObjectInfo(
-                object_type=raw["object_type"],
-                object_id=str(raw["object_id"]),
-                path=raw["path"],
+                object_type=raw.get("object_type", None),
+                object_id=str(raw.get("object_id", None)),
+                path=raw.get("path", None),
                 language=raw.get("language", None),
             )
 
@@ -310,7 +306,9 @@ class WorkspaceListing(Listing, CrawlerBase):
 
     def _try_fetch(self) -> list[WorkspaceObjectInfo]:
         for row in self._fetch(f"SELECT * FROM {self._schema}.{self._table}"):
-            yield WorkspaceObjectInfo(*row)
+            yield WorkspaceObjectInfo(
+                path=row["path"], object_type=row["object_type"], object_id=row["object_id"], language=row["language"]
+            )
 
     def object_types(self) -> set[str]:
         return {"notebooks", "directories", "repos", "files"}

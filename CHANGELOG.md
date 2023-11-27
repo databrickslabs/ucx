@@ -1,5 +1,54 @@
 # Version changelog
 
+## 0.6.1
+
+ * Added a logo for UCX ([#605](https://github.com/databricks/ucx/pull/605)).
+ * Check if the `hatch` is already installed, and install only if it isn't installed yet ([#603](https://github.com/databricks/ucx/pull/603)).
+ * Fixed installation check for git pre-release versions ([#600](https://github.com/databricks/ucx/pull/600)).
+ * Temporarily remove SQL warehouse requirement from `labs.yml` ([#604](https://github.com/databricks/ucx/pull/604)).
+
+## 0.6.0
+
+**Breaking changes** (existing installations need to reinstall UCX and re-run assessment jobs)
+
+ * Switched local group migration component to rename groups instead of creating backup groups ([#450](https://github.com/databricks/ucx/pull/450)).
+ * Mitigate permissions loss in Table ACLs by folding grants belonging to the same principal, object id and object type together ([#512](https://github.com/databricks/ucx/pull/512)).
+
+**New features**
+
+ * Added support for the experimental Databricks CLI launcher ([#517](https://github.com/databricks/ucx/pull/517)).
+ * Added support for external Hive Metastores including AWS Glue ([#400](https://github.com/databricks/ucx/pull/400)).
+ * Added more views to assessment dashboard ([#474](https://github.com/databricks/ucx/pull/474)).
+ * Added rate limit for creating backup group to increase stability ([#500](https://github.com/databricks/ucx/pull/500)).
+ * Added deduplication for mount point list ([#569](https://github.com/databricks/ucx/pull/569)).
+ * Added documentation to describe interaction with external Hive Metastores ([#473](https://github.com/databricks/ucx/pull/473)).
+ * Added failure injection for job failure message propagation  ([#591](https://github.com/databricks/ucx/pull/591)).
+ * Added uniqueness in the new warehouse name to avoid conflicts on installation ([#542](https://github.com/databricks/ucx/pull/542)).
+ * Added a global init script to collect Hive Metastore lineage ([#513](https://github.com/databricks/ucx/pull/513)).
+ * Added retry set/update permissions when possible and assess the changes in the workspace ([#519](https://github.com/databricks/ucx/pull/519)).
+ * Use `~/.ucx/state.json` to store the state of both dashboards and jobs ([#561](https://github.com/databricks/ucx/pull/561)).
+
+**Bug fixes**
+
+ * Fixed handling for `OWN` table permissions ([#571](https://github.com/databricks/ucx/pull/571)).
+ * Fixed handling of keys with and without values. ([#514](https://github.com/databricks/ucx/pull/514)).
+ * Fixed integration test failures related to concurrent group delete ([#584](https://github.com/databricks/ucx/pull/584)).
+ * Fixed issue with workspace listing process on None type `object_type` ([#481](https://github.com/databricks/ucx/pull/481)).
+ * Fixed missing group entitlement migration bug ([#583](https://github.com/databricks/ucx/pull/583)).
+ * Fixed entitlement application for account-level groups ([#529](https://github.com/databricks/ucx/pull/529)).
+ * Fixed assessment throwing an error when the owner of an object is empty ([#485](https://github.com/databricks/ucx/pull/485)).
+ * Fixed installer to migrate between different configuration file versions ([#596](https://github.com/databricks/ucx/pull/596)).
+ * Fixed cluster policy crawler to be aware of deleted policies ([#486](https://github.com/databricks/ucx/pull/486)).
+ * Improved error message for not null constraints violated ([#532](https://github.com/databricks/ucx/pull/532)).
+ * Improved integration test resiliency ([#597](https://github.com/databricks/ucx/pull/597), [#594](https://github.com/databricks/ucx/pull/594), [#586](https://github.com/databricks/ucx/pull/586)).
+ * Introduced Safer access to workspace objects' properties. ([#530](https://github.com/databricks/ucx/pull/530)).
+ * Mitigated permissions loss in Table ACLs by running appliers with single thread ([#518](https://github.com/databricks/ucx/pull/518)).
+ * Running apply permission task before assessment should display message ([#487](https://github.com/databricks/ucx/pull/487)).
+ * Split integration tests from blocking the merge queue ([#496](https://github.com/databricks/ucx/pull/496)).
+ * Support more than one dashboard per step ([#472](https://github.com/databricks/ucx/pull/472)).
+ * Update databricks-sdk requirement from ~=0.11.0 to ~=0.12.0 ([#505](https://github.com/databricks/ucx/pull/505)).
+ * Update databricks-sdk requirement from ~=0.12.0 to ~=0.13.0 ([#575](https://github.com/databricks/ucx/pull/575)).
+
 ## 0.5.0
 
 * Added `make install-dev` and a stronger `make clean` for easier dev on-boarding and release upgrades ([#458](https://github.com/databricks/ucx/pull/458)).

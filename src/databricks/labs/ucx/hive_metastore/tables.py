@@ -73,6 +73,14 @@ class Table:
         )
 
 
+@dataclass
+class TableError:
+    catalog: str
+    database: str
+    name: str = None
+    error: str = None
+
+
 class TablesCrawler(CrawlerBase):
     def __init__(self, backend: SqlBackend, schema):
         """

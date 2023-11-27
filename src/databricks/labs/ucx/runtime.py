@@ -18,136 +18,13 @@ from databricks.labs.ucx.hive_metastore import GrantsCrawler, TablesCrawler
 from databricks.labs.ucx.hive_metastore.data_objects import ExternalLocationCrawler
 from databricks.labs.ucx.hive_metastore.mounts import Mounts
 from databricks.labs.ucx.workspace_access.generic import WorkspaceListing
-from databricks.labs.ucx.workspace_access.groups import (
-    GroupManager,
-    GroupMigrationState,
-)
+from databricks.labs.ucx.workspace_access.groups import GroupManager
 from databricks.labs.ucx.workspace_access.manager import PermissionManager
 
 logger = logging.getLogger(__name__)
 
 
-def _get_view_definition() -> str:
-    return """CREATE
-OR REPLACE VIEW $inventory.failure_details AS WITH failuretab (object_type, object_id, failures) AS (
-  SELECT
-    object_type,
-    object_id,
-    failures
-  FROM
-    (
-      SELECT
-        "jobs" AS object_type,
-        job_id AS object_id,
-        failures
-      FROM
-        $inventory.jobs
-      WHERE
-        failures IS NOT NULL
-        AND failures != '[]'
-      UNION ALL
-      SELECT
-        "clusters" AS object_type,
-        cluster_id AS object_id,
-        failures
-      FROM
-        $inventory.clusters
-      WHERE
-        failures IS NOT NULL
-        AND failures != '[]'
-      UNION ALL
-      SELECT
-        "global init scripts" AS object_type,
-        script_id AS object_id,
-        failures
-      FROM
-        $inventory.global_init_scripts
-      WHERE
-        failures IS NOT NULL
-        AND failures != '[]'
-      UNION ALL
-      SELECT
-        "pipelines" AS object_type,
-        pipeline_id AS object_id,
-        failures
-      FROM
-        $inventory.pipelines
-      WHERE
-        failures IS NOT NULL
-        AND failures != '[]'
-      UNION ALL
-      SELECT
-        object_type,
-        object_id,
-        failures
-      FROM
-        (
-          SELECT
-            "Table" as object_type,
-            CONCAT(catalog, '.', database, '.', name) AS object_id,
-            TO_JSON(
-              ARRAY(
-                CASE
-                  WHEN STARTSWITH(location, "wasb") THEN "Unsupported Storage Type"
-                  WHEN STARTSWITH(location, "adl") THEN "Unsupported Storage Type"
-                  WHEN STARTSWITH(location, "dbfs:/mnt") THEN "DBFS Mount"
-                  WHEN STARTSWITH(location, "/dbfs/mnt") THEN "DBFS Mount"
-                  WHEN STARTSWITH(location, "dbfs:/") THEN "DBFS Root"
-                  WHEN STARTSWITH(location, "/dbfs/") THEN "DBFS Root"
-                  ELSE NULL
-                END,
-                IF(table_format != "delta", "Non Delta", NULL)
-              )
-            ) AS failures
-          FROM
-            $inventory.tables
-          WHERE
-            object_type IN ("MANAGED", "EXTERNAL")
-        )
-      WHERE
-        failures != '[null,null]'
-      UNION ALL
-      SELECT
-        CASE
-          WHEN instr(error, "ignoring database") > 0 THEN "Database"
-          WHEN instr(error, "ignoring table") > 0 THEN "Table"
-        END AS object_type,
-        CASE
-          WHEN instr(error, "ignoring database") > 0 THEN concat(catalog, '.', database)
-          WHEN instr(error, "ignoring table") > 0 THEN concat(catalog, '.', database, '.', name)
-        END AS object_id,
-        TO_JSON(ARRAY(error)) AS failures
-      FROM
-        $inventory.table_failures
-      WHERE
-        error IS NOT NULL
-        AND error != ""
-    )
-)
-SELECT
-  object_type,
-  object_id,
-  failures
-FROM
-  failuretab
-WHERE
-  failures IS NOT NULL
-  AND failures != ""
-ORDER BY
-  object_id,
-  object_type,
-  failures;"""
-
-
-@task("assessment")
-def setup_schema(cfg: WorkspaceConfig):
-    """Creates a database for the UCX migration intermediate state. The name comes from the configuration file
-    and is set with the `inventory_database` key."""
-    backend = RuntimeBackend()
-    backend.execute(f"CREATE SCHEMA IF NOT EXISTS hive_metastore.{cfg.inventory_database}")
-
-
-@task("assessment", depends_on=[setup_schema], notebook="hive_metastore/tables.scala")
+@task("assessment", notebook="hive_metastore/tables.scala")
 def crawl_tables(_: WorkspaceConfig):
     """Iterates over all tables in the Hive Metastore of the current workspace and persists their metadata, such
     as _database name_, _table name_, _table type_, _table location_, etc., in the Delta table named
@@ -177,7 +54,7 @@ def crawl_grants(cfg: WorkspaceConfig):
     grants.snapshot()
 
 
-@task("assessment", depends_on=[setup_schema])
+@task("assessment")
 def crawl_mounts(cfg: WorkspaceConfig):
     """Defines the scope of the _mount points_ intended for migration into Unity Catalog. As these objects are not
     compatible with the Unity Catalog paradigm, a key component of the migration process involves transferring them
@@ -205,7 +82,7 @@ def guess_external_locations(cfg: WorkspaceConfig):
     crawler.snapshot()
 
 
-@task("assessment", depends_on=[setup_schema])
+@task("assessment")
 def assess_jobs(cfg: WorkspaceConfig):
     """Scans through all the jobs and identifies those that are not compatible with UC. The list of all the jobs is
     stored in the `$inventory.jobs` table.
@@ -221,7 +98,7 @@ def assess_jobs(cfg: WorkspaceConfig):
     crawler.snapshot()
 
 
-@task("assessment", depends_on=[setup_schema])
+@task("assessment")
 def assess_clusters(cfg: WorkspaceConfig):
     """Scan through all the clusters and identifies those that are not compatible with UC. The list of all the clusters
     is stored in the`$inventory.clusters` table.
@@ -237,7 +114,7 @@ def assess_clusters(cfg: WorkspaceConfig):
     crawler.snapshot()
 
 
-@task("assessment", depends_on=[setup_schema])
+@task("assessment")
 def assess_pipelines(cfg: WorkspaceConfig):
     """This module scans through all the Pipelines and identifies those pipelines which has Azure Service Principals
     embedded (who has been given access to the Azure storage accounts via spark configurations) in the pipeline
@@ -253,7 +130,7 @@ def assess_pipelines(cfg: WorkspaceConfig):
     crawler.snapshot()
 
 
-@task("assessment", depends_on=[setup_schema])
+@task("assessment")
 def assess_azure_service_principals(cfg: WorkspaceConfig):
     """This module scans through all the clusters configurations, cluster policies, job cluster configurations,
     Pipeline configurations, Warehouse configuration and identifies all the Azure Service Principals who has been
@@ -269,7 +146,7 @@ def assess_azure_service_principals(cfg: WorkspaceConfig):
     crawler.snapshot()
 
 
-@task("assessment", depends_on=[setup_schema])
+@task("assessment")
 def assess_global_init_scripts(cfg: WorkspaceConfig):
     """This module scans through all the global init scripts and identifies if there is an Azure Service Principal
     who has been given access to the Azure storage accounts via spark configurations referred in those scripts.
@@ -281,7 +158,7 @@ def assess_global_init_scripts(cfg: WorkspaceConfig):
     crawler.snapshot()
 
 
-@task("assessment", depends_on=[setup_schema])
+@task("assessment")
 def workspace_listing(cfg: WorkspaceConfig):
     """Scans the workspace for workspace objects. It recursively list all sub directories
     and compiles a list of directories, notebooks, files, repos and libraries in the workspace.
@@ -314,9 +191,24 @@ def crawl_permissions(cfg: WorkspaceConfig):
     permission_manager.inventorize_permissions()
 
 
+@task("assessment")
+def crawl_groups(cfg: WorkspaceConfig):
+    """Scans all groups for the local group migration scope"""
+    sql_backend = RuntimeBackend()
+    ws = WorkspaceClient(config=cfg.to_databricks_config())
+    group_manager = GroupManager(
+        sql_backend, ws, cfg.inventory_database, cfg.include_group_names, cfg.renamed_group_prefix
+    )
+    group_manager.snapshot()
+
+
 @task(
     "assessment",
     depends_on=[
+        crawl_grants,
+        crawl_groups,
+        crawl_permissions,
+        guess_external_locations,
         assess_jobs,
         assess_clusters,
         assess_pipelines,
@@ -324,26 +216,6 @@ def crawl_permissions(cfg: WorkspaceConfig):
         assess_global_init_scripts,
         crawl_tables,
     ],
-)
-def setup_view(cfg: WorkspaceConfig):
-    """Creates a database view for capturing following details as part of the assessment process:
-    - Unsupported DBR version
-    - Unsupported config
-    - DBFS mount used in configuration
-    - Azure service principal credentials used in config
-    - Unsupported storage type (WASBS, ADL) used in table location
-    - DBFS root and DBFS Mount location used in table location
-    - Non Delta tables
-    - Table scan failures
-    - Database scan failures
-    """
-    backend = RuntimeBackend()
-    backend.execute(cfg.replace_inventory_variable(_get_view_definition()))
-
-
-@task(
-    "assessment",
-    depends_on=[crawl_grants, crawl_permissions, guess_external_locations, setup_view],
     dashboard="assessment_main",
 )
 def assessment_report(_: WorkspaceConfig):
@@ -351,55 +223,29 @@ def assessment_report(_: WorkspaceConfig):
     dashboard _before_ all tasks have been completed, but then only already completed information is shown."""
 
 
-@task("002-apply-permissions-to-backup-groups", depends_on=[crawl_permissions], job_cluster="tacl")
-def apply_permissions_to_backup_groups(cfg: WorkspaceConfig):
-    """Second phase of the workspace-local group migration process. It does the following:
-      - Creates a backup of every workspace-local group, adding a prefix that can be set in the configuration
-      - Assigns the full set of permissions of the original group to the backup one
-
-    It covers local workspace-local permissions for all entities: Legacy Table ACLs, Entitlements,
-    AWS instance profiles, Clusters, Cluster policies, Instance Pools, Databricks SQL warehouses, Delta Live
-    Tables, Jobs, MLflow experiments, MLflow registry, SQL Dashboards & Queries, SQL Alerts, Token and Password usage
-    permissions, Secret Scopes, Notebooks, Directories, Repos, Files.
-
-    See [interactive tutorial here](https://app.getreprise.com/launch/myM3VNn/)."""
+@task("migrate-groups", depends_on=[crawl_groups])
+def rename_workspace_local_groups(cfg: WorkspaceConfig):
+    """Renames workspace local groups by adding `ucx-renamed-` prefix."""
+    sql_backend = RuntimeBackend()
     ws = WorkspaceClient(config=cfg.to_databricks_config())
-    group_manager = GroupManager(ws, cfg.groups)
-    group_manager.prepare_groups_in_environment()
-    if not group_manager.has_groups():
-        logger.info("Skipping group migration as no groups were found.")
-        return
-
-    backend = RuntimeBackend()
-    permission_manager = PermissionManager.factory(
-        ws,
-        backend,
-        cfg.inventory_database,
-        num_threads=cfg.num_threads,
-        workspace_start_path=cfg.workspace_start_path,
+    group_manager = GroupManager(
+        sql_backend, ws, cfg.inventory_database, cfg.include_group_names, cfg.renamed_group_prefix
     )
-    permission_manager.apply_group_permissions(group_manager.migration_state, destination="backup")
-    group_manager.migration_state.persist_migration_state(backend, cfg.inventory_database)
+    group_manager.rename_groups()
 
 
-@task("003-replace-workspace-local-with-account-groups", depends_on=[apply_permissions_to_backup_groups])
-def replace_workspace_groups_with_account_groups(cfg: WorkspaceConfig):
-    """Third phase of the workspace-local group migration process. It does the following:
-    - Creates an account-level group with the original name of the workspace-local one"""
+@task("migrate-groups", depends_on=[rename_workspace_local_groups])
+def reflect_account_groups_on_workspace(cfg: WorkspaceConfig):
+    """Adds matching account groups to this workspace."""
+    sql_backend = RuntimeBackend()
     ws = WorkspaceClient(config=cfg.to_databricks_config())
-    group_manager = GroupManager(ws, cfg.groups)
-    remote_state = GroupMigrationState().fetch_migration_state(RuntimeBackend(), cfg.inventory_database)
-    if len(remote_state.groups) == 0:
-        logger.info("Skipping group migration as no groups were found.")
-        return
-    group_manager.replace_workspace_groups_with_account_groups(remote_state)
+    group_manager = GroupManager(
+        sql_backend, ws, cfg.inventory_database, cfg.include_group_names, cfg.renamed_group_prefix
+    )
+    group_manager.reflect_account_groups_on_workspace()
 
 
-@task(
-    "004-apply-permissions-to-account-groups",
-    depends_on=[replace_workspace_groups_with_account_groups],
-    job_cluster="tacl",
-)
+@task("migrate-groups", depends_on=[reflect_account_groups_on_workspace], job_cluster="tacl")
 def apply_permissions_to_account_groups(cfg: WorkspaceConfig):
     """Fourth phase of the workspace-local group migration process. It does the following:
       - Assigns the full set of permissions of the original group to the account-level one
@@ -410,13 +256,11 @@ def apply_permissions_to_account_groups(cfg: WorkspaceConfig):
     permissions, Secret Scopes, Notebooks, Directories, Repos, Files.
 
     See [interactive tutorial here](https://app.getreprise.com/launch/myM3VNn/)."""
-    ws = WorkspaceClient(config=cfg.to_databricks_config())
     backend = RuntimeBackend()
+    ws = WorkspaceClient(config=cfg.to_databricks_config())
+    group_manager = GroupManager(backend, ws, cfg.inventory_database, cfg.include_group_names, cfg.renamed_group_prefix)
 
-    remote_state = GroupMigrationState().fetch_migration_state(backend, cfg.inventory_database)
-    migration_state = GroupManager.prepare_apply_permissions_to_account_groups(
-        ws, remote_state, cfg.groups.backup_group_prefix
-    )
+    migration_state = group_manager.get_migration_state()
     if len(migration_state.groups) == 0:
         logger.info("Skipping group migration as no groups were found.")
         return
@@ -428,17 +272,18 @@ def apply_permissions_to_account_groups(cfg: WorkspaceConfig):
         num_threads=cfg.num_threads,
         workspace_start_path=cfg.workspace_start_path,
     )
-    permission_manager.apply_group_permissions(migration_state, destination="account")
+    permission_manager.apply_group_permissions(migration_state)
 
 
-@task("005-remove-workspace-local-backup-groups", depends_on=[apply_permissions_to_account_groups])
+@task("remove-workspace-local-backup-groups", depends_on=[apply_permissions_to_account_groups])
 def delete_backup_groups(cfg: WorkspaceConfig):
     """Last step of the group migration process. Removes all workspace-level backup groups, along with their
     permissions. Execute this workflow only after you've confirmed that workspace-local migration worked
     successfully for all the groups involved."""
+    backend = RuntimeBackend()
     ws = WorkspaceClient(config=cfg.to_databricks_config())
-    group_manager = GroupManager(ws, cfg.groups)
-    group_manager.delete_backup_groups()
+    group_manager = GroupManager(backend, ws, cfg.inventory_database, cfg.include_group_names, cfg.renamed_group_prefix)
+    group_manager.delete_original_workspace_groups()
 
 
 @task("099-destroy-schema")

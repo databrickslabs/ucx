@@ -1,16 +1,22 @@
 import logging
 import random
+from datetime import timedelta
 
 from databricks.sdk import WorkspaceClient
+from databricks.sdk.errors import NotFound
+from databricks.sdk.retries import retried
 from databricks.sdk.service import workspace
 from databricks.sdk.service.iam import PermissionLevel
 
-from databricks.labs.ucx.config import ConnectConfig, GroupsConfig, WorkspaceConfig
+from databricks.labs.ucx.config import ConnectConfig, WorkspaceConfig
 from databricks.labs.ucx.workspace_access import GroupMigrationToolkit
+
+from ..conftest import get_workspace_membership
 
 logger = logging.getLogger(__name__)
 
 
+@retried(on=[NotFound, AssertionError], timeout=timedelta(minutes=15))
 def test_workspace_access_e2e(
     ws: WorkspaceClient,
     sql_backend,
@@ -169,23 +175,14 @@ def test_workspace_access_e2e(
     config = WorkspaceConfig(
         connect=ConnectConfig.from_databricks_config(ws.config),
         inventory_database=inventory_schema,
-        groups=GroupsConfig(selected=[ws_group.display_name]),
         workspace_start_path=directory,
         log_level="DEBUG",
         num_threads=8,
+        include_group_names=[ws_group.display_name],
     )
 
     warehouse_id = env_or_skip("TEST_DEFAULT_WAREHOUSE_ID")
     toolkit = GroupMigrationToolkit(config, warehouse_id=warehouse_id)
-    toolkit.prepare_environment()
-
-    group_migration_state = toolkit._group_manager.migration_state
-    for _info in group_migration_state.groups:
-        _ws = ws.groups.get(id=_info.workspace.id)
-        _backup = ws.groups.get(id=_info.backup.id)
-        _ws_members = sorted([m.value for m in _ws.members])
-        _backup_members = sorted([m.value for m in _backup.members])
-        assert _ws_members == _backup_members
 
     logger.debug("Verifying that the groups were created - done")
 
@@ -195,11 +192,9 @@ def test_workspace_access_e2e(
 
     toolkit.apply_permissions_to_backup_groups()
 
-    toolkit.verify_permissions_on_backup_groups(to_verify)
+    toolkit.replace_workspace_groups_with_account_groups()
 
-    toolkit.replace_workspace_groups_with_account_groups(group_migration_state)
-
-    workspace_acc_membership = toolkit._group_manager.get_workspace_membership("Group")
+    workspace_acc_membership = get_workspace_membership(ws, "Group")
     assert acc_group.display_name in workspace_acc_membership
 
     toolkit.apply_permissions_to_account_groups()
@@ -208,7 +203,7 @@ def test_workspace_access_e2e(
 
     toolkit.delete_backup_groups()
 
-    workspace_membership = toolkit._group_manager.get_workspace_membership()
+    workspace_membership = get_workspace_membership(ws)
     assert f"db-temp-{ws_group.display_name}" not in workspace_membership
 
     toolkit.cleanup_inventory_table()

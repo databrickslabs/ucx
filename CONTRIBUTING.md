@@ -83,6 +83,32 @@ for the latest reference of environment variables related to authentication.
 - `TEST_USER_ISOLATION_CLUSTER_ID`: This environment variable contains the identifier for the cluster used in testing
   user isolation. The value is a unique cluster ID, like "0825-164947-...".
 
+With the final results looking like (Note, for Azure Cloud, no `DATABRICKS_TOKEN` value):
+```shell
+export DATABRICKS_ACCOUNT_ID=999f9f99-89ba-4dd2-9999-a3301d0f21c0
+export DATABRICKS_HOST=https://adb-8590162618999999.14.azuredatabricks.net
+export DATABRICKS_CLUSTER_ID=8888-999999-6w1gh5v6
+export TEST_DEFAULT_WAREHOUSE_ID=a73e69a521a9c91c
+export TEST_DEFAULT_CLUSTER_ID=8888-999999-6w1gh5v6
+export TEST_LEGACY_TABLE_ACL_CLUSTER_ID=8888-999999-9fafnezi
+export TEST_INSTANCE_POOL_ID=7777-999999-save46-pool-cghrk21s
+```
+
+The test workspace must have test user accounts, matching displayName pattern `test-uesr-*`
+To create test users:
+
+```shell
+databricks users create --active --display-name "test-user-1" --user-name "first.last-t1@example.com"
+databricks users create --active --display-name "test-user-2" --user-name "first.last-t2@example.com"
+```
+
+Before running integration tests on Azure Cloud, you must login (and clear any TOKEN authenticaton):
+
+```shell
+az login
+unset DATABRICKS_TOKEN
+```
+
 Use the following command to run the integration tests:
 
 ```shell
@@ -117,6 +143,22 @@ in turn, contributes to the overall reliability and quality of our software.
 
 Currently, VSCode IDE is not supported, as it does not offer interactive debugging single integration tests. 
 However, it's possible that this limitation may be addressed in the future.
+
+### Flaky tests
+
+You can add `@retried` decorator to deal with [flaky tests](https://docs.pytest.org/en/latest/explanation/flaky.html):
+
+```python
+from datetime import timedelta
+
+from databricks.sdk.errors import NotFound
+from databricks.sdk.retries import retried
+
+@retried(on=[NotFound], timeout=timedelta(minutes=5))
+def test_something(ws):
+    ...
+
+```
 
 ## Local Setup
 

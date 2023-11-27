@@ -3,10 +3,9 @@ from unittest.mock import MagicMock
 
 import pytest
 from databricks.sdk.service import iam
-from databricks.sdk.service.iam import Group, ResourceMeta
 
 from databricks.labs.ucx.mixins.sql import Row
-from databricks.labs.ucx.workspace_access.groups import GroupMigrationState
+from databricks.labs.ucx.workspace_access.groups import MigratedGroup, MigrationState
 from databricks.labs.ucx.workspace_access.manager import PermissionManager, Permissions
 
 from ..framework.mocks import MockBackend
@@ -152,21 +151,27 @@ def test_manager_apply(mocker):
     mock_applier = mocker.Mock()
     mock_applier.object_types = lambda: {"clusters", "cluster-policies"}
     # this emulates a real applier and call to an API
-    mock_applier.get_apply_task = lambda item, _, dst: lambda: applied_items.add(
-        f"{item.object_id} {item.object_id} {dst}"
-    )
+    mock_applier.get_apply_task = lambda item, _: lambda: applied_items.add(f"{item.object_id} {item.object_id}")
 
     pm = PermissionManager(b, "test_database", [mock_applier])
-    group_migration_state = GroupMigrationState()
-    group_migration_state.add(
-        Group(display_name="group", meta=ResourceMeta(resource_type="WorkspaceGroup")),
-        Group(display_name="group_backup", meta=ResourceMeta(resource_type="WorkspaceGroup")),
-        Group(display_name="group", meta=ResourceMeta(resource_type="Group")),
+    group_migration_state = MigrationState(
+        [
+            MigratedGroup(
+                id_in_workspace=None,
+                name_in_workspace="group",
+                name_in_account="group",
+                temporary_name="group_backup",
+                members=None,
+                entitlements=None,
+                external_id=None,
+                roles=None,
+            )
+        ]
     )
 
-    pm.apply_group_permissions(group_migration_state, "backup")
+    pm.apply_group_permissions(group_migration_state)
 
-    assert {"test2 test2 backup", "test test backup"} == applied_items
+    assert {"test2 test2", "test test"} == applied_items
 
 
 def test_unregistered_support():
@@ -178,7 +183,7 @@ def test_unregistered_support():
         }
     )
     pm = PermissionManager(b, "test", [])
-    pm.apply_group_permissions(migration_state=MagicMock(), destination="backup")
+    pm.apply_group_permissions(migration_state=MagicMock())
 
 
 def test_factory(mocker):

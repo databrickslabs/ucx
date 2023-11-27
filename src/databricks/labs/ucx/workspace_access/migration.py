@@ -30,38 +30,16 @@ class GroupMigrationToolkit:
             num_threads=config.num_threads,
             workspace_start_path=config.workspace_start_path,
         )
-        self._group_manager = GroupManager(ws, config.groups)
+        self._group_manager = GroupManager(
+            self._backend(ws, warehouse_id),
+            ws,
+            config.inventory_database,
+            config.include_group_names,
+            config.renamed_group_prefix,
+        )
         # TODO: remove VerificationManager in scope of https://github.com/databrickslabs/ucx/issues/36,
         # where we probably should add verify() abstract method to every Applier
         self._verification_manager = VerificationManager(ws, secrets_support)
-
-    @staticmethod
-    def _object_type_appliers(generic_support, sql_support, secrets_support, scim_support):
-        return {
-            # SCIM-based API
-            "entitlements": scim_support,
-            "roles": scim_support,
-            # Generic Permissions API
-            "authorization": generic_support,
-            "clusters": generic_support,
-            "cluster-policies": generic_support,
-            "instance-pools": generic_support,
-            "sql/warehouses": generic_support,
-            "jobs": generic_support,
-            "pipelines": generic_support,
-            "experiments": generic_support,
-            "registered-models": generic_support,
-            "notebooks": generic_support,
-            "files": generic_support,
-            "directories": generic_support,
-            "repos": generic_support,
-            # Redash equivalent of Generic Permissions API
-            "alerts": sql_support,
-            "queries": sql_support,
-            "dashboards": sql_support,
-            # Secret Scope ACL API
-            "secrets": secrets_support,
-        }
 
     @staticmethod
     def _backend(ws: WorkspaceClient, warehouse_id: str | None = None) -> SqlBackend:
@@ -82,12 +60,6 @@ class GroupMigrationToolkit:
         ucx_logger = logging.getLogger("databricks.labs.ucx")
         ucx_logger.setLevel(level)
 
-    def has_groups(self) -> bool:
-        return self._group_manager.has_groups()
-
-    def prepare_environment(self):
-        self._group_manager.prepare_groups_in_environment()
-
     def cleanup_inventory_table(self):
         self._permissions_manager.cleanup()
 
@@ -95,19 +67,19 @@ class GroupMigrationToolkit:
         self._permissions_manager.inventorize_permissions()
 
     def apply_permissions_to_backup_groups(self):
-        self._permissions_manager.apply_group_permissions(self._group_manager.migration_state, destination="backup")
+        self._group_manager.rename_groups()
 
     def verify_permissions_on_backup_groups(self, to_verify):
-        self._verification_manager.verify(self._group_manager.migration_state, "backup", to_verify)
+        self._verification_manager.verify(self._group_manager.get_migration_state(), "backup", to_verify)
 
-    def replace_workspace_groups_with_account_groups(self, migration_state):
-        self._group_manager.replace_workspace_groups_with_account_groups(migration_state)
+    def replace_workspace_groups_with_account_groups(self):
+        self._group_manager.reflect_account_groups_on_workspace()
 
     def apply_permissions_to_account_groups(self):
-        self._permissions_manager.apply_group_permissions(self._group_manager.migration_state, destination="account")
+        self._permissions_manager.apply_group_permissions(self._group_manager.get_migration_state())
 
     def verify_permissions_on_account_groups(self, to_verify):
-        self._verification_manager.verify(self._group_manager.migration_state, "account", to_verify)
+        self._verification_manager.verify(self._group_manager.get_migration_state(), "account", to_verify)
 
     def delete_backup_groups(self):
-        self._group_manager.delete_backup_groups()
+        self._group_manager.delete_original_workspace_groups()
