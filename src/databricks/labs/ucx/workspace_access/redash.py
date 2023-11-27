@@ -83,6 +83,7 @@ class RedashPermissionsSupport(AclSupport):
         try:
             return self._ws.dbsql_permissions.get(object_type, object_id)
         except DatabricksError as e:
+            logger.error(f"DatabricksError {e}  error_code: {e.error_code}")
             if e.error_code in ["RESOURCE_DOES_NOT_EXIST", "RESOURCE_NOT_FOUND", "PERMISSION_DENIED"]:
                 logger.warning(f"Could not get permissions for {object_type} {object_id} due to {e.error_code}")
                 return None
@@ -174,6 +175,7 @@ class RedashPermissionsSupport(AclSupport):
                 )
                 raise RetryableError(message=msg)
         except DatabricksError as e:
+            logger.error(f"DatabricksError {e}  error_code: {e.error_code}")
             if e.error_code in [
                 "BAD_REQUEST",
                 "UNAUTHORIZED",
