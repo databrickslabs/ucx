@@ -5,14 +5,13 @@ from functools import partial
 
 from databricks.sdk import WorkspaceClient
 from databricks.sdk.core import DatabricksError
-from databricks.sdk.errors import NotFound
+from databricks.sdk.errors import NotFound, PermissionDenied
 from databricks.sdk.retries import retried
 from databricks.sdk.service import iam
 from databricks.sdk.service.iam import Group, Patch, PatchSchema
 
 from databricks.labs.ucx.mixins.hardening import rate_limited
 from databricks.labs.ucx.workspace_access.base import AclSupport, Permissions
-from databricks.labs.ucx.workspace_access.generic import RetryableError
 from databricks.labs.ucx.workspace_access.groups import MigrationState
 
 logger = logging.getLogger(__name__)
@@ -93,13 +92,19 @@ class ScimSupport(AclSupport):
     ):
         try:
             return self._ws.groups.patch(id=group_id, operations=operations, schemas=schemas)
-        except NotFound as e:
+        except PermissionDenied:
+            logger.warning(f"permission denied: {group_id}")
+            return None
+        except NotFound:
             logger.warning(f"removed on backend: {group_id}")
             return None
 
     def _safe_get_group(self, group_id: str) -> Group | None:
         try:
             return self._ws.groups.get(group_id)
+        except PermissionDenied:
+            logger.warning(f"permission denied: {group_id}")
+            return None
         except NotFound:
             logger.warning(f"removed on backend: {group_id}")
             return None

@@ -4,6 +4,7 @@ from unittest.mock import MagicMock, Mock, patch
 
 import pytest
 from databricks.sdk.core import DatabricksError
+from databricks.sdk.errors import InternalError, NotFound, PermissionDenied
 from databricks.sdk.service import compute, iam, ml
 from databricks.sdk.service.compute import ClusterDetails
 from databricks.sdk.service.iam import (
@@ -21,7 +22,6 @@ from databricks.labs.ucx.workspace_access.generic import (
     GenericPermissionsSupport,
     Listing,
     Permissions,
-    RetryableError,
     WorkspaceListing,
     WorkspaceObjectInfo,
     experiments_listing,
@@ -127,7 +127,7 @@ def test_relevance():
 
 def test_safe_get_permissions_when_error_non_retriable():
     ws = MagicMock()
-    ws.permissions.get.side_effect = DatabricksError(error_code="RESOURCE_DOES_NOT_EXIST")
+    ws.permissions.get.side_effect = NotFound(...)
     sup = GenericPermissionsSupport(ws=ws, listings=[])
     result = sup._safe_get_permissions("clusters", "test")
     assert result is None
@@ -140,12 +140,11 @@ def test_safe_get_permissions_when_error_non_retriable():
 
 def test_safe_get_permissions_when_error_retriable():
     ws = MagicMock()
-    error_code = "INTERNAL_SERVER_ERROR"
-    ws.permissions.get.side_effect = DatabricksError(error_code=error_code)
+    ws.permissions.get.side_effect = InternalError(...)
     sup = GenericPermissionsSupport(ws=ws, listings=[])
-    with pytest.raises(RetryableError) as e:
+    with pytest.raises(DatabricksError) as e:
         sup._safe_get_permissions("clusters", "test")
-    assert error_code in str(e)
+    assert e.type == InternalError
 
 
 def test_no_permissions():
@@ -155,7 +154,7 @@ def test_no_permissions():
             cluster_id="test",
         )
     ]
-    ws.permissions.get.side_effect = DatabricksError(error_code="RESOURCE_DOES_NOT_EXIST")
+    ws.permissions.get.side_effect = NotFound(...)
     sup = GenericPermissionsSupport(
         ws=ws,
         listings=[
@@ -410,7 +409,7 @@ def test_applier_task_failed_when_get_error_non_retriable():
         group_name="group_2",
     )
     ws.permissions.update.return_value = iam.ObjectPermissions(access_control_list=[group_1_acl, group_2_acl])
-    ws.permissions.get.side_effect = DatabricksError(error_code="PERMISSION_DENIED")
+    ws.permissions.get.side_effect = PermissionDenied(...)
     sup = GenericPermissionsSupport(ws=ws, listings=[], verify_timeout=timedelta(seconds=1))
     result = sup._applier_task(
         object_type="clusters",
@@ -424,7 +423,7 @@ def test_applier_task_failed_when_get_error_non_retriable():
 
 def test_safe_update_permissions_when_error_non_retriable():
     ws = MagicMock()
-    ws.permissions.update.side_effect = DatabricksError(error_code="PERMISSION_DENIED")
+    ws.permissions.update.side_effect = PermissionDenied(...)
 
     sup = GenericPermissionsSupport(ws=ws, listings=[], verify_timeout=timedelta(seconds=1))
 
@@ -438,18 +437,17 @@ def test_safe_update_permissions_when_error_non_retriable():
 
 def test_safe_update_permissions_when_error_retriable():
     ws = MagicMock()
-    error_code = "INTERNAL_SERVER_ERROR"
-    ws.permissions.update.side_effect = DatabricksError(error_code=error_code)
+    ws.permissions.update.side_effect = InternalError(...)
 
     sup = GenericPermissionsSupport(ws=ws, listings=[], verify_timeout=timedelta(seconds=1))
 
-    with pytest.raises(RetryableError) as e:
+    with pytest.raises(DatabricksError) as e:
         sup._safe_update_permissions(
             object_type="clusters",
             object_id="cluster_id",
             acl=[iam.AccessControlRequest(group_name="group", permission_level=iam.PermissionLevel.CAN_USE)],
         )
-    assert error_code in str(e)
+    assert e.type == InternalError
 
 
 def test_load_as_dict():
@@ -491,7 +489,7 @@ def test_load_as_dict_no_permissions():
         listings=[],
     )
 
-    ws.permissions.get.side_effect = Mock(side_effect=DatabricksError(error_code="RESOURCE_DOES_NOT_EXIST"))
+    ws.permissions.get.side_effect = Mock(side_effect=NotFound(...))
 
     policy_permissions = sup.load_as_dict("clusters", "cluster_test")
 
@@ -506,7 +504,7 @@ def test_load_as_dict_handle_exception_when_getting_permissions():
         listings=[],
     )
 
-    ws.permissions.get.side_effect = Mock(side_effect=DatabricksError(error_code="RESOURCE_DOES_NOT_EXIST"))
+    ws.permissions.get.side_effect = Mock(side_effect=NotFound(...))
 
     policy_permissions = sup.load_as_dict("clusters", "cluster_test")
 

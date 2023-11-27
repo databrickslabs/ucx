@@ -3,11 +3,11 @@ from unittest.mock import MagicMock
 
 import pytest
 from databricks.sdk.core import DatabricksError
+from databricks.sdk.errors import InternalError, PermissionDenied
 from databricks.sdk.service import iam
 from databricks.sdk.service.iam import Group, PatchOp, PatchSchema
 
 from databricks.labs.ucx.workspace_access.base import Permissions
-from databricks.labs.ucx.workspace_access.generic import RetryableError
 from databricks.labs.ucx.workspace_access.groups import MigratedGroup, MigrationState
 from databricks.labs.ucx.workspace_access.scim import ScimSupport
 
@@ -70,7 +70,7 @@ def test_applier_task_when_get_error_retriable():
 
 def test_applier_task_when_get_error_non_retriable():
     ws = MagicMock()
-    ws.groups.get.side_effect = DatabricksError(error_code="PERMISSION_DENIED")
+    ws.groups.get.side_effect = PermissionDenied(...)
     sup = ScimSupport(ws=ws, verify_timeout=timedelta(seconds=1))
     group_id = "1"
     result = sup._applier_task(
@@ -81,7 +81,7 @@ def test_applier_task_when_get_error_non_retriable():
 
 def test_safe_patch_group_when_error_non_retriable():
     ws = MagicMock()
-    ws.groups.patch.side_effect = DatabricksError(error_code="PERMISSION_DENIED")
+    ws.groups.patch.side_effect = PermissionDenied(...)
     sup = ScimSupport(ws=ws, verify_timeout=timedelta(seconds=1))
     operations = [
         iam.Patch(op=iam.PatchOp.ADD, path="roles", value=[e.as_dict() for e in [iam.ComplexValue(value="role1")]])
@@ -93,22 +93,20 @@ def test_safe_patch_group_when_error_non_retriable():
 
 def test_safe_patch_group_when_error_retriable():
     ws = MagicMock()
-    error_code = "INTERNAL_SERVER_ERROR"
-    ws.groups.patch.side_effect = DatabricksError(error_code=error_code)
+    ws.groups.patch.side_effect = InternalError(...)
     sup = ScimSupport(ws=ws, verify_timeout=timedelta(seconds=1))
     operations = [
         iam.Patch(op=iam.PatchOp.ADD, path="roles", value=[e.as_dict() for e in [iam.ComplexValue(value="role1")]])
     ]
     schemas = [iam.PatchSchema.URN_IETF_PARAMS_SCIM_API_MESSAGES_2_0_PATCH_OP]
-    with pytest.raises(RetryableError) as e:
+    with pytest.raises(DatabricksError) as e:
         sup._safe_patch_group(group_id="1", operations=operations, schemas=schemas)
-    assert error_code in str(e)
+    assert e.type == InternalError
 
 
 def test_safe_get_group_when_error_non_retriable():
     ws = MagicMock()
-    error_code = "PERMISSION_DENIED"
-    ws.groups.get.side_effect = DatabricksError(error_code=error_code)
+    ws.groups.get.side_effect = PermissionDenied(...)
     sup = ScimSupport(ws=ws, verify_timeout=timedelta(seconds=1))
     result = sup._safe_get_group(group_id="1")
     assert result is None
@@ -116,12 +114,11 @@ def test_safe_get_group_when_error_non_retriable():
 
 def test_safe_get_group_when_error_retriable():
     ws = MagicMock()
-    error_code = "INTERNAL_SERVER_ERROR"
-    ws.groups.get.side_effect = DatabricksError(error_code=error_code)
+    ws.groups.get.side_effect = InternalError(...)
     sup = ScimSupport(ws=ws, verify_timeout=timedelta(seconds=1))
-    with pytest.raises(RetryableError) as e:
+    with pytest.raises(DatabricksError) as e:
         sup._safe_get_group(group_id="1")
-    assert error_code in str(e)
+    assert e.type == InternalError
 
 
 def test_get_crawler_task_with_roles_and_entitlements_should_be_crawled():

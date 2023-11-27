@@ -4,9 +4,9 @@ from unittest.mock import MagicMock
 
 import pytest
 from databricks.sdk.core import DatabricksError
+from databricks.sdk.errors import InternalError, NotFound, PermissionDenied
 from databricks.sdk.service import sql
 
-from databricks.labs.ucx.workspace_access.generic import RetryableError
 from databricks.labs.ucx.workspace_access.redash import (
     Listing,
     Permissions,
@@ -133,22 +133,22 @@ def test_apply(migration_state):
 
 def test_safe_getter_known():
     ws = MagicMock()
-    ws.dbsql_permissions.get.side_effect = DatabricksError(error_code="RESOURCE_DOES_NOT_EXIST")
+    ws.dbsql_permissions.get.side_effect = NotFound(...)
     sup = RedashPermissionsSupport(ws=ws, listings=[])
     assert sup._safe_get_dbsql_permissions(object_type=sql.ObjectTypePlural.ALERTS, object_id="test") is None
 
 
 def test_safe_getter_unknown():
     ws = MagicMock()
-    ws.dbsql_permissions.get.side_effect = DatabricksError(error_code="SOMETHING_NON_EXPECTED")
+    ws.dbsql_permissions.get.side_effect = InternalError(...)
     sup = RedashPermissionsSupport(ws=ws, listings=[])
-    with pytest.raises(RetryableError):
+    with pytest.raises(DatabricksError):
         sup._safe_get_dbsql_permissions(object_type=sql.ObjectTypePlural.ALERTS, object_id="test")
 
 
 def test_empty_permissions():
     ws = MagicMock()
-    ws.dbsql_permissions.get.side_effect = DatabricksError(error_code="RESOURCE_DOES_NOT_EXIST")
+    ws.dbsql_permissions.get.side_effect = NotFound(...)
     sup = RedashPermissionsSupport(ws=ws, listings=[])
     assert sup._crawler_task(object_id="test", object_type=sql.ObjectTypePlural.ALERTS) is None
 
@@ -278,7 +278,7 @@ def test_applier_task_when_set_error_retriable():
 
 def test_safe_set_permissions_when_error_non_retriable():
     ws = MagicMock()
-    ws.dbsql_permissions.set.side_effect = DatabricksError(error_code="PERMISSION_DENIED")
+    ws.dbsql_permissions.set.side_effect = PermissionDenied(...)
     sup = RedashPermissionsSupport(ws=ws, listings=[], verify_timeout=timedelta(seconds=1))
     acl = [sql.AccessControl(group_name="group_1", permission_level=sql.PermissionLevel.CAN_MANAGE)]
     result = sup._safe_set_permissions(sql.ObjectTypePlural.QUERIES, "test", acl)
@@ -287,8 +287,7 @@ def test_safe_set_permissions_when_error_non_retriable():
 
 def test_safe_set_permissions_when_error_retriable():
     ws = MagicMock()
-    error_code = "INTERNAL_SERVER_ERROR"
-    ws.dbsql_permissions.set.side_effect = DatabricksError(error_code=error_code)
+    ws.dbsql_permissions.set.side_effect = InternalError(...)
     sup = RedashPermissionsSupport(ws=ws, listings=[], verify_timeout=timedelta(seconds=1))
     acl = [sql.AccessControl(group_name="group_1", permission_level=sql.PermissionLevel.CAN_MANAGE)]
     with pytest.raises(TimeoutError) as e:

@@ -5,6 +5,7 @@ from databricks.labs.ucx.workspace_access.manager import PermissionManager
 def test_x(ws):
     ws.jobs.get(23424234)
 
+
 def test_permissions_save_and_load(ws, sql_backend, inventory_schema, env_or_skip):
     pi = PermissionManager(sql_backend, inventory_schema, [])
 

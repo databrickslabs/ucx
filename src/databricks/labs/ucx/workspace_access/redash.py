@@ -8,14 +8,13 @@ from functools import partial
 
 from databricks.sdk import WorkspaceClient
 from databricks.sdk.core import DatabricksError
-from databricks.sdk.errors import NotFound
+from databricks.sdk.errors import NotFound, PermissionDenied
 from databricks.sdk.retries import retried
 from databricks.sdk.service import sql
 from databricks.sdk.service.sql import ObjectTypePlural, SetResponse
 
 from databricks.labs.ucx.mixins.hardening import rate_limited
 from databricks.labs.ucx.workspace_access.base import AclSupport, Permissions
-from databricks.labs.ucx.workspace_access.generic import RetryableError
 from databricks.labs.ucx.workspace_access.groups import MigrationState
 
 logger = logging.getLogger(__name__)
@@ -120,7 +119,7 @@ class RedashPermissionsSupport(AclSupport):
         This affects the way how we prepare the new ACL request.
         """
 
-        set_retry_on_value_error = retried(on=[DatabricksError], timeout=self._verify_timeout)
+        set_retry_on_value_error = retried(on=[ValueError, DatabricksError], timeout=self._verify_timeout)
         set_retried_check = set_retry_on_value_error(self._safe_set_permissions)
         set_retried_check(object_type, object_id, acl)
 
@@ -168,7 +167,10 @@ class RedashPermissionsSupport(AclSupport):
                     f"Failed to set permission and will be retried for {object_type} {object_id}, "
                     f"doing another attempt..."
                 )
-                raise RetryableError(message=msg)
+                raise ValueError(msg)
+        except PermissionDenied:
+            logger.warning(f"Permission denied: {object_type} {object_id}")
+            return None
         except NotFound:
             logger.warning(f"Deleted on platform: {object_type} {object_id}")
             return None

@@ -9,7 +9,7 @@ from typing import Optional
 
 from databricks.sdk import WorkspaceClient
 from databricks.sdk.core import DatabricksError
-from databricks.sdk.errors import NotFound, InvalidParameterValue
+from databricks.sdk.errors import InvalidParameterValue, NotFound, PermissionDenied
 from databricks.sdk.retries import retried
 from databricks.sdk.service import iam, ml
 from databricks.sdk.service.iam import PermissionLevel
@@ -201,6 +201,9 @@ class GenericPermissionsSupport(AclSupport):
     def _safe_get_permissions(self, object_type: str, object_id: str) -> iam.ObjectPermissions | None:
         try:
             return self._ws.permissions.get(object_type, object_id)
+        except PermissionDenied:
+            logger.warning(f"permission denied: {object_type} {object_id}")
+            return None
         except NotFound:
             logger.warning(f"removed on backend: {object_type} {object_id}")
             return None
@@ -213,6 +216,9 @@ class GenericPermissionsSupport(AclSupport):
     ) -> iam.ObjectPermissions | None:
         try:
             return self._ws.permissions.update(object_type, object_id, access_control_list=acl)
+        except PermissionDenied:
+            logger.warning(f"permission denied: {object_type} {object_id}")
+            return None
         except NotFound:
             logger.warning(f"removed on backend: {object_type} {object_id}")
             return None
