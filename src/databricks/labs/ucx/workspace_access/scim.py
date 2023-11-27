@@ -5,6 +5,7 @@ from functools import partial
 
 from databricks.sdk import WorkspaceClient
 from databricks.sdk.core import DatabricksError
+from databricks.sdk.errors import NotFound
 from databricks.sdk.retries import retried
 from databricks.sdk.service import iam
 from databricks.sdk.service.iam import Group, Patch, PatchSchema
@@ -79,11 +80,11 @@ class ScimSupport(AclSupport):
         operations = [iam.Patch(op=iam.PatchOp.ADD, path=property_name, value=[e.as_dict() for e in value])]
         schemas = [iam.PatchSchema.URN_IETF_PARAMS_SCIM_API_MESSAGES_2_0_PATCH_OP]
 
-        patch_retry_on_value_error = retried(on=[RetryableError], timeout=self._verify_timeout)
+        patch_retry_on_value_error = retried(on=[DatabricksError], timeout=self._verify_timeout)
         patch_retried_check = patch_retry_on_value_error(self._safe_patch_group)
         patch_retried_check(group_id=group_id, operations=operations, schemas=schemas)
 
-        retry_on_value_error = retried(on=[ValueError, RetryableError], timeout=self._verify_timeout)
+        retry_on_value_error = retried(on=[ValueError, DatabricksError], timeout=self._verify_timeout)
         retried_check = retry_on_value_error(self._inflight_check)
         return retried_check(group_id, value, property_name)
 
@@ -92,35 +93,13 @@ class ScimSupport(AclSupport):
     ):
         try:
             return self._ws.groups.patch(id=group_id, operations=operations, schemas=schemas)
-        except DatabricksError as e:
-            if e.error_code in [
-                "BAD_REQUEST",
-                "INVALID_PARAMETER_VALUE",
-                "UNAUTHORIZED",
-                "PERMISSION_DENIED",
-                "FEATURE_DISABLED",
-                "RESOURCE_DOES_NOT_EXIST",
-            ]:
-                logger.warning(f"Could not apply changes to group {group_id} due to {e.error_code}")
-                return None
-            else:
-                msg = f"{e.error_code} can be retried for group {group_id}, doing another attempt..."
-                raise RetryableError(message=msg) from e
+        except NotFound as e:
+            logger.warning(f"removed on backend: {group_id}")
+            return None
 
     def _safe_get_group(self, group_id: str) -> Group | None:
         try:
             return self._ws.groups.get(group_id)
-        except DatabricksError as e:
-            if e.error_code in [
-                "BAD_REQUEST",
-                "INVALID_PARAMETER_VALUE",
-                "UNAUTHORIZED",
-                "PERMISSION_DENIED",
-                "FEATURE_DISABLED",
-                "RESOURCE_DOES_NOT_EXIST",
-            ]:
-                logger.warning(f"Could not get details of group {group_id} due to {e.error_code}")
-                return None
-            else:
-                msg = f"{e.error_code} can be retried for group {group_id}, doing another attempt..."
-                raise RetryableError(message=msg) from e
+        except NotFound:
+            logger.warning(f"removed on backend: {group_id}")
+            return None
