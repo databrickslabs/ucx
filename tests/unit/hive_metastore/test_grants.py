@@ -77,9 +77,14 @@ def test_hive_sql():
     assert grant.hive_revoke_sql() == "REVOKE SELECT ON TABLE hive_metastore.mydb.mytable FROM `user`"
 
 
-def test_hive_own_sql():
+def test_hive_table_own_sql():
     grant = Grant(principal="user", action_type="OWN", catalog="hive_metastore", database="mydb", table="mytable")
-    assert grant.hive_grant_sql() == "ALTER hive_metastore.mydb.mytable OWNER TO `user`"
+    assert grant.hive_grant_sql() == "ALTER TABLE hive_metastore.mydb.mytable OWNER TO `user`"
+
+
+def test_hive_database_own_sql():
+    grant = Grant(principal="user", action_type="OWN", catalog="hive_metastore", database="mydb")
+    assert grant.hive_grant_sql() == "ALTER DATABASE hive_metastore.mydb OWNER TO `user`"
 
 
 def test_hive_revoke_sql():

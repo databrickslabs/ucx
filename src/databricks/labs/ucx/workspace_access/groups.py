@@ -27,6 +27,17 @@ class MigratedGroup:
     external_id: str = None
     roles: str = None
 
+    @classmethod
+    def partial_info(cls, workspace: iam.Group, account: iam.Group):
+        """This method is only intended for use in tests"""
+        return cls(
+            id_in_workspace=workspace.id,
+            name_in_workspace=workspace.display_name,
+            name_in_account=account.display_name,
+            temporary_name=f"tmp-{workspace.display_name}",
+            external_id=workspace.external_id,
+        )
+
 
 class MigrationState:
     """Holds migration state of workspace-to-account groups"""
