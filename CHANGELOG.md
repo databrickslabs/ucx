@@ -9,11 +9,14 @@
  * Fixed `databricks labs ucx workflows` command ([#608](https://github.com/databrickslabs/ucx/pull/608)).
  * Fixed problematic integration test fixture `make_ucx_group` ([#613](https://github.com/databrickslabs/ucx/pull/613)).
  * Fixed internal API request retry logic by relying on concrete exception types ([#637](https://github.com/databrickslabs/ucx/pull/637)).
- * Fixed `tables.scala` notebook to read inventory database from `~/.ucx/config.yml` file ([#614](https://github.com/databrickslabs/ucx/pull/614)).
  * Introduced `StaticTablesCrawler` for integration tests ([#632](https://github.com/databrickslabs/ucx/pull/632)).
  * Reduced runtime of `test_set_owner_permission` from 15 minutes to 44 seconds ([#636](https://github.com/databrickslabs/ucx/pull/636)).
  * Updated `LICENSE` ([#643](https://github.com/databrickslabs/ucx/pull/643)).
  * Updated documentation ([#611](https://github.com/databrickslabs/ucx/pull/611), [#646](https://github.com/databrickslabs/ucx/pull/646)).
+
+**Breaking changes** (existing installations need to remove `ucx` database, reinstall UCX and re-run assessment jobs)
+
+ * Fixed `tables.scala` notebook to read inventory database from `~/.ucx/config.yml` file. ([#614](https://github.com/databrickslabs/ucx/pull/614)).
 
 ## 0.6.1
 
