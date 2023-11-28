@@ -749,7 +749,7 @@ def make_catalog(ws, sql_backend, make_random) -> Callable[..., CatalogInfo]:
 def make_schema(ws, sql_backend, make_random) -> Callable[..., SchemaInfo]:
     def create(*, catalog_name: str = "hive_metastore", name: str | None = None) -> SchemaInfo:
         if name is None:
-            name = f"ucx_S{make_random(4)}"
+            name = f"ucx_S{make_random(4)}".lower()
         full_name = f"{catalog_name}.{name}".lower()
         sql_backend.execute(f"CREATE SCHEMA {full_name}")
         schema_info = SchemaInfo(catalog_name=catalog_name, name=name, full_name=full_name)
@@ -784,7 +784,7 @@ def make_table(ws, sql_backend, make_schema, make_random) -> Callable[..., Table
             catalog_name = schema.catalog_name
             schema_name = schema.name
         if name is None:
-            name = f"ucx_T{make_random(4)}"
+            name = f"ucx_T{make_random(4)}".lower()
         full_name = f"{catalog_name}.{schema_name}.{name}".lower()
         ddl = f'CREATE {"VIEW" if view else "TABLE"} {full_name}'
         if ctas is not None:

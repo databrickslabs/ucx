@@ -10,11 +10,10 @@ from databricks.sdk.service.iam import PermissionLevel
 from databricks.labs.ucx.config import WorkspaceConfig
 from databricks.labs.ucx.framework.parallel import Threads
 from databricks.labs.ucx.hive_metastore.grants import GrantsCrawler
-from databricks.labs.ucx.hive_metastore.tables import TablesCrawler
 from databricks.labs.ucx.install import WorkspaceInstaller
 from databricks.labs.ucx.workspace_access.generic import GenericPermissionsSupport
 
-from .conftest import get_workspace_membership
+from .conftest import StaticTablesCrawler, get_workspace_membership
 
 logger = logging.getLogger(__name__)
 
@@ -54,7 +53,7 @@ def test_job_failure_propagates_correct_error_message_and_logs(ws, sql_backend, 
     assert len(workflow_run_logs) == 1
 
 
-@retried(on=[NotFound, TimeoutError, OperationFailed, InvalidParameterValue], timeout=timedelta(minutes=25))
+@retried(on=[NotFound, TimeoutError, OperationFailed, InvalidParameterValue], timeout=timedelta(minutes=15))
 def test_jobs_with_no_inventory_database(
     ws,
     sql_backend,
@@ -68,6 +67,7 @@ def test_jobs_with_no_inventory_database(
     make_table,
     env_or_skip,
 ):
+    # TODO: (nfx) 5 minute optimization potential: parallelize 4 tasks: wait clusters, fixtures, and installation
     inventory_database = f"ucx_{make_random(4)}"
     default_cluster_id = env_or_skip("TEST_DEFAULT_CLUSTER_ID")
     tacl_cluster_id = env_or_skip("TEST_LEGACY_TABLE_ACL_CLUSTER_ID")
@@ -107,7 +107,7 @@ def test_jobs_with_no_inventory_database(
     sql_backend.execute(f"GRANT READ_METADATA ON SCHEMA {schema_a.name} TO `admins`")
     sql_backend.execute(f"GRANT READ_METADATA ON TABLE {table_b.full_name} TO `admins`")
 
-    tables_crawler = TablesCrawler(sql_backend, inventory_database)
+    tables_crawler = StaticTablesCrawler(sql_backend, inventory_database, [table_a, table_b, table_c])
     grants_crawler = GrantsCrawler(tables_crawler)
     src_table_a_grants = grants_crawler.for_table_info(table_a)
     src_table_b_grants = grants_crawler.for_table_info(table_b)

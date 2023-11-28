@@ -4,7 +4,9 @@ from datetime import timedelta
 from databricks.sdk.errors import NotFound
 from databricks.sdk.retries import retried
 
-from databricks.labs.ucx.hive_metastore import GrantsCrawler, TablesCrawler
+from databricks.labs.ucx.hive_metastore import GrantsCrawler
+
+from ..conftest import StaticTablesCrawler
 
 logger = logging.getLogger(__name__)
 
@@ -32,7 +34,8 @@ def test_all_grants_in_databases(sql_backend, inventory_schema, make_schema, mak
     sql_backend.execute(f"GRANT MODIFY ON VIEW {view_c.full_name} TO `{group_b.display_name}`")
     sql_backend.execute(f"GRANT MODIFY ON TABLE {view_d.full_name} TO `{group_b.display_name}`")
 
-    tables = TablesCrawler(sql_backend, inventory_schema)
+    # 20 seconds less than TablesCrawler(sql_backend, inventory_schema)
+    tables = StaticTablesCrawler(sql_backend, inventory_schema, [table_a, table_b, view_c, view_d, table_e])
     grants = GrantsCrawler(tables)
 
     all_grants = {}
@@ -41,7 +44,6 @@ def test_all_grants_in_databases(sql_backend, inventory_schema, make_schema, mak
         all_grants[f"{grant.principal}.{grant.object_key}"] = grant.action_type
 
     assert len(all_grants) >= 8, "must have at least three grants"
-    # TODO: (nfx) KeyError: 'sdk-xH7i.hive_metastore.default'
     assert all_grants[f"{group_a.display_name}.hive_metastore.default"] == "USAGE"
     assert all_grants[f"{group_b.display_name}.hive_metastore.default"] == "USAGE"
     assert all_grants[f"{group_a.display_name}.{table_a.full_name}"] == "SELECT"

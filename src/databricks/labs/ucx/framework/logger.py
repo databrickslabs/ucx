@@ -32,7 +32,7 @@ class NiceFormatter(logging.Formatter):
     def format(self, record: logging.LogRecord):  # noqa: A003
         if not self.colors:
             return super().format(record)
-        ts = self.formatTime(record, datefmt="%H:%M")
+        ts = self.formatTime(record, datefmt="%H:%M:%S")
         level = self._levels[record.levelno]
         # databricks.labs.ucx.foo.bar -> d.l.u.foo.bar
         module_split = record.name.split(".")
@@ -53,7 +53,10 @@ class NiceFormatter(logging.Formatter):
             color_marker = self.BOLD
         elif record.levelno in (logging.ERROR, logging.FATAL):
             color_marker = self.RED + self.BOLD
-        return f"{self.GRAY}{ts}{self.RESET} {level} {color_marker}[{name}] {msg}{self.RESET}"
+        thread_name = ""
+        if record.threadName != "MainThread":
+            thread_name = f"[{record.threadName}]"
+        return f"{self.GRAY}{ts}{self.RESET} {level} {color_marker}[{name}]{thread_name} {msg}{self.RESET}"
 
 
 def _install(level="DEBUG"):
