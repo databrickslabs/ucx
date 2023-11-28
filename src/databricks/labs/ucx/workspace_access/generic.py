@@ -36,11 +36,6 @@ class WorkspaceObjectInfo:
     language: str = None
 
 
-class RetryableError(DatabricksError):
-    def __init__(self, *args, **kwargs):
-        super().__init__(*args, **kwargs)
-
-
 class Listing:
     def __init__(self, func: Callable[..., list], id_attribute: str, object_type: str):
         self._func = func
