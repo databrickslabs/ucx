@@ -290,6 +290,6 @@ def test_safe_set_permissions_when_error_retriable():
     ws.dbsql_permissions.set.side_effect = InternalError(...)
     sup = RedashPermissionsSupport(ws=ws, listings=[], verify_timeout=timedelta(seconds=1))
     acl = [sql.AccessControl(group_name="group_1", permission_level=sql.PermissionLevel.CAN_MANAGE)]
-    with pytest.raises(TimeoutError) as e:
+    with pytest.raises(InternalError) as e:
         sup._safe_set_permissions(sql.ObjectTypePlural.QUERIES, "test", acl)
-    assert "Timed out after" in str(e.value)
+    assert e.type == InternalError
