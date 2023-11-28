@@ -8,6 +8,7 @@ Legacy Table ACLs, Entitlements, AWS instance profiles, Clusters, Cluster polici
 See [contributing instructions](CONTRIBUTING.md) to help improve this project.
 
 
+
 ## Introduction
 UCX will guide you, the Databricks customer, through the process of upgrading your account, groups, workspaces, jobs etc. to Unity Catalog.
 
