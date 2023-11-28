@@ -8,7 +8,7 @@ import org.apache.spark.sql.DataFrame
 
 // must follow the same structure as databricks.labs.ucx.hive_metastore.tables.Table
 case class TableDetails(catalog: String, database: String, name: String, object_type: String,
-                        table_format: String, location: String, view_text: String, upgraded_to: String)
+                        table_format: String, location: String, view_text: String, upgraded_to: String, storage_properties: String)
 
 // recording error log in the database
 case class TableError(catalog: String, database: String, name: String, error: String)
@@ -37,10 +37,22 @@ def metadataForAllTables(databases: Seq[String], queue: ConcurrentLinkedQueue[Ta
           failures.add(TableError("hive_metastore", databaseName, tableName, s"result is null"))
           None
         } else {
-          val upgraded_to=table.properties.get("upgraded_to")
+          val upgraded_to = table.properties.get("upgraded_to")
+          val redactedKey = "*********"
+
+          val formattedString = table.storage.properties.map {
+            case (key, value) =>
+              if (key == "personalAccessToken")
+                s"$key=$redactedKey(redacted)"
+              else if (key.equalsIgnoreCase("password"))
+                s"$key=$redactedKey(redacted)"
+              else
+                s"$key=$value"
+          }.mkString("[", ", ", "]")
+
           Some(TableDetails("hive_metastore", databaseName, tableName, table.tableType.name, table.provider.orNull,
             table.storage.locationUri.map(_.toString).orNull, table.viewText.orNull,
-              upgraded_to match {case Some(target) => target case None => null}))
+            upgraded_to match { case Some(target) => target case None => null }, formattedString))
         }
       } catch {
         case err: Throwable =>
