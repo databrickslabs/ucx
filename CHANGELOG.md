@@ -3,7 +3,6 @@
 ## 0.6.2
 
  * Added current version of UCX to task logs ([#566](https://github.com/databrickslabs/ucx/pull/566)).
- 
  * Fixed `'str' object has no attribute 'value'` failure on apply backup group permissions task ([#574](https://github.com/databrickslabs/ucx/pull/574)).
  * Fixed `crawl_cluster` failure over custom runtimes ([#602](https://github.com/databrickslabs/ucx/pull/602)).
  * Fixed `databricks labs ucx workflows` command ([#608](https://github.com/databrickslabs/ucx/pull/608)).
