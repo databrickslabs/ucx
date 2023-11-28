@@ -159,7 +159,7 @@ class PermissionManager(CrawlerBase):
 
     def load_all_for(self, object_type: str, object_id: str, klass: type) -> any:
         for perm in self.load_all():
-            if object_type == perm.object_type and object_id == perm.object_id:
+            if object_type == perm.object_type and object_id.lower() == perm.object_id.lower():
                 raw = json.loads(perm.raw)
                 yield klass(**raw)
 

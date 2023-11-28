@@ -7,7 +7,7 @@ from databricks.sdk.errors import NotFound
 from databricks.sdk.retries import retried
 from databricks.sdk.service.iam import PermissionLevel, ResourceMeta
 
-from databricks.labs.ucx.hive_metastore import GrantsCrawler, TablesCrawler
+from databricks.labs.ucx.hive_metastore import GrantsCrawler
 from databricks.labs.ucx.hive_metastore.grants import Grant
 from databricks.labs.ucx.workspace_access.generic import (
     GenericPermissionsSupport,
@@ -16,6 +16,8 @@ from databricks.labs.ucx.workspace_access.generic import (
 from databricks.labs.ucx.workspace_access.groups import GroupManager
 from databricks.labs.ucx.workspace_access.manager import PermissionManager
 from databricks.labs.ucx.workspace_access.tacl import TableAclSupport
+
+from ..conftest import StaticTablesCrawler
 
 logger = logging.getLogger(__name__)
 
@@ -118,7 +120,8 @@ def test_delete_ws_groups_should_not_delete_non_reflected_acc_groups(ws, make_uc
     assert ws.groups.get(ws_group.id).display_name == "ucx-temp-" + ws_group.display_name
 
 
-@retried(on=[NotFound, TimeoutError, AssertionError], timeout=timedelta(minutes=20))
+# average runtime is 100 seconds
+@retried(on=[NotFound, TimeoutError, AssertionError], timeout=timedelta(minutes=15))
 def test_replace_workspace_groups_with_account_groups(
     ws,
     sql_backend,
@@ -137,13 +140,18 @@ def test_replace_workspace_groups_with_account_groups(
     )
     logger.info(f"Cluster policy: {ws.config.host}#setting/clusters/cluster-policies/view/{cluster_policy.policy_id}")
 
-    tables = TablesCrawler(sql_backend, inventory_schema)
-    grants = GrantsCrawler(tables)
-
     dummy_table = make_table()
     sql_backend.execute(f"GRANT SELECT, MODIFY ON TABLE {dummy_table.full_name} TO `{ws_group.display_name}`")
-    res = grants.for_table_info(dummy_table)
-    assert len(res[ws_group.display_name]) == 2
+
+    tables = StaticTablesCrawler(sql_backend, inventory_schema, [dummy_table])
+    grants = GrantsCrawler(tables)
+
+    @retried(on=[AssertionError], timeout=timedelta(seconds=30))
+    def assert_table_has_two_grants():
+        res = grants.for_table_info(dummy_table)
+        assert len(res[ws_group.display_name]) == 2
+
+    assert_table_has_two_grants()
 
     group_manager = GroupManager(sql_backend, ws, inventory_schema, [ws_group.display_name], "ucx-temp-")
 
@@ -156,8 +164,12 @@ def test_replace_workspace_groups_with_account_groups(
 
     permission_manager.inventorize_permissions()
 
-    dummy_grants = list(permission_manager.load_all_for("TABLE", dummy_table.full_name, Grant))
-    assert 2 == len(dummy_grants)
+    @retried(on=[AssertionError], timeout=timedelta(seconds=30))
+    def assert_table_has_two_permissions():
+        dummy_grants = list(permission_manager.load_all_for("TABLE", dummy_table.full_name, Grant))
+        assert 2 == len(dummy_grants)
+
+    assert_table_has_two_permissions()
 
     table_permissions = grants.for_table_info(dummy_table)
     assert ws_group.display_name in table_permissions

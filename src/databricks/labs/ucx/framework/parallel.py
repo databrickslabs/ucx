@@ -3,6 +3,7 @@ import datetime as dt
 import functools
 import logging
 import os
+import re
 import threading
 from collections.abc import Callable
 from concurrent.futures import ThreadPoolExecutor
@@ -73,7 +74,8 @@ class Threads(Generic[Result]):
             logger.info(f"Finished '{self._name}' tasks: {stats}")
 
     def _execute(self):
-        with ThreadPoolExecutor(self._num_threads) as pool:
+        thread_name_prefix = re.sub(r"\W+", "_", self._name)
+        with ThreadPoolExecutor(self._num_threads, thread_name_prefix) as pool:
             futures = []
             for task in self._tasks:
                 if task is None:
