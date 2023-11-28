@@ -3,20 +3,20 @@
 ## 0.6.2
 
  * Added current version of UCX to task logs ([#566](https://github.com/databrickslabs/ucx/pull/566)).
- * Fixed external locations widget to return hostname for `jdbc:`-sourced tables ([#621](https://github.com/databrickslabs/ucx/pull/621)).
+ 
  * Fixed `'str' object has no attribute 'value'` failure on apply backup group permissions task ([#574](https://github.com/databrickslabs/ucx/pull/574)).
  * Fixed `crawl_cluster` failure over custom runtimes ([#602](https://github.com/databrickslabs/ucx/pull/602)).
  * Fixed `databricks labs ucx workflows` command ([#608](https://github.com/databrickslabs/ucx/pull/608)).
  * Fixed problematic integration test fixture `make_ucx_group` ([#613](https://github.com/databrickslabs/ucx/pull/613)).
  * Fixed internal API request retry logic by relying on concrete exception types ([#637](https://github.com/databrickslabs/ucx/pull/637)).
+ * Fixed `tables.scala` notebook to read inventory database from `~/.ucx/config.yml` file. ([#614](https://github.com/databrickslabs/ucx/pull/614)).
  * Introduced `StaticTablesCrawler` for integration tests ([#632](https://github.com/databrickslabs/ucx/pull/632)).
  * Reduced runtime of `test_set_owner_permission` from 15 minutes to 44 seconds ([#636](https://github.com/databrickslabs/ucx/pull/636)).
  * Updated `LICENSE` ([#643](https://github.com/databrickslabs/ucx/pull/643)).
  * Updated documentation ([#611](https://github.com/databrickslabs/ucx/pull/611), [#646](https://github.com/databrickslabs/ucx/pull/646)).
 
 **Breaking changes** (existing installations need to remove `ucx` database, reinstall UCX and re-run assessment jobs)
-
- * Fixed `tables.scala` notebook to read inventory database from `~/.ucx/config.yml` file. ([#614](https://github.com/databrickslabs/ucx/pull/614)).
+ * Fixed external locations widget to return hostname for `jdbc:`-sourced tables ([#621](https://github.com/databrickslabs/ucx/pull/621)).
 
 ## 0.6.1
 
