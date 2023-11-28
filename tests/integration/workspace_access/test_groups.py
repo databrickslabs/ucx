@@ -143,7 +143,6 @@ def test_replace_workspace_groups_with_account_groups(
     dummy_table = make_table()
     sql_backend.execute(f"GRANT SELECT, MODIFY ON TABLE {dummy_table.full_name} TO `{ws_group.display_name}`")
 
-    # tables = TablesCrawler(sql_backend, inventory_schema)
     tables = StaticTablesCrawler(sql_backend, inventory_schema, [dummy_table])
     grants = GrantsCrawler(tables)
 
