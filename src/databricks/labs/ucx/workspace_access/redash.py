@@ -8,13 +8,13 @@ from functools import partial
 
 from databricks.sdk import WorkspaceClient
 from databricks.sdk.core import DatabricksError
+from databricks.sdk.errors import NotFound, PermissionDenied
 from databricks.sdk.retries import retried
 from databricks.sdk.service import sql
 from databricks.sdk.service.sql import ObjectTypePlural, SetResponse
 
 from databricks.labs.ucx.mixins.hardening import rate_limited
 from databricks.labs.ucx.workspace_access.base import AclSupport, Permissions
-from databricks.labs.ucx.workspace_access.generic import RetryableError
 from databricks.labs.ucx.workspace_access.groups import MigrationState
 
 logger = logging.getLogger(__name__)
@@ -82,13 +82,9 @@ class RedashPermissionsSupport(AclSupport):
     def _safe_get_dbsql_permissions(self, object_type: sql.ObjectTypePlural, object_id: str) -> sql.GetResponse | None:
         try:
             return self._ws.dbsql_permissions.get(object_type, object_id)
-        except DatabricksError as e:
-            if e.error_code in ["RESOURCE_DOES_NOT_EXIST", "RESOURCE_NOT_FOUND", "PERMISSION_DENIED"]:
-                logger.warning(f"Could not get permissions for {object_type} {object_id} due to {e.error_code}")
-                return None
-            else:
-                msg = f"{e.error_code} can be retried, doing another attempt..."
-                raise RetryableError(message=msg) from e
+        except NotFound:
+            logger.warning(f"removed on backend: {object_type} {object_id}")
+            return None
 
     @rate_limited(max_requests=100)
     def _crawler_task(self, object_id: str, object_type: sql.ObjectTypePlural) -> Permissions | None:
@@ -123,11 +119,11 @@ class RedashPermissionsSupport(AclSupport):
         This affects the way how we prepare the new ACL request.
         """
 
-        set_retry_on_value_error = retried(on=[RetryableError], timeout=self._verify_timeout)
+        set_retry_on_value_error = retried(on=[ValueError, DatabricksError], timeout=self._verify_timeout)
         set_retried_check = set_retry_on_value_error(self._safe_set_permissions)
         set_retried_check(object_type, object_id, acl)
 
-        retry_on_value_error = retried(on=[ValueError, RetryableError], timeout=self._verify_timeout)
+        retry_on_value_error = retried(on=[ValueError, DatabricksError], timeout=self._verify_timeout)
         retried_check = retry_on_value_error(self._inflight_check)
         return retried_check(object_type, object_id, acl)
 
@@ -152,7 +148,6 @@ class RedashPermissionsSupport(AclSupport):
             acl_requests.append(new_acl_request)
         return acl_requests
 
-    @retried(on=[RetryableError], timeout=timedelta(minutes=12))
     @rate_limited(burst_period_seconds=30)
     def _safe_set_permissions(
         self, object_type: ObjectTypePlural, object_id: str, acl: list[sql.AccessControl] | None
@@ -172,19 +167,13 @@ class RedashPermissionsSupport(AclSupport):
                     f"Failed to set permission and will be retried for {object_type} {object_id}, "
                     f"doing another attempt..."
                 )
-                raise RetryableError(message=msg)
-        except DatabricksError as e:
-            if e.error_code in [
-                "BAD_REQUEST",
-                "UNAUTHORIZED",
-                "PERMISSION_DENIED",
-                "NOT_FOUND",
-            ]:
-                logger.warning(f"Could not update permissions for {object_type} {object_id} due to {e.error_code}")
-                return None
-            else:
-                msg = f"{e.error_code} can be retried for {object_type} {object_id}, doing another attempt..."
-                raise RetryableError(message=msg) from e
+                raise ValueError(msg)
+        except PermissionDenied:
+            logger.warning(f"Permission denied: {object_type} {object_id}")
+            return None
+        except NotFound:
+            logger.warning(f"Deleted on platform: {object_type} {object_id}")
+            return None
 
 
 def redash_listing_wrapper(

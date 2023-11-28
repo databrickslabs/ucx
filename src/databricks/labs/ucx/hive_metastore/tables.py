@@ -26,6 +26,8 @@ class Table:
     view_text: str = None
     upgraded_to: str = None
 
+    storage_properties: str = None
+
     @property
     def is_delta(self) -> bool:
         if self.table_format is None:
@@ -162,6 +164,7 @@ class TablesCrawler(CrawlerBase):
                 location=describe.get("Location", None),
                 view_text=describe.get("View Text", None),
                 upgraded_to=self._parse_table_props(describe.get("Table Properties", "")).get("upgraded_to", None),
+                storage_properties=self._parse_table_props(describe.get("Storage Properties", "")),
             )
         except Exception as e:
             # TODO: https://github.com/databrickslabs/ucx/issues/406

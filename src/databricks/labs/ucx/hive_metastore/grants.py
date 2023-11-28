@@ -76,7 +76,7 @@ class Grant:
         object_type, object_key = self.this_type_and_key()
         # See https://docs.databricks.com/en/sql/language-manual/security-grant.html
         if self.action_type.upper() == "OWN":
-            return f"ALTER {object_key} OWNER TO `{self.principal}`"
+            return f"ALTER {object_type} {object_key} OWNER TO `{self.principal}`"
         else:
             return f"GRANT {self.action_type} ON {object_type} {object_key} TO `{self.principal}`"
 

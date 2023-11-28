@@ -9,6 +9,7 @@ from typing import Optional
 
 from databricks.sdk import WorkspaceClient
 from databricks.sdk.core import DatabricksError
+from databricks.sdk.errors import InvalidParameterValue, NotFound, PermissionDenied
 from databricks.sdk.retries import retried
 from databricks.sdk.service import iam, ml
 from databricks.sdk.service.iam import PermissionLevel
@@ -33,11 +34,6 @@ class WorkspaceObjectInfo:
     object_type: str = None
     object_id: str = None
     language: str = None
-
-
-class RetryableError(DatabricksError):
-    def __init__(self, *args, **kwargs):
-        super().__init__(*args, **kwargs)
 
 
 class Listing:
@@ -127,11 +123,11 @@ class GenericPermissionsSupport(AclSupport):
 
     @rate_limited(max_requests=30)
     def _applier_task(self, object_type: str, object_id: str, acl: list[iam.AccessControlRequest]):
-        update_retry_on_value_error = retried(on=[RetryableError], timeout=self._verify_timeout)
+        update_retry_on_value_error = retried(on=[DatabricksError], timeout=self._verify_timeout)
         update_retried_check = update_retry_on_value_error(self._safe_update_permissions)
         update_retried_check(object_type, object_id, acl)
 
-        retry_on_value_error = retried(on=[ValueError, RetryableError], timeout=self._verify_timeout)
+        retry_on_value_error = retried(on=[ValueError, DatabricksError], timeout=self._verify_timeout)
         retried_check = retry_on_value_error(self._inflight_check)
         return retried_check(object_type, object_id, acl)
 
@@ -200,39 +196,30 @@ class GenericPermissionsSupport(AclSupport):
     def _safe_get_permissions(self, object_type: str, object_id: str) -> iam.ObjectPermissions | None:
         try:
             return self._ws.permissions.get(object_type, object_id)
-        except DatabricksError as e:
-            if e.error_code in [
-                "RESOURCE_DOES_NOT_EXIST",
-                "RESOURCE_NOT_FOUND",
-                "PERMISSION_DENIED",
-                "FEATURE_DISABLED",
-                "BAD_REQUEST",
-            ]:
-                logger.warning(f"Could not get permissions for {object_type} {object_id} due to {e.error_code}")
-                return None
-            else:
-                msg = f"{e.error_code} can be retried for {object_type} {object_id}, doing another attempt..."
-                raise RetryableError(message=msg) from e
+        except PermissionDenied:
+            logger.warning(f"permission denied: {object_type} {object_id}")
+            return None
+        except NotFound:
+            logger.warning(f"removed on backend: {object_type} {object_id}")
+            return None
+        except InvalidParameterValue:
+            logger.warning(f"jobs or cluster removed on backend: {object_type} {object_id}")
+            return None
 
     def _safe_update_permissions(
         self, object_type: str, object_id: str, acl: list[iam.AccessControlRequest]
     ) -> iam.ObjectPermissions | None:
         try:
             return self._ws.permissions.update(object_type, object_id, access_control_list=acl)
-        except DatabricksError as e:
-            if e.error_code in [
-                "BAD_REQUEST",
-                "INVALID_PARAMETER_VALUE",
-                "UNAUTHORIZED",
-                "PERMISSION_DENIED",
-                "FEATURE_DISABLED",
-                "RESOURCE_DOES_NOT_EXIST",
-            ]:
-                logger.warning(f"Could not update permissions for {object_type} {object_id} due to {e.error_code}")
-                return None
-            else:
-                msg = f"{e.error_code} can be retried for {object_type} {object_id}, doing another attempt..."
-                raise RetryableError(message=msg) from e
+        except PermissionDenied:
+            logger.warning(f"permission denied: {object_type} {object_id}")
+            return None
+        except NotFound:
+            logger.warning(f"removed on backend: {object_type} {object_id}")
+            return None
+        except InvalidParameterValue:
+            logger.warning(f"jobs or cluster removed on backend: {object_type} {object_id}")
+            return None
 
     def _prepare_new_acl(
         self, permissions: iam.ObjectPermissions, migration_state: MigrationState
