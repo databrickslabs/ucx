@@ -6,8 +6,8 @@ from unittest.mock import MagicMock, patch
 
 import pytest
 import yaml
-from databricks.sdk.errors import NotFound, OperationFailed
-from databricks.sdk.service import iam, jobs
+from databricks.sdk.errors import InvalidParameterValue, NotFound, OperationFailed
+from databricks.sdk.service import iam, jobs, sql
 from databricks.sdk.service.compute import (
     GlobalInitScriptDetails,
     GlobalInitScriptDetailsWithContent,
@@ -89,7 +89,6 @@ def test_run_workflow_creates_proper_failure(ws, mocker):
     ws.jobs.get_run_output.return_value = jobs.RunOutput(error="does not compute", error_trace="# goes to stderr")
     installer = WorkspaceInstaller(ws)
     installer._state.jobs = {"foo": "bar"}
-
     with pytest.raises(OperationFailed) as failure:
         installer.run_workflow("foo")
 
@@ -659,3 +658,75 @@ def test_global_init_script_create_new(mock_open, mock_input, ws):
 
     install = WorkspaceInstaller(ws)
     install._install_spark_config_for_hms_lineage()
+
+
+def test_remove_database(ws, mocker):
+    install = WorkspaceInstaller(ws, sql_backend=MockBackend())
+    mocker.patch("builtins.input", return_value="yes")
+    mocker.patch("databricks.labs.ucx.framework.crawlers.SqlBackend.execute", return_value=None)
+
+    config_bytes = yaml.dump(WorkspaceConfig(inventory_database="testdb", warehouse_id="123").as_dict()).encode("utf8")
+    ws.workspace.download = lambda _: io.BytesIO(config_bytes)
+    install._remove_database()
+
+
+def test_remove_jobs_no_state(ws, mocker):
+    install = WorkspaceInstaller(ws)
+    install._state.jobs = {}
+    install._remove_jobs()
+
+
+def test_remove_jobs_with_state_missing_job(ws, mocker):
+    install = WorkspaceInstaller(ws)
+    install._state.jobs = {"job1": "123"}
+    ws.jobs.delete.side_effect = InvalidParameterValue("job id 123 not found")
+    install._remove_jobs()
+
+
+def test_remove_jobs_job(ws, mocker):
+    install = WorkspaceInstaller(ws)
+    install._state.jobs = {"job1": "123"}
+    install._remove_jobs()
+
+
+def test_remove_warehouse(ws, mocker):
+    install = WorkspaceInstaller(ws)
+    config_bytes = yaml.dump(WorkspaceConfig(inventory_database="testdb", warehouse_id="123").as_dict()).encode("utf8")
+    ws.workspace.download = lambda _: io.BytesIO(config_bytes)
+    ws.warehouses.get.return_value = sql.GetWarehouseResponse(id="123", name="Unity Catalog Migration 123456")
+    ws.warehouses.delete.return_value = None
+    install._remove_warehouse()
+
+
+def test_remove_warehouse_not_exists(ws, mocker):
+    install = WorkspaceInstaller(ws)
+    config_bytes = yaml.dump(WorkspaceConfig(inventory_database="testdb", warehouse_id="123").as_dict()).encode("utf8")
+    ws.workspace.download = lambda _: io.BytesIO(config_bytes)
+
+    ws.warehouses.get.return_value = sql.GetWarehouseResponse(id="123", name="Unity Catalog Migration 123456")
+    ws.warehouses.delete.side_effect = InvalidParameterValue("warehouse id 123 not found")
+    install._remove_warehouse()
+
+
+def test_remove_install_folder(ws, mocker):
+    install = WorkspaceInstaller(ws)
+    ws.workspace.delete.return_value = None
+    install._remove_install_folder()
+
+
+def test_remove_install_folder_not_exists(ws, mocker):
+    install = WorkspaceInstaller(ws)
+    ws.workspace.delete.side_effect = InvalidParameterValue("folder not found")
+    install._remove_install_folder()
+
+
+def test_uninstall(ws, mocker):
+    install = WorkspaceInstaller(ws, sql_backend=MockBackend())
+    mocker.patch("builtins.input", return_value="yes")
+    mocker.patch("databricks.labs.ucx.framework.crawlers.SqlBackend.execute", return_value=None)
+    config_bytes = yaml.dump(WorkspaceConfig(inventory_database="testdb", warehouse_id="123").as_dict()).encode("utf8")
+    ws.workspace.download = lambda _: io.BytesIO(config_bytes)
+    install._state.jobs = {"job1": "123"}
+    ws.warehouses.get.return_value = sql.GetWarehouseResponse(id="123", name="Customer Warehouse 123456")
+    ws.workspace.delete.return_value = None
+    install.uninstall()

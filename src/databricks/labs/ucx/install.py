@@ -144,8 +144,6 @@ class WorkspaceInstaller:
         self._override_clusters = None
         self._dashboards = {}
         self._state = InstallState(ws, self._install_folder)
-        self._delete_ucx = False
-        self._delete_inventory_database = False
 
     def run(self):
         logger.info(f"Installing UCX v{self._version}")
@@ -929,8 +927,8 @@ class WorkspaceInstaller:
                 return
             self._remove_database()
             self._remove_jobs()
-            self.remove_warehouse()
-            self.remove_install_folder()
+            self._remove_warehouse()
+            self._remove_install_folder()
             logger.info(f"UnInstalling UCX v{self._version}")
 
     def _remove_database(self):
@@ -962,7 +960,7 @@ class WorkspaceInstaller:
                 logger.error(f"Error deleting job {step_name} job_id={job_id}.")
                 continue
 
-    def remove_warehouse(self):
+    def _remove_warehouse(self):
         try:
             warehouse_name = self._ws.warehouses.get(id=self._current_config.warehouse_id).name
             if warehouse_name.startswith("Unity Catalog Migration"):
@@ -971,7 +969,7 @@ class WorkspaceInstaller:
         except InvalidParameterValue:
             logger.error("Error accessing warehouse details")
 
-    def remove_install_folder(self):
+    def _remove_install_folder(self):
         try:
             logger.info(f"Deleting install folder {self._install_folder}.")
             self._ws.workspace.delete(path=self._install_folder, recursive=True)
