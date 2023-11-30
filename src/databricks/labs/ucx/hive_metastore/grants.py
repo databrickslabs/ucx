@@ -140,7 +140,7 @@ class GrantsCrawler(CrawlerBase):
 
     def _crawl(self) -> list[Grant]:
         """
-        Crawls and lists grants for all databases, tables, and views within hive_metastore.
+        Crawls and lists grants for all databases, tables,  views, any file and anonymous function within hive_metastore.
 
         Returns:
             list[Grant]: A list of Grant objects representing the listed grants.
@@ -155,13 +155,15 @@ class GrantsCrawler(CrawlerBase):
 
         Note:
         - The method assumes that the `_grants` method fetches grants based on the provided parameters (catalog,
-          database, table, view).
+          database, table, view, any file, anonymous function).
 
         Returns:
         list[Grant]: A list of Grant objects representing the grants found in hive_metastore.
         """
         catalog = "hive_metastore"
         tasks = [partial(self._grants, catalog=catalog)]
+        tasks.append(partial(self._grants, catalog=catalog, any_file=True))
+        tasks.append(partial(self._grants, catalog=catalog, anonymous_function=True))
         # scan all databases, even empty ones
         for row in self._fetch(f"SHOW DATABASES FROM {catalog}"):
             tasks.append(partial(self._grants, catalog=catalog, database=row.databaseName))
@@ -239,7 +241,8 @@ class GrantsCrawler(CrawlerBase):
         )
         try:
             grants = []
-            object_type_normalization = {"SCHEMA": "DATABASE", "CATALOG$": "CATALOG"}
+            object_type_normalization = {"SCHEMA": "DATABASE", "CATALOG$": "CATALOG", "ANY_FILE": "ANY FILE",
+                                         "ANONYMOUS_FUNCTION": "ANONYMOUS FUNCTION"}
             for row in self._fetch(f"SHOW GRANTS ON {on_type} {key}"):
                 (principal, action_type, object_type, _) = row
                 if object_type in object_type_normalization:
