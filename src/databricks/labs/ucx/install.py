@@ -419,6 +419,12 @@ class WorkspaceInstaller:
                     )
                     instance_profile, spark_conf_dict = self._get_ext_hms_conf_from_policy(cluster_policy)
 
+        use_policy = self._question("Do you want to follow a policy to create clusters", default="no")
+        if use_policy != 'no':
+            custom_cluster_policy_id = self._question("Provide a cluster policy id")
+        else:
+            custom_cluster_policy_id = None
+
         self._config = WorkspaceConfig(
             inventory_database=inventory_database,
             include_group_names=groups_config_args["selected"],
@@ -428,6 +434,7 @@ class WorkspaceInstaller:
             num_threads=num_threads,
             instance_profile=instance_profile,
             spark_conf=spark_conf_dict,
+            custom_cluster_policy_id = custom_cluster_policy_id
         )
 
         self._write_config(overwrite=False)
@@ -740,6 +747,8 @@ class WorkspaceInstaller:
                 num_workers=0,
             )
         )
+        if self._config.custom_cluster_policy_id is not None:
+            spec = replace(spec, policy_id=self._config.custom_cluster_policy_id)
         if self._ws.config.is_aws and spec.aws_attributes is not None:
             aws_attributes = replace(spec.aws_attributes, instance_profile_arn=self._config.instance_profile)
             spec = replace(spec, aws_attributes=aws_attributes)
@@ -796,7 +805,7 @@ class WorkspaceInstaller:
                 f"https://github.com/databrickslabs/ucx/releases. Original error is: {err!s}"
             )
             raise OSError(msg) from None
-
+            
     def _build_wheel(self, tmp_dir: str, *, verbose: bool = False):
         """Helper to build the wheel package"""
         streams = {}
@@ -845,9 +854,14 @@ class WorkspaceInstaller:
 
     def _cluster_node_type(self, spec: compute.ClusterSpec) -> compute.ClusterSpec:
         cfg = self._current_config
-        if cfg.instance_pool_id is not None:
-            return replace(spec, instance_pool_id=cfg.instance_pool_id)
-        spec = replace(spec, node_type_id=self._ws.clusters.select_node_type(local_disk=True))
+        valid_node_type = False
+        if cfg.custom_cluster_policy_id is not None:
+            if self._check_policy_has_instance_pool(cfg.custom_cluster_policy_id):
+                valid_node_type = True
+        if ~valid_node_type:
+            if cfg.instance_pool_id is not None:
+                return replace(spec, instance_pool_id=cfg.instance_pool_id)
+            spec = replace(spec, node_type_id=self._ws.clusters.select_node_type(local_disk=True))
         if self._ws.config.is_aws:
             return replace(spec, aws_attributes=compute.AwsAttributes(availability=compute.AwsAvailability.ON_DEMAND))
         if self._ws.config.is_azure:
@@ -872,7 +886,15 @@ class WorkspaceInstaller:
                 if key.startswith("spark_config.spark.sql.hive.metastore"):
                     yield policy
                     break
-
+    def _check_policy_has_instance_pool(self, policy_id):
+        policy = self._ws.cluster_policies.get(policy_id=policy_id)
+        def_json = json.loads(policy.definition)
+        instance_pool = def_json.get("instance_pool_id")
+        if instance_pool is not None:
+            return True
+        else:
+            return False
+         
     @staticmethod
     def _get_ext_hms_conf_from_policy(cluster_policy):
         spark_conf_dict = {}
