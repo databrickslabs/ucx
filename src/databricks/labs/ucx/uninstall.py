@@ -8,8 +8,7 @@ from databricks.labs.ucx.install import WorkspaceInstaller
 logger = logging.getLogger(__name__)
 
 if __name__ == "__main__":
-    print("uninstalling")
+    logger.setLevel("INFO")
     ws = WorkspaceClient(product="ucx", product_version=__version__)
-    logger.setLevel("DEBUG")
     installer = WorkspaceInstaller(ws)
     installer.uninstall()

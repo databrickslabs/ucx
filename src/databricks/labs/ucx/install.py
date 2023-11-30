@@ -920,10 +920,11 @@ class WorkspaceInstaller:
             try:
                 self._ws.workspace.get_status(self.config_file)
                 self._ws.workspace.get_status(self._install_folder)
-                self._ws.workspace.get_status(self._state)
+                self._ws.workspace.get_status(self._state._state_file)
             except NotFound:
                 logger.error(
-                    f"Check if {self._install_folder} is present along with {self.config_file} and {self._state}."
+                    f"Check if {self._install_folder} is present along with {self.config_file} and "
+                    f"{self._state._state_file}."
                 )
                 return
             self._remove_database()
@@ -980,6 +981,6 @@ class WorkspaceInstaller:
 
 if __name__ == "__main__":
     ws = WorkspaceClient(product="ucx", product_version=__version__)
-    logger.setLevel("DEBUG")
+    logger.setLevel("INFO")
     installer = WorkspaceInstaller(ws)
     installer.run()
