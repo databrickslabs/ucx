@@ -140,7 +140,8 @@ class GrantsCrawler(CrawlerBase):
 
     def _crawl(self) -> list[Grant]:
         """
-        Crawls and lists grants for all databases, tables,  views, any file and anonymous function within hive_metastore.
+        Crawls and lists grants for all databases, tables,  views, any file
+        and anonymous function within hive_metastore.
 
         Returns:
             list[Grant]: A list of Grant objects representing the listed grants.
@@ -244,8 +245,12 @@ class GrantsCrawler(CrawlerBase):
             grants = []
             # Added ANY FILE and ANONYMOUS FUNCTION in object_type_normalization
             # to capture the same in grants. issue:#623
-            object_type_normalization = {"SCHEMA": "DATABASE", "CATALOG$": "CATALOG", "ANY_FILE": "ANY FILE",
-                                         "ANONYMOUS_FUNCTION": "ANONYMOUS FUNCTION"}
+            object_type_normalization = {
+                "SCHEMA": "DATABASE",
+                "CATALOG$": "CATALOG",
+                "ANY_FILE": "ANY FILE",
+                "ANONYMOUS_FUNCTION": "ANONYMOUS FUNCTION",
+            }
             for row in self._fetch(f"SHOW GRANTS ON {on_type} {key}"):
                 (principal, action_type, object_type, _) = row
                 if object_type in object_type_normalization:
