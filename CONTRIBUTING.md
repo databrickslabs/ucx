@@ -277,4 +277,22 @@ Coverage HTML written to dir htmlcov
 $ 
 ```
 
+Sometimes, when multiple Python versions are installed in the workstation used for UCX development, one might encounter the following:
+
+```sh
+$ make dev
+ERROR: Environment `default` is incompatible: cannot locate Python: 3.10
+```
+
+The easiest fix is to reinstall Python 3.10. If required remove the installed hatch package manager and reinstall it:
+
+```sh
+$ brew install python@3.10
+$ rm -rf venv
+$ pip3 uninstall hatch
+$ python3.10 -m pip install hatch
+$ make dev
+$ make test
+```
+
 Note: The initial `hatch env show` is just to list the environments managed by Hatch and is not needed.

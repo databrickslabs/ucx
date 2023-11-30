@@ -236,7 +236,8 @@ def rename_workspace_local_groups(cfg: WorkspaceConfig):
 
 @task("migrate-groups", depends_on=[rename_workspace_local_groups])
 def reflect_account_groups_on_workspace(cfg: WorkspaceConfig):
-    """Adds matching account groups to this workspace."""
+    """Adds matching account groups to this workspace. The matching account level group(s) must preexist(s) for this
+    step to be successful. This process does not create the account level group(s)."""
     sql_backend = RuntimeBackend()
     ws = WorkspaceClient(config=cfg.to_databricks_config())
     group_manager = GroupManager(
