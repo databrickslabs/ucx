@@ -910,6 +910,6 @@ class WorkspaceInstaller:
 
 if __name__ == "__main__":
     ws = WorkspaceClient(product="ucx", product_version=__version__)
-    logger.setLevel("INFO")
+    logger.setLevel("DEBUG")
     installer = WorkspaceInstaller(ws)
     installer.run()
