@@ -162,6 +162,7 @@ class GrantsCrawler(CrawlerBase):
         """
         catalog = "hive_metastore"
         tasks = [partial(self._grants, catalog=catalog)]
+        # Scanning ANY FILE and ANONYMOUS FUNCTION grants
         tasks.append(partial(self._grants, catalog=catalog, any_file=True))
         tasks.append(partial(self._grants, catalog=catalog, anonymous_function=True))
         # scan all databases, even empty ones
@@ -241,6 +242,8 @@ class GrantsCrawler(CrawlerBase):
         )
         try:
             grants = []
+            # Added ANY FILE and ANONYMOUS FUNCTION in object_type_normalization
+            # to capture the same in grants. issue:#623
             object_type_normalization = {"SCHEMA": "DATABASE", "CATALOG$": "CATALOG", "ANY_FILE": "ANY FILE",
                                          "ANONYMOUS_FUNCTION": "ANONYMOUS FUNCTION"}
             for row in self._fetch(f"SHOW GRANTS ON {on_type} {key}"):
