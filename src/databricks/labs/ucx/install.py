@@ -144,6 +144,8 @@ class WorkspaceInstaller:
         self._override_clusters = None
         self._dashboards = {}
         self._state = InstallState(ws, self._install_folder)
+        self._delete_ucx = False
+        self._delete_inventory_database = False
 
     def run(self):
         logger.info(f"Installing UCX v{self._version}")
@@ -906,6 +908,74 @@ class WorkspaceInstaller:
                 logger.warning(f"skipping {step}: {e}")
                 continue
         return latest_status
+
+    def uninstall(self):
+        delete_ucx = self._question(
+            "Do you want to uninstall ucx from the workspace too, this would "
+            "remove ucx project folder, dashboards, queries and jobs",
+            default="yes",
+        )
+        if delete_ucx:
+            logger.info(f"UnInstalling UCX from workspace v{self._version}")
+            try:
+                self._ws.workspace.get_status(self.config_file)
+                self._ws.workspace.get_status(self._install_folder)
+                self._ws.workspace.get_status(self._state)
+            except NotFound:
+                logger.error(
+                    f"Check if {self._install_folder} is present along with {self.config_file} and {self._state}."
+                )
+                return
+            self._remove_database()
+            self._remove_jobs()
+            self.remove_warehouse()
+            self.remove_install_folder()
+            logger.info(f"UnInstalling UCX v{self._version}")
+
+    def _remove_database(self):
+        from databricks.labs import ucx
+
+        if (
+            self._question(
+                f"Do you want to delete the inventory database {self._current_config.inventory_database} too?",
+                default="yes",
+            )
+            == "yes"
+        ):
+            logger.info(f"Deleting inventory database {self._current_config.inventory_database}")
+            if self._sql_backend is None:
+                self._sql_backend = StatementExecutionBackend(self._ws, self._current_config.warehouse_id)
+            deployer = SchemaDeployer(self._sql_backend, self._current_config.inventory_database, ucx)
+            deployer.delete_schema()
+
+    def _remove_jobs(self):
+        logger.info("Deleting jobs")
+        if not self._state.jobs:
+            logger.error("No jobs present or jobs already deleted")
+            return
+        for step_name, job_id in self._state.jobs.items():
+            try:
+                logger.info(f"Deleting {step_name} job_id={job_id}.")
+                self._ws.jobs.delete(job_id)
+            except InvalidParameterValue:
+                logger.error(f"Error deleting job {step_name} job_id={job_id}.")
+                continue
+
+    def remove_warehouse(self):
+        try:
+            warehouse_name = self._ws.warehouses.get(id=self._current_config.warehouse_id).name
+            if warehouse_name.startswith("Unity Catalog Migration"):
+                logger.info("Deleting warehouse_name.")
+                self._ws.warehouses.delete(id=self._current_config.warehouse_id)
+        except InvalidParameterValue:
+            logger.error("Error accessing warehouse details")
+
+    def remove_install_folder(self):
+        try:
+            logger.info(f"Deleting install folder {self._install_folder}.")
+            self._ws.workspace.delete(path=self._install_folder, recursive=True)
+        except InvalidParameterValue:
+            logger.error("Error deleting install folder")
 
 
 if __name__ == "__main__":
