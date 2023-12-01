@@ -908,12 +908,11 @@ class WorkspaceInstaller:
         return latest_status
 
     def uninstall(self):
-        delete_ucx = self._question(
+        if not self._prompts or self._question(
             "Do you want to uninstall ucx from the workspace too, this would "
             "remove ucx project folder, dashboards, queries and jobs",
             default="yes",
-        )
-        if delete_ucx:
+        ):
             logger.info(f"UnInstalling UCX from workspace v{self._version}")
             try:
                 self._ws.workspace.get_status(self.config_file)
@@ -929,13 +928,14 @@ class WorkspaceInstaller:
             self._remove_jobs()
             self._remove_warehouse()
             self._remove_install_folder()
-            logger.info(f"UnInstalling UCX v{self._version}")
+            logger.info(f"UnInstalling UCX complete")
 
     def _remove_database(self):
         from databricks.labs import ucx
 
         if (
-            self._question(
+            not self._prompts
+            or self._question(
                 f"Do you want to delete the inventory database {self._current_config.inventory_database} too?",
                 default="yes",
             )
