@@ -69,23 +69,36 @@ class SecretScopesSupport(AclSupport):
         return any(g in mentioned_groups for g in [info.name_in_workspace for info in migration_state.groups])
 
     def secret_scope_permission(self, scope_name: str, group_name: str) -> workspace.AclPermission | None:
-        for acl in self._ws.secrets.list_acls(scope=scope_name):
-            if acl.principal == group_name:
-                return acl.permission
-        return None
+        try:
+            scope_acl = self._ws.secrets.get_acl(scope_name, group_name)
+            return scope_acl.permission
+        except:
+            return None
+
+        # for acl in self._ws.secrets.list_acls(scope=scope_name):
+        #     if acl.principal == group_name:
+        #         return acl.permission
+        # return None
 
     def _inflight_check(self, scope_name: str, group_name: str, expected_permission: workspace.AclPermission):
         # in-flight check for the applied permissions
         # the api might be inconsistent, therefore we need to check that the permissions were applied
         applied_permission = self.secret_scope_permission(scope_name, group_name)
         if applied_permission != expected_permission:
-            msg = f"Applied permission {applied_permission} is not equal to expected permission {expected_permission}"
-            raise ValueError(msg)
+            msg = f"Applied permission {applied_permission} is not equal to expected permission {expected_permission} for {scope_name} and {group_name}!"
+            # raise ValueError(msg)
+            logger.warning(msg)
+            return False
+        logger.info(f"Permissions matched for {scope_name}, {group_name} and {expected_permission}!")
         return True
 
     @rate_limited(max_requests=1100, burst_period_seconds=60)
     def _rate_limited_put_acl(self, object_id: str, principal: str, permission: workspace.AclPermission):
         self._ws.secrets.put_acl(object_id, principal, permission)
+
+        while not self._inflight_check(object_id, principal, permission):
+            logger.info(f"Performing inflight check for {object_id}, {principal} and {permission}")
+            self._ws.secrets.put_acl(object_id, principal, permission)
         retry_on_value_error = retried(on=[ValueError], timeout=self._verify_timeout)
         retried_check = retry_on_value_error(self._inflight_check)
         retried_check(object_id, principal, permission)
