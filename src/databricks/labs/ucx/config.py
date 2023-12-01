@@ -2,7 +2,7 @@ import dataclasses
 from abc import abstractmethod
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Any, Generic, TypeVar
+from typing import Any, Generic, TypeVar, Optional
 
 from databricks.sdk import AccountClient, WorkspaceClient
 from databricks.sdk.core import Config
@@ -174,7 +174,6 @@ class WorkspaceConfig(_Config["WorkspaceConfig"]):
     workspace_group_regex: str = None
     workspace_group_replace: str = None
     account_group_regex: str = None
-    group_match_by_external_id: bool = False
     # Includes group names for migration. If not specified, all matching groups will be picked up
     include_group_names: list[str] | None = None
     renamed_group_prefix: str = "ucx-renamed-"
