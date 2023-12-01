@@ -928,7 +928,7 @@ class WorkspaceInstaller:
             self._remove_jobs()
             self._remove_warehouse()
             self._remove_install_folder()
-            logger.info(f"UnInstalling UCX complete")
+            logger.info("UnInstalling UCX complete")
 
     def _remove_database(self):
         from databricks.labs import ucx

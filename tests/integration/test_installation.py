@@ -257,9 +257,9 @@ def test_uninstallation(
     install_folder = install._install_folder
     assessment_job_id = install._state.jobs["assessment"]
     install.uninstall()
-    with pytest.raises(NotFound) as failure:
+    with pytest.raises(NotFound):
         ws.workspace.get_status(install_folder)
-    with pytest.raises(InvalidParameterValue) as failure:
+    with pytest.raises(InvalidParameterValue):
         ws.jobs.get(job_id=assessment_job_id)
-    with pytest.raises(NotFound) as failure:
+    with pytest.raises(NotFound):
         sql_backend.execute(f"show tables from hive_metastore.{inventory_database}")
