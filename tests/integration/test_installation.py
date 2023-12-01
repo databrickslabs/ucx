@@ -220,3 +220,46 @@ def test_jobs_with_no_inventory_database(
         for step, job_id in install._state.jobs.items():
             logger.debug(f"cleaning up {step} job_id={job_id}")
             ws.jobs.delete(job_id)
+
+
+@retried(on=[TimeoutError], timeout=timedelta(minutes=20))
+def test_uninstallation(
+    ws,
+    sql_backend,
+    make_random,
+    env_or_skip,
+):
+    # TODO: (nfx) 5 minute optimization potential: parallelize 4 tasks: wait clusters, fixtures, and installation
+    inventory_database = f"ucx_{make_random(4)}"
+    default_cluster_id = env_or_skip("TEST_DEFAULT_CLUSTER_ID")
+    tacl_cluster_id = env_or_skip("TEST_LEGACY_TABLE_ACL_CLUSTER_ID")
+    logger.info(f"ensuring default ({default_cluster_id}) and tacl ({tacl_cluster_id}) clusters are running")
+    ws.clusters.ensure_cluster_is_running(default_cluster_id)
+    ws.clusters.ensure_cluster_is_running(tacl_cluster_id)
+
+    backup_group_prefix = "db-temp-"
+    install = WorkspaceInstaller.run_for_config(
+        ws,
+        WorkspaceConfig(
+            inventory_database=inventory_database,
+            instance_pool_id=env_or_skip("TEST_INSTANCE_POOL_ID"),
+            include_group_names=["ALL"],
+            renamed_group_prefix=backup_group_prefix,
+            log_level="DEBUG",
+        ),
+        sql_backend=sql_backend,
+        prefix=make_random(4),
+        override_clusters={
+            "main": default_cluster_id,
+            "tacl": tacl_cluster_id,
+        },
+    )
+    install_folder = install._install_folder
+    assessment_job_id = install._state.jobs["assessment"]
+    install.uninstall()
+    with pytest.raises(NotFound):
+        ws.workspace.get_status(install_folder)
+    with pytest.raises(InvalidParameterValue):
+        ws.jobs.get(job_id=assessment_job_id)
+    with pytest.raises(NotFound):
+        sql_backend.execute(f"show tables from hive_metastore.{inventory_database}")
