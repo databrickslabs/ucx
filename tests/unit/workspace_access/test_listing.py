@@ -7,7 +7,6 @@ from databricks.sdk.service.workspace import ObjectInfo, ObjectType
 from databricks.labs.ucx.workspace_access import generic, listing
 
 
-
 def test_logging_calls():
     ws = MagicMock()
     workspace_listing = listing.WorkspaceListing(ws=ws, num_threads=1)
@@ -159,18 +158,14 @@ def test_walk_should_retry_on_backend_exceptions_and_log_them():
     rootobj = ObjectInfo(path="/rootPath")
     file = ObjectInfo(path="/rootPath/file1", object_type=ObjectType.FILE)
     first_folder = ObjectInfo(path="/rootPath/nested_folder", object_type=ObjectType.DIRECTORY)
-    second_folder = ObjectInfo(
-        path="/rootPath/nested_folder_2", object_type=ObjectType.DIRECTORY
-    )
-    second_folder_notebook = ObjectInfo(
-        path="/rootPath/nested_folder_2/notebook2", object_type=ObjectType.NOTEBOOK
-    )
+    second_folder = ObjectInfo(path="/rootPath/nested_folder_2", object_type=ObjectType.DIRECTORY)
+    second_folder_notebook = ObjectInfo(path="/rootPath/nested_folder_2/notebook2", object_type=ObjectType.NOTEBOOK)
 
     def my_side_effect(path, **kwargs):
         if path == "/rootPath":
             return [file, first_folder, second_folder]
         elif path == "/rootPath/nested_folder":
-            raise mapping.InternalError("Backend dead")
+            raise mapping.InternalError
         elif path == "/rootPath/nested_folder_2":
             return [second_folder_notebook]
 

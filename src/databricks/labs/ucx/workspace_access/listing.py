@@ -5,7 +5,7 @@ from concurrent.futures import FIRST_COMPLETED, ThreadPoolExecutor, wait
 from itertools import groupby
 
 from databricks.sdk import WorkspaceClient
-from databricks.sdk.errors import NotFound, InternalError, DatabricksError
+from databricks.sdk.errors import InternalError, NotFound
 from databricks.sdk.retries import retried
 from databricks.sdk.service.workspace import ObjectInfo, ObjectType
 
