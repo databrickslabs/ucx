@@ -5,7 +5,8 @@ from concurrent.futures import FIRST_COMPLETED, ThreadPoolExecutor, wait
 from itertools import groupby
 
 from databricks.sdk import WorkspaceClient
-from databricks.sdk.errors import NotFound
+from databricks.sdk.errors import NotFound, InternalError, DatabricksError
+from databricks.sdk.retries import retried
 from databricks.sdk.service.workspace import ObjectInfo, ObjectType
 
 logger = logging.getLogger(__name__)
@@ -16,6 +17,7 @@ class WorkspaceListing:
         self,
         ws: WorkspaceClient,
         num_threads: int,
+        verify_timeout: dt.timedelta | None = dt.timedelta(minutes=1),
         *,
         with_directories: bool = True,
     ):
@@ -25,6 +27,7 @@ class WorkspaceListing:
         self._num_threads = num_threads
         self._with_directories = with_directories
         self._counter = 0
+        self._verify_timeout = verify_timeout
 
     def _progress_report(self, _):
         self._counter += 1
@@ -40,9 +43,17 @@ class WorkspaceListing:
                 f" rps: {rps:.3f}/sec"
             )
 
+    def _try_list_workspace(self, path: str) -> Iterator[ObjectType]:
+        try:
+            return self._ws.workspace.list(path=path, recursive=False)
+        except InternalError as e:
+            logger.warning(f"Had an InternalError when listing path {path}, retrying")
+            logger.warning(e)
+
     def _list_workspace(self, path: str) -> Iterator[ObjectType]:
-        # TODO: remove, use SDK
-        return self._ws.workspace.list(path=path, recursive=False)
+        list_retry_on_value_error = retried(on=[InternalError], timeout=self._verify_timeout)
+        list_retried_check = list_retry_on_value_error(self._ws.workspace.list)
+        return list_retried_check(path=path, recursive=False)
 
     def _list_and_analyze(self, obj: ObjectInfo) -> (list[ObjectInfo], list[ObjectInfo]):
         directories = []
@@ -60,6 +71,9 @@ class WorkspaceListing:
         except NotFound:
             # See https://github.com/databrickslabs/ucx/issues/230
             logger.warning(f"{obj.path} is not listable. Ignoring")
+        except TimeoutError as e:
+            logger.warning(f"Could not list {obj.path} due to backend error. Ignoring")
+            logger.warning(e)
         return directories, others
 
     def walk(self, start_path="/"):
