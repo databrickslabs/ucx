@@ -931,8 +931,6 @@ class WorkspaceInstaller:
             logger.info("UnInstalling UCX complete")
 
     def _remove_database(self):
-        from databricks.labs import ucx
-
         if (
             not self._prompts
             or self._question(
