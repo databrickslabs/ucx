@@ -478,12 +478,12 @@ def test_list_workspace_groups():
         entitlements=[ComplexValue(value="allow-cluster-create"), ComplexValue(value="allow-instance-pool-create")],
     )
 
-    def my_side_effect(id, **kwargs):
-        if id == "1":
+    def my_side_effect(group_id, **kwargs):
+        if group_id == "1":
             return full_group1
-        elif id == "2":
+        elif group_id == "2":
             return full_group2
-        elif id == "3":
+        elif group_id == "3":
             return full_group3
 
     wsclient.groups.get.side_effect = my_side_effect
@@ -503,5 +503,25 @@ def test_list_workspace_groups():
     assert result[0].members == [
         ComplexValue(display="test-user-1", value="20"),
         ComplexValue(display="test-user-2", value="21"),
+    ]
+    wsclient.groups.get.assert_called()
+
+    # Test when attributes contain "roles"
+    result = gm._list_workspace_groups("WorkspaceGroup", "id,displayName,meta,roles")
+    assert len(result) == 3
+    assert result[0].display_name == "group_1"
+    assert result[0].roles == [
+        ComplexValue(value="arn:aws:iam::123456789098:instance-profile/ip1"),
+        ComplexValue(value="arn:aws:iam::123456789098:instance-profile/ip2"),
+    ]
+    wsclient.groups.get.assert_called()
+
+    # Test when attributes contain "entitlements"
+    result = gm._list_workspace_groups("WorkspaceGroup", "id,displayName,meta,entitlements")
+    assert len(result) == 3
+    assert result[0].display_name == "group_1"
+    assert result[0].entitlements == [
+        ComplexValue(value="allow-cluster-create"),
+        ComplexValue(value="allow-instance-pool-create"),
     ]
     wsclient.groups.get.assert_called()

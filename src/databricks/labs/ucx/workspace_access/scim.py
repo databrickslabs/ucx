@@ -5,7 +5,7 @@ from functools import partial
 
 from databricks.sdk import WorkspaceClient
 from databricks.sdk.core import DatabricksError
-from databricks.sdk.errors import NotFound, PermissionDenied
+from databricks.sdk.errors import InternalError, NotFound, PermissionDenied
 from databricks.sdk.retries import retried
 from databricks.sdk.service import iam
 from databricks.sdk.service.iam import Group, Patch, PatchSchema
@@ -36,7 +36,7 @@ class ScimSupport(AclSupport):
     # TODO remove after ES-892977 is fixed
     @retried(on=[DatabricksError])
     def _get_groups(self):
-        return list(self._ws.groups.list(attributes="id,displayName,roles,entitlements"))
+        return list(self._list_workspace_groups(attributes="id,displayName,roles,entitlements"))
 
     def object_types(self) -> set[str]:
         return {"roles", "entitlements"}
@@ -108,3 +108,33 @@ class ScimSupport(AclSupport):
         except NotFound:
             logger.warning(f"removed on backend: {group_id}")
             return None
+
+    def _is_group_out_of_scope(self, group: iam.Group) -> bool:
+        if group.display_name in self._SYSTEM_GROUPS:
+            return True
+        return False
+
+    @retried(on=[InternalError])
+    @rate_limited(max_requests=255, burst_period_seconds=60)
+    def _get_group_with_retries(self, group_id: str) -> iam.Group | None:
+        return self._ws.groups.get(group_id)
+
+    def _list_workspace_groups(self, scim_attributes: str) -> list[iam.Group]:
+        results = []
+        logger.info(f"Listing workspace groups with {scim_attributes}...")
+        # these attributes can get too large causing the api to timeout
+        # so we're fetching groups without these attributes first
+        # and then calling get on each of them to fetch all attributes
+        if "members" in scim_attributes or "roles" in scim_attributes or "entitlements" in scim_attributes:
+            for g in self._ws.groups.list(attributes="id,displayName,meta"):
+                if self._is_group_out_of_scope(g):
+                    continue
+                group_with_all_attributes = self._get_group_with_retries(g.id)
+                results.append(group_with_all_attributes)
+        else:
+            for g in self._ws.groups.list(attributes=scim_attributes):
+                if self._is_group_out_of_scope(g):
+                    continue
+                results.append(g)
+        logger.info(f"Found {len(results)} groups")
+        return results

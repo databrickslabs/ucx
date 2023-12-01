@@ -201,37 +201,35 @@ class GroupManager(CrawlerBase):
             by_name[g.display_name] = g.id
         return by_name
 
+    def _is_group_out_of_scope(self, group: iam.Group, resource_type: str) -> bool:
+        if group.display_name in self._SYSTEM_GROUPS or group.meta.resource_type != resource_type:
+            return True
+        return False
+
     def _list_workspace_groups(self, resource_type: str, scim_attributes: str) -> list[iam.Group]:
         results = []
         logger.info(f"Listing workspace groups (resource_type={resource_type}) with {scim_attributes}...")
         # these attributes can get too large causing the api to timeout
-        # so we're fetching groups without these attributes first 
+        # so we're fetching groups without these attributes first
         # and then calling get on each of them to fetch all attributes
         if "members" in scim_attributes or "roles" in scim_attributes or "entitlements" in scim_attributes:
             for g in self._ws.groups.list(attributes="id,displayName,meta"):
-                if g.display_name in self._SYSTEM_GROUPS:
+                if self._is_group_out_of_scope(g, resource_type):
                     continue
-                if g.meta.resource_type != resource_type:
-                    continue
-                g = self._safe_get_group(g.id)
-                results.append(g)
+                group_with_all_attributes = self._get_group_with_retries(g.id)
+                results.append(group_with_all_attributes)
         else:
             for g in self._ws.groups.list(attributes=scim_attributes):
-                if g.display_name in self._SYSTEM_GROUPS:
-                    continue
-                if g.meta.resource_type != resource_type:
+                if self._is_group_out_of_scope(g, resource_type):
                     continue
                 results.append(g)
         logger.info(f"Found {len(results)} {resource_type}")
         return results
-    
+
+    @retried(on=[InternalError])
     @rate_limited(max_requests=255, burst_period_seconds=60)
-    def _safe_get_group(self, group_id: str) -> iam.Group | None:
-        try:
-            return self._ws.groups.get(group_id)
-        except InternalError:
-            logger.warning(f"internal error: {group_id}")
-            return None
+    def _get_group_with_retries(self, group_id: str) -> iam.Group | None:
+        return self._ws.groups.get(group_id)
 
     def _list_account_groups(self, scim_attributes: str) -> list[iam.Group]:
         # TODO: we should avoid using this method, as it's not documented
