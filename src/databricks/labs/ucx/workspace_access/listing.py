@@ -53,8 +53,8 @@ class WorkspaceListing:
 
     def _list_workspace(self, path: str) -> Iterator[ObjectType]:
         list_retry_on_value_error = retried(on=[InternalError], timeout=self._verify_timeout)
-        list_retried_check = list_retry_on_value_error(self._ws.workspace.list)
-        return list_retried_check(path=path, recursive=False)
+        list_retried_check = list_retry_on_value_error(self._try_list_workspace)
+        return list_retried_check(path=path)
 
     def _list_and_analyze(self, obj: ObjectInfo) -> (list[ObjectInfo], list[ObjectInfo]):
         directories = []

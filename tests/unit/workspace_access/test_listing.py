@@ -165,7 +165,7 @@ def test_walk_should_retry_on_backend_exceptions_and_log_them():
         if path == "/rootPath":
             return [file, first_folder, second_folder]
         elif path == "/rootPath/nested_folder":
-            raise InternalError
+            raise InternalError(message="Backend dead")
         elif path == "/rootPath/nested_folder_2":
             return [second_folder_notebook]
 
