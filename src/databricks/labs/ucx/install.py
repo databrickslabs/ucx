@@ -962,7 +962,7 @@ class WorkspaceInstaller:
 
     def _remove_warehouse(self):
         try:
-            warehouse_name = self._ws.warehouses.get(id=self._current_config.warehouse_id).name
+            warehouse_name = self._ws.warehouses.get(self._current_config.warehouse_id).name
             if warehouse_name.startswith("Unity Catalog Migration"):
                 logger.info("Deleting warehouse_name.")
                 self._ws.warehouses.delete(id=self._current_config.warehouse_id)
