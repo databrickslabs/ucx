@@ -937,7 +937,7 @@ class WorkspaceInstaller:
             not self._prompts
             or self._question(
                 f"Do you want to delete the inventory database {self._current_config.inventory_database} too?",
-                default="yes",
+                default="no",
             )
             == "yes"
         ):
