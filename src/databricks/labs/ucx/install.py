@@ -50,6 +50,7 @@ from databricks.labs.ucx.workspace_access.groups import MigratedGroup
 
 TAG_STEP = "step"
 TAG_APP = "App"
+WAREHOUSE_PREFIX = "Unity Catalog Migration"
 NUM_USER_ATTEMPTS = 10  # number of attempts user gets at answering a question
 EXTRA_TASK_PARAMS = {
     "job_id": "{{job_id}}",
@@ -372,7 +373,7 @@ class WorkspaceInstaller:
         )
         if warehouse_id == "create_new":
             new_warehouse = self._ws.warehouses.create(
-                name=f"Unity Catalog Migration {time.time_ns()}",
+                name=f"{WAREHOUSE_PREFIX} {time.time_ns()}",
                 spot_instance_policy=SpotInstancePolicy.COST_OPTIMIZED,
                 warehouse_type=EndpointInfoWarehouseType.PRO,
                 cluster_size="Small",
@@ -942,7 +943,7 @@ class WorkspaceInstaller:
             logger.info(f"Deleting inventory database {self._current_config.inventory_database}")
             if self._sql_backend is None:
                 self._sql_backend = StatementExecutionBackend(self._ws, self._current_config.warehouse_id)
-            deployer = SchemaDeployer(self._sql_backend, self._current_config.inventory_database, ucx)
+            deployer = SchemaDeployer(self._sql_backend, self._current_config.inventory_database, Any)
             deployer.delete_schema()
 
     def _remove_jobs(self):
@@ -961,7 +962,7 @@ class WorkspaceInstaller:
     def _remove_warehouse(self):
         try:
             warehouse_name = self._ws.warehouses.get(self._current_config.warehouse_id).name
-            if warehouse_name.startswith("Unity Catalog Migration"):
+            if warehouse_name.startswith(WAREHOUSE_PREFIX):
                 logger.info("Deleting warehouse_name.")
                 self._ws.warehouses.delete(id=self._current_config.warehouse_id)
         except InvalidParameterValue:
