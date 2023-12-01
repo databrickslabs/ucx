@@ -913,7 +913,7 @@ class WorkspaceInstaller:
             "remove ucx project folder, dashboards, queries and jobs",
             default="no",
         ):
-            logger.info(f"UnInstalling UCX from workspace v{self._version}")
+            logger.info(f"Deleting UCX v{self._version} from {self._ws.config.host}")
             try:
                 self._ws.workspace.get_status(self.config_file)
                 self._ws.workspace.get_status(self._install_folder)
