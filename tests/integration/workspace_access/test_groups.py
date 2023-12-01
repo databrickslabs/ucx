@@ -120,6 +120,32 @@ def test_delete_ws_groups_should_not_delete_non_reflected_acc_groups(ws, make_uc
     assert ws.groups.get(ws_group.id).display_name == "ucx-temp-" + ws_group.display_name
 
 
+def test_group_name_change(
+    ws,
+    sql_backend,
+    inventory_schema,
+    make_table,
+    make_ucx_group_prefix,
+    make_ucx_group_match,
+):
+    ws_group, account_group = make_ucx_group_prefix(prefix="SAMPLE_")
+    print(ws_group)
+    print(account_group)
+    dummy_table = make_table()
+    sql_backend.execute(f"GRANT SELECT, MODIFY ON TABLE {dummy_table.full_name} TO `{ws_group.display_name}`")
+    tables = StaticTablesCrawler(sql_backend, inventory_schema, [dummy_table])
+    grants = GrantsCrawler(tables)
+    group_manager = GroupManager(sql_backend, ws, inventory_schema, [ws_group.display_name], "ucx-temp-","^","SAMPLE_")
+    tacl = TableAclSupport(grants, sql_backend)
+    permission_manager = PermissionManager(sql_backend, inventory_schema, [tacl])
+    permission_manager.inventorize_permissions()
+    state = group_manager.get_migration_state()
+    group_manager.rename_groups()
+    group_manager.reflect_account_groups_on_workspace()
+    permission_manager.apply_group_permissions(state)
+    group_manager.delete_original_workspace_groups()
+
+
 # average runtime is 100 seconds
 @retried(on=[NotFound, TimeoutError, AssertionError], timeout=timedelta(minutes=15))
 def test_replace_workspace_groups_with_account_groups(
@@ -131,6 +157,11 @@ def test_replace_workspace_groups_with_account_groups(
     make_cluster_policy_permissions,
     make_table,
 ):
+    """
+
+    Args:
+        sql_backend (object):
+    """
     ws_group, _ = make_ucx_group()
     cluster_policy = make_cluster_policy()
     make_cluster_policy_permissions(

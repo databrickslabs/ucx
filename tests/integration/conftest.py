@@ -104,6 +104,74 @@ def make_ucx_group(make_random, make_group, make_acc_group, make_user):
     return inner
 
 
+@pytest.fixture
+def make_ucx_group_suffix(make_random, make_group, make_acc_group, user_pool):
+    assert (
+        len(user_pool) >= 1
+    ), "must have 'test-user-*' test users with id, userName and displayName in your test workspace"
+
+    def inner(suffix="_PROD"):
+        display_name = f"ucx_{make_random(4)}"
+        members = [_.id for _ in random.choices(user_pool, k=random.randint(1, 40))]
+        ws_group = make_group(display_name=display_name, members=members, entitlements=["allow-cluster-create"])
+        acc_group = make_acc_group(display_name=display_name+suffix, members=members)
+        return ws_group, acc_group
+
+    return inner
+
+
+@pytest.fixture
+def make_ucx_group_prefix(make_random, make_group, make_acc_group, user_pool):
+    assert (
+        len(user_pool) >= 1
+    ), "must have 'test-user-*' test users with id, userName and displayName in your test workspace"
+
+    def inner(prefix="PROD_"):
+        display_name = f"ucx_{make_random(4)}"
+        members = [_.id for _ in random.choices(user_pool, k=random.randint(1, 40))]
+        ws_group = make_group(display_name=display_name, members=members, entitlements=["allow-cluster-create"])
+        acc_group = make_acc_group(display_name=prefix + display_name, members=members)
+        return ws_group, acc_group
+
+    return inner
+
+
+@pytest.fixture
+def make_ucx_group_replace(make_random, make_group, make_acc_group, user_pool):
+    assert (
+        len(user_pool) >= 1
+    ), "must have 'test-user-*' test users with id, userName and displayName in your test workspace"
+
+    def inner(ws_elem="DS", acct_elem="DataScience"):
+        rand = make_random()
+        ws_group_name = f"ucx_{ws_elem}_{rand}"
+        acct_group_name = f"ucx_{acct_elem}_{rand}"
+        members = [_.id for _ in random.choices(user_pool, k=random.randint(1, 40))]
+        ws_group = make_group(display_name=ws_group_name, members=members, entitlements=["allow-cluster-create"])
+        acc_group = make_acc_group(display_name=acct_group_name, members=members)
+        return ws_group, acc_group
+
+    return inner
+
+
+@pytest.fixture
+def make_ucx_group_match(make_random, make_group, make_acc_group, user_pool):
+    assert (
+        len(user_pool) >= 1
+    ), "must have 'test-user-*' test users with id, userName and displayName in your test workspace"
+
+    def inner():
+        rand = make_random()
+        ws_group_name = f"ucx_some_random_name_({rand})"
+        acct_group_name = f"ucx_another_name_({rand})"
+        members = [_.id for _ in random.choices(user_pool, k=random.randint(1, 40))]
+        ws_group = make_group(display_name=ws_group_name, members=members, entitlements=["allow-cluster-create"])
+        acc_group = make_acc_group(display_name=acct_group_name, members=members)
+        return ws_group, acc_group
+
+    return inner
+
+
 class StaticTablesCrawler(TablesCrawler):
     def __init__(self, sql_backend: SqlBackend, schema: str, tables: list[TableInfo]):
         super().__init__(sql_backend, schema)

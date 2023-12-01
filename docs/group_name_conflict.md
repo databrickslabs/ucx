@@ -3,7 +3,7 @@ During the UC upgrade process we migrate all the local workspace group to accoun
 The process is detailed here: [local-group-migration.md](local-group-migration.md)
 <br/>
 When migrating multiple workspaces we can run into conflicts. 
-These conflicts occur when groups in different workspaces have different membership and different use.
+These conflicts occur when groups with the same name in different workspaces have different membership and different use.
 
 ## Suggested Workflow
 During the installation process we pose the following question:

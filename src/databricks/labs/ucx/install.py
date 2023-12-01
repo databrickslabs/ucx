@@ -132,7 +132,7 @@ def deploy_schema(sql_backend: SqlBackend, inventory_schema: str):
 
 class WorkspaceInstaller:
     def __init__(
-        self, ws: WorkspaceClient, *, prefix: str = "ucx", promtps: bool = True, sql_backend: SqlBackend = None
+            self, ws: WorkspaceClient, *, prefix: str = "ucx", promtps: bool = True, sql_backend: SqlBackend = None
     ):
         if "DATABRICKS_RUNTIME_VERSION" in os.environ:
             msg = "WorkspaceInstaller is not supposed to be executed in Databricks Runtime"
@@ -183,12 +183,12 @@ class WorkspaceInstaller:
                 logger.info("Already exists and enabled. Skipped creating a new one.")
             elif not gscript.enabled:
                 if (
-                    self._prompts
-                    and self._question(
-                        "Your Global Init Script with required spark config is disabled, Do you want to enable it",
-                        default="yes",
-                    )
-                    == "yes"
+                        self._prompts
+                        and self._question(
+                    "Your Global Init Script with required spark config is disabled, Do you want to enable it",
+                    default="yes",
+                )
+                        == "yes"
                 ):
                     logger.info("Enabling Global Init Script...")
                     hms_lineage.enable_global_init_script(gscript)
@@ -196,23 +196,23 @@ class WorkspaceInstaller:
                     logger.info("No change to Global Init Script is made.")
         elif not gscript:
             if (
-                self._prompts
-                and self._question(
-                    "No Global Init Script with Required Spark Config exists, Do you want to create one ", default="yes"
-                )
-                == "yes"
+                    self._prompts
+                    and self._question(
+                "No Global Init Script with Required Spark Config exists, Do you want to create one ", default="yes"
+            )
+                    == "yes"
             ):
                 logger.info("Creating Global Init Script...")
                 hms_lineage.add_global_init_script()
 
     @staticmethod
     def run_for_config(
-        ws: WorkspaceClient,
-        config: WorkspaceConfig,
-        *,
-        prefix="ucx",
-        override_clusters: dict[str, str] | None = None,
-        sql_backend: SqlBackend = None,
+            ws: WorkspaceClient,
+            config: WorkspaceConfig,
+            *,
+            prefix="ucx",
+            override_clusters: dict[str, str] | None = None,
+            sql_backend: SqlBackend = None,
     ) -> "WorkspaceInstaller":
         workspace_installer = WorkspaceInstaller(ws, prefix=prefix, promtps=False, sql_backend=sql_backend)
         logger.info(f"Installing UCX v{workspace_installer._version} on {ws.config.host}")
@@ -381,6 +381,75 @@ class WorkspaceInstaller:
             )
             warehouse_id = new_warehouse.id
 
+        # Setting up group migration parameters
+        groups_config_args = {}
+        if self._question(
+                "Do you need to convert the workspace groups to match the account groups' name?"
+                " If the workspace groups' names match the account groups' names select ""no"" or hit <Enter/Return>.",
+                default="no",
+        ) == "yes":
+            logger.info("Setting up group name translation")
+            groups_config_args["convert_group_names"] = "yes"
+            choice = self._choice_from_dict("Choose How to rename the workspace groups:", {"Apply a Prefix": "0"
+                , "Apply a Suffix": "1", "Regex Substitution": "2", "Regex Matching": "3"})
+            match choice:
+                case "0":
+                    prefix = None
+                    while not prefix :
+                        prefix = self._question(
+                            "Enter a prefix to add to the workspace group name. Use only valid characters.")
+                        if not self._is_valid_group_str(prefix):
+                            print(f"{prefix} is an invalid Prefix. It contains invalid characters.")
+                            prefix = None
+                    groups_config_args["workspace_group_match_regex"] = "^"
+                    groups_config_args["workspace_group_replace"] = prefix
+                case "1":
+                    suffix = None
+                    while not suffix:
+                        suffix = self._question(
+                            "Enter a suffix to add to the workspace group name. Use only valid characters.")
+                        if not self._is_valid_group_str(suffix):
+                            print(f"{suffix} is an invalid Suffix. It contains invalid characters.")
+                            suffix = None
+                    groups_config_args["workspace_group_match_regex"] = "$"
+                    groups_config_args["workspace_group_replace"] = suffix
+                case "2":
+                    match_value = None
+                    sub_value = None
+                    while not match_value:
+                        match_value = self._question("Enter a RegEx expression for Substitution.")
+                        try:
+                            re.compile(match_value)
+                        except re.error:
+                            print(f"{match_value} is Not a valid regex pattern")
+                            match_value = None
+                    while not sub_value:
+                        sub_value = self._question("Enter the substitution value.")
+                        if not self._is_valid_group_str(sub_value):
+                            print(f"{sub_value} is an invalid substitution value. It contains invalid characters.")
+                            sub_value = None
+                    groups_config_args["workspace_group_match_regex"] = match_value
+                    groups_config_args["workspace_group_replace"] = sub_value
+                case "3":
+                    ws_match_value = None
+                    acct_match_value = None
+                    while not ws_match_value:
+                        ws_match_value = self._question("Enter a RegEx expression to match on the workspace group.")
+                        try:
+                            re.compile(ws_match_value)
+                        except re.error:
+                            print(f"{ws_match_value} is Not a valid regex pattern")
+                            ws_match_value = None
+                    while not acct_match_value:
+                        acct_match_value = self._question("Enter a RegEx expression to match on the account group.")
+                        try:
+                            re.compile(acct_match_value)
+                        except re.error:
+                            print(f"{acct_match_value} is Not a valid regex pattern")
+                            acct_match_value = None
+                    groups_config_args["workspace_group_match_regex"] = ws_match_value
+                    groups_config_args["account_group_match_regex"] = acct_match_value
+
         selected_groups = self._question(
             "Comma-separated list of workspace group names to migrate. If not specified, we'll use all "
             "account-level groups with matching names to workspace-level groups.",
@@ -389,10 +458,7 @@ class WorkspaceInstaller:
         backup_group_prefix = self._question("Backup prefix", default="db-temp-")
         log_level = self._question("Log level", default="INFO").upper()
         num_threads = int(self._question("Number of threads", default="8"))
-        groups_config_args = {
-            "backup_group_prefix": backup_group_prefix,
-        }
-
+        groups_config_args["backup_group_prefix"] = backup_group_prefix
         if selected_groups != "<ALL>":
             groups_config_args["selected"] = [x.strip() for x in selected_groups.split(",")]
         else:
@@ -404,13 +470,13 @@ class WorkspaceInstaller:
         if self._prompts:
             policies_with_external_hms = list(self._get_cluster_policies_with_external_hive_metastores())
             if (
-                len(policies_with_external_hms) > 0
-                and self._question(
-                    "We have identified one or more cluster policies set up for an external metastore. "
-                    "Would you like to set UCX to connect to the external metastore.",
-                    default="no",
-                )
-                == "yes"
+                    len(policies_with_external_hms) > 0
+                    and self._question(
+                "We have identified one or more cluster policies set up for an external metastore. "
+                "Would you like to set UCX to connect to the external metastore.",
+                default="no",
+            )
+                    == "yes"
             ):
                 logger.info("Setting up an external metastore")
                 cluster_policies = {conf.name: conf.definition for conf in policies_with_external_hms}
@@ -422,6 +488,9 @@ class WorkspaceInstaller:
 
         self._config = WorkspaceConfig(
             inventory_database=inventory_database,
+            workspace_group_regex=groups_config_args.get("workspace_group_regex"),
+            workspace_group_replace=groups_config_args.get("workspace_group_replace"),
+            account_group_regex=groups_config_args.get("account_group_regex"),
             include_group_names=groups_config_args["selected"],
             renamed_group_prefix=groups_config_args["backup_group_prefix"],
             warehouse_id=warehouse_id,
@@ -706,10 +775,10 @@ class WorkspaceInstaller:
                 notebook_path=remote_notebook,
                 # ES-872211: currently, we cannot read WSFS files from Scala context
                 base_parameters={
-                    "task": task.name,
-                    "config": f"/Workspace{self.config_file}",
-                }
-                | EXTRA_TASK_PARAMS,
+                                    "task": task.name,
+                                    "config": f"/Workspace{self.config_file}",
+                                }
+                                | EXTRA_TASK_PARAMS,
             ),
         )
 
@@ -883,13 +952,17 @@ class WorkspaceInstaller:
             logger.info(f"Instance Profile is Set to {instance_profile}")
         for key in cluster_policy.keys():
             if (
-                key.startswith("spark_conf.sql.hive.metastore")
-                or key.startswith("spark_conf.spark.hadoop.javax.jdo.option")
-                or key.startswith("spark_conf.spark.databricks.hive.metastore")
-                or key.startswith("spark_conf.spark.hadoop.hive.metastore.glue")
+                    key.startswith("spark_conf.sql.hive.metastore")
+                    or key.startswith("spark_conf.spark.hadoop.javax.jdo.option")
+                    or key.startswith("spark_conf.spark.databricks.hive.metastore")
+                    or key.startswith("spark_conf.spark.hadoop.hive.metastore.glue")
             ):
                 spark_conf_dict[key[11:]] = cluster_policy[key]["value"]
         return instance_profile, spark_conf_dict
+
+    @staticmethod
+    def _is_valid_group_str(group_str: str):
+        return group_str and not re.search("[\s#,+""\\<>;]", group_str)
 
     def latest_job_status(self) -> list[dict]:
         latest_status = []
