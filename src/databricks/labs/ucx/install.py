@@ -13,6 +13,8 @@ from dataclasses import replace
 from pathlib import Path
 from typing import Any
 
+
+
 import yaml
 from databricks.sdk import WorkspaceClient
 from databricks.sdk.errors import InvalidParameterValue, NotFound, OperationFailed
@@ -22,6 +24,7 @@ from databricks.sdk.service.sql import EndpointInfoWarehouseType, SpotInstancePo
 from databricks.sdk.service.workspace import ImportFormat
 
 from databricks.labs.ucx.__about__ import __version__
+
 from databricks.labs.ucx.assessment.crawlers import (
     AzureServicePrincipalInfo,
     ClusterInfo,
@@ -29,6 +32,7 @@ from databricks.labs.ucx.assessment.crawlers import (
     JobInfo,
     PipelineInfo,
 )
+from databricks.labs.ucx.configure import ConfigureMixin
 from databricks.labs.ucx.config import WorkspaceConfig
 from databricks.labs.ucx.framework.crawlers import (
     SchemaDeployer,
@@ -51,7 +55,6 @@ from databricks.labs.ucx.workspace_access.groups import MigratedGroup
 TAG_STEP = "step"
 TAG_APP = "App"
 NUM_USER_ATTEMPTS = 10  # number of attempts user gets at answering a question
-CLUSTER_ID_LENGTH = 20  # number of characters in a valid cluster_id
 
 EXTRA_TASK_PARAMS = {
     "job_id": "{{job_id}}",
@@ -131,7 +134,7 @@ def deploy_schema(sql_backend: SqlBackend, inventory_schema: str):
     deployer.deploy_view("grant_detail", "queries/views/grant_detail.sql")
 
 
-class WorkspaceInstaller:
+class WorkspaceInstaller(ConfigureMixin):
     def __init__(
         self, ws: WorkspaceClient, *, prefix: str = "ucx", promtps: bool = True, sql_backend: SqlBackend = None
     ):
@@ -143,7 +146,7 @@ class WorkspaceInstaller:
         self._prefix = prefix
         self._prompts = promtps
         self._this_file = Path(__file__)
-        self._override_clusters = None
+        #self._override_clusters = None
         self._dashboards = {}
         self._state = InstallState(ws, self._install_folder)
 
@@ -219,7 +222,7 @@ class WorkspaceInstaller:
         logger.info(f"Installing UCX v{workspace_installer._version} on {ws.config.host}")
         workspace_installer._config = config
         workspace_installer._write_config(overwrite=False)
-        workspace_installer._override_clusters = override_clusters
+        workspace_installer._current_config._override_clusters = override_clusters
         # TODO: rather introduce a method `is_configured`, as we may want to reconfigure workspaces for some reason
         workspace_installer._run_configured()
         return workspace_installer
@@ -331,47 +334,19 @@ class WorkspaceInstaller:
         return f"[{self._prefix.upper()}] {name}"
 
     def _configure_inventory_database(self):
-        counter = 0
-        inventory_database = None
-        while True:
-            inventory_database = self._question("Inventory Database stored in hive_metastore", default="ucx")
-            if re.match(r"^\w+$", inventory_database):
-                break
-            else:
-                print(f"{inventory_database} is not a valid database name")
-                counter = counter + 1
-                if counter > NUM_USER_ATTEMPTS:
-                    msg = "Exceeded max tries to get a valid database name, try again later."
-                    raise SystemExit(msg)
-        return inventory_database
-
-    def _valid_cluster_id(self, cluster_id: str) -> bool:
-        """Lite validation of user supplied cluster id"""
-        return CLUSTER_ID_LENGTH == len(cluster_id)
-
-    def _configure_override_clusters(self):
-        """User may override standard job clusters with interactive clusters"""
-        default_val = ""
-        preamble = "Pick default and we'll create a compatible job cluster (recommended) or "
-        cluster_id = self._question(
-            preamble + "enter pre-existing HMS Legacy cluster ID",
-            default=default_val,
-        )
-        tacl_cluster_id = self._question(
-            preamble + "enter pre-existing Table Access Control cluster ID",
-            default=default_val,
-        )
-        overrides = None
-        if (
-            default_val not in (cluster_id, tacl_cluster_id)
-            and self._valid_cluster_id(cluster_id)
-            and self._valid_cluster_id(tacl_cluster_id)
-        ):
-            overrides = {
-                "main": cluster_id,
-                "tacl": tacl_cluster_id,
-            }
-        return overrides
+            counter = 0
+            inventory_database = None
+            while True:
+                inventory_database = self._question("Inventory Database stored in hive_metastore", default="ucx")
+                if re.match(r"^\w+$", inventory_database):
+                    break
+                else:
+                    print(f"{inventory_database} is not a valid database name")
+                    counter = counter + 1
+                    if counter > NUM_USER_ATTEMPTS:
+                        msg = "Exceeded max tries to get a valid database name, try again later."
+                        raise SystemExit(msg)
+            return inventory_database
 
     def _configure(self):
         ws_file_url = self.notebook_link(self.config_file)
@@ -449,8 +424,7 @@ class WorkspaceInstaller:
                     )
                     instance_profile, spark_conf_dict = self._get_ext_hms_conf_from_policy(cluster_policy)
 
-        self._override_clusters = self._configure_override_clusters()
-
+        _override_clusters = self._configure_override_clusters()
         self._config = WorkspaceConfig(
             inventory_database=inventory_database,
             include_group_names=groups_config_args["selected"],
@@ -460,6 +434,7 @@ class WorkspaceInstaller:
             num_threads=num_threads,
             instance_profile=instance_profile,
             spark_conf=spark_conf_dict,
+            override_clusters=_override_clusters,
         )
 
         self._write_config(overwrite=False)
@@ -487,12 +462,12 @@ class WorkspaceInstaller:
         desired_steps = {t.workflow for t in _TASKS.values()}
         wheel_runner = None
 
-        if self._override_clusters:
+        if self._current_config._override_clusters:
             wheel_runner = self._upload_wheel_runner(remote_wheel)
         for step_name in desired_steps:
             settings = self._job_settings(step_name, remote_wheel)
-            if self._override_clusters:
-                settings = self._apply_cluster_overrides(settings, self._override_clusters, wheel_runner)
+            if self._current_config._override_clusters:
+                settings = self._apply_cluster_overrides(settings, self._current_config._override_clusters, wheel_runner)
             self._deploy_workflow(step_name, settings)
 
         for step_name, job_id in self._state.jobs.items():
@@ -658,15 +633,15 @@ class WorkspaceInstaller:
                     self._ws.dbfs.mkdirs(remote_dirname)
                     logger.info(f"Uploading wheel to dbfs:{remote_wheel}")
                     self._ws.dbfs.upload(remote_wheel, f, overwrite=True)
-                except OperationFailed as err:
+                except PermissionDenied as err:
                     logger.warning(f"Uploading wheel file to DBFS failed, DBFS is probably write protected. {err}")
                     # assume DBFS is write protected
                     self._write_protected_dbfs = True
-                    if not self._override_clusters:
+                    if not self._current_config._override_clusters:
                         logger.error("Recommend adding override clusters with attached wheel file as python library.")
                         raise err
                     else:
-                        logger.warning(f"Continuing with override clusters {self._override_clusters}")
+                        logger.warning(f"Continuing with override clusters {self._current_config._override_clusters}")
 
             with local_wheel.open("rb") as f:
                 self._ws.workspace.mkdirs(remote_dirname)
@@ -676,7 +651,7 @@ class WorkspaceInstaller:
 
     def _job_settings(self, step_name: str, dbfs_path: str):
         email_notifications = None
-        if not self._override_clusters and "@" in self._my_username:
+        if not self._current_config._override_clusters and "@" in self._my_username:
             # set email notifications only if we're running the real
             # installation and not the integration test.
             email_notifications = jobs.JobEmailNotifications(

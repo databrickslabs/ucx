@@ -34,6 +34,31 @@ from databricks.labs.ucx.install import WorkspaceInstaller
 from ..unit.framework.mocks import MockBackend
 
 
+cluster_id = "9999-999999-abcdefgh"
+
+def mock_clusters():
+    from databricks.sdk.service.compute import ClusterAttributes
+    from databricks.sdk.service.compute import DataSecurityMode
+    from databricks.sdk.service.compute import State
+    
+    return [
+        MagicMock(spark_version="13.3.x-dbrxxx", 
+                    cluster_name="zero", 
+                    data_security_mode=DataSecurityMode.USER_ISOLATION,
+                    state=State.RUNNING,
+                    cluster_id=cluster_id),
+        MagicMock(spark_version="13.3.x-dbrxxx", 
+                    cluster_name="one", 
+                    data_security_mode=DataSecurityMode.NONE,
+                    state=State.RUNNING,
+                    cluster_id=cluster_id),
+            MagicMock(spark_version="13.3.x-dbrxxx", 
+                    cluster_name="two", 
+                    data_security_mode=DataSecurityMode.LEGACY_TABLE_ACL,
+                    state=State.RUNNING,
+                    cluster_id=cluster_id),
+        ]
+
 @pytest.fixture
 def ws(mocker):
     ws = mocker.patch("databricks.sdk.WorkspaceClient.__init__")
@@ -49,11 +74,46 @@ def ws(mocker):
     ws.queries.create.return_value = Query(id="abc")
     ws.query_visualizations.create.return_value = Visualization(id="abc")
     ws.dashboard_widgets.create.return_value = Widget(id="abc")
+    ws.clusters.list.return_value = mock_clusters()
     return ws
 
+def mock_default_choice_from_dict(text: str, choices: dict[str, Any]) -> Any:
+    if "Select a Cluster" in text:
+        return policy_def
+    if "warehouse" in text:
+        return "abc"
+    if "pre-existing HMS Legacy cluster ID" in text: # cluster override
+        return None
+    if "pre-existing Table Access Control cluster ID" in text: # cluster override
+        return None
 
-cluster_id = "9999-999999-abcdefgh"
+def mock_override_choice_from_dict(text: str, choices: dict[str, Any]) -> Any:
+    if "Select a Cluster" in text:
+        return policy_def
+    if "warehouse" in text:
+        return "abc"
+    if "pre-existing HMS Legacy cluster ID" in text: # cluster override
+        return cluster_id
+    if "pre-existing Table Access Control cluster ID" in text: # cluster override
+        return cluster_id
 
+
+def test_install_cluster_default(ws, mocker, tmp_path):
+    jobs_mock = MagicMock()
+
+    def jobs_create(*args, **kwargs):
+        assert "write_protected_dbfs" not in args, f"{args}"
+        assert "write_protected_dbfs" not in kwargs, f"{kwargs}"
+        return MagicMock(job_id="bar")
+
+    jobs_mock.create = jobs_create
+    ws.jobs = jobs_mock
+
+    install = WorkspaceInstaller(ws)
+    mocker.patch("builtins.input", return_value="0")
+    install._choice_from_dict = mock_override_choice_from_dict
+    res = install._configure_override_clusters()
+    assert res is None
 
 def test_install_cluster_override_basic(ws, mocker, tmp_path):
     jobs_mock = MagicMock()
@@ -67,7 +127,8 @@ def test_install_cluster_override_basic(ws, mocker, tmp_path):
     ws.jobs = jobs_mock
 
     install = WorkspaceInstaller(ws)
-    mocker.patch("builtins.input", return_value=cluster_id)
+    mocker.patch("builtins.input", return_value="1")
+    install._choice_from_dict = mock_override_choice_from_dict
     res = install._configure_override_clusters()
     assert res["main"] == cluster_id
     assert res["tacl"] == cluster_id
@@ -103,7 +164,7 @@ def test_install_cluster_override_jobs(ws, mocker, tmp_path):
     ws.jobs.create = mock_create_job
     install = WorkspaceInstaller(ws)
     install._question = mock_question_cluster_override
-    install._override_clusters = {"main": cluster_id, "tacl": cluster_id}
+    install._current_config._override_clusters = {"main": cluster_id, "tacl": cluster_id}
     install._job_dashboard_task = MagicMock(name="_job_dashboard_task")  # disable problematic task
     install._create_jobs()
 
@@ -116,7 +177,7 @@ def test_write_protected_dbfs(ws, mocker, tmp_path):
     ws.dbfs.upload = mock_dbfs
     install = WorkspaceInstaller(ws)
     install._question = mock_question_cluster_override
-    install._override_clusters = {"main": cluster_id, "tacl": cluster_id}
+    install._current_config._override_clusters = {"main": cluster_id, "tacl": cluster_id}
     install._job_dashboard_task = MagicMock(name="_job_dashboard_task")  # disable problematic task
     install._create_jobs()
 
@@ -189,7 +250,7 @@ def test_build_wheel(ws, tmp_path):
 
 def test_save_config(ws, mocker):
     def not_found(_):
-        raise NotFound(...)
+        raise NotFound("save_config")
 
     mocker.patch("builtins.input", return_value="42")
 
@@ -198,9 +259,11 @@ def test_save_config(ws, mocker):
         EndpointInfo(id="abc", warehouse_type=EndpointInfoWarehouseType.PRO, state=State.RUNNING)
     ]
     ws.cluster_policies.list = lambda: []
+    ws.workspace.download = not_found
 
     install = WorkspaceInstaller(ws)
     install._choice = lambda _1, _2: "None (abc, PRO, RUNNING)"
+    install._choice_from_dict = mock_override_choice_from_dict
     install._configure()
 
     ws.workspace.upload.assert_called_with(
@@ -211,6 +274,9 @@ include_group_names:
 inventory_database: '42'
 log_level: '42'
 num_threads: 42
+override_clusters:
+  main: 9999-999999-abcdefgh
+  tacl: 9999-999999-abcdefgh
 renamed_group_prefix: '42'
 version: 2
 warehouse_id: abc
@@ -345,6 +411,7 @@ def test_save_config_auto_groups(ws, mocker):
     install = WorkspaceInstaller(ws)
     install._question = mock_question
     install._choice = lambda _1, _2: "None (abc, PRO, RUNNING)"
+    install._choice_from_dict = mock_override_choice_from_dict
     install._configure()
 
     ws.workspace.upload.assert_called_with(
@@ -436,6 +503,8 @@ def test_save_config_with_glue(ws, mocker):
             return policy_def
         if "warehouse" in text:
             return "abc"
+        if "cluster ID" in text: # cluster override
+            return cluster_id
 
     mocker.patch("builtins.input", return_value="42")
 
