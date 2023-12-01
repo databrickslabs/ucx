@@ -431,3 +431,77 @@ def test_delete_original_workspace_groups_should_fail_if_delete_does_not_work():
 
     with pytest.raises(RuntimeWarning):
         gm.delete_original_workspace_groups()
+
+
+def test_list_workspace_groups():
+    backend = MockBackend()
+    wsclient = MagicMock()
+
+    # Mock the groups.list method to return a list of groups
+    group1 = Group(id="1", display_name="group_1", meta=ResourceMeta(resource_type="WorkspaceGroup"))
+    group2 = Group(id="2", display_name="group_2", meta=ResourceMeta(resource_type="WorkspaceGroup"))
+    group3 = Group(id="3", display_name="group_3", meta=ResourceMeta(resource_type="WorkspaceGroup"))
+    wsclient.groups.list.return_value = [group1, group2, group3]
+
+    # Mock the _safe_get_group method to return a group
+    full_group1 = Group(
+        id="1",
+        display_name="group_1",
+        meta=ResourceMeta(resource_type="WorkspaceGroup"),
+        members=[ComplexValue(display="test-user-1", value="20"), ComplexValue(display="test-user-2", value="21")],
+        roles=[
+            ComplexValue(value="arn:aws:iam::123456789098:instance-profile/ip1"),
+            ComplexValue(value="arn:aws:iam::123456789098:instance-profile/ip2"),
+        ],
+        entitlements=[ComplexValue(value="allow-cluster-create"), ComplexValue(value="allow-instance-pool-create")],
+    )
+    full_group2 = Group(
+        id="2",
+        display_name="group_2",
+        meta=ResourceMeta(resource_type="WorkspaceGroup"),
+        members=[ComplexValue(display="test-user-1", value="20"), ComplexValue(display="test-user-2", value="21")],
+        roles=[
+            ComplexValue(value="arn:aws:iam::123456789098:instance-profile/ip1"),
+            ComplexValue(value="arn:aws:iam::123456789098:instance-profile/ip2"),
+        ],
+        entitlements=[ComplexValue(value="allow-cluster-create"), ComplexValue(value="allow-instance-pool-create")],
+    )
+    full_group3 = Group(
+        id="3",
+        display_name="group_3",
+        meta=ResourceMeta(resource_type="WorkspaceGroup"),
+        members=[ComplexValue(display="test-user-1", value="20"), ComplexValue(display="test-user-2", value="21")],
+        roles=[
+            ComplexValue(value="arn:aws:iam::123456789098:instance-profile/ip1"),
+            ComplexValue(value="arn:aws:iam::123456789098:instance-profile/ip2"),
+        ],
+        entitlements=[ComplexValue(value="allow-cluster-create"), ComplexValue(value="allow-instance-pool-create")],
+    )
+
+    def my_side_effect(id, **kwargs):
+        if id == "1":
+            return full_group1
+        elif id == "2":
+            return full_group2
+        elif id == "3":
+            return full_group3
+
+    wsclient.groups.get.side_effect = my_side_effect
+
+    # Test when attributes do not contain "members"
+    gm = GroupManager(backend, wsclient, inventory_database="inv")
+    result = gm._list_workspace_groups("WorkspaceGroup", "id,displayName,meta")
+    assert len(result) == 3
+    assert result[0].display_name == "group_1"
+    assert result[0].members is None
+    wsclient.groups.get.assert_not_called()
+
+    # Test when attributes contain "members"
+    result = gm._list_workspace_groups("WorkspaceGroup", "id,displayName,meta,members")
+    assert len(result) == 3
+    assert result[0].display_name == "group_1"
+    assert result[0].members == [
+        ComplexValue(display="test-user-1", value="20"),
+        ComplexValue(display="test-user-2", value="21"),
+    ]
+    wsclient.groups.get.assert_called()

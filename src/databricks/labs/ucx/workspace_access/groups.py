@@ -6,6 +6,7 @@ from dataclasses import dataclass
 
 from databricks.sdk import WorkspaceClient
 from databricks.sdk.core import DatabricksError
+from databricks.sdk.errors import InternalError
 from databricks.sdk.retries import retried
 from databricks.sdk.service import iam
 
@@ -203,14 +204,34 @@ class GroupManager(CrawlerBase):
     def _list_workspace_groups(self, resource_type: str, scim_attributes: str) -> list[iam.Group]:
         results = []
         logger.info(f"Listing workspace groups (resource_type={resource_type}) with {scim_attributes}...")
-        for g in self._ws.groups.list(attributes=scim_attributes):
-            if g.display_name in self._SYSTEM_GROUPS:
-                continue
-            if g.meta.resource_type != resource_type:
-                continue
-            results.append(g)
+        # these attributes can get too large causing the api to timeout
+        # so we're fetching groups without these attributes first 
+        # and then calling get on each of them to fetch all attributes
+        if "members" in scim_attributes or "roles" in scim_attributes or "entitlements" in scim_attributes:
+            for g in self._ws.groups.list(attributes="id,displayName,meta"):
+                if g.display_name in self._SYSTEM_GROUPS:
+                    continue
+                if g.meta.resource_type != resource_type:
+                    continue
+                g = self._safe_get_group(g.id)
+                results.append(g)
+        else:
+            for g in self._ws.groups.list(attributes=scim_attributes):
+                if g.display_name in self._SYSTEM_GROUPS:
+                    continue
+                if g.meta.resource_type != resource_type:
+                    continue
+                results.append(g)
         logger.info(f"Found {len(results)} {resource_type}")
         return results
+    
+    @rate_limited(max_requests=255, burst_period_seconds=60)
+    def _safe_get_group(self, group_id: str) -> iam.Group | None:
+        try:
+            return self._ws.groups.get(group_id)
+        except InternalError:
+            logger.warning(f"internal error: {group_id}")
+            return None
 
     def _list_account_groups(self, scim_attributes: str) -> list[iam.Group]:
         # TODO: we should avoid using this method, as it's not documented
