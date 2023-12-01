@@ -25,6 +25,7 @@ from databricks.sdk.service.sql import (
 )
 from databricks.sdk.service.workspace import ImportFormat, ObjectInfo
 
+import databricks.labs.ucx.uninstall  # noqa
 from databricks.labs.ucx.config import WorkspaceConfig
 from databricks.labs.ucx.framework.dashboards import DashboardFromFiles
 from databricks.labs.ucx.framework.install_state import InstallState
@@ -729,4 +730,17 @@ def test_uninstall(ws, mocker):
     install._state.jobs = {"job1": "123"}
     ws.warehouses.get.return_value = sql.GetWarehouseResponse(id="123", name="Customer Warehouse 123456")
     ws.workspace.delete.return_value = None
+    install.uninstall()
+
+
+def test_uninstall_no_config_file(ws, mocker):
+    def not_found(_):
+        raise NotFound(...)
+
+    install = WorkspaceInstaller(ws, sql_backend=MockBackend())
+    mocker.patch("builtins.input", return_value="yes")
+    mocker.patch("databricks.labs.ucx.framework.crawlers.SqlBackend.execute", return_value=None)
+    config_bytes = yaml.dump(WorkspaceConfig(inventory_database="testdb", warehouse_id="123").as_dict()).encode("utf8")
+    ws.workspace.download = lambda _: io.BytesIO(config_bytes)
+    ws.workspace.get_status = not_found
     install.uninstall()
