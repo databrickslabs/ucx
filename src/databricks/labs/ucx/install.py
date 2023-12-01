@@ -911,7 +911,7 @@ class WorkspaceInstaller:
         if not self._prompts or self._question(
             "Do you want to uninstall ucx from the workspace too, this would "
             "remove ucx project folder, dashboards, queries and jobs",
-            default="yes",
+            default="no",
         ):
             logger.info(f"UnInstalling UCX from workspace v{self._version}")
             try:
