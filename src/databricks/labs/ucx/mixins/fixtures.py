@@ -24,6 +24,7 @@ from databricks.sdk.service.sql import (
 from databricks.sdk.service.workspace import ImportFormat
 
 from databricks.labs.ucx.framework.crawlers import StatementExecutionBackend
+from databricks.sdk.errors import NotFound
 
 logger = logging.getLogger(__name__)
 
@@ -682,11 +683,9 @@ def debug_env_name():
 @pytest.fixture
 def debug_env(monkeypatch, debug_env_name) -> MutableMapping[str, str]:
     if not _is_in_debug():
-        logger.info("heyyy")
         return os.environ
     conf_file = pathlib.Path.home() / ".databricks/debug-env.json"
     if not conf_file.exists():
-        logger.info("mdddrrr")
         return os.environ
     with conf_file.open("r") as f:
         conf = json.load(f)
@@ -863,7 +862,7 @@ def make_query(ws, make_table, make_random):
     def remove(query: Query):
         try:
             ws.queries.delete(query_id=query.id)
-        except RuntimeError as e:
+        except NotFound as e:
             logger.info(f"Can't drop query {e}")
 
     yield from factory("query", create, remove)
