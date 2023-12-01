@@ -43,18 +43,10 @@ class WorkspaceListing:
                 f" rps: {rps:.3f}/sec"
             )
 
-    def _try_list_workspace(self, path: str) -> Iterator[ObjectType]:
-        try:
-            return self._ws.workspace.list(path=path, recursive=False)
-        except InternalError as e:
-            logger.warning(f"Had an InternalError when listing path {path}, retrying")
-            logger.warning(e)
-            raise e
-
     def _list_workspace(self, path: str) -> Iterator[ObjectType]:
         list_retry_on_value_error = retried(on=[InternalError], timeout=self._verify_timeout)
-        list_retried_check = list_retry_on_value_error(self._try_list_workspace)
-        return list_retried_check(path=path)
+        list_retried_check = list_retry_on_value_error(self._ws.workspace.list)
+        return list_retried_check(path=path, recursive=False)
 
     def _list_and_analyze(self, obj: ObjectInfo) -> (list[ObjectInfo], list[ObjectInfo]):
         directories = []
@@ -73,8 +65,7 @@ class WorkspaceListing:
             # See https://github.com/databrickslabs/ucx/issues/230
             logger.warning(f"{obj.path} is not listable. Ignoring")
         except TimeoutError as e:
-            logger.warning(f"Could not list {obj.path} due to backend error. Ignoring")
-            logger.warning(e)
+            logger.warning(f"Could not list {obj.path} due to backend error: {e}")
         return directories, others
 
     def walk(self, start_path="/"):
