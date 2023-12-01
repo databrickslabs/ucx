@@ -1,7 +1,7 @@
 import datetime as dt
 from unittest.mock import MagicMock, Mock, patch
 
-from databricks.sdk.errors import mapping
+from databricks.sdk.errors import InternalError
 from databricks.sdk.service.workspace import ObjectInfo, ObjectType
 
 from databricks.labs.ucx.workspace_access import generic, listing
@@ -165,7 +165,7 @@ def test_walk_should_retry_on_backend_exceptions_and_log_them():
         if path == "/rootPath":
             return [file, first_folder, second_folder]
         elif path == "/rootPath/nested_folder":
-            raise mapping.InternalError
+            raise InternalError
         elif path == "/rootPath/nested_folder_2":
             return [second_folder_notebook]
 

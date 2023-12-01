@@ -49,6 +49,7 @@ class WorkspaceListing:
         except InternalError as e:
             logger.warning(f"Had an InternalError when listing path {path}, retrying")
             logger.warning(e)
+            raise e
 
     def _list_workspace(self, path: str) -> Iterator[ObjectType]:
         list_retry_on_value_error = retried(on=[InternalError], timeout=self._verify_timeout)
