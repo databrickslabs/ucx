@@ -1,4 +1,4 @@
-from unittest.mock import MagicMock
+from unittest.mock import MagicMock, patch
 
 import pytest
 from _pytest.outcomes import fail
@@ -25,6 +25,7 @@ def test_snapshot_with_group_created_in_account_console_should_be_considered():
         entitlements=[ComplexValue(value="allow-cluster-create"), ComplexValue(value="allow-instance-pool-create")],
     )
     wsclient.groups.list.return_value = [group]
+    wsclient.groups.get.return_value = group
     account_admins_group = Group(id="1234", display_name="de")
     wsclient.api_client.do.return_value = {
         "Resources": [g.as_dict() for g in [account_admins_group]],
@@ -132,25 +133,29 @@ def test_snapshot_should_consider_groups_defined_in_conf():
     wsclient = MagicMock()
     group1 = Group(id="1", display_name="de", meta=ResourceMeta(resource_type="WorkspaceGroup"))
     group2 = Group(id="2", display_name="ds", meta=ResourceMeta(resource_type="WorkspaceGroup"))
-    wsclient.groups.list.return_value = [group1, group2]
     acc_group_1 = Group(id="11", display_name="de")
     acc_group_2 = Group(id="12", display_name="ds")
     wsclient.api_client.do.return_value = {
         "Resources": [g.as_dict() for g in [acc_group_1, acc_group_2]],
     }
-    res = GroupManager(backend, wsclient, inventory_database="inv", include_group_names=["de"]).snapshot()
-    assert res == [
-        MigratedGroup(
-            id_in_workspace="1",
-            name_in_workspace="de",
-            name_in_account="de",
-            temporary_name="ucx-renamed-de",
-            members=None,
-            external_id="11",
-            roles=None,
-            entitlements=None,
-        )
-    ]
+
+    gm = GroupManager(backend, wsclient, inventory_database="inv", include_group_names=["de"])
+
+    with patch.object(gm, "_list_workspace_groups", return_value=[group1, group2]):
+        res = gm.snapshot()
+
+        assert res == [
+            MigratedGroup(
+                id_in_workspace="1",
+                name_in_workspace="de",
+                name_in_account="de",
+                temporary_name="ucx-renamed-de",
+                members=None,
+                external_id="11",
+                roles=None,
+                entitlements=None,
+            )
+        ]
 
 
 def test_snapshot_should_filter_system_groups_defined_in_conf():
@@ -197,35 +202,38 @@ def test_snapshot_should_rename_groups_defined_in_conf():
     wsclient = MagicMock()
     group1 = Group(id="1", display_name="de", meta=ResourceMeta(resource_type="WorkspaceGroup"))
     group2 = Group(id="2", display_name="ds", meta=ResourceMeta(resource_type="WorkspaceGroup"))
-    wsclient.groups.list.return_value = [group1, group2]
     account_admins_group_1 = Group(id="11", display_name="de")
     account_admins_group_2 = Group(id="12", display_name="ds")
     wsclient.api_client.do.return_value = {
         "Resources": [g.as_dict() for g in [account_admins_group_1, account_admins_group_2]],
     }
-    res = GroupManager(backend, wsclient, inventory_database="inv", renamed_group_prefix="test-group-").snapshot()
-    assert res == [
-        MigratedGroup(
-            id_in_workspace="1",
-            name_in_workspace="de",
-            name_in_account="de",
-            temporary_name="test-group-de",
-            members=None,
-            external_id="11",
-            roles=None,
-            entitlements=None,
-        ),
-        MigratedGroup(
-            id_in_workspace="2",
-            name_in_workspace="ds",
-            name_in_account="ds",
-            temporary_name="test-group-ds",
-            members=None,
-            external_id="12",
-            roles=None,
-            entitlements=None,
-        ),
-    ]
+    gm = GroupManager(backend, wsclient, inventory_database="inv", renamed_group_prefix="test-group-")
+
+    with patch.object(gm, "_list_workspace_groups", return_value=[group1, group2]):
+        res = gm.snapshot()
+
+        assert res == [
+            MigratedGroup(
+                id_in_workspace="1",
+                name_in_workspace="de",
+                name_in_account="de",
+                temporary_name="test-group-de",
+                members=None,
+                external_id="11",
+                roles=None,
+                entitlements=None,
+            ),
+            MigratedGroup(
+                id_in_workspace="2",
+                name_in_workspace="ds",
+                name_in_account="ds",
+                temporary_name="test-group-ds",
+                members=None,
+                external_id="12",
+                roles=None,
+                entitlements=None,
+            ),
+        ]
 
 
 def test_rename_groups_should_patch_eligible_groups():
@@ -235,6 +243,7 @@ def test_rename_groups_should_patch_eligible_groups():
     wsclient.groups.list.return_value = [
         group1,
     ]
+    wsclient.groups.get.return_value = group1
     account_admins_group_1 = Group(id="11", display_name="de")
     wsclient.api_client.do.return_value = {
         "Resources": [g.as_dict() for g in [account_admins_group_1]],
@@ -276,6 +285,7 @@ def test_rename_groups_should_fail_if_error_is_thrown():
     wsclient.groups.list.return_value = [
         group1,
     ]
+    wsclient.groups.get.return_value = group1
     account_admins_group_1 = Group(id="11", display_name="de")
     wsclient.api_client.do.return_value = {
         "Resources": [g.as_dict() for g in [account_admins_group_1]],

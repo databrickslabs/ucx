@@ -123,14 +123,14 @@ def test_safe_get_group_when_error_retriable():
 
 def test_get_crawler_task_with_roles_and_entitlements_should_be_crawled():
     ws = MagicMock()
-    ws.groups.list.return_value = [
-        Group(
-            id="1",
-            display_name="de",
-            roles=[iam.ComplexValue(value="role1"), iam.ComplexValue(value="role2")],
-            entitlements=[iam.ComplexValue(value="forbidden-cluster-create")],
-        )
-    ]
+    group = Group(
+        id="1",
+        display_name="de",
+        roles=[iam.ComplexValue(value="role1"), iam.ComplexValue(value="role2")],
+        entitlements=[iam.ComplexValue(value="forbidden-cluster-create")],
+    )
+    ws.groups.list.return_value = [group]
+    ws.groups.get.return_value = group
     sup = ScimSupport(ws=ws, verify_timeout=timedelta(seconds=1))
 
     result = list(sup.get_crawler_tasks())
@@ -145,7 +145,9 @@ def test_get_crawler_task_with_roles_and_entitlements_should_be_crawled():
 
 def test_groups_without_roles_and_entitlements_should_be_ignored():
     ws = MagicMock()
-    ws.groups.list.return_value = [Group(id="1", display_name="de")]
+    group = Group(id="1", display_name="de")
+    ws.groups.list.return_value = [group]
+    ws.groups.get.return_value = group
     sup = ScimSupport(ws=ws, verify_timeout=timedelta(seconds=1))
 
     result = list(sup.get_crawler_tasks())

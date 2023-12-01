@@ -36,7 +36,7 @@ class ScimSupport(AclSupport):
     # TODO remove after ES-892977 is fixed
     @retried(on=[DatabricksError])
     def _get_groups(self):
-        return list(self._list_workspace_groups(attributes="id,displayName,roles,entitlements"))
+        return list(self._list_workspace_groups(scim_attributes="id,displayName,roles,entitlements"))
 
     def object_types(self) -> set[str]:
         return {"roles", "entitlements"}
@@ -109,11 +109,6 @@ class ScimSupport(AclSupport):
             logger.warning(f"removed on backend: {group_id}")
             return None
 
-    def _is_group_out_of_scope(self, group: iam.Group) -> bool:
-        if group.display_name in self._SYSTEM_GROUPS:
-            return True
-        return False
-
     @retried(on=[InternalError])
     @rate_limited(max_requests=255, burst_period_seconds=60)
     def _get_group_with_retries(self, group_id: str) -> iam.Group | None:
@@ -127,14 +122,10 @@ class ScimSupport(AclSupport):
         # and then calling get on each of them to fetch all attributes
         if "members" in scim_attributes or "roles" in scim_attributes or "entitlements" in scim_attributes:
             for g in self._ws.groups.list(attributes="id,displayName,meta"):
-                if self._is_group_out_of_scope(g):
-                    continue
                 group_with_all_attributes = self._get_group_with_retries(g.id)
                 results.append(group_with_all_attributes)
         else:
             for g in self._ws.groups.list(attributes=scim_attributes):
-                if self._is_group_out_of_scope(g):
-                    continue
                 results.append(g)
         logger.info(f"Found {len(results)} groups")
         return results
