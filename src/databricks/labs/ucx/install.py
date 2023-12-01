@@ -957,7 +957,7 @@ class WorkspaceInstaller:
                 logger.info(f"Deleting {step_name} job_id={job_id}.")
                 self._ws.jobs.delete(job_id)
             except InvalidParameterValue:
-                logger.error(f"Error deleting job {step_name} job_id={job_id}.")
+                logger.error(f"Already deleted: {step_name} job_id={job_id}.")
                 continue
 
     def _remove_warehouse(self):
