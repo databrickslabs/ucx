@@ -85,11 +85,12 @@ def ws(mocker):
     ws.clusters.list.return_value = mock_clusters()
     return ws
 
+
 def mock_override_choice_from_dict(text: str, choices: dict[str, Any]) -> Any:
     if "warehouse" in text:
         return "abc"
     if " cluster ID" in text:  # cluster override
-        return "1"
+        return cluster_id
 
 
 def test_install_cluster_default(ws, mocker, tmp_path):
@@ -126,7 +127,9 @@ def test_install_cluster_override_basic(ws, mocker, tmp_path):
     install = WorkspaceInstaller(ws)
     mocker.patch("builtins.input", return_value="1")
     install._choice_from_dict = mock_override_choice_from_dict
+    ws.dbfs.upload = mock_dbfs # trigger the override cluster path
     res = install._configure_override_clusters()
+    assert res is not None
     assert res["main"] == cluster_id
     assert res["tacl"] == cluster_id
 
@@ -263,8 +266,7 @@ def test_save_config(ws, mocker):
     ws.workspace.download = not_found
 
     install = WorkspaceInstaller(ws)
-    install._choice = lambda _1, _2: "None (abc, PRO, RUNNING)"
-    install._choice_from_dict = mock_override_choice_from_dict
+    install._choice = lambda _1, _2: "abc (abc, PRO, RUNNING)"
     install._configure()
 
     ws.workspace.upload.assert_called_with(
@@ -275,9 +277,6 @@ include_group_names:
 inventory_database: '42'
 log_level: '42'
 num_threads: 42
-override_clusters:
-  main: 9999-999999-abcdefgh
-  tacl: 9999-999999-abcdefgh
 renamed_group_prefix: '42'
 version: 2
 warehouse_id: abc
@@ -451,7 +450,7 @@ def test_save_config_strip_group_names(ws, mocker):
 
     install = WorkspaceInstaller(ws)
     install._question = mock_question
-    install._choice = lambda _1, _2: "None (abc, PRO, RUNNING)"
+    install._choice = lambda _1, _2: "abc (abc, PRO, RUNNING)"
     install._configure()
 
     ws.workspace.upload.assert_called_with(

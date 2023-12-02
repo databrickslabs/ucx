@@ -426,7 +426,7 @@ class WorkspaceInstaller(ConfigureMixin):
                     )
                     instance_profile, spark_conf_dict = self._get_ext_hms_conf_from_policy(cluster_policy)
 
-        #override_clusters = self._configure_override_clusters()
+        # override_clusters = self._configure_override_clusters()
         self._config = WorkspaceConfig(
             inventory_database=inventory_database,
             include_group_names=groups_config_args["selected"],
