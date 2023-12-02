@@ -148,9 +148,9 @@ class WorkspaceInstaller(ConfigureMixin):
         self._prefix = prefix
         self._prompts = promtps
         self._this_file = Path(__file__)
-        # self._override_clusters = None
         self._dashboards = {}
         self._state = InstallState(ws, self._install_folder)
+        self._install_override_clusters = None
 
     def run(self):
         logger.info(f"Installing UCX v{self._version}")
@@ -224,7 +224,7 @@ class WorkspaceInstaller(ConfigureMixin):
         logger.info(f"Installing UCX v{workspace_installer._version} on {ws.config.host}")
         workspace_installer._config = config
         workspace_installer._write_config(overwrite=False)
-        workspace_installer._current_config._override_clusters = override_clusters
+        workspace_installer._current_config.override_clusters = override_clusters
         # TODO: rather introduce a method `is_configured`, as we may want to reconfigure workspaces for some reason
         workspace_installer._run_configured()
         return workspace_installer
@@ -426,7 +426,7 @@ class WorkspaceInstaller(ConfigureMixin):
                     )
                     instance_profile, spark_conf_dict = self._get_ext_hms_conf_from_policy(cluster_policy)
 
-        _override_clusters = self._configure_override_clusters()
+        #override_clusters = self._configure_override_clusters()
         self._config = WorkspaceConfig(
             inventory_database=inventory_database,
             include_group_names=groups_config_args["selected"],
@@ -436,7 +436,7 @@ class WorkspaceInstaller(ConfigureMixin):
             num_threads=num_threads,
             instance_profile=instance_profile,
             spark_conf=spark_conf_dict,
-            override_clusters=_override_clusters,
+            override_clusters=self._install_override_clusters,
         )
 
         self._write_config(overwrite=False)
@@ -464,14 +464,12 @@ class WorkspaceInstaller(ConfigureMixin):
         desired_steps = {t.workflow for t in _TASKS.values()}
         wheel_runner = None
 
-        if self._current_config._override_clusters:
+        if self._current_config.override_clusters:
             wheel_runner = self._upload_wheel_runner(remote_wheel)
         for step_name in desired_steps:
             settings = self._job_settings(step_name, remote_wheel)
-            if self._current_config._override_clusters:
-                settings = self._apply_cluster_overrides(
-                    settings, self._current_config._override_clusters, wheel_runner
-                )
+            if self._current_config.override_clusters:
+                settings = self._apply_cluster_overrides(settings, self._current_config.override_clusters, wheel_runner)
             self._deploy_workflow(step_name, settings)
 
         for step_name, job_id in self._state.jobs.items():
@@ -641,11 +639,7 @@ class WorkspaceInstaller(ConfigureMixin):
                     logger.warning(f"Uploading wheel file to DBFS failed, DBFS is probably write protected. {err}")
                     # assume DBFS is write protected
                     self._write_protected_dbfs = True
-                    if not self._current_config._override_clusters:
-                        logger.error("Recommend adding override clusters with attached wheel file as python library.")
-                        raise err
-                    else:
-                        logger.warning(f"Continuing with override clusters {self._current_config._override_clusters}")
+                    self._install_override_clusters = self._configure_override_clusters()
 
             with local_wheel.open("rb") as f:
                 self._ws.workspace.mkdirs(remote_dirname)
@@ -655,7 +649,7 @@ class WorkspaceInstaller(ConfigureMixin):
 
     def _job_settings(self, step_name: str, dbfs_path: str):
         email_notifications = None
-        if not self._current_config._override_clusters and "@" in self._my_username:
+        if not self._current_config.override_clusters and "@" in self._my_username:
             # set email notifications only if we're running the real
             # installation and not the integration test.
             email_notifications = jobs.JobEmailNotifications(

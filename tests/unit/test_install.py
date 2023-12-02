@@ -33,6 +33,7 @@ from databricks.labs.ucx.install import WorkspaceInstaller
 
 from ..unit.framework.mocks import MockBackend
 
+# test cluster id
 cluster_id = "9999-999999-abcdefgh"
 
 
@@ -84,27 +85,11 @@ def ws(mocker):
     ws.clusters.list.return_value = mock_clusters()
     return ws
 
-
-def mock_default_choice_from_dict(text: str, choices: dict[str, Any]) -> Any:
-    # if "Select a Cluster" in text:
-    #    return policy_def
-    if "warehouse" in text:
-        return "abc"
-    if "pre-existing HMS Legacy cluster ID" in text:  # cluster override
-        return None
-    if "pre-existing Table Access Control cluster ID" in text:  # cluster override
-        return None
-
-
 def mock_override_choice_from_dict(text: str, choices: dict[str, Any]) -> Any:
-    # if "Select a Cluster" in text:
-    #    return policy_def
     if "warehouse" in text:
         return "abc"
-    if "pre-existing HMS Legacy cluster ID" in text:  # cluster override
-        return cluster_id
-    if "pre-existing Table Access Control cluster ID" in text:  # cluster override
-        return cluster_id
+    if " cluster ID" in text:  # cluster override
+        return "1"
 
 
 def test_install_cluster_default(ws, mocker, tmp_path):
@@ -123,7 +108,7 @@ def test_install_cluster_default(ws, mocker, tmp_path):
     mocker.patch("builtins.input", return_value="0")
     install._choice_from_dict = mock_override_choice_from_dict
     install._configure()
-    res = install._current_config._override_clusters
+    res = install._current_config.override_clusters
     assert res is None
 
 
@@ -151,6 +136,8 @@ def mock_question_cluster_override(text: str, *, default: str | None = None) -> 
         return "<ALL>"
     if "Open job overview in" in text:
         return "no"
+    if " cluster ID" in text:
+        return "1"
     return "42"
 
 
@@ -176,7 +163,7 @@ def test_install_cluster_override_jobs(ws, mocker, tmp_path):
     ws.jobs.create = mock_create_job
     install = WorkspaceInstaller(ws)
     install._question = mock_question_cluster_override
-    install._current_config._override_clusters = {"main": cluster_id, "tacl": cluster_id}
+    install._current_config.override_clusters = {"main": cluster_id, "tacl": cluster_id}
     install._job_dashboard_task = MagicMock(name="_job_dashboard_task")  # disable problematic task
     install._create_jobs()
 
@@ -187,9 +174,10 @@ def test_write_protected_dbfs(ws, mocker, tmp_path):
     ws.workspace.download = lambda _: io.BytesIO(config_bytes)
     ws.jobs.create = mock_create_job
     ws.dbfs.upload = mock_dbfs
+    mocker.patch("builtins.input", return_value="1")
     install = WorkspaceInstaller(ws)
     install._question = mock_question_cluster_override
-    install._current_config._override_clusters = {"main": cluster_id, "tacl": cluster_id}
+    install._current_config.override_clusters = {"main": cluster_id, "tacl": cluster_id}
     install._job_dashboard_task = MagicMock(name="_job_dashboard_task")  # disable problematic task
     install._create_jobs()
 

@@ -14,6 +14,7 @@ class ConfigureMixin:
 
     def _configure_override_clusters(self):
         """User may override standard job clusters with interactive clusters"""
+        logger.info("Configuring cluster overrides from existing clusters")
 
         def is_classic(c) -> bool:
             return (
@@ -39,7 +40,7 @@ class ConfigureMixin:
         classic_clusters = [c for c in clusters if is_classic(c)]
         tacl_clusters = [c for c in clusters if is_tacl(c)]
 
-        preamble = "Pick default and we'll create a compatible job cluster (recommended) or "
+        preamble = """We detected an install issue and recommend using existing clusters for the upgrade tasks ahead, please choose a """
         legacy_prompt = preamble + "pre-existing HMS Legacy cluster ID"
         tacl_prompt = preamble + "pre-existing Table Access Control cluster ID"
 
