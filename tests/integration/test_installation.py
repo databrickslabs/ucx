@@ -210,8 +210,8 @@ def test_jobs_with_no_inventory_database(
             assert sort_dict(schema_a_grants) == sort_dict(src_schema_a_grants)
             assert sort_dict(schema_b_grants) == sort_dict(src_schema_b_grants)
             assert (
-                    sort_dict(schema_default_grants)[ws_group_c.display_name]
-                    == sort_dict(src_schema_default_grants)[ws_group_c.display_name]
+                sort_dict(schema_default_grants)[ws_group_c.display_name]
+                == sort_dict(src_schema_default_grants)[ws_group_c.display_name]
             )
             assert len(all_grants) >= 6
 
