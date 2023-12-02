@@ -1,6 +1,7 @@
 import datetime as dt
 from unittest.mock import MagicMock, Mock, patch
 
+from databricks.sdk.errors import InternalError
 from databricks.sdk.service.workspace import ObjectInfo, ObjectType
 
 from databricks.labs.ucx.workspace_access import generic, listing
@@ -150,4 +151,32 @@ def test_walk_with_three_level_nested_folders_returns_three_levels():
     assert compare(
         listing_instance.results,
         [rootobj, file, nested_folder, nested_notebook, second_nested_folder, second_nested_notebook],
+    )
+
+
+def test_walk_should_retry_on_backend_exceptions_and_log_them():
+    rootobj = ObjectInfo(path="/rootPath")
+    file = ObjectInfo(path="/rootPath/file1", object_type=ObjectType.FILE)
+    first_folder = ObjectInfo(path="/rootPath/nested_folder", object_type=ObjectType.DIRECTORY)
+    second_folder = ObjectInfo(path="/rootPath/nested_folder_2", object_type=ObjectType.DIRECTORY)
+    second_folder_notebook = ObjectInfo(path="/rootPath/nested_folder_2/notebook2", object_type=ObjectType.NOTEBOOK)
+
+    def my_side_effect(path, **kwargs):
+        if path == "/rootPath":
+            return [file, first_folder, second_folder]
+        elif path == "/rootPath/nested_folder":
+            raise InternalError(message="Backend dead")
+        elif path == "/rootPath/nested_folder_2":
+            return [second_folder_notebook]
+
+    client = Mock()
+    client.workspace.list.side_effect = my_side_effect
+    client.workspace.get_status.return_value = rootobj
+    listing_instance = listing.WorkspaceListing(client, 2, verify_timeout=dt.timedelta(seconds=1))
+    listing_instance.walk("/rootPath")
+
+    assert len(listing_instance.results) == 5
+    assert compare(
+        listing_instance.results,
+        [rootobj, file, first_folder, second_folder, second_folder_notebook],
     )
