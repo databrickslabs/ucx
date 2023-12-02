@@ -1,6 +1,7 @@
 import logging
 
 from databricks.sdk.service import compute
+
 logger = logging.getLogger(__name__)
 CLUSTER_ID_LENGTH = 20  # number of characters in a valid cluster_id
 
@@ -8,6 +9,8 @@ CLUSTER_ID_LENGTH = 20  # number of characters in a valid cluster_id
 class ConfigureMixin:
     """Installation configuration operations to suplement install.WorkspaceInstaller"""
 
+    def _valid_cluster_id(self, cluster_id: str) -> bool:
+        return cluster_id is not None and CLUSTER_ID_LENGTH == len(cluster_id)
 
     def _configure_override_clusters(self):
         """User may override standard job clusters with interactive clusters"""
@@ -42,16 +45,12 @@ class ConfigureMixin:
 
         cluster_id = build_and_prompt(legacy_prompt, classic_clusters)
         logger.info(f"classic cluster id {cluster_id} {self._valid_cluster_id(cluster_id)}")
-        
+
         tacl_cluster_id = build_and_prompt(tacl_prompt, tacl_clusters)
         logger.info(f"tacl cluster choosen {tacl_cluster_id} {self._valid_cluster_id(tacl_cluster_id)}")
 
         overrides = None
-        if (
-            default_val not in (cluster_id, tacl_cluster_id)
-            and self._valid_cluster_id(cluster_id)
-            and self._valid_cluster_id(tacl_cluster_id)
-        ):
+        if self._valid_cluster_id(cluster_id) and self._valid_cluster_id(tacl_cluster_id):
             overrides = {
                 "main": cluster_id,
                 "tacl": tacl_cluster_id,

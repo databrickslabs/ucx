@@ -6,7 +6,7 @@ from unittest.mock import MagicMock, patch
 
 import pytest
 import yaml
-from databricks.sdk.errors import NotFound, OperationFailed
+from databricks.sdk.errors import NotFound, OperationFailed, PermissionDenied
 from databricks.sdk.service import iam, jobs
 from databricks.sdk.service.compute import (
     GlobalInitScriptDetails,
@@ -33,31 +33,36 @@ from databricks.labs.ucx.install import WorkspaceInstaller
 
 from ..unit.framework.mocks import MockBackend
 
-
 cluster_id = "9999-999999-abcdefgh"
 
+
 def mock_clusters():
-    from databricks.sdk.service.compute import ClusterAttributes
-    from databricks.sdk.service.compute import DataSecurityMode
-    from databricks.sdk.service.compute import State
-    
+    from databricks.sdk.service.compute import DataSecurityMode, State
+
     return [
-        MagicMock(spark_version="13.3.x-dbrxxx", 
-                    cluster_name="zero", 
-                    data_security_mode=DataSecurityMode.USER_ISOLATION,
-                    state=State.RUNNING,
-                    cluster_id=cluster_id),
-        MagicMock(spark_version="13.3.x-dbrxxx", 
-                    cluster_name="one", 
-                    data_security_mode=DataSecurityMode.NONE,
-                    state=State.RUNNING,
-                    cluster_id=cluster_id),
-            MagicMock(spark_version="13.3.x-dbrxxx", 
-                    cluster_name="two", 
-                    data_security_mode=DataSecurityMode.LEGACY_TABLE_ACL,
-                    state=State.RUNNING,
-                    cluster_id=cluster_id),
-        ]
+        MagicMock(
+            spark_version="13.3.x-dbrxxx",
+            cluster_name="zero",
+            data_security_mode=DataSecurityMode.USER_ISOLATION,
+            state=State.RUNNING,
+            cluster_id=cluster_id,
+        ),
+        MagicMock(
+            spark_version="13.3.x-dbrxxx",
+            cluster_name="one",
+            data_security_mode=DataSecurityMode.NONE,
+            state=State.RUNNING,
+            cluster_id=cluster_id,
+        ),
+        MagicMock(
+            spark_version="13.3.x-dbrxxx",
+            cluster_name="two",
+            data_security_mode=DataSecurityMode.LEGACY_TABLE_ACL,
+            state=State.RUNNING,
+            cluster_id=cluster_id,
+        ),
+    ]
+
 
 @pytest.fixture
 def ws(mocker):
@@ -68,7 +73,7 @@ def ws(mocker):
     ws.config.is_aws = True
     ws.workspace.get_status = lambda _: ObjectInfo(object_id=123)
     ws.data_sources.list = lambda: [DataSource(id="bcd", warehouse_id="abc")]
-    ws.warehouses.list = lambda **_: [EndpointInfo(id="abc", warehouse_type=EndpointInfoWarehouseType.PRO)]
+    ws.warehouses.list = lambda **_: [EndpointInfo(name="abc", id="abc", warehouse_type=EndpointInfoWarehouseType.PRO)]
     ws.dashboards.create.return_value = Dashboard(id="abc")
     ws.jobs.create.return_value = jobs.CreateResponse(job_id="abc")
     ws.queries.create.return_value = Query(id="abc")
@@ -77,28 +82,31 @@ def ws(mocker):
     ws.clusters.list.return_value = mock_clusters()
     return ws
 
+
 def mock_default_choice_from_dict(text: str, choices: dict[str, Any]) -> Any:
-    if "Select a Cluster" in text:
-        return policy_def
+    # if "Select a Cluster" in text:
+    #    return policy_def
     if "warehouse" in text:
         return "abc"
-    if "pre-existing HMS Legacy cluster ID" in text: # cluster override
+    if "pre-existing HMS Legacy cluster ID" in text:  # cluster override
         return None
-    if "pre-existing Table Access Control cluster ID" in text: # cluster override
+    if "pre-existing Table Access Control cluster ID" in text:  # cluster override
         return None
 
+
 def mock_override_choice_from_dict(text: str, choices: dict[str, Any]) -> Any:
-    if "Select a Cluster" in text:
-        return policy_def
+    # if "Select a Cluster" in text:
+    #    return policy_def
     if "warehouse" in text:
         return "abc"
-    if "pre-existing HMS Legacy cluster ID" in text: # cluster override
+    if "pre-existing HMS Legacy cluster ID" in text:  # cluster override
         return cluster_id
-    if "pre-existing Table Access Control cluster ID" in text: # cluster override
+    if "pre-existing Table Access Control cluster ID" in text:  # cluster override
         return cluster_id
 
 
 def test_install_cluster_default(ws, mocker, tmp_path):
+    """Ensure configure does not add cluster override for happy path of no DBFS error"""
     jobs_mock = MagicMock()
 
     def jobs_create(*args, **kwargs):
@@ -112,8 +120,10 @@ def test_install_cluster_default(ws, mocker, tmp_path):
     install = WorkspaceInstaller(ws)
     mocker.patch("builtins.input", return_value="0")
     install._choice_from_dict = mock_override_choice_from_dict
-    res = install._configure_override_clusters()
+    install._configure()
+    res = install._current_config._override_clusters
     assert res is None
+
 
 def test_install_cluster_override_basic(ws, mocker, tmp_path):
     jobs_mock = MagicMock()
@@ -155,7 +165,7 @@ def mock_create_job(**args):
 def mock_dbfs(path, f, overwrite):
     """Write protected DBFS"""
     message = "403 error"
-    raise OperationFailed(message)
+    raise PermissionDenied(message)
 
 
 def test_install_cluster_override_jobs(ws, mocker, tmp_path):
@@ -250,13 +260,14 @@ def test_build_wheel(ws, tmp_path):
 
 def test_save_config(ws, mocker):
     def not_found(_):
-        raise NotFound("save_config")
+        msg = "save_config"
+        raise NotFound(msg)
 
     mocker.patch("builtins.input", return_value="42")
 
     ws.workspace.get_status = not_found
     ws.warehouses.list = lambda **_: [
-        EndpointInfo(id="abc", warehouse_type=EndpointInfoWarehouseType.PRO, state=State.RUNNING)
+        EndpointInfo(name="abc", id="abc", warehouse_type=EndpointInfoWarehouseType.PRO, state=State.RUNNING)
     ]
     ws.cluster_policies.list = lambda: []
     ws.workspace.download = not_found
@@ -312,7 +323,7 @@ workspace_start_path: /
     mocker.patch("builtins.input", return_value="42")
 
     ws.warehouses.list = lambda **_: [
-        EndpointInfo(id="abc", warehouse_type=EndpointInfoWarehouseType.PRO, state=State.RUNNING)
+        EndpointInfo(name="abc", id="abc", warehouse_type=EndpointInfoWarehouseType.PRO, state=State.RUNNING)
     ]
     ws.cluster_policies.list = lambda: []
 
@@ -363,7 +374,7 @@ workspace_start_path: /
     mocker.patch("builtins.input", return_value="42")
 
     ws.warehouses.list = lambda **_: [
-        EndpointInfo(id="abc", warehouse_type=EndpointInfoWarehouseType.PRO, state=State.RUNNING)
+        EndpointInfo(name="abc", id="abc", warehouse_type=EndpointInfoWarehouseType.PRO, state=State.RUNNING)
     ]
     ws.cluster_policies.list = lambda: []
 
@@ -404,7 +415,7 @@ def test_save_config_auto_groups(ws, mocker):
 
     ws.workspace.get_status = not_found
     ws.warehouses.list = lambda **_: [
-        EndpointInfo(id="abc", warehouse_type=EndpointInfoWarehouseType.PRO, state=State.RUNNING)
+        EndpointInfo(name="abc", id="abc", warehouse_type=EndpointInfoWarehouseType.PRO, state=State.RUNNING)
     ]
     ws.cluster_policies.list = lambda: []
 
@@ -444,7 +455,7 @@ def test_save_config_strip_group_names(ws, mocker):
 
     ws.workspace.get_status = not_found
     ws.warehouses.list = lambda **_: [
-        EndpointInfo(id="abc", warehouse_type=EndpointInfoWarehouseType.PRO, state=State.RUNNING)
+        EndpointInfo(name="abc", id="abc", warehouse_type=EndpointInfoWarehouseType.PRO, state=State.RUNNING)
     ]
     ws.cluster_policies.list = lambda: []
 
@@ -503,14 +514,14 @@ def test_save_config_with_glue(ws, mocker):
             return policy_def
         if "warehouse" in text:
             return "abc"
-        if "cluster ID" in text: # cluster override
+        if "cluster ID" in text:  # cluster override
             return cluster_id
 
     mocker.patch("builtins.input", return_value="42")
 
     ws.workspace.get_status = not_found
     ws.warehouses.list = lambda **_: [
-        EndpointInfo(id="abc", warehouse_type=EndpointInfoWarehouseType.PRO, state=State.RUNNING)
+        EndpointInfo(name="abc", id="abc", warehouse_type=EndpointInfoWarehouseType.PRO, state=State.RUNNING)
     ]
     ws.cluster_policies.list = lambda: [Policy(definition=policy_def.decode("utf-8"))]
 
@@ -568,7 +579,7 @@ workspace_start_path: /
     ws.workspace.download = lambda _: io.BytesIO(config_bytes)
     ws.workspace.get_status = lambda _: ObjectInfo(object_id=123)
     ws.data_sources.list = lambda: [DataSource(id="bcd", warehouse_id="abc")]
-    ws.warehouses.list = lambda **_: [EndpointInfo(id="abc", warehouse_type=EndpointInfoWarehouseType.PRO)]
+    ws.warehouses.list = lambda **_: [EndpointInfo(name="abc", id="abc", warehouse_type=EndpointInfoWarehouseType.PRO)]
     ws.dashboards.create.return_value = Dashboard(id="abc")
     ws.queries.create.return_value = Query(id="abc")
     ws.query_visualizations.create.return_value = Visualization(id="abc")

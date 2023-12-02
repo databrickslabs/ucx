@@ -13,18 +13,20 @@ from dataclasses import replace
 from pathlib import Path
 from typing import Any
 
-
-
 import yaml
 from databricks.sdk import WorkspaceClient
-from databricks.sdk.errors import InvalidParameterValue, NotFound, OperationFailed
+from databricks.sdk.errors import (
+    InvalidParameterValue,
+    NotFound,
+    OperationFailed,
+    PermissionDenied,
+)
 from databricks.sdk.mixins.compute import SemVer
 from databricks.sdk.service import compute, jobs
 from databricks.sdk.service.sql import EndpointInfoWarehouseType, SpotInstancePolicy
 from databricks.sdk.service.workspace import ImportFormat
 
 from databricks.labs.ucx.__about__ import __version__
-
 from databricks.labs.ucx.assessment.crawlers import (
     AzureServicePrincipalInfo,
     ClusterInfo,
@@ -32,8 +34,8 @@ from databricks.labs.ucx.assessment.crawlers import (
     JobInfo,
     PipelineInfo,
 )
-from databricks.labs.ucx.configure import ConfigureMixin
 from databricks.labs.ucx.config import WorkspaceConfig
+from databricks.labs.ucx.configure import ConfigureMixin
 from databricks.labs.ucx.framework.crawlers import (
     SchemaDeployer,
     SqlBackend,
@@ -146,7 +148,7 @@ class WorkspaceInstaller(ConfigureMixin):
         self._prefix = prefix
         self._prompts = promtps
         self._this_file = Path(__file__)
-        #self._override_clusters = None
+        # self._override_clusters = None
         self._dashboards = {}
         self._state = InstallState(ws, self._install_folder)
 
@@ -334,19 +336,19 @@ class WorkspaceInstaller(ConfigureMixin):
         return f"[{self._prefix.upper()}] {name}"
 
     def _configure_inventory_database(self):
-            counter = 0
-            inventory_database = None
-            while True:
-                inventory_database = self._question("Inventory Database stored in hive_metastore", default="ucx")
-                if re.match(r"^\w+$", inventory_database):
-                    break
-                else:
-                    print(f"{inventory_database} is not a valid database name")
-                    counter = counter + 1
-                    if counter > NUM_USER_ATTEMPTS:
-                        msg = "Exceeded max tries to get a valid database name, try again later."
-                        raise SystemExit(msg)
-            return inventory_database
+        counter = 0
+        inventory_database = None
+        while True:
+            inventory_database = self._question("Inventory Database stored in hive_metastore", default="ucx")
+            if re.match(r"^\w+$", inventory_database):
+                break
+            else:
+                print(f"{inventory_database} is not a valid database name")
+                counter = counter + 1
+                if counter > NUM_USER_ATTEMPTS:
+                    msg = "Exceeded max tries to get a valid database name, try again later."
+                    raise SystemExit(msg)
+        return inventory_database
 
     def _configure(self):
         ws_file_url = self.notebook_link(self.config_file)
@@ -467,7 +469,9 @@ class WorkspaceInstaller(ConfigureMixin):
         for step_name in desired_steps:
             settings = self._job_settings(step_name, remote_wheel)
             if self._current_config._override_clusters:
-                settings = self._apply_cluster_overrides(settings, self._current_config._override_clusters, wheel_runner)
+                settings = self._apply_cluster_overrides(
+                    settings, self._current_config._override_clusters, wheel_runner
+                )
             self._deploy_workflow(step_name, settings)
 
         for step_name, job_id in self._state.jobs.items():
