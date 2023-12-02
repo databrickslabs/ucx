@@ -73,7 +73,9 @@ def ws(mocker):
     ws.config.is_aws = True
     ws.workspace.get_status = lambda _: ObjectInfo(object_id=123)
     ws.data_sources.list = lambda: [DataSource(id="bcd", warehouse_id="abc")]
-    ws.warehouses.list = lambda **_: [EndpointInfo(name="abc", id="abc", warehouse_type=EndpointInfoWarehouseType.PRO)]
+    ws.warehouses.list = lambda **_: [
+        EndpointInfo(name="abc", id="abc", warehouse_type=EndpointInfoWarehouseType.PRO, state=State.RUNNING)
+    ]
     ws.dashboards.create.return_value = Dashboard(id="abc")
     ws.jobs.create.return_value = jobs.CreateResponse(job_id="abc")
     ws.queries.create.return_value = Query(id="abc")
