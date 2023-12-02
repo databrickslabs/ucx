@@ -6,7 +6,11 @@ from unittest.mock import MagicMock, patch
 
 import pytest
 import yaml
-from databricks.sdk.errors import NotFound, OperationFailed, PermissionDenied
+from databricks.sdk.errors import (
+    NotFound,
+    OperationFailed,
+    PermissionDenied,
+)
 from databricks.sdk.service import iam, jobs
 from databricks.sdk.service.compute import (
     GlobalInitScriptDetails,
@@ -127,7 +131,7 @@ def test_install_cluster_override_basic(ws, mocker, tmp_path):
     install = WorkspaceInstaller(ws)
     mocker.patch("builtins.input", return_value="1")
     install._choice_from_dict = mock_override_choice_from_dict
-    ws.dbfs.upload = mock_dbfs # trigger the override cluster path
+    ws.dbfs.upload = mock_dbfs  # trigger the override cluster path
     res = install._configure_override_clusters()
     assert res is not None
     assert res["main"] == cluster_id
