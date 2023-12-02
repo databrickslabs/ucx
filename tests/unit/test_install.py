@@ -10,7 +10,7 @@ from databricks.sdk.errors import (
     InvalidParameterValue,
     NotFound,
     OperationFailed,
-    PermissionDenied
+    PermissionDenied,
 )
 from databricks.sdk.service import iam, jobs, sql
 from databricks.sdk.service.compute import (
