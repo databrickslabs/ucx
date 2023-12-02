@@ -192,6 +192,10 @@ def test_jobs_with_no_inventory_database(
         @retried(on=[AssertionError], timeout=timedelta(minutes=2))
         def validate_tacl():
             logger.info("validating tacl")
+
+            def sort_dict(obj: dict):
+                return {k: sorted(v) for k, v in obj.items()}
+
             table_a_grants = grants_crawler.for_table_info(table_a)
             table_b_grants = grants_crawler.for_table_info(table_b)
             table_c_grants = grants_crawler.for_table_info(table_c)
@@ -200,12 +204,15 @@ def test_jobs_with_no_inventory_database(
             schema_default_grants = grants_crawler.for_schema_info(schema_default)
             all_grants = grants_crawler.snapshot()
 
-            assert table_a_grants == src_table_a_grants
-            assert table_b_grants == src_table_b_grants
-            assert table_c_grants == src_table_c_grants
-            assert schema_a_grants == src_schema_a_grants
-            assert schema_b_grants == src_schema_b_grants
-            assert schema_default_grants[ws_group_c.display_name] == src_schema_default_grants[ws_group_c.display_name]
+            assert sort_dict(table_a_grants) == sort_dict(src_table_a_grants)
+            assert sort_dict(table_b_grants) == sort_dict(src_table_b_grants)
+            assert sort_dict(table_c_grants) == sort_dict(src_table_c_grants)
+            assert sort_dict(schema_a_grants) == sort_dict(src_schema_a_grants)
+            assert sort_dict(schema_b_grants) == sort_dict(src_schema_b_grants)
+            assert (
+                    sort_dict(schema_default_grants)[ws_group_c.display_name]
+                    == sort_dict(src_schema_default_grants)[ws_group_c.display_name]
+            )
             assert len(all_grants) >= 6
 
             return True
