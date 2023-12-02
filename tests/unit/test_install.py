@@ -135,6 +135,12 @@ def mock_dbfs(path, f, overwrite):
     raise PermissionDenied(message)
 
 
+def mock_dbfs_unexpected_error(path, f, overwrite):
+    """Unexpected error"""
+    message = "500 error"
+    raise OperationFailed(message)
+
+
 def test_install_cluster_override_jobs(ws, mocker, tmp_path):
     config_bytes = yaml.dump(WorkspaceConfig(inventory_database="a").as_dict()).encode("utf8")
     ws.workspace.download = lambda _: io.BytesIO(config_bytes)
@@ -180,6 +186,22 @@ def test_writeable_dbfs(ws, mocker, tmp_path):
 
     res = install._current_config.override_clusters
     assert res is None
+
+
+def test_unexpected_dbfs_upload_error(ws, mocker, tmp_path):
+    """Simulate write protected DBFS AND override clusters"""
+    config_bytes = yaml.dump(WorkspaceConfig(inventory_database="a").as_dict()).encode("utf8")
+    ws.workspace.download = lambda _: io.BytesIO(config_bytes)
+    ws.jobs.create = mock_create_job
+    ws.dbfs.upload = mock_dbfs_unexpected_error
+    mocker.patch("builtins.input", return_value="1")
+    with pytest.raises(OperationFailed) as failure:
+        install = WorkspaceInstaller(ws)
+        install._question = mock_question_cluster_override
+        install._current_config.override_clusters = {"main": cluster_id, "tacl": cluster_id}
+        install._job_dashboard_task = MagicMock(name="_job_dashboard_task")  # disable problematic task
+        install._create_jobs()
+    assert "500 error" == str(failure.value)
 
 
 def test_replace_clusters_for_integration_tests(ws):
