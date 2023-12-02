@@ -158,10 +158,10 @@ def test_write_protected_dbfs(ws, mocker, tmp_path):
     ws.workspace.download = lambda _: io.BytesIO(config_bytes)
     ws.jobs.create = mock_create_job
     ws.dbfs.upload = mock_dbfs
+
     mocker.patch("builtins.input", return_value="1")
     install = WorkspaceInstaller(ws)
     install._question = mock_question_cluster_override
-    install._current_config.override_clusters = {"main": cluster_id, "tacl": cluster_id}
     install._job_dashboard_task = MagicMock(name="_job_dashboard_task")  # disable problematic task
     install._create_jobs()
 
