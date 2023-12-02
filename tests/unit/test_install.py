@@ -99,47 +99,6 @@ def mock_override_choice_from_dict(text: str, choices: dict[str, Any]) -> Any:
         return cluster_id
 
 
-def test_install_cluster_default(ws, mocker, tmp_path):
-    """Ensure configure does not add cluster override for happy path of no DBFS error"""
-    jobs_mock = MagicMock()
-
-    def jobs_create(*args, **kwargs):
-        assert "write_protected_dbfs" not in args, f"{args}"
-        assert "write_protected_dbfs" not in kwargs, f"{kwargs}"
-        return MagicMock(job_id="bar")
-
-    jobs_mock.create = jobs_create
-    ws.jobs = jobs_mock
-
-    install = WorkspaceInstaller(ws)
-    mocker.patch("builtins.input", return_value="0")
-    install._choice_from_dict = mock_override_choice_from_dict
-    install._configure()
-    res = install._current_config.override_clusters
-    assert res is None
-
-
-def test_install_cluster_override_basic(ws, mocker, tmp_path):
-    jobs_mock = MagicMock()
-
-    def jobs_create(*args, **kwargs):
-        assert "write_protected_dbfs" not in args, f"{args}"
-        assert "write_protected_dbfs" not in kwargs, f"{kwargs}"
-        return MagicMock(job_id="bar")
-
-    jobs_mock.create = jobs_create
-    ws.jobs = jobs_mock
-
-    install = WorkspaceInstaller(ws)
-    mocker.patch("builtins.input", return_value="1")
-    install._choice_from_dict = mock_override_choice_from_dict
-    ws.dbfs.upload = mock_dbfs  # trigger the override cluster path
-    res = install._configure_override_clusters()
-    assert res is not None
-    assert res["main"] == cluster_id
-    assert res["tacl"] == cluster_id
-
-
 def mock_question_cluster_override(text: str, *, default: str | None = None) -> str:
     if "workspace group names" in text:
         return "<ALL>"
@@ -157,6 +116,16 @@ def mock_create_job(**args):
         if isinstance(task, Task):
             assert task.libraries is None, task.libraries
             assert task.existing_cluster_id == cluster_id
+    return jobs.CreateResponse(job_id="abc")
+
+
+def mock_create_job_for_writable_dbfs(**args):
+    """Intercept job.create api calls to validate"""
+    assert args["job_clusters"] != [], "job_clusters argument should not be an empty list"
+    for task in args["tasks"]:
+        if isinstance(task, Task):
+            assert task.libraries is not None, task.libraries
+            assert task.existing_cluster_id is None
     return jobs.CreateResponse(job_id="abc")
 
 
@@ -189,6 +158,28 @@ def test_write_protected_dbfs(ws, mocker, tmp_path):
     install._current_config.override_clusters = {"main": cluster_id, "tacl": cluster_id}
     install._job_dashboard_task = MagicMock(name="_job_dashboard_task")  # disable problematic task
     install._create_jobs()
+
+    res = install._current_config.override_clusters
+    assert res is not None
+    assert res["main"] == cluster_id
+    assert res["tacl"] == cluster_id
+
+
+def test_writeable_dbfs(ws, mocker, tmp_path):
+    """Ensure configure does not add cluster override for happy path of writable DBFS"""
+    config_bytes = yaml.dump(WorkspaceConfig(inventory_database="a").as_dict()).encode("utf8")
+    ws.workspace.download = lambda _: io.BytesIO(config_bytes)
+    ws.jobs.create = mock_create_job_for_writable_dbfs
+
+    mocker.patch("builtins.input", return_value="1")
+    install = WorkspaceInstaller(ws)
+    install._question = mock_question_cluster_override
+
+    install._job_dashboard_task = MagicMock(name="_job_dashboard_task")  # disable problematic task
+    install._create_jobs()
+
+    res = install._current_config.override_clusters
+    assert res is None
 
 
 def test_replace_clusters_for_integration_tests(ws):

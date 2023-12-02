@@ -35,7 +35,7 @@ from databricks.labs.ucx.assessment.crawlers import (
     PipelineInfo,
 )
 from databricks.labs.ucx.config import WorkspaceConfig
-from databricks.labs.ucx.configure import ConfigureMixin
+from databricks.labs.ucx.configure import ConfigureClusterOverrides
 from databricks.labs.ucx.framework.crawlers import (
     SchemaDeployer,
     SqlBackend,
@@ -137,7 +137,7 @@ def deploy_schema(sql_backend: SqlBackend, inventory_schema: str):
     deployer.deploy_view("grant_detail", "queries/views/grant_detail.sql")
 
 
-class WorkspaceInstaller(ConfigureMixin):
+class WorkspaceInstaller:
     def __init__(
         self, ws: WorkspaceClient, *, prefix: str = "ucx", promtps: bool = True, sql_backend: SqlBackend = None
     ):
@@ -427,7 +427,6 @@ class WorkspaceInstaller(ConfigureMixin):
                     )
                     instance_profile, spark_conf_dict = self._get_ext_hms_conf_from_policy(cluster_policy)
 
-        # override_clusters = self._configure_override_clusters()
         self._config = WorkspaceConfig(
             inventory_database=inventory_database,
             include_group_names=groups_config_args["selected"],
@@ -640,7 +639,9 @@ class WorkspaceInstaller(ConfigureMixin):
                     logger.warning(f"Uploading wheel file to DBFS failed, DBFS is probably write protected. {err}")
                     # assume DBFS is write protected
                     self._write_protected_dbfs = True
-                    self._install_override_clusters = self._configure_override_clusters()
+                    self._current_config.override_clusters = ConfigureClusterOverrides(
+                        self._ws, self._choice_from_dict
+                    )._configure_override_clusters()
 
             with local_wheel.open("rb") as f:
                 self._ws.workspace.mkdirs(remote_dirname)
