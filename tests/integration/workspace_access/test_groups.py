@@ -1,11 +1,12 @@
 import json
 import logging
+import random
 from datetime import timedelta
 
 import pytest
 from databricks.sdk.errors import NotFound
 from databricks.sdk.retries import retried
-from databricks.sdk.service.iam import PermissionLevel, ResourceMeta
+from databricks.sdk.service.iam import PermissionLevel, ResourceMeta, Group
 
 from databricks.labs.ucx.hive_metastore import GrantsCrawler
 from databricks.labs.ucx.hive_metastore.grants import Grant
@@ -120,30 +121,40 @@ def test_delete_ws_groups_should_not_delete_non_reflected_acc_groups(ws, make_uc
     assert ws.groups.get(ws_group.id).display_name == "ucx-temp-" + ws_group.display_name
 
 
+def validate_migrate_groups(group_manager: GroupManager, ws_group: Group ,to_group: Group):
+    workspace_groups = group_manager._workspace_groups_in_workspace()
+    assert ws_group.display_name in workspace_groups
+    group_manager.rename_groups()
+    workspace_groups = group_manager._workspace_groups_in_workspace()
+    assert f"ucx-temp-{ws_group.display_name}" in workspace_groups
+    group_manager.reflect_account_groups_on_workspace()
+    account_workspace_groups = group_manager._account_groups_in_workspace()
+    assert to_group.display_name in account_workspace_groups
+
 def test_group_name_change(
     ws,
     sql_backend,
     inventory_schema,
     make_table,
-    make_ucx_group_prefix,
-    make_ucx_group_match,
+    make_group,
+    make_acc_group,
+    make_random
 ):
-    ws_group, account_group = make_ucx_group_prefix(prefix="SAMPLE_")
-    print(ws_group)
-    print(account_group)
-    dummy_table = make_table()
-    sql_backend.execute(f"GRANT SELECT, MODIFY ON TABLE {dummy_table.full_name} TO `{ws_group.display_name}`")
-    tables = StaticTablesCrawler(sql_backend, inventory_schema, [dummy_table])
-    grants = GrantsCrawler(tables)
-    group_manager = GroupManager(sql_backend, ws, inventory_schema, [ws_group.display_name], "ucx-temp-","^","SAMPLE_")
-    tacl = TableAclSupport(grants, sql_backend)
-    permission_manager = PermissionManager(sql_backend, inventory_schema, [tacl])
-    permission_manager.inventorize_permissions()
-    state = group_manager.get_migration_state()
-    group_manager.rename_groups()
-    group_manager.reflect_account_groups_on_workspace()
-    permission_manager.apply_group_permissions(state)
-    group_manager.delete_original_workspace_groups()
+    ws_display_name = f"ucx_{make_random(4)}"
+
+
+    ws_group_prefix, accnt_group_prefix = make_ucx_group_prefix(prefix="SAMPLE_")
+    ws_group_suffix, accnt_group_suffix = make_ucx_group_suffix(suffix="_SAMPLE")
+    logger.info(f"Attempting Mapping From Workspace Group {ws_group_prefix.display_name} to "
+                f"Account Group {accnt_group_prefix.display_name}")
+    group_manager_prefix = GroupManager(sql_backend, ws, inventory_schema, [ws_group_prefix.display_name], "ucx-temp-","^","SAMPLE_")
+    validate_migrate_groups(group_manager_prefix,ws_group_prefix, accnt_group_prefix)
+    sql_backend.execute(f"DROP TABLE {inventory_schema}.GROUPS")
+    logger.info(f"Attempting Mapping From Workspace Group {ws_group_suffix.display_name} to "
+                f"Account Group {accnt_group_suffix.display_name}")
+    group_manager_suffix = GroupManager(sql_backend, ws, inventory_schema, [ws_group_suffix.display_name], "ucx-temp-","$","_SAMPLE")
+    validate_migrate_groups(group_manager_suffix,ws_group_suffix, accnt_group_suffix)
+
 
 
 # average runtime is 100 seconds
