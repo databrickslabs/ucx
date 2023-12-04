@@ -82,11 +82,13 @@ class GroupManager(CrawlerBase):
         inventory_database: str,
         include_group_names: list[str] | None = None,
         renamed_group_prefix: str = "ucx-renamed-",
+        verify_timeout: timedelta | None = timedelta(minutes=1),
     ):
         super().__init__(sql_backend, "hive_metastore", inventory_database, "groups", MigratedGroup)
         self._ws = ws
         self._include_group_names = include_group_names
         self._renamed_group_prefix = renamed_group_prefix
+        self._verify_timeout = verify_timeout
 
     def snapshot(self) -> list[MigratedGroup]:
         return self._snapshot(self._fetcher, self._crawler)
@@ -218,10 +220,13 @@ class GroupManager(CrawlerBase):
         attributes = scim_attributes.split(",")
         if "members" in attributes:
             attributes.remove("members")
-            for g in self._ws.groups.list(attributes="id,displayName,meta"):
+            for g in self._ws.groups.list(attributes=",".join(attributes)):
                 if self._is_group_out_of_scope(g, resource_type):
                     continue
-                group_with_all_attributes = self._get_group_with_retries(g.id)
+                # group_with_all_attributes = self._get_group_with_retries(g.id)
+                set_retry_on_value_error = retried(on=[InternalError], timeout=self._verify_timeout)
+                set_retried_check = set_retry_on_value_error(self._get_group_with_retries)
+                group_with_all_attributes = set_retried_check(g.id)
                 results.append(group_with_all_attributes)
         else:
             for g in self._ws.groups.list(attributes=scim_attributes):
@@ -231,9 +236,8 @@ class GroupManager(CrawlerBase):
         logger.info(f"Found {len(results)} {resource_type}")
         return results
 
-    @retried(on=[InternalError], timeout=timedelta(minutes=2))
     @rate_limited(max_requests=255, burst_period_seconds=60)
-    def _get_group_with_retries(self, group_id: str) -> iam.Group | None:
+    def _get_group_with_retries(self, group_id: str) -> iam.Group:
         return self._ws.groups.get(group_id)
 
     def _list_account_groups(self, scim_attributes: str) -> list[iam.Group]:
