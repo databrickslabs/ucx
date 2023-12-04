@@ -139,23 +139,22 @@ def test_snapshot_should_consider_groups_defined_in_conf():
         "Resources": [g.as_dict() for g in [acc_group_1, acc_group_2]],
     }
 
-    gm = GroupManager(backend, wsclient, inventory_database="inv", include_group_names=["de"])
+    wsclient.groups.list.return_value = [group1, group2]
+    wsclient.groups.get.side_effect = [group1, group2]
+    res = GroupManager(backend, wsclient, inventory_database="inv", include_group_names=["de"]).snapshot()
 
-    with patch.object(gm, "_list_workspace_groups", return_value=[group1, group2]):
-        res = gm.snapshot()
-
-        assert res == [
-            MigratedGroup(
-                id_in_workspace="1",
-                name_in_workspace="de",
-                name_in_account="de",
-                temporary_name="ucx-renamed-de",
-                members=None,
-                external_id="11",
-                roles=None,
-                entitlements=None,
-            )
-        ]
+    assert res == [
+        MigratedGroup(
+            id_in_workspace="1",
+            name_in_workspace="de",
+            name_in_account="de",
+            temporary_name="ucx-renamed-de",
+            members=None,
+            external_id="11",
+            roles=None,
+            entitlements=None,
+        )
+    ]
 
 
 def test_snapshot_should_filter_system_groups_defined_in_conf():
@@ -207,33 +206,34 @@ def test_snapshot_should_rename_groups_defined_in_conf():
     wsclient.api_client.do.return_value = {
         "Resources": [g.as_dict() for g in [account_admins_group_1, account_admins_group_2]],
     }
+
+    wsclient.groups.list.return_value = [group1, group2]
+    wsclient.groups.get.side_effect = [group1, group2]
     gm = GroupManager(backend, wsclient, inventory_database="inv", renamed_group_prefix="test-group-")
+    res = gm.snapshot()
 
-    with patch.object(gm, "_list_workspace_groups", return_value=[group1, group2]):
-        res = gm.snapshot()
-
-        assert res == [
-            MigratedGroup(
-                id_in_workspace="1",
-                name_in_workspace="de",
-                name_in_account="de",
-                temporary_name="test-group-de",
-                members=None,
-                external_id="11",
-                roles=None,
-                entitlements=None,
-            ),
-            MigratedGroup(
-                id_in_workspace="2",
-                name_in_workspace="ds",
-                name_in_account="ds",
-                temporary_name="test-group-ds",
-                members=None,
-                external_id="12",
-                roles=None,
-                entitlements=None,
-            ),
-        ]
+    assert res == [
+        MigratedGroup(
+            id_in_workspace="1",
+            name_in_workspace="de",
+            name_in_account="de",
+            temporary_name="test-group-de",
+            members=None,
+            external_id="11",
+            roles=None,
+            entitlements=None,
+        ),
+        MigratedGroup(
+            id_in_workspace="2",
+            name_in_workspace="ds",
+            name_in_account="ds",
+            temporary_name="test-group-ds",
+            members=None,
+            external_id="12",
+            roles=None,
+            entitlements=None,
+        ),
+    ]
 
 
 def test_rename_groups_should_patch_eligible_groups():
@@ -513,25 +513,5 @@ def test_list_workspace_groups():
     assert result[0].members == [
         ComplexValue(display="test-user-1", value="20"),
         ComplexValue(display="test-user-2", value="21"),
-    ]
-    wsclient.groups.get.assert_called()
-
-    # Test when attributes contain "roles"
-    result = gm._list_workspace_groups("WorkspaceGroup", "id,displayName,meta,roles")
-    assert len(result) == 3
-    assert result[0].display_name == "group_1"
-    assert result[0].roles == [
-        ComplexValue(value="arn:aws:iam::123456789098:instance-profile/ip1"),
-        ComplexValue(value="arn:aws:iam::123456789098:instance-profile/ip2"),
-    ]
-    wsclient.groups.get.assert_called()
-
-    # Test when attributes contain "entitlements"
-    result = gm._list_workspace_groups("WorkspaceGroup", "id,displayName,meta,entitlements")
-    assert len(result) == 3
-    assert result[0].display_name == "group_1"
-    assert result[0].entitlements == [
-        ComplexValue(value="allow-cluster-create"),
-        ComplexValue(value="allow-instance-pool-create"),
     ]
     wsclient.groups.get.assert_called()

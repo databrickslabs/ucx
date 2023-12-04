@@ -3,6 +3,7 @@ import json
 import logging
 import typing
 from dataclasses import dataclass
+from datetime import timedelta
 
 from databricks.sdk import WorkspaceClient
 from databricks.sdk.core import DatabricksError
@@ -202,7 +203,9 @@ class GroupManager(CrawlerBase):
         return by_name
 
     def _is_group_out_of_scope(self, group: iam.Group, resource_type: str) -> bool:
-        if group.display_name in self._SYSTEM_GROUPS or group.meta.resource_type != resource_type:
+        if group.display_name in self._SYSTEM_GROUPS:
+            return True
+        if group.meta.resource_type != resource_type:
             return True
         return False
 
@@ -212,7 +215,9 @@ class GroupManager(CrawlerBase):
         # these attributes can get too large causing the api to timeout
         # so we're fetching groups without these attributes first
         # and then calling get on each of them to fetch all attributes
-        if "members" in scim_attributes or "roles" in scim_attributes or "entitlements" in scim_attributes:
+        attributes = scim_attributes.split(",")
+        if "members" in attributes:
+            attributes.remove("members")
             for g in self._ws.groups.list(attributes="id,displayName,meta"):
                 if self._is_group_out_of_scope(g, resource_type):
                     continue
@@ -226,7 +231,7 @@ class GroupManager(CrawlerBase):
         logger.info(f"Found {len(results)} {resource_type}")
         return results
 
-    @retried(on=[InternalError])
+    @retried(on=[InternalError], timeout=timedelta(minutes=2))
     @rate_limited(max_requests=255, burst_period_seconds=60)
     def _get_group_with_retries(self, group_id: str) -> iam.Group | None:
         return self._ws.groups.get(group_id)

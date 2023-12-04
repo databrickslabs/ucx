@@ -36,7 +36,7 @@ class ScimSupport(AclSupport):
     # TODO remove after ES-892977 is fixed
     @retried(on=[DatabricksError])
     def _get_groups(self):
-        return list(self._list_workspace_groups(scim_attributes="id,displayName,roles,entitlements"))
+        return list(self._list_workspace_groups("id,displayName,roles,entitlements"))
 
     def object_types(self) -> set[str]:
         return {"roles", "entitlements"}
@@ -109,7 +109,7 @@ class ScimSupport(AclSupport):
             logger.warning(f"removed on backend: {group_id}")
             return None
 
-    @retried(on=[InternalError])
+    @retried(on=[InternalError], timeout=timedelta(minutes=2))
     @rate_limited(max_requests=255, burst_period_seconds=60)
     def _get_group_with_retries(self, group_id: str) -> iam.Group | None:
         return self._ws.groups.get(group_id)
@@ -120,12 +120,13 @@ class ScimSupport(AclSupport):
         # these attributes can get too large causing the api to timeout
         # so we're fetching groups without these attributes first
         # and then calling get on each of them to fetch all attributes
-        if "members" in scim_attributes or "roles" in scim_attributes or "entitlements" in scim_attributes:
-            for g in self._ws.groups.list(attributes="id,displayName,meta"):
+        attributes = scim_attributes.split(",")
+        if "members" in attributes:
+            attributes.remove("members")
+            for g in self._ws.groups.list(attributes="id"):
                 group_with_all_attributes = self._get_group_with_retries(g.id)
                 results.append(group_with_all_attributes)
         else:
-            for g in self._ws.groups.list(attributes=scim_attributes):
-                results.append(g)
+            results = list(self._ws.groups.list(attributes=scim_attributes))
         logger.info(f"Found {len(results)} groups")
         return results
