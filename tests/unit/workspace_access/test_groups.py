@@ -515,3 +515,13 @@ def test_list_workspace_groups():
         ComplexValue(display="test-user-2", value="21"),
     ]
     wsclient.groups.get.assert_called()
+
+
+@pytest.mark.parametrize('status_code,include_retry_after',
+                         ((429, False),
+                          (429, True),
+                          (503, False),
+                          (503, True)))
+def test_blah(status_code, include_retry_after):
+    print(f'{status_code}, {include_retry_after}')
+    assert False
