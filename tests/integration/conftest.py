@@ -1,7 +1,6 @@
 import collections
 import functools
 import logging
-import random
 from datetime import timedelta
 from functools import partial
 
@@ -90,21 +89,16 @@ def sql_fetch_all(sql_backend):
 
 
 @pytest.fixture
-def user_pool(ws):
-    return list(ws.users.list(filter="displayName sw 'test-user-'", attributes="id, userName, displayName"))
-
-
-@pytest.fixture
-def make_ucx_group(make_random, make_group, make_acc_group, user_pool):
-    assert (
-        len(user_pool) >= 1
-    ), "must have 'test-user-*' test users with id, userName and displayName in your test workspace"
-
-    def inner():
-        display_name = f"ucx_{make_random(4)}"
-        members = [_.id for _ in random.choices(user_pool, k=random.randint(1, 40))]
-        ws_group = make_group(display_name=display_name, members=members, entitlements=["allow-cluster-create"])
-        acc_group = make_acc_group(display_name=display_name, members=members)
+def make_ucx_group(make_random, make_group, make_acc_group, make_user):
+    def inner(workspace_group_name=None, account_group_name=None):
+        if not workspace_group_name:
+            workspace_group_name = f"ucx_{make_random(4)}"
+        if not account_group_name:
+            account_group_name = workspace_group_name
+        user = make_user()
+        members = [user.id]
+        ws_group = make_group(display_name=workspace_group_name, members=members, entitlements=["allow-cluster-create"])
+        acc_group = make_acc_group(display_name=account_group_name, members=members)
         return ws_group, acc_group
 
     return inner
