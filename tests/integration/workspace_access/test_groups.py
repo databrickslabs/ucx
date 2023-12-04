@@ -131,30 +131,61 @@ def validate_migrate_groups(group_manager: GroupManager, ws_group: Group ,to_gro
     account_workspace_groups = group_manager._account_groups_in_workspace()
     assert to_group.display_name in account_workspace_groups
 
-def test_group_name_change(
+def test_group_name_change_prefix(
     ws,
     sql_backend,
     inventory_schema,
-    make_table,
-    make_group,
-    make_acc_group,
+    make_ucx_group,
     make_random
 ):
     ws_display_name = f"ucx_{make_random(4)}"
+    ws_group, accnt_group = make_ucx_group(workspace_group_name=ws_display_name,account_group_name=f"SAMPLE_{ws_display_name}")
+    logger.info(f"Attempting Mapping From Workspace Group {ws_group.display_name} to "
+                f"Account Group {accnt_group.display_name}")
+    group_manager = GroupManager(sql_backend, ws, inventory_schema, [ws_group.display_name], "ucx-temp-","^","SAMPLE_")
+    validate_migrate_groups(group_manager,ws_group, accnt_group)
 
+def test_group_name_change_suffix(
+    ws,
+    sql_backend,
+    inventory_schema,
+    make_ucx_group,
+    make_random
+):
+    ws_display_name = f"ucx_{make_random(4)}"
+    ws_group, accnt_group = make_ucx_group(workspace_group_name=ws_display_name,account_group_name=f"{ws_display_name}_SAMPLE")
+    logger.info(f"Attempting Mapping From Workspace Group {ws_group.display_name} to "
+                f"Account Group {accnt_group.display_name}")
+    group_manager = GroupManager(sql_backend, ws, inventory_schema, [ws_group.display_name], "ucx-temp-","$","_SAMPLE")
+    validate_migrate_groups(group_manager,ws_group, accnt_group)
 
-    ws_group_prefix, accnt_group_prefix = make_ucx_group_prefix(prefix="SAMPLE_")
-    ws_group_suffix, accnt_group_suffix = make_ucx_group_suffix(suffix="_SAMPLE")
-    logger.info(f"Attempting Mapping From Workspace Group {ws_group_prefix.display_name} to "
-                f"Account Group {accnt_group_prefix.display_name}")
-    group_manager_prefix = GroupManager(sql_backend, ws, inventory_schema, [ws_group_prefix.display_name], "ucx-temp-","^","SAMPLE_")
-    validate_migrate_groups(group_manager_prefix,ws_group_prefix, accnt_group_prefix)
-    sql_backend.execute(f"DROP TABLE {inventory_schema}.GROUPS")
-    logger.info(f"Attempting Mapping From Workspace Group {ws_group_suffix.display_name} to "
-                f"Account Group {accnt_group_suffix.display_name}")
-    group_manager_suffix = GroupManager(sql_backend, ws, inventory_schema, [ws_group_suffix.display_name], "ucx-temp-","$","_SAMPLE")
-    validate_migrate_groups(group_manager_suffix,ws_group_suffix, accnt_group_suffix)
+def test_group_name_change_substitute(
+    ws,
+    sql_backend,
+    inventory_schema,
+    make_ucx_group,
+    make_random
+):
+    random_elem = f"{make_random(4)}"
+    ws_display_name = f"ucx_engineering_{random_elem}"
+    acct_display_name = f"ucx_eng_{random_elem}"
+    ws_group, accnt_group = make_ucx_group(workspace_group_name=ws_display_name,account_group_name=acct_display_name)
+    logger.info(f"Attempting Mapping From Workspace Group {ws_group.display_name} to "
+                f"Account Group {accnt_group.display_name}")
+    group_manager = GroupManager(sql_backend, ws, inventory_schema, [ws_group.display_name], "ucx-temp-","engineering","eng")
+    validate_migrate_groups(group_manager,ws_group, accnt_group)
 
+def test_group_matching_names(
+    ws,
+    sql_backend,
+    inventory_schema,
+    make_ucx_group
+):
+    ws_group, accnt_group = make_ucx_group()
+    logger.info(f"Attempting Mapping From Workspace Group {ws_group.display_name} to "
+                f"Account Group {accnt_group.display_name}")
+    group_manager = GroupManager(sql_backend, ws, inventory_schema, [ws_group.display_name], "ucx-temp-")
+    validate_migrate_groups(group_manager,ws_group, accnt_group)
 
 
 # average runtime is 100 seconds

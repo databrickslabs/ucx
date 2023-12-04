@@ -3,12 +3,14 @@ import json
 import logging
 import re
 import typing
+from abc import abstractmethod
 from dataclasses import dataclass
 
 from databricks.sdk import WorkspaceClient
 from databricks.sdk.core import DatabricksError
 from databricks.sdk.retries import retried
 from databricks.sdk.service import iam
+from databricks.sdk.service.iam import Group
 
 from databricks.labs.ucx.framework.crawlers import CrawlerBase, SqlBackend
 from databricks.labs.ucx.framework.parallel import Threads
@@ -71,6 +73,134 @@ class MigrationState:
         return len(self._name_to_group)
 
 
+class GroupMigrationStrategy:
+
+    def __init__(self, workspace_groups_in_workspace, account_groups_in_account, /,
+                 renamed_groups_prefix, include_group_names=None):
+        self.renamed_groups_prefix = renamed_groups_prefix
+        self.workspace_groups_in_workspace = workspace_groups_in_workspace
+        self.account_groups_in_account = account_groups_in_account
+        self.include_group_names = include_group_names
+
+    @abstractmethod
+    def generate_migrated_groups(self):
+        raise NotImplementedError
+
+    def get_filtered_groups(self):
+        if self.include_group_names:
+            logger.info(
+                "Group listing provided, a subset of all groups will be migrated"
+            )
+            return {group_name: self.workspace_groups_in_workspace[group_name] for group_name in
+                    self.workspace_groups_in_workspace.keys() if group_name in self.include_group_names}
+        else:
+            logger.info(
+                "No group listing provided, all matching groups will be migrated"
+            )
+            return self.workspace_groups_in_workspace
+
+    @staticmethod
+    def _safe_match(group_name: str, match_re: str):
+        try:
+            match = re.search(match_re, group_name)
+            account_name = match.groups()[0] if match else group_name
+        except re.error:
+            account_name = group_name
+        return account_name
+
+    @staticmethod
+    def _safe_sub(group_name: str, match_re: str, replace: str):
+        try:
+            return re.sub(match_re, replace, group_name)
+        except re.error:
+            logger.debug(f"Failed to apply Regex Expression {match_re} on Group Name {group_name}")
+            return group_name
+
+
+class MatchingNamesStrategy(GroupMigrationStrategy):
+
+    def __init__(self, workspace_groups_in_workspace, account_groups_in_account, /,
+                 renamed_groups_prefix, include_group_names=None):
+        super().__init__(workspace_groups_in_workspace, account_groups_in_account,
+                         include_group_names=include_group_names, renamed_groups_prefix=renamed_groups_prefix)
+
+    def generate_migrated_groups(self):
+        workspace_groups = self.get_filtered_groups()
+        for g in workspace_groups.values():
+            temporary_name = f"{self.renamed_groups_prefix}{g.display_name}"
+
+            yield MigratedGroup(
+                id_in_workspace=g.id,
+                name_in_workspace=g.display_name,
+                name_in_account=g.display_name,
+                temporary_name=temporary_name,
+                external_id=self.account_groups_in_account[g.display_name].external_id,
+                members=json.dumps([gg.as_dict() for gg in g.members]) if g.members else None,
+                roles=json.dumps([gg.as_dict() for gg in g.roles]) if g.roles else None,
+                entitlements=json.dumps([gg.as_dict() for gg in g.entitlements]) if g.entitlements else None,
+            )
+
+
+class RegexSubStrategy(GroupMigrationStrategy):
+
+    def __init__(self, workspace_groups_in_workspace, account_groups_in_account, /,
+                 renamed_groups_prefix, include_group_names=None,
+                 workspace_group_regex: str = None,
+                 workspace_group_replace: str = None
+                 ):
+        super().__init__(workspace_groups_in_workspace, account_groups_in_account,
+                         include_group_names=include_group_names, renamed_groups_prefix=renamed_groups_prefix)
+        self.workspace_group_replace = workspace_group_replace
+        self.workspace_group_regex = workspace_group_regex
+
+    def generate_migrated_groups(self):
+        workspace_groups = self.get_filtered_groups()
+        for g in workspace_groups.values():
+            temporary_name = f"{self.renamed_groups_prefix}{g.display_name}"
+            name_in_account = self._safe_sub(g.display_name, self.workspace_group_regex,
+                                             self.workspace_group_replace)
+            yield MigratedGroup(
+                id_in_workspace=g.id,
+                name_in_workspace=g.display_name,
+                name_in_account=name_in_account,
+                temporary_name=temporary_name,
+                external_id=self.account_groups_in_account[name_in_account].external_id,
+                members=json.dumps([gg.as_dict() for gg in g.members]) if g.members else None,
+                roles=json.dumps([gg.as_dict() for gg in g.roles]) if g.roles else None,
+                entitlements=json.dumps([gg.as_dict() for gg in g.entitlements]) if g.entitlements else None,
+            )
+
+
+class RegexMatchStrategy(GroupMigrationStrategy):
+
+    def __init__(self, workspace_groups_in_workspace, account_groups_in_account, /,
+                 renamed_groups_prefix, include_group_names=None,
+                 workspace_group_regex: str = None,
+                 workspace_group_replace: str = None
+                 ):
+        super().__init__(workspace_groups_in_workspace, account_groups_in_account,
+                         include_group_names=include_group_names, renamed_groups_prefix=renamed_groups_prefix)
+        self.workspace_group_replace = workspace_group_replace
+        self.workspace_group_regex = workspace_group_regex
+
+    def generate_migrated_groups(self):
+        workspace_groups = self.get_filtered_groups()
+        for g in workspace_groups.values():
+            temporary_name = f"{self.renamed_groups_prefix}{g.display_name}"
+
+            yield MigratedGroup(
+                id_in_workspace=g.id,
+                name_in_workspace=g.display_name,
+                name_in_account=self._safe_sub(g.display_name, self.workspace_group_regex,
+                                               self.workspace_group_replace),
+                temporary_name=temporary_name,
+                external_id=self.account_groups_in_account[g.display_name].external_id,
+                members=json.dumps([gg.as_dict() for gg in g.members]) if g.members else None,
+                roles=json.dumps([gg.as_dict() for gg in g.roles]) if g.roles else None,
+                entitlements=json.dumps([gg.as_dict() for gg in g.entitlements]) if g.entitlements else None,
+            )
+
+
 class GroupManager(CrawlerBase):
     _SYSTEM_GROUPS: typing.ClassVar[list[str]] = ["users", "admins", "account users"]
 
@@ -124,28 +254,9 @@ class GroupManager(CrawlerBase):
         self._ws.groups.patch(group_id, operations=ops)
         return True
 
-    @staticmethod
-    def _safe_match(group_name: str, match_re: str):
-        try:
-            match = re.search(match_re, group_name)
-            account_name = match.groups()[0] if match else group_name
-        except re.error:
-            account_name = group_name
-        return account_name
-
-    @staticmethod
-    def _safe_sub(group_name: str, match_re: str, replace: str):
-        try:
-            return re.sub(match_re, replace, group_name)
-        except re.error:
-            logger.debug(f"Failed to apply Regex Expression {match_re} on Group Name {group_name}")
-            return group_name
-
     def reflect_account_groups_on_workspace(self):
         tasks = []
         account_groups_in_account = self._account_groups_in_account()
-        if self._account_group_regex:
-            account_groups_in_workspace = []
         account_groups_in_workspace = self._account_groups_in_workspace()
         groups_to_migrate = self.get_migration_state().groups
 
@@ -156,7 +267,7 @@ class GroupManager(CrawlerBase):
             if mg.name_in_account not in account_groups_in_account:
                 logger.warning(f"Skipping {mg.name_in_account}: not in account")
                 continue
-            group_id = account_groups_in_account[mg.name_in_account]
+            group_id = account_groups_in_account[mg.name_in_account].id
             tasks.append(functools.partial(self._reflect_account_group_to_workspace, group_id))
         _, errors = Threads.gather("reflect account groups on this workspace", tasks)
         if len(errors) > 0:
@@ -188,53 +299,29 @@ class GroupManager(CrawlerBase):
             yield MigratedGroup(*row)
 
     def _crawler(self) -> typing.Iterator[MigratedGroup]:
-        attributes = "id,displayName,meta,members,roles,entitlements"
-        workspace_groups = self._list_workspace_groups("WorkspaceGroup", attributes)
+        workspace_groups_in_workspace = self._workspace_groups_in_workspace()
         account_groups_in_account = self._account_groups_in_account()
-        workspace_to_account_groups = self._workspace_to_account_groups(workspace_groups)
-        names_in_scope = self._get_valid_group_names_to_migrate(workspace_to_account_groups, account_groups_in_account)
-        for g in workspace_groups:
-            if g.display_name not in names_in_scope:
-                logger.info(f"Skipping {g.display_name}: out of scope")
-                continue
-            temporary_name = f"{self._renamed_group_prefix}{g.display_name}"
+        strategy = self._get_strategy(workspace_groups_in_workspace, account_groups_in_account)
+        for g in strategy.generate_migrated_groups():
+            yield g
 
-            account_name = workspace_to_account_groups.get(g.display_name, g.display_name)
+    def _workspace_groups_in_workspace(self) -> dict[str, Group]:
+        attributes = "id,displayName,meta,members,roles,entitlements"
+        return {g.display_name: g
+                for g in self._list_workspace_groups("WorkspaceGroup", attributes)}
 
-            yield MigratedGroup(
-                id_in_workspace=g.id,
-                name_in_workspace=g.display_name,
-                name_in_account=account_name,
-                temporary_name=temporary_name,
-                external_id=account_groups_in_account[workspace_to_account_groups[g.display_name]],
-                members=json.dumps([gg.as_dict() for gg in g.members]) if g.members else None,
-                roles=json.dumps([gg.as_dict() for gg in g.roles]) if g.roles else None,
-                entitlements=json.dumps([gg.as_dict() for gg in g.entitlements]) if g.entitlements else None,
-            )
+    def _account_groups_in_workspace(self) -> dict[str, Group]:
+        return {g.display_name: g
+                for g in self._list_workspace_groups("Group", "id,displayName,meta")}
 
-    def _workspace_groups_in_workspace(self) -> dict[str, str]:
-        return {g.display_name: g.id
-                for g in self._list_workspace_groups("WorkspaceGroup", "id,displayName,meta")}
-
-    def _account_groups_in_workspace(self) -> dict[str, str]:
-        if self._account_group_regex:
-            return {self._safe_match(g.display_name, self._account_group_regex): g.id
-                    for g in self._list_workspace_groups("Group", "id,displayName,meta")}
-        else:
-            return {g.display_name: g.id
-                    for g in self._list_workspace_groups("Group", "id,displayName,meta")}
-
-    def _account_groups_in_account(self) -> dict[str, str]:
-        if self._account_group_regex:
-            return {self._safe_match(g.display_name, self._account_group_regex): g.id
-                    for g in self._list_account_groups("id,displayName")}
-        else:
-            return {g.display_name: g.id
-                    for g in self._list_account_groups("id,displayName")}
+    def _account_groups_in_account(self) -> dict[str, Group]:
+        return {g.display_name: g
+                for g in self._list_account_groups("id,displayName,externalId")}
 
     def _workspace_to_account_groups(self, ws_groups: [str]) -> dict[str, str]:
         if self._workspace_group_regex and self._workspace_group_replace:
-            return {_.display_name: self._safe_sub(_.display_name, self._workspace_group_regex, self._workspace_group_replace)
+            return {_.display_name: self._safe_sub(_.display_name, self._workspace_group_regex,
+                                                   self._workspace_group_replace)
                     for _ in ws_groups}
         if self._workspace_group_regex and not self._workspace_group_replace:
             return {_.display_name: self._safe_match(_.display_name, self._workspace_group_regex) for _ in ws_groups}
@@ -290,48 +377,22 @@ class GroupManager(CrawlerBase):
         self._ws.api_client.do("PUT", path, data=json.dumps({"permissions": ["USER"]}))
         return True
 
-    def _get_valid_group_names_to_migrate(
-            self, workspace_groups: dict[str, str], account_groups_in_account: dict[str, str]
-    ) -> set[str]:
-        if self._include_group_names:
-            return self._validate_selected_groups(
-                self._include_group_names, workspace_groups, account_groups_in_account
-            )
-        return self._detect_overlapping_group_names(workspace_groups, account_groups_in_account)
-
-    @staticmethod
-    def _detect_overlapping_group_names(
-            workspace_groups: dict[str: str], account_groups_in_account: dict[str, str]
-    ) -> set[str]:
-        logger.info(
-            "No group listing provided, all available workspace-level groups that have an account-level "
-            "group with the same name will be used"
-        )
-        ac_group_names = account_groups_in_account.keys()
-        valid_group_names = {_ for _ in workspace_groups.keys() if workspace_groups[_] in ac_group_names}
-        logger.info(f"Found {len(valid_group_names)} workspace groups that have corresponding account groups")
-        return valid_group_names
-
-    @classmethod
-    def _validate_selected_groups(
-            cls, group_names: list[str], workspace_groups: dict[str: str],
-            account_groups_in_account: dict[str, str]
-    ) -> set[str]:
-        valid_group_names = set()
-
-        logger.info("Using the provided group listing")
-        for name in group_names:
-            if name in cls._SYSTEM_GROUPS:
-                logger.info(f"Cannot migrate system group {name}. {name} will be skipped.")
-                continue
-            if name not in workspace_groups.keys():
-                logger.info(f"Group {name} not found on the workspace level. {name} will be skipped.")
-                continue
-            if workspace_groups[name] not in account_groups_in_account:
-                logger.info(
-                    f"Group {name} not found on the account level. {name} will be skipped. You can add {name} "
-                    f"to the account and rerun the job."
-                )
-                continue
-            valid_group_names.add(name)
-        return valid_group_names
+    def _get_strategy(self, workspace_groups_in_workspace: dict[str, Group],
+                      account_groups_in_account: dict[str, Group]) -> GroupMigrationStrategy:
+        if self._workspace_group_regex and self._workspace_group_replace:
+            return RegexSubStrategy(workspace_groups_in_workspace, account_groups_in_account,
+                                    renamed_groups_prefix=self._renamed_group_prefix,
+                                    include_group_names=self._include_group_names,
+                                    workspace_group_regex=self._workspace_group_regex,
+                                    workspace_group_replace=self._workspace_group_replace
+                                    )
+        if self._workspace_group_regex and self._account_group_regex:
+            return RegexMatchStrategy(workspace_groups_in_workspace, account_groups_in_account,
+                                      renamed_groups_prefix=self._renamed_group_prefix,
+                                      include_group_names=self._include_group_names,
+                                      workspace_group_regex=self._workspace_group_regex,
+                                      workspace_group_replace=self._workspace_group_replace
+                                      )
+        return MatchingNamesStrategy(workspace_groups_in_workspace, account_groups_in_account,
+                                     renamed_groups_prefix=self._renamed_group_prefix,
+                                     include_group_names=self._include_group_names)
