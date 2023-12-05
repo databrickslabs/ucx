@@ -177,7 +177,7 @@ def test_group_name_change_substitute(ws, sql_backend, inventory_schema, make_uc
 
 
 def test_group_matching_names(ws, sql_backend, inventory_schema, make_ucx_group):
-    ws_group, accnt_group = make_ucx_group("test_group_[1234]", "same_group_[1234]")
+    ws_group, accnt_group = make_ucx_group("test_group_1234", "same_group_[1234]")
     logger.info(
         f"Attempting Mapping From Workspace Group {ws_group.display_name} to "
         f"Account Group {accnt_group.display_name}"
@@ -188,8 +188,8 @@ def test_group_matching_names(ws, sql_backend, inventory_schema, make_ucx_group)
         inventory_schema,
         [ws_group.display_name],
         "ucx-temp-",
-        workspace_group_regex=r"\[[0-9]*\]",
-        account_group_regex=r"\[[0-9]*\]",
+        workspace_group_regex=r"([0-9]*)$",
+        account_group_regex=r"\[([0-9]*)\]",
     )
     validate_migrate_groups(group_manager, ws_group, accnt_group)
 

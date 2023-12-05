@@ -397,7 +397,7 @@ class WorkspaceInstaller:
             groups_config_args["convert_group_names"] = "yes"
             choice = self._choice_from_dict(
                 "Choose How to rename the workspace groups:",
-                {"Apply a Prefix": "0", "Apply a Suffix": "1", "Regex Substitution": "2", "Regex Matching": "3"},
+                {"Apply a Prefix": "0", "Apply a Suffix": "1", "Regex Substitution": "2", "Regex Matching": "3", "Match By External ID": "4"},
             )
             match choice:
                 case "0":
@@ -458,6 +458,8 @@ class WorkspaceInstaller:
                             acct_match_value = None
                     groups_config_args["workspace_group_match_regex"] = ws_match_value
                     groups_config_args["account_group_match_regex"] = acct_match_value
+                case "4":
+                    groups_config_args["group_match_by_external_id"] = True
 
         selected_groups = self._question(
             "Comma-separated list of workspace group names to migrate. If not specified, we'll use all "
@@ -500,6 +502,7 @@ class WorkspaceInstaller:
             workspace_group_regex=groups_config_args.get("workspace_group_regex"),
             workspace_group_replace=groups_config_args.get("workspace_group_replace"),
             account_group_regex=groups_config_args.get("account_group_regex"),
+            group_match_by_external_id=groups_config_args.get("group_match_by_external_id"),
             include_group_names=groups_config_args["selected"],
             renamed_group_prefix=groups_config_args["backup_group_prefix"],
             warehouse_id=warehouse_id,
