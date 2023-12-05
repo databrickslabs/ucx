@@ -1,6 +1,7 @@
 import collections
 import functools
 import logging
+import random
 from datetime import timedelta
 from functools import partial
 
@@ -114,7 +115,7 @@ def make_ucx_group_suffix(make_random, make_group, make_acc_group, user_pool):
         display_name = f"ucx_{make_random(4)}"
         members = [_.id for _ in random.choices(user_pool, k=random.randint(1, 40))]
         ws_group = make_group(display_name=display_name, members=members, entitlements=["allow-cluster-create"])
-        acc_group = make_acc_group(display_name=display_name+suffix, members=members)
+        acc_group = make_acc_group(display_name=display_name + suffix, members=members)
         return ws_group, acc_group
 
     return inner

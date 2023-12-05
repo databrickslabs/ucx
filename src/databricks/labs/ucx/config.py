@@ -2,7 +2,7 @@ import dataclasses
 from abc import abstractmethod
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Any, Generic, TypeVar, Optional
+from typing import Any, Generic, TypeVar
 
 from databricks.sdk import AccountClient, WorkspaceClient
 from databricks.sdk.core import Config

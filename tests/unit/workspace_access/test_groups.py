@@ -431,13 +431,3 @@ def test_delete_original_workspace_groups_should_fail_if_delete_does_not_work():
 
     with pytest.raises(RuntimeWarning):
         gm.delete_original_workspace_groups()
-
-
-@pytest.mark.parametrize('status_code,include_retry_after',
-                         ((429, False),
-                          (429, True),
-                          (503, False),
-                          (503, True)))
-def test_blah(status_code, include_retry_after):
-    print(f'{status_code}, {include_retry_after}')
-    assert False
