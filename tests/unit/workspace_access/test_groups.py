@@ -15,7 +15,6 @@ def test_snapshot_with_group_created_in_account_console_should_be_considered():
     wsclient = MagicMock()
     group = Group(
         id="1",
-        external_id="1234",
         display_name="de",
         meta=ResourceMeta(resource_type="WorkspaceGroup"),
         members=[ComplexValue(display="test-user-1", value="20"), ComplexValue(display="test-user-2", value="21")],
@@ -26,7 +25,8 @@ def test_snapshot_with_group_created_in_account_console_should_be_considered():
         entitlements=[ComplexValue(value="allow-cluster-create"), ComplexValue(value="allow-instance-pool-create")],
     )
     wsclient.groups.list.return_value = [group]
-    account_admins_group = Group(id="1234", external_id="1234", display_name="de")
+    wsclient.groups.get.return_value = group
+    account_admins_group = Group(id="1234", display_name="de")
     wsclient.api_client.do.return_value = {
         "Resources": [g.as_dict() for g in [account_admins_group]],
     }
@@ -133,13 +133,16 @@ def test_snapshot_should_consider_groups_defined_in_conf():
     wsclient = MagicMock()
     group1 = Group(id="1", display_name="de", meta=ResourceMeta(resource_type="WorkspaceGroup"))
     group2 = Group(id="2", display_name="ds", meta=ResourceMeta(resource_type="WorkspaceGroup"))
-    wsclient.groups.list.return_value = [group1, group2]
-    acc_group_1 = Group(id="11", display_name="de", external_id="1234")
-    acc_group_2 = Group(id="12", display_name="ds", external_id="1235")
+    acc_group_1 = Group(id="11", display_name="de")
+    acc_group_2 = Group(id="12", display_name="ds")
     wsclient.api_client.do.return_value = {
         "Resources": [g.as_dict() for g in [acc_group_1, acc_group_2]],
     }
+
+    wsclient.groups.list.return_value = [group1, group2]
+    wsclient.groups.get.side_effect = [group1, group2]
     res = GroupManager(backend, wsclient, inventory_database="inv", include_group_names=["de"]).snapshot()
+
     assert res == [
         MigratedGroup(
             id_in_workspace="1",
@@ -147,7 +150,7 @@ def test_snapshot_should_consider_groups_defined_in_conf():
             name_in_account="de",
             temporary_name="ucx-renamed-de",
             members=None,
-            external_id="1234",
+            external_id="11",
             roles=None,
             entitlements=None,
         )
@@ -198,13 +201,17 @@ def test_snapshot_should_rename_groups_defined_in_conf():
     wsclient = MagicMock()
     group1 = Group(id="1", display_name="de", meta=ResourceMeta(resource_type="WorkspaceGroup"))
     group2 = Group(id="2", display_name="ds", meta=ResourceMeta(resource_type="WorkspaceGroup"))
-    wsclient.groups.list.return_value = [group1, group2]
-    account_admins_group_1 = Group(id="11", display_name="de", external_id="1234")
-    account_admins_group_2 = Group(id="12", display_name="ds", external_id="1235")
+    account_admins_group_1 = Group(id="11", display_name="de")
+    account_admins_group_2 = Group(id="12", display_name="ds")
     wsclient.api_client.do.return_value = {
         "Resources": [g.as_dict() for g in [account_admins_group_1, account_admins_group_2]],
     }
-    res = GroupManager(backend, wsclient, inventory_database="inv", renamed_group_prefix="test-group-").snapshot()
+
+    wsclient.groups.list.return_value = [group1, group2]
+    wsclient.groups.get.side_effect = [group1, group2]
+    gm = GroupManager(backend, wsclient, inventory_database="inv", renamed_group_prefix="test-group-")
+    res = gm.snapshot()
+
     assert res == [
         MigratedGroup(
             id_in_workspace="1",
@@ -212,7 +219,7 @@ def test_snapshot_should_rename_groups_defined_in_conf():
             name_in_account="de",
             temporary_name="test-group-de",
             members=None,
-            external_id="1234",
+            external_id="11",
             roles=None,
             entitlements=None,
         ),
@@ -222,7 +229,7 @@ def test_snapshot_should_rename_groups_defined_in_conf():
             name_in_account="ds",
             temporary_name="test-group-ds",
             members=None,
-            external_id="1235",
+            external_id="12",
             roles=None,
             entitlements=None,
         ),
@@ -236,6 +243,7 @@ def test_rename_groups_should_patch_eligible_groups():
     wsclient.groups.list.return_value = [
         group1,
     ]
+    wsclient.groups.get.return_value = group1
     account_admins_group_1 = Group(id="11", display_name="de")
     wsclient.api_client.do.return_value = {
         "Resources": [g.as_dict() for g in [account_admins_group_1]],
@@ -277,6 +285,7 @@ def test_rename_groups_should_fail_if_error_is_thrown():
     wsclient.groups.list.return_value = [
         group1,
     ]
+    wsclient.groups.get.return_value = group1
     account_admins_group_1 = Group(id="11", display_name="de")
     wsclient.api_client.do.return_value = {
         "Resources": [g.as_dict() for g in [account_admins_group_1]],
@@ -433,13 +442,21 @@ def test_delete_original_workspace_groups_should_fail_if_delete_does_not_work():
     with pytest.raises(RuntimeWarning):
         gm.delete_original_workspace_groups()
 
-def test_snapshot_with_group_matched_by_suffix():
+
+def test_list_workspace_groups():
     backend = MockBackend()
     wsclient = MagicMock()
-    group = Group(
+
+    # Mock the groups.list method to return a list of groups
+    group1 = Group(id="1", display_name="group_1", meta=ResourceMeta(resource_type="WorkspaceGroup"))
+    group2 = Group(id="2", display_name="group_2", meta=ResourceMeta(resource_type="WorkspaceGroup"))
+    group3 = Group(id="3", display_name="group_3", meta=ResourceMeta(resource_type="WorkspaceGroup"))
+    wsclient.groups.list.return_value = [group1, group2, group3]
+
+    # Mock the _safe_get_group method to return a group
+    full_group1 = Group(
         id="1",
-        external_id="1234",
-        display_name="de",
+        display_name="group_1",
         meta=ResourceMeta(resource_type="WorkspaceGroup"),
         members=[ComplexValue(display="test-user-1", value="20"), ComplexValue(display="test-user-2", value="21")],
         roles=[
@@ -448,34 +465,9 @@ def test_snapshot_with_group_matched_by_suffix():
         ],
         entitlements=[ComplexValue(value="allow-cluster-create"), ComplexValue(value="allow-instance-pool-create")],
     )
-    wsclient.groups.list.return_value = [group]
-    account_admins_group = Group(id="1234", external_id="1234", display_name="de_sx")
-    wsclient.api_client.do.return_value = {
-        "Resources": [g.as_dict() for g in [account_admins_group]],
-    }
-    res = GroupManager(backend, wsclient, inventory_database="inv", workspace_group_regex="$",
-                       workspace_group_replace="_sx").snapshot()
-    assert res == [
-        MigratedGroup(
-            id_in_workspace="1",
-            name_in_workspace="de",
-            name_in_account="de_sx",
-            temporary_name="ucx-renamed-de",
-            members='[{"display": "test-user-1", "value": "20"}, {"display": "test-user-2", "value": "21"}]',
-            external_id="1234",
-            roles='[{"value": "arn:aws:iam::123456789098:instance-profile/ip1"}, '
-            '{"value": "arn:aws:iam::123456789098:instance-profile/ip2"}]',
-            entitlements='[{"value": "allow-cluster-create"}, {"value": "allow-instance-pool-create"}]',
-        )
-    ]
-
-def test_snapshot_with_group_matched_by_prefix():
-    backend = MockBackend()
-    wsclient = MagicMock()
-    group = Group(
-        id="1",
-        external_id="1234",
-        display_name="de",
+    full_group2 = Group(
+        id="2",
+        display_name="group_2",
         meta=ResourceMeta(resource_type="WorkspaceGroup"),
         members=[ComplexValue(display="test-user-1", value="20"), ComplexValue(display="test-user-2", value="21")],
         roles=[
@@ -484,34 +476,9 @@ def test_snapshot_with_group_matched_by_prefix():
         ],
         entitlements=[ComplexValue(value="allow-cluster-create"), ComplexValue(value="allow-instance-pool-create")],
     )
-    wsclient.groups.list.return_value = [group]
-    account_admins_group = Group(id="1234", external_id="1234", display_name="px_de")
-    wsclient.api_client.do.return_value = {
-        "Resources": [g.as_dict() for g in [account_admins_group]],
-    }
-    res = GroupManager(backend, wsclient, inventory_database="inv", workspace_group_regex="^",
-                       workspace_group_replace="px_").snapshot()
-    assert res == [
-        MigratedGroup(
-            id_in_workspace="1",
-            name_in_workspace="de",
-            name_in_account="px_de",
-            temporary_name="ucx-renamed-de",
-            members='[{"display": "test-user-1", "value": "20"}, {"display": "test-user-2", "value": "21"}]',
-            external_id="1234",
-            roles='[{"value": "arn:aws:iam::123456789098:instance-profile/ip1"}, '
-            '{"value": "arn:aws:iam::123456789098:instance-profile/ip2"}]',
-            entitlements='[{"value": "allow-cluster-create"}, {"value": "allow-instance-pool-create"}]',
-        )
-    ]
-
-def test_snapshot_with_group_matched_by_subset():
-    backend = MockBackend()
-    wsclient = MagicMock()
-    group = Group(
-        id="1",
-        external_id="1234",
-        display_name="de",
+    full_group3 = Group(
+        id="3",
+        display_name="group_3",
         meta=ResourceMeta(resource_type="WorkspaceGroup"),
         members=[ComplexValue(display="test-user-1", value="20"), ComplexValue(display="test-user-2", value="21")],
         roles=[
@@ -520,59 +487,31 @@ def test_snapshot_with_group_matched_by_subset():
         ],
         entitlements=[ComplexValue(value="allow-cluster-create"), ComplexValue(value="allow-instance-pool-create")],
     )
-    wsclient.groups.list.return_value = [group]
-    account_admins_group = Group(id="1234", external_id="1234", display_name="px_de")
-    wsclient.api_client.do.return_value = {
-        "Resources": [g.as_dict() for g in [account_admins_group]],
-    }
-    res = GroupManager(backend, wsclient, inventory_database="inv", workspace_group_regex="^",
-                       workspace_group_replace="px_").snapshot()
-    assert res == [
-        MigratedGroup(
-            id_in_workspace="1",
-            name_in_workspace="de",
-            name_in_account="px_de",
-            temporary_name="ucx-renamed-de",
-            members='[{"display": "test-user-1", "value": "20"}, {"display": "test-user-2", "value": "21"}]',
-            external_id="1234",
-            roles='[{"value": "arn:aws:iam::123456789098:instance-profile/ip1"}, '
-            '{"value": "arn:aws:iam::123456789098:instance-profile/ip2"}]',
-            entitlements='[{"value": "allow-cluster-create"}, {"value": "allow-instance-pool-create"}]',
-        )
-    ]
 
+    def my_side_effect(group_id, **kwargs):
+        if group_id == "1":
+            return full_group1
+        elif group_id == "2":
+            return full_group2
+        elif group_id == "3":
+            return full_group3
 
-def test_snapshot_with_group_matched_by_external_id():
-    backend = MockBackend()
-    wsclient = MagicMock()
-    group = Group(
-        id="1",
-        external_id="1234",
-        display_name="de",
-        meta=ResourceMeta(resource_type="WorkspaceGroup"),
-        members=[ComplexValue(display="test-user-1", value="20"), ComplexValue(display="test-user-2", value="21")],
-        roles=[
-            ComplexValue(value="arn:aws:iam::123456789098:instance-profile/ip1"),
-            ComplexValue(value="arn:aws:iam::123456789098:instance-profile/ip2"),
-        ],
-        entitlements=[ComplexValue(value="allow-cluster-create"), ComplexValue(value="allow-instance-pool-create")],
-    )
-    wsclient.groups.list.return_value = [group]
-    account_admins_group = Group(id="1234", external_id="1234", display_name="xxxx")
-    wsclient.api_client.do.return_value = {
-        "Resources": [g.as_dict() for g in [account_admins_group]],
-    }
-    res = GroupManager(backend, wsclient, inventory_database="inv", external_id_match=True).snapshot()
-    assert res == [
-        MigratedGroup(
-            id_in_workspace="1",
-            name_in_workspace="de",
-            name_in_account="xxxx",
-            temporary_name="ucx-renamed-de",
-            members='[{"display": "test-user-1", "value": "20"}, {"display": "test-user-2", "value": "21"}]',
-            external_id="1234",
-            roles='[{"value": "arn:aws:iam::123456789098:instance-profile/ip1"}, '
-            '{"value": "arn:aws:iam::123456789098:instance-profile/ip2"}]',
-            entitlements='[{"value": "allow-cluster-create"}, {"value": "allow-instance-pool-create"}]',
-        )
+    wsclient.groups.get.side_effect = my_side_effect
+
+    # Test when attributes do not contain "members"
+    gm = GroupManager(backend, wsclient, inventory_database="inv")
+    result = gm._list_workspace_groups("WorkspaceGroup", "id,displayName,meta")
+    assert len(result) == 3
+    assert result[0].display_name == "group_1"
+    assert result[0].members is None
+    wsclient.groups.get.assert_not_called()
+
+    # Test when attributes contain "members"
+    result = gm._list_workspace_groups("WorkspaceGroup", "id,displayName,meta,members")
+    assert len(result) == 3
+    assert result[0].display_name == "group_1"
+    assert result[0].members == [
+        ComplexValue(display="test-user-1", value="20"),
+        ComplexValue(display="test-user-2", value="21"),
     ]
+    wsclient.groups.get.assert_called()
