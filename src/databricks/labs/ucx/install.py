@@ -424,7 +424,7 @@ class WorkspaceInstaller:
         if use_policy != 'no':
             cluster_policies_list = {
                 f"{_.name} ({_.policy_id})": _.policy_id
-                for _ in ws.cluster_policies.list()
+                for _ in self._ws.cluster_policies.list()
             }
             custom_cluster_policy_id = self._choice_from_dict("Choose a cluster policy", cluster_policies_list)
         else:
