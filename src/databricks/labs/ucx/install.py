@@ -810,6 +810,7 @@ class WorkspaceInstaller:
                 f"https://github.com/databrickslabs/ucx/releases. Original error is: {err!s}"
             )
             raise OSError(msg) from None
+
     def _build_wheel(self, tmp_dir: str, *, verbose: bool = False):
         """Helper to build the wheel package"""
         streams = {}
