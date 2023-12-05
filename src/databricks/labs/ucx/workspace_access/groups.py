@@ -8,6 +8,7 @@ from datetime import timedelta
 from databricks.sdk import WorkspaceClient
 from databricks.sdk.core import DatabricksError
 from databricks.sdk.errors import InternalError
+from databricks.sdk.errors.mapping import NotFound
 from databricks.sdk.retries import retried
 from databricks.sdk.service import iam
 
@@ -223,8 +224,7 @@ class GroupManager(CrawlerBase):
             for g in self._ws.groups.list(attributes=",".join(attributes)):
                 if self._is_group_out_of_scope(g, resource_type):
                     continue
-                # group_with_all_attributes = self._get_group_with_retries(g.id)
-                set_retry_on_value_error = retried(on=[InternalError], timeout=self._verify_timeout)
+                set_retry_on_value_error = retried(on=[InternalError, NotFound], timeout=self._verify_timeout)
                 set_retried_check = set_retry_on_value_error(self._get_group_with_retries)
                 group_with_all_attributes = set_retried_check(g.id)
                 results.append(group_with_all_attributes)
