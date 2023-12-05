@@ -25,7 +25,6 @@ def open_remote_config():
     ws_file_url = installer.notebook_link(installer.config_file)
     webbrowser.open(ws_file_url)
 
-
 def list_installations():
     ws = WorkspaceClient()
     installation_manager = InstallationManager(ws)
@@ -33,6 +32,14 @@ def list_installations():
     all_users = [_.as_summary() for _ in installation_manager.user_installations()]
     print(json.dumps(all_users))
 
+
+def sync_workspace_info():
+    """
+    Cli function to upload a mapping file to each ucx installation folder
+    :return:
+    """
+    workspaces = Workspaces(AccountConfig())
+    workspaces.sync_workspace_info()
 
 MAPPING = {
     "open-remote-config": open_remote_config,
