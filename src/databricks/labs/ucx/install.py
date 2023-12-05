@@ -421,7 +421,11 @@ class WorkspaceInstaller:
 
         use_policy = self._question("Do you want to follow a policy to create clusters", default="no")
         if use_policy != 'no':
-            custom_cluster_policy_id = self._question("Provide a cluster policy id")
+            cluster_policies_list = {
+                f"{_.name} ({_.policy_id})": _.policy_id
+                for _ in ws.cluster_policies.list()
+            }
+            custom_cluster_policy_id = self._choice_from_dict("Choose a cluster policy", cluster_policies_list)
         else:
             custom_cluster_policy_id = None
 
@@ -805,7 +809,6 @@ class WorkspaceInstaller:
                 f"https://github.com/databrickslabs/ucx/releases. Original error is: {err!s}"
             )
             raise OSError(msg) from None
-            
     def _build_wheel(self, tmp_dir: str, *, verbose: bool = False):
         """Helper to build the wheel package"""
         streams = {}
@@ -858,7 +861,7 @@ class WorkspaceInstaller:
         if cfg.custom_cluster_policy_id is not None:
             if self._check_policy_has_instance_pool(cfg.custom_cluster_policy_id):
                 valid_node_type = True
-        if ~valid_node_type:
+        if not valid_node_type:
             if cfg.instance_pool_id is not None:
                 return replace(spec, instance_pool_id=cfg.instance_pool_id)
             spec = replace(spec, node_type_id=self._ws.clusters.select_node_type(local_disk=True))
