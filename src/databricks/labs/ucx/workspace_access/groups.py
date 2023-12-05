@@ -147,17 +147,60 @@ class MatchingNamesStrategy(GroupMigrationStrategy):
         workspace_groups = self.get_filtered_groups()
         for g in workspace_groups.values():
             temporary_name = f"{self.renamed_groups_prefix}{g.display_name}"
+            account_group = self.account_groups_in_account.get(g.display_name)
+            if account_group:
+                yield MigratedGroup(
+                    id_in_workspace=g.id,
+                    name_in_workspace=g.display_name,
+                    name_in_account=g.display_name,
+                    temporary_name=temporary_name,
+                    external_id=account_group.external_id,
+                    members=json.dumps([gg.as_dict() for gg in g.members]) if g.members else None,
+                    roles=json.dumps([gg.as_dict() for gg in g.roles]) if g.roles else None,
+                    entitlements=json.dumps([gg.as_dict() for gg in g.entitlements]) if g.entitlements else None,
+                )
+            else:
+                logger.info(f"Couldn't find a matching account group for {g.display_name} group")
 
-            yield MigratedGroup(
-                id_in_workspace=g.id,
-                name_in_workspace=g.display_name,
-                name_in_account=g.display_name,
-                temporary_name=temporary_name,
-                external_id=self.account_groups_in_account[g.display_name].external_id,
-                members=json.dumps([gg.as_dict() for gg in g.members]) if g.members else None,
-                roles=json.dumps([gg.as_dict() for gg in g.roles]) if g.roles else None,
-                entitlements=json.dumps([gg.as_dict() for gg in g.entitlements]) if g.entitlements else None,
-            )
+
+class MatchByExternalIdStrategy(GroupMigrationStrategy):
+    def __init__(
+        self,
+        workspace_groups_in_workspace,
+        account_groups_in_account,
+        /,
+        renamed_groups_prefix,
+        include_group_names=None,
+    ):
+        super().__init__(
+            workspace_groups_in_workspace,
+            account_groups_in_account,
+            include_group_names=include_group_names,
+            renamed_groups_prefix=renamed_groups_prefix,
+        )
+
+    def generate_migrated_groups(self):
+        workspace_groups = self.get_filtered_groups()
+        account_groups_by_id = {
+            group.external_id: group
+            for group in self.account_groups_in_account.values()
+        }
+        for g in workspace_groups.values():
+            temporary_name = f"{self.renamed_groups_prefix}{g.display_name}"
+            account_group = account_groups_by_id.get(g.external_id)
+            if account_group:
+                yield MigratedGroup(
+                    id_in_workspace=g.id,
+                    name_in_workspace=g.display_name,
+                    name_in_account=account_group.display_name,
+                    temporary_name=temporary_name,
+                    external_id=account_group.external_id,
+                    members=json.dumps([gg.as_dict() for gg in g.members]) if g.members else None,
+                    roles=json.dumps([gg.as_dict() for gg in g.roles]) if g.roles else None,
+                    entitlements=json.dumps([gg.as_dict() for gg in g.entitlements]) if g.entitlements else None,
+                )
+            else:
+                logger.info(f"Couldn't find a matching account group for {g.display_name} group with external_id")
 
 
 class RegexSubStrategy(GroupMigrationStrategy):
@@ -259,6 +302,7 @@ class GroupManager(CrawlerBase):
         workspace_group_regex: str | None = None,
         workspace_group_replace: str | None = None,
         account_group_regex: str | None = None,
+        external_id_match: bool = True
         verify_timeout: timedelta | None = timedelta(minutes=1),
     ):
         super().__init__(sql_backend, "hive_metastore", inventory_database, "groups", MigratedGroup)
@@ -268,6 +312,7 @@ class GroupManager(CrawlerBase):
         self._workspace_group_regex = workspace_group_regex
         self._workspace_group_replace = workspace_group_replace
         self._account_group_regex = account_group_regex
+        self._external_id_match = external_id_match
         self._verify_timeout = verify_timeout
 
     def snapshot(self) -> list[MigratedGroup]:
@@ -352,11 +397,11 @@ class GroupManager(CrawlerBase):
         yield from strategy.generate_migrated_groups()
 
     def _workspace_groups_in_workspace(self) -> dict[str, Group]:
-        attributes = "id,displayName,meta,members,roles,entitlements"
+        attributes = "id,displayName,meta,externalId,members,roles,entitlements"
         return {g.display_name: g for g in self._list_workspace_groups("WorkspaceGroup", attributes)}
 
     def _account_groups_in_workspace(self) -> dict[str, Group]:
-        return {g.display_name: g for g in self._list_workspace_groups("Group", "id,displayName,meta")}
+        return {g.display_name: g for g in self._list_workspace_groups("Group", "id,displayName,externalId,meta")}
 
     def _account_groups_in_account(self) -> dict[str, Group]:
         return {g.display_name: g for g in self._list_account_groups("id,displayName,externalId")}
@@ -466,6 +511,13 @@ class GroupManager(CrawlerBase):
                 include_group_names=self._include_group_names,
                 workspace_group_regex=self._workspace_group_regex,
                 account_group_regex=self._account_group_regex,
+            )
+        if self._external_id_match:
+            return MatchByExternalIdStrategy(
+                workspace_groups_in_workspace,
+                account_groups_in_account,
+                renamed_groups_prefix=self._renamed_group_prefix,
+                include_group_names=self._include_group_names,
             )
         return MatchingNamesStrategy(
             workspace_groups_in_workspace,
