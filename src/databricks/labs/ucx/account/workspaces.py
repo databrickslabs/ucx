@@ -125,6 +125,43 @@ class Workspaces:
         config["host"] = f"https://{workspace.deployment_name}.{self._tlds[workspace.cloud]}"
         return WorkspaceClient(**config, product="ucx", product_version=__version__)
 
+    def workspace_clients(self) -> list[WorkspaceClient]:
+        """
+        Return a list of WorkspaceClient for each configured workspace in the account
+        :return: list[WorkspaceClient]
+        """
+        clients = []
+        for workspace in self.configured_workspaces():
+            ws = self.client_for(workspace)
+            clients.append(ws)
+        return clients
+
+    def sync_workspace_info(self):
+        """
+        Create a json dump for each Workspace in account
+        For each user that has ucx installed in their workspace,
+        upload the json dump of workspace info in the .ucx folder
+        :return:
+        """
+        workspaces = []
+        for workspace in self._ac.workspaces.list():
+            workspaces.append(workspace.as_dict())
+        workspaces_json = json.dumps(workspaces, indent=2).encode("utf8")
+
+        workspaces_in_account = Workspaces(self._cfg)
+        for ws in workspaces_in_account.workspace_clients():
+            for user in ws.users.list(attributes="userName"):
+                try:
+                    potential_install = f"/Users/{user.user_name}/.ucx"
+                    ws.workspace.upload(
+                        path=f"{potential_install}/workspaces.json",
+                        content=workspaces_json,
+                        overwrite=True,
+                        format=ImportFormat.AUTO,
+                    )
+                except NotFound:
+                    continue
+
     def _all_workspaces(self):
         if self._ac.config.is_azure:
             yield from self._azure_workspaces()
