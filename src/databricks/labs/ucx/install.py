@@ -753,7 +753,7 @@ class WorkspaceInstaller:
         spec = self._cluster_node_type(
             compute.ClusterSpec(
                 spark_version=self._ws.clusters.select_spark_version(latest=True),
-                data_security_mode=compute.DataSecurityMode.NONE,
+                data_security_mode=compute.DataSecurityMode.LEGACY_SINGLE_USER,
                 spark_conf=spark_conf,
                 custom_tags={"ResourceClass": "SingleNode"},
                 num_workers=0,
