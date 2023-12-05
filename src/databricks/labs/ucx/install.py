@@ -436,12 +436,12 @@ class WorkspaceInstaller:
                         try:
                             re.compile(match_value)
                         except re.error:
-                            print(f"{match_value} is Not a valid regex pattern")
+                            logger.error(f"{match_value} is Not a valid regex pattern")
                             match_value = None
                     while not sub_value:
                         sub_value = self._question("Enter the substitution value.")
                         if not self._is_valid_group_str(sub_value):
-                            print(f"{sub_value} is an invalid substitution value. It contains invalid characters.")
+                            logger.error(f"{sub_value} is an invalid substitution value. It contains invalid characters.")
                             sub_value = None
                     groups_config_args["workspace_group_match_regex"] = match_value
                     groups_config_args["workspace_group_replace"] = sub_value
@@ -453,14 +453,14 @@ class WorkspaceInstaller:
                         try:
                             re.compile(ws_match_value)
                         except re.error:
-                            print(f"{ws_match_value} is Not a valid regex pattern")
+                            logger.error(f"{ws_match_value} is Not a valid regex pattern")
                             ws_match_value = None
                     while not acct_match_value:
                         acct_match_value = self._question("Enter a RegEx expression to match on the account group.")
                         try:
                             re.compile(acct_match_value)
                         except re.error:
-                            print(f"{acct_match_value} is Not a valid regex pattern")
+                            logger.error(f"{acct_match_value} is Not a valid regex pattern")
                             acct_match_value = None
                     groups_config_args["workspace_group_match_regex"] = ws_match_value
                     groups_config_args["account_group_match_regex"] = acct_match_value

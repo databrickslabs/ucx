@@ -95,35 +95,37 @@ class GroupMigrationStrategy:
         raise NotImplementedError
 
     def get_filtered_groups(self):
-        if self.include_group_names:
-            logger.info("Group listing provided, a subset of all groups will be migrated")
-            return {
-                group_name: self.workspace_groups_in_workspace[group_name]
-                for group_name in self.workspace_groups_in_workspace.keys()
-                if group_name in self.include_group_names
-            }
-        else:
+        if not self.include_group_names:
             logger.info("No group listing provided, all matching groups will be migrated")
             return self.workspace_groups_in_workspace
+        logger.info("Group listing provided, a subset of all groups will be migrated")
+        return {
+            group_name: self.workspace_groups_in_workspace[group_name]
+            for group_name in self.workspace_groups_in_workspace.keys()
+            if group_name in self.include_group_names
+        }
 
     @staticmethod
-    def _safe_match(group_name: str, match_re: str):
+    def _safe_match(group_name: str, match_re: str) -> str:
         try:
             match = re.search(match_re, group_name)
-            if match and match.groups():
-                return match.groups()[0]
-            elif match:
+            if not match:
+                return group_name
+            else:
+                match_groups = match.groups()
+            if match_groups:
+                return match_groups[0]
+            else:
                 return match.group()
-            return group_name
         except re.error:
             return group_name
 
     @staticmethod
-    def _safe_sub(group_name: str, match_re: str, replace: str):
+    def _safe_sub(group_name: str, match_re: str, replace: str) -> str:
         try:
             return re.sub(match_re, replace, group_name)
         except re.error:
-            logger.debug(f"Failed to apply Regex Expression {match_re} on Group Name {group_name}")
+            logger.warning(f"Failed to apply Regex Expression {match_re} on Group Name {group_name}")
             return group_name
 
 
@@ -148,20 +150,19 @@ class MatchingNamesStrategy(GroupMigrationStrategy):
         for g in workspace_groups.values():
             temporary_name = f"{self.renamed_groups_prefix}{g.display_name}"
             account_group = self.account_groups_in_account.get(g.display_name)
-            if account_group:
-                yield MigratedGroup(
-                    id_in_workspace=g.id,
-                    name_in_workspace=g.display_name,
-                    name_in_account=g.display_name,
-                    temporary_name=temporary_name,
-                    external_id=account_group.external_id,
-                    members=json.dumps([gg.as_dict() for gg in g.members]) if g.members else None,
-                    roles=json.dumps([gg.as_dict() for gg in g.roles]) if g.roles else None,
-                    entitlements=json.dumps([gg.as_dict() for gg in g.entitlements]) if g.entitlements else None,
-                )
-            else:
+            if not account_group:
                 logger.info(f"Couldn't find a matching account group for {g.display_name} group")
-
+                continue
+            yield MigratedGroup(
+                id_in_workspace=g.id,
+                name_in_workspace=g.display_name,
+                name_in_account=g.display_name,
+                temporary_name=temporary_name,
+                external_id=account_group.external_id,
+                members=json.dumps([gg.as_dict() for gg in g.members]) if g.members else None,
+                roles=json.dumps([gg.as_dict() for gg in g.roles]) if g.roles else None,
+                entitlements=json.dumps([gg.as_dict() for gg in g.entitlements]) if g.entitlements else None,
+            )
 
 class MatchByExternalIdStrategy(GroupMigrationStrategy):
     def __init__(

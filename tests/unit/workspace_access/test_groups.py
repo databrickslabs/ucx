@@ -609,7 +609,7 @@ def test_snapshot_with_group_matched_by_subset():
     group = Group(
         id="1",
         external_id="1234",
-        display_name="de",
+        display_name="de_(1234)",
         meta=ResourceMeta(resource_type="WorkspaceGroup"),
         members=[ComplexValue(display="test-user-1", value="20"), ComplexValue(display="test-user-2", value="21")],
         roles=[
@@ -620,19 +620,19 @@ def test_snapshot_with_group_matched_by_subset():
     )
     wsclient.groups.list.return_value = [group]
     wsclient.groups.get.return_value = group
-    account_admins_group = Group(id="1234", external_id="1234", display_name="px_de")
+    account_admins_group = Group(id="1234", external_id="1234", display_name="px_1234")
     wsclient.api_client.do.return_value = {
         "Resources": [g.as_dict() for g in [account_admins_group]],
     }
     res = GroupManager(
-        backend, wsclient, inventory_database="inv", workspace_group_regex="^", workspace_group_replace="px_"
+        backend, wsclient, inventory_database="inv", workspace_group_regex=r"\(([1-9]+)\)", account_group_regex="[1-9]+"
     ).snapshot()
     assert res == [
         MigratedGroup(
             id_in_workspace="1",
-            name_in_workspace="de",
-            name_in_account="px_de",
-            temporary_name="ucx-renamed-de",
+            name_in_workspace="de_(1234)",
+            name_in_account="px_1234",
+            temporary_name="ucx-renamed-de_(1234)",
             members='[{"display": "test-user-1", "value": "20"}, {"display": "test-user-2", "value": "21"}]',
             external_id="1234",
             roles='[{"value": "arn:aws:iam::123456789098:instance-profile/ip1"}, '
