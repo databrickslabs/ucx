@@ -28,7 +28,6 @@ def test_snapshot_with_group_created_in_account_console_should_be_considered():
     wsclient.groups.list.return_value = [group]
     account_admins_group = Group(id="1234", external_id="1234", display_name="de")
     wsclient.groups.get.return_value = group
-    account_admins_group = Group(id="1234", display_name="de")
     wsclient.api_client.do.return_value = {
         "Resources": [g.as_dict() for g in [account_admins_group]],
     }
@@ -138,8 +137,6 @@ def test_snapshot_should_consider_groups_defined_in_conf():
     wsclient.groups.list.return_value = [group1, group2]
     acc_group_1 = Group(id="11", display_name="de", external_id="1234")
     acc_group_2 = Group(id="12", display_name="ds", external_id="1235")
-    acc_group_1 = Group(id="11", display_name="de")
-    acc_group_2 = Group(id="12", display_name="ds")
     wsclient.api_client.do.return_value = {
         "Resources": [g.as_dict() for g in [acc_group_1, acc_group_2]],
     }
@@ -251,6 +248,7 @@ def test_rename_groups_should_patch_eligible_groups():
     wsclient.groups.list.return_value = [
         group1,
     ]
+    wsclient.groups.get.return_value = group1
     account_admins_group_1 = Group(id="11", display_name="de")
     wsclient.api_client.do.return_value = {
         "Resources": [g.as_dict() for g in [account_admins_group_1]],
@@ -280,7 +278,7 @@ def test_rename_groups_should_filter_already_renamed_groups():
     wsclient = MagicMock()
     group1 = Group(id="1", display_name="test-group-de", meta=ResourceMeta(resource_type="WorkspaceGroup"))
     wsclient.groups.list.return_value = [group1]
-
+    wsclient.groups.get.return_value = group1
     GroupManager(backend, wsclient, inventory_database="inv", renamed_group_prefix="test-group-").rename_groups()
     wsclient.groups.patch.assert_not_called()
 
@@ -314,7 +312,7 @@ def test_reflect_account_groups_on_workspace_should_be_called_for_eligible_group
 
     group1 = Group(id="1", display_name="test-dfd-de", meta=ResourceMeta(resource_type="WorkspaceGroup"))
     wsclient.groups.list.return_value = [group1]
-
+    wsclient.groups.get.return_value = group1
     (GroupManager(backend, wsclient, inventory_database="inv").reflect_account_groups_on_workspace())
 
     wsclient.api_client.do.assert_called_with(
@@ -327,6 +325,7 @@ def test_reflect_account_groups_on_workspace_should_filter_account_groups_in_wor
     wsclient = MagicMock()
     group1 = Group(id="1", display_name="de", meta=ResourceMeta(resource_type="Group"))
     wsclient.groups.list.return_value = [group1]
+    wsclient.groups.get.return_value = group1
     account_group1 = Group(id="11", display_name="de")
     wsclient.api_client.do.return_value = {
         "Resources": [g.as_dict() for g in [account_group1]],
@@ -342,6 +341,7 @@ def test_reflect_account_groups_on_workspace_should_filter_account_groups_not_in
     wsclient = MagicMock()
     group1 = Group(id="1", display_name="de", meta=ResourceMeta(resource_type="WorkspaceGroup"))
     wsclient.groups.list.return_value = [group1]
+    wsclient.groups.get.return_value = group1
     account_group1 = Group(id="11", display_name="ds")
     wsclient.api_client.do.return_value = {
         "Resources": [g.as_dict() for g in [account_group1]],
@@ -382,7 +382,7 @@ def test_delete_original_workspace_groups_should_delete_relected_acc_groups_in_w
     temp_group = Group(id=ws_id, display_name="test-group-de", meta=ResourceMeta(resource_type="WorkspaceGroup"))
     reflected_group = Group(id=account_id, display_name="de", meta=ResourceMeta(resource_type="Group"))
     wsclient.groups.list.return_value = [temp_group, reflected_group]
-
+    wsclient.groups.get.return_value = temp_group
     GroupManager(backend, wsclient, inventory_database="inv").delete_original_workspace_groups()
     wsclient.groups.delete.assert_called_with(id=ws_id)
 
@@ -396,7 +396,7 @@ def test_delete_original_workspace_groups_should_not_delete_groups_not_renamed()
     temp_group = Group(id=ws_id, display_name="de", meta=ResourceMeta(resource_type="WorkspaceGroup"))
     reflected_group = Group(id=account_id, display_name="de", meta=ResourceMeta(resource_type="Group"))
     wsclient.groups.list.return_value = [temp_group, reflected_group]
-
+    wsclient.groups.get.return_value = temp_group
     GroupManager(backend, wsclient, inventory_database="inv").delete_original_workspace_groups()
     wsclient.groups.delete.assert_not_called()
 
@@ -409,7 +409,7 @@ def test_delete_original_workspace_groups_should_not_delete_groups_not_reflected
 
     temp_group = Group(id=ws_id, display_name="test-group-de", meta=ResourceMeta(resource_type="WorkspaceGroup"))
     wsclient.groups.list.return_value = [temp_group]
-
+    wsclient.groups.get.return_value = temp_group
     GroupManager(backend, wsclient, inventory_database="inv").delete_original_workspace_groups()
     wsclient.groups.delete.assert_not_called()
 
@@ -442,6 +442,7 @@ def test_delete_original_workspace_groups_should_fail_if_delete_does_not_work():
     temp_group = Group(id=ws_id, display_name="test-group-de", meta=ResourceMeta(resource_type="WorkspaceGroup"))
     reflected_group = Group(id=account_id, display_name="de", meta=ResourceMeta(resource_type="Group"))
     wsclient.groups.list.return_value = [temp_group, reflected_group]
+    wsclient.groups.get.return_value = temp_group
 
     wsclient.groups.delete.side_effect = RuntimeError("Something bad")
     gm = GroupManager(backend, wsclient, inventory_database="inv")
@@ -524,14 +525,6 @@ def test_list_workspace_groups():
     wsclient.groups.get.assert_called()
 
 
-@pytest.mark.parametrize('status_code,include_retry_after',
-                         ((429, False),
-                          (429, True),
-                          (503, False),
-                          (503, True)))
-def test_blah(status_code, include_retry_after):
-    print(f'{status_code}, {include_retry_after}')
-    assert False
 def test_snapshot_with_group_matched_by_suffix():
     backend = MockBackend()
     wsclient = MagicMock()
@@ -548,12 +541,14 @@ def test_snapshot_with_group_matched_by_suffix():
         entitlements=[ComplexValue(value="allow-cluster-create"), ComplexValue(value="allow-instance-pool-create")],
     )
     wsclient.groups.list.return_value = [group]
+    wsclient.groups.get.return_value = group
     account_admins_group = Group(id="1234", external_id="1234", display_name="de_sx")
     wsclient.api_client.do.return_value = {
         "Resources": [g.as_dict() for g in [account_admins_group]],
     }
-    res = GroupManager(backend, wsclient, inventory_database="inv", workspace_group_regex="$",
-                       workspace_group_replace="_sx").snapshot()
+    res = GroupManager(
+        backend, wsclient, inventory_database="inv", workspace_group_regex="$", workspace_group_replace="_sx"
+    ).snapshot()
     assert res == [
         MigratedGroup(
             id_in_workspace="1",
@@ -567,6 +562,7 @@ def test_snapshot_with_group_matched_by_suffix():
             entitlements='[{"value": "allow-cluster-create"}, {"value": "allow-instance-pool-create"}]',
         )
     ]
+
 
 def test_snapshot_with_group_matched_by_prefix():
     backend = MockBackend()
@@ -584,12 +580,14 @@ def test_snapshot_with_group_matched_by_prefix():
         entitlements=[ComplexValue(value="allow-cluster-create"), ComplexValue(value="allow-instance-pool-create")],
     )
     wsclient.groups.list.return_value = [group]
+    wsclient.groups.get.return_value = group
     account_admins_group = Group(id="1234", external_id="1234", display_name="px_de")
     wsclient.api_client.do.return_value = {
         "Resources": [g.as_dict() for g in [account_admins_group]],
     }
-    res = GroupManager(backend, wsclient, inventory_database="inv", workspace_group_regex="^",
-                       workspace_group_replace="px_").snapshot()
+    res = GroupManager(
+        backend, wsclient, inventory_database="inv", workspace_group_regex="^", workspace_group_replace="px_"
+    ).snapshot()
     assert res == [
         MigratedGroup(
             id_in_workspace="1",
@@ -603,6 +601,7 @@ def test_snapshot_with_group_matched_by_prefix():
             entitlements='[{"value": "allow-cluster-create"}, {"value": "allow-instance-pool-create"}]',
         )
     ]
+
 
 def test_snapshot_with_group_matched_by_subset():
     backend = MockBackend()
@@ -620,12 +619,14 @@ def test_snapshot_with_group_matched_by_subset():
         entitlements=[ComplexValue(value="allow-cluster-create"), ComplexValue(value="allow-instance-pool-create")],
     )
     wsclient.groups.list.return_value = [group]
+    wsclient.groups.get.return_value = group
     account_admins_group = Group(id="1234", external_id="1234", display_name="px_de")
     wsclient.api_client.do.return_value = {
         "Resources": [g.as_dict() for g in [account_admins_group]],
     }
-    res = GroupManager(backend, wsclient, inventory_database="inv", workspace_group_regex="^",
-                       workspace_group_replace="px_").snapshot()
+    res = GroupManager(
+        backend, wsclient, inventory_database="inv", workspace_group_regex="^", workspace_group_replace="px_"
+    ).snapshot()
     assert res == [
         MigratedGroup(
             id_in_workspace="1",
@@ -657,6 +658,7 @@ def test_snapshot_with_group_matched_by_external_id():
         entitlements=[ComplexValue(value="allow-cluster-create"), ComplexValue(value="allow-instance-pool-create")],
     )
     wsclient.groups.list.return_value = [group]
+    wsclient.groups.get.return_value = group
     account_admins_group = Group(id="1234", external_id="1234", display_name="xxxx")
     wsclient.api_client.do.return_value = {
         "Resources": [g.as_dict() for g in [account_admins_group]],

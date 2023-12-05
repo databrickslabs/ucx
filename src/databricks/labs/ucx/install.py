@@ -397,7 +397,13 @@ class WorkspaceInstaller:
             groups_config_args["convert_group_names"] = "yes"
             choice = self._choice_from_dict(
                 "Choose How to rename the workspace groups:",
-                {"Apply a Prefix": "0", "Apply a Suffix": "1", "Regex Substitution": "2", "Regex Matching": "3", "Match By External ID": "4"},
+                {
+                    "Apply a Prefix": "0",
+                    "Apply a Suffix": "1",
+                    "Regex Substitution": "2",
+                    "Regex Matching": "3",
+                    "Match By External ID": "4",
+                },
             )
             match choice:
                 case "0":

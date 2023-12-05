@@ -181,10 +181,7 @@ class MatchByExternalIdStrategy(GroupMigrationStrategy):
 
     def generate_migrated_groups(self):
         workspace_groups = self.get_filtered_groups()
-        account_groups_by_id = {
-            group.external_id: group
-            for group in self.account_groups_in_account.values()
-        }
+        account_groups_by_id = {group.external_id: group for group in self.account_groups_in_account.values()}
         for g in workspace_groups.values():
             temporary_name = f"{self.renamed_groups_prefix}{g.display_name}"
             account_group = account_groups_by_id.get(g.external_id)
@@ -302,8 +299,9 @@ class GroupManager(CrawlerBase):
         workspace_group_regex: str | None = None,
         workspace_group_replace: str | None = None,
         account_group_regex: str | None = None,
-        external_id_match: bool = True
         verify_timeout: timedelta | None = timedelta(minutes=1),
+        *,
+        external_id_match: bool = False,
     ):
         super().__init__(sql_backend, "hive_metastore", inventory_database, "groups", MigratedGroup)
         self._ws = ws
@@ -398,26 +396,22 @@ class GroupManager(CrawlerBase):
 
     def _workspace_groups_in_workspace(self) -> dict[str, Group]:
         attributes = "id,displayName,meta,externalId,members,roles,entitlements"
-        return {g.display_name: g for g in self._list_workspace_groups("WorkspaceGroup", attributes)}
+        groups = {}
+        for g in self._list_workspace_groups("WorkspaceGroup", attributes):
+            groups[g.display_name] = g
+        return groups
 
     def _account_groups_in_workspace(self) -> dict[str, Group]:
-        return {g.display_name: g for g in self._list_workspace_groups("Group", "id,displayName,externalId,meta")}
+        groups = {}
+        for g in self._list_workspace_groups("Group", "id,displayName,externalId,meta"):
+            groups[g.display_name] = g
+        return groups
 
     def _account_groups_in_account(self) -> dict[str, Group]:
-        return {g.display_name: g for g in self._list_account_groups("id,displayName,externalId")}
-
-    def _workspace_to_account_groups(self, ws_groups: [str]) -> dict[str, str]:
-        if self._workspace_group_regex and self._workspace_group_replace:
-            return {
-                _.display_name: self._safe_sub(
-                    _.display_name, self._workspace_group_regex, self._workspace_group_replace
-                )
-                for _ in ws_groups
-            }
-        if self._workspace_group_regex and not self._workspace_group_replace:
-            return {_.display_name: self._safe_match(_.display_name, self._workspace_group_regex) for _ in ws_groups}
-        else:
-            return {_.display_name: _.display_name for _ in ws_groups}
+        groups = {}
+        for g in self._list_account_groups("id,displayName,externalId"):
+            groups[g.display_name] = g
+        return groups
 
     def _is_group_out_of_scope(self, group: iam.Group, resource_type: str) -> bool:
         if group.display_name in self._SYSTEM_GROUPS:
