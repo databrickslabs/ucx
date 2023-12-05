@@ -3,6 +3,8 @@ name: ucx
 description: Unity Catalog Migration Toolkit (UCX)
 install:
   script: src/databricks/labs/ucx/install.py
+uninstall:
+  script: src/databricks/labs/ucx/uninstall.py
 entrypoint: src/databricks/labs/ucx/cli.py
 min_python: 3.10
 commands:
