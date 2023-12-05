@@ -5,6 +5,8 @@ import webbrowser
 
 from databricks.sdk import WorkspaceClient
 
+from databricks.labs.ucx.account.workspaces import Workspaces
+from databricks.labs.ucx.config import AccountConfig
 from databricks.labs.ucx.install import WorkspaceInstaller
 from databricks.labs.ucx.installer import InstallationManager
 
@@ -41,10 +43,20 @@ def sync_workspace_info():
     workspaces = Workspaces(AccountConfig())
     workspaces.sync_workspace_info()
 
+def workspace_mapping():
+    """
+    Cli function to upload a mapping file to each ucx installation folder
+    :return:
+    """
+    workspaces = Workspaces(AccountConfig())
+    workspaces.workspace_mapping()
+
+
 MAPPING = {
     "open-remote-config": open_remote_config,
     "installations": list_installations,
     "workflows": workflows,
+    "workspace-mapping": workspace_mapping,
 }
 
 

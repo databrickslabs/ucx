@@ -18,6 +18,7 @@ commands:
       {{range .}}{{.step}}\t{{.state}}\t{{.started}}
       {{end}}
 
+
   - name: installations
     description: Show installations by different users on the same workspace
     table_template: |-

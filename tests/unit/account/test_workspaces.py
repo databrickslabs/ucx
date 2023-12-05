@@ -2,7 +2,6 @@ import base64
 import json
 
 import pytest
-from databricks.sdk.core import Config
 from databricks.sdk.oauth import Token
 from databricks.sdk.service.iam import User
 from databricks.sdk.service.provisioning import Workspace
@@ -35,6 +34,7 @@ def arm_requests(mocker):
     return inner
 
 
+<<<<<<< HEAD
 @pytest.fixture()
 def workspace_mock(mocker):
     acc_cfg = AccountConfig()
@@ -58,6 +58,8 @@ def workspace_mock(mocker):
     return Workspaces(acc_cfg)
 
 
+=======
+>>>>>>> 3b1c156 (Add workspace-mapping to cli)
 def test_client_for_workspace():
     wrksp = Workspaces(
         AccountConfig(
