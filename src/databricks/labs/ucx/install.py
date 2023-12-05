@@ -421,7 +421,7 @@ class WorkspaceInstaller:
                     instance_profile, spark_conf_dict = self._get_ext_hms_conf_from_policy(cluster_policy)
 
         use_policy = self._question("Do you want to follow a policy to create clusters", default="no")
-        if use_policy != 'no':
+        if use_policy != "no":
             cluster_policies_list = {
                 f"{_.name} ({_.policy_id})": _.policy_id
                 for _ in self._ws.cluster_policies.list()
@@ -898,7 +898,7 @@ class WorkspaceInstaller:
             return True
         else:
             return False
-         
+
     @staticmethod
     def _get_ext_hms_conf_from_policy(cluster_policy):
         spark_conf_dict = {}
