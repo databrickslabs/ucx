@@ -1,7 +1,6 @@
 import collections
 import functools
 import logging
-import random
 from datetime import timedelta
 from functools import partial
 

@@ -441,7 +441,9 @@ class WorkspaceInstaller:
                     while not sub_value:
                         sub_value = self._question("Enter the substitution value.")
                         if not self._is_valid_group_str(sub_value):
-                            logger.error(f"{sub_value} is an invalid substitution value. It contains invalid characters")
+                            logger.error(
+                                f"{sub_value} is an invalid substitution value. It contains invalid characters"
+                            )
                             sub_value = None
                     groups_config_args["workspace_group_match_regex"] = match_value
                     groups_config_args["workspace_group_replace"] = sub_value

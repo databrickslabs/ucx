@@ -164,6 +164,7 @@ class MatchingNamesStrategy(GroupMigrationStrategy):
                 entitlements=json.dumps([gg.as_dict() for gg in g.entitlements]) if g.entitlements else None,
             )
 
+
 class MatchByExternalIdStrategy(GroupMigrationStrategy):
     def __init__(
         self,
