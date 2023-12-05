@@ -410,10 +410,10 @@ class WorkspaceInstaller:
                     prefix = None
                     while not prefix:
                         prefix = self._question(
-                            "Enter a prefix to add to the workspace group name. Use only valid characters."
+                            "Enter a prefix to add to the workspace group name. Use only valid characters"
                         )
                         if not self._is_valid_group_str(prefix):
-                            print(f"{prefix} is an invalid Prefix. It contains invalid characters.")
+                            print(f"{prefix} is an invalid Prefix. It contains invalid characters")
                             prefix = None
                     groups_config_args["workspace_group_match_regex"] = "^"
                     groups_config_args["workspace_group_replace"] = prefix
@@ -421,10 +421,10 @@ class WorkspaceInstaller:
                     suffix = None
                     while not suffix:
                         suffix = self._question(
-                            "Enter a suffix to add to the workspace group name. Use only valid characters."
+                            "Enter a suffix to add to the workspace group name. Use only valid characters"
                         )
                         if not self._is_valid_group_str(suffix):
-                            print(f"{suffix} is an invalid Suffix. It contains invalid characters.")
+                            print(f"{suffix} is an invalid Suffix. It contains invalid characters")
                             suffix = None
                     groups_config_args["workspace_group_match_regex"] = "$"
                     groups_config_args["workspace_group_replace"] = suffix
@@ -432,7 +432,7 @@ class WorkspaceInstaller:
                     match_value = None
                     sub_value = None
                     while not match_value:
-                        match_value = self._question("Enter a RegEx expression for Substitution.")
+                        match_value = self._question("Enter a RegEx expression for Substitution")
                         try:
                             re.compile(match_value)
                         except re.error:
@@ -441,7 +441,7 @@ class WorkspaceInstaller:
                     while not sub_value:
                         sub_value = self._question("Enter the substitution value.")
                         if not self._is_valid_group_str(sub_value):
-                            logger.error(f"{sub_value} is an invalid substitution value. It contains invalid characters.")
+                            logger.error(f"{sub_value} is an invalid substitution value. It contains invalid characters")
                             sub_value = None
                     groups_config_args["workspace_group_match_regex"] = match_value
                     groups_config_args["workspace_group_replace"] = sub_value
@@ -449,14 +449,14 @@ class WorkspaceInstaller:
                     ws_match_value = None
                     acct_match_value = None
                     while not ws_match_value:
-                        ws_match_value = self._question("Enter a RegEx expression to match on the workspace group.")
+                        ws_match_value = self._question("Enter a RegEx expression to match on the workspace group")
                         try:
                             re.compile(ws_match_value)
                         except re.error:
                             logger.error(f"{ws_match_value} is Not a valid regex pattern")
                             ws_match_value = None
                     while not acct_match_value:
-                        acct_match_value = self._question("Enter a RegEx expression to match on the account group.")
+                        acct_match_value = self._question("Enter a RegEx expression to match on the account group")
                         try:
                             re.compile(acct_match_value)
                         except re.error:
@@ -469,7 +469,7 @@ class WorkspaceInstaller:
 
         selected_groups = self._question(
             "Comma-separated list of workspace group names to migrate. If not specified, we'll use all "
-            "account-level groups with matching names to workspace-level groups.",
+            "account-level groups with matching names to workspace-level groups",
             default="<ALL>",
         )
         backup_group_prefix = self._question("Backup prefix", default="db-temp-")
