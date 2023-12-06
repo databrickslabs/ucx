@@ -335,7 +335,7 @@ workspace_start_path: /
     ws.cluster_policies.list = lambda: []
 
     install = WorkspaceInstaller(ws)
-    install._choice = lambda _1, _2: "None (abc, PRO, RUNNING)"
+    install._choice = lambda *_1, **_2: "None (abc, PRO, RUNNING)"
     install._configure()
 
     ws.workspace.upload.assert_called_with(
@@ -386,7 +386,7 @@ workspace_start_path: /
     ws.cluster_policies.list = lambda: []
 
     install = WorkspaceInstaller(ws)
-    install._choice = lambda _1, _2: "None (abc, PRO, RUNNING)"
+    install._choice = lambda *_1, **_2: "None (abc, PRO, RUNNING)"
     install._configure()
 
     ws.workspace.upload.assert_called_with(
@@ -468,6 +468,7 @@ def test_save_config_strip_group_names(ws, mocker):
 
     install = WorkspaceInstaller(ws)
     install._question = mock_question
+
     install._choice = lambda _1, _2: "abc (abc, PRO, RUNNING)"
     install._configure()
 
