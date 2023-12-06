@@ -284,7 +284,7 @@ def test_save_config(ws, mocker):
     ws.workspace.download = not_found
 
     install = WorkspaceInstaller(ws)
-    install._choice = lambda _1, _2: "abc (abc, PRO, RUNNING)"
+    install._choice = lambda *_1, **_2: "abc (abc, PRO, RUNNING)"
     install._configure()
 
     ws.workspace.upload.assert_called_with(
@@ -469,7 +469,7 @@ def test_save_config_strip_group_names(ws, mocker):
     install = WorkspaceInstaller(ws)
     install._question = mock_question
 
-    install._choice = lambda _1, _2: "abc (abc, PRO, RUNNING)"
+    install._choice = lambda *_1, **_2: "abc (abc, PRO, RUNNING)"
     install._configure()
 
     ws.workspace.upload.assert_called_with(
