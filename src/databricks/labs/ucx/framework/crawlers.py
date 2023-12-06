@@ -257,6 +257,11 @@ class SchemaDeployer:
         logger.info(f"Ensuring {self._inventory_schema} database exists")
         self._sql_backend.execute(f"CREATE SCHEMA IF NOT EXISTS hive_metastore.{self._inventory_schema}")
 
+    def delete_schema(self):
+        logger.info(f"deleting {self._inventory_schema} database")
+
+        self._sql_backend.execute(f"DROP SCHEMA IF EXISTS hive_metastore.{self._inventory_schema} CASCADE")
+
     def deploy_table(self, name: str, klass: type):
         logger.info(f"Ensuring {self._inventory_schema}.{name} table exists")
         self._sql_backend.create_table(f"hive_metastore.{self._inventory_schema}.{name}", klass)
