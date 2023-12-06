@@ -11,7 +11,7 @@ def azure_mock_config(mocker) -> WorkspaceConfig:
             host="adb-9999999999999999.14.azuredatabricks.net",
             token="dapifaketoken",
         ),
-        inventory_database="ucx"
+        inventory_database="ucx",
     )
     return config
 
