@@ -6,6 +6,7 @@ import webbrowser
 from databricks.sdk import WorkspaceClient
 
 from databricks.labs.ucx.install import WorkspaceInstaller
+from databricks.labs.ucx.installer import InstallationManager
 
 logger = logging.getLogger("databricks.labs.ucx")
 
@@ -25,8 +26,17 @@ def open_remote_config():
     webbrowser.open(ws_file_url)
 
 
+def list_installations():
+    ws = WorkspaceClient()
+    installation_manager = InstallationManager(ws)
+    logger.info("Fetching installations...")
+    all_users = [_.as_summary() for _ in installation_manager.user_installations()]
+    print(json.dumps(all_users))
+
+
 MAPPING = {
     "open-remote-config": open_remote_config,
+    "installations": list_installations,
     "workflows": workflows,
 }
 
