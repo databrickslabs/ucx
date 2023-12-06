@@ -41,9 +41,14 @@ class ConfigureClusterOverrides:
                 choices[_.cluster_name] = _.cluster_id
             return self._choice_from_dict(prompt, choices=choices)
 
-        clusters = self._ws.clusters.list(can_use_client="NOTEBOOK")
-        classic_clusters = [c for c in clusters if is_classic(c)]
-        tacl_clusters = [c for c in clusters if is_tacl(c)]
+        # build list of valid active clusters
+        classic_clusters = []
+        tacl_clusters = []
+        for c in self._ws.clusters.list(can_use_client="NOTEBOOK"):
+            if is_classic(c):
+                classic_clusters.append(c)
+            if is_tacl(c):
+                tacl_clusters.append(c)
 
         preamble = """
         We detected an install issue and
