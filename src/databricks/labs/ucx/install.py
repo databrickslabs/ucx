@@ -383,7 +383,8 @@ class WorkspaceInstaller:
 
         # Setting up group migration parameters
         groups_config_args = {}
-        if (
+
+        while (
             self._question(
                 "Do you need to convert the workspace groups to match the account groups' name?"
                 " If the workspace groups' names match the account groups' names select "
@@ -395,86 +396,62 @@ class WorkspaceInstaller:
         ):
             logger.info("Setting up group name translation")
             groups_config_args["convert_group_names"] = "yes"
-            choice = self._choice_from_dict(
-                "Choose How to rename the workspace groups:",
-                {
-                    "Apply a Prefix": "0",
-                    "Apply a Suffix": "1",
-                    "Regex Substitution": "2",
-                    "Regex Matching": "3",
-                    "Match By External ID": "4",
-                },
-            )
+            choices = {
+                "Apply a Prefix": "prefix",
+                "Apply a Suffix": "suffix",
+                "Regex Substitution": "sub",
+                "Regex Matching": "match",
+                "Match By External ID": "external",
+                "Cancel": "cancel",
+            }
+            choice = self._choice_from_dict("Choose how to map the workspace groups:", choices, sort=False)
             match choice:
-                case "0":
-                    prefix = None
-                    while not prefix:
-                        prefix = self._question(
-                            "Enter a prefix to add to the workspace group name. Use only valid characters"
-                        )
-                        if not self._is_valid_group_str(prefix):
-                            print(f"{prefix} is an invalid Prefix. It contains invalid characters")
-                            prefix = None
+                case "cancel":
+                    continue
+                case "prefix":
+                    prefix = self._group_question(
+                        "Enter a prefix to add to the workspace group name. Use only valid characters"
+                    )
+                    if not prefix:
+                        continue
                     groups_config_args["workspace_group_match_regex"] = "^"
                     groups_config_args["workspace_group_replace"] = prefix
-                case "1":
-                    suffix = None
-                    while not suffix:
-                        suffix = self._question(
-                            "Enter a suffix to add to the workspace group name. Use only valid characters"
-                        )
-                        if not self._is_valid_group_str(suffix):
-                            print(f"{suffix} is an invalid Suffix. It contains invalid characters")
-                            suffix = None
+                case "suffix":
+                    suffix = self._group_question(
+                        "Enter a suffix to add to the workspace group name. Use only valid characters"
+                    )
+                    if not suffix:
+                        continue
                     groups_config_args["workspace_group_match_regex"] = "$"
                     groups_config_args["workspace_group_replace"] = suffix
-                case "2":
-                    match_value = None
-                    sub_value = None
-                    while not match_value:
-                        match_value = self._question("Enter a RegEx expression for Substitution")
-                        try:
-                            re.compile(match_value)
-                        except re.error:
-                            logger.error(f"{match_value} is Not a valid regex pattern")
-                            match_value = None
-                    while not sub_value:
-                        sub_value = self._question("Enter the substitution value.")
-                        if not self._is_valid_group_str(sub_value):
-                            logger.error(
-                                f"{sub_value} is an invalid substitution value. It contains invalid characters"
-                            )
-                            sub_value = None
+                case "sub":
+                    match_value = self._regex_question("Enter a RegEx expression for Substitution")
+                    if not match_value:
+                        continue
+                    sub_value = self._group_question("Enter the substitution value")
+                    if not sub_value:
+                        continue
                     groups_config_args["workspace_group_match_regex"] = match_value
                     groups_config_args["workspace_group_replace"] = sub_value
-                case "3":
-                    ws_match_value = None
-                    acct_match_value = None
-                    while not ws_match_value:
-                        ws_match_value = self._question("Enter a RegEx expression to match on the workspace group")
-                        try:
-                            re.compile(ws_match_value)
-                        except re.error:
-                            logger.error(f"{ws_match_value} is Not a valid regex pattern")
-                            ws_match_value = None
-                    while not acct_match_value:
-                        acct_match_value = self._question("Enter a RegEx expression to match on the account group")
-                        try:
-                            re.compile(acct_match_value)
-                        except re.error:
-                            logger.error(f"{acct_match_value} is Not a valid regex pattern")
-                            acct_match_value = None
+                case "matching":
+                    ws_match_value = self._regex_question("Enter a RegEx expression to match on the workspace group")
+                    if not ws_match_value:
+                        continue
+                    acct_match_value = self._regex_question("Enter a RegEx expression to match on the account group")
+                    if not acct_match_value:
+                        continue
                     groups_config_args["workspace_group_match_regex"] = ws_match_value
                     groups_config_args["account_group_match_regex"] = acct_match_value
-                case "4":
+                case "external":
                     groups_config_args["group_match_by_external_id"] = True
+            break
 
         selected_groups = self._question(
             "Comma-separated list of workspace group names to migrate. If not specified, we'll use all "
             "account-level groups with matching names to workspace-level groups",
             default="<ALL>",
         )
-        backup_group_prefix = self._question("Backup prefix", default="db-temp-")
+        backup_group_prefix = self._group_question("Backup prefix", default="db-temp-")
         log_level = self._question("Log level", default="INFO").upper()
         num_threads = int(self._question("Number of threads", default="8"))
         groups_config_args["backup_group_prefix"] = backup_group_prefix
@@ -491,8 +468,8 @@ class WorkspaceInstaller:
             if (
                 len(policies_with_external_hms) > 0
                 and self._question(
-                    "We have identified one or more cluster policies set up for an external metastore. "
-                    "Would you like to set UCX to connect to the external metastore.",
+                    "We have identified one or more cluster policies set up for an external metastore"
+                    "Would you like to set UCX to connect to the external metastore",
                     default="no",
                 )
                 == "yes"
@@ -669,14 +646,15 @@ class WorkspaceInstaller:
     def notebook_link(self, path: str) -> str:
         return f"{self._ws.config.host}/#workspace{path}"
 
-    def _choice_from_dict(self, text: str, choices: dict[str, Any]) -> Any:
-        key = self._choice(text, list(choices.keys()))
+    def _choice_from_dict(self, text: str, choices: dict[str, Any], *, sort: bool = True) -> Any:
+        key = self._choice(text, list(choices.keys()), sort=sort)
         return choices[key]
 
-    def _choice(self, text: str, choices: list[Any], *, max_attempts: int = 10) -> str:
+    def _choice(self, text: str, choices: list[Any], *, max_attempts: int = 10, sort: bool = True) -> str:
         if not self._prompts:
             return "any"
-        choices = sorted(choices, key=str.casefold)
+        if sort:
+            choices = sorted(choices, key=str.casefold)
         numbered = "\n".join(f"\033[1m[{i}]\033[0m \033[36m{v}\033[0m" for i, v in enumerate(choices))
         prompt = f"\033[1m{text}\033[0m\n{numbered}\nEnter a number between 0 and {len(choices) - 1}: "
         attempt = 0
@@ -705,6 +683,36 @@ class WorkspaceInstaller:
             if not res and default is not None:
                 return default
         return res
+
+    @classmethod
+    def _group_question(cls, text: str, *, default: str | None = None) -> str | None:
+        attempts_left = NUM_USER_ATTEMPTS
+        while attempts_left:
+            group_input = cls._question(text, default=default)
+            if cls._is_valid_group_str(group_input):
+                return group_input
+            else:
+                attempts_left -= 1
+                logger.error(
+                    f"{group_input} is an invalid Prefix. It contains invalid characters. "
+                    f"Please try again ({attempts_left} more attempts)"
+                )
+        return None
+
+    @classmethod
+    def _regex_question(cls, text: str, *, default: str | None = None) -> str | None:
+        attempts_left = NUM_USER_ATTEMPTS
+        while attempts_left:
+            regex_input = cls._question(text, default=default)
+            try:
+                re.compile(regex_input)
+                return regex_input
+            except re.error:
+                attempts_left -= 1
+                logger.error(
+                    f"{regex_input} is an invalid RegEx expression. Please try again ({attempts_left} more attempts)"
+                )
+        return None
 
     def _upload_wheel(self) -> str:
         with tempfile.TemporaryDirectory() as tmp_dir:
