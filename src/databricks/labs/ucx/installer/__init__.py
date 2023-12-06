@@ -8,7 +8,7 @@ from databricks.sdk.errors import NotFound
 from databricks.sdk.service.iam import User
 
 from databricks.labs.ucx.config import WorkspaceConfig
-from databricks.labs.ucx.framework.parallel import Threads
+from databricks.labs.ucx.framework.parallel import ManyError, Threads
 
 logger = logging.getLogger(__name__)
 
@@ -51,5 +51,5 @@ class InstallationManager:
             tasks.append(functools.partial(self._user_installation, user))
         installations, errors = Threads.gather("detecting installations", tasks)
         if errors:
-            raise ValueError(errors)
+            raise ManyError(errors)
         return sorted(installations, key=lambda i: (i.config.inventory_database, i.user.user_name))
