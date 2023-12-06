@@ -638,7 +638,6 @@ class WorkspaceInstaller:
                 except PermissionDenied as err:
                     logger.warning(f"Uploading wheel file to DBFS failed, DBFS is probably write protected. {err}")
                     # assume DBFS is write protected
-                    self._write_protected_dbfs = True
                     self._current_config.override_clusters = ConfigureClusterOverrides(
                         self._ws, self._choice_from_dict
                     )._configure_override_clusters()

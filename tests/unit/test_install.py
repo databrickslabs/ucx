@@ -44,10 +44,10 @@ cluster_id = "9999-999999-abcdefgh"
 
 
 def mock_clusters():
-    from databricks.sdk.service.compute import DataSecurityMode, State
+    from databricks.sdk.service.compute import ClusterDetails, DataSecurityMode, State
 
     return [
-        MagicMock(
+        ClusterDetails(
             spark_version="13.3.x-dbrxxx",
             cluster_name="zero",
             data_security_mode=DataSecurityMode.USER_ISOLATION,

@@ -4,15 +4,15 @@ from databricks.sdk.service import compute
 
 logger = logging.getLogger(__name__)
 CLUSTER_ID_LENGTH = 20  # number of characters in a valid cluster_id
+MINIMUM_SPARK_VERSION = "13.3.x"
 
 
 class ConfigureClusterOverrides:
     """Installation configuration operations to suplement install.WorkspaceInstaller"""
 
-    def __init__(self, ws, _choice_from_dict):
-        self.minimum_spark_version = "13.3.x"
+    def __init__(self, ws, choice_from_dict):
         self._ws = ws
-        self._choice_from_dict = _choice_from_dict
+        self._choice_from_dict = choice_from_dict
 
     def _valid_cluster_id(self, cluster_id: str) -> bool:
         return cluster_id is not None and CLUSTER_ID_LENGTH == len(cluster_id)
@@ -24,14 +24,14 @@ class ConfigureClusterOverrides:
         def is_classic(c) -> bool:
             return (
                 c.state == compute.State.RUNNING
-                and c.spark_version > self.minimum_spark_version
+                and c.spark_version >= MINIMUM_SPARK_VERSION
                 and c.data_security_mode == compute.DataSecurityMode.NONE
             )
 
         def is_tacl(c) -> bool:
             return (
                 c.state == compute.State.RUNNING
-                and c.spark_version > self.minimum_spark_version
+                and c.spark_version >= MINIMUM_SPARK_VERSION
                 and c.data_security_mode == compute.DataSecurityMode.LEGACY_TABLE_ACL
             )
 
