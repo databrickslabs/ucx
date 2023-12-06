@@ -482,12 +482,9 @@ class WorkspaceInstaller:
                     )
                     instance_profile, spark_conf_dict = self._get_ext_hms_conf_from_policy(cluster_policy)
 
-        use_policy = self._question("Do you want to follow a policy to create clusters", default="no")
-        if use_policy != "no":
-            cluster_policies_list = {
-                f"{_.name} ({_.policy_id})": _.policy_id
-                for _ in self._ws.cluster_policies.list()
-            }
+        use_policy = self._question("Do you want to follow a policy to create clusters?", default="no")
+        if use_policy == "yes":
+            cluster_policies_list = {f"{_.name} ({_.policy_id})": _.policy_id for _ in self._ws.cluster_policies.list()}
             custom_cluster_policy_id = self._choice_from_dict("Choose a cluster policy", cluster_policies_list)
         else:
             custom_cluster_policy_id = None
@@ -505,7 +502,7 @@ class WorkspaceInstaller:
             num_threads=num_threads,
             instance_profile=instance_profile,
             spark_conf=spark_conf_dict,
-            custom_cluster_policy_id = custom_cluster_policy_id
+            custom_cluster_policy_id=custom_cluster_policy_id,
         )
 
         self._write_config(overwrite=False)
@@ -988,6 +985,7 @@ class WorkspaceInstaller:
                 if key.startswith("spark_config.spark.sql.hive.metastore"):
                     yield policy
                     break
+
     def _check_policy_has_instance_pool(self, policy_id):
         policy = self._ws.cluster_policies.get(policy_id=policy_id)
         def_json = json.loads(policy.definition)
