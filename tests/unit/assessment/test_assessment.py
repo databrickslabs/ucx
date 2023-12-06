@@ -602,7 +602,7 @@ def test_pipeline_list_with_no_config():
         )
     ]
     mock_ws = Mock()
-    mock_ws.pipelines.list_pipelines.return_value = sample_pipelines = sample_pipelines
+    mock_ws.pipelines.list_pipelines.return_value = sample_pipelines
     config_dict = {"spark.hadoop.fs.azure1.account.oauth2.client.id.abcde.dfs.core.windows.net": "wewewerty"}
     mock_ws.pipelines.get().spec.configuration = config_dict
     crawler = AzureServicePrincipalCrawler(mock_ws, MockBackend(), "ucx")._list_all_pipeline_with_spn_in_spark_conf()

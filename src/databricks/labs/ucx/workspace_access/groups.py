@@ -3,9 +3,12 @@ import json
 import logging
 import typing
 from dataclasses import dataclass
+from datetime import timedelta
 
 from databricks.sdk import WorkspaceClient
 from databricks.sdk.core import DatabricksError
+from databricks.sdk.errors import InternalError
+from databricks.sdk.errors.mapping import NotFound
 from databricks.sdk.retries import retried
 from databricks.sdk.service import iam
 
@@ -80,11 +83,13 @@ class GroupManager(CrawlerBase):
         inventory_database: str,
         include_group_names: list[str] | None = None,
         renamed_group_prefix: str = "ucx-renamed-",
+        verify_timeout: timedelta | None = timedelta(minutes=1),
     ):
         super().__init__(sql_backend, "hive_metastore", inventory_database, "groups", MigratedGroup)
         self._ws = ws
         self._include_group_names = include_group_names
         self._renamed_group_prefix = renamed_group_prefix
+        self._verify_timeout = verify_timeout
 
     def snapshot(self) -> list[MigratedGroup]:
         return self._snapshot(self._fetcher, self._crawler)
@@ -200,17 +205,40 @@ class GroupManager(CrawlerBase):
             by_name[g.display_name] = g.id
         return by_name
 
+    def _is_group_out_of_scope(self, group: iam.Group, resource_type: str) -> bool:
+        if group.display_name in self._SYSTEM_GROUPS:
+            return True
+        if group.meta.resource_type != resource_type:
+            return True
+        return False
+
     def _list_workspace_groups(self, resource_type: str, scim_attributes: str) -> list[iam.Group]:
         results = []
         logger.info(f"Listing workspace groups (resource_type={resource_type}) with {scim_attributes}...")
-        for g in self._ws.groups.list(attributes=scim_attributes):
-            if g.display_name in self._SYSTEM_GROUPS:
-                continue
-            if g.meta.resource_type != resource_type:
-                continue
-            results.append(g)
+        # these attributes can get too large causing the api to timeout
+        # so we're fetching groups without these attributes first
+        # and then calling get on each of them to fetch all attributes
+        attributes = scim_attributes.split(",")
+        if "members" in attributes:
+            attributes.remove("members")
+            for g in self._ws.groups.list(attributes=",".join(attributes)):
+                if self._is_group_out_of_scope(g, resource_type):
+                    continue
+                set_retry_on_value_error = retried(on=[InternalError, NotFound], timeout=self._verify_timeout)
+                set_retried_check = set_retry_on_value_error(self._get_group_with_retries)
+                group_with_all_attributes = set_retried_check(g.id)
+                results.append(group_with_all_attributes)
+        else:
+            for g in self._ws.groups.list(attributes=scim_attributes):
+                if self._is_group_out_of_scope(g, resource_type):
+                    continue
+                results.append(g)
         logger.info(f"Found {len(results)} {resource_type}")
         return results
+
+    @rate_limited(max_requests=255, burst_period_seconds=60)
+    def _get_group_with_retries(self, group_id: str) -> iam.Group:
+        return self._ws.groups.get(group_id)
 
     def _list_account_groups(self, scim_attributes: str) -> list[iam.Group]:
         # TODO: we should avoid using this method, as it's not documented

@@ -112,10 +112,10 @@ class StaticTablesCrawler(TablesCrawler):
                 catalog=_.catalog_name,
                 database=_.schema_name,
                 name=_.name,
-                object_type="TABLE" if not _.view_definition else "VIEW",
+                object_type=f"{_.table_type.value}",
                 view_text=_.view_definition,
                 location=_.storage_location,
-                table_format=f"{_.data_source_format}",
+                table_format=f"{_.data_source_format.value}",
             )
             for _ in tables
         ]
