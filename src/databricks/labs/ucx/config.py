@@ -170,12 +170,14 @@ class AccountConfig(_Config["AccountConfig"]):
 @dataclass
 class WorkspaceConfig(_Config["WorkspaceConfig"]):
     inventory_database: str
-
+    # Group name conversion parameters.
+    workspace_group_regex: str = None
+    workspace_group_replace: str = None
+    account_group_regex: str = None
+    group_match_by_external_id: bool = False
     # Includes group names for migration. If not specified, all matching groups will be picked up
-    include_group_names: list[str] = None
-
+    include_group_names: list[str] | None = None
     renamed_group_prefix: str = "ucx-renamed-"
-
     instance_pool_id: str = None
     warehouse_id: str = None
     connect: ConnectConfig | None = None
