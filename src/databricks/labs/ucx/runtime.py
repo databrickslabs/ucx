@@ -211,6 +211,7 @@ def crawl_groups(cfg: WorkspaceConfig):
     group_manager.snapshot()
 
 
+# This method returns the dependency tasks for assessment report based on the cloud environment
 @staticmethod
 def depends_on_cloud():
     ws = WorkspaceClient(product="ucx", product_version=__version__)
