@@ -4,6 +4,7 @@ import sys
 
 from databricks.sdk import WorkspaceClient
 
+from databricks.labs.ucx.__about__ import __version__
 from databricks.labs.ucx.assessment.crawlers import (
     AzureServicePrincipalCrawler,
     ClustersCrawler,
@@ -202,20 +203,39 @@ def crawl_groups(cfg: WorkspaceConfig):
     group_manager.snapshot()
 
 
+@staticmethod
+def depends_on_cloud():
+    ws = WorkspaceClient(product="ucx", product_version=__version__)
+    if ws.config.is_azure:
+        return [
+            crawl_grants,
+            crawl_groups,
+            crawl_permissions,
+            guess_external_locations,
+            assess_jobs,
+            assess_clusters,
+            assess_azure_service_principals,
+            assess_pipelines,
+            assess_global_init_scripts,
+            crawl_tables,
+        ]
+    else:
+        return [
+            crawl_grants,
+            crawl_groups,
+            crawl_permissions,
+            guess_external_locations,
+            assess_jobs,
+            assess_clusters,
+            assess_pipelines,
+            assess_global_init_scripts,
+            crawl_tables,
+        ]
+
+
 @task(
     "assessment",
-    depends_on=[
-        crawl_grants,
-        crawl_groups,
-        crawl_permissions,
-        guess_external_locations,
-        assess_jobs,
-        assess_clusters,
-        assess_pipelines,
-        assess_azure_service_principals,
-        assess_global_init_scripts,
-        crawl_tables,
-    ],
+    depends_on=depends_on_cloud(),
     dashboard="assessment_main",
 )
 def assessment_report(_: WorkspaceConfig):
