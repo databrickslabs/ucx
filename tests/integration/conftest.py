@@ -115,7 +115,7 @@ class StaticTablesCrawler(TablesCrawler):
                 object_type=f"{_.table_type.value}",
                 view_text=_.view_definition,
                 location=_.storage_location,
-                table_format=f"{_.data_source_format.value}",
+                table_format=f"{ _.data_source_format.value}" if _.table_type.value != "VIEW" else None,
             )
             for _ in tables
         ]

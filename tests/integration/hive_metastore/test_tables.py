@@ -37,9 +37,9 @@ def test_describe_all_tables_in_databases(ws, sql_backend, inventory_schema, mak
         all_tables[t.key] = t
 
     assert len(all_tables) >= 5
-    assert all_tables[non_delta.full_name].table_format == "JSON"
-    assert all_tables[managed_table.full_name].object_type == "MANAGED"
-    assert all_tables[tmp_table.full_name].object_type == "MANAGED"
-    assert all_tables[external_table.full_name].object_type == "EXTERNAL"
-    assert all_tables[view.full_name].object_type == "VIEW"
-    assert all_tables[view.full_name].view_text == "SELECT 2+2 AS four"
+    assert all_tables[non_delta.full_name].table_format == "json"
+    assert all_tables[managed_table.full_name].object_type == "managed"
+    assert all_tables[tmp_table.full_name].object_type == "managed"
+    assert all_tables[external_table.full_name].object_type == "external"
+    assert all_tables[view.full_name].object_type == "view"
+    assert all_tables[view.full_name].view_text == "select 2+2 as four"
