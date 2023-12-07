@@ -2,7 +2,7 @@
 -- widget title=Table Types, row=1, col=3, size_x=3, size_y=8
 SELECT CONCAT(`database`, '.', name) AS name,
        object_type AS type,
-       UPPER(table_format) AS format,
+       table_format AS format,
        CASE
            WHEN STARTSWITH(location, "dbfs:/mnt") THEN "DBFS MOUNT"
            WHEN STARTSWITH(location, "/dbfs/mnt") THEN "DBFS MOUNT"
@@ -12,6 +12,6 @@ SELECT CONCAT(`database`, '.', name) AS name,
            WHEN STARTSWITH(location, "adl") THEN "UNSUPPORTED"
            ELSE "EXTERNAL"
        END AS storage,
-       IF(format = "DELTA", "Yes", "No") AS is_delta,
+       IF(format = "delta", "Yes", "No") AS is_delta,
        location
 FROM $inventory.tables

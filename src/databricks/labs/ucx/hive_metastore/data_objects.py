@@ -33,7 +33,7 @@ class ExternalLocationCrawler(CrawlerBase):
             if location is not None and len(location) > 0:
                 if location.startswith("dbfs:/mnt"):
                     for mount in mounts:
-                        if location[5:].startswith(mount.name):
+                        if location[5:].startswith(mount.name.lower()):
                             location = location[5:].replace(mount.name, mount.source)
                             break
                 if (

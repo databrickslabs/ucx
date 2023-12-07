@@ -156,13 +156,13 @@ class TablesCrawler(CrawlerBase):
             for key, value, _ in self._fetch(f"DESCRIBE TABLE EXTENDED {full_name}"):
                 describe[key] = value
             return Table(
-                catalog=describe["Catalog"].lower(),
-                database=database.lower(),
-                name=table.lower(),
-                object_type=describe["Type"].lower(),
+                catalog=None if describe["Catalog"] is None else describe["Catalog"].lower(),
+                database=None if database is None else database.lower(),
+                name=None if table is None else table.lower(),
+                object_type=None if describe["Type"] is None else describe["Type"].lower(),
                 table_format=describe.get("Provider", "").lower(),
-                location=describe.get("Location", None).lower(),
-                view_text=describe.get("View Text", None).lower(),
+                location=None if describe.get("Location", None) is None else describe["Location"].lower(),
+                view_text=None if describe.get("View Text", None) is None else describe["View Text"].lower(),
                 upgraded_to=self._parse_table_props(describe.get("Table Properties", "").lower()).get(
                     "upgraded_to", None
                 ),
