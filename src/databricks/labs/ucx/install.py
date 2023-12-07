@@ -50,6 +50,7 @@ from databricks.labs.ucx.workspace_access.groups import MigratedGroup
 
 TAG_STEP = "step"
 TAG_APP = "App"
+WAREHOUSE_PREFIX = "Unity Catalog Migration"
 NUM_USER_ATTEMPTS = 10  # number of attempts user gets at answering a question
 EXTRA_TASK_PARAMS = {
     "job_id": "{{job_id}}",
@@ -372,7 +373,7 @@ class WorkspaceInstaller:
         )
         if warehouse_id == "create_new":
             new_warehouse = self._ws.warehouses.create(
-                name=f"Unity Catalog Migration {time.time_ns()}",
+                name=f"{WAREHOUSE_PREFIX} {time.time_ns()}",
                 spot_instance_policy=SpotInstancePolicy.COST_OPTIMIZED,
                 warehouse_type=EndpointInfoWarehouseType.PRO,
                 cluster_size="Small",
@@ -380,18 +381,80 @@ class WorkspaceInstaller:
             )
             warehouse_id = new_warehouse.id
 
+        # Setting up group migration parameters
+        groups_config_args = {}
+
+        while (
+            self._question(
+                "Do you need to convert the workspace groups to match the account groups' name?"
+                " If the workspace groups' names match the account groups' names select "
+                "no"
+                " or hit <Enter/Return>.",
+                default="no",
+            )
+            == "yes"
+        ):
+            logger.info("Setting up group name translation")
+            groups_config_args["convert_group_names"] = "yes"
+            choices = {
+                "Apply a Prefix": "prefix",
+                "Apply a Suffix": "suffix",
+                "Regex Substitution": "sub",
+                "Regex Matching": "match",
+                "Match By External ID": "external",
+                "Cancel": "cancel",
+            }
+            choice = self._choice_from_dict("Choose how to map the workspace groups:", choices, sort=False)
+            match choice:
+                case "cancel":
+                    continue
+                case "prefix":
+                    prefix = self._group_question(
+                        "Enter a prefix to add to the workspace group name. Use only valid characters"
+                    )
+                    if not prefix:
+                        continue
+                    groups_config_args["workspace_group_match_regex"] = "^"
+                    groups_config_args["workspace_group_replace"] = prefix
+                case "suffix":
+                    suffix = self._group_question(
+                        "Enter a suffix to add to the workspace group name. Use only valid characters"
+                    )
+                    if not suffix:
+                        continue
+                    groups_config_args["workspace_group_match_regex"] = "$"
+                    groups_config_args["workspace_group_replace"] = suffix
+                case "sub":
+                    match_value = self._regex_question("Enter a RegEx expression for Substitution")
+                    if not match_value:
+                        continue
+                    sub_value = self._group_question("Enter the substitution value")
+                    if not sub_value:
+                        continue
+                    groups_config_args["workspace_group_match_regex"] = match_value
+                    groups_config_args["workspace_group_replace"] = sub_value
+                case "matching":
+                    ws_match_value = self._regex_question("Enter a RegEx expression to match on the workspace group")
+                    if not ws_match_value:
+                        continue
+                    acct_match_value = self._regex_question("Enter a RegEx expression to match on the account group")
+                    if not acct_match_value:
+                        continue
+                    groups_config_args["workspace_group_match_regex"] = ws_match_value
+                    groups_config_args["account_group_match_regex"] = acct_match_value
+                case "external":
+                    groups_config_args["group_match_by_external_id"] = True
+            break
+
         selected_groups = self._question(
             "Comma-separated list of workspace group names to migrate. If not specified, we'll use all "
-            "account-level groups with matching names to workspace-level groups.",
+            "account-level groups with matching names to workspace-level groups",
             default="<ALL>",
         )
-        backup_group_prefix = self._question("Backup prefix", default="db-temp-")
+        backup_group_prefix = self._group_question("Backup prefix", default="db-temp-")
         log_level = self._question("Log level", default="INFO").upper()
         num_threads = int(self._question("Number of threads", default="8"))
-        groups_config_args = {
-            "backup_group_prefix": backup_group_prefix,
-        }
-
+        groups_config_args["backup_group_prefix"] = backup_group_prefix
         if selected_groups != "<ALL>":
             groups_config_args["selected"] = [x.strip() for x in selected_groups.split(",")]
         else:
@@ -405,8 +468,8 @@ class WorkspaceInstaller:
             if (
                 len(policies_with_external_hms) > 0
                 and self._question(
-                    "We have identified one or more cluster policies set up for an external metastore. "
-                    "Would you like to set UCX to connect to the external metastore.",
+                    "We have identified one or more cluster policies set up for an external metastore"
+                    "Would you like to set UCX to connect to the external metastore",
                     default="no",
                 )
                 == "yes"
@@ -421,6 +484,10 @@ class WorkspaceInstaller:
 
         self._config = WorkspaceConfig(
             inventory_database=inventory_database,
+            workspace_group_regex=groups_config_args.get("workspace_group_regex"),
+            workspace_group_replace=groups_config_args.get("workspace_group_replace"),
+            account_group_regex=groups_config_args.get("account_group_regex"),
+            group_match_by_external_id=groups_config_args.get("group_match_by_external_id"),
             include_group_names=groups_config_args["selected"],
             renamed_group_prefix=groups_config_args["backup_group_prefix"],
             warehouse_id=warehouse_id,
@@ -579,14 +646,15 @@ class WorkspaceInstaller:
     def notebook_link(self, path: str) -> str:
         return f"{self._ws.config.host}/#workspace{path}"
 
-    def _choice_from_dict(self, text: str, choices: dict[str, Any]) -> Any:
-        key = self._choice(text, list(choices.keys()))
+    def _choice_from_dict(self, text: str, choices: dict[str, Any], *, sort: bool = True) -> Any:
+        key = self._choice(text, list(choices.keys()), sort=sort)
         return choices[key]
 
-    def _choice(self, text: str, choices: list[Any], *, max_attempts: int = 10) -> str:
+    def _choice(self, text: str, choices: list[Any], *, max_attempts: int = 10, sort: bool = True) -> str:
         if not self._prompts:
             return "any"
-        choices = sorted(choices, key=str.casefold)
+        if sort:
+            choices = sorted(choices, key=str.casefold)
         numbered = "\n".join(f"\033[1m[{i}]\033[0m \033[36m{v}\033[0m" for i, v in enumerate(choices))
         prompt = f"\033[1m{text}\033[0m\n{numbered}\nEnter a number between 0 and {len(choices) - 1}: "
         attempt = 0
@@ -615,6 +683,36 @@ class WorkspaceInstaller:
             if not res and default is not None:
                 return default
         return res
+
+    @classmethod
+    def _group_question(cls, text: str, *, default: str | None = None) -> str | None:
+        attempts_left = NUM_USER_ATTEMPTS
+        while attempts_left:
+            group_input = cls._question(text, default=default)
+            if cls._is_valid_group_str(group_input):
+                return group_input
+            else:
+                attempts_left -= 1
+                logger.error(
+                    f"{group_input} is an invalid Prefix. It contains invalid characters. "
+                    f"Please try again ({attempts_left} more attempts)"
+                )
+        return None
+
+    @classmethod
+    def _regex_question(cls, text: str, *, default: str | None = None) -> str | None:
+        attempts_left = NUM_USER_ATTEMPTS
+        while attempts_left:
+            regex_input = cls._question(text, default=default)
+            try:
+                re.compile(regex_input)
+                return regex_input
+            except re.error:
+                attempts_left -= 1
+                logger.error(
+                    f"{regex_input} is an invalid RegEx expression. Please try again ({attempts_left} more attempts)"
+                )
+        return None
 
     def _upload_wheel(self) -> str:
         with tempfile.TemporaryDirectory() as tmp_dir:
@@ -734,7 +832,7 @@ class WorkspaceInstaller:
         spec = self._cluster_node_type(
             compute.ClusterSpec(
                 spark_version=self._ws.clusters.select_spark_version(latest=True),
-                data_security_mode=compute.DataSecurityMode.NONE,
+                data_security_mode=compute.DataSecurityMode.LEGACY_SINGLE_USER,
                 spark_conf=spark_conf,
                 custom_tags={"ResourceClass": "SingleNode"},
                 num_workers=0,
@@ -890,6 +988,10 @@ class WorkspaceInstaller:
                 spark_conf_dict[key[11:]] = cluster_policy[key]["value"]
         return instance_profile, spark_conf_dict
 
+    @staticmethod
+    def _is_valid_group_str(group_str: str):
+        return group_str and not re.search(r"[\s#,+ \\<>;]", group_str)
+
     def latest_job_status(self) -> list[dict]:
         latest_status = []
         for step, job_id in self._state.jobs.items():
@@ -906,6 +1008,73 @@ class WorkspaceInstaller:
                 logger.warning(f"skipping {step}: {e}")
                 continue
         return latest_status
+
+    def uninstall(self):
+        if not self._prompts or self._question(
+            "Do you want to uninstall ucx from the workspace too, this would "
+            "remove ucx project folder, dashboards, queries and jobs",
+            default="no",
+        ):
+            logger.info(f"Deleting UCX v{self._version} from {self._ws.config.host}")
+            try:
+                self._ws.workspace.get_status(self.config_file)
+                self._ws.workspace.get_status(self._install_folder)
+                self._ws.workspace.get_status(self._state._state_file)
+            except NotFound:
+                logger.error(
+                    f"Check if {self._install_folder} is present along with {self.config_file} and "
+                    f"{self._state._state_file}."
+                )
+                return
+            self._remove_database()
+            self._remove_jobs()
+            self._remove_warehouse()
+            self._remove_install_folder()
+            logger.info("UnInstalling UCX complete")
+
+    def _remove_database(self):
+        if (
+            not self._prompts
+            or self._question(
+                f"Do you want to delete the inventory database {self._current_config.inventory_database} too?",
+                default="no",
+            )
+            == "yes"
+        ):
+            logger.info(f"Deleting inventory database {self._current_config.inventory_database}")
+            if self._sql_backend is None:
+                self._sql_backend = StatementExecutionBackend(self._ws, self._current_config.warehouse_id)
+            deployer = SchemaDeployer(self._sql_backend, self._current_config.inventory_database, Any)
+            deployer.delete_schema()
+
+    def _remove_jobs(self):
+        logger.info("Deleting jobs")
+        if not self._state.jobs:
+            logger.error("No jobs present or jobs already deleted")
+            return
+        for step_name, job_id in self._state.jobs.items():
+            try:
+                logger.info(f"Deleting {step_name} job_id={job_id}.")
+                self._ws.jobs.delete(job_id)
+            except InvalidParameterValue:
+                logger.error(f"Already deleted: {step_name} job_id={job_id}.")
+                continue
+
+    def _remove_warehouse(self):
+        try:
+            warehouse_name = self._ws.warehouses.get(self._current_config.warehouse_id).name
+            if warehouse_name.startswith(WAREHOUSE_PREFIX):
+                logger.info("Deleting warehouse_name.")
+                self._ws.warehouses.delete(id=self._current_config.warehouse_id)
+        except InvalidParameterValue:
+            logger.error("Error accessing warehouse details")
+
+    def _remove_install_folder(self):
+        try:
+            logger.info(f"Deleting install folder {self._install_folder}.")
+            self._ws.workspace.delete(path=self._install_folder, recursive=True)
+        except InvalidParameterValue:
+            logger.error("Error deleting install folder")
 
 
 if __name__ == "__main__":

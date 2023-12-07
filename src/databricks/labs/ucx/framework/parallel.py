@@ -15,6 +15,13 @@ Result = TypeVar("Result")
 logger = logging.getLogger(__name__)
 
 
+class ManyError(RuntimeError):
+    def __init__(self, errs):
+        strs = [str(_) for _ in errs]
+        msg = f'Detected {len(errs)} failures: {",".join(strs)}'
+        super().__init__(msg)
+
+
 class Threads(Generic[Result]):
     def __init__(self, name, tasks: list[Callable[..., Result]], num_threads: int):
         self._name = name

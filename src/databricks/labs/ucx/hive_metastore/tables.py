@@ -206,9 +206,11 @@ class TablesMigrate:
         _, errors = Threads.gather("migrate tables", tasks)
         if len(errors) > 0:
             # TODO: https://github.com/databrickslabs/ucx/issues/406
-            logger.error(f"Detected {len(errors)} errors while migrating tables")
+            # TODO: pick first X issues in the summary
+            msg = f"Detected {len(errors)} errors: {'. '.join(str(e) for e in errors)}"
+            raise ValueError(msg)
 
-    def _migrate_table(self, target_catalog, table):
+    def _migrate_table(self, target_catalog: str, table: Table):
         sql = table.uc_create_sql(target_catalog)
         logger.debug(f"Migrating table {table.key} to using SQL query: {sql}")
         target = f"{target_catalog}.{table.database}.{table.name}".lower()
@@ -220,8 +222,16 @@ class TablesMigrate:
             self._backend.execute(table.sql_alter_to(target_catalog))
             self._backend.execute(table.sql_alter_from(target_catalog))
             self._seen_tables[target] = table.key
+        elif table.object_type == "EXTERNAL":
+            result = next(self._backend.fetch(sql))
+            if result.status_code != "SUCCESS":
+                raise ValueError(result.description)
+            self._backend.execute(table.sql_alter_to(target_catalog))
+            self._backend.execute(table.sql_alter_from(target_catalog))
+            self._seen_tables[target] = table.key
         else:
-            logger.info(f"Table {table.key} is a {table.object_type} and is not supported for migration yet ")
+            msg = f"Table {table.key} is a {table.object_type} and is not supported for migration yet"
+            raise ValueError(msg)
         return True
 
     def _init_seen_tables(self):

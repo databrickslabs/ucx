@@ -14,8 +14,14 @@ from typing import BinaryIO, Optional
 import pytest
 from databricks.sdk import AccountClient, WorkspaceClient
 from databricks.sdk.core import DatabricksError
-from databricks.sdk.service import compute, iam, jobs, pipelines, sql, workspace
-from databricks.sdk.service.catalog import CatalogInfo, SchemaInfo, TableInfo
+from databricks.sdk.service import compute, iam, jobs, pipelines, workspace
+from databricks.sdk.service.catalog import (
+    CatalogInfo,
+    DataSourceFormat,
+    SchemaInfo,
+    TableInfo,
+    TableType,
+)
 from databricks.sdk.service.sql import (
     CreateWarehouseRequestWarehouseType,
     Query,
@@ -779,6 +785,7 @@ def make_table(ws, sql_backend, make_schema, make_random) -> Callable[..., Table
         ctas: str | None = None,
         non_delta: bool = False,
         external: bool = False,
+        external_csv: str | None = None,
         view: bool = False,
         tbl_properties: dict[str, str] | None = None,
         function: bool = False,
@@ -789,39 +796,57 @@ def make_table(ws, sql_backend, make_schema, make_random) -> Callable[..., Table
             schema_name = schema.name
         if name is None:
             name = f"ucx_T{make_random(4)}".lower()
+        table_type = None
+        data_source_format = None
+        storage_location = None
         full_name = f"{catalog_name}.{schema_name}.{name}".lower()
 
-        type = ""
-        if function:
-            type = "FUNCTION"
-        elif view:
-            type = "VIEW"
-        else:
-            type = "TABLE"
-
-        ddl = f"CREATE {type} {full_name}"
+        ddl = f'CREATE {"VIEW" if view else "TABLE"} {full_name}'
+        if view:
+            table_type = TableType.VIEW
         if ctas is not None:
             # temporary (if not view)
             ddl = f"{ddl} AS {ctas}"
         elif function:
             ddl = f"{ddl}() RETURNS INT NOT DETERMINISTIC CONTAINS SQL RETURN (rand() * 6)::INT + 1;"
         elif non_delta:
-            location = "dbfs:/databricks-datasets/iot-stream/data-device"
-            ddl = f"{ddl} USING json LOCATION '{location}'"
+            table_type = TableType.MANAGED
+            data_source_format = DataSourceFormat.JSON
+            storage_location = "dbfs:/databricks-datasets/iot-stream/data-device"
+            ddl = f"{ddl} USING json LOCATION '{storage_location}'"
+        elif external_csv is not None:
+            table_type = TableType.EXTERNAL
+            data_source_format = DataSourceFormat.CSV
+            storage_location = external_csv
+            ddl = f"{ddl} USING CSV OPTIONS (header=true) LOCATION '{storage_location}'"
         elif external:
             # external table
+            table_type = TableType.EXTERNAL
+            data_source_format = DataSourceFormat.DELTASHARING
             url = "s3a://databricks-datasets-oregon/delta-sharing/share/open-datasets.share"
-            share = f"{url}#delta_sharing.default.lending_club"
-            ddl = f"{ddl} USING deltaSharing LOCATION '{share}'"
+            storage_location = f"{url}#delta_sharing.default.lending_club"
+            ddl = f"{ddl} USING deltaSharing LOCATION '{storage_location}'"
         else:
             # managed table
+            table_type = TableType.MANAGED
+            data_source_format = DataSourceFormat.DELTA
+            storage_location = f"dbfs:/user/hive/warehouse/{schema_name}/{name}"
             ddl = f"{ddl} (id INT, value STRING)"
         if tbl_properties:
             tbl_properties = ",".join([f" '{k}' = '{v}' " for k, v in tbl_properties.items()])
             ddl = f"{ddl} TBLPROPERTIES ({tbl_properties})"
 
         sql_backend.execute(ddl)
-        table_info = TableInfo(catalog_name=catalog_name, schema_name=schema_name, name=name, full_name=full_name)
+        table_info = TableInfo(
+            catalog_name=catalog_name,
+            schema_name=schema_name,
+            name=name,
+            full_name=full_name,
+            properties=tbl_properties,
+            storage_location=storage_location,
+            table_type=table_type,
+            data_source_format=data_source_format,
+        )
         logger.info(
             f"Table {table_info.full_name}: "
             f"{ws.config.host}/explore/data/{table_info.catalog_name}/{table_info.schema_name}/{table_info.name}"
