@@ -669,8 +669,7 @@ def make_warehouse(ws, make_random):
 
 
 def _is_in_debug() -> bool:
-    logger.info(os.path.basename(sys.argv[0]))
-    return os.path.basename(sys.argv[0]) in ["_jb_pytest_runner.py", "testlauncher.py", "-c"]
+    return os.path.basename(sys.argv[0]) in ["_jb_pytest_runner.py", "testlauncher.py", "pytest"]
 
 
 @pytest.fixture

@@ -16,7 +16,7 @@ from databricks.sdk.service.sql import (
     ServiceErrorCode,
     StatementExecutionAPI,
     StatementState,
-    StatementStatus,
+    StatementStatus, ExecuteStatementRequestOnWaitTimeout,
 )
 
 MAX_SLEEP_PER_ATTEMPT = 10
@@ -127,13 +127,6 @@ class StatementExecutionExt(StatementExecutionAPI):
         schema: str | None = None,
         timeout: timedelta = timedelta(minutes=20),
     ) -> ExecuteStatementResponse:
-        # The wait_timeout field must be 0 seconds (disables wait),
-        # or between 5 seconds and 50 seconds.
-        wait_timeout = None
-        if MIN_PLATFORM_TIMEOUT <= timeout.total_seconds() <= MAX_PLATFORM_TIMEOUT:
-            # set server-side timeout
-            wait_timeout = f"{timeout.total_seconds()}s"
-
         _LOG.debug(f"Executing SQL statement: {statement}")
 
         # technically, we can do Disposition.EXTERNAL_LINKS, but let's push it further away.
@@ -146,7 +139,7 @@ class StatementExecutionExt(StatementExecutionAPI):
             disposition=Disposition.INLINE,
             format=Format.JSON_ARRAY,
             byte_limit=byte_limit,
-            wait_timeout=wait_timeout,
+            wait_timeout="0s",
         )
 
         if immediate_response.status.state == StatementState.SUCCEEDED:

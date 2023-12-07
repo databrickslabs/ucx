@@ -1,3 +1,4 @@
+import datetime
 import json
 import logging
 import random
@@ -68,11 +69,11 @@ def test_performance(
     env_or_skip,
 ):
     NB_OF_TEST_WS_OBJECTS = 2
-    NB_OF_FILES = 5
-    MAX_NB_OF_FILES = 2
-    NB_OF_TEST_GROUPS = 5
-    NB_OF_SCHEMAS = 1
-    MAX_NB_OF_TABLES = 2
+    NB_OF_FILES = 1
+    MAX_NB_OF_FILES = 3
+    NB_OF_TEST_GROUPS = 3
+    NB_OF_SCHEMAS = 3
+    MAX_NB_OF_TABLES = 10
 
     test_database = make_schema()
     groups = create_groups(NB_OF_TEST_GROUPS, make_ucx_group, sql_backend, test_database)
@@ -158,6 +159,10 @@ def test_performance(
     try_validate_secrets(persisted_rows, sql_backend, test_database, test_groups, ws)
     validate_entitlements(sql_backend, test_database, ws)
 
+    if len(verificationErrors) > 0:
+        with open(f"perf-test-{datetime.datetime.now()}.txt", "w") as txt_file:
+            for line in verificationErrors:
+                txt_file.write(line + "\n")
     assert [] == verificationErrors
 
 
