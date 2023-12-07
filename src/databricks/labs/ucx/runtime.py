@@ -198,7 +198,15 @@ def crawl_groups(cfg: WorkspaceConfig):
     sql_backend = RuntimeBackend()
     ws = WorkspaceClient(config=cfg.to_databricks_config())
     group_manager = GroupManager(
-        sql_backend, ws, cfg.inventory_database, cfg.include_group_names, cfg.renamed_group_prefix
+        sql_backend,
+        ws,
+        cfg.inventory_database,
+        cfg.include_group_names,
+        cfg.renamed_group_prefix,
+        workspace_group_regex=cfg.workspace_group_regex,
+        workspace_group_replace=cfg.workspace_group_replace,
+        account_group_regex=cfg.account_group_regex,
+        external_id_match=cfg.group_match_by_external_id,
     )
     group_manager.snapshot()
 
@@ -249,7 +257,15 @@ def rename_workspace_local_groups(cfg: WorkspaceConfig):
     sql_backend = RuntimeBackend()
     ws = WorkspaceClient(config=cfg.to_databricks_config())
     group_manager = GroupManager(
-        sql_backend, ws, cfg.inventory_database, cfg.include_group_names, cfg.renamed_group_prefix
+        sql_backend,
+        ws,
+        cfg.inventory_database,
+        cfg.include_group_names,
+        cfg.renamed_group_prefix,
+        workspace_group_regex=cfg.workspace_group_regex,
+        workspace_group_replace=cfg.workspace_group_replace,
+        account_group_regex=cfg.account_group_regex,
+        external_id_match=cfg.group_match_by_external_id,
     )
     group_manager.rename_groups()
 
@@ -261,7 +277,15 @@ def reflect_account_groups_on_workspace(cfg: WorkspaceConfig):
     sql_backend = RuntimeBackend()
     ws = WorkspaceClient(config=cfg.to_databricks_config())
     group_manager = GroupManager(
-        sql_backend, ws, cfg.inventory_database, cfg.include_group_names, cfg.renamed_group_prefix
+        sql_backend,
+        ws,
+        cfg.inventory_database,
+        cfg.include_group_names,
+        cfg.renamed_group_prefix,
+        workspace_group_regex=cfg.workspace_group_regex,
+        workspace_group_replace=cfg.workspace_group_replace,
+        account_group_regex=cfg.account_group_regex,
+        external_id_match=cfg.group_match_by_external_id,
     )
     group_manager.reflect_account_groups_on_workspace()
 
@@ -279,7 +303,17 @@ def apply_permissions_to_account_groups(cfg: WorkspaceConfig):
     See [interactive tutorial here](https://app.getreprise.com/launch/myM3VNn/)."""
     backend = RuntimeBackend()
     ws = WorkspaceClient(config=cfg.to_databricks_config())
-    group_manager = GroupManager(backend, ws, cfg.inventory_database, cfg.include_group_names, cfg.renamed_group_prefix)
+    group_manager = GroupManager(
+        backend,
+        ws,
+        cfg.inventory_database,
+        cfg.include_group_names,
+        cfg.renamed_group_prefix,
+        workspace_group_regex=cfg.workspace_group_regex,
+        workspace_group_replace=cfg.workspace_group_replace,
+        account_group_regex=cfg.account_group_regex,
+        external_id_match=cfg.group_match_by_external_id,
+    )
 
     migration_state = group_manager.get_migration_state()
     if len(migration_state.groups) == 0:
@@ -303,7 +337,17 @@ def delete_backup_groups(cfg: WorkspaceConfig):
     successfully for all the groups involved."""
     backend = RuntimeBackend()
     ws = WorkspaceClient(config=cfg.to_databricks_config())
-    group_manager = GroupManager(backend, ws, cfg.inventory_database, cfg.include_group_names, cfg.renamed_group_prefix)
+    group_manager = GroupManager(
+        backend,
+        ws,
+        cfg.inventory_database,
+        cfg.include_group_names,
+        cfg.renamed_group_prefix,
+        workspace_group_regex=cfg.workspace_group_regex,
+        workspace_group_replace=cfg.workspace_group_replace,
+        account_group_regex=cfg.account_group_regex,
+        external_id_match=cfg.group_match_by_external_id,
+    )
     group_manager.delete_original_workspace_groups()
 
 

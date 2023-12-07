@@ -17,3 +17,10 @@ commands:
       Step\tState\tStarted
       {{range .}}{{.step}}\t{{.state}}\t{{.started}}
       {{end}}
+
+  - name: installations
+    description: Show installations by different users on the same workspace
+    table_template: |-
+      User\tDatabase\tWarehouse
+      {{range .}}{{.user_name}}\t{{.database}}\t{{.warehouse_id}}
+      {{end}}
