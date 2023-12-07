@@ -5,6 +5,7 @@ import org.yaml.snakeyaml.Yaml
 import org.apache.spark.sql.catalyst.analysis.NoSuchDatabaseException
 import org.apache.spark.sql.catalyst.catalog.{CatalogTable, CatalogTableType}
 import org.apache.spark.sql.DataFrame
+import org.apache.spark.sql.functions.{col,lower}
 
 // must follow the same structure as databricks.labs.ucx.hive_metastore.tables.Table
 case class TableDetails(catalog: String, database: String, name: String, object_type: String,
@@ -78,7 +79,11 @@ def getInventoryDatabase(): String={
 }
 
 val inventoryDatabase = getInventoryDatabase()
-val df = metadataForAllTables(spark.sharedState.externalCatalog.listDatabases(), failures)
+var df = metadataForAllTables(spark.sharedState.externalCatalog.listDatabases(), failures)
+val columnsToMap = df.columns
+columnsToMap.map(column => {
+  df = df.withColumn(column, lower(col(column)))
+})
 df.write.mode("overwrite").option("overwriteSchema", "true").saveAsTable(s"$inventoryDatabase.tables")
 
 JavaConverters.asScalaIteratorConverter(failures.iterator).asScala.toList.toDF

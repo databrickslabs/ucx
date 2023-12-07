@@ -156,15 +156,17 @@ class TablesCrawler(CrawlerBase):
             for key, value, _ in self._fetch(f"DESCRIBE TABLE EXTENDED {full_name}"):
                 describe[key] = value
             return Table(
-                catalog=describe["Catalog"],
-                database=database,
-                name=table,
-                object_type=describe["Type"],
-                table_format=describe.get("Provider", "").upper(),
-                location=describe.get("Location", None),
-                view_text=describe.get("View Text", None),
-                upgraded_to=self._parse_table_props(describe.get("Table Properties", "")).get("upgraded_to", None),
-                storage_properties=self._parse_table_props(describe.get("Storage Properties", "")),
+                catalog=describe["Catalog"].lower(),
+                database=database.lower(),
+                name=table.lower(),
+                object_type=describe["Type"].lower(),
+                table_format=describe.get("Provider", "").lower(),
+                location=describe.get("Location", None).lower(),
+                view_text=describe.get("View Text", None).lower(),
+                upgraded_to=self._parse_table_props(describe.get("Table Properties", "").lower()).get(
+                    "upgraded_to", None
+                ),
+                storage_properties=self._parse_table_props(describe.get("Storage Properties", "").lower()),
             )
         except Exception as e:
             # TODO: https://github.com/databrickslabs/ucx/issues/406
