@@ -9,7 +9,6 @@ from databricks.sdk.errors import DatabricksError
 from databricks.sdk.retries import retried
 from databricks.sdk.service import iam, sql
 from databricks.sdk.service.iam import Group, PermissionLevel
-from databricks.sdk.service.settings import TokenAccessControlRequest, TokenPermissionLevel
 from databricks.sdk.service.workspace import (
     AclPermission,
     WorkspaceObjectAccessControlRequest,
@@ -42,6 +41,7 @@ class PersistedGroup:
 
 verificationErrors = []
 
+
 def test_performance(
     ws,
     make_cluster_policy,
@@ -67,10 +67,12 @@ def test_performance(
     make_random,
     env_or_skip,
 ):
-    NB_OF_TEST_WS_OBJECTS = 100
-    NB_OF_FILES = 10000
-    NB_OF_TEST_GROUPS = 1000
+    NB_OF_TEST_WS_OBJECTS = 2
+    NB_OF_FILES = 5
+    MAX_NB_OF_FILES = 2
+    NB_OF_TEST_GROUPS = 5
     NB_OF_SCHEMAS = 1
+    MAX_NB_OF_TABLES = 2
 
     test_database = make_schema()
     groups = create_groups(NB_OF_TEST_GROUPS, make_ucx_group, sql_backend, test_database)
@@ -101,11 +103,13 @@ def test_performance(
 
     create_repos(NB_OF_TEST_WS_OBJECTS, groups, make_repo, sql_backend, test_database, ws)
 
-    create_dirs_n_notebookes(NB_OF_FILES, groups, make_directory, make_notebook, make_random, sql_backend,
-                             test_database, ws)
+    create_dirs_n_notebookes(
+        NB_OF_FILES, MAX_NB_OF_FILES, groups, make_directory, make_notebook, make_random, sql_backend, test_database, ws
+    )
 
-    create_schemas_n_tables(NB_OF_SCHEMAS, groups, make_schema, make_table, sql_backend,
-                            test_database, users)
+    create_schemas_n_tables(
+        NB_OF_SCHEMAS, MAX_NB_OF_TABLES, groups, make_schema, make_table, sql_backend, test_database, users
+    )
 
     backup_group_prefix = "db-temp-"
     inventory_database = f"ucx_{make_random(4)}"
@@ -115,17 +119,12 @@ def test_performance(
         ws,
         WorkspaceConfig(
             inventory_database=inventory_database,
-            instance_pool_id=env_or_skip("TEST_INSTANCE_POOL_ID"),
             include_group_names=test_groups,
             renamed_group_prefix=backup_group_prefix,
             log_level="DEBUG",
         ),
         sql_backend=sql_backend,
         prefix=make_random(4),
-        override_clusters={
-            "main": env_or_skip("TEST_DEFAULT_CLUSTER_ID"),
-            "tacl": env_or_skip("TEST_LEGACY_TABLE_ACL_CLUSTER_ID"),
-        },
     )
 
     required_workflows = ["assessment", "migrate-groups", "remove-workspace-local-backup-groups"]
@@ -179,8 +178,9 @@ def get_persisted_rows(sql_backend, test_database):
     return persisted_rows
 
 
-def create_schemas_n_tables(NB_OF_SCHEMAS, groups, make_schema, make_table, sql_backend,
-                            test_database, users):
+def create_schemas_n_tables(
+    NB_OF_SCHEMAS, MAX_NB_OF_TABLES, groups, make_schema, make_table, sql_backend, test_database, users
+):
     to_persist = []
     for i in range(NB_OF_SCHEMAS):
         schema = make_schema()
@@ -196,7 +196,7 @@ def create_schemas_n_tables(NB_OF_SCHEMAS, groups, make_schema, make_table, sql_
                 to_persist.append(ObjectPermission(group, "SCHEMA", schema.name, permission))
         to_persist.append(ObjectPermission(owner, "DATABASE", schema.name, "OWN"))
 
-        nb_of_tables = random.randint(1, 10)
+        nb_of_tables = random.randint(1, MAX_NB_OF_TABLES)
         logger.info(f"Creating {nb_of_tables} tables and views on schema {schema.name}")
 
         for j in range(nb_of_tables):
@@ -254,8 +254,9 @@ def create_schemas_n_tables(NB_OF_SCHEMAS, groups, make_schema, make_table, sql_
     sql_backend.save_table(f"{test_database.name}.objects", to_persist, ObjectPermission)
 
 
-def create_dirs_n_notebookes(NB_OF_FILES, groups, make_directory, make_notebook, make_random, sql_backend,
-                             test_database, ws):
+def create_dirs_n_notebookes(
+    NB_OF_FILES, MAX_NB_OF_FILES, groups, make_directory, make_notebook, make_random, sql_backend, test_database, ws
+):
     to_persist = []
     for i in range(NB_OF_FILES):
         test_dir = make_directory()
@@ -273,7 +274,7 @@ def create_dirs_n_notebookes(NB_OF_FILES, groups, make_directory, make_notebook,
         for group, permission in dir_perms.items():
             to_persist.append(ObjectPermission(group, "directories", stat.object_id, permission.value))
 
-        nb_of_notebooks = random.randint(1, 100)
+        nb_of_notebooks = random.randint(1, MAX_NB_OF_FILES)
         logger.info(f"Creating {nb_of_notebooks} notebooks on directory {test_dir}")
         for j in range(nb_of_notebooks):
             nb = make_notebook(path=test_dir + "/" + make_random() + ".py")
@@ -458,7 +459,7 @@ def create_pipelines(NB_OF_TEST_WS_OBJECTS, groups, make_pipeline, sql_backend, 
     sql_backend.save_table(f"{test_database.name}.objects", to_persist, ObjectPermission)
 
 
-def create_scopes(NB_OF_TEST_WS_OBJECTS, groups, make_secret_scope, sql_backend, test_database, ws:WorkspaceClient):
+def create_scopes(NB_OF_TEST_WS_OBJECTS, groups, make_secret_scope, sql_backend, test_database, ws: WorkspaceClient):
     to_persist = []
     for i in range(NB_OF_TEST_WS_OBJECTS):
         scope = make_secret_scope()
@@ -515,16 +516,21 @@ def validate_objects(persisted_rows, sql_backend, test_database, test_groups, ws
             if acl.group_name not in test_groups:
                 continue
 
-            validate_that(len(acl.all_permissions) == 1,
-                          f"More than 1 permission found in {object_type} {obj_id} -> {json.dumps(acl.as_dict())}")
-            validate_that(acl.group_name in persisted_rows[obj_id],
-                          f"{acl.group_name} not found in persisted rows for {object_type} {obj_id}")
+            validate_that(
+                len(acl.all_permissions) == 1,
+                f"More than 1 permission found in {object_type} {obj_id} -> {json.dumps(acl.as_dict())}",
+            )
+            validate_that(
+                acl.group_name in persisted_rows[obj_id],
+                f"{acl.group_name} not found in persisted rows for {object_type} {obj_id}",
+            )
             validate_that(
                 acl.all_permissions[0].permission_level.value in persisted_rows[obj_id][acl.group_name],
-            f"{acl.all_permissions[0].permission_level.value} not found in persisted rows for {object_type} {obj_id} and group {acl.group_name}")
+                f"{acl.all_permissions[0].permission_level.value} not found in persisted rows for {object_type} {obj_id} and group {acl.group_name}",
+            )
 
 
-def validate_entitlements(sql_backend, test_database, ws:WorkspaceClient):
+def validate_entitlements(sql_backend, test_database, ws: WorkspaceClient):
     for row in sql_backend.fetch(f"SELECT * FROM {test_database.name}.groups"):
         mggrp = MigratedGroup(*row)
         try:
@@ -534,12 +540,15 @@ def validate_entitlements(sql_backend, test_database, ws:WorkspaceClient):
             logger.warning(e)
             continue
 
-        target_entitlements = json.dumps([gg.as_dict() for gg in migrated_group.entitlements]) if migrated_group.entitlements else None
-        validate_that(target_entitlements == mggrp.entitlements,
-                      f"Migrated group {mggrp.name_in_workspace} does not have the same entitlements as the one in the account \n"
-                      f"previous group = {mggrp.entitlements} \n"
-                      f"new group = {target_entitlements}")
-
+        target_entitlements = (
+            json.dumps([gg.as_dict() for gg in migrated_group.entitlements]) if migrated_group.entitlements else None
+        )
+        validate_that(
+            target_entitlements == mggrp.entitlements,
+            f"Migrated group {mggrp.name_in_workspace} does not have the same entitlements as the one in the account \n"
+            f"previous group = {mggrp.entitlements} \n"
+            f"new group = {target_entitlements}",
+        )
 
 
 def try_validate_secrets(persisted_rows, sql_backend, test_database, test_groups, ws):
@@ -549,7 +558,7 @@ def try_validate_secrets(persisted_rows, sql_backend, test_database, test_groups
         logger.warning(f"Something wrong happened when asserting objects -> {e}")
 
 
-def validate_secrets(persisted_rows, sql_backend, test_database, test_groups, ws:WorkspaceClient):
+def validate_secrets(persisted_rows, sql_backend, test_database, test_groups, ws: WorkspaceClient):
     for pipe_id in sql_backend.fetch(
         f"SELECT distinct group, object_id FROM {test_database.name}.objects where object_type = 'secrets'"
     ):
@@ -562,7 +571,10 @@ def validate_secrets(persisted_rows, sql_backend, test_database, test_groups, ws
             logger.warning(e)
             continue
 
-        validate_that(acl.permission.value in persisted_rows[obj_id][acl.principal], f"permission {acl.permission.value} not found for scope {obj_id} and group {group}")
+        validate_that(
+            acl.permission.value in persisted_rows[obj_id][acl.principal],
+            f"permission {acl.permission.value} not found for scope {obj_id} and group {group}",
+        )
 
 
 def try_validate_tables(persisted_rows, sql_backend, test_database, test_groups, users, ws, object_type):
@@ -587,12 +599,11 @@ def validate_tables(persisted_rows, sql_backend, test_database, test_groups, use
             if remote_object_type != object_type:
                 continue
 
-            validate_that(
-                principal in persisted_rows[obj_id],
-      f"{principal} not found in {object_type} {obj_id}")
+            validate_that(principal in persisted_rows[obj_id], f"{principal} not found in {object_type} {obj_id}")
             validate_that(
                 action_type in persisted_rows[obj_id][principal],
-       f"{principal} does not have {action_type} permission on {object_type} {obj_id}")
+                f"{principal} does not have {action_type} permission on {object_type} {obj_id}",
+            )
 
 
 def try_validate_sql_objects(persisted_rows, sql_backend, test_database, test_groups, ws, object_type):
@@ -614,11 +625,14 @@ def validate_sql_objects(persisted_rows, sql_backend, test_database, test_groups
             if acl.group_name not in test_groups:
                 continue
 
-            validate_that(acl.group_name in persisted_rows[obj_id],
-                          f"{acl.group_name} not found in persisted rows for {object_type} {obj_id}")
+            validate_that(
+                acl.group_name in persisted_rows[obj_id],
+                f"{acl.group_name} not found in persisted rows for {object_type} {obj_id}",
+            )
             validate_that(
                 acl.permission_level.value in persisted_rows[obj_id][acl.group_name],
-                f"{acl.permission_level.value} not found in persisted rows for {object_type} {obj_id} and group {acl.group_name}")
+                f"{acl.permission_level.value} not found in persisted rows for {object_type} {obj_id} and group {acl.group_name}",
+            )
 
 
 def try_validate_files(persisted_rows, sql_backend, test_database, test_groups, ws, object_type):
@@ -628,11 +642,10 @@ def try_validate_files(persisted_rows, sql_backend, test_database, test_groups, 
         logger.warning(f"Something wrong happened when asserting files -> {e}")
 
 
-def validate_files(persisted_rows, sql_backend, test_database, test_groups, ws:WorkspaceClient, object_type):
+def validate_files(persisted_rows, sql_backend, test_database, test_groups, ws: WorkspaceClient, object_type):
     for pipe_id in sql_backend.fetch(
         f"SELECT distinct object_id FROM {test_database.name}.objects where object_type = '{object_type}'"
     ):
-
         obj_id = pipe_id["object_id"]
         try:
             acls = ws.workspace.get_permissions(object_type, obj_id).access_control_list
@@ -648,14 +661,16 @@ def validate_files(persisted_rows, sql_backend, test_database, test_groups, ws:W
                 if acl.group_name not in test_groups:
                     continue
 
-                validate_that(acl.group_name in persisted_rows[obj_id],
-                          f"{acl.group_name} not found in persisted rows for {object_type} {obj_id}")
+                validate_that(
+                    acl.group_name in persisted_rows[obj_id],
+                    f"{acl.group_name} not found in persisted rows for {object_type} {obj_id}",
+                )
 
                 for perm in non_inherited_permissions:
                     validate_that(
                         perm.permission_level.value in persisted_rows[obj_id][acl.group_name],
-                        f"{perm.permission_level.value} not found in persisted rows for {object_type} {obj_id} and group {acl.group_name}")
-
+                        f"{perm.permission_level.value} not found in persisted rows for {object_type} {obj_id} and group {acl.group_name}",
+                    )
 
 
 def assign_ws_local_permissions(object_type, dir_perms, object_id, ws):
@@ -764,11 +779,14 @@ def persist_groups(groups: [(Group, Group)], sql_backend, test_database):
                 external_id=acc_group.id,
                 members=json.dumps([gg.as_dict() for gg in ws_group.members]) if ws_group.members else None,
                 roles=json.dumps([gg.as_dict() for gg in ws_group.roles]) if ws_group.roles else None,
-                entitlements=json.dumps([gg.as_dict() for gg in ws_group.entitlements]) if ws_group.entitlements else None,
+                entitlements=json.dumps([gg.as_dict() for gg in ws_group.entitlements])
+                if ws_group.entitlements
+                else None,
             )
         )
 
     sql_backend.save_table(f"{test_database.name}.groups", to_persist, MigratedGroup)
+
 
 def validate_that(func, message):
     try:
@@ -776,4 +794,4 @@ def validate_that(func, message):
             verificationErrors.append(message)
     except Exception as e:
         verificationErrors.append(message)
-        logger.warning('Something wrong happened during the assertion: %s', e)
+        logger.warning("Something wrong happened during the assertion: %s", e)

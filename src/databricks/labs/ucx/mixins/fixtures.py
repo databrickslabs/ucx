@@ -14,6 +14,7 @@ from typing import BinaryIO, Optional
 import pytest
 from databricks.sdk import AccountClient, WorkspaceClient
 from databricks.sdk.core import DatabricksError
+from databricks.sdk.errors import NotFound
 from databricks.sdk.service import compute, iam, jobs, pipelines, workspace
 from databricks.sdk.service.catalog import (
     CatalogInfo,
@@ -23,6 +24,7 @@ from databricks.sdk.service.catalog import (
     TableType,
 )
 from databricks.sdk.service.sql import (
+    AlertOptions,
     CreateWarehouseRequestWarehouseType,
     Query,
     QueryInfo,
@@ -30,7 +32,6 @@ from databricks.sdk.service.sql import (
 from databricks.sdk.service.workspace import ImportFormat
 
 from databricks.labs.ucx.framework.crawlers import StatementExecutionBackend
-from databricks.sdk.errors import NotFound
 
 logger = logging.getLogger(__name__)
 
@@ -669,11 +670,7 @@ def make_warehouse(ws, make_random):
 
 def _is_in_debug() -> bool:
     logger.info(os.path.basename(sys.argv[0]))
-    return os.path.basename(sys.argv[0]) in [
-        "_jb_pytest_runner.py",
-        "testlauncher.py",
-        "-c"
-    ]
+    return os.path.basename(sys.argv[0]) in ["_jb_pytest_runner.py", "testlauncher.py", "-c"]
 
 
 @pytest.fixture
@@ -892,12 +889,13 @@ def make_query(ws, make_table, make_random):
 
     yield from factory("query", create, remove)
 
+
 @pytest.fixture
 def make_alert(ws, sql_backend, make_random):
     def create(query_id, *, name: str | None = None):
         if name is None:
             name = f"ucx_T{make_random(4)}"
-        return ws.alerts.create(options=sql.AlertOptions(column="1", op="==", value="1"), name=name, query_id=query_id)
+        return ws.alerts.create(options=AlertOptions(column="1", op="==", value="1"), name=name, query_id=query_id)
 
     yield from factory(
         "alert",
