@@ -74,7 +74,7 @@ class SecretScopesSupport(AclSupport):
                 return acl.permission
         return None
 
-    def _inflight_check(self, scope_name: str, group_name: str, expected_permission: workspace.AclPermission):
+    def _reapply_on_failure(self, scope_name: str, group_name: str, expected_permission: workspace.AclPermission):
         # in-flight check for the applied permissions
         # the api might be inconsistent, therefore we need to check that the permissions were applied
         applied_permission = self.secret_scope_permission(scope_name, group_name)
@@ -94,5 +94,5 @@ class SecretScopesSupport(AclSupport):
     def _rate_limited_put_acl(self, object_id: str, principal: str, permission: workspace.AclPermission):
         self._ws.secrets.put_acl(object_id, principal, permission)
         retry_on_value_error = retried(on=[ValueError], timeout=self._verify_timeout)
-        retried_check = retry_on_value_error(self._inflight_check)
+        retried_check = retry_on_value_error(self._reapply_on_failure)
         retried_check(object_id, principal, permission)
