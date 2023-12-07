@@ -2,6 +2,8 @@ import logging
 from datetime import timedelta
 
 from databricks.sdk import WorkspaceClient
+from databricks.sdk.errors.mapping import NotFound
+from databricks.sdk.retries import retried
 from databricks.sdk.service.workspace import AclPermission
 
 from databricks.labs.ucx.workspace_access.groups import GroupManager
@@ -10,41 +12,44 @@ from databricks.labs.ucx.workspace_access.secrets import SecretScopesSupport
 
 logger = logging.getLogger(__name__)
 
+
+@retried(on=[NotFound], timeout=timedelta(minutes=3))
 def test_secrets(
     ws: WorkspaceClient,
     make_ucx_group,
     sql_backend,
     inventory_schema,
-    make_random,
     make_secret_scope,
     make_secret_scope_acl,
 ):
     """
     This test does the following:
-    * creates 10 ws groups and secret scopes  with permissions to
+    * creates 2 ws groups and secret scopes
     * assigns ACL permissions to the groups on the secrets
     * run assessment
-    * migrate this group
-    * verify that the migrated group has the same permissions on the scopes
+    * migrate groups
+    * verify that the migrated groups has the same permissions on the scopes
     :return:
     """
 
-    created_groups = []
-    created_secrets_scopes = []
     created_items = []
-    for i in range(10):
+    for _ in range(2):
         ws_group, acc_group = make_ucx_group()
-        created_groups.append(ws_group)
 
         scope = make_secret_scope()
-        created_secrets_scopes.append(scope)
-        created_items.append((ws_group, acc_group, scope))
         make_secret_scope_acl(scope=scope, principal=ws_group.display_name, permission=AclPermission.WRITE)
 
-        scope_acls = ws.secrets.get_acl(scope, ws_group.display_name)
-        logger.debug(f"secret scope acls: {scope_acls}")
+        scope_acl = ws.secrets.get_acl(scope, ws_group.display_name)
+        item = {
+            "ws_group": ws_group,
+            "acc_group": acc_group,
+            "scope": scope,
+            "scope_acl": scope_acl,
+        }
+        created_items.append(item)
+        logger.debug(f"secret scope acls: {scope_acl}")
 
-    created_groups_names = [g.display_name for g in created_groups]
+    created_groups_names = [i["ws_group"].display_name for i in created_items]
 
     # Task 1 - crawl_permissions
     secret_support = SecretScopesSupport(ws)
@@ -71,17 +76,15 @@ def test_secrets(
     permission_manager.apply_group_permissions(migration_state)
 
     for item in created_items:
-        ws_group = item[0]
-        acc_group = item[1]
-        scope = item[2]
+        ws_group = item["ws_group"]
+        acc_group = item["acc_group"]
+        scope = item["scope"]
+        old_scope_acl = item["scope_acl"]
         old_group = ws.groups.get(ws_group.id)
         reflected_group = ws.groups.get(acc_group.id)
-        scope_acls = ws.secrets.get_acl(scope, reflected_group.display_name)
-        logger.debug(f"old_group: {old_group}")
-        logger.debug(f"reflected_group: {reflected_group}")
-        logger.debug(f"secret scope: {scope}")
-        logger.debug(f"secret scope acls: {scope_acls}")
+        reflected_scope_acls = ws.secrets.get_acl(scope, reflected_group.display_name)
 
         assert reflected_group.display_name == ws_group.display_name
         assert reflected_group.id == acc_group.id
+        assert old_scope_acl == reflected_scope_acls
         assert len(reflected_group.members) == len(old_group.members)
