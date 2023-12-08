@@ -25,19 +25,19 @@ class Task:
     job_cluster: str = "main"
     notebook: str = None
     dashboard: str = None
-    # if all are False then task is for all clouds
-    is_aws: bool = False
-    is_azure: bool = False
-    is_gcp: bool = False
+    cloud: str = None
 
     def cloud_compatible(self, config: Config) -> bool:
         """Test compatibility between workspace config and task"""
-        if self.is_aws:
-            return config.is_aws
-        elif self.is_azure:
-            return config.is_azure
-        elif self.is_gcp:
-            return config.is_gcp
+        if self.cloud:
+            if self.cloud.lower() == "aws":
+                return config.is_aws
+            elif self.cloud.lower() == "azure":
+                return config.is_azure
+            elif self.cloud.lower() == "gcp":
+                return config.is_gcp
+            else:
+                return True
         else:
             return True
 
@@ -61,9 +61,7 @@ def task(
     job_cluster="main",
     notebook: str | None = None,
     dashboard: str | None = None,
-    is_azure: bool = False,
-    is_aws: bool = False,
-    is_gcp: bool = False,
+    cloud: str | None = None,
 ):
     def decorator(func):
         @wraps(func)
@@ -106,9 +104,7 @@ def task(
             job_cluster=job_cluster,
             notebook=notebook,
             dashboard=dashboard,
-            is_aws=is_aws,
-            is_azure=is_azure,
-            is_gcp=is_gcp,
+            cloud=cloud,
         )
 
         return wrapper

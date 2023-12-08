@@ -738,7 +738,7 @@ class WorkspaceInstaller:
                 on_success=[self._my_username], on_failure=[self._my_username]
             )
         tasks = sorted(
-            [t for t in _TASKS.values() if t.workflow == step_name and t.cloud_compatible(self._ws.config)],
+            [t for t in _TASKS.values() if t.workflow == step_name],
             key=lambda _: _.name,
         )
         version = self._version if not self._ws.config.is_gcp else self._version.replace("+", "-")

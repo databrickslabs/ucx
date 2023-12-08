@@ -42,14 +42,14 @@ def test_azure_crawler(mocker):
 
 def test_tasks(mocker):
     tasks = [
-        Task(task_id=0, workflow="wl_1", name="n3", doc="d3", fn=lambda: None, is_aws=True),
-        Task(task_id=1, workflow="wl_2", name="n2", doc="d2", fn=lambda: None, is_azure=True),
-        Task(task_id=2, workflow="wl_1", name="n1", doc="d1", fn=lambda: None, is_gcp=True),
+        Task(task_id=0, workflow="wl_1", name="n3", doc="d3", fn=lambda: None, cloud="azure"),
+        Task(task_id=1, workflow="wl_2", name="n2", doc="d2", fn=lambda: None, cloud="aws"),
+        Task(task_id=2, workflow="wl_1", name="n1", doc="d1", fn=lambda: None, cloud="gcp"),
     ]
 
-    assert len([_ for _ in tasks if _.is_azure is True]) == 1
-    assert len([_ for _ in tasks if _.is_aws is True]) == 1
-    assert len([_ for _ in tasks if _.is_gcp is True]) == 1
+    assert len([_ for _ in tasks if _.cloud == "azure"]) == 1
+    assert len([_ for _ in tasks if _.cloud == "aws"]) == 1
+    assert len([_ for _ in tasks if _.cloud == "gcp"]) == 1
 
 
 def test_assessment_tasks(mocker):
@@ -60,5 +60,5 @@ def test_assessment_tasks(mocker):
         t = _TASKS[task]
         assert t is not None
 
-    azure = [_TASKS[_] for _ in _TASKS if _TASKS[_].is_azure]
+    azure = [_TASKS[_] for _ in _TASKS if _TASKS[_].cloud == "azure"]
     assert len(azure) >= 1
