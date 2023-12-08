@@ -4,7 +4,6 @@ import sys
 
 from databricks.sdk import WorkspaceClient
 
-from databricks.labs.ucx.__about__ import __version__
 from databricks.labs.ucx.assessment.crawlers import (
     AzureServicePrincipalCrawler,
     ClustersCrawler,
@@ -215,17 +214,17 @@ def crawl_groups(cfg: WorkspaceConfig):
 @task(
     "assessment",
     depends_on=[
-            crawl_grants,
-            crawl_groups,
-            crawl_permissions,
-            guess_external_locations,
-            assess_jobs,
-            assess_clusters,
-            assess_azure_service_principals,
-            assess_pipelines,
-            assess_global_init_scripts,
-            crawl_tables,
-        ],
+        crawl_grants,
+        crawl_groups,
+        crawl_permissions,
+        guess_external_locations,
+        assess_jobs,
+        assess_clusters,
+        assess_azure_service_principals,
+        assess_pipelines,
+        assess_global_init_scripts,
+        crawl_tables,
+    ],
     dashboard="assessment_main",
 )
 def assessment_report(_: WorkspaceConfig):
