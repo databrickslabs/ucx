@@ -143,8 +143,9 @@ def assess_azure_service_principals(cfg: WorkspaceConfig):
     Subsequently, the list of all the Azure Service Principals referred in those configurations are saved
     in the `$inventory.azure_service_principals` table."""
     ws = WorkspaceClient(config=cfg.to_databricks_config())
-    crawler = AzureServicePrincipalCrawler(ws, RuntimeBackend(), cfg.inventory_database)
-    crawler.snapshot()
+    if ws.config.is_azure:
+        crawler = AzureServicePrincipalCrawler(ws, RuntimeBackend(), cfg.inventory_database)
+        crawler.snapshot()
 
 
 @task("assessment")
@@ -211,12 +212,9 @@ def crawl_groups(cfg: WorkspaceConfig):
     group_manager.snapshot()
 
 
-# This method returns the dependency tasks for assessment report based on the cloud environment
-@staticmethod
-def depends_on_cloud():
-    ws = WorkspaceClient(product="ucx", product_version=__version__)
-    if ws.config.is_azure:
-        return [
+@task(
+    "assessment",
+    depends_on=[
             crawl_grants,
             crawl_groups,
             crawl_permissions,
@@ -227,24 +225,7 @@ def depends_on_cloud():
             assess_pipelines,
             assess_global_init_scripts,
             crawl_tables,
-        ]
-    else:
-        return [
-            crawl_grants,
-            crawl_groups,
-            crawl_permissions,
-            guess_external_locations,
-            assess_jobs,
-            assess_clusters,
-            assess_pipelines,
-            assess_global_init_scripts,
-            crawl_tables,
-        ]
-
-
-@task(
-    "assessment",
-    depends_on=depends_on_cloud(),
+        ],
     dashboard="assessment_main",
 )
 def assessment_report(_: WorkspaceConfig):
