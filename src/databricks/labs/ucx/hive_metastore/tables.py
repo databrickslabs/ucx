@@ -159,7 +159,7 @@ class TablesCrawler(CrawlerBase):
                 catalog=None if describe["Catalog"] is None else describe["Catalog"].lower(),
                 database=None if database is None else database.lower(),
                 name=None if table is None else table.lower(),
-                object_type=None if describe["Type"] is None else describe["Type"].lower(),
+                object_type=None if describe["Type"] is None else describe["Type"].upper(),
                 table_format=describe.get("Provider", "").lower(),
                 location=None if describe.get("Location", None) is None else describe["Location"].lower(),
                 view_text=None if describe.get("View Text", None) is None else describe["View Text"].lower(),
