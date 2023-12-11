@@ -11,6 +11,7 @@ from databricks.labs.ucx.workspace_access.secrets import SecretScopesSupport
 
 logger = logging.getLogger(__name__)
 
+
 @retried(on=[NotFound], timeout=timedelta(minutes=3))
 def test_permissions_for_secrets(ws: WorkspaceClient, make_group, make_secret_scope, make_secret_scope_acl):
     group_a = make_group()
