@@ -162,7 +162,7 @@ class TablesCrawler(CrawlerBase):
                 object_type=None if describe["Type"] is None else describe["Type"].upper(),
                 table_format=describe.get("Provider", "").upper(),
                 location=None if describe.get("Location", None) is None else describe["Location"].lower(),
-                view_text=None if describe.get("View Text", None) is None else describe["View Text"].lower(),
+                view_text=None if describe.get("View Text", None) is None else describe["View Text"],
                 upgraded_to=self._parse_table_props(describe.get("Table Properties", "").lower()).get(
                     "upgraded_to", None
                 ),
