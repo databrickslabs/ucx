@@ -6,8 +6,8 @@ WITH table_stats AS (
     object_type,
     table_format AS `format`,
     `location`,
-    IF(object_type IN ("managed", "external"), 1, 0) AS is_table,
-    IF(object_type = "view", 1, 0) AS is_view,
+    IF(object_type IN ("MANAGED", "EXTERNAL"), 1, 0) AS is_table,
+    IF(object_type = "VIEW", 1, 0) AS is_view,
     CASE
         WHEN STARTSWITH(location, "dbfs:/") AND NOT STARTSWITH(location, "dbfs:/mnt") THEN 1
         WHEN STARTSWITH(location, "/dbfs/") AND NOT STARTSWITH(location, "/dbfs/mnt") THEN 1
@@ -18,7 +18,7 @@ WITH table_stats AS (
         WHEN STARTSWITH(location, "adl") THEN 1
         ELSE 0
     END AS is_unsupported,
-    IF(format = "delta", 1, 0) AS is_delta
+    IF(format = "DELTA", 1, 0) AS is_delta
    FROM $inventory.tables
 ), database_stats AS (
   SELECT `database`,
@@ -41,8 +41,8 @@ WITH table_stats AS (
     `database`,
     COUNT(*) AS total_grants,
     COUNT(DISTINCT principal) AS granted_principals,
-    SUM(IF(object_type == 'database', 1, 0)) AS database_grants,
-    SUM(IF(object_type == 'table', 1, 0)) AS table_grants,
+    SUM(IF(object_type == 'DATABASE', 1, 0)) AS database_grants,
+    SUM(IF(object_type == 'TABLE', 1, 0)) AS table_grants,
     SUM(IF(principal_type == 'service-principal', 1, 0)) AS service_principal_grants,
     SUM(IF(principal_type == 'user', 1, 0)) AS user_grants,
     SUM(IF(principal_type == 'group', 1, 0)) AS group_grants

@@ -5,7 +5,7 @@ import org.yaml.snakeyaml.Yaml
 import org.apache.spark.sql.catalyst.analysis.NoSuchDatabaseException
 import org.apache.spark.sql.catalyst.catalog.{CatalogTable, CatalogTableType}
 import org.apache.spark.sql.DataFrame
-import org.apache.spark.sql.functions.{col,lower}
+import org.apache.spark.sql.functions.{col,lower,upper}
 
 // must follow the same structure as databricks.labs.ucx.hive_metastore.tables.Table
 case class TableDetails(catalog: String, database: String, name: String, object_type: String,
@@ -80,14 +80,18 @@ def getInventoryDatabase(): String={
 
 val inventoryDatabase = getInventoryDatabase()
 var df = metadataForAllTables(spark.sharedState.externalCatalog.listDatabases(), failures)
-var columnsToMap = df.columns
-columnsToMap.map(column => {
+var columnsToMapLower = Array("catalog","database","name","location","upgraded_to","storage_properties")
+columnsToMapLower.map(column => {
   df = df.withColumn(column, lower(col(column)))
+})
+var columnsToMapUpper = Array("object_type","table_format")
+columnsToMapUpper.map(column => {
+  df = df.withColumn(column, upper(col(column)))
 })
 df.write.mode("overwrite").option("overwriteSchema", "true").saveAsTable(s"$inventoryDatabase.tables")
 var dfTableFailures = JavaConverters.asScalaIteratorConverter(failures.iterator).asScala.toList.toDF
-columnsToMap = dfTableFailures.columns
-columnsToMap.map(column => {
+columnsToMapLower = Array("catalog","database","name")
+columnsToMapLower.map(column => {
   dfTableFailures = dfTableFailures.withColumn(column, lower(col(column)))
 })
 
