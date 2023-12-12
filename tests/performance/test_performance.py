@@ -65,21 +65,23 @@ logger = logging.getLogger(__name__)
 logger.addHandler(fh)
 
 
+
 def test_performance(
     ws,
     acc,
     sql_backend
 ):
-    NB_OF_TEST_WS_OBJECTS = 1
-    NB_OF_FILES = 1
-    MAX_NB_OF_FILES = 1
-    NB_OF_TEST_GROUPS = 10
-    NB_OF_SCHEMAS = 1
-    MAX_NB_OF_TABLES = 1
-    MAX_GRP_USERS = 5
+    NB_OF_TEST_WS_OBJECTS = 100
+    NB_OF_FILES = 100
+    MAX_NB_OF_FILES = 100
+    NB_OF_TEST_GROUPS = 1000
+    NB_OF_SCHEMAS = 100
+    MAX_NB_OF_TABLES = 20
+    USER_POOL_LENGTH = 2000
 
-    test_database = create_schema(sql_backend, ws, name="test_results")
-    users = create_users(MAX_GRP_USERS, sql_backend, test_database, ws)
+    fresh_account(acc)
+    test_database = create_schema(sql_backend, ws, name=f"test_results_{datetime.datetime.utcnow().strftime('%Y_%m_%d_%H_%M_%S')}")
+    users = create_users(USER_POOL_LENGTH, sql_backend, test_database, ws)
 
     groups = create_groups(NB_OF_TEST_GROUPS, ws, acc, sql_backend, test_database, users)
 
@@ -154,10 +156,9 @@ def test_performance(
     try_validate_files(persisted_rows, sql_backend, test_database, test_groups, ws, "notebooks")
     try_validate_files(persisted_rows, sql_backend, test_database, test_groups, ws, "directories")
 
-    test_users = [_.display_name for _ in users]
-    try_validate_tables(persisted_rows, sql_backend, test_database, test_groups, test_users, ws, "SCHEMA")
-    try_validate_tables(persisted_rows, sql_backend, test_database, test_groups, test_users, ws, "TABLE")
-    try_validate_tables(persisted_rows, sql_backend, test_database, test_groups, test_users, ws, "VIEW")
+    try_validate_tables(persisted_rows, sql_backend, test_database, test_groups, "SCHEMA")
+    try_validate_tables(persisted_rows, sql_backend, test_database, test_groups, "TABLE")
+    try_validate_tables(persisted_rows, sql_backend, test_database, test_groups, "VIEW")
 
     try_validate_secrets(persisted_rows, sql_backend, test_database, test_groups, ws)
     validate_entitlements(sql_backend, test_database, ws)
@@ -168,20 +169,29 @@ def test_performance(
                 txt_file.write(line + "\n")
     assert [] == verificationErrors
 
+def fresh_account(acc):
+    for user in list(acc.users.list()):
+        if "william" not in user.display_name:
+            logger.info(f"Deleting user {user.display_name}")
+            acc.users.delete(user.id)
+
+    for grp in list(acc.groups.list()):
+        logger.info(f"Deleting group {grp.display_name}")
+        acc.groups.delete(grp.id)
+
+
 def recover(ws, acc, sql_backend):
+    inventory_database = "test_inv_database" #Needs to be modified depending on recover
+    results_database = "test_inv_database"
+
     mggrps = []
-    for row in sql_backend.fetch("SELECT * FROM hive_metastore.test_results.groups"):
+    for row in sql_backend.fetch(f"SELECT * FROM hive_metastore.{results_database}.groups"):
         mggrps.append(MigratedGroup(*row))
 
-    users = []
-    for row in sql_backend.fetch("SELECT * FROM hive_metastore.test_results.users"):
-        users.append(User(*row))
-
     test_groups = [_.name_in_workspace for _ in mggrps]
-    test_users = [_.display_name for _ in users]
 
-    install_and_run(sql_backend, ws, "test_inv_database", test_groups)
-    validate(sql_backend, SchemaInfo(name="test_results"), test_groups, ws, test_users)
+    install_and_run(sql_backend, ws, inventory_database , test_groups)
+    validate(sql_backend, SchemaInfo(name=results_database), test_groups, ws)
 
 def install_and_run(sql_backend, ws:WorkspaceClient, inventory_database:str, test_groups):
     backup_group_prefix = "db-temp-"
@@ -201,7 +211,7 @@ def install_and_run(sql_backend, ws:WorkspaceClient, inventory_database:str, tes
     for step in required_workflows:
         install.run_workflow(step)
 
-def validate(sql_backend, test_database, test_groups, ws, test_users):
+def validate(sql_backend, test_database, test_groups, ws):
     persisted_rows = get_persisted_rows(sql_backend, test_database)
 
     try_validate_object(persisted_rows, sql_backend, test_database, test_groups, ws, "pipelines")
@@ -221,9 +231,9 @@ def validate(sql_backend, test_database, test_groups, ws, test_users):
     try_validate_files(persisted_rows, sql_backend, test_database, test_groups, ws, "notebooks")
     try_validate_files(persisted_rows, sql_backend, test_database, test_groups, ws, "directories")
 
-    try_validate_tables(persisted_rows, sql_backend, test_database, test_groups, test_users, ws, "SCHEMA")
-    try_validate_tables(persisted_rows, sql_backend, test_database, test_groups, test_users, ws, "TABLE")
-    try_validate_tables(persisted_rows, sql_backend, test_database, test_groups, test_users, ws, "VIEW")
+    try_validate_tables(persisted_rows, sql_backend, test_database, test_groups, "SCHEMA")
+    try_validate_tables(persisted_rows, sql_backend, test_database, test_groups, "TABLE")
+    try_validate_tables(persisted_rows, sql_backend, test_database, test_groups, "VIEW")
 
     try_validate_secrets(persisted_rows, sql_backend, test_database, test_groups, ws)
     #validate_entitlements(sql_backend, test_database, ws)
@@ -680,15 +690,15 @@ def validate_secrets(persisted_rows, sql_backend, test_database, test_groups, ws
         )
 
 
-def try_validate_tables(persisted_rows, sql_backend, test_database, test_groups, users, ws, object_type):
+def try_validate_tables(persisted_rows, sql_backend, test_database, test_groups, object_type):
     logger.info(f"Validating {object_type}")
     try:
-        validate_tables(persisted_rows, sql_backend, test_database, test_groups, users, ws, object_type)
+        validate_tables(persisted_rows, sql_backend, test_database, test_groups, object_type)
     except RuntimeError as e:
         logger.warning(f"Something wrong happened when asserting tables -> {e}")
 
 
-def validate_tables(persisted_rows, sql_backend, test_database, test_groups, users, ws, object_type):
+def validate_tables(persisted_rows, sql_backend, test_database, test_groups, object_type):
     for pipe_id in sql_backend.fetch(
         f"SELECT distinct object_id FROM {test_database.name}.objects where object_type = '{object_type}'"
     ):
