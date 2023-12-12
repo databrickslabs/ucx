@@ -80,7 +80,7 @@ def getInventoryDatabase(): String={
 
 val inventoryDatabase = getInventoryDatabase()
 var df = metadataForAllTables(spark.sharedState.externalCatalog.listDatabases(), failures)
-var columnsToMapLower = Array("catalog","database","name","location","upgraded_to","storage_properties")
+var columnsToMapLower = Array("catalog","database","name","upgraded_to","storage_properties")
 columnsToMapLower.map(column => {
   df = df.withColumn(column, lower(col(column)))
 })
