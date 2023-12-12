@@ -26,7 +26,7 @@ classifiers = [
     "Programming Language :: Python :: 3.11",
     "Programming Language :: Python :: Implementation :: CPython",
 ]
-dependencies = ["databricks-sdk~=0.14.0",
+dependencies = ["databricks-sdk~=0.15.0",
                 "PyYAML>=6.0.0,<7.0.0"]
 
 [project.entry-points.databricks]

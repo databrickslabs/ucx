@@ -104,3 +104,62 @@ def test_secret_scopes_apply_incorrect():
     expected_permission = workspace.AclPermission.MANAGE
     with pytest.raises(TimeoutError):
         sup._rate_limited_put_acl("test", "db-temp-test", expected_permission)
+
+
+def test_secret_scopes_reapply():
+    ws = MagicMock()
+    ws.secrets.list_acls.side_effect = [
+        [
+            workspace.AclItem(
+                principal="db-temp-test",
+                permission=workspace.AclPermission.READ,
+            )
+        ],
+        [
+            workspace.AclItem(
+                principal="db-temp-test",
+                permission=workspace.AclPermission.MANAGE,
+            )
+        ],
+    ]
+
+    sup = SecretScopesSupport(ws, timedelta(seconds=10))
+    expected_permission = workspace.AclPermission.MANAGE
+
+    sup._rate_limited_put_acl("test", "db-temp-test", expected_permission)
+    assert ws.secrets.put_acl.call_count == 2
+
+
+def test_secret_scopes_reapply_check_valueerror():
+    ws = MagicMock()
+    ws.secrets.list_acls.side_effect = [
+        [
+            workspace.AclItem(
+                principal="db-temp-test",
+                permission=workspace.AclPermission.READ,
+            )
+        ]
+    ]
+
+    sup = SecretScopesSupport(ws, timedelta(seconds=10))
+    expected_permission = workspace.AclPermission.MANAGE
+
+    with pytest.raises(ValueError):
+        sup._reapply_on_failure("test", "db-temp-test", expected_permission)
+
+
+def test_secret_scopes_reapply_check_exception_type():
+    ws = MagicMock()
+    ws.secrets.list_acls.return_value = [
+        workspace.AclItem(
+            principal="db-temp-test",
+            permission=workspace.AclPermission.READ,
+        )
+    ]
+
+    sup = SecretScopesSupport(ws, timedelta(seconds=1))
+    expected_permission = workspace.AclPermission.MANAGE
+    try:
+        sup._rate_limited_put_acl("test", "db-temp-test", expected_permission)
+    except Exception as e:
+        assert isinstance(e, TimeoutError)
