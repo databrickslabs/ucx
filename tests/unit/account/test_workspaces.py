@@ -35,7 +35,7 @@ def arm_requests(mocker):
 
 
 @pytest.fixture()
-def workspace_mock(mocker):
+def workspace_mock(mocker, arm_requests):
     acc_cfg = AccountConfig()
     acc_client = mocker.patch("databricks.sdk.AccountClient.__init__")
     acc_cfg.to_databricks_config = lambda: acc_client
