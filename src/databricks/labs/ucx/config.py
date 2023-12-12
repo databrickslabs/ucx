@@ -190,7 +190,10 @@ class WorkspaceConfig(_Config["WorkspaceConfig"]):
     workspace_start_path: str = "/"
     instance_profile: str = None
     spark_conf: dict[str, str] = None
+
     override_clusters: dict[str, str] = None
+    custom_cluster_policy_id: str = None
+
 
     @classmethod
     def from_dict(cls, raw: dict):

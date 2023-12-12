@@ -62,6 +62,34 @@ export DATABRICKS_HOST=https://adb-123....azuredatabricks.net/
 ```
 
 Please follow the instructions in `./install.sh`, which will deploy UCX to your workspace and open a notebook with the description of all jobs to trigger. The journey starts with assessment.
+
+### UCX on macOS
+#### Install Databricks via brew
+![macos_install_databricks](docs/macos_1_databrickslabsmac_installdatabricks.gif)
+
+#### Install UCX
+![macos_install_ucx](docs/macos_2_databrickslabsmac_installucx.gif)
+
+#### Upgrade UCX
+![macos_upgrade_ucx](docs/macos_3_databrickslabsmac_upgradeucx.gif)
+
+#### Uninstall UCX
+![macos_uninstall_ucx](docs/macos_4_databrickslabsmac_uninstallucx.gif)
+
+### UCX on Windows OS
+#### Install Databricks via curl
+![winos_install_databricks](docs/winos_1_databrickslabsmac_installdatabricks.gif)
+
+#### Install UCX
+![winos_install_ucx](docs/winos_2_databrickslabsmac_installucx.gif)
+
+#### Upgrade UCX
+![winos_upgrade_ucx](docs/winos_3_databrickslabsmac_upgradeucx.gif)
+
+#### Uninstall UCX
+![winos_uninstall_ucx](docs/winos_4_databrickslabsmac_uninstallucx.gif)
+
+
 ### Special Consideration - External Metastores
 If your Databricks Workspace relies on an external Hive Metastore (such as glue), make sure to read the [External HMS Document](docs/external_hms_glue.md).
 

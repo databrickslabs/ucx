@@ -492,6 +492,69 @@ workspace_start_path: /
     )
 
 
+def test_save_config_with_custom_policy(ws, mocker):
+    policy_def = b"""
+{
+  "aws_attributes.instance_profile_arn": {
+    "type": "fixed",
+    "value": "arn:aws:iam::111222333:instance-profile/foo-instance-profile",
+    "hidden": false
+  },
+  "spark_conf.spark.databricks.hive.metastore.glueCatalog.enabled": {
+    "type": "fixed",
+    "value": "true",
+    "hidden": true
+  }
+}
+            """
+
+    def not_found(_):
+        raise NotFound(...)
+
+    def mock_question(text: str, *, default: str | None = None) -> str:
+        if "follow a policy" in text:
+            return "yes"
+        else:
+            return "42"
+
+    def mock_choice_from_dict(text: str, choices: dict[str, Any]) -> Any:
+        if "Choose a cluster policy" in text:
+            return "0123456789ABCDEF"
+        if "warehouse" in text:
+            return "abc"
+
+    mocker.patch("builtins.input", return_value="42")
+
+    ws.workspace.get_status = not_found
+    ws.warehouses.list = lambda **_: [
+        EndpointInfo(id="abc", warehouse_type=EndpointInfoWarehouseType.PRO, state=State.RUNNING)
+    ]
+    ws.cluster_policies.list = lambda: [Policy(definition=policy_def.decode("utf-8"))]
+
+    install = WorkspaceInstaller(ws)
+    install._question = mock_question
+    install._choice_from_dict = mock_choice_from_dict
+    install._configure()
+
+    ws.workspace.upload.assert_called_with(
+        "/Users/me@example.com/.ucx/config.yml",
+        b"""custom_cluster_policy_id: 0123456789ABCDEF
+default_catalog: ucx_default
+include_group_names:
+- '42'
+inventory_database: '42'
+log_level: '42'
+num_threads: 42
+renamed_group_prefix: '42'
+version: 2
+warehouse_id: abc
+workspace_start_path: /
+""",
+        format=ImportFormat.AUTO,
+        overwrite=False,
+    )
+
+
 def test_save_config_with_glue(ws, mocker):
     policy_def = b"""
 {

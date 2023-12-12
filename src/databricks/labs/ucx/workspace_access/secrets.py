@@ -18,7 +18,7 @@ class SecretScopesSupport(AclSupport):
     def __init__(self, ws: WorkspaceClient, verify_timeout: timedelta | None = None):
         self._ws = ws
         if verify_timeout is None:
-            verify_timeout = timedelta(minutes=1)
+            verify_timeout = timedelta(minutes=2)
         self._verify_timeout = verify_timeout
 
     def get_crawler_tasks(self):
@@ -74,18 +74,25 @@ class SecretScopesSupport(AclSupport):
                 return acl.permission
         return None
 
-    def _inflight_check(self, scope_name: str, group_name: str, expected_permission: workspace.AclPermission):
+    def _reapply_on_failure(self, scope_name: str, group_name: str, expected_permission: workspace.AclPermission):
         # in-flight check for the applied permissions
         # the api might be inconsistent, therefore we need to check that the permissions were applied
         applied_permission = self.secret_scope_permission(scope_name, group_name)
         if applied_permission != expected_permission:
-            msg = f"Applied permission {applied_permission} is not equal to expected permission {expected_permission}"
+            # try to apply again if the permissions are not equal: sometimes the list_acls api is inconsistent
+            logger.info(f"Applying permissions again {expected_permission} to {group_name} for {scope_name}")
+            self._ws.secrets.put_acl(scope_name, group_name, expected_permission)
+            msg = (
+                f"Applied permission {applied_permission} is not equal to expected "
+                f"permission {expected_permission} for {scope_name} and {group_name}!"
+            )
             raise ValueError(msg)
+        logger.info(f"Permissions matched for {scope_name}, {group_name} and {expected_permission}!")
         return True
 
     @rate_limited(max_requests=1100, burst_period_seconds=60)
     def _rate_limited_put_acl(self, object_id: str, principal: str, permission: workspace.AclPermission):
         self._ws.secrets.put_acl(object_id, principal, permission)
         retry_on_value_error = retried(on=[ValueError], timeout=self._verify_timeout)
-        retried_check = retry_on_value_error(self._inflight_check)
+        retried_check = retry_on_value_error(self._reapply_on_failure)
         retried_check(object_id, principal, permission)

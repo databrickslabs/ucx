@@ -4,7 +4,7 @@ WITH table_stats AS (
   SELECT
     `database`,
     object_type,
-    UPPER(table_format) AS `format`,
+    table_format AS `format`,
     `location`,
     IF(object_type IN ("MANAGED", "EXTERNAL"), 1, 0) AS is_table,
     IF(object_type = "VIEW", 1, 0) AS is_view,
