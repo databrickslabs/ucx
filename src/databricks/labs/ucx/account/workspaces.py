@@ -154,8 +154,8 @@ class Workspaces:
                 try:
                     potential_install = f"/Users/{user.user_name}/.ucx"
                     ws.workspace.upload(
-                        path=f"{potential_install}/workspaces.json",
-                        content=workspaces_json,
+                        f"{potential_install}/workspaces.json",
+                        workspaces_json,
                         overwrite=True,
                         format=ImportFormat.AUTO,
                     )
