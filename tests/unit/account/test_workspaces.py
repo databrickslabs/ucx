@@ -35,7 +35,7 @@ def arm_requests(mocker):
 
 
 @pytest.fixture()
-def workspace_mock(mocker, arm_requests):
+def account_workspaces_mock(mocker, arm_requests):
     acc_cfg = AccountConfig()
     acc_client = mocker.patch("databricks.sdk.AccountClient.__init__")
     acc_cfg.to_databricks_config = lambda: acc_client
@@ -73,17 +73,17 @@ def test_client_for_workspace():
     assert "https://adb-123.10.azuredatabricks.net" == specified_workspace_client.config.host
 
 
-def test_workspace_clients(workspace_mock):
-    ws_clients = workspace_mock.workspace_clients()
+def test_workspace_clients(account_workspaces_mock):
+    ws_clients = account_workspaces_mock.workspace_clients()
     assert len(ws_clients) == 2
     assert ws_clients[0].config.auth_type == "azure-cli"
     assert ws_clients[0].config.host == "https://abc.azuredatabricks.net"
 
 
-def test_configured_workspaces(workspace_mock):
+def test_configured_workspaces(account_workspaces_mock):
     ws_clients = []
-    for ws in workspace_mock.configured_workspaces():
-        ws_clients.append(workspace_mock.client_for(ws))
+    for ws in account_workspaces_mock.configured_workspaces():
+        ws_clients.append(account_workspaces_mock.client_for(ws))
 
     # test for number of workspaces returned
     assert len(ws_clients) == 2
