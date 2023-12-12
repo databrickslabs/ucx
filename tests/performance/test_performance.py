@@ -73,15 +73,15 @@ def test_performance(
     NB_OF_TEST_WS_OBJECTS = 1
     NB_OF_FILES = 1
     MAX_NB_OF_FILES = 1
-    NB_OF_TEST_GROUPS = 1
+    NB_OF_TEST_GROUPS = 10
     NB_OF_SCHEMAS = 1
     MAX_NB_OF_TABLES = 1
-    MAX_GRP_USERS = 1
+    MAX_GRP_USERS = 5
 
     test_database = create_schema(sql_backend, ws, name="test_results")
-    groups = create_groups(NB_OF_TEST_GROUPS, MAX_GRP_USERS, ws, acc, sql_backend, test_database)
+    users = create_users(MAX_GRP_USERS, sql_backend, test_database, ws)
 
-    users = create_users(sql_backend, test_database, ws)
+    groups = create_groups(NB_OF_TEST_GROUPS, ws, acc, sql_backend, test_database, users)
 
     create_scopes(NB_OF_TEST_WS_OBJECTS, groups, sql_backend, test_database, ws)
 
@@ -168,7 +168,7 @@ def test_performance(
                 txt_file.write(line + "\n")
     assert [] == verificationErrors
 
-def test_recover(ws, acc, sql_backend):
+def recover(ws, acc, sql_backend):
     mggrps = []
     for row in sql_backend.fetch("SELECT * FROM hive_metastore.test_results.groups"):
         mggrps.append(MigratedGroup(*row))
@@ -562,7 +562,7 @@ def create_scopes(NB_OF_TEST_WS_OBJECTS, groups, sql_backend, test_database, ws:
     sql_backend.save_table(f"{test_database.name}.objects", to_persist, ObjectPermission)
 
 
-def create_groups(NB_OF_TEST_GROUPS, MAX_GRP_USERS, ws, acc, sql_backend, test_database):
+def create_groups(NB_OF_TEST_GROUPS, ws, acc, sql_backend, test_database, user_pool):
     groups = []
     for i in range(NB_OF_TEST_GROUPS):
         entitlements_list = [
@@ -572,21 +572,28 @@ def create_groups(NB_OF_TEST_GROUPS, MAX_GRP_USERS, ws, acc, sql_backend, test_d
             "allow-instance-pool-create",
         ]
         entitlements = [_ for _ in random.choices(entitlements_list, k=random.randint(1, 3))]
-        nb_of_users = random.randint(1, MAX_GRP_USERS)
-        ws_group, acc_group = create_group(ws, acc, nb_of_users, entitlements)
+
+        nb_of_members = random.randint(1, len(user_pool) - 1)
+        members = []
+        for j in range(nb_of_members):
+            user_index_in_list = random.randint(0, len(user_pool) - 1)
+            members.append(user_pool[user_index_in_list].id)
+
+        ws_group, acc_group = create_group(ws, acc, members, entitlements)
         groups.append((ws_group, acc_group))
         logger.info(f"Created group {ws_group.display_name} {i + 1} with {len(ws_group.members)} members")
     persist_groups(groups, sql_backend, test_database)
     return groups
 
 
-def create_users(sql_backend, test_database, ws:WorkspaceClient):
+def create_users(MAX_GRP_USERS, sql_backend, test_database, ws:WorkspaceClient):
     users = []
     to_persist = []
-    for i in range(1):
+    for i in range(MAX_GRP_USERS):
         user = create_user(ws)
         users.append(user)
         to_persist.append(User(user.display_name))
+        logger.info(f"Created user {user.display_name}")
     sql_backend.save_table(f"{test_database.name}.users", users, User)
     return users
 
@@ -901,13 +908,9 @@ def _scim_values(ids: list[str]) -> list[iam.ComplexValue]:
     return [iam.ComplexValue(value=x) for x in ids]
 
 
-def create_group(ws:WorkspaceClient, acc:AccountClient, nb_of_users, entitlements):
+def create_group(ws:WorkspaceClient, acc:AccountClient, members, entitlements):
     workspace_group_name = f"ucx_{make_random(4)}"
     account_group_name = workspace_group_name
-    members = []
-    for i in range(nb_of_users):
-        user = create_user(ws)
-        members.append(user.id)
 
     ws_group = create_ws_group(ws, display_name=workspace_group_name, members=members, entitlements=entitlements)
     acc_group = create_acc_group(acc, display_name=account_group_name, members=members)
