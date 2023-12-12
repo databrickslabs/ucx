@@ -8,7 +8,7 @@ from datetime import timedelta
 from databricks.sdk import WorkspaceClient
 from databricks.sdk.errors import DatabricksError
 from databricks.sdk.retries import retried
-from databricks.sdk.service import iam, sql
+from databricks.sdk.service import iam, sql, pipelines
 from databricks.sdk.service.iam import Group, PermissionLevel
 from databricks.sdk.service.workspace import (
     AclPermission,
@@ -21,7 +21,7 @@ from databricks.labs.ucx.install import WorkspaceInstaller
 from databricks.labs.ucx.mixins.hardening import rate_limited
 from databricks.labs.ucx.workspace_access.groups import MigratedGroup
 
-logger = logging.getLogger(__name__)
+from performance.creates import *
 
 
 @dataclass
@@ -31,6 +31,9 @@ class ObjectPermission:
     object_id: str
     permission: str
 
+@dataclass
+class User:
+    display_name:str
 
 @dataclass
 class PersistedGroup:
@@ -42,74 +45,70 @@ class PersistedGroup:
 
 verificationErrors = []
 
+logging.getLogger("tests").setLevel("DEBUG")
+
+logging.getLogger("databricks.labs.ucx").setLevel("DEBUG")
+
+formatter = logging.Formatter(
+    '%(asctime)s - %(name)s - %(levelname)s - %(message)s')
+fh = logging.FileHandler('spam.log')
+fh.setLevel(logging.DEBUG)
+fh.setFormatter(formatter)
+
+logger.addHandler(fh)
+logging.getLogger("tests").addHandler(fh)
+logging.getLogger("databricks.labs.ucx").addHandler(fh)
+logger = logging.getLogger(__name__)
+
 
 def test_performance(
     ws,
-    make_cluster_policy,
-    make_ucx_group,
-    make_warehouse,
-    make_cluster,
-    make_instance_pool,
-    make_secret_scope,
-    make_model,
-    make_experiment,
-    make_job,
-    make_pipeline,
-    make_schema,
-    sql_backend,
-    make_table,
-    make_user,
-    make_query,
-    make_alert,
-    make_dashboard,
-    make_directory,
-    make_repo,
-    make_notebook,
-    make_random,
-    env_or_skip,
+    acc,
+    sql_backend
 ):
-    NB_OF_TEST_WS_OBJECTS = 2
-    NB_OF_FILES = 1
-    MAX_NB_OF_FILES = 3
-    NB_OF_TEST_GROUPS = 3
-    NB_OF_SCHEMAS = 3
-    MAX_NB_OF_TABLES = 10
+    NB_OF_TEST_WS_OBJECTS = 100
+    NB_OF_FILES = 100
+    MAX_NB_OF_FILES = 100
+    NB_OF_TEST_GROUPS = 1000
+    NB_OF_SCHEMAS = 100
+    MAX_NB_OF_TABLES = 25
+    MAX_GRP_USERS = 1000
 
-    test_database = make_schema()
-    groups = create_groups(NB_OF_TEST_GROUPS, make_ucx_group, sql_backend, test_database)
+    test_database = create_schema(sql_backend, ws, name="test_results")
+    groups = create_groups(NB_OF_TEST_GROUPS, MAX_GRP_USERS, ws, acc, sql_backend, test_database)
 
-    users = create_users(make_user)
+    users = create_users(sql_backend, test_database, ws)
 
-    create_scopes(NB_OF_TEST_WS_OBJECTS, groups, make_secret_scope, sql_backend, test_database, ws)
+    create_scopes(NB_OF_TEST_WS_OBJECTS, groups, sql_backend, test_database, ws)
 
-    create_pipelines(NB_OF_TEST_WS_OBJECTS, groups, make_pipeline, sql_backend, test_database, ws)
+    create_pipelines(NB_OF_TEST_WS_OBJECTS, groups, sql_backend, test_database, ws)
 
-    create_jobs(NB_OF_TEST_WS_OBJECTS, groups, make_job, sql_backend, test_database, ws)
+    create_jobs(NB_OF_TEST_WS_OBJECTS, groups, sql_backend, test_database, ws)
 
-    create_experiments(NB_OF_TEST_WS_OBJECTS, groups, make_experiment, sql_backend, test_database, ws)
+    create_experiments(NB_OF_TEST_WS_OBJECTS, groups, sql_backend, test_database, ws)
 
-    create_models(NB_OF_TEST_WS_OBJECTS, groups, make_model, sql_backend, test_database, ws)
+    create_models(NB_OF_TEST_WS_OBJECTS, groups, sql_backend, test_database, ws)
 
-    create_pools(NB_OF_TEST_WS_OBJECTS, groups, make_instance_pool, sql_backend, test_database, ws)
+    create_pools(NB_OF_TEST_WS_OBJECTS, groups, sql_backend, test_database, ws)
 
-    create_warehouses(NB_OF_TEST_WS_OBJECTS, groups, make_warehouse, sql_backend, test_database, ws)
+    create_warehouses(NB_OF_TEST_WS_OBJECTS, groups, sql_backend, test_database, ws)
 
-    create_clusters(NB_OF_TEST_WS_OBJECTS, groups, make_cluster, sql_backend, test_database, ws)
+    create_clusters(NB_OF_TEST_WS_OBJECTS, groups, sql_backend, test_database, ws)
 
-    create_policies(NB_OF_TEST_WS_OBJECTS, groups, make_cluster_policy, sql_backend, test_database, ws)
+    create_policies(NB_OF_TEST_WS_OBJECTS, groups, sql_backend, test_database, ws)
 
-    create_queries_and_alerts(NB_OF_TEST_WS_OBJECTS, groups, make_alert, make_query, sql_backend, test_database, ws)
+    create_queries_and_alerts(NB_OF_TEST_WS_OBJECTS, groups, sql_backend, test_database, ws)
 
-    create_dashboards(NB_OF_TEST_WS_OBJECTS, groups, make_dashboard, sql_backend, test_database, ws)
+    create_dashboards(NB_OF_TEST_WS_OBJECTS, groups, sql_backend, test_database, ws)
 
-    create_repos(NB_OF_TEST_WS_OBJECTS, groups, make_repo, sql_backend, test_database, ws)
+    create_repos(NB_OF_TEST_WS_OBJECTS, groups, sql_backend, test_database, ws)
 
     create_dirs_n_notebookes(
-        NB_OF_FILES, MAX_NB_OF_FILES, groups, make_directory, make_notebook, make_random, sql_backend, test_database, ws
+        NB_OF_FILES, MAX_NB_OF_FILES, groups, sql_backend, test_database, ws
     )
 
     create_schemas_n_tables(
-        NB_OF_SCHEMAS, MAX_NB_OF_TABLES, groups, make_schema, make_table, sql_backend, test_database, users
+        NB_OF_SCHEMAS, MAX_NB_OF_TABLES, groups, sql_backend, test_database, users, ws
     )
 
     backup_group_prefix = "db-temp-"
@@ -165,6 +164,71 @@ def test_performance(
                 txt_file.write(line + "\n")
     assert [] == verificationErrors
 
+def test_recover(ws, acc, sql_backend):
+    mggrps = []
+    for row in sql_backend.fetch("SELECT * FROM hive_metastore.test_results.groups"):
+        mggrps.append(MigratedGroup(*row))
+
+    users = []
+    for row in sql_backend.fetch("SELECT * FROM hive_metastore.test_results.users"):
+        users.append(User(*row))
+
+    test_groups = [_.name_in_workspace for _ in mggrps]
+    test_users = [_.display_name for _ in users]
+
+    install_and_run(sql_backend, ws, "test_inv_database", test_groups)
+    validate(sql_backend, SchemaInfo(name="test_results"), test_groups, ws, test_users)
+
+def install_and_run(sql_backend, ws:WorkspaceClient, inventory_database:str, test_groups):
+    backup_group_prefix = "db-temp-"
+
+    install = WorkspaceInstaller.run_for_config(
+        ws,
+        WorkspaceConfig(
+            inventory_database=inventory_database,
+            include_group_names=test_groups,
+            renamed_group_prefix=backup_group_prefix,
+            log_level="DEBUG",
+        ),
+        sql_backend=sql_backend,
+        prefix=make_random(4),
+    )
+    required_workflows = ["assessment", "migrate-groups", "remove-workspace-local-backup-groups"]
+    for step in required_workflows:
+        install.run_workflow(step)
+
+def validate(sql_backend, test_database, test_groups, ws, test_users):
+    persisted_rows = get_persisted_rows(sql_backend, test_database)
+
+    try_validate_object(persisted_rows, sql_backend, test_database, test_groups, ws, "pipelines")
+    try_validate_object(persisted_rows, sql_backend, test_database, test_groups, ws, "jobs")
+    try_validate_object(persisted_rows, sql_backend, test_database, test_groups, ws, "experiments")
+    try_validate_object(persisted_rows, sql_backend, test_database, test_groups, ws, "registered-models")
+    try_validate_object(persisted_rows, sql_backend, test_database, test_groups, ws, "instance-pools")
+    try_validate_object(persisted_rows, sql_backend, test_database, test_groups, ws, "warehouses")
+    try_validate_object(persisted_rows, sql_backend, test_database, test_groups, ws, "clusters")
+    try_validate_object(persisted_rows, sql_backend, test_database, test_groups, ws, "cluster-policies")
+    try_validate_sql_objects(persisted_rows, sql_backend, test_database, test_groups, ws, sql.ObjectTypePlural.ALERTS)
+    try_validate_sql_objects(
+        persisted_rows, sql_backend, test_database, test_groups, ws, sql.ObjectTypePlural.DASHBOARDS
+    )
+    try_validate_sql_objects(persisted_rows, sql_backend, test_database, test_groups, ws, sql.ObjectTypePlural.QUERIES)
+
+    try_validate_files(persisted_rows, sql_backend, test_database, test_groups, ws, "notebooks")
+    try_validate_files(persisted_rows, sql_backend, test_database, test_groups, ws, "directories")
+
+    try_validate_tables(persisted_rows, sql_backend, test_database, test_groups, test_users, ws, "SCHEMA")
+    try_validate_tables(persisted_rows, sql_backend, test_database, test_groups, test_users, ws, "TABLE")
+    try_validate_tables(persisted_rows, sql_backend, test_database, test_groups, test_users, ws, "VIEW")
+
+    try_validate_secrets(persisted_rows, sql_backend, test_database, test_groups, ws)
+    #validate_entitlements(sql_backend, test_database, ws)
+
+    if len(verificationErrors) > 0:
+        with open(f"perf-test-{datetime.datetime.now()}.txt", "w") as txt_file:
+            for line in verificationErrors:
+                txt_file.write(line + "\n")
+    assert [] == verificationErrors
 
 def get_persisted_rows(sql_backend, test_database):
     persisted_rows = {}
@@ -184,16 +248,16 @@ def get_persisted_rows(sql_backend, test_database):
 
 
 def create_schemas_n_tables(
-    NB_OF_SCHEMAS, MAX_NB_OF_TABLES, groups, make_schema, make_table, sql_backend, test_database, users
+    NB_OF_SCHEMAS, MAX_NB_OF_TABLES, groups, sql_backend, test_database, users, ws
 ):
     to_persist = []
     for i in range(NB_OF_SCHEMAS):
-        schema = make_schema()
+        schema = create_schema(sql_backend, ws)
         schema_permissions = create_hive_metastore_permissions(
             groups, ["SELECT", "MODIFY", "READ_METADATA", "CREATE", "USAGE"]
         )
         grant_permissions(sql_backend, "SCHEMA", schema.name, schema_permissions)
-        owner = groups[random.randint(1, len(groups) - 1)][0].display_name
+        owner = groups[random.randint(0, len(groups) - 1)][0].display_name
         transfer_ownership(sql_backend, "SCHEMA", schema.name, owner)
 
         for group, permissions in schema_permissions.items():
@@ -202,69 +266,74 @@ def create_schemas_n_tables(
         to_persist.append(ObjectPermission(owner, "DATABASE", schema.name, "OWN"))
 
         nb_of_tables = random.randint(1, MAX_NB_OF_TABLES)
+        logger.info(f"Created schema {schema.name}")
         logger.info(f"Creating {nb_of_tables} tables and views on schema {schema.name}")
 
         for j in range(nb_of_tables):
-            table = make_table(schema_name=schema.name)
+            table = create_table(sql_backend, ws, schema_name=schema.name)
             full_name = schema.name + "." + table.name
             table_permission = create_hive_metastore_permissions(groups, ["SELECT", "MODIFY", "READ_METADATA"])
             grant_permissions(sql_backend, "TABLE", full_name, table_permission)
 
-            owner = groups[random.randint(1, len(groups) - 1)][0].display_name
+            owner = groups[random.randint(0, len(groups) - 1)][0].display_name
             transfer_ownership(sql_backend, "TABLE", full_name, owner)
             for group, permissions in table_permission.items():
                 for permission in permissions:
                     to_persist.append(ObjectPermission(group, "TABLE", full_name, permission))
             to_persist.append(ObjectPermission(owner, "TABLE", full_name, "OWN"))
+            logger.info(f"Created table {full_name}")
 
         for j in range(nb_of_tables):
-            view = make_table(schema_name=schema.name, view=True, ctas="SELECT 2+2 AS four")
+            view = create_table(sql_backend, ws, schema_name=schema.name, view=True, ctas="SELECT 2+2 AS four")
             full_name = schema.name + "." + view.name
             view_permission = create_hive_metastore_permissions(groups, ["SELECT"])
             grant_permissions(sql_backend, "VIEW", full_name, view_permission)
 
-            owner = groups[random.randint(1, len(groups) - 1)][0].display_name
+            owner = groups[random.randint(0, len(groups) - 1)][0].display_name
             transfer_ownership(sql_backend, "VIEW", full_name, owner)
             for group, permissions in view_permission.items():
                 for permission in permissions:
                     to_persist.append(ObjectPermission(group, "VIEW", full_name, permission))
             to_persist.append(ObjectPermission(owner, "VIEW", full_name, "OWN"))
+            logger.info(f"Created view {full_name}")
         for j in range(nb_of_tables):
-            table = make_table(schema_name=schema.name)
+            table = create_table(sql_backend, ws, schema_name=schema.name)
             full_name = schema.name + "." + table.name
             table_permission = create_hive_metastore_permissions(groups, ["SELECT", "MODIFY", "READ_METADATA"])
 
             grant_permissions(sql_backend, "TABLE", full_name, table_permission)
 
-            owner = users[random.randint(1, len(users) - 1)].display_name
+            owner = users[random.randint(0, len(users) - 1)].display_name
             transfer_ownership(sql_backend, "TABLE", full_name, owner)
             for group, permissions in table_permission.items():
                 for permission in permissions:
                     to_persist.append(ObjectPermission(group, "TABLE", full_name, permission))
 
             to_persist.append(ObjectPermission(owner, "TABLE", full_name, "OWN"))
+            logger.info(f"Created table {full_name}")
         for j in range(nb_of_tables):
-            view = make_table(schema_name=schema.name, view=True, ctas="SELECT 2+2 AS four")
+            view = create_table(sql_backend, ws, schema_name=schema.name, view=True, ctas="SELECT 2+2 AS four")
             full_name = schema.name + "." + view.name
             view_permission = create_hive_metastore_permissions(groups, ["SELECT"])
 
             grant_permissions(sql_backend, "VIEW", full_name, view_permission)
 
-            owner = users[random.randint(1, len(users) - 1)].display_name
+            owner = users[random.randint(0, len(users) - 1)].display_name
             transfer_ownership(sql_backend, "VIEW", full_name, owner)
             for group, permissions in view_permission.items():
                 for permission in permissions:
                     to_persist.append(ObjectPermission(group, "VIEW", full_name, permission))
             to_persist.append(ObjectPermission(owner, "VIEW", full_name, "OWN"))
+            logger.info(f"Created view {full_name}")
     sql_backend.save_table(f"{test_database.name}.objects", to_persist, ObjectPermission)
 
 
 def create_dirs_n_notebookes(
-    NB_OF_FILES, MAX_NB_OF_FILES, groups, make_directory, make_notebook, make_random, sql_backend, test_database, ws
+    NB_OF_FILES, MAX_NB_OF_FILES, groups, sql_backend, test_database, ws
 ):
     to_persist = []
     for i in range(NB_OF_FILES):
-        test_dir = make_directory()
+        test_dir = create_dir(ws)
         stat = ws.workspace.get_status(test_dir)
         dir_perms = create_permissions(
             groups,
@@ -278,11 +347,11 @@ def create_dirs_n_notebookes(
         assign_ws_local_permissions("directories", dir_perms, stat.object_id, ws)
         for group, permission in dir_perms.items():
             to_persist.append(ObjectPermission(group, "directories", stat.object_id, permission.value))
-
+        logger.info(f"Created directory {test_dir}")
         nb_of_notebooks = random.randint(1, MAX_NB_OF_FILES)
         logger.info(f"Creating {nb_of_notebooks} notebooks on directory {test_dir}")
         for j in range(nb_of_notebooks):
-            nb = make_notebook(path=test_dir + "/" + make_random() + ".py")
+            nb = create_notebook(ws, path=test_dir + "/" + make_random() + ".py")
             nb_stat = ws.workspace.get_status(nb)
             nb_perms = create_permissions(
                 groups,
@@ -296,13 +365,14 @@ def create_dirs_n_notebookes(
             assign_ws_local_permissions("notebooks", nb_perms, nb_stat.object_id, ws)
             for group, permission in nb_perms.items():
                 to_persist.append(ObjectPermission(group, "notebooks", nb_stat.object_id, permission.value))
+            logger.info(f"Created notebook {nb}")
     sql_backend.save_table(f"{test_database.name}.objects", to_persist, ObjectPermission)
 
 
-def create_repos(NB_OF_TEST_WS_OBJECTS, groups, make_repo, sql_backend, test_database, ws):
+def create_repos(NB_OF_TEST_WS_OBJECTS, groups, sql_backend, test_database, ws):
     to_persist = []
     for j in range(NB_OF_TEST_WS_OBJECTS):
-        repo = make_repo()
+        repo = create_repo(ws)
         repo_perms = create_permissions(
             groups,
             [
@@ -315,13 +385,14 @@ def create_repos(NB_OF_TEST_WS_OBJECTS, groups, make_repo, sql_backend, test_dat
         assign_ws_local_permissions("repos", repo_perms, repo.id, ws)
         for group, permission in repo_perms.items():
             to_persist.append(ObjectPermission(group, "repos", repo.id, permission.value))
+        logger.info(f"Created repo {repo.id}")
     sql_backend.save_table(f"{test_database.name}.objects", to_persist, ObjectPermission)
 
 
-def create_dashboards(NB_OF_TEST_WS_OBJECTS, groups, make_dashboard, sql_backend, test_database, ws):
+def create_dashboards(NB_OF_TEST_WS_OBJECTS, groups, sql_backend, test_database, ws):
     to_persist = []
     for j in range(NB_OF_TEST_WS_OBJECTS):
-        dashboard = make_dashboard()
+        dashboard = create_dashboard(ws)
         dashboard_permissions = create_permissions(
             groups, [sql.PermissionLevel.CAN_MANAGE, sql.PermissionLevel.CAN_RUN, sql.PermissionLevel.CAN_VIEW]
         )
@@ -330,24 +401,26 @@ def create_dashboards(NB_OF_TEST_WS_OBJECTS, groups, make_dashboard, sql_backend
             to_persist.append(
                 ObjectPermission(group, sql.ObjectTypePlural.DASHBOARDS.value, dashboard.id, permission.value)
             )
+        logger.info(f"Created dashboard {dashboard.id}")
     sql_backend.save_table(f"{test_database.name}.objects", to_persist, ObjectPermission)
 
 
-def create_queries_and_alerts(NB_OF_TEST_WS_OBJECTS, groups, make_alert, make_query, sql_backend, test_database, ws):
+def create_queries_and_alerts(NB_OF_TEST_WS_OBJECTS, groups, sql_backend, test_database, ws):
     to_persist = []
     for i in range(NB_OF_TEST_WS_OBJECTS):
-        query = make_query()
+        query = create_query(ws)
         query_permissions = create_permissions(
             groups, [sql.PermissionLevel.CAN_MANAGE, sql.PermissionLevel.CAN_RUN, sql.PermissionLevel.CAN_VIEW]
         )
         set_dbsql_permissions(query, "id", sql.ObjectTypePlural.QUERIES, ws, query_permissions)
         for group, permission in query_permissions.items():
             to_persist.append(ObjectPermission(group, sql.ObjectTypePlural.QUERIES.value, query.id, permission.value))
+        logger.info(f"Created query {query.id}")
 
         nb_of_alerts = random.randint(1, 10)
         logger.info(f"Creating {nb_of_alerts} alerts on top of query {query.name}")
         for j in range(nb_of_alerts):
-            alert = make_alert(query_id=query.id)
+            alert = create_alert(query_id=query.id, ws=ws)
             alert_permissions = create_permissions(
                 groups, [sql.PermissionLevel.CAN_MANAGE, sql.PermissionLevel.CAN_RUN, sql.PermissionLevel.CAN_VIEW]
             )
@@ -356,59 +429,64 @@ def create_queries_and_alerts(NB_OF_TEST_WS_OBJECTS, groups, make_alert, make_qu
                 to_persist.append(
                     ObjectPermission(group, sql.ObjectTypePlural.ALERTS.value, alert.id, permission.value)
                 )
+            logger.info(f"Created alert {alert.id}")
     sql_backend.save_table(f"{test_database.name}.objects", to_persist, ObjectPermission)
 
 
-def create_policies(NB_OF_TEST_WS_OBJECTS, groups, make_cluster_policy, sql_backend, test_database, ws):
+def create_policies(NB_OF_TEST_WS_OBJECTS, groups, sql_backend, test_database, ws):
     to_persist = []
     for i in range(NB_OF_TEST_WS_OBJECTS):
-        ws_object = make_cluster_policy()
+        ws_object = create_policy(ws)
         ws_permissions = create_permissions(groups, [PermissionLevel.CAN_USE])
         set_permissions(ws_object, "policy_id", "cluster-policies", ws, ws_permissions)
         for group, permission in ws_permissions.items():
             to_persist.append(ObjectPermission(group, "cluster-policies", ws_object.policy_id, permission.value))
+        logger.info(f"Created policy {ws_object.policy_id}")
     sql_backend.save_table(f"{test_database.name}.objects", to_persist, ObjectPermission)
 
 
-def create_clusters(NB_OF_TEST_WS_OBJECTS, groups, make_cluster, sql_backend, test_database, ws):
+def create_clusters(NB_OF_TEST_WS_OBJECTS, groups, sql_backend, test_database, ws):
     to_persist = []
     for i in range(NB_OF_TEST_WS_OBJECTS):
-        ws_object = make_cluster(single_node=True)
+        ws_object = create_cluster(ws, single_node=True)
         ws_permissions = create_permissions(
             groups, [PermissionLevel.CAN_MANAGE, PermissionLevel.CAN_RESTART, PermissionLevel.CAN_ATTACH_TO]
         )
         set_permissions(ws_object, "cluster_id", "clusters", ws, ws_permissions)
         for group, permission in ws_permissions.items():
             to_persist.append(ObjectPermission(group, "clusters", ws_object.cluster_id, permission.value))
+        logger.info(f"Created cluster {ws_object.cluster_id}")
     sql_backend.save_table(f"{test_database.name}.objects", to_persist, ObjectPermission)
 
 
-def create_warehouses(NB_OF_TEST_WS_OBJECTS, groups, make_warehouse, sql_backend, test_database, ws):
+def create_warehouses(NB_OF_TEST_WS_OBJECTS, groups, sql_backend, test_database, ws):
     to_persist = []
     for i in range(NB_OF_TEST_WS_OBJECTS):
-        warehouse = make_warehouse()
+        warehouse = create_warehouse(ws)
         ws_permissions = create_permissions(groups, [PermissionLevel.CAN_MANAGE, PermissionLevel.CAN_USE])
         set_permissions(warehouse, "id", "warehouses", ws, ws_permissions)
         for group, permission in ws_permissions.items():
             to_persist.append(ObjectPermission(group, "warehouses", warehouse.id, permission.value))
+        logger.info(f"Created warehouse {warehouse.id}")
     sql_backend.save_table(f"{test_database.name}.objects", to_persist, ObjectPermission)
 
 
-def create_pools(NB_OF_TEST_WS_OBJECTS, groups, make_instance_pool, sql_backend, test_database, ws):
+def create_pools(NB_OF_TEST_WS_OBJECTS, groups, sql_backend, test_database, ws):
     to_persist = []
     for i in range(NB_OF_TEST_WS_OBJECTS):
-        ws_object = make_instance_pool()
+        ws_object = create_pool(ws)
         ws_permissions = create_permissions(groups, [PermissionLevel.CAN_MANAGE, PermissionLevel.CAN_ATTACH_TO])
         set_permissions(ws_object, "instance_pool_id", "instance-pools", ws, ws_permissions)
         for group, permission in ws_permissions.items():
             to_persist.append(ObjectPermission(group, "instance-pools", ws_object.instance_pool_id, permission.value))
+        logger.info(f"Created pool {ws_object.instance_pool_id}")
     sql_backend.save_table(f"{test_database.name}.objects", to_persist, ObjectPermission)
 
 
-def create_models(NB_OF_TEST_WS_OBJECTS, groups, make_model, sql_backend, test_database, ws):
+def create_models(NB_OF_TEST_WS_OBJECTS, groups, sql_backend, test_database, ws):
     to_persist = []
     for i in range(NB_OF_TEST_WS_OBJECTS):
-        ws_object = make_model()
+        ws_object = create_model(ws)
         ws_permissions = create_permissions(
             groups,
             [
@@ -422,60 +500,65 @@ def create_models(NB_OF_TEST_WS_OBJECTS, groups, make_model, sql_backend, test_d
         set_permissions(ws_object, "id", "registered-models", ws, ws_permissions)
         for group, permission in ws_permissions.items():
             to_persist.append(ObjectPermission(group, "registered-models", ws_object.id, permission.value))
+        logger.info(f"Created model {ws_object.id}")
     sql_backend.save_table(f"{test_database.name}.objects", to_persist, ObjectPermission)
 
 
-def create_experiments(NB_OF_TEST_WS_OBJECTS, groups, make_experiment, sql_backend, test_database, ws):
+def create_experiments(NB_OF_TEST_WS_OBJECTS, groups, sql_backend, test_database, ws):
     to_persist = []
     for i in range(NB_OF_TEST_WS_OBJECTS):
-        ws_object = make_experiment()
+        ws_object = create_experiment(ws)
         ws_permissions = create_permissions(
             groups, [PermissionLevel.CAN_READ, PermissionLevel.CAN_MANAGE, PermissionLevel.CAN_EDIT]
         )
         set_permissions(ws_object, "experiment_id", "experiments", ws, ws_permissions)
         for group, permission in ws_permissions.items():
             to_persist.append(ObjectPermission(group, "experiments", ws_object.experiment_id, permission.value))
+        logger.info(f"Created experiment {ws_object.experiment_id}")
     sql_backend.save_table(f"{test_database.name}.objects", to_persist, ObjectPermission)
 
 
-def create_jobs(NB_OF_TEST_WS_OBJECTS, groups, make_job, sql_backend, test_database, ws):
+def create_jobs(NB_OF_TEST_WS_OBJECTS, groups, sql_backend, test_database, ws):
     to_persist = []
     for i in range(NB_OF_TEST_WS_OBJECTS):
-        ws_object = make_job()
+        ws_object = create_job(ws)
         ws_permissions = create_permissions(
             groups, [PermissionLevel.CAN_VIEW, PermissionLevel.CAN_MANAGE, PermissionLevel.CAN_MANAGE_RUN]
         )
         set_permissions(ws_object, "job_id", "jobs", ws, ws_permissions)
         for group, permission in ws_permissions.items():
             to_persist.append(ObjectPermission(group, "jobs", ws_object.job_id, permission.value))
+        logger.info(f"Created jobs {ws_object.job_id}")
     sql_backend.save_table(f"{test_database.name}.objects", to_persist, ObjectPermission)
 
 
-def create_pipelines(NB_OF_TEST_WS_OBJECTS, groups, make_pipeline, sql_backend, test_database, ws):
+def create_pipelines(NB_OF_TEST_WS_OBJECTS, groups, sql_backend, test_database, ws):
     to_persist = []
     for i in range(NB_OF_TEST_WS_OBJECTS):
-        ws_object = make_pipeline()
+        ws_object = create_dlt(ws)
         ws_permissions = create_permissions(
             groups, [PermissionLevel.CAN_VIEW, PermissionLevel.CAN_MANAGE, PermissionLevel.CAN_RUN]
         )
         set_permissions(ws_object, "pipeline_id", "pipelines", ws, ws_permissions)
         for group, permission in ws_permissions.items():
             to_persist.append(ObjectPermission(group, "pipelines", ws_object.pipeline_id, permission.value))
+        logger.info(f"Created pipeline {ws_object.pipeline_id}")
     sql_backend.save_table(f"{test_database.name}.objects", to_persist, ObjectPermission)
 
 
-def create_scopes(NB_OF_TEST_WS_OBJECTS, groups, make_secret_scope, sql_backend, test_database, ws: WorkspaceClient):
+def create_scopes(NB_OF_TEST_WS_OBJECTS, groups, sql_backend, test_database, ws: WorkspaceClient):
     to_persist = []
     for i in range(NB_OF_TEST_WS_OBJECTS):
-        scope = make_secret_scope()
+        scope = create_scope(ws)
         ws_permissions = create_permissions(groups, [AclPermission.MANAGE, AclPermission.READ, AclPermission.WRITE])
         set_secrets_permissions(scope, ws, ws_permissions)
         for group, permission in ws_permissions.items():
             to_persist.append(ObjectPermission(group, "secrets", scope, permission.value))
+        logger.info(f"Created scope {scope}")
     sql_backend.save_table(f"{test_database.name}.objects", to_persist, ObjectPermission)
 
 
-def create_groups(NB_OF_TEST_GROUPS, make_ucx_group, sql_backend, test_database):
+def create_groups(NB_OF_TEST_GROUPS, MAX_GRP_USERS, ws, acc, sql_backend, test_database):
     groups = []
     for i in range(NB_OF_TEST_GROUPS):
         entitlements_list = [
@@ -485,18 +568,22 @@ def create_groups(NB_OF_TEST_GROUPS, make_ucx_group, sql_backend, test_database)
             "allow-instance-pool-create",
         ]
         entitlements = [_ for _ in random.choices(entitlements_list, k=random.randint(1, 3))]
-        ws_group, acc_group = make_ucx_group(entitlements=entitlements)
+        nb_of_users = random.randint(1, MAX_GRP_USERS)
+        ws_group, acc_group = create_group(ws, acc, nb_of_users, entitlements)
         groups.append((ws_group, acc_group))
-        logger.info(f"Created group number {i + 1}")
+        logger.info(f"Created group {ws_group.display_name} {i + 1} with {len(ws_group.members)} members")
     persist_groups(groups, sql_backend, test_database)
     return groups
 
 
-def create_users(make_user):
+def create_users(sql_backend, test_database, ws:WorkspaceClient):
     users = []
-    for i in range(10):
-        user = make_user()
+    to_persist = []
+    for i in range(1):
+        user = create_user(ws)
         users.append(user)
+        to_persist.append(User(user.display_name))
+    sql_backend.save_table(f"{test_database.name}.users", users, User)
     return users
 
 
@@ -702,7 +789,7 @@ def create_hive_metastore_permissions(groups, all_permissions):
     schema_permissions = {}
     for permission in all_permissions:
         for j in range(10):
-            rand = random.randint(1, len(groups) - 1)
+            rand = random.randint(0, len(groups) - 1)
             ws_group = groups[rand][0].display_name
             if ws_group in schema_permissions:
                 previous_perms = schema_permissions[ws_group]
@@ -717,7 +804,7 @@ def create_permissions(groups, all_permissions):
     schema_permissions = {}
     for permission in all_permissions:
         for j in range(10):
-            rand = random.randint(1, len(groups) - 1)
+            rand = random.randint(0, len(groups)-1)
             ws_group = groups[rand][0].display_name
             schema_permissions[ws_group] = permission
     return schema_permissions
