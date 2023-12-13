@@ -5,6 +5,8 @@ from functools import wraps
 from logging.handlers import TimedRotatingFileHandler
 from pathlib import Path
 
+from databricks.sdk.core import Config
+
 from databricks.labs.ucx.__about__ import __version__
 from databricks.labs.ucx.config import WorkspaceConfig
 from databricks.labs.ucx.framework.logger import _install
@@ -23,6 +25,21 @@ class Task:
     job_cluster: str = "main"
     notebook: str = None
     dashboard: str = None
+    cloud: str = None
+
+    def cloud_compatible(self, config: Config) -> bool:
+        """Test compatibility between workspace config and task"""
+        if self.cloud:
+            if self.cloud.lower() == "aws":
+                return config.is_aws
+            elif self.cloud.lower() == "azure":
+                return config.is_azure
+            elif self.cloud.lower() == "gcp":
+                return config.is_gcp
+            else:
+                return True
+        else:
+            return True
 
 
 @staticmethod
@@ -37,7 +54,15 @@ def _remove_extra_indentation(doc: str) -> str:
     return "\n".join(stripped)
 
 
-def task(workflow, *, depends_on=None, job_cluster="main", notebook: str | None = None, dashboard: str | None = None):
+def task(
+    workflow,
+    *,
+    depends_on=None,
+    job_cluster="main",
+    notebook: str | None = None,
+    dashboard: str | None = None,
+    cloud: str | None = None,
+):
     def decorator(func):
         @wraps(func)
         def wrapper(*args, **kwargs):
@@ -79,6 +104,7 @@ def task(workflow, *, depends_on=None, job_cluster="main", notebook: str | None 
             job_cluster=job_cluster,
             notebook=notebook,
             dashboard=dashboard,
+            cloud=cloud,
         )
 
         return wrapper

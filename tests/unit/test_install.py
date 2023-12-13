@@ -78,6 +78,8 @@ def ws(mocker):
     ws.current_user.me = lambda: iam.User(user_name="me@example.com", groups=[iam.ComplexValue(display="admins")])
     ws.config.host = "https://foo"
     ws.config.is_aws = True
+    ws.config.is_azure = False
+    ws.config.is_gcp = False
     ws.workspace.get_status = lambda _: ObjectInfo(object_id=123)
     ws.data_sources.list = lambda: [DataSource(id="bcd", warehouse_id="abc")]
     ws.warehouses.list = lambda **_: [
@@ -632,6 +634,8 @@ def test_main_with_existing_conf_does_not_recreate_config(ws, mocker):
     ws.current_user.me = lambda: iam.User(user_name="me@example.com", groups=[iam.ComplexValue(display="admins")])
     ws.config.host = "https://foo"
     ws.config.is_aws = True
+    ws.config.is_azure = False
+    ws.config.is_gcp = False
     config_bytes = b"""default_catalog: ucx_default
 include_group_names:
 - '42'
@@ -661,6 +665,35 @@ workspace_start_path: /
 
     webbrowser_open.assert_called_with("https://foo/#workspace/Users/me@example.com/.ucx/README.py")
     # ws.workspace.mkdirs.assert_called_with("/Users/me@example.com/.ucx")
+
+
+def test_cloud_match(ws, mocker):
+    from databricks.labs.ucx.framework.tasks import Task
+
+    tasks = [
+        Task(task_id=0, workflow="wl_1", name="n3", doc="d3", fn=lambda: None, cloud="aws"),
+        Task(task_id=1, workflow="wl_2", name="n2", doc="d2", fn=lambda: None, cloud="azure"),
+        Task(task_id=2, workflow="wl_1", name="n1", doc="d1", fn=lambda: None, cloud="gcp"),
+    ]
+
+    with mocker.patch.object(WorkspaceInstaller, attribute="_sorted_tasks", return_value=tasks):
+        install = WorkspaceInstaller(ws)
+        steps = install._step_list()
+    assert len(steps) == 2
+    assert steps[0] == "wl_1" and steps[1] == "wl_2"
+
+
+def test_task_cloud(ws, mocker):
+    from databricks.labs.ucx.framework.tasks import Task
+
+    tasks = [
+        Task(task_id=0, workflow="wl_1", name="n3", doc="d3", fn=lambda: None, cloud="aws"),
+        Task(task_id=1, workflow="wl_2", name="n2", doc="d2", fn=lambda: None, cloud="azure"),
+        Task(task_id=2, workflow="wl_1", name="n1", doc="d1", fn=lambda: None, cloud="gcp"),
+    ]
+
+    filter_tasks = sorted([t.name for t in tasks if t.cloud_compatible(ws.config)])
+    assert filter_tasks == ["n3"]
 
 
 def test_query_metadata(ws, mocker):

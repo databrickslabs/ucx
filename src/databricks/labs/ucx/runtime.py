@@ -130,7 +130,7 @@ def assess_pipelines(cfg: WorkspaceConfig):
     crawler.snapshot()
 
 
-@task("assessment")
+@task("assessment", cloud="azure")
 def assess_azure_service_principals(cfg: WorkspaceConfig):
     """This module scans through all the clusters configurations, cluster policies, job cluster configurations,
     Pipeline configurations, Warehouse configuration and identifies all the Azure Service Principals who has been
@@ -142,8 +142,9 @@ def assess_azure_service_principals(cfg: WorkspaceConfig):
     Subsequently, the list of all the Azure Service Principals referred in those configurations are saved
     in the `$inventory.azure_service_principals` table."""
     ws = WorkspaceClient(config=cfg.to_databricks_config())
-    crawler = AzureServicePrincipalCrawler(ws, RuntimeBackend(), cfg.inventory_database)
-    crawler.snapshot()
+    if ws.config.is_azure:
+        crawler = AzureServicePrincipalCrawler(ws, RuntimeBackend(), cfg.inventory_database)
+        crawler.snapshot()
 
 
 @task("assessment")
@@ -219,8 +220,8 @@ def crawl_groups(cfg: WorkspaceConfig):
         guess_external_locations,
         assess_jobs,
         assess_clusters,
-        assess_pipelines,
         assess_azure_service_principals,
+        assess_pipelines,
         assess_global_init_scripts,
         crawl_tables,
     ],

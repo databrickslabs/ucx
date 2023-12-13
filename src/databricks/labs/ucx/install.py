@@ -535,7 +535,7 @@ class WorkspaceInstaller:
                 self._state.jobs[step] = job_id
         logger.debug(f"Creating jobs from tasks in {main.__name__}")
         remote_wheel = self._upload_wheel()
-        desired_steps = {t.workflow for t in _TASKS.values()}
+        desired_steps = {t.workflow for t in _TASKS.values() if t.cloud_compatible(self._ws.config)}
         wheel_runner = None
 
         if self._current_config.override_clusters:
@@ -761,7 +761,10 @@ class WorkspaceInstaller:
             email_notifications = jobs.JobEmailNotifications(
                 on_success=[self._my_username], on_failure=[self._my_username]
             )
-        tasks = sorted([t for t in _TASKS.values() if t.workflow == step_name], key=lambda _: _.name)
+        tasks = sorted(
+            [t for t in _TASKS.values() if t.workflow == step_name],
+            key=lambda _: _.name,
+        )
         version = self._version if not self._ws.config.is_gcp else self._version.replace("+", "-")
         return {
             "name": self._name(step_name),
