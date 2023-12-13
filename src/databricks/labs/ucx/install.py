@@ -15,7 +15,12 @@ from typing import Any
 
 import yaml
 from databricks.sdk import WorkspaceClient
-from databricks.sdk.errors import InvalidParameterValue, NotFound, OperationFailed
+from databricks.sdk.errors import (
+    InvalidParameterValue,
+    NotFound,
+    OperationFailed,
+    PermissionDenied,
+)
 from databricks.sdk.mixins.compute import SemVer
 from databricks.sdk.service import compute, jobs
 from databricks.sdk.service.sql import EndpointInfoWarehouseType, SpotInstancePolicy
@@ -30,6 +35,7 @@ from databricks.labs.ucx.assessment.crawlers import (
     PipelineInfo,
 )
 from databricks.labs.ucx.config import WorkspaceConfig
+from databricks.labs.ucx.configure import ConfigureClusterOverrides
 from databricks.labs.ucx.framework.crawlers import (
     SchemaDeployer,
     SqlBackend,
@@ -52,6 +58,7 @@ TAG_STEP = "step"
 TAG_APP = "App"
 WAREHOUSE_PREFIX = "Unity Catalog Migration"
 NUM_USER_ATTEMPTS = 10  # number of attempts user gets at answering a question
+
 EXTRA_TASK_PARAMS = {
     "job_id": "{{job_id}}",
     "run_id": "{{run_id}}",
@@ -142,9 +149,9 @@ class WorkspaceInstaller:
         self._prefix = prefix
         self._prompts = promtps
         self._this_file = Path(__file__)
-        self._override_clusters = None
         self._dashboards = {}
         self._state = InstallState(ws, self._install_folder)
+        self._install_override_clusters = None
 
     def run(self):
         logger.info(f"Installing UCX v{self._version}")
@@ -218,7 +225,7 @@ class WorkspaceInstaller:
         logger.info(f"Installing UCX v{workspace_installer._version} on {ws.config.host}")
         workspace_installer._config = config
         workspace_installer._write_config(overwrite=False)
-        workspace_installer._override_clusters = override_clusters
+        workspace_installer._current_config.override_clusters = override_clusters
         # TODO: rather introduce a method `is_configured`, as we may want to reconfigure workspaces for some reason
         workspace_installer._run_configured()
         return workspace_installer
@@ -502,6 +509,7 @@ class WorkspaceInstaller:
             num_threads=num_threads,
             instance_profile=instance_profile,
             spark_conf=spark_conf_dict,
+            override_clusters=self._install_override_clusters,
             custom_cluster_policy_id=custom_cluster_policy_id,
         )
 
@@ -530,12 +538,12 @@ class WorkspaceInstaller:
         desired_steps = {t.workflow for t in _TASKS.values()}
         wheel_runner = None
 
-        if self._override_clusters:
+        if self._current_config.override_clusters:
             wheel_runner = self._upload_wheel_runner(remote_wheel)
         for step_name in desired_steps:
             settings = self._job_settings(step_name, remote_wheel)
-            if self._override_clusters:
-                settings = self._apply_cluster_overrides(settings, self._override_clusters, wheel_runner)
+            if self._current_config.override_clusters:
+                settings = self._apply_cluster_overrides(settings, self._current_config.override_clusters, wheel_runner)
             self._deploy_workflow(step_name, settings)
 
         for step_name, job_id in self._state.jobs.items():
@@ -728,9 +736,17 @@ class WorkspaceInstaller:
             remote_wheel = f"{self._install_folder}/wheels/{local_wheel.name}"
             remote_dirname = os.path.dirname(remote_wheel)
             with local_wheel.open("rb") as f:
-                self._ws.dbfs.mkdirs(remote_dirname)
-                logger.info(f"Uploading wheel to dbfs:{remote_wheel}")
-                self._ws.dbfs.upload(remote_wheel, f, overwrite=True)
+                try:
+                    self._ws.dbfs.mkdirs(remote_dirname)
+                    logger.info(f"Uploading wheel to dbfs:{remote_wheel}")
+                    self._ws.dbfs.upload(remote_wheel, f, overwrite=True)
+                except PermissionDenied as err:
+                    logger.warning(f"Uploading wheel file to DBFS failed, DBFS is probably write protected. {err}")
+                    # assume DBFS is write protected
+                    self._current_config.override_clusters = ConfigureClusterOverrides(
+                        self._ws, self._choice_from_dict
+                    )._configure_override_clusters()
+
             with local_wheel.open("rb") as f:
                 self._ws.workspace.mkdirs(remote_dirname)
                 logger.info(f"Uploading wheel to /Workspace{remote_wheel}")
@@ -739,7 +755,7 @@ class WorkspaceInstaller:
 
     def _job_settings(self, step_name: str, dbfs_path: str):
         email_notifications = None
-        if not self._override_clusters and "@" in self._my_username:
+        if not self._current_config.override_clusters and "@" in self._my_username:
             # set email notifications only if we're running the real
             # installation and not the integration test.
             email_notifications = jobs.JobEmailNotifications(
@@ -772,6 +788,7 @@ class WorkspaceInstaller:
             if job_task.job_cluster_key in overrides:
                 job_task.existing_cluster_id = overrides[job_task.job_cluster_key]
                 job_task.job_cluster_key = None
+                job_task.libraries = None
             if job_task.python_wheel_task is not None:
                 job_task.python_wheel_task = None
                 params = {"task": job_task.task_key} | EXTRA_TASK_PARAMS
@@ -835,7 +852,7 @@ class WorkspaceInstaller:
             "spark.databricks.cluster.profile": "singleNode",
             "spark.master": "local[*]",
         }
-        if self._config.spark_conf is not None:
+        if self._current_config.spark_conf is not None:
             spark_conf = spark_conf | self._config.spark_conf
         spec = self._cluster_node_type(
             compute.ClusterSpec(
