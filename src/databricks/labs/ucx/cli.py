@@ -5,8 +5,8 @@ import webbrowser
 
 from databricks.sdk import WorkspaceClient
 
-from databricks.labs.ucx.account.workspaces import Workspaces
-from databricks.labs.ucx.config import AccountConfig
+from databricks.labs.ucx.account.workspaces import AccountWorkspaces
+from databricks.labs.ucx.config import AccountConfig, ConnectConfig
 from databricks.labs.ucx.install import WorkspaceInstaller
 from databricks.labs.ucx.installer import InstallationManager
 
@@ -41,7 +41,7 @@ def sync_workspace_info():
     Cli function to upload a mapping file to each ucx installation folder
     :return:
     """
-    workspaces = Workspaces(AccountConfig())
+    workspaces = AccountWorkspaces(AccountConfig(connect=ConnectConfig()))
     workspaces.sync_workspace_info()
 
 

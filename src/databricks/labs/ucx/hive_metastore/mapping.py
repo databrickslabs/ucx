@@ -1,49 +1,15 @@
 import csv
 import dataclasses
 import io
-import json
 import re
 from dataclasses import dataclass
 
-import requests
 from databricks.sdk import WorkspaceClient
 from databricks.sdk.errors import NotFound
-from databricks.sdk.service.provisioning import Workspace
 
+from databricks.labs.ucx.account import WorkspaceInfoReader
 from databricks.labs.ucx.hive_metastore import TablesCrawler
 from databricks.labs.ucx.hive_metastore.tables import Table
-
-
-class WorkspaceInfoReader:
-    def __init__(self, ws: WorkspaceClient, folder: str):
-        self._ws = ws
-        self._folder = folder
-
-    def _current_workspace_id(self) -> int:
-        headers = self._ws.config.authenticate()
-        headers["User-Agent"] = self._ws.config.user_agent
-        response = requests.get(f"{self._ws.config.host}/api/2.0/preview/scim/v2/Me", headers=headers, timeout=10)
-        return int(response.headers.get("x-databricks-org-id"))
-
-    def _load_workspace_info(self) -> dict[int, Workspace]:
-        try:
-            id_to_workspace = {}
-            workspace_info = self._ws.workspace.download(f"{self._folder}/workspace-info.json")
-            for workspace_metadata in json.loads(workspace_info):
-                workspace = Workspace.from_dict(workspace_metadata)
-                id_to_workspace[workspace.workspace_id] = workspace
-            return id_to_workspace
-        except NotFound:
-            msg = "Please run as account-admin: databricks labs ucx sync-workspace-info"
-            raise ValueError(msg) from None
-
-    def current(self) -> str:
-        workspace_id = self._current_workspace_id()
-        workspaces = self._load_workspace_info()
-        if workspace_id not in workspaces:
-            msg = f"Current workspace is not known: {workspace_id}"
-            raise KeyError(msg) from None
-        return workspaces[workspace_id].workspace_name
 
 
 @dataclass
