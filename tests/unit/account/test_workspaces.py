@@ -2,11 +2,11 @@ import base64
 import json
 
 import pytest
-from databricks.sdk.core import Config
 from databricks.sdk.oauth import Token
-from databricks.sdk.service.provisioning import PricingTier, Workspace
+from databricks.sdk.service.iam import User
+from databricks.sdk.service.provisioning import Workspace
 
-from databricks.labs.ucx.account.workspaces import AzureWorkspaceLister, Workspaces
+from databricks.labs.ucx.account.workspaces import Workspaces
 from databricks.labs.ucx.config import AccountConfig, ConnectConfig
 
 
@@ -34,87 +34,27 @@ def arm_requests(mocker):
     return inner
 
 
-def test_subscriptions_name_to_id(arm_requests):
-    arm_requests(
-        {
-            "/subscriptions": {
-                "value": [
-                    {"displayName": "first", "subscriptionId": "001", "tenantId": "xxx"},
-                    {"displayName": "second", "subscriptionId": "002", "tenantId": "def_from_token"},
-                    {"displayName": "third", "subscriptionId": "003", "tenantId": "def_from_token"},
-                ]
-            }
-        }
+@pytest.fixture()
+def account_workspaces_mock(mocker, arm_requests):
+    acc_cfg = AccountConfig()
+    acc_client = mocker.patch("databricks.sdk.AccountClient.__init__")
+    acc_cfg.to_databricks_config = lambda: acc_client
+    acc_client.config = mocker.Mock()
+    acc_client.config.as_dict = lambda: {}
+
+    acc_cfg.to_account_client = lambda: acc_client
+    acc_cfg.include_workspace_names = ["foo", "bar"]
+    mock_workspace1 = Workspace(
+        workspace_name="foo", workspace_id=123, workspace_status_message="Running", deployment_name="abc"
     )
-    cfg = Config(host="https://accounts.azuredatabricks.net", auth_type="azure-cli")
-
-    awl = AzureWorkspaceLister(cfg)
-    subs = awl.subscriptions_name_to_id()
-
-    assert {"second": "002", "third": "003"} == subs
-
-
-def test_list_azure_workspaces(arm_requests):
-    arm_requests(
-        {
-            "/subscriptions": {
-                "value": [
-                    {"displayName": "first", "subscriptionId": "001", "tenantId": "xxx"},
-                    {"displayName": "second", "subscriptionId": "002", "tenantId": "def_from_token"},
-                    {"displayName": "third", "subscriptionId": "003", "tenantId": "def_from_token"},
-                ]
-            },
-            "/subscriptions/002/providers/Microsoft.Databricks/workspaces": {
-                "value": [
-                    {
-                        "id": ".../resourceGroups/first-rg/...",
-                        "name": "first-workspace",
-                        "location": "eastus",
-                        "sku": {"name": "premium"},
-                        "properties": {
-                            "provisioningState": "Succeeded",
-                            "workspaceUrl": "adb-123.10.azuredatabricks.net",
-                            "workspaceId": "123",
-                        },
-                    },
-                    {
-                        "id": ".../resourceGroups/first-rg/...",
-                        "name": "second-workspace",
-                        "location": "eastus",
-                        "sku": {"name": "premium"},
-                        "properties": {
-                            "provisioningState": "Succeeded",
-                            "workspaceUrl": "adb-123.10.azuredatabricks.net",
-                            "workspaceId": "123",
-                        },
-                    },
-                ]
-            },
-        }
+    mock_workspace2 = Workspace(
+        workspace_name="bar", workspace_id=456, workspace_status_message="Running", deployment_name="def"
     )
 
-    wrksp = Workspaces(
-        AccountConfig(
-            connect=ConnectConfig(host="https://accounts.azuredatabricks.net"),
-            include_workspace_names=["first-workspace"],
-            include_azure_subscription_names=["second"],
-        )
-    )
-
-    all_workspaces = list(wrksp.configured_workspaces())
-
-    assert [
-        Workspace(
-            cloud="azure",
-            location="eastus",
-            workspace_id=123,
-            pricing_tier=PricingTier.PREMIUM,
-            workspace_name="first-workspace",
-            deployment_name="adb-123.10",
-            workspace_status_message="Succeeded",
-            custom_tags={"AzureResourceGroup": "first-rg", "AzureSubscription": "second", "AzureSubscriptionID": "002"},
-        )
-    ] == all_workspaces
+    mock_user1 = User(user_name="jack")
+    acc_client.workspaces.users.list.return_value = [mock_user1]
+    acc_client.workspaces.list.return_value = [mock_workspace1, mock_workspace2]
+    return Workspaces(acc_cfg)
 
 
 def test_client_for_workspace():
@@ -122,7 +62,7 @@ def test_client_for_workspace():
         AccountConfig(
             connect=ConnectConfig(
                 host="https://accounts.azuredatabricks.net",
-                azure_tenant_id="abc",
+                azure_tenant_id="abc.com",
                 azure_client_id="bcd",
                 azure_client_secret="def",
             )
@@ -131,3 +71,23 @@ def test_client_for_workspace():
     specified_workspace_client = wrksp.client_for(Workspace(cloud="azure", deployment_name="adb-123.10"))
     assert "azure-client-secret" == specified_workspace_client.config.auth_type
     assert "https://adb-123.10.azuredatabricks.net" == specified_workspace_client.config.host
+
+
+def test_workspace_clients(account_workspaces_mock):
+    ws_clients = account_workspaces_mock.workspace_clients()
+    assert len(ws_clients) == 2
+    assert ws_clients[0].config.auth_type == "azure-cli"
+    assert ws_clients[0].config.host == "https://abc.azuredatabricks.net"
+
+
+def test_configured_workspaces(account_workspaces_mock):
+    ws_clients = []
+    for ws in account_workspaces_mock.configured_workspaces():
+        ws_clients.append(account_workspaces_mock.client_for(ws))
+
+    # test for number of workspaces returned
+    assert len(ws_clients) == 2
+
+    # test for cloud and deployment name
+    assert ws_clients[1].config.auth_type == "azure-cli"
+    assert ws_clients[1].config.host == "https://def.azuredatabricks.net"
