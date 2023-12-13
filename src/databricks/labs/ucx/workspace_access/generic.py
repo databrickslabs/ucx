@@ -2,6 +2,7 @@ import datetime
 import json
 import logging
 from collections.abc import Callable, Iterator
+from concurrent.futures import ThreadPoolExecutor
 from dataclasses import dataclass
 from datetime import timedelta
 from functools import partial
@@ -324,11 +325,13 @@ class WorkspaceListing(Listing, CrawlerBase):
                 yield GenericPermissionsInfo(object_id=str(_object.object_id), request_type=request_type)
 
 
-def models_listing(ws: WorkspaceClient):
+def models_listing(ws: WorkspaceClient, num_threads: int):
     def inner() -> Iterator[ml.ModelDatabricks]:
-        for model in ws.model_registry.list_models():
-            model_with_id = ws.model_registry.get_model(model.name).registered_model_databricks
-            yield model_with_id
+        with ThreadPoolExecutor(num_threads) as pool:
+            yield from pool.map(
+                lambda m: ws.model_registry.get_model(m.name).registered_model_databricks,
+                ws.model_registry.list_models(),
+            )
 
     return inner
 

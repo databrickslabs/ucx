@@ -213,7 +213,7 @@ def test_passwords_tokens_crawler(migration_state):
 
 def test_models_listing():
     ws = MagicMock()
-    ws.model_registry.list_models.return_value = [ml.Model(name="test")]
+    ws.model_registry.list_models.return_value = [ml.Model(name="test"), ml.Model(name="test2")]
     ws.model_registry.get_model.return_value = ml.GetModelResponse(
         registered_model_databricks=ml.ModelDatabricks(
             id="some-id",
@@ -221,9 +221,9 @@ def test_models_listing():
         )
     )
 
-    wrapped = Listing(models_listing(ws), id_attribute="id", object_type="registered-models")
+    wrapped = Listing(models_listing(ws, 2), id_attribute="id", object_type="registered-models")
     result = list(wrapped)
-    assert len(result) == 1
+    assert len(result) == 2
     assert result[0].object_id == "some-id"
     assert result[0].request_type == "registered-models"
 
