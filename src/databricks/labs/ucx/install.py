@@ -511,7 +511,6 @@ class WorkspaceInstaller:
             spark_conf=spark_conf_dict,
             override_clusters=self._install_override_clusters,
             custom_cluster_policy_id=custom_cluster_policy_id,
-
         )
 
         self._write_config(overwrite=False)
