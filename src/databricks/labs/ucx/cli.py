@@ -5,8 +5,12 @@ import webbrowser
 
 from databricks.sdk import WorkspaceClient
 
-from databricks.labs.ucx.account.workspaces import Workspaces
-from databricks.labs.ucx.config import AccountConfig
+from databricks.labs.ucx.account import AccountWorkspaces, WorkspaceInfo
+from databricks.labs.ucx.config import AccountConfig, ConnectConfig
+from databricks.labs.ucx.framework.crawlers import StatementExecutionBackend
+from databricks.labs.ucx.framework.tui import Prompts
+from databricks.labs.ucx.hive_metastore import TablesCrawler
+from databricks.labs.ucx.hive_metastore.mapping import TableMapping
 from databricks.labs.ucx.install import WorkspaceInstaller
 from databricks.labs.ucx.installer import InstallationManager
 
@@ -37,12 +41,27 @@ def list_installations():
 
 
 def sync_workspace_info():
-    """
-    Cli function to upload a mapping file to each ucx installation folder
-    :return:
-    """
-    workspaces = Workspaces(AccountConfig())
+    workspaces = AccountWorkspaces(AccountConfig(connect=ConnectConfig()))
     workspaces.sync_workspace_info()
+
+
+def manual_workspace_info():
+    ws = WorkspaceClient()
+    prompts = Prompts()
+    workspace_info = WorkspaceInfo(ws)
+    workspace_info.manual_workspace_info(prompts)
+
+
+def create_table_mapping():
+    ws = WorkspaceClient()
+    table_mapping = TableMapping(ws)
+    workspace_info = WorkspaceInfo(ws)
+    installation_manager = InstallationManager(ws)
+    installation = installation_manager.for_user(ws.current_user.me())
+    sql_backend = StatementExecutionBackend(ws, installation.config.warehouse_id)
+    tables_crawler = TablesCrawler(sql_backend, installation.config.inventory_database)
+    path = table_mapping.save(tables_crawler, workspace_info)
+    webbrowser.open(f"{ws.config.host}/#workspace{path}")
 
 
 MAPPING = {
@@ -50,6 +69,8 @@ MAPPING = {
     "installations": list_installations,
     "workflows": workflows,
     "sync-workspace-info": sync_workspace_info,
+    "manual-workspace-info": manual_workspace_info,
+    "create-table-mapping": create_table_mapping,
 }
 
 
@@ -61,9 +82,10 @@ def main(raw):
         raise KeyError(msg)
     flags = payload["flags"]
     log_level = flags.pop("log_level")
-    if log_level != "disabled":
-        databricks_logger = logging.getLogger("databricks")
-        databricks_logger.setLevel(log_level.upper())
+    if log_level == "disabled":
+        log_level = "info"
+    databricks_logger = logging.getLogger("databricks")
+    databricks_logger.setLevel(log_level.upper())
 
     kwargs = {k.replace("-", "_"): v for k, v in flags.items()}
     MAPPING[command](**kwargs)
