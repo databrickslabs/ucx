@@ -33,7 +33,7 @@ class InstallationManager:
         self._root = Path("/Users")
         self._prefix = prefix
 
-    def _user_installation(self, user: User) -> Installation | None:
+    def for_user(self, user: User) -> Installation | None:
         try:
             config_file = self._root / user.user_name / self._prefix / "config.yml"
             with self._ws.workspace.download(config_file) as f:
@@ -48,7 +48,7 @@ class InstallationManager:
     def user_installations(self) -> list[Installation]:
         tasks = []
         for user in self._ws.users.list(attributes="userName", count=500):
-            tasks.append(functools.partial(self._user_installation, user))
+            tasks.append(functools.partial(self.for_user, user))
         installations, errors = Threads.gather("detecting installations", tasks)
         if errors:
             raise ManyError(errors)

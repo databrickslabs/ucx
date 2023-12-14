@@ -1,18 +1,19 @@
 import io
-from unittest.mock import MagicMock
+from unittest.mock import MagicMock, create_autospec
 
 import pytest
 from databricks.sdk.errors import NotFound
 
+from databricks.labs.ucx.account import WorkspaceInfo
 from databricks.labs.ucx.hive_metastore.mapping import Rule, TableMapping
-from databricks.labs.ucx.hive_metastore.tables import Table
+from databricks.labs.ucx.hive_metastore.tables import Table, TablesCrawler
 
 
 def test_current_tables_empty_fails():
     ws = MagicMock()
     table_mapping = TableMapping(ws, "~/.ucx")
 
-    tables_crawler = MagicMock()
+    tables_crawler = create_autospec(TablesCrawler)
     tables_crawler.snapshot.return_value = []
 
     with pytest.raises(ValueError):
@@ -23,7 +24,7 @@ def test_current_tables_some_rules():
     ws = MagicMock()
     table_mapping = TableMapping(ws, "~/.ucx")
 
-    tables_crawler = MagicMock()
+    tables_crawler = create_autospec(TablesCrawler)
     tables_crawler.snapshot.return_value = [
         Table(
             catalog="hive_metastore",
@@ -45,7 +46,7 @@ def test_save_mapping():
     ws = MagicMock()
     table_mapping = TableMapping(ws, "~/.ucx")
 
-    tables_crawler = MagicMock()
+    tables_crawler = create_autospec(TablesCrawler)
     tables_crawler.snapshot.return_value = [
         Table(
             catalog="hive_metastore",
@@ -56,7 +57,7 @@ def test_save_mapping():
         )
     ]
 
-    workspace_info = MagicMock()
+    workspace_info = create_autospec(WorkspaceInfo)
     workspace_info.current.return_value = "foo-bar"
 
     table_mapping.save(tables_crawler, workspace_info)

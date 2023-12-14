@@ -10,6 +10,7 @@ from databricks.sdk.service.workspace import ImportFormat
 
 from databricks.labs.ucx.__about__ import __version__
 from databricks.labs.ucx.config import AccountConfig
+from databricks.labs.ucx.framework.tui import Prompts
 from databricks.labs.ucx.installer import InstallationManager
 
 logger = logging.getLogger(__name__)
@@ -21,6 +22,8 @@ class AccountWorkspaces:
         "azure": "azuredatabricks.net",
         "gcp": "gcp.databricks.com",
     }
+
+    SYNC_FILE_NAME: ClassVar[str] = "workspaces.json"
 
     def __init__(
         self, cfg: AccountConfig, new_workspace_client=WorkspaceClient, new_installation_manager=InstallationManager
@@ -82,14 +85,17 @@ class AccountWorkspaces:
         for ws in self.workspace_clients():
             installation_manager = self._new_installation_manager(ws)
             for installation in installation_manager.user_installations():
-                path = f"{installation.path}/workspaces.json"
+                path = f"{installation.path}/{self.SYNC_FILE_NAME}"
                 ws.workspace.upload(path, info, overwrite=True, format=ImportFormat.AUTO)
 
 
-class WorkspaceInfoReader:
-    def __init__(self, ws: WorkspaceClient, folder: str):
+class WorkspaceInfo:
+    def __init__(self, ws: WorkspaceClient, folder: str | None = None, new_installation_manager=InstallationManager):
+        if not folder:
+            folder = f"/Users/{ws.current_user.me().user_name}/.ucx"
         self._ws = ws
         self._folder = folder
+        self._new_installation_manager = new_installation_manager
 
     def _current_workspace_id(self) -> int:
         headers = self._ws.config.authenticate()
@@ -100,11 +106,11 @@ class WorkspaceInfoReader:
     def _load_workspace_info(self) -> dict[int, Workspace]:
         try:
             id_to_workspace = {}
-            workspace_info = self._ws.workspace.download(f"{self._folder}/workspace-info.json")
-            for workspace_metadata in json.loads(workspace_info):
-                workspace = Workspace.from_dict(workspace_metadata)
-                id_to_workspace[workspace.workspace_id] = workspace
-            return id_to_workspace
+            with self._ws.workspace.download(f"{self._folder}/{AccountWorkspaces.SYNC_FILE_NAME}") as f:
+                for workspace_metadata in json.loads(f.read()):
+                    workspace = Workspace.from_dict(workspace_metadata)
+                    id_to_workspace[workspace.workspace_id] = workspace
+                return id_to_workspace
         except NotFound:
             msg = "Please run as account-admin: databricks labs ucx sync-workspace-info"
             raise ValueError(msg) from None
@@ -116,3 +122,31 @@ class WorkspaceInfoReader:
             msg = f"Current workspace is not known: {workspace_id}"
             raise KeyError(msg) from None
         return workspaces[workspace_id].workspace_name
+
+    def manual_workspace_info(self, prompts: Prompts):
+        logger.warning(
+            'You are strongly recommended to run "databricks labs ucx sync-workspace-info" by account admin,'
+            ' otherwise there is a significant risk of inconsistencies between different workspaces. This '
+            'command will overwrite all UCX installations on this given workspace. Result may be consistent '
+            f'only within {self._ws.config.host}'
+        )
+        workspaces = []
+        workspace_id = self._current_workspace_id()
+        while workspace_id:
+            workspace_name = prompts.question(
+                f"Workspace name for {workspace_id}", default=f"workspace-{workspace_id}", valid_regex=r"^[\w-]+$"
+            )
+            workspace = Workspace(workspace_id=int(workspace_id), workspace_name=workspace_name)
+            workspaces.append(workspace.as_dict())
+            workspace_id = prompts.question("Next workspace id", valid_number=True, default="stop")
+            if workspace_id == "stop":
+                break
+            workspace_id = int(workspace_id)
+        info = json.dumps(workspaces, indent=2).encode("utf8")
+        installation_manager = self._new_installation_manager(self._ws)
+        logger.info("Detecting UCX installations on current workspace...")
+        for installation in installation_manager.user_installations():
+            path = f"{installation.path}/{AccountWorkspaces.SYNC_FILE_NAME}"
+            logger.info(f"Overwriting {path}")
+            self._ws.workspace.upload(path, info, overwrite=True, format=ImportFormat.AUTO)
+        logger.info("Synchronised workspace id mapping for installations on current workspace")
