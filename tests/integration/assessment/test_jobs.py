@@ -2,9 +2,9 @@ from datetime import timedelta
 
 from databricks.sdk.errors import NotFound
 from databricks.sdk.retries import retried
+from .test_assessment import _SPARK_CONF
 
 from databricks.labs.ucx.assessment.jobs import JobsCrawler
-from integration.assessment.test_assessment import _SPARK_CONF
 
 
 @retried(on=[NotFound], timeout=timedelta(minutes=5))

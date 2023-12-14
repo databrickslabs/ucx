@@ -2,12 +2,12 @@ import logging
 from collections import defaultdict
 from dataclasses import dataclass
 from functools import partial
-from typing import Iterable
+from collections.abc import Iterable
 
 from databricks.sdk.service.catalog import SchemaInfo, TableInfo
 
 from databricks.labs.ucx.framework.crawlers import CrawlerBase
-from databricks.labs.ucx.framework.parallel import Threads, ManyError
+from databricks.labs.ucx.framework.parallel import ManyError, Threads
 from databricks.labs.ucx.hive_metastore.tables import TablesCrawler
 
 logger = logging.getLogger(__name__)

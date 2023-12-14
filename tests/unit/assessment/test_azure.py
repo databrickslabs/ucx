@@ -1,7 +1,7 @@
 import json
 from unittest.mock import Mock
 
-from databricks.sdk.errors import DatabricksError, NotFound
+from databricks.sdk.errors import NotFound
 from databricks.sdk.service.compute import (
     AutoScale,
     ClusterDetails,

@@ -1,8 +1,7 @@
 import base64
 import json
-from collections.abc import Iterator
 from dataclasses import dataclass
-from typing import Iterable
+from collections.abc import Iterable
 
 from databricks.sdk import WorkspaceClient
 

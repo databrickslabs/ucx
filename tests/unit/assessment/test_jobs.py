@@ -575,4 +575,4 @@ def test_job_crawler_with_no_owner_should_have_empty_creator_name():
     ws.clusters.list.return_value = sample_clusters
     JobsCrawler(ws, mockbackend, "ucx").snapshot()
     result = mockbackend.rows_written_for("hive_metastore.ucx.jobs", "append")
-    assert result == [JobInfo(job_id="536591785949415", job_name='Unknown', creator=None, success=1, failures="[]")]
+    assert result == [JobInfo(job_id="536591785949415", job_name="Unknown", creator=None, success=1, failures="[]")]

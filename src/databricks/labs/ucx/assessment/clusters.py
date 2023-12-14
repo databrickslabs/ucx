@@ -1,6 +1,6 @@
 import json
 from dataclasses import dataclass
-from typing import Iterable
+from collections.abc import Iterable
 
 from databricks.sdk import WorkspaceClient
 from databricks.sdk.errors import NotFound

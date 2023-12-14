@@ -13,7 +13,7 @@ from databricks.labs.ucx.framework.crawlers import (
     DataclassInstance,
     SqlBackend,
 )
-from databricks.labs.ucx.framework.parallel import Threads, ManyError
+from databricks.labs.ucx.framework.parallel import ManyError, Threads
 from databricks.labs.ucx.hive_metastore import GrantsCrawler, TablesCrawler
 from databricks.labs.ucx.workspace_access import generic, redash, scim, secrets
 from databricks.labs.ucx.workspace_access.base import AclSupport, Permissions

@@ -3,10 +3,10 @@ import json
 import logging
 import re
 from abc import abstractmethod
-from collections.abc import Iterator
 from dataclasses import dataclass
 from datetime import timedelta
-from typing import ClassVar, Iterable
+from typing import ClassVar
+from collections.abc import Iterable
 
 from databricks.sdk import WorkspaceClient
 from databricks.sdk.core import DatabricksError
@@ -17,7 +17,7 @@ from databricks.sdk.service import iam
 from databricks.sdk.service.iam import Group
 
 from databricks.labs.ucx.framework.crawlers import CrawlerBase, SqlBackend
-from databricks.labs.ucx.framework.parallel import Threads, ManyError
+from databricks.labs.ucx.framework.parallel import ManyError, Threads
 from databricks.labs.ucx.mixins.hardening import rate_limited
 
 logger = logging.getLogger(__name__)

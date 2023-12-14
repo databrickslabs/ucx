@@ -129,7 +129,7 @@ def test_get_crawler_task_with_roles_and_entitlements_should_be_crawled():
             display_name="de",
             roles=[iam.ComplexValue(value="role1"), iam.ComplexValue(value="role2")],
             entitlements=[iam.ComplexValue(value="forbidden-cluster-create")],
-            meta=ResourceMeta(resource_type='WorkspaceGroup')
+            meta=ResourceMeta(resource_type="WorkspaceGroup"),
         )
     ]
     sup = ScimSupport(ws=ws, verify_timeout=timedelta(seconds=1))
@@ -156,10 +156,13 @@ def test_groups_without_roles_and_entitlements_should_be_ignored():
 def test_get_apply_task_should_call_patch_on_group_external_id():
     ws = MagicMock()
     ws.groups.list.return_value = [
-        Group(id="1", display_name="de", entitlements=[iam.ComplexValue(value="forbidden-cluster-create")],
-            meta=ResourceMeta(resource_type='WorkspaceGroup'),
+        Group(
+            id="1",
+            display_name="de",
+            entitlements=[iam.ComplexValue(value="forbidden-cluster-create")],
+            meta=ResourceMeta(resource_type="WorkspaceGroup"),
         ),
-        Group(id="12", display_name="ANOTHER", meta=ResourceMeta(resource_type='Group')),
+        Group(id="12", display_name="ANOTHER", meta=ResourceMeta(resource_type="Group")),
     ]
     ws.groups.get.return_value = Group(
         id="1", display_name="de", entitlements=[iam.ComplexValue(value="forbidden-cluster-create")]
@@ -177,7 +180,8 @@ def test_get_apply_task_should_call_patch_on_group_external_id():
     appliers = sup.get_apply_task(item, MigrationState([mggrp]))
     appliers()
 
-    ws.groups.patch.assert_called_once_with("12",
+    ws.groups.patch.assert_called_once_with(
+        "12",
         operations=[iam.Patch(op=PatchOp.ADD, path="entitlements", value=[{"value": "forbidden-cluster-create"}])],
         schemas=[PatchSchema.URN_IETF_PARAMS_SCIM_API_MESSAGES_2_0_PATCH_OP],
     )
