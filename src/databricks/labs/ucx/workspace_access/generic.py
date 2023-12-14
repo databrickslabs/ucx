@@ -331,6 +331,8 @@ def models_listing(ws: WorkspaceClient, num_threads: int):
         for m in ws.model_registry.list_models():
             tasks.append(partial(ws.model_registry.get_model, name=m.name))
         models, errors = Threads.gather("listing model ids", tasks, num_threads)
+        if len(errors) > 0:
+            logger.error(f"Detected {len(errors)} errors while listing models")
         for model in models:
             yield model.registered_model_databricks
 
