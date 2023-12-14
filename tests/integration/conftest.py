@@ -27,7 +27,7 @@ retry_on_not_found = functools.partial(retried, on=[NotFound], timeout=timedelta
 long_retry_on_not_found = functools.partial(retry_on_not_found, timeout=timedelta(minutes=15))
 
 
-@pytest.fixture
+@pytest.fixture  # type: ignore[no-redef]
 def debug_env_name():
     return "ucws"
 
@@ -55,14 +55,14 @@ def account_host(self: databricks.sdk.core.Config) -> str:
         return "https://accounts.cloud.databricks.com"
 
 
-@pytest.fixture(scope="session")
+@pytest.fixture(scope="session")  # type: ignore[no-redef]
 def product_info():
     from databricks.labs.ucx.__about__ import __version__
 
     return "ucx", __version__
 
 
-@pytest.fixture
+@pytest.fixture  # type: ignore[no-redef]
 def acc(ws) -> AccountClient:
     # TODO: https://github.com/databricks/databricks-sdk-py/pull/390
     def account_host(cfg: Config) -> str:
@@ -115,7 +115,7 @@ class StaticTablesCrawler(TablesCrawler):
                 object_type=f"{_.table_type.value}",
                 view_text=_.view_definition,
                 location=_.storage_location,
-                table_format=f"{ _.data_source_format.value}" if _.table_type.value != "VIEW" else None,
+                table_format=f"{ _.data_source_format.value}" if _.table_type.value != "VIEW" else None,  # type: ignore[arg-type]
             )
             for _ in tables
         ]

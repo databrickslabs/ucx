@@ -25,7 +25,7 @@ class Foo:
 @dataclass
 class Baz:
     first: str
-    second: str = None
+    second: str | None = None
 
 
 @dataclass
@@ -223,12 +223,13 @@ def test_runtime_backend_save_table_with_row_containing_none_with_nullable_class
         rb._spark.createDataFrame().write.saveAsTable.assert_called_with("a.b.c", mode="append")
 
 
-def test_save_table_with_not_null_constraint_violated(mocker):
-    @dataclass
-    class TestClass:
-        key: str
-        value: str = None
+@dataclass
+class TestClass:
+    key: str
+    value: str | None = None
 
+
+def test_save_table_with_not_null_constraint_violated(mocker):
     rows = [TestClass("1", "test"), TestClass("2", None), TestClass(None, "value")]
 
     with mock.patch.dict(os.environ, {"DATABRICKS_RUNTIME_VERSION": "14.0"}):

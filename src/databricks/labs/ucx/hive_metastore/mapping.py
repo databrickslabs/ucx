@@ -70,7 +70,7 @@ class TableMapping:
         try:
             rules = []
             remote = self._ws.workspace.download(f"{self._folder}/mapping.csv")
-            for row in csv.DictReader(remote):
+            for row in csv.DictReader(remote):  # type: ignore[arg-type]
                 rules.append(Rule(**row))
             return rules
         except NotFound:

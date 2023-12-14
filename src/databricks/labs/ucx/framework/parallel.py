@@ -5,7 +5,7 @@ import logging
 import os
 import re
 import threading
-from collections.abc import Callable, Sequence
+from collections.abc import Callable, Iterable, Sequence
 from concurrent.futures import ThreadPoolExecutor
 from typing import Generic, TypeVar
 
@@ -38,7 +38,7 @@ class Threads(Generic[Result]):
     @classmethod
     def gather(
         cls, name: str, tasks: Sequence[Task[Result]], num_threads: int | None = None
-    ) -> tuple[list[Result], list[Exception]]:
+    ) -> tuple[Iterable[Result], list[Exception]]:
         if num_threads is None:
             num_cpus = os.cpu_count()
             if num_cpus is None:
@@ -48,7 +48,7 @@ class Threads(Generic[Result]):
                 num_threads = MIN_THREADS
         return cls(name, tasks, num_threads=num_threads)._run()
 
-    def _run(self) -> tuple[list[Result], list[Exception]]:
+    def _run(self) -> tuple[Iterable[Result], list[Exception]]:
         given_cnt = len(self._tasks)
         if given_cnt == 0:
             return [], []

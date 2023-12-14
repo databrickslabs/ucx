@@ -136,7 +136,7 @@ def deploy_schema(sql_backend: SqlBackend, inventory_schema: str):
 
 class WorkspaceInstaller:
     def __init__(
-        self, ws: WorkspaceClient, *, prefix: str = "ucx", promtps: bool = True, sql_backend: SqlBackend = None
+        self, ws: WorkspaceClient, *, prefix: str = "ucx", promtps: bool = True, sql_backend: SqlBackend | None = None
     ):
         if "DATABRICKS_RUNTIME_VERSION" in os.environ:
             msg = "WorkspaceInstaller is not supposed to be executed in Databricks Runtime"
@@ -146,7 +146,7 @@ class WorkspaceInstaller:
         self._prefix = prefix
         self._prompts = promtps
         self._this_file = Path(__file__)
-        self._dashboards = {}
+        self._dashboards: dict[str, str] = {}
         self._state = InstallState(ws, self._install_folder)
         self._install_override_clusters = None
 
@@ -216,7 +216,7 @@ class WorkspaceInstaller:
         *,
         prefix="ucx",
         override_clusters: dict[str, str] | None = None,
-        sql_backend: SqlBackend = None,
+        sql_backend: SqlBackend | None = None,
     ) -> "WorkspaceInstaller":
         workspace_installer = WorkspaceInstaller(ws, prefix=prefix, promtps=False, sql_backend=sql_backend)
         logger.info(f"Installing UCX v{workspace_installer._version} on {ws.config.host}")
@@ -237,12 +237,16 @@ class WorkspaceInstaller:
             # currently we don't have any good message from API, so we have to work around it.
             job_run = self._ws.jobs.get_run(job_run_waiter.run_id)
             messages = []
+            assert job_run.tasks is not None
             for run_task in job_run.tasks:
+                if not run_task.state:
+                    continue
                 if run_task.state.result_state == jobs.RunResultState.TIMEDOUT:
                     messages.append(f"{run_task.task_key}: The run was stopped after reaching the timeout")
                     continue
                 if run_task.state.result_state != jobs.RunResultState.FAILED:
                     continue
+                assert run_task.run_id is not None
                 run_output = self._ws.jobs.get_run_output(run_task.run_id)
                 if logger.isEnabledFor(logging.DEBUG):
                     if run_output and run_output.error_trace:
@@ -251,6 +255,8 @@ class WorkspaceInstaller:
                     messages.append(f"{run_task.task_key}: {run_output.error}")
                 else:
                     messages.append(f"{run_task.task_key}: output unavailable")
+            assert job_run.state is not None
+            assert job_run.state.state_message is not None
             msg = f'{job_run.state.state_message.rstrip(".")}: {", ".join(messages)}'
             raise OperationFailed(msg) from None
 
@@ -648,13 +654,10 @@ class WorkspaceInstaller:
         )
         path = f"{self._install_folder}/DEBUG.py"
         logger.debug(f"Created debug notebook: {self.notebook_link(path)}")
-        self._ws.workspace.upload(
-            path,
-            DEBUG_NOTEBOOK.format(
-                remote_wheel=remote_wheel, readme_link=readme_link, job_links=job_links, config_file=self.config_file
-            ).encode("utf8"),
-            overwrite=True,
-        )
+        content = DEBUG_NOTEBOOK.format(
+            remote_wheel=remote_wheel, readme_link=readme_link, job_links=job_links, config_file=self.config_file
+        ).encode("utf8")
+        self._ws.workspace.upload(path, content, overwrite=True)  # type: ignore[arg-type]
 
     def notebook_link(self, path: str) -> str:
         return f"{self._ws.config.host}/#workspace{path}"
@@ -675,14 +678,14 @@ class WorkspaceInstaller:
             attempt += 1
             res = input(prompt)
             try:
-                res = int(res)
+                res = int(res)  # type: ignore[assignment]
             except ValueError:
                 print(f"\033[31m[ERROR] Invalid number: {res}\033[0m\n")
                 continue
-            if res >= len(choices) or res < 0:
+            if res >= len(choices) or res < 0:  # type: ignore[operator]
                 print(f"\033[31m[ERROR] Out of range: {res}\033[0m\n")
                 continue
-            return choices[res]
+            return choices[res]  # type: ignore[call-overload]
         msg = f"cannot get answer within {max_attempts} attempt"
         raise ValueError(msg)
 
@@ -776,11 +779,11 @@ class WorkspaceInstaller:
         path = f"{self._install_folder}/wheels/wheel-test-runner-{self._version}.py"
         logger.debug(f"Created runner notebook: {self.notebook_link(path)}")
         py = TEST_RUNNER_NOTEBOOK.format(remote_wheel=remote_wheel, config_file=self.config_file).encode("utf8")
-        self._ws.workspace.upload(path, py, overwrite=True)
+        self._ws.workspace.upload(path, py, overwrite=True)  # type: ignore[arg-type]
         return path
 
     @staticmethod
-    def _apply_cluster_overrides(settings: dict[str, any], overrides: dict[str, str], wheel_runner: str) -> dict:
+    def _apply_cluster_overrides(settings: dict[str, Any], overrides: dict[str, str], wheel_runner: str) -> dict:
         settings["job_clusters"] = [_ for _ in settings["job_clusters"] if _.job_cluster_key not in overrides]
         for job_task in settings["tasks"]:
             if job_task.job_cluster_key is None:
@@ -808,6 +811,7 @@ class WorkspaceInstaller:
         return self._job_wheel_task(jobs_task, task, dbfs_path)
 
     def _job_dashboard_task(self, jobs_task: jobs.Task, task: Task) -> jobs.Task:
+        assert task.dashboard is not None
         return replace(
             jobs_task,
             job_cluster_key=None,

@@ -1,6 +1,6 @@
 import base64
 import json
-from collections.abc import Iterator
+from collections.abc import Iterable
 from dataclasses import dataclass
 
 from databricks.sdk import WorkspaceClient
@@ -28,7 +28,7 @@ class GlobalInitScriptCrawler(CrawlerBase[GlobalInitScriptInfo]):
         super().__init__(sbe, "hive_metastore", schema, "global_init_scripts", GlobalInitScriptInfo)
         self._ws = ws
 
-    def _crawl(self) -> list[GlobalInitScriptInfo]:
+    def _crawl(self) -> Iterable[GlobalInitScriptInfo]:
         all_global_init_scripts = list(self._ws.global_init_scripts.list())
         return list(self._assess_global_init_scripts(all_global_init_scripts))
 
@@ -48,9 +48,8 @@ class GlobalInitScriptCrawler(CrawlerBase[GlobalInitScriptInfo]):
                 failures="[]",
             )
             failures = []
-            global_init_script = base64.b64decode(self._ws.global_init_scripts.get(gis.script_id).script).decode(
-                "utf-8"
-            )
+            script = self._ws.global_init_scripts.get(gis.script_id)
+            global_init_script = base64.b64decode(script.script).decode("utf-8")
             if not global_init_script:
                 continue
             if _azure_sp_conf_in_init_scripts(global_init_script):
@@ -61,9 +60,9 @@ class GlobalInitScriptCrawler(CrawlerBase[GlobalInitScriptInfo]):
                 global_init_script_info.success = 0
             yield global_init_script_info
 
-    def snapshot(self) -> list[GlobalInitScriptInfo]:
+    def snapshot(self) -> Iterable[GlobalInitScriptInfo]:
         return self._snapshot(self._try_fetch, self._crawl)
 
-    def _try_fetch(self) -> Iterator[GlobalInitScriptInfo]:
+    def _try_fetch(self) -> Iterable[GlobalInitScriptInfo]:
         for row in self._fetch(f"SELECT * FROM {self._schema}.{self._table}"):
             yield GlobalInitScriptInfo(*row)

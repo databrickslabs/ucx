@@ -1,10 +1,11 @@
 import base64
 import json
 import re
+from collections.abc import Iterable
 from dataclasses import dataclass
 
 from databricks.sdk import WorkspaceClient
-from databricks.sdk.errors import DatabricksError, NotFound
+from databricks.sdk.errors import NotFound
 from databricks.sdk.service.compute import ClusterSource, Policy
 
 from databricks.labs.ucx.assessment.crawlers import (
@@ -37,7 +38,7 @@ class AzureServicePrincipalCrawler(CrawlerBase[AzureServicePrincipalInfo]):
         super().__init__(sbe, "hive_metastore", schema, "azure_service_principals", AzureServicePrincipalInfo)
         self._ws = ws
 
-    def _crawl(self) -> list[AzureServicePrincipalInfo]:
+    def _crawl(self) -> Iterable[AzureServicePrincipalInfo]:
         all_relevant_service_principals = self._get_relevant_service_principals()
         deduped_service_principals = [dict(t) for t in {tuple(d.items()) for d in all_relevant_service_principals}]
         return list(self._assess_service_principals(deduped_service_principals))
@@ -51,17 +52,21 @@ class AzureServicePrincipalCrawler(CrawlerBase[AzureServicePrincipalInfo]):
                 secret = self._ws.secrets.get_secret(secret_scope, secret_key)
                 assert secret.value is not None
                 return base64.b64decode(secret.value).decode("utf-8")
-            except DatabricksError as err:
-                logger.warning(f"Error retrieving secret for {secret_matched.group(1)}. Error: {err}")
+            except NotFound:
+                logger.warning(f'removed on the backend: {"/".join(split)}')
+                return None
         return None
 
     def _get_azure_spn_tenant_id(self, config: dict, tenant_key: str) -> str | None:
         matching_key = [key for key in config.keys() if re.search(tenant_key, key)]
         if len(matching_key) > 0:
-            if re.search("spark_conf", matching_key[0]):
-                client_endpoint_list = config.get(matching_key[0]).get("value").split("/")
+            matched = matching_key[0]
+            if not matched:
+                return None
+            if re.search("spark_conf", matched):
+                client_endpoint_list = config.get(matched, {}).get("value", "").split("/")
             else:
-                client_endpoint_list = config.get(matching_key[0]).split("/")
+                client_endpoint_list = config.get(matched, "").split("/")
             if len(client_endpoint_list) == _CLIENT_ENDPOINT_LENGTH:
                 return client_endpoint_list[3]
         return None
@@ -74,7 +79,7 @@ class AzureServicePrincipalCrawler(CrawlerBase[AzureServicePrincipalInfo]):
             for key in matching_key_list:
                 storage_account_match = re.search(_STORAGE_ACCOUNT_EXTRACT_PATTERN, key)
                 if re.search("spark_conf", key):
-                    spn_application_id = config.get(key).get("value")
+                    spn_application_id = config.get(key, {}).get("value")
                 else:
                     spn_application_id = config.get(key)
                 if not spn_application_id:
@@ -109,7 +114,7 @@ class AzureServicePrincipalCrawler(CrawlerBase[AzureServicePrincipalInfo]):
                         "storage_account": storage_account,
                     }
                 )
-            return spn_list
+        return spn_list
 
     def _get_cluster_configs_from_all_jobs(self, all_jobs, all_clusters_by_id):
         for j in all_jobs:
@@ -208,11 +213,15 @@ class AzureServicePrincipalCrawler(CrawlerBase[AzureServicePrincipalInfo]):
                 if warehouse_config_dict:
                     if _azure_sp_conf_present_check(warehouse_config_dict):
                         return self._get_azure_spn_list(warehouse_config_dict)
+        return []
 
     def _list_all_pipeline_with_spn_in_spark_conf(self) -> list:
         azure_spn_list_with_data_access_from_pipeline = []
         for pipeline in self._ws.pipelines.list_pipelines():
-            pipeline_config = self._ws.pipelines.get(pipeline.pipeline_id).spec.configuration
+            assert pipeline.pipeline_id is not None
+            pipeline_info = self._ws.pipelines.get(pipeline.pipeline_id)
+            assert pipeline_info.spec is not None
+            pipeline_config = pipeline_info.spec.configuration
             if pipeline_config:
                 if not _azure_sp_conf_present_check(pipeline_config):
                     continue
@@ -232,9 +241,9 @@ class AzureServicePrincipalCrawler(CrawlerBase[AzureServicePrincipalInfo]):
             )
             yield spn_info
 
-    def snapshot(self) -> list[AzureServicePrincipalInfo]:
+    def snapshot(self) -> Iterable[AzureServicePrincipalInfo]:
         return self._snapshot(self._try_fetch, self._crawl)
 
-    def _try_fetch(self) -> list[AzureServicePrincipalInfo]:
+    def _try_fetch(self) -> Iterable[AzureServicePrincipalInfo]:
         for row in self._fetch(f"SELECT * FROM {self._schema}.{self._table}"):
             yield AzureServicePrincipalInfo(*row)

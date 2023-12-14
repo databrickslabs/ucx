@@ -3,7 +3,8 @@ import logging
 import os
 import pkgutil
 from abc import ABC, abstractmethod
-from collections.abc import Callable, Iterator, Sequence
+from collections.abc import Callable, Iterable, Iterator, Sequence
+from types import UnionType
 from typing import Any, ClassVar, Generic, Protocol, TypeVar
 
 from databricks.sdk import WorkspaceClient
@@ -18,9 +19,9 @@ class DataclassInstance(Protocol):
     __dataclass_fields__: ClassVar[dict]
 
 
-Dataclass = type[DataclassInstance]
 Result = TypeVar("Result", bound=DataclassInstance)
-ResultFn = Callable[[], Sequence[Result]]
+Dataclass = type[DataclassInstance]
+ResultFn = Callable[[], Iterable[Result]]
 
 
 class SqlBackend(ABC):
@@ -42,27 +43,25 @@ class SqlBackend(ABC):
 
     _builtin_type_mapping: ClassVar[dict[type, str]] = {
         str: "STRING",
-        str | None: "STRING",
         int: "INT",
-        int | None: "INT",
         bool: "BOOLEAN",
-        bool | None: "BOOLEAN",
         float: "FLOAT",
-        float | None: "FLOAT",
     }
 
     @classmethod
     def _schema_for(cls, klass: Dataclass):
         fields = []
         for f in dataclasses.fields(klass):
-            # TODO: (nfx) fix inference
-            if f.type not in cls._builtin_type_mapping:
-                msg = f"Cannot auto-convert {f.type}"
+            field_type = f.type
+            if isinstance(field_type, UnionType):
+                field_type = field_type.__args__[0]
+            if field_type not in cls._builtin_type_mapping:
+                msg = f"Cannot auto-convert {field_type}"
                 raise SyntaxError(msg)
             not_null = " NOT NULL"
             if f.default is None:
                 not_null = ""
-            spark_type = cls._builtin_type_mapping[f.type]
+            spark_type = cls._builtin_type_mapping[field_type]
             fields.append(f"{f.name} {spark_type}{not_null}")
         return ", ".join(fields)
 
@@ -122,17 +121,20 @@ class StatementExecutionBackend(SqlBackend):
         data = []
         for f in fields:
             value = getattr(row, f.name)
+            field_type = f.type
+            if isinstance(field_type, UnionType):
+                field_type = field_type.__args__[0]
             if value is None:
                 data.append("NULL")
-            elif f.type == bool:
+            elif field_type == bool:
                 data.append("TRUE" if value else "FALSE")
-            elif f.type == str:
+            elif field_type == str:
                 value = str(value).replace("'", "''")
                 data.append(f"'{value}'")
-            elif f.type == int:
+            elif field_type == int:
                 data.append(f"{value}")
             else:
-                msg = f"unknown type: {f.type}"
+                msg = f"unknown type: {field_type}"
                 raise ValueError(msg)
         return ", ".join(data)
 
@@ -216,7 +218,7 @@ class CrawlerBase(Generic[Result]):
         return name
 
     @classmethod
-    def _try_valid(cls, name: str):
+    def _try_valid(cls, name: str | None):
         """
         Tries to validate a name. If None, returns None.
 

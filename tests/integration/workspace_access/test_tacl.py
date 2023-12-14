@@ -1,10 +1,11 @@
 import logging
 
 from databricks.labs.ucx.hive_metastore import GrantsCrawler
-from databricks.labs.ucx.workspace_access.groups import MigratedGroup, MigrationState
+from databricks.labs.ucx.workspace_access.groups import MigratedGroup
 from databricks.labs.ucx.workspace_access.tacl import TableAclSupport
 
 from ..conftest import StaticTablesCrawler
+from . import apply_tasks
 
 logger = logging.getLogger(__name__)
 
@@ -22,19 +23,13 @@ def test_permission_for_files_anonymous_func(sql_backend, inventory_schema, make
     grants = GrantsCrawler(tables)
 
     tacl_support = TableAclSupport(grants, sql_backend)
-
-    migration_state = MigrationState(
+    apply_tasks(
+        tacl_support,
         [
-            MigratedGroup.partial_info(group_a, group_b),
-            MigratedGroup.partial_info(group_c, group_d),
-        ]
+            MigratedGroup.partial_info(group_a, group_c),
+            MigratedGroup.partial_info(group_b, group_d),
+        ],
     )
-    for crawler_task in tacl_support.get_crawler_tasks():
-        permission = crawler_task()
-        apply_task = tacl_support.get_apply_task(permission, migration_state)
-        if not apply_task:
-            continue
-        apply_task()
 
     any_file_actual = {}
     for any_file_grant in grants._grants(any_file=True):
@@ -75,19 +70,13 @@ def test_owner_permissions_for_tables_and_schemas(sql_backend, inventory_schema,
 
     tacl_support = TableAclSupport(grants, sql_backend)
 
-    migration_state = MigrationState(
+    apply_tasks(
+        tacl_support,
         [
             MigratedGroup.partial_info(group_a, group_c),
             MigratedGroup.partial_info(group_b, group_d),
-        ]
+        ],
     )
-
-    for crawler_task in tacl_support.get_crawler_tasks():
-        permission = crawler_task()
-        apply_task = tacl_support.get_apply_task(permission, migration_state)
-        if not apply_task:
-            continue
-        apply_task()
 
     table_grants = grants.for_table_info(table_info)
     assert group_a.display_name not in table_grants

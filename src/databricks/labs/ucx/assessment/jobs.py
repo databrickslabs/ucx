@@ -1,4 +1,5 @@
 import json
+from collections.abc import Iterable
 from dataclasses import dataclass
 
 from databricks.sdk import WorkspaceClient
@@ -51,15 +52,17 @@ class JobsCrawler(CrawlerBase[JobInfo]):
                 elif t.new_cluster is not None:
                     yield j, t.new_cluster
 
-    def _crawl(self) -> list[JobInfo]:
+    def _crawl(self) -> Iterable[JobInfo]:
         all_jobs = list(self._ws.jobs.list(expand_tasks=True))
         all_clusters = {c.cluster_id: c for c in self._ws.clusters.list()}
         return self._assess_jobs(all_jobs, all_clusters)
 
-    def _assess_jobs(self, all_jobs: list[BaseJob], all_clusters_by_id) -> list[JobInfo]:
-        job_assessment = {}
-        job_details = {}
+    def _assess_jobs(self, all_jobs: list[BaseJob], all_clusters_by_id) -> Iterable[JobInfo]:
+        job_assessment: dict[int, set[str]] = {}
+        job_details: dict[int, JobInfo] = {}
         for job in all_jobs:
+            if not job.job_id:
+                continue
             job_assessment[job.job_id] = set()
             if not job.creator_user_name:
                 logger.warning(
@@ -67,9 +70,14 @@ class JobsCrawler(CrawlerBase[JobInfo]):
                     f"and should be re-created"
                 )
 
+            job_settings = job.settings
+            assert job_settings is not None
+            job_name = job_settings.name
+            if not job_name:
+                job_name = "Unknown"
             job_details[job.job_id] = JobInfo(
                 job_id=str(job.job_id),
-                job_name=job.settings.name,
+                job_name=job_name,
                 creator=job.creator_user_name,
                 success=1,
                 failures="[]",
@@ -77,33 +85,36 @@ class JobsCrawler(CrawlerBase[JobInfo]):
 
         for job, cluster_config in self._get_cluster_configs_from_all_jobs(all_jobs, all_clusters_by_id):
             support_status = spark_version_compatibility(cluster_config.spark_version)
+            job_id = job.job_id
+            if not job_id:
+                continue
             if support_status != "supported":
-                job_assessment[job.job_id].add(f"not supported DBR: {cluster_config.spark_version}")
+                job_assessment[job_id].add(f"not supported DBR: {cluster_config.spark_version}")
 
             if cluster_config.spark_conf is not None:
                 for k in INCOMPATIBLE_SPARK_CONFIG_KEYS:
                     if k in cluster_config.spark_conf:
-                        job_assessment[job.job_id].add(f"unsupported config: {k}")
+                        job_assessment[job_id].add(f"unsupported config: {k}")
 
                 for value in cluster_config.spark_conf.values():
                     if "dbfs:/mnt" in value or "/dbfs/mnt" in value:
-                        job_assessment[job.job_id].add(f"using DBFS mount in configuration: {value}")
+                        job_assessment[job_id].add(f"using DBFS mount in configuration: {value}")
 
                 # Checking if Azure cluster config is present in spark config
                 if _azure_sp_conf_present_check(cluster_config.spark_conf):
-                    job_assessment[job.job_id].add(f"{_AZURE_SP_CONF_FAILURE_MSG} Job cluster.")
+                    job_assessment[job_id].add(f"{_AZURE_SP_CONF_FAILURE_MSG} Job cluster.")
 
             # Checking if Azure cluster config is present in cluster policies
             if cluster_config.policy_id:
                 policy = self._safe_get_cluster_policy(cluster_config.policy_id)
-
-                if policy is not None:
-                    if policy.definition:
-                        if _azure_sp_conf_present_check(json.loads(policy.definition)):
-                            job_assessment[job.job_id].add(f"{_AZURE_SP_CONF_FAILURE_MSG} Job cluster.")
-                    if policy.policy_family_definition_overrides:
-                        if _azure_sp_conf_present_check(json.loads(policy.policy_family_definition_overrides)):
-                            job_assessment[job.job_id].add(f"{_AZURE_SP_CONF_FAILURE_MSG} Job cluster.")
+                if policy is None:
+                    continue
+                if policy.definition:
+                    if _azure_sp_conf_present_check(json.loads(policy.definition)):
+                        job_assessment[job_id].add(f"{_AZURE_SP_CONF_FAILURE_MSG} Job cluster.")
+                if policy.policy_family_definition_overrides:
+                    if _azure_sp_conf_present_check(json.loads(policy.policy_family_definition_overrides)):
+                        job_assessment[job_id].add(f"{_AZURE_SP_CONF_FAILURE_MSG} Job cluster.")
 
             if cluster_config.init_scripts:
                 for init_script_info in cluster_config.init_scripts:
@@ -112,7 +123,7 @@ class JobsCrawler(CrawlerBase[JobInfo]):
                         continue
                     if not _azure_sp_conf_in_init_scripts(init_script_data):
                         continue
-                    job_assessment[job.job_id].add(f"{_AZURE_SP_CONF_FAILURE_MSG} Job cluster.")
+                    job_assessment[job_id].add(f"{_AZURE_SP_CONF_FAILURE_MSG} Job cluster.")
 
         for job_key in job_details.keys():
             job_details[job_key].failures = json.dumps(list(job_assessment[job_key]))
@@ -127,9 +138,9 @@ class JobsCrawler(CrawlerBase[JobInfo]):
             logger.warning(f"The cluster policy was deleted: {policy_id}")
             return None
 
-    def snapshot(self) -> list[JobInfo]:
+    def snapshot(self) -> Iterable[JobInfo]:
         return self._snapshot(self._try_fetch, self._crawl)
 
-    def _try_fetch(self) -> list[JobInfo]:
+    def _try_fetch(self) -> Iterable[JobInfo]:
         for row in self._fetch(f"SELECT * FROM {self._schema}.{self._table}"):
             yield JobInfo(*row)

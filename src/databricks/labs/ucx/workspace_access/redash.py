@@ -1,7 +1,7 @@
 import dataclasses
 import json
 import logging
-from collections.abc import Callable
+from collections.abc import Callable, Iterable
 from dataclasses import dataclass
 from datetime import timedelta
 from functools import partial
@@ -30,7 +30,7 @@ class SqlPermissionsInfo:
 
 
 class Listing:
-    def __init__(self, func: Callable[..., list], request_type: sql.ObjectTypePlural):
+    def __init__(self, func: Callable[..., Iterable], request_type: sql.ObjectTypePlural):
         self._func = func
         self._request_type = request_type
         self.object_type = request_type.value
@@ -50,9 +50,9 @@ class RedashPermissionsSupport(AclSupport):
 
     @staticmethod
     def _is_item_relevant(item: Permissions, migration_state: MigrationState) -> bool:
-        mentioned_groups = [
-            acl.group_name for acl in sql.GetResponse.from_dict(json.loads(item.raw)).access_control_list
-        ]
+        permissions_response = sql.GetResponse.from_dict(json.loads(item.raw))
+        assert permissions_response.access_control_list is not None
+        mentioned_groups = [acl.group_name for acl in permissions_response.access_control_list]
         return any(g in mentioned_groups for g in [info.name_in_workspace for info in migration_state.groups])
 
     def get_crawler_tasks(self):
@@ -69,9 +69,9 @@ class RedashPermissionsSupport(AclSupport):
     def get_apply_task(self, item: Permissions, migration_state: MigrationState):
         if not self._is_item_relevant(item, migration_state):
             return None
-        new_acl = self._prepare_new_acl(
-            sql.GetResponse.from_dict(json.loads(item.raw)).access_control_list, migration_state
-        )
+        permissions = sql.GetResponse.from_dict(json.loads(item.raw))
+        assert permissions.access_control_list is not None
+        new_acl = self._prepare_new_acl(permissions.access_control_list, migration_state)
         return partial(
             self._applier_task,
             object_type=sql.ObjectTypePlural(item.object_type),
@@ -95,12 +95,14 @@ class RedashPermissionsSupport(AclSupport):
                 object_type=object_type.value,
                 raw=json.dumps(permissions.as_dict()),
             )
+        return None
 
     def _inflight_check(self, object_type: sql.ObjectTypePlural, object_id: str, acl: list[sql.AccessControl]):
         # in-flight check for the applied permissions
         # the api might be inconsistent, therefore we need to check that the permissions were applied
         remote_permission = self._safe_get_dbsql_permissions(object_type, object_id)
         if remote_permission:
+            assert remote_permission.access_control_list is not None
             if all(elem in remote_permission.access_control_list for elem in acl):
                 return True
             else:
@@ -135,6 +137,8 @@ class RedashPermissionsSupport(AclSupport):
         """
         acl_requests: list[sql.AccessControl] = []
         for access_control in acl:
+            if not access_control.group_name:
+                continue
             if not migration_state.is_in_scope(access_control.group_name):
                 logger.debug(f"Skipping redash item for `{access_control.group_name}`: not in scope")
                 acl_requests.append(access_control)
@@ -152,6 +156,8 @@ class RedashPermissionsSupport(AclSupport):
     def _safe_set_permissions(
         self, object_type: ObjectTypePlural, object_id: str, acl: list[sql.AccessControl] | None
     ) -> SetResponse | None:
+        assert acl is not None
+
         def hash_permissions(permissions: list[sql.AccessControl]):
             return {
                 hash((permission.permission_level, permission.user_name, permission.group_name))
@@ -160,6 +166,7 @@ class RedashPermissionsSupport(AclSupport):
 
         try:
             res = self._ws.dbsql_permissions.set(object_type=object_type, object_id=object_id, access_control_list=acl)
+            assert res.access_control_list is not None
             if hash_permissions(acl).issubset(hash_permissions(res.access_control_list)):
                 return res
             else:
@@ -178,8 +185,8 @@ class RedashPermissionsSupport(AclSupport):
 
 def redash_listing_wrapper(
     func: Callable[..., list], object_type: sql.ObjectTypePlural
-) -> Callable[..., list[SqlPermissionsInfo]]:
-    def wrapper() -> list[SqlPermissionsInfo]:
+) -> Callable[..., Iterable[SqlPermissionsInfo]]:
+    def wrapper() -> Iterable[SqlPermissionsInfo]:
         for item in func():
             yield SqlPermissionsInfo(
                 object_id=item.id,
