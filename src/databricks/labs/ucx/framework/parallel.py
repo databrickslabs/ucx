@@ -36,15 +36,18 @@ class Threads(Generic[Result]):
 
     @classmethod
     def gather(
-        cls, name: str, tasks: list[Callable[..., Result]], num_threads: int | None = None
-    ) -> (list[Result], list[Exception]):
+        cls, name: str, tasks: list[Callable[[], Result]], num_threads: int | None = None
+    ) -> tuple[list[Result], list[Exception]]:
         if num_threads is None:
-            num_threads = os.cpu_count() * 2
+            num_cpus = os.cpu_count()
+            if num_cpus is None:
+                num_cpus = 1
+            num_threads = num_cpus * 2
             if num_threads < MIN_THREADS:
                 num_threads = MIN_THREADS
         return cls(name, tasks, num_threads=num_threads)._run()
 
-    def _run(self) -> (list[Result], list[Exception]):
+    def _run(self) -> tuple[list[Result], list[Exception]]:
         given_cnt = len(self._tasks)
         if given_cnt == 0:
             return [], []

@@ -49,6 +49,8 @@ dependencies = [
     "black>=23.1.0",
     "ruff>=0.0.243",
     "isort>=2.5.0",
+    "mypy",
+    "types-PyYAML",
 ]
 
 python="3.10"

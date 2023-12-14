@@ -926,12 +926,11 @@ class WorkspaceInstaller:
 
     def _build_wheel(self, tmp_dir: str, *, verbose: bool = False):
         """Helper to build the wheel package"""
-        streams = {}
+        stdout = subprocess.STDOUT
+        stderr = subprocess.STDOUT
         if not verbose:
-            streams = {
-                "stdout": subprocess.DEVNULL,
-                "stderr": subprocess.DEVNULL,
-            }
+            stdout = subprocess.DEVNULL
+            stderr = subprocess.DEVNULL
         project_root = self._find_project_root()
         is_non_released_version = "+" in self._version
         if (project_root / ".git" / "config").exists() and is_non_released_version:
@@ -946,9 +945,10 @@ class WorkspaceInstaller:
             project_root = tmp_dir_path
         logger.debug(f"Building wheel for {project_root} in {tmp_dir}")
         subprocess.run(
-            [sys.executable, "-m", "pip", "wheel", "--no-deps", "--wheel-dir", tmp_dir, project_root],
-            **streams,
+            [sys.executable, "-m", "pip", "wheel", "--no-deps", "--wheel-dir", tmp_dir, project_root.as_posix()],
             check=True,
+            stdout=stdout,
+            stderr=stderr,
         )
         # get wheel name as first file in the temp directory
         return next(Path(tmp_dir).glob("*.whl"))
@@ -1040,10 +1040,12 @@ class WorkspaceInstaller:
         for step, job_id in self._state.jobs.items():
             try:
                 job_runs = list(self._ws.jobs.list_runs(job_id=job_id, limit=1))
+                state = job_runs[0].state
+                result_state = state.result_state if state else None
                 latest_status.append(
                     {
                         "step": step,
-                        "state": "UNKNOWN" if not job_runs else str(job_runs[0].state.result_state),
+                        "state": "UNKNOWN" if not job_runs else str(result_state),
                         "started": "<never run>" if not job_runs else job_runs[0].start_time,
                     }
                 )

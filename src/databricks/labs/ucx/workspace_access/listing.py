@@ -48,9 +48,11 @@ class WorkspaceListing:
         list_retried_check = list_retry_on_value_error(self._ws.workspace.list)
         return list_retried_check(path=path, recursive=False)
 
-    def _list_and_analyze(self, obj: ObjectInfo) -> (list[ObjectInfo], list[ObjectInfo]):
+    def _list_and_analyze(self, obj: ObjectInfo) -> tuple[list[ObjectInfo], list[ObjectInfo]]:
         directories = []
         others = []
+        if not obj.path:
+            return [], []
         try:
             grouped_iterator = groupby(
                 self._list_workspace(obj.path), key=lambda x: x.object_type == ObjectType.DIRECTORY
