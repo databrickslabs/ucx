@@ -205,7 +205,7 @@ class WorkspaceConfig(_Config["WorkspaceConfig"]):
     # Starting path for notebooks and directories crawler
     workspace_start_path: str = "/"
     instance_profile: str | None = None
-    spark_conf: dict[str, str]  | None = None
+    spark_conf: dict[str, str] | None = None
 
     override_clusters: dict[str, str] | None = None
     custom_cluster_policy_id: str | None = None

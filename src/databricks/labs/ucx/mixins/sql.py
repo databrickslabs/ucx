@@ -14,10 +14,11 @@ from databricks.sdk.service.sql import (
     ExecuteStatementResponse,
     Format,
     ResultData,
+    ServiceError,
     ServiceErrorCode,
     StatementExecutionAPI,
     StatementState,
-    StatementStatus, ServiceError,
+    StatementStatus,
 )
 
 MAX_SLEEP_PER_ATTEMPT = 10
@@ -97,10 +98,10 @@ class StatementExecutionExt(StatementExecutionAPI):
             return
         status_error = status.error
         if status_error is None:
-            status_error = ServiceError(message='unknown', error_code=ServiceErrorCode.UNKNOWN)
+            status_error = ServiceError(message="unknown", error_code=ServiceErrorCode.UNKNOWN)
         error_message = status_error.message
         if error_message is None:
-            error_message = ''
+            error_message = ""
         if "SCHEMA_NOT_FOUND" in error_message:
             raise NotFound(error_message)
         if "TABLE_OR_VIEW_NOT_FOUND" in error_message:
@@ -172,12 +173,14 @@ class StatementExecutionExt(StatementExecutionAPI):
         deadline = time.time() + timeout.total_seconds()
         statement_id = immediate_response.statement_id
         if not statement_id:
-            raise ValueError(f'No statement id: {immediate_response}')
+            msg = f"No statement id: {immediate_response}"
+            raise ValueError(msg)
         while time.time() < deadline:
             res = self.get_statement(statement_id)
             result_status = res.status
             if not result_status:
-                raise ValueError(f'Result status is none: {res}')
+                msg = f"Result status is none: {res}"
+                raise ValueError(msg)
             state = result_status.state
             if not state:
                 state = StatementState.FAILED
@@ -215,10 +218,12 @@ class StatementExecutionExt(StatementExecutionAPI):
         col_conv = []
         manifest = execute_response.manifest
         if not manifest:
-            raise ValueError(f'missing manifest: {execute_response}')
+            msg = f"missing manifest: {execute_response}"
+            raise ValueError(msg)
         manifest_schema = manifest.schema
         if not manifest_schema:
-            raise ValueError(f'missing schema: {manifest}')
+            msg = f"missing schema: {manifest}"
+            raise ValueError(msg)
         columns = manifest_schema.columns
         if not columns:
             columns = []
