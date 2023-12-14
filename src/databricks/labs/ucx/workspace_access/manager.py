@@ -2,7 +2,7 @@ import json
 import logging
 import os
 from itertools import groupby
-from typing import Callable, Iterable, Iterator, Sequence
+from collections.abc import Callable, Iterable, Iterator, Sequence
 
 from databricks.sdk import WorkspaceClient
 from databricks.sdk.service import sql
