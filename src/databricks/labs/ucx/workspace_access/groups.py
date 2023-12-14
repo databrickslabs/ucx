@@ -471,7 +471,7 @@ class GroupManager(CrawlerBase[MigratedGroup]):
         raw = self._ws.api_client.do("GET", "/api/2.0/account/scim/v2/Groups", query={"attributes": scim_attributes})
         for r in raw.get("Resources", []):  # type: ignore[union-attr]
             g = iam.Group.from_dict(r)
-            if g.display_name not in self._SYSTEM_GROUPS:
+            if g.display_name in self._SYSTEM_GROUPS:
                 continue
             account_groups.append(g)
         logger.info(f"Found {len(account_groups)} account groups")

@@ -12,7 +12,7 @@ from tests.unit.framework.mocks import MockBackend
 
 def test_snapshot_with_group_created_in_account_console_should_be_considered():
     backend = MockBackend()
-    wsclient = MagicMock()
+    ws = MagicMock()
     group = Group(
         id="1",
         external_id="1234",
@@ -25,13 +25,14 @@ def test_snapshot_with_group_created_in_account_console_should_be_considered():
         ],
         entitlements=[ComplexValue(value="allow-cluster-create"), ComplexValue(value="allow-instance-pool-create")],
     )
-    wsclient.groups.list.return_value = [group]
+    ws.groups.list.return_value = [group]
     account_admins_group = Group(id="1234", external_id="1234", display_name="de")
-    wsclient.groups.get.return_value = group
-    wsclient.api_client.do.return_value = {
+    ws.groups.get.return_value = group
+    ws.api_client.do.return_value = {
         "Resources": [g.as_dict() for g in [account_admins_group]],
     }
-    res = GroupManager(backend, wsclient, inventory_database="inv").snapshot()
+    group_manager = GroupManager(backend, ws, inventory_database="inv")
+    res = group_manager.snapshot()
     assert res == [
         MigratedGroup(
             id_in_workspace="1",
