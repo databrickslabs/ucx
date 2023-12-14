@@ -1,6 +1,6 @@
 import logging
 import re
-from collections.abc import Iterator
+from collections.abc import Iterable, Iterator
 from dataclasses import dataclass
 from functools import partial
 
@@ -112,12 +112,12 @@ class TablesCrawler(CrawlerBase):
         # Convert key-value pairs to dictionary
         return dict(key_value_pairs)
 
-    def _try_load(self):
+    def _try_load(self) -> Iterable[Table]:
         """Tries to load table information from the database or throws TABLE_OR_VIEW_NOT_FOUND error"""
         for row in self._fetch(f"SELECT * FROM {self._full_name}"):
             yield Table(*row)
 
-    def _crawl(self) -> list[Table]:
+    def _crawl(self) -> Iterable[Table]:
         """Crawls and lists tables within the specified catalog and database.
 
         After performing initial scan of all tables, starts making parallel

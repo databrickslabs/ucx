@@ -16,10 +16,10 @@ logger = logging.getLogger(__name__)
 class Grant:
     principal: str
     action_type: str
-    catalog: str
-    database: str = None
-    table: str = None
-    view: str = None
+    catalog: str | None = None
+    database: str | None = None
+    table: str | None = None
+    view: str | None = None
     any_file: bool = False
     anonymous_function: bool = False
 
@@ -32,7 +32,7 @@ class Grant:
         view: str | None = None,
         any_file: bool = False,
         anonymous_function: bool = False,
-    ) -> (str, str):
+    ) -> tuple[str, str]:
         if table is not None:
             catalog = "hive_metastore" if catalog is None else catalog
             database = "default" if database is None else database

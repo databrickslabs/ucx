@@ -1,4 +1,5 @@
 import json
+from collections.abc import Iterable, Iterator
 from dataclasses import dataclass
 
 from databricks.sdk import WorkspaceClient
@@ -25,7 +26,7 @@ class PipelinesCrawler(CrawlerBase[PipelineInfo]):
         super().__init__(sbe, "hive_metastore", schema, "pipelines", PipelineInfo)
         self._ws = ws
 
-    def _crawl(self) -> list[PipelineInfo]:
+    def _crawl(self) -> Iterable[PipelineInfo]:
         all_pipelines = list(self._ws.pipelines.list_pipelines())
         return list(self._assess_pipelines(all_pipelines))
 
@@ -58,6 +59,6 @@ class PipelinesCrawler(CrawlerBase[PipelineInfo]):
     def snapshot(self) -> list[PipelineInfo]:
         return self._snapshot(self._try_fetch, self._crawl)
 
-    def _try_fetch(self) -> list[PipelineInfo]:
+    def _try_fetch(self) -> Iterator[PipelineInfo]:
         for row in self._fetch(f"SELECT * FROM {self._schema}.{self._table}"):
             yield PipelineInfo(*row)

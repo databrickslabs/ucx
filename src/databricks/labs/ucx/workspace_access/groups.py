@@ -301,7 +301,7 @@ class GroupManager(CrawlerBase[MigratedGroup]):
         ws: WorkspaceClient,
         inventory_database: str,
         include_group_names: list[str] | None = None,
-        renamed_group_prefix: str = "ucx-renamed-",
+        renamed_group_prefix: str | None = "ucx-renamed-",
         workspace_group_regex: str | None = None,
         workspace_group_replace: str | None = None,
         account_group_regex: str | None = None,
@@ -310,6 +310,9 @@ class GroupManager(CrawlerBase[MigratedGroup]):
         external_id_match: bool = False,
     ):
         super().__init__(sql_backend, "hive_metastore", inventory_database, "groups", MigratedGroup)
+        if not renamed_group_prefix:
+            renamed_group_prefix = "ucx-renamed-"
+
         self._ws = ws
         self._include_group_names = include_group_names
         self._renamed_group_prefix = renamed_group_prefix
@@ -467,17 +470,13 @@ class GroupManager(CrawlerBase[MigratedGroup]):
         # TODO: we should avoid using this method, as it's not documented
         # get account-level groups even if they're not (yet) assigned to a workspace
         logger.info(f"Listing account groups with {scim_attributes}...")
-        account_groups = [
-            iam.Group.from_dict(r)
-            for r in self._ws.api_client.do(
-                "get",
-                "/api/2.0/account/scim/v2/Groups",
-                query={"attributes": scim_attributes},
-            ).get(
-                "Resources", []
-            )  # type: ignore[union-attr]
-        ]
-        account_groups = [g for g in account_groups if g.display_name not in self._SYSTEM_GROUPS]
+        account_groups = []
+        raw = self._ws.api_client.do("GET", "/api/2.0/account/scim/v2/Groups", query={"attributes": scim_attributes})
+        for r in raw.get("Resources", []):  # type: ignore[union-attr]
+            g = iam.Group.from_dict(r)
+            if g.display_name not in self._SYSTEM_GROUPS:
+                continue
+            account_groups.append(g)
         logger.info(f"Found {len(account_groups)} account groups")
         sorted_groups: list[iam.Group] = sorted(account_groups, key=lambda _: _.display_name)  # type: ignore[arg-type,return-value]
         return sorted_groups

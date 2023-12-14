@@ -1,7 +1,6 @@
 import logging
 
-from databricks.labs.ucx.hive_metastore.data_objects import ExternalLocations
-from databricks.labs.ucx.hive_metastore.locations import Mount
+from databricks.labs.ucx.hive_metastore.locations import ExternalLocations, Mount
 from databricks.labs.ucx.hive_metastore.tables import Table
 
 logger = logging.getLogger(__name__)

@@ -1,4 +1,5 @@
 import json
+from collections.abc import Iterable
 from dataclasses import dataclass
 
 from databricks.sdk import WorkspaceClient
@@ -31,7 +32,7 @@ class ClustersCrawler(CrawlerBase[ClusterInfo]):
         super().__init__(sbe, "hive_metastore", schema, "clusters", ClusterInfo)
         self._ws = ws
 
-    def _crawl(self) -> list[ClusterInfo]:
+    def _crawl(self) -> Iterable[ClusterInfo]:
         all_clusters = list(self._ws.clusters.list())
         return list(self._assess_clusters(all_clusters))
 
@@ -102,9 +103,9 @@ class ClustersCrawler(CrawlerBase[ClusterInfo]):
             logger.warning(f"The cluster policy was deleted: {policy_id}")
             return None
 
-    def snapshot(self) -> list[ClusterInfo]:
+    def snapshot(self) -> Iterable[ClusterInfo]:
         return self._snapshot(self._try_fetch, self._crawl)
 
-    def _try_fetch(self) -> list[ClusterInfo]:
+    def _try_fetch(self) -> Iterable[ClusterInfo]:
         for row in self._fetch(f"SELECT * FROM {self._schema}.{self._table}"):
             yield ClusterInfo(*row)

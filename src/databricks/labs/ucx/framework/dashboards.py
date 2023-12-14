@@ -93,7 +93,7 @@ class DashboardFromFiles:
         dashboard_id = self._state.dashboards[dashboard_ref]
         return f"{self._ws.config.host}/sql/dashboards/{dashboard_id}"
 
-    def create_dashboards(self) -> dict:
+    def create_dashboards(self) -> dict[str, str]:
         queries_per_dashboard = {}
         # Iterate over dashboards for each step, represented as first-level folders
         step_folders = [f for f in self._local_folder.glob("*") if f.is_dir()]
