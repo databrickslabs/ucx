@@ -15,7 +15,7 @@ from databricks.sdk.service import iam, ml
 from databricks.sdk.service.iam import PermissionLevel
 
 from databricks.labs.ucx.framework.crawlers import CrawlerBase, SqlBackend
-from databricks.labs.ucx.framework.parallel import Threads
+from databricks.labs.ucx.framework.parallel import ManyError, Threads
 from databricks.labs.ucx.mixins.hardening import rate_limited
 from databricks.labs.ucx.workspace_access.base import AclSupport, Permissions
 from databricks.labs.ucx.workspace_access.groups import MigrationState
@@ -333,6 +333,7 @@ def models_listing(ws: WorkspaceClient, num_threads: int):
         models, errors = Threads.gather("listing model ids", tasks, num_threads)
         if len(errors) > 0:
             logger.error(f"Detected {len(errors)} errors while listing models")
+            raise ManyError(errors)
         for model in models:
             yield model.registered_model_databricks
 

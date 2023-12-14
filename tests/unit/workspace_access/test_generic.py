@@ -17,6 +17,7 @@ from databricks.sdk.service.jobs import BaseJob
 from databricks.sdk.service.pipelines import PipelineStateInfo
 from databricks.sdk.service.workspace import Language, ObjectInfo, ObjectType
 
+from databricks.labs.ucx.framework.parallel import ManyError
 from databricks.labs.ucx.mixins.sql import Row
 from databricks.labs.ucx.workspace_access.generic import (
     GenericPermissionsSupport,
@@ -226,6 +227,17 @@ def test_models_listing():
     assert len(result) == 2
     assert result[0].object_id == "some-id"
     assert result[0].request_type == "registered-models"
+
+
+def test_models_listing_failure_raise_error():
+    ws = MagicMock()
+    ws.model_registry.list_models.return_value = [ml.Model(name="test")]
+    ws.model_registry.get_model.side_effect = InternalError(...)
+
+    wrapped = Listing(models_listing(ws, 2), id_attribute="id", object_type="registered-models")
+    with pytest.raises(ManyError) as e:
+        list(wrapped)
+    assert e.type == ManyError
 
 
 def test_experiment_listing():
