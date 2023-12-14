@@ -301,7 +301,7 @@ def test_rename_groups_should_fail_if_error_is_thrown():
     gm = GroupManager(backend, wsclient, inventory_database="inv", renamed_group_prefix="test-group-")
     with pytest.raises(ManyError) as e:
         gm.rename_groups()
-    assert e.value.args[0] == 'Detected 1 failures: Something bad'
+    assert e.value.args[0] == "Detected 1 failures: Something bad"
 
 
 def test_reflect_account_groups_on_workspace_should_be_called_for_eligible_groups():
