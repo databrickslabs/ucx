@@ -1,6 +1,5 @@
 import logging
 import re
-import string
 from collections.abc import Iterator
 from dataclasses import dataclass
 from functools import partial
@@ -22,11 +21,11 @@ class Table:
     object_type: str
     table_format: str
 
-    location: str = None
-    view_text: str = None
-    upgraded_to: str = None
+    location: str | None = None
+    view_text: str | None = None
+    upgraded_to: str | None = None
 
-    storage_properties: str = None
+    storage_properties: str | None = None
 
     @property
     def is_delta(self) -> bool:
@@ -79,8 +78,8 @@ class Table:
 class TableError:
     catalog: str
     database: str
-    name: str = None
-    error: str = None
+    name: str | None = None
+    error: str | None = None
 
 
 class TablesCrawler(CrawlerBase):
@@ -107,7 +106,7 @@ class TablesCrawler(CrawlerBase):
         return self._snapshot(partial(self._try_load), partial(self._crawl))
 
     @staticmethod
-    def _parse_table_props(tbl_props: string) -> {}:
+    def _parse_table_props(tbl_props: str) -> dict:
         pattern = r"([^,\[\]]+)=([^,\[\]]+)"
         key_value_pairs = re.findall(pattern, tbl_props)
         # Convert key-value pairs to dictionary
@@ -144,6 +143,14 @@ class TablesCrawler(CrawlerBase):
             logger.error(f"Detected {len(errors)} while scanning tables in {catalog}")
         return catalog_tables
 
+    @staticmethod
+    def _safe_norm(value: str | None, *, lower: bool = True) -> str | None:
+        if not value:
+            return None
+        if lower:
+            return value.lower()
+        return value.upper()
+
     def _describe(self, catalog: str, database: str, table: str) -> Table | None:
         """Fetches metadata like table type, data format, external table location,
         and the text of a view if specified for a specific table within the given
@@ -156,17 +163,17 @@ class TablesCrawler(CrawlerBase):
             for key, value, _ in self._fetch(f"DESCRIBE TABLE EXTENDED {full_name}"):
                 describe[key] = value
             return Table(
-                catalog=None if describe["Catalog"] is None else describe["Catalog"].lower(),
-                database=None if database is None else database.lower(),
-                name=None if table is None else table.lower(),
-                object_type=None if describe["Type"] is None else describe["Type"].upper(),
-                table_format=describe.get("Provider", "").upper(),
+                catalog=catalog.lower(),
+                database=database.lower(),
+                name=table.lower(),
+                object_type=describe.get("Type", "UNKNOWN").upper(),
+                table_format=describe.get("Provider", "UNKNOWN").upper(),
                 location=describe.get("Location", None),
                 view_text=describe.get("View Text", None),
                 upgraded_to=self._parse_table_props(describe.get("Table Properties", "").lower()).get(
                     "upgraded_to", None
                 ),
-                storage_properties=self._parse_table_props(describe.get("Storage Properties", "").lower()),
+                storage_properties=self._parse_table_props(describe.get("Storage Properties", "").lower()),  # type: ignore[arg-type]
             )
         except Exception as e:
             # TODO: https://github.com/databrickslabs/ucx/issues/406
@@ -188,7 +195,7 @@ class TablesMigrate:
         self._ws = ws
         self._database_to_catalog_mapping = database_to_catalog_mapping
         self._default_catalog = self._init_default_catalog(default_catalog)
-        self._seen_tables = {}
+        self._seen_tables: dict[str, str] = {}
 
     @staticmethod
     def _init_default_catalog(default_catalog):

@@ -51,6 +51,7 @@ dependencies = [
     "isort>=2.5.0",
     "mypy",
     "types-PyYAML",
+    "types-requests",
 ]
 
 python="3.10"

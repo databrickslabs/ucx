@@ -198,7 +198,7 @@ def test_runtime_backend_save_table(mocker):
 
         rb = RuntimeBackend()
 
-        rb.save_table("a.b.c", [Foo("aaa", True), Foo("bbb", False)], Bar)
+        rb.save_table("a.b.c", [Foo("aaa", True), Foo("bbb", False)], Foo)
 
         rb._spark.createDataFrame.assert_called_with(
             [Foo(first="aaa", second=True), Foo(first="bbb", second=False)],

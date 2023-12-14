@@ -37,7 +37,7 @@ class SimpleQuery:
 
     @property
     def viz_type(self) -> str:
-        return self.viz.get("type", None)
+        return self.viz.get("type", "UNKNOWN")
 
     @property
     def viz_args(self) -> dict:
@@ -243,16 +243,20 @@ class DashboardFromFiles:
 
     def _install_dashboard(self, dashboard_name: str, parent_folder_id: str, dashboard_ref: str):
         if dashboard_ref in self._state.dashboards:
-            for widget in self._ws.dashboards.get(self._state.dashboards[dashboard_ref]).widgets:
+            dashboard = self._ws.dashboards.get(self._state.dashboards[dashboard_ref])
+            assert dashboard.widgets is not None
+            for widget in dashboard.widgets:
+                assert widget.id is not None
                 self._ws.dashboard_widgets.delete(widget.id)
             return
-        dash = self._ws.dashboards.create(dashboard_name, run_as_role=RunAsRole.VIEWER, parent=parent_folder_id)
+        dashboard = self._ws.dashboards.create(dashboard_name, run_as_role=RunAsRole.VIEWER, parent=parent_folder_id)
+        assert dashboard.id is not None
         self._ws.dbsql_permissions.set(
             ObjectTypePlural.DASHBOARDS,
-            dash.id,
+            dashboard.id,
             access_control_list=[AccessControl(group_name="users", permission_level=PermissionLevel.CAN_VIEW)],
         )
-        self._state.dashboards[dashboard_ref] = dash.id
+        self._state.dashboards[dashboard_ref] = dashboard.id
 
     def _desired_queries(self, local_folder: Path, dashboard_ref: str) -> list[SimpleQuery]:
         desired_queries = []
@@ -279,7 +283,7 @@ class DashboardFromFiles:
         self._state.viz[query.key] = viz.id
 
     def _get_viz_options(self, query: SimpleQuery):
-        viz_types = {"table": self._table_viz_args, "counter": self._counter_viz_args}
+        viz_types: dict[str, Callable[..., dict]] = {"table": self._table_viz_args, "counter": self._counter_viz_args}
         if query.viz_type not in viz_types:
             msg = f"{query.query}: unknown viz type: {query.viz_type}"
             raise SyntaxError(msg)
@@ -296,6 +300,7 @@ class DashboardFromFiles:
             return self._ws.queries.update(self._state.queries[query.key], **query_meta)
 
         deployed_query = self._ws.queries.create(parent=parent, run_as_role=RunAsRole.VIEWER, **query_meta)
+        assert deployed_query.id is not None
         self._ws.dbsql_permissions.set(
             ObjectTypePlural.QUERIES,
             deployed_query.id,
@@ -371,7 +376,7 @@ class DashboardFromFiles:
 
     def _dashboard_data_source(self) -> str:
         data_sources = {_.warehouse_id: _.id for _ in self._ws.data_sources.list()}
-        warehouses = self._ws.warehouses.list()
+        warehouses = list(self._ws.warehouses.list())
         warehouse_id = self._warehouse_id
         if not warehouse_id and not warehouses:
             msg = "need either configured warehouse_id or an existing SQL warehouse"

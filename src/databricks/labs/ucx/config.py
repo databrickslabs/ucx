@@ -92,7 +92,7 @@ class _Config(Generic[T]):
         ...
 
     @classmethod
-    def from_bytes(cls, raw_str: str) -> T:
+    def from_bytes(cls, raw_str: str | bytes) -> T:
         from yaml import safe_load
 
         raw: dict[str, Any] = safe_load(raw_str)
