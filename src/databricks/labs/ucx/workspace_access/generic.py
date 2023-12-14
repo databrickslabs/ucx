@@ -2,7 +2,6 @@ import datetime
 import json
 import logging
 from collections.abc import Callable, Iterator
-from concurrent.futures import ThreadPoolExecutor
 from dataclasses import dataclass
 from datetime import timedelta
 from functools import partial
@@ -16,6 +15,7 @@ from databricks.sdk.service import iam, ml
 from databricks.sdk.service.iam import PermissionLevel
 
 from databricks.labs.ucx.framework.crawlers import CrawlerBase, SqlBackend
+from databricks.labs.ucx.framework.parallel import Threads
 from databricks.labs.ucx.mixins.hardening import rate_limited
 from databricks.labs.ucx.workspace_access.base import AclSupport, Permissions
 from databricks.labs.ucx.workspace_access.groups import MigrationState
@@ -327,11 +327,12 @@ class WorkspaceListing(Listing, CrawlerBase):
 
 def models_listing(ws: WorkspaceClient, num_threads: int):
     def inner() -> Iterator[ml.ModelDatabricks]:
-        with ThreadPoolExecutor(num_threads) as pool:
-            yield from pool.map(
-                lambda m: ws.model_registry.get_model(m.name).registered_model_databricks,
-                ws.model_registry.list_models(),
-            )
+        tasks = []
+        for m in ws.model_registry.list_models():
+            tasks.append(partial(ws.model_registry.get_model, name=m.name))
+        models, errors = Threads.gather("listing model ids", tasks, num_threads)
+        for model in models:
+            yield model.registered_model_databricks
 
     return inner
 
