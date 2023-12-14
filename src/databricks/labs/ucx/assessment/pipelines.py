@@ -46,7 +46,9 @@ class PipelinesCrawler(CrawlerBase[PipelineInfo]):
             )
 
             failures = []
-            pipeline_config = self._ws.pipelines.get(pipeline.pipeline_id).spec.configuration
+            pipeline_response = self._ws.pipelines.get(pipeline.pipeline_id)
+            assert pipeline_response.spec is not None
+            pipeline_config = pipeline_response.spec.configuration
             if pipeline_config:
                 if _azure_sp_conf_present_check(pipeline_config):
                     failures.append(f"{_AZURE_SP_CONF_FAILURE_MSG} pipeline.")

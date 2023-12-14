@@ -3,6 +3,9 @@ from datetime import timedelta
 from databricks.sdk.errors import NotFound
 from databricks.sdk.retries import retried
 from databricks.sdk.service import compute, jobs
+
+from databricks.labs.ucx.assessment.azure import AzureServicePrincipalCrawler
+
 from .test_assessment import (
     _PIPELINE_CONF,
     _PIPELINE_CONF_WITH_SECRET,
@@ -10,8 +13,6 @@ from .test_assessment import (
     _TEST_STORAGE_ACCOUNT,
     _TEST_TENANT_ID,
 )
-
-from databricks.labs.ucx.assessment.azure import AzureServicePrincipalCrawler
 
 
 @retried(on=[NotFound, AssertionError], timeout=timedelta(minutes=5))

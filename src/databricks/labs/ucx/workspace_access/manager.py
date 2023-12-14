@@ -3,6 +3,7 @@ import logging
 import os
 from collections.abc import Callable, Iterable, Iterator
 from itertools import groupby
+from collections.abc import Sequence
 
 from databricks.sdk import WorkspaceClient
 from databricks.sdk.service import sql
@@ -153,7 +154,7 @@ class PermissionManager(CrawlerBase[Permissions]):
         self._exec(f"DROP TABLE IF EXISTS {self._full_name}")
         logger.info("Inventory table cleanup complete")
 
-    def _save(self, items: Iterable[Permissions]):
+    def _save(self, items: Sequence[Permissions]):
         # keep in mind, that object_type and object_id are not primary keys.
         self._append_records(items)  # TODO: update instead of append
         logger.info("Successfully saved the items to inventory table")

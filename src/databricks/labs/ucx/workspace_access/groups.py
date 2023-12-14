@@ -3,10 +3,10 @@ import json
 import logging
 import re
 from abc import abstractmethod
+from collections.abc import Iterable
 from dataclasses import dataclass
 from datetime import timedelta
 from typing import ClassVar
-from collections.abc import Iterable
 
 from databricks.sdk import WorkspaceClient
 from databricks.sdk.core import DatabricksError
@@ -322,7 +322,7 @@ class GroupManager(CrawlerBase[MigratedGroup]):
         self._external_id_match = external_id_match
         self._verify_timeout = verify_timeout
 
-    def snapshot(self) -> Iterable[MigratedGroup]:
+    def snapshot(self) -> list[MigratedGroup]:
         return self._snapshot(self._fetcher, self._crawler)
 
     def has_groups(self) -> bool:

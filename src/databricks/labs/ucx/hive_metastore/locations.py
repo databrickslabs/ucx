@@ -1,9 +1,9 @@
 import logging
 import os
 import re
+from collections.abc import Iterable
 from dataclasses import dataclass
 from typing import ClassVar
-from collections.abc import Iterable
 
 from databricks.sdk import WorkspaceClient
 

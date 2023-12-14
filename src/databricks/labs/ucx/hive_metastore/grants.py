@@ -1,8 +1,8 @@
 import logging
 from collections import defaultdict
+from collections.abc import Iterable
 from dataclasses import dataclass
 from functools import partial
-from collections.abc import Iterable
 
 from databricks.sdk.service.catalog import SchemaInfo, TableInfo
 

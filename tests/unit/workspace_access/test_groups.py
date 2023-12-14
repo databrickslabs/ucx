@@ -6,6 +6,7 @@ from databricks.sdk.errors import DatabricksError
 from databricks.sdk.service import iam
 from databricks.sdk.service.iam import ComplexValue, Group, ResourceMeta
 
+from databricks.labs.ucx.framework.parallel import ManyError
 from databricks.labs.ucx.workspace_access.groups import GroupManager, MigratedGroup
 from tests.unit.framework.mocks import MockBackend
 
@@ -298,9 +299,9 @@ def test_rename_groups_should_fail_if_error_is_thrown():
     }
     wsclient.groups.patch.side_effect = RuntimeError("Something bad")
     gm = GroupManager(backend, wsclient, inventory_database="inv", renamed_group_prefix="test-group-")
-    with pytest.raises(RuntimeWarning) as e:
+    with pytest.raises(ManyError) as e:
         gm.rename_groups()
-    assert e.value.args[0] == "During rename of workspace groups got 1 errors. See debug logs"
+    assert e.value.args[0] == 'Detected 1 failures: Something bad'
 
 
 def test_reflect_account_groups_on_workspace_should_be_called_for_eligible_groups():
@@ -359,7 +360,7 @@ def test_reflect_account_should_fail_if_error_is_thrown():
     account_group = Group(id="1", display_name="de")
 
     def do_side_effect(*args, **kwargs):
-        if args[0] == "get":
+        if args[0] == "GET":
             return {"Resources": [g.as_dict() for g in [account_group]]}
         else:
             raise RuntimeError()
@@ -370,7 +371,7 @@ def test_reflect_account_should_fail_if_error_is_thrown():
     wsclient.groups.list.return_value = [group1]
     gm = GroupManager(backend, wsclient, inventory_database="inv")
 
-    with pytest.raises(RuntimeWarning):
+    with pytest.raises(ManyError):
         gm.reflect_account_groups_on_workspace()
 
 

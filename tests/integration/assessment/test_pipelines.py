@@ -2,13 +2,10 @@ from datetime import timedelta
 
 from databricks.sdk.errors import NotFound
 from databricks.sdk.retries import retried
-from .test_assessment import (
-    _PIPELINE_CONF,
-    _PIPELINE_CONF_WITH_SECRET,
-    logger,
-)
 
 from databricks.labs.ucx.assessment.pipelines import PipelinesCrawler
+
+from .test_assessment import _PIPELINE_CONF, _PIPELINE_CONF_WITH_SECRET, logger
 
 
 @retried(on=[NotFound], timeout=timedelta(minutes=5))
