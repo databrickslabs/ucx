@@ -9,7 +9,7 @@ import threading
 from databricks.sdk import WorkspaceClient
 from databricks.sdk.core import DatabricksError
 from databricks.sdk.service import compute
-from databricks.sdk.service.compute import Language
+from databricks.sdk.service.compute import ContextStatusResponse, Language
 
 _out_re = re.compile(r"Out\[[\d\s]+]:\s")
 _tag_re = re.compile(r"<[^>]*>")
@@ -25,10 +25,10 @@ class _ReturnToPrintJsonTransformer(ast.NodeTransformer):
         self._has_json_import = False
         self.has_return = False
 
-    def apply(self, node: ast.AST) -> ast.AST:
-        node = self.visit(node)
+    def apply(self, raw_node: ast.AST) -> ast.AST:
+        node: ast.Module = self.visit(raw_node)
         if self.has_return and not self._has_json_import:
-            new_import = ast.parse("import json").body[0]
+            new_import: ast.stmt = ast.parse("import json").body[0]
             node.body.insert(0, new_import)
         return node
 
@@ -65,7 +65,7 @@ class CommandExecutor:
         self._clusters = ws.clusters
         self._commands = ws.command_execution
         self._lock = threading.Lock()
-        self._ctx = None
+        self._ctx: ContextStatusResponse | None = None
 
     def run(self, code):
         code = self._trim_leading_whitespace(code)
@@ -112,7 +112,8 @@ class CommandExecutor:
             if self._ctx:
                 return self._ctx
             self._clusters.ensure_cluster_is_running(self._cluster_id)
-            self._ctx = self._commands.create(cluster_id=self._cluster_id, language=self._language).result()
+            command_wait = self._commands.create(cluster_id=self._cluster_id, language=self._language)
+            self._ctx = command_wait.result()
         return self._ctx
 
     def _is_failed(self, results: compute.Results) -> bool:
@@ -131,10 +132,16 @@ class CommandExecutor:
     def _error_from_results(self, results: compute.Results):
         if not self._is_failed(results):
             return
-        if results.cause:
-            sys.stderr.write(_ascii_escape_re.sub("", results.cause))
+        results_cause = results.cause
+        if results_cause:
+            sys.stderr.write(_ascii_escape_re.sub("", results_cause))
+        else:
+            results_cause = ""
 
-        summary = _tag_re.sub("", results.summary)
+        summary = ""
+        if results.summary:
+            summary = results.summary
+        summary = _tag_re.sub("", summary)
         summary = html.unescape(summary)
 
         exception_matches = _exception_re.findall(summary)
@@ -143,11 +150,11 @@ class CommandExecutor:
             summary = summary.rstrip(" ")
             return summary
 
-        execution_error_matches = _execution_error_re.findall(results.cause)
+        execution_error_matches = _execution_error_re.findall(results_cause)
         if len(execution_error_matches) == 1:
             return "\n".join(execution_error_matches[0])
 
-        error_message_matches = _error_message_re.findall(results.cause)
+        error_message_matches = _error_message_re.findall(results_cause)
         if len(error_message_matches) == 1:
             return error_message_matches[0]
 
@@ -158,7 +165,7 @@ class CommandExecutor:
         """Removes leading whitespace, so that Python code blocks that
         are embedded into Python code still could be interpreted properly."""
         lines = command_str.replace("\t", "    ").split("\n")
-        leading_whitespace = float("inf")
+        leading_whitespace = sys.maxsize
         if lines[0] == "":
             lines = lines[1:]
         for line in lines:

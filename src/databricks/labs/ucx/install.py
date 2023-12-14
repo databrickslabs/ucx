@@ -27,13 +27,11 @@ from databricks.sdk.service.sql import EndpointInfoWarehouseType, SpotInstancePo
 from databricks.sdk.service.workspace import ImportFormat
 
 from databricks.labs.ucx.__about__ import __version__
-from databricks.labs.ucx.assessment.crawlers import (
-    AzureServicePrincipalInfo,
-    ClusterInfo,
-    GlobalInitScriptInfo,
-    JobInfo,
-    PipelineInfo,
-)
+from databricks.labs.ucx.assessment.azure import AzureServicePrincipalInfo
+from databricks.labs.ucx.assessment.clusters import ClusterInfo
+from databricks.labs.ucx.assessment.init_scripts import GlobalInitScriptInfo
+from databricks.labs.ucx.assessment.jobs import JobInfo
+from databricks.labs.ucx.assessment.pipelines import PipelineInfo
 from databricks.labs.ucx.config import WorkspaceConfig
 from databricks.labs.ucx.configure import ConfigureClusterOverrides
 from databricks.labs.ucx.framework.crawlers import (
@@ -801,7 +799,7 @@ class WorkspaceInstaller:
         jobs_task = jobs.Task(
             task_key=task.name,
             job_cluster_key=task.job_cluster,
-            depends_on=[jobs.TaskDependency(task_key=d) for d in _TASKS[task.name].depends_on],
+            depends_on=[jobs.TaskDependency(task_key=d) for d in _TASKS[task.name].dependencies()],
         )
         if task.dashboard:
             return self._job_dashboard_task(jobs_task, task)
@@ -820,6 +818,7 @@ class WorkspaceInstaller:
         )
 
     def _job_notebook_task(self, jobs_task: jobs.Task, task: Task) -> jobs.Task:
+        assert task.notebook is not None
         local_notebook = self._this_file.parent / task.notebook
         remote_notebook = f"{self._install_folder}/{local_notebook.name}"
         with local_notebook.open("rb") as f:

@@ -4,13 +4,11 @@ import sys
 
 from databricks.sdk import WorkspaceClient
 
-from databricks.labs.ucx.assessment.crawlers import (
-    AzureServicePrincipalCrawler,
-    ClustersCrawler,
-    GlobalInitScriptCrawler,
-    JobsCrawler,
-    PipelinesCrawler,
-)
+from databricks.labs.ucx.assessment.azure import AzureServicePrincipalCrawler
+from databricks.labs.ucx.assessment.clusters import ClustersCrawler
+from databricks.labs.ucx.assessment.init_scripts import GlobalInitScriptCrawler
+from databricks.labs.ucx.assessment.jobs import JobsCrawler
+from databricks.labs.ucx.assessment.pipelines import PipelinesCrawler
 from databricks.labs.ucx.config import WorkspaceConfig
 from databricks.labs.ucx.framework.crawlers import RuntimeBackend
 from databricks.labs.ucx.framework.tasks import task, trigger

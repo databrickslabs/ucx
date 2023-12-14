@@ -1,8 +1,9 @@
 import logging
 import os
 import re
-import typing
+from collections.abc import Iterator
 from dataclasses import dataclass
+from typing import ClassVar
 
 from databricks.sdk import WorkspaceClient
 
@@ -23,8 +24,8 @@ class Mount:
     source: str
 
 
-class ExternalLocations(CrawlerBase):
-    _prefix_size: typing.ClassVar[list[int]] = [1, 12]
+class ExternalLocations(CrawlerBase[ExternalLocation]):
+    _prefix_size: ClassVar[list[int]] = [1, 12]
 
     def __init__(self, ws: WorkspaceClient, sbe: SqlBackend, schema):
         super().__init__(sbe, "hive_metastore", schema, "external_locations", ExternalLocation)
@@ -108,7 +109,7 @@ class ExternalLocations(CrawlerBase):
     def snapshot(self) -> list[ExternalLocation]:
         return self._snapshot(self._try_fetch, self._external_location_list)
 
-    def _try_fetch(self) -> list[ExternalLocation]:
+    def _try_fetch(self) -> Iterator[ExternalLocation]:
         for row in self._fetch(f"SELECT * FROM {self._schema}.{self._table}"):
             yield ExternalLocation(*row)
 
@@ -141,6 +142,6 @@ class Mounts(CrawlerBase):
     def snapshot(self) -> list[Mount]:
         return self._snapshot(self._try_fetch, self._list_mounts)
 
-    def _try_fetch(self) -> list[Mount]:
+    def _try_fetch(self) -> Iterator[Mount]:
         for row in self._fetch(f"SELECT * FROM {self._schema}.{self._table}"):
             yield Mount(*row)

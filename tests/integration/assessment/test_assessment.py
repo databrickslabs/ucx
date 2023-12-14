@@ -5,12 +5,10 @@ from databricks.sdk.errors import NotFound
 from databricks.sdk.retries import retried
 from databricks.sdk.service import compute, jobs
 
-from databricks.labs.ucx.assessment.crawlers import (
-    AzureServicePrincipalCrawler,
-    ClustersCrawler,
-    JobsCrawler,
-    PipelinesCrawler,
-)
+from databricks.labs.ucx.assessment.azure import AzureServicePrincipalCrawler
+from databricks.labs.ucx.assessment.clusters import ClustersCrawler
+from databricks.labs.ucx.assessment.jobs import JobsCrawler
+from databricks.labs.ucx.assessment.pipelines import PipelinesCrawler
 from databricks.labs.ucx.workspace_access.generic import WorkspaceListing
 
 _TEST_STORAGE_ACCOUNT = "storage_acct_1"
