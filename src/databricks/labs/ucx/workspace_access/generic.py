@@ -15,6 +15,7 @@ from databricks.sdk.service import iam, ml
 from databricks.sdk.service.iam import PermissionLevel
 
 from databricks.labs.ucx.framework.crawlers import CrawlerBase, SqlBackend
+from databricks.labs.ucx.framework.parallel import ManyError, Threads
 from databricks.labs.ucx.mixins.hardening import rate_limited
 from databricks.labs.ucx.workspace_access.base import AclSupport, Permissions
 from databricks.labs.ucx.workspace_access.groups import MigrationState
@@ -324,11 +325,17 @@ class WorkspaceListing(Listing, CrawlerBase):
                 yield GenericPermissionsInfo(object_id=str(_object.object_id), request_type=request_type)
 
 
-def models_listing(ws: WorkspaceClient):
+def models_listing(ws: WorkspaceClient, num_threads: int):
     def inner() -> Iterator[ml.ModelDatabricks]:
-        for model in ws.model_registry.list_models():
-            model_with_id = ws.model_registry.get_model(model.name).registered_model_databricks
-            yield model_with_id
+        tasks = []
+        for m in ws.model_registry.list_models():
+            tasks.append(partial(ws.model_registry.get_model, name=m.name))
+        models, errors = Threads.gather("listing model ids", tasks, num_threads)
+        if len(errors) > 0:
+            logger.error(f"Detected {len(errors)} errors while listing models")
+            raise ManyError(errors)
+        for model in models:
+            yield model.registered_model_databricks
 
     return inner
 
