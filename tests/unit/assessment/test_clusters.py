@@ -10,10 +10,11 @@ from databricks.sdk.service.compute import (
     InitScriptInfo,
     WorkspaceStorageInfo,
 )
-from ..framework.mocks import MockBackend
 
 from databricks.labs.ucx.assessment.azure import AzureServicePrincipalCrawler
 from databricks.labs.ucx.assessment.clusters import ClusterInfo, ClustersCrawler
+
+from ..framework.mocks import MockBackend
 
 
 def test_cluster_assessment(mocker):

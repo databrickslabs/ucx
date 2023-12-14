@@ -1,12 +1,13 @@
 import base64
 
 from databricks.sdk.service.compute import GlobalInitScriptDetails
-from ..framework.mocks import MockBackend
 
 from databricks.labs.ucx.assessment.init_scripts import (
     GlobalInitScriptCrawler,
     GlobalInitScriptInfo,
 )
+
+from ..framework.mocks import MockBackend
 
 
 def test_global_init_scripts_no_config(mocker):

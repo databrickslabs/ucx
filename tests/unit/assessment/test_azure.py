@@ -17,10 +17,11 @@ from databricks.sdk.service.jobs import (
 )
 from databricks.sdk.service.sql import EndpointConfPair
 from databricks.sdk.service.workspace import GetSecretResponse
-from ..framework.mocks import MockBackend
 
 from databricks.labs.ucx.assessment.azure import AzureServicePrincipalCrawler
 from databricks.labs.ucx.assessment.pipelines import PipelineInfo
+
+from ..framework.mocks import MockBackend
 
 
 def test_azure_spn_info_without_secret(mocker):

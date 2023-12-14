@@ -12,10 +12,11 @@ from databricks.sdk.service.compute import (
     WorkspaceStorageInfo,
 )
 from databricks.sdk.service.jobs import BaseJob, JobSettings, NotebookTask, Task
-from ..framework.mocks import MockBackend
 
 from databricks.labs.ucx.assessment.azure import AzureServicePrincipalCrawler
 from databricks.labs.ucx.assessment.jobs import JobInfo, JobsCrawler
+
+from ..framework.mocks import MockBackend
 
 
 def test_job_assessment():

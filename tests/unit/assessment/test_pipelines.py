@@ -1,10 +1,11 @@
 from unittest.mock import Mock
 
 from databricks.sdk.service.pipelines import PipelineState, PipelineStateInfo
-from ..framework.mocks import MockBackend
 
 from databricks.labs.ucx.assessment.azure import AzureServicePrincipalCrawler
 from databricks.labs.ucx.assessment.pipelines import PipelineInfo, PipelinesCrawler
+
+from ..framework.mocks import MockBackend
 
 
 def test_pipeline_assessment_with_config(mocker):
