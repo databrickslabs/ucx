@@ -13,7 +13,7 @@ from databricks.labs.ucx.framework.crawlers import (
     DataclassInstance,
     SqlBackend,
 )
-from databricks.labs.ucx.framework.parallel import Threads
+from databricks.labs.ucx.framework.parallel import Threads, ManyError
 from databricks.labs.ucx.hive_metastore import GrantsCrawler, TablesCrawler
 from databricks.labs.ucx.workspace_access import generic, redash, scim, secrets
 from databricks.labs.ucx.workspace_access.base import AclSupport, Permissions
@@ -78,13 +78,13 @@ class PermissionManager(CrawlerBase[Permissions]):
         )
 
     def inventorize_permissions(self):
+        # TODO: rename into snapshot()
         logger.debug("Crawling permissions")
         crawler_tasks = list(self._get_crawler_tasks())
         logger.info(f"Starting to crawl permissions. Total tasks: {len(crawler_tasks)}")
         items, errors = Threads.gather("crawl permissions", crawler_tasks)
         if len(errors) > 0:
-            # TODO: https://github.com/databrickslabs/ucx/issues/406
-            logger.error(f"Detected {len(errors)} errors while crawling permissions")
+            raise ManyError(errors)
         logger.info(f"Total crawled permissions: {len(items)}")
         self._save(items)
         logger.info(f"Saved {len(items)} to {self._full_name}")
@@ -153,7 +153,7 @@ class PermissionManager(CrawlerBase[Permissions]):
         self._exec(f"DROP TABLE IF EXISTS {self._full_name}")
         logger.info("Inventory table cleanup complete")
 
-    def _save(self, items: list[Permissions]):
+    def _save(self, items: Iterable[Permissions]):
         # keep in mind, that object_type and object_id are not primary keys.
         self._append_records(items)  # TODO: update instead of append
         logger.info("Successfully saved the items to inventory table")

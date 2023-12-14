@@ -169,8 +169,10 @@ def test_cluster_assessment_cluster_policy_not_found(mocker):
     ]
     ws = Mock()
     ws.cluster_policies.get.side_effect = NotFound("NO_POLICY")
-    crawler = ClustersCrawler(ws, MockBackend(), "ucx")._assess_clusters(sample_clusters1)
-    assert len(list(crawler)) == 1
+    clusters_crawler = ClustersCrawler(ws, MockBackend(), "ucx")
+    crawler = clusters_crawler._assess_clusters(sample_clusters1)
+    results = list(crawler)
+    assert len(results) == 1
 
 
 def test_cluster_assessment_cluster_policy_exception(mocker):

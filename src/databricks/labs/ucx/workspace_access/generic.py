@@ -316,7 +316,7 @@ class WorkspaceListing(Listing, CrawlerBase[WorkspaceObjectInfo]):
                 language=raw.get("language", None),
             )
 
-    def snapshot(self) -> list[WorkspaceObjectInfo]:
+    def snapshot(self) -> Iterable[WorkspaceObjectInfo]:
         return self._snapshot(self._try_fetch, self._crawl)
 
     def _try_fetch(self) -> Iterable[WorkspaceObjectInfo]:
@@ -347,8 +347,10 @@ class WorkspaceListing(Listing, CrawlerBase[WorkspaceObjectInfo]):
     def __iter__(self):
         for _object in self.snapshot():
             request_type = self._convert_object_type_to_request_type(_object)
-            if request_type:
-                yield GenericPermissionsInfo(object_id=str(_object.object_id), request_type=request_type)
+            if not request_type:
+                continue
+            assert _object.object_id is not None
+            yield GenericPermissionsInfo(str(_object.object_id), request_type)
 
 
 def models_listing(ws: WorkspaceClient, num_threads: int):
@@ -358,7 +360,6 @@ def models_listing(ws: WorkspaceClient, num_threads: int):
             tasks.append(partial(ws.model_registry.get_model, name=m.name))
         models, errors = Threads.gather("listing model ids", tasks, num_threads)
         if len(errors) > 0:
-            logger.error(f"Detected {len(errors)} errors while listing models")
             raise ManyError(errors)
         for model in models:
             if not model.registered_model_databricks:

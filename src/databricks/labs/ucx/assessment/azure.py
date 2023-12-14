@@ -52,8 +52,9 @@ class AzureServicePrincipalCrawler(CrawlerBase[AzureServicePrincipalInfo]):
                 secret = self._ws.secrets.get_secret(secret_scope, secret_key)
                 assert secret.value is not None
                 return base64.b64decode(secret.value).decode("utf-8")
-            except DatabricksError as err:
-                logger.warning(f"Error retrieving secret for {secret_matched.group(1)}. Error: {err}")
+            except NotFound:
+                logger.warning(f'removed on the backend: {"/".join(split)}')
+                return None
         return None
 
     def _get_azure_spn_tenant_id(self, config: dict, tenant_key: str) -> str | None:

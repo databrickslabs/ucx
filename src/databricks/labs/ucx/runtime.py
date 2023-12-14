@@ -65,7 +65,7 @@ def crawl_mounts(cfg: WorkspaceConfig):
     storing this information in the `$inventory.mounts` table. This is crucial for planning the migration."""
     ws = WorkspaceClient(config=cfg.to_databricks_config())
     mounts = Mounts(backend=RuntimeBackend(), ws=ws, inventory_database=cfg.inventory_database)
-    mounts.inventorize_mounts()
+    mounts.snapshot()
 
 
 @task("assessment", depends_on=[crawl_mounts, crawl_tables])

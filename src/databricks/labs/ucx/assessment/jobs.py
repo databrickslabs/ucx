@@ -107,14 +107,14 @@ class JobsCrawler(CrawlerBase[JobInfo]):
             # Checking if Azure cluster config is present in cluster policies
             if cluster_config.policy_id:
                 policy = self._safe_get_cluster_policy(cluster_config.policy_id)
-
-                if policy is not None:
-                    if policy.definition:
-                        if _azure_sp_conf_present_check(json.loads(policy.definition)):
-                            job_assessment[job_id].add(f"{_AZURE_SP_CONF_FAILURE_MSG} Job cluster.")
-                    if policy.policy_family_definition_overrides:
-                        if _azure_sp_conf_present_check(json.loads(policy.policy_family_definition_overrides)):
-                            job_assessment[job_id].add(f"{_AZURE_SP_CONF_FAILURE_MSG} Job cluster.")
+                if policy is None:
+                    continue
+                if policy.definition:
+                    if _azure_sp_conf_present_check(json.loads(policy.definition)):
+                        job_assessment[job_id].add(f"{_AZURE_SP_CONF_FAILURE_MSG} Job cluster.")
+                if policy.policy_family_definition_overrides:
+                    if _azure_sp_conf_present_check(json.loads(policy.policy_family_definition_overrides)):
+                        job_assessment[job_id].add(f"{_AZURE_SP_CONF_FAILURE_MSG} Job cluster.")
 
             if cluster_config.init_scripts:
                 for init_script_info in cluster_config.init_scripts:

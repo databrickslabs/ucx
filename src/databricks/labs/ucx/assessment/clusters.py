@@ -1,6 +1,6 @@
 import json
-from collections.abc import Iterable
 from dataclasses import dataclass
+from typing import Iterable
 
 from databricks.sdk import WorkspaceClient
 from databricks.sdk.errors import NotFound
@@ -73,8 +73,7 @@ class ClustersCrawler(CrawlerBase[ClusterInfo]):
             # Checking if Azure cluster config is present in cluster policies
             if cluster.policy_id:
                 policy = self._safe_get_cluster_policy(cluster.policy_id)
-
-                if policy is not None:
+                if policy:
                     if policy.definition:
                         if _azure_sp_conf_present_check(json.loads(policy.definition)):
                             failures.append(f"{_AZURE_SP_CONF_FAILURE_MSG} cluster.")

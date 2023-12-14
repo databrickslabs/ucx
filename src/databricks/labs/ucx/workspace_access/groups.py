@@ -6,7 +6,7 @@ from abc import abstractmethod
 from collections.abc import Iterator
 from dataclasses import dataclass
 from datetime import timedelta
-from typing import ClassVar
+from typing import ClassVar, Iterable
 
 from databricks.sdk import WorkspaceClient
 from databricks.sdk.core import DatabricksError
@@ -17,7 +17,7 @@ from databricks.sdk.service import iam
 from databricks.sdk.service.iam import Group
 
 from databricks.labs.ucx.framework.crawlers import CrawlerBase, SqlBackend
-from databricks.labs.ucx.framework.parallel import Threads
+from databricks.labs.ucx.framework.parallel import Threads, ManyError
 from databricks.labs.ucx.mixins.hardening import rate_limited
 
 logger = logging.getLogger(__name__)
@@ -322,7 +322,7 @@ class GroupManager(CrawlerBase[MigratedGroup]):
         self._external_id_match = external_id_match
         self._verify_timeout = verify_timeout
 
-    def snapshot(self) -> list[MigratedGroup]:
+    def snapshot(self) -> Iterable[MigratedGroup]:
         return self._snapshot(self._fetcher, self._crawler)
 
     def has_groups(self) -> bool:
@@ -345,8 +345,7 @@ class GroupManager(CrawlerBase[MigratedGroup]):
             tasks.append(functools.partial(self._rename_group, mg.id_in_workspace, mg.temporary_name))
         _, errors = Threads.gather("rename groups in the workspace", tasks)
         if len(errors) > 0:
-            msg = f"During rename of workspace groups got {len(errors)} errors. See debug logs"
-            raise RuntimeWarning(msg)
+            raise ManyError(errors)
 
     def _rename_group(self, group_id: str, new_group_name: str):
         ops = [iam.Patch(iam.PatchOp.REPLACE, "displayName", new_group_name)]
@@ -358,7 +357,6 @@ class GroupManager(CrawlerBase[MigratedGroup]):
         account_groups_in_account = self._account_groups_in_account()
         account_groups_in_workspace = self._account_groups_in_workspace()
         groups_to_migrate = self.get_migration_state().groups
-
         for mg in groups_to_migrate:
             if mg.name_in_account in account_groups_in_workspace:
                 logger.info(f"Skipping {mg.name_in_account}: already in workspace")
@@ -370,8 +368,7 @@ class GroupManager(CrawlerBase[MigratedGroup]):
             tasks.append(functools.partial(self._reflect_account_group_to_workspace, group_id))
         _, errors = Threads.gather("reflect account groups on this workspace", tasks)
         if len(errors) > 0:
-            msg = f"During account-to-workspace reflection got {len(errors)} errors. See debug logs"
-            raise RuntimeWarning(msg)
+            raise ManyError(errors)
 
     def get_migration_state(self) -> MigrationState:
         return MigrationState(self.snapshot())
@@ -393,11 +390,11 @@ class GroupManager(CrawlerBase[MigratedGroup]):
             msg = f"During account-to-workspace reflection got {len(errors)} errors. See debug logs"
             raise RuntimeWarning(msg)
 
-    def _fetcher(self) -> Iterator[MigratedGroup]:
+    def _fetcher(self) -> Iterable[MigratedGroup]:
         for row in self._backend.fetch(f"SELECT * FROM {self._full_name}"):
             yield MigratedGroup(*row)
 
-    def _crawler(self) -> Iterator[MigratedGroup]:
+    def _crawler(self) -> Iterable[MigratedGroup]:
         workspace_groups_in_workspace = self._workspace_groups_in_workspace()
         account_groups_in_account = self._account_groups_in_account()
         strategy = self._get_strategy(workspace_groups_in_workspace, account_groups_in_account)
@@ -489,10 +486,8 @@ class GroupManager(CrawlerBase[MigratedGroup]):
             self._ws.groups.delete(id=group_id)
             logger.info(f"Workspace-level group {display_name} with id {group_id} was deleted")
             return None
-        except DatabricksError as err:
-            if "not found" in str(err):
-                return None
-            raise
+        except NotFound:
+            return None
 
     @retried(on=[DatabricksError])
     @rate_limited(max_requests=10)

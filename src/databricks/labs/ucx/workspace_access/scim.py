@@ -112,7 +112,7 @@ class ScimSupport(AclSupport):
 
         patch_retry_on_value_error = retried(on=[DatabricksError], timeout=self._verify_timeout)
         patch_retried_check = patch_retry_on_value_error(self._safe_patch_group)
-        patch_retried_check(group_id=group_id, operations=operations, schemas=schemas)
+        patch_retried_check(group_id, operations, schemas)
 
         retry_on_value_error = retried(on=[ValueError, DatabricksError], timeout=self._verify_timeout)
         retried_check = retry_on_value_error(self._inflight_check)
@@ -122,7 +122,7 @@ class ScimSupport(AclSupport):
         self, group_id: str, operations: list[Patch] | None = None, schemas: list[PatchSchema] | None = None
     ):
         try:
-            return self._ws.groups.patch(id=group_id, operations=operations, schemas=schemas)
+            return self._ws.groups.patch(group_id, operations=operations, schemas=schemas)
         except PermissionDenied:
             logger.warning(f"permission denied: {group_id}")
             return None

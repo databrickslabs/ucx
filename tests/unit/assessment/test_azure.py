@@ -1,7 +1,7 @@
 import json
 from unittest.mock import Mock
 
-from databricks.sdk.errors import DatabricksError
+from databricks.sdk.errors import DatabricksError, NotFound
 from databricks.sdk.service.compute import (
     AutoScale,
     ClusterDetails,
@@ -1524,7 +1524,8 @@ def test_list_all_pipeline_with_conf_spn_secret_unavlbl(mocker):
     }
     ws.pipelines.get().spec.configuration = config_dict
     ws.secrets.get_secret = mock_get_secret
-    result_set = AzureServicePrincipalCrawler(ws, MockBackend(), "ucx")._list_all_pipeline_with_spn_in_spark_conf()
+    crawler = AzureServicePrincipalCrawler(ws, MockBackend(), "ucx")
+    result_set = crawler._list_all_pipeline_with_spn_in_spark_conf()
 
     assert len(result_set) == 0
 
@@ -1578,7 +1579,7 @@ def test_azure_spn_info_with_secret_unavailable(mocker):
 
 def mock_get_secret(secret_scope, secret_key):
     msg = f"Secret Scope {secret_scope} does not exist!"
-    raise DatabricksError(msg)
+    raise NotFound(msg)
 
 
 _SECRET_VALUE = b"SGVsbG8sIFdvcmxkIQ=="

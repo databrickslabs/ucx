@@ -30,7 +30,7 @@ class PipelinesCrawler(CrawlerBase[PipelineInfo]):
         all_pipelines = list(self._ws.pipelines.list_pipelines())
         return list(self._assess_pipelines(all_pipelines))
 
-    def _assess_pipelines(self, all_pipelines):
+    def _assess_pipelines(self, all_pipelines) -> Iterable[PipelineInfo]:
         for pipeline in all_pipelines:
             if not pipeline.creator_user_name:
                 logger.warning(
@@ -56,9 +56,9 @@ class PipelinesCrawler(CrawlerBase[PipelineInfo]):
                 pipeline_info.success = 0
             yield pipeline_info
 
-    def snapshot(self) -> list[PipelineInfo]:
+    def snapshot(self) -> Iterable[PipelineInfo]:
         return self._snapshot(self._try_fetch, self._crawl)
 
-    def _try_fetch(self) -> Iterator[PipelineInfo]:
+    def _try_fetch(self) -> Iterable[PipelineInfo]:
         for row in self._fetch(f"SELECT * FROM {self._schema}.{self._table}"):
             yield PipelineInfo(*row)
