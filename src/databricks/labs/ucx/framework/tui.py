@@ -4,7 +4,7 @@ from typing import Any
 
 class Prompts:
     def multi_select_from_dict(self, all_prompt: str, item_prompt: str, choices: dict[str, Any]) -> list[Any]:
-        selected = []
+        selected: list[Any] = []
         if self.question(all_prompt, default="no") == "yes":
             return selected
         dropdown = {"[DONE]": "done"} | choices
