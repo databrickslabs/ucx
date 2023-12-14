@@ -33,55 +33,30 @@ For questions, troubleshooting or bug fixes, please see your Databricks account 
 ## Installation
 ### Prerequisites
 1. Get trained on UC [[free instructor-led training 2x week](https://customer-academy.databricks.com/learn/course/1683/data-governance-with-unity-catalog?generated_by=302876&hash=4eab6668f83636ba44d109880002b293e8dda6dd)] [[full training schedule](https://files.training.databricks.com/static/ilt-sessions/half-day-workshops/index.html)]
-2. You will need a desktop computer, running Windows or MacOS; This computer is used to install the UCX toolkit onto the Databricks workspace, the computer will also need:
+2. You will need a desktop computer, running Windows, MacOS, or Linux; This computer is used to install the UCX toolkit onto the Databricks workspace, the computer will also need:
   -  Network access to your Databricks Workspace
   -  Network access to the Internet to retrieve additional Python packages (e.g. PyYAML, databricks-sdk,...) and access github.com
-  -  Python 3.10 or later - [instructions](https://www.python.org/downloads/)
-  -  Databricks CLI - [instructions](https://docs.databricks.com/en/dev-tools/cli/install.html)
-  -  Git Client - [instructions](https://git-scm.com/book/en/v2/Getting-Started-Installing-Git)
+  -  Python 3.10 or later - [Windows instructions](https://www.python.org/downloads/)
+  -  Databricks CLI with a workspace [configuration profile](https://docs.databricks.com/en/dev-tools/auth.html#databricks-client-unified-authentication) for workspace - [instructions](https://docs.databricks.com/en/dev-tools/cli/install.html)
   -  Your windows computer will need a shell environment (GitBash or ([WSL](https://learn.microsoft.com/en-us/windows/wsl/about))
 3. Within the Databricks Workspace you will need:
   - Workspace administrator access permissions
-  - A PAT token and setup for `databricks` cli authentication
-  - Either create a Hive Metastore database (default name ucx) on DBFS or pre-create a Hive Metastore database for the assessment inventory.
-  - The ability for the installer to ppload python wheel files to DBFS and Workspace FileSystem
-  - The ability to create Databricks Workflows
+  - The ability for the installer to upload Python Wheel files to DBFS and Workspace FileSystem
   - A PRO or Serverless SQL Warehouse
-  - The Assessment workflow will create a legacy "No Isolation Shared" cluster and a legacy "Table ACL" cluster needed to inventory Hive Metastore Table ACLS
-  - Optionally for AWS deployments, a instance profile and cluster configuration to attach to Glue catalog (if Glue catalog is your Hive Metastore catalog of choice)
+  - The Assessment workflow will create a legacy "No Isolation Shared" and a legacy "Table ACL" jobs clusters needed to inventory Hive Metastore Table ACLS
+  - If your Databricks Workspace relies on an external Hive Metastore (such as glue), make sure to read the [External HMS Document](docs/external_hms_glue.md).
 4. [[AWS](https://docs.databricks.com/en/administration-guide/users-groups/best-practices.html)] [[Azure](https://learn.microsoft.com/en-us/azure/databricks/administration-guide/users-groups/best-practices)] [[GCP](https://docs.gcp.databricks.com/administration-guide/users-groups/best-practices.html)] Account level Identity Setup
 5. [[AWS](https://docs.databricks.com/en/data-governance/unity-catalog/create-metastore.html)] [[Azure](https://learn.microsoft.com/en-us/azure/databricks/data-governance/unity-catalog/create-metastore)] [[GCP](https://docs.gcp.databricks.com/data-governance/unity-catalog/create-metastore.html)] Unity Catalog Metastore Created (per region)
 
 ### Download & Install
-As a customer, download the [latest release](https://github.com/databrickslabs/ucx/releases) from github onto your laptop/desktop machine. Unzip or untar the release.
 
-The `./install.sh` script will guide you through installation process.
-Make sure you have Python 3.10 (or greater) installed on your workstation, and you've configured authentication for
-the [Databricks Workspace](https://databricks-sdk-py.readthedocs.io/en/latest/authentication.html#default-authentication-flow).
+We only support installations and upgrades through [Databricks CLI](https://docs.databricks.com/en/dev-tools/cli/index.html), as UCX requires an installation script run to make sure all the necessary and correct configurations are in place.
 
-![install wizard](docs/ucx-install.gif)
-
-The easiest way to install and authenticate is through a [Databricks configuration profile](https://docs.databricks.com/en/dev-tools/auth.html#databricks-client-unified-authentication):
-
-```shell
-export DATABRICKS_CONFIG_PROFILE=ABC
-./install.sh
-```
-
-You can also specify environment variables in a more direct way, like in this example for installing
-on an Azure Databricks Workspace using the Azure CLI authentication:
-
-```shell
-az login
-export DATABRICKS_HOST=https://adb-123....azuredatabricks.net/
-./install.sh
-```
-
-Please follow the instructions in `./install.sh`, which will deploy UCX to your workspace and open a notebook with the description of all jobs to trigger. The journey starts with assessment.
-
-### UCX on macOS
-#### Install Databricks via brew
+#### Installing Databricks CLI on macOS
 ![macos_install_databricks](docs/macos_1_databrickslabsmac_installdatabricks.gif)
+
+#### Install Databricks CLI via curl on Windows
+![winos_install_databricks](docs/winos_1_databrickslabsmac_installdatabricks.gif)
 
 #### Install UCX
 ![macos_install_ucx](docs/macos_2_databrickslabsmac_installucx.gif)
@@ -91,24 +66,6 @@ Please follow the instructions in `./install.sh`, which will deploy UCX to your 
 
 #### Uninstall UCX
 ![macos_uninstall_ucx](docs/macos_4_databrickslabsmac_uninstallucx.gif)
-
-### UCX on Windows OS
-#### Install Databricks via curl
-![winos_install_databricks](docs/winos_1_databrickslabsmac_installdatabricks.gif)
-
-#### Install UCX
-![winos_install_ucx](docs/winos_2_databrickslabsmac_installucx.gif)
-
-#### Upgrade UCX
-![winos_upgrade_ucx](docs/winos_3_databrickslabsmac_upgradeucx.gif)
-
-#### Uninstall UCX
-![winos_uninstall_ucx](docs/winos_4_databrickslabsmac_uninstallucx.gif)
-
-
-### Special Consideration - External Metastores
-If your Databricks Workspace relies on an external Hive Metastore (such as glue), make sure to read the [External HMS Document](docs/external_hms_glue.md).
-
 
 ## Star History
 
