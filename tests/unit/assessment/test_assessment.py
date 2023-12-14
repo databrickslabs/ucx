@@ -38,9 +38,6 @@ from databricks.labs.ucx.assessment.crawlers import (
     PipelinesCrawler,
     spark_version_compatibility,
 )
-from databricks.labs.ucx.hive_metastore.data_objects import ExternalLocationCrawler
-from databricks.labs.ucx.hive_metastore.mounts import Mount
-from databricks.labs.ucx.mixins.sql import Row
 from tests.unit.framework.mocks import MockBackend
 
 _SECRET_PATTERN = r"{{(secrets.*?)}}"
@@ -61,62 +58,6 @@ def test_spark_version_compatibility():
     assert "supported" == spark_version_compatibility("14.1.x-gpu-ml-scala2.12")
     assert "supported" == spark_version_compatibility("14.1.x-cpu-ml-scala2.12")
     assert "unsupported" == spark_version_compatibility("x14.1.x-photon-scala2.12")
-
-
-def test_external_locations():
-    crawler = ExternalLocationCrawler(Mock(), MockBackend(), "test")
-    row_factory = type("Row", (Row,), {"__columns__": ["location", "storage_properties"]})
-    sample_locations = [
-        row_factory(["s3://us-east-1-dev-account-staging-uc-ext-loc-bucket-1/Location/Table", ""]),
-        row_factory(["s3://us-east-1-dev-account-staging-uc-ext-loc-bucket-1/Location/Table2", ""]),
-        row_factory(["s3://us-east-1-dev-account-staging-uc-ext-loc-bucket-23/testloc/Table3", ""]),
-        row_factory(["s3://us-east-1-dev-account-staging-uc-ext-loc-bucket-23/anotherloc/Table4", ""]),
-        row_factory(["dbfs:/mnt/ucx/database1/table1", ""]),
-        row_factory(["dbfs:/mnt/ucx/database2/table2", ""]),
-        row_factory(["DatabricksRootmntDatabricksRoot", ""]),
-        row_factory(
-            [
-                "jdbc:databricks://",
-                "[personalAccessToken=*********(redacted), \
-        httpPath=/sql/1.0/warehouses/65b52fb5bd86a7be, host=dbc-test1-aa11.cloud.databricks.com, \
-        dbtable=samples.nyctaxi.trips]",
-            ]
-        ),
-        row_factory(
-            [
-                "jdbc:/MYSQL",
-                "[database=test_db, host=somemysql.us-east-1.rds.amazonaws.com, \
-            port=3306, dbtable=movies, user=*********(redacted), password=*********(redacted)]",
-            ]
-        ),
-        row_factory(
-            [
-                "jdbc:providerknown:/",
-                "[database=test_db, host=somedb.us-east-1.rds.amazonaws.com, \
-            port=1234, dbtable=sometable, user=*********(redacted), password=*********(redacted), \
-            provider=providerknown]",
-            ]
-        ),
-        row_factory(
-            [
-                "jdbc:providerunknown:/",
-                "[database=test_db, host=somedb.us-east-1.rds.amazonaws.com, \
-            port=1234, dbtable=sometable, user=*********(redacted), password=*********(redacted)]",
-            ]
-        ),
-    ]
-    sample_mounts = [Mount("/mnt/ucx", "s3://us-east-1-ucx-container")]
-    result_set = crawler._external_locations(sample_locations, sample_mounts)
-    assert len(result_set) == 7
-    assert result_set[0].location == "s3://us-east-1-dev-account-staging-uc-ext-loc-bucket-1/Location/"
-    assert result_set[1].location == "s3://us-east-1-dev-account-staging-uc-ext-loc-bucket-23/"
-    assert (
-        result_set[3].location
-        == "jdbc:databricks://dbc-test1-aa11.cloud.databricks.com;httpPath=/sql/1.0/warehouses/65b52fb5bd86a7be"
-    )
-    assert result_set[4].location == "jdbc:mysql://somemysql.us-east-1.rds.amazonaws.com:3306/test_db"
-    assert result_set[5].location == "jdbc:providerknown://somedb.us-east-1.rds.amazonaws.com:1234/test_db"
-    assert result_set[6].location == "jdbc:providerunknown://somedb.us-east-1.rds.amazonaws.com:1234/test_db"
 
 
 def test_job_assessment():

@@ -4,9 +4,17 @@ import time
 from databricks.sdk import WorkspaceClient
 from databricks.sdk.service.compute import GlobalInitScriptDetailsWithContent
 
-from databricks.labs.ucx.hive_metastore.hms_lineage_global_init_script import (
-    global_init_script,
-)
+global_init_script = """if [[ $DB_IS_DRIVER = "TRUE" ]]; then
+  driver_conf=${DB_HOME}/driver/conf/spark-branch.conf
+  if [ ! -e $driver_conf ] ; then
+    touch $driver_conf
+  fi
+cat << EOF >>  $driver_conf
+  [driver] {
+   "spark.databricks.dataLineage.enabled" = true
+   }
+EOF
+fi"""
 
 
 class HiveMetastoreLineageEnabler:
