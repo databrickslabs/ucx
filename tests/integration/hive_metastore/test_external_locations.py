@@ -1,7 +1,7 @@
 import logging
 
-from databricks.labs.ucx.hive_metastore.data_objects import ExternalLocationCrawler
-from databricks.labs.ucx.hive_metastore.mounts import Mount
+from databricks.labs.ucx.hive_metastore.data_objects import ExternalLocations
+from databricks.labs.ucx.hive_metastore.locations import Mount
 from databricks.labs.ucx.hive_metastore.tables import Table
 
 logger = logging.getLogger(__name__)
@@ -59,7 +59,7 @@ def test_external_locations(ws, sql_backend, inventory_schema, env_or_skip):
     sql_backend.save_table(f"{inventory_schema}.tables", tables, Table)
     sql_backend.save_table(f"{inventory_schema}.mounts", [Mount("/mnt/foo", "s3://bar")], Mount)
 
-    crawler = ExternalLocationCrawler(ws, sql_backend, inventory_schema)
+    crawler = ExternalLocations(ws, sql_backend, inventory_schema)
     results = crawler.snapshot()
     assert len(results) == 6
     assert results[1].location == "s3://bar/test3/"

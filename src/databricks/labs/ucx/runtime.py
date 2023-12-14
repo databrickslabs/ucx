@@ -14,9 +14,12 @@ from databricks.labs.ucx.assessment.crawlers import (
 from databricks.labs.ucx.config import WorkspaceConfig
 from databricks.labs.ucx.framework.crawlers import RuntimeBackend
 from databricks.labs.ucx.framework.tasks import task, trigger
-from databricks.labs.ucx.hive_metastore import GrantsCrawler, TablesCrawler
-from databricks.labs.ucx.hive_metastore.data_objects import ExternalLocationCrawler
-from databricks.labs.ucx.hive_metastore.mounts import Mounts
+from databricks.labs.ucx.hive_metastore import (
+    ExternalLocations,
+    GrantsCrawler,
+    Mounts,
+    TablesCrawler,
+)
 from databricks.labs.ucx.workspace_access.generic import WorkspaceListing
 from databricks.labs.ucx.workspace_access.groups import GroupManager
 from databricks.labs.ucx.workspace_access.manager import PermissionManager
@@ -78,7 +81,7 @@ def guess_external_locations(cfg: WorkspaceConfig):
       - Scanning all these locations to identify folders that can act as shared path prefixes
       - These identified external locations will be created subsequently prior to the actual table migration"""
     ws = WorkspaceClient(config=cfg.to_databricks_config())
-    crawler = ExternalLocationCrawler(ws, RuntimeBackend(), cfg.inventory_database)
+    crawler = ExternalLocations(ws, RuntimeBackend(), cfg.inventory_database)
     crawler.snapshot()
 
 
