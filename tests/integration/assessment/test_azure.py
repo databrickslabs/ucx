@@ -15,7 +15,7 @@ from .test_assessment import (
 )
 
 
-@retried(on=[NotFound, AssertionError], timeout=timedelta(minutes=5))
+@retried(on=[NotFound], timeout=timedelta(minutes=3))
 def test_spn_crawler(ws, inventory_schema, make_job, make_pipeline, sql_backend):
     make_job(spark_conf=_SPARK_CONF)
     make_pipeline(configuration=_PIPELINE_CONF)
