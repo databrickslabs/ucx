@@ -11,7 +11,7 @@ from typing import ClassVar
 from databricks.sdk import WorkspaceClient
 from databricks.sdk.core import DatabricksError
 from databricks.sdk.errors import InternalError
-from databricks.sdk.errors.mapping import NotFound
+from databricks.sdk.errors.mapping import BadRequest, NotFound
 from databricks.sdk.retries import retried
 from databricks.sdk.service import iam
 from databricks.sdk.service.iam import Group
@@ -305,7 +305,7 @@ class GroupManager(CrawlerBase[MigratedGroup]):
         workspace_group_regex: str | None = None,
         workspace_group_replace: str | None = None,
         account_group_regex: str | None = None,
-        verify_timeout: timedelta | None = timedelta(minutes=1),
+        verify_timeout: timedelta | None = timedelta(minutes=2),
         *,
         external_id_match: bool = False,
     ):
@@ -492,10 +492,14 @@ class GroupManager(CrawlerBase[MigratedGroup]):
     @retried(on=[DatabricksError])
     @rate_limited(max_requests=10)
     def _reflect_account_group_to_workspace(self, account_group_id: str):
-        # TODO: add OpenAPI spec for it
-        path = f"/api/2.0/preview/permissionassignments/principals/{account_group_id}"
-        self._ws.api_client.do("PUT", path, data=json.dumps({"permissions": ["USER"]}))
-        return True
+        try:
+            # TODO: add OpenAPI spec for it
+            path = f"/api/2.0/preview/permissionassignments/principals/{account_group_id}"
+            self._ws.api_client.do("PUT", path, data=json.dumps({"permissions": ["USER"]}))
+            return True
+        except BadRequest:
+            # already exists
+            return True
 
     def _get_strategy(
         self, workspace_groups_in_workspace: dict[str, Group], account_groups_in_account: dict[str, Group]

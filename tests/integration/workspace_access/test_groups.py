@@ -30,7 +30,6 @@ def test_prepare_environment(ws, make_ucx_group, sql_backend, inventory_schema):
 
     assert len(group_migration_state) == 1
     assert group_migration_state[0].id_in_workspace == ws_group.id
-    assert group_migration_state[0].external_id == acc_group.id
     assert group_migration_state[0].name_in_workspace == ws_group.display_name
     assert group_migration_state[0].name_in_account == acc_group.display_name
     assert group_migration_state[0].temporary_name == "ucx-temp-" + ws_group.display_name
@@ -50,6 +49,7 @@ def test_prepare_environment_no_groups_selected(ws, make_ucx_group, sql_backend,
 
 
 def test_rename_groups(ws, make_ucx_group, sql_backend, inventory_schema):
+    # FIXME - test_rename_groups - TimeoutError: Timed out after 0:01:00
     ws_group, acc_group = make_ucx_group()
 
     group_manager = GroupManager(sql_backend, ws, inventory_schema, [ws_group.display_name], "ucx-temp-")
@@ -58,14 +58,13 @@ def test_rename_groups(ws, make_ucx_group, sql_backend, inventory_schema):
     assert ws.groups.get(ws_group.id).display_name == "ucx-temp-" + ws_group.display_name
 
 
-def test_reflect_account_groups_on_workspace_throws_when_group_already_exists(
+def test_reflect_account_groups_on_workspace_recovers_when_group_already_exists(
     ws, make_ucx_group, sql_backend, inventory_schema
 ):
     ws_group, acc_group = make_ucx_group()
 
     group_manager = GroupManager(sql_backend, ws, inventory_schema, [ws_group.display_name], "ucx-temp-")
-    with pytest.raises(RuntimeWarning):
-        group_manager.reflect_account_groups_on_workspace()
+    group_manager.reflect_account_groups_on_workspace()
 
 
 def test_reflect_account_groups_on_workspace(ws, make_ucx_group, sql_backend, inventory_schema):

@@ -65,6 +65,8 @@ def test_migrate_tables_with_cache_should_not_create_table(
     # crawler = TablesCrawler(sql_backend, inventory_schema)
     crawler = StaticTablesCrawler(sql_backend, inventory_schema, [src_managed_table])
     tm = TablesMigrate(crawler, ws, sql_backend, dst_catalog.name)
+
+    # FIXME: flaky: databricks.sdk.errors.mapping.NotFound: Catalog 'ucx_cjazg' does not exist.
     tm.migrate_tables()
 
     target_tables = list(sql_backend.fetch(f"SHOW TABLES IN {dst_schema.full_name}"))
