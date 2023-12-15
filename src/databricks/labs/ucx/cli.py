@@ -6,8 +6,6 @@ import webbrowser
 from databricks.sdk import WorkspaceClient
 from databricks.sdk.errors import NotFound
 
-from databricks.labs.ucx.framework.crawlers import StatementExecutionBackend
-from databricks.labs.ucx.hive_metastore.tables import TablesAnnotator
 from databricks.labs.ucx.account import AccountWorkspaces, WorkspaceInfo
 from databricks.labs.ucx.config import AccountConfig, ConnectConfig
 from databricks.labs.ucx.framework.crawlers import StatementExecutionBackend
@@ -61,11 +59,11 @@ def skip(schema: str, table: str | None = None):
         )
         return None
 
-    annotate = TablesAnnotator(ws, sql_backend)
+    mapping = TableMapping(ws)
     if table:
-        annotate.skip_table(schema, table)
+        mapping.skip_table(sql_backend, schema, table)
     else:
-        annotate.skip_schema(schema)
+        mapping.skip_schema(sql_backend, schema)
 
 
 def sync_workspace_info():

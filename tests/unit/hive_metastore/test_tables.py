@@ -1,9 +1,7 @@
 import pytest
-from databricks.sdk.errors import NotFound
 
 from databricks.labs.ucx.hive_metastore.tables import (
     Table,
-    TablesAnnotator,
     TablesCrawler,
 )
 
@@ -112,29 +110,3 @@ def test_tables_returning_error_when_describing():
     tc = TablesCrawler(backend, "default")
     results = tc._crawl()
     assert len(results) == 1
-
-
-def test_skip_happy_path(mocker, caplog):
-    ws = mocker.patch("databricks.sdk.WorkspaceClient.__init__")
-    sbe = mocker.patch("databricks.labs.ucx.framework.crawlers.StatementExecutionBackend.__init__")
-    annotate = TablesAnnotator(ws, sbe)
-    annotate.skip_table(schema="schema", table="table")
-    assert len(caplog.records) == 0
-
-
-def test_skip_missing_schema(mocker, caplog):
-    ws = mocker.patch("databricks.sdk.WorkspaceClient.__init__")
-    sbe = mocker.patch("databricks.labs.ucx.framework.crawlers.StatementExecutionBackend.__init__")
-    sbe.execute.side_effect = NotFound("[SCHEMA_NOT_FOUND]")
-    annotate = TablesAnnotator(ws, sbe)
-    annotate.skip_schema(schema="schema")
-    assert [rec.message for rec in caplog.records if "schema not found" in rec.message.lower()]
-
-
-def test_skip_missing_table(mocker, caplog):
-    ws = mocker.patch("databricks.sdk.WorkspaceClient.__init__")
-    sbe = mocker.patch("databricks.labs.ucx.framework.crawlers.StatementExecutionBackend.__init__")
-    sbe.execute.side_effect = NotFound("[TABLE_OR_VIEW_NOT_FOUND]")
-    annotate = TablesAnnotator(ws, sbe)
-    annotate.skip_table(schema="schema", table="table")
-    assert [rec.message for rec in caplog.records if "table not found" in rec.message.lower()]
