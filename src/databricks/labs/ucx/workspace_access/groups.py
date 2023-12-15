@@ -11,7 +11,7 @@ from typing import ClassVar
 from databricks.sdk import WorkspaceClient
 from databricks.sdk.core import DatabricksError
 from databricks.sdk.errors import InternalError
-from databricks.sdk.errors.mapping import NotFound, BadRequest
+from databricks.sdk.errors.mapping import BadRequest, NotFound
 from databricks.sdk.retries import retried
 from databricks.sdk.service import iam
 from databricks.sdk.service.iam import Group
