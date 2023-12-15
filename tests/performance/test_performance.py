@@ -1,6 +1,7 @@
 import datetime
 from dataclasses import dataclass
 from datetime import timedelta
+from functools import partial
 
 from databricks.sdk.retries import retried
 from databricks.sdk.service import iam, sql, pipelines, compute, jobs
@@ -8,10 +9,12 @@ from databricks.sdk.service.iam import Group, PermissionLevel
 from databricks.sdk.service.workspace import (
     AclPermission,
     WorkspaceObjectAccessControlRequest,
-    WorkspaceObjectPermissionLevel,
+    WorkspaceObjectPermissionLevel, ObjectInfo, WorkspaceObjectPermissions,
 )
 
 from databricks.labs.ucx.config import WorkspaceConfig
+from databricks.labs.ucx.framework.crawlers import StatementExecutionBackend
+from databricks.labs.ucx.framework.parallel import Threads
 from databricks.labs.ucx.install import WorkspaceInstaller
 from databricks.labs.ucx.mixins.hardening import rate_limited
 from databricks.labs.ucx.workspace_access.groups import MigratedGroup
@@ -37,14 +40,12 @@ class ObjectPermission:
 
 @dataclass
 class User:
+    id:str
     display_name:str
 
 @dataclass
-class PersistedGroup:
-    group: str
-    object_type: str
-    object_id: str
-    permission: str
+class PerfGroup:
+    display_name:str
 
 
 verificationErrors = []
@@ -65,25 +66,88 @@ logger = logging.getLogger(__name__)
 logger.addHandler(fh)
 
 
+def fresh_account(acc):
+    tasks = []
+    for user in list(acc.users.list(attributes="displayName")):
+        if "sdk" in user.display_name:
+            logger.debug(f"Deleting user {user.display_name}")
+            tasks.append(partial(delete_user, acc, user))
+
+    for grp in list(acc.groups.list(attributes="displayName")):
+        if "ucx" in grp.display_name:
+            logger.debug(f"Deleting grp {grp.display_name}")
+            tasks.append(partial(delete_group, acc, grp))
+
+    catalog_tables, errors = Threads.gather(f"Removing identities in account", tasks)
+    if len(errors) > 0:
+        logger.error(f"Detected {len(errors)} while deleting acc groups")
+
+
+@rate_limited(max_requests=5, burst_period_seconds=1)
+def delete_user(acc, user):
+    logger.info(f"Deleting user {user.display_name}")
+    acc.users.delete(user.id)
+
+
+@rate_limited(max_requests=5, burst_period_seconds=1)
+def delete_group(acc, grp):
+    logger.info(f"Deleting group {grp.display_name}")
+    acc.groups.delete(grp.id)
+
+def recover(ws, sql_backend):
+    tasks = []
+    for database in sql_backend.fetch("SHOW DATABASES IN hive_metastore"):
+        if "ucx" in database.databaseName:
+            tasks.append(partial(show_grants, sql_backend, database.databaseName))
+    success, errs = Threads.gather("schema grants", tasks)
+
+    lst = [grant for grants in success for grant in grants]
+    sql_backend.save_table(f"test_results_2023_12_13_13_00_32.objects", lst, ObjectPermission)
+
+
+def show_grants(sql_backend, db_name):
+    objs = []
+    for row in sql_backend.fetch(f"SHOW TABLES FROM  {db_name}"):
+        for grants in sql_backend.fetch(f"SHOW GRANTS ON TABLE {db_name}.{row.tableName}"):
+            objs.append(ObjectPermission(grants.Principal, "TABLE", grants.ObjectKey, grants.ActionType))
+    return objs
+
 
 def test_performance(
-    ws,
-    acc,
-    sql_backend
+    ws:WorkspaceClient,
+    acc:AccountClient,
+    sql_backend:StatementExecutionBackend
 ):
     NB_OF_TEST_WS_OBJECTS = 100
     NB_OF_FILES = 100
-    MAX_NB_OF_FILES = 100
+    MAX_NB_OF_FILES = 200
     NB_OF_TEST_GROUPS = 1000
     NB_OF_SCHEMAS = 100
-    MAX_NB_OF_TABLES = 20
-    USER_POOL_LENGTH = 2000
+    MAX_NB_OF_TABLES = 80
+    USER_POOL_LENGTH = 1500
 
-    fresh_account(acc)
-    test_database = create_schema(sql_backend, ws, name=f"test_results_{datetime.datetime.utcnow().strftime('%Y_%m_%d_%H_%M_%S')}")
-    users = create_users(USER_POOL_LENGTH, sql_backend, test_database, ws)
+    test_database = create_or_fetch_test_db(sql_backend, ws)
 
-    groups = create_groups(NB_OF_TEST_GROUPS, ws, acc, sql_backend, test_database, users)
+    if not table_exists(sql_backend, test_database, "users"):
+        create_users(USER_POOL_LENGTH, sql_backend, test_database, ws)
+    users = []
+    for row in sql_backend.fetch(f"SELECT * FROM hive_metastore.{test_database.name}.users"):
+        users.append(User(*row))
+
+    if not table_exists(sql_backend, test_database, "groups"):
+        create_groups_parallel(NB_OF_TEST_GROUPS, ws, acc, sql_backend, test_database, list(chunks(users, 100))[0])
+        create_big_groups(3, ws, acc, sql_backend, test_database, users)
+
+    groups = []
+    for row in sql_backend.fetch(f"SELECT * FROM hive_metastore.{test_database.name}.groups"):
+        groups.append(PerfGroup(display_name=row["display_name"]))
+
+    schemas = create_schemas_parallel(NB_OF_SCHEMAS, groups, sql_backend, test_database, ws)
+    create_tables_parallel(MAX_NB_OF_TABLES, schemas, groups, sql_backend, test_database, ws)
+    create_views_parallel(MAX_NB_OF_TABLES, schemas, groups, sql_backend, test_database, ws)
+
+    dirs = create_dirs_parallel(NB_OF_FILES, groups, sql_backend, test_database, ws)
+    create_notebooks_parallel(MAX_NB_OF_FILES, dirs, groups, sql_backend, test_database, ws)
 
     create_scopes(NB_OF_TEST_WS_OBJECTS, groups, sql_backend, test_database, ws)
 
@@ -109,58 +173,48 @@ def test_performance(
 
     create_repos(NB_OF_TEST_WS_OBJECTS, groups, sql_backend, test_database, ws)
 
-    create_dirs_n_notebookes(
-        NB_OF_FILES, MAX_NB_OF_FILES, groups, sql_backend, test_database, ws
-    )
-
-    create_schemas_n_tables(
-        NB_OF_SCHEMAS, MAX_NB_OF_TABLES, groups, sql_backend, test_database, users, ws
-    )
-
     backup_group_prefix = "db-temp-"
     inventory_database = f"ucx_{make_random(4)}"
-    test_groups = [_[0].display_name for _ in groups]
+    test_groups = [_.display_name for _ in groups]
 
     install = WorkspaceInstaller.run_for_config(
-        ws,
-        WorkspaceConfig(
-            inventory_database=inventory_database,
-            include_group_names=test_groups,
-            renamed_group_prefix=backup_group_prefix,
-            log_level="DEBUG",
-        ),
-        sql_backend=sql_backend,
-        prefix=make_random(4),
+       ws,
+       WorkspaceConfig(
+           inventory_database=inventory_database,
+           include_group_names=test_groups,
+           renamed_group_prefix=backup_group_prefix,
+           log_level="DEBUG",
+       ),
+       sql_backend=sql_backend,
+       prefix=make_random(4),
     )
 
     required_workflows = ["assessment", "migrate-groups", "remove-workspace-local-backup-groups"]
     for step in required_workflows:
         install.run_workflow(step)
 
-    persisted_rows = get_persisted_rows(sql_backend, test_database)
-
-    try_validate_object(persisted_rows, sql_backend, test_database, test_groups, ws, "pipelines")
-    try_validate_object(persisted_rows, sql_backend, test_database, test_groups, ws, "jobs")
-    try_validate_object(persisted_rows, sql_backend, test_database, test_groups, ws, "experiments")
-    try_validate_object(persisted_rows, sql_backend, test_database, test_groups, ws, "registered-models")
-    try_validate_object(persisted_rows, sql_backend, test_database, test_groups, ws, "instance-pools")
-    try_validate_object(persisted_rows, sql_backend, test_database, test_groups, ws, "warehouses")
-    try_validate_object(persisted_rows, sql_backend, test_database, test_groups, ws, "clusters")
-    try_validate_object(persisted_rows, sql_backend, test_database, test_groups, ws, "cluster-policies")
-    try_validate_sql_objects(persisted_rows, sql_backend, test_database, test_groups, ws, sql.ObjectTypePlural.ALERTS)
+    try_validate_object(sql_backend, test_database, test_groups, ws, "pipelines")
+    try_validate_object(sql_backend, test_database, test_groups, ws, "jobs")
+    try_validate_object(sql_backend, test_database, test_groups, ws, "experiments")
+    try_validate_object(sql_backend, test_database, test_groups, ws, "registered-models")
+    try_validate_object(sql_backend, test_database, test_groups, ws, "instance-pools")
+    try_validate_object(sql_backend, test_database, test_groups, ws, "warehouses")
+    try_validate_object(sql_backend, test_database, test_groups, ws, "clusters")
+    try_validate_object(sql_backend, test_database, test_groups, ws, "cluster-policies")
+    try_validate_sql_objects(sql_backend, test_database, test_groups, ws, sql.ObjectTypePlural.ALERTS)
     try_validate_sql_objects(
-        persisted_rows, sql_backend, test_database, test_groups, ws, sql.ObjectTypePlural.DASHBOARDS
+        sql_backend, test_database, test_groups, ws, sql.ObjectTypePlural.DASHBOARDS
     )
-    try_validate_sql_objects(persisted_rows, sql_backend, test_database, test_groups, ws, sql.ObjectTypePlural.QUERIES)
+    try_validate_sql_objects(sql_backend, test_database, test_groups, ws, sql.ObjectTypePlural.QUERIES)
 
-    try_validate_files(persisted_rows, sql_backend, test_database, test_groups, ws, "notebooks")
-    try_validate_files(persisted_rows, sql_backend, test_database, test_groups, ws, "directories")
+    try_validate_files(sql_backend, test_database, test_groups, ws, "notebooks")
+    try_validate_files(sql_backend, test_database, test_groups, ws, "directories")
 
-    try_validate_tables(persisted_rows, sql_backend, test_database, test_groups, "SCHEMA")
-    try_validate_tables(persisted_rows, sql_backend, test_database, test_groups, "TABLE")
-    try_validate_tables(persisted_rows, sql_backend, test_database, test_groups, "VIEW")
+    try_validate_tables( sql_backend, test_database, test_groups, "SCHEMA")
+    try_validate_tables( sql_backend, test_database, test_groups, "TABLE")
+    try_validate_tables( sql_backend, test_database, test_groups, "VIEW")
 
-    try_validate_secrets(persisted_rows, sql_backend, test_database, test_groups, ws)
+    try_validate_secrets(sql_backend, test_database, ws)
     validate_entitlements(sql_backend, test_database, ws)
 
     if len(verificationErrors) > 0:
@@ -169,178 +223,242 @@ def test_performance(
                 txt_file.write(line + "\n")
     assert [] == verificationErrors
 
-def fresh_account(acc):
-    for user in list(acc.users.list()):
-        if "william" not in user.display_name:
-            logger.info(f"Deleting user {user.display_name}")
-            acc.users.delete(user.id)
 
-    for grp in list(acc.groups.list()):
-        logger.info(f"Deleting group {grp.display_name}")
-        acc.groups.delete(grp.id)
+def table_exists(sql_backend, test_database, table_name):
+    try:
+        list(sql_backend.fetch(f"SELECT count(*) FROM {test_database.name}.{table_name}"))[0]
+        logger.info(f"Table {table_name} exist, skipping this part")
+        return True
+    except:
+        logger.info(f"Table {table_name} do not exist, populating objects")
+        return False
+
+def create_or_fetch_test_db(sql_backend, ws):
+    dbs = []
+    for db_name in sql_backend.fetch(f"SHOW DATABASES IN hive_metastore"):
+        dbs.append(db_name["databaseName"])
+    if "test_results" not in dbs:
+        logger.debug("Creating test database test_results")
+        test_database = create_schema(sql_backend, ws, name=f"test_results")
+    else:
+        logger.debug("Test database already exists")
+        test_database = SchemaInfo(name="test_results")
+    return test_database
 
 
-def recover(ws, acc, sql_backend):
-    inventory_database = "test_inv_database" #Needs to be modified depending on recover
-    results_database = "test_inv_database"
-
-    mggrps = []
-    for row in sql_backend.fetch(f"SELECT * FROM hive_metastore.{results_database}.groups"):
-        mggrps.append(MigratedGroup(*row))
-
-    test_groups = [_.name_in_workspace for _ in mggrps]
-
-    install_and_run(sql_backend, ws, inventory_database , test_groups)
-    validate(sql_backend, SchemaInfo(name=results_database), test_groups, ws)
-
-def install_and_run(sql_backend, ws:WorkspaceClient, inventory_database:str, test_groups):
-    backup_group_prefix = "db-temp-"
-
-    install = WorkspaceInstaller.run_for_config(
-        ws,
-        WorkspaceConfig(
-            inventory_database=inventory_database,
-            include_group_names=test_groups,
-            renamed_group_prefix=backup_group_prefix,
-            log_level="DEBUG",
-        ),
-        sql_backend=sql_backend,
-        prefix=make_random(4),
-    )
-    required_workflows = ["assessment", "migrate-groups", "remove-workspace-local-backup-groups"]
-    for step in required_workflows:
-        install.run_workflow(step)
-
-def validate(sql_backend, test_database, test_groups, ws):
-    persisted_rows = get_persisted_rows(sql_backend, test_database)
-
-    try_validate_object(persisted_rows, sql_backend, test_database, test_groups, ws, "pipelines")
-    try_validate_object(persisted_rows, sql_backend, test_database, test_groups, ws, "jobs")
-    try_validate_object(persisted_rows, sql_backend, test_database, test_groups, ws, "experiments")
-    try_validate_object(persisted_rows, sql_backend, test_database, test_groups, ws, "registered-models")
-    try_validate_object(persisted_rows, sql_backend, test_database, test_groups, ws, "instance-pools")
-    try_validate_object(persisted_rows, sql_backend, test_database, test_groups, ws, "warehouses")
-    try_validate_object(persisted_rows, sql_backend, test_database, test_groups, ws, "clusters")
-    try_validate_object(persisted_rows, sql_backend, test_database, test_groups, ws, "cluster-policies")
-    try_validate_sql_objects(persisted_rows, sql_backend, test_database, test_groups, ws, sql.ObjectTypePlural.ALERTS)
-    try_validate_sql_objects(
-        persisted_rows, sql_backend, test_database, test_groups, ws, sql.ObjectTypePlural.DASHBOARDS
-    )
-    try_validate_sql_objects(persisted_rows, sql_backend, test_database, test_groups, ws, sql.ObjectTypePlural.QUERIES)
-
-    try_validate_files(persisted_rows, sql_backend, test_database, test_groups, ws, "notebooks")
-    try_validate_files(persisted_rows, sql_backend, test_database, test_groups, ws, "directories")
-
-    try_validate_tables(persisted_rows, sql_backend, test_database, test_groups, "SCHEMA")
-    try_validate_tables(persisted_rows, sql_backend, test_database, test_groups, "TABLE")
-    try_validate_tables(persisted_rows, sql_backend, test_database, test_groups, "VIEW")
-
-    try_validate_secrets(persisted_rows, sql_backend, test_database, test_groups, ws)
-    #validate_entitlements(sql_backend, test_database, ws)
-
-    if len(verificationErrors) > 0:
-        with open(f"perf-test-{datetime.datetime.now()}.txt", "w") as txt_file:
-            for line in verificationErrors:
-                txt_file.write(line + "\n")
-    assert [] == verificationErrors
-
-def get_persisted_rows(sql_backend, test_database):
+def get_persisted_rows(sql_backend, test_database, object_type):
     persisted_rows = {}
-    for row in sql_backend.fetch(f"SELECT * FROM {test_database.name}.objects"):
-        mgted_grp = ObjectPermission(*row)
-        if mgted_grp.object_id in persisted_rows:
-            previous_perms = persisted_rows[mgted_grp.object_id]
-            if mgted_grp.group in previous_perms:
-                previous_perms[mgted_grp.group] = [mgted_grp.permission] + previous_perms[mgted_grp.group]
+    for object_id, group_name, permission in sql_backend.fetch(
+            f"SELECT distinct object_id, group, permission FROM {test_database.name}.objects where object_type = '{object_type}'"
+    ):
+        if object_id in persisted_rows:
+            previous_perms = persisted_rows[object_id]
+            if group_name in previous_perms:
+                previous_perms[group_name] = [permission] + previous_perms[group_name]
             else:
-                previous_perms[mgted_grp.group] = [mgted_grp.permission]
-            persisted_rows[mgted_grp.object_id] = previous_perms
+                previous_perms[group_name] = [permission]
+            persisted_rows[object_id] = previous_perms
         else:
-            persisted_rows[mgted_grp.object_id] = {mgted_grp.group: [mgted_grp.permission]}
-    logger.debug(json.dumps(persisted_rows))
+            persisted_rows[object_id] = {group_name: [permission]}
+
     return persisted_rows
 
-
-def create_schemas_n_tables(
-    NB_OF_SCHEMAS, MAX_NB_OF_TABLES, groups, sql_backend, test_database, users, ws
-):
-    to_persist = []
+def create_schemas_parallel(NB_OF_SCHEMAS, groups, sql_backend, test_database, ws):
+    create_schema_task = []
     for i in range(NB_OF_SCHEMAS):
-        schema = create_schema(sql_backend, ws)
-        schema_permissions = create_hive_metastore_permissions(
-            groups, ["SELECT", "MODIFY", "READ_METADATA", "CREATE", "USAGE"]
-        )
-        grant_permissions(sql_backend, "SCHEMA", schema.name, schema_permissions)
-        owner = groups[random.randint(0, len(groups) - 1)][0].display_name
-        transfer_ownership(sql_backend, "SCHEMA", schema.name, owner)
+        create_schema_task.append(partial(create_schema, sql_backend, ws))
 
-        for group, permissions in schema_permissions.items():
-            for permission in permissions:
-                to_persist.append(ObjectPermission(group, "SCHEMA", schema.name, permission))
-        to_persist.append(ObjectPermission(owner, "DATABASE", schema.name, "OWN"))
+    schemas, errors = Threads.gather(f"schema creation", create_schema_task)
+    logger.warning(f"Had {len(errors)} error while creating schemas")
 
+    apply_permission_task = []
+    for schema in schemas:
+        apply_permission_task.append(partial(apply_schema_permissions, groups, schema, sql_backend))
+
+    schema_permissions, errors = Threads.gather(f"schema_permissions", apply_permission_task)
+    logger.warning(f"Had {len(errors)} error while applying permissions on schemas")
+
+    permissions_flatten = [grant for grants in schema_permissions for grant in grants]
+    sql_backend.save_table(f"{test_database.name}.objects", permissions_flatten, ObjectPermission)
+    return schemas
+
+
+def apply_schema_permissions(groups, schema, sql_backend) -> [ObjectPermission]:
+    schema_permissions = create_hive_metastore_permissions(
+        groups, ["SELECT", "MODIFY", "READ_METADATA", "CREATE", "USAGE"]
+    )
+    grant_permissions(sql_backend, "SCHEMA", schema.name, schema_permissions)
+    owner = groups[random.randint(0, len(groups) - 1)].display_name
+    transfer_ownership(sql_backend, "SCHEMA", schema.name, owner)
+
+    to_persist = []
+    for group, permissions in schema_permissions.items():
+        for permission in permissions:
+            to_persist.append(ObjectPermission(group, "SCHEMA", schema.name, permission))
+    return to_persist
+
+
+def create_tables_parallel(MAX_NB_OF_TABLES, schemas, groups, sql_backend, test_database, ws):
+    create_table_task = []
+
+    for schema in schemas:
         nb_of_tables = random.randint(1, MAX_NB_OF_TABLES)
-        logger.info(f"Created schema {schema.name}")
-        logger.info(f"Creating {nb_of_tables} tables and views on schema {schema.name}")
-
         for j in range(nb_of_tables):
-            table = create_table(sql_backend, ws, schema_name=schema.name)
-            full_name = schema.name + "." + table.name
-            table_permission = create_hive_metastore_permissions(groups, ["SELECT", "MODIFY", "READ_METADATA"])
-            grant_permissions(sql_backend, "TABLE", full_name, table_permission)
+            create_table_task.append(partial(create_table, sql_backend, ws, schema_name=schema.name))
 
-            owner = groups[random.randint(0, len(groups) - 1)][0].display_name
-            transfer_ownership(sql_backend, "TABLE", full_name, owner)
-            for group, permissions in table_permission.items():
-                for permission in permissions:
-                    to_persist.append(ObjectPermission(group, "TABLE", full_name, permission))
-            to_persist.append(ObjectPermission(owner, "TABLE", full_name, "OWN"))
-            logger.info(f"Created table {full_name}")
+    tables, errors = Threads.gather(f"table creation", create_table_task)
+    logger.warning(f"Had {len(errors)} error while creating tables")
 
+    apply_permission_task = []
+    for table in tables:
+        apply_permission_task.append(partial(apply_table_permission, groups, sql_backend, table))
+
+    table_permissions, errors = Threads.gather(f"table permissions", apply_permission_task)
+    logger.warning(f"Had {len(errors)} error while creating tables")
+
+    permissions_flatten = [grant for grants in table_permissions for grant in grants]
+    sql_backend.save_table(f"{test_database.name}.objects", permissions_flatten, ObjectPermission)
+
+
+def apply_table_permission(groups, sql_backend, table):
+    full_name = table.schema_name + "." + table.name
+    table_permission = create_hive_metastore_permissions(groups, ["SELECT", "MODIFY", "READ_METADATA"])
+    grant_permissions(sql_backend, "TABLE", full_name, table_permission)
+    owner = groups[random.randint(0, len(groups) - 1)].display_name
+    transfer_ownership(sql_backend, "TABLE", full_name, owner)
+
+    to_persist = []
+    for group, permissions in table_permission.items():
+        for permission in permissions:
+            to_persist.append(ObjectPermission(group, "TABLE", full_name, permission))
+    to_persist.append(ObjectPermission(owner, "TABLE", full_name, "OWN"))
+    return to_persist
+
+
+def create_views_parallel(MAX_NB_OF_TABLES, schemas, groups, sql_backend, test_database, ws):
+    create_view_task = []
+
+    for schema in schemas:
+        nb_of_tables = random.randint(1, MAX_NB_OF_TABLES)
         for j in range(nb_of_tables):
-            view = create_table(sql_backend, ws, schema_name=schema.name, view=True, ctas="SELECT 2+2 AS four")
-            full_name = schema.name + "." + view.name
-            view_permission = create_hive_metastore_permissions(groups, ["SELECT"])
-            grant_permissions(sql_backend, "VIEW", full_name, view_permission)
+            create_view_task.append(partial(create_table, sql_backend, ws, schema_name=schema.name, view=True, ctas="SELECT 2+2 AS four"))
 
-            owner = groups[random.randint(0, len(groups) - 1)][0].display_name
-            transfer_ownership(sql_backend, "VIEW", full_name, owner)
-            for group, permissions in view_permission.items():
-                for permission in permissions:
-                    to_persist.append(ObjectPermission(group, "VIEW", full_name, permission))
-            to_persist.append(ObjectPermission(owner, "VIEW", full_name, "OWN"))
-            logger.info(f"Created view {full_name}")
-        for j in range(nb_of_tables):
-            table = create_table(sql_backend, ws, schema_name=schema.name)
-            full_name = schema.name + "." + table.name
-            table_permission = create_hive_metastore_permissions(groups, ["SELECT", "MODIFY", "READ_METADATA"])
+    views, errors = Threads.gather(f"view creation", create_view_task)
+    logger.warning(f"Had {len(errors)} error while creating views")
 
-            grant_permissions(sql_backend, "TABLE", full_name, table_permission)
+    apply_permission_task = []
+    for view in views:
+        apply_permission_task.append(partial(apply_view_permissions, groups, sql_backend, view))
 
-            owner = users[random.randint(0, len(users) - 1)].display_name
-            transfer_ownership(sql_backend, "TABLE", full_name, owner)
-            for group, permissions in table_permission.items():
-                for permission in permissions:
-                    to_persist.append(ObjectPermission(group, "TABLE", full_name, permission))
+    view_permissions, errors = Threads.gather(f"view permissions", apply_permission_task)
+    logger.warning(f"Had {len(errors)} error while creating views")
 
-            to_persist.append(ObjectPermission(owner, "TABLE", full_name, "OWN"))
-            logger.info(f"Created table {full_name}")
-        for j in range(nb_of_tables):
-            view = create_table(sql_backend, ws, schema_name=schema.name, view=True, ctas="SELECT 2+2 AS four")
-            full_name = schema.name + "." + view.name
-            view_permission = create_hive_metastore_permissions(groups, ["SELECT"])
+    permissions_flatten = [grant for grants in view_permissions for grant in grants]
+    sql_backend.save_table(f"{test_database.name}.objects", permissions_flatten, ObjectPermission)
 
-            grant_permissions(sql_backend, "VIEW", full_name, view_permission)
 
-            owner = users[random.randint(0, len(users) - 1)].display_name
-            transfer_ownership(sql_backend, "VIEW", full_name, owner)
-            for group, permissions in view_permission.items():
-                for permission in permissions:
-                    to_persist.append(ObjectPermission(group, "VIEW", full_name, permission))
-            to_persist.append(ObjectPermission(owner, "VIEW", full_name, "OWN"))
-            logger.info(f"Created view {full_name}")
-    sql_backend.save_table(f"{test_database.name}.objects", to_persist, ObjectPermission)
+def apply_view_permissions(groups, sql_backend, view):
+    full_name = view.schema_name + "." + view.name
+    view_permission = create_hive_metastore_permissions(groups, ["SELECT"])
+    grant_permissions(sql_backend, "VIEW", full_name, view_permission)
+    owner = groups[random.randint(0, len(groups) - 1)].display_name
+    transfer_ownership(sql_backend, "VIEW", full_name, owner)
 
+    to_persist = []
+    for group, permissions in view_permission.items():
+        for permission in permissions:
+            to_persist.append(ObjectPermission(group, "VIEW", full_name, permission))
+    to_persist.append(ObjectPermission(owner, "VIEW", full_name, "OWN"))
+    return to_persist
+
+def create_dirs_parallel(
+    NB_OF_FILES, groups, sql_backend, test_database, ws
+):
+    dir_tasks = []
+    for i in range(NB_OF_FILES):
+        dir_tasks.append(partial(create_directory, ws))
+
+    directories, errors = Threads.gather(f"create directories", dir_tasks)
+    logger.warning(f"Had {len(errors)} error while creating directories")
+
+    dir_permissions_tasks = []
+    for directory in directories:
+        dir_permissions_tasks.append(partial(assign_dir_permissions, groups, directory, ws))
+
+    directory_permissions, errors = Threads.gather(f"assign directories permissions", dir_permissions_tasks)
+    logger.warning(f"Had {len(errors)} error while assigning directories permissions")
+
+    permissions_flatten = [grant for grants in directory_permissions for grant in grants]
+    sql_backend.save_table(f"{test_database.name}.objects", permissions_flatten, ObjectPermission)
+    return directories
+
+
+def create_directory(ws:WorkspaceClient):
+    test_dir = create_dir(ws)
+    logger.info(f"Created dir {test_dir}")
+    return ws.workspace.get_status(test_dir)
+
+
+def assign_dir_permissions(groups, stat, ws:WorkspaceClient) -> [ObjectPermission]:
+    dir_perms = create_permissions(
+        groups,
+        [
+            WorkspaceObjectPermissionLevel.CAN_MANAGE,
+            WorkspaceObjectPermissionLevel.CAN_RUN,
+            WorkspaceObjectPermissionLevel.CAN_EDIT,
+            WorkspaceObjectPermissionLevel.CAN_READ,
+        ],
+    )
+    assign_ws_local_permissions("directories", dir_perms, stat.object_id, ws)
+    to_persist = []
+    for group, permission in dir_perms.items():
+        to_persist.append(ObjectPermission(group, "directories", stat.object_id, permission.value))
+
+    return to_persist
+
+def create_notebooks_parallel(MAX_NB_OF_FILES, directories, groups, sql_backend, test_database, ws):
+    notebook_tasks = []
+    for dir_path in directories:
+        nb_of_notebooks = random.randint(1, MAX_NB_OF_FILES)
+        for j in range(nb_of_notebooks):
+            notebook_tasks.append(partial(do_notebook, ws, dir_path))
+
+    notebooks, errors = Threads.gather(f"create notebooks", notebook_tasks)
+    logger.warning(f"Had {len(errors)} error while creating notebooks")
+
+    nb_permissions_tasks = []
+    for notebook in notebooks:
+        nb_permissions_tasks.append(partial(notebook_permissions, notebook, groups , ws))
+
+    notebook_perms, errors = Threads.gather(f"assign notebook permissions", nb_permissions_tasks)
+    logger.warning(f"Had {len(errors)} error while assigning notebook permissions")
+
+    permissions_flatten = [grant for grants in notebook_perms for grant in grants]
+    sql_backend.save_table(f"{test_database.name}.objects", permissions_flatten, ObjectPermission)
+
+def do_notebook(ws, test_dir:ObjectInfo):
+    nb = create_notebook(ws, path=test_dir.path + "/" + make_random() + ".py")
+    logger.info(f"Created notebook {nb}")
+    return ws.workspace.get_status(nb)
+
+def notebook_permissions(nb_stat, groups, ws):
+    nb_perms = create_permissions(
+        groups,
+        [
+            WorkspaceObjectPermissionLevel.CAN_MANAGE,
+            WorkspaceObjectPermissionLevel.CAN_RUN,
+            WorkspaceObjectPermissionLevel.CAN_EDIT,
+            WorkspaceObjectPermissionLevel.CAN_READ,
+        ],
+    )
+    assign_ws_local_permissions("notebooks", nb_perms, nb_stat.object_id, ws)
+    logger.debug(f"Assigned permission on notebook {nb_stat.path}")
+
+    to_persist=[]
+    for group, permission in nb_perms.items():
+        to_persist.append(ObjectPermission(group, "notebooks", nb_stat.object_id, permission.value))
+
+    return to_persist
 
 def create_dirs_n_notebookes(
     NB_OF_FILES, MAX_NB_OF_FILES, groups, sql_backend, test_database, ws
@@ -572,8 +690,8 @@ def create_scopes(NB_OF_TEST_WS_OBJECTS, groups, sql_backend, test_database, ws:
     sql_backend.save_table(f"{test_database.name}.objects", to_persist, ObjectPermission)
 
 
-def create_groups(NB_OF_TEST_GROUPS, ws, acc, sql_backend, test_database, user_pool):
-    groups = []
+def create_big_groups(NB_OF_TEST_GROUPS, ws:WorkspaceClient, acc:AccountClient, sql_backend, test_database, user_pool):
+    to_persist = []
     for i in range(NB_OF_TEST_GROUPS):
         entitlements_list = [
             "workspace-access",
@@ -581,48 +699,109 @@ def create_groups(NB_OF_TEST_GROUPS, ws, acc, sql_backend, test_database, user_p
             "allow-cluster-create",
             "allow-instance-pool-create",
         ]
-        entitlements = [_ for _ in random.choices(entitlements_list, k=random.randint(1, 3))]
+        entitlements = [iam.ComplexValue(value=_) for _ in random.choices(entitlements_list, k=random.randint(1, 3))]
+
+        members = []
+        for user in user_pool:
+            members.append(iam.ComplexValue(value=user.id))
+
+        group_name = f"ucx_{make_random(6)}"
+        logger.info(f"Creating big group {group_name} with {len(members)} members")
+        grp = do_ws_group(ws, group_name, [], entitlements)
+        acc_grp = do_acc_group(acc, group_name, [])
+
+        for chunk in chunks(members, 100):
+            logger.debug(f"Adding 100 users to ws group {group_name}")
+            ws.groups.patch(
+                grp.id,
+                operations=[iam.Patch(op=iam.PatchOp.ADD,path="members",value=[x.as_dict() for x in chunk])],
+                schemas=[iam.PatchSchema.URN_IETF_PARAMS_SCIM_API_MESSAGES_2_0_PATCH_OP],
+            )
+            logger.debug(f"Adding 100 users to acc group {group_name}")
+            acc.groups.patch(
+                acc_grp.id,
+                operations=[iam.Patch(op=iam.PatchOp.ADD,path="members",value=[x.as_dict() for x in chunk])],
+                schemas=[iam.PatchSchema.URN_IETF_PARAMS_SCIM_API_MESSAGES_2_0_PATCH_OP],
+            )
+        to_persist.append(PerfGroup(grp.display_name))
+
+    sql_backend.save_table(f"{test_database.name}.groups", to_persist, PerfGroup)
+
+def chunks(lst, n):
+    """Yield successive n-sized chunks from lst."""
+    for i in range(0, len(lst), n):
+        yield lst[i:i + n]
+
+def create_groups_parallel(NB_OF_TEST_GROUPS, ws, acc, sql_backend, test_database, user_pool):
+    tasks = []
+    for i in range(NB_OF_TEST_GROUPS):
+        entitlements_list = [
+            "workspace-access",
+            "databricks-sql-access",
+            "allow-cluster-create",
+            "allow-instance-pool-create",
+        ]
+        entitlements = [iam.ComplexValue(value=_) for _ in random.choices(entitlements_list, k=random.randint(1, 3))]
 
         nb_of_members = random.randint(1, len(user_pool) - 1)
         members = []
         for j in range(nb_of_members):
             user_index_in_list = random.randint(0, len(user_pool) - 1)
-            members.append(user_pool[user_index_in_list].id)
+            members.append(iam.ComplexValue(value=user_pool[user_index_in_list].id))
 
-        ws_group, acc_group = create_group(ws, acc, members, entitlements)
-        groups.append((ws_group, acc_group))
-        logger.info(f"Created group {ws_group.display_name} {i + 1} with {len(ws_group.members)} members")
-    persist_groups(groups, sql_backend, test_database)
-    return groups
+        group_name = f"ucx_{make_random(6)}"
+        logger.info(f"Creating group {group_name} with {len(members)} members")
+        tasks.append(partial(do_ws_group, ws, group_name, members, entitlements))
+        tasks.append(partial(do_acc_group, acc, group_name, members))
+
+    groups, failures = Threads.gather("Group creation", tasks)
+
+    grp_names = set([group.display_name for group in groups])
+    to_persist = [PerfGroup(grp_name) for grp_name in grp_names]
+
+    sql_backend.save_table(f"{test_database.name}.groups", to_persist, PerfGroup)
+
+
+@rate_limited(max_requests=35, burst_period_seconds=60)
+def do_ws_group(ws:WorkspaceClient, name, members, entitlements):
+    return ws.groups.create(display_name=name, entitlements=entitlements, members=members)
+
+
+@rate_limited(max_requests=5, burst_period_seconds=1)
+def do_acc_group(acc:AccountClient, name, members):
+    return acc.groups.create(display_name=name, members=members)
 
 
 def create_users(MAX_GRP_USERS, sql_backend, test_database, ws:WorkspaceClient):
-    users = []
-    to_persist = []
+    tasks = []
     for i in range(MAX_GRP_USERS):
-        user = create_user(ws)
-        users.append(user)
-        to_persist.append(User(user.display_name))
-        logger.info(f"Created user {user.display_name}")
+        tasks.append(partial(create_user, ws))
+    users, errors = Threads.gather(f"User creation", tasks)
+
+    if len(errors) > 0:
+        logger.error(f"Detected {len(errors)} while scanning tables")
+
+    to_persist = []
+    for user in users:
+        to_persist.append(User(user.id, user.display_name))
     sql_backend.save_table(f"{test_database.name}.users", users, User)
-    return users
 
 
-def try_validate_object(persisted_rows, sql_backend, test_database, test_groups, ws, object_type):
+def try_validate_object(persisted_rows, sql_backend, test_database, test_groups, ws):
     try:
-        validate_objects(persisted_rows, sql_backend, test_database, test_groups, ws, object_type)
+        validate_objects(persisted_rows, sql_backend, test_database, test_groups, ws)
     except Exception as e:
         logger.warning(f"Something wrong happened when asserting objects -> {e}")
 
 
-def validate_objects(persisted_rows, sql_backend, test_database, test_groups, ws: WorkspaceClient, object_type):
+def validate_objects(sql_backend, test_database, test_groups, ws: WorkspaceClient, object_type):
+    persisted_rows = get_persisted_rows(sql_backend, test_database, object_type)
+
     for pipe_id in sql_backend.fetch(
         f"SELECT distinct object_id FROM {test_database.name}.objects where object_type = '{object_type}'"
     ):
         obj_id = pipe_id["object_id"]
-        acls = ws.permissions.get(
-            object_type, obj_id
-        ).access_control_list  # TODO: can fail, must capture the exception and move on
+        acls = ws.permissions.get(object_type, obj_id).access_control_list
         for acl in acls:
             if acl.group_name in ["users", "admins", "account users"]:
                 continue
@@ -664,19 +843,21 @@ def validate_entitlements(sql_backend, test_database, ws: WorkspaceClient):
         )
 
 
-def try_validate_secrets(persisted_rows, sql_backend, test_database, test_groups, ws):
+def try_validate_secrets( sql_backend, test_database, ws):
     try:
-        validate_secrets(persisted_rows, sql_backend, test_database, test_groups, ws)
+        validate_secrets( sql_backend, test_database, ws)
     except Exception as e:
         logger.warning(f"Something wrong happened when asserting objects -> {e}")
 
 
-def validate_secrets(persisted_rows, sql_backend, test_database, test_groups, ws: WorkspaceClient):
+def validate_secrets(sql_backend, test_database, ws: WorkspaceClient):
+    persisted_rows = get_persisted_rows(sql_backend, test_database, "secrets")
     for pipe_id in sql_backend.fetch(
         f"SELECT distinct group, object_id FROM {test_database.name}.objects where object_type = 'secrets'"
     ):
         obj_id = pipe_id["object_id"]
         group = pipe_id["group"]
+        logger.debug(f"Validating secret {obj_id}")
         try:
             acl = ws.secrets.get_acl(obj_id, group)
         except Exception as e:
@@ -690,43 +871,53 @@ def validate_secrets(persisted_rows, sql_backend, test_database, test_groups, ws
         )
 
 
-def try_validate_tables(persisted_rows, sql_backend, test_database, test_groups, object_type):
+def try_validate_tables(sql_backend, test_database, test_groups, object_type):
     logger.info(f"Validating {object_type}")
     try:
-        validate_tables(persisted_rows, sql_backend, test_database, test_groups, object_type)
+        validate_tables(sql_backend, test_database, test_groups, object_type)
     except RuntimeError as e:
         logger.warning(f"Something wrong happened when asserting tables -> {e}")
 
 
-def validate_tables(persisted_rows, sql_backend, test_database, test_groups, object_type):
+def validate_tables(sql_backend, test_database, test_groups, object_type):
+    persisted_rows = get_persisted_rows(sql_backend, test_database, object_type)
+    validation_tasks = []
     for pipe_id in sql_backend.fetch(
         f"SELECT distinct object_id FROM {test_database.name}.objects where object_type = '{object_type}'"
     ):
         obj_id = pipe_id["object_id"]
-        for row in sql_backend.fetch(f"SHOW GRANTS ON {object_type} {obj_id}"):
-            (principal, action_type, remote_object_type, _) = row
-            if principal in ["users", "admins", "account users"]:
-                continue
-            if principal not in test_groups:
-                continue
-            if remote_object_type != object_type:
-                continue
+        logger.debug(f"Validating {object_type} {obj_id}")
+        validation_tasks.append(partial(validate_table, obj_id, object_type, persisted_rows, sql_backend, test_groups))
 
-            validate_that(principal in persisted_rows[obj_id], f"{principal} not found in {object_type} {obj_id}")
-            validate_that(
-                action_type in persisted_rows[obj_id][principal],
-                f"{principal} does not have {action_type} permission on {object_type} {obj_id}",
-            )
+    succ, errors = Threads.gather("Table validation", validation_tasks)
+    logger.warning(f"There was {len(errors)} while validating tables ")
 
 
-def try_validate_sql_objects(persisted_rows, sql_backend, test_database, test_groups, ws, object_type):
+def validate_table(obj_id, object_type, persisted_rows, sql_backend, test_groups):
+    for row in sql_backend.fetch(f"SHOW GRANTS ON {object_type} {obj_id}"):
+        (principal, action_type, remote_object_type, _) = row
+        if principal in ["users", "admins", "account users"]:
+            continue
+        if principal not in test_groups:
+            continue
+        if remote_object_type != object_type:
+            continue
+        validate_that(principal in persisted_rows[obj_id], f"{principal} not found in {object_type} {obj_id}")
+        validate_that(
+            action_type in persisted_rows[obj_id][principal],
+            f"{principal} does not have {action_type} permission on {object_type} {obj_id}",
+        )
+
+
+def try_validate_sql_objects(sql_backend, test_database, test_groups, ws, object_type):
     try:
-        validate_sql_objects(persisted_rows, sql_backend, test_database, test_groups, ws, object_type)
+        validate_sql_objects(sql_backend, test_database, test_groups, ws, object_type)
     except Exception as e:
         logger.warning(f"Something wrong happened when asserting SQL objects -> {e}")
 
 
-def validate_sql_objects(persisted_rows, sql_backend, test_database, test_groups, ws, object_type):
+def validate_sql_objects(sql_backend, test_database, test_groups, ws, object_type):
+    persisted_rows = get_persisted_rows(sql_backend, test_database, object_type)
     for pipe_id in sql_backend.fetch(
         f"SELECT distinct object_id FROM {test_database.name}.objects where object_type = '{object_type.value}'"
     ):
@@ -748,45 +939,53 @@ def validate_sql_objects(persisted_rows, sql_backend, test_database, test_groups
             )
 
 
-def try_validate_files(persisted_rows, sql_backend, test_database, test_groups, ws, object_type):
+def try_validate_files(sql_backend, test_database, test_groups, ws, object_type):
     try:
-        validate_files(persisted_rows, sql_backend, test_database, test_groups, ws, object_type)
+        validate_files(sql_backend, test_database, test_groups, ws, object_type)
     except Exception as e:
         logger.warning(f"Something wrong happened when asserting files -> {e}")
 
 
-def validate_files(persisted_rows, sql_backend, test_database, test_groups, ws: WorkspaceClient, object_type):
+def validate_files(sql_backend, test_database, test_groups, ws: WorkspaceClient, object_type):
+    validation_tasks = []
+    persisted_rows = get_persisted_rows(sql_backend, test_database, object_type)
     for pipe_id in sql_backend.fetch(
         f"SELECT distinct object_id FROM {test_database.name}.objects where object_type = '{object_type}'"
     ):
-        obj_id = pipe_id["object_id"]
-        try:
-            acls = ws.workspace.get_permissions(object_type, obj_id).access_control_list
-        except Exception as e:
-            logger.warning(f"Could not fetch permissions for {object_type} {obj_id} ")
-            logger.warning(e)
-            continue
-        for acl in acls:
-            non_inherited_permissions = [perm for perm in acl.all_permissions if not perm.inherited]
-            if non_inherited_permissions:
-                if acl.group_name in ["users", "admins", "account users"]:
-                    continue
-                if acl.group_name not in test_groups:
-                    continue
+        validation_tasks.append(partial(validate_table, pipe_id, ws, object_type, test_groups, persisted_rows))
 
+
+def validate_file(pipe_id, ws, object_type, test_groups, persisted_rows):
+    obj_id = pipe_id["object_id"]
+    try:
+        acls = ws.workspace.get_permissions(object_type, obj_id).access_control_list
+    except Exception as e:
+        logger.warning(f"Could not fetch permissions for {object_type} {obj_id} ")
+        logger.warning(e)
+        return
+
+    logger.debug(f"Validating {object_type} {obj_id}")
+    for acl in acls:
+        non_inherited_permissions = [perm for perm in acl.all_permissions if not perm.inherited]
+        if non_inherited_permissions:
+            if acl.group_name in ["users", "admins", "account users"]:
+                continue
+            if acl.group_name not in test_groups:
+                continue
+
+            validate_that(
+                acl.group_name in persisted_rows[obj_id],
+                f"{acl.group_name} not found in persisted rows for {object_type} {obj_id}",
+            )
+
+            for perm in non_inherited_permissions:
                 validate_that(
-                    acl.group_name in persisted_rows[obj_id],
-                    f"{acl.group_name} not found in persisted rows for {object_type} {obj_id}",
+                    perm.permission_level.value in persisted_rows[obj_id][acl.group_name],
+                    f"{perm.permission_level.value} not found in persisted rows for {object_type} {obj_id} and group {acl.group_name}",
                 )
 
-                for perm in non_inherited_permissions:
-                    validate_that(
-                        perm.permission_level.value in persisted_rows[obj_id][acl.group_name],
-                        f"{perm.permission_level.value} not found in persisted rows for {object_type} {obj_id} and group {acl.group_name}",
-                    )
 
-
-def assign_ws_local_permissions(object_type, dir_perms, object_id, ws):
+def assign_ws_local_permissions(object_type, dir_perms, object_id, ws:WorkspaceClient) -> [WorkspaceObjectAccessControlRequest]:
     acls = []
     for group, permission in dir_perms.items():
         acls.append(WorkspaceObjectAccessControlRequest(group_name=group, permission_level=permission))
@@ -811,7 +1010,7 @@ def create_hive_metastore_permissions(groups, all_permissions):
     for permission in all_permissions:
         for j in range(10):
             rand = random.randint(0, len(groups) - 1)
-            ws_group = groups[rand][0].display_name
+            ws_group = groups[rand].display_name
             if ws_group in schema_permissions:
                 previous_perms = schema_permissions[ws_group]
                 previous_perms.add(permission)
@@ -826,7 +1025,7 @@ def create_permissions(groups, all_permissions):
     for permission in all_permissions:
         for j in range(10):
             rand = random.randint(0, len(groups)-1)
-            ws_group = groups[rand][0].display_name
+            ws_group = groups[rand].display_name
             schema_permissions[ws_group] = permission
     return schema_permissions
 
@@ -911,15 +1110,20 @@ def validate_that(func, message):
 
 #TODO: FIXTURES ARE TOO DANGEROUS BECAUSE iF THERE'S ANY FAILURE WE HAVE TO WAIL A FULL DAY TO RECREATE OBJECTS
 
-def create_user(ws:WorkspaceClient):
-    return ws.users.create(user_name=f"sdk-{make_random(4)}@example.com".lower())
+@rate_limited(max_requests=5, burst_period_seconds=1)
+def create_user(ws:WorkspaceClient) -> User:
+    name = f"sdk-{make_random(6)}@example.com".lower()
+    user = ws.users.create(user_name=name)
+    logger.info(f"Created user {name}")
+    return user
+
 
 def _scim_values(ids: list[str]) -> list[iam.ComplexValue]:
     return [iam.ComplexValue(value=x) for x in ids]
 
 
 def create_group(ws:WorkspaceClient, acc:AccountClient, members, entitlements):
-    workspace_group_name = f"ucx_{make_random(4)}"
+    workspace_group_name = f"ucx_{make_random(6)}"
     account_group_name = workspace_group_name
 
     ws_group = create_ws_group(ws, display_name=workspace_group_name, members=members, entitlements=entitlements)
@@ -940,7 +1144,7 @@ def _make_group(name, cfg, interface, members: list[str] | None = None,
     entitlements: list[str] | None = None,
     display_name: str | None = None, **kwargs):
 
-    kwargs["display_name"] = f"sdk-{make_random(4)}" if display_name is None else display_name
+    kwargs["display_name"] = f"sdk-{make_random(6)}" if display_name is None else display_name
     if members is not None:
         kwargs["members"] = _scim_values(members)
     if roles is not None:
