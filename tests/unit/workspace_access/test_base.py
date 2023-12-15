@@ -1,4 +1,4 @@
-from collections.abc import Callable, Iterator
+from collections.abc import Callable, Iterable
 from functools import partial
 
 from databricks.labs.ucx.workspace_access.base import AclSupport, Permissions
@@ -10,7 +10,7 @@ def test_applier():
         def __init__(self):
             self.called = False
 
-        def get_crawler_tasks(self) -> Iterator[Callable[..., Permissions | None]]:
+        def get_crawler_tasks(self) -> Iterable[Callable[..., Permissions | None]]:
             return []
 
         def object_types(self) -> set[str]:

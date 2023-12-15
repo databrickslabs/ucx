@@ -8,13 +8,15 @@ from databricks.sdk.service.workspace import ImportFormat
 
 logger = logging.getLogger(__name__)
 
+Resources = dict[str, str]
+
 
 class InstallState:
     def __init__(self, ws: WorkspaceClient, install_folder: str, version: int = 1):
         self._ws = ws
         self._state_file = f"{install_folder}/state.json"
         self._version = version
-        self._state = {}
+        self._state: dict[str, Resources] = {}
 
     def __getattr__(self, item):
         if not self._state:

@@ -31,12 +31,22 @@ class VerificationManager:
         base_attr = "temporary_name" if target == "backup" else "name_in_account"
         op = self._ws.permissions.get(object_type, object_id)
         for info in migration_state.groups:
+            if not op.access_control_list:
+                continue
             src_permissions = sorted(
-                [_ for _ in op.access_control_list if _.group_name == info.name_in_workspace],
+                [
+                    _
+                    for _ in op.access_control_list
+                    if _.group_name == info.name_in_workspace and _.group_name is not None
+                ],
                 key=lambda p: p.group_name,
             )
             dst_permissions = sorted(
-                [_ for _ in op.access_control_list if _.group_name == getattr(info, base_attr)],
+                [
+                    _
+                    for _ in op.access_control_list
+                    if _.group_name == getattr(info, base_attr) and _.group_name is not None
+                ],
                 key=lambda p: p.group_name,
             )
             assert len(dst_permissions) == len(
@@ -50,19 +60,19 @@ class VerificationManager:
         self, scope_name: str, migration_state: MigrationState, target: Literal["backup", "account"]
     ):
         base_attr = "name_in_workspace" if target == "backup" else "temporary_name"
-        target = "temporary_name" if target == "backup" else "name_in_account"
+        target_attr = "temporary_name" if target == "backup" else "name_in_account"
         for mi in migration_state.groups:
             src_name = getattr(mi, base_attr)
-            dst_name = getattr(mi, target)
+            dst_name = getattr(mi, target_attr)
             src_permission = self._secrets_support.secret_scope_permission(scope_name, src_name)
             dst_permission = self._secrets_support.secret_scope_permission(scope_name, dst_name)
             assert src_permission == dst_permission, "Scope ACLs were not applied correctly"
 
     def verify_roles_and_entitlements(self, migration_state: MigrationState, target: Literal["backup", "account"]):
-        target = "external_id" if target == "backup" else "id_in_workspace"
+        target_attr = "external_id" if target == "backup" else "id_in_workspace"
         for el in migration_state.groups:
             comparison_base = getattr(el, "id_in_workspace" if target == "backup" else "id_in_workspace")
-            comparison_target = getattr(el, target)
+            comparison_target = getattr(el, target_attr)
 
             base_group_info = self._ws.groups.get(comparison_base)
             target_group_info = self._ws.groups.get(comparison_target)

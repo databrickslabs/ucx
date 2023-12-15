@@ -1,6 +1,6 @@
 import datetime as dt
 import logging
-from collections.abc import Iterator
+from collections.abc import Iterable
 from concurrent.futures import FIRST_COMPLETED, ThreadPoolExecutor, wait
 from itertools import groupby
 
@@ -43,18 +43,23 @@ class WorkspaceListing:
                 f" rps: {rps:.3f}/sec"
             )
 
-    def _list_workspace(self, path: str) -> Iterator[ObjectType]:
+    def _list_workspace(self, path: str) -> Iterable[ObjectInfo]:
         list_retry_on_value_error = retried(on=[InternalError], timeout=self._verify_timeout)
         list_retried_check = list_retry_on_value_error(self._ws.workspace.list)
         return list_retried_check(path=path, recursive=False)
 
-    def _list_and_analyze(self, obj: ObjectInfo) -> (list[ObjectInfo], list[ObjectInfo]):
+    def _list_and_analyze(self, obj: ObjectInfo) -> tuple[list[ObjectInfo], list[ObjectInfo]]:
         directories = []
         others = []
+        if not obj.path:
+            return [], []
         try:
-            grouped_iterator = groupby(
-                self._list_workspace(obj.path), key=lambda x: x.object_type == ObjectType.DIRECTORY
-            )
+            list_workspace = self._list_workspace(obj.path)
+
+            def is_dir(x: ObjectInfo) -> bool:
+                return x.object_type == ObjectType.DIRECTORY
+
+            grouped_iterator: Iterable[tuple[bool, Iterable[ObjectInfo]]] = groupby(list_workspace, key=is_dir)
             for is_directory, objects in grouped_iterator:
                 if is_directory:
                     directories.extend(list(objects))

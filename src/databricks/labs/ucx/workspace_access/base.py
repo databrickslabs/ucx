@@ -1,5 +1,5 @@
 from abc import abstractmethod
-from collections.abc import Callable, Iterator
+from collections.abc import Callable, Iterable
 from dataclasses import dataclass
 from logging import Logger
 
@@ -18,7 +18,7 @@ class Permissions:
 
 class AclSupport:
     @abstractmethod
-    def get_crawler_tasks(self) -> Iterator[Callable[..., Permissions | None]]:
+    def get_crawler_tasks(self) -> Iterable[Callable[..., Permissions | None]]:
         """
         This method should return a list of crawler tasks (e.g. partials or just any callables)
         :return:

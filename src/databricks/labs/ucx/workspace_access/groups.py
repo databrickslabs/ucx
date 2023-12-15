@@ -2,21 +2,22 @@ import functools
 import json
 import logging
 import re
-import typing
 from abc import abstractmethod
+from collections.abc import Iterable
 from dataclasses import dataclass
 from datetime import timedelta
+from typing import ClassVar
 
 from databricks.sdk import WorkspaceClient
 from databricks.sdk.core import DatabricksError
 from databricks.sdk.errors import InternalError
-from databricks.sdk.errors.mapping import NotFound
+from databricks.sdk.errors.mapping import BadRequest, NotFound
 from databricks.sdk.retries import retried
 from databricks.sdk.service import iam
 from databricks.sdk.service.iam import Group
 
 from databricks.labs.ucx.framework.crawlers import CrawlerBase, SqlBackend
-from databricks.labs.ucx.framework.parallel import Threads
+from databricks.labs.ucx.framework.parallel import ManyError, Threads
 from databricks.labs.ucx.mixins.hardening import rate_limited
 
 logger = logging.getLogger(__name__)
@@ -28,14 +29,17 @@ class MigratedGroup:
     name_in_workspace: str
     name_in_account: str
     temporary_name: str
-    members: str = None
-    entitlements: str = None
-    external_id: str = None
-    roles: str = None
+    members: str | None = None
+    entitlements: str | None = None
+    external_id: str | None = None
+    roles: str | None = None
 
     @classmethod
     def partial_info(cls, workspace: iam.Group, account: iam.Group):
         """This method is only intended for use in tests"""
+        assert workspace.id is not None
+        assert workspace.display_name is not None
+        assert account.display_name is not None
         return cls(
             id_in_workspace=workspace.id,
             name_in_workspace=workspace.display_name,
@@ -288,8 +292,8 @@ class RegexMatchStrategy(GroupMigrationStrategy):
                 logger.info(f"Couldn't find a match for group {ws_group.display_name}")
 
 
-class GroupManager(CrawlerBase):
-    _SYSTEM_GROUPS: typing.ClassVar[list[str]] = ["users", "admins", "account users"]
+class GroupManager(CrawlerBase[MigratedGroup]):
+    _SYSTEM_GROUPS: ClassVar[list[str]] = ["users", "admins", "account users"]
 
     def __init__(
         self,
@@ -297,15 +301,18 @@ class GroupManager(CrawlerBase):
         ws: WorkspaceClient,
         inventory_database: str,
         include_group_names: list[str] | None = None,
-        renamed_group_prefix: str = "ucx-renamed-",
+        renamed_group_prefix: str | None = "ucx-renamed-",
         workspace_group_regex: str | None = None,
         workspace_group_replace: str | None = None,
         account_group_regex: str | None = None,
-        verify_timeout: timedelta | None = timedelta(minutes=1),
+        verify_timeout: timedelta | None = timedelta(minutes=2),
         *,
         external_id_match: bool = False,
     ):
         super().__init__(sql_backend, "hive_metastore", inventory_database, "groups", MigratedGroup)
+        if not renamed_group_prefix:
+            renamed_group_prefix = "ucx-renamed-"
+
         self._ws = ws
         self._include_group_names = include_group_names
         self._renamed_group_prefix = renamed_group_prefix
@@ -338,8 +345,7 @@ class GroupManager(CrawlerBase):
             tasks.append(functools.partial(self._rename_group, mg.id_in_workspace, mg.temporary_name))
         _, errors = Threads.gather("rename groups in the workspace", tasks)
         if len(errors) > 0:
-            msg = f"During rename of workspace groups got {len(errors)} errors. See debug logs"
-            raise RuntimeWarning(msg)
+            raise ManyError(errors)
 
     def _rename_group(self, group_id: str, new_group_name: str):
         ops = [iam.Patch(iam.PatchOp.REPLACE, "displayName", new_group_name)]
@@ -351,7 +357,6 @@ class GroupManager(CrawlerBase):
         account_groups_in_account = self._account_groups_in_account()
         account_groups_in_workspace = self._account_groups_in_workspace()
         groups_to_migrate = self.get_migration_state().groups
-
         for mg in groups_to_migrate:
             if mg.name_in_account in account_groups_in_workspace:
                 logger.info(f"Skipping {mg.name_in_account}: already in workspace")
@@ -363,8 +368,7 @@ class GroupManager(CrawlerBase):
             tasks.append(functools.partial(self._reflect_account_group_to_workspace, group_id))
         _, errors = Threads.gather("reflect account groups on this workspace", tasks)
         if len(errors) > 0:
-            msg = f"During account-to-workspace reflection got {len(errors)} errors. See debug logs"
-            raise RuntimeWarning(msg)
+            raise ManyError(errors)
 
     def get_migration_state(self) -> MigrationState:
         return MigrationState(self.snapshot())
@@ -386,11 +390,11 @@ class GroupManager(CrawlerBase):
             msg = f"During account-to-workspace reflection got {len(errors)} errors. See debug logs"
             raise RuntimeWarning(msg)
 
-    def _fetcher(self) -> typing.Iterator[MigratedGroup]:
+    def _fetcher(self) -> Iterable[MigratedGroup]:
         for row in self._backend.fetch(f"SELECT * FROM {self._full_name}"):
             yield MigratedGroup(*row)
 
-    def _crawler(self) -> typing.Iterator[MigratedGroup]:
+    def _crawler(self) -> Iterable[MigratedGroup]:
         workspace_groups_in_workspace = self._workspace_groups_in_workspace()
         account_groups_in_account = self._account_groups_in_account()
         strategy = self._get_strategy(workspace_groups_in_workspace, account_groups_in_account)
@@ -400,25 +404,34 @@ class GroupManager(CrawlerBase):
         attributes = "id,displayName,meta,externalId,members,roles,entitlements"
         groups = {}
         for g in self._list_workspace_groups("WorkspaceGroup", attributes):
+            if not g.display_name:
+                continue
             groups[g.display_name] = g
         return groups
 
     def _account_groups_in_workspace(self) -> dict[str, Group]:
         groups = {}
         for g in self._list_workspace_groups("Group", "id,displayName,externalId,meta"):
+            if not g.display_name:
+                continue
             groups[g.display_name] = g
         return groups
 
     def _account_groups_in_account(self) -> dict[str, Group]:
         groups = {}
         for g in self._list_account_groups("id,displayName,externalId"):
+            if not g.display_name:
+                continue
             groups[g.display_name] = g
         return groups
 
     def _is_group_out_of_scope(self, group: iam.Group, resource_type: str) -> bool:
         if group.display_name in self._SYSTEM_GROUPS:
             return True
-        if group.meta.resource_type != resource_type:
+        meta = group.meta
+        if not meta:
+            return False
+        if meta.resource_type != resource_type:
             return True
         return False
 
@@ -454,17 +467,16 @@ class GroupManager(CrawlerBase):
         # TODO: we should avoid using this method, as it's not documented
         # get account-level groups even if they're not (yet) assigned to a workspace
         logger.info(f"Listing account groups with {scim_attributes}...")
-        account_groups = [
-            iam.Group.from_dict(r)
-            for r in self._ws.api_client.do(
-                "get",
-                "/api/2.0/account/scim/v2/Groups",
-                query={"attributes": scim_attributes},
-            ).get("Resources", [])
-        ]
-        account_groups = [g for g in account_groups if g.display_name not in self._SYSTEM_GROUPS]
+        account_groups = []
+        raw = self._ws.api_client.do("GET", "/api/2.0/account/scim/v2/Groups", query={"attributes": scim_attributes})
+        for r in raw.get("Resources", []):  # type: ignore[union-attr]
+            g = iam.Group.from_dict(r)
+            if g.display_name in self._SYSTEM_GROUPS:
+                continue
+            account_groups.append(g)
         logger.info(f"Found {len(account_groups)} account groups")
-        return sorted(account_groups, key=lambda _: _.display_name)
+        sorted_groups: list[iam.Group] = sorted(account_groups, key=lambda _: _.display_name)  # type: ignore[arg-type,return-value]
+        return sorted_groups
 
     @retried(on=[DatabricksError])
     @rate_limited(max_requests=35, burst_period_seconds=60)
@@ -474,18 +486,20 @@ class GroupManager(CrawlerBase):
             self._ws.groups.delete(id=group_id)
             logger.info(f"Workspace-level group {display_name} with id {group_id} was deleted")
             return None
-        except DatabricksError as err:
-            if "not found" in str(err):
-                return None
-            raise
+        except NotFound:
+            return None
 
     @retried(on=[DatabricksError])
     @rate_limited(max_requests=10)
     def _reflect_account_group_to_workspace(self, account_group_id: str):
-        # TODO: add OpenAPI spec for it
-        path = f"/api/2.0/preview/permissionassignments/principals/{account_group_id}"
-        self._ws.api_client.do("PUT", path, data=json.dumps({"permissions": ["USER"]}))
-        return True
+        try:
+            # TODO: add OpenAPI spec for it
+            path = f"/api/2.0/preview/permissionassignments/principals/{account_group_id}"
+            self._ws.api_client.do("PUT", path, data=json.dumps({"permissions": ["USER"]}))
+            return True
+        except BadRequest:
+            # already exists
+            return True
 
     def _get_strategy(
         self, workspace_groups_in_workspace: dict[str, Group], account_groups_in_account: dict[str, Group]

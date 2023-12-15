@@ -1,14 +1,19 @@
 import json
 import logging
 import os
-from collections.abc import Callable, Iterator
+from collections.abc import Callable, Iterable, Iterator, Sequence
 from itertools import groupby
 
 from databricks.sdk import WorkspaceClient
 from databricks.sdk.service import sql
 
-from databricks.labs.ucx.framework.crawlers import CrawlerBase, SqlBackend
-from databricks.labs.ucx.framework.parallel import Threads
+from databricks.labs.ucx.framework.crawlers import (
+    CrawlerBase,
+    Dataclass,
+    DataclassInstance,
+    SqlBackend,
+)
+from databricks.labs.ucx.framework.parallel import ManyError, Threads
 from databricks.labs.ucx.hive_metastore import GrantsCrawler, TablesCrawler
 from databricks.labs.ucx.workspace_access import generic, redash, scim, secrets
 from databricks.labs.ucx.workspace_access.base import AclSupport, Permissions
@@ -18,7 +23,7 @@ from databricks.labs.ucx.workspace_access.tacl import TableAclSupport
 logger = logging.getLogger(__name__)
 
 
-class PermissionManager(CrawlerBase):
+class PermissionManager(CrawlerBase[Permissions]):
     def __init__(self, backend: SqlBackend, inventory_database: str, crawlers: list[AclSupport]):
         super().__init__(backend, "hive_metastore", inventory_database, "permissions", Permissions)
         self._acl_support = crawlers
@@ -34,7 +39,10 @@ class PermissionManager(CrawlerBase):
         workspace_start_path: str = "/",
     ) -> "PermissionManager":
         if num_threads is None:
-            num_threads = os.cpu_count() * 2
+            cpu_count = os.cpu_count()
+            if not cpu_count:
+                cpu_count = 1
+            num_threads = cpu_count * 2
         generic_acl_listing = [
             generic.Listing(ws.clusters.list, "cluster_id", "clusters"),
             generic.Listing(ws.cluster_policies.list, "policy_id", "cluster-policies"),
@@ -43,7 +51,7 @@ class PermissionManager(CrawlerBase):
             generic.Listing(ws.jobs.list, "job_id", "jobs"),
             generic.Listing(ws.pipelines.list_pipelines, "pipeline_id", "pipelines"),
             generic.Listing(generic.experiments_listing(ws), "experiment_id", "experiments"),
-            generic.Listing(generic.models_listing(ws), "id", "registered-models"),
+            generic.Listing(generic.models_listing(ws, num_threads), "id", "registered-models"),
             generic.Listing(generic.tokens_and_passwords, "object_id", "authorization"),
             generic.WorkspaceListing(
                 ws,
@@ -70,13 +78,13 @@ class PermissionManager(CrawlerBase):
         )
 
     def inventorize_permissions(self):
+        # TODO: rename into snapshot()
         logger.debug("Crawling permissions")
         crawler_tasks = list(self._get_crawler_tasks())
         logger.info(f"Starting to crawl permissions. Total tasks: {len(crawler_tasks)}")
         items, errors = Threads.gather("crawl permissions", crawler_tasks)
         if len(errors) > 0:
-            # TODO: https://github.com/databrickslabs/ucx/issues/406
-            logger.error(f"Detected {len(errors)} errors while crawling permissions")
+            raise ManyError(errors)
         logger.info(f"Total crawled permissions: {len(items)}")
         self._save(items)
         logger.info(f"Saved {len(items)} to {self._full_name}")
@@ -92,7 +100,7 @@ class PermissionManager(CrawlerBase):
             f"Total groups to apply permissions: {len(migration_state)}. "
             f"Total permissions found: {len(items)}"
         )
-        applier_tasks = []
+        applier_tasks: list[Callable[..., None]] = []
         supports_to_items = {
             support: list(items_subset) for support, items_subset in groupby(items, key=lambda i: i.object_type)
         }
@@ -107,8 +115,14 @@ class PermissionManager(CrawlerBase):
 
         for object_type, items_subset in supports_to_items.items():
             relevant_support = appliers[object_type]
-            tasks_for_support = [relevant_support.get_apply_task(item, migration_state) for item in items_subset]
-            tasks_for_support = [_ for _ in tasks_for_support if _ is not None]
+            tasks_for_support: list[Callable[..., None]] = []
+            for item in items_subset:
+                if not item:
+                    continue
+                task = relevant_support.get_apply_task(item, migration_state)
+                if not task:
+                    continue
+                tasks_for_support.append(task)
             if len(tasks_for_support) == 0:
                 continue
             logger.info(f"Total tasks for {object_type}: {len(tasks_for_support)}")
@@ -125,7 +139,7 @@ class PermissionManager(CrawlerBase):
         return True
 
     def _appliers(self) -> dict[str, AclSupport]:
-        appliers = {}
+        appliers: dict[str, AclSupport] = {}
         for support in self._acl_support:
             for object_type in support.object_types():
                 if object_type in appliers:
@@ -139,7 +153,7 @@ class PermissionManager(CrawlerBase):
         self._exec(f"DROP TABLE IF EXISTS {self._full_name}")
         logger.info("Inventory table cleanup complete")
 
-    def _save(self, items: list[Permissions]):
+    def _save(self, items: Sequence[Permissions]):
         # keep in mind, that object_type and object_id are not primary keys.
         self._append_records(items)  # TODO: update instead of append
         logger.info("Successfully saved the items to inventory table")
@@ -157,7 +171,7 @@ class PermissionManager(CrawlerBase):
             for object_id, object_type, raw in self._fetch(f"SELECT object_id, object_type, raw FROM {self._full_name}")
         ]
 
-    def load_all_for(self, object_type: str, object_id: str, klass: type) -> any:
+    def load_all_for(self, object_type: str, object_id: str, klass: Dataclass) -> Iterable[DataclassInstance]:
         for perm in self.load_all():
             if object_type == perm.object_type and object_id.lower() == perm.object_id.lower():
                 raw = json.loads(perm.raw)

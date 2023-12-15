@@ -1,6 +1,11 @@
 import pytest
 from databricks.sdk import WorkspaceClient
-from databricks.sdk.service.sql import AccessControl, ObjectTypePlural, PermissionLevel
+from databricks.sdk.service.sql import (
+    AccessControl,
+    ObjectTypePlural,
+    PermissionLevel,
+    RunAsRole,
+)
 
 from databricks.labs.ucx.mixins.redash import (
     DashboardWidgetsAPI,
@@ -17,6 +22,7 @@ def test_creating_widgets(ws: WorkspaceClient, make_warehouse, env_or_skip):
     query_visualizations_api = QueryVisualizationsExt(ws.api_client)
 
     x = ws.dashboards.create(name="test dashboard")
+    assert x.id is not None
     ws.dbsql_permissions.set(
         ObjectTypePlural.DASHBOARDS,
         x.id,
@@ -49,8 +55,9 @@ def test_creating_widgets(ws: WorkspaceClient, make_warehouse, env_or_skip):
         description="abc",
         name="this is a test query",
         query="SHOW DATABASES",
-        run_as_role="viewer",
+        run_as_role=RunAsRole.VIEWER,
     )
 
+    assert query.id is not None
     y = query_visualizations_api.create_table(query.id, "ABC Viz", [VizColumn(name="databaseName", title="DB")])
     print(y)

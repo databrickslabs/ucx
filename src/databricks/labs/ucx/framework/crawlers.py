@@ -3,15 +3,25 @@ import logging
 import os
 import pkgutil
 from abc import ABC, abstractmethod
-from collections.abc import Iterator
-from typing import ClassVar
+from collections.abc import Callable, Iterable, Iterator, Sequence
+from types import UnionType
+from typing import Any, ClassVar, Generic, Protocol, TypeVar
 
 from databricks.sdk import WorkspaceClient
 from databricks.sdk.errors import NotFound
 
-from databricks.labs.ucx.mixins.sql import StatementExecutionExt
+from databricks.labs.ucx.mixins.sql import Row, StatementExecutionExt
 
 logger = logging.getLogger(__name__)
+
+
+class DataclassInstance(Protocol):
+    __dataclass_fields__: ClassVar[dict]
+
+
+Result = TypeVar("Result", bound=DataclassInstance)
+Dataclass = type[DataclassInstance]
+ResultFn = Callable[[], Iterable[Result]]
 
 
 class SqlBackend(ABC):
@@ -20,34 +30,40 @@ class SqlBackend(ABC):
         raise NotImplementedError
 
     @abstractmethod
-    def fetch(self, sql) -> Iterator[any]:
+    def fetch(self, sql) -> Iterator[Any]:
         raise NotImplementedError
 
     @abstractmethod
-    def save_table(self, full_name: str, rows: list[any], klass: dataclasses.dataclass, mode: str = "append"):
+    def save_table(self, full_name: str, rows: Sequence[DataclassInstance], klass: Dataclass, mode: str = "append"):
         raise NotImplementedError
 
-    def create_table(self, full_name: str, klass: dataclasses.dataclass):
+    def create_table(self, full_name: str, klass: Dataclass):
         ddl = f"CREATE TABLE IF NOT EXISTS {full_name} ({self._schema_for(klass)}) USING DELTA"
         self.execute(ddl)
 
-    _builtin_type_mapping: ClassVar[dict[type, str]] = {str: "STRING", int: "INT", bool: "BOOLEAN", float: "FLOAT"}
+    _builtin_type_mapping: ClassVar[dict[type, str]] = {
+        str: "STRING",
+        int: "INT",
+        bool: "BOOLEAN",
+        float: "FLOAT",
+    }
 
     @classmethod
-    def _schema_for(cls, klass):
+    def _schema_for(cls, klass: Dataclass):
         fields = []
         for f in dataclasses.fields(klass):
-            if f.type not in cls._builtin_type_mapping:
-                msg = f"Cannot auto-convert {f.type}"
+            field_type = f.type
+            if isinstance(field_type, UnionType):
+                field_type = field_type.__args__[0]
+            if field_type not in cls._builtin_type_mapping:
+                msg = f"Cannot auto-convert {field_type}"
                 raise SyntaxError(msg)
             not_null = " NOT NULL"
             if f.default is None:
                 not_null = ""
-            spark_type = cls._builtin_type_mapping[f.type]
+            spark_type = cls._builtin_type_mapping[field_type]
             fields.append(f"{f.name} {spark_type}{not_null}")
         return ", ".join(fields)
-
-    from dataclasses import asdict, dataclass, fields
 
     @classmethod
     def _filter_none_rows(cls, rows, klass):
@@ -80,11 +96,11 @@ class StatementExecutionBackend(SqlBackend):
         logger.debug(f"[api][execute] {sql}")
         self._sql.execute(self._warehouse_id, sql)
 
-    def fetch(self, sql) -> Iterator[any]:
+    def fetch(self, sql) -> Iterator[Row]:
         logger.debug(f"[api][fetch] {sql}")
         return self._sql.execute_fetch_all(self._warehouse_id, sql)
 
-    def save_table(self, full_name: str, rows: list[any], klass: dataclasses.dataclass, mode="append"):
+    def save_table(self, full_name: str, rows: Sequence[DataclassInstance], klass: Dataclass, mode="append"):
         if mode == "overwrite":
             msg = "Overwrite mode is not yet supported"
             raise NotImplementedError(msg)
@@ -105,24 +121,27 @@ class StatementExecutionBackend(SqlBackend):
         data = []
         for f in fields:
             value = getattr(row, f.name)
+            field_type = f.type
+            if isinstance(field_type, UnionType):
+                field_type = field_type.__args__[0]
             if value is None:
                 data.append("NULL")
-            elif f.type == bool:
+            elif field_type == bool:
                 data.append("TRUE" if value else "FALSE")
-            elif f.type == str:
+            elif field_type == str:
                 value = str(value).replace("'", "''")
                 data.append(f"'{value}'")
-            elif f.type == int:
+            elif field_type == int:
                 data.append(f"{value}")
             else:
-                msg = f"unknown type: {f.type}"
+                msg = f"unknown type: {field_type}"
                 raise ValueError(msg)
         return ", ".join(data)
 
 
 class RuntimeBackend(SqlBackend):
     def __init__(self):
-        from pyspark.sql.session import SparkSession
+        from pyspark.sql.session import SparkSession  # type: ignore[import-not-found]
 
         if "DATABRICKS_RUNTIME_VERSION" not in os.environ:
             msg = "Not in the Databricks Runtime"
@@ -134,23 +153,23 @@ class RuntimeBackend(SqlBackend):
         logger.debug(f"[spark][execute] {sql}")
         self._spark.sql(sql)
 
-    def fetch(self, sql) -> Iterator[any]:
+    def fetch(self, sql) -> Iterator[Row]:
         logger.debug(f"[spark][fetch] {sql}")
         return self._spark.sql(sql).collect()
 
-    def save_table(self, full_name: str, rows: list[any], klass: dataclasses.dataclass, mode: str = "append"):
+    def save_table(self, full_name: str, rows: Sequence[DataclassInstance], klass: Dataclass, mode: str = "append"):
         rows = self._filter_none_rows(rows, klass)
 
         if len(rows) == 0:
             self.create_table(full_name, klass)
             return
         # pyspark deals well with lists of dataclass instances, as long as schema is provided
-        df = self._spark.createDataFrame(rows, self._schema_for(rows[0]))
+        df = self._spark.createDataFrame(rows, self._schema_for(klass))
         df.write.saveAsTable(full_name, mode=mode)
 
 
-class CrawlerBase:
-    def __init__(self, backend: SqlBackend, catalog: str, schema: str, table: str, klass: dataclasses.dataclass):
+class CrawlerBase(Generic[Result]):
+    def __init__(self, backend: SqlBackend, catalog: str, schema: str, table: str, klass: type[Result]):
         """
         Initializes a CrawlerBase instance.
 
@@ -199,7 +218,7 @@ class CrawlerBase:
         return name
 
     @classmethod
-    def _try_valid(cls, name: str):
+    def _try_valid(cls, name: str | None):
         """
         Tries to validate a name. If None, returns None.
 
@@ -213,7 +232,7 @@ class CrawlerBase:
             return None
         return cls._valid(name)
 
-    def _snapshot(self, fetcher, loader) -> list[any]:
+    def _snapshot(self, fetcher: ResultFn, loader: ResultFn) -> list[Result]:
         """
         Tries to load dataset of records with `fetcher` function, otherwise automatically creates
         a table with the schema defined in the class of the first row and executes `loader` function
@@ -242,13 +261,13 @@ class CrawlerBase:
         self._append_records(loaded_records)
         return loaded_records
 
-    def _append_records(self, items):
+    def _append_records(self, items: Sequence[Result]):
         logger.debug(f"[{self._full_name}] found {len(items)} new records for {self._table}")
         self._backend.save_table(self._full_name, items, self._klass, mode="append")
 
 
 class SchemaDeployer:
-    def __init__(self, sql_backend: SqlBackend, inventory_schema: str, mod: any):
+    def __init__(self, sql_backend: SqlBackend, inventory_schema: str, mod: Any):
         self._sql_backend = sql_backend
         self._inventory_schema = inventory_schema
         self._module = mod
@@ -262,7 +281,7 @@ class SchemaDeployer:
 
         self._sql_backend.execute(f"DROP SCHEMA IF EXISTS hive_metastore.{self._inventory_schema} CASCADE")
 
-    def deploy_table(self, name: str, klass: type):
+    def deploy_table(self, name: str, klass: Dataclass):
         logger.info(f"Ensuring {self._inventory_schema}.{name} table exists")
         self._sql_backend.create_table(f"hive_metastore.{self._inventory_schema}.{name}", klass)
 
@@ -274,6 +293,7 @@ class SchemaDeployer:
 
     def _load(self, relative_filename: str) -> str:
         data = pkgutil.get_data(self._module.__name__, relative_filename)
+        assert data is not None
         sql = data.decode("utf-8")
         sql = sql.replace("$inventory", f"hive_metastore.{self._inventory_schema}")
         return sql

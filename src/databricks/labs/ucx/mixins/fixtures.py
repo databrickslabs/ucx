@@ -7,7 +7,7 @@ import shutil
 import string
 import subprocess
 import sys
-from collections.abc import Callable, MutableMapping
+from collections.abc import Callable, Generator, MutableMapping
 from pathlib import Path
 from typing import BinaryIO, Optional
 
@@ -294,17 +294,23 @@ class _PermissionsChange:
 
 def _make_permissions_factory(name, resource_type, levels, id_retriever):
     def _non_inherited(x: iam.ObjectPermissions):
-        return [
-            iam.AccessControlRequest(
-                permission_level=permission.permission_level,
-                group_name=access_control.group_name,
-                user_name=access_control.user_name,
-                service_principal_name=access_control.service_principal_name,
-            )
-            for access_control in x.access_control_list
-            for permission in access_control.all_permissions
-            if not permission.inherited
-        ]
+        out: list[iam.AccessControlRequest] = []
+        assert x.access_control_list is not None
+        for access_control in x.access_control_list:
+            if not access_control.all_permissions:
+                continue
+            for permission in access_control.all_permissions:
+                if not permission.inherited:
+                    continue
+                out.append(
+                    iam.AccessControlRequest(
+                        permission_level=permission.permission_level,
+                        group_name=access_control.group_name,
+                        user_name=access_control.user_name,
+                        service_principal_name=access_control.service_principal_name,
+                    )
+                )
+        return out
 
     def _make_permissions(ws):
         def create(
@@ -326,6 +332,7 @@ def _make_permissions_factory(name, resource_type, levels, id_retriever):
             initial = _non_inherited(ws.permissions.get(resource_type, object_id))
             if access_control_list is None:
                 if permission_level not in levels:
+                    assert permission_level is not None
                     names = ", ".join(_.value for _ in levels)
                     msg = f"invalid permission level: {permission_level.value}. Valid levels: {names}"
                     raise ValueError(msg)
@@ -714,7 +721,7 @@ def debug_env(monkeypatch, debug_env_name) -> MutableMapping[str, str]:
 def env_or_skip(debug_env) -> Callable[[str], str]:
     skip = pytest.skip
     if _is_in_debug():
-        skip = pytest.fail
+        skip = pytest.fail  # type: ignore[assignment]
 
     def inner(var: str) -> str:
         if var not in debug_env:
@@ -736,7 +743,7 @@ def inventory_schema(make_schema):
 
 
 @pytest.fixture
-def make_catalog(ws, sql_backend, make_random) -> Callable[..., CatalogInfo]:
+def make_catalog(ws, sql_backend, make_random) -> Generator[Callable[..., CatalogInfo], None, None]:
     def create() -> CatalogInfo:
         name = f"ucx_C{make_random(4)}".lower()
         sql_backend.execute(f"CREATE CATALOG {name}")
@@ -751,7 +758,7 @@ def make_catalog(ws, sql_backend, make_random) -> Callable[..., CatalogInfo]:
 
 
 @pytest.fixture
-def make_schema(ws, sql_backend, make_random) -> Callable[..., SchemaInfo]:
+def make_schema(ws, sql_backend, make_random) -> Generator[Callable[..., SchemaInfo], None, None]:
     def create(*, catalog_name: str = "hive_metastore", name: str | None = None) -> SchemaInfo:
         if name is None:
             name = f"ucx_S{make_random(4)}".lower()
@@ -772,7 +779,7 @@ def make_schema(ws, sql_backend, make_random) -> Callable[..., SchemaInfo]:
 
 
 @pytest.fixture
-def make_table(ws, sql_backend, make_schema, make_random) -> Callable[..., TableInfo]:
+def make_table(ws, sql_backend, make_schema, make_random) -> Generator[Callable[..., TableInfo], None, None]:
     def create(
         *,
         catalog_name="hive_metastore",
@@ -829,8 +836,8 @@ def make_table(ws, sql_backend, make_schema, make_random) -> Callable[..., Table
             storage_location = f"dbfs:/user/hive/warehouse/{schema_name}/{name}"
             ddl = f"{ddl} (id INT, value STRING)"
         if tbl_properties:
-            tbl_properties = ",".join([f" '{k}' = '{v}' " for k, v in tbl_properties.items()])
-            ddl = f"{ddl} TBLPROPERTIES ({tbl_properties})"
+            str_properties = ",".join([f" '{k}' = '{v}' " for k, v in tbl_properties.items()])
+            ddl = f"{ddl} TBLPROPERTIES ({str_properties})"
 
         sql_backend.execute(ddl)
         table_info = TableInfo(

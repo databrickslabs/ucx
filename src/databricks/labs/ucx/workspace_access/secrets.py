@@ -25,6 +25,7 @@ class SecretScopesSupport(AclSupport):
         scopes = self._ws.secrets.list_scopes()
 
         def _crawler_task(scope: workspace.SecretScope):
+            assert scope.name is not None
             acl_items = self._ws.secrets.list_acls(scope.name)
             return Permissions(
                 object_id=scope.name,
