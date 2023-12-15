@@ -5,6 +5,7 @@ from dataclasses import dataclass
 from functools import partial
 
 from databricks.sdk import WorkspaceClient
+from databricks.sdk.errors import BadRequest, NotFound
 
 from databricks.labs.ucx.framework.crawlers import CrawlerBase, SqlBackend
 from databricks.labs.ucx.framework.parallel import Threads
@@ -252,3 +253,37 @@ class TablesMigrate:
 
     def _table_already_upgraded(self, target) -> bool:
         return target in self._seen_tables
+
+
+class TablesAnnotator:
+    def __init__(
+        self,
+        ws: WorkspaceClient,
+        backend: SqlBackend,
+    ):
+        self._backend = backend
+        self._ws = ws
+
+    def skip_table(self, schema: str, table: str):
+        # Marks a table to be skipped in the migration process
+        try:
+            self._backend.execute(f"ALTER TABLE `{schema}`.`{table}` SET TBLPROPERTIES('UCX_SKIP' = true)")
+        except NotFound as nf:
+            if "[TABLE_OR_VIEW_NOT_FOUND]" in str(nf):
+                logger.error(f"Failed to apply skip marker for Table {schema}.{table}. Table not found.")
+            else:
+                logger.error(nf)
+        except BadRequest as br:
+            logger.error(br)
+
+    def skip_schema(self, schema: str):
+        # Marks a schema to be skipped in the migration process
+        try:
+            self._backend.execute(f"ALTER SCHEMA `{schema}` SET DBPROPERTIES('UCX_SKIP' = true)")
+        except NotFound as nf:
+            if "[SCHEMA_NOT_FOUND]" in str(nf):
+                logger.error(f"Failed to apply skip marker for Schema {schema}. Schema not found.")
+            else:
+                logger.error(nf)
+        except BadRequest as br:
+            logger.error(br)
