@@ -84,7 +84,7 @@ class TableMapping:
             raise ValueError(msg) from None
 
     def skip_table(self, backend: StatementExecutionBackend, schema: str, table: str):
-        # Marks a table to be skipped in the migration process
+        # Marks a table to be skipped in the migration process by applying a table property
         try:
             backend.execute(f"ALTER TABLE `{schema}`.`{table}` SET TBLPROPERTIES('{self.UCX_SKIP_PROPERTY}' = true)")
         except NotFound as nf:
@@ -96,7 +96,7 @@ class TableMapping:
             logger.error(br)
 
     def skip_schema(self, backend: StatementExecutionBackend, schema: str):
-        # Marks a schema to be skipped in the migration process
+        # Marks a schema to be skipped in the migration process by applying a table property
         try:
             backend.execute(f"ALTER SCHEMA `{schema}` SET DBPROPERTIES('{self.UCX_SKIP_PROPERTY}' = true)")
         except NotFound as nf:
