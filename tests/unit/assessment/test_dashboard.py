@@ -28,6 +28,7 @@ def test_dashboard(mocker):
     ws.queries.create.return_value = Query(id="abc")
     ws.query_visualizations.create.return_value = Visualization(id="abc")
     ws.dashboard_widgets.create.return_value = Widget(id="abc")
+    ws.warehouses.list.return_value = []
     installer = WorkspaceInstaller(ws)
     local_query_files = installer._find_project_root() / "src/databricks/labs/ucx/queries"
     dash = DashboardFromFiles(

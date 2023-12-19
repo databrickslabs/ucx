@@ -17,7 +17,7 @@ class WidgetOptions:
     updated_at: str | None = None
 
     def as_dict(self) -> dict:
-        body = {}
+        body: dict[str, Any] = {}
         if self.created_at is not None:
             body["created_at"] = self.created_at
         if self.description is not None:
@@ -35,7 +35,7 @@ class WidgetOptions:
         return body
 
     @classmethod
-    def from_dict(cls, d: dict[str, any]) -> "WidgetOptions":
+    def from_dict(cls, d: dict[str, Any]) -> "WidgetOptions":
         return cls(
             created_at=d.get("created_at", None),
             description=d.get("description", None),
@@ -59,7 +59,7 @@ class WidgetPosition:
     size_y: int | None = None
 
     def as_dict(self) -> dict:
-        body = {}
+        body: dict[str, bool | int] = {}
         if self.auto_height is not None:
             body["autoHeight"] = self.auto_height
         if self.col is not None:
@@ -73,7 +73,7 @@ class WidgetPosition:
         return body
 
     @classmethod
-    def from_dict(cls, d: dict[str, any]) -> "WidgetPosition":
+    def from_dict(cls, d: dict[str, Any]) -> "WidgetPosition":
         return cls(
             auto_height=d.get("autoHeight", None),
             col=d.get("col", None),
@@ -114,7 +114,7 @@ class DashboardWidgetsAPI:
 
         :returns: :class:`Widget`
         """
-        body = {}
+        body: dict[str, str | dict | int] = {}
         if dashboard_id is not None:
             body["dashboard_id"] = dashboard_id
         if options is not None:
@@ -157,7 +157,7 @@ class DashboardWidgetsAPI:
 
         :returns: :class:`Widget`
         """
-        body = {}
+        body: dict[str, str | dict | int] = {}
         if dashboard_id is not None:
             body["dashboard_id"] = dashboard_id
         if options is not None:
@@ -190,7 +190,7 @@ class QueryVisualizationsAPI:
         name: str | None = None,
         updated_at: str | None = None,
     ) -> Visualization:
-        body = {}
+        body: dict[str, Any] = {}
         if query_id is not None:
             body["query_id"] = query_id
         if type is not None:

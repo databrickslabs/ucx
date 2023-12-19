@@ -1,12 +1,13 @@
 import logging
 from collections import defaultdict
+from collections.abc import Iterable
 from dataclasses import dataclass
 from functools import partial
 
 from databricks.sdk.service.catalog import SchemaInfo, TableInfo
 
 from databricks.labs.ucx.framework.crawlers import CrawlerBase
-from databricks.labs.ucx.framework.parallel import Threads
+from databricks.labs.ucx.framework.parallel import ManyError, Threads
 from databricks.labs.ucx.hive_metastore.tables import TablesCrawler
 
 logger = logging.getLogger(__name__)
@@ -16,10 +17,10 @@ logger = logging.getLogger(__name__)
 class Grant:
     principal: str
     action_type: str
-    catalog: str
-    database: str = None
-    table: str = None
-    view: str = None
+    catalog: str | None = None
+    database: str | None = None
+    table: str | None = None
+    view: str | None = None
     any_file: bool = False
     anonymous_function: bool = False
 
@@ -32,7 +33,7 @@ class Grant:
         view: str | None = None,
         any_file: bool = False,
         anonymous_function: bool = False,
-    ) -> (str, str):
+    ) -> tuple[str, str]:
         if table is not None:
             catalog = "hive_metastore" if catalog is None else catalog
             database = "default" if database is None else database
@@ -126,19 +127,19 @@ class Grant:
         return make_query(object_type, object_key)
 
 
-class GrantsCrawler(CrawlerBase):
+class GrantsCrawler(CrawlerBase[Grant]):
     def __init__(self, tc: TablesCrawler):
         super().__init__(tc._backend, tc._catalog, tc._schema, "grants", Grant)
         self._tc = tc
 
-    def snapshot(self) -> list[Grant]:
+    def snapshot(self) -> Iterable[Grant]:
         return self._snapshot(partial(self._try_load), partial(self._crawl))
 
     def _try_load(self):
         for row in self._fetch(f"SELECT * FROM {self._full_name}"):
             yield Grant(*row)
 
-    def _crawl(self) -> list[Grant]:
+    def _crawl(self) -> Iterable[Grant]:
         """
         Crawls and lists grants for all databases, tables,  views, any file
         and anonymous function within hive_metastore.
@@ -175,8 +176,7 @@ class GrantsCrawler(CrawlerBase):
             tasks.append(partial(fn, table=table.name))
         catalog_grants, errors = Threads.gather(f"listing grants for {catalog}", tasks)
         if len(errors) > 0:
-            # TODO: https://github.com/databrickslabs/ucx/issues/406
-            logger.error(f"Detected {len(errors)} during scanning for grants in {catalog}")
+            raise ManyError(errors)
         return [grant for grants in catalog_grants for grant in grants]
 
     def for_table_info(self, table: TableInfo):

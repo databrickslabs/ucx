@@ -1,7 +1,7 @@
 import datetime
 import json
 import logging
-from collections.abc import Callable, Iterator
+from collections.abc import Callable, Iterable, Iterator
 from dataclasses import dataclass
 from datetime import timedelta
 from functools import partial
@@ -15,6 +15,7 @@ from databricks.sdk.service import iam, ml
 from databricks.sdk.service.iam import PermissionLevel
 
 from databricks.labs.ucx.framework.crawlers import CrawlerBase, SqlBackend
+from databricks.labs.ucx.framework.parallel import ManyError, Threads
 from databricks.labs.ucx.mixins.hardening import rate_limited
 from databricks.labs.ucx.workspace_access.base import AclSupport, Permissions
 from databricks.labs.ucx.workspace_access.groups import MigrationState
@@ -31,13 +32,13 @@ class GenericPermissionsInfo:
 @dataclass
 class WorkspaceObjectInfo:
     path: str
-    object_type: str = None
-    object_id: str = None
-    language: str = None
+    object_type: str | None = None
+    object_id: str | None = None
+    language: str | None = None
 
 
 class Listing:
-    def __init__(self, func: Callable[..., list], id_attribute: str, object_type: str):
+    def __init__(self, func: Callable[..., Iterable], id_attribute: str, object_type: str):
         self._func = func
         self._id_attribute = id_attribute
         self._object_type = object_type
@@ -86,7 +87,10 @@ class GenericPermissionsSupport(AclSupport):
         if item.object_id in ("tokens", "passwords"):
             return True
         object_permissions = iam.ObjectPermissions.from_dict(json.loads(item.raw))
+        assert object_permissions.access_control_list is not None
         for acl in object_permissions.access_control_list:
+            if not acl.group_name:
+                continue
             if migration_state.is_in_scope(acl.group_name):
                 return True
         return False
@@ -95,8 +99,12 @@ class GenericPermissionsSupport(AclSupport):
     def _response_to_request(
         acls: Optional["list[iam.AccessControlResponse]"] = None,
     ) -> list[iam.AccessControlRequest]:
-        results = []
+        results: list[iam.AccessControlRequest] = []
+        if not acls:
+            return results
         for acl in acls:
+            if not acl.all_permissions:
+                continue
             for permission in acl.all_permissions:
                 results.append(
                     iam.AccessControlRequest(
@@ -152,7 +160,13 @@ class GenericPermissionsSupport(AclSupport):
         )
 
     def _object_have_owner(self, permissions: iam.ObjectPermissions | None):
+        if not permissions:
+            return False
+        if not permissions.access_control_list:
+            return False
         for acl in permissions.access_control_list:
+            if not acl.all_permissions:
+                continue
             for perm in acl.all_permissions:
                 if perm.permission_level == PermissionLevel.IS_OWNER:
                     return True
@@ -162,8 +176,12 @@ class GenericPermissionsSupport(AclSupport):
         loaded = self._safe_get_permissions(object_type, object_id)
         if loaded is None:
             return []
-        acl = []
+        acl: list[iam.AccessControlRequest] = []
+        if not loaded.access_control_list:
+            return acl
         for v in loaded.access_control_list:
+            if not v.all_permissions:
+                continue
             for permission in v.all_permissions:
                 if permission.inherited:
                     continue
@@ -181,6 +199,8 @@ class GenericPermissionsSupport(AclSupport):
     def load_as_dict(self, object_type: str, object_id: str) -> dict[str, iam.PermissionLevel]:
         result = {}
         for acl in self._load_as_request(object_type, object_id):
+            if not acl.permission_level:
+                continue
             result[self._key_for_acl_dict(acl)] = acl.permission_level
         return result
 
@@ -190,7 +210,9 @@ class GenericPermissionsSupport(AclSupport):
             return acl.group_name
         if acl.user_name is not None:
             return acl.user_name
-        return acl.service_principal_name
+        if acl.service_principal_name is not None:
+            return acl.service_principal_name
+        return "UNKNOWN"
 
     # TODO remove after ES-892977 is fixed
     def _safe_get_permissions(self, object_type: str, object_id: str) -> iam.ObjectPermissions | None:
@@ -225,15 +247,21 @@ class GenericPermissionsSupport(AclSupport):
         self, permissions: iam.ObjectPermissions, migration_state: MigrationState
     ) -> list[iam.AccessControlRequest]:
         _acl = permissions.access_control_list
-        acl_requests = []
+        acl_requests: list[iam.AccessControlRequest] = []
+        if not _acl:
+            return acl_requests
         coord = f"{permissions.object_type}/{permissions.object_id}"
         for _item in _acl:
+            if not _item.group_name:
+                continue
             if not migration_state.is_in_scope(_item.group_name):
                 logger.debug(f"Skipping {_item} for {coord} because it is not in scope")
                 continue
             new_group_name = migration_state.get_target_principal(_item.group_name)
             if new_group_name is None:
                 logger.debug(f"Skipping {_item.group_name} for {coord} because it has no target principal")
+                continue
+            if not _item.all_permissions:
                 continue
             for p in _item.all_permissions:
                 if p.inherited:
@@ -249,7 +277,7 @@ class GenericPermissionsSupport(AclSupport):
         return acl_requests
 
 
-class WorkspaceListing(Listing, CrawlerBase):
+class WorkspaceListing(Listing, CrawlerBase[WorkspaceObjectInfo]):
     def __init__(
         self,
         ws: WorkspaceClient,
@@ -258,7 +286,7 @@ class WorkspaceListing(Listing, CrawlerBase):
         num_threads=20,
         start_path: str | None = "/",
     ):
-        Listing.__init__(self, ..., ..., ...)
+        Listing.__init__(self, lambda: [], "_", "_")
         CrawlerBase.__init__(
             self,
             backend=sql_backend,
@@ -273,7 +301,7 @@ class WorkspaceListing(Listing, CrawlerBase):
         self._sql_backend = sql_backend
         self._inventory_database = inventory_database
 
-    def _crawl(self) -> list[WorkspaceObjectInfo]:
+    def _crawl(self) -> Iterable[WorkspaceObjectInfo]:
         from databricks.labs.ucx.workspace_access.listing import WorkspaceListing
 
         ws_listing = WorkspaceListing(self._ws, num_threads=self._num_threads, with_directories=False)
@@ -288,10 +316,10 @@ class WorkspaceListing(Listing, CrawlerBase):
                 language=raw.get("language", None),
             )
 
-    def snapshot(self) -> list[WorkspaceObjectInfo]:
+    def snapshot(self) -> Iterable[WorkspaceObjectInfo]:
         return self._snapshot(self._try_fetch, self._crawl)
 
-    def _try_fetch(self) -> list[WorkspaceObjectInfo]:
+    def _try_fetch(self) -> Iterable[WorkspaceObjectInfo]:
         for row in self._fetch(f"SELECT * FROM {self._schema}.{self._table}"):
             yield WorkspaceObjectInfo(
                 path=row["path"], object_type=row["object_type"], object_id=row["object_id"], language=row["language"]
@@ -313,22 +341,30 @@ class WorkspaceListing(Listing, CrawlerBase):
                 return "repos"
             case "FILE":
                 return "files"
-            # silent handler for experiments - they'll be inventorized by the experiments manager
-            case None:
-                return None
+        # silent handler for experiments - they'll be inventoried by the experiments manager
+        return None
 
     def __iter__(self):
         for _object in self.snapshot():
             request_type = self._convert_object_type_to_request_type(_object)
-            if request_type:
-                yield GenericPermissionsInfo(object_id=str(_object.object_id), request_type=request_type)
+            if not request_type:
+                continue
+            assert _object.object_id is not None
+            yield GenericPermissionsInfo(str(_object.object_id), request_type)
 
 
-def models_listing(ws: WorkspaceClient):
+def models_listing(ws: WorkspaceClient, num_threads: int):
     def inner() -> Iterator[ml.ModelDatabricks]:
-        for model in ws.model_registry.list_models():
-            model_with_id = ws.model_registry.get_model(model.name).registered_model_databricks
-            yield model_with_id
+        tasks = []
+        for m in ws.model_registry.list_models():
+            tasks.append(partial(ws.model_registry.get_model, name=m.name))
+        models, errors = Threads.gather("listing model ids", tasks, num_threads)
+        if len(errors) > 0:
+            raise ManyError(errors)
+        for model in models:
+            if not model.registered_model_databricks:
+                continue
+            yield model.registered_model_databricks
 
     return inner
 
@@ -355,5 +391,5 @@ def experiments_listing(ws: WorkspaceClient):
 
 
 def tokens_and_passwords():
-    for _value in ["passwords", "tokens"]:
+    for _value in ["tokens", "passwords"]:
         yield GenericPermissionsInfo(_value, "authorization")

@@ -4,22 +4,36 @@ import time
 from databricks.sdk import WorkspaceClient
 from databricks.sdk.service.compute import GlobalInitScriptDetailsWithContent
 
-from databricks.labs.ucx.hive_metastore.hms_lineage_global_init_script import (
-    global_init_script,
-)
+global_init_script = """if [[ $DB_IS_DRIVER = "TRUE" ]]; then
+  driver_conf=${DB_HOME}/driver/conf/spark-branch.conf
+  if [ ! -e $driver_conf ] ; then
+    touch $driver_conf
+  fi
+cat << EOF >>  $driver_conf
+  [driver] {
+   "spark.databricks.dataLineage.enabled" = true
+   }
+EOF
+fi"""
 
 
 class HiveMetastoreLineageEnabler:
     def __init__(self, ws: WorkspaceClient):
         self._ws = ws
 
-    def check_lineage_spark_config_exists(self) -> GlobalInitScriptDetailsWithContent:
+    def check_lineage_spark_config_exists(self) -> GlobalInitScriptDetailsWithContent | None:
         for script in self._ws.global_init_scripts.list():
-            gscript = self._ws.global_init_scripts.get(script_id=script.script_id)
-            if not gscript:
+            if not script.script_id:
                 continue
-            if "spark.databricks.dataLineage.enabled" in base64.b64decode(gscript.script).decode("utf-8"):
-                return gscript
+            script_content = self._ws.global_init_scripts.get(script_id=script.script_id)
+            if not script_content:
+                continue
+            content = script_content.script
+            if not content:
+                continue
+            if "spark.databricks.dataLineage.enabled" in base64.b64decode(content).decode("utf-8"):
+                return script_content
+        return None
 
     def _get_init_script_content(self):
         try:
@@ -28,13 +42,15 @@ class HiveMetastoreLineageEnabler:
             print("The init script content was not found.")
 
     def add_global_init_script(self) -> str:
-        created_script = self._ws.global_init_scripts.create(
-            name=f"hms-lineage-{time.time_ns()}", script=self._get_init_script_content(), enabled=True
-        )
+        content = self._get_init_script_content()
+        created_script = self._ws.global_init_scripts.create(f"hms-lineage-{time.time_ns()}", content, enabled=True)
+        assert created_script.script_id is not None
         return created_script.script_id
 
     def enable_global_init_script(self, gscript: GlobalInitScriptDetailsWithContent) -> str:
-        self._ws.global_init_scripts.update(
-            script_id=gscript.script_id, name=gscript.name, script=gscript.script, enabled=True
-        )
-        return gscript.script_id
+        script_id = gscript.script_id
+        assert script_id is not None
+        assert gscript.name is not None
+        assert gscript.script is not None
+        self._ws.global_init_scripts.update(script_id, gscript.name, gscript.script, enabled=True)
+        return script_id

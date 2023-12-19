@@ -13,7 +13,7 @@ from databricks.labs.ucx.mixins.fixtures import *  # noqa: F403
 logger = logging.getLogger(__name__)
 
 
-@pytest.fixture
+@pytest.fixture  # type: ignore[no-redef]
 def debug_env_name():
     return "ucws"
 

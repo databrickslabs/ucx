@@ -4,19 +4,20 @@ import sys
 
 from databricks.sdk import WorkspaceClient
 
-from databricks.labs.ucx.assessment.crawlers import (
-    AzureServicePrincipalCrawler,
-    ClustersCrawler,
-    GlobalInitScriptCrawler,
-    JobsCrawler,
-    PipelinesCrawler,
-)
+from databricks.labs.ucx.assessment.azure import AzureServicePrincipalCrawler
+from databricks.labs.ucx.assessment.clusters import ClustersCrawler
+from databricks.labs.ucx.assessment.init_scripts import GlobalInitScriptCrawler
+from databricks.labs.ucx.assessment.jobs import JobsCrawler
+from databricks.labs.ucx.assessment.pipelines import PipelinesCrawler
 from databricks.labs.ucx.config import WorkspaceConfig
 from databricks.labs.ucx.framework.crawlers import RuntimeBackend
 from databricks.labs.ucx.framework.tasks import task, trigger
-from databricks.labs.ucx.hive_metastore import GrantsCrawler, TablesCrawler
-from databricks.labs.ucx.hive_metastore.data_objects import ExternalLocationCrawler
-from databricks.labs.ucx.hive_metastore.mounts import Mounts
+from databricks.labs.ucx.hive_metastore import (
+    ExternalLocations,
+    GrantsCrawler,
+    Mounts,
+    TablesCrawler,
+)
 from databricks.labs.ucx.workspace_access.generic import WorkspaceListing
 from databricks.labs.ucx.workspace_access.groups import GroupManager
 from databricks.labs.ucx.workspace_access.manager import PermissionManager
@@ -64,7 +65,7 @@ def crawl_mounts(cfg: WorkspaceConfig):
     storing this information in the `$inventory.mounts` table. This is crucial for planning the migration."""
     ws = WorkspaceClient(config=cfg.to_databricks_config())
     mounts = Mounts(backend=RuntimeBackend(), ws=ws, inventory_database=cfg.inventory_database)
-    mounts.inventorize_mounts()
+    mounts.snapshot()
 
 
 @task("assessment", depends_on=[crawl_mounts, crawl_tables])
@@ -78,7 +79,7 @@ def guess_external_locations(cfg: WorkspaceConfig):
       - Scanning all these locations to identify folders that can act as shared path prefixes
       - These identified external locations will be created subsequently prior to the actual table migration"""
     ws = WorkspaceClient(config=cfg.to_databricks_config())
-    crawler = ExternalLocationCrawler(ws, RuntimeBackend(), cfg.inventory_database)
+    crawler = ExternalLocations(ws, RuntimeBackend(), cfg.inventory_database)
     crawler.snapshot()
 
 
@@ -130,7 +131,7 @@ def assess_pipelines(cfg: WorkspaceConfig):
     crawler.snapshot()
 
 
-@task("assessment")
+@task("assessment", cloud="azure")
 def assess_azure_service_principals(cfg: WorkspaceConfig):
     """This module scans through all the clusters configurations, cluster policies, job cluster configurations,
     Pipeline configurations, Warehouse configuration and identifies all the Azure Service Principals who has been
@@ -142,8 +143,9 @@ def assess_azure_service_principals(cfg: WorkspaceConfig):
     Subsequently, the list of all the Azure Service Principals referred in those configurations are saved
     in the `$inventory.azure_service_principals` table."""
     ws = WorkspaceClient(config=cfg.to_databricks_config())
-    crawler = AzureServicePrincipalCrawler(ws, RuntimeBackend(), cfg.inventory_database)
-    crawler.snapshot()
+    if ws.config.is_azure:
+        crawler = AzureServicePrincipalCrawler(ws, RuntimeBackend(), cfg.inventory_database)
+        crawler.snapshot()
 
 
 @task("assessment")
@@ -219,8 +221,8 @@ def crawl_groups(cfg: WorkspaceConfig):
         guess_external_locations,
         assess_jobs,
         assess_clusters,
-        assess_pipelines,
         assess_azure_service_principals,
+        assess_pipelines,
         assess_global_init_scripts,
         crawl_tables,
     ],

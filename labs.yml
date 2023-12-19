@@ -18,9 +18,20 @@ commands:
       {{range .}}{{.step}}\t{{.state}}\t{{.started}}
       {{end}}
 
+
   - name: installations
     description: Show installations by different users on the same workspace
     table_template: |-
       User\tDatabase\tWarehouse
       {{range .}}{{.user_name}}\t{{.database}}\t{{.warehouse_id}}
       {{end}}
+
+  - name: sync-workspace-info
+    is_account_level: true
+    description: upload workspace config to all workspaces in the account where ucx is installed
+
+  - name: manual-workspace-info
+    description: only supposed to be run if cannot get admins to run `databricks labs ucx sync-workspace-info`
+
+  - name: create-table-mapping
+    description: create initial table mapping for review

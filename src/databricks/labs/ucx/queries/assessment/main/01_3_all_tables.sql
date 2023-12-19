@@ -2,7 +2,7 @@
 -- widget title=Table Types, row=1, col=3, size_x=3, size_y=8
 SELECT CONCAT(`database`, '.', name) AS name,
        object_type AS type,
-       UPPER(table_format) AS format,
+       table_format AS format,
        CASE
            WHEN STARTSWITH(location, "dbfs:/mnt") THEN "DBFS MOUNT"
            WHEN STARTSWITH(location, "/dbfs/mnt") THEN "DBFS MOUNT"

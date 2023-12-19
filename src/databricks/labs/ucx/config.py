@@ -88,15 +88,16 @@ class _Config(Generic[T]):
 
     @classmethod
     @abstractmethod
-    def from_dict(cls, raw: dict) -> T:
+    def from_dict(cls, raw: dict[str, Any]) -> T:
         ...
 
     @classmethod
-    def from_bytes(cls, raw: str) -> T:
+    def from_bytes(cls, raw_str: str | bytes) -> T:
         from yaml import safe_load
 
-        raw = safe_load(raw)
-        return cls.from_dict({} if not raw else raw)
+        raw: dict[str, Any] = safe_load(raw_str)
+        empty: dict[str, Any] = {}
+        return cls.from_dict(empty if not raw else raw)
 
     @classmethod
     def from_file(cls, config_file: Path) -> T:
@@ -166,30 +167,48 @@ class AccountConfig(_Config["AccountConfig"]):
     def to_account_client(self) -> AccountClient:
         return AccountClient(config=self.to_databricks_config())
 
+    @classmethod
+    def _verify_version(cls, raw: dict):
+        stored_version = raw.pop("version", None)
+        if stored_version == _CONFIG_VERSION:
+            return raw
+        if stored_version == 1:
+            raw["include_group_names"] = (
+                raw.get("groups", {"selected": []})["selected"] if "selected" in raw["groups"] else None
+            )
+            raw["renamed_group_prefix"] = raw.get("groups", {"backup_group_prefix": "db-temp-"})["backup_group_prefix"]
+            raw.pop("groups", None)
+            return raw
+        msg = f"Unknown config version: {stored_version}"
+        raise ValueError(msg)
+
 
 @dataclass
 class WorkspaceConfig(_Config["WorkspaceConfig"]):
     inventory_database: str
     # Group name conversion parameters.
-    workspace_group_regex: str = None
-    workspace_group_replace: str = None
-    account_group_regex: str = None
+    workspace_group_regex: str | None = None
+    workspace_group_replace: str | None = None
+    account_group_regex: str | None = None
     group_match_by_external_id: bool = False
     # Includes group names for migration. If not specified, all matching groups will be picked up
     include_group_names: list[str] | None = None
-    renamed_group_prefix: str = "ucx-renamed-"
-    instance_pool_id: str = None
-    warehouse_id: str = None
+    renamed_group_prefix: str | None = "ucx-renamed-"
+    instance_pool_id: str | None = None
+    warehouse_id: str | None = None
     connect: ConnectConfig | None = None
     num_threads: int | None = 10
-    database_to_catalog_mapping: dict[str, str] = None
-    default_catalog: str = "ucx_default"
-    log_level: str = "INFO"
+    database_to_catalog_mapping: dict[str, str] | None = None
+    default_catalog: str | None = "ucx_default"
+    log_level: str | None = "INFO"
 
     # Starting path for notebooks and directories crawler
     workspace_start_path: str = "/"
-    instance_profile: str = None
-    spark_conf: dict[str, str] = None
+    instance_profile: str | None = None
+    spark_conf: dict[str, str] | None = None
+
+    override_clusters: dict[str, str] | None = None
+    custom_cluster_policy_id: str | None = None
 
     @classmethod
     def from_dict(cls, raw: dict):

@@ -188,6 +188,7 @@ def test_unregistered_support():
 
 def test_factory(mocker):
     ws = mocker.Mock()
+    ws.groups.list.return_value = []
     b = MockBackend()
     permission_manager = PermissionManager.factory(ws, b, "test")
     appliers = permission_manager._appliers()
