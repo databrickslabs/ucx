@@ -4,6 +4,7 @@ from unittest.mock import MagicMock, create_autospec
 import pytest
 from databricks.sdk.errors import NotFound
 from databricks.sdk.service.catalog import ExternalLocationInfo
+
 from databricks.labs.ucx.account import WorkspaceInfo
 from databricks.labs.ucx.hive_metastore.locations import (
     ExternalLocation,
@@ -119,6 +120,19 @@ def test_save_external_location_mapping_missing_location():
     (path, content), _ = ws.workspace.upload.call_args
     assert "~/.ucx/external_locations.tf" == path
     assert (
-        "workspace_name,catalog_name,src_schema,dst_schema,src_table,dst_table\r\n"
-        "foo-bar,foo_bar,foo,foo,bar,bar\r\n"
+        'resource "databricks_external_location" "name_1" { \n'
+        'name = "name_1"\n'
+        'url  = "s3://test_location/test1"\n'
+        "credential_name = <storage_credential_reference>\n"
+        "}"
     ) == content.read()
+
+
+def test_save_external_location_mapping_no_missing_location():
+    ws = MagicMock()
+    ext_location_mapping = ExternalLocationMapping(ws, "~/.ucx")
+    location_crawler = create_autospec(ExternalLocations)
+    location_crawler.snapshot.return_value = [ExternalLocation(location="s3://test_location/test1", table_count=1)]
+    ws.external_locations.list.return_value = [ExternalLocationInfo(name="loc1", url="s3://test_location/test1")]
+    ext_location_mapping.save(location_crawler)
+    ws.workspace.upload.assert_not_called()

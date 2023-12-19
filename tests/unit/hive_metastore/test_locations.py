@@ -81,6 +81,14 @@ def test_external_locations():
         ),
         row_factory(
             [
+                "jdbc:providerknown:/",
+                "[database=test_db, host=somedb.us-east-1.rds.amazonaws.com, \
+            port=1234, dbtable=sometable2, user=*********(redacted), password=*********(redacted), \
+            provider=providerknown]",
+            ]
+        ),
+        row_factory(
+            [
                 "jdbc:providerunknown:/",
                 "[database=test_db, host=somedb.us-east-1.rds.amazonaws.com, \
             port=1234, dbtable=sometable, user=*********(redacted), password=*********(redacted)]",

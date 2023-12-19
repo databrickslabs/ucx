@@ -58,7 +58,7 @@ class TableMapping:
         workspace_name = workspace_info.current()
         default_catalog_name = re.sub(r"\W+", "_", workspace_name)
         buffer = io.StringIO()
-        writer = csv.DictWriter(buffer, self._field_na)
+        writer = csv.DictWriter(buffer, self._field_names)
         writer.writeheader()
         for rule in self.current_tables(tables, workspace_name, default_catalog_name):
             writer.writerow(dataclasses.asdict(rule))
@@ -93,7 +93,7 @@ class ExternalLocationMapping:
         tf_script = []
         cnt = 1
         for loc in missing_locations:
-            script = f'resource "databricks_external_location" "name_{cnt}" cc{{ \n'
+            script = f'resource "databricks_external_location" "name_{cnt}" {{ \n'
             script += f'name = "name_{cnt}"\n'
             script += f'url  = "{loc.location}"\n'
             script += "credential_name = <storage_credential_reference>\n"
@@ -110,31 +110,29 @@ class ExternalLocationMapping:
         missing_locations = []
         for loc in table_locations:
             if loc.location in location_path:
-                matching_locations.append(
-                    [external_locations[location_path.index(loc.location)].name, loc.table_count]
-                )
+                matching_locations.append([external_locations[location_path.index(loc.location)].name, loc.table_count])
                 continue
             missing_locations.append(loc)
         return matching_locations, missing_locations
 
     def save(self, locations: ExternalLocations) -> str:
         matching_locations, missing_locations = self._match_table_external_locations(locations)
-        logger.info("following external location already configured.")
+        logger.info("following external locations are already configured.")
         logger.info("sharing details of # tables that can be migrated for each location")
         for _ in matching_locations:
             logger.info(f"{_[1]} tables can be migrated using external location {_[0]}.")
         buffer = io.StringIO()
-        writer = csv.writer(buffer)
         if len(missing_locations) > 0:
-            logger.info("following external location need to be configured.")
+            logger.info("following external location need to be created.")
             for _ in missing_locations:
                 logger.info(f"{_.table_count} tables can be migrated using external location {_.location}.")
             for script in self._get_ext_location_definitions(missing_locations):
-                writer.writerow(script)
+                buffer.write(script)
             buffer.seek(0)
             return self._overwrite_mapping(buffer)
         else:
-            return ""
+            logger.info("no additional external location to be created.")
+            return None
 
     def _overwrite_mapping(self, buffer) -> str:
         path = f"{self._folder}/external_locations.tf"
