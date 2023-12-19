@@ -117,15 +117,16 @@ class ExternalLocationMapping:
 
     def save(self, locations: ExternalLocations) -> str:
         matching_locations, missing_locations = self._match_table_external_locations(locations)
-        logger.info("following external locations are already configured.")
-        logger.info("sharing details of # tables that can be migrated for each location")
-        for _ in matching_locations:
-            logger.info(f"{_[1]} tables can be migrated using external location {_[0]}.")
-        buffer = io.StringIO()
+        if len(matching_locations) > 0:
+            logger.info("following external locations are already configured.")
+            logger.info("sharing details of # tables that can be migrated for each location")
+            for _ in matching_locations:
+                logger.info(f"{_[1]} tables can be migrated using external location {_[0]}.")
         if len(missing_locations) > 0:
             logger.info("following external location need to be created.")
             for _ in missing_locations:
                 logger.info(f"{_.table_count} tables can be migrated using external location {_.location}.")
+            buffer = io.StringIO()
             for script in self._get_ext_location_definitions(missing_locations):
                 buffer.write(script)
             buffer.seek(0)
