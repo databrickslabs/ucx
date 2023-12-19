@@ -102,7 +102,7 @@ class ExternalLocationMapping:
             cnt += 1
         return tf_script
 
-    def _match_table_external_locations(self, locations: ExternalLocations) -> tuple(list, list):
+    def _match_table_external_locations(self, locations: ExternalLocations) -> [list, list[ExternalLocation]]:
         external_locations = list(self._ws.external_locations.list())
         location_path = [_.url for _ in external_locations]
         table_locations = locations.snapshot()
@@ -111,7 +111,7 @@ class ExternalLocationMapping:
         for loc in table_locations:
             if loc.location in location_path:
                 matching_locations.append(
-                    [external_locations[external_locations.index(loc.location)].name, loc.table_count]
+                    [external_locations[location_path.index(loc.location)].name, loc.table_count]
                 )
                 continue
             missing_locations.append(loc)
@@ -128,7 +128,7 @@ class ExternalLocationMapping:
         if len(missing_locations) > 0:
             logger.info("following external location need to be configured.")
             for _ in missing_locations:
-                logger.info(f"{_[1]} tables can be migrated using external location {_[0]}.")
+                logger.info(f"{_.table_count} tables can be migrated using external location {_.location}.")
             for script in self._get_ext_location_definitions(missing_locations):
                 writer.writerow(script)
             buffer.seek(0)

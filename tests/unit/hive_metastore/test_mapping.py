@@ -3,7 +3,7 @@ from unittest.mock import MagicMock, create_autospec
 
 import pytest
 from databricks.sdk.errors import NotFound
-
+from databricks.sdk.service.catalog import ExternalLocationInfo
 from databricks.labs.ucx.account import WorkspaceInfo
 from databricks.labs.ucx.hive_metastore.locations import (
     ExternalLocation,
@@ -109,18 +109,13 @@ def test_load_mapping():
     ] == rules
 
 
-def test_save_external_location_mapping():
+def test_save_external_location_mapping_missing_location():
     ws = MagicMock()
     ext_location_mapping = ExternalLocationMapping(ws, "~/.ucx")
-
     location_crawler = create_autospec(ExternalLocations)
     location_crawler.snapshot.return_value = [ExternalLocation(location="s3://test_location/test1", table_count=1)]
-
-    workspace_info = create_autospec(WorkspaceInfo)
-    workspace_info.current.return_value = "foo-bar"
-
-    ext_location_mapping.save(location_crawler, workspace_info)
-
+    ws.external_locations.list.return_value = [ExternalLocationInfo(name="loc1", url="s3://test_location/test11")]
+    ext_location_mapping.save(location_crawler)
     (path, content), _ = ws.workspace.upload.call_args
     assert "~/.ucx/external_locations.tf" == path
     assert (
