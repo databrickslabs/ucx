@@ -29,4 +29,4 @@ SELECT
     catalog,
     database,
     table
-FROM $inventory.grants
+FROM $inventory.grants where database != split("$inventory",'[.]')[1]
