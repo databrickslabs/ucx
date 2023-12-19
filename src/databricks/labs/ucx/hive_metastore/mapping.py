@@ -1,16 +1,20 @@
 import csv
 import dataclasses
 import io
+import logging
 import re
 from dataclasses import dataclass
 
 from databricks.sdk import WorkspaceClient
-from databricks.sdk.errors import NotFound
+from databricks.sdk.errors import BadRequest, NotFound
 from databricks.sdk.service.workspace import ImportFormat
 
 from databricks.labs.ucx.account import WorkspaceInfo
+from databricks.labs.ucx.framework.crawlers import StatementExecutionBackend
 from databricks.labs.ucx.hive_metastore import TablesCrawler
 from databricks.labs.ucx.hive_metastore.tables import Table
+
+logger = logging.getLogger(__name__)
 
 
 @dataclass
@@ -35,6 +39,8 @@ class Rule:
 
 
 class TableMapping:
+    UCX_SKIP_PROPERTY = "databricks.labs.ucx.skip"
+
     def __init__(self, ws: WorkspaceClient, folder: str | None = None):
         if not folder:
             folder = f"/Users/{ws.current_user.me().user_name}/.ucx"
@@ -76,3 +82,27 @@ class TableMapping:
         except NotFound:
             msg = "Please run: databricks labs ucx table-mapping"
             raise ValueError(msg) from None
+
+    def skip_table(self, backend: StatementExecutionBackend, schema: str, table: str):
+        # Marks a table to be skipped in the migration process by applying a table property
+        try:
+            backend.execute(f"ALTER TABLE `{schema}`.`{table}` SET TBLPROPERTIES('{self.UCX_SKIP_PROPERTY}' = true)")
+        except NotFound as nf:
+            if "[TABLE_OR_VIEW_NOT_FOUND]" in str(nf):
+                logger.error(f"Failed to apply skip marker for Table {schema}.{table}. Table not found.")
+            else:
+                logger.error(nf)
+        except BadRequest as br:
+            logger.error(br)
+
+    def skip_schema(self, backend: StatementExecutionBackend, schema: str):
+        # Marks a schema to be skipped in the migration process by applying a table property
+        try:
+            backend.execute(f"ALTER SCHEMA `{schema}` SET DBPROPERTIES('{self.UCX_SKIP_PROPERTY}' = true)")
+        except NotFound as nf:
+            if "[SCHEMA_NOT_FOUND]" in str(nf):
+                logger.error(f"Failed to apply skip marker for Schema {schema}. Schema not found.")
+            else:
+                logger.error(nf)
+        except BadRequest as br:
+            logger.error(br)
