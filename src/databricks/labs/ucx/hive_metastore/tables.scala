@@ -78,7 +78,7 @@ def getInventoryDatabase(): String={
 }
 
 val inventoryDatabase = getInventoryDatabase()
-val df = metadataForAllTables(spark.sharedState.externalCatalog.listDatabases(), failures)
+val df = metadataForAllTables(spark.sharedState.externalCatalog.listDatabases().filter(_ != s"$inventoryDatabase"), failures)
 df.write.mode("overwrite").option("overwriteSchema", "true").saveAsTable(s"$inventoryDatabase.tables")
 
 JavaConverters.asScalaIteratorConverter(failures.iterator).asScala.toList.toDF
