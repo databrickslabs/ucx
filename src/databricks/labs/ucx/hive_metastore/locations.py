@@ -15,6 +15,7 @@ logger = logging.getLogger(__name__)
 @dataclass
 class ExternalLocation:
     location: str
+    table_count: int
 
 
 @dataclass
@@ -56,12 +57,14 @@ class ExternalLocations(CrawlerBase):
                             + "/"
                         )
                         if common.count("/") > min_slash:
-                            external_locations[loc] = ExternalLocation(common)
+                            table_count = external_locations[loc].table_count
+                            external_locations[loc] = ExternalLocation(common, table_count + 1)
                             dupe = True
                         loc += 1
                     if not dupe:
-                        external_locations.append(ExternalLocation(os.path.dirname(location) + "/"))
+                        external_locations.append(ExternalLocation(os.path.dirname(location) + "/", 1))
                 if location.startswith("jdbc"):
+                    dupe = False
                     pattern = r"(\w+)=(.*?)(?=\s*,|\s*\])"
 
                     # Find all matches in the input string
@@ -92,7 +95,13 @@ class ExternalLocations(CrawlerBase):
                         jdbc_location = f"jdbc:{provider.lower()}://{host}:{port}/{database}"
                     else:
                         jdbc_location = f"{location.lower()}/{host}:{port}/{database}"
-                    external_locations.append(ExternalLocation(jdbc_location))
+                    for loc in external_locations:
+                        if loc.location == jdbc_location:
+                            loc.table_count += 1
+                            dupe = True
+                            break
+                    if not dupe:
+                        external_locations.append(ExternalLocation(jdbc_location, 1))
 
         return external_locations
 

@@ -91,6 +91,7 @@ def test_external_locations():
     result_set = crawler._external_locations(sample_locations, sample_mounts)
     assert len(result_set) == 7
     assert result_set[0].location == "s3://us-east-1-dev-account-staging-uc-ext-loc-bucket-1/Location/"
+    assert result_set[0].table_count == 2
     assert result_set[1].location == "s3://us-east-1-dev-account-staging-uc-ext-loc-bucket-23/"
     assert (
         result_set[3].location

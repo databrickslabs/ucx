@@ -5,7 +5,15 @@ import pytest
 from databricks.sdk.errors import NotFound
 
 from databricks.labs.ucx.account import WorkspaceInfo
-from databricks.labs.ucx.hive_metastore.mapping import Rule, TableMapping
+from databricks.labs.ucx.hive_metastore.locations import (
+    ExternalLocation,
+    ExternalLocations,
+)
+from databricks.labs.ucx.hive_metastore.mapping import (
+    ExternalLocationMapping,
+    Rule,
+    TableMapping,
+)
 from databricks.labs.ucx.hive_metastore.tables import Table, TablesCrawler
 
 
@@ -99,3 +107,23 @@ def test_load_mapping():
             dst_table="bar",
         )
     ] == rules
+
+
+def test_save_external_location_mapping():
+    ws = MagicMock()
+    ext_location_mapping = ExternalLocationMapping(ws, "~/.ucx")
+
+    location_crawler = create_autospec(ExternalLocations)
+    location_crawler.snapshot.return_value = [ExternalLocation(location="s3://test_location/test1", table_count=1)]
+
+    workspace_info = create_autospec(WorkspaceInfo)
+    workspace_info.current.return_value = "foo-bar"
+
+    ext_location_mapping.save(location_crawler, workspace_info)
+
+    (path, content), _ = ws.workspace.upload.call_args
+    assert "~/.ucx/external_locations.tf" == path
+    assert (
+        "workspace_name,catalog_name,src_schema,dst_schema,src_table,dst_table\r\n"
+        "foo-bar,foo_bar,foo,foo,bar,bar\r\n"
+    ) == content.read()

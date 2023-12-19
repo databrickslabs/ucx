@@ -1,7 +1,6 @@
 import logging
 
-from databricks.labs.ucx.hive_metastore.data_objects import ExternalLocations
-from databricks.labs.ucx.hive_metastore.locations import Mount
+from databricks.labs.ucx.hive_metastore.locations import ExternalLocations, Mount
 from databricks.labs.ucx.hive_metastore.tables import Table
 
 logger = logging.getLogger(__name__)
@@ -48,6 +47,17 @@ def test_external_locations(ws, sql_backend, inventory_schema, env_or_skip):
         Table(
             "hive_metastore",
             "foo",
+            "bar2",
+            "EXTERNAL",
+            "delta",
+            location="jdbc://providerknown/",
+            storage_properties="[database=test_db, host=somedb.us-east-1.rds.amazonaws.com, \
+            port=1234, dbtable=sometable, user=*********(redacted), password=*********(redacted), \
+            provider=providerknown]",
+        ),
+        Table(
+            "hive_metastore",
+            "foo",
             "bar",
             "EXTERNAL",
             "delta",
@@ -69,4 +79,5 @@ def test_external_locations(ws, sql_backend, inventory_schema, env_or_skip):
     )
     assert results[3].location == "jdbc:mysql://somemysql.us-east-1.rds.amazonaws.com:3306/test_db"
     assert results[4].location == "jdbc:providerknown://somedb.us-east-1.rds.amazonaws.com:1234/test_db"
+    assert results[4].table_count == 2
     assert results[5].location == "jdbc://providerunknown//somedb.us-east-1.rds.amazonaws.com:1234/test_db"
