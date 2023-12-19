@@ -7,10 +7,11 @@ from databricks.sdk import WorkspaceClient
 from databricks.sdk.errors import NotFound
 
 from databricks.labs.ucx.account import AccountWorkspaces, WorkspaceInfo
+from databricks.labs.ucx.assessment.aws import iam_profiles
 from databricks.labs.ucx.config import AccountConfig, ConnectConfig
 from databricks.labs.ucx.framework.crawlers import StatementExecutionBackend
 from databricks.labs.ucx.framework.tui import Prompts
-from databricks.labs.ucx.hive_metastore import TablesCrawler
+from databricks.labs.ucx.hive_metastore import TablesCrawler, ExternalLocations
 from databricks.labs.ucx.hive_metastore.mapping import TableMapping
 from databricks.labs.ucx.install import WorkspaceInstaller
 from databricks.labs.ucx.installer import InstallationManager
@@ -90,6 +91,17 @@ def create_table_mapping():
     webbrowser.open(f"{ws.config.host}/#workspace{path}")
 
 
+def aws_iam_profiles():
+    ws = WorkspaceClient()
+    installation_manager = InstallationManager(ws)
+    installation = installation_manager.for_user(ws.current_user.me())
+    sql_backend = StatementExecutionBackend(ws, installation.config.warehouse_id)
+    external_locations = ExternalLocations(ws, sql_backend, installation.config.inventory_database)
+    for loc in external_locations.snapshot():
+        print(loc.location)
+    # iam_profiles()
+
+
 MAPPING = {
     "open-remote-config": open_remote_config,
     "installations": list_installations,
@@ -98,6 +110,7 @@ MAPPING = {
     "manual-workspace-info": manual_workspace_info,
     "create-table-mapping": create_table_mapping,
     "skip": skip,
+    "aws-iam-profiles": aws_iam_profiles,
 }
 
 
