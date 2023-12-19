@@ -9,7 +9,13 @@ from datetime import timedelta
 from typing import ClassVar
 
 from databricks.sdk import WorkspaceClient
-from databricks.sdk.errors.mapping import BadRequest, NotFound
+from databricks.sdk.errors.mapping import (
+    BadRequest,
+    DeadlineExceeded,
+    InternalError,
+    NotFound,
+    ResourceConflict,
+)
 from databricks.sdk.retries import retried
 from databricks.sdk.service import iam
 from databricks.sdk.service.iam import Group
@@ -17,7 +23,6 @@ from databricks.sdk.service.iam import Group
 from databricks.labs.ucx.framework.crawlers import CrawlerBase, SqlBackend
 from databricks.labs.ucx.framework.parallel import ManyError, Threads
 from databricks.labs.ucx.mixins.hardening import rate_limited
-from databricks.labs.ucx.mixins.retryables import retryable_exceptions
 
 logger = logging.getLogger(__name__)
 
@@ -446,7 +451,7 @@ class GroupManager(CrawlerBase[MigratedGroup]):
             for g in self._ws.groups.list(attributes=",".join(attributes)):
                 if self._is_group_out_of_scope(g, resource_type):
                     continue
-                set_retry_on_value_error = retried(on=retryable_exceptions, timeout=self._verify_timeout)
+                set_retry_on_value_error = retried(on=[InternalError, NotFound], timeout=self._verify_timeout)
                 set_retried_check = set_retry_on_value_error(self._get_group_with_retries)
                 group_with_all_attributes = set_retried_check(g.id)
                 results.append(group_with_all_attributes)
@@ -477,7 +482,7 @@ class GroupManager(CrawlerBase[MigratedGroup]):
         sorted_groups: list[iam.Group] = sorted(account_groups, key=lambda _: _.display_name)  # type: ignore[arg-type,return-value]
         return sorted_groups
 
-    @retried(on=retryable_exceptions)
+    @retried(on=[InternalError, ResourceConflict, DeadlineExceeded])
     @rate_limited(max_requests=35, burst_period_seconds=60)
     def _delete_workspace_group(self, group_id: str, display_name: str) -> None:
         try:
@@ -488,7 +493,7 @@ class GroupManager(CrawlerBase[MigratedGroup]):
         except NotFound:
             return None
 
-    @retried(on=retryable_exceptions)
+    @retried(on=[InternalError, ResourceConflict, DeadlineExceeded])
     @rate_limited(max_requests=10)
     def _reflect_account_group_to_workspace(self, account_group_id: str):
         try:

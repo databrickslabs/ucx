@@ -8,7 +8,15 @@ from functools import partial
 from typing import Optional
 
 from databricks.sdk import WorkspaceClient
-from databricks.sdk.errors import InvalidParameterValue, NotFound, PermissionDenied
+from databricks.sdk.errors import (
+    DeadlineExceeded,
+    InternalError,
+    InvalidParameterValue,
+    NotFound,
+    PermissionDenied,
+    ResourceConflict,
+    TemporarilyUnavailable,
+)
 from databricks.sdk.retries import retried
 from databricks.sdk.service import iam, ml
 from databricks.sdk.service.iam import PermissionLevel
@@ -16,7 +24,6 @@ from databricks.sdk.service.iam import PermissionLevel
 from databricks.labs.ucx.framework.crawlers import CrawlerBase, SqlBackend
 from databricks.labs.ucx.framework.parallel import ManyError, Threads
 from databricks.labs.ucx.mixins.hardening import rate_limited
-from databricks.labs.ucx.mixins.retryables import retryable_exceptions
 from databricks.labs.ucx.workspace_access.base import AclSupport, Permissions
 from databricks.labs.ucx.workspace_access.groups import MigrationState
 
@@ -131,6 +138,8 @@ class GenericPermissionsSupport(AclSupport):
 
     @rate_limited(max_requests=30)
     def _applier_task(self, object_type: str, object_id: str, acl: list[iam.AccessControlRequest]):
+        retryable_exceptions = [InternalError, NotFound, ResourceConflict, TemporarilyUnavailable, DeadlineExceeded]
+
         update_retry_on_value_error = retried(on=retryable_exceptions, timeout=self._verify_timeout)
         update_retried_check = update_retry_on_value_error(self._safe_update_permissions)
         update_retried_check(object_type, object_id, acl)

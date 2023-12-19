@@ -393,7 +393,7 @@ def test_applier_task_failed_when_get_error_retriable():
         group_name="group_2",
     )
     ws.permissions.update.return_value = iam.ObjectPermissions(access_control_list=[group_1_acl, group_2_acl])
-    ws.permissions.get.side_effect = DatabricksError(error_code="INTERNAL_SERVER_ERROR")
+    ws.permissions.get.side_effect = InternalError(error_code="INTERNAL_SERVER_ERROR")
     sup = GenericPermissionsSupport(ws=ws, listings=[], verify_timeout=timedelta(seconds=1))
     with pytest.raises(TimeoutError) as e:
         sup._applier_task(
@@ -731,22 +731,3 @@ def test_eligibles_assets_without_owner_should_be_ignored():
             tasks.append(task)
     assert len(tasks) == 1
     assert tasks[0].object_type == "clusters"
-
-
-def test_timeout_error_should_be_retried():
-    ws = MagicMock()
-    acl = iam.AccessControlResponse(
-        all_permissions=[Permission(permission_level=PermissionLevel.CAN_USE)], group_name="group"
-    )
-    ws.permissions.update.side_effect = InternalError(
-        "java.io.IOException: java.util.concurrent.TimeoutException: Timed out after 5 seconds"
-    )
-    ws.permissions.get.return_value = iam.ObjectPermissions(access_control_list=[acl])
-    sup = GenericPermissionsSupport(ws=ws, listings=[], verify_timeout=timedelta(seconds=1))
-    with pytest.raises(TimeoutError) as e:
-        sup._applier_task(
-            object_type="clusters",
-            object_id="cluster_id",
-            acl=[iam.AccessControlRequest(group_name="group", permission_level=iam.PermissionLevel.CAN_USE)],
-        )
-    assert "Timed out after" in str(e.value)

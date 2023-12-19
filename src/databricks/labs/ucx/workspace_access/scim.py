@@ -4,13 +4,19 @@ from datetime import timedelta
 from functools import partial
 
 from databricks.sdk import WorkspaceClient
-from databricks.sdk.errors import NotFound, PermissionDenied
+from databricks.sdk.errors import (
+    Aborted,
+    DeadlineExceeded,
+    InternalError,
+    NotFound,
+    PermissionDenied,
+    ResourceConflict,
+)
 from databricks.sdk.retries import retried
 from databricks.sdk.service import iam
 from databricks.sdk.service.iam import Group, Patch, PatchSchema
 
 from databricks.labs.ucx.mixins.hardening import rate_limited
-from databricks.labs.ucx.mixins.retryables import retryable_exceptions
 from databricks.labs.ucx.workspace_access.base import AclSupport, Permissions
 from databricks.labs.ucx.workspace_access.groups import MigrationState
 
@@ -107,14 +113,16 @@ class ScimSupport(AclSupport):
 
     @rate_limited(max_requests=10, burst_period_seconds=60)
     def _applier_task(self, group_id: str, value: list[iam.ComplexValue], property_name: str):
+        retryable_errors = [ResourceConflict, Aborted, DeadlineExceeded, InternalError]
+
         operations = [iam.Patch(op=iam.PatchOp.ADD, path=property_name, value=[e.as_dict() for e in value])]
         schemas = [iam.PatchSchema.URN_IETF_PARAMS_SCIM_API_MESSAGES_2_0_PATCH_OP]
 
-        patch_retry_on_value_error = retried(on=retryable_exceptions, timeout=self._verify_timeout)
+        patch_retry_on_value_error = retried(on=retryable_errors, timeout=self._verify_timeout)
         patch_retried_check = patch_retry_on_value_error(self._safe_patch_group)
         patch_retried_check(group_id, operations, schemas)
 
-        retry_on_value_error = retried(on=[*retryable_exceptions, ValueError], timeout=self._verify_timeout)
+        retry_on_value_error = retried(on=[*retryable_errors, ValueError], timeout=self._verify_timeout)
         retried_check = retry_on_value_error(self._inflight_check)
         return retried_check(group_id, value, property_name)
 

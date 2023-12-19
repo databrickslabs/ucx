@@ -7,13 +7,12 @@ from datetime import timedelta
 from functools import partial
 
 from databricks.sdk import WorkspaceClient
-from databricks.sdk.errors import NotFound, PermissionDenied
+from databricks.sdk.errors import InternalError, NotFound, PermissionDenied
 from databricks.sdk.retries import retried
 from databricks.sdk.service import sql
 from databricks.sdk.service.sql import ObjectTypePlural, SetResponse
 
 from databricks.labs.ucx.mixins.hardening import rate_limited
-from databricks.labs.ucx.mixins.retryables import retryable_exceptions
 from databricks.labs.ucx.workspace_access.base import AclSupport, Permissions
 from databricks.labs.ucx.workspace_access.groups import MigrationState
 
@@ -121,11 +120,11 @@ class RedashPermissionsSupport(AclSupport):
         This affects the way how we prepare the new ACL request.
         """
 
-        set_retry_on_value_error = retried(on=[*retryable_exceptions, ValueError], timeout=self._verify_timeout)
+        set_retry_on_value_error = retried(on=[InternalError, ValueError], timeout=self._verify_timeout)
         set_retried_check = set_retry_on_value_error(self._safe_set_permissions)
         set_retried_check(object_type, object_id, acl)
 
-        retry_on_value_error = retried(on=[*retryable_exceptions, ValueError], timeout=self._verify_timeout)
+        retry_on_value_error = retried(on=[InternalError, ValueError], timeout=self._verify_timeout)
         retried_check = retry_on_value_error(self._inflight_check)
         return retried_check(object_type, object_id, acl)
 

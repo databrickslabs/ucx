@@ -8,7 +8,6 @@ from databricks.sdk.retries import retried
 from databricks.sdk.service import workspace
 
 from databricks.labs.ucx.mixins.hardening import rate_limited
-from databricks.labs.ucx.mixins.retryables import retryable_exceptions
 from databricks.labs.ucx.workspace_access.base import AclSupport, Permissions
 from databricks.labs.ucx.workspace_access.groups import MigrationState
 
@@ -95,6 +94,6 @@ class SecretScopesSupport(AclSupport):
     @rate_limited(max_requests=1100, burst_period_seconds=60)
     def _rate_limited_put_acl(self, object_id: str, principal: str, permission: workspace.AclPermission):
         self._ws.secrets.put_acl(object_id, principal, permission)
-        retry_on_value_error = retried(on=[*retryable_exceptions, ValueError], timeout=self._verify_timeout)
+        retry_on_value_error = retried(on=[ValueError], timeout=self._verify_timeout)
         retried_check = retry_on_value_error(self._reapply_on_failure)
         retried_check(object_id, principal, permission)
