@@ -750,5 +750,3 @@ def test_timeout_error_should_be_retried():
             acl=[iam.AccessControlRequest(group_name="group", permission_level=iam.PermissionLevel.CAN_USE)],
         )
     assert "Timed out after" in str(e.value)
-
-    print(ws.mock_calls)
