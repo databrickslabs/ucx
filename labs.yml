@@ -44,5 +44,10 @@ commands:
   - name: create-table-mapping
     description: create initial table mapping for review
 
+  - name: ensure-assessment-run
+    description: ensure the assessment job was run on a workspace
+
+
+
   - name: validate-external-locations
     description: validates and provides mapping to external table to external location and shared generation tf scripts

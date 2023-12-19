@@ -1,7 +1,9 @@
+from unittest.mock import MagicMock
+
 import pytest
 from databricks.sdk.errors import NotFound
 from databricks.sdk.service import iam
-from databricks.sdk.service.iam import User
+from databricks.sdk.service.iam import ComplexValue, User
 
 from databricks.labs.ucx.cli import skip
 
@@ -23,12 +25,12 @@ def test_skip_no_schema(mocker, caplog):
 
 def test_skip_no_ucx(caplog, mocker):
     mocker.patch("databricks.sdk.WorkspaceClient.__init__", return_value=None)
-    mocker.patch("databricks.labs.ucx.install.WorkspaceInstaller.__init__", return_value=None)
-    mocker.patch("databricks.labs.ucx.install.WorkspaceInstaller._current_config", return_value="foo")
-    mocker.patch(
-        "databricks.labs.ucx.framework.crawlers.StatementExecutionBackend.__init__",
-        return_value=None,
-        side_effect=NotFound("..."),
-    )
+    current_user = MagicMock()
+    current_user.me.return_value = User(user_name="foo", groups=[ComplexValue(display="admins")])
+    current_user.return_value = None
+    mocker.patch("databricks.sdk.WorkspaceClient.current_user", return_value=current_user)
+    # ws.current_user = current_user
+    mocker.patch("databricks.labs.ucx.installer.InstallationManager.__init__", return_value=None)
+    mocker.patch("databricks.labs.ucx.installer.InstallationManager.for_user", return_value=None)
     skip(schema="schema", table="table")
     assert [rec.message for rec in caplog.records if "UCX configuration" in rec.message]
