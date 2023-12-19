@@ -5,9 +5,11 @@ from concurrent.futures import FIRST_COMPLETED, ThreadPoolExecutor, wait
 from itertools import groupby
 
 from databricks.sdk import WorkspaceClient
-from databricks.sdk.errors import InternalError, NotFound
+from databricks.sdk.errors import NotFound
 from databricks.sdk.retries import retried
 from databricks.sdk.service.workspace import ObjectInfo, ObjectType
+
+from databricks.labs.ucx.mixins.retryables import retryable_exceptions
 
 logger = logging.getLogger(__name__)
 
@@ -44,7 +46,7 @@ class WorkspaceListing:
             )
 
     def _list_workspace(self, path: str) -> Iterable[ObjectInfo]:
-        list_retry_on_value_error = retried(on=[InternalError], timeout=self._verify_timeout)
+        list_retry_on_value_error = retried(on=retryable_exceptions, timeout=self._verify_timeout)
         list_retried_check = list_retry_on_value_error(self._ws.workspace.list)
         return list_retried_check(path=path, recursive=False)
 

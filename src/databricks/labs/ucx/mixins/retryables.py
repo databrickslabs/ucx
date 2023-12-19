@@ -1,0 +1,31 @@
+from databricks.sdk.errors import (
+    Aborted,
+    BadRequest,
+    Cancelled,
+    DatabricksError,
+    DeadlineExceeded,
+    InternalError,
+    NotFound,
+    RequestLimitExceeded,
+    ResourceConflict,
+    ResourceDoesNotExist,
+    ResourceExhausted,
+    TemporarilyUnavailable,
+    TooManyRequests,
+)
+
+retryable_exceptions = [
+    DatabricksError,
+    BadRequest,
+    NotFound,
+    TooManyRequests,
+    ResourceConflict,
+    Cancelled,
+    InternalError,
+    TemporarilyUnavailable,
+    DeadlineExceeded,
+    ResourceDoesNotExist,
+    Aborted,
+    ResourceExhausted,
+    RequestLimitExceeded,
+]
