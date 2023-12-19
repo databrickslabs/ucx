@@ -58,7 +58,7 @@ def test_applier_task_should_return_false_if_entitlements_are_not_properly_appli
 
 def test_applier_task_when_get_error_retriable():
     ws = MagicMock()
-    ws.groups.get.side_effect = DatabricksError(error_code="INTERNAL_SERVER_ERROR")
+    ws.groups.get.side_effect = InternalError(error_code="INTERNAL_SERVER_ERROR")
     sup = ScimSupport(ws=ws, verify_timeout=timedelta(seconds=1))
     group_id = "1"
     with pytest.raises(TimeoutError) as e:

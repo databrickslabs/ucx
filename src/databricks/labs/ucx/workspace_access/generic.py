@@ -8,8 +8,15 @@ from functools import partial
 from typing import Optional
 
 from databricks.sdk import WorkspaceClient
-from databricks.sdk.core import DatabricksError
-from databricks.sdk.errors import InvalidParameterValue, NotFound, PermissionDenied
+from databricks.sdk.errors import (
+    DeadlineExceeded,
+    InternalError,
+    InvalidParameterValue,
+    NotFound,
+    PermissionDenied,
+    ResourceConflict,
+    TemporarilyUnavailable,
+)
 from databricks.sdk.retries import retried
 from databricks.sdk.service import iam, ml
 from databricks.sdk.service.iam import PermissionLevel
@@ -131,11 +138,13 @@ class GenericPermissionsSupport(AclSupport):
 
     @rate_limited(max_requests=30)
     def _applier_task(self, object_type: str, object_id: str, acl: list[iam.AccessControlRequest]):
-        update_retry_on_value_error = retried(on=[DatabricksError], timeout=self._verify_timeout)
+        retryable_exceptions = [InternalError, NotFound, ResourceConflict, TemporarilyUnavailable, DeadlineExceeded]
+
+        update_retry_on_value_error = retried(on=retryable_exceptions, timeout=self._verify_timeout)
         update_retried_check = update_retry_on_value_error(self._safe_update_permissions)
         update_retried_check(object_type, object_id, acl)
 
-        retry_on_value_error = retried(on=[ValueError, DatabricksError], timeout=self._verify_timeout)
+        retry_on_value_error = retried(on=[*retryable_exceptions, ValueError], timeout=self._verify_timeout)
         retried_check = retry_on_value_error(self._inflight_check)
         return retried_check(object_type, object_id, acl)
 

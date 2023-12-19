@@ -9,9 +9,13 @@ from datetime import timedelta
 from typing import ClassVar
 
 from databricks.sdk import WorkspaceClient
-from databricks.sdk.core import DatabricksError
-from databricks.sdk.errors import InternalError
-from databricks.sdk.errors.mapping import BadRequest, NotFound
+from databricks.sdk.errors.mapping import (
+    BadRequest,
+    DeadlineExceeded,
+    InternalError,
+    NotFound,
+    ResourceConflict,
+)
 from databricks.sdk.retries import retried
 from databricks.sdk.service import iam
 from databricks.sdk.service.iam import Group
@@ -478,7 +482,7 @@ class GroupManager(CrawlerBase[MigratedGroup]):
         sorted_groups: list[iam.Group] = sorted(account_groups, key=lambda _: _.display_name)  # type: ignore[arg-type,return-value]
         return sorted_groups
 
-    @retried(on=[DatabricksError])
+    @retried(on=[InternalError, ResourceConflict, DeadlineExceeded])
     @rate_limited(max_requests=35, burst_period_seconds=60)
     def _delete_workspace_group(self, group_id: str, display_name: str) -> None:
         try:
@@ -489,7 +493,7 @@ class GroupManager(CrawlerBase[MigratedGroup]):
         except NotFound:
             return None
 
-    @retried(on=[DatabricksError])
+    @retried(on=[InternalError, ResourceConflict, DeadlineExceeded])
     @rate_limited(max_requests=10)
     def _reflect_account_group_to_workspace(self, account_group_id: str):
         try:
