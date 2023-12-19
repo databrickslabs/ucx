@@ -113,7 +113,6 @@ def main(raw):
         log_level = "info"
     databricks_logger = logging.getLogger("databricks")
     databricks_logger.setLevel(log_level.upper())
-    logger.info(payload)
     kwargs = {k.replace("-", "_"): v for k, v in flags.items()}
     MAPPING[command](**kwargs)
 

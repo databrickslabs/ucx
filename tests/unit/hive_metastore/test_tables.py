@@ -1,9 +1,6 @@
 import pytest
 
-from databricks.labs.ucx.hive_metastore.tables import (
-    Table,
-    TablesCrawler,
-)
+from databricks.labs.ucx.hive_metastore.tables import Table, TablesCrawler
 
 from ..framework.mocks import MockBackend
 
