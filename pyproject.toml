@@ -46,6 +46,7 @@ dependencies = [
     "pytest-xdist",
     "pytest-cov>=4.0.0,<5.0.0",
     "pytest-mock>=3.0.0,<4.0.0",
+    "pytest-timeout",
     "black>=23.1.0",
     "ruff>=0.0.243",
     "isort>=2.5.0",
@@ -60,8 +61,8 @@ python="3.10"
 path = ".venv"
 
 [tool.hatch.envs.default.scripts]
-test        = "pytest -n auto --cov src --cov-report=xml tests/unit"
-coverage    = "pytest -n auto --cov src tests/unit --cov-report=html"
+test        = "pytest -n auto --cov src --cov-report=xml --timeout 10 tests/unit"
+coverage    = "pytest -n auto --cov src tests/unit --timeout 10 --cov-report=html"
 integration = "pytest -n 10 --cov src tests/integration"
 fmt         = ["isort .",
                "black .",
