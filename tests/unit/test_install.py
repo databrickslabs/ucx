@@ -276,6 +276,7 @@ def test_save_config(ws):
         promtps=MockPrompts(
             {
                 r".*PRO or SERVERLESS SQL warehouse.*": "1",
+                r'Choose how to map the workspace groups.*': "2",
                 r".*": "",
             }
         ),
@@ -411,6 +412,7 @@ def test_save_config_auto_groups(ws):
         promtps=MockPrompts(
             {
                 r".*PRO or SERVERLESS SQL warehouse.*": "1",
+                r'Choose how to map the workspace groups.*': "2",
                 r".*": "",
             }
         ),
@@ -445,6 +447,7 @@ def test_save_config_strip_group_names(ws):
         promtps=MockPrompts(
             {
                 r".*PRO or SERVERLESS SQL warehouse.*": "1",
+                r'Choose how to map the workspace groups.*': '2',  # specify names
                 r".*workspace group names.*": "g1, g2, g99",
                 r".*": "",
             }
@@ -506,6 +509,7 @@ def test_save_config_with_custom_policy(ws):
             {
                 r".*PRO or SERVERLESS SQL warehouse.*": "1",
                 r".*follow a policy.*": "yes",
+                r'Choose how to map the workspace groups.*': "2",
                 r".*Choose a cluster policy.*": "0",
                 r".*": "",
             }
@@ -561,6 +565,7 @@ def test_save_config_with_glue(ws):
         promtps=MockPrompts(
             {
                 r".*PRO or SERVERLESS SQL warehouse.*": "1",
+                r'Choose how to map the workspace groups.*': "2",
                 r".*connect to the external metastore?.*": "yes",
                 r".*Choose a cluster policy.*": "0",
                 r".*": "",
