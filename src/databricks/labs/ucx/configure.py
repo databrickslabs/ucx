@@ -17,7 +17,7 @@ class ConfigureClusterOverrides:
     def _valid_cluster_id(self, cluster_id: str) -> bool:
         return cluster_id is not None and CLUSTER_ID_LENGTH == len(cluster_id)
 
-    def _configure_override_clusters(self):
+    def configure(self):
         """User may override standard job clusters with interactive clusters"""
         logger.info("Configuring cluster overrides from existing clusters")
 
