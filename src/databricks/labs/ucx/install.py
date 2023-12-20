@@ -1,8 +1,6 @@
-import functools
 import json
 import logging
 import os
-import re
 import sys
 import time
 import webbrowser
@@ -47,7 +45,7 @@ from databricks.labs.ucx.hive_metastore.tables import Table, TableError
 from databricks.labs.ucx.runtime import main
 from databricks.labs.ucx.workspace_access.base import Permissions
 from databricks.labs.ucx.workspace_access.generic import WorkspaceObjectInfo
-from databricks.labs.ucx.workspace_access.groups import MigratedGroup
+from databricks.labs.ucx.workspace_access.groups import ConfigureGroups, MigratedGroup
 
 TAG_STEP = "step"
 TAG_APP = "App"
@@ -380,77 +378,10 @@ class WorkspaceInstaller:
             )
             warehouse_id = new_warehouse.id
 
-        # Setting up group migration parameters
-        groups_config_args = {}
-
-        ask_for_group = functools.partial(self._prompts.question, validate=self._is_valid_group_str)
-        ask_for_regex = functools.partial(self._prompts.question, validate=self._validate_regex)
-        while self._prompts.confirm(
-            "Do you need to convert the workspace groups to match the account groups' name?"
-            " If the workspace groups' names match the account groups' names select no"
-            " or hit <Enter/Return>."
-        ):
-            logger.info("Setting up group name translation")
-            groups_config_args["convert_group_names"] = "yes"
-            choices = {
-                "Apply a Prefix": "prefix",
-                "Apply a Suffix": "suffix",
-                "Regex Substitution": "sub",
-                "Regex Matching": "match",
-                "Match By External ID": "external",
-                "Cancel": "cancel",
-            }
-            choice = self._prompts.choice_from_dict("Choose how to map the workspace groups:", choices, sort=False)
-            match choice:
-                case "cancel":
-                    continue
-                case "prefix":
-                    prefix = ask_for_group("Enter a prefix to add to the workspace group name")
-                    if not prefix:
-                        continue
-                    groups_config_args["workspace_group_match_regex"] = "^"
-                    groups_config_args["workspace_group_replace"] = prefix
-                case "suffix":
-                    suffix = ask_for_group("Enter a suffix to add to the workspace group name")
-                    if not suffix:
-                        continue
-                    groups_config_args["workspace_group_match_regex"] = "$"
-                    groups_config_args["workspace_group_replace"] = suffix
-                case "sub":
-                    match_value = ask_for_regex("Enter a regular expression for substitution")
-                    if not match_value:
-                        continue
-                    sub_value = ask_for_group("Enter the substitution value")
-                    if not sub_value:
-                        continue
-                    groups_config_args["workspace_group_match_regex"] = match_value
-                    groups_config_args["workspace_group_replace"] = sub_value
-                case "matching":
-                    ws_match_value = ask_for_regex("Enter a regular expression to match on the workspace group")
-                    if not ws_match_value:
-                        continue
-                    acct_match_value = ask_for_regex("Enter a regular expression to match on the account group")
-                    if not acct_match_value:
-                        continue
-                    groups_config_args["workspace_group_match_regex"] = ws_match_value
-                    groups_config_args["account_group_match_regex"] = acct_match_value
-                case "external":
-                    groups_config_args["group_match_by_external_id"] = True
-            break
-
-        selected_groups = self._prompts.question(
-            "Comma-separated list of workspace group names to migrate. If not specified, we'll use all "
-            "account-level groups with matching names to workspace-level groups",
-            default="<ALL>",
-        )
-        backup_group_prefix = ask_for_group("Backup prefix", default="db-temp-")
+        configure_groups = ConfigureGroups(self._prompts)
+        configure_groups.run()
         log_level = self._prompts.question("Log level", default="INFO").upper()
         num_threads = int(self._prompts.question("Number of threads", default="8", valid_number=True))
-        groups_config_args["backup_group_prefix"] = backup_group_prefix
-        if selected_groups != "<ALL>":
-            groups_config_args["selected"] = [x.strip() for x in selected_groups.split(",")]
-        else:
-            groups_config_args["selected"] = None
 
         # Checking for external HMS
         instance_profile = None
@@ -474,12 +405,12 @@ class WorkspaceInstaller:
 
         self._config = WorkspaceConfig(
             inventory_database=inventory_database,
-            workspace_group_regex=groups_config_args.get("workspace_group_regex"),
-            workspace_group_replace=groups_config_args.get("workspace_group_replace"),
-            account_group_regex=groups_config_args.get("account_group_regex"),
-            group_match_by_external_id=groups_config_args.get("group_match_by_external_id"),
-            include_group_names=groups_config_args["selected"],
-            renamed_group_prefix=groups_config_args["backup_group_prefix"],
+            workspace_group_regex=configure_groups.workspace_group_regex,
+            workspace_group_replace=configure_groups.workspace_group_replace,
+            account_group_regex=configure_groups.account_group_regex,
+            group_match_by_external_id=configure_groups.group_match_by_external_id,
+            include_group_names=configure_groups.include_group_names,
+            renamed_group_prefix=configure_groups.renamed_group_prefix,
             warehouse_id=warehouse_id,
             log_level=log_level,
             num_threads=num_threads,
@@ -642,15 +573,6 @@ class WorkspaceInstaller:
 
     def notebook_link(self, path: str) -> str:
         return f"{self._ws.config.host}/#workspace{path}"
-
-    @staticmethod
-    def _validate_regex(regex_input: str) -> bool:
-        try:
-            re.compile(regex_input)
-            return True
-        except re.error:
-            logger.error(f"{regex_input} is an invalid regular expression")
-            return False
 
     def _job_settings(self, step_name: str, remote_wheel: str):
         email_notifications = None
@@ -857,10 +779,6 @@ class WorkspaceInstaller:
             ):
                 spark_conf_dict[key[11:]] = cluster_policy[key]["value"]
         return instance_profile, spark_conf_dict
-
-    @staticmethod
-    def _is_valid_group_str(group_str: str):
-        return group_str and not re.search(r"[\s#,+ \\<>;]", group_str)
 
     def latest_job_status(self) -> list[dict]:
         latest_status = []

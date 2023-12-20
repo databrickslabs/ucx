@@ -7,7 +7,12 @@ from databricks.sdk.service import iam
 from databricks.sdk.service.iam import ComplexValue, Group, ResourceMeta
 
 from databricks.labs.ucx.framework.parallel import ManyError
-from databricks.labs.ucx.workspace_access.groups import GroupManager, MigratedGroup
+from databricks.labs.ucx.framework.tui import MockPrompts
+from databricks.labs.ucx.workspace_access.groups import (
+    ConfigureGroups,
+    GroupManager,
+    MigratedGroup,
+)
 from tests.unit.framework.mocks import MockBackend
 
 
@@ -679,3 +684,17 @@ def test_snapshot_with_group_matched_by_external_id():
             entitlements='[{"value": "allow-cluster-create"}, {"value": "allow-instance-pool-create"}]',
         )
     ]
+
+
+def test_configure_groups():
+    cg = ConfigureGroups(
+        MockPrompts(
+            {
+                "Backup prefix": "",
+                r"Choose how to map the workspace groups.*": "2",  # specify names
+                r"^Comma-separated list of workspace group names to migrate.*": "foo, bar,  baz",
+            }
+        )
+    )
+    cg.run()
+    assert ["foo", "bar", "baz"] == cg.include_group_names
