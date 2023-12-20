@@ -242,8 +242,7 @@ def test_applier_task_failed_when_all_permissions_not_up_to_date():
 
 def test_applier_task_when_set_error_non_retriable():
     ws = MagicMock()
-    error_code = "PERMISSION_DENIED"
-    ws.dbsql_permissions.set.side_effect = DatabricksError(error_code=error_code)
+    ws.dbsql_permissions.set.side_effect = PermissionDenied()
 
     sup = RedashPermissionsSupport(ws=ws, listings=[], verify_timeout=timedelta(seconds=1))
     with pytest.raises(TimeoutError) as e:
@@ -256,12 +255,12 @@ def test_applier_task_when_set_error_non_retriable():
             ],
         )
     assert "Timed out after" in str(e.value)
+    ws.dbsql_permissions.get.assert_called()
 
 
 def test_applier_task_when_set_error_retriable():
     ws = MagicMock()
-    error_code = "INTERNAL_SERVER_ERROR"
-    ws.dbsql_permissions.set.side_effect = DatabricksError(error_code=error_code)
+    ws.dbsql_permissions.set.side_effect = InternalError()
 
     sup = RedashPermissionsSupport(ws=ws, listings=[], verify_timeout=timedelta(seconds=1))
     with pytest.raises(TimeoutError) as e:
@@ -274,6 +273,7 @@ def test_applier_task_when_set_error_retriable():
             ],
         )
     assert "Timed out after" in str(e.value)
+    ws.dbsql_permissions.get.assert_not_called()
 
 
 def test_safe_set_permissions_when_error_non_retriable():

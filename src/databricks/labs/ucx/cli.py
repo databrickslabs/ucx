@@ -4,6 +4,7 @@ import sys
 import webbrowser
 
 from databricks.sdk import WorkspaceClient
+from databricks.sdk.errors import NotFound
 
 from databricks.labs.ucx.account import AccountWorkspaces, WorkspaceInfo
 from databricks.labs.ucx.config import AccountConfig, ConnectConfig
@@ -41,6 +42,31 @@ def list_installations():
     logger.info("Fetching installations...")
     all_users = [_.as_summary() for _ in installation_manager.user_installations()]
     print(json.dumps(all_users))
+
+
+def skip(schema: str, table: str | None = None):
+    logger.info("Running skip command")
+    if not schema:
+        logger.error("--Schema is a required parameter.")
+        return None
+    ws = WorkspaceClient()
+    installation_manager = WorkspaceInstaller(ws)
+    logger.info("Fetching installation config.")
+    try:
+        warehouse_id = installation_manager._current_config.warehouse_id
+        sql_backend = StatementExecutionBackend(ws, warehouse_id)
+    except NotFound:
+        logger.error(
+            "Couldn't find UCX configuration in the user's home folder. "
+            "Make sure the current user has configured and installed UCX."
+        )
+        return None
+
+    mapping = TableMapping(ws)
+    if table:
+        mapping.skip_table(sql_backend, schema, table)
+    else:
+        mapping.skip_schema(sql_backend, schema)
 
 
 def sync_workspace_info():
@@ -93,6 +119,7 @@ MAPPING = {
     "manual-workspace-info": manual_workspace_info,
     "create-table-mapping": create_table_mapping,
     "validate-external-locations": validate_external_locations,
+    "skip": skip,
 }
 
 
@@ -108,7 +135,6 @@ def main(raw):
         log_level = "info"
     databricks_logger = logging.getLogger("databricks")
     databricks_logger.setLevel(log_level.upper())
-
     kwargs = {k.replace("-", "_"): v for k, v in flags.items()}
     MAPPING[command](**kwargs)
 

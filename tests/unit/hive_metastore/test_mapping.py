@@ -109,7 +109,36 @@ def test_load_mapping():
         )
     ] == rules
 
+def test_skip_happy_path(mocker, caplog):
+    ws = mocker.patch("databricks.sdk.WorkspaceClient.__init__")
+    sbe = mocker.patch("databricks.labs.ucx.framework.crawlers.StatementExecutionBackend.__init__")
+    mapping = TableMapping(ws)
+    mapping.skip_table(sbe, schema="schema", table="table")
+    sbe.execute.assert_called_with(
+        f"ALTER TABLE `schema`.`table` SET TBLPROPERTIES('{mapping.UCX_SKIP_PROPERTY}' = true)"
+    )
+    assert len(caplog.records) == 0
+    mapping.skip_schema(sbe, schema="schema")
+    sbe.execute.assert_called_with(f"ALTER SCHEMA `schema` SET DBPROPERTIES('{mapping.UCX_SKIP_PROPERTY}' = true)")
+    assert len(caplog.records) == 0
 
+
+def test_skip_missing_schema(mocker, caplog):
+    ws = mocker.patch("databricks.sdk.WorkspaceClient.__init__")
+    sbe = mocker.patch("databricks.labs.ucx.framework.crawlers.StatementExecutionBackend.__init__")
+    sbe.execute.side_effect = NotFound("[SCHEMA_NOT_FOUND]")
+    mapping = TableMapping(ws)
+    mapping.skip_schema(sbe, schema="schema")
+    assert [rec.message for rec in caplog.records if "schema not found" in rec.message.lower()]
+
+
+def test_skip_missing_table(mocker, caplog):
+    ws = mocker.patch("databricks.sdk.WorkspaceClient.__init__")
+    sbe = mocker.patch("databricks.labs.ucx.framework.crawlers.StatementExecutionBackend.__init__")
+    sbe.execute.side_effect = NotFound("[TABLE_OR_VIEW_NOT_FOUND]")
+    mapping = TableMapping(ws)
+    mapping.skip_table(sbe, schema="schema", table="table")
+    assert [rec.message for rec in caplog.records if "table not found" in rec.message.lower()]
 def test_save_external_location_mapping_missing_location():
     ws = MagicMock()
     ext_location_mapping = ExternalLocationMapping(ws, "~/.ucx")

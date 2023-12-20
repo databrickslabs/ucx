@@ -5,13 +5,14 @@ import logging
 import os
 import re
 import threading
-from collections.abc import Callable
+from collections.abc import Callable, Iterable, Sequence
 from concurrent.futures import ThreadPoolExecutor
 from typing import Generic, TypeVar
 
 MIN_THREADS = 8
 
 Result = TypeVar("Result")
+Task = Callable[[], Result | None] | functools.partial[Result | None]
 logger = logging.getLogger(__name__)
 
 
@@ -23,7 +24,7 @@ class ManyError(RuntimeError):
 
 
 class Threads(Generic[Result]):
-    def __init__(self, name, tasks: list[Callable[..., Result]], num_threads: int):
+    def __init__(self, name, tasks: Sequence[Task[Result]], num_threads: int):
         self._name = name
         self._tasks = tasks
         self._task_fail_error_pct = 50
@@ -36,8 +37,8 @@ class Threads(Generic[Result]):
 
     @classmethod
     def gather(
-        cls, name: str, tasks: list[Callable[[], Result]], num_threads: int | None = None
-    ) -> tuple[list[Result], list[Exception]]:
+        cls, name: str, tasks: Sequence[Task[Result]], num_threads: int | None = None
+    ) -> tuple[Iterable[Result], list[Exception]]:
         if num_threads is None:
             num_cpus = os.cpu_count()
             if num_cpus is None:
@@ -47,7 +48,7 @@ class Threads(Generic[Result]):
                 num_threads = MIN_THREADS
         return cls(name, tasks, num_threads=num_threads)._run()
 
-    def _run(self) -> tuple[list[Result], list[Exception]]:
+    def _run(self) -> tuple[Iterable[Result], list[Exception]]:
         given_cnt = len(self._tasks)
         if given_cnt == 0:
             return [], []

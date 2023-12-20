@@ -101,7 +101,11 @@ class WorkspaceInfo:
         headers = self._ws.config.authenticate()
         headers["User-Agent"] = self._ws.config.user_agent
         response = requests.get(f"{self._ws.config.host}/api/2.0/preview/scim/v2/Me", headers=headers, timeout=10)
-        return int(response.headers.get("x-databricks-org-id"))
+        org_id_header = response.headers.get("x-databricks-org-id", None)
+        if not org_id_header:
+            msg = "Cannot determine current workspace id"
+            raise ValueError(msg)
+        return int(org_id_header)
 
     def _load_workspace_info(self) -> dict[int, Workspace]:
         try:
@@ -109,6 +113,7 @@ class WorkspaceInfo:
             with self._ws.workspace.download(f"{self._folder}/{AccountWorkspaces.SYNC_FILE_NAME}") as f:
                 for workspace_metadata in json.loads(f.read()):
                     workspace = Workspace.from_dict(workspace_metadata)
+                    assert workspace.workspace_id is not None
                     id_to_workspace[workspace.workspace_id] = workspace
                 return id_to_workspace
         except NotFound:
@@ -121,7 +126,9 @@ class WorkspaceInfo:
         if workspace_id not in workspaces:
             msg = f"Current workspace is not known: {workspace_id}"
             raise KeyError(msg) from None
-        return workspaces[workspace_id].workspace_name
+        workspace = workspaces[workspace_id]
+        assert workspace.workspace_name, "workspace name undefined"
+        return workspace.workspace_name
 
     def manual_workspace_info(self, prompts: Prompts):
         logger.warning(
@@ -138,15 +145,15 @@ class WorkspaceInfo:
             )
             workspace = Workspace(workspace_id=int(workspace_id), workspace_name=workspace_name)
             workspaces.append(workspace.as_dict())
-            workspace_id = prompts.question("Next workspace id", valid_number=True, default="stop")
-            if workspace_id == "stop":
+            answer = prompts.question("Next workspace id", valid_number=True, default="stop")
+            if answer == "stop":
                 break
-            workspace_id = int(workspace_id)
+            workspace_id = int(answer)
         info = json.dumps(workspaces, indent=2).encode("utf8")
         installation_manager = self._new_installation_manager(self._ws)
         logger.info("Detecting UCX installations on current workspace...")
         for installation in installation_manager.user_installations():
             path = f"{installation.path}/{AccountWorkspaces.SYNC_FILE_NAME}"
             logger.info(f"Overwriting {path}")
-            self._ws.workspace.upload(path, info, overwrite=True, format=ImportFormat.AUTO)
+            self._ws.workspace.upload(path, info, overwrite=True, format=ImportFormat.AUTO)  # type: ignore[arg-type]
         logger.info("Synchronised workspace id mapping for installations on current workspace")

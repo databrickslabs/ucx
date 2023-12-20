@@ -35,8 +35,9 @@ class InstallationManager:
 
     def for_user(self, user: User) -> Installation | None:
         try:
+            assert user.user_name is not None
             config_file = self._root / user.user_name / self._prefix / "config.yml"
-            with self._ws.workspace.download(config_file) as f:
+            with self._ws.workspace.download(config_file.as_posix()) as f:
                 cfg = WorkspaceConfig.from_bytes(f.read())
                 return Installation(cfg, user, config_file.parent.as_posix())
         except NotFound:

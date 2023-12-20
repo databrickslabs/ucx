@@ -21,11 +21,16 @@ class Task:
     name: str
     doc: str
     fn: Callable[[WorkspaceConfig], None]
-    depends_on: list[str] = None
+    depends_on: list[str] | None = None
     job_cluster: str = "main"
-    notebook: str = None
-    dashboard: str = None
-    cloud: str = None
+    notebook: str | None = None
+    dashboard: str | None = None
+    cloud: str | None = None
+
+    def dependencies(self):
+        if not self.depends_on:
+            return []
+        return self.depends_on
 
     def cloud_compatible(self, config: Config) -> bool:
         """Test compatibility between workspace config and task"""
@@ -42,7 +47,6 @@ class Task:
             return True
 
 
-@staticmethod
 def _remove_extra_indentation(doc: str) -> str:
     lines = doc.splitlines()
     stripped = []
