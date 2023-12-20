@@ -134,7 +134,7 @@ class PermissionManager(CrawlerBase[Permissions]):
         if len(errors) > 0:
             # TODO: https://github.com/databrickslabs/ucx/issues/406
             logger.error(f"Detected {len(errors)} while applying permissions")
-            return False
+            raise ManyError(errors)
         logger.info("Permissions were applied")
         return True
 

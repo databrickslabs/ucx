@@ -391,8 +391,8 @@ class GroupManager(CrawlerBase[MigratedGroup]):
             tasks.append(functools.partial(self._delete_workspace_group, mg.id_in_workspace, mg.temporary_name))
         _, errors = Threads.gather("removing original workspace groups", tasks)
         if len(errors) > 0:
-            msg = f"During account-to-workspace reflection got {len(errors)} errors. See debug logs"
-            raise RuntimeWarning(msg)
+            logger.error(f"During account-to-workspace reflection got {len(errors)} errors. See debug logs")
+            raise ManyError(errors)
 
     def _fetcher(self) -> Iterable[MigratedGroup]:
         for row in self._backend.fetch(f"SELECT * FROM {self._full_name}"):
