@@ -140,7 +140,9 @@ class GenericPermissionsSupport(AclSupport):
     def _applier_task(self, object_type: str, object_id: str, acl: list[iam.AccessControlRequest]):
         retryable_exceptions = [InternalError, NotFound, ResourceConflict, TemporarilyUnavailable, DeadlineExceeded]
 
-        update_retry_on_value_error = retried(on=retryable_exceptions, timeout=self._verify_timeout)
+        update_retry_on_value_error = retried(
+            on=retryable_exceptions, timeout=self._verify_timeout  # type: ignore[arg-type]
+        )
         update_retried_check = update_retry_on_value_error(self._safe_update_permissions)
         update_retried_check(object_type, object_id, acl)
 
