@@ -2,7 +2,7 @@ import io
 import os.path
 from pathlib import Path
 from typing import Any
-from unittest.mock import MagicMock, patch
+from unittest.mock import MagicMock, patch, create_autospec
 
 import pytest
 import yaml
@@ -35,6 +35,8 @@ from databricks.labs.ucx.config import WorkspaceConfig
 from databricks.labs.ucx.framework.dashboards import DashboardFromFiles
 from databricks.labs.ucx.framework.install_state import InstallState
 from databricks.labs.ucx.framework.tasks import Task
+from databricks.labs.ucx.framework.tui import MockPrompts
+from databricks.labs.ucx.framework.wheels import Wheels
 from databricks.labs.ucx.install import WorkspaceInstaller
 
 from ..unit.framework.mocks import MockBackend
@@ -86,7 +88,7 @@ def ws(mocker):
         EndpointInfo(name="abc", id="abc", warehouse_type=EndpointInfoWarehouseType.PRO, state=State.RUNNING)
     ]
     ws.dashboards.create.return_value = Dashboard(id="abc")
-    ws.jobs.create.return_value = jobs.CreateResponse(job_id="abc")
+    ws.jobs.create.return_value = jobs.CreateResponse(job_id=123)
     ws.queries.create.return_value = Query(id="abc")
     ws.query_visualizations.create.return_value = Visualization(id="abc")
     ws.dashboard_widgets.create.return_value = Widget(id="abc")
@@ -131,38 +133,31 @@ def mock_create_job_for_writable_dbfs(**args):
     return jobs.CreateResponse(job_id="abc")
 
 
-def mock_dbfs(path, f, overwrite):
-    """Write protected DBFS"""
-    message = "403 error"
-    raise PermissionDenied(message)
-
-
-def mock_dbfs_unexpected_error(path, f, overwrite):
-    """Unexpected error"""
-    message = "500 error"
-    raise OperationFailed(message)
-
-
 def test_install_cluster_override_jobs(ws, mocker, tmp_path):
     config_bytes = yaml.dump(WorkspaceConfig(inventory_database="a").as_dict()).encode("utf8")
     ws.workspace.download = lambda _: io.BytesIO(config_bytes)
     ws.jobs.create = mock_create_job
-    install = WorkspaceInstaller(ws)
+    wheels = create_autospec(Wheels)
+    install = WorkspaceInstaller(ws, wheels=wheels)
     install._question = mock_question_cluster_override
     install._current_config.override_clusters = {"main": cluster_id, "tacl": cluster_id}
     install._job_dashboard_task = MagicMock(name="_job_dashboard_task")  # disable problematic task
     install._create_jobs()
 
 
-def test_write_protected_dbfs(ws, mocker, tmp_path):
+def test_write_protected_dbfs(ws, tmp_path):
     """Simulate write protected DBFS AND override clusters"""
     config_bytes = yaml.dump(WorkspaceConfig(inventory_database="a").as_dict()).encode("utf8")
     ws.workspace.download = lambda _: io.BytesIO(config_bytes)
     ws.jobs.create = mock_create_job
-    ws.dbfs.upload = mock_dbfs
 
-    mocker.patch("builtins.input", return_value="1")
-    install = WorkspaceInstaller(ws)
+    wheels = create_autospec(Wheels)
+    wheels.upload_to_dbfs.side_effect = PermissionDenied(...)
+    wheels.upload_to_wsfs.return_value = '/a/b/c'
+    install = WorkspaceInstaller(ws, promtps=MockPrompts({
+        '.*pre-existing HMS Legacy cluster ID.*': '1',
+        '.*pre-existing Table Access Control cluster ID.*': '1',
+    }), wheels=wheels)
     install._question = mock_question_cluster_override
     install._job_dashboard_task = MagicMock(name="_job_dashboard_task")  # disable problematic task
     install._create_jobs()
@@ -173,14 +168,14 @@ def test_write_protected_dbfs(ws, mocker, tmp_path):
     assert res["tacl"] == cluster_id
 
 
-def test_writeable_dbfs(ws, mocker, tmp_path):
+def test_writeable_dbfs(ws, tmp_path):
     """Ensure configure does not add cluster override for happy path of writable DBFS"""
     config_bytes = yaml.dump(WorkspaceConfig(inventory_database="a").as_dict()).encode("utf8")
     ws.workspace.download = lambda _: io.BytesIO(config_bytes)
     ws.jobs.create = mock_create_job_for_writable_dbfs
 
-    mocker.patch("builtins.input", return_value="1")
-    install = WorkspaceInstaller(ws)
+    wheels = create_autospec(Wheels)
+    install = WorkspaceInstaller(ws, wheels=wheels)
     install._question = mock_question_cluster_override
 
     install._job_dashboard_task = MagicMock(name="_job_dashboard_task")  # disable problematic task
@@ -190,15 +185,15 @@ def test_writeable_dbfs(ws, mocker, tmp_path):
     assert res is None
 
 
-def test_unexpected_dbfs_upload_error(ws, mocker, tmp_path):
+def test_unexpected_dbfs_upload_error(ws, tmp_path):
     """Simulate write protected DBFS AND override clusters"""
     config_bytes = yaml.dump(WorkspaceConfig(inventory_database="a").as_dict()).encode("utf8")
     ws.workspace.download = lambda _: io.BytesIO(config_bytes)
     ws.jobs.create = mock_create_job
-    ws.dbfs.upload = mock_dbfs_unexpected_error
-    mocker.patch("builtins.input", return_value="1")
+    wheels = create_autospec(Wheels)
+    wheels.upload_to_dbfs.side_effect = OperationFailed("500 error")
     with pytest.raises(OperationFailed) as failure:
-        install = WorkspaceInstaller(ws)
+        install = WorkspaceInstaller(ws, wheels=wheels)
         install._question = mock_question_cluster_override
         install._current_config.override_clusters = {"main": cluster_id, "tacl": cluster_id}
         install._job_dashboard_task = MagicMock(name="_job_dashboard_task")  # disable problematic task
@@ -209,11 +204,16 @@ def test_unexpected_dbfs_upload_error(ws, mocker, tmp_path):
 def test_replace_clusters_for_integration_tests(ws):
     config_bytes = yaml.dump(WorkspaceConfig(inventory_database="a").as_dict()).encode("utf8")
     ws.workspace.download = lambda _: io.BytesIO(config_bytes)
+    wheels = create_autospec(Wheels)
     return_value = WorkspaceInstaller.run_for_config(
         ws,
         WorkspaceConfig(inventory_database="a"),
         override_clusters={"main": "abc"},
         sql_backend=MockBackend(),
+        promtps=MockPrompts({
+            r'.*No Global Init Script.*': 'yes',
+        }),
+        wheels=wheels,
     )
     assert return_value
 
@@ -250,16 +250,15 @@ def test_run_workflow_creates_proper_failure(ws, mocker):
     assert "Stuff happens: stuff: does not compute" == str(failure.value)
 
 
-def test_install_database_happy(ws, mocker, tmp_path):
+def test_install_database_happy(ws, tmp_path):
     install = WorkspaceInstaller(ws)
-    mocker.patch("builtins.input", return_value="ucx")
     res = install._configure_inventory_database()
     assert "ucx" == res
 
 
-def test_install_database_unhappy(ws, mocker, tmp_path):
+def test_install_database_unhappy(ws, tmp_path):
     install = WorkspaceInstaller(ws)
-    mocker.patch("builtins.input", return_value="main.ucx")
+    # mocker.patch("builtins.input", return_value="main.ucx")
 
     with pytest.raises(SystemExit):
         install._configure_inventory_database()
@@ -275,8 +274,6 @@ def test_save_config(ws, mocker):
     def not_found(_):
         msg = "save_config"
         raise NotFound(msg)
-
-    mocker.patch("builtins.input", return_value="42")
 
     ws.workspace.get_status = not_found
     ws.warehouses.list = lambda **_: [
@@ -308,7 +305,6 @@ workspace_start_path: /
 
 
 def test_migrate_from_v1(ws, mocker):
-    mocker.patch("builtins.input", return_value="yes")
     mock_file = MagicMock()
     mocker.patch("builtins.open", return_value=mock_file)
     mocker.patch("base64.b64encode")
@@ -329,7 +325,6 @@ workspace_start_path: /
     """
     ws.workspace.download = lambda _: io.BytesIO(config_bytes)
     ws.workspace.get_status = lambda _: ObjectInfo(object_id=123)
-    mocker.patch("builtins.input", return_value="42")
 
     ws.warehouses.list = lambda **_: [
         EndpointInfo(name="abc", id="abc", warehouse_type=EndpointInfoWarehouseType.PRO, state=State.RUNNING)
@@ -357,7 +352,6 @@ workspace_start_path: /
 
 
 def test_migrate_from_v1_selected_groups(ws, mocker):
-    mocker.patch("builtins.input", return_value="yes")
     mock_file = MagicMock()
     mocker.patch("builtins.open", return_value=mock_file)
     mocker.patch("base64.b64encode")
@@ -380,7 +374,6 @@ workspace_start_path: /
     """
     ws.workspace.download = lambda _: io.BytesIO(config_bytes)
     ws.workspace.get_status = lambda _: ObjectInfo(object_id=123)
-    mocker.patch("builtins.input", return_value="42")
 
     ws.warehouses.list = lambda **_: [
         EndpointInfo(name="abc", id="abc", warehouse_type=EndpointInfoWarehouseType.PRO, state=State.RUNNING)
@@ -414,14 +407,6 @@ def test_save_config_auto_groups(ws, mocker):
     def not_found(_):
         raise NotFound(...)
 
-    def mock_question(text: str, *, default: str | None = None) -> str:
-        if "workspace group names" in text:
-            return "<ALL>"
-        else:
-            return "42"
-
-    mocker.patch("builtins.input", return_value="42")
-
     ws.workspace.get_status = not_found
     ws.warehouses.list = lambda **_: [
         EndpointInfo(name="abc", id="abc", warehouse_type=EndpointInfoWarehouseType.PRO, state=State.RUNNING)
@@ -429,9 +414,6 @@ def test_save_config_auto_groups(ws, mocker):
     ws.cluster_policies.list = lambda: []
 
     install = WorkspaceInstaller(ws)
-    install._question = mock_question
-    install._choice = lambda _1, _2: "None (abc, PRO, RUNNING)"
-    install._choice_from_dict = mock_override_choice_from_dict
     install._configure()
 
     ws.workspace.upload.assert_called_with(
@@ -459,8 +441,6 @@ def test_save_config_strip_group_names(ws, mocker):
             return "g1, g2, g99"
         else:
             return "42"
-
-    mocker.patch("builtins.input", return_value="42")
 
     ws.workspace.get_status = not_found
     ws.warehouses.list = lambda **_: [
@@ -525,8 +505,6 @@ def test_save_config_with_custom_policy(ws, mocker):
         if "warehouse" in text:
             return "abc"
 
-    mocker.patch("builtins.input", return_value="42")
-
     ws.workspace.get_status = not_found
     ws.warehouses.list = lambda **_: [
         EndpointInfo(id="abc", warehouse_type=EndpointInfoWarehouseType.PRO, state=State.RUNNING)
@@ -590,8 +568,6 @@ def test_save_config_with_glue(ws, mocker):
         if "cluster ID" in text:  # cluster override
             return cluster_id
 
-    mocker.patch("builtins.input", return_value="42")
-
     ws.workspace.get_status = not_found
     ws.warehouses.list = lambda **_: [
         EndpointInfo(name="abc", id="abc", warehouse_type=EndpointInfoWarehouseType.PRO, state=State.RUNNING)
@@ -625,7 +601,6 @@ workspace_start_path: /
 
 
 def test_main_with_existing_conf_does_not_recreate_config(ws, mocker):
-    mocker.patch("builtins.input", return_value="yes")
     mock_file = MagicMock()
     mocker.patch("builtins.open", return_value=mock_file)
     mocker.patch("base64.b64encode")
@@ -702,27 +677,6 @@ def test_query_metadata(ws, mocker):
     DashboardFromFiles(ws, InstallState(ws, "any"), local_query_files, "any", "any").validate()
 
 
-def test_choices_out_of_range(ws, mocker):
-    install = WorkspaceInstaller(ws)
-    mocker.patch("builtins.input", return_value="42")
-    with pytest.raises(ValueError):
-        install._choice("foo", ["a", "b"])
-
-
-def test_choices_not_a_number(ws, mocker):
-    install = WorkspaceInstaller(ws)
-    mocker.patch("builtins.input", return_value="two")
-    with pytest.raises(ValueError):
-        install._choice("foo", ["a", "b"])
-
-
-def test_choices_happy(ws, mocker):
-    install = WorkspaceInstaller(ws)
-    mocker.patch("builtins.input", return_value="1")
-    res = install._choice("foo", ["a", "b"])
-    assert "b" == res
-
-
 def test_step_list(ws, mocker):
     from databricks.labs.ucx.framework.tasks import Task
 
@@ -740,7 +694,6 @@ def test_step_list(ws, mocker):
 
 
 def test_create_readme(ws, mocker):
-    mocker.patch("builtins.input", return_value="yes")
     webbrowser_open = mocker.patch("webbrowser.open")
 
     ws.current_user.me = lambda: iam.User(user_name="me@example.com", groups=[iam.ComplexValue(display="admins")])
@@ -815,7 +768,6 @@ def test_global_init_script_already_exists_enabled(ws, mocker):
         updated_by="test@abc.com",
     )
     install = WorkspaceInstaller(ws)
-    mocker.patch("builtins.input", return_value="yes")
     install._install_spark_config_for_hms_lineage()
 
 
@@ -851,7 +803,6 @@ def test_global_init_script_already_exists_disabled(ws, mocker):
         updated_by="test@abc.com",
     )
     install = WorkspaceInstaller(ws)
-    mocker.patch("builtins.input", return_value="yes")
     install._install_spark_config_for_hms_lineage()
 
 
@@ -887,7 +838,6 @@ def test_global_init_script_exists_disabled_not_enabled(ws, mocker):
         updated_by="test@abc.com",
     )
     install = WorkspaceInstaller(ws)
-    mocker.patch("builtins.input", return_value="no")
     install._install_spark_config_for_hms_lineage()
 
 
@@ -917,7 +867,6 @@ def test_global_init_script_create_new(mock_open, mock_input, ws):
 
 def test_remove_database(ws, mocker):
     install = WorkspaceInstaller(ws, sql_backend=MockBackend())
-    mocker.patch("builtins.input", return_value="yes")
     mocker.patch("databricks.labs.ucx.framework.crawlers.SqlBackend.execute", return_value=None)
 
     config_bytes = yaml.dump(WorkspaceConfig(inventory_database="testdb", warehouse_id="123").as_dict()).encode("utf8")
@@ -925,26 +874,26 @@ def test_remove_database(ws, mocker):
     install._remove_database()
 
 
-def test_remove_jobs_no_state(ws, mocker):
+def test_remove_jobs_no_state(ws):
     install = WorkspaceInstaller(ws)
     install._state.jobs = {}
     install._remove_jobs()
 
 
-def test_remove_jobs_with_state_missing_job(ws, mocker):
+def test_remove_jobs_with_state_missing_job(ws):
     install = WorkspaceInstaller(ws)
     install._state.jobs = {"job1": "123"}
     ws.jobs.delete.side_effect = InvalidParameterValue("job id 123 not found")
     install._remove_jobs()
 
 
-def test_remove_jobs_job(ws, mocker):
+def test_remove_jobs_job(ws):
     install = WorkspaceInstaller(ws)
     install._state.jobs = {"job1": "123"}
     install._remove_jobs()
 
 
-def test_remove_warehouse(ws, mocker):
+def test_remove_warehouse(ws):
     install = WorkspaceInstaller(ws)
     config_bytes = yaml.dump(WorkspaceConfig(inventory_database="testdb", warehouse_id="123").as_dict()).encode("utf8")
     ws.workspace.download = lambda _: io.BytesIO(config_bytes)
@@ -953,7 +902,7 @@ def test_remove_warehouse(ws, mocker):
     install._remove_warehouse()
 
 
-def test_remove_warehouse_not_exists(ws, mocker):
+def test_remove_warehouse_not_exists(ws):
     install = WorkspaceInstaller(ws)
     config_bytes = yaml.dump(WorkspaceConfig(inventory_database="testdb", warehouse_id="123").as_dict()).encode("utf8")
     ws.workspace.download = lambda _: io.BytesIO(config_bytes)
@@ -963,13 +912,13 @@ def test_remove_warehouse_not_exists(ws, mocker):
     install._remove_warehouse()
 
 
-def test_remove_install_folder(ws, mocker):
+def test_remove_install_folder(ws):
     install = WorkspaceInstaller(ws)
     ws.workspace.delete.return_value = None
     install._remove_install_folder()
 
 
-def test_remove_install_folder_not_exists(ws, mocker):
+def test_remove_install_folder_not_exists(ws):
     install = WorkspaceInstaller(ws)
     ws.workspace.delete.side_effect = InvalidParameterValue("folder not found")
     install._remove_install_folder()
@@ -977,7 +926,6 @@ def test_remove_install_folder_not_exists(ws, mocker):
 
 def test_uninstall(ws, mocker):
     install = WorkspaceInstaller(ws, sql_backend=MockBackend())
-    mocker.patch("builtins.input", return_value="yes")
     mocker.patch("databricks.labs.ucx.framework.crawlers.SqlBackend.execute", return_value=None)
     config_bytes = yaml.dump(WorkspaceConfig(inventory_database="testdb", warehouse_id="123").as_dict()).encode("utf8")
     ws.workspace.download = lambda _: io.BytesIO(config_bytes)
@@ -992,7 +940,6 @@ def test_uninstall_no_config_file(ws, mocker):
         raise NotFound(...)
 
     install = WorkspaceInstaller(ws, sql_backend=MockBackend())
-    mocker.patch("builtins.input", return_value="yes")
     mocker.patch("databricks.labs.ucx.framework.crawlers.SqlBackend.execute", return_value=None)
     config_bytes = yaml.dump(WorkspaceConfig(inventory_database="testdb", warehouse_id="123").as_dict()).encode("utf8")
     ws.workspace.download = lambda _: io.BytesIO(config_bytes)

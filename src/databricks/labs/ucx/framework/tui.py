@@ -1,5 +1,5 @@
 import re
-from typing import Any
+from typing import Any, Callable
 
 
 class Prompts:
@@ -39,6 +39,10 @@ class Prompts:
         msg = f"cannot get answer within {max_attempts} attempt"
         raise ValueError(msg)
 
+    def confirm(self, text: str, *, max_attempts: int = 10):
+        answer = self.question(text, valid_regex=r'[Yy][Ee][Ss]|[Nn][Oo]', default='no', max_attempts=max_attempts)
+        return answer.lower() == 'yes'
+
     def question(
         self,
         text: str,
@@ -47,6 +51,7 @@ class Prompts:
         max_attempts: int = 10,
         valid_number: bool = False,
         valid_regex: str | None = None,
+        validate: Callable[[str], bool] | None = None
     ) -> str:
         default_help = "" if default is None else f"\033[36m (default: {default})\033[0m"
         prompt = f"\033[1m{text}{default_help}: \033[0m"
@@ -59,6 +64,9 @@ class Prompts:
         while attempt < max_attempts:
             attempt += 1
             res = input(prompt)
+            if res and validate:
+                if not validate(res):
+                    continue
             if res and match_regex:
                 if not match_regex.match(res):
                     print(f"\033[31m[ERROR] Not a '{valid_regex}' match: {res}\033[0m\n")
@@ -79,7 +87,7 @@ class MockPrompts(Prompts):
 
     def question(self, text: str, **_) -> str:
         for question, answer in self._questions_to_answers.items():
-            if question.match(text):
+            if question.search(text):
                 return answer
         mocked = f"not mocked: {text}"
         raise ValueError(mocked)
