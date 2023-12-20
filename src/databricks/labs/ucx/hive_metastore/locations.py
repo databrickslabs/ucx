@@ -96,9 +96,9 @@ class ExternalLocations(CrawlerBase[ExternalLocation]):
                         jdbc_location = f"jdbc:{provider.lower()}://{host}:{port}/{database}"
                     else:
                         jdbc_location = f"{location.lower()}/{host}:{port}/{database}"
-                    for loc in external_locations:
-                        if loc.location == jdbc_location:
-                            loc.table_count += 1
+                    for ext_loc in external_locations:
+                        if ext_loc.location == jdbc_location:
+                            ext_loc.table_count += 1
                             dupe = True
                             break
                     if not dupe:

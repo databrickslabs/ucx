@@ -10,9 +10,9 @@ from databricks.sdk.errors import BadRequest, NotFound
 from databricks.sdk.service.workspace import ImportFormat
 
 from databricks.labs.ucx.account import WorkspaceInfo
+from databricks.labs.ucx.framework.crawlers import StatementExecutionBackend
 from databricks.labs.ucx.hive_metastore import ExternalLocations, TablesCrawler
 from databricks.labs.ucx.hive_metastore.locations import ExternalLocation
-from databricks.labs.ucx.framework.crawlers import StatementExecutionBackend
 from databricks.labs.ucx.hive_metastore.tables import Table
 
 logger = logging.getLogger(__name__)
@@ -108,6 +108,7 @@ class TableMapping:
         except BadRequest as br:
             logger.error(br)
 
+
 class ExternalLocationMapping:
     def __init__(self, ws: WorkspaceClient, folder: str | None = None):
         if not folder:
@@ -128,7 +129,7 @@ class ExternalLocationMapping:
             cnt += 1
         return tf_script
 
-    def _match_table_external_locations(self, locations: ExternalLocations) -> [list, list[ExternalLocation]]:
+    def _match_table_external_locations(self, locations: ExternalLocations) -> tuple[list, list[ExternalLocation]]:
         external_locations = list(self._ws.external_locations.list())
         location_path = [_.url for _ in external_locations]
         table_locations = locations.snapshot()
@@ -159,10 +160,9 @@ class ExternalLocationMapping:
             return self._overwrite_mapping(buffer)
         else:
             logger.info("no additional external location to be created.")
-            return None
+            return str(None)
 
     def _overwrite_mapping(self, buffer) -> str:
         path = f"{self._folder}/external_locations.tf"
         self._ws.workspace.upload(path, buffer, overwrite=True, format=ImportFormat.AUTO)
         return path
-
