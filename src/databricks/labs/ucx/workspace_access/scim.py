@@ -118,7 +118,9 @@ class ScimSupport(AclSupport):
         operations = [iam.Patch(op=iam.PatchOp.ADD, path=property_name, value=[e.as_dict() for e in value])]
         schemas = [iam.PatchSchema.URN_IETF_PARAMS_SCIM_API_MESSAGES_2_0_PATCH_OP]
 
-        patch_retry_on_value_error = retried(on=retryable_errors, timeout=self._verify_timeout)
+        patch_retry_on_value_error = retried(
+            on=retryable_errors, timeout=self._verify_timeout  # type: ignore[arg-type]
+        )
         patch_retried_check = patch_retry_on_value_error(self._safe_patch_group)
         patch_retried_check(group_id, operations, schemas)
 

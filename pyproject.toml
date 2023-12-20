@@ -66,10 +66,12 @@ coverage    = "pytest -n auto --cov src tests/unit --timeout 10 --cov-report=htm
 integration = "pytest -n 10 --cov src tests/integration"
 fmt         = ["isort .",
                "black .",
-               "ruff  . --fix"]
+               "ruff  . --fix",
+               "mypy ."]
 verify      = ["black --check .",
                "isort . --check-only",
-               "ruff ."]
+               "ruff .",
+               "mypy ."]
 
 [tool.isort]
 skip_glob = ["notebooks/*.py"]
