@@ -22,6 +22,7 @@ from databricks.sdk.service.iam import Group
 
 from databricks.labs.ucx.framework.crawlers import CrawlerBase, SqlBackend
 from databricks.labs.ucx.framework.parallel import ManyError, Threads
+from databricks.labs.ucx.framework.tui import Prompts
 from databricks.labs.ucx.mixins.hardening import rate_limited
 
 logger = logging.getLogger(__name__)
@@ -72,13 +73,6 @@ class MigrationState:
             return False
         else:
             return name in self._name_to_group
-
-    def get_target_id(self, group_id: str) -> str | None:
-        group = self._id_to_group.get(group_id)
-        if group:
-            return group.external_id
-        else:
-            return None
 
     def __len__(self):
         return len(self._name_to_group)
@@ -539,3 +533,97 @@ class GroupManager(CrawlerBase[MigratedGroup]):
             renamed_groups_prefix=self._renamed_group_prefix,
             include_group_names=self._include_group_names,
         )
+
+
+class ConfigureGroups:
+    renamed_group_prefix = "db-temp-"
+    workspace_group_regex = None
+    workspace_group_replace = None
+    account_group_regex = None
+    group_match_by_external_id = None
+    include_group_names = None
+
+    def __init__(self, prompts: Prompts):
+        self._prompts = prompts
+        self._ask_for_group = functools.partial(self._prompts.question, validate=self._is_valid_group_str)
+        self._ask_for_regex = functools.partial(self._prompts.question, validate=self._validate_regex)
+
+    def run(self):
+        self.renamed_group_prefix = self._ask_for_group("Backup prefix", default=self.renamed_group_prefix)
+        strategy = self._prompts.choice_from_dict(
+            "Choose how to map the workspace groups:",
+            {
+                "Apply a Prefix": self._configure_prefix,
+                "Apply a Suffix": self._configure_suffix,
+                "Comma-separated list of workspace group names to migrate": self._configure_names,
+                "Match By External ID": self._configure_external,
+                "Regex Substitution": self._configure_substitution,
+                "Regex Matching": self._configure_matching,
+            },
+        )
+        strategy()
+
+    def _configure_prefix(self):
+        prefix = self._ask_for_group("Enter a prefix to add to the workspace group name")
+        if not prefix:
+            return False
+        self.workspace_group_regex = "^"
+        self.workspace_group_replace = prefix
+        return True
+
+    def _configure_suffix(self):
+        suffix = self._ask_for_group("Enter a suffix to add to the workspace group name")
+        if not suffix:
+            return False
+        self.workspace_group_regex = "$"
+        self.workspace_group_replace = suffix
+        return True
+
+    def _configure_substitution(self):
+        match_value = self._ask_for_regex("Enter a regular expression for substitution")
+        if not match_value:
+            return False
+        sub_value = self._ask_for_group("Enter the substitution value")
+        if not sub_value:
+            return False
+        self.workspace_group_regex = match_value
+        self.workspace_group_replace = sub_value
+        return True
+
+    def _configure_matching(self):
+        ws_match_value = self._ask_for_regex("Enter a regular expression to match on the workspace group")
+        if not ws_match_value:
+            return False
+        acct_match_value = self._ask_for_regex("Enter a regular expression to match on the account group")
+        if not acct_match_value:
+            return False
+        self.workspace_group_regex = ws_match_value
+        self.account_group_regex = acct_match_value
+        return True
+
+    def _configure_names(self):
+        selected_groups = self._prompts.question(
+            "Comma-separated list of workspace group names to migrate. If not specified, we'll use all "
+            "account-level groups with matching names to workspace-level groups",
+            default="<ALL>",
+        )
+        if selected_groups != "<ALL>":
+            self.include_group_names = [x.strip() for x in selected_groups.split(",")]
+        return True
+
+    def _configure_external(self):
+        self.group_match_by_external_id = True
+        return True
+
+    @staticmethod
+    def _is_valid_group_str(group_str: str):
+        return group_str and not re.search(r"[\s#,+ \\<>;]", group_str)
+
+    @staticmethod
+    def _validate_regex(regex_input: str) -> bool:
+        try:
+            re.compile(regex_input)
+            return True
+        except re.error:
+            logger.error(f"{regex_input} is an invalid regular expression")
+            return False
