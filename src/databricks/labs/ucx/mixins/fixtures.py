@@ -30,7 +30,6 @@ from databricks.sdk.service.sql import (
 from databricks.sdk.service.workspace import ImportFormat
 
 from databricks.labs.ucx.framework.crawlers import StatementExecutionBackend
-from databricks.sdk.service.catalog import ExternalLocationInfo
 
 logger = logging.getLogger(__name__)
 
@@ -881,21 +880,3 @@ def make_query(ws, make_table, make_random):
             logger.info(f"Can't drop query {e}")
 
     yield from factory("query", create, remove)
-
-
-@pytest.fixture
-def make_external_location(ws, make_random):
-    def create() -> QueryInfo:
-        location_name = f"ucx_location_{make_random(4)}"
-        location_url = f"abfss://test@storagetest.dfs.windows.net/{make_random(4)}"
-        location = ws.external_locations.create(name=location_name, url=location_url)
-        logger.info(f"External Location Created {location_name}: {location_url}")
-        return location
-
-    def remove(location: ExternalLocationInfo):
-        try:
-            ws.external_locations.delete(location.name)
-        except RuntimeError as e:
-            logger.info(f"Can't delete external location {e}")
-
-    yield from factory("external_location", create, remove)
