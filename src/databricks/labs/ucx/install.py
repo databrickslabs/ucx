@@ -221,7 +221,7 @@ class WorkspaceInstaller:
         workspace_installer = WorkspaceInstaller(
             ws, prefix=prefix, promtps=promtps, wheels=wheels, sql_backend=sql_backend
         )
-        logger.info(f"Installing UCX v{wheels.version()} on {ws.config.host}")
+        logger.info(f"Installing UCX v{workspace_installer._wheels.version()} on {ws.config.host}")
         workspace_installer._config = config
         workspace_installer._write_config(overwrite=False)
         workspace_installer._current_config.override_clusters = override_clusters
