@@ -26,6 +26,14 @@ commands:
       {{range .}}{{.user_name}}\t{{.database}}\t{{.warehouse_id}}
       {{end}}
 
+  - name: skip
+    description: Create a skip comment on a schema or a table
+    flags:
+      - name: schema
+        description: Schema Name to Skip
+      - name: table
+        description: Table Name to Skip
+
   - name: sync-workspace-info
     is_account_level: true
     description: upload workspace config to all workspaces in the account where ucx is installed

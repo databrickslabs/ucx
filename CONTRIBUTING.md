@@ -51,6 +51,50 @@ issues without relying on external systems. Focus on testing the edge cases of t
 things may fail. See [this example](https://github.com/databricks/databricks-sdk-py/pull/295) as a reference of an extensive
 unit test coverage suite and the clear difference between _unit tests_ and _integration tests_.
 
+## Common fixes for `mypy` errors
+
+See https://mypy.readthedocs.io/en/stable/cheat_sheet_py3.html for more details
+
+### ..., expression has type "None", variable has type "str"
+
+* Add `assert ... is not None` if it's a body of a method. Example:
+
+```
+# error: Argument 1 to "delete" of "DashboardWidgetsAPI" has incompatible type "str | None"; expected "str"
+self._ws.dashboard_widgets.delete(widget.id)
+```
+
+after
+
+```
+assert widget.id is not None
+self._ws.dashboard_widgets.delete(widget.id)
+```
+
+* Add `... | None` if it's in the dataclass. Example: `cloud: str = None` -> `cloud: str | None = None`
+
+### ..., has incompatible type "Path"; expected "str"
+
+Add `.as_posix()` to convert Path to str
+
+###  Argument 2 to "get" of "dict" has incompatible type "None"; expected ...
+
+Add a valid default value for the dictionary return. 
+
+Example: 
+```python
+def viz_type(self) -> str:
+    return self.viz.get("type", None)
+```
+
+after:
+
+Example: 
+```python
+def viz_type(self) -> str:
+    return self.viz.get("type", "UNKNOWN")
+```
+
 ## Integration Testing Infrastructure
 
 Integration tests must accompany all new code additions. Integration tests help us validate that various parts of 

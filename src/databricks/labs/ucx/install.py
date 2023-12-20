@@ -1,12 +1,7 @@
-import datetime
 import json
 import logging
 import os
-import re
-import shutil
-import subprocess
 import sys
-import tempfile
 import time
 import webbrowser
 from dataclasses import replace
@@ -21,19 +16,16 @@ from databricks.sdk.errors import (
     OperationFailed,
     PermissionDenied,
 )
-from databricks.sdk.mixins.compute import SemVer
 from databricks.sdk.service import compute, jobs
 from databricks.sdk.service.sql import EndpointInfoWarehouseType, SpotInstancePolicy
 from databricks.sdk.service.workspace import ImportFormat
 
 from databricks.labs.ucx.__about__ import __version__
-from databricks.labs.ucx.assessment.crawlers import (
-    AzureServicePrincipalInfo,
-    ClusterInfo,
-    GlobalInitScriptInfo,
-    JobInfo,
-    PipelineInfo,
-)
+from databricks.labs.ucx.assessment.azure import AzureServicePrincipalInfo
+from databricks.labs.ucx.assessment.clusters import ClusterInfo
+from databricks.labs.ucx.assessment.init_scripts import GlobalInitScriptInfo
+from databricks.labs.ucx.assessment.jobs import JobInfo
+from databricks.labs.ucx.assessment.pipelines import PipelineInfo
 from databricks.labs.ucx.config import WorkspaceConfig
 from databricks.labs.ucx.configure import ConfigureClusterOverrides
 from databricks.labs.ucx.framework.crawlers import (
@@ -44,6 +36,8 @@ from databricks.labs.ucx.framework.crawlers import (
 from databricks.labs.ucx.framework.dashboards import DashboardFromFiles
 from databricks.labs.ucx.framework.install_state import InstallState
 from databricks.labs.ucx.framework.tasks import _TASKS, Task
+from databricks.labs.ucx.framework.tui import Prompts
+from databricks.labs.ucx.framework.wheels import Wheels, find_project_root
 from databricks.labs.ucx.hive_metastore.grants import Grant
 from databricks.labs.ucx.hive_metastore.hms_lineage import HiveMetastoreLineageEnabler
 from databricks.labs.ucx.hive_metastore.locations import ExternalLocation, Mount
@@ -51,7 +45,7 @@ from databricks.labs.ucx.hive_metastore.tables import Table, TableError
 from databricks.labs.ucx.runtime import main
 from databricks.labs.ucx.workspace_access.base import Permissions
 from databricks.labs.ucx.workspace_access.generic import WorkspaceObjectInfo
-from databricks.labs.ucx.workspace_access.groups import MigratedGroup
+from databricks.labs.ucx.workspace_access.groups import ConfigureGroups, MigratedGroup
 
 TAG_STEP = "step"
 TAG_APP = "App"
@@ -138,22 +132,33 @@ def deploy_schema(sql_backend: SqlBackend, inventory_schema: str):
 
 class WorkspaceInstaller:
     def __init__(
-        self, ws: WorkspaceClient, *, prefix: str = "ucx", promtps: bool = True, sql_backend: SqlBackend = None
+        self,
+        ws: WorkspaceClient,
+        *,
+        prefix: str = "ucx",
+        promtps: Prompts | None = None,
+        wheels: Wheels | None = None,
+        sql_backend: SqlBackend | None = None,
     ):
         if "DATABRICKS_RUNTIME_VERSION" in os.environ:
             msg = "WorkspaceInstaller is not supposed to be executed in Databricks Runtime"
             raise SystemExit(msg)
+        if not promtps:
+            promtps = Prompts()
         self._ws = ws
-        self._sql_backend = sql_backend
         self._prefix = prefix
+        if not wheels:
+            wheels = Wheels(ws, self._install_folder, __version__)
+        self._sql_backend = sql_backend
         self._prompts = promtps
+        self._wheels = wheels
         self._this_file = Path(__file__)
-        self._dashboards = {}
+        self._dashboards: dict[str, str] = {}
         self._state = InstallState(ws, self._install_folder)
         self._install_override_clusters = None
 
     def run(self):
-        logger.info(f"Installing UCX v{self._version}")
+        logger.info(f"Installing UCX v{self._wheels.version()}")
         self._configure()
         self._run_configured()
 
@@ -179,8 +184,6 @@ class WorkspaceInstaller:
             "system.hms_to_uc_migration.table_access and "
             "helps in your migration process from HMS to UC by allowing you to programmatically query HMS "
             "lineage data."
-            ""
-            ""
         )
         logger.info("Checking if Global Init Script with Required Spark Config already exists and enabled.")
         gscript = hms_lineage.check_lineage_spark_config_exists()
@@ -188,25 +191,16 @@ class WorkspaceInstaller:
             if gscript.enabled:
                 logger.info("Already exists and enabled. Skipped creating a new one.")
             elif not gscript.enabled:
-                if (
-                    self._prompts
-                    and self._question(
-                        "Your Global Init Script with required spark config is disabled, Do you want to enable it",
-                        default="yes",
-                    )
-                    == "yes"
+                if self._prompts.confirm(
+                    "Your Global Init Script with required spark config is disabled, Do you want to enable it?"
                 ):
                     logger.info("Enabling Global Init Script...")
                     hms_lineage.enable_global_init_script(gscript)
                 else:
                     logger.info("No change to Global Init Script is made.")
         elif not gscript:
-            if (
-                self._prompts
-                and self._question(
-                    "No Global Init Script with Required Spark Config exists, Do you want to create one ", default="yes"
-                )
-                == "yes"
+            if self._prompts.confirm(
+                "No Global Init Script with Required Spark Config exists, Do you want to create one?"
             ):
                 logger.info("Creating Global Init Script...")
                 hms_lineage.add_global_init_script()
@@ -217,11 +211,15 @@ class WorkspaceInstaller:
         config: WorkspaceConfig,
         *,
         prefix="ucx",
+        promtps: Prompts | None = None,
+        wheels: Wheels | None = None,
         override_clusters: dict[str, str] | None = None,
-        sql_backend: SqlBackend = None,
+        sql_backend: SqlBackend | None = None,
     ) -> "WorkspaceInstaller":
-        workspace_installer = WorkspaceInstaller(ws, prefix=prefix, promtps=False, sql_backend=sql_backend)
-        logger.info(f"Installing UCX v{workspace_installer._version} on {ws.config.host}")
+        workspace_installer = WorkspaceInstaller(
+            ws, prefix=prefix, promtps=promtps, wheels=wheels, sql_backend=sql_backend
+        )
+        logger.info(f"Installing UCX v{workspace_installer._wheels.version()} on {ws.config.host}")
         workspace_installer._config = config
         workspace_installer._write_config(overwrite=False)
         workspace_installer._current_config.override_clusters = override_clusters
@@ -239,12 +237,16 @@ class WorkspaceInstaller:
             # currently we don't have any good message from API, so we have to work around it.
             job_run = self._ws.jobs.get_run(job_run_waiter.run_id)
             messages = []
+            assert job_run.tasks is not None
             for run_task in job_run.tasks:
+                if not run_task.state:
+                    continue
                 if run_task.state.result_state == jobs.RunResultState.TIMEDOUT:
                     messages.append(f"{run_task.task_key}: The run was stopped after reaching the timeout")
                     continue
                 if run_task.state.result_state != jobs.RunResultState.FAILED:
                     continue
+                assert run_task.run_id is not None
                 run_output = self._ws.jobs.get_run_output(run_task.run_id)
                 if logger.isEnabledFor(logging.DEBUG):
                     if run_output and run_output.error_trace:
@@ -253,12 +255,14 @@ class WorkspaceInstaller:
                     messages.append(f"{run_task.task_key}: {run_output.error}")
                 else:
                     messages.append(f"{run_task.task_key}: output unavailable")
+            assert job_run.state is not None
+            assert job_run.state.state_message is not None
             msg = f'{job_run.state.state_message.rstrip(".")}: {", ".join(messages)}'
             raise OperationFailed(msg) from None
 
     def _create_dashboards(self):
         logger.info("Creating dashboards...")
-        local_query_files = self._find_project_root() / "src/databricks/labs/ucx/queries"
+        local_query_files = find_project_root() / "src/databricks/labs/ucx/queries"
         dash = DashboardFromFiles(
             self._ws,
             state=self._state,
@@ -335,21 +339,6 @@ class WorkspaceInstaller:
     def _name(self, name: str) -> str:
         return f"[{self._prefix.upper()}] {name}"
 
-    def _configure_inventory_database(self):
-        counter = 0
-        inventory_database = None
-        while True:
-            inventory_database = self._question("Inventory Database stored in hive_metastore", default="ucx")
-            if re.match(r"^\w+$", inventory_database):
-                break
-            else:
-                print(f"{inventory_database} is not a valid database name")
-                counter = counter + 1
-                if counter > NUM_USER_ATTEMPTS:
-                    msg = "Exceeded max tries to get a valid database name, try again later."
-                    raise SystemExit(msg)
-        return inventory_database
-
     def _configure(self):
         ws_file_url = self.notebook_link(self.config_file)
         try:
@@ -364,7 +353,9 @@ class WorkspaceInstaller:
         except NotFound:
             pass
         logger.info("Please answer a couple of questions to configure Unity Catalog migration")
-        inventory_database = self._configure_inventory_database()
+        inventory_database = self._prompts.question(
+            "Inventory Database stored in hive_metastore", default="ucx", valid_regex=r"^\w+$"
+        )
 
         def warehouse_type(_):
             return _.warehouse_type.value if not _.enable_serverless_compute else "SERVERLESS"
@@ -374,7 +365,7 @@ class WorkspaceInstaller:
             for _ in self._ws.warehouses.list()
             if _.warehouse_type == EndpointInfoWarehouseType.PRO
         }
-        warehouse_id = self._choice_from_dict(
+        warehouse_id = self._prompts.choice_from_dict(
             "Select PRO or SERVERLESS SQL warehouse to run assessment dashboards on", pro_warehouses
         )
         if warehouse_id == "create_new":
@@ -387,122 +378,39 @@ class WorkspaceInstaller:
             )
             warehouse_id = new_warehouse.id
 
-        # Setting up group migration parameters
-        groups_config_args = {}
-
-        while (
-            self._question(
-                "Do you need to convert the workspace groups to match the account groups' name?"
-                " If the workspace groups' names match the account groups' names select "
-                "no"
-                " or hit <Enter/Return>.",
-                default="no",
-            )
-            == "yes"
-        ):
-            logger.info("Setting up group name translation")
-            groups_config_args["convert_group_names"] = "yes"
-            choices = {
-                "Apply a Prefix": "prefix",
-                "Apply a Suffix": "suffix",
-                "Regex Substitution": "sub",
-                "Regex Matching": "match",
-                "Match By External ID": "external",
-                "Cancel": "cancel",
-            }
-            choice = self._choice_from_dict("Choose how to map the workspace groups:", choices, sort=False)
-            match choice:
-                case "cancel":
-                    continue
-                case "prefix":
-                    prefix = self._group_question(
-                        "Enter a prefix to add to the workspace group name. Use only valid characters"
-                    )
-                    if not prefix:
-                        continue
-                    groups_config_args["workspace_group_match_regex"] = "^"
-                    groups_config_args["workspace_group_replace"] = prefix
-                case "suffix":
-                    suffix = self._group_question(
-                        "Enter a suffix to add to the workspace group name. Use only valid characters"
-                    )
-                    if not suffix:
-                        continue
-                    groups_config_args["workspace_group_match_regex"] = "$"
-                    groups_config_args["workspace_group_replace"] = suffix
-                case "sub":
-                    match_value = self._regex_question("Enter a RegEx expression for Substitution")
-                    if not match_value:
-                        continue
-                    sub_value = self._group_question("Enter the substitution value")
-                    if not sub_value:
-                        continue
-                    groups_config_args["workspace_group_match_regex"] = match_value
-                    groups_config_args["workspace_group_replace"] = sub_value
-                case "matching":
-                    ws_match_value = self._regex_question("Enter a RegEx expression to match on the workspace group")
-                    if not ws_match_value:
-                        continue
-                    acct_match_value = self._regex_question("Enter a RegEx expression to match on the account group")
-                    if not acct_match_value:
-                        continue
-                    groups_config_args["workspace_group_match_regex"] = ws_match_value
-                    groups_config_args["account_group_match_regex"] = acct_match_value
-                case "external":
-                    groups_config_args["group_match_by_external_id"] = True
-            break
-
-        selected_groups = self._question(
-            "Comma-separated list of workspace group names to migrate. If not specified, we'll use all "
-            "account-level groups with matching names to workspace-level groups",
-            default="<ALL>",
-        )
-        backup_group_prefix = self._group_question("Backup prefix", default="db-temp-")
-        log_level = self._question("Log level", default="INFO").upper()
-        num_threads = int(self._question("Number of threads", default="8"))
-        groups_config_args["backup_group_prefix"] = backup_group_prefix
-        if selected_groups != "<ALL>":
-            groups_config_args["selected"] = [x.strip() for x in selected_groups.split(",")]
-        else:
-            groups_config_args["selected"] = None
+        configure_groups = ConfigureGroups(self._prompts)
+        configure_groups.run()
+        log_level = self._prompts.question("Log level", default="INFO").upper()
+        num_threads = int(self._prompts.question("Number of threads", default="8", valid_number=True))
 
         # Checking for external HMS
         instance_profile = None
         spark_conf_dict = {}
-        if self._prompts:
-            policies_with_external_hms = list(self._get_cluster_policies_with_external_hive_metastores())
-            if (
-                len(policies_with_external_hms) > 0
-                and self._question(
-                    "We have identified one or more cluster policies set up for an external metastore"
-                    "Would you like to set UCX to connect to the external metastore",
-                    default="no",
-                )
-                == "yes"
-            ):
-                logger.info("Setting up an external metastore")
-                cluster_policies = {conf.name: conf.definition for conf in policies_with_external_hms}
-                if len(cluster_policies) >= 1:
-                    cluster_policy = json.loads(
-                        self._choice_from_dict("Select a Cluster Policy from The List", cluster_policies)
-                    )
-                    instance_profile, spark_conf_dict = self._get_ext_hms_conf_from_policy(cluster_policy)
+        policies_with_external_hms = list(self._get_cluster_policies_with_external_hive_metastores())
+        if len(policies_with_external_hms) > 0 and self._prompts.confirm(
+            "We have identified one or more cluster policies set up for an external metastore"
+            "Would you like to set UCX to connect to the external metastore?"
+        ):
+            logger.info("Setting up an external metastore")
+            cluster_policies = {conf.name: conf.definition for conf in policies_with_external_hms}
+            if len(cluster_policies) >= 1:
+                cluster_policy = json.loads(self._prompts.choice_from_dict("Choose a cluster policy", cluster_policies))
+                instance_profile, spark_conf_dict = self._get_ext_hms_conf_from_policy(cluster_policy)
 
-        use_policy = self._question("Do you want to follow a policy to create clusters?", default="no")
-        if use_policy == "yes":
+        if self._prompts.confirm("Do you want to follow a policy to create clusters?"):
             cluster_policies_list = {f"{_.name} ({_.policy_id})": _.policy_id for _ in self._ws.cluster_policies.list()}
-            custom_cluster_policy_id = self._choice_from_dict("Choose a cluster policy", cluster_policies_list)
+            custom_cluster_policy_id = self._prompts.choice_from_dict("Choose a cluster policy", cluster_policies_list)
         else:
             custom_cluster_policy_id = None
 
         self._config = WorkspaceConfig(
             inventory_database=inventory_database,
-            workspace_group_regex=groups_config_args.get("workspace_group_regex"),
-            workspace_group_replace=groups_config_args.get("workspace_group_replace"),
-            account_group_regex=groups_config_args.get("account_group_regex"),
-            group_match_by_external_id=groups_config_args.get("group_match_by_external_id"),
-            include_group_names=groups_config_args["selected"],
-            renamed_group_prefix=groups_config_args["backup_group_prefix"],
+            workspace_group_regex=configure_groups.workspace_group_regex,
+            workspace_group_replace=configure_groups.workspace_group_replace,
+            account_group_regex=configure_groups.account_group_regex,
+            group_match_by_external_id=configure_groups.group_match_by_external_id,
+            include_group_names=configure_groups.include_group_names,
+            renamed_group_prefix=configure_groups.renamed_group_prefix,
             warehouse_id=warehouse_id,
             log_level=log_level,
             num_threads=num_threads,
@@ -513,8 +421,7 @@ class WorkspaceInstaller:
         )
 
         self._write_config(overwrite=False)
-        msg = "Open config file in the browser and continue installing?"
-        if self._prompts and self._question(msg, default="yes") == "yes":
+        if self._prompts.confirm("Open config file in the browser and continue installing?"):
             webbrowser.open(ws_file_url)
 
     def _write_config(self, overwrite):
@@ -527,6 +434,16 @@ class WorkspaceInstaller:
         config_bytes = yaml.dump(self._config.as_dict()).encode("utf8")
         logger.info(f"Creating configuration file: {self.config_file}")
         self._ws.workspace.upload(self.config_file, config_bytes, format=ImportFormat.AUTO, overwrite=overwrite)
+
+    def _upload_wheel(self):
+        with self._wheels:
+            try:
+                self._wheels.upload_to_dbfs()
+            except PermissionDenied as err:
+                logger.warning(f"Uploading wheel file to DBFS failed, DBFS is probably write protected. {err}")
+                configure_cluster_overrides = ConfigureClusterOverrides(self._ws, self._prompts.choice_from_dict)
+                self._current_config.override_clusters = configure_cluster_overrides.configure()
+            return self._wheels.upload_to_wsfs()
 
     def _create_jobs(self):
         if not self._state.jobs:
@@ -635,8 +552,7 @@ class WorkspaceInstaller:
         self._ws.workspace.upload(path, intro.encode("utf8"), overwrite=True)
         url = self.notebook_link(path)
         logger.info(f"Created README notebook with job overview: {url}")
-        msg = "Open job overview in README notebook in your home directory ?"
-        if self._prompts and self._question(msg, default="no") == "yes":
+        if self._prompts.confirm("Open job overview in README notebook in your home directory?"):
             webbrowser.open(url)
 
     def _replace_inventory_variable(self, text: str) -> str:
@@ -650,109 +566,15 @@ class WorkspaceInstaller:
         )
         path = f"{self._install_folder}/DEBUG.py"
         logger.debug(f"Created debug notebook: {self.notebook_link(path)}")
-        self._ws.workspace.upload(
-            path,
-            DEBUG_NOTEBOOK.format(
-                remote_wheel=remote_wheel, readme_link=readme_link, job_links=job_links, config_file=self.config_file
-            ).encode("utf8"),
-            overwrite=True,
-        )
+        content = DEBUG_NOTEBOOK.format(
+            remote_wheel=remote_wheel, readme_link=readme_link, job_links=job_links, config_file=self.config_file
+        ).encode("utf8")
+        self._ws.workspace.upload(path, content, overwrite=True)  # type: ignore[arg-type]
 
     def notebook_link(self, path: str) -> str:
         return f"{self._ws.config.host}/#workspace{path}"
 
-    def _choice_from_dict(self, text: str, choices: dict[str, Any], *, sort: bool = True) -> Any:
-        key = self._choice(text, list(choices.keys()), sort=sort)
-        return choices[key]
-
-    def _choice(self, text: str, choices: list[Any], *, max_attempts: int = 10, sort: bool = True) -> str:
-        if not self._prompts:
-            return "any"
-        if sort:
-            choices = sorted(choices, key=str.casefold)
-        numbered = "\n".join(f"\033[1m[{i}]\033[0m \033[36m{v}\033[0m" for i, v in enumerate(choices))
-        prompt = f"\033[1m{text}\033[0m\n{numbered}\nEnter a number between 0 and {len(choices) - 1}: "
-        attempt = 0
-        while attempt < max_attempts:
-            attempt += 1
-            res = input(prompt)
-            try:
-                res = int(res)
-            except ValueError:
-                print(f"\033[31m[ERROR] Invalid number: {res}\033[0m\n")
-                continue
-            if res >= len(choices) or res < 0:
-                print(f"\033[31m[ERROR] Out of range: {res}\033[0m\n")
-                continue
-            return choices[res]
-        msg = f"cannot get answer within {max_attempts} attempt"
-        raise ValueError(msg)
-
-    @staticmethod
-    def _question(text: str, *, default: str | None = None) -> str:
-        default_help = "" if default is None else f"\033[36m (default: {default})\033[0m"
-        prompt = f"\033[1m{text}{default_help}: \033[0m"
-        res = None
-        while not res:
-            res = input(prompt)
-            if not res and default is not None:
-                return default
-        return res
-
-    @classmethod
-    def _group_question(cls, text: str, *, default: str | None = None) -> str | None:
-        attempts_left = NUM_USER_ATTEMPTS
-        while attempts_left:
-            group_input = cls._question(text, default=default)
-            if cls._is_valid_group_str(group_input):
-                return group_input
-            else:
-                attempts_left -= 1
-                logger.error(
-                    f"{group_input} is an invalid Prefix. It contains invalid characters. "
-                    f"Please try again ({attempts_left} more attempts)"
-                )
-        return None
-
-    @classmethod
-    def _regex_question(cls, text: str, *, default: str | None = None) -> str | None:
-        attempts_left = NUM_USER_ATTEMPTS
-        while attempts_left:
-            regex_input = cls._question(text, default=default)
-            try:
-                re.compile(regex_input)
-                return regex_input
-            except re.error:
-                attempts_left -= 1
-                logger.error(
-                    f"{regex_input} is an invalid RegEx expression. Please try again ({attempts_left} more attempts)"
-                )
-        return None
-
-    def _upload_wheel(self) -> str:
-        with tempfile.TemporaryDirectory() as tmp_dir:
-            local_wheel = self._build_wheel(tmp_dir)
-            remote_wheel = f"{self._install_folder}/wheels/{local_wheel.name}"
-            remote_dirname = os.path.dirname(remote_wheel)
-            with local_wheel.open("rb") as f:
-                try:
-                    self._ws.dbfs.mkdirs(remote_dirname)
-                    logger.info(f"Uploading wheel to dbfs:{remote_wheel}")
-                    self._ws.dbfs.upload(remote_wheel, f, overwrite=True)
-                except PermissionDenied as err:
-                    logger.warning(f"Uploading wheel file to DBFS failed, DBFS is probably write protected. {err}")
-                    # assume DBFS is write protected
-                    self._current_config.override_clusters = ConfigureClusterOverrides(
-                        self._ws, self._choice_from_dict
-                    )._configure_override_clusters()
-
-            with local_wheel.open("rb") as f:
-                self._ws.workspace.mkdirs(remote_dirname)
-                logger.info(f"Uploading wheel to /Workspace{remote_wheel}")
-                self._ws.workspace.upload(remote_wheel, f, overwrite=True, format=ImportFormat.AUTO)
-        return remote_wheel
-
-    def _job_settings(self, step_name: str, dbfs_path: str):
+    def _job_settings(self, step_name: str, remote_wheel: str):
         email_notifications = None
         if not self._current_config.override_clusters and "@" in self._my_username:
             # set email notifications only if we're running the real
@@ -764,25 +586,26 @@ class WorkspaceInstaller:
             [t for t in _TASKS.values() if t.workflow == step_name],
             key=lambda _: _.name,
         )
-        version = self._version if not self._ws.config.is_gcp else self._version.replace("+", "-")
+        version = self._wheels.version()
+        version = version if not self._ws.config.is_gcp else version.replace("+", "-")
         return {
             "name": self._name(step_name),
             "tags": {TAG_APP: self._app, "version": f"v{version}"},
             "job_clusters": self._job_clusters({t.job_cluster for t in tasks}),
             "email_notifications": email_notifications,
-            "tasks": [self._job_task(task, dbfs_path) for task in tasks],
+            "tasks": [self._job_task(task, remote_wheel) for task in tasks],
         }
 
     def _upload_wheel_runner(self, remote_wheel: str):
         # TODO: we have to be doing this workaround until ES-897453 is solved in the platform
-        path = f"{self._install_folder}/wheels/wheel-test-runner-{self._version}.py"
+        path = f"{self._install_folder}/wheels/wheel-test-runner-{self._wheels.version()}.py"
         logger.debug(f"Created runner notebook: {self.notebook_link(path)}")
         py = TEST_RUNNER_NOTEBOOK.format(remote_wheel=remote_wheel, config_file=self.config_file).encode("utf8")
-        self._ws.workspace.upload(path, py, overwrite=True)
+        self._ws.workspace.upload(path, py, overwrite=True)  # type: ignore[arg-type]
         return path
 
     @staticmethod
-    def _apply_cluster_overrides(settings: dict[str, any], overrides: dict[str, str], wheel_runner: str) -> dict:
+    def _apply_cluster_overrides(settings: dict[str, Any], overrides: dict[str, str], wheel_runner: str) -> dict:
         settings["job_clusters"] = [_ for _ in settings["job_clusters"] if _.job_cluster_key not in overrides]
         for job_task in settings["tasks"]:
             if job_task.job_cluster_key is None:
@@ -797,19 +620,20 @@ class WorkspaceInstaller:
                 job_task.notebook_task = jobs.NotebookTask(notebook_path=wheel_runner, base_parameters=params)
         return settings
 
-    def _job_task(self, task: Task, dbfs_path: str) -> jobs.Task:
+    def _job_task(self, task: Task, remote_wheel: str) -> jobs.Task:
         jobs_task = jobs.Task(
             task_key=task.name,
             job_cluster_key=task.job_cluster,
-            depends_on=[jobs.TaskDependency(task_key=d) for d in _TASKS[task.name].depends_on],
+            depends_on=[jobs.TaskDependency(task_key=d) for d in _TASKS[task.name].dependencies()],
         )
         if task.dashboard:
             return self._job_dashboard_task(jobs_task, task)
         if task.notebook:
             return self._job_notebook_task(jobs_task, task)
-        return self._job_wheel_task(jobs_task, task, dbfs_path)
+        return self._job_wheel_task(jobs_task, task, remote_wheel)
 
     def _job_dashboard_task(self, jobs_task: jobs.Task, task: Task) -> jobs.Task:
+        assert task.dashboard is not None
         return replace(
             jobs_task,
             job_cluster_key=None,
@@ -820,6 +644,7 @@ class WorkspaceInstaller:
         )
 
     def _job_notebook_task(self, jobs_task: jobs.Task, task: Task) -> jobs.Task:
+        assert task.notebook is not None
         local_notebook = self._this_file.parent / task.notebook
         remote_notebook = f"{self._install_folder}/{local_notebook.name}"
         with local_notebook.open("rb") as f:
@@ -837,10 +662,11 @@ class WorkspaceInstaller:
             ),
         )
 
-    def _job_wheel_task(self, jobs_task: jobs.Task, task: Task, dbfs_path: str) -> jobs.Task:
+    def _job_wheel_task(self, jobs_task: jobs.Task, task: Task, remote_wheel: str) -> jobs.Task:
         return replace(
             jobs_task,
-            libraries=[compute.Library(whl=f"dbfs:{dbfs_path}")],
+            # TODO: check when we can install wheels from WSFS properly
+            libraries=[compute.Library(whl=f"dbfs:{remote_wheel}")],
             python_wheel_task=jobs.PythonWheelTask(
                 package_name="databricks_labs_ucx",
                 entry_point="runtime",  # [project.entry-points.databricks] in pyproject.toml
@@ -868,6 +694,7 @@ class WorkspaceInstaller:
         if self._config.custom_cluster_policy_id is not None:
             spec = replace(spec, policy_id=self._config.custom_cluster_policy_id)
         if self._ws.config.is_aws and spec.aws_attributes is not None:
+            # TODO: we might not need spec.aws_attributes, if we have a cluster policy
             aws_attributes = replace(spec.aws_attributes, instance_profile_arn=self._config.instance_profile)
             spec = replace(spec, aws_attributes=aws_attributes)
         if "main" in names:
@@ -891,84 +718,6 @@ class WorkspaceInstaller:
                 )
             )
         return clusters
-
-    @property
-    def _version(self):
-        if hasattr(self, "__version"):
-            return self.__version
-        project_root = self._find_project_root()
-        if not (project_root / ".git/config").exists():
-            # normal install, downloaded releases won't have the .git folder
-            return __version__
-        try:
-            out = subprocess.run(["git", "describe", "--tags"], stdout=subprocess.PIPE, check=True)  # noqa S607
-            git_detached_version = out.stdout.decode("utf8")
-            dv = SemVer.parse(git_detached_version)
-            datestamp = datetime.datetime.now().strftime("%Y%m%d%H%M%S")
-            # new commits on main branch since the last tag
-            new_commits = dv.pre_release.split("-")[0] if dv.pre_release else None
-            # show that it's a version different from the released one in stats
-            bump_patch = dv.patch + 1
-            # create something that is both https://semver.org and https://peps.python.org/pep-0440/
-            semver_and_pep0440 = f"{dv.major}.{dv.minor}.{bump_patch}+{new_commits}{datestamp}"
-            # validate the semver
-            SemVer.parse(semver_and_pep0440)
-            self.__version = semver_and_pep0440
-            return semver_and_pep0440
-        except Exception as err:
-            msg = (
-                f"Cannot determine unreleased version. Please report this error "
-                f"message that you see on https://github.com/databrickslabs/ucx/issues/new. "
-                f"Meanwhile, download, unpack, and install the latest released version from "
-                f"https://github.com/databrickslabs/ucx/releases. Original error is: {err!s}"
-            )
-            raise OSError(msg) from None
-
-    def _build_wheel(self, tmp_dir: str, *, verbose: bool = False):
-        """Helper to build the wheel package"""
-        stdout = subprocess.STDOUT
-        stderr = subprocess.STDOUT
-        if not verbose:
-            stdout = subprocess.DEVNULL
-            stderr = subprocess.DEVNULL
-        project_root = self._find_project_root()
-        is_non_released_version = "+" in self._version
-        if (project_root / ".git" / "config").exists() and is_non_released_version:
-            tmp_dir_path = Path(tmp_dir) / "working-copy"
-            # copy everything to a temporary directory
-            shutil.copytree(project_root, tmp_dir_path)
-            # and override the version file
-            version_file = tmp_dir_path / "src/databricks/labs/ucx/__about__.py"
-            with version_file.open("w") as f:
-                f.write(f'__version__ = "{self._version}"')
-            # working copy becomes project root for building a wheel
-            project_root = tmp_dir_path
-        logger.debug(f"Building wheel for {project_root} in {tmp_dir}")
-        subprocess.run(
-            [sys.executable, "-m", "pip", "wheel", "--no-deps", "--wheel-dir", tmp_dir, project_root.as_posix()],
-            check=True,
-            stdout=stdout,
-            stderr=stderr,
-        )
-        # get wheel name as first file in the temp directory
-        return next(Path(tmp_dir).glob("*.whl"))
-
-    def _find_project_root(self) -> Path:
-        for leaf in ["pyproject.toml", "setup.py"]:
-            root = WorkspaceInstaller._find_dir_with_leaf(self._this_file, leaf)
-            if root is not None:
-                return root
-        msg = "Cannot find project root"
-        raise NotADirectoryError(msg)
-
-    @staticmethod
-    def _find_dir_with_leaf(folder: Path, leaf: str) -> Path | None:
-        root = folder.root
-        while str(folder.absolute()) != root:
-            if (folder / leaf).exists():
-                return folder
-            folder = folder.parent
-        return None
 
     def _cluster_node_type(self, spec: compute.ClusterSpec) -> compute.ClusterSpec:
         cfg = self._current_config
@@ -1031,10 +780,6 @@ class WorkspaceInstaller:
                 spark_conf_dict[key[11:]] = cluster_policy[key]["value"]
         return instance_profile, spark_conf_dict
 
-    @staticmethod
-    def _is_valid_group_str(group_str: str):
-        return group_str and not re.search(r"[\s#,+ \\<>;]", group_str)
-
     def latest_job_status(self) -> list[dict]:
         latest_status = []
         for step, job_id in self._state.jobs.items():
@@ -1055,12 +800,11 @@ class WorkspaceInstaller:
         return latest_status
 
     def uninstall(self):
-        if not self._prompts or self._question(
+        if self._prompts.confirm(
             "Do you want to uninstall ucx from the workspace too, this would "
-            "remove ucx project folder, dashboards, queries and jobs",
-            default="no",
+            "remove ucx project folder, dashboards, queries and jobs"
         ):
-            logger.info(f"Deleting UCX v{self._version} from {self._ws.config.host}")
+            logger.info(f"Deleting UCX v{self._wheels.version()} from {self._ws.config.host}")
             try:
                 self._ws.workspace.get_status(self.config_file)
                 self._ws.workspace.get_status(self._install_folder)
@@ -1078,13 +822,8 @@ class WorkspaceInstaller:
             logger.info("UnInstalling UCX complete")
 
     def _remove_database(self):
-        if (
-            not self._prompts
-            or self._question(
-                f"Do you want to delete the inventory database {self._current_config.inventory_database} too?",
-                default="no",
-            )
-            == "yes"
+        if self._prompts.confirm(
+            f"Do you want to delete the inventory database {self._current_config.inventory_database} too?"
         ):
             logger.info(f"Deleting inventory database {self._current_config.inventory_database}")
             if self._sql_backend is None:

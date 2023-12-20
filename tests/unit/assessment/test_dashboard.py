@@ -13,6 +13,7 @@ from databricks.sdk.service.sql import (
 from databricks.labs.ucx.config import WorkspaceConfig
 from databricks.labs.ucx.framework.dashboards import DashboardFromFiles
 from databricks.labs.ucx.framework.install_state import InstallState
+from databricks.labs.ucx.framework.wheels import find_project_root
 from databricks.labs.ucx.install import WorkspaceInstaller
 
 
@@ -28,8 +29,9 @@ def test_dashboard(mocker):
     ws.queries.create.return_value = Query(id="abc")
     ws.query_visualizations.create.return_value = Visualization(id="abc")
     ws.dashboard_widgets.create.return_value = Widget(id="abc")
+    ws.warehouses.list.return_value = []
     installer = WorkspaceInstaller(ws)
-    local_query_files = installer._find_project_root() / "src/databricks/labs/ucx/queries"
+    local_query_files = find_project_root() / "src/databricks/labs/ucx/queries"
     dash = DashboardFromFiles(
         ws,
         InstallState(ws, "/users/not_a_real_user"),
