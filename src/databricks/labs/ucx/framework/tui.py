@@ -1,5 +1,9 @@
+import logging
 import re
-from typing import Any, Callable
+from collections.abc import Callable
+from typing import Any
+
+logger = logging.getLogger(__name__)
 
 
 class Prompts:
@@ -40,8 +44,8 @@ class Prompts:
         raise ValueError(msg)
 
     def confirm(self, text: str, *, max_attempts: int = 10):
-        answer = self.question(text, valid_regex=r'[Yy][Ee][Ss]|[Nn][Oo]', default='no', max_attempts=max_attempts)
-        return answer.lower() == 'yes'
+        answer = self.question(text, valid_regex=r"[Yy][Ee][Ss]|[Nn][Oo]", default="no", max_attempts=max_attempts)
+        return answer.lower() == "yes"
 
     def question(
         self,
@@ -51,7 +55,7 @@ class Prompts:
         max_attempts: int = 10,
         valid_number: bool = False,
         valid_regex: str | None = None,
-        validate: Callable[[str], bool] | None = None
+        validate: Callable[[str], bool] | None = None,
     ) -> str:
         default_help = "" if default is None else f"\033[36m (default: {default})\033[0m"
         prompt = f"\033[1m{text}{default_help}: \033[0m"
@@ -82,12 +86,18 @@ class Prompts:
 
 
 class MockPrompts(Prompts):
-    def __init__(self, patterns_to_answers: dict):
-        self._questions_to_answers = {re.compile(k): v for k, v in patterns_to_answers.items()}
+    def __init__(self, patterns_to_answers: dict[str, str]):
+        self._questions_to_answers = sorted(
+            [(re.compile(k), v) for k, v in patterns_to_answers.items()], key=lambda _: len(_[0].pattern), reverse=True
+        )
 
-    def question(self, text: str, **_) -> str:
-        for question, answer in self._questions_to_answers.items():
-            if question.search(text):
-                return answer
+    def question(self, text: str, default: str | None = None, **_) -> str:
+        logger.info(f"Asking prompt: {text}")
+        for question, answer in self._questions_to_answers:
+            if not question.search(text):
+                continue
+            if not answer and default:
+                return default
+            return answer
         mocked = f"not mocked: {text}"
         raise ValueError(mocked)

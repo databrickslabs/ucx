@@ -9,11 +9,11 @@ from contextlib import AbstractContextManager
 from pathlib import Path
 
 from databricks.sdk import WorkspaceClient
-from databricks.sdk.errors import PermissionDenied
 from databricks.sdk.mixins.compute import SemVer
 from databricks.sdk.service.workspace import ImportFormat
 
 logger = logging.getLogger(__name__)
+
 
 class Wheels(AbstractContextManager):
     def __init__(self, ws: WorkspaceClient, install_folder: str, released_version: str):
@@ -25,7 +25,7 @@ class Wheels(AbstractContextManager):
     def version(self):
         if hasattr(self, "__version"):
             return self.__version
-        project_root = self.find_project_root()
+        project_root = find_project_root()
         if not (project_root / ".git/config").exists():
             # normal install, downloaded releases won't have the .git folder
             return self._released_version
@@ -53,7 +53,7 @@ class Wheels(AbstractContextManager):
             )
             raise OSError(msg) from None
 
-    def __enter__(self) -> 'Wheels':
+    def __enter__(self) -> "Wheels":
         self._tmp_dir = tempfile.TemporaryDirectory()
         self._local_wheel = self._build_wheel(self._tmp_dir.name)
         self._remote_wheel = f"{self._install_folder}/wheels/{self._local_wheel.name}"
@@ -84,7 +84,7 @@ class Wheels(AbstractContextManager):
         if not verbose:
             stdout = subprocess.DEVNULL
             stderr = subprocess.DEVNULL
-        project_root = self.find_project_root()
+        project_root = find_project_root()
         is_non_released_version = "+" in self.version()
         if (project_root / ".git" / "config").exists() and is_non_released_version:
             tmp_dir_path = Path(tmp_dir) / "working-copy"
@@ -107,15 +107,8 @@ class Wheels(AbstractContextManager):
         # get wheel name as first file in the temp directory
         return next(Path(tmp_dir).glob("*.whl"))
 
-    def find_project_root(self) -> Path:
-        for leaf in ["pyproject.toml", "setup.py"]:
-            root = self._find_dir_with_leaf(self._this_file, leaf)
-            if root is not None:
-                return root
-        msg = "Cannot find project root"
-        raise NotADirectoryError(msg)
 
-    @staticmethod
+def find_project_root() -> Path:
     def _find_dir_with_leaf(folder: Path, leaf: str) -> Path | None:
         root = folder.root
         while str(folder.absolute()) != root:
@@ -123,3 +116,10 @@ class Wheels(AbstractContextManager):
                 return folder
             folder = folder.parent
         return None
+
+    for leaf in ["pyproject.toml", "setup.py"]:
+        root = _find_dir_with_leaf(Path(__file__), leaf)
+        if root is not None:
+            return root
+    msg = "Cannot find project root"
+    raise NotADirectoryError(msg)

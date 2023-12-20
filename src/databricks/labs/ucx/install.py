@@ -1,13 +1,9 @@
-import datetime
 import functools
 import json
 import logging
 import os
 import re
-import shutil
-import subprocess
 import sys
-import tempfile
 import time
 import webbrowser
 from dataclasses import replace
@@ -22,7 +18,6 @@ from databricks.sdk.errors import (
     OperationFailed,
     PermissionDenied,
 )
-from databricks.sdk.mixins.compute import SemVer
 from databricks.sdk.service import compute, jobs
 from databricks.sdk.service.sql import EndpointInfoWarehouseType, SpotInstancePolicy
 from databricks.sdk.service.workspace import ImportFormat
@@ -44,7 +39,7 @@ from databricks.labs.ucx.framework.dashboards import DashboardFromFiles
 from databricks.labs.ucx.framework.install_state import InstallState
 from databricks.labs.ucx.framework.tasks import _TASKS, Task
 from databricks.labs.ucx.framework.tui import Prompts
-from databricks.labs.ucx.framework.wheels import Wheels
+from databricks.labs.ucx.framework.wheels import Wheels, find_project_root
 from databricks.labs.ucx.hive_metastore.grants import Grant
 from databricks.labs.ucx.hive_metastore.hms_lineage import HiveMetastoreLineageEnabler
 from databricks.labs.ucx.hive_metastore.locations import ExternalLocation, Mount
@@ -139,10 +134,13 @@ def deploy_schema(sql_backend: SqlBackend, inventory_schema: str):
 
 class WorkspaceInstaller:
     def __init__(
-        self, ws: WorkspaceClient, *, prefix: str = "ucx",
-            promtps: Prompts | None = None,
-            wheels: Wheels | None = None,
-            sql_backend: SqlBackend | None = None
+        self,
+        ws: WorkspaceClient,
+        *,
+        prefix: str = "ucx",
+        promtps: Prompts | None = None,
+        wheels: Wheels | None = None,
+        sql_backend: SqlBackend | None = None,
     ):
         if "DATABRICKS_RUNTIME_VERSION" in os.environ:
             msg = "WorkspaceInstaller is not supposed to be executed in Databricks Runtime"
@@ -195,13 +193,17 @@ class WorkspaceInstaller:
             if gscript.enabled:
                 logger.info("Already exists and enabled. Skipped creating a new one.")
             elif not gscript.enabled:
-                if self._prompts.confirm("Your Global Init Script with required spark config is disabled, Do you want to enable it?"):
+                if self._prompts.confirm(
+                    "Your Global Init Script with required spark config is disabled, Do you want to enable it?"
+                ):
                     logger.info("Enabling Global Init Script...")
                     hms_lineage.enable_global_init_script(gscript)
                 else:
                     logger.info("No change to Global Init Script is made.")
         elif not gscript:
-            if self._prompts.confirm("No Global Init Script with Required Spark Config exists, Do you want to create one?"):
+            if self._prompts.confirm(
+                "No Global Init Script with Required Spark Config exists, Do you want to create one?"
+            ):
                 logger.info("Creating Global Init Script...")
                 hms_lineage.add_global_init_script()
 
@@ -216,7 +218,9 @@ class WorkspaceInstaller:
         override_clusters: dict[str, str] | None = None,
         sql_backend: SqlBackend | None = None,
     ) -> "WorkspaceInstaller":
-        workspace_installer = WorkspaceInstaller(ws, prefix=prefix, promtps=promtps, wheels=wheels, sql_backend=sql_backend)
+        workspace_installer = WorkspaceInstaller(
+            ws, prefix=prefix, promtps=promtps, wheels=wheels, sql_backend=sql_backend
+        )
         logger.info(f"Installing UCX v{wheels.version()} on {ws.config.host}")
         workspace_installer._config = config
         workspace_installer._write_config(overwrite=False)
@@ -260,7 +264,7 @@ class WorkspaceInstaller:
 
     def _create_dashboards(self):
         logger.info("Creating dashboards...")
-        local_query_files = self._wheels.find_project_root() / "src/databricks/labs/ucx/queries"
+        local_query_files = find_project_root() / "src/databricks/labs/ucx/queries"
         dash = DashboardFromFiles(
             self._ws,
             state=self._state,
@@ -351,7 +355,9 @@ class WorkspaceInstaller:
         except NotFound:
             pass
         logger.info("Please answer a couple of questions to configure Unity Catalog migration")
-        inventory_database = self._prompts.question("Inventory Database stored in hive_metastore", default="ucx", valid_regex=r"^\w+$")
+        inventory_database = self._prompts.question(
+            "Inventory Database stored in hive_metastore", default="ucx", valid_regex=r"^\w+$"
+        )
 
         def warehouse_type(_):
             return _.warehouse_type.value if not _.enable_serverless_compute else "SERVERLESS"
@@ -439,7 +445,7 @@ class WorkspaceInstaller:
         )
         backup_group_prefix = ask_for_group("Backup prefix", default="db-temp-")
         log_level = self._prompts.question("Log level", default="INFO").upper()
-        num_threads = int(self._question("Number of threads", default="8"))
+        num_threads = int(self._prompts.question("Number of threads", default="8", valid_number=True))
         groups_config_args["backup_group_prefix"] = backup_group_prefix
         if selected_groups != "<ALL>":
             groups_config_args["selected"] = [x.strip() for x in selected_groups.split(",")]
@@ -449,26 +455,20 @@ class WorkspaceInstaller:
         # Checking for external HMS
         instance_profile = None
         spark_conf_dict = {}
-        if self._prompts:
-            policies_with_external_hms = list(self._get_cluster_policies_with_external_hive_metastores())
-            if (
-                len(policies_with_external_hms) > 0
-                and self._prompts.confirm(
-                    "We have identified one or more cluster policies set up for an external metastore"
-                    "Would you like to set UCX to connect to the external metastore?"
-                )
-            ):
-                logger.info("Setting up an external metastore")
-                cluster_policies = {conf.name: conf.definition for conf in policies_with_external_hms}
-                if len(cluster_policies) >= 1:
-                    cluster_policy = json.loads(
-                        self._prompts.choice_from_dict("Select a Cluster Policy from The List", cluster_policies)
-                    )
-                    instance_profile, spark_conf_dict = self._get_ext_hms_conf_from_policy(cluster_policy)
+        policies_with_external_hms = list(self._get_cluster_policies_with_external_hive_metastores())
+        if len(policies_with_external_hms) > 0 and self._prompts.confirm(
+            "We have identified one or more cluster policies set up for an external metastore"
+            "Would you like to set UCX to connect to the external metastore?"
+        ):
+            logger.info("Setting up an external metastore")
+            cluster_policies = {conf.name: conf.definition for conf in policies_with_external_hms}
+            if len(cluster_policies) >= 1:
+                cluster_policy = json.loads(self._prompts.choice_from_dict("Choose a cluster policy", cluster_policies))
+                instance_profile, spark_conf_dict = self._get_ext_hms_conf_from_policy(cluster_policy)
 
         if self._prompts.confirm("Do you want to follow a policy to create clusters?"):
             cluster_policies_list = {f"{_.name} ({_.policy_id})": _.policy_id for _ in self._ws.cluster_policies.list()}
-            custom_cluster_policy_id = self._choice_from_dict("Choose a cluster policy", cluster_policies_list)
+            custom_cluster_policy_id = self._prompts.choice_from_dict("Choose a cluster policy", cluster_policies_list)
         else:
             custom_cluster_policy_id = None
 
@@ -490,8 +490,7 @@ class WorkspaceInstaller:
         )
 
         self._write_config(overwrite=False)
-        msg = "Open config file in the browser and continue installing?"
-        if self._prompts and self._question(msg, default="yes") == "yes":
+        if self._prompts.confirm("Open config file in the browser and continue installing?"):
             webbrowser.open(ws_file_url)
 
     def _write_config(self, overwrite):
@@ -622,8 +621,7 @@ class WorkspaceInstaller:
         self._ws.workspace.upload(path, intro.encode("utf8"), overwrite=True)
         url = self.notebook_link(path)
         logger.info(f"Created README notebook with job overview: {url}")
-        msg = "Open job overview in README notebook in your home directory ?"
-        if self._prompts and self._question(msg, default="no") == "yes":
+        if self._prompts.confirm("Open job overview in README notebook in your home directory?"):
             webbrowser.open(url)
 
     def _replace_inventory_variable(self, text: str) -> str:
@@ -774,6 +772,7 @@ class WorkspaceInstaller:
         if self._config.custom_cluster_policy_id is not None:
             spec = replace(spec, policy_id=self._config.custom_cluster_policy_id)
         if self._ws.config.is_aws and spec.aws_attributes is not None:
+            # TODO: we might not need spec.aws_attributes, if we have a cluster policy
             aws_attributes = replace(spec.aws_attributes, instance_profile_arn=self._config.instance_profile)
             spec = replace(spec, aws_attributes=aws_attributes)
         if "main" in names:
