@@ -449,7 +449,7 @@ def test_delete_original_workspace_groups_should_fail_if_delete_does_not_work():
     wsclient.groups.delete.side_effect = RuntimeError("Something bad")
     gm = GroupManager(backend, wsclient, inventory_database="inv")
 
-    with pytest.raises(RuntimeWarning):
+    with pytest.raises(ManyError):
         gm.delete_original_workspace_groups()
 
 
