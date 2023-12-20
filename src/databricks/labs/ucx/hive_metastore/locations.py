@@ -1,3 +1,4 @@
+import io
 import logging
 import os
 import re
@@ -6,6 +7,7 @@ from dataclasses import dataclass
 from typing import ClassVar
 
 from databricks.sdk import WorkspaceClient
+from databricks.sdk.service.workspace import ImportFormat
 
 from databricks.labs.ucx.framework.crawlers import CrawlerBase, SqlBackend
 from databricks.labs.ucx.mixins.sql import Row
@@ -28,9 +30,12 @@ class Mount:
 class ExternalLocations(CrawlerBase[ExternalLocation]):
     _prefix_size: ClassVar[list[int]] = [1, 12]
 
-    def __init__(self, ws: WorkspaceClient, sbe: SqlBackend, schema):
+    def __init__(self, ws: WorkspaceClient, sbe: SqlBackend, schema, folder: str | None = None):
         super().__init__(sbe, "hive_metastore", schema, "external_locations", ExternalLocation)
         self._ws = ws
+        if not folder:
+            folder = f"/Users/{ws.current_user.me().user_name}/.ucx"
+        self._folder = folder
 
     def _external_locations(self, tables: list[Row], mounts) -> Iterable[ExternalLocation]:
         min_slash = 2
@@ -121,6 +126,71 @@ class ExternalLocations(CrawlerBase[ExternalLocation]):
     def _try_fetch(self) -> Iterable[ExternalLocation]:
         for row in self._fetch(f"SELECT * FROM {self._schema}.{self._table}"):
             yield ExternalLocation(*row)
+
+    def _get_ext_location_definitions(self, missing_locations: list[ExternalLocation]) -> list:
+        tf_script = []
+        cnt = 1
+        for loc in missing_locations:
+            if loc.location.startswith("s3://"):
+                res_name = loc.location[5:].replace("/", "_")[:-1]
+            elif loc.location.startswith("gcs://"):
+                res_name = loc.location[6:].replace("/", "_")[:-1]
+            elif loc.location.startswith("abfss://"):
+                res_name = (
+                    loc.location[loc.location.index("@") + 1 :]
+                    .replace(".dfs.core.windows.net", "")
+                    .replace("/", "_")[:-1]
+                )
+            else:
+                res_name = f"name_{cnt}"
+            script = f'resource "databricks_external_location" "{res_name}" {{ \n'
+            script += f'    name = "{res_name}"\n'
+            script += f'    url  = "{loc.location[:-1]}"\n'
+            script += "    credential_name = databricks_storage_credential.<storage_credential_reference>.id\n"
+            script += "}\n"
+            tf_script.append(script)
+            cnt += 1
+        return tf_script
+
+    def _match_table_external_locations(self) -> tuple[list, list[ExternalLocation]]:
+        external_locations = list(self._ws.external_locations.list())
+        location_path = [_.url.lower() for _ in external_locations]
+        table_locations = self.snapshot()
+        matching_locations = []
+        missing_locations = []
+        for loc in table_locations:
+            if loc.location[:-1].lower() in location_path:
+                matching_locations.append(
+                    [external_locations[location_path.index(loc.location[:-1])].name, loc.table_count]
+                )
+                continue
+            missing_locations.append(loc)
+        return matching_locations, missing_locations
+
+    def save(self) -> str:
+        matching_locations, missing_locations = self._match_table_external_locations()
+        if len(matching_locations) > 0:
+            logger.info("following external locations are already configured.")
+            logger.info("sharing details of # tables that can be migrated for each location")
+            for _ in matching_locations:
+                logger.info(f"{_[1]} tables can be migrated using external location {_[0]}.")
+        if len(missing_locations) > 0:
+            logger.info("following external location need to be created.")
+            for _ in missing_locations:
+                logger.info(f"{_.table_count} tables can be migrated using external location {_.location}.")
+            buffer = io.StringIO()
+            for script in self._get_ext_location_definitions(missing_locations):
+                buffer.write(script)
+            buffer.seek(0)
+            return self._overwrite_mapping(buffer)
+        else:
+            logger.info("no additional external location to be created.")
+            return str(None)
+
+    def _overwrite_mapping(self, buffer) -> str:
+        path = f"{self._folder}/external_locations.tf"
+        self._ws.workspace.upload(path, buffer, overwrite=True, format=ImportFormat.AUTO)
+        return path
 
 
 class Mounts(CrawlerBase[Mount]):

@@ -26,8 +26,8 @@ def test_spn_crawler(ws, inventory_schema, make_job, make_pipeline, sql_backend)
         results.append(spn)
 
     assert len(results) >= 2
-    assert results[0].storage_account == _TEST_STORAGE_ACCOUNT
-    assert results[0].tenant_id == _TEST_TENANT_ID
+    assert results[1].storage_account == _TEST_STORAGE_ACCOUNT
+    assert results[1].tenant_id == _TEST_TENANT_ID
 
 
 @retried(on=[NotFound], timeout=timedelta(minutes=5))
