@@ -97,7 +97,7 @@ class ExternalLocationMapping:
             script += f'name = "name_{cnt}"\n'
             script += f'url  = "{loc.location}"\n'
             script += "credential_name = <storage_credential_reference>\n"
-            script += "}"
+            script += "}\n"
             tf_script.append(script)
             cnt += 1
         return tf_script

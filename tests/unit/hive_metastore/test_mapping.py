@@ -124,7 +124,7 @@ def test_save_external_location_mapping_missing_location():
         'name = "name_1"\n'
         'url  = "s3://test_location/test1"\n'
         "credential_name = <storage_credential_reference>\n"
-        "}"
+        "}\n"
     ) == content.read()
 
 
