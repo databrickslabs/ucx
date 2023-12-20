@@ -550,16 +550,18 @@ class ConfigureGroups:
 
     def run(self):
         self.renamed_group_prefix = self._ask_for_group("Backup prefix", default=self.renamed_group_prefix)
-        strategy = self._prompts.choice_from_dict("Choose how to map the workspace groups:", {
-            "Apply a Prefix": self._configure_prefix,
-            "Apply a Suffix": self._configure_suffix,
-            "Comma-separated list of workspace group names to migrate": self._configure_names,
-            "Match By External ID": self._configure_external,
-            "Regex Substitution": self._configure_substitution,
-            "Regex Matching": self._configure_matching,
-        })
+        strategy = self._prompts.choice_from_dict(
+            "Choose how to map the workspace groups:",
+            {
+                "Apply a Prefix": self._configure_prefix,
+                "Apply a Suffix": self._configure_suffix,
+                "Comma-separated list of workspace group names to migrate": self._configure_names,
+                "Match By External ID": self._configure_external,
+                "Regex Substitution": self._configure_substitution,
+                "Regex Matching": self._configure_matching,
+            },
+        )
         strategy()
-        return
 
     def _configure_prefix(self):
         prefix = self._ask_for_group("Enter a prefix to add to the workspace group name")
@@ -625,4 +627,3 @@ class ConfigureGroups:
         except re.error:
             logger.error(f"{regex_input} is an invalid regular expression")
             return False
-

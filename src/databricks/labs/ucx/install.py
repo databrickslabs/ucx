@@ -1,8 +1,6 @@
-import functools
 import json
 import logging
 import os
-import re
 import sys
 import time
 import webbrowser
@@ -47,7 +45,7 @@ from databricks.labs.ucx.hive_metastore.tables import Table, TableError
 from databricks.labs.ucx.runtime import main
 from databricks.labs.ucx.workspace_access.base import Permissions
 from databricks.labs.ucx.workspace_access.generic import WorkspaceObjectInfo
-from databricks.labs.ucx.workspace_access.groups import MigratedGroup, ConfigureGroups
+from databricks.labs.ucx.workspace_access.groups import ConfigureGroups, MigratedGroup
 
 TAG_STEP = "step"
 TAG_APP = "App"
