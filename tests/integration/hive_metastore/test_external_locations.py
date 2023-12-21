@@ -95,5 +95,5 @@ def test_save_external_location_mapping_missing_location(ws, sql_backend, invent
     ]
     sql_backend.save_table(f"{inventory_schema}.external_locations", locations, ExternalLocation)
     location_crawler = ExternalLocations(ws, sql_backend, inventory_schema)
-    path = location_crawler.save()
+    path = location_crawler.save_as_terraform_definitions_on_workspace("~/.ucx")
     assert ws.workspace.get_status(path)

@@ -30,11 +30,10 @@ class Mount:
 class ExternalLocations(CrawlerBase[ExternalLocation]):
     _prefix_size: ClassVar[list[int]] = [1, 12]
 
-    def __init__(self, ws: WorkspaceClient, sbe: SqlBackend, schema, folder: str | None = None):
+    def __init__(self, ws: WorkspaceClient, sbe: SqlBackend, schema):
         super().__init__(sbe, "hive_metastore", schema, "external_locations", ExternalLocation)
         self._ws = ws
-        if not folder:
-            folder = f"/Users/{ws.current_user.me().user_name}/.ucx"
+        folder = f"/Users/{ws.current_user.me().user_name}/.ucx"
         self._folder = folder
 
     def _external_locations(self, tables: list[Row], mounts) -> Iterable[ExternalLocation]:
@@ -142,7 +141,10 @@ class ExternalLocations(CrawlerBase[ExternalLocation]):
                     .replace("/", "_")[:-1]
                 )
             else:
+                # if the cloud storage url doesn't match the above condition or incorrect (example wasb://)
+                # generate a dummy resource name
                 res_name = f"name_{cnt}"
+                logger.info(f"generating generic resource name for {loc.location}")
             script = f'resource "databricks_external_location" "{res_name}" {{ \n'
             script += f'    name = "{res_name}"\n'
             script += f'    url  = "{loc.location[:-1]}"\n'
@@ -159,15 +161,19 @@ class ExternalLocations(CrawlerBase[ExternalLocation]):
         matching_locations = []
         missing_locations = []
         for loc in table_locations:
-            if loc.location[:-1].lower() in location_path:
-                matching_locations.append(
-                    [external_locations[location_path.index(loc.location[:-1])].name, loc.table_count]
-                )
+            # external_location.list returns url without trailing "/" but ExternalLocation.snapshot
+            # does so removing the trailing slash before comparing
+            if loc.location.rstrip("/").lower() in location_path:
+                # identify the index of the matching external_locations
+                iloc = location_path.index(loc.location.rstrip("/"))
+                matching_locations.append([external_locations[iloc].name, loc.table_count])
                 continue
             missing_locations.append(loc)
         return matching_locations, missing_locations
 
-    def save(self) -> str:
+    def save_as_terraform_definitions_on_workspace(self, folder: str | None = None) -> str:
+        if folder:
+            self._folder = folder
         matching_locations, missing_locations = self._match_table_external_locations()
         if len(matching_locations) > 0:
             logger.info("following external locations are already configured.")

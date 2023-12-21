@@ -129,9 +129,9 @@ def test_save_external_location_mapping_missing_location():
             ],
         }
     )
-    location_crawler = ExternalLocations(ws, sbe, "test", "~/.ucx")
+    location_crawler = ExternalLocations(ws, sbe, "test")
     ws.external_locations.list.return_value = [ExternalLocationInfo(name="loc1", url="s3://test_location/test11")]
-    location_crawler.save()
+    location_crawler.save_as_terraform_definitions_on_workspace("~/.ucx")
     (path, content), _ = ws.workspace.upload.call_args
     assert "~/.ucx/external_locations.tf" == path
     assert (
@@ -163,7 +163,7 @@ def test_save_external_location_mapping_no_missing_location():
             ],
         }
     )
-    location_crawler = ExternalLocations(ws, sbe, "test", "~/.ucx")
+    location_crawler = ExternalLocations(ws, sbe, "test")
     ws.external_locations.list.return_value = [ExternalLocationInfo(name="loc1", url="s3://test_location/test1")]
-    location_crawler.save()
+    location_crawler.save_as_terraform_definitions_on_workspace("~/.ucx")
     ws.workspace.upload.assert_not_called()
