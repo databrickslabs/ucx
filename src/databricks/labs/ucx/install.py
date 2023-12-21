@@ -555,9 +555,7 @@ class WorkspaceInstaller:
         self._ws.workspace.upload(path, intro.encode("utf8"), overwrite=True)
         url = self.notebook_link(path)
         logger.info(f"Created README notebook with job overview: {url}")
-        if self._skip_prompts or self._prompts.confirm(
-            "Open job overview in README notebook in your home directory?"
-        ):
+        if self._skip_prompts or self._prompts.confirm("Open job overview in README notebook in your home directory?"):
             webbrowser.open(url)
 
     def _replace_inventory_variable(self, text: str) -> str:
@@ -827,7 +825,7 @@ class WorkspaceInstaller:
             logger.info("UnInstalling UCX complete")
 
     def _remove_database(self):
-        if self._skip_prompts or  self._prompts.confirm(
+        if self._skip_prompts or self._prompts.confirm(
             f"Do you want to delete the inventory database {self._current_config.inventory_database} too?"
         ):
             logger.info(f"Deleting inventory database {self._current_config.inventory_database}")
