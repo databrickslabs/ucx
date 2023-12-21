@@ -4,7 +4,6 @@ import sys
 import webbrowser
 
 from databricks.sdk import WorkspaceClient
-from databricks.sdk.errors import NotFound
 
 from databricks.labs.ucx.account import AccountWorkspaces, WorkspaceInfo
 from databricks.labs.ucx.config import AccountConfig, ConnectConfig
