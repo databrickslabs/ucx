@@ -145,8 +145,8 @@ def test_save_external_location_mapping_missing_location():
         '    url  = "gcs://test_location2/test2"\n'
         "    credential_name = databricks_storage_credential.<storage_credential_reference>.id\n"
         "}\n"
-        'resource "databricks_external_location" "storagetest1_test2" { \n'
-        '    name = "storagetest1_test2"\n'
+        'resource "databricks_external_location" "cont1_storagetest1_test2" { \n'
+        '    name = "cont1_storagetest1_test2"\n'
         '    url  = "abfss://cont1@storagetest1.dfs.core.windows.net/test2"\n'
         "    credential_name = databricks_storage_credential.<storage_credential_reference>.id\n"
         "}\n"

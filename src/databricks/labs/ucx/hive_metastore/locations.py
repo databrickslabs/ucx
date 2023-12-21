@@ -33,8 +33,7 @@ class ExternalLocations(CrawlerBase[ExternalLocation]):
     def __init__(self, ws: WorkspaceClient, sbe: SqlBackend, schema):
         super().__init__(sbe, "hive_metastore", schema, "external_locations", ExternalLocation)
         self._ws = ws
-        folder = f"/Users/{ws.current_user.me().user_name}/.ucx"
-        self._folder = folder
+        self._folder = f"/Users/{ws.current_user.me().user_name}/.ucx"
 
     def _external_locations(self, tables: list[Row], mounts) -> Iterable[ExternalLocation]:
         min_slash = 2
@@ -131,30 +130,33 @@ class ExternalLocations(CrawlerBase[ExternalLocation]):
         cnt = 1
         for loc in missing_locations:
             if loc.location.startswith("s3://"):
-                res_name = loc.location[5:].replace("/", "_")[:-1]
+                res_name = loc.location[5:].rstrip("/").replace("/", "_")
             elif loc.location.startswith("gcs://"):
-                res_name = loc.location[6:].replace("/", "_")[:-1]
+                res_name = loc.location[6:].rstrip("/").replace("/", "_")
             elif loc.location.startswith("abfss://"):
+                container_name = loc.location[8 : loc.location.index("@")]
                 res_name = (
                     loc.location[loc.location.index("@") + 1 :]
                     .replace(".dfs.core.windows.net", "")
-                    .replace("/", "_")[:-1]
+                    .rstrip("/")
+                    .replace("/", "_")
                 )
+                res_name = f"{container_name}_{res_name}"
             else:
                 # if the cloud storage url doesn't match the above condition or incorrect (example wasb://)
-                # generate a dummy resource name
-                res_name = f"name_{cnt}"
-                logger.info(f"generating generic resource name for {loc.location}")
+                # dont generate tf script and ignore
+                logger.warning(f"unsupported storage format {loc.location}")
+                continue
             script = f'resource "databricks_external_location" "{res_name}" {{ \n'
             script += f'    name = "{res_name}"\n'
-            script += f'    url  = "{loc.location[:-1]}"\n'
+            script += f'    url  = "{loc.location.rstrip("/")}"\n'
             script += "    credential_name = databricks_storage_credential.<storage_credential_reference>.id\n"
             script += "}\n"
             tf_script.append(script)
             cnt += 1
         return tf_script
 
-    def _match_table_external_locations(self) -> tuple[list, list[ExternalLocation]]:
+    def _match_table_external_locations(self) -> tuple[list[list], list[ExternalLocation]]:
         external_locations = list(self._ws.external_locations.list())
         location_path = [_.url.lower() for _ in external_locations]
         table_locations = self.snapshot()
@@ -191,7 +193,7 @@ class ExternalLocations(CrawlerBase[ExternalLocation]):
             return self._overwrite_mapping(buffer)
         else:
             logger.info("no additional external location to be created.")
-            return str(None)
+            return ""
 
     def _overwrite_mapping(self, buffer) -> str:
         path = f"{self._folder}/external_locations.tf"
