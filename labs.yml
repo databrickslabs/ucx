@@ -44,5 +44,5 @@ commands:
   - name: create-table-mapping
     description: create initial table mapping for review
 
-  - name: aws-iam-profiles
-    description: WIP
+  - name: validate-external-locations
+    description: validates and provides mapping to external table to external location and shared generation tf scripts
