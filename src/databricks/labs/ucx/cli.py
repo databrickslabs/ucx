@@ -10,7 +10,7 @@ from databricks.labs.ucx.account import AccountWorkspaces, WorkspaceInfo
 from databricks.labs.ucx.config import AccountConfig, ConnectConfig
 from databricks.labs.ucx.framework.crawlers import StatementExecutionBackend
 from databricks.labs.ucx.framework.tui import Prompts
-from databricks.labs.ucx.hive_metastore import TablesCrawler
+from databricks.labs.ucx.hive_metastore import ExternalLocations, TablesCrawler
 from databricks.labs.ucx.hive_metastore.mapping import TableMapping
 from databricks.labs.ucx.install import WorkspaceInstaller
 from databricks.labs.ucx.installer import InstallationManager
@@ -90,6 +90,18 @@ def create_table_mapping():
     webbrowser.open(f"{ws.config.host}/#workspace{path}")
 
 
+def validate_external_locations():
+    ws = WorkspaceClient()
+    prompts = Prompts()
+    installation_manager = InstallationManager(ws)
+    installation = installation_manager.for_user(ws.current_user.me())
+    sql_backend = StatementExecutionBackend(ws, installation.config.warehouse_id)
+    location_crawler = ExternalLocations(ws, sql_backend, installation.config.inventory_database)
+    path = location_crawler.save_as_terraform_definitions_on_workspace()
+    if len(path) > 0 and prompts.confirm(f"external_locations.tf file written to {path}. Do you want to open it?"):
+        webbrowser.open(f"{ws.config.host}/#workspace{path}")
+
+
 MAPPING = {
     "open-remote-config": open_remote_config,
     "installations": list_installations,
@@ -97,6 +109,7 @@ MAPPING = {
     "sync-workspace-info": sync_workspace_info,
     "manual-workspace-info": manual_workspace_info,
     "create-table-mapping": create_table_mapping,
+    "validate-external-locations": validate_external_locations,
     "skip": skip,
 }
 
