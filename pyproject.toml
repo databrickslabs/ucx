@@ -64,6 +64,7 @@ path = ".venv"
 test        = "pytest -n auto --cov src --cov-report=xml --timeout 30 tests/unit"
 coverage    = "pytest -n auto --cov src tests/unit --timeout 30 --cov-report=html"
 integration = "pytest -n 10 --cov src tests/integration"
+performance = "pytest --cov src tests/performance"
 fmt         = ["isort .",
                "black .",
                "ruff  . --fix",

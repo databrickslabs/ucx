@@ -14,6 +14,7 @@ from typing import BinaryIO, Optional
 import pytest
 from databricks.sdk import AccountClient, WorkspaceClient
 from databricks.sdk.core import DatabricksError
+from databricks.sdk.errors import NotFound
 from databricks.sdk.service import compute, iam, jobs, pipelines, workspace
 from databricks.sdk.service.catalog import (
     CatalogInfo,
@@ -23,6 +24,7 @@ from databricks.sdk.service.catalog import (
     TableType,
 )
 from databricks.sdk.service.sql import (
+    AlertOptions,
     CreateWarehouseRequestWarehouseType,
     Query,
     QueryInfo,
@@ -674,10 +676,7 @@ def make_warehouse(ws, make_random):
 
 
 def _is_in_debug() -> bool:
-    return os.path.basename(sys.argv[0]) in [
-        "_jb_pytest_runner.py",
-        "testlauncher.py",
-    ]
+    return os.path.basename(sys.argv[0]) in ["_jb_pytest_runner.py", "testlauncher.py", "pytest"]
 
 
 @pytest.fixture
@@ -792,6 +791,7 @@ def make_table(ws, sql_backend, make_schema, make_random) -> Generator[Callable[
         external_csv: str | None = None,
         view: bool = False,
         tbl_properties: dict[str, str] | None = None,
+        function: bool = False,
     ) -> TableInfo:
         if schema_name is None:
             schema = make_schema(catalog_name=catalog_name)
@@ -803,12 +803,15 @@ def make_table(ws, sql_backend, make_schema, make_random) -> Generator[Callable[
         data_source_format = None
         storage_location = None
         full_name = f"{catalog_name}.{schema_name}.{name}".lower()
+
         ddl = f'CREATE {"VIEW" if view else "TABLE"} {full_name}'
         if view:
             table_type = TableType.VIEW
         if ctas is not None:
             # temporary (if not view)
             ddl = f"{ddl} AS {ctas}"
+        elif function:
+            ddl = f"{ddl}() RETURNS INT NOT DETERMINISTIC CONTAINS SQL RETURN (rand() * 6)::INT + 1;"
         elif non_delta:
             table_type = TableType.MANAGED
             data_source_format = DataSourceFormat.JSON
@@ -869,21 +872,53 @@ def make_table(ws, sql_backend, make_schema, make_random) -> Generator[Callable[
 
 @pytest.fixture
 def make_query(ws, make_table, make_random):
-    def create() -> QueryInfo:
-        table = make_table()
-        query_name = f"ucx_query_Q{make_random(4)}"
-        query = ws.queries.create(
+    def create(*, query_name: str | None = None, query: str | None = None) -> QueryInfo:
+        if query_name is None:
+            query_name = f"ucx_query_Q{make_random(4)}"
+        if query is None:
+            table = make_table()
+            query = f"SELECT * FROM {table.schema_name}.{table.name}"
+
+        dbsql_query = ws.queries.create(
             name=f"{query_name}",
             description="TEST QUERY FOR UCX",
-            query=f"SELECT * FROM {table.schema_name}.{table.name}",
+            query=query,
         )
-        logger.info(f"Query Created {query_name}: {ws.config.host}/sql/editor/{query.id}")
-        return query
+        logger.info(f"Query Created {query_name}: {ws.config.host}/sql/editor/{dbsql_query.id}")
+        return dbsql_query
 
     def remove(query: Query):
         try:
             ws.queries.delete(query_id=query.id)
-        except RuntimeError as e:
+        except NotFound as e:
             logger.info(f"Can't drop query {e}")
 
     yield from factory("query", create, remove)
+
+
+@pytest.fixture
+def make_alert(ws, sql_backend, make_random):
+    def create(query_id, *, name: str | None = None):
+        if name is None:
+            name = f"ucx_T{make_random(4)}"
+        return ws.alerts.create(options=AlertOptions(column="1", op="==", value="1"), name=name, query_id=query_id)
+
+    yield from factory(
+        "alert",
+        create,
+        lambda alert: ws.alerts.delete(alert.id),
+    )
+
+
+@pytest.fixture
+def make_dashboard(ws, sql_backend, make_random):
+    def create(*, name: str | None = None):
+        if name is None:
+            name = f"ucx_T{make_random(4)}"
+        return ws.dashboards.create(name=name)
+
+    yield from factory(
+        "dashboard",
+        create,
+        lambda dashboard: ws.dashboards.delete(dashboard.id),
+    )
