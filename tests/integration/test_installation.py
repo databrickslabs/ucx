@@ -40,6 +40,7 @@ def test_job_failure_propagates_correct_error_message_and_logs(ws, sql_backend, 
             "main": default_cluster_id,
             "tacl": tacl_cluster_id,
         },
+        skip_prompts=True,
     )
 
     sql_backend.execute(f"DROP SCHEMA {inventory_database} CASCADE")
@@ -156,6 +157,7 @@ def test_jobs_with_no_inventory_database(
             "main": default_cluster_id,
             "tacl": tacl_cluster_id,
         },
+        skip_prompts=True,
     )
 
     try:
@@ -260,6 +262,7 @@ def test_uninstallation(
             "main": default_cluster_id,
             "tacl": tacl_cluster_id,
         },
+        skip_prompts=True,
     )
     install_folder = install._install_folder
     assessment_job_id = install._state.jobs["assessment"]
