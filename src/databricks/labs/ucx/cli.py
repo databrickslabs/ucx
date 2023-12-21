@@ -58,13 +58,6 @@ def skip(schema: str, table: str | None = None):
         return None
     warehouse_id = installation.config.warehouse_id
     sql_backend = StatementExecutionBackend(ws, warehouse_id)
-    except NotFound:
-        logger.error(
-            "Couldn't find UCX configuration in the user's home folder. "
-            "Make sure the current user has configured and installed UCX."
-        )
-        return None
-
     mapping = TableMapping(ws)
     if table:
         mapping.skip_table(sql_backend, schema, table)
@@ -108,9 +101,6 @@ def validate_external_locations():
         webbrowser.open(f"{ws.config.host}/#workspace{path}")
 
 
-def ensure_assessment_run():
-def ensure_assessment_run(run: bool = False):
-def ensure_assessment_run(*, run: bool = False):
 def ensure_assessment_run():
     ws = WorkspaceClient()
     installation_manager = InstallationManager(ws)
