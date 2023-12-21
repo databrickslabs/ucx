@@ -36,6 +36,7 @@ def test_migrate_managed_tables(ws, sql_backend, inventory_schema, make_catalog,
     assert target_table_properties["upgraded_from"] == src_managed_table.full_name
 
 
+@retried(on=[NotFound], timeout=timedelta(minutes=5))
 def test_migrate_tables_with_cache_should_not_create_table(
     ws, sql_backend, inventory_schema, make_random, make_catalog, make_schema, make_table
 ):
