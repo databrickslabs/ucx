@@ -1,5 +1,47 @@
 # Version changelog
 
+## 0.7.0
+
+* Added `databricks labs ucx create-table-mapping` and `databricks labs ucx manual-workspace-info` commands for CLI ([#682](https://github.com/databrickslabs/ucx/pull/682)).
+* Added `databricks labs ucx installations` command ([#679](https://github.com/databrickslabs/ucx/pull/679)).
+* Added `databricks labs ucx skip --schema ... --table ...` command to mark table/schema for skipping in the table migration process ([#680](https://github.com/databrickslabs/ucx/pull/680)).
+* Added `workspace_group_name` and `account_group_name` to `make_ucx_group` fixture ([#664](https://github.com/databrickslabs/ucx/pull/664)).
+* Added capturing `ANY FILE` and `ANONYMOUS FUNCTION` grants ([#653](https://github.com/databrickslabs/ucx/pull/653)).
+* Added cluster override and handle case of write protected DBFS ([#610](https://github.com/databrickslabs/ucx/pull/610)).
+* Added cluster policy selector in the installer ([#655](https://github.com/databrickslabs/ucx/pull/655)).
+* Added detailed UCX pre-requisite information to README.md ([#689](https://github.com/databrickslabs/ucx/pull/689)).
+* Added filters to run only cloud specific task ([#681](https://github.com/databrickslabs/ucx/pull/681)).
+* Added interactive wizard for `databricks labs uninstall ucx` command ([#657](https://github.com/databrickslabs/ucx/pull/657)).
+* Added more granular error retry logic ([#704](https://github.com/databrickslabs/ucx/pull/704)).
+* Added parallel fetching of registered model identifiers to speed-up assessment workflow ([#691](https://github.com/databrickslabs/ucx/pull/691)).
+* Added retry on workspace listing ([#659](https://github.com/databrickslabs/ucx/pull/659)).
+* Added support for mapping workspace group to account group by prefix/suffix/regex/external id ([#650](https://github.com/databrickslabs/ucx/pull/650)).
+* Changed cluster security mode from NONE to LEGACY_SINGLE_USER, as `crawl_tables` was failing when run on non-UC Workspace in No Isolation mode with unable to access the config file ([#661](https://github.com/databrickslabs/ucx/pull/661)).
+* Changed the fields of the table "Tables" to lower case ([#684](https://github.com/databrickslabs/ucx/pull/684)).
+* Cleanup README.md ([#695](https://github.com/databrickslabs/ucx/pull/695)).
+* Cleanup installer framework and speed up test execution ([#711](https://github.com/databrickslabs/ucx/pull/711)).
+* Decouple group configuration from `install.py` ([#714](https://github.com/databrickslabs/ucx/pull/714)).
+* Enabled integration tests for `EXTERNAL` table migrations ([#677](https://github.com/databrickslabs/ucx/pull/677)).
+* Enforced `mypy` validation ([#713](https://github.com/databrickslabs/ucx/pull/713)).
+* Filtering out inventory database from loading into tables and filtering out the same from grant detail view ([#705](https://github.com/databrickslabs/ucx/pull/705)).
+* Fixed documentation for `reflect_account_groups_on_workspace` task and updated `CONTRIBUTING.md` guide ([#654](https://github.com/databrickslabs/ucx/pull/654)).
+* Fixed for secret scope apply task always raises ValueError ([#683](https://github.com/databrickslabs/ucx/pull/683)).
+* Fixed some flaky integration tests ([#700](https://github.com/databrickslabs/ucx/pull/700)).
+* More `mypy` chores ([#697](https://github.com/databrickslabs/ucx/pull/697)).
+* Moved `ExternalLocations` and `Mounts` to `locations` module ([#692](https://github.com/databrickslabs/ucx/pull/692)).
+* New CLI command for workspace mapping ([#678](https://github.com/databrickslabs/ucx/pull/678)).
+* No more `mypy` chores after this ([#699](https://github.com/databrickslabs/ucx/pull/699)).
+* Reduce server load for getting workspace groups and their members ([#666](https://github.com/databrickslabs/ucx/pull/666)).
+* Some `mypy` chores ([#696](https://github.com/databrickslabs/ucx/pull/696)).
+* Throwing ManyError on migrate-groups tasks ([#710](https://github.com/databrickslabs/ucx/pull/710)).
+* Updated installation documentation to use Databricks CLI ([#686](https://github.com/databrickslabs/ucx/pull/686)).
+
+Dependency updates:
+
+ * Updated databricks-sdk requirement from ~=0.13.0 to ~=0.14.0 ([#651](https://github.com/databrickslabs/ucx/pull/651)).
+ * Updated databricks-sdk requirement from ~=0.14.0 to ~=0.15.0 ([#687](https://github.com/databrickslabs/ucx/pull/687)).
+ * Updated databricks-sdk requirement from ~=0.15.0 to ~=0.16.0 ([#712](https://github.com/databrickslabs/ucx/pull/712)).
+
 ## 0.6.2
 
  * Added current version of UCX to task logs ([#566](https://github.com/databrickslabs/ucx/pull/566)).
