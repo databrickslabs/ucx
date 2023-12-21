@@ -98,10 +98,7 @@ def validate_external_locations():
     sql_backend = StatementExecutionBackend(ws, installation.config.warehouse_id)
     location_crawler = ExternalLocations(ws, sql_backend, installation.config.inventory_database)
     path = location_crawler.save_as_terraform_definitions_on_workspace()
-    if (
-        len(path) > 0
-        and prompts.confirm(f"external_locations.tf file written to {path}. Do you want to open it?") == "Yes"
-    ):
+    if len(path) > 0 and prompts.confirm(f"external_locations.tf file written to {path}. Do you want to open it?"):
         webbrowser.open(f"{ws.config.host}/#workspace{path}")
 
 

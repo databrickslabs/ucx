@@ -17,7 +17,7 @@ def test_permission_for_files_anonymous_func(sql_backend, inventory_schema, make
     group_d = make_group()
 
     sql_backend.execute(f"GRANT READ_METADATA ON ANY FILE TO `{group_a.display_name}`")
-    sql_backend.execute(f"GRANT SELECT ON ANONYMOUS FUNCTION TO `{group_b.display_name}`")
+    sql_backend.execute(f"GRANT SELECT ON ANONYMOUS FUNCTION TO `{group_c.display_name}`")
 
     tables = StaticTablesCrawler(sql_backend, inventory_schema, [])
     grants = GrantsCrawler(tables)
@@ -35,9 +35,9 @@ def test_permission_for_files_anonymous_func(sql_backend, inventory_schema, make
     for any_file_grant in grants._grants(any_file=True):
         any_file_actual[any_file_grant.principal] = any_file_grant.action_type
 
-    assert group_c.display_name in any_file_actual
-    assert any_file_actual[group_c.display_name] == "READ_METADATA"
-    assert any_file_actual[group_a.display_name] == any_file_actual[group_c.display_name]
+    assert group_b.display_name in any_file_actual
+    assert any_file_actual[group_b.display_name] == "READ_METADATA"
+    assert any_file_actual[group_a.display_name] == any_file_actual[group_b.display_name]
 
     anonymous_function_actual = {}
     for ano_func_grant in grants._grants(anonymous_function=True):
@@ -45,7 +45,7 @@ def test_permission_for_files_anonymous_func(sql_backend, inventory_schema, make
 
     assert group_d.display_name in anonymous_function_actual
     assert anonymous_function_actual[group_d.display_name] == "SELECT"
-    assert anonymous_function_actual[group_b.display_name] == anonymous_function_actual[group_d.display_name]
+    assert anonymous_function_actual[group_c.display_name] == anonymous_function_actual[group_d.display_name]
 
 
 def test_owner_permissions_for_tables_and_schemas(sql_backend, inventory_schema, make_schema, make_table, make_group):

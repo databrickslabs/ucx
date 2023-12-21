@@ -139,7 +139,6 @@ class WorkspaceInstaller:
         promtps: Prompts | None = None,
         wheels: Wheels | None = None,
         sql_backend: SqlBackend | None = None,
-        skip_prompts: bool = False,
     ):
         if "DATABRICKS_RUNTIME_VERSION" in os.environ:
             msg = "WorkspaceInstaller is not supposed to be executed in Databricks Runtime"
@@ -157,7 +156,6 @@ class WorkspaceInstaller:
         self._dashboards: dict[str, str] = {}
         self._state = InstallState(ws, self._install_folder)
         self._install_override_clusters = None
-        self._skip_prompts = skip_prompts
 
     def run(self):
         logger.info(f"Installing UCX v{self._wheels.version()}")
@@ -193,7 +191,7 @@ class WorkspaceInstaller:
             if gscript.enabled:
                 logger.info("Already exists and enabled. Skipped creating a new one.")
             elif not gscript.enabled:
-                if self._skip_prompts or self._prompts.confirm(
+                if self._prompts.confirm(
                     "Your Global Init Script with required spark config is disabled, Do you want to enable it?"
                 ):
                     logger.info("Enabling Global Init Script...")
@@ -201,7 +199,7 @@ class WorkspaceInstaller:
                 else:
                     logger.info("No change to Global Init Script is made.")
         elif not gscript:
-            if self._skip_prompts or self._prompts.confirm(
+            if self._prompts.confirm(
                 "No Global Init Script with Required Spark Config exists, Do you want to create one?"
             ):
                 logger.info("Creating Global Init Script...")
@@ -217,10 +215,9 @@ class WorkspaceInstaller:
         wheels: Wheels | None = None,
         override_clusters: dict[str, str] | None = None,
         sql_backend: SqlBackend | None = None,
-        skip_prompts: bool = False,
     ) -> "WorkspaceInstaller":
         workspace_installer = WorkspaceInstaller(
-            ws, prefix=prefix, promtps=promtps, wheels=wheels, sql_backend=sql_backend, skip_prompts=skip_prompts
+            ws, prefix=prefix, promtps=promtps, wheels=wheels, sql_backend=sql_backend
         )
         logger.info(f"Installing UCX v{workspace_installer._wheels.version()} on {ws.config.host}")
         workspace_installer._config = config
@@ -555,7 +552,7 @@ class WorkspaceInstaller:
         self._ws.workspace.upload(path, intro.encode("utf8"), overwrite=True)
         url = self.notebook_link(path)
         logger.info(f"Created README notebook with job overview: {url}")
-        if self._skip_prompts or self._prompts.confirm("Open job overview in README notebook in your home directory?"):
+        if self._prompts.confirm("Open job overview in README notebook in your home directory?"):
             webbrowser.open(url)
 
     def _replace_inventory_variable(self, text: str) -> str:
@@ -803,7 +800,7 @@ class WorkspaceInstaller:
         return latest_status
 
     def uninstall(self):
-        if self._skip_prompts or self._prompts.confirm(
+        if self._prompts.confirm(
             "Do you want to uninstall ucx from the workspace too, this would "
             "remove ucx project folder, dashboards, queries and jobs"
         ):
@@ -825,7 +822,7 @@ class WorkspaceInstaller:
             logger.info("UnInstalling UCX complete")
 
     def _remove_database(self):
-        if self._skip_prompts or self._prompts.confirm(
+        if self._prompts.confirm(
             f"Do you want to delete the inventory database {self._current_config.inventory_database} too?"
         ):
             logger.info(f"Deleting inventory database {self._current_config.inventory_database}")
