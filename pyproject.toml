@@ -132,7 +132,9 @@ ignore = [
     # Ignore complexity
     "C901", "PLR0911", "PLR0912", "PLR0913", "PLR0915",
     # Ignore flaky Import block is un-sorted or un-formatted
-    "I001"
+    "I001",
+    # Ignore Exception must not use a string literal, assign to variable first
+    "EM101",
 ]
 extend-exclude = [
     "notebooks/*.py"

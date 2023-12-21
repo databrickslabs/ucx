@@ -139,7 +139,7 @@ def test_install_cluster_override_jobs(ws, mocker, tmp_path):
     wheels = create_autospec(Wheels)
     install = WorkspaceInstaller(ws, wheels=wheels, promtps=MockPrompts({".*": ""}))
     install._question = mock_question_cluster_override
-    install._current_config.override_clusters = {"main": cluster_id, "tacl": cluster_id}
+    install.current_config.override_clusters = {"main": cluster_id, "tacl": cluster_id}
     install._job_dashboard_task = MagicMock(name="_job_dashboard_task")  # disable problematic task
     install._create_jobs()
 
@@ -168,7 +168,7 @@ def test_write_protected_dbfs(ws, tmp_path):
     install._job_dashboard_task = MagicMock(name="_job_dashboard_task")  # disable problematic task
     install._create_jobs()
 
-    res = install._current_config.override_clusters
+    res = install.current_config.override_clusters
     assert res is not None
     assert res["main"] == cluster_id
     assert res["tacl"] == cluster_id
@@ -187,7 +187,7 @@ def test_writeable_dbfs(ws, tmp_path):
     install._job_dashboard_task = MagicMock(name="_job_dashboard_task")  # disable problematic task
     install._create_jobs()
 
-    res = install._current_config.override_clusters
+    res = install.current_config.override_clusters
     assert res is None
 
 
@@ -201,7 +201,7 @@ def test_unexpected_dbfs_upload_error(ws, tmp_path):
     with pytest.raises(OperationFailed) as failure:
         install = WorkspaceInstaller(ws, wheels=wheels)
         install._question = mock_question_cluster_override
-        install._current_config.override_clusters = {"main": cluster_id, "tacl": cluster_id}
+        install.current_config.override_clusters = {"main": cluster_id, "tacl": cluster_id}
         install._job_dashboard_task = MagicMock(name="_job_dashboard_task")  # disable problematic task
         install._create_jobs()
     assert "500 error" == str(failure.value)
@@ -216,12 +216,6 @@ def test_replace_clusters_for_integration_tests(ws):
         WorkspaceConfig(inventory_database="a"),
         override_clusters={"main": "abc"},
         sql_backend=MockBackend(),
-        promtps=MockPrompts(
-            {
-                r".*No Global Init Script.*": "yes",
-                r".*": "",
-            }
-        ),
         wheels=wheels,
     )
     assert return_value

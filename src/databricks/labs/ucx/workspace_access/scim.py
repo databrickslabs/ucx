@@ -28,6 +28,7 @@ class ScimSupport(AclSupport):
         self._ws = ws
         self._verify_timeout = verify_timeout
         self._snapshot = {}
+        # TODO: we may need to inject GroupManager here for proper group listing
         for group in self._ws.groups.list(attributes="id,displayName,meta,roles,entitlements"):
             if not group.display_name:
                 continue

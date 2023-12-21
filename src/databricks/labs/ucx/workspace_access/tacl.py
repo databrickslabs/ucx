@@ -2,6 +2,7 @@ import collections
 import dataclasses
 import functools
 import json
+import threading
 from collections.abc import Callable, Iterator
 from functools import partial
 
@@ -16,6 +17,7 @@ class TableAclSupport(AclSupport):
     def __init__(self, grants_crawler: GrantsCrawler, sql_backend: SqlBackend):
         self._grants_crawler = grants_crawler
         self._sql_backend = sql_backend
+        self._lock = threading.Lock()
 
     def get_crawler_tasks(self) -> Iterator[Callable[..., Permissions | None]]:
         # TableAcl grant/revoke operations are not atomic. When granting the permissions,
@@ -36,23 +38,15 @@ class TableAclSupport(AclSupport):
         # The exception is OWN permission which are set with ALTER table
 
         folded_actions = collections.defaultdict(set)
-        own_permissions = set()
         for grant in self._grants_crawler.snapshot():
             key = (grant.principal, grant.this_type_and_key())
-            if grant.action_type.upper() == "OWN":
-                own_permissions.add(key)
-            else:
-                folded_actions[key].add(grant.action_type)
+            folded_actions[key].add(grant.action_type)
 
         def inner(object_type: str, object_id: str, grant: Grant) -> Permissions:
             return Permissions(object_type=object_type, object_id=object_id, raw=json.dumps(dataclasses.asdict(grant)))
 
         for (principal, (object_type, object_id)), actions in folded_actions.items():
             grant = self._from_reduced(object_type, object_id, principal, ", ".join(sorted(actions)))
-            yield functools.partial(inner, object_type=object_type, object_id=object_id, grant=grant)
-
-        for principal, (object_type, object_id) in own_permissions:
-            grant = self._from_reduced(object_type, object_id, principal, "OWN")
             yield functools.partial(inner, object_type=object_type, object_id=object_id, grant=grant)
 
     def _from_reduced(self, object_type: str, object_id: str, principal: str, action_type: str):
@@ -90,6 +84,10 @@ class TableAclSupport(AclSupport):
             # this is a grant for user, service principal, or irrelevant group
             return None
         target_grant = dataclasses.replace(grant, principal=target_principal)
-        sql = target_grant.hive_grant_sql()
         # this has to be executed on tacl cluster, otherwise - use SQLExecutionAPI backend & Warehouse
-        return partial(self._sql_backend.execute, sql)
+        return partial(self._apply_grant, target_grant)
+
+    def _apply_grant(self, grant: Grant):
+        for sql in grant.hive_grant_sql():
+            self._sql_backend.execute(sql)
+        return True

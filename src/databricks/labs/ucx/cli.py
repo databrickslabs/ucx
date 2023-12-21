@@ -4,6 +4,7 @@ import sys
 import webbrowser
 
 from databricks.sdk import WorkspaceClient
+from databricks.sdk.errors import NotFound
 
 from databricks.labs.ucx.account import AccountWorkspaces, WorkspaceInfo
 from databricks.labs.ucx.config import AccountConfig, ConnectConfig
@@ -96,8 +97,8 @@ def validate_external_locations():
     installation = installation_manager.for_user(ws.current_user.me())
     sql_backend = StatementExecutionBackend(ws, installation.config.warehouse_id)
     location_crawler = ExternalLocations(ws, sql_backend, installation.config.inventory_database)
-    path = location_crawler.save_as_terraform_definitions_on_workspace()
-    if len(path) > 0 and prompts.confirm(f"external_locations.tf file written to {path}. Do you want to open it?"):
+    path = location_crawler.save_as_terraform_definitions_on_workspace(installation.path)
+    if path and prompts.confirm(f"external_locations.tf file written to {path}. Do you want to open it?"):
         webbrowser.open(f"{ws.config.host}/#workspace{path}")
 
 
