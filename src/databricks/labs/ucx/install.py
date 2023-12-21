@@ -193,7 +193,7 @@ class WorkspaceInstaller:
             if gscript.enabled:
                 logger.info("Already exists and enabled. Skipped creating a new one.")
             elif not gscript.enabled:
-                if not self._skip_prompts and self._prompts.confirm(
+                if self._skip_prompts or self._prompts.confirm(
                     "Your Global Init Script with required spark config is disabled, Do you want to enable it?"
                 ):
                     logger.info("Enabling Global Init Script...")
@@ -201,7 +201,7 @@ class WorkspaceInstaller:
                 else:
                     logger.info("No change to Global Init Script is made.")
         elif not gscript:
-            if not self._skip_prompts and self._prompts.confirm(
+            if self._skip_prompts or self._prompts.confirm(
                 "No Global Init Script with Required Spark Config exists, Do you want to create one?"
             ):
                 logger.info("Creating Global Init Script...")
@@ -555,7 +555,7 @@ class WorkspaceInstaller:
         self._ws.workspace.upload(path, intro.encode("utf8"), overwrite=True)
         url = self.notebook_link(path)
         logger.info(f"Created README notebook with job overview: {url}")
-        if not self._skip_prompts and self._prompts.confirm(
+        if self._skip_prompts or self._prompts.confirm(
             "Open job overview in README notebook in your home directory?"
         ):
             webbrowser.open(url)
@@ -805,7 +805,7 @@ class WorkspaceInstaller:
         return latest_status
 
     def uninstall(self):
-        if self._prompts.confirm(
+        if self._skip_prompts or self._prompts.confirm(
             "Do you want to uninstall ucx from the workspace too, this would "
             "remove ucx project folder, dashboards, queries and jobs"
         ):
@@ -827,7 +827,7 @@ class WorkspaceInstaller:
             logger.info("UnInstalling UCX complete")
 
     def _remove_database(self):
-        if self._prompts.confirm(
+        if self._skip_prompts or  self._prompts.confirm(
             f"Do you want to delete the inventory database {self._current_config.inventory_database} too?"
         ):
             logger.info(f"Deleting inventory database {self._current_config.inventory_database}")
