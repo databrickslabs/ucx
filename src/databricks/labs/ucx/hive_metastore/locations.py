@@ -33,7 +33,6 @@ class ExternalLocations(CrawlerBase[ExternalLocation]):
     def __init__(self, ws: WorkspaceClient, sbe: SqlBackend, schema):
         super().__init__(sbe, "hive_metastore", schema, "external_locations", ExternalLocation)
         self._ws = ws
-        self._folder = f"/Users/{ws.current_user.me().user_name}/.ucx"
 
     def _external_locations(self, tables: list[Row], mounts) -> Iterable[ExternalLocation]:
         min_slash = 2
@@ -173,9 +172,7 @@ class ExternalLocations(CrawlerBase[ExternalLocation]):
             missing_locations.append(loc)
         return matching_locations, missing_locations
 
-    def save_as_terraform_definitions_on_workspace(self, folder: str | None = None) -> str:
-        if folder:
-            self._folder = folder
+    def save_as_terraform_definitions_on_workspace(self, folder: str) -> str | None:
         matching_locations, missing_locations = self._match_table_external_locations()
         if len(matching_locations) > 0:
             logger.info("following external locations are already configured.")
@@ -190,13 +187,12 @@ class ExternalLocations(CrawlerBase[ExternalLocation]):
             for script in self._get_ext_location_definitions(missing_locations):
                 buffer.write(script)
             buffer.seek(0)
-            return self._overwrite_mapping(buffer)
-        else:
-            logger.info("no additional external location to be created.")
-            return ""
+            return self._overwrite_mapping(folder, buffer)
+        logger.info("no additional external location to be created.")
+        return None
 
-    def _overwrite_mapping(self, buffer) -> str:
-        path = f"{self._folder}/external_locations.tf"
+    def _overwrite_mapping(self, folder, buffer) -> str:
+        path = f"{folder}/external_locations.tf"
         self._ws.workspace.upload(path, buffer, overwrite=True, format=ImportFormat.AUTO)
         return path
 

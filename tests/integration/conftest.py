@@ -16,6 +16,7 @@ from databricks.labs.ucx.framework.crawlers import SqlBackend
 from databricks.labs.ucx.hive_metastore import TablesCrawler
 from databricks.labs.ucx.hive_metastore.tables import Table
 from databricks.labs.ucx.mixins.fixtures import *  # noqa: F403
+from databricks.labs.ucx.workspace_access.groups import MigratedGroup
 
 logging.getLogger("tests").setLevel("DEBUG")
 logging.getLogger("databricks.labs.ucx").setLevel("DEBUG")
@@ -100,6 +101,17 @@ def make_ucx_group(make_random, make_group, make_acc_group, make_user):
         ws_group = make_group(display_name=workspace_group_name, members=members, entitlements=["allow-cluster-create"])
         acc_group = make_acc_group(display_name=account_group_name, members=members)
         return ws_group, acc_group
+
+    return inner
+
+
+@pytest.fixture
+def make_group_pair(make_random, make_group):
+    def inner() -> MigratedGroup:
+        suffix = make_random(4)
+        ws_group = make_group(display_name=f"old_{suffix}", entitlements=["allow-cluster-create"])
+        acc_group = make_group(display_name=f"new_{suffix}")
+        return MigratedGroup.partial_info(ws_group, acc_group)
 
     return inner
 

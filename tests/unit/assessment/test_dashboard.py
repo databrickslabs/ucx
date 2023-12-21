@@ -39,7 +39,7 @@ def test_dashboard(mocker):
         remote_folder="/users/not_a_real_user/queries",
         name_prefix="Assessment",
         warehouse_id="000000",
-        query_text_callback=installer._current_config.replace_inventory_variable,
+        query_text_callback=installer.current_config.replace_inventory_variable,
     )
     dashboards = dash.create_dashboards()
     assert dashboards is not None

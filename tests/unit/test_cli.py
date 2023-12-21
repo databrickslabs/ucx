@@ -29,7 +29,6 @@ def test_skip_no_ucx(caplog, mocker):
     current_user.me.return_value = User(user_name="foo", groups=[ComplexValue(display="admins")])
     current_user.return_value = None
     mocker.patch("databricks.sdk.WorkspaceClient.current_user", return_value=current_user)
-    # ws.current_user = current_user
     mocker.patch("databricks.labs.ucx.installer.InstallationManager.__init__", return_value=None)
     mocker.patch("databricks.labs.ucx.installer.InstallationManager.for_user", return_value=None)
     skip(schema="schema", table="table")

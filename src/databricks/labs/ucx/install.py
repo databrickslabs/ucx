@@ -1,3 +1,4 @@
+import functools
 import json
 import logging
 import os
@@ -36,6 +37,7 @@ from databricks.labs.ucx.framework.crawlers import (
 )
 from databricks.labs.ucx.framework.dashboards import DashboardFromFiles
 from databricks.labs.ucx.framework.install_state import InstallState
+from databricks.labs.ucx.framework.parallel import Threads
 from databricks.labs.ucx.framework.tasks import _TASKS, Task
 from databricks.labs.ucx.framework.tui import Prompts
 from databricks.labs.ucx.framework.wheels import Wheels, find_project_root
@@ -114,19 +116,25 @@ def deploy_schema(sql_backend: SqlBackend, inventory_schema: str):
 
     deployer = SchemaDeployer(sql_backend, inventory_schema, ucx)
     deployer.deploy_schema()
-    deployer.deploy_table("azure_service_principals", AzureServicePrincipalInfo)
-    deployer.deploy_table("clusters", ClusterInfo)
-    deployer.deploy_table("global_init_scripts", GlobalInitScriptInfo)
-    deployer.deploy_table("jobs", JobInfo)
-    deployer.deploy_table("pipelines", PipelineInfo)
-    deployer.deploy_table("external_locations", ExternalLocation)
-    deployer.deploy_table("mounts", Mount)
-    deployer.deploy_table("grants", Grant)
-    deployer.deploy_table("groups", MigratedGroup)
-    deployer.deploy_table("tables", Table)
-    deployer.deploy_table("table_failures", TableError)
-    deployer.deploy_table("workspace_objects", WorkspaceObjectInfo)
-    deployer.deploy_table("permissions", Permissions)
+    table = functools.partial(deployer.deploy_table)
+    Threads.strict(
+        "deploy tables",
+        [
+            functools.partial(table, "azure_service_principals", AzureServicePrincipalInfo),
+            functools.partial(table, "clusters", ClusterInfo),
+            functools.partial(table, "global_init_scripts", GlobalInitScriptInfo),
+            functools.partial(table, "jobs", JobInfo),
+            functools.partial(table, "pipelines", PipelineInfo),
+            functools.partial(table, "external_locations", ExternalLocation),
+            functools.partial(table, "mounts", Mount),
+            functools.partial(table, "grants", Grant),
+            functools.partial(table, "groups", MigratedGroup),
+            functools.partial(table, "tables", Table),
+            functools.partial(table, "table_failures", TableError),
+            functools.partial(table, "workspace_objects", WorkspaceObjectInfo),
+            functools.partial(table, "permissions", Permissions),
+        ],
+    )
     deployer.deploy_view("objects", "queries/views/objects.sql")
     deployer.deploy_view("grant_detail", "queries/views/grant_detail.sql")
 
@@ -144,8 +152,6 @@ class WorkspaceInstaller:
         if "DATABRICKS_RUNTIME_VERSION" in os.environ:
             msg = "WorkspaceInstaller is not supposed to be executed in Databricks Runtime"
             raise SystemExit(msg)
-        if not promtps:
-            promtps = Prompts()
         self._ws = ws
         self._prefix = prefix
         if not wheels:
@@ -174,8 +180,8 @@ class WorkspaceInstaller:
 
     def _create_database(self):
         if self._sql_backend is None:
-            self._sql_backend = StatementExecutionBackend(self._ws, self._current_config.warehouse_id)
-        deploy_schema(self._sql_backend, self._current_config.inventory_database)
+            self._sql_backend = StatementExecutionBackend(self._ws, self.current_config.warehouse_id)
+        deploy_schema(self._sql_backend, self.current_config.inventory_database)
 
     def _install_spark_config_for_hms_lineage(self):
         hms_lineage = HiveMetastoreLineageEnabler(ws=self._ws)
@@ -191,7 +197,7 @@ class WorkspaceInstaller:
         if gscript:
             if gscript.enabled:
                 logger.info("Already exists and enabled. Skipped creating a new one.")
-            elif not gscript.enabled:
+            elif not gscript.enabled and self._prompts:
                 if self._prompts.confirm(
                     "Your Global Init Script with required spark config is disabled, Do you want to enable it?"
                 ):
@@ -199,7 +205,7 @@ class WorkspaceInstaller:
                     hms_lineage.enable_global_init_script(gscript)
                 else:
                     logger.info("No change to Global Init Script is made.")
-        elif not gscript:
+        elif not gscript and self._prompts:
             if self._prompts.confirm(
                 "No Global Init Script with Required Spark Config exists, Do you want to create one?"
             ):
@@ -212,18 +218,15 @@ class WorkspaceInstaller:
         config: WorkspaceConfig,
         *,
         prefix="ucx",
-        promtps: Prompts | None = None,
         wheels: Wheels | None = None,
         override_clusters: dict[str, str] | None = None,
         sql_backend: SqlBackend | None = None,
     ) -> "WorkspaceInstaller":
-        workspace_installer = WorkspaceInstaller(
-            ws, prefix=prefix, promtps=promtps, wheels=wheels, sql_backend=sql_backend
-        )
+        workspace_installer = WorkspaceInstaller(ws, prefix=prefix, wheels=wheels, sql_backend=sql_backend)
         logger.info(f"Installing UCX v{workspace_installer._wheels.version()} on {ws.config.host}")
-        workspace_installer._config = config
+        workspace_installer._config = config  # type: ignore[has-type]
         workspace_installer._write_config(overwrite=False)
-        workspace_installer._current_config.override_clusters = override_clusters
+        workspace_installer.current_config.override_clusters = override_clusters
         # TODO: rather introduce a method `is_configured`, as we may want to reconfigure workspaces for some reason
         workspace_installer._run_configured()
         return workspace_installer
@@ -271,22 +274,22 @@ class WorkspaceInstaller:
             remote_folder=f"{self._install_folder}/queries",
             name_prefix=self._name("UCX "),
             warehouse_id=self._warehouse_id,
-            query_text_callback=self._current_config.replace_inventory_variable,
+            query_text_callback=self.current_config.replace_inventory_variable,
         )
         self._dashboards = dash.create_dashboards()
 
     @property
     def _warehouse_id(self) -> str:
-        if self._current_config.warehouse_id is not None:
-            return self._current_config.warehouse_id
+        if self.current_config.warehouse_id is not None:
+            return self.current_config.warehouse_id
         warehouses = [_ for _ in self._ws.warehouses.list() if _.warehouse_type == EndpointInfoWarehouseType.PRO]
-        warehouse_id = self._current_config.warehouse_id
+        warehouse_id = self.current_config.warehouse_id
         if not warehouse_id and not warehouses:
             msg = "need either configured warehouse_id or an existing PRO SQL warehouse"
             raise ValueError(msg)
         if not warehouse_id:
             warehouse_id = warehouses[0].id
-        self._current_config.warehouse_id = warehouse_id
+        self.current_config.warehouse_id = warehouse_id
         return warehouse_id
 
     @property
@@ -326,9 +329,9 @@ class WorkspaceInstaller:
         return f"{self._install_folder}/config.yml"
 
     @property
-    def _current_config(self):
+    def current_config(self) -> WorkspaceConfig:
         if hasattr(self, "_config"):
-            return self._config
+            return self._config  # type: ignore[has-type]
         with self._ws.workspace.download(self.config_file) as f:
             self._config = WorkspaceConfig.from_bytes(f.read())
         return self._config
@@ -345,7 +348,7 @@ class WorkspaceInstaller:
         try:
             if "version: 1" in self._raw_previous_config():
                 logger.info("old version detected, attempting to migrate to new config")
-                self._config = self._current_config
+                self._config = self.current_config
                 self._write_config(overwrite=True)
                 return
             elif "version: 2" in self._raw_previous_config():
@@ -353,6 +356,8 @@ class WorkspaceInstaller:
                 return
         except NotFound:
             pass
+        if not self._prompts:
+            raise RuntimeWarning("No Prompts instance found")
         logger.info("Please answer a couple of questions to configure Unity Catalog migration")
         inventory_database = self._prompts.question(
             "Inventory Database stored in hive_metastore", default="ucx", valid_regex=r"^\w+$"
@@ -441,9 +446,11 @@ class WorkspaceInstaller:
             try:
                 self._wheels.upload_to_dbfs()
             except PermissionDenied as err:
+                if not self._prompts:
+                    raise RuntimeWarning("no Prompts instance found") from err
                 logger.warning(f"Uploading wheel file to DBFS failed, DBFS is probably write protected. {err}")
                 configure_cluster_overrides = ConfigureClusterOverrides(self._ws, self._prompts.choice_from_dict)
-                self._current_config.override_clusters = configure_cluster_overrides.configure()
+                self.current_config.override_clusters = configure_cluster_overrides.configure()
             return self._wheels.upload_to_wsfs()
 
     def _create_jobs(self):
@@ -455,12 +462,12 @@ class WorkspaceInstaller:
         desired_steps = {t.workflow for t in _TASKS.values() if t.cloud_compatible(self._ws.config)}
         wheel_runner = None
 
-        if self._current_config.override_clusters:
+        if self.current_config.override_clusters:
             wheel_runner = self._upload_wheel_runner(remote_wheel)
         for step_name in desired_steps:
             settings = self._job_settings(step_name, remote_wheel)
-            if self._current_config.override_clusters:
-                settings = self._apply_cluster_overrides(settings, self._current_config.override_clusters, wheel_runner)
+            if self.current_config.override_clusters:
+                settings = self._apply_cluster_overrides(settings, self.current_config.override_clusters, wheel_runner)
             self._deploy_workflow(step_name, settings)
 
         for step_name, job_id in self._state.jobs.items():
@@ -543,7 +550,7 @@ class WorkspaceInstaller:
             for t in self._sorted_tasks():
                 if t.workflow != step_name:
                     continue
-                doc = self._current_config.replace_inventory_variable(t.doc)
+                doc = self.current_config.replace_inventory_variable(t.doc)
                 md.append(f"### `{t.name}`\n\n")
                 md.append(f"{doc}\n")
                 md.append("\n\n")
@@ -553,11 +560,11 @@ class WorkspaceInstaller:
         self._ws.workspace.upload(path, intro.encode("utf8"), overwrite=True)
         url = self.notebook_link(path)
         logger.info(f"Created README notebook with job overview: {url}")
-        if self._prompts.confirm("Open job overview in README notebook in your home directory?"):
+        if self._prompts and self._prompts.confirm("Open job overview in README notebook in your home directory?"):
             webbrowser.open(url)
 
     def _replace_inventory_variable(self, text: str) -> str:
-        return text.replace("$inventory", f"hive_metastore.{self._current_config.inventory_database}")
+        return text.replace("$inventory", f"hive_metastore.{self.current_config.inventory_database}")
 
     def _create_debug(self, remote_wheel: str):
         readme_link = self.notebook_link(f"{self._install_folder}/README.py")
@@ -577,7 +584,7 @@ class WorkspaceInstaller:
 
     def _job_settings(self, step_name: str, remote_wheel: str):
         email_notifications = None
-        if not self._current_config.override_clusters and "@" in self._my_username:
+        if not self.current_config.override_clusters and "@" in self._my_username:
             # set email notifications only if we're running the real
             # installation and not the integration test.
             email_notifications = jobs.JobEmailNotifications(
@@ -681,8 +688,8 @@ class WorkspaceInstaller:
             "spark.databricks.cluster.profile": "singleNode",
             "spark.master": "local[*]",
         }
-        if self._current_config.spark_conf is not None:
-            spark_conf = spark_conf | self._config.spark_conf
+        if self.current_config.spark_conf is not None:
+            spark_conf = spark_conf | self.current_config.spark_conf
         spec = self._cluster_node_type(
             compute.ClusterSpec(
                 spark_version=self._ws.clusters.select_spark_version(latest=True),
@@ -721,7 +728,7 @@ class WorkspaceInstaller:
         return clusters
 
     def _cluster_node_type(self, spec: compute.ClusterSpec) -> compute.ClusterSpec:
-        cfg = self._current_config
+        cfg = self.current_config
         valid_node_type = False
         if cfg.custom_cluster_policy_id is not None:
             if self._check_policy_has_instance_pool(cfg.custom_cluster_policy_id):
@@ -801,36 +808,38 @@ class WorkspaceInstaller:
         return latest_status
 
     def uninstall(self):
-        if self._prompts.confirm(
+        if self._prompts and not self._prompts.confirm(
             "Do you want to uninstall ucx from the workspace too, this would "
             "remove ucx project folder, dashboards, queries and jobs"
         ):
-            logger.info(f"Deleting UCX v{self._wheels.version()} from {self._ws.config.host}")
-            try:
-                self._ws.workspace.get_status(self.config_file)
-                self._ws.workspace.get_status(self._install_folder)
-                self._ws.workspace.get_status(self._state._state_file)
-            except NotFound:
-                logger.error(
-                    f"Check if {self._install_folder} is present along with {self.config_file} and "
-                    f"{self._state._state_file}."
-                )
-                return
-            self._remove_database()
-            self._remove_jobs()
-            self._remove_warehouse()
-            self._remove_install_folder()
-            logger.info("UnInstalling UCX complete")
+            return
+        logger.info(f"Deleting UCX v{self._wheels.version()} from {self._ws.config.host}")
+        try:
+            self._ws.workspace.get_status(self.config_file)
+            self._ws.workspace.get_status(self._install_folder)
+            self._ws.workspace.get_status(self._state._state_file)
+        except NotFound:
+            logger.error(
+                f"Check if {self._install_folder} is present along with {self.config_file} and "
+                f"{self._state._state_file}."
+            )
+            return
+        self._remove_database()
+        self._remove_jobs()
+        self._remove_warehouse()
+        self._remove_install_folder()
+        logger.info("UnInstalling UCX complete")
 
     def _remove_database(self):
-        if self._prompts.confirm(
-            f"Do you want to delete the inventory database {self._current_config.inventory_database} too?"
+        if self._prompts and not self._prompts.confirm(
+            f"Do you want to delete the inventory database {self.current_config.inventory_database} too?"
         ):
-            logger.info(f"Deleting inventory database {self._current_config.inventory_database}")
-            if self._sql_backend is None:
-                self._sql_backend = StatementExecutionBackend(self._ws, self._current_config.warehouse_id)
-            deployer = SchemaDeployer(self._sql_backend, self._current_config.inventory_database, Any)
-            deployer.delete_schema()
+            return
+        logger.info(f"Deleting inventory database {self.current_config.inventory_database}")
+        if self._sql_backend is None:
+            self._sql_backend = StatementExecutionBackend(self._ws, self.current_config.warehouse_id)
+        deployer = SchemaDeployer(self._sql_backend, self.current_config.inventory_database, Any)
+        deployer.delete_schema()
 
     def _remove_jobs(self):
         logger.info("Deleting jobs")
@@ -847,10 +856,10 @@ class WorkspaceInstaller:
 
     def _remove_warehouse(self):
         try:
-            warehouse_name = self._ws.warehouses.get(self._current_config.warehouse_id).name
+            warehouse_name = self._ws.warehouses.get(self.current_config.warehouse_id).name
             if warehouse_name.startswith(WAREHOUSE_PREFIX):
                 logger.info("Deleting warehouse_name.")
-                self._ws.warehouses.delete(id=self._current_config.warehouse_id)
+                self._ws.warehouses.delete(id=self.current_config.warehouse_id)
         except InvalidParameterValue:
             logger.error("Error accessing warehouse details")
 
@@ -888,5 +897,5 @@ class WorkspaceInstaller:
 if __name__ == "__main__":
     ws = WorkspaceClient(product="ucx", product_version=__version__)
     logger.setLevel("INFO")
-    installer = WorkspaceInstaller(ws)
+    installer = WorkspaceInstaller(ws, promtps=Prompts())
     installer.run()
