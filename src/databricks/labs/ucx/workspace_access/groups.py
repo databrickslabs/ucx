@@ -442,12 +442,14 @@ class GroupManager(CrawlerBase[MigratedGroup]):
         attributes = scim_attributes.split(",")
         if "members" in attributes:
             attributes.remove("members")
+            retry_on_internal_error = retried(on=[InternalError], timeout=self._verify_timeout)
+            get_group = retry_on_internal_error(self._get_group)
             for g in self._ws.groups.list(attributes=",".join(attributes)):
                 if self._is_group_out_of_scope(g, resource_type):
                     continue
-                set_retry_on_value_error = retried(on=[InternalError, NotFound], timeout=self._verify_timeout)
-                set_retried_check = set_retry_on_value_error(self._get_group_with_retries)
-                group_with_all_attributes = set_retried_check(g.id)
+                group_with_all_attributes = get_group(g.id)
+                if not group_with_all_attributes:
+                    continue
                 results.append(group_with_all_attributes)
         else:
             for g in self._ws.groups.list(attributes=scim_attributes):
@@ -458,8 +460,13 @@ class GroupManager(CrawlerBase[MigratedGroup]):
         return results
 
     @rate_limited(max_requests=255, burst_period_seconds=60)
-    def _get_group_with_retries(self, group_id: str) -> iam.Group:
-        return self._ws.groups.get(group_id)
+    def _get_group(self, group_id: str) -> iam.Group | None:
+        try:
+            return self._ws.groups.get(group_id)
+        except NotFound:
+            # during integration tests, we may get certain groups removed,
+            # which will cause timeout errors because of groups no longer there.
+            return None
 
     def _list_account_groups(self, scim_attributes: str) -> list[iam.Group]:
         # TODO: we should avoid using this method, as it's not documented

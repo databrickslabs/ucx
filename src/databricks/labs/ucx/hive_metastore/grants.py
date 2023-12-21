@@ -73,13 +73,17 @@ class Grant:
             anonymous_function=self.anonymous_function,
         )
 
-    def hive_grant_sql(self) -> str:
+    def hive_grant_sql(self) -> list[str]:
         object_type, object_key = self.this_type_and_key()
         # See https://docs.databricks.com/en/sql/language-manual/security-grant.html
-        if self.action_type.upper() == "OWN":
-            return f"ALTER {object_type} {object_key} OWNER TO `{self.principal}`"
-        else:
-            return f"GRANT {self.action_type} ON {object_type} {object_key} TO `{self.principal}`"
+        statements = []
+        actions = self.action_type.split(", ")
+        if "OWN" in actions:
+            actions.remove("OWN")
+            statements.append(f"ALTER {object_type} {object_key} OWNER TO `{self.principal}`")
+        if actions:
+            statements.append(f"GRANT {', '.join(actions)} ON {object_type} {object_key} TO `{self.principal}`")
+        return statements
 
     def hive_revoke_sql(self) -> str:
         object_type, object_key = self.this_type_and_key()

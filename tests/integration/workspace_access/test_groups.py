@@ -22,6 +22,7 @@ from ..conftest import StaticTablesCrawler
 logger = logging.getLogger(__name__)
 
 
+@retried(on=[NotFound], timeout=timedelta(minutes=2))
 def test_prepare_environment(ws, make_ucx_group, sql_backend, inventory_schema):
     ws_group, acc_group = make_ucx_group()
 
@@ -38,6 +39,7 @@ def test_prepare_environment(ws, make_ucx_group, sql_backend, inventory_schema):
     assert len(group_migration_state[0].entitlements) == len(json.dumps([gg.as_dict() for gg in ws_group.entitlements]))
 
 
+@retried(on=[NotFound], timeout=timedelta(minutes=2))
 def test_prepare_environment_no_groups_selected(ws, make_ucx_group, sql_backend, inventory_schema):
     ws_group, acc_group = make_ucx_group()
 
@@ -48,6 +50,7 @@ def test_prepare_environment_no_groups_selected(ws, make_ucx_group, sql_backend,
     assert ws_group.display_name in names
 
 
+@retried(on=[NotFound], timeout=timedelta(minutes=2))
 def test_rename_groups(ws, make_ucx_group, sql_backend, inventory_schema):
     # FIXME - test_rename_groups - TimeoutError: Timed out after 0:01:00
     ws_group, acc_group = make_ucx_group()
@@ -58,6 +61,7 @@ def test_rename_groups(ws, make_ucx_group, sql_backend, inventory_schema):
     assert ws.groups.get(ws_group.id).display_name == "ucx-temp-" + ws_group.display_name
 
 
+@retried(on=[NotFound], timeout=timedelta(minutes=2))
 def test_reflect_account_groups_on_workspace_recovers_when_group_already_exists(
     ws, make_ucx_group, sql_backend, inventory_schema
 ):
@@ -67,6 +71,7 @@ def test_reflect_account_groups_on_workspace_recovers_when_group_already_exists(
     group_manager.reflect_account_groups_on_workspace()
 
 
+@retried(on=[NotFound], timeout=timedelta(minutes=2))
 def test_reflect_account_groups_on_workspace(ws, make_ucx_group, sql_backend, inventory_schema):
     ws_group, acc_group = make_ucx_group()
 
@@ -87,6 +92,7 @@ def test_reflect_account_groups_on_workspace(ws, make_ucx_group, sql_backend, in
     )  # At this time previous ws level groups aren't deleted
 
 
+@retried(on=[NotFound], timeout=timedelta(minutes=2))
 def test_delete_ws_groups_should_delete_renamed_and_reflected_groups_only(
     ws, make_ucx_group, sql_backend, inventory_schema
 ):
@@ -101,6 +107,7 @@ def test_delete_ws_groups_should_delete_renamed_and_reflected_groups_only(
         ws.groups.get(ws_group.id)
 
 
+@retried(on=[NotFound], timeout=timedelta(minutes=2))
 def test_delete_ws_groups_should_not_delete_current_ws_groups(ws, make_ucx_group, sql_backend, inventory_schema):
     ws_group, acc_group = make_ucx_group()
 
@@ -110,6 +117,7 @@ def test_delete_ws_groups_should_not_delete_current_ws_groups(ws, make_ucx_group
     assert ws.groups.get(ws_group.id).display_name == ws_group.display_name
 
 
+@retried(on=[NotFound], timeout=timedelta(minutes=2))
 def test_delete_ws_groups_should_not_delete_non_reflected_acc_groups(ws, make_ucx_group, sql_backend, inventory_schema):
     ws_group, acc_group = make_ucx_group()
     group_manager = GroupManager(sql_backend, ws, inventory_schema, [ws_group.display_name], "ucx-temp-")
@@ -130,6 +138,7 @@ def validate_migrate_groups(group_manager: GroupManager, ws_group: Group, to_gro
     assert to_group.display_name in account_workspace_groups
 
 
+@retried(on=[NotFound], timeout=timedelta(minutes=2))
 def test_group_name_change_prefix(ws, sql_backend, inventory_schema, make_ucx_group, make_random):
     ws_display_name = f"ucx_{make_random(4)}"
     ws_group, accnt_group = make_ucx_group(
@@ -145,6 +154,7 @@ def test_group_name_change_prefix(ws, sql_backend, inventory_schema, make_ucx_gr
     validate_migrate_groups(group_manager, ws_group, accnt_group)
 
 
+@retried(on=[NotFound], timeout=timedelta(minutes=2))
 def test_group_name_change_suffix(ws, sql_backend, inventory_schema, make_ucx_group, make_random):
     ws_display_name = f"ucx_{make_random(4)}"
     ws_group, accnt_group = make_ucx_group(
@@ -160,6 +170,7 @@ def test_group_name_change_suffix(ws, sql_backend, inventory_schema, make_ucx_gr
     validate_migrate_groups(group_manager, ws_group, accnt_group)
 
 
+@retried(on=[NotFound], timeout=timedelta(minutes=2))
 def test_group_name_change_substitute(ws, sql_backend, inventory_schema, make_ucx_group, make_random):
     random_elem = f"{make_random(4)}"
     ws_display_name = f"ucx_engineering_{random_elem}"
@@ -175,6 +186,7 @@ def test_group_name_change_substitute(ws, sql_backend, inventory_schema, make_uc
     validate_migrate_groups(group_manager, ws_group, accnt_group)
 
 
+@retried(on=[NotFound], timeout=timedelta(minutes=2))
 def test_group_matching_names(ws, sql_backend, inventory_schema, make_ucx_group):
     ws_group, accnt_group = make_ucx_group("test_group_1234", "same_group_[1234]")
     logger.info(
@@ -194,7 +206,7 @@ def test_group_matching_names(ws, sql_backend, inventory_schema, make_ucx_group)
 
 
 # average runtime is 100 seconds
-@retried(on=[NotFound, TimeoutError, AssertionError], timeout=timedelta(minutes=15))
+@retried(on=[NotFound], timeout=timedelta(minutes=3))
 def test_replace_workspace_groups_with_account_groups(
     ws,
     sql_backend,

@@ -26,7 +26,7 @@ class ManyError(RuntimeError):
 class Threads(Generic[Result]):
     def __init__(self, name, tasks: Sequence[Task[Result]], num_threads: int):
         self._name = name
-        self._tasks = tasks
+        self._tasks = list(tasks)
         self._task_fail_error_pct = 50
         self._num_threads = num_threads
         self._started = dt.datetime.now()
@@ -47,6 +47,12 @@ class Threads(Generic[Result]):
             if num_threads < MIN_THREADS:
                 num_threads = MIN_THREADS
         return cls(name, tasks, num_threads=num_threads)._run()
+
+    @classmethod
+    def strict(cls, name: str, tasks: Sequence[Task[Result]]):
+        _, errs = cls.gather(name, tasks)
+        if errs:
+            raise ManyError(errs)
 
     def _run(self) -> tuple[Iterable[Result], list[Exception]]:
         given_cnt = len(self._tasks)

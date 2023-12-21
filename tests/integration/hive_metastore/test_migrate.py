@@ -1,6 +1,9 @@
 import logging
+from datetime import timedelta
 
 import pytest
+from databricks.sdk.errors import NotFound
+from databricks.sdk.retries import retried
 
 from databricks.labs.ucx.hive_metastore.tables import TablesMigrate
 
@@ -9,6 +12,7 @@ from ..conftest import StaticTablesCrawler
 logger = logging.getLogger(__name__)
 
 
+@retried(on=[NotFound], timeout=timedelta(minutes=2))
 def test_migrate_managed_tables(ws, sql_backend, inventory_schema, make_catalog, make_schema, make_table):
     if not ws.config.is_azure:
         pytest.skip("temporary: only works in azure test env")
@@ -32,6 +36,7 @@ def test_migrate_managed_tables(ws, sql_backend, inventory_schema, make_catalog,
     assert target_table_properties["upgraded_from"] == src_managed_table.full_name
 
 
+@retried(on=[NotFound], timeout=timedelta(minutes=5))
 def test_migrate_tables_with_cache_should_not_create_table(
     ws, sql_backend, inventory_schema, make_random, make_catalog, make_schema, make_table
 ):
@@ -75,6 +80,7 @@ def test_migrate_tables_with_cache_should_not_create_table(
     assert target_tables[0]["tableName"] == table_name
 
 
+@retried(on=[NotFound], timeout=timedelta(minutes=5))
 def test_migrate_external_table(ws, sql_backend, inventory_schema, make_catalog, make_schema, make_table, env_or_skip):
     if not ws.config.is_azure:
         pytest.skip("temporary: only works in azure test env")

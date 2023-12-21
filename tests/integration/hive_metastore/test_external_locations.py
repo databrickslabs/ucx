@@ -87,13 +87,13 @@ def test_external_locations(ws, sql_backend, inventory_schema, env_or_skip):
     assert results[5].location == "jdbc://providerunknown//somedb.us-east-1.rds.amazonaws.com:1234/test_db"
 
 
-def test_save_external_location_mapping_missing_location(ws, sql_backend, inventory_schema):
-    logger.info("setting up fixtures")
+def test_save_external_location_mapping_missing_location(ws, sql_backend, inventory_schema, make_directory):
+    folder = make_directory()
     locations = [
         ExternalLocation("abfss://cont1@storage123/test_location", 2),
         ExternalLocation("abfss://cont1@storage456/test_location2", 1),
     ]
     sql_backend.save_table(f"{inventory_schema}.external_locations", locations, ExternalLocation)
     location_crawler = ExternalLocations(ws, sql_backend, inventory_schema)
-    path = location_crawler.save_as_terraform_definitions_on_workspace()
+    path = location_crawler.save_as_terraform_definitions_on_workspace(folder)
     assert ws.workspace.get_status(path)
