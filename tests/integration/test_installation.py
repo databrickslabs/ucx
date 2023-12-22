@@ -10,7 +10,7 @@ from databricks.sdk.retries import retried
 from databricks.sdk.service.iam import PermissionLevel
 
 from databricks.labs.ucx.config import WorkspaceConfig
-from databricks.labs.ucx.framework.parallel import ManyError, Threads
+from databricks.labs.ucx.framework.parallel import Threads
 from databricks.labs.ucx.install import WorkspaceInstaller
 from databricks.labs.ucx.workspace_access.generic import (
     GenericPermissionsSupport,
@@ -24,7 +24,9 @@ logger = logging.getLogger(__name__)
 
 @pytest.fixture
 def new_installation(ws, sql_backend, env_or_skip, inventory_schema, make_random):
-    def inner(config_transform: Callable[[WorkspaceConfig], WorkspaceConfig] | None = None):
+    cleanup = []
+
+    def factory(config_transform: Callable[[WorkspaceConfig], WorkspaceConfig] | None = None):
         prefix = make_random(4)
         renamed_group_prefix = f"rename-{prefix}-"
         wc = WorkspaceConfig(
@@ -32,23 +34,26 @@ def new_installation(ws, sql_backend, env_or_skip, inventory_schema, make_random
         )
         default_cluster_id = env_or_skip("TEST_DEFAULT_CLUSTER_ID")
         tacl_cluster_id = env_or_skip("TEST_LEGACY_TABLE_ACL_CLUSTER_ID")
-        _, errs = Threads.gather(
+        Threads.strict(
             "ensure clusters running",
             [
                 functools.partial(ws.clusters.ensure_cluster_is_running, default_cluster_id),
                 functools.partial(ws.clusters.ensure_cluster_is_running, tacl_cluster_id),
             ],
         )
-        if errs:
-            raise ManyError(errs)
         if config_transform:
             wc = config_transform(wc)
         overrides = {"main": default_cluster_id, "tacl": tacl_cluster_id}
-        return WorkspaceInstaller.run_for_config(
+        install = WorkspaceInstaller.run_for_config(
             ws, wc, sql_backend=sql_backend, prefix=prefix, override_clusters=overrides
         )
+        cleanup.append(install)
+        return install
 
-    return inner
+    yield factory
+
+    for installation in cleanup:
+        installation.uninstall()
 
 
 @retried(on=[NotFound, TimeoutError], timeout=timedelta(minutes=5))

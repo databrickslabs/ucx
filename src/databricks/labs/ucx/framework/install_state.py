@@ -1,5 +1,6 @@
 import json
 import logging
+import threading
 from json import JSONDecodeError
 
 from databricks.sdk import WorkspaceClient
@@ -17,13 +18,15 @@ class InstallState:
         self._state_file = f"{install_folder}/state.json"
         self._version = version
         self._state: dict[str, Resources] = {}
+        self._lock = threading.Lock()
 
     def __getattr__(self, item):
-        if not self._state:
-            self._state = self._load()
-        if item not in self._state["resources"]:
-            self._state["resources"][item] = {}
-        return self._state["resources"][item]
+        with self._lock:
+            if not self._state:
+                self._state = self._load()
+            if item not in self._state["resources"]:
+                self._state["resources"][item] = {}
+            return self._state["resources"][item]
 
     def _load(self):
         default_state = {"$version": self._version, "resources": {}}
@@ -41,5 +44,6 @@ class InstallState:
             return default_state
 
     def save(self):
-        state_dump = json.dumps(self._state, indent=2).encode("utf8")
-        self._ws.workspace.upload(self._state_file, state_dump, format=ImportFormat.AUTO, overwrite=True)
+        with self._lock:
+            state_dump = json.dumps(self._state, indent=2).encode("utf8")
+            self._ws.workspace.upload(self._state_file, state_dump, format=ImportFormat.AUTO, overwrite=True)
