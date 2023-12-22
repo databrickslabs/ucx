@@ -769,8 +769,8 @@ def test_configure_match():
             {
                 "Backup prefix": "",
                 r"Choose how to map the workspace groups.*": "5",  # partial match
-                r".*workspace group$": r"\[(#+)\]",
-                r".*account group$": r"\((#+)\)",
+                r".*match on the workspace.*": r"\[(#+)\]",
+                r".*match on the account.*": r"\((#+)\)",
                 ".*": "",
             }
         )
