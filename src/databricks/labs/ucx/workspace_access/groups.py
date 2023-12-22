@@ -560,15 +560,17 @@ class ConfigureGroups:
         strategy = self._prompts.choice_from_dict(
             "Choose how to map the workspace groups:",
             {
+                "Match by Name": lambda: True,
                 "Apply a Prefix": self._configure_prefix,
                 "Apply a Suffix": self._configure_suffix,
-                "Comma-separated list of workspace group names to migrate": self._configure_names,
-                "Match By External ID": self._configure_external,
+                "Match by External ID": self._configure_external,
                 "Regex Substitution": self._configure_substitution,
                 "Regex Matching": self._configure_matching,
             },
+            sort=False,
         )
         strategy()
+        self._configure_names()
 
     def _configure_prefix(self):
         prefix = self._ask_for_group("Enter a prefix to add to the workspace group name")
