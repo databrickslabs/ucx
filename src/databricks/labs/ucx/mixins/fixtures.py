@@ -733,7 +733,7 @@ def env_or_skip(debug_env) -> Callable[[str], str]:
 
 
 @pytest.fixture
-def sql_backend(ws, env_or_skip):
+def sql_backend(ws, env_or_skip) -> StatementExecutionBackend:
     warehouse_id = env_or_skip("TEST_DEFAULT_WAREHOUSE_ID")
     return StatementExecutionBackend(ws, warehouse_id)
 

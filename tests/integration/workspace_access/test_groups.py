@@ -273,7 +273,7 @@ def test_replace_workspace_groups_with_account_groups(
 
     group_info = state.groups[0]
 
-    @retried(on=[AssertionError], timeout=timedelta(seconds=30))
+    @retried(on=[AssertionError], timeout=timedelta(minutes=1))
     def check_permissions_for_backup_group():
         logger.info("check_permissions_for_backup_group()")
 
