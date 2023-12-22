@@ -1002,3 +1002,232 @@ def test_uninstall_no_config_file(ws, mocker):
     ws.workspace.download = lambda _: io.BytesIO(config_bytes)
     ws.workspace.get_status.side_effect = NotFound(...)
     install.uninstall()
+
+
+def test_save_config_with_prefix(ws):
+    ws.workspace.get_status.side_effect = NotFound(...)
+    ws.warehouses.list = lambda **_: [
+        EndpointInfo(id="abc", warehouse_type=EndpointInfoWarehouseType.PRO, state=State.RUNNING)
+    ]
+
+    install = WorkspaceInstaller(
+        ws,
+        promtps=MockPrompts(
+            {
+                r".*PRO or SERVERLESS SQL warehouse.*": "1",
+                r".*follow a policy.*": "no",
+                r"Choose how to map the workspace groups.*": "1",
+                r"Enter a prefix.*": "test",
+                r".*": "",
+            }
+        ),
+    )
+    install._configure()
+
+    ws.workspace.upload.assert_called_with(
+        "/Users/me@example.com/.ucx/config.yml",
+        b"""default_catalog: ucx_default
+inventory_database: ucx
+log_level: INFO
+num_threads: 8
+renamed_group_prefix: db-temp-
+version: 2
+warehouse_id: abc
+workspace_group_regex: ^
+workspace_group_replace: test
+workspace_start_path: /
+""",
+        format=ImportFormat.AUTO,
+        overwrite=False,
+    )
+
+
+def test_save_config_with_suffix(ws):
+    ws.workspace.get_status.side_effect = NotFound(...)
+    ws.warehouses.list = lambda **_: [
+        EndpointInfo(id="abc", warehouse_type=EndpointInfoWarehouseType.PRO, state=State.RUNNING)
+    ]
+
+    install = WorkspaceInstaller(
+        ws,
+        promtps=MockPrompts(
+            {
+                r".*PRO or SERVERLESS SQL warehouse.*": "1",
+                r".*follow a policy.*": "no",
+                r"Choose how to map the workspace groups.*": "2",
+                r"Enter a suffix.*": "test",
+                r".*": "",
+            }
+        ),
+    )
+    install._configure()
+
+    ws.workspace.upload.assert_called_with(
+        "/Users/me@example.com/.ucx/config.yml",
+        b"""default_catalog: ucx_default
+inventory_database: ucx
+log_level: INFO
+num_threads: 8
+renamed_group_prefix: db-temp-
+version: 2
+warehouse_id: abc
+workspace_group_regex: $
+workspace_group_replace: test
+workspace_start_path: /
+""",
+        format=ImportFormat.AUTO,
+        overwrite=False,
+    )
+
+
+def test_save_config_external_id(ws):
+    ws.workspace.get_status.side_effect = NotFound(...)
+    ws.warehouses.list = lambda **_: [
+        EndpointInfo(id="abc", warehouse_type=EndpointInfoWarehouseType.PRO, state=State.RUNNING)
+    ]
+
+    install = WorkspaceInstaller(
+        ws,
+        promtps=MockPrompts(
+            {
+                r".*PRO or SERVERLESS SQL warehouse.*": "1",
+                r".*follow a policy.*": "no",
+                r"Choose how to map the workspace groups.*": "3",
+                r".*": "",
+            }
+        ),
+    )
+    install._configure()
+
+    ws.workspace.upload.assert_called_with(
+        "/Users/me@example.com/.ucx/config.yml",
+        b"""default_catalog: ucx_default
+group_match_by_external_id: true
+inventory_database: ucx
+log_level: INFO
+num_threads: 8
+renamed_group_prefix: db-temp-
+version: 2
+warehouse_id: abc
+workspace_start_path: /
+""",
+        format=ImportFormat.AUTO,
+        overwrite=False,
+    )
+
+
+def test_save_config_substitute(ws):
+    ws.workspace.get_status.side_effect = NotFound(...)
+    ws.warehouses.list = lambda **_: [
+        EndpointInfo(id="abc", warehouse_type=EndpointInfoWarehouseType.PRO, state=State.RUNNING)
+    ]
+
+    install = WorkspaceInstaller(
+        ws,
+        promtps=MockPrompts(
+            {
+                r".*PRO or SERVERLESS SQL warehouse.*": "1",
+                r".*follow a policy.*": "no",
+                r"Choose how to map the workspace groups.*": "4",
+                r".*for substitution": "biz",
+                r".*substitution value": "business",
+                r".*": "",
+            }
+        ),
+    )
+    install._configure()
+
+    ws.workspace.upload.assert_called_with(
+        "/Users/me@example.com/.ucx/config.yml",
+        b"""default_catalog: ucx_default
+inventory_database: ucx
+log_level: INFO
+num_threads: 8
+renamed_group_prefix: db-temp-
+version: 2
+warehouse_id: abc
+workspace_group_regex: biz
+workspace_group_replace: business
+workspace_start_path: /
+""",
+        format=ImportFormat.AUTO,
+        overwrite=False,
+    )
+
+
+def test_save_config_match(ws):
+    ws.workspace.get_status.side_effect = NotFound(...)
+    ws.warehouses.list = lambda **_: [
+        EndpointInfo(id="abc", warehouse_type=EndpointInfoWarehouseType.PRO, state=State.RUNNING)
+    ]
+
+    install = WorkspaceInstaller(
+        ws,
+        promtps=MockPrompts(
+            {
+                r".*PRO or SERVERLESS SQL warehouse.*": "1",
+                r".*follow a policy.*": "no",
+                r"Choose how to map the workspace groups.*": "5",
+                r".*workspace group$": r"\[(#+)\]",
+                r".*account group$": r"\[(#+)\]",
+                r".*": "",
+            }
+        ),
+    )
+    install._configure()
+
+    ws.workspace.upload.assert_called_with(
+        "/Users/me@example.com/.ucx/config.yml",
+        rb"""account_group_regex: \[(#+)\]
+default_catalog: ucx_default
+inventory_database: ucx
+log_level: INFO
+num_threads: 8
+renamed_group_prefix: db-temp-
+version: 2
+warehouse_id: abc
+workspace_group_regex: \[(#+)\]
+workspace_start_path: /
+""",
+        format=ImportFormat.AUTO,
+        overwrite=False,
+    )
+
+
+def test_save_include_groups(ws):
+    ws.workspace.get_status.side_effect = NotFound(...)
+    ws.warehouses.list = lambda **_: [
+        EndpointInfo(id="abc", warehouse_type=EndpointInfoWarehouseType.PRO, state=State.RUNNING)
+    ]
+
+    install = WorkspaceInstaller(
+        ws,
+        promtps=MockPrompts(
+            {
+                r".*PRO or SERVERLESS SQL warehouse.*": "1",
+                r".*follow a policy.*": "no",
+                r"Choose how to map the workspace groups.*": "0",
+                r".*workspace group": "group1,group2",
+                r".*": "",
+            }
+        ),
+    )
+    install._configure()
+
+    ws.workspace.upload.assert_called_with(
+        "/Users/me@example.com/.ucx/config.yml",
+        b"""default_catalog: ucx_default
+include_group_names:
+- group1
+- group2
+inventory_database: ucx
+log_level: INFO
+num_threads: 8
+renamed_group_prefix: db-temp-
+version: 2
+warehouse_id: abc
+workspace_start_path: /
+""",
+        format=ImportFormat.AUTO,
+        overwrite=False,
+    )
