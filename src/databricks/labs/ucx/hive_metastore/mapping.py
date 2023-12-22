@@ -106,3 +106,7 @@ class TableMapping:
                 logger.error(nf)
         except BadRequest as br:
             logger.error(br)
+
+    def revert_migrated_tables(self, backend: StatementExecutionBackend,*, schema: str | None = None, table: str | None = None):
+        # TODO: implement revert migrated tables
+        pass

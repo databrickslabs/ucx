@@ -113,6 +113,10 @@ def ensure_assessment_run():
         workspace_installer.validate_and_run("assessment")
 
 
+def revert_migrated_tables(schema: str, table: str):
+    pass
+
+
 MAPPING = {
     "open-remote-config": open_remote_config,
     "installations": list_installations,
@@ -123,6 +127,7 @@ MAPPING = {
     "validate-external-locations": validate_external_locations,
     "ensure-assessment-run": ensure_assessment_run,
     "skip": skip,
+    "revert-migrated-table": revert_migrated_tables,
 }
 
 
