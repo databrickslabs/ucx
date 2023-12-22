@@ -123,9 +123,9 @@ def revert_migrated_tables(schema: str, table: str):
         return None
     warehouse_id = installation.config.warehouse_id
     sql_backend = StatementExecutionBackend(ws, warehouse_id)
-    table_crawler = TablesCrawler(sql_backend, "hive_metastore")
+    table_crawler = TablesCrawler(sql_backend, installation.config.inventory_database)
     tc = TablesMigrate(ws=ws, backend=sql_backend, tc=table_crawler)
-    tc.revert_migrated_tables()
+    tc.revert_migrated_tables(schema=schema, table=table)
 
 
 MAPPING = {

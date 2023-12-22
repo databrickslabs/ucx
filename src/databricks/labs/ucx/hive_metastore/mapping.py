@@ -106,4 +106,3 @@ class TableMapping:
                 logger.error(nf)
         except BadRequest as br:
             logger.error(br)
-

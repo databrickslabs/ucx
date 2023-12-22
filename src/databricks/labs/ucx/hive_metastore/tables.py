@@ -73,6 +73,9 @@ class Table:
             f" TBLPROPERTIES ('upgraded_from' = '{self.key}');"
         )
 
+    def sql_unset_to(self, catalog):
+        return f"ALTER {self.kind} {catalog}.{self.database}.{self.name} UNSET TBLPROPERTIES IF EXISTS('upgraded_to');"
+
 
 @dataclass
 class TableError:
@@ -180,6 +183,10 @@ class TablesCrawler(CrawlerBase):
             logger.error(f"Couldn't fetch information for table {full_name} : {e}")
             return None
 
+    def reset(self):
+        self._backend.execute(f"DROP TABLE IF EXISTS {self._full_name}")
+        self.snapshot()
+
 
 class TablesMigrate:
     def __init__(
@@ -254,11 +261,20 @@ class TablesMigrate:
         return target in self._seen_tables
 
     def revert_migrated_tables(self, *, schema: str | None = None, table: str | None = None):
-        self._init_seen_tables()
-        for table_name in self._seen_tables.values():
-            print(table_name)
+        def scope_filter(cur_table: Table):
+            return (not schema or cur_table.database == schema) and (not table or cur_table.name == table)
 
-
-    def _revert_table(self, table: Table):
-        # TODO: implement revert migrated tables
-        pass
+        upgraded_tables = [
+            cur_table
+            for cur_table in list(self._tc.snapshot())
+            if scope_filter(cur_table) and cur_table.upgraded_to is not None
+        ]
+        for upgraded_table in upgraded_tables:
+            logger.info(
+                f"Reverting Table {upgraded_table.database}.{upgraded_table.name} "
+                f"upgraded_to {upgraded_table.upgraded_to}"
+            )
+            self._backend.execute(upgraded_table.sql_unset_to("hive_metastore"))
+        if upgraded_tables:
+            logger.info("Resetting table list")
+            self._tc.reset()

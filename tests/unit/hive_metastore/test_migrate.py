@@ -3,7 +3,11 @@ from unittest.mock import MagicMock
 
 from databricks.sdk.service.catalog import CatalogInfo, SchemaInfo, TableInfo
 
-from databricks.labs.ucx.hive_metastore.tables import TablesCrawler, TablesMigrate
+from databricks.labs.ucx.hive_metastore.tables import (
+    Table,
+    TablesCrawler,
+    TablesMigrate,
+)
 
 from ..framework.mocks import MockBackend
 
@@ -117,3 +121,65 @@ def test_migrate_tables_should_add_table_to_cache_when_migrated():
     tm.migrate_tables()
 
     assert tm._seen_tables == {"test_catalog.db1.managed": "hive_metastore.db1.managed"}
+
+
+def test_tables_sql_unset_to():
+    table = Table(
+        object_type="TABLE",
+        table_format="DELTA",
+        catalog="hive_metastore",
+        database="test_schema1",
+        name="test_table1",
+        upgraded_to="dest1",
+    )
+    assert table.sql_unset_to("hive_metastore") == (
+        "ALTER TABLE hive_metastore.test_schema1.test_table1 UNSET TBLPROPERTIES IF EXISTS('upgraded_to');"
+    )
+
+
+def test_revert_migrated_tables():
+    errors = {}
+    rows = {
+        "SELECT": [
+            ("hive_metastore", "db1", "managed", "MANAGED", "DELTA", None, None),
+        ]
+    }
+    backend = MockBackend(fails_on_first=errors, rows=rows)
+    tc = TablesCrawler(backend, "inventory_database")
+    client = MagicMock()
+    tm = TablesMigrate(tc, client, backend, default_catalog="test_catalog")
+    test_tables = [
+        Table(
+            object_type="TABLE",
+            table_format="DELTA",
+            catalog="hive_metastore",
+            database="test_schema1",
+            name="test_table1",
+            upgraded_to="dest1",
+        ),
+        Table(
+            object_type="TABLE",
+            table_format="DELTA",
+            catalog="hive_metastore",
+            database="test_schema1",
+            name="test_table2",
+            upgraded_to="dest1",
+        ),
+        Table(
+            object_type="TABLE",
+            table_format="DELTA",
+            catalog="hive_metastore",
+            database="test_schema2",
+            name="test_table3",
+            upgraded_to="dest1",
+        ),
+    ]
+
+    tc.snapshot = MagicMock()
+    tc.snapshot.return_value = test_tables
+    tm.revert_migrated_tables(schema="test_schema1")
+    assert (list(backend.queries)) == [
+        "ALTER TABLE hive_metastore.test_schema1.test_table1 UNSET TBLPROPERTIES IF EXISTS('upgraded_to');",
+        "ALTER TABLE hive_metastore.test_schema1.test_table2 UNSET TBLPROPERTIES IF EXISTS('upgraded_to');",
+        "DROP TABLE IF EXISTS hive_metastore.inventory_database.tables",
+    ]
