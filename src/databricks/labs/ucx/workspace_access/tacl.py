@@ -2,7 +2,6 @@ import collections
 import dataclasses
 import functools
 import json
-import threading
 from collections.abc import Callable, Iterator
 from functools import partial
 
@@ -17,17 +16,16 @@ class TableAclSupport(AclSupport):
     def __init__(self, grants_crawler: GrantsCrawler, sql_backend: SqlBackend):
         self._grants_crawler = grants_crawler
         self._sql_backend = sql_backend
-        self._lock = threading.Lock()
 
     def get_crawler_tasks(self) -> Iterator[Callable[..., Permissions | None]]:
-        # TableAcl grant/revoke operations are not atomic. When granting the permissions,
+        # Table ACL permissions (grant/revoke and ownership) are not atomic. When granting the permissions,
         # the service would first get all existing permissions, append with the new permissions,
         # and set the full list in the database. If there are concurrent grant requests,
         # both requests might succeed and emit the audit logs, but what actually happens could be that
         # the new permission list from one request overrides the other one, causing permissions loss.
         # More info here: https://databricks.atlassian.net/browse/ES-908737
         #
-        # Below optimization mitigates the issue by folding all action types (grants)
+        # Below optimization mitigates the issue by folding all action types (grants and own permissions)
         # for the same principal, object_id and object_type into one grant with comma separated list of action types.
         #
         # For example, the following table grants:
@@ -35,7 +33,7 @@ class TableAclSupport(AclSupport):
         # * GRANT MODIFY ON TABLE hive_metastore.db_a.table_a TO group_a
         # will be folded and executed in one statement/transaction:
         # * GRANT SELECT, MODIFY ON TABLE hive_metastore.db_a.table_a TO group_a
-        # The exception is OWN permission which are set with ALTER table
+        # The exception is the "OWN" permission which must be set using a separate ALTER statement.
 
         folded_actions = collections.defaultdict(set)
         for grant in self._grants_crawler.snapshot():
@@ -88,6 +86,12 @@ class TableAclSupport(AclSupport):
         return partial(self._apply_grant, target_grant)
 
     def _apply_grant(self, grant: Grant):
+        """
+        Apply grants and OWN permission serially for the same principal, object_id and object_type.
+        Executing grants (using GRANT statement) and OWN permission (using ALTER statement) concurrently
+        could cause permission lost due to limitations in the Table ACLs.
+        More info here: https://databricks.atlassian.net/browse/ES-976290
+        """
         for sql in grant.hive_grant_sql():
             self._sql_backend.execute(sql)
         return True
