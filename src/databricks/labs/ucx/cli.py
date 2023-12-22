@@ -2,8 +2,12 @@ import json
 import logging
 import sys
 import webbrowser
+from typing import Optional
 
 from databricks.sdk import WorkspaceClient
+
+from databricks.sdk.errors import NotFound
+from databricks.sdk.service.catalog import MetastoreAssignment
 
 from databricks.labs.ucx.account import AccountWorkspaces, WorkspaceInfo
 from databricks.labs.ucx.config import AccountConfig, ConnectConfig
@@ -14,6 +18,7 @@ from databricks.labs.ucx.hive_metastore.mapping import TableMapping
 from databricks.labs.ucx.hive_metastore.table_migrate import TablesMigrate
 from databricks.labs.ucx.install import WorkspaceInstaller
 from databricks.labs.ucx.installer import InstallationManager
+from tests.unit.test_install import ws
 
 logger = logging.getLogger("databricks.labs.ucx")
 
@@ -88,6 +93,19 @@ def create_table_mapping():
     tables_crawler = TablesCrawler(sql_backend, installation.config.inventory_database)
     path = table_mapping.save(tables_crawler, workspace_info)
     webbrowser.open(f"{ws.config.host}/#workspace{path}")
+
+def verify_metastore():
+    """
+    Scans and verifies if a metastore esists for a metostore
+    :param cfg:
+    :return:
+    """
+    ws = WorkspaceClient()
+    current_metastore = ws.metastores.current()
+    if current_metastore:
+        print(f'Metastore {current_metastore.default_catalog_name} with {current_metastore.metastore_id} exists')
+    else:
+        print('Metastore does not exist')
 
 
 def validate_external_locations():
