@@ -50,7 +50,7 @@ commands:
   - name: validate-external-locations
     description: validates and provides mapping to external table to external location and shared generation tf scripts
 
-  - name: revert-migrated-table
+  - name: revert-migrated-tables
     description: remove notation on a migrated table for re-migration
     flags:
       - name: schema

@@ -11,6 +11,7 @@ from databricks.labs.ucx.framework.crawlers import StatementExecutionBackend
 from databricks.labs.ucx.framework.tui import Prompts
 from databricks.labs.ucx.hive_metastore import ExternalLocations, TablesCrawler
 from databricks.labs.ucx.hive_metastore.mapping import TableMapping
+from databricks.labs.ucx.hive_metastore.tables import TablesMigrate
 from databricks.labs.ucx.install import WorkspaceInstaller
 from databricks.labs.ucx.installer import InstallationManager
 
@@ -114,7 +115,17 @@ def ensure_assessment_run():
 
 
 def revert_migrated_tables(schema: str, table: str):
-    pass
+    ws = WorkspaceClient()
+    installation_manager = InstallationManager(ws)
+    installation = installation_manager.for_user(ws.current_user.me())
+    if not installation:
+        logger.error(CANT_FIND_UCX_MSG)
+        return None
+    warehouse_id = installation.config.warehouse_id
+    sql_backend = StatementExecutionBackend(ws, warehouse_id)
+    table_crawler = TablesCrawler(sql_backend, "hive_metastore")
+    tc = TablesMigrate(ws=ws, backend=sql_backend, tc=table_crawler)
+    tc.revert_migrated_tables()
 
 
 MAPPING = {
@@ -127,7 +138,7 @@ MAPPING = {
     "validate-external-locations": validate_external_locations,
     "ensure-assessment-run": ensure_assessment_run,
     "skip": skip,
-    "revert-migrated-table": revert_migrated_tables,
+    "revert-migrated-tables": revert_migrated_tables,
 }
 
 

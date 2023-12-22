@@ -252,3 +252,13 @@ class TablesMigrate:
 
     def _table_already_upgraded(self, target) -> bool:
         return target in self._seen_tables
+
+    def revert_migrated_tables(self, *, schema: str | None = None, table: str | None = None):
+        self._init_seen_tables()
+        for table_name in self._seen_tables.values():
+            print(table_name)
+
+
+    def _revert_table(self, table: Table):
+        # TODO: implement revert migrated tables
+        pass
