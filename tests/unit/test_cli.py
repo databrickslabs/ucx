@@ -5,7 +5,7 @@ from databricks.sdk.errors import NotFound
 from databricks.sdk.service import iam
 from databricks.sdk.service.iam import ComplexValue, User
 
-from databricks.labs.ucx.cli import skip
+from databricks.labs.ucx.cli import repair_run, skip
 
 
 @pytest.fixture
@@ -33,3 +33,21 @@ def test_skip_no_ucx(caplog, mocker):
     mocker.patch("databricks.labs.ucx.installer.InstallationManager.for_user", return_value=None)
     skip(schema="schema", table="table")
     assert [rec.message for rec in caplog.records if "UCX configuration" in rec.message]
+
+
+def test_repair_run(mocker, caplog):
+    mocker.patch("databricks.sdk.WorkspaceClient.__init__", return_value=None)
+    mocker.patch("databricks.labs.ucx.install.WorkspaceInstaller.__init__", return_value=None)
+    mocker.patch("databricks.labs.ucx.install.WorkspaceInstaller.repair_run", return_value=None)
+    repair_run("assessment")
+    assert caplog.messages == []
+
+
+def test_no_step_in_repair_run(mocker, caplog):
+    mocker.patch("databricks.sdk.WorkspaceClient.__init__", return_value=None)
+    mocker.patch("databricks.labs.ucx.install.WorkspaceInstaller.__init__", return_value=None)
+    mocker.patch("databricks.labs.ucx.install.WorkspaceInstaller.repair_run", return_value=None)
+    try:
+        repair_run("")
+    except KeyError as e:
+        assert e.args[0] == "You did not specify --step"

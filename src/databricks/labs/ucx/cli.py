@@ -118,7 +118,7 @@ def repair_run(step):
         raise KeyError("You did not specify --step")
     ws = WorkspaceClient()
     installer = WorkspaceInstaller(ws)
-    logger.info("Repair Running  Job...")
+    logger.info(f"Repair Running {step} Job")
     installer.repair_run(step)
 
 
@@ -132,6 +132,7 @@ MAPPING = {
     "validate-external-locations": validate_external_locations,
     "ensure-assessment-run": ensure_assessment_run,
     "skip": skip,
+    "repair-run": repair_run,
 }
 
 

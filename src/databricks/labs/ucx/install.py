@@ -807,13 +807,17 @@ class WorkspaceInstaller:
                 continue
         return latest_status
 
-    def repair_run(self, workflow) -> list[dict]:
+    def repair_run(self, workflow):
         try:
             job_id = [job_id for step, job_id in self._state.jobs.items() if workflow == step]
             job_runs = list(self._ws.jobs.list_runs(job_id=job_id, limit=1))
-            run_id = job_runs[0].run_id
-            self._ws.jobs.repair_run(run_id=run_id, rerun_all_failed_tasks=True)
-        except Exception as e:
+            state = job_runs[0].state
+            if job_runs and state.result_state.value != "SUCCESS":
+                run_id = job_runs[0].run_id
+                self._ws.jobs.repair_run(run_id=run_id, rerun_all_failed_tasks=True)
+            else:
+                logger.info(f"{workflow} job is not in FAILED state hence skipping Repair Run")
+        except InvalidParameterValue as e:
             logger.warning(f"skipping {workflow}: {e}")
 
     def uninstall(self):

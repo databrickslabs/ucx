@@ -17,6 +17,7 @@ from databricks.sdk.service.compute import (
     GlobalInitScriptDetailsWithContent,
     Policy,
 )
+from databricks.sdk.service.jobs import BaseRun, RunResultState, RunState
 from databricks.sdk.service.sql import (
     Dashboard,
     DataSource,
@@ -1002,3 +1003,33 @@ def test_uninstall_no_config_file(ws, mocker):
     ws.workspace.download = lambda _: io.BytesIO(config_bytes)
     ws.workspace.get_status.side_effect = NotFound(...)
     install.uninstall()
+
+
+def test_repair_run(ws, mocker):
+    base = [
+        BaseRun(
+            attempt_number=None,
+            cleanup_duration=0,
+            cluster_instance=None,
+            cluster_spec=None,
+            creator_user_name="abc",
+            end_time=1703146375271,
+            execution_duration=0,
+            git_source=None,
+            job_clusters=None,
+            job_id=677268692725050,
+            job_parameters=None,
+            number_in_job=725118654200173,
+            original_attempt_run_id=725118654200173,
+            overriding_parameters=None,
+            run_duration=566445,
+            run_id=725118654200173,
+            run_name="[UCX] assessment",
+            state=RunState(result_state=RunResultState.FAILED),
+        )
+    ]
+    install = WorkspaceInstaller(ws)
+    install._state.jobs = {"assessment": "test1"}
+    ws.jobs.list_runs.return_value = base
+    ws.jobs.list_runs.repair_run = None
+    install.repair_run("assessment")
