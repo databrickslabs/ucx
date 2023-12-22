@@ -807,6 +807,15 @@ class WorkspaceInstaller:
                 continue
         return latest_status
 
+    def repair_run(self, workflow) -> list[dict]:
+        try:
+            job_id = [job_id for step, job_id in self._state.jobs.items() if workflow == step]
+            job_runs = list(self._ws.jobs.list_runs(job_id=job_id, limit=1))
+            run_id = job_runs[0].run_id
+            self._ws.jobs.repair_run(run_id=run_id, rerun_all_failed_tasks=True)
+        except Exception as e:
+            logger.warning(f"skipping {workflow}: {e}")
+
     def uninstall(self):
         if self._prompts and not self._prompts.confirm(
             "Do you want to uninstall ucx from the workspace too, this would "

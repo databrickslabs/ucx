@@ -113,6 +113,15 @@ def ensure_assessment_run():
         workspace_installer.validate_and_run("assessment")
 
 
+def repair_run(step):
+    if not step:
+        raise KeyError("You did not specify --step")
+    ws = WorkspaceClient()
+    installer = WorkspaceInstaller(ws)
+    logger.info("Repair Running  Job...")
+    installer.repair_run(step)
+
+
 MAPPING = {
     "open-remote-config": open_remote_config,
     "installations": list_installations,
