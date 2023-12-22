@@ -40,6 +40,7 @@ jobs:
           tenant-id: ${{ secrets.ARM_TENANT_ID }}
           subscription-id: ${{ secrets.ARM_SUBSCRIPTION_ID }}
 
+
       - name: Run integration tests
         run: hatch run integration
         env:
