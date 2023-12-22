@@ -686,15 +686,95 @@ def test_snapshot_with_group_matched_by_external_id():
     ]
 
 
-def test_configure_groups():
+def test_configure_include_groups():
     cg = ConfigureGroups(
         MockPrompts(
             {
                 "Backup prefix": "",
-                r"Choose how to map the workspace groups.*": "2",  # specify names
+                r"Choose how to map the workspace groups.*": "0",  # name match
                 r"^Comma-separated list of workspace group names to migrate.*": "foo, bar,  baz",
             }
         )
     )
     cg.run()
     assert ["foo", "bar", "baz"] == cg.include_group_names
+
+
+def test_configure_prefix():
+    cg = ConfigureGroups(
+        MockPrompts(
+            {
+                "Backup prefix": "",
+                r"Choose how to map the workspace groups.*": "1",  # prefix
+                r".*prefix.*": "test",
+                ".*": "",
+            }
+        )
+    )
+    cg.run()
+    assert "^" == cg.workspace_group_regex
+    assert "test" == cg.workspace_group_replace
+
+
+def test_configure_suffix():
+    cg = ConfigureGroups(
+        MockPrompts(
+            {
+                "Backup prefix": "",
+                r"Choose how to map the workspace groups.*": "2",  # suffix
+                r".*suffix.*": "test",
+                ".*": "",
+            }
+        )
+    )
+    cg.run()
+    assert "$" == cg.workspace_group_regex
+    assert "test" == cg.workspace_group_replace
+
+
+def test_configure_external_id():
+    cg = ConfigureGroups(
+        MockPrompts(
+            {
+                "Backup prefix": "",
+                r"Choose how to map the workspace groups.*": "3",  # external id
+                ".*": "",
+            }
+        )
+    )
+    cg.run()
+    assert cg.group_match_by_external_id
+
+
+def test_configure_substitute():
+    cg = ConfigureGroups(
+        MockPrompts(
+            {
+                "Backup prefix": "",
+                r"Choose how to map the workspace groups.*": "4",  # substitute
+                r".*for substitution": "biz",
+                r".*substitution value": "business",
+                ".*": "",
+            }
+        )
+    )
+    cg.run()
+    assert "biz" == cg.workspace_group_regex
+    assert "business" == cg.workspace_group_replace
+
+
+def test_configure_match():
+    cg = ConfigureGroups(
+        MockPrompts(
+            {
+                "Backup prefix": "",
+                r"Choose how to map the workspace groups.*": "5",  # partial match
+                r".*match on the workspace.*": r"\[(#+)\]",
+                r".*match on the account.*": r"\((#+)\)",
+                ".*": "",
+            }
+        )
+    )
+    cg.run()
+    assert r"\[(#+)\]" == cg.workspace_group_regex
+    assert r"\((#+)\)" == cg.account_group_regex
