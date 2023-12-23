@@ -1,11 +1,18 @@
+import io
+import sys
 from unittest.mock import MagicMock
 
 import pytest
 from databricks.sdk.errors import NotFound
 from databricks.sdk.service import iam
+from databricks.sdk.service.catalog import MetastoreAssignment
 from databricks.sdk.service.iam import ComplexValue, User
 
+<<<<<<< HEAD
 from databricks.labs.ucx.cli import repair_run, skip
+=======
+from databricks.labs.ucx.cli import skip, verify_metastore
+>>>>>>> 2a2a1e7 (Added unit tests)
 
 
 @pytest.fixture
@@ -51,3 +58,4 @@ def test_no_step_in_repair_run(mocker, caplog):
         repair_run("")
     except KeyError as e:
         assert e.args[0] == "You did not specify --step"
+

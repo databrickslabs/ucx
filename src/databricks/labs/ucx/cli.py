@@ -92,7 +92,7 @@ def create_table_mapping():
 
 def verify_metastore():
     """
-    Scans and verifies if a metastore esists for a metostore
+    Scans and verifies if a metastore exists for a metastore
     :param cfg:
     :return:
     """
