@@ -76,6 +76,10 @@ class Table:
     def sql_unset_to(self, catalog):
         return f"ALTER {self.kind} {catalog}.{self.database}.{self.name} UNSET TBLPROPERTIES IF EXISTS('upgraded_to');"
 
+    # SQL to reset the assessment record to revert migration state
+    def sql_unset_to_assessment(self, schema):
+        return f"UPDATE {schema}.tables SET upgraded_to=NULL where DATABASE = {self.database} and NAME = {self.name}"
+
 
 @dataclass
 class TableError:
@@ -183,9 +187,13 @@ class TablesCrawler(CrawlerBase):
             logger.error(f"Couldn't fetch information for table {full_name} : {e}")
             return None
 
-    def reset(self):
-        self._backend.execute(f"DROP TABLE IF EXISTS {self._full_name}")
-        self.snapshot()
+    def unset_upgraded_to(self, database: str | None = None, name: str | None = None):
+        filter_exp = " "
+        if database and name:
+            filter_exp = f" WHERE database='{database}' AND name='{name}'"
+        elif database:
+            filter_exp = f" WHERE database='{database}'"
+        self._backend.execute(f"UPDATE {self._full_name} SET upgraded_to=NULL{filter_exp}")
 
 
 class TablesMigrate:
@@ -262,19 +270,21 @@ class TablesMigrate:
 
     def revert_migrated_tables(self, *, schema: str | None = None, table: str | None = None):
         def scope_filter(cur_table: Table):
-            return (not schema or cur_table.database == schema) and (not table or cur_table.name == table)
+            schema_match = not schema or cur_table.database == schema
+            # if schema is specified matches the schema
+            table_match = not table or cur_table.name == table
+            # if table is specified matches the table
+            return schema_match and table_match
 
-        upgraded_tables = [
-            cur_table
-            for cur_table in list(self._tc.snapshot())
-            if scope_filter(cur_table) and cur_table.upgraded_to is not None
-        ]
+        upgraded_tables = []
+        for cur_table in list(self._tc.snapshot()):
+            if scope_filter(cur_table) and cur_table.upgraded_to is not None:
+                upgraded_tables.append(cur_table)
+
         for upgraded_table in upgraded_tables:
             logger.info(
                 f"Reverting Table {upgraded_table.database}.{upgraded_table.name} "
                 f"upgraded_to {upgraded_table.upgraded_to}"
             )
             self._backend.execute(upgraded_table.sql_unset_to("hive_metastore"))
-        if upgraded_tables:
-            logger.info("Resetting table list")
-            self._tc.reset()
+        self._tc.unset_upgraded_to(database=schema, name=table)

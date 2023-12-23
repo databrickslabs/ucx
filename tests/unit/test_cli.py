@@ -1,11 +1,13 @@
-from unittest.mock import MagicMock
+from unittest.mock import MagicMock, create_autospec
 
 import pytest
+from databricks.sdk import WorkspaceClient
 from databricks.sdk.errors import NotFound
 from databricks.sdk.service import iam
 from databricks.sdk.service.iam import ComplexValue, User
 
 from databricks.labs.ucx.cli import revert_migrated_tables, skip
+from databricks.labs.ucx.installer import Installation, InstallationManager
 
 
 @pytest.fixture
@@ -36,17 +38,11 @@ def test_skip_no_ucx(caplog, mocker):
 
 
 def test_revert(mocker):
-    mocker.patch("databricks.sdk.WorkspaceClient.__init__", return_value=None)
-    current_user = MagicMock()
-    current_user.me.return_value = User(user_name="foo", groups=[ComplexValue(display="admins")])
-    current_user.return_value = None
-    mocker.patch("databricks.sdk.WorkspaceClient.current_user", return_value=current_user)
-    mocker.patch("databricks.labs.ucx.installer.InstallationManager.__init__", return_value=None)
-    installation = MagicMock()
-    installation.config.warehouse_id = 123
-    mocker.patch("databricks.labs.ucx.installer.InstallationManager.for_user", return_value=installation)
-    mocker.patch("databricks.labs.ucx.framework.crawlers.StatementExecutionBackend.__init__", return_value=None)
-    mocker.patch("databricks.labs.ucx.hive_metastore.tables.TablesMigrate.__init__", return_value=None)
+    ws = create_autospec(WorkspaceClient)
+    im = InstallationManager(ws)
+    im.for_user = MagicMock()
+    inst = create_autospec(Installation)
+    im.for_user.return_value = [inst]
     rmt = mocker.patch(
         "databricks.labs.ucx.hive_metastore.tables.TablesMigrate.revert_migrated_tables", return_value=None
     )

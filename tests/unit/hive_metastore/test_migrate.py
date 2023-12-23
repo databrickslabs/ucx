@@ -181,5 +181,5 @@ def test_revert_migrated_tables():
     assert (list(backend.queries)) == [
         "ALTER TABLE hive_metastore.test_schema1.test_table1 UNSET TBLPROPERTIES IF EXISTS('upgraded_to');",
         "ALTER TABLE hive_metastore.test_schema1.test_table2 UNSET TBLPROPERTIES IF EXISTS('upgraded_to');",
-        "DROP TABLE IF EXISTS hive_metastore.inventory_database.tables",
+        "UPDATE hive_metastore.inventory_database.tables SET upgraded_to=NULL WHERE database='test_schema1'",
     ]
