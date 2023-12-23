@@ -29,8 +29,13 @@ def new_installation(ws, sql_backend, env_or_skip, inventory_schema, make_random
     def factory(config_transform: Callable[[WorkspaceConfig], WorkspaceConfig] | None = None):
         prefix = make_random(4)
         renamed_group_prefix = f"rename-{prefix}-"
+        workspace_start_path = f"/Users/{ws.current_user.me().user_name}/.{prefix}"
+
         wc = WorkspaceConfig(
-            inventory_database=inventory_schema, log_level="DEBUG", renamed_group_prefix=renamed_group_prefix
+            inventory_database=inventory_schema,
+            log_level="DEBUG",
+            renamed_group_prefix=renamed_group_prefix,
+            workspace_start_path=workspace_start_path,
         )
         default_cluster_id = env_or_skip("TEST_DEFAULT_CLUSTER_ID")
         tacl_cluster_id = env_or_skip("TEST_LEGACY_TABLE_ACL_CLUSTER_ID")
