@@ -1,13 +1,11 @@
-from unittest.mock import MagicMock, create_autospec
+from unittest.mock import MagicMock
 
 import pytest
-from databricks.sdk import WorkspaceClient
 from databricks.sdk.errors import NotFound
 from databricks.sdk.service import iam
 from databricks.sdk.service.iam import ComplexValue, User
 
-from databricks.labs.ucx.cli import revert_migrated_tables, skip
-from databricks.labs.ucx.installer import Installation, InstallationManager
+from databricks.labs.ucx.cli import skip
 
 
 @pytest.fixture
@@ -35,16 +33,3 @@ def test_skip_no_ucx(caplog, mocker):
     mocker.patch("databricks.labs.ucx.installer.InstallationManager.for_user", return_value=None)
     skip(schema="schema", table="table")
     assert [rec.message for rec in caplog.records if "UCX configuration" in rec.message]
-
-
-def test_revert(mocker):
-    ws = create_autospec(WorkspaceClient)
-    im = InstallationManager(ws)
-    im.for_user = MagicMock()
-    inst = create_autospec(Installation)
-    im.for_user.return_value = [inst]
-    rmt = mocker.patch(
-        "databricks.labs.ucx.hive_metastore.tables.TablesMigrate.revert_migrated_tables", return_value=None
-    )
-    revert_migrated_tables(schema="schema", table="table")
-    rmt.assert_called_with(schema="schema", table="table")

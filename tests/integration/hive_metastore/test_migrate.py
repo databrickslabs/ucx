@@ -4,9 +4,8 @@ from datetime import timedelta
 import pytest
 from databricks.sdk.errors import NotFound
 from databricks.sdk.retries import retried
-from databricks.sdk.service.catalog import TableInfo
 
-from databricks.labs.ucx.hive_metastore.tables import TablesMigrate, TablesCrawler
+from databricks.labs.ucx.hive_metastore.tables import TablesCrawler, TablesMigrate
 from databricks.labs.ucx.mixins.sql import Row
 
 from ..conftest import StaticTablesCrawler
@@ -134,14 +133,15 @@ def test_revert_migrated_table(ws, sql_backend, inventory_schema, make_schema, m
         return False
 
     # Checking that two of the tables were reverted and one was left intact.
-    assert [False,False,True,False] == [checks_upgraded_to(table.full_name) for table in tables]
+    assert [False, False, True, False] == [checks_upgraded_to(table.full_name) for table in tables]
 
-    assessed_tables = sql_backend.fetch(f"SELECT database, name, upgraded_to from {inventory_schema}.tables "
-                                        f"where database in ('{schema1.name}','{schema2.name}')")
+    assessed_tables = sql_backend.fetch(
+        f"SELECT database, name, upgraded_to from {inventory_schema}.tables "
+        f"where database in ('{schema1.name}','{schema2.name}')"
+    )
     assessed_tables_list = list(assessed_tables)
     assert Row((tables[0].schema_name, tables[0].name, None)) in assessed_tables_list
     assert Row((tables[1].schema_name, tables[1].name, None)) in assessed_tables_list
     assert Row((tables[2].schema_name, tables[2].name, "fake dest")) in assessed_tables_list
     assert Row((tables[3].schema_name, tables[3].name, None)) in assessed_tables_list
     assert True
-
