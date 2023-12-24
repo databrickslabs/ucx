@@ -1,6 +1,7 @@
 import logging
-from unittest.mock import MagicMock
+from unittest.mock import MagicMock, create_autospec
 
+from databricks.sdk import WorkspaceClient
 from databricks.sdk.service.catalog import CatalogInfo, SchemaInfo, TableInfo
 
 from databricks.labs.ucx.hive_metastore.tables import (
@@ -133,7 +134,7 @@ def test_tables_sql_unset_to():
         upgraded_to="dest1",
     )
     assert table.sql_unset_to("hive_metastore") == (
-        "ALTER TABLE hive_metastore.test_schema1.test_table1 UNSET TBLPROPERTIES IF EXISTS('upgraded_to');"
+        "ALTER TABLE `hive_metastore`.`test_schema1`.`test_table1` UNSET TBLPROPERTIES IF EXISTS('upgraded_to');"
     )
 
 
@@ -145,8 +146,8 @@ def test_revert_migrated_tables():
         ]
     }
     backend = MockBackend(fails_on_first=errors, rows=rows)
-    tc = TablesCrawler(backend, "inventory_database")
-    client = MagicMock()
+    tc = create_autospec(TablesCrawler)
+    client = create_autospec(WorkspaceClient)
     tm = TablesMigrate(tc, client, backend, default_catalog="test_catalog")
     test_tables = [
         Table(
@@ -175,11 +176,17 @@ def test_revert_migrated_tables():
         ),
     ]
 
-    tc.snapshot = MagicMock()
     tc.snapshot.return_value = test_tables
     tm.revert_migrated_tables(schema="test_schema1")
     assert (list(backend.queries)) == [
-        "ALTER TABLE hive_metastore.test_schema1.test_table1 UNSET TBLPROPERTIES IF EXISTS('upgraded_to');",
-        "ALTER TABLE hive_metastore.test_schema1.test_table2 UNSET TBLPROPERTIES IF EXISTS('upgraded_to');",
-        "UPDATE hive_metastore.inventory_database.tables SET upgraded_to=NULL WHERE database='test_schema1'",
+        "ALTER TABLE `hive_metastore`.`test_schema1`.`test_table1` UNSET TBLPROPERTIES IF EXISTS('upgraded_to');",
+        "ALTER TABLE `hive_metastore`.`test_schema1`.`test_table2` UNSET TBLPROPERTIES IF EXISTS('upgraded_to');",
     ]
+    tc.unset_upgraded_to.assert_called_with(database="test_schema1", name=None)
+
+    tc_test = TablesCrawler(backend, "inventory_database")
+    tc_test.unset_upgraded_to(database="test_schema1", name=None)
+    assert (
+        backend.queries[-1]
+        == "UPDATE hive_metastore.inventory_database.tables SET upgraded_to=NULL WHERE database='test_schema1'"
+    )

@@ -74,7 +74,10 @@ class Table:
         )
 
     def sql_unset_to(self, catalog):
-        return f"ALTER {self.kind} {catalog}.{self.database}.{self.name} UNSET TBLPROPERTIES IF EXISTS('upgraded_to');"
+        return (
+            f"ALTER {self.kind} `{catalog}`.`{self.database}`.`{self.name}` "
+            f"UNSET TBLPROPERTIES IF EXISTS('upgraded_to');"
+        )
 
     # SQL to reset the assessment record to revert migration state
     def sql_unset_to_assessment(self, schema):
@@ -268,17 +271,12 @@ class TablesMigrate:
     def _table_already_upgraded(self, target) -> bool:
         return target in self._seen_tables
 
-    def revert_migrated_tables(self, *, schema: str | None = None, table: str | None = None):
-        def scope_filter(cur_table: Table):
-            schema_match = not schema or cur_table.database == schema
-            # if schema is specified matches the schema
-            table_match = not table or cur_table.name == table
-            # if table is specified matches the table
-            return schema_match and table_match
-
+    def revert_migrated_tables(self, schema: str | None = None, table: str | None = None):
         upgraded_tables = []
-        for cur_table in list(self._tc.snapshot()):
-            if scope_filter(cur_table) and cur_table.upgraded_to is not None:
+        for cur_table in self._tc.snapshot():
+            schema_match = not schema or cur_table.database == schema
+            table_match = not table or cur_table.name == table
+            if schema_match and table_match and cur_table.upgraded_to is not None:
                 upgraded_tables.append(cur_table)
 
         for upgraded_table in upgraded_tables:
@@ -288,3 +286,12 @@ class TablesMigrate:
             )
             self._backend.execute(upgraded_table.sql_unset_to("hive_metastore"))
         self._tc.unset_upgraded_to(database=schema, name=table)
+
+    def checks_upgraded_to(self, schema: str, table: str):
+        result = self._backend.fetch(f"SHOW TBLPROPERTIES `{schema}`.`{table}`")
+        for value in result:
+            if value["key"] == "upgraded_to":
+                logger.info(f"{schema}.{table} is set as upgraded")
+                return True
+        logger.info(f"{schema}.{table} is set as not upgraded")
+        return False

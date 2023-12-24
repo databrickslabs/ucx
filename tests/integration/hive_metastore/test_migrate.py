@@ -115,26 +115,25 @@ def test_revert_migrated_table(ws, sql_backend, inventory_schema, make_schema, m
         make_table(schema_name=schema2.name),
     ]
 
-    for i in range(3):
-        logger.info(f"Applying upgraded_to table property for {tables[i].full_name}")
-        sql_backend.execute(f"ALTER TABLE {tables[i].full_name} set TBLPROPERTIES('upgraded_to'='FAKE DEST')")
+    for table in tables[0:3]:
+        # apply "upgraded to" table property to the first three tables.
+        logger.info(f"Applying upgraded_to table property for {table.full_name}")
+        sql_backend.execute(f"ALTER TABLE {table.full_name} set TBLPROPERTIES('upgraded_to'='FAKE DEST')")
 
     crawler = TablesCrawler(sql_backend, inventory_schema)
     tm = TablesMigrate(crawler, ws, sql_backend)
     tm.revert_migrated_tables(schema=schema1.name)
 
-    def checks_upgraded_to(table_name: str):
-        result = sql_backend.fetch(f"SHOW TBLPROPERTIES {table_name}")
-        for value in result:
-            if value["key"] == "upgraded_to":
-                logger.info(f"{table_name} is set as upgraded")
-                return True
-        logger.info(f"{table_name} is set as not upgraded")
-        return False
-
     # Checking that two of the tables were reverted and one was left intact.
-    assert [False, False, True, False] == [checks_upgraded_to(table.full_name) for table in tables]
+    # The first two tables belong to schema 1 and should have not "upgraded_to" property
+    assert not tm.checks_upgraded_to(tables[0].schema_name, tables[0].name)
+    assert not tm.checks_upgraded_to(tables[1].schema_name, tables[1].name)
+    # The third table belongs to schema 2 and should have an "upgraded_to" property set
+    assert tm.checks_upgraded_to(tables[2].schema_name, tables[2].name)
+    # The fourth table did have the "upgraded_to" property set and should remain that way.
+    assert not tm.checks_upgraded_to(tables[3].schema_name, tables[3].name)
 
+    # Testing that the records in the tables table reflect then new state of the tables.
     assessed_tables = sql_backend.fetch(
         f"SELECT database, name, upgraded_to from {inventory_schema}.tables "
         f"where database in ('{schema1.name}','{schema2.name}')"
@@ -144,4 +143,3 @@ def test_revert_migrated_table(ws, sql_backend, inventory_schema, make_schema, m
     assert Row((tables[1].schema_name, tables[1].name, None)) in assessed_tables_list
     assert Row((tables[2].schema_name, tables[2].name, "fake dest")) in assessed_tables_list
     assert Row((tables[3].schema_name, tables[3].name, None)) in assessed_tables_list
-    assert True
