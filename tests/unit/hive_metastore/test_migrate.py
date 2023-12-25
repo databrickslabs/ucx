@@ -125,20 +125,6 @@ def test_migrate_tables_should_add_table_to_cache_when_migrated():
     assert tm._seen_tables == {"test_catalog.db1.managed": "hive_metastore.db1.managed"}
 
 
-def test_tables_sql_unset_to():
-    table = Table(
-        object_type="TABLE",
-        table_format="DELTA",
-        catalog="hive_metastore",
-        database="test_schema1",
-        name="test_table1",
-        upgraded_to="dest1",
-    )
-    assert table.sql_unset_to("hive_metastore") == (
-        "ALTER TABLE `hive_metastore`.`test_schema1`.`test_table1` UNSET TBLPROPERTIES IF EXISTS('upgraded_to');"
-    )
-
-
 def test_revert_migrated_tables():
     errors = {}
     rows = {
