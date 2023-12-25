@@ -287,19 +287,26 @@ class TablesMigrate:
             if cur_table.upgraded_to is not None:
                 upgraded_tables.append(cur_table)
 
+        tasks = []
         for upgraded_table in upgraded_tables:
             if upgraded_table.kind == "VIEW" or upgraded_table.object_type == "EXTERNAL" or delete_managed:
-                logger.info(
-                    f"Reverting {upgraded_table.object_type} Table {upgraded_table.database}.{upgraded_table.name} "
-                    f"upgraded_to {upgraded_table.upgraded_to}"
-                )
-                self._backend.execute(upgraded_table.sql_unset_upgraded_to("hive_metastore"))
-                self._backend.execute(upgraded_table.sql_remove_target())
+                tasks.append(partial(self._revert_migrated_table, upgraded_table))
             else:
                 logger.info(
                     f"Skipping {upgraded_table.object_type} Table {upgraded_table.database}.{upgraded_table.name} "
                     f"upgraded_to {upgraded_table.upgraded_to}"
                 )
+        _, errors = Threads.gather("revert migrated tables", tasks)
+        if len(errors) > 0:
+            msg = f"Detected {len(errors)} errors: {'. '.join(str(e) for e in errors)}"
+            raise ValueError(msg)
+
+    def _revert_migrated_table(self, table: Table):
+        logger.info(
+            f"Reverting {table.object_type} Table {table.database}.{table.name} upgraded_to {table.upgraded_to}"
+        )
+        self._backend.execute(table.sql_unset_upgraded_to("hive_metastore"))
+        self._backend.execute(table.sql_remove_target())
 
     def get_migrated_count(self, schema: str | None = None, table: str | None = None) -> list[MigrationCount]:
         migration_list = []
