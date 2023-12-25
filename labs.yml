@@ -57,3 +57,5 @@ commands:
         description: Schema Name to revert
       - name: table
         description: Table Name to revert
+      - name: deletemanaged
+        description: Revert and Delete Manage Tables

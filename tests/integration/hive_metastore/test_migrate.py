@@ -105,41 +105,58 @@ def test_migrate_external_table(ws, sql_backend, inventory_schema, make_catalog,
 
 
 @retried(on=[NotFound], timeout=timedelta(minutes=5))
-def test_revert_migrated_table(ws, sql_backend, inventory_schema, make_schema, make_table):
-    schema1 = make_schema(catalog_name="hive_metastore")
-    schema2 = make_schema(catalog_name="hive_metastore")
-    tables = [
-        make_table(schema_name=schema1.name),
-        make_table(schema_name=schema1.name),
-        make_table(schema_name=schema2.name),
-        make_table(schema_name=schema2.name),
-    ]
+def test_revert_migrated_table(ws, sql_backend, inventory_schema, make_schema, make_table, make_catalog):
+    src_schema1 = make_schema(catalog_name="hive_metastore")
+    src_schema2 = make_schema(catalog_name="hive_metastore")
+    table_to_revert = make_table(schema_name=src_schema1.name)
+    table_not_migrated = make_table(schema_name=src_schema1.name)
+    table_to_not_revert = make_table(schema_name=src_schema2.name)
+    all_tables = [table_to_revert, table_not_migrated, table_to_not_revert]
 
-    for table in tables[0:3]:
-        # apply "upgraded to" table property to the first three tables.
-        logger.info(f"Applying upgraded_to table property for {table.full_name}")
-        sql_backend.execute(f"ALTER TABLE {table.full_name} set TBLPROPERTIES('upgraded_to'='FAKE DEST')")
+    dst_catalog = make_catalog()
+    dst_schema1 = make_schema(catalog_name=dst_catalog.name, name=src_schema1.name)
+    dst_schema2 = make_schema(catalog_name=dst_catalog.name, name=src_schema2.name)
 
+    static_crawler = StaticTablesCrawler(sql_backend, inventory_schema, all_tables)
+    tm1 = TablesMigrate(static_crawler, ws, sql_backend, dst_catalog.name)
+    tm1.migrate_tables()
+
+    sql_backend.execute(f"DROP TABLE IF EXISTS {inventory_schema}.tables ")
     crawler = TablesCrawler(sql_backend, inventory_schema)
-    tm = TablesMigrate(crawler, ws, sql_backend)
-    tm.revert_migrated_tables(schema=schema1.name)
+    tm2 = TablesMigrate(crawler, ws, sql_backend, dst_catalog.name)
+    tm2.revert_migrated_tables(src_schema1.name, deletemanaged=True)
 
     # Checking that two of the tables were reverted and one was left intact.
-    # The first two tables belong to schema 1 and should have not "upgraded_to" property
-    assert not tm.checks_upgraded_to(tables[0].schema_name, tables[0].name)
-    assert not tm.checks_upgraded_to(tables[1].schema_name, tables[1].name)
-    # The third table belongs to schema 2 and should have an "upgraded_to" property set
-    assert tm.checks_upgraded_to(tables[2].schema_name, tables[2].name)
-    # The fourth table did have the "upgraded_to" property set and should remain that way.
-    assert not tm.checks_upgraded_to(tables[3].schema_name, tables[3].name)
+    # The first two table belongs to schema 1 and should have not "upgraded_to" property
+    assert not tm2.checks_upgraded_to(table_to_revert.schema_name, table_to_revert.name)
+    # The second table didn't have the "upgraded_to" property set and should remain that way.
+    assert not tm2.checks_upgraded_to(table_not_migrated.schema_name, table_not_migrated.name)
+    # The third table belongs to schema2 and had the "upgraded_to" property set and should remain that way.
+    assert tm2.checks_upgraded_to(table_to_not_revert.schema_name, table_to_not_revert.name)
 
     # Testing that the records in the tables table reflect then new state of the tables.
     assessed_tables = sql_backend.fetch(
         f"SELECT database, name, upgraded_to from {inventory_schema}.tables "
-        f"where database in ('{schema1.name}','{schema2.name}')"
+        f"where database in ('{src_schema1.name}','{src_schema2.name}')"
     )
     assessed_tables_list = list(assessed_tables)
-    assert Row((tables[0].schema_name, tables[0].name, None)) in assessed_tables_list
-    assert Row((tables[1].schema_name, tables[1].name, None)) in assessed_tables_list
-    assert Row((tables[2].schema_name, tables[2].name, "fake dest")) in assessed_tables_list
-    assert Row((tables[3].schema_name, tables[3].name, None)) in assessed_tables_list
+    assert Row((table_to_revert.schema_name, table_to_revert.name, None)) in assessed_tables_list
+    assert Row((table_not_migrated.schema_name, table_not_migrated.name, None)) in assessed_tables_list
+    assert (
+        Row(
+            (
+                table_to_not_revert.schema_name,
+                table_to_not_revert.name,
+                f"{dst_catalog.name}.{dst_schema2.name}.{table_to_not_revert.name}",
+            )
+        )
+        in assessed_tables_list
+    )
+
+    target_tables_schema1 = list(sql_backend.fetch(f"SHOW TABLES IN {dst_schema1.full_name}"))
+    assert len(target_tables_schema1) == 0
+
+    target_tables_schema2 = list(sql_backend.fetch(f"SHOW TABLES IN {dst_schema2.full_name}"))
+    assert len(target_tables_schema2) == 1
+    assert target_tables_schema2[0]["database"] == dst_schema2.name
+    assert target_tables_schema2[0]["tableName"] == table_to_not_revert.name

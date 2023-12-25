@@ -1,5 +1,6 @@
 import logging
 import re
+from collections import defaultdict
 from collections.abc import Iterable, Iterator
 from dataclasses import dataclass
 from functools import partial
@@ -81,7 +82,10 @@ class Table:
 
     # SQL to reset the assessment record to revert migration state
     def sql_unset_to_assessment(self, schema):
-        return f"UPDATE {schema}.tables SET upgraded_to=NULL where DATABASE = {self.database} and NAME = {self.name}"
+        return f"UPDATE {schema}.tables SET upgraded_to=NULL where database = {self.database} and name = {self.name}"
+
+    def sql_remove_target(self):
+        return f"DROP TABLE IF EXISTS {self.upgraded_to}"
 
 
 @dataclass
@@ -90,6 +94,14 @@ class TableError:
     database: str
     name: str | None = None
     error: str | None = None
+
+
+@dataclass
+class MigrationCount:
+    database: str
+    managed_tables: int = 0
+    external_tables: int = 0
+    views: int = 0
 
 
 class TablesCrawler(CrawlerBase):
@@ -190,12 +202,15 @@ class TablesCrawler(CrawlerBase):
             logger.error(f"Couldn't fetch information for table {full_name} : {e}")
             return None
 
-    def unset_upgraded_to(self, database: str | None = None, name: str | None = None):
-        filter_exp = " "
+    def unset_upgraded_to(self, database: str | None = None, name: str | None = None, *, deletemanaged: bool = False):
+        if deletemanaged:
+            filter_exp = " WHERE object_type in ('MANAGED','EXTERNAL')"
+        else:
+            filter_exp = " WHERE object_type = 'EXTERNAL'"
         if database and name:
-            filter_exp = f" WHERE database='{database}' AND name='{name}'"
+            filter_exp += f" AND database='{database}' AND name='{name}'"
         elif database:
-            filter_exp = f" WHERE database='{database}'"
+            filter_exp += f" AND database='{database}'"
         self._backend.execute(f"UPDATE {self._full_name} SET upgraded_to=NULL{filter_exp}")
 
 
@@ -271,21 +286,60 @@ class TablesMigrate:
     def _table_already_upgraded(self, target) -> bool:
         return target in self._seen_tables
 
-    def revert_migrated_tables(self, schema: str | None = None, table: str | None = None):
+    def revert_migrated_tables(
+        self, schema: str | None = None, table: str | None = None, *, deletemanaged: bool = False
+    ):
         upgraded_tables = []
+        if table and not schema:
+            logger.error("Cannot accept 'Table' parameter without 'Schema' parameter")
         for cur_table in self._tc.snapshot():
-            schema_match = not schema or cur_table.database == schema
-            table_match = not table or cur_table.name == table
-            if schema_match and table_match and cur_table.upgraded_to is not None:
+            if schema and cur_table.database != schema:
+                continue
+            if table and cur_table.name != table:
+                continue
+            if cur_table.upgraded_to is not None:
                 upgraded_tables.append(cur_table)
 
         for upgraded_table in upgraded_tables:
-            logger.info(
-                f"Reverting Table {upgraded_table.database}.{upgraded_table.name} "
-                f"upgraded_to {upgraded_table.upgraded_to}"
+            if upgraded_table.object_type == "EXTERNAL" or deletemanaged:
+                logger.info(
+                    f"Reverting {upgraded_table.object_type} Table {upgraded_table.database}.{upgraded_table.name} "
+                    f"upgraded_to {upgraded_table.upgraded_to}"
+                )
+                self._backend.execute(upgraded_table.sql_unset_to("hive_metastore"))
+                self._backend.execute(upgraded_table.sql_remove_target())
+            else:
+                logger.info(
+                    f"Skipping {upgraded_table.object_type} Table {upgraded_table.database}.{upgraded_table.name} "
+                    f"upgraded_to {upgraded_table.upgraded_to}"
+                )
+
+        self._tc.unset_upgraded_to(schema, table, deletemanaged=deletemanaged)
+
+    def get_migrated_count(self, schema: str | None = None, table: str | None = None) -> list[MigrationCount]:
+        migration_list = []
+        table_by_database = defaultdict(list)
+        for cur_table in self._tc.snapshot():
+            if schema and cur_table.database != schema:
+                continue
+            if table and cur_table.name != table:
+                continue
+            if cur_table.upgraded_to is not None:
+                table_by_database[cur_table.database].append(cur_table)
+
+        for cur_database in table_by_database.keys():
+            external_tables = 0
+            managed_tables = 0
+            for current_table in table_by_database[cur_database]:
+                if current_table.upgraded_to is not None:
+                    if current_table.object_type == "EXTERNAL":
+                        external_tables += 1
+                if current_table.object_type == "MANAGED":
+                    managed_tables += 1
+            migration_list.append(
+                MigrationCount(database=cur_database, managed_tables=managed_tables, external_tables=external_tables)
             )
-            self._backend.execute(upgraded_table.sql_unset_to("hive_metastore"))
-        self._tc.unset_upgraded_to(database=schema, name=table)
+        return migration_list
 
     def checks_upgraded_to(self, schema: str, table: str):
         result = self._backend.fetch(f"SHOW TBLPROPERTIES `{schema}`.`{table}`")
