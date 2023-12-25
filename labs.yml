@@ -54,8 +54,8 @@ commands:
     description: remove notation on a migrated table for re-migration
     flags:
       - name: schema
-        description: Schema Name to revert
+        description: Schema to revert (if left blank all schemas in the workspace will be reverted)
       - name: table
-        description: Table Name to revert
-      - name: deletemanaged
-        description: Revert and Delete Manage Tables
+        description: Table Name to revert (if left blank all tables in the schema will be reverted). Requires schema parameter to be specified.)
+      - name: delete_managed
+        description: Revert and Delete Managed Tables

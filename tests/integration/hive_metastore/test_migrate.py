@@ -4,9 +4,9 @@ from datetime import timedelta
 import pytest
 from databricks.sdk.errors import NotFound
 from databricks.sdk.retries import retried
+from databricks.sdk.service.catalog import DataSourceFormat, TableInfo, TableType
 
-from databricks.labs.ucx.hive_metastore.tables import TablesCrawler, TablesMigrate
-from databricks.labs.ucx.mixins.sql import Row
+from databricks.labs.ucx.hive_metastore.tables import TablesMigrate
 
 from ..conftest import StaticTablesCrawler
 
@@ -121,37 +121,30 @@ def test_revert_migrated_table(ws, sql_backend, inventory_schema, make_schema, m
     tm1 = TablesMigrate(static_crawler, ws, sql_backend, dst_catalog.name)
     tm1.migrate_tables()
 
-    sql_backend.execute(f"DROP TABLE IF EXISTS {inventory_schema}.tables ")
-    crawler = TablesCrawler(sql_backend, inventory_schema)
-    tm2 = TablesMigrate(crawler, ws, sql_backend, dst_catalog.name)
-    tm2.revert_migrated_tables(src_schema1.name, deletemanaged=True)
+    tables_after_migration = []
+    for migrated_table in tm1._seen_tables.keys():
+        src_table_elements = tm1._seen_tables[migrated_table].split(".")
+        table = TableInfo(
+            catalog_name=src_table_elements[0],
+            schema_name=src_table_elements[1],
+            name=src_table_elements[2],
+            table_type=TableType.MANAGED,
+            data_source_format=DataSourceFormat.DELTA,
+            properties={"upgraded_to": migrated_table},
+        )
+        tables_after_migration.append(table)
+    tables_after_migration.append(table_not_migrated)
+    static_crawler2 = StaticTablesCrawler(sql_backend, inventory_schema, tables_after_migration)
+    tm2 = TablesMigrate(static_crawler2, ws, sql_backend, dst_catalog.name)
+    tm2.revert_migrated_tables(src_schema1.name, delete_managed=True)
 
     # Checking that two of the tables were reverted and one was left intact.
     # The first two table belongs to schema 1 and should have not "upgraded_to" property
-    assert not tm2.checks_upgraded_to(table_to_revert.schema_name, table_to_revert.name)
+    assert not tm2.is_upgraded(table_to_revert.schema_name, table_to_revert.name)
     # The second table didn't have the "upgraded_to" property set and should remain that way.
-    assert not tm2.checks_upgraded_to(table_not_migrated.schema_name, table_not_migrated.name)
+    assert not tm2.is_upgraded(table_not_migrated.schema_name, table_not_migrated.name)
     # The third table belongs to schema2 and had the "upgraded_to" property set and should remain that way.
-    assert tm2.checks_upgraded_to(table_to_not_revert.schema_name, table_to_not_revert.name)
-
-    # Testing that the records in the tables table reflect then new state of the tables.
-    assessed_tables = sql_backend.fetch(
-        f"SELECT database, name, upgraded_to from {inventory_schema}.tables "
-        f"where database in ('{src_schema1.name}','{src_schema2.name}')"
-    )
-    assessed_tables_list = list(assessed_tables)
-    assert Row((table_to_revert.schema_name, table_to_revert.name, None)) in assessed_tables_list
-    assert Row((table_not_migrated.schema_name, table_not_migrated.name, None)) in assessed_tables_list
-    assert (
-        Row(
-            (
-                table_to_not_revert.schema_name,
-                table_to_not_revert.name,
-                f"{dst_catalog.name}.{dst_schema2.name}.{table_to_not_revert.name}",
-            )
-        )
-        in assessed_tables_list
-    )
+    assert tm2.is_upgraded(table_to_not_revert.schema_name, table_to_not_revert.name)
 
     target_tables_schema1 = list(sql_backend.fetch(f"SHOW TABLES IN {dst_schema1.full_name}"))
     assert len(target_tables_schema1) == 0

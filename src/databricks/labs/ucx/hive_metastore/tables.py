@@ -74,18 +74,14 @@ class Table:
             f" TBLPROPERTIES ('upgraded_from' = '{self.key}');"
         )
 
-    def sql_unset_to(self, catalog):
+    def sql_unset_upgraded_to(self, catalog):
         return (
             f"ALTER {self.kind} `{catalog}`.`{self.database}`.`{self.name}` "
             f"UNSET TBLPROPERTIES IF EXISTS('upgraded_to');"
         )
 
-    # SQL to reset the assessment record to revert migration state
-    def sql_unset_to_assessment(self, schema):
-        return f"UPDATE {schema}.tables SET upgraded_to=NULL where database = {self.database} and name = {self.name}"
-
     def sql_remove_target(self):
-        return f"DROP TABLE IF EXISTS {self.upgraded_to}"
+        return f"DROP {self.kind} IF EXISTS {self.upgraded_to}"
 
 
 @dataclass
@@ -202,17 +198,6 @@ class TablesCrawler(CrawlerBase):
             logger.error(f"Couldn't fetch information for table {full_name} : {e}")
             return None
 
-    def unset_upgraded_to(self, database: str | None = None, name: str | None = None, *, deletemanaged: bool = False):
-        if deletemanaged:
-            filter_exp = " WHERE object_type in ('MANAGED','EXTERNAL')"
-        else:
-            filter_exp = " WHERE object_type = 'EXTERNAL'"
-        if database and name:
-            filter_exp += f" AND database='{database}' AND name='{name}'"
-        elif database:
-            filter_exp += f" AND database='{database}'"
-        self._backend.execute(f"UPDATE {self._full_name} SET upgraded_to=NULL{filter_exp}")
-
 
 class TablesMigrate:
     def __init__(
@@ -287,8 +272,10 @@ class TablesMigrate:
         return target in self._seen_tables
 
     def revert_migrated_tables(
-        self, schema: str | None = None, table: str | None = None, *, deletemanaged: bool = False
+        self, schema: str | None = None, table: str | None = None, *, delete_managed: bool = False
     ):
+        table = table.lower() if table else None
+        schema = schema.lower() if schema else None
         upgraded_tables = []
         if table and not schema:
             logger.error("Cannot accept 'Table' parameter without 'Schema' parameter")
@@ -301,20 +288,18 @@ class TablesMigrate:
                 upgraded_tables.append(cur_table)
 
         for upgraded_table in upgraded_tables:
-            if upgraded_table.object_type == "EXTERNAL" or deletemanaged:
+            if upgraded_table.kind == "VIEW" or upgraded_table.object_type == "EXTERNAL" or delete_managed:
                 logger.info(
                     f"Reverting {upgraded_table.object_type} Table {upgraded_table.database}.{upgraded_table.name} "
                     f"upgraded_to {upgraded_table.upgraded_to}"
                 )
-                self._backend.execute(upgraded_table.sql_unset_to("hive_metastore"))
+                self._backend.execute(upgraded_table.sql_unset_upgraded_to("hive_metastore"))
                 self._backend.execute(upgraded_table.sql_remove_target())
             else:
                 logger.info(
                     f"Skipping {upgraded_table.object_type} Table {upgraded_table.database}.{upgraded_table.name} "
                     f"upgraded_to {upgraded_table.upgraded_to}"
                 )
-
-        self._tc.unset_upgraded_to(schema, table, deletemanaged=deletemanaged)
 
     def get_migrated_count(self, schema: str | None = None, table: str | None = None) -> list[MigrationCount]:
         migration_list = []
@@ -330,18 +315,26 @@ class TablesMigrate:
         for cur_database in table_by_database.keys():
             external_tables = 0
             managed_tables = 0
+            views = 0
             for current_table in table_by_database[cur_database]:
                 if current_table.upgraded_to is not None:
+                    if current_table.kind == "VIEW":
+                        views += 1
+                        continue
                     if current_table.object_type == "EXTERNAL":
                         external_tables += 1
-                if current_table.object_type == "MANAGED":
-                    managed_tables += 1
+                        continue
+                    if current_table.object_type == "MANAGED":
+                        managed_tables += 1
+                        continue
             migration_list.append(
-                MigrationCount(database=cur_database, managed_tables=managed_tables, external_tables=external_tables)
+                MigrationCount(
+                    database=cur_database, managed_tables=managed_tables, external_tables=external_tables, views=views
+                )
             )
         return migration_list
 
-    def checks_upgraded_to(self, schema: str, table: str):
+    def is_upgraded(self, schema: str, table: str) -> bool:
         result = self._backend.fetch(f"SHOW TBLPROPERTIES `{schema}`.`{table}`")
         for value in result:
             if value["key"] == "upgraded_to":
@@ -349,3 +342,21 @@ class TablesMigrate:
                 return True
         logger.info(f"{schema}.{table} is set as not upgraded")
         return False
+
+    def get_migration_report(self) -> str | None:
+        migrated_count = self.get_migrated_count()
+        if migrated_count:
+            migrated_report = "The following is the count of migrated tables and views found in scope:\n"
+            migrated_report += "\n"
+            migrated_report += (
+                "Database                      | External Tables  | Managed Table    | Views            |\n"
+            )
+            migrated_report += "=" * 88 + "\n"
+            for count in migrated_count:
+                migrated_report += (
+                    f"{count.database:<30}| {count.external_tables:16} | {count.managed_tables:16} |"
+                    f" {count.views:16} |\n"
+                )
+            migrated_report += "=" * 88 + "\n"
+            return migrated_report
+        return None

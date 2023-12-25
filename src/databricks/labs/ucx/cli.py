@@ -114,7 +114,7 @@ def ensure_assessment_run():
         workspace_installer.validate_and_run("assessment")
 
 
-def revert_migrated_tables(schema: str, table: str, *, deletemanaged: bool = False):
+def revert_migrated_tables(schema: str, table: str, *, delete_managed: bool = False):
     ws = WorkspaceClient()
     prompts = Prompts()
     installation_manager = InstallationManager(ws)
@@ -133,23 +133,19 @@ def revert_migrated_tables(schema: str, table: str, *, deletemanaged: bool = Fal
     sql_backend = StatementExecutionBackend(ws, warehouse_id)
     table_crawler = TablesCrawler(sql_backend, installation.config.inventory_database)
     tm = TablesMigrate(table_crawler, ws, sql_backend)
-    migrated_count = tm.get_migrated_count()
-    if migrated_count:
-        print("The following is the count of migrated tables found in scope:")
-        print()
-        print("Database                      | External Tables  | Managed Table    |")
-        print("=" * 69)
-        for count in migrated_count:
-            print(f"{count.database:<30}| {count.external_tables:16} | {count.managed_tables:16} |")
-        print("=" * 69)
-        print("Migrated External Tables (targets) will be deleted")
-        if deletemanaged:
+    migration_report = tm.get_migration_report()
+    if migration_report:
+        print(migration_report)
+        print("Migrated External Tables and Views (targets) will be deleted")
+        if delete_managed:
             print("Migrated Manged Tables (targets) will be deleted")
         else:
             print("Migrated Manged Tables (targets) will be left intact")
         if not prompts.confirm("Would you like to continue?", max_attempts=2):
             return None
-    tm.revert_migrated_tables(schema, table, deletemanaged=deletemanaged)
+        tm.revert_migrated_tables(schema, table, delete_managed=delete_managed)
+    else:
+        logger.info("No migrated tables were found.")
 
 
 MAPPING = {

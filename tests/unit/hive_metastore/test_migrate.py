@@ -160,6 +160,15 @@ def test_revert_migrated_tables():
             upgraded_to="cat1.schema1.dest1",
         ),
         Table(
+            object_type="VIEW",
+            table_format="VIEW",
+            catalog="hive_metastore",
+            database="test_schema1",
+            name="test_view1",
+            view_text="SELECT * FROM SOMETHING",
+            upgraded_to="cat1.schema1.dest_view1",
+        ),
+        Table(
             object_type="MANAGED",
             table_format="DELTA",
             catalog="hive_metastore",
@@ -182,25 +191,20 @@ def test_revert_migrated_tables():
     assert (list(backend.queries)) == [
         "ALTER TABLE `hive_metastore`.`test_schema1`.`test_table1` UNSET TBLPROPERTIES IF EXISTS('upgraded_to');",
         "DROP TABLE IF EXISTS cat1.schema1.dest1",
+        "ALTER VIEW `hive_metastore`.`test_schema1`.`test_view1` UNSET TBLPROPERTIES IF EXISTS('upgraded_to');",
+        "DROP VIEW IF EXISTS cat1.schema1.dest_view1",
     ]
-    tc.unset_upgraded_to.assert_called_with(database="test_schema1", name=None, deletemanaged=False)
 
     # testing reverting managed tables
-    tm.revert_migrated_tables(schema="test_schema1", deletemanaged=True)
-    assert (list(backend.queries)[-4:]) == [
+    tm.revert_migrated_tables(schema="test_schema1", delete_managed=True)
+    assert (list(backend.queries)[-6:]) == [
         "ALTER TABLE `hive_metastore`.`test_schema1`.`test_table1` UNSET TBLPROPERTIES IF EXISTS('upgraded_to');",
         "DROP TABLE IF EXISTS cat1.schema1.dest1",
+        "ALTER VIEW `hive_metastore`.`test_schema1`.`test_view1` UNSET TBLPROPERTIES IF EXISTS('upgraded_to');",
+        "DROP VIEW IF EXISTS cat1.schema1.dest_view1",
         "ALTER TABLE `hive_metastore`.`test_schema1`.`test_table2` UNSET TBLPROPERTIES IF EXISTS('upgraded_to');",
         "DROP TABLE IF EXISTS cat1.schema1.dest2",
     ]
-    tc.unset_upgraded_to.assert_called_with(database="test_schema1", name=None, deletemanaged=True)
-
-    tc_test = TablesCrawler(backend, "inventory_database")
-    tc_test.unset_upgraded_to(database="test_schema1", name=None, deletemanaged=True)
-    assert (
-        backend.queries[-1] == "UPDATE hive_metastore.inventory_database.tables SET upgraded_to=NULL WHERE "
-        "object_type in ('MANAGED','EXTERNAL') AND database='test_schema1'"
-    )
 
 
 def test_get_migrated_count():
