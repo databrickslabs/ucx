@@ -113,6 +113,24 @@ def ensure_assessment_run():
         workspace_installer.validate_and_run("assessment")
 
 
+def migrate_uc_to_uc(from_catalog: str, from_schema: str, from_table: list[str], to_catalog: str,
+                     to_schema: str = None, ) -> None:
+    logger.info("Running migrating uc objects command")
+    if not from_catalog or not to_catalog:
+        logger.error("Please enter from_catalog and to_catalog details")
+        return
+    if not from_schema or not to_schema or from_table:
+        logger.error("Please enter from_schema, to_schema and from_table(enter * for migrating all tables) details.")
+        return
+    if from_catalog == to_catalog and from_schema == to_schema:
+        logger.error("please select a different schema or catalog to migrate to")
+        return
+    if from_table[0] == "*":
+        logger.error(f"migrating all tables from {from_catalog}.{from_schema} to {to_catalog}.{to_schema}.")
+    else:
+        logger.error(f"migrating tables {from_table} from {from_catalog}.{from_schema} to {to_catalog}.{to_schema}")
+
+
 MAPPING = {
     "open-remote-config": open_remote_config,
     "installations": list_installations,
@@ -123,6 +141,7 @@ MAPPING = {
     "validate-external-locations": validate_external_locations,
     "ensure-assessment-run": ensure_assessment_run,
     "skip": skip,
+    "move-uc-objects": migrate_uc_to_uc,
 }
 
 
