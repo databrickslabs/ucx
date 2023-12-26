@@ -113,8 +113,13 @@ def ensure_assessment_run():
         workspace_installer.validate_and_run("assessment")
 
 
-def migrate_uc_to_uc(from_catalog: str, from_schema: str, from_table: list[str], to_catalog: str,
-                     to_schema: str = None, ) -> None:
+def migrate_uc_to_uc(
+    from_catalog: str,
+    from_schema: str,
+    from_table: list[str],
+    to_catalog: str,
+    to_schema: str,
+) -> None:
     logger.info("Running migrating uc objects command")
     if not from_catalog or not to_catalog:
         logger.error("Please enter from_catalog and to_catalog details")
