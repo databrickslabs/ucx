@@ -11,6 +11,7 @@ from databricks.labs.ucx.framework.crawlers import StatementExecutionBackend
 from databricks.labs.ucx.framework.tui import Prompts
 from databricks.labs.ucx.hive_metastore import ExternalLocations, TablesCrawler
 from databricks.labs.ucx.hive_metastore.mapping import TableMapping
+from databricks.labs.ucx.hive_metastore.tables import TablesMigrate
 from databricks.labs.ucx.install import WorkspaceInstaller
 from databricks.labs.ucx.installer import InstallationManager
 
@@ -119,8 +120,18 @@ def migrate_uc_to_uc(
     from_table: list[str],
     to_catalog: str,
     to_schema: str,
-) -> None:
+):
     logger.info("Running migrating uc objects command")
+    ws = WorkspaceClient()
+    installation_manager = InstallationManager(ws)
+    installation = installation_manager.for_user(ws.current_user.me())
+    if not installation:
+        logger.error(CANT_FIND_UCX_MSG)
+        return
+    sql_backend = StatementExecutionBackend(ws, installation.config.warehouse_id)
+    tables = TablesMigrate(
+        TablesCrawler(backend=sql_backend, schema=installation.config.inventory_database), ws=ws, backend=sql_backend
+    )
     if not from_catalog or not to_catalog:
         logger.error("Please enter from_catalog and to_catalog details")
         return
@@ -132,6 +143,9 @@ def migrate_uc_to_uc(
         return
     if from_table[0] == "*":
         logger.error(f"migrating all tables from {from_catalog}.{from_schema} to {to_catalog}.{to_schema}.")
+        tables.migrate_uc_schema(
+            from_catalog=from_catalog, from_schema=from_schema, to_catalog=to_catalog, to_schema=to_schema
+        )
     else:
         logger.error(f"migrating tables {from_table} from {from_catalog}.{from_schema} to {to_catalog}.{to_schema}")
 
