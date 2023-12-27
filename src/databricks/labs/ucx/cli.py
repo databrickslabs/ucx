@@ -133,19 +133,10 @@ def revert_migrated_tables(schema: str, table: str, *, delete_managed: bool = Fa
     sql_backend = StatementExecutionBackend(ws, warehouse_id)
     table_crawler = TablesCrawler(sql_backend, installation.config.inventory_database)
     tm = TablesMigrate(table_crawler, ws, sql_backend)
-    migration_report = tm.get_migration_report()
-    if migration_report:
-        print(migration_report)
-        print("Migrated External Tables and Views (targets) will be deleted")
-        if delete_managed:
-            print("Migrated Manged Tables (targets) will be deleted")
-        else:
-            print("Migrated Manged Tables (targets) will be left intact")
-        if not prompts.confirm("Would you like to continue?", max_attempts=2):
-            return None
+    if tm.print_revert_report(delete_managed=delete_managed) and prompts.confirm(
+        "Would you like to continue?", max_attempts=2
+    ):
         tm.revert_migrated_tables(schema, table, delete_managed=delete_managed)
-    else:
-        logger.info("No migrated tables were found.")
 
 
 MAPPING = {

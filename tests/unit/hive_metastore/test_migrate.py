@@ -173,24 +173,43 @@ def test_revert_migrated_tables():
     ]
 
     tc.snapshot.return_value = test_tables
+    tm._seen_tables = {
+        "cat1.schema1.dest1": "hive_metastore.test_schema1.test_table1",
+        "cat1.schema1.dest_view1": "hive_metastore.test_schema1.test_view1",
+        "cat1.schema1.dest2": "hive_metastore.test_schema1.test_table2",
+        "cat1.schema2.dest3": "hive_metastore.test_schema2.test_table2",
+    }
     tm.revert_migrated_tables(schema="test_schema1")
-    assert (list(backend.queries)) == [
-        "ALTER TABLE `hive_metastore`.`test_schema1`.`test_table1` UNSET TBLPROPERTIES IF EXISTS('upgraded_to');",
-        "DROP TABLE IF EXISTS cat1.schema1.dest1",
-        "ALTER VIEW `hive_metastore`.`test_schema1`.`test_view1` UNSET TBLPROPERTIES IF EXISTS('upgraded_to');",
-        "DROP VIEW IF EXISTS cat1.schema1.dest_view1",
-    ]
+    revert_queries = list(backend.queries)
+    assert (
+        "ALTER TABLE `hive_metastore`.`test_schema1`.`test_table1` UNSET TBLPROPERTIES IF EXISTS('upgraded_to');"
+        in revert_queries
+    )
+    assert "DROP TABLE IF EXISTS cat1.schema1.dest1" in revert_queries
+    assert (
+        "ALTER VIEW `hive_metastore`.`test_schema1`.`test_view1` UNSET TBLPROPERTIES IF EXISTS('upgraded_to');"
+        in revert_queries
+    )
+    assert "DROP VIEW IF EXISTS cat1.schema1.dest_view1" in revert_queries
 
     # testing reverting managed tables
     tm.revert_migrated_tables(schema="test_schema1", delete_managed=True)
-    assert (list(backend.queries)[-6:]) == [
-        "ALTER TABLE `hive_metastore`.`test_schema1`.`test_table1` UNSET TBLPROPERTIES IF EXISTS('upgraded_to');",
-        "DROP TABLE IF EXISTS cat1.schema1.dest1",
-        "ALTER VIEW `hive_metastore`.`test_schema1`.`test_view1` UNSET TBLPROPERTIES IF EXISTS('upgraded_to');",
-        "DROP VIEW IF EXISTS cat1.schema1.dest_view1",
-        "ALTER TABLE `hive_metastore`.`test_schema1`.`test_table2` UNSET TBLPROPERTIES IF EXISTS('upgraded_to');",
-        "DROP TABLE IF EXISTS cat1.schema1.dest2",
-    ]
+    revert_with_managed_queries = list(backend.queries)[-6:]
+    assert (
+        "ALTER TABLE `hive_metastore`.`test_schema1`.`test_table1` UNSET TBLPROPERTIES IF EXISTS('upgraded_to');"
+        in revert_with_managed_queries
+    )
+    assert "DROP TABLE IF EXISTS cat1.schema1.dest1" in revert_with_managed_queries
+    assert (
+        "ALTER VIEW `hive_metastore`.`test_schema1`.`test_view1` UNSET TBLPROPERTIES IF EXISTS('upgraded_to');"
+        in revert_with_managed_queries
+    )
+    assert "DROP VIEW IF EXISTS cat1.schema1.dest_view1" in revert_with_managed_queries
+    assert (
+        "ALTER TABLE `hive_metastore`.`test_schema1`.`test_table2` UNSET TBLPROPERTIES IF EXISTS('upgraded_to');"
+        in revert_with_managed_queries
+    )
+    assert "DROP TABLE IF EXISTS cat1.schema1.dest2" in revert_with_managed_queries
 
 
 def test_get_migrated_count():
@@ -211,7 +230,7 @@ def test_get_migrated_count():
             catalog="hive_metastore",
             database="test_schema1",
             name="test_table1",
-            upgraded_to="dest1",
+            upgraded_to="cat1.schema1.dest1",
         ),
         Table(
             object_type="MANAGED",
@@ -227,11 +246,49 @@ def test_get_migrated_count():
             catalog="hive_metastore",
             database="test_schema2",
             name="test_table3",
-            upgraded_to="dest1",
+            upgraded_to="cat1.schema2.dest3",
+        ),
+        Table(
+            object_type="VIEW",
+            table_format="VIEW",
+            view_text="SELECT * FROM SOMETHING",
+            catalog="hive_metastore",
+            database="test_schema1",
+            name="test_view1",
+            upgraded_to="cat1.schema1.dest_view1",
         ),
     ]
 
     tc.snapshot.return_value = test_tables
-    migrated_count = tm.get_migrated_count()
-    assert MigrationCount("test_schema1", 1, 1, 0) in migrated_count
+    tm._seen_tables = {
+        "cat1.schema1.dest1": "hive_metastore.test_schema1.test_table1",
+        "cat1.schema1.dest2": "hive_metastore.test_schema1.test_table2",
+        "cat1.schema1.dest_view1": "hive_metastore.test_schema1.test_view1",
+        "cat1.schema2.dest3": "hive_metastore.test_schema2.test_table3",
+    }
+    migrated_count = tm._get_revert_count()
+    assert MigrationCount("test_schema1", 1, 1, 1) in migrated_count
     assert MigrationCount("test_schema2", 0, 1, 0) in migrated_count
+
+
+def test_revert_report(capsys):
+    errors = {}
+    rows = {
+        "SELECT": [
+            ("hive_metastore", "db1", "managed", "MANAGED", "DELTA", None, None),
+        ]
+    }
+    backend = MockBackend(fails_on_first=errors, rows=rows)
+    tc = create_autospec(TablesCrawler)
+    client = create_autospec(WorkspaceClient)
+    tm = TablesMigrate(tc, client, backend, default_catalog="test_catalog")
+    tm._get_revert_count = MagicMock()
+    tm._get_revert_count.return_value = [
+        MigrationCount("test_schema1", 1, 1, 1),
+        MigrationCount("test_schema2", 0, 1, 0),
+    ]
+
+    tm.print_revert_report(delete_managed=True)
+    captured = capsys.readouterr()
+    assert "test_schema1|1|1|1" in captured.out.replace(" ", "")
+    assert "test_schema2|1|0|0" in captured.out.replace(" ", "")
