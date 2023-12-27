@@ -809,19 +809,21 @@ class WorkspaceInstaller:
 
     def repair_run(self, workflow):
         try:
-            job_id_list = [job_id for step, job_id in self._state.jobs.items() if workflow == step]
-            if job_id_list:
-                job_id = job_id_list[0]
-                job_runs = list(self._ws.jobs.list_runs(job_id=job_id, limit=1))
-                state = job_runs[0].state
-                if job_runs and state.result_state.value != "SUCCESS":
-                    run_id = job_runs[0].run_id
-                    self._ws.jobs.repair_run(run_id=run_id, rerun_all_failed_tasks=True)
-                    logger.info("Exception")
-                else:
-                    logger.info(f"{workflow} job is not in FAILED state hence skipping Repair Run")
-            else:
+            job_id = self._state.jobs.get(workflow)
+            if not job_id:
                 logger.warning(f"{workflow} job does not exists hence skipping Repair Run")
+            else:
+                job_runs = list(self._ws.jobs.list_runs(job_id=job_id, limit=1))
+                if not job_runs:
+                    logger.warning(f"{workflow} job is not initialized yet. Can't trigger repair run now")
+                else:
+                    latest_job_run = job_runs[0]
+                    state = latest_job_run.state
+                    if state.result_state.value != "SUCCESS":
+                        run_id = latest_job_run.run_id
+                        self._ws.jobs.repair_run(run_id=run_id, rerun_all_failed_tasks=True)
+                    else:
+                        logger.warning(f"{workflow} job is not in FAILED state hence skipping Repair Run")
         except InvalidParameterValue as e:
             logger.warning(f"skipping {workflow}: {e}")
 

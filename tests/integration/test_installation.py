@@ -139,6 +139,17 @@ def test_running_real_remove_backup_groups_job(ws, sql_backend, new_installation
         ws.groups.get(ws_group_a.id)
 
 
+@retried(on=[NotFound, InvalidParameterValue, OperationFailed], timeout=timedelta(minutes=5))
+def test_repair_run_assessment_job(
+    ws, new_installation, caplog
+):
+
+    install = new_installation()
+    install.run_workflow("assessment")
+    install.repair_run("assessment")
+    assert "job is not in FAILED state" in caplog.text
+
+
 @retried(on=[NotFound], timeout=timedelta(minutes=5))
 def test_uninstallation(ws, sql_backend, new_installation):
     install = new_installation()
@@ -151,3 +162,6 @@ def test_uninstallation(ws, sql_backend, new_installation):
         ws.jobs.get(job_id=assessment_job_id)
     with pytest.raises(NotFound):
         sql_backend.execute(f"show tables from hive_metastore.{install.current_config.inventory_database}")
+
+
+

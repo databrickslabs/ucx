@@ -1024,7 +1024,7 @@ def test_repair_run(ws):
     install.repair_run("assessment")
 
 
-def test_repair_run_success(ws):
+def test_repair_run_success(ws,caplog):
     base = [
         BaseRun(
             job_clusters=None,
@@ -1041,6 +1041,8 @@ def test_repair_run_success(ws):
     ws.jobs.list_runs.return_value = base
     ws.jobs.list_runs.repair_run = None
     install.repair_run("assessment")
+    assert "job is not in FAILED state" in caplog.text
+    # install.repair_run("assessment")
 
 
 def test_repair_run_no_job_id(ws):
@@ -1060,6 +1062,25 @@ def test_repair_run_no_job_id(ws):
     ws.jobs.list_runs.return_value = base
     ws.jobs.list_runs.repair_run = None
     install.repair_run("workflow")
+
+
+def test_repair_run_no_job_run(ws):
+    base = [
+        BaseRun(
+            job_clusters=None,
+            job_id=677268692725050,
+            job_parameters=None,
+            number_in_job=725118654200173,
+            run_id=725118654200173,
+            run_name="[UCX] assessment",
+            state=RunState(result_state=RunResultState.SUCCESS),
+        )
+    ]
+    install = WorkspaceInstaller(ws)
+    install._state.jobs = {"assessment": "677268692725050"}
+    ws.jobs.list_runs.return_value = ""
+    ws.jobs.list_runs.repair_run = None
+    install.repair_run("assessment")
 
 
 def test_repair_run_exception(ws):
