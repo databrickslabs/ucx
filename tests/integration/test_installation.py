@@ -149,7 +149,7 @@ def test_running_real_remove_backup_groups_job(ws, sql_backend, new_installation
         ws.groups.get(ws_group_a.id)
 
 
-@retried(on=[NotFound, InvalidParameterValue, OperationFailed], timeout=timedelta(minutes=5))
+@retried(on=[NotFound, InvalidParameterValue, OperationFailed], timeout=timedelta(minutes=10))
 def test_repair_run_assessment_job(ws, new_installation, caplog):
     install = new_installation()
     install.run_workflow("assessment")
