@@ -80,21 +80,24 @@ class Grant:
         actions = self.action_type.split(", ")
         if "OWN" in actions:
             actions.remove("OWN")
-            statements.append(f"ALTER {object_type} {object_key} OWNER TO `{self.principal}`")
+            statements.append(self._set_owner_sql(object_type, object_key))
         if actions:
-            statements.append(f"GRANT {', '.join(actions)} ON {object_type} {object_key} TO `{self.principal}`")
+            statements.append(self._apply_grant_sql(", ".join(actions), object_type, object_key))
         return statements
 
     def hive_revoke_sql(self) -> str:
         object_type, object_key = self.this_type_and_key()
         return f"REVOKE {self.action_type} ON {object_type} {object_key} FROM `{self.principal}`"
 
-    def _set_owner(self, object_type, object_key):
+    def _set_owner_sql(self, object_type, object_key):
         return f"ALTER {object_type} {object_key} OWNER TO `{self.principal}`"
+
+    def _apply_grant_sql(self, action_type, object_type, object_key):
+        return f"GRANT {action_type} ON {object_type} {object_key} TO `{self.principal}`"
 
     def _uc_action(self, action_type):
         def inner(object_type, object_key):
-            return f"GRANT {action_type} ON {object_type} {object_key} TO `{self.principal}`"
+            return self._apply_grant_sql(action_type, object_type, object_key)
 
         return inner
 
@@ -114,15 +117,15 @@ class Grant:
             ("TABLE", "SELECT"): self._uc_action("SELECT"),
             ("TABLE", "MODIFY"): self._uc_action("MODIFY"),
             ("TABLE", "READ_METADATA"): self._uc_action("BROWSE"),
-            ("TABLE", "OWN"): self._set_owner,
+            ("TABLE", "OWN"): self._set_owner_sql,
             ("DATABASE", "USAGE"): self._uc_action("USE SCHEMA"),
             ("DATABASE", "CREATE"): self._uc_action("CREATE TABLE"),
             ("DATABASE", "CREATE_NAMED_FUNCTION"): self._uc_action("CREATE FUNCTION"),
             ("DATABASE", "SELECT"): self._uc_action("SELECT"),
             ("DATABASE", "MODIFY"): self._uc_action("MODIFY"),
-            ("DATABASE", "OWN"): self._set_owner,
+            ("DATABASE", "OWN"): self._set_owner_sql,
             ("DATABASE", "READ_METADATA"): self._uc_action("BROWSE"),
-            ("CATALOG", "OWN"): self._set_owner,
+            ("CATALOG", "OWN"): self._set_owner_sql,
         }
         make_query = hive_to_uc.get((object_type, self.action_type), None)
         if make_query is None:

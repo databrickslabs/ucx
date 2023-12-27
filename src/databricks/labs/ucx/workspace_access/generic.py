@@ -226,6 +226,7 @@ class GenericPermissionsSupport(AclSupport):
         return "UNKNOWN"
 
     # TODO remove after ES-892977 is fixed
+    @retried(on=[InternalError], timeout=timedelta(minutes=5))
     def _safe_get_permissions(self, object_type: str, object_id: str) -> iam.ObjectPermissions | None:
         try:
             return self._ws.permissions.get(object_type, object_id)

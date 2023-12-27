@@ -187,8 +187,9 @@ def test_group_name_change_substitute(ws, sql_backend, inventory_schema, make_uc
 
 
 @retried(on=[NotFound], timeout=timedelta(minutes=2))
-def test_group_matching_names(ws, sql_backend, inventory_schema, make_ucx_group):
-    ws_group, accnt_group = make_ucx_group("test_group_1234", "same_group_[1234]")
+def test_group_matching_names(ws, sql_backend, inventory_schema, make_ucx_group, make_random):
+    rand_elem = make_random(4)
+    ws_group, accnt_group = make_ucx_group(f"test_group_{rand_elem}", f"same_group_[{rand_elem}]")
     logger.info(
         f"Attempting Mapping From Workspace Group {ws_group.display_name} to "
         f"Account Group {accnt_group.display_name}"
@@ -199,8 +200,8 @@ def test_group_matching_names(ws, sql_backend, inventory_schema, make_ucx_group)
         inventory_schema,
         [ws_group.display_name],
         "ucx-temp-",
-        workspace_group_regex=r"([0-9]*)$",
-        account_group_regex=r"\[([0-9]*)\]",
+        workspace_group_regex=r"([0-9a-zA-Z]*)$",
+        account_group_regex=r"\[([0-9a-zA-Z]*)\]",
     )
     validate_migrate_groups(group_manager, ws_group, accnt_group)
 
@@ -273,7 +274,7 @@ def test_replace_workspace_groups_with_account_groups(
 
     group_info = state.groups[0]
 
-    @retried(on=[AssertionError], timeout=timedelta(seconds=30))
+    @retried(on=[AssertionError], timeout=timedelta(minutes=1))
     def check_permissions_for_backup_group():
         logger.info("check_permissions_for_backup_group()")
 

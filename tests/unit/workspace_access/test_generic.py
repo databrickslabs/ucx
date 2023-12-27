@@ -4,7 +4,7 @@ from unittest.mock import MagicMock, Mock, patch
 
 import pytest
 from databricks.sdk.core import DatabricksError
-from databricks.sdk.errors import InternalError, NotFound, PermissionDenied
+from databricks.sdk.errors import Aborted, InternalError, NotFound, PermissionDenied
 from databricks.sdk.service import compute, iam, ml
 from databricks.sdk.service.compute import ClusterDetails
 from databricks.sdk.service.iam import (
@@ -141,11 +141,11 @@ def test_safe_get_permissions_when_error_non_retriable():
 
 def test_safe_get_permissions_when_error_retriable():
     ws = MagicMock()
-    ws.permissions.get.side_effect = InternalError(...)
+    ws.permissions.get.side_effect = Aborted(...)
     sup = GenericPermissionsSupport(ws=ws, listings=[])
     with pytest.raises(DatabricksError) as e:
         sup._safe_get_permissions("clusters", "test")
-    assert e.type == InternalError
+    assert e.type == Aborted
 
 
 def test_no_permissions():
@@ -393,7 +393,7 @@ def test_applier_task_failed_when_get_error_retriable():
         group_name="group_2",
     )
     ws.permissions.update.return_value = iam.ObjectPermissions(access_control_list=[group_1_acl, group_2_acl])
-    ws.permissions.get.side_effect = InternalError(error_code="INTERNAL_SERVER_ERROR")
+    ws.permissions.get.side_effect = Aborted(...)
     sup = GenericPermissionsSupport(ws=ws, listings=[], verify_timeout=timedelta(seconds=1))
     with pytest.raises(TimeoutError) as e:
         sup._applier_task(

@@ -8,12 +8,15 @@ import string
 import subprocess
 import sys
 from collections.abc import Callable, Generator, MutableMapping
+from datetime import timedelta
 from pathlib import Path
 from typing import BinaryIO, Optional
 
 import pytest
 from databricks.sdk import AccountClient, WorkspaceClient
 from databricks.sdk.core import DatabricksError
+from databricks.sdk.errors import ResourceConflict
+from databricks.sdk.retries import retried
 from databricks.sdk.service import compute, iam, jobs, pipelines, workspace
 from databricks.sdk.service.catalog import (
     CatalogInfo,
@@ -431,6 +434,7 @@ def _scim_values(ids: list[str]) -> list[iam.ComplexValue]:
 
 
 def _make_group(name, cfg, interface, make_random):
+    @retried(on=[ResourceConflict], timeout=timedelta(seconds=30))
     def create(
         *,
         members: list[str] | None = None,
@@ -733,7 +737,7 @@ def env_or_skip(debug_env) -> Callable[[str], str]:
 
 
 @pytest.fixture
-def sql_backend(ws, env_or_skip):
+def sql_backend(ws, env_or_skip) -> StatementExecutionBackend:
     warehouse_id = env_or_skip("TEST_DEFAULT_WAREHOUSE_ID")
     return StatementExecutionBackend(ws, warehouse_id)
 
