@@ -1005,7 +1005,7 @@ def test_uninstall_no_config_file(ws, mocker):
     install.uninstall()
 
 
-def test_repair_run(ws):
+def test_repair_run(ws, mocker):
     base = [
         BaseRun(
             job_clusters=None,
@@ -1017,7 +1017,8 @@ def test_repair_run(ws):
             state=RunState(result_state=RunResultState.FAILED),
         )
     ]
-    install = WorkspaceInstaller(ws)
+    install = WorkspaceInstaller(ws, promtps=MockPrompts({".*": ""}))
+    mocker.patch("webbrowser.open")
     install._state.jobs = {"assessment": "123"}
     ws.jobs.list_runs.return_value = base
     ws.jobs.list_runs.repair_run = None

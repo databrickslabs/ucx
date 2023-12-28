@@ -827,8 +827,10 @@ class WorkspaceInstaller:
             state = latest_job_run.state
             if state.result_state.value != "SUCCESS":
                 run_id = latest_job_run.run_id
-                job_run_waiter = self._ws.jobs.repair_run(run_id=run_id, rerun_all_failed_tasks=True)
-                job_run_waiter.result()
+                job_url = f"{self._ws.config.host}#job/{job_id}"
+                logger.debug(f"Repair Running {workflow} job: {job_url}")
+                self._ws.jobs.repair_run(run_id=run_id, rerun_all_failed_tasks=True)
+                webbrowser.open(job_url)
             else:
                 logger.warning(f"{workflow} job is not in FAILED state hence skipping Repair Run")
 
