@@ -28,24 +28,29 @@ def test_dashboard(mocker):
 
     def download_mock(path):
         if path == f"{queries_folder}/state.json":
-            return io.StringIO(json.dumps(
-                {
-                    "jobs.sql:query_id": "91e51760-7653-4769-bc32-1595ce1892af",
-                    "all_tables.sql:query_id": "4000e54c-4c51-45b3-b009-a4dd9a3b5599"
-                }
-            ))
+            return io.StringIO(
+                json.dumps(
+                    {
+                        "jobs.sql:query_id": "91e51760-7653-4769-bc32-1595ce1892af",
+                        "all_tables.sql:query_id": "4000e54c-4c51-45b3-b009-a4dd9a3b5599",
+                    }
+                )
+            )
 
         if path == f"{install_folder}/state.json":
-            return io.StringIO(json.dumps(
-                {
-                    "$version": 1,
-                    "resources": {
-                        "queries": {
-                            "jobs.sql": "91e51760-7653-4769-bc32-1595ce1892af",
-                            "all_tables.sql": "4000e54c-4c51-45b3-b009-a4dd9a3b5599"
-                        }
+            return io.StringIO(
+                json.dumps(
+                    {
+                        "$version": 1,
+                        "resources": {
+                            "queries": {
+                                "jobs.sql": "91e51760-7653-4769-bc32-1595ce1892af",
+                                "all_tables.sql": "4000e54c-4c51-45b3-b009-a4dd9a3b5599",
+                            }
+                        },
                     }
-                }))
+                )
+            )
 
         config_bytes = yaml.dump(WorkspaceConfig(inventory_database="a").as_dict()).encode("utf8")
         return io.BytesIO(config_bytes)
