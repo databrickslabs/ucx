@@ -1,5 +1,16 @@
 # Version changelog
 
+## 0.8.0
+
+* Added `databricks labs ucx repair-run --step ...` CLI command for repair run of any failed workflows, like `assessment`, `migrate-groups` etc. ([#724](https://github.com/databrickslabs/ucx/pull/724)).
+* Added `databricks labs ucx revert-migrated-table` command ([#729](https://github.com/databrickslabs/ucx/pull/729)).
+* Allow specifying a group list when group match options are used ([#725](https://github.com/databrickslabs/ucx/pull/725)).
+* Fixed installation issue when upgrading from an older version of the tool and improve logs ([#740](https://github.com/databrickslabs/ucx/pull/740)).
+* Renamed summary panel from Failure Summary to Assessment Summary ([#733](https://github.com/databrickslabs/ucx/pull/733)).
+* Retry internal error when getting permissions and update legacy table ACL documentation ([#728](https://github.com/databrickslabs/ucx/pull/728)).
+* Speedup installer execution ([#727](https://github.com/databrickslabs/ucx/pull/727)).
+
+
 ## 0.7.0
 
 * Added `databricks labs ucx create-table-mapping` and `databricks labs ucx manual-workspace-info` commands for CLI ([#682](https://github.com/databrickslabs/ucx/pull/682)).
