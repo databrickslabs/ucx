@@ -1,13 +1,13 @@
 import logging
+from collections.abc import Iterable
 from dataclasses import dataclass
 from functools import partial
-from typing import Iterable
 
-from databricks.labs.ucx.framework.crawlers import CrawlerBase, SqlBackend
+from databricks.labs.ucx.framework.crawlers import CrawlerBase, RuntimeBackend
 from databricks.labs.ucx.hive_metastore import TablesCrawler
-from databricks.labs.ucx.hive_metastore.tables import Table
 
 logger = logging.getLogger(__name__)
+
 
 @dataclass
 class TableSize:
@@ -18,7 +18,7 @@ class TableSize:
 
 
 class TableSizeCrawler(CrawlerBase):
-    def __init__(self, backend: SqlBackend, schema):
+    def __init__(self, backend: RuntimeBackend, schema):
         """
         Initializes a TablesSizeCrawler instance.
 
@@ -26,6 +26,7 @@ class TableSizeCrawler(CrawlerBase):
             backend (SqlBackend): The SQL Execution Backend abstraction (either REST API or Spark)
             schema: The schema name for the inventory persistence.
         """
+        self._backend: RuntimeBackend = backend
         super().__init__(backend, "hive_metastore", schema, "table_size", TableSize)
         self._table_crawler = TablesCrawler(backend, schema)
 
@@ -37,14 +38,17 @@ class TableSizeCrawler(CrawlerBase):
         for table in self._table_crawler.snapshot():
             if not table.kind == "TABLE" or not table.is_dbfs_root():
                 continue
-            table_size = TableSize(catalog=table.catalog, database=table.database, name=table.name, size_in_bytes=0)
+            size_in_bytes = self._backend.get_table_size(f"{table.catalog}.{table.database}.{table.name}")
+            table_size = TableSize(
+                catalog=table.catalog, database=table.database, name=table.name, size_in_bytes=size_in_bytes
+            )
             table_sizes.append(table_size)
         return table_sizes
 
-    def _try_load(self) -> Iterable[Table]:
+    def _try_load(self) -> Iterable[TableSize]:
         """Tries to load table information from the database or throws TABLE_OR_VIEW_NOT_FOUND error"""
         for row in self._fetch(f"SELECT * FROM {self._full_name}"):
-            yield Table(*row)
+            yield TableSize(*row)
 
     def snapshot(self) -> list[TableSize]:
         """
@@ -54,5 +58,3 @@ class TableSizeCrawler(CrawlerBase):
             list[Table]: A list of Table objects representing the snapshot of tables.
         """
         return self._snapshot(partial(self._try_load), partial(self._crawl))
-
-

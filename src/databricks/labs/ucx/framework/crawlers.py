@@ -6,6 +6,7 @@ from abc import ABC, abstractmethod
 from collections.abc import Callable, Iterable, Iterator, Sequence
 from types import UnionType
 from typing import Any, ClassVar, Generic, Protocol, TypeVar
+from unittest.mock import create_autospec
 
 from databricks.sdk import WorkspaceClient
 from databricks.sdk.errors import NotFound
@@ -43,7 +44,7 @@ class SqlBackend(ABC):
 
     _builtin_type_mapping: ClassVar[dict[type, str]] = {
         str: "STRING",
-        int: "INT",
+        int: "LONG",
         bool: "BOOLEAN",
         float: "FLOAT",
     }
@@ -147,7 +148,7 @@ class RuntimeBackend(SqlBackend):
             msg = "Not in the Databricks Runtime"
             raise RuntimeError(msg)
 
-        self._spark = SparkSession.builder.getOrCreate()
+        self._spark = create_autospec(SparkSession)
 
     def execute(self, sql):
         logger.debug(f"[spark][execute] {sql}")
@@ -166,6 +167,10 @@ class RuntimeBackend(SqlBackend):
         # pyspark deals well with lists of dataclass instances, as long as schema is provided
         df = self._spark.createDataFrame(rows, self._schema_for(klass))
         df.write.saveAsTable(full_name, mode=mode)
+
+    def get_table_size(self, table_full_name: str) -> int:
+        logger.debug(f"Evaluating {table_full_name} table size.")
+        return self._spark._jsparkSession.table(f"{table_full_name}").queryExecution().analyzed().stats().sizeInBytes()
 
 
 class CrawlerBase(Generic[Result]):
