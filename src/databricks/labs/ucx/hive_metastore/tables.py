@@ -80,6 +80,23 @@ class Table:
             f"UNSET TBLPROPERTIES IF EXISTS('upgraded_to');"
         )
 
+    def is_dbfs_root(self) -> bool:
+        if not self.location:
+            return False
+        if (
+                self.location.startswith("/dbfs/mnt")
+                or
+                self.location.startswith("dbfs:/mnt")
+        ):
+            return False
+        if (
+                self.location.startswith("/dbfs/")
+                or
+                self.location.startswith("dbfs:/")
+        ):
+            return True
+        return False
+
 
 @dataclass
 class TableError:
@@ -188,7 +205,8 @@ class TablesCrawler(CrawlerBase):
                 upgraded_to=self._parse_table_props(describe.get("Table Properties", "").lower()).get(
                     "upgraded_to", None
                 ),
-                storage_properties=self._parse_table_props(describe.get("Storage Properties", "").lower()),  # type: ignore[arg-type]
+                storage_properties=self._parse_table_props(describe.get("Storage Properties", "").lower()),
+                # type: ignore[arg-type]
             )
         except Exception as e:
             # TODO: https://github.com/databrickslabs/ucx/issues/406
@@ -198,12 +216,12 @@ class TablesCrawler(CrawlerBase):
 
 class TablesMigrate:
     def __init__(
-        self,
-        tc: TablesCrawler,
-        ws: WorkspaceClient,
-        backend: SqlBackend,
-        default_catalog=None,
-        database_to_catalog_mapping: dict[str, str] | None = None,
+            self,
+            tc: TablesCrawler,
+            ws: WorkspaceClient,
+            backend: SqlBackend,
+            default_catalog=None,
+            database_to_catalog_mapping: dict[str, str] | None = None,
     ):
         self._tc = tc
         self._backend = backend
@@ -287,7 +305,7 @@ class TablesMigrate:
         return upgraded_tables
 
     def revert_migrated_tables(
-        self, schema: str | None = None, table: str | None = None, *, delete_managed: bool = False
+            self, schema: str | None = None, table: str | None = None, *, delete_managed: bool = False
     ):
         upgraded_tables = self._get_tables_to_revert(schema=schema, table=table)
         # reverses the _seen_tables dictionary to key by the source table
