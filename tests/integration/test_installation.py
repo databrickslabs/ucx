@@ -149,6 +149,25 @@ def test_running_real_remove_backup_groups_job(ws, sql_backend, new_installation
         ws.groups.get(ws_group_a.id)
 
 
+@retried(on=[NotFound, InvalidParameterValue, OperationFailed], timeout=timedelta(minutes=10))
+def test_repair_run_workflow_job(ws, mocker, new_installation, sql_backend):
+    install = new_installation()
+    mocker.patch("webbrowser.open")
+    sql_backend.execute(f"DROP SCHEMA {install.current_config.inventory_database} CASCADE")
+    with pytest.raises(OperationFailed):
+        install.run_workflow("099-destroy-schema")
+
+    sql_backend.execute(f"CREATE SCHEMA IF NOT EXISTS {install.current_config.inventory_database}")
+
+    install.repair_run("099-destroy-schema")
+    workflow_job_id = install._state.jobs["099-destroy-schema"]
+    run_status = None
+    while run_status is None:
+        job_runs = list(install._ws.jobs.list_runs(job_id=workflow_job_id, limit=1))
+        run_status = job_runs[0].state.result_state
+    assert run_status.value == "SUCCESS"
+
+
 @retried(on=[NotFound], timeout=timedelta(minutes=5))
 def test_uninstallation(ws, sql_backend, new_installation):
     install = new_installation()

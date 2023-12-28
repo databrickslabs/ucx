@@ -813,6 +813,29 @@ class WorkspaceInstaller:
                 continue
         return latest_status
 
+    def repair_run(self, workflow):
+        try:
+            job_id = self._state.jobs.get(workflow)
+            if not job_id:
+                logger.warning(f"{workflow} job does not exists hence skipping Repair Run")
+                return
+            job_runs = list(self._ws.jobs.list_runs(job_id=job_id, limit=1))
+            if not job_runs:
+                logger.warning(f"{workflow} job is not initialized yet. Can't trigger repair run now")
+                return
+            latest_job_run = job_runs[0]
+            state = latest_job_run.state
+            if state.result_state.value != "FAILED":
+                logger.warning(f"{workflow} job is not in FAILED state hence skipping Repair Run")
+                return
+            run_id = latest_job_run.run_id
+            job_url = f"{self._ws.config.host}#job/{job_id}/run/{run_id}"
+            logger.debug(f"Repair Running {workflow} job: {job_url}")
+            self._ws.jobs.repair_run(run_id=run_id, rerun_all_failed_tasks=True)
+            webbrowser.open(job_url)
+        except InvalidParameterValue as e:
+            logger.warning(f"skipping {workflow}: {e}")
+
     def uninstall(self):
         if self._prompts and not self._prompts.confirm(
             "Do you want to uninstall ucx from the workspace too, this would "

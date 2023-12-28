@@ -114,6 +114,15 @@ def ensure_assessment_run():
         workspace_installer.validate_and_run("assessment")
 
 
+def repair_run(step):
+    if not step:
+        raise KeyError("You did not specify --step")
+    ws = WorkspaceClient()
+    installer = WorkspaceInstaller(ws)
+    logger.info(f"Repair Running {step} Job")
+    installer.repair_run(step)
+
+
 def revert_migrated_tables(schema: str, table: str, *, delete_managed: bool = False):
     ws = WorkspaceClient()
     prompts = Prompts()
@@ -149,6 +158,7 @@ MAPPING = {
     "validate-external-locations": validate_external_locations,
     "ensure-assessment-run": ensure_assessment_run,
     "skip": skip,
+    "repair-run": repair_run,
     "revert-migrated-tables": revert_migrated_tables,
 }
 
