@@ -4,6 +4,7 @@ from unittest.mock import MagicMock, create_autospec
 from databricks.sdk import WorkspaceClient
 from databricks.sdk.service.catalog import CatalogInfo, SchemaInfo, TableInfo
 
+from databricks.labs.ucx.framework.crawlers import SqlBackend
 from databricks.labs.ucx.hive_metastore.tables import (
     MigrationCount,
     Table,
@@ -125,17 +126,49 @@ def test_migrate_tables_should_add_table_to_cache_when_migrated():
     assert tm._seen_tables == {"test_catalog.db1.managed": "hive_metastore.db1.managed"}
 
 
-def test_revert_migrated_tables():
-    errors = {}
-    rows = {
-        "SELECT": [
-            ("hive_metastore", "db1", "managed", "MANAGED", "DELTA", None, None),
-        ]
-    }
-    backend = MockBackend(fails_on_first=errors, rows=rows)
+def get_table_migrate(backend: SqlBackend) -> TablesMigrate:
     tc = create_autospec(TablesCrawler)
     client = create_autospec(WorkspaceClient)
-    tm = TablesMigrate(tc, client, backend, default_catalog="test_catalog")
+    client.catalogs.list.return_value = [CatalogInfo(name="cat1")]
+    client.schemas.list.return_value = [
+        SchemaInfo(catalog_name="cat1", name="test_schema1"),
+        SchemaInfo(catalog_name="cat1", name="test_schema2"),
+    ]
+    client.tables.list.side_effect = [
+        [
+            TableInfo(
+                catalog_name="cat1",
+                schema_name="schema1",
+                name="dest1",
+                full_name="cat1.schema1.dest1",
+                properties={"upgraded_from": "hive_metastore.test_schema1.test_table1"},
+            ),
+            TableInfo(
+                catalog_name="cat1",
+                schema_name="schema1",
+                name="dest_view1",
+                full_name="cat1.schema1.dest_view1",
+                properties={"upgraded_from": "hive_metastore.test_schema1.test_view1"},
+            ),
+            TableInfo(
+                catalog_name="cat1",
+                schema_name="schema1",
+                name="dest2",
+                full_name="cat1.schema1.dest2",
+                properties={"upgraded_from": "hive_metastore.test_schema1.test_table2"},
+            ),
+        ],
+        [
+            TableInfo(
+                catalog_name="cat1",
+                schema_name="schema2",
+                name="dest3",
+                full_name="cat1.schema2.dest3",
+                properties={"upgraded_from": "hive_metastore.test_schema2.test_table3"},
+            ),
+        ],
+    ]
+
     test_tables = [
         Table(
             object_type="EXTERNAL",
@@ -171,14 +204,16 @@ def test_revert_migrated_tables():
             upgraded_to="cat1.schema2.dest3",
         ),
     ]
-
     tc.snapshot.return_value = test_tables
-    tm._seen_tables = {
-        "cat1.schema1.dest1": "hive_metastore.test_schema1.test_table1",
-        "cat1.schema1.dest_view1": "hive_metastore.test_schema1.test_view1",
-        "cat1.schema1.dest2": "hive_metastore.test_schema1.test_table2",
-        "cat1.schema2.dest3": "hive_metastore.test_schema2.test_table2",
-    }
+    tm = TablesMigrate(tc, client, backend, default_catalog="test_catalog")
+    return tm
+
+
+def test_revert_migrated_tables_skip_managed():
+    errors = {}
+    rows = {}
+    backend = MockBackend(fails_on_first=errors, rows=rows)
+    tm = get_table_migrate(backend)
     tm.revert_migrated_tables(schema="test_schema1")
     revert_queries = list(backend.queries)
     assert (
@@ -192,9 +227,15 @@ def test_revert_migrated_tables():
     )
     assert "DROP VIEW IF EXISTS cat1.schema1.dest_view1" in revert_queries
 
+
+def test_revert_migrated_tables_including_managed():
+    errors = {}
+    rows = {}
+    backend = MockBackend(fails_on_first=errors, rows=rows)
+    tm = get_table_migrate(backend)
     # testing reverting managed tables
     tm.revert_migrated_tables(schema="test_schema1", delete_managed=True)
-    revert_with_managed_queries = list(backend.queries)[-6:]
+    revert_with_managed_queries = list(backend.queries)
     assert (
         "ALTER TABLE `hive_metastore`.`test_schema1`.`test_table1` UNSET TBLPROPERTIES IF EXISTS('upgraded_to');"
         in revert_with_managed_queries
@@ -214,62 +255,21 @@ def test_revert_migrated_tables():
 
 def test_get_table_list():
     errors = {}
-    rows = {
-        "SELECT": [
-            ("hive_metastore", "db1", "managed", "MANAGED", "DELTA", None, None),
-        ]
-    }
+    rows = {}
     backend = MockBackend(fails_on_first=errors, rows=rows)
-    tc = create_autospec(TablesCrawler)
-    client = create_autospec(WorkspaceClient)
-    tm = TablesMigrate(tc, client, backend, default_catalog="test_catalog")
-    test_tables = [
-        Table(
-            object_type="EXTERNAL",
-            table_format="DELTA",
-            catalog="hive_metastore",
-            database="test_schema1",
-            name="test_table1",
-            upgraded_to="cat1.schema1.dest1",
-        ),
-        Table(
-            object_type="VIEW",
-            table_format="VIEW",
-            catalog="hive_metastore",
-            database="test_schema1",
-            name="test_view1",
-            view_text="SELECT * FROM SOMETHING",
-            upgraded_to="cat1.schema1.dest_view1",
-        ),
-        Table(
-            object_type="MANAGED",
-            table_format="DELTA",
-            catalog="hive_metastore",
-            database="test_schema1",
-            name="test_table2",
-            upgraded_to="cat1.schema1.dest2",
-        ),
-        Table(
-            object_type="EXTERNAL",
-            table_format="DELTA",
-            catalog="hive_metastore",
-            database="test_schema2",
-            name="test_table3",
-            upgraded_to="cat1.schema2.dest3",
-        ),
-    ]
-
-    tc.snapshot.return_value = test_tables
-    tm._seen_tables = {
-        "cat1.schema1.dest1": "hive_metastore.test_schema1.test_table1",
-        "cat1.schema1.dest_view1": "hive_metastore.test_schema1.test_view1",
-        "cat1.schema1.dest2": "hive_metastore.test_schema1.test_table2",
-        "cat1.schema2.dest3": "hive_metastore.test_schema2.test_table2",
-    }
+    tm = get_table_migrate(backend)
     assert len(tm._get_tables_to_revert("test_schema1", "test_table1")) == 1
     assert len(tm._get_tables_to_revert("test_schema1")) == 3
 
-    tm._seen_tables = {}
+
+def test_no_migrated_tables():
+    errors = {}
+    rows = {}
+    backend = MockBackend(fails_on_first=errors, rows=rows)
+    tc = create_autospec(TablesCrawler)
+    client = create_autospec(WorkspaceClient)
+    client.tables.list.side_effect = []
+    tm = TablesMigrate(tc, client, backend, default_catalog="test_catalog")
     tm._init_seen_tables = MagicMock()
     assert len(tm._get_tables_to_revert("test_schema1", "test_table1")) == 0
     tm._init_seen_tables.assert_called()
@@ -277,58 +277,9 @@ def test_get_table_list():
 
 def test_get_migrated_count():
     errors = {}
-    rows = {
-        "SELECT": [
-            ("hive_metastore", "db1", "managed", "MANAGED", "DELTA", None, None),
-        ]
-    }
+    rows = {}
     backend = MockBackend(fails_on_first=errors, rows=rows)
-    tc = create_autospec(TablesCrawler)
-    client = create_autospec(WorkspaceClient)
-    tm = TablesMigrate(tc, client, backend, default_catalog="test_catalog")
-    test_tables = [
-        Table(
-            object_type="EXTERNAL",
-            table_format="DELTA",
-            catalog="hive_metastore",
-            database="test_schema1",
-            name="test_table1",
-            upgraded_to="cat1.schema1.dest1",
-        ),
-        Table(
-            object_type="MANAGED",
-            table_format="DELTA",
-            catalog="hive_metastore",
-            database="test_schema1",
-            name="test_table2",
-            upgraded_to="dest1",
-        ),
-        Table(
-            object_type="EXTERNAL",
-            table_format="DELTA",
-            catalog="hive_metastore",
-            database="test_schema2",
-            name="test_table3",
-            upgraded_to="cat1.schema2.dest3",
-        ),
-        Table(
-            object_type="VIEW",
-            table_format="VIEW",
-            view_text="SELECT * FROM SOMETHING",
-            catalog="hive_metastore",
-            database="test_schema1",
-            name="test_view1",
-            upgraded_to="cat1.schema1.dest_view1",
-        ),
-    ]
-
-    tc.snapshot.return_value = test_tables
-    tm._seen_tables = {
-        "cat1.schema1.dest1": "hive_metastore.test_schema1.test_table1",
-        "cat1.schema1.dest2": "hive_metastore.test_schema1.test_table2",
-        "cat1.schema1.dest_view1": "hive_metastore.test_schema1.test_view1",
-        "cat1.schema2.dest3": "hive_metastore.test_schema2.test_table3",
-    }
+    tm = get_table_migrate(backend)
     migrated_count = tm._get_revert_count()
     assert MigrationCount("test_schema1", 1, 1, 1) in migrated_count
     assert MigrationCount("test_schema2", 0, 1, 0) in migrated_count
@@ -336,21 +287,9 @@ def test_get_migrated_count():
 
 def test_revert_report(capsys):
     errors = {}
-    rows = {
-        "SELECT": [
-            ("hive_metastore", "db1", "managed", "MANAGED", "DELTA", None, None),
-        ]
-    }
+    rows = {}
     backend = MockBackend(fails_on_first=errors, rows=rows)
-    tc = create_autospec(TablesCrawler)
-    client = create_autospec(WorkspaceClient)
-    tm = TablesMigrate(tc, client, backend, default_catalog="test_catalog")
-    tm._get_revert_count = MagicMock()
-    tm._get_revert_count.return_value = [
-        MigrationCount("test_schema1", 1, 1, 1),
-        MigrationCount("test_schema2", 0, 1, 0),
-    ]
-
+    tm = get_table_migrate(backend)
     tm.print_revert_report(delete_managed=True)
     captured = capsys.readouterr()
     assert "test_schema1|1|1|1" in captured.out.replace(" ", "")
@@ -361,8 +300,15 @@ def test_revert_report(capsys):
     captured = capsys.readouterr()
     assert "Migrated Manged Tables (targets) will be left intact" in captured.out
 
-    tm._get_revert_count.return_value = []
 
+def test_empty_revert_report(capsys):
+    errors = {}
+    rows = {}
+    backend = MockBackend(fails_on_first=errors, rows=rows)
+    tc = create_autospec(TablesCrawler)
+    client = create_autospec(WorkspaceClient)
+    client.tables.list.side_effect = []
+    tm = TablesMigrate(tc, client, backend, default_catalog="test_catalog")
     assert not tm.print_revert_report(delete_managed=False)
 
 
