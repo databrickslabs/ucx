@@ -87,11 +87,11 @@ class Table:
             return False
         if self.location.startswith("dbfs:/mnt"):
             return False
-        if self.location.startswith("dbfs:/databricks-datasets"):
+        if self .location.startswith("dbfs:/databricks-datasets"):
             return False
-        if self.location.startswith("/dbfs/databricks-datasets"):
+        if self .location.startswith("/dbfs/databricks-datasets"):
             return False
-        if self.location.startswith("/databricks-datasets"):
+        if self .location.startswith("/databricks-datasets"):
             return False
         if self.location.startswith("/dbfs/"):
             return True
