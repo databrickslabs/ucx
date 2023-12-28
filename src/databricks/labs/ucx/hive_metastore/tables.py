@@ -271,8 +271,6 @@ class TablesMigrate:
     def _get_tables_to_revert(self, schema: str | None = None, table: str | None = None) -> list[Table]:
         schema = schema.lower() if schema else None
         table = table.lower() if table else None
-        if len(self._seen_tables) == 0:
-            self._init_seen_tables()
         upgraded_tables = []
         if table and not schema:
             logger.error("Cannot accept 'Table' parameter without 'Schema' parameter")
@@ -366,6 +364,6 @@ class TablesMigrate:
         if delete_managed:
             print("Migrated Manged Tables (targets) will be deleted")
         else:
-            print("Migrated Manged Tables (targets) will be left intact")
-
+            print("Migrated Manged Tables (targets) will be left intact.")
+            print("To revert and delete Migrated Tables, add --delete_managed true flag to the command.")
         return True
