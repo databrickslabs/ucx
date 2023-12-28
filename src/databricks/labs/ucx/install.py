@@ -833,8 +833,6 @@ class WorkspaceInstaller:
             logger.debug(f"Repair Running {workflow} job: {job_url}")
             self._ws.jobs.repair_run(run_id=run_id, rerun_all_failed_tasks=True)
             webbrowser.open(job_url)
-
-
         except InvalidParameterValue as e:
             logger.warning(f"skipping {workflow}: {e}")
 
