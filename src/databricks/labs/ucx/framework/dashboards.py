@@ -192,7 +192,7 @@ class DashboardFromFiles:
     def _installed_query_state(self):
         if not self._state.dashboards:
             for k, v in self._state_pre_v06().items():
-                prefix, suffix = k.split(":", 2)
+                prefix, suffix = [*k.split(":"), None][:2]
                 match suffix:
                     case "dashboard_id":
                         self._state.dashboards[prefix] = v

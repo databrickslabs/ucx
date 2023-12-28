@@ -201,7 +201,7 @@ class WorkspaceInstaller:
         gscript = hms_lineage.check_lineage_spark_config_exists()
         if gscript:
             if gscript.enabled:
-                logger.info("Already exists and enabled. Skipped creating a new one.")
+                logger.info("Global Init Script already exists and enabled. Skipped creating a new one.")
             elif not gscript.enabled and self._prompts:
                 if self._prompts.confirm(
                     "Your Global Init Script with required spark config is disabled, Do you want to enable it?"
@@ -286,6 +286,7 @@ class WorkspaceInstaller:
     @property
     def _warehouse_id(self) -> str:
         if self.current_config.warehouse_id is not None:
+            logger.info("Fetching warehouse_id from a config")
             return self.current_config.warehouse_id
         warehouses = [_ for _ in self._ws.warehouses.list() if _.warehouse_type == EndpointInfoWarehouseType.PRO]
         warehouse_id = self.current_config.warehouse_id
@@ -863,7 +864,7 @@ class WorkspaceInstaller:
         try:
             warehouse_name = self._ws.warehouses.get(self.current_config.warehouse_id).name
             if warehouse_name.startswith(WAREHOUSE_PREFIX):
-                logger.info("Deleting warehouse_name.")
+                logger.info(f"Deleting {warehouse_name}.")
                 self._ws.warehouses.delete(id=self.current_config.warehouse_id)
         except InvalidParameterValue:
             logger.error("Error accessing warehouse details")
