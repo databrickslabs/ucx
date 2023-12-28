@@ -90,20 +90,6 @@ def create_table_mapping():
     webbrowser.open(f"{ws.config.host}/#workspace{path}")
 
 
-def verify_metastore():
-    """
-    Scans and verifies if a metastore exists for a metastore
-    :param cfg:
-    :return:
-    """
-    ws = WorkspaceClient()
-    current_metastore = ws.metastores.current()
-    if current_metastore:
-        print(f"Metastore {current_metastore.default_catalog_name} with {current_metastore.metastore_id} exists")
-    else:
-        print("Metastore does not exist")
-
-
 def validate_external_locations():
     ws = WorkspaceClient()
     prompts = Prompts()

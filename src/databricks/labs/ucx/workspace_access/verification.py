@@ -79,3 +79,43 @@ class VerificationManager:
 
             assert base_group_info.roles == target_group_info.roles
             assert base_group_info.entitlements == target_group_info.entitlements
+
+
+class VerifyHasMetastore:
+    def __init__(self, ws: WorkspaceClient):
+        self.metastore_id: str | None = None
+        self.default_catalog_name: str | None = None
+        self.workspace_id: int | None = None
+        self._ws = ws
+
+    def verify_metastore(self) -> bool:
+        """
+        Verifies if a metastore exists for a metastore
+        :param cfg:
+        :return:
+        """
+        metastore_exists = self.check_metastore_existence()
+        if not metastore_exists:
+            raise MetastoreNotFoundError()
+        return True
+
+    def check_metastore_existence(self) -> bool:
+        """
+        Uses the databricks sdk client to check whether
+        metastore exists. Updates the catalog name and id if exists
+        :return:
+        """
+        current_metastore = self._ws.metastores.current()
+        if current_metastore:
+            self.default_catalog_name = current_metastore.default_catalog_name
+            self.metastore_id = current_metastore.metastore_id
+            self.workspace_id = current_metastore.workspace_id
+            return True
+
+        return False
+
+
+class MetastoreNotFoundError(Exception):
+    def __init__(self, message="Metastore not found in the workspace"):
+        self.message = message
+        super().__init__(self.message)
