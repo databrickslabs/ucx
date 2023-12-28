@@ -150,11 +150,19 @@ def test_running_real_remove_backup_groups_job(ws, sql_backend, new_installation
 
 
 @retried(on=[NotFound, InvalidParameterValue, OperationFailed], timeout=timedelta(minutes=10))
-def test_repair_run_assessment_job(ws, new_installation, caplog):
+def test_repair_run_assessment_job(ws, new_installation, sql_backend):
     install = new_installation()
-    install.run_workflow("assessment")
-    install.repair_run("assessment")
-    assert "job is not in FAILED state" in caplog.text
+    sql_backend.execute(f"DROP SCHEMA {install.current_config.inventory_database} CASCADE")
+    with pytest.raises(OperationFailed):
+        install.run_workflow("099-destroy-schema")
+
+    sql_backend.execute(f"CREATE SCHEMA IF NOT EXISTS {install.current_config.inventory_database}")
+
+    install.repair_run("099-destroy-schema")
+    workflow_job_id = install._state.jobs["099-destroy-schema"]
+    job_runs = list(install._ws.jobs.list_runs(job_id=workflow_job_id, limit=1))
+    run_status = job_runs[0].state.result_state.value
+    assert run_status == "SUCCESS"
 
 
 @retried(on=[NotFound], timeout=timedelta(minutes=5))
