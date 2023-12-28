@@ -17,6 +17,7 @@ from databricks.sdk.service.compute import (
     GlobalInitScriptDetailsWithContent,
     Policy,
 )
+from databricks.sdk.service.jobs import BaseRun, RunResultState, RunState
 from databricks.sdk.service.sql import (
     Dashboard,
     DataSource,
@@ -1002,3 +1003,77 @@ def test_uninstall_no_config_file(ws, mocker):
     ws.workspace.download = lambda _: io.BytesIO(config_bytes)
     ws.workspace.get_status.side_effect = NotFound(...)
     install.uninstall()
+
+
+def test_repair_run(ws, mocker):
+    base = [
+        BaseRun(
+            job_clusters=None,
+            job_id=677268692725050,
+            job_parameters=None,
+            number_in_job=725118654200173,
+            run_id=725118654200173,
+            run_name="[UCX] assessment",
+            state=RunState(result_state=RunResultState.FAILED),
+        )
+    ]
+    install = WorkspaceInstaller(ws, promtps=MockPrompts({".*": ""}))
+    mocker.patch("webbrowser.open")
+    install._state.jobs = {"assessment": "123"}
+    ws.jobs.list_runs.return_value = base
+    ws.jobs.list_runs.repair_run = None
+    install.repair_run("assessment")
+
+
+def test_repair_run_success(ws, caplog):
+    base = [
+        BaseRun(
+            job_clusters=None,
+            job_id=677268692725050,
+            job_parameters=None,
+            number_in_job=725118654200173,
+            run_id=725118654200173,
+            run_name="[UCX] assessment",
+            state=RunState(result_state=RunResultState.SUCCESS),
+        )
+    ]
+    install = WorkspaceInstaller(ws)
+    install._state.jobs = {"assessment": "123"}
+    ws.jobs.list_runs.return_value = base
+    ws.jobs.list_runs.repair_run = None
+    install.repair_run("assessment")
+    assert "job is not in FAILED state" in caplog.text
+
+
+def test_repair_run_no_job_id(ws):
+    base = [
+        BaseRun(
+            job_clusters=None,
+            job_id=677268692725050,
+            job_parameters=None,
+            number_in_job=725118654200173,
+            run_id=725118654200173,
+            run_name="[UCX] assessment",
+            state=RunState(result_state=RunResultState.SUCCESS),
+        )
+    ]
+    install = WorkspaceInstaller(ws)
+    install._state.jobs = {"assessment": ""}
+    ws.jobs.list_runs.return_value = base
+    ws.jobs.list_runs.repair_run = None
+    install.repair_run("workflow")
+
+
+def test_repair_run_no_job_run(ws):
+    install = WorkspaceInstaller(ws)
+    install._state.jobs = {"assessment": "677268692725050"}
+    ws.jobs.list_runs.return_value = ""
+    ws.jobs.list_runs.repair_run = None
+    install.repair_run("assessment")
+
+
+def test_repair_run_exception(ws):
+    install = WorkspaceInstaller(ws)
+    install._state.jobs = {"assessment": "123"}
+    ws.jobs.list_runs.side_effect = InvalidParameterValue("Workflow does not exists")
+    install.repair_run("assessment")
