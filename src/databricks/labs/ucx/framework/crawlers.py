@@ -169,7 +169,7 @@ class RuntimeBackend(SqlBackend):
 
     def get_table_size(self, table_full_name: str) -> int:
         logger.debug(f"Evaluating {table_full_name} table size.")
-        return self._spark._jsparkSession.table(f"{table_full_name}").queryExecution().analyzed().stats().sizeInBytes()
+        return self._spark._jsparkSession.table(table_full_name).queryExecution().analyzed().stats().sizeInBytes()
 
 
 class CrawlerBase(Generic[Result]):

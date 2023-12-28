@@ -39,7 +39,7 @@ class TableSizeCrawler(CrawlerBase):
                 continue
             if not table.is_dbfs_root():
                 continue
-            size_in_bytes = self._backend.get_table_size(f"{table.catalog}.{table.database}.{table.name}")
+            size_in_bytes = self._backend.get_table_size(table.key)
             table_size = TableSize(
                 catalog=table.catalog, database=table.database, name=table.name, size_in_bytes=size_in_bytes
             )
