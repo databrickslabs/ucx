@@ -28,22 +28,22 @@ class TableSizeCrawler(CrawlerBase):
         """
         self._backend: RuntimeBackend = backend
         super().__init__(backend, "hive_metastore", schema, "table_size", TableSize)
-        self._table_crawler = TablesCrawler(backend, schema)
+        self._tables_crawler = TablesCrawler(backend, schema)
 
     def _crawl(self) -> Iterable[TableSize]:
         """Crawls and lists tables using table crawler
         Identifies DBFS root tables and calculates the size for these.
         """
-        table_sizes = []
-        for table in self._table_crawler.snapshot():
-            if not table.kind == "TABLE" or not table.is_dbfs_root():
+        for table in self._tables_crawler.snapshot():
+            if not table.kind == "TABLE":
+                continue
+            if not table.is_dbfs_root():
                 continue
             size_in_bytes = self._backend.get_table_size(f"{table.catalog}.{table.database}.{table.name}")
             table_size = TableSize(
                 catalog=table.catalog, database=table.database, name=table.name, size_in_bytes=size_in_bytes
             )
-            table_sizes.append(table_size)
-        return table_sizes
+            yield table_size
 
     def _try_load(self) -> Iterable[TableSize]:
         """Tries to load table information from the database or throws TABLE_OR_VIEW_NOT_FOUND error"""

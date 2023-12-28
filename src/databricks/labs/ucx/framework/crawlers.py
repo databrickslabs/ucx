@@ -6,7 +6,6 @@ from abc import ABC, abstractmethod
 from collections.abc import Callable, Iterable, Iterator, Sequence
 from types import UnionType
 from typing import Any, ClassVar, Generic, Protocol, TypeVar
-from unittest.mock import create_autospec
 
 from databricks.sdk import WorkspaceClient
 from databricks.sdk.errors import NotFound
@@ -148,7 +147,7 @@ class RuntimeBackend(SqlBackend):
             msg = "Not in the Databricks Runtime"
             raise RuntimeError(msg)
 
-        self._spark = create_autospec(SparkSession)
+        self._spark = SparkSession.builder.getOrCreate()
 
     def execute(self, sql):
         logger.debug(f"[spark][execute] {sql}")

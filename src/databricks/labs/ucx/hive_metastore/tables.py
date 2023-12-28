@@ -81,11 +81,15 @@ class Table:
         )
 
     def is_dbfs_root(self) -> bool:
-        if not self.location:
+        if self.location is None:
             return False
-        if self.location.startswith("/dbfs/mnt") or self.location.startswith("dbfs:/mnt"):
+        if self.location.startswith("/dbfs/mnt"):
             return False
-        if self.location.startswith("/dbfs/") or self.location.startswith("dbfs:/"):
+        if self.location.startswith("dbfs:/mnt"):
+            return False
+        if self.location.startswith("/dbfs/"):
+            return True
+        if self.location.startswith("dbfs:/"):
             return True
         return False
 
