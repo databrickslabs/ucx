@@ -150,7 +150,7 @@ def test_running_real_remove_backup_groups_job(ws, sql_backend, new_installation
 
 
 @retried(on=[NotFound, InvalidParameterValue, OperationFailed], timeout=timedelta(minutes=10))
-def test_repair_run_assessment_job(ws, new_installation, sql_backend):
+def test_repair_run_workflow_job(ws, new_installation, sql_backend):
     install = new_installation()
     sql_backend.execute(f"DROP SCHEMA {install.current_config.inventory_database} CASCADE")
     with pytest.raises(OperationFailed):
