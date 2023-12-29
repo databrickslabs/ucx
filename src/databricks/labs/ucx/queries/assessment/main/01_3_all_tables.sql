@@ -18,7 +18,7 @@ SELECT CONCAT(tables.`database`, '.', tables.name) AS name,
        location,
        CASE
             WHEN size_in_bytes IS null THEN "Non DBFS Root"
-            WHEN size_in_bytes = 9223372036854775807 THEN "INVALID SIZE ESTIMATE"
+            WHEN size_in_bytes > 10000000000000000 THEN "SIZE OUT OF RANGE"
             WHEN size_in_bytes < 100 THEN CONCAT(CAST(size_in_bytes AS string)," Bytes")
             WHEN size_in_bytes < 100000 THEN CONCAT(CAST(round(size_in_bytes/1024,2) AS string),"KB")
             WHEN size_in_bytes < 100000000 THEN CONCAT(CAST(round(size_in_bytes/1024/1024,2) AS string),"MB")

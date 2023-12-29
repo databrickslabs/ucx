@@ -19,6 +19,8 @@ class TableSize:
 
 class TableSizeCrawler(CrawlerBase):
     def __init__(self, backend: RuntimeBackend, schema):
+        from pyspark.sql.session import SparkSession  # type: ignore[import-not-found]
+
         """
         Initializes a TablesSizeCrawler instance.
 
@@ -29,6 +31,7 @@ class TableSizeCrawler(CrawlerBase):
         self._backend: RuntimeBackend = backend
         super().__init__(backend, "hive_metastore", schema, "table_size", TableSize)
         self._tables_crawler = TablesCrawler(backend, schema)
+        self._spark = SparkSession.builder.getOrCreate()
 
     def _crawl(self) -> Iterable[TableSize]:
         """Crawls and lists tables using table crawler
@@ -59,6 +62,5 @@ class TableSizeCrawler(CrawlerBase):
         return self._snapshot(partial(self._try_load), partial(self._crawl))
 
     def get_table_size(self, table_full_name: str) -> int:
-        spark = self._backend.spark
         logger.debug(f"Evaluating {table_full_name} table size.")
-        return spark._jsparkSession.table(table_full_name).queryExecution().analyzed().stats().sizeInBytes()
+        return self._spark._jsparkSession.table(table_full_name).queryExecution().analyzed().stats().sizeInBytes()
