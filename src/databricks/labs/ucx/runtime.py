@@ -22,10 +22,7 @@ from databricks.labs.ucx.hive_metastore.table_size import TableSizeCrawler
 from databricks.labs.ucx.workspace_access.generic import WorkspaceListing
 from databricks.labs.ucx.workspace_access.groups import GroupManager
 from databricks.labs.ucx.workspace_access.manager import PermissionManager
-from databricks.labs.ucx.workspace_access.verification import (
-    MetastoreNotFoundError,
-    VerifyHasMetastore,
-)
+from databricks.labs.ucx.workspace_access.verification import VerifyHasMetastore
 
 logger = logging.getLogger(__name__)
 
@@ -255,11 +252,9 @@ def rename_workspace_local_groups(cfg: WorkspaceConfig):
     sql_backend = RuntimeBackend()
     ws = WorkspaceClient(config=cfg.to_databricks_config())
     verify_has_metastore = VerifyHasMetastore(ws)
-    try:
-        if verify_has_metastore.verify_metastore():
-            logger.info("Metastore exists in the workspace")
-    except MetastoreNotFoundError as e:
-        logger.info(e.message)
+    if verify_has_metastore.verify_metastore():
+        logger.info("Metastore exists in the workspace")
+
     group_manager = GroupManager(
         sql_backend,
         ws,
