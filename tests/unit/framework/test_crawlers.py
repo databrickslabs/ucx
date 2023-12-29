@@ -173,7 +173,7 @@ def test_runtime_backend_execute(mocker):
 
         rb.execute("CREATE TABLE foo")
 
-        rb._spark.sql.assert_called_with("CREATE TABLE foo")
+        rb.spark.sql.assert_called_with("CREATE TABLE foo")
 
 
 def test_runtime_backend_fetch(mocker):
@@ -182,13 +182,13 @@ def test_runtime_backend_fetch(mocker):
         sys.modules["pyspark.sql.session"] = pyspark_sql_session
 
         rb = RuntimeBackend()
-        rb._spark.sql().collect.return_value = [1, 2, 3]
+        rb.spark.sql().collect.return_value = [1, 2, 3]
 
         result = rb.fetch("SELECT id FROM range(3)")
 
         assert [1, 2, 3] == result
 
-        rb._spark.sql.assert_called_with("SELECT id FROM range(3)")
+        rb.spark.sql.assert_called_with("SELECT id FROM range(3)")
 
 
 def test_runtime_backend_save_table(mocker):
@@ -200,11 +200,11 @@ def test_runtime_backend_save_table(mocker):
 
         rb.save_table("a.b.c", [Foo("aaa", True), Foo("bbb", False)], Foo)
 
-        rb._spark.createDataFrame.assert_called_with(
+        rb.spark.createDataFrame.assert_called_with(
             [Foo(first="aaa", second=True), Foo(first="bbb", second=False)],
             "first STRING NOT NULL, second BOOLEAN NOT NULL",
         )
-        rb._spark.createDataFrame().write.saveAsTable.assert_called_with("a.b.c", mode="append")
+        rb.spark.createDataFrame().write.saveAsTable.assert_called_with("a.b.c", mode="append")
 
 
 def test_runtime_backend_save_table_with_row_containing_none_with_nullable_class(mocker):
@@ -216,11 +216,11 @@ def test_runtime_backend_save_table_with_row_containing_none_with_nullable_class
 
         rb.save_table("a.b.c", [Baz("aaa", "ccc"), Baz("bbb", None)], Baz)
 
-        rb._spark.createDataFrame.assert_called_with(
+        rb.spark.createDataFrame.assert_called_with(
             [Baz(first="aaa", second="ccc"), Baz(first="bbb", second=None)],
             "first STRING NOT NULL, second STRING",
         )
-        rb._spark.createDataFrame().write.saveAsTable.assert_called_with("a.b.c", mode="append")
+        rb.spark.createDataFrame().write.saveAsTable.assert_called_with("a.b.c", mode="append")
 
 
 @dataclass

@@ -3,7 +3,7 @@ from collections.abc import Iterable
 from dataclasses import dataclass
 from functools import partial
 
-from databricks.labs.ucx.framework.crawlers import CrawlerBase, RuntimeBackend
+from databricks.labs.ucx.framework.crawlers import CrawlerBase, RuntimeBackend, logger
 from databricks.labs.ucx.hive_metastore import TablesCrawler
 
 logger = logging.getLogger(__name__)
@@ -39,11 +39,10 @@ class TableSizeCrawler(CrawlerBase):
                 continue
             if not table.is_dbfs_root():
                 continue
-            size_in_bytes = self._backend.get_table_size(table.key)
-            table_size = TableSize(
+            size_in_bytes = self.get_table_size(table.key)
+            yield TableSize(
                 catalog=table.catalog, database=table.database, name=table.name, size_in_bytes=size_in_bytes
             )
-            yield table_size
 
     def _try_load(self) -> Iterable[TableSize]:
         """Tries to load table information from the database or throws TABLE_OR_VIEW_NOT_FOUND error"""
@@ -58,3 +57,8 @@ class TableSizeCrawler(CrawlerBase):
             list[Table]: A list of Table objects representing the snapshot of tables.
         """
         return self._snapshot(partial(self._try_load), partial(self._crawl))
+
+    def get_table_size(self, table_full_name: str) -> int:
+        spark = self._backend.spark
+        logger.debug(f"Evaluating {table_full_name} table size.")
+        return spark._jsparkSession.table(table_full_name).queryExecution().analyzed().stats().sizeInBytes()

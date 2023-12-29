@@ -6,6 +6,8 @@ SELECT CONCAT(tables.`database`, '.', tables.name) AS name,
        CASE
            WHEN STARTSWITH(location, "dbfs:/mnt") THEN "DBFS MOUNT"
            WHEN STARTSWITH(location, "/dbfs/mnt") THEN "DBFS MOUNT"
+           WHEN STARTSWITH(location, "dbfs:/databricks-datasets") THEN "Databricks Demo Dataset"
+           WHEN STARTSWITH(location, "/dbfs/databricks-datasets") THEN "Databricks Demo Dataset"
            WHEN STARTSWITH(location, "dbfs:/") THEN "DBFS ROOT"
            WHEN STARTSWITH(location, "/dbfs/") THEN "DBFS ROOT"
            WHEN STARTSWITH(location, "wasb") THEN "UNSUPPORTED"
@@ -14,7 +16,15 @@ SELECT CONCAT(tables.`database`, '.', tables.name) AS name,
        END AS storage,
        IF(format = "DELTA", "Yes", "No") AS is_delta,
        location,
-       size_in_bytes
+       CASE
+            WHEN size_in_bytes IS null THEN "Non DBFS Root"
+            WHEN size_in_bytes = 9223372036854775807 THEN "INVALID SIZE ESTIMATE"
+            WHEN size_in_bytes < 100 THEN CONCAT(CAST(size_in_bytes AS string)," Bytes")
+            WHEN size_in_bytes < 100000 THEN CONCAT(CAST(round(size_in_bytes/1024,2) AS string),"KB")
+            WHEN size_in_bytes < 100000000 THEN CONCAT(CAST(round(size_in_bytes/1024/1024,2) AS string),"MB")
+            WHEN size_in_bytes < 100000000000 THEN CONCAT(CAST(round(size_in_bytes/1024/1024/1024,2) AS string),"GB")
+            ELSE CONCAT(CAST(round(size_in_bytes/1024/1024/1024/1024,2) AS string),"TB")
+       END AS table_size
 FROM $inventory.tables left outer join $inventory.table_size on
 $inventory.tables.catalog = $inventory.table_size.catalog and
 $inventory.tables.database = $inventory.table_size.database and

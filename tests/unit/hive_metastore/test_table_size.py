@@ -1,5 +1,11 @@
+from unittest.mock import MagicMock, create_autospec
+
 from databricks.labs.ucx.hive_metastore.table_size import TableSize, TableSizeCrawler
-from tests.unit.framework.mocks import MockRuntimeBackend
+from tests.unit.framework.mocks import MockBackend
+
+
+class SparkSession:
+    pass
 
 
 def test_table_size_crawler():
@@ -19,7 +25,10 @@ def test_table_size_crawler():
         ],
         "SHOW DATABASES": [("db1",)],
     }
-    backend = MockRuntimeBackend(fails_on_first=errors, rows=rows, table_sizes=[100, 200, 300])
+    backend = MockBackend(fails_on_first=errors, rows=rows)
+    backend.spark = create_autospec(SparkSession)
+    backend.spark._jsparkSession = MagicMock()
+    backend.spark._jsparkSession.table().queryExecution().analyzed().stats().sizeInBytes.side_effect = [100, 200, 300]
     tsc = TableSizeCrawler(backend, "inventory_database")
     results = tsc.snapshot()
     assert len(results) == 2

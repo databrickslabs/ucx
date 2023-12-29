@@ -1,7 +1,6 @@
 import logging
 import re
 from collections.abc import Iterator, Sequence
-from unittest.mock import MagicMock, create_autospec
 
 from databricks.labs.ucx.framework.crawlers import DataclassInstance, SqlBackend
 from databricks.labs.ucx.mixins.sql import Row
@@ -53,14 +52,3 @@ class MockBackend(SqlBackend):
                 continue
             rows += stub_rows
         return rows
-
-
-class MockRuntimeBackend(MockBackend):
-    def __init__(
-        self, *, fails_on_first: dict | None = None, rows: dict | None = None, table_sizes: list[int] | None = None
-    ):
-        self._fails_on_first = fails_on_first
-        super().__init__(fails_on_first=fails_on_first, rows=rows)
-        self._spark = create_autospec("SparkSession")
-        self.get_table_size = MagicMock()
-        self.get_table_size.side_effect = table_sizes

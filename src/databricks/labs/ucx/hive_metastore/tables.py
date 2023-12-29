@@ -28,6 +28,18 @@ class Table:
 
     storage_properties: str | None = None
 
+    DBFS_ROOT_PREFIXES = [
+        "/dbfs/",
+        "dbfs:/",
+    ]
+
+    DBFS_ROOT_PREFIX_EXCEPTIONS = [
+        "/dbfs/mnt",
+        "dbfs:/mnt",
+        "/dbfs/databricks-datasets",
+        "dbfs:/databricks-datasets",
+    ]
+
     @property
     def is_delta(self) -> bool:
         if self.table_format is None:
@@ -81,22 +93,12 @@ class Table:
         )
 
     def is_dbfs_root(self) -> bool:
-        if self.location is None:
-            return False
-        if self.location.startswith("/dbfs/mnt"):
-            return False
-        if self.location.startswith("dbfs:/mnt"):
-            return False
-        if self .location.startswith("dbfs:/databricks-datasets"):
-            return False
-        if self .location.startswith("/dbfs/databricks-datasets"):
-            return False
-        if self .location.startswith("/databricks-datasets"):
-            return False
-        if self.location.startswith("/dbfs/"):
-            return True
-        if self.location.startswith("dbfs:/"):
-            return True
+        for exception in self.DBFS_ROOT_PREFIX_EXCEPTIONS:
+            if self.location.startswith(exception):
+                return False
+        for prefix in self.DBFS_ROOT_PREFIXES:
+            if self.location.startswith(prefix):
+                return True
         return False
 
 

@@ -147,15 +147,15 @@ class RuntimeBackend(SqlBackend):
             msg = "Not in the Databricks Runtime"
             raise RuntimeError(msg)
 
-        self._spark = SparkSession.builder.getOrCreate()
+        self.spark = SparkSession.builder.getOrCreate()
 
     def execute(self, sql):
         logger.debug(f"[spark][execute] {sql}")
-        self._spark.sql(sql)
+        self.spark.sql(sql)
 
     def fetch(self, sql) -> Iterator[Row]:
         logger.debug(f"[spark][fetch] {sql}")
-        return self._spark.sql(sql).collect()
+        return self.spark.sql(sql).collect()
 
     def save_table(self, full_name: str, rows: Sequence[DataclassInstance], klass: Dataclass, mode: str = "append"):
         rows = self._filter_none_rows(rows, klass)
@@ -164,12 +164,8 @@ class RuntimeBackend(SqlBackend):
             self.create_table(full_name, klass)
             return
         # pyspark deals well with lists of dataclass instances, as long as schema is provided
-        df = self._spark.createDataFrame(rows, self._schema_for(klass))
+        df = self.spark.createDataFrame(rows, self._schema_for(klass))
         df.write.saveAsTable(full_name, mode=mode)
-
-    def get_table_size(self, table_full_name: str) -> int:
-        logger.debug(f"Evaluating {table_full_name} table size.")
-        return self._spark._jsparkSession.table(table_full_name).queryExecution().analyzed().stats().sizeInBytes()
 
 
 class CrawlerBase(Generic[Result]):
