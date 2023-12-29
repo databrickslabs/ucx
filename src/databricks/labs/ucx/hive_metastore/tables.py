@@ -1,5 +1,6 @@
 import logging
 import re
+import typing
 from collections import defaultdict
 from collections.abc import Iterable, Iterator
 from dataclasses import dataclass
@@ -28,12 +29,12 @@ class Table:
 
     storage_properties: str | None = None
 
-    DBFS_ROOT_PREFIXES = [
+    DBFS_ROOT_PREFIXES: typing.ClassVar[list[str]] = [
         "/dbfs/",
         "dbfs:/",
     ]
 
-    DBFS_ROOT_PREFIX_EXCEPTIONS = [
+    DBFS_ROOT_PREFIX_EXCEPTIONS: typing.ClassVar[list[str]] = [
         "/dbfs/mnt",
         "dbfs:/mnt",
         "/dbfs/databricks-datasets",
@@ -93,6 +94,8 @@ class Table:
         )
 
     def is_dbfs_root(self) -> bool:
+        if not self.location:
+            return False
         for exception in self.DBFS_ROOT_PREFIX_EXCEPTIONS:
             if self.location.startswith(exception):
                 return False
