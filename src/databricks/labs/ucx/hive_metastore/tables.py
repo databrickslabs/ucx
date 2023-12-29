@@ -1,5 +1,6 @@
 import logging
 import re
+import typing
 from collections import defaultdict
 from collections.abc import Iterable, Iterator
 from dataclasses import dataclass
@@ -27,6 +28,18 @@ class Table:
     upgraded_to: str | None = None
 
     storage_properties: str | None = None
+
+    DBFS_ROOT_PREFIXES: typing.ClassVar[list[str]] = [
+        "/dbfs/",
+        "dbfs:/",
+    ]
+
+    DBFS_ROOT_PREFIX_EXCEPTIONS: typing.ClassVar[list[str]] = [
+        "/dbfs/mnt",
+        "dbfs:/mnt",
+        "/dbfs/databricks-datasets",
+        "dbfs:/databricks-datasets",
+    ]
 
     @property
     def is_delta(self) -> bool:
@@ -79,6 +92,17 @@ class Table:
             f"ALTER {self.kind} `{catalog}`.`{self.database}`.`{self.name}` "
             f"UNSET TBLPROPERTIES IF EXISTS('upgraded_to');"
         )
+
+    def is_dbfs_root(self) -> bool:
+        if not self.location:
+            return False
+        for exception in self.DBFS_ROOT_PREFIX_EXCEPTIONS:
+            if self.location.startswith(exception):
+                return False
+        for prefix in self.DBFS_ROOT_PREFIXES:
+            if self.location.startswith(prefix):
+                return True
+        return False
 
 
 @dataclass
