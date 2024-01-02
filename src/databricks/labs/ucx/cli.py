@@ -11,7 +11,6 @@ from databricks.labs.ucx.framework.crawlers import StatementExecutionBackend
 from databricks.labs.ucx.framework.tui import Prompts
 from databricks.labs.ucx.hive_metastore import ExternalLocations, TablesCrawler
 from databricks.labs.ucx.hive_metastore.mapping import TableMapping
-from databricks.labs.ucx.hive_metastore.tables import TablesMigrate
 from databricks.labs.ucx.install import WorkspaceInstaller
 from databricks.labs.ucx.installer import InstallationManager
 
@@ -114,42 +113,6 @@ def ensure_assessment_run():
         workspace_installer.validate_and_run("assessment")
 
 
-def migrate_uc_to_uc(
-    from_catalog: str,
-    from_schema: str,
-    from_table: list[str],
-    to_catalog: str,
-    to_schema: str,
-):
-    logger.info("Running migrating uc objects command")
-    ws = WorkspaceClient()
-    installation_manager = InstallationManager(ws)
-    installation = installation_manager.for_user(ws.current_user.me())
-    if not installation:
-        logger.error(CANT_FIND_UCX_MSG)
-        return
-    sql_backend = StatementExecutionBackend(ws, installation.config.warehouse_id)
-    tables = TablesMigrate(
-        TablesCrawler(backend=sql_backend, schema=installation.config.inventory_database), ws=ws, backend=sql_backend
-    )
-    if not from_catalog or not to_catalog:
-        logger.error("Please enter from_catalog and to_catalog details")
-        return
-    if not from_schema or not to_schema or from_table:
-        logger.error("Please enter from_schema, to_schema and from_table(enter * for migrating all tables) details.")
-        return
-    if from_catalog == to_catalog and from_schema == to_schema:
-        logger.error("please select a different schema or catalog to migrate to")
-        return
-    if from_table[0] == "*":
-        logger.error(f"migrating all tables from {from_catalog}.{from_schema} to {to_catalog}.{to_schema}.")
-        tables.migrate_uc_schema(
-            from_catalog=from_catalog, from_schema=from_schema, to_catalog=to_catalog, to_schema=to_schema
-        )
-    else:
-        logger.error(f"migrating tables {from_table} from {from_catalog}.{from_schema} to {to_catalog}.{to_schema}")
-
-
 MAPPING = {
     "open-remote-config": open_remote_config,
     "installations": list_installations,
@@ -160,7 +123,6 @@ MAPPING = {
     "validate-external-locations": validate_external_locations,
     "ensure-assessment-run": ensure_assessment_run,
     "skip": skip,
-    "move-uc-objects": migrate_uc_to_uc,
 }
 
 

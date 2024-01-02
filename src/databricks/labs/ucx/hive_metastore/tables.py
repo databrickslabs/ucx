@@ -1,5 +1,7 @@
 import logging
 import re
+import typing
+from collections import defaultdict
 from collections.abc import Iterable, Iterator
 from dataclasses import dataclass
 from functools import partial
@@ -26,6 +28,18 @@ class Table:
     upgraded_to: str | None = None
 
     storage_properties: str | None = None
+
+    DBFS_ROOT_PREFIXES: typing.ClassVar[list[str]] = [
+        "/dbfs/",
+        "dbfs:/",
+    ]
+
+    DBFS_ROOT_PREFIX_EXCEPTIONS: typing.ClassVar[list[str]] = [
+        "/dbfs/mnt",
+        "dbfs:/mnt",
+        "/dbfs/databricks-datasets",
+        "dbfs:/databricks-datasets",
+    ]
 
     @property
     def is_delta(self) -> bool:
@@ -73,6 +87,23 @@ class Table:
             f" TBLPROPERTIES ('upgraded_from' = '{self.key}');"
         )
 
+    def sql_unset_upgraded_to(self, catalog):
+        return (
+            f"ALTER {self.kind} `{catalog}`.`{self.database}`.`{self.name}` "
+            f"UNSET TBLPROPERTIES IF EXISTS('upgraded_to');"
+        )
+
+    def is_dbfs_root(self) -> bool:
+        if not self.location:
+            return False
+        for exception in self.DBFS_ROOT_PREFIX_EXCEPTIONS:
+            if self.location.startswith(exception):
+                return False
+        for prefix in self.DBFS_ROOT_PREFIXES:
+            if self.location.startswith(prefix):
+                return True
+        return False
+
 
 @dataclass
 class TableError:
@@ -80,6 +111,14 @@ class TableError:
     database: str
     name: str | None = None
     error: str | None = None
+
+
+@dataclass
+class MigrationCount:
+    database: str
+    managed_tables: int = 0
+    external_tables: int = 0
+    views: int = 0
 
 
 class TablesCrawler(CrawlerBase):
@@ -252,6 +291,106 @@ class TablesMigrate:
 
     def _table_already_upgraded(self, target) -> bool:
         return target in self._seen_tables
+
+    def _get_tables_to_revert(self, schema: str | None = None, table: str | None = None) -> list[Table]:
+        schema = schema.lower() if schema else None
+        table = table.lower() if table else None
+        upgraded_tables = []
+        if table and not schema:
+            logger.error("Cannot accept 'Table' parameter without 'Schema' parameter")
+        if len(self._seen_tables) == 0:
+            self._init_seen_tables()
+
+        for cur_table in self._tc.snapshot():
+            if schema and cur_table.database != schema:
+                continue
+            if table and cur_table.name != table:
+                continue
+            if cur_table.key in self._seen_tables.values():
+                upgraded_tables.append(cur_table)
+        return upgraded_tables
+
+    def revert_migrated_tables(
+        self, schema: str | None = None, table: str | None = None, *, delete_managed: bool = False
+    ):
+        upgraded_tables = self._get_tables_to_revert(schema=schema, table=table)
+        # reverses the _seen_tables dictionary to key by the source table
+        reverse_seen = {v: k for (k, v) in self._seen_tables.items()}
+        tasks = []
+        for upgraded_table in upgraded_tables:
+            if upgraded_table.kind == "VIEW" or upgraded_table.object_type == "EXTERNAL" or delete_managed:
+                tasks.append(partial(self._revert_migrated_table, upgraded_table, reverse_seen[upgraded_table.key]))
+                continue
+            logger.info(
+                f"Skipping {upgraded_table.object_type} Table {upgraded_table.database}.{upgraded_table.name} "
+                f"upgraded_to {upgraded_table.upgraded_to}"
+            )
+        Threads.strict("revert migrated tables", tasks)
+
+    def _revert_migrated_table(self, table: Table, target_table_key: str):
+        logger.info(
+            f"Reverting {table.object_type} table {table.database}.{table.name} upgraded_to {table.upgraded_to}"
+        )
+        self._backend.execute(table.sql_unset_upgraded_to("hive_metastore"))
+        self._backend.execute(f"DROP {table.kind} IF EXISTS {target_table_key}")
+
+    def _get_revert_count(self, schema: str | None = None, table: str | None = None) -> list[MigrationCount]:
+        upgraded_tables = self._get_tables_to_revert(schema=schema, table=table)
+
+        table_by_database = defaultdict(list)
+        for cur_table in upgraded_tables:
+            table_by_database[cur_table.database].append(cur_table)
+
+        migration_list = []
+        for cur_database in table_by_database.keys():
+            external_tables = 0
+            managed_tables = 0
+            views = 0
+            for current_table in table_by_database[cur_database]:
+                if current_table.upgraded_to is not None:
+                    if current_table.kind == "VIEW":
+                        views += 1
+                        continue
+                    if current_table.object_type == "EXTERNAL":
+                        external_tables += 1
+                        continue
+                    if current_table.object_type == "MANAGED":
+                        managed_tables += 1
+                        continue
+            migration_list.append(
+                MigrationCount(
+                    database=cur_database, managed_tables=managed_tables, external_tables=external_tables, views=views
+                )
+            )
+        return migration_list
+
+    def is_upgraded(self, schema: str, table: str) -> bool:
+        result = self._backend.fetch(f"SHOW TBLPROPERTIES `{schema}`.`{table}`")
+        for value in result:
+            if value["key"] == "upgraded_to":
+                logger.info(f"{schema}.{table} is set as upgraded")
+                return True
+        logger.info(f"{schema}.{table} is set as not upgraded")
+        return False
+
+    def print_revert_report(self, *, delete_managed: bool) -> bool | None:
+        migrated_count = self._get_revert_count()
+        if not migrated_count:
+            logger.info("No migrated tables were found.")
+            return False
+        print("The following is the count of migrated tables and views found in scope:")
+        print("Database                      | External Tables  | Managed Table    | Views            |")
+        print("=" * 88)
+        for count in migrated_count:
+            print(f"{count.database:<30}| {count.external_tables:16} | {count.managed_tables:16} | {count.views:16} |")
+        print("=" * 88)
+        print("Migrated External Tables and Views (targets) will be deleted")
+        if delete_managed:
+            print("Migrated Manged Tables (targets) will be deleted")
+        else:
+            print("Migrated Manged Tables (targets) will be left intact.")
+            print("To revert and delete Migrated Tables, add --delete_managed true flag to the command.")
+        return True
 
     def migrate_uc_schema(self, from_catalog: str, from_schema: str, to_catalog: str, to_schema: str):
         from_schema_name = f"{from_catalog}.{from_schema}"
