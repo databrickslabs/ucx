@@ -35,7 +35,7 @@ class MockBackend(SqlBackend):
         if self._rows:
             for pattern in self._rows.keys():
                 r = re.compile(pattern)
-                if r.match(sql):
+                if r.search(sql):
                     logger.debug(f"Found match: {sql}")
                     rows.extend(self._rows[pattern])
         logger.debug(f"Returning rows: {rows}")
