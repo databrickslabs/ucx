@@ -44,6 +44,7 @@ from databricks.labs.ucx.framework.wheels import Wheels, find_project_root
 from databricks.labs.ucx.hive_metastore.grants import Grant
 from databricks.labs.ucx.hive_metastore.hms_lineage import HiveMetastoreLineageEnabler
 from databricks.labs.ucx.hive_metastore.locations import ExternalLocation, Mount
+from databricks.labs.ucx.hive_metastore.table_size import TableSize
 from databricks.labs.ucx.hive_metastore.tables import Table, TableError
 from databricks.labs.ucx.runtime import main
 from databricks.labs.ucx.workspace_access.base import Permissions
@@ -130,6 +131,7 @@ def deploy_schema(sql_backend: SqlBackend, inventory_schema: str):
             functools.partial(table, "grants", Grant),
             functools.partial(table, "groups", MigratedGroup),
             functools.partial(table, "tables", Table),
+            functools.partial(table, "table_size", TableSize),
             functools.partial(table, "table_failures", TableError),
             functools.partial(table, "workspace_objects", WorkspaceObjectInfo),
             functools.partial(table, "permissions", Permissions),
@@ -201,7 +203,7 @@ class WorkspaceInstaller:
         gscript = hms_lineage.check_lineage_spark_config_exists()
         if gscript:
             if gscript.enabled:
-                logger.info("Already exists and enabled. Skipped creating a new one.")
+                logger.info("Global Init Script already exists and enabled. Skipped creating a new one.")
             elif not gscript.enabled and self._prompts:
                 if self._prompts.confirm(
                     "Your Global Init Script with required spark config is disabled, Do you want to enable it?"
@@ -286,6 +288,7 @@ class WorkspaceInstaller:
     @property
     def _warehouse_id(self) -> str:
         if self.current_config.warehouse_id is not None:
+            logger.info("Fetching warehouse_id from a config")
             return self.current_config.warehouse_id
         warehouses = [_ for _ in self._ws.warehouses.list() if _.warehouse_type == EndpointInfoWarehouseType.PRO]
         warehouse_id = self.current_config.warehouse_id
@@ -812,6 +815,29 @@ class WorkspaceInstaller:
                 continue
         return latest_status
 
+    def repair_run(self, workflow):
+        try:
+            job_id = self._state.jobs.get(workflow)
+            if not job_id:
+                logger.warning(f"{workflow} job does not exists hence skipping Repair Run")
+                return
+            job_runs = list(self._ws.jobs.list_runs(job_id=job_id, limit=1))
+            if not job_runs:
+                logger.warning(f"{workflow} job is not initialized yet. Can't trigger repair run now")
+                return
+            latest_job_run = job_runs[0]
+            state = latest_job_run.state
+            if state.result_state.value != "FAILED":
+                logger.warning(f"{workflow} job is not in FAILED state hence skipping Repair Run")
+                return
+            run_id = latest_job_run.run_id
+            job_url = f"{self._ws.config.host}#job/{job_id}/run/{run_id}"
+            logger.debug(f"Repair Running {workflow} job: {job_url}")
+            self._ws.jobs.repair_run(run_id=run_id, rerun_all_failed_tasks=True)
+            webbrowser.open(job_url)
+        except InvalidParameterValue as e:
+            logger.warning(f"skipping {workflow}: {e}")
+
     def uninstall(self):
         if self._prompts and not self._prompts.confirm(
             "Do you want to uninstall ucx from the workspace too, this would "
@@ -863,7 +889,7 @@ class WorkspaceInstaller:
         try:
             warehouse_name = self._ws.warehouses.get(self.current_config.warehouse_id).name
             if warehouse_name.startswith(WAREHOUSE_PREFIX):
-                logger.info("Deleting warehouse_name.")
+                logger.info(f"Deleting {warehouse_name}.")
                 self._ws.warehouses.delete(id=self.current_config.warehouse_id)
         except InvalidParameterValue:
             logger.error("Error accessing warehouse details")
