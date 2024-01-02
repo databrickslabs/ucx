@@ -6,11 +6,10 @@ from databricks.sdk.service.catalog import CatalogInfo, SchemaInfo, TableInfo
 
 from databricks.labs.ucx.framework.crawlers import SqlBackend
 from databricks.labs.ucx.hive_metastore.tables import (
-    MigrationCount,
     Table,
     TablesCrawler,
-    TablesMigrate,
 )
+from databricks.labs.ucx.migration.migrate_tables import TablesMigrate, MigrationCount
 
 from ..framework.mocks import MockBackend
 
