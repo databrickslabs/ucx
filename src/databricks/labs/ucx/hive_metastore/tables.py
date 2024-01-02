@@ -9,7 +9,7 @@ from functools import partial
 from databricks.sdk import WorkspaceClient
 
 from databricks.labs.ucx.framework.crawlers import CrawlerBase, SqlBackend
-from databricks.labs.ucx.framework.parallel import ManyError, Threads
+from databricks.labs.ucx.framework.parallel import Threads
 from databricks.labs.ucx.mixins.sql import Row
 
 logger = logging.getLogger(__name__)
@@ -222,12 +222,12 @@ class TablesCrawler(CrawlerBase):
 
 class TablesMigrate:
     def __init__(
-        self,
-        tc: TablesCrawler,
-        ws: WorkspaceClient,
-        backend: SqlBackend,
-        default_catalog=None,
-        database_to_catalog_mapping: dict[str, str] | None = None,
+            self,
+            tc: TablesCrawler,
+            ws: WorkspaceClient,
+            backend: SqlBackend,
+            default_catalog=None,
+            database_to_catalog_mapping: dict[str, str] | None = None,
     ):
         self._tc = tc
         self._backend = backend
@@ -311,7 +311,7 @@ class TablesMigrate:
         return upgraded_tables
 
     def revert_migrated_tables(
-        self, schema: str | None = None, table: str | None = None, *, delete_managed: bool = False
+            self, schema: str | None = None, table: str | None = None, *, delete_managed: bool = False
     ):
         upgraded_tables = self._get_tables_to_revert(schema=schema, table=table)
         # reverses the _seen_tables dictionary to key by the source table
@@ -391,57 +391,3 @@ class TablesMigrate:
             print("Migrated Manged Tables (targets) will be left intact.")
             print("To revert and delete Migrated Tables, add --delete_managed true flag to the command.")
         return True
-
-    def migrate_uc_schema(self, from_catalog: str, from_schema: str, to_catalog: str, to_schema: str):
-        from_schema_name = f"{from_catalog}.{from_schema}"
-        to_schema_name = f"{to_catalog}.{to_schema}"
-        if self._validate_uc_objects("schema", from_schema_name) == 0:
-            logger.error(f"schema {from_schema} not found in {from_catalog}")
-            return
-        else:
-            if self._validate_uc_objects("schema", to_schema_name) == 0:
-                logger.info(f"schema {to_schema} not found in {to_catalog}, creating...")
-                self._backend.execute(f"create schema {to_catalog}.{to_schema}")
-                logger.info(f"created schema {to_schema}.")
-            tables = self._ws.tables.list(catalog_name=from_catalog, schema_name=from_schema)
-            for table in tables:
-                if table.name is not None:
-                    self._migrate_uc_tables(
-                        from_catalog=from_catalog,
-                        from_schema=from_schema,
-                        from_table=table.name,
-                        to_catalog=to_catalog,
-                        to_schema=to_schema,
-                    )
-
-    def _migrate_uc_tables(self, from_catalog: str, from_schema: str, from_table: str, to_catalog: str, to_schema: str):
-        to_table_name = f"{to_catalog}.{to_schema}.{from_table}"
-        from_table_name = f"{from_catalog}.{from_schema}.{from_table}"
-        tasks = []
-        if self._validate_uc_objects("table", to_table_name) == 1:
-            msg = f"table {from_table} already present in {from_catalog}.{from_schema}. skipping this table..."
-            raise ManyError(msg)
-        else:
-            tasks.append(partial(self._migrate_uc_table, from_table_name, to_table_name))
-            _, errors = Threads.gather(name="creating tables", tasks=tasks)
-            if len(errors) > 1:
-                raise ManyError(errors)
-
-    def _migrate_uc_table(self, from_table: str, to_table: str):
-        pass
-        # todo. get current table script and run on new place
-
-    def _validate_uc_objects(self, object_type: str, object_name: str) -> int:
-        object_parts = object_name.split(".")
-        if object_type == "table":
-            query = (
-                f"select count(*) from system.information_schema.tables where catalog_name = '{object_parts[0]}"
-                f" and schema_name = '{object_parts[1]}' and table_name = '{object_parts[2]}'"
-            )
-        else:
-            query = (
-                f"select count(*) from system.information_schema.schemata where catalog_name = '{object_parts[0]} "
-                f"and schema_name = '{object_parts[1]}'"
-            )
-
-        return next(self._backend.fetch(query))[0][0]

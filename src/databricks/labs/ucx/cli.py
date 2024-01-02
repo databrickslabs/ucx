@@ -11,6 +11,7 @@ from databricks.labs.ucx.framework.crawlers import StatementExecutionBackend
 from databricks.labs.ucx.framework.tui import Prompts
 from databricks.labs.ucx.hive_metastore import ExternalLocations, TablesCrawler
 from databricks.labs.ucx.hive_metastore.mapping import TableMapping
+from databricks.labs.ucx.hive_metastore.tables import TablesMigrate
 from databricks.labs.ucx.install import WorkspaceInstaller
 from databricks.labs.ucx.installer import InstallationManager
 
@@ -113,6 +114,40 @@ def ensure_assessment_run():
         workspace_installer.validate_and_run("assessment")
 
 
+def repair_run(step):
+    if not step:
+        raise KeyError("You did not specify --step")
+    ws = WorkspaceClient()
+    installer = WorkspaceInstaller(ws)
+    logger.info(f"Repair Running {step} Job")
+    installer.repair_run(step)
+
+
+def revert_migrated_tables(schema: str, table: str, *, delete_managed: bool = False):
+    ws = WorkspaceClient()
+    prompts = Prompts()
+    installation_manager = InstallationManager(ws)
+    installation = installation_manager.for_user(ws.current_user.me())
+    if not schema and not table:
+        if not prompts.confirm(
+                "You haven't specified a schema or a table. All migrated tables will be reverted."
+                " Would you like to continue?",
+                max_attempts=2,
+        ):
+            return None
+    if not installation:
+        logger.error(CANT_FIND_UCX_MSG)
+        return None
+    warehouse_id = installation.config.warehouse_id
+    sql_backend = StatementExecutionBackend(ws, warehouse_id)
+    table_crawler = TablesCrawler(sql_backend, installation.config.inventory_database)
+    tm = TablesMigrate(table_crawler, ws, sql_backend)
+    if tm.print_revert_report(delete_managed=delete_managed) and prompts.confirm(
+            "Would you like to continue?", max_attempts=2
+    ):
+        tm.revert_migrated_tables(schema, table, delete_managed=delete_managed)
+
+
 MAPPING = {
     "open-remote-config": open_remote_config,
     "installations": list_installations,
@@ -123,6 +158,8 @@ MAPPING = {
     "validate-external-locations": validate_external_locations,
     "ensure-assessment-run": ensure_assessment_run,
     "skip": skip,
+    "repair-run": repair_run,
+    "revert-migrated-tables": revert_migrated_tables,
 }
 
 
