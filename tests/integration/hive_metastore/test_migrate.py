@@ -101,3 +101,39 @@ def test_migrate_external_table(ws, sql_backend, inventory_schema, make_catalog,
 
     target_tables = list(sql_backend.fetch(f"SHOW TABLES IN {dst_schema.full_name}"))
     assert len(target_tables) == 1
+
+
+@retried(on=[NotFound], timeout=timedelta(minutes=5))
+def test_revert_migrated_table(ws, sql_backend, inventory_schema, make_schema, make_table, make_catalog):
+    src_schema1 = make_schema(catalog_name="hive_metastore")
+    src_schema2 = make_schema(catalog_name="hive_metastore")
+    table_to_revert = make_table(schema_name=src_schema1.name)
+    table_not_migrated = make_table(schema_name=src_schema1.name)
+    table_to_not_revert = make_table(schema_name=src_schema2.name)
+    all_tables = [table_to_revert, table_not_migrated, table_to_not_revert]
+
+    dst_catalog = make_catalog()
+    dst_schema1 = make_schema(catalog_name=dst_catalog.name, name=src_schema1.name)
+    dst_schema2 = make_schema(catalog_name=dst_catalog.name, name=src_schema2.name)
+
+    static_crawler = StaticTablesCrawler(sql_backend, inventory_schema, all_tables)
+    tm = TablesMigrate(static_crawler, ws, sql_backend, dst_catalog.name)
+    tm.migrate_tables()
+
+    tm.revert_migrated_tables(src_schema1.name, delete_managed=True)
+
+    # Checking that two of the tables were reverted and one was left intact.
+    # The first two table belongs to schema 1 and should have not "upgraded_to" property
+    assert not tm.is_upgraded(table_to_revert.schema_name, table_to_revert.name)
+    # The second table didn't have the "upgraded_to" property set and should remain that way.
+    assert not tm.is_upgraded(table_not_migrated.schema_name, table_not_migrated.name)
+    # The third table belongs to schema2 and had the "upgraded_to" property set and should remain that way.
+    assert tm.is_upgraded(table_to_not_revert.schema_name, table_to_not_revert.name)
+
+    target_tables_schema1 = list(sql_backend.fetch(f"SHOW TABLES IN {dst_schema1.full_name}"))
+    assert len(target_tables_schema1) == 0
+
+    target_tables_schema2 = list(sql_backend.fetch(f"SHOW TABLES IN {dst_schema2.full_name}"))
+    assert len(target_tables_schema2) == 1
+    assert target_tables_schema2[0]["database"] == dst_schema2.name
+    assert target_tables_schema2[0]["tableName"] == table_to_not_revert.name
