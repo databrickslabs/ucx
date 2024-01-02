@@ -222,12 +222,12 @@ class TablesCrawler(CrawlerBase):
 
 class TablesMigrate:
     def __init__(
-            self,
-            tc: TablesCrawler,
-            ws: WorkspaceClient,
-            backend: SqlBackend,
-            default_catalog=None,
-            database_to_catalog_mapping: dict[str, str] | None = None,
+        self,
+        tc: TablesCrawler,
+        ws: WorkspaceClient,
+        backend: SqlBackend,
+        default_catalog=None,
+        database_to_catalog_mapping: dict[str, str] | None = None,
     ):
         self._tc = tc
         self._backend = backend
@@ -311,7 +311,7 @@ class TablesMigrate:
         return upgraded_tables
 
     def revert_migrated_tables(
-            self, schema: str | None = None, table: str | None = None, *, delete_managed: bool = False
+        self, schema: str | None = None, table: str | None = None, *, delete_managed: bool = False
     ):
         upgraded_tables = self._get_tables_to_revert(schema=schema, table=table)
         # reverses the _seen_tables dictionary to key by the source table

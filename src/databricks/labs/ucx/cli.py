@@ -130,9 +130,9 @@ def revert_migrated_tables(schema: str, table: str, *, delete_managed: bool = Fa
     installation = installation_manager.for_user(ws.current_user.me())
     if not schema and not table:
         if not prompts.confirm(
-                "You haven't specified a schema or a table. All migrated tables will be reverted."
-                " Would you like to continue?",
-                max_attempts=2,
+            "You haven't specified a schema or a table. All migrated tables will be reverted."
+            " Would you like to continue?",
+            max_attempts=2,
         ):
             return None
     if not installation:
@@ -143,7 +143,7 @@ def revert_migrated_tables(schema: str, table: str, *, delete_managed: bool = Fa
     table_crawler = TablesCrawler(sql_backend, installation.config.inventory_database)
     tm = TablesMigrate(table_crawler, ws, sql_backend)
     if tm.print_revert_report(delete_managed=delete_managed) and prompts.confirm(
-            "Would you like to continue?", max_attempts=2
+        "Would you like to continue?", max_attempts=2
     ):
         tm.revert_migrated_tables(schema, table, delete_managed=delete_managed)
 
