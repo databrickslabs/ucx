@@ -25,6 +25,24 @@ class Rule:
     dst_schema: str
     src_table: str
     dst_table: str
+    skip_table: bool = False
+
+    def __init__(
+            self,
+            workspace_name: str,
+            catalog_name: str,
+            src_schema: str,
+            dst_schema: str,
+            src_table: str,
+            dst_table: str,
+            skip_table: str | bool = False):
+        self.workspace_name = workspace_name
+        self.catalog_name = catalog_name
+        self.src_schema = src_schema
+        self.dst_schema = dst_schema
+        self.src_table = src_table
+        self.dst_table = dst_table
+        self.skip_table = str(skip_table).lower() == "true"
 
     @classmethod
     def initial(cls, workspace_name: str, catalog_name: str, table: Table) -> "Rule":
@@ -35,7 +53,16 @@ class Rule:
             dst_schema=table.database,
             src_table=table.name,
             dst_table=table.name,
+            skip_table=False
         )
+
+    @property
+    def as_uc_table_key(self):
+        return f"{self.catalog_name}.{self.dst_schema}.{self.dst_table}"
+
+    @property
+    def as_hms_table_key(self):
+        return f"hive_metastore.{self.src_schema}.{self.src_table}"
 
 
 class TableMapping:

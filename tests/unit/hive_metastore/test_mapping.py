@@ -40,6 +40,8 @@ def test_current_tables_some_rules():
     assert rule == Rule(
         workspace_name="a", catalog_name="b", src_schema="foo", dst_schema="foo", src_table="bar", dst_table="bar"
     )
+    assert rule.as_uc_table_key == "b.foo.bar"
+    assert rule.as_hms_table_key == "hive_metastore.foo.bar"
 
 
 def test_save_mapping():
@@ -65,8 +67,8 @@ def test_save_mapping():
     (path, content), _ = ws.workspace.upload.call_args
     assert "~/.ucx/mapping.csv" == path
     assert (
-        "workspace_name,catalog_name,src_schema,dst_schema,src_table,dst_table\r\n"
-        "foo-bar,foo_bar,foo,foo,bar,bar\r\n"
+        "workspace_name,catalog_name,src_schema,dst_schema,src_table,dst_table,skip_table\r\n"
+        "foo-bar,foo_bar,foo,foo,bar,bar,False\r\n"
     ) == content.read()
 
 
@@ -82,8 +84,8 @@ def test_load_mapping_not_found():
 def test_load_mapping():
     ws = MagicMock()
     ws.workspace.download.return_value = io.StringIO(
-        "workspace_name,catalog_name,src_schema,dst_schema,src_table,dst_table\r\n"
-        "foo-bar,foo_bar,foo,foo,bar,bar\r\n"
+        "workspace_name,catalog_name,src_schema,dst_schema,src_table,dst_table,skip_table\r\n"
+        "foo-bar,foo_bar,foo,foo,bar,bar,False\r\n"
     )
     table_mapping = TableMapping(ws, "~/.ucx")
 
@@ -97,6 +99,7 @@ def test_load_mapping():
             dst_schema="foo",
             src_table="bar",
             dst_table="bar",
+            skip_table=False,
         )
     ] == rules
 

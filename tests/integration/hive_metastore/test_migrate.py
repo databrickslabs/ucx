@@ -1,15 +1,14 @@
 import logging
 from datetime import timedelta
-from unittest.mock import create_autospec
 
 import pytest
 from databricks.sdk.errors import NotFound
 from databricks.sdk.retries import retried
 
-from databricks.labs.ucx.hive_metastore.mapping import Rule, TableMapping
+from databricks.labs.ucx.hive_metastore.mapping import Rule
 from databricks.labs.ucx.hive_metastore.table_migrate import TablesMigrate
 
-from ..conftest import StaticTablesCrawler
+from ..conftest import StaticTablesCrawler, StaticTableMapping
 
 logger = logging.getLogger(__name__)
 
@@ -27,8 +26,7 @@ def test_migrate_managed_tables(ws, sql_backend, inventory_schema, make_catalog,
     logger.info(f"dst_catalog={dst_catalog.name}, managed_table={src_managed_table.full_name}")
 
     tc = StaticTablesCrawler(sql_backend, inventory_schema, [src_managed_table])
-    tmp = create_autospec(TableMapping)
-    tmp.load.return_value = [
+    rules = [
         Rule(
             "workspace",
             dst_catalog.name,
@@ -38,6 +36,7 @@ def test_migrate_managed_tables(ws, sql_backend, inventory_schema, make_catalog,
             src_managed_table.name,
         ),
     ]
+    tmp = StaticTableMapping(ws,rules=rules)
     tm = TablesMigrate(tc, ws, sql_backend, tmp)
 
     tm.migrate_tables()
@@ -82,8 +81,7 @@ def test_migrate_tables_with_cache_should_not_create_table(
 
     # crawler = TablesCrawler(sql_backend, inventory_schema)
     tc = StaticTablesCrawler(sql_backend, inventory_schema, [src_managed_table])
-    tmp = create_autospec(TableMapping)
-    tmp.load.return_value = [
+    rules = [
         Rule(
             "workspace",
             dst_catalog.name,
@@ -93,6 +91,7 @@ def test_migrate_tables_with_cache_should_not_create_table(
             dst_managed_table.name,
         ),
     ]
+    tmp = StaticTableMapping(ws,rules=rules)
     tm = TablesMigrate(tc, ws, sql_backend, tmp)
 
     # FIXME: flaky: databricks.sdk.errors.mapping.NotFound: Catalog 'ucx_cjazg' does not exist.
@@ -120,8 +119,7 @@ def test_migrate_external_table(ws, sql_backend, inventory_schema, make_catalog,
 
     # crawler = TablesCrawler(sql_backend, inventory_schema)
     tc = StaticTablesCrawler(sql_backend, inventory_schema, [src_external_table])
-    tmp = create_autospec(TableMapping)
-    tmp.load.return_value = [
+    rules = [
         Rule(
             "workspace",
             dst_catalog.name,
@@ -131,6 +129,7 @@ def test_migrate_external_table(ws, sql_backend, inventory_schema, make_catalog,
             src_external_table.name,
         ),
     ]
+    tmp = StaticTableMapping(ws,rules=rules)
     tm = TablesMigrate(tc, ws, sql_backend, tmp)
 
     tm.migrate_tables()
@@ -153,8 +152,7 @@ def test_revert_migrated_table(ws, sql_backend, inventory_schema, make_schema, m
     dst_schema2 = make_schema(catalog_name=dst_catalog.name, name=src_schema2.name)
 
     tc = StaticTablesCrawler(sql_backend, inventory_schema, all_tables)
-    tmp = create_autospec(TableMapping)
-    tmp.load.return_value = [
+    rules = [
         Rule(
             "workspace",
             dst_catalog.name,
@@ -172,6 +170,7 @@ def test_revert_migrated_table(ws, sql_backend, inventory_schema, make_schema, m
             table_to_not_revert.name,
         ),
     ]
+    tmp = StaticTableMapping(ws,rules=rules)
     tm = TablesMigrate(tc, ws, sql_backend, tmp)
     tm.migrate_tables()
 

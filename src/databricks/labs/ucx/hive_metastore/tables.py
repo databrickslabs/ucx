@@ -54,11 +54,11 @@ class Table:
 
     def uc_create_sql(self, target_table_key):
         if self.kind == "VIEW":
-            return self._sql_view(target_table_key)
+            return self._sql_migrate_view(target_table_key)
         elif self.object_type == "EXTERNAL":
-            return self._sql_external(target_table_key)
+            return self._sql_migrate_external(target_table_key)
         else:
-            return self._sql_managed(target_table_key)
+            return self._sql_migrate_managed(target_table_key)
 
     def sql_alter_to(self, target_table_key):
         return f"ALTER {self.kind} {self.key} SET TBLPROPERTIES ('upgraded_to' = '{target_table_key}');"
@@ -80,16 +80,16 @@ class Table:
                 return True
         return False
 
-    def _sql_external(self, target_table_key):
+    def _sql_migrate_external(self, target_table_key):
         return f"SYNC TABLE {target_table_key} FROM {self.key};"
 
-    def _sql_managed(self, target_table_key):
+    def _sql_migrate_managed(self, target_table_key):
         if not self.is_delta:
             msg = f"{self.key} is not DELTA: {self.table_format}"
             raise ValueError(msg)
         return f"CREATE TABLE IF NOT EXISTS {target_table_key} DEEP CLONE {self.key};"
 
-    def _sql_view(self, target_table_key):
+    def _sql_migrate_view(self, target_table_key):
         return f"CREATE VIEW IF NOT EXISTS {target_table_key} AS {self.view_text};"
 
 

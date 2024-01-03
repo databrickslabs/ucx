@@ -39,7 +39,7 @@ def test_kind_view():
 
 def test_sql_managed_non_delta():
     with pytest.raises(ValueError):
-        Table(catalog="catalog", database="db", name="table", object_type="type", table_format="PARQUET")._sql_managed(
+        Table(catalog="catalog", database="db", name="table", object_type="type", table_format="PARQUET")._sql_migrate_managed(
             "catalog"
         )
 
