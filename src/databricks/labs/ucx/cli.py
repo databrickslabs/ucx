@@ -141,7 +141,8 @@ def revert_migrated_tables(schema: str, table: str, *, delete_managed: bool = Fa
     warehouse_id = installation.config.warehouse_id
     sql_backend = StatementExecutionBackend(ws, warehouse_id)
     table_crawler = TablesCrawler(sql_backend, installation.config.inventory_database)
-    tm = TablesMigrate(table_crawler, ws, sql_backend)
+    tmp = TableMapping(ws)
+    tm = TablesMigrate(table_crawler, ws, sql_backend, tmp)
     if tm.print_revert_report(delete_managed=delete_managed) and prompts.confirm(
         "Would you like to continue?", max_attempts=2
     ):

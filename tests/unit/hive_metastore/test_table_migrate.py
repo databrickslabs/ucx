@@ -5,6 +5,7 @@ from databricks.sdk import WorkspaceClient
 from databricks.sdk.service.catalog import CatalogInfo, SchemaInfo, TableInfo
 
 from databricks.labs.ucx.framework.crawlers import SqlBackend
+from databricks.labs.ucx.hive_metastore.mapping import Rule, TableMapping
 from databricks.labs.ucx.hive_metastore.table_migrate import TablesMigrate
 from databricks.labs.ucx.hive_metastore.tables import (
     MigrationCount,
@@ -23,8 +24,8 @@ def test_migrate_managed_tables_should_produce_proper_queries():
         "SELECT": [
             (
                 "hive_metastore",
-                "db1",
-                "managed",
+                "db1_src",
+                "managed_src",
                 "MANAGED",
                 "DELTA",
                 None,
@@ -35,14 +36,22 @@ def test_migrate_managed_tables_should_produce_proper_queries():
     backend = MockBackend(fails_on_first=errors, rows=rows)
     tc = TablesCrawler(backend, "inventory_database")
     client = MagicMock()
-    tm = TablesMigrate(tc, client, backend)
+    tmp = create_autospec(TableMapping)
+    tmp.load.return_value = [
+        Rule("workspace", "ucx_default", "db1_src", "db1_dst", "managed_src", "managed_dst"),
+        Rule("workspace", "ucx_default", "db1_src", "db1_dst", "managed_src_db_dataset", "managed_src_db_dataset"),
+        Rule("workspace", "ucx_default", "db1_src", "db1_dst", "managed_src_to_skip", "managed_src_to_skip"),
+    ]
+    tm = TablesMigrate(tc, client, backend, tmp)
     tm.migrate_tables()
 
     assert (list(backend.queries)) == [
         "SELECT * FROM hive_metastore.inventory_database.tables",
-        "CREATE TABLE IF NOT EXISTS ucx_default.db1.managed DEEP CLONE hive_metastore.db1.managed;",
-        "ALTER TABLE hive_metastore.db1.managed SET TBLPROPERTIES ('upgraded_to' = 'ucx_default.db1.managed');",
-        "ALTER TABLE ucx_default.db1.managed SET TBLPROPERTIES ('upgraded_from' = 'hive_metastore.db1.managed');",
+        "CREATE TABLE IF NOT EXISTS ucx_default.db1_dst.managed_dst DEEP CLONE hive_metastore.db1_src.managed_src;",
+        "ALTER TABLE hive_metastore.db1_src.managed_src "
+        "SET TBLPROPERTIES ('upgraded_to' = 'ucx_default.db1_dst.managed_dst');",
+        "ALTER TABLE ucx_default.db1_dst.managed_dst "
+        "SET TBLPROPERTIES ('upgraded_from' = 'hive_metastore.db1_src.managed_src');",
     ]
 
 
@@ -61,13 +70,17 @@ def test_migrate_managed_tables_should_do_nothing_if_upgrade_tag_is_present():
     client.tables.list.return_value = [
         TableInfo(full_name="catalog_1.db1.managed", properties={"upgraded_from": "hive_metastore.db1.managed"})
     ]
-    tm = TablesMigrate(tc, client, backend, default_catalog="catalog_1")
+    tmp = create_autospec(TableMapping)
+    tmp.load.return_value = [
+        Rule("workspace", "catalog_1", "db1", "db1", "managed", "managed"),
+    ]
+    tm = TablesMigrate(tc, client, backend, tmp)
     tm.migrate_tables()
 
     assert (list(backend.queries)) == ["SELECT * FROM hive_metastore.inventory_database.tables"]
 
 
-def test_migrate_tables_should_migrate_tables_to_default_catalog_if_not_found_in_mapping():
+def test_migrate_tables_should_not_migrate_if_not_found_in_mapping():
     errors = {}
     rows = {
         "SELECT": [
@@ -77,37 +90,12 @@ def test_migrate_tables_should_migrate_tables_to_default_catalog_if_not_found_in
     backend = MockBackend(fails_on_first=errors, rows=rows)
     tc = TablesCrawler(backend, "inventory_database")
     client = MagicMock()
-    database_to_catalog_mapping = {"db1": "catalog_1", "db2": "catalog_2"}
-    tm = TablesMigrate(tc, client, backend, database_to_catalog_mapping=database_to_catalog_mapping)
+    tmp = create_autospec(TableMapping)
+    tmp.load.return_value = []
+    tm = TablesMigrate(tc, client, backend, tmp)
     tm.migrate_tables()
 
-    assert (list(backend.queries)) == [
-        "SELECT * FROM hive_metastore.inventory_database.tables",
-        "CREATE TABLE IF NOT EXISTS catalog_1.db1.managed DEEP CLONE hive_metastore.db1.managed;",
-        "ALTER TABLE hive_metastore.db1.managed SET TBLPROPERTIES ('upgraded_to' = 'catalog_1.db1.managed');",
-        "ALTER TABLE catalog_1.db1.managed SET TBLPROPERTIES ('upgraded_from' = 'hive_metastore.db1.managed');",
-    ]
-
-
-def test_migrate_tables_should_migrate_tables_to_default_catalog_if_specified():
-    errors = {}
-    rows = {
-        "SELECT": [
-            ("hive_metastore", "db1", "managed", "MANAGED", "DELTA", None, None),
-        ]
-    }
-    backend = MockBackend(fails_on_first=errors, rows=rows)
-    tc = TablesCrawler(backend, "inventory_database")
-    client = MagicMock()
-    tm = TablesMigrate(tc, client, backend, default_catalog="test_catalog")
-    tm.migrate_tables()
-
-    assert (list(backend.queries)) == [
-        "SELECT * FROM hive_metastore.inventory_database.tables",
-        "CREATE TABLE IF NOT EXISTS test_catalog.db1.managed DEEP CLONE hive_metastore.db1.managed;",
-        "ALTER TABLE hive_metastore.db1.managed SET TBLPROPERTIES ('upgraded_to' = 'test_catalog.db1.managed');",
-        "ALTER TABLE test_catalog.db1.managed SET TBLPROPERTIES ('upgraded_from' = 'hive_metastore.db1.managed');",
-    ]
+    assert len(backend.queries) == 1
 
 
 def test_migrate_tables_should_add_table_to_cache_when_migrated():
@@ -120,7 +108,11 @@ def test_migrate_tables_should_add_table_to_cache_when_migrated():
     backend = MockBackend(fails_on_first=errors, rows=rows)
     tc = TablesCrawler(backend, "inventory_database")
     client = MagicMock()
-    tm = TablesMigrate(tc, client, backend, default_catalog="test_catalog")
+    tmp = create_autospec(TableMapping)
+    tmp.load.return_value = [
+        Rule("workspace", "test_catalog", "db1", "db1", "managed", "managed"),
+    ]
+    tm = TablesMigrate(tc, client, backend, tmp)
     tm.migrate_tables()
 
     assert tm._seen_tables == {"test_catalog.db1.managed": "hive_metastore.db1.managed"}
@@ -205,7 +197,9 @@ def get_table_migrate(backend: SqlBackend) -> TablesMigrate:
         ),
     ]
     tc.snapshot.return_value = test_tables
-    tm = TablesMigrate(tc, client, backend, default_catalog="test_catalog")
+    tmp = create_autospec(TableMapping)
+    tmp.load.return_value = []
+    tm = TablesMigrate(tc, client, backend, tmp)
     return tm
 
 
@@ -217,12 +211,12 @@ def test_revert_migrated_tables_skip_managed():
     tm.revert_migrated_tables(schema="test_schema1")
     revert_queries = list(backend.queries)
     assert (
-        "ALTER TABLE `hive_metastore`.`test_schema1`.`test_table1` UNSET TBLPROPERTIES IF EXISTS('upgraded_to');"
+        "ALTER TABLE hive_metastore.test_schema1.test_table1 UNSET TBLPROPERTIES IF EXISTS('upgraded_to');"
         in revert_queries
     )
     assert "DROP TABLE IF EXISTS cat1.schema1.dest1" in revert_queries
     assert (
-        "ALTER VIEW `hive_metastore`.`test_schema1`.`test_view1` UNSET TBLPROPERTIES IF EXISTS('upgraded_to');"
+        "ALTER VIEW hive_metastore.test_schema1.test_view1 UNSET TBLPROPERTIES IF EXISTS('upgraded_to');"
         in revert_queries
     )
     assert "DROP VIEW IF EXISTS cat1.schema1.dest_view1" in revert_queries
@@ -237,17 +231,17 @@ def test_revert_migrated_tables_including_managed():
     tm.revert_migrated_tables(schema="test_schema1", delete_managed=True)
     revert_with_managed_queries = list(backend.queries)
     assert (
-        "ALTER TABLE `hive_metastore`.`test_schema1`.`test_table1` UNSET TBLPROPERTIES IF EXISTS('upgraded_to');"
+        "ALTER TABLE hive_metastore.test_schema1.test_table1 UNSET TBLPROPERTIES IF EXISTS('upgraded_to');"
         in revert_with_managed_queries
     )
     assert "DROP TABLE IF EXISTS cat1.schema1.dest1" in revert_with_managed_queries
     assert (
-        "ALTER VIEW `hive_metastore`.`test_schema1`.`test_view1` UNSET TBLPROPERTIES IF EXISTS('upgraded_to');"
+        "ALTER VIEW hive_metastore.test_schema1.test_view1 UNSET TBLPROPERTIES IF EXISTS('upgraded_to');"
         in revert_with_managed_queries
     )
     assert "DROP VIEW IF EXISTS cat1.schema1.dest_view1" in revert_with_managed_queries
     assert (
-        "ALTER TABLE `hive_metastore`.`test_schema1`.`test_table2` UNSET TBLPROPERTIES IF EXISTS('upgraded_to');"
+        "ALTER TABLE hive_metastore.test_schema1.test_table2 UNSET TBLPROPERTIES IF EXISTS('upgraded_to');"
         in revert_with_managed_queries
     )
     assert "DROP TABLE IF EXISTS cat1.schema1.dest2" in revert_with_managed_queries
@@ -269,7 +263,12 @@ def test_no_migrated_tables():
     tc = create_autospec(TablesCrawler)
     client = create_autospec(WorkspaceClient)
     client.tables.list.side_effect = []
-    tm = TablesMigrate(tc, client, backend, default_catalog="test_catalog")
+    tmp = create_autospec(TableMapping)
+    tmp.load.return_value = [
+        Rule("workspace", "catalog_1", "db1", "db1", "managed", "managed"),
+    ]
+    tm = TablesMigrate(tc, client, backend, tmp)
+    tm.migrate_tables()
     tm._init_seen_tables = MagicMock()
     assert len(tm._get_tables_to_revert("test_schema1", "test_table1")) == 0
     tm._init_seen_tables.assert_called()
@@ -308,7 +307,10 @@ def test_empty_revert_report(capsys):
     tc = create_autospec(TablesCrawler)
     client = create_autospec(WorkspaceClient)
     client.tables.list.side_effect = []
-    tm = TablesMigrate(tc, client, backend, default_catalog="test_catalog")
+    tmp = create_autospec(TableMapping)
+    tmp.load.return_value = []
+    tm = TablesMigrate(tc, client, backend, tmp)
+    tm.migrate_tables()
     assert not tm.print_revert_report(delete_managed=False)
 
 
@@ -325,6 +327,9 @@ def test_is_upgraded():
     backend = MockBackend(fails_on_first=errors, rows=rows)
     tc = create_autospec(TablesCrawler)
     client = create_autospec(WorkspaceClient)
-    tm = TablesMigrate(tc, client, backend, default_catalog="test_catalog")
+    tmp = create_autospec(TableMapping)
+    tmp.load.return_value = []
+    tm = TablesMigrate(tc, client, backend, tmp)
+    tm.migrate_tables()
     assert tm.is_upgraded("schema1", "table1")
     assert not tm.is_upgraded("schema1", "table2")
