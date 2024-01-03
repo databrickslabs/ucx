@@ -48,5 +48,3 @@ def test_permission_denied_error(mocker):
     verify_metastore_obj = VerifyHasMetastore(ws)
 
     assert verify_metastore_obj.verify_metastore() is None
-
-

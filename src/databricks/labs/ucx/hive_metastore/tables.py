@@ -206,4 +206,3 @@ class TablesCrawler(CrawlerBase):
             # TODO: https://github.com/databrickslabs/ucx/issues/406
             logger.error(f"Couldn't fetch information for table {full_name} : {e}")
             return None
-
