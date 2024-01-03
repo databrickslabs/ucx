@@ -5,7 +5,7 @@ import pytest
 from databricks.sdk.errors import NotFound
 from databricks.sdk.retries import retried
 
-from databricks.labs.ucx.hive_metastore.tables import TablesMigrate
+from databricks.labs.ucx.migration.table_migrate import TablesMigrate
 
 from ..conftest import StaticTablesCrawler
 

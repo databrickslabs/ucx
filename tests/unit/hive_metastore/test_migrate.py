@@ -9,8 +9,8 @@ from databricks.labs.ucx.hive_metastore.tables import (
     MigrationCount,
     Table,
     TablesCrawler,
-    TablesMigrate,
 )
+from databricks.labs.ucx.migration.table_migrate import TablesMigrate
 
 from ..framework.mocks import MockBackend
 
