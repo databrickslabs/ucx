@@ -1,5 +1,4 @@
-import unittest
-
+import pytest
 from databricks.sdk.service.catalog import MetastoreAssignment
 
 from databricks.labs.ucx.workspace_access.verification import (
@@ -16,7 +15,6 @@ def test_validate_metastore_exists(mocker):
     )
     verify_metastore_obj = VerifyHasMetastore(ws)
 
-    assert verify_metastore_obj.check_metastore_existence() is True
     assert verify_metastore_obj.verify_metastore() is True
 
     assert verify_metastore_obj.metastore_id == "21fwef-b2345-sdas-2343-sddsvv332"
@@ -30,12 +28,10 @@ def test_validate_no_metastore_exists(mocker):
     ws.metastores.current = mocker.patch(
         "databricks.sdk.service.catalog.MetastoreAssignment.__init__", return_value=None
     )
+    ws.metastores.current.return_value = None
     ws.return_value = None
 
     verify_metastore_obj = VerifyHasMetastore(ws)
-    unit_tester = unittest.TestCase
 
-    assert verify_metastore_obj.check_metastore_existence() is False
-
-    with unit_tester.assertRaises(unit_tester, MetastoreNotFoundError):
+    with pytest.raises(MetastoreNotFoundError, match="Metastore not found in the workspace"):
         verify_metastore_obj.verify_metastore()

@@ -1,9 +1,15 @@
+import logging
 from typing import Literal
 
 from databricks.sdk import WorkspaceClient
+from databricks.sdk.errors import PermissionDenied
 
 from databricks.labs.ucx.workspace_access.groups import MigrationState
 from databricks.labs.ucx.workspace_access.secrets import SecretScopesSupport
+
+logging.basicConfig()
+logger = logging.getLogger(__name__)
+logger.setLevel(logging.DEBUG)
 
 
 class VerificationManager:
@@ -88,31 +94,25 @@ class VerifyHasMetastore:
         self.workspace_id: int | None = None
         self._ws = ws
 
-    def verify_metastore(self) -> bool:
+    def verify_metastore(self):
         """
         Verifies if a metastore exists for a metastore
-        :param cfg:
+        :param :
         :return:
         """
-        metastore_exists = self.check_metastore_existence()
-        if not metastore_exists:
-            raise MetastoreNotFoundError()
-        return True
 
-    def check_metastore_existence(self) -> bool:
-        """
-        Uses the databricks sdk client to check whether
-        metastore exists. Updates the catalog name and id if exists
-        :return:
-        """
-        current_metastore = self._ws.metastores.current()
-        if current_metastore:
-            self.default_catalog_name = current_metastore.default_catalog_name
-            self.metastore_id = current_metastore.metastore_id
-            self.workspace_id = current_metastore.workspace_id
-            return True
-
-        return False
+        try:
+            current_metastore = self._ws.metastores.current()
+            if current_metastore:
+                self.default_catalog_name = current_metastore.default_catalog_name
+                self.metastore_id = current_metastore.metastore_id
+                self.workspace_id = current_metastore.workspace_id
+                return True
+            else:
+                raise MetastoreNotFoundError
+        except PermissionDenied as e:
+            pass
+            # logger.error("Permission Denied while trying to access metastore", e.args)
 
 
 class MetastoreNotFoundError(Exception):
