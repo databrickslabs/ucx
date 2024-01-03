@@ -7,8 +7,7 @@ from databricks.sdk.service.catalog import CatalogInfo, SchemaInfo, TableInfo
 
 from databricks.labs.ucx.framework.crawlers import SqlBackend
 from databricks.labs.ucx.hive_metastore.mapping import TableMapping, Rule
-from databricks.labs.ucx.hive_metastore.tables import Table, TablesCrawler
-from databricks.labs.ucx.migration.migrate_tables import MigrationCount, TablesMigrate
+from databricks.labs.ucx.hive_metastore.tables import Table, TablesCrawler, MigrationCount, TablesMigrate
 
 from ..framework.mocks import MockBackend
 
