@@ -1,4 +1,4 @@
-from unittest.mock import MagicMock
+from unittest.mock import MagicMock, patch
 
 import pytest
 from databricks.sdk.errors import NotFound
@@ -57,9 +57,33 @@ def test_uc_to_uc_no_catalog(mocker, caplog):
     mocker.patch("databricks.sdk.WorkspaceClient.__init__", return_value=None)
     current_user = MagicMock()
     current_user.me.return_value = User(user_name="foo", groups=[ComplexValue(display="admins")])
-    current_user.return_value = None
     mocker.patch("databricks.sdk.WorkspaceClient.current_user", return_value=current_user)
-    mocker.patch("databricks.labs.ucx.installer.InstallationManager.__init__", return_value=None)
-    mocker.patch("databricks.labs.ucx.installer.InstallationManager.for_user", return_value=None)
+    mocker.patch("databricks.labs.ucx.installer.InstallationManager.for_user", return_value=current_user)
+    mocker.patch("databricks.labs.ucx.framework.crawlers.StatementExecutionBackend.__init__", return_value=None)
     migrate_uc_to_uc(from_catalog="", from_schema="", from_table="", to_catalog="", to_schema="")
-    assert len([rec.message for rec in caplog.records if "Please enter from_catalog and to_catalog" in rec.message]) == 1
+    assert (
+        len([rec.message for rec in caplog.records if "Please enter from_catalog and to_catalog" in rec.message]) == 1
+    )
+
+
+def test_uc_to_uc_no_schema(mocker, caplog):
+    mocker.patch("databricks.sdk.WorkspaceClient.__init__", return_value=None)
+    current_user = MagicMock()
+    current_user.me.return_value = User(user_name="foo", groups=[ComplexValue(display="admins")])
+    mocker.patch("databricks.sdk.WorkspaceClient.current_user", return_value=current_user)
+    mocker.patch("databricks.labs.ucx.installer.InstallationManager.for_user", return_value=current_user)
+    mocker.patch("databricks.labs.ucx.framework.crawlers.StatementExecutionBackend.__init__", return_value=None)
+    migrate_uc_to_uc(from_catalog="SrcCat", from_schema="", from_table="", to_catalog="TgtCat", to_schema="")
+    assert len([rec.message for rec in caplog.records if "Please enter from_schema, to_schema" in rec.message]) == 1
+
+
+def test_uc_to_uc_(mocker, caplog):
+    mocker.patch("databricks.sdk.WorkspaceClient.__init__", return_value=None)
+    current_user = MagicMock()
+    current_user.me.return_value = User(user_name="foo", groups=[ComplexValue(display="admins")])
+    mocker.patch("databricks.sdk.WorkspaceClient.current_user", return_value=current_user)
+    mocker.patch("databricks.labs.ucx.installer.InstallationManager.for_user", return_value=current_user)
+    mocker.patch("databricks.labs.ucx.framework.crawlers.StatementExecutionBackend.__init__", return_value=None)
+    with patch("databricks.labs.ucx.hive_metastore.tables.TablesMigrate.migrate_uc_tables", return_value=None) as m:
+        migrate_uc_to_uc(from_catalog="SrcC", from_schema="SrcS", from_table="*", to_catalog="TgtC", to_schema="ToS")
+        m.assert_called_once()
