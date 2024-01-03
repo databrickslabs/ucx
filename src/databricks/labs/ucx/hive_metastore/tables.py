@@ -6,10 +6,11 @@ from collections import defaultdict
 from collections.abc import Iterable, Iterator
 from dataclasses import dataclass
 from functools import partial
+
 from databricks.sdk import WorkspaceClient
+
 from databricks.labs.ucx.framework.crawlers import CrawlerBase, SqlBackend
 from databricks.labs.ucx.framework.parallel import Threads
-
 from databricks.labs.ucx.mixins.sql import Row
 
 logger = logging.getLogger(__name__)
@@ -503,6 +504,7 @@ class TablesMigrate:
 
     def _is_marked_for_skip(self, table: Table) -> bool:
         import databricks.labs.ucx.hive_metastore
+
         result = self._backend.fetch(f"SHOW TBLPROPERTIES {table.key}")
         for value in result:
             if value["key"] == databricks.labs.ucx.hive_metastore.TableMapping.UCX_SKIP_PROPERTY:

@@ -2,6 +2,7 @@ import json
 import logging
 import sys
 import webbrowser
+from unittest.mock import create_autospec
 
 from databricks.sdk import WorkspaceClient
 
@@ -9,8 +10,12 @@ from databricks.labs.ucx.account import AccountWorkspaces, WorkspaceInfo
 from databricks.labs.ucx.config import AccountConfig, ConnectConfig
 from databricks.labs.ucx.framework.crawlers import StatementExecutionBackend
 from databricks.labs.ucx.framework.tui import Prompts
-from databricks.labs.ucx.hive_metastore import ExternalLocations, TablesCrawler
-from databricks.labs.ucx.hive_metastore.mapping import TableMapping
+from databricks.labs.ucx.hive_metastore import (
+    ExternalLocations,
+    TablesCrawler,
+    TablesMigrate,
+)
+from databricks.labs.ucx.hive_metastore.mapping import TableMapping, Rule
 from databricks.labs.ucx.install import WorkspaceInstaller
 from databricks.labs.ucx.installer import InstallationManager
 
@@ -139,8 +144,10 @@ def revert_migrated_tables(schema: str, table: str, *, delete_managed: bool = Fa
         return None
     warehouse_id = installation.config.warehouse_id
     sql_backend = StatementExecutionBackend(ws, warehouse_id)
-    table_crawler = TablesCrawler(sql_backend, installation.config.inventory_database)
-    tm = TablesMigrate(table_crawler, ws, sql_backend)
+    tc = TablesCrawler(sql_backend, installation.config.inventory_database)
+    tmp = create_autospec(TableMapping)
+    tmp.load.return_value = [Rule("workspace", "catalog_1", "db1", "db1", "managed", "managed")]
+    tm = TablesMigrate(tc, ws, sql_backend, tmp)
     if tm.print_revert_report(delete_managed=delete_managed) and prompts.confirm(
         "Would you like to continue?", max_attempts=2
     ):
