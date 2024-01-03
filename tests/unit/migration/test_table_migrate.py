@@ -12,7 +12,7 @@ from databricks.labs.ucx.hive_metastore.tables import (
 )
 from databricks.labs.ucx.migration.table_migrate import TablesMigrate
 
-from ..framework.mocks import MockBackend
+from tests.unit.framework.mocks import MockBackend
 
 logger = logging.getLogger(__name__)
 
