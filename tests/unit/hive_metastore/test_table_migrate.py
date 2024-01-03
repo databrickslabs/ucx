@@ -10,9 +10,9 @@ from databricks.labs.ucx.hive_metastore.tables import (
     Table,
     TablesCrawler,
 )
-from databricks.labs.ucx.migration.table_migrate import TablesMigrate
+from databricks.labs.ucx.hive_metastore.table_migrate import TablesMigrate
 
-from tests.unit.framework.mocks import MockBackend
+from ..framework.mocks import MockBackend
 
 logger = logging.getLogger(__name__)
 
