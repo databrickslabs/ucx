@@ -395,28 +395,29 @@ class TablesMigrate:
     def migrate_uc_tables(
         self, from_catalog: str, from_schema: str, from_table: list[str], to_catalog: str, to_schema: str
     ):
-        if self._validate_uc_objects("schema", f"{from_catalog}.{from_schema}") == 0:
+        if self._validate_uc_objects("schema", f"{from_catalog}.{from_schema}") == "0":
             logger.error(f"schema {from_schema} not found in {from_catalog}")
             return
         else:
-            if self._validate_uc_objects("schema", f"{to_catalog}.{to_schema}") == 0:
-                logger.info(f"schema {to_schema} not found in {to_catalog}, creating...")
+            if self._validate_uc_objects("schema", f"{to_catalog}.{to_schema}") == "0":
+                logger.warning(f"schema {to_schema} not found in {to_catalog}, creating...")
                 self._backend.execute(f"create schema {to_catalog}.{to_schema}")
                 logger.info(f"created schema {to_schema}.")
             tables = self._ws.tables.list(catalog_name=from_catalog, schema_name=from_schema)
+            table_tasks = []
+            view_tasks = []
             for table in tables:
-                if table.name in from_table:
-                    table_tasks = []
-                    view_tasks = []
-                    if self._validate_uc_objects("table", f"{to_catalog}.{to_schema}.{from_table}") == 1:
+                if table.name in from_table or from_table[0] == "*":
+                    if self._validate_uc_objects("table", f"{to_catalog}.{to_schema}.{table.name}") == "1":
                         logger.warning(
                             f"table {from_table} already present in {from_catalog}.{from_schema}."
                             f" skipping this table..."
                         )
+                        continue
                     if table.table_type and table.table_type.value in ("EXTERNAL", "MANAGED"):
                         table_tasks.append(
                             partial(
-                                self._migrate_uc_table, from_catalog, from_schema, from_table, to_catalog, to_schema
+                                self._migrate_uc_table, from_catalog, from_schema, table.name, to_catalog, to_schema
                             )
                         )
                     else:
@@ -425,20 +426,20 @@ class TablesMigrate:
                                 self._migrate_uc_table,
                                 from_catalog,
                                 from_schema,
-                                from_table,
+                                table.name,
                                 to_catalog,
                                 to_schema,
                                 table.view_definition,
                             )
                         )
-                    _, errors = Threads.gather(name="creating tables", tasks=table_tasks)
-                    if len(errors) > 1:
-                        raise ManyError(errors)
-                    logger.info(f"migrated {len(list(_))} tables to the new schema {to_schema}.")
-                    _, errors = Threads.gather(name="creating views", tasks=view_tasks)
-                    if len(errors) > 1:
-                        raise ManyError(errors)
-                    logger.info(f"migrated {len(list(_))} views to the new schema {to_schema}.")
+            _, errors = Threads.gather(name="creating tables", tasks=table_tasks)
+            if len(errors) > 1:
+                raise ManyError(errors)
+            logger.info(f"migrated {len(list(_))} tables to the new schema {to_schema}.")
+            _, errors = Threads.gather(name="creating views", tasks=view_tasks)
+            if len(errors) > 1:
+                raise ManyError(errors)
+            logger.info(f"migrated {len(list(_))} views to the new schema {to_schema}.")
 
     def _migrate_uc_table(
         self,
@@ -451,7 +452,9 @@ class TablesMigrate:
     ):
         try:
             if not view_text:
-                create_sql = str(next(self._backend.fetch(f"SHOW CREATE TABLE {from_table}"))[0][0])
+                create_sql = str(
+                    next(self._backend.fetch(f"SHOW CREATE TABLE {from_catalog}.{from_schema}.{from_table}"))[0]
+                )
                 create_sql = create_sql.replace(from_catalog, to_catalog).replace(from_schema, to_schema)
                 logger.debug(f"Creating table {to_catalog}.{to_schema}.{from_table}.")
                 self._backend.execute(create_sql)
@@ -469,13 +472,13 @@ class TablesMigrate:
         object_parts = object_name.split(".")
         if object_type == "table":
             query = (
-                f"select count(*) from system.information_schema.tables where catalog_name = '{object_parts[0]}"
-                f" and schema_name = '{object_parts[1]}' and table_name = '{object_parts[2]}'"
+                f"SELECT COUNT(*) FROM SYSTEM.INFORMATION_SCHEMA.TABLES WHERE CATALOG_NAME = '{object_parts[0]}'"
+                f" AND SCHEMA_NAME = '{object_parts[1]}' AND TABLE_NAME = '{object_parts[2]}'"
             )
         else:
             query = (
-                f"select count(*) from system.information_schema.schemata where catalog_name = '{object_parts[0]} "
-                f"and schema_name = '{object_parts[1]}'"
+                f"SELECT COUNT(*) FROM SYSTEM.INFORMATION_SCHEMA.SCHEMATA WHERE CATALOG_NAME = '{object_parts[0]}' "
+                f"AND SCHEMA_NAME = '{object_parts[1]}'"
             )
 
-        return next(self._backend.fetch(query))[0][0]
+        return next(self._backend.fetch(query))[0]

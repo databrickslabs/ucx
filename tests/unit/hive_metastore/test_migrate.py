@@ -2,7 +2,7 @@ import logging
 from unittest.mock import MagicMock, create_autospec
 
 from databricks.sdk import WorkspaceClient
-from databricks.sdk.service.catalog import CatalogInfo, SchemaInfo, TableInfo
+from databricks.sdk.service.catalog import CatalogInfo, SchemaInfo, TableInfo, TableType
 
 from databricks.labs.ucx.framework.crawlers import SqlBackend
 from databricks.labs.ucx.hive_metastore.tables import (
@@ -328,3 +328,99 @@ def test_is_upgraded():
     tm = TablesMigrate(tc, client, backend, default_catalog="test_catalog")
     assert tm.is_upgraded("schema1", "table1")
     assert not tm.is_upgraded("schema1", "table2")
+
+
+def test_migrate_uc_tables_invalid_from_schema(caplog):
+    tc = create_autospec(TablesCrawler)
+    client = create_autospec(WorkspaceClient)
+    errors = {}
+    rows = {
+        "SYSTEM.INFORMATION_SCHEMA.SCHEMATA": [
+            ("0"),
+        ]
+    }
+    backend = MockBackend(fails_on_first=errors, rows=rows)
+    tm = TablesMigrate(tc, client, backend)
+    tm.migrate_uc_tables(from_catalog="SrcC", from_schema="SrcS", from_table=["*"], to_catalog="TgtC", to_schema="TgtS")
+    assert len([rec.message for rec in caplog.records if "schema SrcS not found in SrcC" in rec.message]) == 1
+
+
+def test_migrate_uc_tables_invalid_to_schema(caplog):
+    tc = create_autospec(TablesCrawler)
+    client = create_autospec(WorkspaceClient)
+    errors = {}
+    rows = {
+        "SYSTEM.INFORMATION_SCHEMA.SCHEMATA WHERE CATALOG_NAME = 'SrcC' AND SCHEMA_NAME = 'SrcS'": [
+            ("1"),
+        ],
+        "SYSTEM.INFORMATION_SCHEMA.SCHEMATA WHERE CATALOG_NAME = 'TgtC' AND SCHEMA_NAME = 'TgtS'": [
+            ("0"),
+        ],
+    }
+    backend = MockBackend(fails_on_first=errors, rows=rows)
+    tm = TablesMigrate(tc, client, backend)
+    tm.migrate_uc_tables(from_catalog="SrcC", from_schema="SrcS", from_table=["*"], to_catalog="TgtC", to_schema="TgtS")
+    assert len([rec.message for rec in caplog.records if "schema TgtS not found in TgtC" in rec.message]) == 1
+
+
+def test_migrate_uc_tables(caplog):
+    caplog.set_level(logging.INFO)
+    tc = create_autospec(TablesCrawler)
+    client = create_autospec(WorkspaceClient)
+    errors = {}
+    rows = {
+        "SYSTEM.INFORMATION_SCHEMA.SCHEMATA WHERE CATALOG_NAME = 'SrcC' AND SCHEMA_NAME = 'SrcS'": [
+            ("1"),
+        ],
+        "SYSTEM.INFORMATION_SCHEMA.SCHEMATA WHERE CATALOG_NAME = 'TgtC' AND SCHEMA_NAME = 'TgtS'": [
+            ("1"),
+        ],
+        "SYSTEM.INFORMATION_SCHEMA.TABLES WHERE CATALOG_NAME = 'TgtC' AND SCHEMA_NAME = 'TgtS' AND "
+        "TABLE_NAME = 'table1'": [
+            ("0"),
+        ],
+        "SYSTEM.INFORMATION_SCHEMA.TABLES WHERE CATALOG_NAME = 'TgtC' AND SCHEMA_NAME = 'TgtS' AND "
+        "TABLE_NAME = 'table2'": [
+            ("1"),
+        ],
+        "SYSTEM.INFORMATION_SCHEMA.TABLES WHERE CATALOG_NAME = 'TgtC' AND SCHEMA_NAME = 'TgtS' AND "
+        "TABLE_NAME = 'view1'": [
+            ("0"),
+        ],
+        "SHOW CREATE TABLE SrcC.SrcS.table1": [
+            ("CREATE TABLE SrcC.SrcS.table1 (name string)"),
+        ],
+    }
+    client.tables.list.return_value = [
+        TableInfo(
+            catalog_name="SrcC",
+            schema_name="SrcS",
+            name="table1",
+            full_name="SrcC.SrcS.table1",
+            table_type=TableType.EXTERNAL,
+        ),
+        TableInfo(
+            catalog_name="SrcC",
+            schema_name="SrcS",
+            name="table2",
+            full_name="SrcC.SrcS.table2",
+            table_type=TableType.EXTERNAL,
+        ),
+        TableInfo(
+            catalog_name="SrcC",
+            schema_name="SrcS",
+            name="view1",
+            full_name="SrcC.SrcS.view1",
+            table_type=TableType.VIEW,
+            view_definition="SELECT * FROM SrcC.SrcS.table1",
+        ),
+    ]
+    backend = MockBackend(fails_on_first=errors, rows=rows)
+    tm = TablesMigrate(tc, client, backend)
+    tm.migrate_uc_tables(from_catalog="SrcC", from_schema="SrcS", from_table=["*"], to_catalog="TgtC", to_schema="TgtS")
+    log_cnt = 0
+    for rec in caplog.records:
+        if rec.message in ["migrated 1 tables to the new schema TgtS.", "migrated 1 views to the new schema TgtS."]:
+            log_cnt += 1
+
+    assert log_cnt == 2
