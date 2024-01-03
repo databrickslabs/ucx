@@ -111,7 +111,7 @@ class VerifyHasMetastore:
             else:
                 raise MetastoreNotFoundError
         except PermissionDenied:
-            logger.error("Permission Denied while trying to access non-UC metastore")
+            logger.error("Permission Denied while trying to access metastore")
 
 
 class MetastoreNotFoundError(Exception):
