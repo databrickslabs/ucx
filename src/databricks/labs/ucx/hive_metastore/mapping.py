@@ -27,24 +27,6 @@ class Rule:
     dst_table: str
     skip_table: bool = False
 
-    def __init__(
-        self,
-        workspace_name: str,
-        catalog_name: str,
-        src_schema: str,
-        dst_schema: str,
-        src_table: str,
-        dst_table: str,
-        skip_table: str | bool = False,  # noqa: FBT002
-    ):
-        self.workspace_name = workspace_name
-        self.catalog_name = catalog_name
-        self.src_schema = src_schema
-        self.dst_schema = dst_schema
-        self.src_table = src_table
-        self.dst_table = dst_table
-        self.skip_table = str(skip_table).lower() == "true"
-
     @classmethod
     def initial(cls, workspace_name: str, catalog_name: str, table: Table) -> "Rule":
         return cls(
@@ -105,7 +87,9 @@ class TableMapping:
             rules = []
             remote = self._ws.workspace.download(f"{self._folder}/mapping.csv")
             for row in csv.DictReader(remote):  # type: ignore[arg-type]
-                rules.append(Rule(**row))
+                skip_table = row.get("skip_table")
+                row["skip_table"] = skip_table and skip_table == "true"
+                rules.append(Rule(**row))  # type: ignore[arg-type]
             return rules
         except NotFound:
             msg = "Please run: databricks labs ucx table-mapping"

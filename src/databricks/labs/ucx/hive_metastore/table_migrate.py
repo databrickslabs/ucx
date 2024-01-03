@@ -50,17 +50,14 @@ class TablesMigrate:
             self._backend.execute(sql)
             self._backend.execute(src_table.sql_alter_to(target_table_key))
             self._backend.execute(src_table.sql_alter_from(target_table_key))
-            self._seen_tables[target_table_key] = src_table.key
             return True
         if src_table.kind == "VIEW":
             self._backend.execute(sql)
             self._backend.execute(src_table.sql_alter_to(target_table_key))
             self._backend.execute(src_table.sql_alter_from(target_table_key))
-            self._seen_tables[target_table_key] = src_table.key
             return True
         if src_table.object_type == "EXTERNAL":
             self._backend.execute(sql)
-            self._seen_tables[target_table_key] = src_table.key
             return True
 
         msg = f"Table {src_table.key} is a {src_table.object_type} and is not supported for migration yet"
@@ -82,8 +79,6 @@ class TablesMigrate:
         upgraded_tables = []
         if table and not schema:
             logger.error("Cannot accept 'Table' parameter without 'Schema' parameter")
-        if len(self._seen_tables) == 0:
-            self._init_seen_tables()
 
         for cur_table in self._tc.snapshot():
             if schema and cur_table.database != schema:
@@ -97,6 +92,7 @@ class TablesMigrate:
     def revert_migrated_tables(
         self, schema: str | None = None, table: str | None = None, *, delete_managed: bool = False
     ):
+        self._init_seen_tables()
         upgraded_tables = self._get_tables_to_revert(schema=schema, table=table)
         # reverses the _seen_tables dictionary to key by the source table
         reverse_seen = {v: k for (k, v) in self._seen_tables.items()}
@@ -119,6 +115,7 @@ class TablesMigrate:
         self._backend.execute(f"DROP {table.kind} IF EXISTS {target_table_key}")
 
     def _get_revert_count(self, schema: str | None = None, table: str | None = None) -> list[MigrationCount]:
+        self._init_seen_tables()
         upgraded_tables = self._get_tables_to_revert(schema=schema, table=table)
 
         table_by_database = defaultdict(list)

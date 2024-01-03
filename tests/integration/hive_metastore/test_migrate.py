@@ -25,7 +25,7 @@ def test_migrate_managed_tables(ws, sql_backend, inventory_schema, make_catalog,
 
     logger.info(f"dst_catalog={dst_catalog.name}, managed_table={src_managed_table.full_name}")
 
-    tc = StaticTablesCrawler(sql_backend, inventory_schema, [src_managed_table])
+    table_crawler = StaticTablesCrawler(sql_backend, inventory_schema, [src_managed_table])
     rules = [
         Rule(
             "workspace",
@@ -36,10 +36,10 @@ def test_migrate_managed_tables(ws, sql_backend, inventory_schema, make_catalog,
             src_managed_table.name,
         ),
     ]
-    tmp = StaticTableMapping(ws, rules=rules)
-    tm = TablesMigrate(tc, ws, sql_backend, tmp)
+    table_mapping = StaticTableMapping(rules=rules)
+    table_migrate = TablesMigrate(table_crawler, ws, sql_backend, table_mapping)
 
-    tm.migrate_tables()
+    table_migrate.migrate_tables()
 
     target_tables = list(sql_backend.fetch(f"SHOW TABLES IN {dst_schema.full_name}"))
     assert len(target_tables) == 1
@@ -80,7 +80,7 @@ def test_migrate_tables_with_cache_should_not_create_table(
     )
 
     # crawler = TablesCrawler(sql_backend, inventory_schema)
-    tc = StaticTablesCrawler(sql_backend, inventory_schema, [src_managed_table])
+    table_crawler = StaticTablesCrawler(sql_backend, inventory_schema, [src_managed_table])
     rules = [
         Rule(
             "workspace",
@@ -91,11 +91,11 @@ def test_migrate_tables_with_cache_should_not_create_table(
             dst_managed_table.name,
         ),
     ]
-    tmp = StaticTableMapping(ws, rules=rules)
-    tm = TablesMigrate(tc, ws, sql_backend, tmp)
+    table_mapping = StaticTableMapping(rules=rules)
+    table_migrate = TablesMigrate(table_crawler, ws, sql_backend, table_mapping)
 
     # FIXME: flaky: databricks.sdk.errors.mapping.NotFound: Catalog 'ucx_cjazg' does not exist.
-    tm.migrate_tables()
+    table_migrate.migrate_tables()
 
     target_tables = list(sql_backend.fetch(f"SHOW TABLES IN {dst_schema.full_name}"))
     assert len(target_tables) == 1
@@ -118,7 +118,7 @@ def test_migrate_external_table(ws, sql_backend, inventory_schema, make_catalog,
     logger.info(f"dst_catalog={dst_catalog.name}, external_table={src_external_table.full_name}")
 
     # crawler = TablesCrawler(sql_backend, inventory_schema)
-    tc = StaticTablesCrawler(sql_backend, inventory_schema, [src_external_table])
+    table_crawler = StaticTablesCrawler(sql_backend, inventory_schema, [src_external_table])
     rules = [
         Rule(
             "workspace",
@@ -129,10 +129,10 @@ def test_migrate_external_table(ws, sql_backend, inventory_schema, make_catalog,
             src_external_table.name,
         ),
     ]
-    tmp = StaticTableMapping(ws, rules=rules)
-    tm = TablesMigrate(tc, ws, sql_backend, tmp)
+    table_mapping = StaticTableMapping(rules=rules)
+    table_migrate = TablesMigrate(table_crawler, ws, sql_backend, table_mapping)
 
-    tm.migrate_tables()
+    table_migrate.migrate_tables()
 
     target_tables = list(sql_backend.fetch(f"SHOW TABLES IN {dst_schema.full_name}"))
     assert len(target_tables) == 1
@@ -151,7 +151,7 @@ def test_revert_migrated_table(ws, sql_backend, inventory_schema, make_schema, m
     dst_schema1 = make_schema(catalog_name=dst_catalog.name, name=src_schema1.name)
     dst_schema2 = make_schema(catalog_name=dst_catalog.name, name=src_schema2.name)
 
-    tc = StaticTablesCrawler(sql_backend, inventory_schema, all_tables)
+    table_crawler = StaticTablesCrawler(sql_backend, inventory_schema, all_tables)
     rules = [
         Rule(
             "workspace",
@@ -170,19 +170,19 @@ def test_revert_migrated_table(ws, sql_backend, inventory_schema, make_schema, m
             table_to_not_revert.name,
         ),
     ]
-    tmp = StaticTableMapping(ws, rules=rules)
-    tm = TablesMigrate(tc, ws, sql_backend, tmp)
-    tm.migrate_tables()
+    table_mapping = StaticTableMapping(rules=rules)
+    table_migrate = TablesMigrate(table_crawler, ws, sql_backend, table_mapping)
+    table_migrate.migrate_tables()
 
-    tm.revert_migrated_tables(src_schema1.name, delete_managed=True)
+    table_migrate.revert_migrated_tables(src_schema1.name, delete_managed=True)
 
     # Checking that two of the tables were reverted and one was left intact.
     # The first two table belongs to schema 1 and should have not "upgraded_to" property
-    assert not tm.is_upgraded(table_to_revert.schema_name, table_to_revert.name)
+    assert not table_migrate.is_upgraded(table_to_revert.schema_name, table_to_revert.name)
     # The second table didn't have the "upgraded_to" property set and should remain that way.
-    assert not tm.is_upgraded(table_not_migrated.schema_name, table_not_migrated.name)
+    assert not table_migrate.is_upgraded(table_not_migrated.schema_name, table_not_migrated.name)
     # The third table belongs to schema2 and had the "upgraded_to" property set and should remain that way.
-    assert tm.is_upgraded(table_to_not_revert.schema_name, table_to_not_revert.name)
+    assert table_migrate.is_upgraded(table_to_not_revert.schema_name, table_to_not_revert.name)
 
     target_tables_schema1 = list(sql_backend.fetch(f"SHOW TABLES IN {dst_schema1.full_name}"))
     assert len(target_tables_schema1) == 0
