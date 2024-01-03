@@ -5,12 +5,12 @@ from databricks.sdk import WorkspaceClient
 from databricks.sdk.service.catalog import CatalogInfo, SchemaInfo, TableInfo
 
 from databricks.labs.ucx.framework.crawlers import SqlBackend
+from databricks.labs.ucx.hive_metastore.table_migrate import TablesMigrate
 from databricks.labs.ucx.hive_metastore.tables import (
     MigrationCount,
     Table,
     TablesCrawler,
 )
-from databricks.labs.ucx.hive_metastore.table_migrate import TablesMigrate
 
 from ..framework.mocks import MockBackend
 
