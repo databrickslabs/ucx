@@ -34,6 +34,9 @@ class Table:
     DBFS_ROOT_PREFIX_EXCEPTIONS: typing.ClassVar[list[str]] = [
         "/dbfs/mnt",
         "dbfs:/mnt",
+    ]
+
+    DATABRICKS_DATASETS_PREFIXES: typing.ClassVar[list[str]] = [
         "/dbfs/databricks-datasets",
         "dbfs:/databricks-datasets",
     ]
@@ -45,6 +48,12 @@ class Table:
         return self.table_format.upper() == "DELTA"
 
     @property
+    def is_supported_for_sync(self) -> bool:
+        if self.table_format is None:
+            return False
+        return self.table_format.upper() in ("DELTA", "PARQUET", "CSV", "JSON", "ORC", "TEXT")
+
+    @property
     def key(self) -> str:
         return f"{self.catalog}.{self.database}.{self.name}".lower()
 
@@ -52,37 +61,17 @@ class Table:
     def kind(self) -> str:
         return "VIEW" if self.view_text is not None else "TABLE"
 
-    def _sql_external(self, catalog):
-        return f"SYNC TABLE {catalog}.{self.database}.{self.name} FROM {self.key};"
+    def sql_external(self, target_key):
+        return f"SYNC TABLE {target_key} FROM {self.key};"
 
-    def _sql_managed(self, catalog):
+    def sql_managed(self, target_key):
         if not self.is_delta:
             msg = f"{self.key} is not DELTA: {self.table_format}"
             raise ValueError(msg)
-        return f"CREATE TABLE IF NOT EXISTS {catalog}.{self.database}.{self.name} DEEP CLONE {self.key};"
+        return f"CREATE TABLE IF NOT EXISTS {target_key} DEEP CLONE {self.key};"
 
-    def _sql_view(self, catalog):
-        return f"CREATE VIEW IF NOT EXISTS {catalog}.{self.database}.{self.name} AS {self.view_text};"
-
-    def uc_create_sql(self, catalog):
-        if self.kind == "VIEW":
-            return self._sql_view(catalog)
-        elif self.object_type == "EXTERNAL":
-            return self._sql_external(catalog)
-        else:
-            return self._sql_managed(catalog)
-
-    def sql_alter_to(self, catalog):
-        return (
-            f"ALTER {self.kind} {self.key} SET"
-            f" TBLPROPERTIES ('upgraded_to' = '{catalog}.{self.database}.{self.name}');"
-        )
-
-    def sql_alter_from(self, catalog):
-        return (
-            f"ALTER {self.kind} {catalog}.{self.database}.{self.name} SET"
-            f" TBLPROPERTIES ('upgraded_from' = '{self.key}');"
-        )
+    def sql_view(self, target_key):
+        return f"CREATE VIEW IF NOT EXISTS {target_key} AS {self.view_text};"
 
     def sql_unset_upgraded_to(self, catalog):
         return (
@@ -90,14 +79,27 @@ class Table:
             f"UNSET TBLPROPERTIES IF EXISTS('upgraded_to');"
         )
 
+    @property
     def is_dbfs_root(self) -> bool:
         if not self.location:
             return False
         for exception in self.DBFS_ROOT_PREFIX_EXCEPTIONS:
             if self.location.startswith(exception):
                 return False
+        for databricks_dataset in self.DATABRICKS_DATASETS_PREFIXES:
+            if self.location.startswith(databricks_dataset):
+                return False
         for prefix in self.DBFS_ROOT_PREFIXES:
             if self.location.startswith(prefix):
+                return True
+        return False
+
+    @property
+    def is_databricks_dataset(self) -> bool:
+        if not self.location:
+            return False
+        for databricks_dataset in self.DATABRICKS_DATASETS_PREFIXES:
+            if self.location.startswith(databricks_dataset):
                 return True
         return False
 
@@ -207,5 +209,3 @@ class TablesCrawler(CrawlerBase):
             # TODO: https://github.com/databrickslabs/ucx/issues/406
             logger.error(f"Couldn't fetch information for table {full_name} : {e}")
             return None
-
-
