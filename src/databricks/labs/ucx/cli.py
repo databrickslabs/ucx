@@ -11,7 +11,7 @@ from databricks.labs.ucx.framework.crawlers import StatementExecutionBackend
 from databricks.labs.ucx.framework.tui import Prompts
 from databricks.labs.ucx.hive_metastore import ExternalLocations, TablesCrawler
 from databricks.labs.ucx.hive_metastore.mapping import TableMapping
-from databricks.labs.ucx.hive_metastore.tables import TablesMigrate
+from databricks.labs.ucx.hive_metastore.table_migrate import TablesMigrate
 from databricks.labs.ucx.install import WorkspaceInstaller
 from databricks.labs.ucx.installer import InstallationManager
 
