@@ -345,10 +345,16 @@ class GroupManager(CrawlerBase[MigratedGroup]):
         if len(errors) > 0:
             raise ManyError(errors)
 
+    @retried(on=[InternalError, ResourceConflict, DeadlineExceeded])
+    @rate_limited(max_requests=10, burst_period_seconds=60)
     def _rename_group(self, group_id: str, new_group_name: str):
-        ops = [iam.Patch(iam.PatchOp.REPLACE, "displayName", new_group_name)]
-        self._ws.groups.patch(group_id, operations=ops)
-        return True
+        try:
+            ops = [iam.Patch(iam.PatchOp.REPLACE, "displayName", new_group_name)]
+            self._ws.groups.patch(group_id, operations=ops)
+            return True
+        except BadRequest:
+            # already exists
+            return True
 
     def reflect_account_groups_on_workspace(self):
         tasks = []
@@ -495,7 +501,7 @@ class GroupManager(CrawlerBase[MigratedGroup]):
             return None
 
     @retried(on=[InternalError, ResourceConflict, DeadlineExceeded])
-    @rate_limited(max_requests=10)
+    @rate_limited(max_requests=5)
     def _reflect_account_group_to_workspace(self, account_group_id: str):
         try:
             # TODO: add OpenAPI spec for it
