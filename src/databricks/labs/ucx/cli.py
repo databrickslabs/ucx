@@ -15,7 +15,7 @@ from databricks.labs.ucx.hive_metastore import (
     TablesCrawler,
     TablesMigrate,
 )
-from databricks.labs.ucx.hive_metastore.mapping import TableMapping, Rule
+from databricks.labs.ucx.hive_metastore.mapping import Rule, TableMapping
 from databricks.labs.ucx.install import WorkspaceInstaller
 from databricks.labs.ucx.installer import InstallationManager
 
