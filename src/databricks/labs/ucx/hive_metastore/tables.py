@@ -392,44 +392,78 @@ class TablesMigrate:
             print("To revert and delete Migrated Tables, add --delete_managed true flag to the command.")
         return True
 
-    def migrate_uc_schema(self, from_catalog: str, from_schema: str, to_catalog: str, to_schema: str):
-        from_schema_name = f"{from_catalog}.{from_schema}"
-        to_schema_name = f"{to_catalog}.{to_schema}"
-        if self._validate_uc_objects("schema", from_schema_name) == 0:
+    def migrate_uc_tables(
+        self, from_catalog: str, from_schema: str, from_table: list[str], to_catalog: str, to_schema: str
+    ):
+        if self._validate_uc_objects("schema", f"{from_catalog}.{from_schema}") == 0:
             logger.error(f"schema {from_schema} not found in {from_catalog}")
             return
         else:
-            if self._validate_uc_objects("schema", to_schema_name) == 0:
+            if self._validate_uc_objects("schema", f"{to_catalog}.{to_schema}") == 0:
                 logger.info(f"schema {to_schema} not found in {to_catalog}, creating...")
                 self._backend.execute(f"create schema {to_catalog}.{to_schema}")
                 logger.info(f"created schema {to_schema}.")
             tables = self._ws.tables.list(catalog_name=from_catalog, schema_name=from_schema)
             for table in tables:
-                if table.name is not None:
-                    self._migrate_uc_tables(
-                        from_catalog=from_catalog,
-                        from_schema=from_schema,
-                        from_table=table.name,
-                        to_catalog=to_catalog,
-                        to_schema=to_schema,
-                    )
+                if table.name in from_table:
+                    table_tasks = []
+                    view_tasks = []
+                    if self._validate_uc_objects("table", f"{to_catalog}.{to_schema}.{from_table}") == 1:
+                        logger.warning(
+                            f"table {from_table} already present in {from_catalog}.{from_schema}."
+                            f" skipping this table..."
+                        )
+                    if table.table_type and table.table_type.value in ("EXTERNAL", "MANAGED"):
+                        table_tasks.append(
+                            partial(
+                                self._migrate_uc_table, from_catalog, from_schema, from_table, to_catalog, to_schema
+                            )
+                        )
+                    else:
+                        view_tasks.append(
+                            partial(
+                                self._migrate_uc_table,
+                                from_catalog,
+                                from_schema,
+                                from_table,
+                                to_catalog,
+                                to_schema,
+                                table.view_definition,
+                            )
+                        )
+                    _, errors = Threads.gather(name="creating tables", tasks=table_tasks)
+                    if len(errors) > 1:
+                        raise ManyError(errors)
+                    logger.info(f"migrated {len(list(_))} tables to the new schema {to_schema}.")
+                    _, errors = Threads.gather(name="creating views", tasks=view_tasks)
+                    if len(errors) > 1:
+                        raise ManyError(errors)
+                    logger.info(f"migrated {len(list(_))} views to the new schema {to_schema}.")
 
-    def _migrate_uc_tables(self, from_catalog: str, from_schema: str, from_table: str, to_catalog: str, to_schema: str):
-        to_table_name = f"{to_catalog}.{to_schema}.{from_table}"
-        from_table_name = f"{from_catalog}.{from_schema}.{from_table}"
-        tasks = []
-        if self._validate_uc_objects("table", to_table_name) == 1:
-            msg = f"table {from_table} already present in {from_catalog}.{from_schema}. skipping this table..."
-            raise ManyError(msg)
-        else:
-            tasks.append(partial(self._migrate_uc_table, from_table_name, to_table_name))
-            _, errors = Threads.gather(name="creating tables", tasks=tasks)
-            if len(errors) > 1:
-                raise ManyError(errors)
-
-    def _migrate_uc_table(self, from_table: str, to_table: str):
-        pass
-        # todo. get current table script and run on new place
+    def _migrate_uc_table(
+        self,
+        from_catalog: str,
+        from_schema: str,
+        from_table: str,
+        to_catalog: str,
+        to_schema: str,
+        view_text: str | None = None,
+    ):
+        try:
+            if not view_text:
+                create_sql = str(next(self._backend.fetch(f"SHOW CREATE TABLE {from_table}"))[0][0])
+                create_sql = create_sql.replace(from_catalog, to_catalog).replace(from_schema, to_schema)
+                logger.debug(f"Creating table {to_catalog}.{to_schema}.{from_table}.")
+                self._backend.execute(create_sql)
+                return True
+            else:
+                create_sql = f"CREATE VIEW {to_catalog}.{to_schema}.{from_table} AS {view_text}"
+                logger.debug(f"Creating view {to_catalog}.{to_schema}.{from_table}.")
+                self._backend.execute(create_sql)
+                return True
+        except RuntimeError:
+            logger.error(f"Error creating table {to_catalog}.{to_schema}.{from_table}.")
+            return False
 
     def _validate_uc_objects(self, object_type: str, object_name: str) -> int:
         object_parts = object_name.split(".")

@@ -166,22 +166,23 @@ def migrate_uc_to_uc(
     tables = TablesMigrate(
         TablesCrawler(backend=sql_backend, schema=installation.config.inventory_database), ws=ws, backend=sql_backend
     )
-    if not from_catalog or not to_catalog:
+    if from_catalog == "" or to_catalog == "":
         logger.error("Please enter from_catalog and to_catalog details")
         return
-    if not from_schema or not to_schema or from_table:
+    if from_schema == "" or to_schema == "" or from_table == "":
         logger.error("Please enter from_schema, to_schema and from_table(enter * for migrating all tables) details.")
         return
     if from_catalog == to_catalog and from_schema == to_schema:
         logger.error("please select a different schema or catalog to migrate to")
         return
-    if from_table[0] == "*":
-        logger.error(f"migrating all tables from {from_catalog}.{from_schema} to {to_catalog}.{to_schema}.")
-        tables.migrate_uc_schema(
-            from_catalog=from_catalog, from_schema=from_schema, to_catalog=to_catalog, to_schema=to_schema
-        )
-    else:
-        logger.error(f"migrating tables {from_table} from {from_catalog}.{from_schema} to {to_catalog}.{to_schema}")
+    logger.error(f"migrating tables {from_table} from {from_catalog}.{from_schema} to {to_catalog}.{to_schema}")
+    tables.migrate_uc_tables(
+        from_catalog=from_catalog,
+        from_schema=from_schema,
+        from_table=from_table,
+        to_catalog=to_catalog,
+        to_schema=to_schema,
+    )
 
 
 MAPPING = {

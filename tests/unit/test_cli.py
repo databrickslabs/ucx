@@ -5,7 +5,7 @@ from databricks.sdk.errors import NotFound
 from databricks.sdk.service import iam
 from databricks.sdk.service.iam import ComplexValue, User
 
-from databricks.labs.ucx.cli import repair_run, skip
+from databricks.labs.ucx.cli import migrate_uc_to_uc, repair_run, skip
 
 
 @pytest.fixture
@@ -51,3 +51,15 @@ def test_no_step_in_repair_run(mocker, caplog):
         repair_run("")
     except KeyError as e:
         assert e.args[0] == "You did not specify --step"
+
+
+def test_uc_to_uc_no_catalog(mocker, caplog):
+    mocker.patch("databricks.sdk.WorkspaceClient.__init__", return_value=None)
+    current_user = MagicMock()
+    current_user.me.return_value = User(user_name="foo", groups=[ComplexValue(display="admins")])
+    current_user.return_value = None
+    mocker.patch("databricks.sdk.WorkspaceClient.current_user", return_value=current_user)
+    mocker.patch("databricks.labs.ucx.installer.InstallationManager.__init__", return_value=None)
+    mocker.patch("databricks.labs.ucx.installer.InstallationManager.for_user", return_value=None)
+    migrate_uc_to_uc(from_catalog="", from_schema="", from_table="", to_catalog="", to_schema="")
+    assert len([rec.message for rec in caplog.records if "Please enter from_catalog and to_catalog" in rec.message]) == 1
