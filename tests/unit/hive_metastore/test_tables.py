@@ -89,7 +89,9 @@ def test_is_dbfs_root():
     assert not Table("a", "b", "c", "MANAGED", "DELTA", location="adls:/somelocation/tablename").is_dbfs_root
     assert Table("a", "b", "c", "MANAGED", "DELTA", location="adls:/somelocation/tablename").is_supported_for_sync
     assert Table("a", "b", "c", "MANAGED", "JSON", location="adls:/somelocation/tablename").is_supported_for_sync
+    assert not Table("a", "b", "c", "MANAGED", "SERDES", location="adls:/somelocation/tablename").is_supported_for_sync
     assert Table(
         "a", "b", "c", "MANAGED", "DELTA", location="dbfs:/databricks-datasets/somelocation/tablename"
     ).is_databricks_dataset
     assert not Table("a", "b", "c", "EXTERNAL", "DELTA", location="/dbfs/somelocation/tablename").is_databricks_dataset
+    assert not Table("a", "b", "c", "EXTERNAL", "DELTA").is_databricks_dataset

@@ -356,12 +356,6 @@ class TablesMigrate:
     def _get_migration_strategy(self, source_table, target_table_key) -> TableMigrationStrategy:
         if source_table.kind == "VIEW":
             return MigrateViewStrategy(self._ws, self._backend, source_table, target_table_key)
-        if source_table.is_databricks_dataset:
-            msg = (
-                f"Table {source_table.key} is a reference to a databricks "
-                f"dataset {source_table.location} and will not be migrated"
-            )
-            raise ValueError(msg)
         if source_table.is_dbfs_root and source_table.is_delta:
             return DBFSRootToManagedStrategy(self._ws, self._backend, source_table, target_table_key)
         if source_table.is_supported_for_sync:
@@ -374,9 +368,18 @@ class TablesMigrate:
             raise ValueError(msg)
 
     def _migrate_table(self, source_table: Table, target_table: str):
+        if source_table.is_databricks_dataset:
+            msg = (
+                f"Table {source_table.key} is a reference to a databricks "
+                f"dataset {source_table.location} and will not be migrated"
+            )
+            logger.info(msg)
+            return None
         if self._is_marked_for_skip(source_table):
             msg = f"Table {source_table.key} is marked to be skipped and will not be upgraded"
-            raise ValueError(msg)
+            logger.info(msg)
+            return None
+
         migration_strategy = self._get_migration_strategy(source_table, target_table)
         migration_strategy.migrate_object()
         self._seen_tables[target_table] = source_table.key

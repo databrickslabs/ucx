@@ -32,6 +32,24 @@ def test_migrate_dbfs_root_tables_should_produce_proper_queries():
                 "dbfs:/table_location/table_name",
                 None,
             ),
+            (
+                "hive_metastore",
+                "db1_src",
+                "managed_src_not_mapped",
+                "MANAGED",
+                "DELTA",
+                "dbfs:/table_location/table_name2",
+                None,
+            ),
+            (
+                "hive_metastore",
+                "db1_src",
+                "managed_src_db_dataset",
+                "MANAGED",
+                "DELTA",
+                "dbfs:/databricks-datasets",
+                None,
+            ),
         ],
         "SHOW TBLPROPERTIES ": [{"key": "fake_key", "value": "fake_value"}],
         "CREATE TABLE IF NOT EXISTS": [],
@@ -40,7 +58,10 @@ def test_migrate_dbfs_root_tables_should_produce_proper_queries():
     tc = TablesCrawler(backend, "inventory_database")
     client = MagicMock()
     tmp = create_autospec(TableMapping)
-    tmp.load.return_value = [Rule("workspace", "ucx_default", "db1_src", "db1_dst", "managed_src", "managed_dst")]
+    tmp.load.return_value = [
+        Rule("workspace", "ucx_default", "db1_src", "db1_dst", "managed_src", "managed_dst"),
+        Rule("workspace", "ucx_default", "db1_src", "db1_dst", "managed_src_db_dataset", "managed_src_db_dataset"),
+    ]
     tm = TablesMigrate(tc, client, backend, tmp)
 
     tm.migrate_tables()
