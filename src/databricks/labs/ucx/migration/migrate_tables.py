@@ -29,12 +29,12 @@ class TableMigrationStrategy:
         ws: WorkspaceClient,
         backend: SqlBackend,
         source_table: Table,
-        target_table: Table,
+        target_table_key: str,
     ):
         self._backend = backend
         self._ws = ws
         self._source_table = source_table
-        self._target_table = target_table
+        self._target_table_key = target_table_key
 
     @abstractmethod
     def migrate_object(self):
@@ -47,18 +47,16 @@ class ExternalTableTargetStrategy(TableMigrationStrategy):
         ws: WorkspaceClient,
         backend: SqlBackend,
         source_table: Table,
-        target_table: Table,
+        target_table_key: str,
     ):
-        super().__init__(ws, backend, source_table, target_table)
+        super().__init__(ws, backend, source_table, target_table_key)
 
     def migrate_object(self):
         source_table = self._source_table
-        target_table = self._target_table
-        sql = source_table.sql_external(target_table.key)
-        logger.debug(f"Migrating table {source_table.key} to {target_table.key} (EXTERNAL) using SQL query: {sql}")
-        result = next(self._backend.fetch(sql))
-        if result.status_code != "SUCCESS":
-            raise ValueError(result.description)
+        target_table_key = self._target_table_key
+        sql = source_table.sql_external(target_table_key)
+        logger.debug(f"Migrating table {source_table.key} to {target_table_key} (EXTERNAL) using SQL query: {sql}")
+        self._backend.execute(sql)
 
 
 class DBFSRootToManagedStrategy(TableMigrationStrategy):
@@ -67,22 +65,20 @@ class DBFSRootToManagedStrategy(TableMigrationStrategy):
         ws: WorkspaceClient,
         backend: SqlBackend,
         source_table: Table,
-        target_table: Table,
+        target_table_key: str,
     ):
-        super().__init__(ws, backend, source_table, target_table)
+        super().__init__(ws, backend, source_table, target_table_key)
 
     def migrate_object(self):
         source_table = self._source_table
-        target_table = self._target_table
-        sql = source_table.sql_managed(target_table.key)
+        target_table_key = self._target_table_key
+        sql = source_table.sql_managed(target_table_key)
         logger.debug(
-            f"Migrating table {source_table.key} to {target_table.key} (DBFS Root to Managed) using SQL query: {sql}"
+            f"Migrating table {source_table.key} to {target_table_key} (DBFS Root to Managed) using SQL query: {sql}"
         )
-        result = next(self._backend.fetch(sql))
-        if result.status_code != "SUCCESS":
-            raise ValueError(result.description)
-        self._backend.execute(TablesMigrate.sql_alter_to(source_table, target_table))
-        self._backend.execute(TablesMigrate.sql_alter_from(source_table, target_table))
+        self._backend.execute(sql)
+        self._backend.execute(TablesMigrate.sql_alter_to(source_table, target_table_key))
+        self._backend.execute(TablesMigrate.sql_alter_from(source_table, target_table_key))
         return True
 
 
@@ -92,20 +88,18 @@ class MigrateViewStrategy(TableMigrationStrategy):
         ws: WorkspaceClient,
         backend: SqlBackend,
         source_table: Table,
-        target_table: Table,
+        target_table_key: str,
     ):
-        super().__init__(ws, backend, source_table, target_table)
+        super().__init__(ws, backend, source_table, target_table_key)
 
     def migrate_object(self):
         source_view = self._source_table
-        target_view = self._target_table
-        sql = source_view.sql_view(target_view.key)
-        logger.debug(f"Migrating table {source_view.key} to {target_view.key} (VIEW) using SQL query: {sql}")
-        result = next(self._backend.fetch(sql))
-        if result.status_code != "SUCCESS":
-            raise ValueError(result.description)
-        self._backend.execute(TablesMigrate.sql_alter_to(source_view, target_view))
-        self._backend.execute(TablesMigrate.sql_alter_from(source_view, target_view))
+        target_view_key = self._target_table_key
+        sql = source_view.sql_view(target_view_key)
+        logger.debug(f"Migrating table {source_view.key} to {target_view_key} (VIEW) using SQL query: {sql}")
+        self._backend.execute(sql)
+        self._backend.execute(TablesMigrate.sql_alter_to(source_view, target_view_key))
+        self._backend.execute(TablesMigrate.sql_alter_from(source_view, target_view_key))
         return True
 
 
@@ -115,17 +109,14 @@ class TablesMigrate:
         tc: TablesCrawler,
         ws: WorkspaceClient,
         backend: SqlBackend,
-        default_catalog=None,
-        database_to_catalog_mapping: dict[str, str] | None = None,
+        tm: TableMapping,
     ):
         self._tc = tc
         self._backend = backend
         self._ws = ws
-        self._database_to_catalog_mapping = database_to_catalog_mapping
-        self._default_catalog = self._init_default_catalog(default_catalog)
         self._seen_tables: dict[str, str] = {}
         mapping_rules: dict[str, str] = {}
-        for rule in TableMapping(ws).load():
+        for rule in tm.load():
             mapping_rules[
                 f"hive_metastore.{rule.src_schema}.{rule.src_table}"
             ] = f"{rule.catalog_name}.{rule.dst_schema}.{rule.dst_table}"
@@ -139,26 +130,30 @@ class TablesMigrate:
             return "ucx_default"  # TODO : Fetch current workspace name and append it to the default catalog.
 
     @staticmethod
-    def sql_alter_to(from_table: Table, to_table: Table):
-        return f"ALTER {from_table.kind} {from_table.key} SET TBLPROPERTIES ('upgraded_to' = '{to_table.key}');"
+    def sql_alter_to(from_table: Table, to_table_key: str):
+        return f"ALTER {from_table.kind} {from_table.key} SET TBLPROPERTIES ('upgraded_to' = '{to_table_key}');"
 
     @staticmethod
-    def sql_alter_from(from_table: Table, to_table: Table):
-        return f"ALTER {from_table.kind} {to_table.key} SET TBLPROPERTIES ('upgraded_from' = '{from_table.key}');"
+    def sql_alter_from(from_table: Table, to_table_key: str):
+        return f"ALTER {from_table.kind} {to_table_key} SET TBLPROPERTIES ('upgraded_from' = '{from_table.key}');"
 
     def migrate_tables(self):
         self._init_seen_tables()
         tasks = []
         for table in self._tc.snapshot():
-            target_catalog = self._default_catalog
-            if self._database_to_catalog_mapping:
-                target_catalog = self._database_to_catalog_mapping[table.database]
-            tasks.append(partial(self._migrate_table, target_catalog, table))
+            target_table = self._mapping_rules.get(table.key)
+            if not target_table:
+                logger.info(f"Table {table.key} doesn't not have a valid mapping and will be skipped")
+                continue
+            if self._table_already_upgraded(target_table):
+                logger.info(f"Table {table.key} has a target {target_table} that is marked as an upgraded table.")
+                continue
+            tasks.append(partial(self._migrate_table, table, target_table))
         Threads.strict("migrate tables", tasks)
 
-    def _get_migration_strategy(self, source_table, target_table) -> TableMigrationStrategy:
+    def _get_migration_strategy(self, source_table, target_table_key) -> TableMigrationStrategy:
         if source_table.kind == "VIEW":
-            return MigrateViewStrategy(self._ws, self._backend, source_table, target_table)
+            return MigrateViewStrategy(self._ws, self._backend, source_table, target_table_key)
         if source_table.is_databricks_dataset:
             msg = (
                 f"Table {source_table.key} is a reference to a databricks "
@@ -166,9 +161,9 @@ class TablesMigrate:
             )
             raise ValueError(msg)
         if source_table.is_dbfs_root and source_table.is_delta:
-            return DBFSRootToManagedStrategy(self._ws, self._backend, source_table, target_table)
+            return DBFSRootToManagedStrategy(self._ws, self._backend, source_table, target_table_key)
         if source_table.is_supported_for_sync:
-            return ExternalTableTargetStrategy(self._ws, self._backend, source_table, target_table)
+            return ExternalTableTargetStrategy(self._ws, self._backend, source_table, target_table_key)
         else:
             msg = (
                 f"Table {source_table.key} of type {source_table.object_type} and format "
@@ -176,13 +171,13 @@ class TablesMigrate:
             )
             raise ValueError(msg)
 
-    def _migrate_table(self, source_table: Table, target_table: Table):
-        if self._is_marked_for_skip(source_table.database, source_table.name):
+    def _migrate_table(self, source_table: Table, target_table: str):
+        if self._is_marked_for_skip(source_table):
             msg = f"Table {source_table.key} is marked to be skipped and will not be upgraded"
             raise ValueError(msg)
         migration_strategy = self._get_migration_strategy(source_table, target_table)
         migration_strategy.migrate_object()
-        self._seen_tables[target_table.key] = source_table.key
+        self._seen_tables[target_table] = source_table.key
 
     def _init_seen_tables(self):
         for catalog in self._ws.catalogs.list():
@@ -305,11 +300,11 @@ class TablesMigrate:
         logger.info(f"{schema}.{table} is set as not upgraded")
         return False
 
-    def _is_marked_for_skip(self, schema: str, table: str) -> bool:
-        result = self._backend.fetch(f"SHOW TBLPROPERTIES `{schema}`.`{table}`")
+    def _is_marked_for_skip(self, table: Table) -> bool:
+        result = self._backend.fetch(f"SHOW TBLPROPERTIES {table.key}")
         for value in result:
             if value["key"] == TableMapping.UCX_SKIP_PROPERTY:
-                logger.info(f"{schema}.{table} is set to be skipped")
+                logger.info(f"{table.key} is set to be skipped")
                 return True
         return False
 
