@@ -80,6 +80,41 @@ def test_migrate_managed_tables_should_do_nothing_if_upgrade_tag_is_present():
     assert (list(backend.queries)) == ["SELECT * FROM hive_metastore.inventory_database.tables"]
 
 
+def test_migrate_view_should_produce_proper_queries():
+    errors = {}
+    rows = {
+        "SELECT": [
+            (
+                "hive_metastore",
+                "db1_src",
+                "view_src",
+                "VIEW",
+                "VIEW",
+                None,
+                "SELECT * FROM table",
+            ),
+        ]
+    }
+    backend = MockBackend(fails_on_first=errors, rows=rows)
+    tc = TablesCrawler(backend, "inventory_database")
+    client = MagicMock()
+    tmp = create_autospec(TableMapping)
+    tmp.load.return_value = [
+        Rule("workspace", "ucx_default", "db1_src", "db1_dst", "view_src", "view_dst"),
+    ]
+    tm = TablesMigrate(tc, client, backend, tmp)
+    tm.migrate_tables()
+
+    assert (list(backend.queries)) == [
+        "SELECT * FROM hive_metastore.inventory_database.tables",
+        "CREATE VIEW IF NOT EXISTS ucx_default.db1_dst.view_dst AS SELECT * FROM table;",
+        "ALTER VIEW hive_metastore.db1_src.view_src "
+        "SET TBLPROPERTIES ('upgraded_to' = 'ucx_default.db1_dst.view_dst');",
+        "ALTER VIEW ucx_default.db1_dst.view_dst "
+        "SET TBLPROPERTIES ('upgraded_from' = 'hive_metastore.db1_src.view_src');",
+    ]
+
+
 def test_migrate_tables_should_not_migrate_if_not_found_in_mapping():
     errors = {}
     rows = {
