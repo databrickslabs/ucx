@@ -50,7 +50,17 @@ def test_migrate_dbfs_root_tables_should_produce_proper_queries():
                 "dbfs:/databricks-datasets",
                 None,
             ),
+            (
+                "hive_metastore",
+                "db1_src",
+                "managed_src_to_skip",
+                "MANAGED",
+                "DELTA",
+                "dbfs:/table_location/table_name",
+                None,
+            ),
         ],
+        "skip": [{"key": "databricks.labs.ucx.skip", "value": "true"}],
         "SHOW TBLPROPERTIES ": [{"key": "fake_key", "value": "fake_value"}],
         "CREATE TABLE IF NOT EXISTS": [],
     }
@@ -61,6 +71,7 @@ def test_migrate_dbfs_root_tables_should_produce_proper_queries():
     tmp.load.return_value = [
         Rule("workspace", "ucx_default", "db1_src", "db1_dst", "managed_src", "managed_dst"),
         Rule("workspace", "ucx_default", "db1_src", "db1_dst", "managed_src_db_dataset", "managed_src_db_dataset"),
+        Rule("workspace", "ucx_default", "db1_src", "db1_dst", "managed_src_to_skip", "managed_src_to_skip"),
     ]
     tm = TablesMigrate(tc, client, backend, tmp)
 
@@ -74,6 +85,7 @@ def test_migrate_dbfs_root_tables_should_produce_proper_queries():
         "('upgraded_to' = 'ucx_default.db1_dst.managed_dst');",
         "ALTER TABLE ucx_default.db1_dst.managed_dst SET TBLPROPERTIES "
         "('upgraded_from' = 'hive_metastore.db1_src.managed_src');",
+        "SHOW TBLPROPERTIES hive_metastore.db1_src.managed_src_to_skip",
     ]
 
 

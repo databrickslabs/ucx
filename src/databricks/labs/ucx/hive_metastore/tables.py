@@ -466,36 +466,6 @@ class TablesMigrate:
             )
         return migration_list
 
-    def _get_upgrade_count(self, schema: str | None = None, table: str | None = None) -> list[MigrationCount]:
-        upgraded_tables = self._get_tables_to_revert(schema=schema, table=table)
-
-        table_by_database = defaultdict(list)
-        for cur_table in upgraded_tables:
-            table_by_database[cur_table.database].append(cur_table)
-
-        migration_list = []
-        for cur_database in table_by_database.keys():
-            external_tables = 0
-            managed_tables = 0
-            views = 0
-            for current_table in table_by_database[cur_database]:
-                if current_table.upgraded_to is not None:
-                    if current_table.kind == "VIEW":
-                        views += 1
-                        continue
-                    if current_table.object_type == "EXTERNAL":
-                        external_tables += 1
-                        continue
-                    if current_table.object_type == "MANAGED":
-                        managed_tables += 1
-                        continue
-            migration_list.append(
-                MigrationCount(
-                    database=cur_database, managed_tables=managed_tables, external_tables=external_tables, views=views
-                )
-            )
-        return migration_list
-
     def _is_upgraded(self, schema: str, table: str) -> bool:
         result = self._backend.fetch(f"SHOW TBLPROPERTIES `{schema}`.`{table}`")
         for value in result:
