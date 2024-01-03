@@ -28,14 +28,15 @@ class Rule:
     skip_table: bool = False
 
     def __init__(
-            self,
-            workspace_name: str,
-            catalog_name: str,
-            src_schema: str,
-            dst_schema: str,
-            src_table: str,
-            dst_table: str,
-            skip_table: str | bool = False):
+        self,
+        workspace_name: str,
+        catalog_name: str,
+        src_schema: str,
+        dst_schema: str,
+        src_table: str,
+        dst_table: str,
+        skip_table: str | bool = False,  # noqa: FBT002
+    ):
         self.workspace_name = workspace_name
         self.catalog_name = catalog_name
         self.src_schema = src_schema
@@ -53,7 +54,7 @@ class Rule:
             dst_schema=table.database,
             src_table=table.name,
             dst_table=table.name,
-            skip_table=False
+            skip_table=False,
         )
 
     @property

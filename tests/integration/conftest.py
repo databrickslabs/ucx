@@ -6,7 +6,7 @@ from functools import partial
 
 import databricks.sdk.core
 import pytest
-from databricks.sdk import AccountClient
+from databricks.sdk import AccountClient, WorkspaceClient
 from databricks.sdk.core import Config
 from databricks.sdk.errors import NotFound
 from databricks.sdk.retries import retried
@@ -14,7 +14,7 @@ from databricks.sdk.service.catalog import TableInfo
 
 from databricks.labs.ucx.framework.crawlers import SqlBackend
 from databricks.labs.ucx.hive_metastore import TablesCrawler
-from databricks.labs.ucx.hive_metastore.mapping import TableMapping, Rule
+from databricks.labs.ucx.hive_metastore.mapping import Rule, TableMapping
 from databricks.labs.ucx.hive_metastore.tables import Table
 from databricks.labs.ucx.mixins.fixtures import *  # noqa: F403
 from databricks.labs.ucx.workspace_access.groups import MigratedGroup
@@ -138,10 +138,9 @@ class StaticTablesCrawler(TablesCrawler):
 
 
 class StaticTableMapping(TableMapping):
-    def __init__(self, ws: WorkspaceClient, folder: str | None = None, rules: list[Rule] = list):
+    def __init__(self, ws: WorkspaceClient, folder: str | None = None, rules: list[Rule] | None = None):
         self._rules = rules
-        super().__init__(ws,folder)
+        super().__init__(ws, folder)
 
     def load(self):
         return self._rules
-

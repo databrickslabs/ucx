@@ -8,7 +8,7 @@ from databricks.sdk.retries import retried
 from databricks.labs.ucx.hive_metastore.mapping import Rule
 from databricks.labs.ucx.hive_metastore.table_migrate import TablesMigrate
 
-from ..conftest import StaticTablesCrawler, StaticTableMapping
+from ..conftest import StaticTableMapping, StaticTablesCrawler
 
 logger = logging.getLogger(__name__)
 
@@ -36,7 +36,7 @@ def test_migrate_managed_tables(ws, sql_backend, inventory_schema, make_catalog,
             src_managed_table.name,
         ),
     ]
-    tmp = StaticTableMapping(ws,rules=rules)
+    tmp = StaticTableMapping(ws, rules=rules)
     tm = TablesMigrate(tc, ws, sql_backend, tmp)
 
     tm.migrate_tables()
@@ -91,7 +91,7 @@ def test_migrate_tables_with_cache_should_not_create_table(
             dst_managed_table.name,
         ),
     ]
-    tmp = StaticTableMapping(ws,rules=rules)
+    tmp = StaticTableMapping(ws, rules=rules)
     tm = TablesMigrate(tc, ws, sql_backend, tmp)
 
     # FIXME: flaky: databricks.sdk.errors.mapping.NotFound: Catalog 'ucx_cjazg' does not exist.
@@ -129,7 +129,7 @@ def test_migrate_external_table(ws, sql_backend, inventory_schema, make_catalog,
             src_external_table.name,
         ),
     ]
-    tmp = StaticTableMapping(ws,rules=rules)
+    tmp = StaticTableMapping(ws, rules=rules)
     tm = TablesMigrate(tc, ws, sql_backend, tmp)
 
     tm.migrate_tables()
@@ -170,7 +170,7 @@ def test_revert_migrated_table(ws, sql_backend, inventory_schema, make_schema, m
             table_to_not_revert.name,
         ),
     ]
-    tmp = StaticTableMapping(ws,rules=rules)
+    tmp = StaticTableMapping(ws, rules=rules)
     tm = TablesMigrate(tc, ws, sql_backend, tmp)
     tm.migrate_tables()
 

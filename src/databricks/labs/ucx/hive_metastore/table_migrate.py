@@ -7,7 +7,7 @@ from databricks.sdk import WorkspaceClient
 from databricks.labs.ucx.framework.crawlers import SqlBackend
 from databricks.labs.ucx.framework.parallel import Threads
 from databricks.labs.ucx.hive_metastore import TablesCrawler
-from databricks.labs.ucx.hive_metastore.mapping import TableMapping, Rule
+from databricks.labs.ucx.hive_metastore.mapping import Rule, TableMapping
 from databricks.labs.ucx.hive_metastore.tables import MigrationCount, Table
 
 logger = logging.getLogger(__name__)
@@ -176,10 +176,8 @@ class TablesMigrate:
             print("To revert and delete Migrated Tables, add --delete_managed true flag to the command.")
         return True
 
-    def _get_mapping_rules_dict(self):
+    def _get_mapping_rules_dict(self) -> dict[str, Rule]:
         mapping_rules: dict[str, Rule] = {}
         for rule in self._tm.load():
-            mapping_rules[
-                rule.as_hms_table_key
-            ] = rule
+            mapping_rules[rule.as_hms_table_key] = rule
         return mapping_rules
