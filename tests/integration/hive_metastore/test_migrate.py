@@ -5,6 +5,7 @@ import pytest
 from databricks.sdk.errors import NotFound
 from databricks.sdk.retries import retried
 
+from databricks.labs.ucx.framework.parallel import ManyError
 from databricks.labs.ucx.hive_metastore.tables import TablesMigrate
 
 from ..conftest import StaticTablesCrawler
@@ -137,3 +138,20 @@ def test_revert_migrated_table(ws, sql_backend, inventory_schema, make_schema, m
     assert len(target_tables_schema2) == 1
     assert target_tables_schema2[0]["database"] == dst_schema2.name
     assert target_tables_schema2[0]["tableName"] == table_to_not_revert.name
+
+
+@retried(on=[NotFound], timeout=timedelta(minutes=2))
+def test_uc_to_uc_no_from_schema(ws, sql_backend, inventory_schema):
+    static_crawler = StaticTablesCrawler(sql_backend, inventory_schema, [])
+    tm = TablesMigrate(static_crawler, ws, sql_backend)
+    with pytest.raises(ManyError):
+        tm.migrate_uc_tables(
+            from_catalog="SrcC", from_schema="SrcS", from_table=["*"], to_catalog="TgtC", to_schema="TgtS"
+        )
+
+
+@retried(on=[NotFound], timeout=timedelta(minutes=2))
+def test_uc_to_uc(ws, sql_backend, inventory_schema, make_catalog, make_schema, make_table, env_or_skip):
+    static_crawler = StaticTablesCrawler(sql_backend, inventory_schema, [])
+    tm = TablesMigrate(static_crawler, ws, sql_backend)
+

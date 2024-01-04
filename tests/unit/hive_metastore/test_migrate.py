@@ -21,6 +21,7 @@ from databricks.labs.ucx.hive_metastore.tables import (
     TablesCrawler,
     TablesMigrate,
 )
+from databricks.labs.ucx.mixins.sql import Row
 
 from ..framework.mocks import MockBackend
 
@@ -340,13 +341,19 @@ def test_is_upgraded():
     assert not tm.is_upgraded("schema1", "table2")
 
 
+def make_row(data, columns):
+    row = Row(data)
+    row.__columns__ = columns
+    return row
+
+
 def test_migrate_uc_tables_invalid_from_schema(caplog):
     tc = create_autospec(TablesCrawler)
     client = create_autospec(WorkspaceClient)
     errors = {}
     rows = {
         "SYSTEM.INFORMATION_SCHEMA.SCHEMATA": [
-            ("0"),
+            make_row([0], ["cnt"]),
         ]
     }
     backend = MockBackend(fails_on_first=errors, rows=rows)
@@ -363,10 +370,10 @@ def test_migrate_uc_tables_invalid_to_schema(caplog):
     errors = {}
     rows = {
         "SYSTEM.INFORMATION_SCHEMA.SCHEMATA WHERE CATALOG_NAME = 'SrcC' AND SCHEMA_NAME = 'SrcS'": [
-            ("1"),
+            make_row([1], ["cnt"]),
         ],
         "SYSTEM.INFORMATION_SCHEMA.SCHEMATA WHERE CATALOG_NAME = 'TgtC' AND SCHEMA_NAME = 'TgtS'": [
-            ("0"),
+            make_row([0], ["cnt"]),
         ],
     }
     backend = MockBackend(fails_on_first=errors, rows=rows)
@@ -382,22 +389,22 @@ def test_migrate_uc_tables(caplog):
     errors = {}
     rows = {
         "SYSTEM.INFORMATION_SCHEMA.SCHEMATA WHERE CATALOG_NAME = 'SrcC' AND SCHEMA_NAME = 'SrcS'": [
-            ("1"),
+            make_row([1], ["cnt"]),
         ],
         "SYSTEM.INFORMATION_SCHEMA.SCHEMATA WHERE CATALOG_NAME = 'TgtC' AND SCHEMA_NAME = 'TgtS'": [
-            ("1"),
+            make_row([1], ["cnt"]),
         ],
         "SYSTEM.INFORMATION_SCHEMA.TABLES WHERE CATALOG_NAME = 'TgtC' AND SCHEMA_NAME = 'TgtS' AND "
         "TABLE_NAME = 'table1'": [
-            ("0"),
+            make_row([0], ["cnt"]),
         ],
         "SYSTEM.INFORMATION_SCHEMA.TABLES WHERE CATALOG_NAME = 'TgtC' AND SCHEMA_NAME = 'TgtS' AND "
         "TABLE_NAME = 'table2'": [
-            ("1"),
+            make_row([1], ["cnt"]),
         ],
         "SYSTEM.INFORMATION_SCHEMA.TABLES WHERE CATALOG_NAME = 'TgtC' AND SCHEMA_NAME = 'TgtS' AND "
         "TABLE_NAME = 'view1'": [
-            ("0"),
+            make_row([0], ["cnt"]),
         ],
         "SHOW CREATE TABLE SrcC.SrcS.table1": [
             ("CREATE TABLE SrcC.SrcS.table1 (name string)"),

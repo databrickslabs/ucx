@@ -397,11 +397,12 @@ class TablesMigrate:
     def migrate_uc_tables(
         self, from_catalog: str, from_schema: str, from_table: list[str], to_catalog: str, to_schema: str
     ):
-        if self._validate_uc_objects("schema", f"{from_catalog}.{from_schema}") == "0":
+        # a = self._validate_uc_objects("schema", f"{from_catalog}.{from_schema}")
+        if self._validate_uc_objects("schema", f"{from_catalog}.{from_schema}") == 0:
             msg = f"schema {from_schema} not found in {from_catalog}"
             raise ManyError(msg)
         else:
-            if self._validate_uc_objects("schema", f"{to_catalog}.{to_schema}") == "0":
+            if self._validate_uc_objects("schema", f"{to_catalog}.{to_schema}") == 0:
                 logger.warning(f"schema {to_schema} not found in {to_catalog}, creating...")
                 self._backend.execute(f"create schema {to_catalog}.{to_schema}")
                 logger.info(f"created schema {to_schema}.")
@@ -410,7 +411,7 @@ class TablesMigrate:
             view_tasks = []
             for table in tables:
                 if table.name in from_table or from_table[0] == "*":
-                    if self._validate_uc_objects("table", f"{to_catalog}.{to_schema}.{table.name}") == "1":
+                    if self._validate_uc_objects("table", f"{to_catalog}.{to_schema}.{table.name}") == 1:
                         logger.warning(
                             f"table {from_table} already present in {from_catalog}.{from_schema}."
                             f" skipping this table..."
@@ -481,13 +482,13 @@ class TablesMigrate:
         object_parts = object_name.split(".")
         if object_type == "table":
             query = (
-                f"SELECT COUNT(*) FROM SYSTEM.INFORMATION_SCHEMA.TABLES WHERE CATALOG_NAME = '{object_parts[0]}'"
+                f"SELECT COUNT(*) as cnt FROM SYSTEM.INFORMATION_SCHEMA.TABLES WHERE CATALOG_NAME = '{object_parts[0]}'"
                 f" AND SCHEMA_NAME = '{object_parts[1]}' AND TABLE_NAME = '{object_parts[2]}'"
             )
         else:
             query = (
-                f"SELECT COUNT(*) FROM SYSTEM.INFORMATION_SCHEMA.SCHEMATA WHERE CATALOG_NAME = '{object_parts[0]}' "
+                f"SELECT COUNT(*) as cnt FROM SYSTEM.INFORMATION_SCHEMA.SCHEMATA WHERE CATALOG_NAME "
+                f"= '{object_parts[0]}' "
                 f"AND SCHEMA_NAME = '{object_parts[1]}'"
             )
-
         return next(self._backend.fetch(query))[0]
