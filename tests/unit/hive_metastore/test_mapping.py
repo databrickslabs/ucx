@@ -40,6 +40,8 @@ def test_current_tables_some_rules():
     assert rule == Rule(
         workspace_name="a", catalog_name="b", src_schema="foo", dst_schema="foo", src_table="bar", dst_table="bar"
     )
+    assert rule.as_uc_table_key == "b.foo.bar"
+    assert rule.as_hms_table_key == "hive_metastore.foo.bar"
 
 
 def test_save_mapping():

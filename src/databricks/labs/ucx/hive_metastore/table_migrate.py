@@ -7,6 +7,7 @@ from databricks.sdk import WorkspaceClient
 from databricks.labs.ucx.framework.crawlers import SqlBackend
 from databricks.labs.ucx.framework.parallel import Threads
 from databricks.labs.ucx.hive_metastore import TablesCrawler
+from databricks.labs.ucx.hive_metastore.mapping import Rule, TableMapping
 from databricks.labs.ucx.hive_metastore.tables import MigrationCount, Table
 
 logger = logging.getLogger(__name__)
@@ -18,61 +19,65 @@ class TablesMigrate:
         tc: TablesCrawler,
         ws: WorkspaceClient,
         backend: SqlBackend,
-        default_catalog=None,
-        database_to_catalog_mapping: dict[str, str] | None = None,
+        tm: TableMapping,
     ):
         self._tc = tc
         self._backend = backend
         self._ws = ws
-        self._database_to_catalog_mapping = database_to_catalog_mapping
-        self._default_catalog = self._init_default_catalog(default_catalog)
+        self._tm = tm
         self._seen_tables: dict[str, str] = {}
-
-    @staticmethod
-    def _init_default_catalog(default_catalog):
-        if default_catalog:
-            return default_catalog
-        else:
-            return "ucx_default"  # TODO : Fetch current workspace name and append it to the default catalog.
 
     def migrate_tables(self):
         self._init_seen_tables()
+        mapping_rules = self._get_mapping_rules()
         tasks = []
         for table in self._tc.snapshot():
-            target_catalog = self._default_catalog
-            if self._database_to_catalog_mapping:
-                target_catalog = self._database_to_catalog_mapping[table.database]
-            tasks.append(partial(self._migrate_table, target_catalog, table))
-        _, errors = Threads.gather("migrate tables", tasks)
-        if len(errors) > 0:
-            # TODO: https://github.com/databrickslabs/ucx/issues/406
-            # TODO: pick first X issues in the summary
-            msg = f"Detected {len(errors)} errors: {'. '.join(str(e) for e in errors)}"
-            raise ValueError(msg)
+            rule = mapping_rules.get(table.key)
+            if not rule:
+                logger.info(f"Skipping table {table.key} table doesn't exist in the mapping table.")
+                continue
+            tasks.append(partial(self._migrate_table, table, rule))
+        Threads.strict("migrate tables", tasks)
 
-    def _migrate_table(self, target_catalog: str, table: Table):
-        sql = table.uc_create_sql(target_catalog)
-        logger.debug(f"Migrating table {table.key} to using SQL query: {sql}")
-        target = f"{target_catalog}.{table.database}.{table.name}".lower()
-
-        if self._table_already_upgraded(target):
-            logger.info(f"Table {table.key} already upgraded to {self._seen_tables[target]}")
-        elif table.object_type == "MANAGED":
-            self._backend.execute(sql)
-            self._backend.execute(table.sql_alter_to(target_catalog))
-            self._backend.execute(table.sql_alter_from(target_catalog))
-            self._seen_tables[target] = table.key
-        elif table.object_type == "EXTERNAL":
-            result = next(self._backend.fetch(sql))
-            if result.status_code != "SUCCESS":
-                raise ValueError(result.description)
-            self._backend.execute(table.sql_alter_to(target_catalog))
-            self._backend.execute(table.sql_alter_from(target_catalog))
-            self._seen_tables[target] = table.key
-        else:
-            msg = f"Table {table.key} is a {table.object_type} and is not supported for migration yet"
-            raise ValueError(msg)
+    def _migrate_table(self, src_table: Table, rule: Rule):
+        if self._table_already_upgraded(rule.as_uc_table_key):
+            logger.info(f"Table {src_table.key} already upgraded to {rule.as_uc_table_key}")
+            return True
+        if src_table.object_type == "MANAGED":
+            return self._migrate_managed_table(src_table, rule)
+        if src_table.kind == "VIEW":
+            return self._migrate_view(src_table, rule)
+        if src_table.object_type == "EXTERNAL":
+            return self._migrate_external_table(src_table, rule)
         return True
+
+    def _migrate_external_table(self, src_table: Table, rule: Rule):
+        target_table_key = rule.as_uc_table_key
+        table_migrate_sql = src_table.uc_create_sql(target_table_key)
+        logger.debug(f"Migrating external table {src_table.key} to using SQL query: {table_migrate_sql}")
+        self._backend.execute(table_migrate_sql)
+        return True
+
+    def _migrate_managed_table(self, src_table: Table, rule: Rule):
+        target_table_key = rule.as_uc_table_key
+        table_migrate_sql = src_table.uc_create_sql(target_table_key)
+        logger.debug(f"Migrating managed table {src_table.key} to using SQL query: {table_migrate_sql}")
+        self._backend.execute(table_migrate_sql)
+        self._backend.execute(src_table.sql_alter_to(rule.as_uc_table_key))
+        self._backend.execute(src_table.sql_alter_from(rule.as_uc_table_key))
+        return True
+
+    def _migrate_view(self, src_table: Table, rule: Rule):
+        target_table_key = rule.as_uc_table_key
+        table_migrate_sql = src_table.uc_create_sql(target_table_key)
+        logger.debug(f"Migrating view {src_table.key} to using SQL query: {table_migrate_sql}")
+        self._backend.execute(table_migrate_sql)
+        self._backend.execute(src_table.sql_alter_to(rule.as_uc_table_key))
+        self._backend.execute(src_table.sql_alter_from(rule.as_uc_table_key))
+        return True
+
+        msg = f"Table {src_table.key} is a {src_table.object_type} and is not supported for migration yet"
+        logger.info(msg)
 
     def _init_seen_tables(self):
         for catalog in self._ws.catalogs.list():
@@ -90,8 +95,6 @@ class TablesMigrate:
         upgraded_tables = []
         if table and not schema:
             logger.error("Cannot accept 'Table' parameter without 'Schema' parameter")
-        if len(self._seen_tables) == 0:
-            self._init_seen_tables()
 
         for cur_table in self._tc.snapshot():
             if schema and cur_table.database != schema:
@@ -105,6 +108,7 @@ class TablesMigrate:
     def revert_migrated_tables(
         self, schema: str | None = None, table: str | None = None, *, delete_managed: bool = False
     ):
+        self._init_seen_tables()
         upgraded_tables = self._get_tables_to_revert(schema=schema, table=table)
         # reverses the _seen_tables dictionary to key by the source table
         reverse_seen = {v: k for (k, v) in self._seen_tables.items()}
@@ -123,10 +127,11 @@ class TablesMigrate:
         logger.info(
             f"Reverting {table.object_type} table {table.database}.{table.name} upgraded_to {table.upgraded_to}"
         )
-        self._backend.execute(table.sql_unset_upgraded_to("hive_metastore"))
+        self._backend.execute(table.sql_unset_upgraded_to())
         self._backend.execute(f"DROP {table.kind} IF EXISTS {target_table_key}")
 
     def _get_revert_count(self, schema: str | None = None, table: str | None = None) -> list[MigrationCount]:
+        self._init_seen_tables()
         upgraded_tables = self._get_tables_to_revert(schema=schema, table=table)
 
         table_by_database = defaultdict(list)
@@ -183,3 +188,9 @@ class TablesMigrate:
             print("Migrated Manged Tables (targets) will be left intact.")
             print("To revert and delete Migrated Tables, add --delete_managed true flag to the command.")
         return True
+
+    def _get_mapping_rules(self) -> dict[str, Rule]:
+        mapping_rules: dict[str, Rule] = {}
+        for rule in self._tm.load():
+            mapping_rules[rule.as_hms_table_key] = rule
+        return mapping_rules

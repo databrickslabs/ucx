@@ -52,43 +52,22 @@ class Table:
     def kind(self) -> str:
         return "VIEW" if self.view_text is not None else "TABLE"
 
-    def _sql_external(self, catalog):
-        return f"SYNC TABLE {catalog}.{self.database}.{self.name} FROM {self.key};"
-
-    def _sql_managed(self, catalog):
-        if not self.is_delta:
-            msg = f"{self.key} is not DELTA: {self.table_format}"
-            raise ValueError(msg)
-        return f"CREATE TABLE IF NOT EXISTS {catalog}.{self.database}.{self.name} DEEP CLONE {self.key};"
-
-    def _sql_view(self, catalog):
-        return f"CREATE VIEW IF NOT EXISTS {catalog}.{self.database}.{self.name} AS {self.view_text};"
-
-    def uc_create_sql(self, catalog):
+    def uc_create_sql(self, target_table_key):
         if self.kind == "VIEW":
-            return self._sql_view(catalog)
+            return self._sql_migrate_view(target_table_key)
         elif self.object_type == "EXTERNAL":
-            return self._sql_external(catalog)
+            return self._sql_migrate_external(target_table_key)
         else:
-            return self._sql_managed(catalog)
+            return self._sql_migrate_managed(target_table_key)
 
-    def sql_alter_to(self, catalog):
-        return (
-            f"ALTER {self.kind} {self.key} SET"
-            f" TBLPROPERTIES ('upgraded_to' = '{catalog}.{self.database}.{self.name}');"
-        )
+    def sql_alter_to(self, target_table_key):
+        return f"ALTER {self.kind} {self.key} SET TBLPROPERTIES ('upgraded_to' = '{target_table_key}');"
 
-    def sql_alter_from(self, catalog):
-        return (
-            f"ALTER {self.kind} {catalog}.{self.database}.{self.name} SET"
-            f" TBLPROPERTIES ('upgraded_from' = '{self.key}');"
-        )
+    def sql_alter_from(self, target_table_key):
+        return f"ALTER {self.kind} {target_table_key} SET TBLPROPERTIES ('upgraded_from' = '{self.key}');"
 
-    def sql_unset_upgraded_to(self, catalog):
-        return (
-            f"ALTER {self.kind} `{catalog}`.`{self.database}`.`{self.name}` "
-            f"UNSET TBLPROPERTIES IF EXISTS('upgraded_to');"
-        )
+    def sql_unset_upgraded_to(self):
+        return f"ALTER {self.kind} {self.key} UNSET TBLPROPERTIES IF EXISTS('upgraded_to');"
 
     def is_dbfs_root(self) -> bool:
         if not self.location:
@@ -100,6 +79,18 @@ class Table:
             if self.location.startswith(prefix):
                 return True
         return False
+
+    def _sql_migrate_external(self, target_table_key):
+        return f"SYNC TABLE {target_table_key} FROM {self.key};"
+
+    def _sql_migrate_managed(self, target_table_key):
+        if not self.is_delta:
+            msg = f"{self.key} is not DELTA: {self.table_format}"
+            raise ValueError(msg)
+        return f"CREATE TABLE IF NOT EXISTS {target_table_key} DEEP CLONE {self.key};"
+
+    def _sql_migrate_view(self, target_table_key):
+        return f"CREATE VIEW IF NOT EXISTS {target_table_key} AS {self.view_text};"
 
 
 @dataclass
