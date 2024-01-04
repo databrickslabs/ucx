@@ -43,7 +43,7 @@ class SqlBackend(ABC):
 
     _builtin_type_mapping: ClassVar[dict[type, str]] = {
         str: "STRING",
-        int: "INT",
+        int: "LONG",
         bool: "BOOLEAN",
         float: "FLOAT",
     }

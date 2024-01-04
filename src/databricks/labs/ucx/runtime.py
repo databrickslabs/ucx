@@ -18,6 +18,7 @@ from databricks.labs.ucx.hive_metastore import (
     Mounts,
     TablesCrawler,
 )
+from databricks.labs.ucx.hive_metastore.table_size import TableSizeCrawler
 from databricks.labs.ucx.workspace_access.generic import WorkspaceListing
 from databricks.labs.ucx.workspace_access.groups import GroupManager
 from databricks.labs.ucx.workspace_access.manager import PermissionManager
@@ -53,6 +54,17 @@ def crawl_grants(cfg: WorkspaceConfig):
     tables = TablesCrawler(backend, cfg.inventory_database)
     grants = GrantsCrawler(tables)
     grants.snapshot()
+
+
+@task("assessment", depends_on=[crawl_tables])
+def estimate_table_size_for_migration(cfg: WorkspaceConfig):
+    """Scans the previously created Delta table named `$inventory_database.tables` and locate tables that cannot be
+    "synced". These tables will have to be cloned in the migration process.
+    Assesses the size of these tables and create `$inventory_database.table_size` table to list these sizes.
+    The table size is a factor in deciding whether to clone these tables."""
+    backend = RuntimeBackend()
+    table_size = TableSizeCrawler(backend, cfg.inventory_database)
+    table_size.snapshot()
 
 
 @task("assessment")
