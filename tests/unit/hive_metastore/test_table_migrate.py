@@ -25,19 +25,7 @@ logger = logging.getLogger(__name__)
 
 def test_migrate_managed_tables_should_produce_proper_queries():
     errors = {}
-    rows = {
-        "SELECT": [
-            (
-                "hive_metastore",
-                "db1_src",
-                "managed_src",
-                "MANAGED",
-                "DELTA",
-                None,
-                None,
-            ),
-        ]
-    }
+    rows = {}
     backend = MockBackend(fails_on_first=errors, rows=rows)
     table_crawler = TablesCrawler(backend, "inventory_database")
     client = MagicMock()
@@ -57,6 +45,27 @@ def test_migrate_managed_tables_should_produce_proper_queries():
         "SET TBLPROPERTIES ('upgraded_to' = 'ucx_default.db1_dst.managed_dst');",
         "ALTER TABLE ucx_default.db1_dst.managed_dst "
         "SET TBLPROPERTIES ('upgraded_from' = 'hive_metastore.db1_src.managed_src');",
+    ]
+
+
+def test_migrate_external_tables_should_produce_proper_queries():
+    errors = {}
+    rows = {}
+    backend = MockBackend(fails_on_first=errors, rows=rows)
+    table_crawler = TablesCrawler(backend, "inventory_database")
+    client = MagicMock()
+    table_mapping = create_autospec(TableMapping)
+    table_mapping.get_tables_to_migrate.return_value = [
+        TableToMigrate(
+            Table("hive_metastore", "db1_src", "external_src", "EXTERNAL", "DELTA"),
+            Rule("workspace", "ucx_default", "db1_src", "db1_dst", "external_src", "external_dst"),
+        )
+    ]
+    table_migrate = TablesMigrate(table_crawler, client, backend, table_mapping)
+    table_migrate.migrate_tables()
+
+    assert (list(backend.queries)) == [
+        "SYNC TABLE ucx_default.db1_dst.external_dst FROM hive_metastore.db1_src.external_src;"
     ]
 
 
