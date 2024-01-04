@@ -163,9 +163,8 @@ class TableMapping:
 
     def _validate_source_database(self, database: str) -> str | None:
         describe = {}
-        for key, value in self._backend.fetch(f"DESCRIBE SCHEMA EXTENDED {database}"):
-            describe[key] = value
-            logger.info(f"{key} --- {value}")
+        for value in self._backend.fetch(f"DESCRIBE SCHEMA EXTENDED {database}"):
+            describe[value["database_description_item"]] = value["database_description_value"]
         if self.UCX_SKIP_PROPERTY in TablesCrawler.parse_database_props(describe.get("Properties", "").lower()):
             logger.info(f"Database {database} is marked to be skipped")
             return None

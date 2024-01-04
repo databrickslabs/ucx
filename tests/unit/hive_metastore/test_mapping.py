@@ -153,6 +153,14 @@ def test_skip_missing_table(mocker, caplog):
     assert [rec.message for rec in caplog.records if "table not found" in rec.message.lower()]
 
 
+def test_extract_database_skip_property():
+    errors = {}
+    rows = {}
+    backend = MockBackend(fails_on_first=errors, rows=rows)
+    table_crawler = TablesCrawler(backend, "ucx")
+    assert "databricks.labs.ucx.skip" in table_crawler.parse_database_props("(databricks.labs.ucx.skip,true)")
+
+
 def test_skip_tables_marked_for_skipping_or_upgraded():
     errors = {}
     rows = {
@@ -164,13 +172,16 @@ def test_skip_tables_marked_for_skipping_or_upgraded():
         "SHOW TBLPROPERTIES `test_schema1`.`test_table1`": [
             {"key": "upgraded_to", "value": "fake_dest"},
         ],
-        "SHOW TBLPROPERTIES `test_schema1`.`test_table2`": [
-            {"key": "another_key", "value": "fake_value"},
+        "SHOW TBLPROPERTIES `test_schema1`.`test_view1`": [
+            {"key": "databricks.labs.ucx.skip", "value": "true"},
         ],
         "DESCRIBE SCHEMA EXTENDED test_schema1": [],
         "DESCRIBE SCHEMA EXTENDED test_schema2": [],
         "DESCRIBE SCHEMA EXTENDED test_schema3": [
-            {"key": "properties", "value": "((databricks.labs.ucx.skip,true))"},
+            {
+                "database_description_item": "Properties",
+                "database_description_value": "((databricks.labs.ucx.skip,true))",
+            },
         ],
     }
     backend = MockBackend(fails_on_first=errors, rows=rows)
@@ -247,4 +258,16 @@ def test_skip_tables_marked_for_skipping_or_upgraded():
     table_mapping = TableMapping(client, backend)
 
     tables_to_migrate = table_mapping.get_tables_to_migrate(table_crawler)
-    assert len(tables_to_migrate) == 4
+    assert len(tables_to_migrate) == 2
+    tables = (table_to_migrate.src for table_to_migrate in tables_to_migrate)
+    assert (
+        Table(
+            object_type="EXTERNAL",
+            table_format="DELTA",
+            catalog="hive_metastore",
+            database="test_schema3",
+            name="test_table4",
+        )
+        not in tables
+    )
+    assert (table for table in tables_to_migrate)

@@ -6,7 +6,11 @@ from databricks.sdk import WorkspaceClient
 from databricks.sdk.service.catalog import CatalogInfo, SchemaInfo, TableInfo
 
 from databricks.labs.ucx.framework.crawlers import SqlBackend
-from databricks.labs.ucx.hive_metastore.mapping import Rule, TableMapping
+from databricks.labs.ucx.hive_metastore.mapping import (
+    Rule,
+    TableMapping,
+    TableToMigrate,
+)
 from databricks.labs.ucx.hive_metastore.table_migrate import TablesMigrate
 from databricks.labs.ucx.hive_metastore.tables import (
     MigrationCount,
@@ -38,16 +42,16 @@ def test_migrate_managed_tables_should_produce_proper_queries():
     table_crawler = TablesCrawler(backend, "inventory_database")
     client = MagicMock()
     table_mapping = create_autospec(TableMapping)
-    table_mapping.load.return_value = [
-        Rule("workspace", "ucx_default", "db1_src", "db1_dst", "managed_src", "managed_dst"),
-        Rule("workspace", "ucx_default", "db1_src", "db1_dst", "managed_src_db_dataset", "managed_src_db_dataset"),
-        Rule("workspace", "ucx_default", "db1_src", "db1_dst", "managed_src_to_skip", "managed_src_to_skip"),
+    table_mapping.get_tables_to_migrate.return_value = [
+        TableToMigrate(
+            Table("hive_metastore", "db1_src", "managed_src", "MANAGED", "DELTA"),
+            Rule("workspace", "ucx_default", "db1_src", "db1_dst", "managed_src", "managed_dst"),
+        )
     ]
     table_migrate = TablesMigrate(table_crawler, client, backend, table_mapping)
     table_migrate.migrate_tables()
 
     assert (list(backend.queries)) == [
-        "SELECT * FROM hive_metastore.inventory_database.tables",
         "CREATE TABLE IF NOT EXISTS ucx_default.db1_dst.managed_dst DEEP CLONE hive_metastore.db1_src.managed_src;",
         "ALTER TABLE hive_metastore.db1_src.managed_src "
         "SET TBLPROPERTIES ('upgraded_to' = 'ucx_default.db1_dst.managed_dst');",
@@ -56,82 +60,29 @@ def test_migrate_managed_tables_should_produce_proper_queries():
     ]
 
 
-def test_migrate_managed_tables_should_do_nothing_if_upgrade_tag_is_present():
-    errors = {}
-    rows = {
-        "SELECT": [
-            ("hive_metastore", "db1", "managed", "MANAGED", "DELTA", None, None),
-        ]
-    }
-    backend = MockBackend(fails_on_first=errors, rows=rows)
-    table_crawler = TablesCrawler(backend, "inventory_database")
-    client = MagicMock()
-    client.catalogs.list.return_value = [CatalogInfo(name="catalog_1")]
-    client.schemas.list.return_value = [SchemaInfo(name="db1")]
-    client.tables.list.return_value = [
-        TableInfo(full_name="catalog_1.db1.managed", properties={"upgraded_from": "hive_metastore.db1.managed"})
-    ]
-    table_mapping = create_autospec(TableMapping)
-    table_mapping.load.return_value = [
-        Rule("workspace", "catalog_1", "db1", "db1", "managed", "managed"),
-    ]
-    table_migrate = TablesMigrate(table_crawler, client, backend, table_mapping)
-    table_migrate.migrate_tables()
-
-    assert (list(backend.queries)) == ["SELECT * FROM hive_metastore.inventory_database.tables"]
-
-
 def test_migrate_view_should_produce_proper_queries():
     errors = {}
-    rows = {
-        "SELECT": [
-            (
-                "hive_metastore",
-                "db1_src",
-                "view_src",
-                "VIEW",
-                "VIEW",
-                None,
-                "SELECT * FROM table",
-            ),
-        ]
-    }
+    rows = {}
     backend = MockBackend(fails_on_first=errors, rows=rows)
     table_crawler = TablesCrawler(backend, "inventory_database")
     client = MagicMock()
     table_mapping = create_autospec(TableMapping)
-    table_mapping.load.return_value = [
-        Rule("workspace", "ucx_default", "db1_src", "db1_dst", "view_src", "view_dst"),
+    table_mapping.get_tables_to_migrate.return_value = [
+        TableToMigrate(
+            Table("hive_metastore", "db1_src", "view_src", "VIEW", "VIEW", view_text="SELECT * FROM table"),
+            Rule("workspace", "ucx_default", "db1_src", "db1_dst", "view_src", "view_dst"),
+        )
     ]
     table_migrate = TablesMigrate(table_crawler, client, backend, table_mapping)
     table_migrate.migrate_tables()
 
     assert (list(backend.queries)) == [
-        "SELECT * FROM hive_metastore.inventory_database.tables",
         "CREATE VIEW IF NOT EXISTS ucx_default.db1_dst.view_dst AS SELECT * FROM table;",
         "ALTER VIEW hive_metastore.db1_src.view_src "
         "SET TBLPROPERTIES ('upgraded_to' = 'ucx_default.db1_dst.view_dst');",
         "ALTER VIEW ucx_default.db1_dst.view_dst "
         "SET TBLPROPERTIES ('upgraded_from' = 'hive_metastore.db1_src.view_src');",
     ]
-
-
-def test_migrate_tables_should_not_migrate_if_not_found_in_mapping():
-    errors = {}
-    rows = {
-        "SELECT": [
-            ("hive_metastore", "db1", "managed", "MANAGED", "DELTA", None, None),
-        ]
-    }
-    backend = MockBackend(fails_on_first=errors, rows=rows)
-    table_crawler = TablesCrawler(backend, "inventory_database")
-    client = MagicMock()
-    table_mapping = create_autospec(TableMapping)
-    table_mapping.load.return_value = []
-    table_migrate = TablesMigrate(table_crawler, client, backend, table_mapping)
-    table_migrate.migrate_tables()
-
-    assert len(backend.queries) == 1
 
 
 def get_table_migrate(backend: SqlBackend) -> TablesMigrate:
