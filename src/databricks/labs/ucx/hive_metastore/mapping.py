@@ -37,6 +37,14 @@ class Rule:
             dst_table=table.name,
         )
 
+    @property
+    def as_uc_table_key(self):
+        return f"{self.catalog_name}.{self.dst_schema}.{self.dst_table}"
+
+    @property
+    def as_hms_table_key(self):
+        return f"hive_metastore.{self.src_schema}.{self.src_table}"
+
 
 class TableMapping:
     UCX_SKIP_PROPERTY = "databricks.labs.ucx.skip"
