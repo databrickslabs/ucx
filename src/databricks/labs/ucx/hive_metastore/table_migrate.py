@@ -29,36 +29,52 @@ class TablesMigrate:
 
     def migrate_tables(self):
         self._init_seen_tables()
-        mapping_rules = self._get_mapping_rules_dict()
+        mapping_rules = self._get_mapping_rules()
         tasks = []
         for table in self._tc.snapshot():
             rule = mapping_rules.get(table.key)
             if not rule:
                 logger.info(f"Skipping table {table.key} table doesn't exist in the mapping table.")
                 continue
-            tasks.append(partial(self._migrate_table, table, rule.as_uc_table_key))
+            tasks.append(partial(self._migrate_table, table, rule))
         Threads.strict("migrate tables", tasks)
 
-    def _migrate_table(self, src_table: Table, target_table_key):
-        sql = src_table.uc_create_sql(target_table_key)
-        logger.debug(f"Migrating table {src_table.key} to using SQL query: {sql}")
-
-        if self._table_already_upgraded(target_table_key):
-            logger.info(f"Table {src_table.key} already upgraded to {target_table_key}")
+    def _migrate_table(self, src_table: Table, rule: Rule):
+        if self._table_already_upgraded(rule.as_uc_table_key):
+            logger.info(f"Table {src_table.key} already upgraded to {rule.as_uc_table_key}")
             return True
         if src_table.object_type == "MANAGED":
-            self._backend.execute(sql)
-            self._backend.execute(src_table.sql_alter_to(target_table_key))
-            self._backend.execute(src_table.sql_alter_from(target_table_key))
-            return True
+            return self._migrate_managed_table(src_table, rule)
         if src_table.kind == "VIEW":
-            self._backend.execute(sql)
-            self._backend.execute(src_table.sql_alter_to(target_table_key))
-            self._backend.execute(src_table.sql_alter_from(target_table_key))
-            return True
+            return self._migrate_view(src_table, rule)
         if src_table.object_type == "EXTERNAL":
-            self._backend.execute(sql)
-            return True
+            return self._migrate_external_table(src_table, rule)
+        return True
+
+    def _migrate_external_table(self, src_table: Table, rule: Rule):
+        target_table_key = rule.as_uc_table_key
+        table_migrate_sql = src_table.uc_create_sql(target_table_key)
+        logger.debug(f"Migrating external table {src_table.key} to using SQL query: {table_migrate_sql}")
+        self._backend.execute(table_migrate_sql)
+        return True
+
+    def _migrate_managed_table(self, src_table: Table, rule: Rule):
+        target_table_key = rule.as_uc_table_key
+        table_migrate_sql = src_table.uc_create_sql(target_table_key)
+        logger.debug(f"Migrating managed table {src_table.key} to using SQL query: {table_migrate_sql}")
+        self._backend.execute(table_migrate_sql)
+        self._backend.execute(src_table.sql_alter_to(rule.as_uc_table_key))
+        self._backend.execute(src_table.sql_alter_from(rule.as_uc_table_key))
+        return True
+
+    def _migrate_view(self, src_table: Table, rule: Rule):
+        target_table_key = rule.as_uc_table_key
+        table_migrate_sql = src_table.uc_create_sql(target_table_key)
+        logger.debug(f"Migrating view {src_table.key} to using SQL query: {table_migrate_sql}")
+        self._backend.execute(table_migrate_sql)
+        self._backend.execute(src_table.sql_alter_to(rule.as_uc_table_key))
+        self._backend.execute(src_table.sql_alter_from(rule.as_uc_table_key))
+        return True
 
         msg = f"Table {src_table.key} is a {src_table.object_type} and is not supported for migration yet"
         logger.info(msg)
@@ -173,7 +189,7 @@ class TablesMigrate:
             print("To revert and delete Migrated Tables, add --delete_managed true flag to the command.")
         return True
 
-    def _get_mapping_rules_dict(self) -> dict[str, Rule]:
+    def _get_mapping_rules(self) -> dict[str, Rule]:
         mapping_rules: dict[str, Rule] = {}
         for rule in self._tm.load():
             mapping_rules[rule.as_hms_table_key] = rule

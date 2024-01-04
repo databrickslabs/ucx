@@ -67,8 +67,8 @@ def test_save_mapping():
     (path, content), _ = ws.workspace.upload.call_args
     assert "~/.ucx/mapping.csv" == path
     assert (
-        "workspace_name,catalog_name,src_schema,dst_schema,src_table,dst_table,skip_table\r\n"
-        "foo-bar,foo_bar,foo,foo,bar,bar,False\r\n"
+        "workspace_name,catalog_name,src_schema,dst_schema,src_table,dst_table\r\n"
+        "foo-bar,foo_bar,foo,foo,bar,bar\r\n"
     ) == content.read()
 
 
@@ -84,8 +84,8 @@ def test_load_mapping_not_found():
 def test_load_mapping():
     ws = MagicMock()
     ws.workspace.download.return_value = io.StringIO(
-        "workspace_name,catalog_name,src_schema,dst_schema,src_table,dst_table,skip_table\r\n"
-        "foo-bar,foo_bar,foo,foo,bar,bar,False\r\n"
+        "workspace_name,catalog_name,src_schema,dst_schema,src_table,dst_table\r\n"
+        "foo-bar,foo_bar,foo,foo,bar,bar\r\n"
     )
     table_mapping = TableMapping(ws, "~/.ucx")
 
@@ -99,7 +99,6 @@ def test_load_mapping():
             dst_schema="foo",
             src_table="bar",
             dst_table="bar",
-            skip_table=False,
         )
     ] == rules
 
