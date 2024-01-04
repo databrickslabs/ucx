@@ -1,10 +1,20 @@
 import logging
 from unittest.mock import MagicMock, create_autospec
 
+import pytest
 from databricks.sdk import WorkspaceClient
-from databricks.sdk.service.catalog import CatalogInfo, SchemaInfo, TableInfo, TableType
+from databricks.sdk.service.catalog import (
+    CatalogInfo,
+    PermissionsList,
+    Privilege,
+    PrivilegeAssignment,
+    SchemaInfo,
+    TableInfo,
+    TableType,
+)
 
 from databricks.labs.ucx.framework.crawlers import SqlBackend
+from databricks.labs.ucx.framework.parallel import ManyError
 from databricks.labs.ucx.hive_metastore.tables import (
     MigrationCount,
     Table,
@@ -341,8 +351,10 @@ def test_migrate_uc_tables_invalid_from_schema(caplog):
     }
     backend = MockBackend(fails_on_first=errors, rows=rows)
     tm = TablesMigrate(tc, client, backend)
-    tm.migrate_uc_tables(from_catalog="SrcC", from_schema="SrcS", from_table=["*"], to_catalog="TgtC", to_schema="TgtS")
-    assert len([rec.message for rec in caplog.records if "schema SrcS not found in SrcC" in rec.message]) == 1
+    with pytest.raises(ManyError):
+        tm.migrate_uc_tables(
+            from_catalog="SrcC", from_schema="SrcS", from_table=["*"], to_catalog="TgtC", to_schema="TgtS"
+        )
 
 
 def test_migrate_uc_tables_invalid_to_schema(caplog):
@@ -415,6 +427,7 @@ def test_migrate_uc_tables(caplog):
             view_definition="SELECT * FROM SrcC.SrcS.table1",
         ),
     ]
+    client.grants.get.return_value = PermissionsList([PrivilegeAssignment("foo", [Privilege.SELECT])])
     backend = MockBackend(fails_on_first=errors, rows=rows)
     tm = TablesMigrate(tc, client, backend)
     tm.migrate_uc_tables(from_catalog="SrcC", from_schema="SrcS", from_table=["*"], to_catalog="TgtC", to_schema="TgtS")

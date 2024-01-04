@@ -7,6 +7,8 @@ from dataclasses import dataclass
 from functools import partial
 
 from databricks.sdk import WorkspaceClient
+from databricks.sdk.core import DatabricksError
+from databricks.sdk.service.catalog import PermissionsChange, SecurableType
 
 from databricks.labs.ucx.framework.crawlers import CrawlerBase, SqlBackend
 from databricks.labs.ucx.framework.parallel import ManyError, Threads
@@ -396,8 +398,8 @@ class TablesMigrate:
         self, from_catalog: str, from_schema: str, from_table: list[str], to_catalog: str, to_schema: str
     ):
         if self._validate_uc_objects("schema", f"{from_catalog}.{from_schema}") == "0":
-            logger.error(f"schema {from_schema} not found in {from_catalog}")
-            return
+            msg = f"schema {from_schema} not found in {from_catalog}"
+            raise ManyError(msg)
         else:
             if self._validate_uc_objects("schema", f"{to_catalog}.{to_schema}") == "0":
                 logger.warning(f"schema {to_schema} not found in {to_catalog}, creating...")
@@ -449,23 +451,30 @@ class TablesMigrate:
         to_catalog: str,
         to_schema: str,
         view_text: str | None = None,
-    ):
+    ) -> bool:
+        from_table_name = f"{from_catalog}.{from_schema}.{from_table}"
+        to_table_name = f"{to_catalog}.{to_schema}.{from_table}"
         try:
             if not view_text:
-                create_sql = str(
-                    next(self._backend.fetch(f"SHOW CREATE TABLE {from_catalog}.{from_schema}.{from_table}"))[0]
-                )
+                create_sql = str(next(self._backend.fetch(f"SHOW CREATE TABLE {from_table_name}"))[0])
                 create_sql = create_sql.replace(from_catalog, to_catalog).replace(from_schema, to_schema)
-                logger.debug(f"Creating table {to_catalog}.{to_schema}.{from_table}.")
+                logger.debug(f"Creating table {from_table_name}.")
                 self._backend.execute(create_sql)
-                return True
             else:
-                create_sql = f"CREATE VIEW {to_catalog}.{to_schema}.{from_table} AS {view_text}"
-                logger.debug(f"Creating view {to_catalog}.{to_schema}.{from_table}.")
+                create_sql = f"CREATE VIEW {to_table_name} AS {view_text}"
+                logger.debug(f"Creating view {to_table_name}.")
                 self._backend.execute(create_sql)
+            grants = self._ws.grants.get(securable_type=SecurableType.TABLE, full_name=from_table_name)
+            if grants.privilege_assignments is None:
                 return True
-        except RuntimeError:
-            logger.error(f"Error creating table {to_catalog}.{to_schema}.{from_table}.")
+            grants_changes = [
+                PermissionsChange(add=pair.privileges, principal=pair.principal)
+                for pair in grants.privilege_assignments
+            ]
+            self._ws.grants.update(securable_type=SecurableType.TABLE, full_name=to_table_name, changes=grants_changes)
+            return True
+        except DatabricksError:
+            logger.error(f"error applying permissions for {to_table_name}")
             return False
 
     def _validate_uc_objects(self, object_type: str, object_name: str) -> int:
