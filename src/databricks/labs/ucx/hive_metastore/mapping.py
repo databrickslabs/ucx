@@ -4,13 +4,16 @@ import io
 import logging
 import re
 from dataclasses import dataclass
+from functools import partial
 
 from databricks.sdk import WorkspaceClient
 from databricks.sdk.errors import BadRequest, NotFound
+from databricks.sdk.service.catalog import TableInfo
 from databricks.sdk.service.workspace import ImportFormat
 
 from databricks.labs.ucx.account import WorkspaceInfo
-from databricks.labs.ucx.framework.crawlers import StatementExecutionBackend
+from databricks.labs.ucx.framework.crawlers import SqlBackend
+from databricks.labs.ucx.framework.parallel import Threads
 from databricks.labs.ucx.hive_metastore import TablesCrawler
 from databricks.labs.ucx.hive_metastore.tables import Table
 
@@ -46,14 +49,21 @@ class Rule:
         return f"hive_metastore.{self.src_schema}.{self.src_table}"
 
 
+@dataclass
+class TableToMigrate:
+    src: Table
+    rule: Rule
+
+
 class TableMapping:
     UCX_SKIP_PROPERTY = "databricks.labs.ucx.skip"
 
-    def __init__(self, ws: WorkspaceClient, folder: str | None = None):
+    def __init__(self, ws: WorkspaceClient, backend: SqlBackend, folder: str | None = None):
         if not folder:
             folder = f"/Users/{ws.current_user.me().user_name}/.ucx"
         self._ws = ws
         self._folder = folder
+        self._backend = backend
         self._field_names = [_.name for _ in dataclasses.fields(Rule)]
 
     def current_tables(self, tables: TablesCrawler, workspace_name: str, catalog_name: str):
@@ -91,10 +101,35 @@ class TableMapping:
             msg = "Please run: databricks labs ucx table-mapping"
             raise ValueError(msg) from None
 
-    def skip_table(self, backend: StatementExecutionBackend, schema: str, table: str):
+    def get_tables_to_migrate(self, tables_crawler: TablesCrawler):
+        upgraded_tables = self._get_upgraded_tables()
+        validated_databases = self._get_validated_databases()
+        tables_to_validate = []
+        rules = self.load()
+        for rule in rules:
+            if rule.as_uc_table_key in upgraded_tables:
+                logger.info(f"Table {rule.as_hms_table_key} was migrated to {rule.as_uc_table_key} and will be skipped")
+                continue
+            if rule.src_schema not in validated_databases:
+                logger.info(f"Table {rule.as_hms_table_key} is in a database that was marked to be skipped")
+                continue
+            tables_to_validate.append(rule.as_hms_table_key)
+        validated_tables = self._get_validated_tables(tables_crawler, tables_to_validate)
+        validated_tables_by_key = {table.key: table for table in validated_tables}
+
+        tables_to_migrate = []
+        for rule in rules:
+            if rule.as_hms_table_key not in validated_tables_by_key:
+                continue
+            tables_to_migrate.append(TableToMigrate(validated_tables_by_key[rule.as_hms_table_key], rule))
+        return tables_to_migrate
+
+    def skip_table(self, schema: str, table: str):
         # Marks a table to be skipped in the migration process by applying a table property
         try:
-            backend.execute(f"ALTER TABLE `{schema}`.`{table}` SET TBLPROPERTIES('{self.UCX_SKIP_PROPERTY}' = true)")
+            self._backend.execute(
+                f"ALTER TABLE `{schema}`.`{table}` SET TBLPROPERTIES('{self.UCX_SKIP_PROPERTY}' = true)"
+            )
         except NotFound as nf:
             if "[TABLE_OR_VIEW_NOT_FOUND]" in str(nf):
                 logger.error(f"Failed to apply skip marker for Table {schema}.{table}. Table not found.")
@@ -103,10 +138,10 @@ class TableMapping:
         except BadRequest as br:
             logger.error(br)
 
-    def skip_schema(self, backend: StatementExecutionBackend, schema: str):
+    def skip_schema(self, schema: str):
         # Marks a schema to be skipped in the migration process by applying a table property
         try:
-            backend.execute(f"ALTER SCHEMA `{schema}` SET DBPROPERTIES('{self.UCX_SKIP_PROPERTY}' = true)")
+            self._backend.execute(f"ALTER SCHEMA `{schema}` SET DBPROPERTIES('{self.UCX_SKIP_PROPERTY}' = true)")
         except NotFound as nf:
             if "[SCHEMA_NOT_FOUND]" in str(nf):
                 logger.error(f"Failed to apply skip marker for Schema {schema}. Schema not found.")
@@ -114,3 +149,60 @@ class TableMapping:
                 logger.error(nf)
         except BadRequest as br:
             logger.error(br)
+
+    def _validate_source_table(self, table: Table) -> Table | None:
+        result = self._backend.fetch(f"SHOW TBLPROPERTIES `{table.database}`.`{table.name}`")
+        for value in result:
+            if value["key"] == "upgraded_to":
+                logger.info(f"{table.key} is set as upgraded to {value['value']}")
+                return None
+            if value["key"] == self.UCX_SKIP_PROPERTY:
+                logger.info(f"{table.key} is marked to be skipped")
+                return None
+        return table
+
+    def _validate_source_database(self, database: str) -> str | None:
+        describe = {}
+        for key, value in self._backend.fetch(f"DESCRIBE SCHEMA EXTENDED {database}"):
+            describe[key] = value
+            logger.info(f"{key} --- {value}")
+        if self.UCX_SKIP_PROPERTY in TablesCrawler.parse_database_props(describe.get("Properties", "").lower()):
+            logger.info(f"Database {database} is marked to be skipped")
+            return None
+        return database
+
+    def _get_upgraded_tables(self) -> dict[str, TableInfo]:
+        upgraded_tables = {}
+        for catalog in self._ws.catalogs.list():
+            if not catalog.name:
+                continue
+            for schema in self._ws.schemas.list(catalog_name=catalog.name):
+                if not schema.name:
+                    continue
+                for table in self._ws.tables.list(catalog_name=catalog.name, schema_name=schema.name):
+                    if table.properties is not None and "upgraded_from" in table.properties:
+                        upgraded_tables[table.properties["upgraded_from"].lower()] = table
+        return upgraded_tables
+
+    def _get_validated_databases(self):
+        databases = self._backend.fetch("SHOW DATABASES")
+        tasks = []
+        for (database,) in databases:
+            tasks.append(partial(self._validate_source_database, database))
+
+        skip_databases, errors = Threads.gather("Checking databases for skip property", tasks)
+        if len(errors) > 0:
+            logger.error(f"Detected {len(errors)} while scanning Skipped Databases")
+        return [skip_database for skip_database in skip_databases if skip_database]
+
+    def _get_validated_tables(self, tables_crawler: TablesCrawler, table_keys: list[str]):
+        tasks = []
+        for table_to_check in tables_crawler.snapshot():
+            if table_to_check.key not in table_keys:
+                continue
+            tasks.append(partial(self._validate_source_table, table_to_check))
+
+        validated_tables, errors = Threads.gather("Checking all database properties", tasks)
+        if len(errors) > 0:
+            logger.error(f"Detected {len(errors)} while validating tables")
+        return [table for table in validated_tables if table]

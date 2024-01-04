@@ -36,7 +36,7 @@ def test_migrate_managed_tables(ws, sql_backend, inventory_schema, make_catalog,
             src_managed_table.name,
         ),
     ]
-    table_mapping = StaticTableMapping(rules=rules)
+    table_mapping = StaticTableMapping(ws, sql_backend, rules=rules)
     table_migrate = TablesMigrate(table_crawler, ws, sql_backend, table_mapping)
 
     table_migrate.migrate_tables()
@@ -91,7 +91,7 @@ def test_migrate_tables_with_cache_should_not_create_table(
             dst_managed_table.name,
         ),
     ]
-    table_mapping = StaticTableMapping(rules=rules)
+    table_mapping = StaticTableMapping(ws, sql_backend, rules=rules)
     table_migrate = TablesMigrate(table_crawler, ws, sql_backend, table_mapping)
 
     # FIXME: flaky: databricks.sdk.errors.mapping.NotFound: Catalog 'ucx_cjazg' does not exist.
@@ -129,7 +129,7 @@ def test_migrate_external_table(ws, sql_backend, inventory_schema, make_catalog,
             src_external_table.name,
         ),
     ]
-    table_mapping = StaticTableMapping(rules=rules)
+    table_mapping = StaticTableMapping(ws, sql_backend, rules=rules)
     table_migrate = TablesMigrate(table_crawler, ws, sql_backend, table_mapping)
 
     table_migrate.migrate_tables()
@@ -170,7 +170,7 @@ def test_revert_migrated_table(ws, sql_backend, inventory_schema, make_schema, m
             table_to_not_revert.name,
         ),
     ]
-    table_mapping = StaticTableMapping(rules=rules)
+    table_mapping = StaticTableMapping(ws, sql_backend, rules=rules)
     table_migrate = TablesMigrate(table_crawler, ws, sql_backend, table_mapping)
     table_migrate.migrate_tables()
 
@@ -191,3 +191,49 @@ def test_revert_migrated_table(ws, sql_backend, inventory_schema, make_schema, m
     assert len(target_tables_schema2) == 1
     assert target_tables_schema2[0]["database"] == dst_schema2.name
     assert target_tables_schema2[0]["tableName"] == table_to_not_revert.name
+
+
+@retried(on=[NotFound], timeout=timedelta(minutes=5))
+def test_mapping_skips_tables_databases(ws, sql_backend, inventory_schema, make_schema, make_table, make_catalog):
+    src_schema1 = make_schema(catalog_name="hive_metastore")
+    src_schema2 = make_schema(catalog_name="hive_metastore")
+    table_to_migrate = make_table(schema_name=src_schema1.name)
+    table_to_skip = make_table(schema_name=src_schema1.name)
+    table_in_skipped_database = make_table(schema_name=src_schema2.name)
+    all_tables = [table_to_migrate, table_to_skip, table_in_skipped_database]
+
+    dst_catalog = make_catalog()
+    dst_schema1 = make_schema(catalog_name=dst_catalog.name, name=src_schema1.name)
+    dst_schema2 = make_schema(catalog_name=dst_catalog.name, name=src_schema2.name)
+
+    table_crawler = StaticTablesCrawler(sql_backend, inventory_schema, all_tables)
+    rules = [
+        Rule(
+            "workspace",
+            dst_catalog.name,
+            src_schema1.name,
+            dst_schema1.name,
+            table_to_migrate.name,
+            table_to_migrate.name,
+        ),
+        Rule(
+            "workspace",
+            dst_catalog.name,
+            src_schema1.name,
+            dst_schema1.name,
+            table_to_skip.name,
+            table_to_skip.name,
+        ),
+        Rule(
+            "workspace",
+            dst_catalog.name,
+            src_schema2.name,
+            dst_schema2.name,
+            table_in_skipped_database.name,
+            table_in_skipped_database.name,
+        ),
+    ]
+    table_mapping = StaticTableMapping(ws, sql_backend, rules=rules)
+    table_mapping.skip_table(src_schema1.name, table_to_skip.name)
+    table_mapping.skip_schema(src_schema2.name)
+    assert len(table_mapping.get_tables_to_migrate(table_crawler)) == 1

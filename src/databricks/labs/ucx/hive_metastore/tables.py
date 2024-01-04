@@ -140,6 +140,13 @@ class TablesCrawler(CrawlerBase):
         # Convert key-value pairs to dictionary
         return dict(key_value_pairs)
 
+    @staticmethod
+    def parse_database_props(tbl_props: str) -> dict:
+        pattern = r"([^,^\(^\)\[\]]+),([^,^\(^\)\[\]]+)"
+        key_value_pairs = re.findall(pattern, tbl_props)
+        # Convert key-value pairs to dictionary
+        return dict(key_value_pairs)
+
     def _try_load(self) -> Iterable[Table]:
         """Tries to load table information from the database or throws TABLE_OR_VIEW_NOT_FOUND error"""
         for row in self._fetch(f"SELECT * FROM {self._full_name}"):
