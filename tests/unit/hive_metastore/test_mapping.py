@@ -379,3 +379,96 @@ def test_skipping_rules_database_missing():
 
     assert "SHOW TBLPROPERTIES `schema1`.`table1`" in backend.queries
     assert "SHOW TBLPROPERTIES `schema2`.`table2`" not in backend.queries
+
+
+def test_skip_missing_table_in_snapshot():
+    errors = {}
+    rows = {}
+    backend = MockBackend(fails_on_first=errors, rows=rows)
+    client = create_autospec(WorkspaceClient)
+    client.tables.get.side_effect = NotFound()
+    client.catalogs.list.return_value = []
+    client.schemas.list.return_value = []
+    client.tables.list.return_value = []
+
+    table_mapping = TableMapping(client, backend)
+    tables_to_migrate = []
+    rules = [
+        Rule("fake_ws", "cat1", "schema1", "schema1", "table1", "dest1"),
+        Rule("fake_ws", "cat1", "schema2", "schema2", "table2", "dest2"),
+    ]
+    databases = {"schema1"}
+    table_mapping._get_tables_in_scope(rules, databases, tables_to_migrate)
+
+    assert not backend.queries
+
+
+def test_skipping_rules_target_exists():
+    errors = {}
+    rows = {}
+    backend = MockBackend(fails_on_first=errors, rows=rows)
+    client = create_autospec(WorkspaceClient)
+    client.tables.get.side_effect = NotFound()
+    client.catalogs.list.return_value = []
+    client.schemas.list.return_value = []
+    client.tables.list.return_value = []
+    client.tables.get.side_effect = [
+        NotFound(),
+        TableInfo(
+            catalog_name="cat1",
+            schema_name="schema2",
+            name="dest2",
+            full_name="cat1.schema2.dest2",
+            properties={},
+        ),
+    ]
+
+    table_mapping = TableMapping(client, backend)
+    tables_to_migrate = [
+        Table(
+            object_type="EXTERNAL",
+            table_format="DELTA",
+            catalog="hive_metastore",
+            database="schema1",
+            name="table1",
+        ),
+        Table(
+            object_type="EXTERNAL",
+            table_format="DELTA",
+            catalog="hive_metastore",
+            database="schema2",
+            name="table2",
+        ),
+    ]
+    rules = [
+        Rule("fake_ws", "cat1", "schema1", "schema1", "table1", "dest1"),
+        Rule("fake_ws", "cat1", "schema2", "schema2", "table2", "dest2"),
+    ]
+    databases = {"schema1", "schema2"}
+    assert len(table_mapping._get_tables_in_scope(rules, databases, tables_to_migrate)) == 1
+
+
+def test_is_target_exists():
+    errors = {}
+    rows = {}
+    backend = MockBackend(fails_on_first=errors, rows=rows)
+    client = create_autospec(WorkspaceClient)
+    client.tables.get.side_effect = NotFound()
+    client.catalogs.list.return_value = []
+    client.schemas.list.return_value = []
+    client.tables.list.return_value = []
+    client.tables.get.side_effect = [
+        NotFound(),
+        TableInfo(
+            catalog_name="cat1",
+            schema_name="schema2",
+            name="dest2",
+            full_name="cat1.schema2.dest2",
+            properties={},
+        ),
+    ]
+
+    table_mapping = TableMapping(client, backend)
+
+    assert not table_mapping._is_target_exists("cat1.schema1.dest1")
+    assert table_mapping._is_target_exists("cat1.schema2.dest2")
