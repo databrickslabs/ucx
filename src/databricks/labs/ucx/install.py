@@ -110,7 +110,7 @@ main(f'--config=/Workspace{config_file}',
      f'--parent_run_id=' + dbutils.widgets.get('parent_run_id'))
 """
 
-logger = get_logger(__file__)
+logger = logging.getLogger(__name__)
 
 
 def deploy_schema(sql_backend: SqlBackend, inventory_schema: str):
@@ -933,7 +933,9 @@ class WorkspaceInstaller:
 
 
 if __name__ == "__main__":
-    ws = WorkspaceClient(product="ucx", product_version=__version__)
+    logger = get_logger(__file__)
     logger.setLevel("INFO")
+
+    ws = WorkspaceClient(product="ucx", product_version=__version__)
     installer = WorkspaceInstaller(ws, promtps=Prompts())
     installer.run()
