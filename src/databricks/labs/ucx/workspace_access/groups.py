@@ -348,13 +348,9 @@ class GroupManager(CrawlerBase[MigratedGroup]):
     @retried(on=[InternalError, ResourceConflict, DeadlineExceeded])
     @rate_limited(max_requests=10, burst_period_seconds=60)
     def _rename_group(self, group_id: str, new_group_name: str):
-        try:
-            ops = [iam.Patch(iam.PatchOp.REPLACE, "displayName", new_group_name)]
-            self._ws.groups.patch(group_id, operations=ops)
-            return True
-        except BadRequest:
-            # already exists
-            return True
+        ops = [iam.Patch(iam.PatchOp.REPLACE, "displayName", new_group_name)]
+        self._ws.groups.patch(group_id, operations=ops)
+        return True
 
     def reflect_account_groups_on_workspace(self):
         tasks = []
