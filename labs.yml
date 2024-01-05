@@ -65,3 +65,4 @@ commands:
         description: Table to revert (if left blank all tables in the schema will be reverted). Requires schema parameter to be specified.)
       - name: delete_managed
         description: Revert and delete managed tables
+
