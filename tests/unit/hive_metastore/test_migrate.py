@@ -394,15 +394,15 @@ def test_migrate_uc_tables(caplog):
         "SYSTEM.INFORMATION_SCHEMA.SCHEMATA WHERE CATALOG_NAME = 'TgtC' AND SCHEMA_NAME = 'TgtS'": [
             make_row([1], ["cnt"]),
         ],
-        "SYSTEM.INFORMATION_SCHEMA.TABLES WHERE CATALOG_NAME = 'TgtC' AND SCHEMA_NAME = 'TgtS' AND "
+        "SYSTEM.INFORMATION_SCHEMA.TABLES WHERE TABLE_CATALOG = 'TgtC' AND TABLE_SCHEMA = 'TgtS' AND "
         "TABLE_NAME = 'table1'": [
             make_row([0], ["cnt"]),
         ],
-        "SYSTEM.INFORMATION_SCHEMA.TABLES WHERE CATALOG_NAME = 'TgtC' AND SCHEMA_NAME = 'TgtS' AND "
+        "SYSTEM.INFORMATION_SCHEMA.TABLES WHERE TABLE_CATALOG = 'TgtC' AND TABLE_SCHEMA = 'TgtS' AND "
         "TABLE_NAME = 'table2'": [
             make_row([1], ["cnt"]),
         ],
-        "SYSTEM.INFORMATION_SCHEMA.TABLES WHERE CATALOG_NAME = 'TgtC' AND SCHEMA_NAME = 'TgtS' AND "
+        "SYSTEM.INFORMATION_SCHEMA.TABLES WHERE TABLE_CATALOG = 'TgtC' AND TABLE_SCHEMA = 'TgtS' AND "
         "TABLE_NAME = 'view1'": [
             make_row([0], ["cnt"]),
         ],

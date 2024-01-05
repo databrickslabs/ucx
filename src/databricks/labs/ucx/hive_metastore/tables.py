@@ -482,8 +482,9 @@ class TablesMigrate:
         object_parts = object_name.split(".")
         if object_type == "table":
             query = (
-                f"SELECT COUNT(*) as cnt FROM SYSTEM.INFORMATION_SCHEMA.TABLES WHERE CATALOG_NAME = '{object_parts[0]}'"
-                f" AND SCHEMA_NAME = '{object_parts[1]}' AND TABLE_NAME = '{object_parts[2]}'"
+                f"SELECT COUNT(*) as cnt FROM SYSTEM.INFORMATION_SCHEMA.TABLES WHERE "
+                f"TABLE_CATALOG = '{object_parts[0]}' AND TABLE_SCHEMA = '{object_parts[1]}' AND "
+                f"TABLE_NAME = '{object_parts[2]}'"
             )
         else:
             query = (

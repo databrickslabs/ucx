@@ -4,6 +4,7 @@ from datetime import timedelta
 import pytest
 from databricks.sdk.errors import NotFound
 from databricks.sdk.retries import retried
+from databricks.sdk.service.catalog import Privilege, PrivilegeAssignment, SecurableType
 
 from databricks.labs.ucx.framework.parallel import ManyError
 from databricks.labs.ucx.hive_metastore.tables import TablesMigrate
@@ -151,7 +152,86 @@ def test_uc_to_uc_no_from_schema(ws, sql_backend, inventory_schema):
 
 
 @retried(on=[NotFound], timeout=timedelta(minutes=2))
-def test_uc_to_uc(ws, sql_backend, inventory_schema, make_catalog, make_schema, make_table, env_or_skip):
+def test_uc_to_uc(ws, sql_backend, inventory_schema, make_catalog, make_schema, make_table, make_acc_group):
     static_crawler = StaticTablesCrawler(sql_backend, inventory_schema, [])
     tm = TablesMigrate(static_crawler, ws, sql_backend)
+    group_a = make_acc_group()
+    group_b = make_acc_group()
+    from_catalog = make_catalog()
+    from_schema = make_schema(catalog_name=from_catalog.name)
+    from_table_1 = make_table(catalog_name=from_catalog.name, schema_name=from_schema.name)
+    from_table_2 = make_table(catalog_name=from_catalog.name, schema_name=from_schema.name)
+    from_table_3 = make_table(catalog_name=from_catalog.name, schema_name=from_schema.name)
+    from_view_1 = make_table(
+        catalog_name=from_catalog.name,
+        schema_name=from_schema.name,
+        view=True,
+        ctas=f"select * from {from_table_2.full_name}",
+    )
+    to_catalog = make_catalog()
+    to_schema = make_schema(catalog_name=to_catalog.name)
+    # creating a table in target schema to test skipping
+    to_table_3 = make_table(catalog_name=to_catalog.name, schema_name=to_schema.name, name=from_table_3.name)
+    sql_backend.execute(f"GRANT SELECT ON TABLE {from_table_1.full_name} TO `{group_a.display_name}`")
+    sql_backend.execute(f"GRANT SELECT,MODIFY ON TABLE {from_table_2.full_name} TO `{group_b.display_name}`")
+    sql_backend.execute(f"GRANT SELECT ON VIEW {from_view_1.full_name} TO `{group_b.display_name}`")
+    sql_backend.execute(f"GRANT SELECT ON TABLE {to_table_3.full_name} TO `{group_a.display_name}`")
+    tm.migrate_uc_tables(
+        from_catalog=from_catalog.name,
+        from_schema=from_schema.name,
+        from_table=["*"],
+        to_catalog=to_catalog.name,
+        to_schema=to_schema.name,
+    )
+    tables = ws.tables.list(catalog_name=to_catalog.name, schema_name=to_schema.name)
+    table_1_grant = ws.grants.get(
+        securable_type=SecurableType.TABLE, full_name=f"{to_catalog.name}.{to_schema.name}.{from_table_1.name}"
+    )
+    table_2_grant = ws.grants.get(
+        securable_type=SecurableType.TABLE, full_name=f"{to_catalog.name}.{to_schema.name}.{from_table_2.name}"
+    )
+    table_3_grant = ws.grants.get(
+        securable_type=SecurableType.TABLE, full_name=f"{to_catalog.name}.{to_schema.name}.{from_table_3.name}"
+    )
+    view_1_grant = ws.grants.get(
+        securable_type=SecurableType.TABLE, full_name=f"{to_catalog.name}.{to_schema.name}.{from_view_1.name}"
+    )
+    assert (
+        len(
+            [t for t in tables if t.name in [from_table_1.name, from_table_2.name, from_table_3.name, from_view_1.name]]
+        )
+        == 4
+    )
+    expected_table_1_grant = [PrivilegeAssignment(group_a.display_name, [Privilege.SELECT])]
+    expected_table_2_grant = [
+        PrivilegeAssignment(group_b.display_name, [Privilege.MODIFY, Privilege.SELECT]),
+    ]
+    expected_table_3_grant = [PrivilegeAssignment(group_a.display_name, [Privilege.SELECT])]
+    expected_view_1_grant = [PrivilegeAssignment(group_b.display_name, [Privilege.SELECT])]
 
+    assert len([perm for perm in table_1_grant.privilege_assignments if perm in expected_table_1_grant]) == 1
+    assert len([perm for perm in table_2_grant.privilege_assignments if perm in expected_table_2_grant]) == 1
+    assert len([perm for perm in table_3_grant.privilege_assignments if perm in expected_table_3_grant]) == 1
+    assert len([perm for perm in view_1_grant.privilege_assignments if perm in expected_view_1_grant]) == 1
+
+
+@retried(on=[NotFound], timeout=timedelta(minutes=2))
+def test_uc_to_uc_no_to_schema(ws, sql_backend, inventory_schema, make_catalog, make_schema, make_table, make_random):
+    static_crawler = StaticTablesCrawler(sql_backend, inventory_schema, [])
+    tm = TablesMigrate(static_crawler, ws, sql_backend)
+    from_catalog = make_catalog()
+    from_schema = make_schema(catalog_name=from_catalog.name)
+    from_table_1 = make_table(catalog_name=from_catalog.name, schema_name=from_schema.name)
+    from_table_2 = make_table(catalog_name=from_catalog.name, schema_name=from_schema.name)
+    from_table_3 = make_table(catalog_name=from_catalog.name, schema_name=from_schema.name)
+    to_catalog = make_catalog()
+    to_schema = make_random(4)
+    tm.migrate_uc_tables(
+        from_catalog=from_catalog.name,
+        from_schema=from_schema.name,
+        from_table=[from_table_1.name, from_table_2.name],
+        to_catalog=to_catalog.name,
+        to_schema=to_schema,
+    )
+    tables = ws.tables.list(catalog_name=to_catalog.name, schema_name=to_schema)
+    assert len([t for t in tables if t.name in [from_table_1.name, from_table_2.name, from_table_3.name]]) == 2
