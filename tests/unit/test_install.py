@@ -36,7 +36,7 @@ import databricks.labs.ucx.uninstall  # noqa
 from databricks.labs.ucx.config import WorkspaceConfig
 from databricks.labs.ucx.framework.dashboards import DashboardFromFiles
 from databricks.labs.ucx.framework.tasks import Task
-from databricks.labs.ucx.framework.wheels import Wheels, find_project_root
+from databricks.labs.blueprint.wheels import Wheels, find_project_root
 from databricks.labs.ucx.install import WorkspaceInstaller
 
 from ..unit.framework.mocks import MockBackend

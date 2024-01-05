@@ -40,7 +40,7 @@ from databricks.labs.ucx.framework.crawlers import (
 )
 from databricks.labs.ucx.framework.dashboards import DashboardFromFiles
 from databricks.labs.ucx.framework.tasks import _TASKS, Task
-from databricks.labs.ucx.framework.wheels import Wheels, find_project_root
+from databricks.labs.blueprint.wheels import Wheels, find_project_root, ProductInfo
 from databricks.labs.ucx.hive_metastore.grants import Grant
 from databricks.labs.ucx.hive_metastore.hms_lineage import HiveMetastoreLineageEnabler
 from databricks.labs.ucx.hive_metastore.locations import ExternalLocation, Mount
@@ -156,18 +156,21 @@ class WorkspaceInstaller:
             raise SystemExit(msg)
         self._ws = ws
         self._prefix = prefix
+        install_state = InstallState(ws, prefix)
+        product_info = ProductInfo()
         if not wheels:
-            wheels = Wheels(ws, self._install_folder, __version__)
+            wheels = Wheels(ws, install_state, product_info)
         self._sql_backend = sql_backend
         self._prompts = promtps
         self._wheels = wheels
+        self._state = install_state
+        self._product_info = product_info
         self._this_file = Path(__file__)
         self._dashboards: dict[str, str] = {}
-        self._state = InstallState(ws, self._install_folder)
         self._install_override_clusters = None
 
     def run(self):
-        logger.info(f"Installing UCX v{self._wheels.version()}")
+        logger.info(f"Installing UCX v{self._product_info.version()}")
         self._configure()
         self._run_configured()
 
@@ -230,7 +233,7 @@ class WorkspaceInstaller:
         sql_backend: SqlBackend | None = None,
     ) -> "WorkspaceInstaller":
         workspace_installer = WorkspaceInstaller(ws, prefix=prefix, wheels=wheels, sql_backend=sql_backend)
-        logger.info(f"Installing UCX v{workspace_installer._wheels.version()} on {ws.config.host}")
+        logger.info(f"Installing UCX v{workspace_installer._product_info.version()} on {ws.config.host}")
         workspace_installer._config = config  # type: ignore[has-type]
         workspace_installer._write_config(overwrite=False)
         workspace_installer.current_config.override_clusters = override_clusters
@@ -603,7 +606,7 @@ class WorkspaceInstaller:
             [t for t in _TASKS.values() if t.workflow == step_name],
             key=lambda _: _.name,
         )
-        version = self._wheels.version()
+        version = self._product_info.version()
         version = version if not self._ws.config.is_gcp else version.replace("+", "-")
         return {
             "name": self._name(step_name),
@@ -615,7 +618,7 @@ class WorkspaceInstaller:
 
     def _upload_wheel_runner(self, remote_wheel: str):
         # TODO: we have to be doing this workaround until ES-897453 is solved in the platform
-        path = f"{self._install_folder}/wheels/wheel-test-runner-{self._wheels.version()}.py"
+        path = f"{self._install_folder}/wheels/wheel-test-runner-{self._product_info.version()}.py"
         logger.debug(f"Created runner notebook: {self.notebook_link(path)}")
         py = TEST_RUNNER_NOTEBOOK.format(remote_wheel=remote_wheel, config_file=self.config_file).encode("utf8")
         self._ws.workspace.upload(path, py, overwrite=True)  # type: ignore[arg-type]
@@ -802,6 +805,8 @@ class WorkspaceInstaller:
         for step, job_id in self._state.jobs.items():
             try:
                 job_runs = list(self._ws.jobs.list_runs(job_id=int(job_id), limit=1))
+                if not job_runs:
+                    continue
                 state = job_runs[0].state
                 result_state = state.result_state if state else None
                 latest_status.append(
