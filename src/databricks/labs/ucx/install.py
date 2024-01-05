@@ -158,7 +158,7 @@ class WorkspaceInstaller:
         self._ws = ws
         self._prefix = prefix
         install_state = InstallState(ws, prefix)
-        product_info = ProductInfo()
+        product_info = ProductInfo(__file__)
         if not wheels:
             wheels = Wheels(ws, install_state, product_info)
         self._sql_backend = sql_backend
