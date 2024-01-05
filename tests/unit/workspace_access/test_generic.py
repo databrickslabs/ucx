@@ -3,6 +3,7 @@ from datetime import timedelta
 from unittest.mock import MagicMock, Mock, patch
 
 import pytest
+from databricks.labs.blueprint.parallel import ManyError
 from databricks.sdk.core import DatabricksError
 from databricks.sdk.errors import Aborted, InternalError, NotFound, PermissionDenied
 from databricks.sdk.service import compute, iam, ml
@@ -17,7 +18,6 @@ from databricks.sdk.service.jobs import BaseJob
 from databricks.sdk.service.pipelines import PipelineStateInfo
 from databricks.sdk.service.workspace import Language, ObjectInfo, ObjectType
 
-from databricks.labs.ucx.framework.parallel import ManyError
 from databricks.labs.ucx.mixins.sql import Row
 from databricks.labs.ucx.workspace_access.generic import (
     GenericPermissionsSupport,

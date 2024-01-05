@@ -2,10 +2,10 @@ import logging
 from collections import defaultdict
 from functools import partial
 
+from databricks.labs.blueprint.parallel import Threads
 from databricks.sdk import WorkspaceClient
 
 from databricks.labs.ucx.framework.crawlers import SqlBackend
-from databricks.labs.ucx.framework.parallel import Threads
 from databricks.labs.ucx.hive_metastore import TablesCrawler
 from databricks.labs.ucx.hive_metastore.mapping import Rule, TableMapping
 from databricks.labs.ucx.hive_metastore.tables import MigrationCount, Table

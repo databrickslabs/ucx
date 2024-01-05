@@ -6,13 +6,13 @@ from dataclasses import dataclass
 from datetime import timedelta
 from functools import partial
 
+from databricks.labs.blueprint.limiter import rate_limited
 from databricks.sdk import WorkspaceClient
 from databricks.sdk.errors import InternalError, NotFound, PermissionDenied
 from databricks.sdk.retries import retried
 from databricks.sdk.service import sql
 from databricks.sdk.service.sql import ObjectTypePlural, SetResponse
 
-from databricks.labs.ucx.mixins.hardening import rate_limited
 from databricks.labs.ucx.workspace_access.base import AclSupport, Permissions
 from databricks.labs.ucx.workspace_access.groups import MigrationState
 

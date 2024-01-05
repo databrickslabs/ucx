@@ -5,6 +5,9 @@ from unittest.mock import MagicMock, create_autospec, patch
 
 import pytest
 import yaml
+from databricks.labs.blueprint.installer import InstallState
+from databricks.labs.blueprint.tui import MockPrompts
+from databricks.labs.blueprint.wheels import Wheels, find_project_root
 from databricks.sdk.errors import (
     InvalidParameterValue,
     NotFound,
@@ -33,10 +36,7 @@ from databricks.sdk.service.workspace import ImportFormat, ObjectInfo
 import databricks.labs.ucx.uninstall  # noqa
 from databricks.labs.ucx.config import WorkspaceConfig
 from databricks.labs.ucx.framework.dashboards import DashboardFromFiles
-from databricks.labs.ucx.framework.install_state import InstallState
 from databricks.labs.ucx.framework.tasks import Task
-from databricks.labs.ucx.framework.tui import MockPrompts
-from databricks.labs.ucx.framework.wheels import Wheels, find_project_root
 from databricks.labs.ucx.install import WorkspaceInstaller
 
 from ..unit.framework.mocks import MockBackend
@@ -224,7 +224,7 @@ def test_replace_clusters_for_integration_tests(ws):
 
 def test_run_workflow_creates_proper_failure(ws, mocker):
     def run_now(job_id):
-        assert "bar" == job_id
+        assert 111 == job_id
 
         def result():
             raise OperationFailed(...)
@@ -247,7 +247,7 @@ def test_run_workflow_creates_proper_failure(ws, mocker):
     )
     ws.jobs.get_run_output.return_value = jobs.RunOutput(error="does not compute", error_trace="# goes to stderr")
     installer = WorkspaceInstaller(ws)
-    installer._state.jobs = {"foo": "bar"}
+    installer._state.jobs = {"foo": "111"}
     with pytest.raises(OperationFailed) as failure:
         installer.run_workflow("foo")
 
@@ -671,7 +671,7 @@ def test_task_cloud(ws):
 
 
 def test_query_metadata(ws):
-    local_query_files = find_project_root() / "src/databricks/labs/ucx/queries"
+    local_query_files = find_project_root(__file__) / "src/databricks/labs/ucx/queries"
     DashboardFromFiles(ws, InstallState(ws, "any"), local_query_files, "any", "any").validate()
 
 

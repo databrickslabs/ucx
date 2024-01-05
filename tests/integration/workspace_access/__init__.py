@@ -1,4 +1,5 @@
-from databricks.labs.ucx.framework.parallel import ManyError, Threads
+from databricks.labs.blueprint.parallel import ManyError, Threads
+
 from databricks.labs.ucx.workspace_access.base import AclSupport
 from databricks.labs.ucx.workspace_access.groups import MigratedGroup, MigrationState
 

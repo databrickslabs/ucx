@@ -2,12 +2,12 @@ from unittest.mock import MagicMock
 
 import pytest
 from _pytest.outcomes import fail
+from databricks.labs.blueprint.parallel import ManyError
+from databricks.labs.blueprint.tui import MockPrompts
 from databricks.sdk.errors import DatabricksError
 from databricks.sdk.service import iam
 from databricks.sdk.service.iam import ComplexValue, Group, ResourceMeta
 
-from databricks.labs.ucx.framework.parallel import ManyError
-from databricks.labs.ucx.framework.tui import MockPrompts
 from databricks.labs.ucx.workspace_access.groups import (
     ConfigureGroups,
     GroupManager,
@@ -306,7 +306,7 @@ def test_rename_groups_should_fail_if_error_is_thrown():
     gm = GroupManager(backend, wsclient, inventory_database="inv", renamed_group_prefix="test-group-")
     with pytest.raises(ManyError) as e:
         gm.rename_groups()
-    assert e.value.args[0] == "Detected 1 failures: Something bad"
+    assert e.value.args[0] == "Detected 1 failures: RuntimeError: Something bad"
 
 
 def test_reflect_account_groups_on_workspace_should_be_called_for_eligible_groups():

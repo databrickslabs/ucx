@@ -5,11 +5,11 @@ from functools import wraps
 from logging.handlers import TimedRotatingFileHandler
 from pathlib import Path
 
+from databricks.labs.blueprint.logger import install_logger
 from databricks.sdk.core import Config
 
 from databricks.labs.ucx.__about__ import __version__
 from databricks.labs.ucx.config import WorkspaceConfig
-from databricks.labs.ucx.framework.logger import _install
 
 _TASKS: dict[str, "Task"] = {}
 
@@ -160,7 +160,7 @@ def trigger(*argv):
     file_handler.setFormatter(log_formatter)
     file_handler.setLevel(logging.DEBUG)
 
-    console_handler = _install(cfg.log_level)
+    console_handler = install_logger(cfg.log_level)
     databricks_logger.removeHandler(console_handler)
     databricks_logger.addHandler(file_handler)
 

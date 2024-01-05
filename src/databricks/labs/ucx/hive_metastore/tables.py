@@ -5,8 +5,9 @@ from collections.abc import Iterable, Iterator
 from dataclasses import dataclass
 from functools import partial
 
+from databricks.labs.blueprint.parallel import Threads
+
 from databricks.labs.ucx.framework.crawlers import CrawlerBase, SqlBackend
-from databricks.labs.ucx.framework.parallel import Threads
 from databricks.labs.ucx.mixins.sql import Row
 
 logger = logging.getLogger(__name__)
