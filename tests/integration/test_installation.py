@@ -5,12 +5,12 @@ from dataclasses import replace
 from datetime import timedelta
 
 import pytest
+from databricks.labs.blueprint.parallel import Threads
 from databricks.sdk.errors import InvalidParameterValue, NotFound, OperationFailed
 from databricks.sdk.retries import retried
 from databricks.sdk.service.iam import PermissionLevel
 
 from databricks.labs.ucx.config import WorkspaceConfig
-from databricks.labs.ucx.framework.parallel import Threads
 from databricks.labs.ucx.install import WorkspaceInstaller
 from databricks.labs.ucx.workspace_access.generic import (
     GenericPermissionsSupport,

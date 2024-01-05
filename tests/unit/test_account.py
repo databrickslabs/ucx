@@ -2,6 +2,7 @@ import io
 import json
 from unittest.mock import create_autospec, patch
 
+from databricks.labs.blueprint.tui import MockPrompts
 from databricks.sdk import WorkspaceClient
 from databricks.sdk.service.iam import User
 from databricks.sdk.service.provisioning import Workspace
@@ -9,7 +10,6 @@ from databricks.sdk.service.workspace import ImportFormat
 
 from databricks.labs.ucx.account import AccountWorkspaces, WorkspaceInfo
 from databricks.labs.ucx.config import AccountConfig, ConnectConfig, WorkspaceConfig
-from databricks.labs.ucx.framework.tui import MockPrompts
 from databricks.labs.ucx.installer import Installation, InstallationManager
 
 

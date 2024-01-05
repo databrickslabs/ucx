@@ -6,6 +6,7 @@ from dataclasses import dataclass
 from json import JSONDecodeError
 from pathlib import Path
 
+from databricks.labs.blueprint.installer import InstallState
 from databricks.sdk import WorkspaceClient
 from databricks.sdk.errors import DatabricksError, NotFound
 from databricks.sdk.service import workspace
@@ -17,8 +18,6 @@ from databricks.sdk.service.sql import (
     WidgetOptions,
     WidgetPosition,
 )
-
-from databricks.labs.ucx.framework.install_state import InstallState
 
 logger = logging.getLogger(__name__)
 
@@ -143,6 +142,7 @@ class DashboardFromFiles:
         widget = self._ws.dashboard_widgets.create(
             dashboard_id, widget_options, 1, visualization_id=self._state.viz[query.key]
         )
+        assert widget.id is not None
         self._state.widgets[query.key] = widget.id
 
     def _get_widget_options(self, query: SimpleQuery):
@@ -280,6 +280,7 @@ class DashboardFromFiles:
         if query.key in self._state.viz:
             return self._ws.query_visualizations.update(self._state.viz[query.key], **viz_args)
         viz = self._ws.query_visualizations.create(self._state.queries[query.key], **viz_args)
+        assert viz.id is not None
         self._state.viz[query.key] = viz.id
 
     def _get_viz_options(self, query: SimpleQuery):

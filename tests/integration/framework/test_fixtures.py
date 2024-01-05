@@ -3,11 +3,11 @@ from datetime import timedelta
 
 import pytest
 from _pytest.outcomes import Failed, Skipped
+from databricks.labs.blueprint.commands import CommandExecutor
 from databricks.sdk.errors import NotFound
 from databricks.sdk.retries import retried
 from databricks.sdk.service.workspace import AclPermission
 
-from databricks.labs.ucx.mixins.compute import CommandExecutor
 from databricks.labs.ucx.mixins.fixtures import *  # noqa: F403
 
 logger = logging.getLogger(__name__)

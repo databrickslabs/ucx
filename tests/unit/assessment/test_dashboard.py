@@ -2,6 +2,7 @@ import io
 import json
 
 import yaml
+from databricks.labs.blueprint.installer import InstallState
 from databricks.sdk.service import iam
 from databricks.sdk.service.sql import (
     Dashboard,
@@ -13,7 +14,6 @@ from databricks.sdk.service.sql import (
 
 from databricks.labs.ucx.config import WorkspaceConfig
 from databricks.labs.ucx.framework.dashboards import DashboardFromFiles
-from databricks.labs.ucx.framework.install_state import InstallState
 from databricks.labs.ucx.framework.wheels import find_project_root
 from databricks.labs.ucx.install import WorkspaceInstaller
 

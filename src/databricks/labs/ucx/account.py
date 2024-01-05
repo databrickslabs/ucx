@@ -3,6 +3,7 @@ import logging
 from typing import ClassVar
 
 import requests
+from databricks.labs.blueprint.tui import Prompts
 from databricks.sdk import WorkspaceClient
 from databricks.sdk.errors import NotFound
 from databricks.sdk.service.provisioning import Workspace
@@ -10,7 +11,6 @@ from databricks.sdk.service.workspace import ImportFormat
 
 from databricks.labs.ucx.__about__ import __version__
 from databricks.labs.ucx.config import AccountConfig
-from databricks.labs.ucx.framework.tui import Prompts
 from databricks.labs.ucx.installer import InstallationManager
 
 logger = logging.getLogger(__name__)

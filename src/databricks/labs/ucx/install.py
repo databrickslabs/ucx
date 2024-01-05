@@ -10,6 +10,9 @@ from pathlib import Path
 from typing import Any
 
 import yaml
+from databricks.labs.blueprint.installer import InstallState
+from databricks.labs.blueprint.parallel import Threads
+from databricks.labs.blueprint.tui import Prompts
 from databricks.sdk import WorkspaceClient
 from databricks.sdk.errors import (
     InvalidParameterValue,
@@ -36,10 +39,7 @@ from databricks.labs.ucx.framework.crawlers import (
     StatementExecutionBackend,
 )
 from databricks.labs.ucx.framework.dashboards import DashboardFromFiles
-from databricks.labs.ucx.framework.install_state import InstallState
-from databricks.labs.ucx.framework.parallel import Threads
 from databricks.labs.ucx.framework.tasks import _TASKS, Task
-from databricks.labs.ucx.framework.tui import Prompts
 from databricks.labs.ucx.framework.wheels import Wheels, find_project_root
 from databricks.labs.ucx.hive_metastore.grants import Grant
 from databricks.labs.ucx.hive_metastore.hms_lineage import HiveMetastoreLineageEnabler
@@ -239,7 +239,7 @@ class WorkspaceInstaller:
         return workspace_installer
 
     def run_workflow(self, step: str):
-        job_id = self._state.jobs[step]
+        job_id = int(self._state.jobs[step])
         logger.debug(f"starting {step} job: {self._ws.config.host}#job/{job_id}")
         job_run_waiter = self._ws.jobs.run_now(job_id)
         try:
@@ -494,7 +494,7 @@ class WorkspaceInstaller:
     def _deploy_workflow(self, step_name: str, settings):
         if step_name in self._state.jobs:
             try:
-                job_id = self._state.jobs[step_name]
+                job_id = int(self._state.jobs[step_name])
                 logger.info(f"Updating configuration for step={step_name} job_id={job_id}")
                 return self._ws.jobs.reset(job_id, jobs.JobSettings(**settings))
             except InvalidParameterValue:
@@ -502,8 +502,9 @@ class WorkspaceInstaller:
                 logger.warning(f"step={step_name} does not exist anymore for some reason")
                 return self._deploy_workflow(step_name, settings)
         logger.info(f"Creating new job configuration for step={step_name}")
-        job_id = self._ws.jobs.create(**settings).job_id
-        self._state.jobs[step_name] = job_id
+        new_job = self._ws.jobs.create(**settings)
+        assert new_job.job_id is not None
+        self._state.jobs[step_name] = str(new_job.job_id)
 
     def _deployed_steps_pre_v06(self):
         deployed_steps = {}
@@ -800,7 +801,7 @@ class WorkspaceInstaller:
         latest_status = []
         for step, job_id in self._state.jobs.items():
             try:
-                job_runs = list(self._ws.jobs.list_runs(job_id=job_id, limit=1))
+                job_runs = list(self._ws.jobs.list_runs(job_id=int(job_id), limit=1))
                 state = job_runs[0].state
                 result_state = state.result_state if state else None
                 latest_status.append(
@@ -902,7 +903,7 @@ class WorkspaceInstaller:
             logger.error("Error deleting install folder")
 
     def validate_step(self, step: str) -> bool:
-        job_id = self._state.jobs[step]
+        job_id = int(self._state.jobs[step])
         logger.debug(f"Validating {step} workflow: {self._ws.config.host}#job/{job_id}")
         current_runs = list(self._ws.jobs.list_runs(completed_only=False, job_id=job_id))
         for run in current_runs:
