@@ -671,7 +671,7 @@ def test_task_cloud(ws):
 
 
 def test_query_metadata(ws):
-    local_query_files = find_project_root() / "src/databricks/labs/ucx/queries"
+    local_query_files = find_project_root(__file__) / "src/databricks/labs/ucx/queries"
     DashboardFromFiles(ws, InstallState(ws, "any"), local_query_files, "any", "any").validate()
 
 

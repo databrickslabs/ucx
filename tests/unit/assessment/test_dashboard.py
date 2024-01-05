@@ -63,7 +63,7 @@ def test_dashboard(mocker):
     ws.dashboard_widgets.create.return_value = Widget(id="abc")
     ws.warehouses.list.return_value = []
     installer = WorkspaceInstaller(ws)
-    local_query_files = find_project_root() / "src/databricks/labs/ucx/queries"
+    local_query_files = find_project_root(__file__) / "src/databricks/labs/ucx/queries"
     dash = DashboardFromFiles(
         ws,
         InstallState(ws, install_folder),

@@ -277,7 +277,7 @@ class WorkspaceInstaller:
 
     def _create_dashboards(self):
         logger.info("Creating dashboards...")
-        local_query_files = find_project_root() / "src/databricks/labs/ucx/queries"
+        local_query_files = find_project_root(__file__) / "src/databricks/labs/ucx/queries"
         dash = DashboardFromFiles(
             self._ws,
             state=self._state,
