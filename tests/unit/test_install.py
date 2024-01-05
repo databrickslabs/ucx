@@ -7,6 +7,7 @@ import pytest
 import yaml
 from databricks.labs.blueprint.installer import InstallState
 from databricks.labs.blueprint.tui import MockPrompts
+from databricks.labs.blueprint.wheels import Wheels, find_project_root
 from databricks.sdk.errors import (
     InvalidParameterValue,
     NotFound,
@@ -36,7 +37,6 @@ import databricks.labs.ucx.uninstall  # noqa
 from databricks.labs.ucx.config import WorkspaceConfig
 from databricks.labs.ucx.framework.dashboards import DashboardFromFiles
 from databricks.labs.ucx.framework.tasks import Task
-from databricks.labs.blueprint.wheels import Wheels, find_project_root
 from databricks.labs.ucx.install import WorkspaceInstaller
 
 from ..unit.framework.mocks import MockBackend

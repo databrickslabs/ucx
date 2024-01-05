@@ -13,6 +13,7 @@ import yaml
 from databricks.labs.blueprint.installer import InstallState
 from databricks.labs.blueprint.parallel import Threads
 from databricks.labs.blueprint.tui import Prompts
+from databricks.labs.blueprint.wheels import ProductInfo, Wheels, find_project_root
 from databricks.sdk import WorkspaceClient
 from databricks.sdk.errors import (
     InvalidParameterValue,
@@ -40,7 +41,6 @@ from databricks.labs.ucx.framework.crawlers import (
 )
 from databricks.labs.ucx.framework.dashboards import DashboardFromFiles
 from databricks.labs.ucx.framework.tasks import _TASKS, Task
-from databricks.labs.blueprint.wheels import Wheels, find_project_root, ProductInfo
 from databricks.labs.ucx.hive_metastore.grants import Grant
 from databricks.labs.ucx.hive_metastore.hms_lineage import HiveMetastoreLineageEnabler
 from databricks.labs.ucx.hive_metastore.locations import ExternalLocation, Mount
@@ -850,11 +850,11 @@ class WorkspaceInstaller:
             "remove ucx project folder, dashboards, queries and jobs"
         ):
             return
-        logger.info(f"Deleting UCX v{self._wheels.version()} from {self._ws.config.host}")
+        logger.info(f"Deleting UCX v{self._product_info.version()} from {self._ws.config.host}")
         try:
             self._ws.workspace.get_status(self.config_file)
             self._ws.workspace.get_status(self._install_folder)
-            self._ws.workspace.get_status(self._state._state_file)
+            self._ws.workspace.get_status(self._state._state_file())
         except NotFound:
             logger.error(
                 f"Check if {self._install_folder} is present along with {self.config_file} and "
