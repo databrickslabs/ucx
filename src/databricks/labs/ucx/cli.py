@@ -164,8 +164,12 @@ def migrate_uc_to_uc(
         logger.error(CANT_FIND_UCX_MSG)
         return
     sql_backend = StatementExecutionBackend(ws, installation.config.warehouse_id)
+    tmp = TableMapping(ws)
     tables = TablesMigrate(
-        TablesCrawler(backend=sql_backend, schema=installation.config.inventory_database), ws=ws, backend=sql_backend
+        TablesCrawler(backend=sql_backend, schema=installation.config.inventory_database),
+        ws=ws,
+        backend=sql_backend,
+        tm=tmp,
     )
     if from_catalog == "" or to_catalog == "":
         logger.error("Please enter from_catalog and to_catalog details")

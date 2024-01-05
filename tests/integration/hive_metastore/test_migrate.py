@@ -6,10 +6,9 @@ from databricks.sdk.errors import NotFound
 from databricks.sdk.retries import retried
 from databricks.sdk.service.catalog import Privilege, PrivilegeAssignment, SecurableType
 
+from databricks.labs.ucx.framework.parallel import ManyError
 from databricks.labs.ucx.hive_metastore.mapping import Rule
 from databricks.labs.ucx.hive_metastore.table_migrate import TablesMigrate
-from databricks.labs.ucx.framework.parallel import ManyError
-from databricks.labs.ucx.hive_metastore.tables import TablesMigrate
 
 from ..conftest import StaticTableMapping, StaticTablesCrawler
 
