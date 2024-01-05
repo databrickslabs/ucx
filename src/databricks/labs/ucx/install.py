@@ -10,6 +10,11 @@ from pathlib import Path
 from typing import Any
 
 import yaml
+from databricks.labs.blueprint.entrypoint import get_logger
+from databricks.labs.blueprint.installer import InstallState
+from databricks.labs.blueprint.parallel import Threads
+from databricks.labs.blueprint.tui import Prompts
+from databricks.labs.blueprint.wheels import ProductInfo, Wheels, find_project_root
 from databricks.sdk import WorkspaceClient
 from databricks.sdk.errors import (
     InvalidParameterValue,
@@ -36,11 +41,7 @@ from databricks.labs.ucx.framework.crawlers import (
     StatementExecutionBackend,
 )
 from databricks.labs.ucx.framework.dashboards import DashboardFromFiles
-from databricks.labs.ucx.framework.install_state import InstallState
-from databricks.labs.ucx.framework.parallel import Threads
 from databricks.labs.ucx.framework.tasks import _TASKS, Task
-from databricks.labs.ucx.framework.tui import Prompts
-from databricks.labs.ucx.framework.wheels import Wheels, find_project_root
 from databricks.labs.ucx.hive_metastore.grants import Grant
 from databricks.labs.ucx.hive_metastore.hms_lineage import HiveMetastoreLineageEnabler
 from databricks.labs.ucx.hive_metastore.locations import ExternalLocation, Mount
@@ -156,18 +157,21 @@ class WorkspaceInstaller:
             raise SystemExit(msg)
         self._ws = ws
         self._prefix = prefix
+        install_state = InstallState(ws, prefix)
+        product_info = ProductInfo(__file__)
         if not wheels:
-            wheels = Wheels(ws, self._install_folder, __version__)
+            wheels = Wheels(ws, install_state, product_info)
         self._sql_backend = sql_backend
         self._prompts = promtps
         self._wheels = wheels
+        self._state = install_state
+        self._product_info = product_info
         self._this_file = Path(__file__)
         self._dashboards: dict[str, str] = {}
-        self._state = InstallState(ws, self._install_folder)
         self._install_override_clusters = None
 
     def run(self):
-        logger.info(f"Installing UCX v{self._wheels.version()}")
+        logger.info(f"Installing UCX v{self._product_info.version()}")
         self._configure()
         self._run_configured()
 
@@ -230,7 +234,7 @@ class WorkspaceInstaller:
         sql_backend: SqlBackend | None = None,
     ) -> "WorkspaceInstaller":
         workspace_installer = WorkspaceInstaller(ws, prefix=prefix, wheels=wheels, sql_backend=sql_backend)
-        logger.info(f"Installing UCX v{workspace_installer._wheels.version()} on {ws.config.host}")
+        logger.info(f"Installing UCX v{workspace_installer._product_info.version()} on {ws.config.host}")
         workspace_installer._config = config  # type: ignore[has-type]
         workspace_installer._write_config(overwrite=False)
         workspace_installer.current_config.override_clusters = override_clusters
@@ -239,7 +243,7 @@ class WorkspaceInstaller:
         return workspace_installer
 
     def run_workflow(self, step: str):
-        job_id = self._state.jobs[step]
+        job_id = int(self._state.jobs[step])
         logger.debug(f"starting {step} job: {self._ws.config.host}#job/{job_id}")
         job_run_waiter = self._ws.jobs.run_now(job_id)
         try:
@@ -273,7 +277,7 @@ class WorkspaceInstaller:
 
     def _create_dashboards(self):
         logger.info("Creating dashboards...")
-        local_query_files = find_project_root() / "src/databricks/labs/ucx/queries"
+        local_query_files = find_project_root(__file__) / "src/databricks/labs/ucx/queries"
         dash = DashboardFromFiles(
             self._ws,
             state=self._state,
@@ -494,7 +498,7 @@ class WorkspaceInstaller:
     def _deploy_workflow(self, step_name: str, settings):
         if step_name in self._state.jobs:
             try:
-                job_id = self._state.jobs[step_name]
+                job_id = int(self._state.jobs[step_name])
                 logger.info(f"Updating configuration for step={step_name} job_id={job_id}")
                 return self._ws.jobs.reset(job_id, jobs.JobSettings(**settings))
             except InvalidParameterValue:
@@ -502,8 +506,9 @@ class WorkspaceInstaller:
                 logger.warning(f"step={step_name} does not exist anymore for some reason")
                 return self._deploy_workflow(step_name, settings)
         logger.info(f"Creating new job configuration for step={step_name}")
-        job_id = self._ws.jobs.create(**settings).job_id
-        self._state.jobs[step_name] = job_id
+        new_job = self._ws.jobs.create(**settings)
+        assert new_job.job_id is not None
+        self._state.jobs[step_name] = str(new_job.job_id)
 
     def _deployed_steps_pre_v06(self):
         deployed_steps = {}
@@ -602,7 +607,7 @@ class WorkspaceInstaller:
             [t for t in _TASKS.values() if t.workflow == step_name],
             key=lambda _: _.name,
         )
-        version = self._wheels.version()
+        version = self._product_info.version()
         version = version if not self._ws.config.is_gcp else version.replace("+", "-")
         return {
             "name": self._name(step_name),
@@ -614,7 +619,7 @@ class WorkspaceInstaller:
 
     def _upload_wheel_runner(self, remote_wheel: str):
         # TODO: we have to be doing this workaround until ES-897453 is solved in the platform
-        path = f"{self._install_folder}/wheels/wheel-test-runner-{self._wheels.version()}.py"
+        path = f"{self._install_folder}/wheels/wheel-test-runner-{self._product_info.version()}.py"
         logger.debug(f"Created runner notebook: {self.notebook_link(path)}")
         py = TEST_RUNNER_NOTEBOOK.format(remote_wheel=remote_wheel, config_file=self.config_file).encode("utf8")
         self._ws.workspace.upload(path, py, overwrite=True)  # type: ignore[arg-type]
@@ -800,7 +805,9 @@ class WorkspaceInstaller:
         latest_status = []
         for step, job_id in self._state.jobs.items():
             try:
-                job_runs = list(self._ws.jobs.list_runs(job_id=job_id, limit=1))
+                job_runs = list(self._ws.jobs.list_runs(job_id=int(job_id), limit=1))
+                if not job_runs:
+                    continue
                 state = job_runs[0].state
                 result_state = state.result_state if state else None
                 latest_status.append(
@@ -844,11 +851,11 @@ class WorkspaceInstaller:
             "remove ucx project folder, dashboards, queries and jobs"
         ):
             return
-        logger.info(f"Deleting UCX v{self._wheels.version()} from {self._ws.config.host}")
+        logger.info(f"Deleting UCX v{self._product_info.version()} from {self._ws.config.host}")
         try:
             self._ws.workspace.get_status(self.config_file)
             self._ws.workspace.get_status(self._install_folder)
-            self._ws.workspace.get_status(self._state._state_file)
+            self._ws.workspace.get_status(self._state._state_file())
         except NotFound:
             logger.error(
                 f"Check if {self._install_folder} is present along with {self.config_file} and "
@@ -902,7 +909,7 @@ class WorkspaceInstaller:
             logger.error("Error deleting install folder")
 
     def validate_step(self, step: str) -> bool:
-        job_id = self._state.jobs[step]
+        job_id = int(self._state.jobs[step])
         logger.debug(f"Validating {step} workflow: {self._ws.config.host}#job/{job_id}")
         current_runs = list(self._ws.jobs.list_runs(completed_only=False, job_id=job_id))
         for run in current_runs:
@@ -926,7 +933,9 @@ class WorkspaceInstaller:
 
 
 if __name__ == "__main__":
-    ws = WorkspaceClient(product="ucx", product_version=__version__)
+    logger = get_logger(__file__)
     logger.setLevel("INFO")
+
+    ws = WorkspaceClient(product="ucx", product_version=__version__)
     installer = WorkspaceInstaller(ws, promtps=Prompts())
     installer.run()

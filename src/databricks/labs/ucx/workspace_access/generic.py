@@ -7,6 +7,8 @@ from datetime import timedelta
 from functools import partial
 from typing import Optional
 
+from databricks.labs.blueprint.limiter import rate_limited
+from databricks.labs.blueprint.parallel import ManyError, Threads
 from databricks.sdk import WorkspaceClient
 from databricks.sdk.errors import (
     DeadlineExceeded,
@@ -22,8 +24,6 @@ from databricks.sdk.service import iam, ml
 from databricks.sdk.service.iam import PermissionLevel
 
 from databricks.labs.ucx.framework.crawlers import CrawlerBase, SqlBackend
-from databricks.labs.ucx.framework.parallel import ManyError, Threads
-from databricks.labs.ucx.mixins.hardening import rate_limited
 from databricks.labs.ucx.workspace_access.base import AclSupport, Permissions
 from databricks.labs.ucx.workspace_access.groups import MigrationState
 
