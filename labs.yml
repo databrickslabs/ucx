@@ -66,6 +66,7 @@ commands:
       - name: delete_managed
         description: Revert and delete managed tables
 
+
   - name: migrate-uc-to-uc
     description: migrate tables/schemas across schema/catalog withing a UC metastore
     flags:

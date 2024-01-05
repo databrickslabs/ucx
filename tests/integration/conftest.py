@@ -14,6 +14,7 @@ from databricks.sdk.service.catalog import TableInfo
 
 from databricks.labs.ucx.framework.crawlers import SqlBackend
 from databricks.labs.ucx.hive_metastore import TablesCrawler
+from databricks.labs.ucx.hive_metastore.mapping import Rule
 from databricks.labs.ucx.hive_metastore.tables import Table
 from databricks.labs.ucx.mixins.fixtures import *  # noqa: F403
 from databricks.labs.ucx.workspace_access.groups import MigratedGroup
@@ -134,3 +135,11 @@ class StaticTablesCrawler(TablesCrawler):
 
     def snapshot(self) -> list[Table]:
         return self._tables
+
+
+class StaticTableMapping:
+    def __init__(self, rules: list[Rule] | None = None):
+        self._rules = rules
+
+    def load(self):
+        return self._rules
