@@ -10,6 +10,7 @@ from pathlib import Path
 from typing import Any
 
 import yaml
+from databricks.labs.blueprint.entrypoint import get_logger
 from databricks.labs.blueprint.installer import InstallState
 from databricks.labs.blueprint.parallel import Threads
 from databricks.labs.blueprint.tui import Prompts
@@ -109,7 +110,7 @@ main(f'--config=/Workspace{config_file}',
      f'--parent_run_id=' + dbutils.widgets.get('parent_run_id'))
 """
 
-logger = logging.getLogger(__name__)
+logger = get_logger(__file__)
 
 
 def deploy_schema(sql_backend: SqlBackend, inventory_schema: str):
