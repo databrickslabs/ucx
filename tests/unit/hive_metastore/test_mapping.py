@@ -301,3 +301,78 @@ def test_table_with_no_target_reverted():
     rule = Rule("fake_ws", "cat1", "schema1", "schema1", "table1", "table1")
     assert table_mapping._get_table_in_scope_task(TableToMigrate(table_to_migrate, rule))
     assert "ALTER TABLE hive_metastore.schema1.table1 UNSET TBLPROPERTIES IF EXISTS('upgraded_to');" in backend.queries
+
+
+def test_skipping_rules_existing_targets():
+    errors = {}
+    rows = {}
+    backend = MockBackend(fails_on_first=errors, rows=rows)
+    client = create_autospec(WorkspaceClient)
+    client.tables.get.side_effect = NotFound()
+    client.catalogs.list.return_value = [CatalogInfo(name="cat1")]
+    client.schemas.list.return_value = [
+        SchemaInfo(catalog_name="cat1", name="schema1"),
+    ]
+    client.tables.list.return_value = [
+        TableInfo(
+            catalog_name="cat1",
+            schema_name="schema1",
+            name="dest1",
+            full_name="cat1.schema1.dest1",
+            properties={"upgraded_from": "hive_metastore.schema1.table1"},
+        ),
+    ]
+
+    table_mapping = TableMapping(client, backend)
+    tables_to_migrate = [
+        Table(
+            object_type="EXTERNAL",
+            table_format="DELTA",
+            catalog="hive_metastore",
+            database="schema1",
+            name="table1",
+        )
+    ]
+    rules = [Rule("fake_ws", "cat1", "schema1", "schema1", "table1", "dest1")]
+    databases = {"schema1"}
+    table_mapping._get_tables_in_scope(rules, databases, tables_to_migrate)
+
+    assert not backend.queries
+
+
+def test_skipping_rules_database_missing():
+    errors = {}
+    rows = {}
+    backend = MockBackend(fails_on_first=errors, rows=rows)
+    client = create_autospec(WorkspaceClient)
+    client.tables.get.side_effect = NotFound()
+    client.catalogs.list.return_value = []
+    client.schemas.list.return_value = []
+    client.tables.list.return_value = []
+
+    table_mapping = TableMapping(client, backend)
+    tables_to_migrate = [
+        Table(
+            object_type="EXTERNAL",
+            table_format="DELTA",
+            catalog="hive_metastore",
+            database="schema1",
+            name="table1",
+        ),
+        Table(
+            object_type="EXTERNAL",
+            table_format="DELTA",
+            catalog="hive_metastore",
+            database="schema2",
+            name="table2",
+        ),
+    ]
+    rules = [
+        Rule("fake_ws", "cat1", "schema1", "schema1", "table1", "dest1"),
+        Rule("fake_ws", "cat1", "schema2", "schema2", "table2", "dest2"),
+    ]
+    databases = {"schema1"}
+    table_mapping._get_tables_in_scope(rules, databases, tables_to_migrate)
+
+    assert "SHOW TBLPROPERTIES `schema1`.`table1`" in backend.queries
+    assert "SHOW TBLPROPERTIES `schema2`.`table2`" not in backend.queries

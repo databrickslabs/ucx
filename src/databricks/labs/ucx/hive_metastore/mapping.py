@@ -173,7 +173,7 @@ class TableMapping:
             if rule.as_hms_table_key not in crawled_tables_keys:
                 logger.info(f"Table {rule.as_hms_table_key} in the mapping doesn't show up in assessment")
                 continue
-            if rule.as_uc_table_key in upgraded_tables:
+            if rule.as_hms_table_key in upgraded_tables:
                 logger.info(f"Table {rule.as_hms_table_key} was migrated to {rule.as_uc_table_key} and will be skipped")
                 continue
             if rule.src_schema not in databases_in_scope:
