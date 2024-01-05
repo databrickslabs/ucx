@@ -179,6 +179,9 @@ def test_skip_tables_marked_for_skipping_or_upgraded():
         "SHOW TBLPROPERTIES `test_schema1`.`test_view1`": [
             {"key": "databricks.labs.ucx.skip", "value": "true"},
         ],
+        "SHOW TBLPROPERTIES `test_schema1`.`test_table2`": [
+            {"key": "upgraded_to", "value": "fake_dest"},
+        ],
         "DESCRIBE SCHEMA EXTENDED test_schema1": [],
         "DESCRIBE SCHEMA EXTENDED test_schema2": [],
         "DESCRIBE SCHEMA EXTENDED test_schema3": [
@@ -263,7 +266,7 @@ def test_skip_tables_marked_for_skipping_or_upgraded():
     table_mapping = TableMapping(client, backend)
 
     tables_to_migrate = table_mapping.get_tables_to_migrate(table_crawler)
-    assert len(tables_to_migrate) == 3
+    assert len(tables_to_migrate) == 2
     tables = (table_to_migrate.src for table_to_migrate in tables_to_migrate)
     assert (
         Table(
