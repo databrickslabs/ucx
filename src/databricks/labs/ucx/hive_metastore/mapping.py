@@ -102,39 +102,14 @@ class TableMapping:
             raise ValueError(msg) from None
 
     def get_tables_to_migrate(self, tables_crawler: TablesCrawler):
-        upgraded_tables = self._get_upgraded_tables()
-
-        tables_to_validate = []
         rules = self.load()
         crawled_tables = tables_crawler.snapshot()
-        crawled_tables_keys = {crawled_table.key: crawled_table for crawled_table in crawled_tables}
-        # Deducing the set of databases in the crawled tables
-        crawled_databases = {crawled_table.database for crawled_table in crawled_tables}
 
         # Getting all the source tables from the rules
-        source_databases = {rule.src_schema for rule in rules if rule.src_schema in crawled_databases}
-        validated_databases = self._get_validated_databases(source_databases)
+        source_databases = {rule.src_schema for rule in rules}
+        databases_in_scope = self._get_databases_in_scope(source_databases)
 
-        for rule in rules:
-            if rule.as_hms_table_key not in crawled_tables_keys:
-                logger.info(f"Table {rule.as_hms_table_key} in the mapping doesn't show up in assessment")
-                continue
-            if rule.as_uc_table_key in upgraded_tables:
-                logger.info(f"Table {rule.as_hms_table_key} was migrated to {rule.as_uc_table_key} and will be skipped")
-                continue
-            if rule.src_schema not in validated_databases:
-                logger.info(f"Table {rule.as_hms_table_key} is in a database that was marked to be skipped")
-                continue
-            tables_to_validate.append(crawled_tables_keys[rule.as_hms_table_key])
-        validated_tables = self._get_validated_tables(tables_to_validate)
-        validated_tables_by_key = {table.key: table for table in validated_tables}
-
-        tables_to_migrate = []
-        for rule in rules:
-            if rule.as_hms_table_key not in validated_tables_by_key:
-                continue
-            tables_to_migrate.append(TableToMigrate(validated_tables_by_key[rule.as_hms_table_key], rule))
-        return tables_to_migrate
+        return self._get_tables_in_scope(rules, databases_in_scope, crawled_tables)
 
     def skip_table(self, schema: str, table: str):
         # Marks a table to be skipped in the migration process by applying a table property
@@ -162,26 +137,6 @@ class TableMapping:
         except BadRequest as br:
             logger.error(br)
 
-    def _get_valid_source_table(self, table: Table) -> Table | None:
-        result = self._backend.fetch(f"SHOW TBLPROPERTIES `{table.database}`.`{table.name}`")
-        for value in result:
-            if value["key"] == "upgraded_to":
-                logger.info(f"{table.key} is set as upgraded to {value['value']}")
-                return None
-            if value["key"] == self.UCX_SKIP_PROPERTY:
-                logger.info(f"{table.key} is marked to be skipped")
-                return None
-        return table
-
-    def _get_valid_source_database(self, database: str) -> str | None:
-        describe = {}
-        for value in self._backend.fetch(f"DESCRIBE SCHEMA EXTENDED {database}"):
-            describe[value["database_description_item"]] = value["database_description_value"]
-        if self.UCX_SKIP_PROPERTY in TablesCrawler.parse_database_props(describe.get("Properties", "").lower()):
-            logger.info(f"Database {database} is marked to be skipped")
-            return None
-        return database
-
     def _get_upgraded_tables(self) -> dict[str, TableInfo]:
         upgraded_tables = {}
         for catalog in self._ws.catalogs.list():
@@ -195,16 +150,65 @@ class TableMapping:
                         upgraded_tables[table.properties["upgraded_from"].lower()] = table
         return upgraded_tables
 
-    def _get_validated_databases(self, databases: set[str]):
+    def _get_databases_in_scope(self, databases: set[str]):
         tasks = []
         for database in databases:
-            tasks.append(partial(self._get_valid_source_database, database))
-        valid_databases = Threads.strict("Checking databases for skip property", tasks)
-        return valid_databases
+            tasks.append(partial(self._get_database_in_scope_task, database))
+        return Threads.strict("checking databases for skip property", tasks)
 
-    def _get_validated_tables(self, tables_to_check: list[Table]):
+    def _get_database_in_scope_task(self, database: str) -> str | None:
+        describe = {}
+        for value in self._backend.fetch(f"DESCRIBE SCHEMA EXTENDED {database}"):
+            describe[value["database_description_item"]] = value["database_description_value"]
+        if self.UCX_SKIP_PROPERTY in TablesCrawler.parse_database_props(describe.get("Properties", "").lower()):
+            logger.info(f"Database {database} is marked to be skipped")
+            return None
+        return database
+
+    def _get_tables_in_scope(self, rules: list[Rule], databases_in_scope: set[str], crawled_tables: list[Table]):
+        crawled_tables_keys = {crawled_table.key: crawled_table for crawled_table in crawled_tables}
+        upgraded_tables = self._get_upgraded_tables()
+        tables_to_check = []
+        for rule in rules:
+            if rule.as_hms_table_key not in crawled_tables_keys:
+                logger.info(f"Table {rule.as_hms_table_key} in the mapping doesn't show up in assessment")
+                continue
+            if rule.as_uc_table_key in upgraded_tables:
+                logger.info(f"Table {rule.as_hms_table_key} was migrated to {rule.as_uc_table_key} and will be skipped")
+                continue
+            if rule.src_schema not in databases_in_scope:
+                logger.info(f"Table {rule.as_hms_table_key} is in a database that was marked to be skipped")
+                continue
+            tables_to_check.append(TableToMigrate(crawled_tables_keys[rule.as_hms_table_key], rule))
         tasks = []
         for table_to_check in tables_to_check:
-            tasks.append(partial(self._get_valid_source_table, table_to_check))
-        validated_tables = Threads.strict("Checking all database properties", tasks)
-        return validated_tables
+            tasks.append(partial(self._get_table_in_scope_task, table_to_check))
+        return Threads.strict("checking all database properties", tasks)
+
+    def _get_table_in_scope_task(self, table_to_migrate: TableToMigrate) -> TableToMigrate | None:
+        table = table_to_migrate.src
+        rule = table_to_migrate.rule
+
+        result = self._backend.fetch(f"SHOW TBLPROPERTIES `{table.database}`.`{table.name}`")
+        for value in result:
+            if value["key"] == self.UCX_SKIP_PROPERTY:
+                logger.info(f"{table.key} is marked to be skipped")
+                return None
+            if value["key"] == "upgraded_to":
+                logger.info(f"{table.key} is set as upgraded to {value['value']}")
+                if self._is_target_exists(value["value"]):
+                    return None
+                logger.info(f"The upgrade target for {table.key} is missing. Unsetting the upgrade_to property")
+                self._backend.execute(table.sql_unset_upgraded_to())
+        if self._is_target_exists(rule.as_uc_table_key):
+            logger.info(f"The intended target for {table.key}, {rule.as_uc_table_key}, already exists.")
+            return None
+        return table_to_migrate
+
+    def _is_target_exists(self, target_key: str):
+        # Attempts to get the target table info from UC returns True if it exists.
+        try:
+            self._ws.tables.get(target_key)
+            return True
+        except NotFound:
+            return False

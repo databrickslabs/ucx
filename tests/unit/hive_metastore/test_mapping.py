@@ -1,5 +1,5 @@
 import io
-from unittest.mock import MagicMock, create_autospec
+from unittest.mock import MagicMock, call, create_autospec
 
 import pytest
 from databricks.sdk import WorkspaceClient
@@ -7,7 +7,11 @@ from databricks.sdk.errors import NotFound
 from databricks.sdk.service.catalog import CatalogInfo, SchemaInfo, TableInfo
 
 from databricks.labs.ucx.account import WorkspaceInfo
-from databricks.labs.ucx.hive_metastore.mapping import Rule, TableMapping
+from databricks.labs.ucx.hive_metastore.mapping import (
+    Rule,
+    TableMapping,
+    TableToMigrate,
+)
 from databricks.labs.ucx.hive_metastore.tables import Table, TablesCrawler
 from tests.unit.framework.mocks import MockBackend
 
@@ -187,6 +191,7 @@ def test_skip_tables_marked_for_skipping_or_upgraded():
     backend = MockBackend(fails_on_first=errors, rows=rows)
     table_crawler = create_autospec(TablesCrawler)
     client = create_autospec(WorkspaceClient)
+    client.tables.get.side_effect = NotFound()
     client.catalogs.list.return_value = [CatalogInfo(name="cat1")]
     client.schemas.list.return_value = [
         SchemaInfo(catalog_name="cat1", name="test_schema1"),
@@ -258,7 +263,7 @@ def test_skip_tables_marked_for_skipping_or_upgraded():
     table_mapping = TableMapping(client, backend)
 
     tables_to_migrate = table_mapping.get_tables_to_migrate(table_crawler)
-    assert len(tables_to_migrate) == 2
+    assert len(tables_to_migrate) == 3
     tables = (table_to_migrate.src for table_to_migrate in tables_to_migrate)
     assert (
         Table(
@@ -271,3 +276,28 @@ def test_skip_tables_marked_for_skipping_or_upgraded():
         not in tables
     )
     assert (table for table in tables_to_migrate)
+    assert call("fake_dest") in client.tables.get.call_args_list
+
+
+def test_table_with_no_target_reverted():
+    errors = {}
+    rows = {
+        "SHOW TBLPROPERTIES `schema1`.`table1`": [
+            {"key": "upgraded_to", "value": "non.existing.table"},
+        ],
+    }
+    backend = MockBackend(fails_on_first=errors, rows=rows)
+    client = create_autospec(WorkspaceClient)
+    client.tables.get.side_effect = NotFound()
+
+    table_mapping = TableMapping(client, backend)
+    table_to_migrate = Table(
+        object_type="EXTERNAL",
+        table_format="DELTA",
+        catalog="hive_metastore",
+        database="schema1",
+        name="table1",
+    )
+    rule = Rule("fake_ws", "cat1", "schema1", "schema1", "table1", "table1")
+    assert table_mapping._get_table_in_scope_task(TableToMigrate(table_to_migrate, rule))
+    assert "ALTER TABLE hive_metastore.schema1.table1 UNSET TBLPROPERTIES IF EXISTS('upgraded_to');" in backend.queries
