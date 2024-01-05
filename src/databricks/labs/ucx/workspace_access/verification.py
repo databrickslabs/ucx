@@ -7,10 +7,6 @@ from databricks.sdk.errors import PermissionDenied
 from databricks.labs.ucx.workspace_access.groups import MigrationState
 from databricks.labs.ucx.workspace_access.secrets import SecretScopesSupport
 
-logging.basicConfig()
-logger = logging.getLogger(__name__)
-logger.setLevel(logging.DEBUG)
-
 
 class VerificationManager:
     def __init__(self, ws: WorkspaceClient, secrets_support: SecretScopesSupport):
