@@ -103,18 +103,30 @@ class TableMapping:
 
     def get_tables_to_migrate(self, tables_crawler: TablesCrawler):
         upgraded_tables = self._get_upgraded_tables()
-        validated_databases = self._get_validated_databases()
+
         tables_to_validate = []
         rules = self.load()
+        crawled_tables = tables_crawler.snapshot()
+        crawled_tables_keys = {crawled_table.key: crawled_table for crawled_table in crawled_tables}
+        # Deducing the set of databases in the crawled tables
+        crawled_databases = {crawled_table.database for crawled_table in crawled_tables}
+
+        # Getting all the source tables from the rules
+        source_databases = {rule.src_schema for rule in rules if rule.src_schema in crawled_databases}
+        validated_databases = self._get_validated_databases(source_databases)
+
         for rule in rules:
+            if rule.as_hms_table_key not in crawled_tables_keys:
+                logger.info(f"Table {rule.as_hms_table_key} in the mapping doesn't show up in assessment")
+                continue
             if rule.as_uc_table_key in upgraded_tables:
                 logger.info(f"Table {rule.as_hms_table_key} was migrated to {rule.as_uc_table_key} and will be skipped")
                 continue
             if rule.src_schema not in validated_databases:
                 logger.info(f"Table {rule.as_hms_table_key} is in a database that was marked to be skipped")
                 continue
-            tables_to_validate.append(rule.as_hms_table_key)
-        validated_tables = self._get_validated_tables(tables_crawler, tables_to_validate)
+            tables_to_validate.append(crawled_tables_keys[rule.as_hms_table_key])
+        validated_tables = self._get_validated_tables(tables_to_validate)
         validated_tables_by_key = {table.key: table for table in validated_tables}
 
         tables_to_migrate = []
@@ -150,7 +162,7 @@ class TableMapping:
         except BadRequest as br:
             logger.error(br)
 
-    def _validate_source_table(self, table: Table) -> Table | None:
+    def _get_valid_source_table(self, table: Table) -> Table | None:
         result = self._backend.fetch(f"SHOW TBLPROPERTIES `{table.database}`.`{table.name}`")
         for value in result:
             if value["key"] == "upgraded_to":
@@ -161,7 +173,7 @@ class TableMapping:
                 return None
         return table
 
-    def _validate_source_database(self, database: str) -> str | None:
+    def _get_valid_source_database(self, database: str) -> str | None:
         describe = {}
         for value in self._backend.fetch(f"DESCRIBE SCHEMA EXTENDED {database}"):
             describe[value["database_description_item"]] = value["database_description_value"]
@@ -183,25 +195,16 @@ class TableMapping:
                         upgraded_tables[table.properties["upgraded_from"].lower()] = table
         return upgraded_tables
 
-    def _get_validated_databases(self):
-        databases = self._backend.fetch("SHOW DATABASES")
+    def _get_validated_databases(self, databases: set[str]):
         tasks = []
-        for (database,) in databases:
-            tasks.append(partial(self._validate_source_database, database))
+        for database in databases:
+            tasks.append(partial(self._get_valid_source_database, database))
+        valid_databases = Threads.strict("Checking databases for skip property", tasks)
+        return valid_databases
 
-        skip_databases, errors = Threads.gather("Checking databases for skip property", tasks)
-        if len(errors) > 0:
-            logger.error(f"Detected {len(errors)} while scanning Skipped Databases")
-        return [skip_database for skip_database in skip_databases if skip_database]
-
-    def _get_validated_tables(self, tables_crawler: TablesCrawler, table_keys: list[str]):
+    def _get_validated_tables(self, tables_to_check: list[Table]):
         tasks = []
-        for table_to_check in tables_crawler.snapshot():
-            if table_to_check.key not in table_keys:
-                continue
-            tasks.append(partial(self._validate_source_table, table_to_check))
-
-        validated_tables, errors = Threads.gather("Checking all database properties", tasks)
-        if len(errors) > 0:
-            logger.error(f"Detected {len(errors)} while validating tables")
-        return [table for table in validated_tables if table]
+        for table_to_check in tables_to_check:
+            tasks.append(partial(self._get_valid_source_table, table_to_check))
+        validated_tables = Threads.strict("Checking all database properties", tasks)
+        return validated_tables
