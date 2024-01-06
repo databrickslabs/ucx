@@ -101,16 +101,6 @@ class TableMapping:
             msg = "Please run: databricks labs ucx table-mapping"
             raise ValueError(msg) from None
 
-    def get_tables_to_migrate(self, tables_crawler: TablesCrawler):
-        rules = self.load()
-        crawled_tables = tables_crawler.snapshot()
-
-        # Getting all the source tables from the rules
-        source_databases = {rule.src_schema for rule in rules}
-        databases_in_scope = self._get_databases_in_scope(source_databases)
-
-        return self._get_tables_in_scope(rules, databases_in_scope, crawled_tables)
-
     def skip_table(self, schema: str, table: str):
         # Marks a table to be skipped in the migration process by applying a table property
         try:
@@ -165,10 +155,13 @@ class TableMapping:
             return None
         return database
 
-    def _get_tables_in_scope(self, rules: list[Rule], databases_in_scope: set[str], crawled_tables: list[Table]):
-        crawled_tables_keys = {crawled_table.key: crawled_table for crawled_table in crawled_tables}
+    def get_tables_to_migrate(self, tables_crawler: TablesCrawler):
+        rules = self.load()
+        # Getting all the source tables from the rules
+        databases_in_scope = self._get_databases_in_scope({rule.src_schema for rule in rules})
+        crawled_tables_keys = {crawled_table.key: crawled_table for crawled_table in tables_crawler.snapshot()}
         upgraded_tables = self._get_upgraded_tables()
-        tables_to_check = []
+        tasks = []
         for rule in rules:
             if rule.as_hms_table_key not in crawled_tables_keys:
                 logger.info(f"Table {rule.as_hms_table_key} in the mapping doesn't show up in assessment")
@@ -179,10 +172,10 @@ class TableMapping:
             if rule.src_schema not in databases_in_scope:
                 logger.info(f"Table {rule.as_hms_table_key} is in a database that was marked to be skipped")
                 continue
-            tables_to_check.append(TableToMigrate(crawled_tables_keys[rule.as_hms_table_key], rule))
-        tasks = []
-        for table_to_check in tables_to_check:
-            tasks.append(partial(self._get_table_in_scope_task, table_to_check))
+            tasks.append(
+                partial(self._get_table_in_scope_task, TableToMigrate(crawled_tables_keys[rule.as_hms_table_key], rule))
+            )
+
         return Threads.strict("checking all database properties", tasks)
 
     def _get_table_in_scope_task(self, table_to_migrate: TableToMigrate) -> TableToMigrate | None:
@@ -196,16 +189,16 @@ class TableMapping:
                 return None
             if value["key"] == "upgraded_to":
                 logger.info(f"{table.key} is set as upgraded to {value['value']}")
-                if self._is_target_exists(value["value"]):
+                if self._exists_in_uc(value["value"]):
                     return None
                 logger.info(f"The upgrade target for {table.key} is missing. Unsetting the upgrade_to property")
                 self._backend.execute(table.sql_unset_upgraded_to())
-        if self._is_target_exists(rule.as_uc_table_key):
+        if self._exists_in_uc(rule.as_uc_table_key):
             logger.info(f"The intended target for {table.key}, {rule.as_uc_table_key}, already exists.")
             return None
         return table_to_migrate
 
-    def _is_target_exists(self, target_key: str):
+    def _exists_in_uc(self, target_key: str):
         # Attempts to get the target table info from UC returns True if it exists.
         try:
             self._ws.tables.get(target_key)
