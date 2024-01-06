@@ -334,6 +334,23 @@ def test_skipping_rules_existing_targets():
     assert ["DESCRIBE SCHEMA EXTENDED schema1"] == backend.queries
 
 
+def test_table_not_in_crawled_tables():
+    client = create_autospec(WorkspaceClient)
+    client.workspace.download.return_value = io.StringIO(
+        "workspace_name,catalog_name,src_schema,dst_schema,src_table,dst_table\r\n"
+        "fake_ws,cat1,schema1,schema1,table1,dest1\r\n"
+    )
+    errors = {}
+    rows = {}
+    backend = MockBackend(fails_on_first=errors, rows=rows)
+    table_mapping = TableMapping(client, backend)
+    tables_crawler = create_autospec(TablesCrawler)
+    tables_crawler.snapshot.return_value = []
+    table_mapping.get_tables_to_migrate(tables_crawler)
+
+    assert ["DESCRIBE SCHEMA EXTENDED schema1"] == backend.queries
+
+
 def test_skipping_rules_database_skipped():
     client = MagicMock()
     client.workspace.download.return_value = io.StringIO(
