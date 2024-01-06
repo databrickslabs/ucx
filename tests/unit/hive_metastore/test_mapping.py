@@ -4,7 +4,7 @@ from unittest.mock import MagicMock, call, create_autospec
 import pytest
 from databricks.sdk import WorkspaceClient
 from databricks.sdk.errors import NotFound
-from databricks.sdk.service.catalog import CatalogInfo, SchemaInfo, TableInfo
+from databricks.sdk.service.catalog import TableInfo
 
 from databricks.labs.ucx.account import WorkspaceInfo
 from databricks.labs.ucx.hive_metastore.mapping import (
@@ -194,24 +194,18 @@ def test_skip_tables_marked_for_skipping_or_upgraded():
     backend = MockBackend(fails_on_first=errors, rows=rows)
     table_crawler = create_autospec(TablesCrawler)
     client = create_autospec(WorkspaceClient)
-    client.tables.get.side_effect = NotFound()
-    client.catalogs.list.return_value = [CatalogInfo(name="cat1")]
-    client.schemas.list.return_value = [
-        SchemaInfo(catalog_name="cat1", name="test_schema1"),
-        SchemaInfo(catalog_name="cat1", name="test_schema2"),
-    ]
-    client.tables.list.side_effect = [
-        [
-            TableInfo(
-                catalog_name="cat1",
-                schema_name="schema1",
-                name="dest1",
-                full_name="cat1.schema1.test_table1",
-                properties={"upgraded_from": "hive_metastore.test_schema1.test_table1"},
-            ),
-        ],
-        [],
-        [],
+    client.tables.get.side_effect = [
+        TableInfo(
+            catalog_name="cat1",
+            schema_name="schema1",
+            name="dest1",
+            full_name="cat1.schema1.test_table1",
+            properties={"upgraded_from": "hive_metastore.test_schema1.test_table1"},
+        ),
+        NotFound(),
+        NotFound(),
+        NotFound(),
+        NotFound(),
     ]
 
     test_tables = [
@@ -316,20 +310,13 @@ def test_skipping_rules_existing_targets():
     rows = {}
     backend = MockBackend(fails_on_first=errors, rows=rows)
 
-    client.tables.get.side_effect = NotFound()
-    client.catalogs.list.return_value = [CatalogInfo(name="cat1")]
-    client.schemas.list.return_value = [
-        SchemaInfo(catalog_name="cat1", name="schema1"),
-    ]
-    client.tables.list.return_value = [
-        TableInfo(
-            catalog_name="cat1",
-            schema_name="schema1",
-            name="dest1",
-            full_name="cat1.schema1.dest1",
-            properties={"upgraded_from": "hive_metastore.schema1.table1"},
-        ),
-    ]
+    client.tables.get.return_value = TableInfo(
+        catalog_name="cat1",
+        schema_name="schema1",
+        name="dest1",
+        full_name="cat1.schema1.test_table1",
+        properties={"upgraded_from": "hive_metastore.test_schema1.test_table1"},
+    )
 
     table_mapping = TableMapping(client, backend)
     tables_crawler = create_autospec(TablesCrawler)

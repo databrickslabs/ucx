@@ -9,7 +9,6 @@ from functools import partial
 from databricks.labs.blueprint.parallel import Threads
 from databricks.sdk import WorkspaceClient
 from databricks.sdk.errors import BadRequest, NotFound
-from databricks.sdk.service.catalog import TableInfo
 from databricks.sdk.service.workspace import ImportFormat
 
 from databricks.labs.ucx.account import WorkspaceInfo
@@ -127,19 +126,6 @@ class TableMapping:
         except BadRequest as br:
             logger.error(br)
 
-    def _get_upgraded_tables(self) -> dict[str, TableInfo]:
-        upgraded_tables = {}
-        for catalog in self._ws.catalogs.list():
-            if not catalog.name:
-                continue
-            for schema in self._ws.schemas.list(catalog_name=catalog.name):
-                if not schema.name:
-                    continue
-                for table in self._ws.tables.list(catalog_name=catalog.name, schema_name=schema.name):
-                    if table.properties is not None and "upgraded_from" in table.properties:
-                        upgraded_tables[table.properties["upgraded_from"].lower()] = table
-        return upgraded_tables
-
     def _get_databases_in_scope(self, databases: set[str]):
         tasks = []
         for database in databases:
@@ -160,14 +146,10 @@ class TableMapping:
         # Getting all the source tables from the rules
         databases_in_scope = self._get_databases_in_scope({rule.src_schema for rule in rules})
         crawled_tables_keys = {crawled_table.key: crawled_table for crawled_table in tables_crawler.snapshot()}
-        upgraded_tables = self._get_upgraded_tables()
         tasks = []
         for rule in rules:
             if rule.as_hms_table_key not in crawled_tables_keys:
                 logger.info(f"Table {rule.as_hms_table_key} in the mapping doesn't show up in assessment")
-                continue
-            if rule.as_hms_table_key in upgraded_tables:
-                logger.info(f"Table {rule.as_hms_table_key} was migrated to {rule.as_uc_table_key} and will be skipped")
                 continue
             if rule.src_schema not in databases_in_scope:
                 logger.info(f"Table {rule.as_hms_table_key} is in a database that was marked to be skipped")
@@ -182,6 +164,9 @@ class TableMapping:
         table = table_to_migrate.src
         rule = table_to_migrate.rule
 
+        if self._exists_in_uc(rule.as_uc_table_key):
+            logger.info(f"The intended target for {table.key}, {rule.as_uc_table_key}, already exists.")
+            return None
         result = self._backend.fetch(f"SHOW TBLPROPERTIES `{table.database}`.`{table.name}`")
         for value in result:
             if value["key"] == self.UCX_SKIP_PROPERTY:
@@ -190,12 +175,15 @@ class TableMapping:
             if value["key"] == "upgraded_to":
                 logger.info(f"{table.key} is set as upgraded to {value['value']}")
                 if self._exists_in_uc(value["value"]):
+                    logger.info(
+                        f"The table {table.key} was previously upgraded to {value['value']}. "
+                        f"To revert the table and allow it to be upgraded again use the CLI command:"
+                        f"databricks labs ucx revert --schema {table.database} --table {table.name}"
+                    )
                     return None
-                logger.info(f"The upgrade target for {table.key} is missing. Unsetting the upgrade_to property")
+                logger.info(f"The upgrade_to target for {table.key} is missing. Unsetting the upgrade_to property")
                 self._backend.execute(table.sql_unset_upgraded_to())
-        if self._exists_in_uc(rule.as_uc_table_key):
-            logger.info(f"The intended target for {table.key}, {rule.as_uc_table_key}, already exists.")
-            return None
+
         return table_to_migrate
 
     def _exists_in_uc(self, target_key: str):
