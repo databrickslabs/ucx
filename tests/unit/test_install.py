@@ -258,7 +258,7 @@ def test_run_workflow_creates_proper_failure(ws, mocker):
 
 def test_run_workflow_creates_failure_from_mapping(ws, mocker):
     def run_now(job_id):
-        assert "bar" == job_id
+        assert 111 == job_id
 
         def result():
             raise OperationFailed(...)
@@ -283,7 +283,7 @@ def test_run_workflow_creates_failure_from_mapping(ws, mocker):
         error="something: PermissionDenied: does not compute", error_trace="# goes to stderr"
     )
     installer = WorkspaceInstaller(ws)
-    installer._state.jobs = {"foo": "bar"}
+    installer._state.jobs = {"foo": "111"}
     with pytest.raises(PermissionDenied) as failure:
         installer.run_workflow("foo")
 
@@ -292,7 +292,7 @@ def test_run_workflow_creates_failure_from_mapping(ws, mocker):
 
 def test_run_workflow_creates_failure_many_error(ws, mocker):
     def run_now(job_id):
-        assert "bar" == job_id
+        assert 111 == job_id
 
         def result():
             raise OperationFailed(...)
@@ -327,7 +327,7 @@ def test_run_workflow_creates_failure_many_error(ws, mocker):
         error="something: DataLoss: does not compute", error_trace="# goes to stderr"
     )
     installer = WorkspaceInstaller(ws)
-    installer._state.jobs = {"foo": "bar"}
+    installer._state.jobs = {"foo": "111"}
     with pytest.raises(ManyError) as failure:
         installer.run_workflow("foo")
 
