@@ -50,7 +50,7 @@ def test_migrate_managed_tables(ws, sql_backend, inventory_schema, make_catalog,
 
 @retried(on=[NotFound], timeout=timedelta(minutes=5))
 def test_migrate_tables_with_cache_should_not_create_table(
-        ws, sql_backend, inventory_schema, make_random, make_catalog, make_schema, make_table
+    ws, sql_backend, inventory_schema, make_random, make_catalog, make_schema, make_table
 ):
     if not ws.config.is_azure:
         pytest.skip("temporary: only works in azure test env")
@@ -244,7 +244,10 @@ def test_mapping_reverts_table(ws, sql_backend, inventory_schema, make_schema, m
     src_schema = make_schema(catalog_name="hive_metastore")
     table_to_revert = make_table(schema_name=src_schema.name)
     table_to_skip = make_table(schema_name=src_schema.name)
-    all_tables = [table_to_revert, table_to_skip, ]
+    all_tables = [
+        table_to_revert,
+        table_to_skip,
+    ]
 
     dst_catalog = make_catalog()
     dst_schema = make_schema(catalog_name=dst_catalog.name, name=src_schema.name)
@@ -267,13 +270,14 @@ def test_mapping_reverts_table(ws, sql_backend, inventory_schema, make_schema, m
     target_table_properties = ws.tables.get(f"{dst_schema.full_name}.{table_to_skip.name}").properties
     assert target_table_properties["upgraded_from"] == table_to_skip.full_name
 
-    sql_backend.execute(f"ALTER TABLE {table_to_revert.full_name} SET "
-                        f"TBLPROPERTIES('upgraded_to' = 'fake_catalog.fake_schema.fake_table');")
+    sql_backend.execute(
+        f"ALTER TABLE {table_to_revert.full_name} SET "
+        f"TBLPROPERTIES('upgraded_to' = 'fake_catalog.fake_schema.fake_table');"
+    )
 
-    results = {_["key"]: _["value"] for _ in
-               list(sql_backend.fetch(f"SHOW TBLPROPERTIES {table_to_revert.full_name}"))}
+    results = {_["key"]: _["value"] for _ in list(sql_backend.fetch(f"SHOW TBLPROPERTIES {table_to_revert.full_name}"))}
     assert "upgraded_to" in results
-    assert results["upgraded_to"] == f"fake_catalog.fake_schema.fake_table"
+    assert results["upgraded_to"] == "fake_catalog.fake_schema.fake_table"
 
     rules2 = [
         Rule(
@@ -306,6 +310,7 @@ def test_mapping_reverts_table(ws, sql_backend, inventory_schema, make_schema, m
         table_to_revert.name,
         table_to_revert.name,
     )
-    results2 = {_["key"]: _["value"] for _ in
-                list(sql_backend.fetch(f"SHOW TBLPROPERTIES {table_to_revert.full_name}"))}
+    results2 = {
+        _["key"]: _["value"] for _ in list(sql_backend.fetch(f"SHOW TBLPROPERTIES {table_to_revert.full_name}"))
+    }
     assert "upgraded_to" not in results2

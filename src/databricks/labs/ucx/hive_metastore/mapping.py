@@ -6,6 +6,7 @@ import re
 from dataclasses import dataclass
 from functools import partial
 
+from databricks.labs.blueprint.parallel import Threads
 from databricks.sdk import WorkspaceClient
 from databricks.sdk.errors import BadRequest, NotFound
 from databricks.sdk.service.catalog import TableInfo
@@ -13,7 +14,6 @@ from databricks.sdk.service.workspace import ImportFormat
 
 from databricks.labs.ucx.account import WorkspaceInfo
 from databricks.labs.ucx.framework.crawlers import SqlBackend
-from databricks.labs.ucx.framework.parallel import Threads
 from databricks.labs.ucx.hive_metastore import TablesCrawler
 from databricks.labs.ucx.hive_metastore.tables import Table
 
