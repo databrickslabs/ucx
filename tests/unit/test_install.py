@@ -6,6 +6,7 @@ from unittest.mock import MagicMock, create_autospec, patch
 import pytest
 import yaml
 from databricks.labs.blueprint.installer import InstallState
+from databricks.labs.blueprint.parallel import ManyError
 from databricks.labs.blueprint.tui import MockPrompts
 from databricks.labs.blueprint.wheels import Wheels, find_project_root
 from databricks.sdk.errors import (
@@ -13,6 +14,7 @@ from databricks.sdk.errors import (
     NotFound,
     OperationFailed,
     PermissionDenied,
+    Unknown,
 )
 from databricks.sdk.service import iam, jobs, sql
 from databricks.sdk.service.compute import (
@@ -248,10 +250,92 @@ def test_run_workflow_creates_proper_failure(ws, mocker):
     ws.jobs.get_run_output.return_value = jobs.RunOutput(error="does not compute", error_trace="# goes to stderr")
     installer = WorkspaceInstaller(ws)
     installer._state.jobs = {"foo": "111"}
-    with pytest.raises(OperationFailed) as failure:
+    with pytest.raises(Unknown) as failure:
         installer.run_workflow("foo")
 
-    assert "Stuff happens: stuff: does not compute" == str(failure.value)
+    assert "stuff: does not compute" == str(failure.value)
+
+
+def test_run_workflow_creates_failure_from_mapping(ws, mocker):
+    def run_now(job_id):
+        assert 111 == job_id
+
+        def result():
+            raise OperationFailed(...)
+
+        waiter = mocker.Mock()
+        waiter.result = result
+        waiter.run_id = "qux"
+        return waiter
+
+    ws.jobs.run_now = run_now
+    ws.jobs.get_run.return_value = jobs.Run(
+        state=jobs.RunState(state_message="Stuff happens."),
+        tasks=[
+            jobs.RunTask(
+                task_key="stuff",
+                state=jobs.RunState(result_state=jobs.RunResultState.FAILED),
+                run_id=123,
+            )
+        ],
+    )
+    ws.jobs.get_run_output.return_value = jobs.RunOutput(
+        error="something: PermissionDenied: does not compute", error_trace="# goes to stderr"
+    )
+    installer = WorkspaceInstaller(ws)
+    installer._state.jobs = {"foo": "111"}
+    with pytest.raises(PermissionDenied) as failure:
+        installer.run_workflow("foo")
+
+    assert str(failure.value) == "does not compute"
+
+
+def test_run_workflow_creates_failure_many_error(ws, mocker):
+    def run_now(job_id):
+        assert 111 == job_id
+
+        def result():
+            raise OperationFailed(...)
+
+        waiter = mocker.Mock()
+        waiter.result = result
+        waiter.run_id = "qux"
+        return waiter
+
+    ws.jobs.run_now = run_now
+    ws.jobs.get_run.return_value = jobs.Run(
+        state=jobs.RunState(state_message="Stuff happens."),
+        tasks=[
+            jobs.RunTask(
+                task_key="stuff",
+                state=jobs.RunState(result_state=jobs.RunResultState.FAILED),
+                run_id=123,
+            ),
+            jobs.RunTask(
+                task_key="things",
+                state=jobs.RunState(result_state=jobs.RunResultState.TIMEDOUT),
+                run_id=124,
+            ),
+            jobs.RunTask(
+                task_key="some",
+                state=jobs.RunState(result_state=jobs.RunResultState.FAILED),
+                run_id=125,
+            ),
+        ],
+    )
+    ws.jobs.get_run_output.return_value = jobs.RunOutput(
+        error="something: DataLoss: does not compute", error_trace="# goes to stderr"
+    )
+    installer = WorkspaceInstaller(ws)
+    installer._state.jobs = {"foo": "111"}
+    with pytest.raises(ManyError) as failure:
+        installer.run_workflow("foo")
+
+    assert str(failure.value) == (
+        "Detected 3 failures: "
+        "DataLoss: does not compute, "
+        "DeadlineExceeded: things: The run was stopped after reaching the timeout"
+    )
 
 
 def test_save_config(ws):
