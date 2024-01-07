@@ -44,6 +44,14 @@ def test_no_step_in_repair_run(mocker, caplog):
         assert e.args[0] == "You did not specify --step"
 
 
+def test_uc_to_uc_no_ucx(mocker, caplog):
+    w = create_autospec(WorkspaceClient)
+    w.current_user.me = lambda: iam.User(user_name="foo", groups=[iam.ComplexValue(display="admins")])
+    mocker.patch("databricks.labs.ucx.installer.InstallationManager.for_user", return_value=None)
+    migrate_uc_to_uc(w, "", "", "", "", "")
+    assert [rec.message for rec in caplog.records if "UCX configuration" in rec.message]
+
+
 def test_uc_to_uc_no_catalog(mocker, caplog):
     w = create_autospec(WorkspaceClient)
     w.current_user.me = lambda: iam.User(user_name="foo", groups=[iam.ComplexValue(display="admins")])

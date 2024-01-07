@@ -363,6 +363,9 @@ def test_migrate_uc_tables(caplog):
         "SHOW CREATE TABLE SrcC.SrcS.table1": [
             ("CREATE TABLE SrcC.SrcS.table1 (name string)"),
         ],
+        "SHOW CREATE TABLE SrcC.SrcS.table3": [
+            ("CREATE TABLE SrcC.SrcS.table3 (name string)"),
+        ],
     }
     client.tables.list.return_value = [
         TableInfo(
@@ -382,15 +385,32 @@ def test_migrate_uc_tables(caplog):
         TableInfo(
             catalog_name="SrcC",
             schema_name="SrcS",
+            name="table3",
+            full_name="SrcC.SrcS.table3",
+            table_type=TableType.EXTERNAL,
+        ),
+        TableInfo(
+            catalog_name="SrcC",
+            schema_name="SrcS",
             name="view1",
             full_name="SrcC.SrcS.view1",
             table_type=TableType.VIEW,
             view_definition="SELECT * FROM SrcC.SrcS.table1",
         ),
+        TableInfo(
+            catalog_name="SrcC",
+            schema_name="SrcS",
+            name="view2",
+            full_name="SrcC.SrcS.view2",
+            table_type=TableType.VIEW,
+            view_definition="SELECT * FROM SrcC.SrcS.table1",
+        ),
     ]
-    client.grants.get.return_value = PermissionsList([PrivilegeAssignment("foo", [Privilege.SELECT])])
+    perm_list = PermissionsList([PrivilegeAssignment("foo", [Privilege.SELECT])])
+    perm_none = PermissionsList(None)
+    client.grants.get.side_effect = [perm_list, perm_none, perm_none, perm_list, perm_none]
     client.schemas.get.side_effect = [SchemaInfo(), SchemaInfo()]
-    client.tables.get.side_effect = [NotFound(), TableInfo(), NotFound()]
+    client.tables.get.side_effect = [NotFound(), TableInfo(), NotFound(), NotFound(), NotFound()]
     backend = MockBackend(fails_on_first=errors, rows=rows)
     table_mapping = create_autospec(TableMapping)
     table_mapping.load.return_value = []
@@ -398,7 +418,7 @@ def test_migrate_uc_tables(caplog):
     tm.move_migrated_tables("SrcC", "SrcS", "*", "TgtC", "TgtS")
     log_cnt = 0
     for rec in caplog.records:
-        if rec.message in ["migrated 1 tables to the new schema TgtS.", "migrated 1 views to the new schema TgtS."]:
+        if rec.message in ["migrated 2 tables to the new schema TgtS.", "migrated 2 views to the new schema TgtS."]:
             log_cnt += 1
 
     assert log_cnt == 2
