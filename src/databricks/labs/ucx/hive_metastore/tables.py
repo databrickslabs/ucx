@@ -5,8 +5,9 @@ from collections.abc import Iterable, Iterator
 from dataclasses import dataclass
 from functools import partial
 
+from databricks.labs.blueprint.parallel import Threads
+
 from databricks.labs.ucx.framework.crawlers import CrawlerBase, SqlBackend
-from databricks.labs.ucx.framework.parallel import Threads
 from databricks.labs.ucx.mixins.sql import Row
 
 logger = logging.getLogger(__name__)
@@ -135,6 +136,13 @@ class TablesCrawler(CrawlerBase):
     @staticmethod
     def _parse_table_props(tbl_props: str) -> dict:
         pattern = r"([^,\[\]]+)=([^,\[\]]+)"
+        key_value_pairs = re.findall(pattern, tbl_props)
+        # Convert key-value pairs to dictionary
+        return dict(key_value_pairs)
+
+    @staticmethod
+    def parse_database_props(tbl_props: str) -> dict:
+        pattern = r"([^,^\(^\)\[\]]+),([^,^\(^\)\[\]]+)"
         key_value_pairs = re.findall(pattern, tbl_props)
         # Convert key-value pairs to dictionary
         return dict(key_value_pairs)

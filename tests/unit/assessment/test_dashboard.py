@@ -2,6 +2,8 @@ import io
 import json
 
 import yaml
+from databricks.labs.blueprint.entrypoint import find_project_root
+from databricks.labs.blueprint.installer import InstallState
 from databricks.sdk.service import iam
 from databricks.sdk.service.sql import (
     Dashboard,
@@ -13,8 +15,6 @@ from databricks.sdk.service.sql import (
 
 from databricks.labs.ucx.config import WorkspaceConfig
 from databricks.labs.ucx.framework.dashboards import DashboardFromFiles
-from databricks.labs.ucx.framework.install_state import InstallState
-from databricks.labs.ucx.framework.wheels import find_project_root
 from databricks.labs.ucx.install import WorkspaceInstaller
 
 
@@ -63,7 +63,7 @@ def test_dashboard(mocker):
     ws.dashboard_widgets.create.return_value = Widget(id="abc")
     ws.warehouses.list.return_value = []
     installer = WorkspaceInstaller(ws)
-    local_query_files = find_project_root() / "src/databricks/labs/ucx/queries"
+    local_query_files = find_project_root(__file__) / "src/databricks/labs/ucx/queries"
     dash = DashboardFromFiles(
         ws,
         InstallState(ws, install_folder),

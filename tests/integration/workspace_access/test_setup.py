@@ -2,10 +2,9 @@ import logging
 from functools import partial
 
 import pytest
+from databricks.labs.blueprint.parallel import Threads
 from databricks.sdk import WorkspaceClient
 from databricks.sdk.service.iam import ComplexValue
-
-from databricks.labs.ucx.framework.parallel import Threads
 
 logger = logging.getLogger(__name__)
 

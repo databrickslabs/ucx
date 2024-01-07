@@ -2,6 +2,7 @@ import io
 from unittest.mock import MagicMock
 
 import pytest
+from databricks.labs.blueprint.parallel import ManyError
 from databricks.sdk.errors import NotFound
 from databricks.sdk.service.iam import ComplexValue, User
 from databricks.sdk.service.jobs import (
@@ -11,7 +12,6 @@ from databricks.sdk.service.jobs import (
     RunState,
 )
 
-from databricks.labs.ucx.framework.parallel import ManyError
 from databricks.labs.ucx.install import WorkspaceInstaller
 from databricks.labs.ucx.installer import InstallationManager
 

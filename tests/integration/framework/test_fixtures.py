@@ -1,13 +1,10 @@
 import logging
-from datetime import timedelta
 
 import pytest
 from _pytest.outcomes import Failed, Skipped
-from databricks.sdk.errors import NotFound
-from databricks.sdk.retries import retried
+from databricks.labs.blueprint.commands import CommandExecutor
 from databricks.sdk.service.workspace import AclPermission
 
-from databricks.labs.ucx.mixins.compute import CommandExecutor
 from databricks.labs.ucx.mixins.fixtures import *  # noqa: F403
 
 logger = logging.getLogger(__name__)
@@ -76,23 +73,8 @@ def test_pipeline(make_pipeline):
     logger.info(f"created {make_pipeline()}")
 
 
-@retried(on=[NotFound], timeout=timedelta(minutes=5))
-def test_this_wheel_installs(ws, wsfs_wheel):
-    commands = CommandExecutor(ws)
-
-    commands.install_notebook_library(f"/Workspace{wsfs_wheel}")
-    installed_version = commands.run(
-        """
-        from databricks.labs.ucx.__about__ import __version__
-        print(__version__)
-        """
-    )
-
-    assert installed_version is not None
-
-
 def test_sql_backend_works(ws, wsfs_wheel):
-    commands = CommandExecutor(ws)
+    commands = CommandExecutor(ws.clusters, ws.command_execution, lambda: ws.config.cluster_id)
 
     commands.install_notebook_library(f"/Workspace{wsfs_wheel}")
     database_names = commands.run(

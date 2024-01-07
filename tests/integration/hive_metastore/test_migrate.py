@@ -6,7 +6,6 @@ from databricks.sdk.errors import NotFound
 from databricks.sdk.retries import retried
 from databricks.sdk.service.catalog import Privilege, PrivilegeAssignment, SecurableType
 
-from databricks.labs.ucx.framework.parallel import ManyError
 from databricks.labs.ucx.hive_metastore.mapping import Rule
 from databricks.labs.ucx.hive_metastore.table_migrate import TablesMigrate
 
@@ -38,7 +37,7 @@ def test_migrate_managed_tables(ws, sql_backend, inventory_schema, make_catalog,
             src_managed_table.name,
         ),
     ]
-    table_mapping = StaticTableMapping(rules=rules)
+    table_mapping = StaticTableMapping(ws, sql_backend, rules=rules)
     table_migrate = TablesMigrate(table_crawler, ws, sql_backend, table_mapping)
 
     table_migrate.migrate_tables()
@@ -93,7 +92,7 @@ def test_migrate_tables_with_cache_should_not_create_table(
             dst_managed_table.name,
         ),
     ]
-    table_mapping = StaticTableMapping(rules=rules)
+    table_mapping = StaticTableMapping(ws, sql_backend, rules=rules)
     table_migrate = TablesMigrate(table_crawler, ws, sql_backend, table_mapping)
 
     # FIXME: flaky: databricks.sdk.errors.mapping.NotFound: Catalog 'ucx_cjazg' does not exist.
@@ -131,7 +130,7 @@ def test_migrate_external_table(ws, sql_backend, inventory_schema, make_catalog,
             src_external_table.name,
         ),
     ]
-    table_mapping = StaticTableMapping(rules=rules)
+    table_mapping = StaticTableMapping(ws, sql_backend, rules=rules)
     table_migrate = TablesMigrate(table_crawler, ws, sql_backend, table_mapping)
 
     table_migrate.migrate_tables()
@@ -172,7 +171,7 @@ def test_revert_migrated_table(ws, sql_backend, inventory_schema, make_schema, m
             table_to_not_revert.name,
         ),
     ]
-    table_mapping = StaticTableMapping(rules=rules)
+    table_mapping = StaticTableMapping(ws, sql_backend, rules=rules)
     table_migrate = TablesMigrate(table_crawler, ws, sql_backend, table_mapping)
     table_migrate.migrate_tables()
 
@@ -195,6 +194,129 @@ def test_revert_migrated_table(ws, sql_backend, inventory_schema, make_schema, m
     assert target_tables_schema2[0]["tableName"] == table_to_not_revert.name
 
 
+@retried(on=[NotFound], timeout=timedelta(minutes=5))
+def test_mapping_skips_tables_databases(ws, sql_backend, inventory_schema, make_schema, make_table, make_catalog):
+    src_schema1 = make_schema(catalog_name="hive_metastore")
+    src_schema2 = make_schema(catalog_name="hive_metastore")
+    table_to_migrate = make_table(schema_name=src_schema1.name)
+    table_to_skip = make_table(schema_name=src_schema1.name)
+    table_in_skipped_database = make_table(schema_name=src_schema2.name)
+    all_tables = [table_to_migrate, table_to_skip, table_in_skipped_database]
+
+    dst_catalog = make_catalog()
+    dst_schema1 = make_schema(catalog_name=dst_catalog.name, name=src_schema1.name)
+    dst_schema2 = make_schema(catalog_name=dst_catalog.name, name=src_schema2.name)
+
+    table_crawler = StaticTablesCrawler(sql_backend, inventory_schema, all_tables)
+    rules = [
+        Rule(
+            "workspace",
+            dst_catalog.name,
+            src_schema1.name,
+            dst_schema1.name,
+            table_to_migrate.name,
+            table_to_migrate.name,
+        ),
+        Rule(
+            "workspace",
+            dst_catalog.name,
+            src_schema1.name,
+            dst_schema1.name,
+            table_to_skip.name,
+            table_to_skip.name,
+        ),
+        Rule(
+            "workspace",
+            dst_catalog.name,
+            src_schema2.name,
+            dst_schema2.name,
+            table_in_skipped_database.name,
+            table_in_skipped_database.name,
+        ),
+    ]
+    table_mapping = StaticTableMapping(ws, sql_backend, rules=rules)
+    table_mapping.skip_table(src_schema1.name, table_to_skip.name)
+    table_mapping.skip_schema(src_schema2.name)
+    assert len(table_mapping.get_tables_to_migrate(table_crawler)) == 1
+
+
+@retried(on=[NotFound], timeout=timedelta(minutes=5))
+def test_mapping_reverts_table(ws, sql_backend, inventory_schema, make_schema, make_table, make_catalog):
+    src_schema = make_schema(catalog_name="hive_metastore")
+    table_to_revert = make_table(schema_name=src_schema.name)
+    table_to_skip = make_table(schema_name=src_schema.name)
+    all_tables = [
+        table_to_revert,
+        table_to_skip,
+    ]
+
+    dst_catalog = make_catalog()
+    dst_schema = make_schema(catalog_name=dst_catalog.name, name=src_schema.name)
+
+    table_crawler = StaticTablesCrawler(sql_backend, inventory_schema, all_tables)
+    rules = [
+        Rule(
+            "workspace",
+            dst_catalog.name,
+            src_schema.name,
+            dst_schema.name,
+            table_to_skip.name,
+            table_to_skip.name,
+        ),
+    ]
+    table_mapping = StaticTableMapping(ws, sql_backend, rules=rules)
+    table_migrate = TablesMigrate(table_crawler, ws, sql_backend, table_mapping)
+    table_migrate.migrate_tables()
+
+    target_table_properties = ws.tables.get(f"{dst_schema.full_name}.{table_to_skip.name}").properties
+    assert target_table_properties["upgraded_from"] == table_to_skip.full_name
+
+    sql_backend.execute(
+        f"ALTER TABLE {table_to_revert.full_name} SET "
+        f"TBLPROPERTIES('upgraded_to' = 'fake_catalog.fake_schema.fake_table');"
+    )
+
+    results = {_["key"]: _["value"] for _ in list(sql_backend.fetch(f"SHOW TBLPROPERTIES {table_to_revert.full_name}"))}
+    assert "upgraded_to" in results
+    assert results["upgraded_to"] == "fake_catalog.fake_schema.fake_table"
+
+    rules2 = [
+        Rule(
+            "workspace",
+            dst_catalog.name,
+            src_schema.name,
+            dst_schema.name,
+            table_to_skip.name,
+            table_to_skip.name,
+        ),
+        Rule(
+            "workspace",
+            dst_catalog.name,
+            src_schema.name,
+            dst_schema.name,
+            table_to_revert.name,
+            table_to_revert.name,
+        ),
+    ]
+    table_mapping2 = StaticTableMapping(ws, sql_backend, rules=rules2)
+    mapping2 = table_mapping2.get_tables_to_migrate(table_crawler)
+
+    # Checking to validate that table_to_skip was omitted from the list of rules
+    assert len(mapping2) == 1
+    assert mapping2[0].rule == Rule(
+        "workspace",
+        dst_catalog.name,
+        src_schema.name,
+        dst_schema.name,
+        table_to_revert.name,
+        table_to_revert.name,
+    )
+    results2 = {
+        _["key"]: _["value"] for _ in list(sql_backend.fetch(f"SHOW TBLPROPERTIES {table_to_revert.full_name}"))
+    }
+    assert "upgraded_to" not in results2
+
+
 @retried(on=[NotFound], timeout=timedelta(minutes=2))
 def test_uc_to_uc_no_from_schema(ws, sql_backend, inventory_schema, make_random, make_catalog):
     static_crawler = StaticTablesCrawler(sql_backend, inventory_schema, [])
@@ -203,7 +325,7 @@ def test_uc_to_uc_no_from_schema(ws, sql_backend, inventory_schema, make_random,
     from_schema = make_random(4)
     to_catalog = make_catalog()
     tm = TablesMigrate(static_crawler, ws, sql_backend, table_mapping)
-    with pytest.raises(ManyError):
+    with pytest.raises(NotFound):
         tm.move_migrated_tables(from_catalog.name, from_schema, "*", to_catalog.name, from_schema)
 
 

@@ -6,7 +6,7 @@ from functools import partial
 
 import databricks.sdk.core
 import pytest
-from databricks.sdk import AccountClient
+from databricks.sdk import AccountClient, WorkspaceClient
 from databricks.sdk.core import Config
 from databricks.sdk.errors import NotFound
 from databricks.sdk.retries import retried
@@ -14,7 +14,7 @@ from databricks.sdk.service.catalog import TableInfo
 
 from databricks.labs.ucx.framework.crawlers import SqlBackend
 from databricks.labs.ucx.hive_metastore import TablesCrawler
-from databricks.labs.ucx.hive_metastore.mapping import Rule
+from databricks.labs.ucx.hive_metastore.mapping import Rule, TableMapping
 from databricks.labs.ucx.hive_metastore.tables import Table
 from databricks.labs.ucx.mixins.fixtures import *  # noqa: F403
 from databricks.labs.ucx.workspace_access.groups import MigratedGroup
@@ -23,7 +23,6 @@ logging.getLogger("tests").setLevel("DEBUG")
 logging.getLogger("databricks.labs.ucx").setLevel("DEBUG")
 
 logger = logging.getLogger(__name__)
-
 
 retry_on_not_found = functools.partial(retried, on=[NotFound], timeout=timedelta(minutes=5))
 long_retry_on_not_found = functools.partial(retry_on_not_found, timeout=timedelta(minutes=15))
@@ -128,7 +127,7 @@ class StaticTablesCrawler(TablesCrawler):
                 object_type=f"{_.table_type.value}",
                 view_text=_.view_definition,
                 location=_.storage_location,
-                table_format=f"{ _.data_source_format.value}" if _.table_type.value != "VIEW" else None,  # type: ignore[arg-type]
+                table_format=f"{_.data_source_format.value}" if _.table_type.value != "VIEW" else None,  # type: ignore[arg-type]
             )
             for _ in tables
         ]
@@ -137,9 +136,12 @@ class StaticTablesCrawler(TablesCrawler):
         return self._tables
 
 
-class StaticTableMapping:
-    def __init__(self, rules: list[Rule] | None = None):
+class StaticTableMapping(TableMapping):
+    def __init__(
+        self, ws: WorkspaceClient, backend: SqlBackend, folder: str | None = None, rules: list[Rule] | None = None
+    ):
         self._rules = rules
+        super().__init__(ws, backend, folder)
 
     def load(self):
         return self._rules

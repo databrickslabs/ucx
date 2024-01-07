@@ -2,13 +2,13 @@ import logging
 from collections import defaultdict
 from functools import partial
 
+from databricks.labs.blueprint.parallel import Threads
 from databricks.sdk import WorkspaceClient
 from databricks.sdk.core import DatabricksError
 from databricks.sdk.errors import NotFound
 from databricks.sdk.service.catalog import PermissionsChange, SecurableType
 
 from databricks.labs.ucx.framework.crawlers import SqlBackend
-from databricks.labs.ucx.framework.parallel import ManyError, Threads
 from databricks.labs.ucx.hive_metastore import TablesCrawler
 from databricks.labs.ucx.hive_metastore.mapping import Rule, TableMapping
 from databricks.labs.ucx.hive_metastore.tables import MigrationCount, Table
@@ -32,14 +32,10 @@ class TablesMigrate:
 
     def migrate_tables(self):
         self._init_seen_tables()
-        mapping_rules = self._get_mapping_rules()
+        tables_to_migrate = self._tm.get_tables_to_migrate(self._tc)
         tasks = []
-        for table in self._tc.snapshot():
-            rule = mapping_rules.get(table.key)
-            if not rule:
-                logger.info(f"Skipping table {table.key} table doesn't exist in the mapping table.")
-                continue
-            tasks.append(partial(self._migrate_table, table, rule))
+        for table in tables_to_migrate:
+            tasks.append(partial(self._migrate_table, table.src, table.rule))
         Threads.strict("migrate tables", tasks)
 
     def _migrate_table(self, src_table: Table, rule: Rule):
@@ -201,11 +197,7 @@ class TablesMigrate:
     def move_migrated_tables(
         self, from_catalog: str, from_schema: str, from_table: str, to_catalog: str, to_schema: str
     ):
-        try:
-            self._ws.schemas.get(f"{from_catalog}.{from_schema}")
-        except NotFound:
-            msg = f"schema {from_schema} not found in {from_catalog}"
-            raise ManyError(msg) from None
+        self._ws.schemas.get(f"{from_catalog}.{from_schema}")
         try:
             self._ws.schemas.get(f"{to_catalog}.{to_schema}")
         except NotFound:

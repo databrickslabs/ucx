@@ -1,21 +1,22 @@
 import json
-import logging
-import sys
 import webbrowser
 
-from databricks.sdk import WorkspaceClient
+from databricks.labs.blueprint.cli import App
+from databricks.labs.blueprint.entrypoint import get_logger
+from databricks.labs.blueprint.tui import Prompts
+from databricks.sdk import AccountClient, WorkspaceClient
 
 from databricks.labs.ucx.account import AccountWorkspaces, WorkspaceInfo
 from databricks.labs.ucx.config import AccountConfig, ConnectConfig
 from databricks.labs.ucx.framework.crawlers import StatementExecutionBackend
-from databricks.labs.ucx.framework.tui import Prompts
 from databricks.labs.ucx.hive_metastore import ExternalLocations, TablesCrawler
 from databricks.labs.ucx.hive_metastore.mapping import TableMapping
 from databricks.labs.ucx.hive_metastore.table_migrate import TablesMigrate
 from databricks.labs.ucx.install import WorkspaceInstaller
 from databricks.labs.ucx.installer import InstallationManager
 
-logger = logging.getLogger("databricks.labs.ucx")
+ucx = App(__file__)
+logger = get_logger(__file__)
 
 CANT_FIND_UCX_MSG = (
     "Couldn't find UCX configuration in the user's home folder. "
@@ -23,111 +24,126 @@ CANT_FIND_UCX_MSG = (
 )
 
 
-def workflows():
-    ws = WorkspaceClient()
-    installer = WorkspaceInstaller(ws)
+@ucx.command
+def workflows(w: WorkspaceClient):
+    """Show deployed workflows and their state"""
+    installer = WorkspaceInstaller(w)
     logger.info("Fetching deployed jobs...")
     print(json.dumps(installer.latest_job_status()))
 
 
-def open_remote_config():
-    ws = WorkspaceClient()
-    installer = WorkspaceInstaller(ws)
+@ucx.command
+def open_remote_config(w: WorkspaceClient):
+    """Opens remote configuration in the browser"""
+    installer = WorkspaceInstaller(w)
 
     ws_file_url = installer.notebook_link(installer.config_file)
     webbrowser.open(ws_file_url)
 
 
-def list_installations():
-    ws = WorkspaceClient()
-    installation_manager = InstallationManager(ws)
+@ucx.command
+def installations(w: WorkspaceClient):
+    """Show installations by different users on the same workspace"""
+    installation_manager = InstallationManager(w)
     logger.info("Fetching installations...")
     all_users = [_.as_summary() for _ in installation_manager.user_installations()]
     print(json.dumps(all_users))
 
 
-def skip(schema: str, table: str | None = None):
+@ucx.command
+def skip(w: WorkspaceClient, schema: str | None = None, table: str | None = None):
+    """Create a skip comment on a schema or a table"""
     logger.info("Running skip command")
     if not schema:
-        logger.error("--Schema is a required parameter.")
+        logger.error("--schema is a required parameter.")
         return None
-    ws = WorkspaceClient()
-    installation_manager = InstallationManager(ws)
-    installation = installation_manager.for_user(ws.current_user.me())
+    installation_manager = InstallationManager(w)
+    installation = installation_manager.for_user(w.current_user.me())
     if not installation:
         logger.error(CANT_FIND_UCX_MSG)
         return None
     warehouse_id = installation.config.warehouse_id
-    sql_backend = StatementExecutionBackend(ws, warehouse_id)
-    mapping = TableMapping(ws)
+    sql_backend = StatementExecutionBackend(w, warehouse_id)
+    mapping = TableMapping(w, sql_backend)
     if table:
-        mapping.skip_table(sql_backend, schema, table)
+        mapping.skip_table(schema, table)
     else:
-        mapping.skip_schema(sql_backend, schema)
+        mapping.skip_schema(schema)
 
 
-def sync_workspace_info():
+@ucx.command(is_account=True)
+def sync_workspace_info(a: AccountClient):
+    """upload workspace config to all workspaces in the account where ucx is installed"""
+    logger.info(f"Account ID: {a.config.account_id}")
     workspaces = AccountWorkspaces(AccountConfig(connect=ConnectConfig()))
     workspaces.sync_workspace_info()
 
 
-def manual_workspace_info():
-    ws = WorkspaceClient()
+@ucx.command
+def manual_workspace_info(w: WorkspaceClient):
+    """only supposed to be run if cannot get admins to run `databricks labs ucx sync-workspace-info`"""
     prompts = Prompts()
-    workspace_info = WorkspaceInfo(ws)
+    workspace_info = WorkspaceInfo(w)
     workspace_info.manual_workspace_info(prompts)
 
 
-def create_table_mapping():
-    ws = WorkspaceClient()
-    table_mapping = TableMapping(ws)
-    workspace_info = WorkspaceInfo(ws)
-    installation_manager = InstallationManager(ws)
-    installation = installation_manager.for_user(ws.current_user.me())
-    sql_backend = StatementExecutionBackend(ws, installation.config.warehouse_id)
+@ucx.command
+def create_table_mapping(w: WorkspaceClient):
+    """create initial table mapping for review"""
+    installation_manager = InstallationManager(w)
+    installation = installation_manager.for_user(w.current_user.me())
+    sql_backend = StatementExecutionBackend(w, installation.config.warehouse_id)
+    table_mapping = TableMapping(w, sql_backend)
+    workspace_info = WorkspaceInfo(w)
+    installation_manager = InstallationManager(w)
+    installation = installation_manager.for_user(w.current_user.me())
+    sql_backend = StatementExecutionBackend(w, installation.config.warehouse_id)
     tables_crawler = TablesCrawler(sql_backend, installation.config.inventory_database)
     path = table_mapping.save(tables_crawler, workspace_info)
-    webbrowser.open(f"{ws.config.host}/#workspace{path}")
+    webbrowser.open(f"{w.config.host}/#workspace{path}")
 
 
-def validate_external_locations():
-    ws = WorkspaceClient()
+@ucx.command
+def validate_external_locations(w: WorkspaceClient):
+    """validates and provides mapping to external table to external location and shared generation tf scripts"""
     prompts = Prompts()
-    installation_manager = InstallationManager(ws)
-    installation = installation_manager.for_user(ws.current_user.me())
-    sql_backend = StatementExecutionBackend(ws, installation.config.warehouse_id)
-    location_crawler = ExternalLocations(ws, sql_backend, installation.config.inventory_database)
+    installation_manager = InstallationManager(w)
+    installation = installation_manager.for_user(w.current_user.me())
+    sql_backend = StatementExecutionBackend(w, installation.config.warehouse_id)
+    location_crawler = ExternalLocations(w, sql_backend, installation.config.inventory_database)
     path = location_crawler.save_as_terraform_definitions_on_workspace(installation.path)
     if path and prompts.confirm(f"external_locations.tf file written to {path}. Do you want to open it?"):
-        webbrowser.open(f"{ws.config.host}/#workspace{path}")
+        webbrowser.open(f"{w.config.host}/#workspace{path}")
 
 
-def ensure_assessment_run():
-    ws = WorkspaceClient()
-    installation_manager = InstallationManager(ws)
-    installation = installation_manager.for_user(ws.current_user.me())
+@ucx.command
+def ensure_assessment_run(w: WorkspaceClient):
+    """ensure the assessment job was run on a workspace"""
+    installation_manager = InstallationManager(w)
+    installation = installation_manager.for_user(w.current_user.me())
     if not installation:
         logger.error(CANT_FIND_UCX_MSG)
         return None
-    else:
-        workspace_installer = WorkspaceInstaller(ws)
-        workspace_installer.validate_and_run("assessment")
+    workspace_installer = WorkspaceInstaller(w)
+    workspace_installer.validate_and_run("assessment")
 
 
-def repair_run(step):
+@ucx.command
+def repair_run(w: WorkspaceClient, step):
+    """Repair Run the Failed Job"""
     if not step:
         raise KeyError("You did not specify --step")
-    ws = WorkspaceClient()
-    installer = WorkspaceInstaller(ws)
+    installer = WorkspaceInstaller(w)
     logger.info(f"Repair Running {step} Job")
     installer.repair_run(step)
 
 
-def revert_migrated_tables(schema: str, table: str, *, delete_managed: bool = False):
-    ws = WorkspaceClient()
+@ucx.command
+def revert_migrated_tables(w: WorkspaceClient, schema: str, table: str, *, delete_managed: bool = False):
+    """remove notation on a migrated table for re-migration"""
     prompts = Prompts()
-    installation_manager = InstallationManager(ws)
-    installation = installation_manager.for_user(ws.current_user.me())
+    installation_manager = InstallationManager(w)
+    installation = installation_manager.for_user(w.current_user.me())
     if not schema and not table:
         if not prompts.confirm(
             "You haven't specified a schema or a table. All migrated tables will be reverted."
@@ -139,37 +155,39 @@ def revert_migrated_tables(schema: str, table: str, *, delete_managed: bool = Fa
         logger.error(CANT_FIND_UCX_MSG)
         return None
     warehouse_id = installation.config.warehouse_id
-    sql_backend = StatementExecutionBackend(ws, warehouse_id)
+    sql_backend = StatementExecutionBackend(w, warehouse_id)
     table_crawler = TablesCrawler(sql_backend, installation.config.inventory_database)
-    tmp = TableMapping(ws)
-    tm = TablesMigrate(table_crawler, ws, sql_backend, tmp)
+    tmp = TableMapping(w, sql_backend)
+    tm = TablesMigrate(table_crawler, w, sql_backend, tmp)
     if tm.print_revert_report(delete_managed=delete_managed) and prompts.confirm(
         "Would you like to continue?", max_attempts=2
     ):
         tm.revert_migrated_tables(schema, table, delete_managed=delete_managed)
 
 
+@ucx.command
 def migrate_uc_to_uc(
+    w: WorkspaceClient,
     from_catalog: str,
     from_schema: str,
     from_table: str,
     to_catalog: str,
     to_schema: str,
 ):
+    """move a uc table/tables from one schema to another schema in same or different catalog"""
     logger.info("Running move command")
-    ws = WorkspaceClient()
-    installation_manager = InstallationManager(ws)
-    installation = installation_manager.for_user(ws.current_user.me())
+    installation_manager = InstallationManager(w)
+    installation = installation_manager.for_user(w.current_user.me())
     if not installation:
         logger.error(CANT_FIND_UCX_MSG)
         return
-    sql_backend = StatementExecutionBackend(ws, installation.config.warehouse_id)
-    tmp = TableMapping(ws)
+    sql_backend = StatementExecutionBackend(w, installation.config.warehouse_id)
+    tmp = TableMapping(w, sql_backend)
     tables = TablesMigrate(
-        TablesCrawler(backend=sql_backend, schema=installation.config.inventory_database),
-        ws=ws,
-        backend=sql_backend,
-        tm=tmp,
+        TablesCrawler(sql_backend, installation.config.inventory_database),
+        w,
+        sql_backend,
+        tmp,
     )
     if from_catalog == "" or to_catalog == "":
         logger.error("Please enter from_catalog and to_catalog details")
@@ -190,37 +208,5 @@ def migrate_uc_to_uc(
     )
 
 
-MAPPING = {
-    "open-remote-config": open_remote_config,
-    "installations": list_installations,
-    "workflows": workflows,
-    "sync-workspace-info": sync_workspace_info,
-    "manual-workspace-info": manual_workspace_info,
-    "create-table-mapping": create_table_mapping,
-    "validate-external-locations": validate_external_locations,
-    "ensure-assessment-run": ensure_assessment_run,
-    "skip": skip,
-    "repair-run": repair_run,
-    "revert-migrated-tables": revert_migrated_tables,
-    "move": migrate_uc_to_uc,
-}
-
-
-def main(raw):
-    payload = json.loads(raw)
-    command = payload["command"]
-    if command not in MAPPING:
-        msg = f"cannot find command: {command}"
-        raise KeyError(msg)
-    flags = payload["flags"]
-    log_level = flags.pop("log_level")
-    if log_level == "disabled":
-        log_level = "info"
-    databricks_logger = logging.getLogger("databricks")
-    databricks_logger.setLevel(log_level.upper())
-    kwargs = {k.replace("-", "_"): v for k, v in flags.items()}
-    MAPPING[command](**kwargs)
-
-
-if __name__ == "__main__":
-    main(*sys.argv[1:])
+if "__main__" == __name__:
+    ucx()

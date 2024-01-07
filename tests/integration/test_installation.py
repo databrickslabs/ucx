@@ -5,12 +5,12 @@ from dataclasses import replace
 from datetime import timedelta
 
 import pytest
-from databricks.sdk.errors import InvalidParameterValue, NotFound, OperationFailed
+from databricks.labs.blueprint.parallel import Threads
+from databricks.sdk.errors import InvalidParameterValue, NotFound
 from databricks.sdk.retries import retried
 from databricks.sdk.service.iam import PermissionLevel
 
 from databricks.labs.ucx.config import WorkspaceConfig
-from databricks.labs.ucx.framework.parallel import Threads
 from databricks.labs.ucx.install import WorkspaceInstaller
 from databricks.labs.ucx.workspace_access.generic import (
     GenericPermissionsSupport,
@@ -67,7 +67,7 @@ def test_job_failure_propagates_correct_error_message_and_logs(ws, sql_backend, 
 
     sql_backend.execute(f"DROP SCHEMA {install.current_config.inventory_database} CASCADE")
 
-    with pytest.raises(OperationFailed) as failure:
+    with pytest.raises(NotFound) as failure:
         install.run_workflow("099-destroy-schema")
 
     assert "cannot be found" in str(failure.value)
@@ -76,7 +76,7 @@ def test_job_failure_propagates_correct_error_message_and_logs(ws, sql_backend, 
     assert len(workflow_run_logs) == 1
 
 
-@retried(on=[NotFound, InvalidParameterValue, OperationFailed], timeout=timedelta(minutes=10))
+@retried(on=[NotFound, InvalidParameterValue], timeout=timedelta(minutes=6))
 def test_running_real_assessment_job(
     ws, new_installation, make_ucx_group, make_cluster_policy, make_cluster_policy_permissions
 ):
@@ -130,7 +130,7 @@ def test_running_real_migrate_groups_job(
     assert found[f"{install.current_config.renamed_group_prefix}{ws_group_a.display_name}"] == PermissionLevel.CAN_USE
 
 
-@retried(on=[NotFound, InvalidParameterValue, OperationFailed], timeout=timedelta(minutes=5))
+@retried(on=[NotFound, InvalidParameterValue], timeout=timedelta(minutes=5))
 def test_running_real_remove_backup_groups_job(ws, sql_backend, new_installation, make_ucx_group):
     ws_group_a, acc_group_a = make_ucx_group()
 
@@ -149,12 +149,12 @@ def test_running_real_remove_backup_groups_job(ws, sql_backend, new_installation
         ws.groups.get(ws_group_a.id)
 
 
-@retried(on=[NotFound, InvalidParameterValue, OperationFailed], timeout=timedelta(minutes=10))
+@retried(on=[NotFound, InvalidParameterValue], timeout=timedelta(minutes=10))
 def test_repair_run_workflow_job(ws, mocker, new_installation, sql_backend):
     install = new_installation()
     mocker.patch("webbrowser.open")
     sql_backend.execute(f"DROP SCHEMA {install.current_config.inventory_database} CASCADE")
-    with pytest.raises(OperationFailed):
+    with pytest.raises(NotFound):
         install.run_workflow("099-destroy-schema")
 
     sql_backend.execute(f"CREATE SCHEMA IF NOT EXISTS {install.current_config.inventory_database}")
