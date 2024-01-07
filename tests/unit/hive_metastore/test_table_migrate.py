@@ -4,6 +4,7 @@ from unittest.mock import MagicMock, create_autospec
 
 import pytest
 from databricks.sdk import WorkspaceClient
+from databricks.sdk.errors import NotFound
 from databricks.sdk.service.catalog import (
     CatalogInfo,
     PermissionsList,
@@ -375,39 +376,22 @@ def make_row(data, columns):
 def test_migrate_uc_tables_invalid_from_schema(caplog):
     tc = create_autospec(TablesCrawler)
     client = create_autospec(WorkspaceClient)
-    errors = {}
-    rows = {
-        "SYSTEM.INFORMATION_SCHEMA.SCHEMATA": [
-            make_row([0], ["cnt"]),
-        ]
-    }
-    backend = MockBackend(fails_on_first=errors, rows=rows)
     table_mapping = create_autospec(TableMapping)
     table_mapping.load.return_value = []
-    tm = TablesMigrate(tc, client, backend, table_mapping)
+    client.schemas.get.side_effect = NotFound()
+    tm = TablesMigrate(tc, client, MockBackend, table_mapping)
     with pytest.raises(ManyError):
-        tm.migrate_uc_tables(
-            from_catalog="SrcC", from_schema="SrcS", from_table=["*"], to_catalog="TgtC", to_schema="TgtS"
-        )
+        tm.move_migrated_tables("SrcC", "SrcS", "*", "TgtC", "TgtS")
 
 
 def test_migrate_uc_tables_invalid_to_schema(caplog):
     tc = create_autospec(TablesCrawler)
     client = create_autospec(WorkspaceClient)
-    errors = {}
-    rows = {
-        "SYSTEM.INFORMATION_SCHEMA.SCHEMATA WHERE CATALOG_NAME = 'SrcC' AND SCHEMA_NAME = 'SrcS'": [
-            make_row([1], ["cnt"]),
-        ],
-        "SYSTEM.INFORMATION_SCHEMA.SCHEMATA WHERE CATALOG_NAME = 'TgtC' AND SCHEMA_NAME = 'TgtS'": [
-            make_row([0], ["cnt"]),
-        ],
-    }
-    backend = MockBackend(fails_on_first=errors, rows=rows)
     table_mapping = create_autospec(TableMapping)
     table_mapping.load.return_value = []
-    tm = TablesMigrate(tc, client, backend, table_mapping)
-    tm.migrate_uc_tables(from_catalog="SrcC", from_schema="SrcS", from_table=["*"], to_catalog="TgtC", to_schema="TgtS")
+    client.schemas.get.side_effect = [SchemaInfo(), NotFound()]
+    tm = TablesMigrate(tc, client, MockBackend, table_mapping)
+    tm.move_migrated_tables("SrcC", "SrcS", "*", "TgtC", "TgtS")
     assert len([rec.message for rec in caplog.records if "schema TgtS not found in TgtC" in rec.message]) == 1
 
 
@@ -417,24 +401,6 @@ def test_migrate_uc_tables(caplog):
     client = create_autospec(WorkspaceClient)
     errors = {}
     rows = {
-        "SYSTEM.INFORMATION_SCHEMA.SCHEMATA WHERE CATALOG_NAME = 'SrcC' AND SCHEMA_NAME = 'SrcS'": [
-            make_row([1], ["cnt"]),
-        ],
-        "SYSTEM.INFORMATION_SCHEMA.SCHEMATA WHERE CATALOG_NAME = 'TgtC' AND SCHEMA_NAME = 'TgtS'": [
-            make_row([1], ["cnt"]),
-        ],
-        "SYSTEM.INFORMATION_SCHEMA.TABLES WHERE TABLE_CATALOG = 'TgtC' AND TABLE_SCHEMA = 'TgtS' AND "
-        "TABLE_NAME = 'table1'": [
-            make_row([0], ["cnt"]),
-        ],
-        "SYSTEM.INFORMATION_SCHEMA.TABLES WHERE TABLE_CATALOG = 'TgtC' AND TABLE_SCHEMA = 'TgtS' AND "
-        "TABLE_NAME = 'table2'": [
-            make_row([1], ["cnt"]),
-        ],
-        "SYSTEM.INFORMATION_SCHEMA.TABLES WHERE TABLE_CATALOG = 'TgtC' AND TABLE_SCHEMA = 'TgtS' AND "
-        "TABLE_NAME = 'view1'": [
-            make_row([0], ["cnt"]),
-        ],
         "SHOW CREATE TABLE SrcC.SrcS.table1": [
             ("CREATE TABLE SrcC.SrcS.table1 (name string)"),
         ],
@@ -464,11 +430,13 @@ def test_migrate_uc_tables(caplog):
         ),
     ]
     client.grants.get.return_value = PermissionsList([PrivilegeAssignment("foo", [Privilege.SELECT])])
+    client.schemas.get.side_effect = [SchemaInfo(), SchemaInfo()]
+    client.tables.get.side_effect = [NotFound(), TableInfo(), NotFound()]
     backend = MockBackend(fails_on_first=errors, rows=rows)
     table_mapping = create_autospec(TableMapping)
     table_mapping.load.return_value = []
     tm = TablesMigrate(tc, client, backend, table_mapping)
-    tm.migrate_uc_tables(from_catalog="SrcC", from_schema="SrcS", from_table=["*"], to_catalog="TgtC", to_schema="TgtS")
+    tm.move_migrated_tables("SrcC", "SrcS", "*", "TgtC", "TgtS")
     log_cnt = 0
     for rec in caplog.records:
         if rec.message in ["migrated 1 tables to the new schema TgtS.", "migrated 1 views to the new schema TgtS."]:

@@ -196,14 +196,15 @@ def test_revert_migrated_table(ws, sql_backend, inventory_schema, make_schema, m
 
 
 @retried(on=[NotFound], timeout=timedelta(minutes=2))
-def test_uc_to_uc_no_from_schema(ws, sql_backend, inventory_schema):
+def test_uc_to_uc_no_from_schema(ws, sql_backend, inventory_schema, make_random, make_catalog):
     static_crawler = StaticTablesCrawler(sql_backend, inventory_schema, [])
     table_mapping = StaticTableMapping(rules=[])
+    from_catalog = make_catalog()
+    from_schema = make_random(4)
+    to_catalog = make_catalog()
     tm = TablesMigrate(static_crawler, ws, sql_backend, table_mapping)
     with pytest.raises(ManyError):
-        tm.migrate_uc_tables(
-            from_catalog="SrcC", from_schema="SrcS", from_table=["*"], to_catalog="TgtC", to_schema="TgtS"
-        )
+        tm.move_migrated_tables(from_catalog.name, from_schema, "*", to_catalog.name, from_schema)
 
 
 @retried(on=[NotFound], timeout=timedelta(minutes=2))
@@ -232,12 +233,12 @@ def test_uc_to_uc(ws, sql_backend, inventory_schema, make_catalog, make_schema, 
     sql_backend.execute(f"GRANT SELECT,MODIFY ON TABLE {from_table_2.full_name} TO `{group_b.display_name}`")
     sql_backend.execute(f"GRANT SELECT ON VIEW {from_view_1.full_name} TO `{group_b.display_name}`")
     sql_backend.execute(f"GRANT SELECT ON TABLE {to_table_3.full_name} TO `{group_a.display_name}`")
-    tm.migrate_uc_tables(
-        from_catalog=from_catalog.name,
-        from_schema=from_schema.name,
-        from_table=["*"],
-        to_catalog=to_catalog.name,
-        to_schema=to_schema.name,
+    tm.move_migrated_tables(
+        from_catalog.name,
+        from_schema.name,
+        "*",
+        to_catalog.name,
+        to_schema.name,
     )
     tables = ws.tables.list(catalog_name=to_catalog.name, schema_name=to_schema.name)
     table_1_grant = ws.grants.get(
@@ -283,12 +284,12 @@ def test_uc_to_uc_no_to_schema(ws, sql_backend, inventory_schema, make_catalog, 
     from_table_3 = make_table(catalog_name=from_catalog.name, schema_name=from_schema.name)
     to_catalog = make_catalog()
     to_schema = make_random(4)
-    tm.migrate_uc_tables(
-        from_catalog=from_catalog.name,
-        from_schema=from_schema.name,
-        from_table=[from_table_1.name, from_table_2.name],
-        to_catalog=to_catalog.name,
-        to_schema=to_schema,
+    tm.move_migrated_tables(
+        from_catalog.name,
+        from_schema.name,
+        from_table_1.name,
+        to_catalog.name,
+        to_schema,
     )
     tables = ws.tables.list(catalog_name=to_catalog.name, schema_name=to_schema)
-    assert len([t for t in tables if t.name in [from_table_1.name, from_table_2.name, from_table_3.name]]) == 2
+    assert len([t for t in tables if t.name in [from_table_1.name, from_table_2.name, from_table_3.name]]) == 1

@@ -66,6 +66,17 @@ def test_uc_to_uc_no_catalog(mocker, caplog):
     )
 
 
+def test_uc_to_uc_same_schema(mocker, caplog):
+    mocker.patch("databricks.sdk.WorkspaceClient.__init__", return_value=None)
+    current_user = MagicMock()
+    current_user.me.return_value = User(user_name="foo", groups=[ComplexValue(display="admins")])
+    mocker.patch("databricks.sdk.WorkspaceClient.current_user", return_value=current_user)
+    mocker.patch("databricks.labs.ucx.installer.InstallationManager.for_user", return_value=current_user)
+    mocker.patch("databricks.labs.ucx.framework.crawlers.StatementExecutionBackend.__init__", return_value=None)
+    migrate_uc_to_uc(from_catalog="SrcCat", from_schema="SrcS", from_table=[], to_catalog="SrcCat", to_schema="SrcS")
+    assert len([rec.message for rec in caplog.records if "please select a different schema" in rec.message]) == 1
+
+
 def test_uc_to_uc_no_schema(mocker, caplog):
     mocker.patch("databricks.sdk.WorkspaceClient.__init__", return_value=None)
     current_user = MagicMock()
@@ -85,7 +96,7 @@ def test_uc_to_uc(mocker, caplog):
     mocker.patch("databricks.labs.ucx.installer.InstallationManager.for_user", return_value=current_user)
     mocker.patch("databricks.labs.ucx.framework.crawlers.StatementExecutionBackend.__init__", return_value=None)
     with patch(
-        "databricks.labs.ucx.hive_metastore.table_migrate.TablesMigrate.migrate_uc_tables", return_value=None
+        "databricks.labs.ucx.hive_metastore.table_migrate.TablesMigrate.move_migrated_tables", return_value=None
     ) as m:
-        migrate_uc_to_uc(from_catalog="SrcC", from_schema="SrcS", from_table=["*"], to_catalog="TgtC", to_schema="ToS")
+        migrate_uc_to_uc(from_catalog="SrcC", from_schema="SrcS", from_table="*", to_catalog="TgtC", to_schema="ToS")
         m.assert_called_once()

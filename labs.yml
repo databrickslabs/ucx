@@ -68,14 +68,14 @@ commands:
 
 
   - name: migrate-uc-to-uc
-    description: migrate tables/schemas across schema/catalog withing a UC metastore
+    description: migrate tables across schema/catalog withing a UC metastore
     flags:
       - name: from-catalog
         description: from catalog name
-      - name: from-schemas
+      - name: from-schema
         description: schema name to migrate.
-      - name: from-tables
-        description: table names to migrate. enter one or more tables to migrate as a list. enter * to migrate all tables
+      - name: from-table
+        description: table names to migrate. enter * to migrate all tables
       - name: to-catalog
         description: target catalog to migrate schema to
       - name: to-schema

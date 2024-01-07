@@ -152,11 +152,11 @@ def revert_migrated_tables(schema: str, table: str, *, delete_managed: bool = Fa
 def migrate_uc_to_uc(
     from_catalog: str,
     from_schema: str,
-    from_table: list[str],
+    from_table: str,
     to_catalog: str,
     to_schema: str,
 ):
-    logger.info("Running migrating uc objects command")
+    logger.info("Running move command")
     ws = WorkspaceClient()
     installation_manager = InstallationManager(ws)
     installation = installation_manager.for_user(ws.current_user.me())
@@ -181,12 +181,12 @@ def migrate_uc_to_uc(
         logger.error("please select a different schema or catalog to migrate to")
         return
     logger.error(f"migrating tables {from_table} from {from_catalog}.{from_schema} to {to_catalog}.{to_schema}")
-    tables.migrate_uc_tables(
-        from_catalog=from_catalog,
-        from_schema=from_schema,
-        from_table=from_table,
-        to_catalog=to_catalog,
-        to_schema=to_schema,
+    tables.move_migrated_tables(
+        from_catalog,
+        from_schema,
+        from_table,
+        to_catalog,
+        to_schema,
     )
 
 
@@ -202,7 +202,7 @@ MAPPING = {
     "skip": skip,
     "repair-run": repair_run,
     "revert-migrated-tables": revert_migrated_tables,
-    "move-uc-objects": migrate_uc_to_uc,
+    "move": migrate_uc_to_uc,
 }
 
 

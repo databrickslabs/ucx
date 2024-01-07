@@ -4,6 +4,7 @@ from functools import partial
 
 from databricks.sdk import WorkspaceClient
 from databricks.sdk.core import DatabricksError
+from databricks.sdk.errors import NotFound
 from databricks.sdk.service.catalog import PermissionsChange, SecurableType
 
 from databricks.labs.ucx.framework.crawlers import SqlBackend
@@ -197,55 +198,52 @@ class TablesMigrate:
             mapping_rules[rule.as_hms_table_key] = rule
         return mapping_rules
 
-    def migrate_uc_tables(
-        self, from_catalog: str, from_schema: str, from_table: list[str], to_catalog: str, to_schema: str
+    def move_migrated_tables(
+        self, from_catalog: str, from_schema: str, from_table: str, to_catalog: str, to_schema: str
     ):
-        # a = self._validate_uc_objects("schema", f"{from_catalog}.{from_schema}")
-        if self._validate_uc_objects("schema", f"{from_catalog}.{from_schema}") == 0:
+        try:
+            self._ws.schemas.get(f"{from_catalog}.{from_schema}")
+        except NotFound:
             msg = f"schema {from_schema} not found in {from_catalog}"
-            raise ManyError(msg)
-        else:
-            if self._validate_uc_objects("schema", f"{to_catalog}.{to_schema}") == 0:
-                logger.warning(f"schema {to_schema} not found in {to_catalog}, creating...")
-                self._backend.execute(f"create schema {to_catalog}.{to_schema}")
-                logger.info(f"created schema {to_schema}.")
-            tables = self._ws.tables.list(catalog_name=from_catalog, schema_name=from_schema)
-            table_tasks = []
-            view_tasks = []
-            for table in tables:
-                if table.name in from_table or from_table[0] == "*":
-                    if self._validate_uc_objects("table", f"{to_catalog}.{to_schema}.{table.name}") == 1:
-                        logger.warning(
-                            f"table {from_table} already present in {from_catalog}.{from_schema}."
-                            f" skipping this table..."
+            raise ManyError(msg) from None
+        try:
+            self._ws.schemas.get(f"{to_catalog}.{to_schema}")
+        except NotFound:
+            logger.warning(f"schema {to_schema} not found in {to_catalog}, creating...")
+            self._ws.schemas.create(name=to_schema, catalog_name=to_catalog)
+
+        tables = self._ws.tables.list(catalog_name=from_catalog, schema_name=from_schema)
+        table_tasks = []
+        view_tasks = []
+        filtered_tables = [table for table in tables if from_table in [table.name, "*"]]
+        for table in filtered_tables:
+            try:
+                self._ws.tables.get(full_name=f"{to_catalog}.{to_schema}.{table.name}")
+                logger.warning(
+                    f"table {from_table} already present in {from_catalog}.{from_schema}. skipping this table..."
+                )
+                continue
+            except NotFound:
+                if table.table_type and table.table_type.value in ("EXTERNAL", "MANAGED"):
+                    table_tasks.append(
+                        partial(self._migrate_uc_table, from_catalog, from_schema, table.name, to_catalog, to_schema)
+                    )
+                else:
+                    view_tasks.append(
+                        partial(
+                            self._migrate_uc_view,
+                            from_catalog,
+                            from_schema,
+                            table.name,
+                            to_catalog,
+                            to_schema,
+                            table.view_definition,
                         )
-                        continue
-                    if table.table_type and table.table_type.value in ("EXTERNAL", "MANAGED"):
-                        table_tasks.append(
-                            partial(
-                                self._migrate_uc_table, from_catalog, from_schema, table.name, to_catalog, to_schema
-                            )
-                        )
-                    else:
-                        view_tasks.append(
-                            partial(
-                                self._migrate_uc_table,
-                                from_catalog,
-                                from_schema,
-                                table.name,
-                                to_catalog,
-                                to_schema,
-                                table.view_definition,
-                            )
-                        )
-            _, errors = Threads.gather(name="creating tables", tasks=table_tasks)
-            if len(errors) > 1:
-                raise ManyError(errors)
-            logger.info(f"migrated {len(list(_))} tables to the new schema {to_schema}.")
-            _, errors = Threads.gather(name="creating views", tasks=view_tasks)
-            if len(errors) > 1:
-                raise ManyError(errors)
-            logger.info(f"migrated {len(list(_))} views to the new schema {to_schema}.")
+                    )
+        Threads.strict(name="creating tables", tasks=table_tasks)
+        logger.info(f"migrated {len(list(table_tasks))} tables to the new schema {to_schema}.")
+        Threads.strict(name="creating views", tasks=view_tasks)
+        logger.info(f"migrated {len(list(view_tasks))} views to the new schema {to_schema}.")
 
     def _migrate_uc_table(
         self,
@@ -254,20 +252,14 @@ class TablesMigrate:
         from_table: str,
         to_catalog: str,
         to_schema: str,
-        view_text: str | None = None,
     ) -> bool:
         from_table_name = f"{from_catalog}.{from_schema}.{from_table}"
         to_table_name = f"{to_catalog}.{to_schema}.{from_table}"
         try:
-            if not view_text:
-                create_sql = str(next(self._backend.fetch(f"SHOW CREATE TABLE {from_table_name}"))[0])
-                create_sql = create_sql.replace(from_catalog, to_catalog).replace(from_schema, to_schema)
-                logger.debug(f"Creating table {from_table_name}.")
-                self._backend.execute(create_sql)
-            else:
-                create_sql = f"CREATE VIEW {to_table_name} AS {view_text}"
-                logger.debug(f"Creating view {to_table_name}.")
-                self._backend.execute(create_sql)
+            create_sql = str(next(self._backend.fetch(f"SHOW CREATE TABLE {from_table_name}"))[0])
+            create_sql = create_sql.replace(from_catalog, to_catalog).replace(from_schema, to_schema)
+            logger.debug(f"Creating table {from_table_name}.")
+            self._backend.execute(create_sql)
             grants = self._ws.grants.get(securable_type=SecurableType.TABLE, full_name=from_table_name)
             if grants.privilege_assignments is None:
                 return True
@@ -281,18 +273,30 @@ class TablesMigrate:
             logger.error(f"error applying permissions for {to_table_name}")
             return False
 
-    def _validate_uc_objects(self, object_type: str, object_name: str) -> int:
-        object_parts = object_name.split(".")
-        if object_type == "table":
-            query = (
-                f"SELECT COUNT(*) as cnt FROM SYSTEM.INFORMATION_SCHEMA.TABLES WHERE "
-                f"TABLE_CATALOG = '{object_parts[0]}' AND TABLE_SCHEMA = '{object_parts[1]}' AND "
-                f"TABLE_NAME = '{object_parts[2]}'"
-            )
-        else:
-            query = (
-                f"SELECT COUNT(*) as cnt FROM SYSTEM.INFORMATION_SCHEMA.SCHEMATA WHERE CATALOG_NAME "
-                f"= '{object_parts[0]}' "
-                f"AND SCHEMA_NAME = '{object_parts[1]}'"
-            )
-        return next(self._backend.fetch(query))[0]
+    def _migrate_uc_view(
+        self,
+        from_catalog: str,
+        from_schema: str,
+        from_table: str,
+        to_catalog: str,
+        to_schema: str,
+        view_text: str | None = None,
+    ) -> bool:
+        from_table_name = f"{from_catalog}.{from_schema}.{from_table}"
+        to_table_name = f"{to_catalog}.{to_schema}.{from_table}"
+        try:
+            create_sql = f"CREATE VIEW {to_table_name} AS {view_text}"
+            logger.debug(f"Creating view {to_table_name}.")
+            self._backend.execute(create_sql)
+            grants = self._ws.grants.get(securable_type=SecurableType.TABLE, full_name=from_table_name)
+            if grants.privilege_assignments is None:
+                return True
+            grants_changes = [
+                PermissionsChange(add=pair.privileges, principal=pair.principal)
+                for pair in grants.privilege_assignments
+            ]
+            self._ws.grants.update(securable_type=SecurableType.TABLE, full_name=to_table_name, changes=grants_changes)
+            return True
+        except DatabricksError:
+            logger.error(f"error applying permissions for {to_table_name}")
+            return False
