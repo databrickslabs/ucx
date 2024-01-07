@@ -152,18 +152,22 @@ def test_is_dbfs_root():
 
 
 def test_is_db_dataset():
-    assert not Table("a", "b", "c", "MANAGED", "DELTA", location="dbfs:/somelocation/tablename").is_db_dataset
-    assert not Table("a", "b", "c", "MANAGED", "DELTA", location="/dbfs/somelocation/tablename").is_db_dataset
-    assert not Table("a", "b", "c", "MANAGED", "DELTA", location="dbfs:/mnt/somelocation/tablename").is_db_dataset
-    assert not Table("a", "b", "c", "MANAGED", "DELTA", location="/dbfs/mnt/somelocation/tablename").is_db_dataset
+    assert not Table("a", "b", "c", "MANAGED", "DELTA", location="dbfs:/somelocation/tablename").is_databricks_dataset
+    assert not Table("a", "b", "c", "MANAGED", "DELTA", location="/dbfs/somelocation/tablename").is_databricks_dataset
+    assert not Table(
+        "a", "b", "c", "MANAGED", "DELTA", location="dbfs:/mnt/somelocation/tablename"
+    ).is_databricks_dataset
+    assert not Table(
+        "a", "b", "c", "MANAGED", "DELTA", location="/dbfs/mnt/somelocation/tablename"
+    ).is_databricks_dataset
     assert Table(
         "a", "b", "c", "MANAGED", "DELTA", location="dbfs:/databricks-datasets/somelocation/tablename"
-    ).is_db_dataset
+    ).is_databricks_dataset
     assert Table(
         "a", "b", "c", "MANAGED", "DELTA", location="/dbfs/databricks-datasets/somelocation/tablename"
-    ).is_db_dataset
-    assert not Table("a", "b", "c", "MANAGED", "DELTA", location="s3:/somelocation/tablename").is_db_dataset
-    assert not Table("a", "b", "c", "MANAGED", "DELTA", location="adls:/somelocation/tablename").is_db_dataset
+    ).is_databricks_dataset
+    assert not Table("a", "b", "c", "MANAGED", "DELTA", location="s3:/somelocation/tablename").is_databricks_dataset
+    assert not Table("a", "b", "c", "MANAGED", "DELTA", location="adls:/somelocation/tablename").is_databricks_dataset
 
 
 def test_is_supported_for_sync():

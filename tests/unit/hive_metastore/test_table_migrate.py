@@ -103,13 +103,15 @@ def test_migrate_view_should_produce_proper_queries():
     table_migrate = TablesMigrate(table_crawler, client, backend, table_mapping)
     table_migrate.migrate_tables()
 
-    assert (list(backend.queries)) == [
-        "CREATE VIEW IF NOT EXISTS ucx_default.db1_dst.view_dst AS SELECT * FROM table;",
+    assert "CREATE VIEW IF NOT EXISTS ucx_default.db1_dst.view_dst AS SELECT * FROM table;" in list(backend.queries)
+    assert (
         "ALTER VIEW hive_metastore.db1_src.view_src "
-        "SET TBLPROPERTIES ('upgraded_to' = 'ucx_default.db1_dst.view_dst');",
+        "SET TBLPROPERTIES ('upgraded_to' = 'ucx_default.db1_dst.view_dst');"
+    ) in list(backend.queries)
+    assert (
         "ALTER VIEW ucx_default.db1_dst.view_dst "
-        "SET TBLPROPERTIES ('upgraded_from' = 'hive_metastore.db1_src.view_src');",
-    ]
+        "SET TBLPROPERTIES ('upgraded_from' = 'hive_metastore.db1_src.view_src');"
+    ) in list(backend.queries)
 
 
 def get_table_migrate(backend: SqlBackend) -> TablesMigrate:

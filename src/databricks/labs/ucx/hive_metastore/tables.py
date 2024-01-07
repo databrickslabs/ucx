@@ -37,7 +37,7 @@ class Table:
         "dbfs:/mnt",
     ]
 
-    DBFS_DB_DATASETS_PREFIXES: typing.ClassVar[list[str]] = [
+    DBFS_DATABRICKS_DATASETS_PREFIXES: typing.ClassVar[list[str]] = [
         "/dbfs/databricks-datasets",
         "dbfs:/databricks-datasets",
     ]
@@ -74,7 +74,7 @@ class Table:
                 for exception in self.DBFS_ROOT_PREFIX_EXCEPTIONS:
                     if self.location.startswith(exception):
                         return False
-                for db_datasets in self.DBFS_DB_DATASETS_PREFIXES:
+                for db_datasets in self.DBFS_DATABRICKS_DATASETS_PREFIXES:
                     if self.location.startswith(db_datasets):
                         return False
                 return True
@@ -87,10 +87,10 @@ class Table:
         return self.table_format.upper() in ("DELTA", "PARQUET", "CSV", "JSON", "ORC", "TEXT")
 
     @property
-    def is_db_dataset(self) -> bool:
+    def is_databricks_dataset(self) -> bool:
         if not self.location:
             return False
-        for db_datasets in self.DBFS_DB_DATASETS_PREFIXES:
+        for db_datasets in self.DBFS_DATABRICKS_DATASETS_PREFIXES:
             if self.location.startswith(db_datasets):
                 return True
         return False
