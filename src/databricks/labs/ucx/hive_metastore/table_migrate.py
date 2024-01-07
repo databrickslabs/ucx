@@ -39,12 +39,13 @@ class TablesMigrate:
         if self._table_already_upgraded(rule.as_uc_table_key):
             logger.info(f"Table {src_table.key} already upgraded to {rule.as_uc_table_key}")
             return True
-        if src_table.kind == "TABLE" and src_table.is_dbfs_root:
+        if src_table.kind == "TABLE" and src_table.table_format == "DELTA" and src_table.is_dbfs_root:
             return self._migrate_dbfs_root_table(src_table, rule)
-        if src_table.kind == "TABLE":
+        if src_table.kind == "TABLE" and src_table.is_format_supported_for_sync:
             return self._migrate_external_table(src_table, rule)
         if src_table.kind == "VIEW":
             return self._migrate_view(src_table, rule)
+        logger.info(f"Table {src_table.key} is not supported for migration")
         return True
 
     def _migrate_external_table(self, src_table: Table, rule: Rule):

@@ -164,3 +164,20 @@ def test_is_db_dataset():
     ).is_db_dataset
     assert not Table("a", "b", "c", "MANAGED", "DELTA", location="s3:/somelocation/tablename").is_db_dataset
     assert not Table("a", "b", "c", "MANAGED", "DELTA", location="adls:/somelocation/tablename").is_db_dataset
+
+
+def test_is_supported_for_sync():
+    assert Table(
+        "a", "b", "c", "EXTERNAL", "DELTA", location="dbfs:/somelocation/tablename"
+    ).is_format_supported_for_sync
+    assert Table("a", "b", "c", "EXTERNAL", "CSV", location="dbfs:/somelocation/tablename").is_format_supported_for_sync
+    assert Table(
+        "a", "b", "c", "EXTERNAL", "TEXT", location="dbfs:/somelocation/tablename"
+    ).is_format_supported_for_sync
+    assert Table("a", "b", "c", "EXTERNAL", "ORC", location="dbfs:/somelocation/tablename").is_format_supported_for_sync
+    assert Table(
+        "a", "b", "c", "EXTERNAL", "JSON", location="dbfs:/somelocation/tablename"
+    ).is_format_supported_for_sync
+    assert not (
+        Table("a", "b", "c", "EXTERNAL", "AVRO", location="dbfs:/somelocation/tablename").is_format_supported_for_sync
+    )

@@ -81,6 +81,12 @@ class Table:
         return False
 
     @property
+    def is_format_supported_for_sync(self) -> bool:
+        if self.table_format is None:
+            return False
+        return self.table_format.upper() in ("DELTA", "PARQUET", "CSV", "JSON", "ORC", "TEXT")
+
+    @property
     def is_db_dataset(self) -> bool:
         if not self.location:
             return False
