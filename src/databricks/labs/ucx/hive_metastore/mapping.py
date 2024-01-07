@@ -8,7 +8,7 @@ from functools import partial
 
 from databricks.labs.blueprint.parallel import Threads
 from databricks.sdk import WorkspaceClient
-from databricks.sdk.errors import BadRequest, NotFound
+from databricks.sdk.errors import BadRequest, NotFound, ResourceConflict
 from databricks.sdk.service.workspace import ImportFormat
 
 from databricks.labs.ucx.account import WorkspaceInfo
@@ -84,11 +84,6 @@ class TableMapping:
         buffer.seek(0)
         return self._overwrite_mapping(buffer)
 
-    def _overwrite_mapping(self, buffer) -> str:
-        path = f"{self._folder}/mapping.csv"
-        self._ws.workspace.upload(path, buffer, overwrite=True, format=ImportFormat.AUTO)
-        return path
-
     def load(self) -> list[Rule]:
         try:
             rules = []
@@ -126,21 +121,6 @@ class TableMapping:
         except BadRequest as br:
             logger.error(br)
 
-    def _get_databases_in_scope(self, databases: set[str]):
-        tasks = []
-        for database in databases:
-            tasks.append(partial(self._get_database_in_scope_task, database))
-        return Threads.strict("checking databases for skip property", tasks)
-
-    def _get_database_in_scope_task(self, database: str) -> str | None:
-        describe = {}
-        for value in self._backend.fetch(f"DESCRIBE SCHEMA EXTENDED {database}"):
-            describe[value["database_description_item"]] = value["database_description_value"]
-        if self.UCX_SKIP_PROPERTY in TablesCrawler.parse_database_props(describe.get("Properties", "").lower()):
-            logger.info(f"Database {database} is marked to be skipped")
-            return None
-        return database
-
     def get_tables_to_migrate(self, tables_crawler: TablesCrawler):
         rules = self.load()
         # Getting all the source tables from the rules
@@ -160,11 +140,31 @@ class TableMapping:
 
         return Threads.strict("checking all database properties", tasks)
 
+    def _overwrite_mapping(self, buffer) -> str:
+        path = f"{self._folder}/mapping.csv"
+        self._ws.workspace.upload(path, buffer, overwrite=True, format=ImportFormat.AUTO)
+        return path
+
+    def _get_databases_in_scope(self, databases: set[str]):
+        tasks = []
+        for database in databases:
+            tasks.append(partial(self._get_database_in_scope_task, database))
+        return Threads.strict("checking databases for skip property", tasks)
+
+    def _get_database_in_scope_task(self, database: str) -> str | None:
+        describe = {}
+        for value in self._backend.fetch(f"DESCRIBE SCHEMA EXTENDED {database}"):
+            describe[value["database_description_item"]] = value["database_description_value"]
+        if self.UCX_SKIP_PROPERTY in TablesCrawler.parse_database_props(describe.get("Properties", "").lower()):
+            logger.info(f"Database {database} is marked to be skipped")
+            return None
+        return database
+
     def _get_table_in_scope_task(self, table_to_migrate: TableToMigrate) -> TableToMigrate | None:
         table = table_to_migrate.src
         rule = table_to_migrate.rule
 
-        if self._exists_in_uc(rule.as_uc_table_key):
+        if self._exists_in_uc(table, rule.as_uc_table_key):
             logger.info(f"The intended target for {table.key}, {rule.as_uc_table_key}, already exists.")
             return None
         result = self._backend.fetch(f"SHOW TBLPROPERTIES `{table.database}`.`{table.name}`")
@@ -174,7 +174,7 @@ class TableMapping:
                 return None
             if value["key"] == "upgraded_to":
                 logger.info(f"{table.key} is set as upgraded to {value['value']}")
-                if self._exists_in_uc(value["value"]):
+                if self._exists_in_uc(table, value["value"]):
                     logger.info(
                         f"The table {table.key} was previously upgraded to {value['value']}. "
                         f"To revert the table and allow it to be upgraded again use the CLI command:"
@@ -186,10 +186,19 @@ class TableMapping:
 
         return table_to_migrate
 
-    def _exists_in_uc(self, target_key: str):
+    def _exists_in_uc(self, src_table: Table, target_key: str):
         # Attempts to get the target table info from UC returns True if it exists.
         try:
-            self._ws.tables.get(target_key)
+            table_info = self._ws.tables.get(target_key)
+            if not table_info.properties:
+                return True
+            upgraded_from = table_info.properties.get("upgraded_from")
+            if upgraded_from and upgraded_from != src_table.key:
+                msg = f"Expected to be migrated from {src_table.key}, but got {upgraded_from}. "
+                "You can skip this error using the CLI command: "
+                "databricks labs ucx skip "
+                f"--schema {src_table.database} --table {src_table.name}"
+                raise ResourceConflict(msg)
             return True
         except NotFound:
             return False

@@ -239,7 +239,7 @@ def test_mapping_skips_tables_databases(ws, sql_backend, inventory_schema, make_
     assert len(table_mapping.get_tables_to_migrate(table_crawler)) == 1
 
 
-# @retried(on=[NotFound], timeout=timedelta(minutes=5))
+@retried(on=[NotFound], timeout=timedelta(minutes=5))
 def test_mapping_reverts_table(ws, sql_backend, inventory_schema, make_schema, make_table, make_catalog):
     src_schema = make_schema(catalog_name="hive_metastore")
     table_to_revert = make_table(schema_name=src_schema.name)
