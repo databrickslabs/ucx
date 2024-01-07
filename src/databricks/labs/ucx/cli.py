@@ -64,11 +64,11 @@ def skip(w: WorkspaceClient, schema: str | None = None, table: str | None = None
         return None
     warehouse_id = installation.config.warehouse_id
     sql_backend = StatementExecutionBackend(w, warehouse_id)
-    mapping = TableMapping(w)
+    mapping = TableMapping(w, sql_backend)
     if table:
-        mapping.skip_table(sql_backend, schema, table)
+        mapping.skip_table(schema, table)
     else:
-        mapping.skip_schema(sql_backend, schema)
+        mapping.skip_schema(schema)
 
 
 @ucx.command(is_account=True)
@@ -90,7 +90,10 @@ def manual_workspace_info(w: WorkspaceClient):
 @ucx.command
 def create_table_mapping(w: WorkspaceClient):
     """create initial table mapping for review"""
-    table_mapping = TableMapping(w)
+    installation_manager = InstallationManager(w)
+    installation = installation_manager.for_user(w.current_user.me())
+    sql_backend = StatementExecutionBackend(w, installation.config.warehouse_id)
+    table_mapping = TableMapping(w, sql_backend)
     workspace_info = WorkspaceInfo(w)
     installation_manager = InstallationManager(w)
     installation = installation_manager.for_user(w.current_user.me())
@@ -121,9 +124,8 @@ def ensure_assessment_run(w: WorkspaceClient):
     if not installation:
         logger.error(CANT_FIND_UCX_MSG)
         return None
-    else:
-        workspace_installer = WorkspaceInstaller(w)
-        workspace_installer.validate_and_run("assessment")
+    workspace_installer = WorkspaceInstaller(w)
+    workspace_installer.validate_and_run("assessment")
 
 
 @ucx.command
@@ -155,7 +157,7 @@ def revert_migrated_tables(w: WorkspaceClient, schema: str, table: str, *, delet
     warehouse_id = installation.config.warehouse_id
     sql_backend = StatementExecutionBackend(w, warehouse_id)
     table_crawler = TablesCrawler(sql_backend, installation.config.inventory_database)
-    tmp = TableMapping(w)
+    tmp = TableMapping(w, sql_backend)
     tm = TablesMigrate(table_crawler, w, sql_backend, tmp)
     if tm.print_revert_report(delete_managed=delete_managed) and prompts.confirm(
         "Would you like to continue?", max_attempts=2
