@@ -320,7 +320,7 @@ def test_mapping_reverts_table(ws, sql_backend, inventory_schema, make_schema, m
 @retried(on=[NotFound], timeout=timedelta(minutes=2))
 def test_uc_to_uc_no_from_schema(ws, sql_backend, inventory_schema, make_random, make_catalog):
     static_crawler = StaticTablesCrawler(sql_backend, inventory_schema, [])
-    table_mapping = StaticTableMapping(rules=[])
+    table_mapping = StaticTableMapping(ws, sql_backend, rules=[])
     from_catalog = make_catalog()
     from_schema = make_random(4)
     to_catalog = make_catalog()
@@ -332,7 +332,7 @@ def test_uc_to_uc_no_from_schema(ws, sql_backend, inventory_schema, make_random,
 @retried(on=[NotFound], timeout=timedelta(minutes=2))
 def test_uc_to_uc(ws, sql_backend, inventory_schema, make_catalog, make_schema, make_table, make_acc_group):
     static_crawler = StaticTablesCrawler(sql_backend, inventory_schema, [])
-    table_mapping = StaticTableMapping(rules=[])
+    table_mapping = StaticTableMapping(ws, sql_backend, rules=[])
     tm = TablesMigrate(static_crawler, ws, sql_backend, table_mapping)
     group_a = make_acc_group()
     group_b = make_acc_group()
@@ -397,7 +397,7 @@ def test_uc_to_uc(ws, sql_backend, inventory_schema, make_catalog, make_schema, 
 @retried(on=[NotFound], timeout=timedelta(minutes=2))
 def test_uc_to_uc_no_to_schema(ws, sql_backend, inventory_schema, make_catalog, make_schema, make_table, make_random):
     static_crawler = StaticTablesCrawler(sql_backend, inventory_schema, [])
-    table_mapping = StaticTableMapping(rules=[])
+    table_mapping = StaticTableMapping(ws, sql_backend, rules=[])
     tm = TablesMigrate(static_crawler, ws, sql_backend, table_mapping)
     from_catalog = make_catalog()
     from_schema = make_schema(catalog_name=from_catalog.name)
