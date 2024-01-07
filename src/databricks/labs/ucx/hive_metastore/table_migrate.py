@@ -29,14 +29,10 @@ class TablesMigrate:
 
     def migrate_tables(self):
         self._init_seen_tables()
-        mapping_rules = self._get_mapping_rules()
+        tables_to_migrate = self._tm.get_tables_to_migrate(self._tc)
         tasks = []
-        for table in self._tc.snapshot():
-            rule = mapping_rules.get(table.key)
-            if not rule:
-                logger.info(f"Skipping table {table.key} table doesn't exist in the mapping table.")
-                continue
-            tasks.append(partial(self._migrate_table, table, rule))
+        for table in tables_to_migrate:
+            tasks.append(partial(self._migrate_table, table.src, table.rule))
         Threads.strict("migrate tables", tasks)
 
     def _migrate_table(self, src_table: Table, rule: Rule):
@@ -188,9 +184,3 @@ class TablesMigrate:
             print("Migrated Manged Tables (targets) will be left intact.")
             print("To revert and delete Migrated Tables, add --delete_managed true flag to the command.")
         return True
-
-    def _get_mapping_rules(self) -> dict[str, Rule]:
-        mapping_rules: dict[str, Rule] = {}
-        for rule in self._tm.load():
-            mapping_rules[rule.as_hms_table_key] = rule
-        return mapping_rules
