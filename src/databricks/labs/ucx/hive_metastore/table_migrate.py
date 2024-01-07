@@ -39,24 +39,24 @@ class TablesMigrate:
         if self._table_already_upgraded(rule.as_uc_table_key):
             logger.info(f"Table {src_table.key} already upgraded to {rule.as_uc_table_key}")
             return True
-        if src_table.object_type == "MANAGED":
-            return self._migrate_managed_table(src_table, rule)
+        if src_table.kind == "TABLE" and src_table.is_dbfs_root:
+            return self._migrate_dbfs_root_table(src_table, rule)
+        if src_table.kind == "TABLE":
+            return self._migrate_external_table(src_table, rule)
         if src_table.kind == "VIEW":
             return self._migrate_view(src_table, rule)
-        if src_table.object_type == "EXTERNAL":
-            return self._migrate_external_table(src_table, rule)
         return True
 
     def _migrate_external_table(self, src_table: Table, rule: Rule):
         target_table_key = rule.as_uc_table_key
-        table_migrate_sql = src_table.uc_create_sql(target_table_key)
+        table_migrate_sql = src_table.sql_migrate_external(target_table_key)
         logger.debug(f"Migrating external table {src_table.key} to using SQL query: {table_migrate_sql}")
         self._backend.execute(table_migrate_sql)
         return True
 
-    def _migrate_managed_table(self, src_table: Table, rule: Rule):
+    def _migrate_dbfs_root_table(self, src_table: Table, rule: Rule):
         target_table_key = rule.as_uc_table_key
-        table_migrate_sql = src_table.uc_create_sql(target_table_key)
+        table_migrate_sql = src_table.sql_migrate_dbfs(target_table_key)
         logger.debug(f"Migrating managed table {src_table.key} to using SQL query: {table_migrate_sql}")
         self._backend.execute(table_migrate_sql)
         self._backend.execute(src_table.sql_alter_to(rule.as_uc_table_key))
@@ -65,15 +65,12 @@ class TablesMigrate:
 
     def _migrate_view(self, src_table: Table, rule: Rule):
         target_table_key = rule.as_uc_table_key
-        table_migrate_sql = src_table.uc_create_sql(target_table_key)
+        table_migrate_sql = src_table.sql_migrate_view(target_table_key)
         logger.debug(f"Migrating view {src_table.key} to using SQL query: {table_migrate_sql}")
         self._backend.execute(table_migrate_sql)
         self._backend.execute(src_table.sql_alter_to(rule.as_uc_table_key))
         self._backend.execute(src_table.sql_alter_from(rule.as_uc_table_key))
         return True
-
-        msg = f"Table {src_table.key} is a {src_table.object_type} and is not supported for migration yet"
-        logger.info(msg)
 
     def _init_seen_tables(self):
         for catalog in self._ws.catalogs.list():

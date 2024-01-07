@@ -41,14 +41,21 @@ def test_sql_managed_non_delta():
     with pytest.raises(ValueError):
         Table(
             catalog="catalog", database="db", name="table", object_type="type", table_format="PARQUET"
-        )._sql_migrate_managed("catalog")
+        ).sql_migrate_dbfs("catalog")
 
 
 @pytest.mark.parametrize(
     "table,target,query",
     [
         (
-            Table(catalog="catalog", database="db", name="managed_table", object_type="..", table_format="DELTA"),
+            Table(
+                catalog="catalog",
+                database="db",
+                name="managed_table",
+                object_type="MANAGED",
+                table_format="DELTA",
+                location="dbfs:/location/table",
+            ),
             "new_catalog.db.managed_table",
             "CREATE TABLE IF NOT EXISTS new_catalog.db.managed_table DEEP CLONE catalog.db.managed_table;",
         ),
@@ -56,8 +63,20 @@ def test_sql_managed_non_delta():
             Table(
                 catalog="catalog",
                 database="db",
+                name="managed_table",
+                object_type="MANAGED",
+                table_format="DELTA",
+                location="dbfs:/mnt/location/table",
+            ),
+            "new_catalog.db.managed_table",
+            "SYNC TABLE new_catalog.db.managed_table FROM catalog.db.managed_table;",
+        ),
+        (
+            Table(
+                catalog="catalog",
+                database="db",
                 name="view",
-                object_type="..",
+                object_type="VIEW",
                 table_format="DELTA",
                 view_text="SELECT * FROM table",
             ),
@@ -79,7 +98,12 @@ def test_sql_managed_non_delta():
     ],
 )
 def test_uc_sql(table, target, query):
-    assert table.uc_create_sql(target) == query
+    if table.kind == "VIEW":
+        assert table.sql_migrate_view(target) == query
+    if table.kind == "TABLE" and table.is_dbfs_root:
+        assert table.sql_migrate_dbfs(target) == query
+    if table.kind == "TABLE" and not table.is_dbfs_root:
+        assert table.sql_migrate_external(target) == query
 
 
 def test_tables_crawler_inventory_table():
@@ -113,15 +137,30 @@ def test_tables_returning_error_when_describing():
 
 
 def test_is_dbfs_root():
-    assert Table("a", "b", "c", "MANAGED", "DELTA", location="dbfs:/somelocation/tablename").is_dbfs_root()
-    assert Table("a", "b", "c", "MANAGED", "DELTA", location="/dbfs/somelocation/tablename").is_dbfs_root()
-    assert not Table("a", "b", "c", "MANAGED", "DELTA", location="dbfs:/mnt/somelocation/tablename").is_dbfs_root()
-    assert not Table("a", "b", "c", "MANAGED", "DELTA", location="/dbfs/mnt/somelocation/tablename").is_dbfs_root()
+    assert Table("a", "b", "c", "MANAGED", "DELTA", location="dbfs:/somelocation/tablename").is_dbfs_root
+    assert Table("a", "b", "c", "MANAGED", "DELTA", location="/dbfs/somelocation/tablename").is_dbfs_root
+    assert not Table("a", "b", "c", "MANAGED", "DELTA", location="dbfs:/mnt/somelocation/tablename").is_dbfs_root
+    assert not Table("a", "b", "c", "MANAGED", "DELTA", location="/dbfs/mnt/somelocation/tablename").is_dbfs_root
     assert not Table(
         "a", "b", "c", "MANAGED", "DELTA", location="dbfs:/databricks-datasets/somelocation/tablename"
-    ).is_dbfs_root()
+    ).is_dbfs_root
     assert not Table(
         "a", "b", "c", "MANAGED", "DELTA", location="/dbfs/databricks-datasets/somelocation/tablename"
-    ).is_dbfs_root()
-    assert not Table("a", "b", "c", "MANAGED", "DELTA", location="s3:/somelocation/tablename").is_dbfs_root()
-    assert not Table("a", "b", "c", "MANAGED", "DELTA", location="adls:/somelocation/tablename").is_dbfs_root()
+    ).is_dbfs_root
+    assert not Table("a", "b", "c", "MANAGED", "DELTA", location="s3:/somelocation/tablename").is_dbfs_root
+    assert not Table("a", "b", "c", "MANAGED", "DELTA", location="adls:/somelocation/tablename").is_dbfs_root
+
+
+def test_is_db_dataset():
+    assert not Table("a", "b", "c", "MANAGED", "DELTA", location="dbfs:/somelocation/tablename").is_db_dataset
+    assert not Table("a", "b", "c", "MANAGED", "DELTA", location="/dbfs/somelocation/tablename").is_db_dataset
+    assert not Table("a", "b", "c", "MANAGED", "DELTA", location="dbfs:/mnt/somelocation/tablename").is_db_dataset
+    assert not Table("a", "b", "c", "MANAGED", "DELTA", location="/dbfs/mnt/somelocation/tablename").is_db_dataset
+    assert Table(
+        "a", "b", "c", "MANAGED", "DELTA", location="dbfs:/databricks-datasets/somelocation/tablename"
+    ).is_db_dataset
+    assert Table(
+        "a", "b", "c", "MANAGED", "DELTA", location="/dbfs/databricks-datasets/somelocation/tablename"
+    ).is_db_dataset
+    assert not Table("a", "b", "c", "MANAGED", "DELTA", location="s3:/somelocation/tablename").is_db_dataset
+    assert not Table("a", "b", "c", "MANAGED", "DELTA", location="adls:/somelocation/tablename").is_db_dataset

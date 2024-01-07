@@ -35,6 +35,9 @@ class Table:
     DBFS_ROOT_PREFIX_EXCEPTIONS: typing.ClassVar[list[str]] = [
         "/dbfs/mnt",
         "dbfs:/mnt",
+    ]
+
+    DBFS_DB_DATASETS_PREFIXES: typing.ClassVar[list[str]] = [
         "/dbfs/databricks-datasets",
         "dbfs:/databricks-datasets",
     ]
@@ -53,14 +56,6 @@ class Table:
     def kind(self) -> str:
         return "VIEW" if self.view_text is not None else "TABLE"
 
-    def uc_create_sql(self, target_table_key):
-        if self.kind == "VIEW":
-            return self._sql_migrate_view(target_table_key)
-        elif self.object_type == "EXTERNAL":
-            return self._sql_migrate_external(target_table_key)
-        else:
-            return self._sql_migrate_managed(target_table_key)
-
     def sql_alter_to(self, target_table_key):
         return f"ALTER {self.kind} {self.key} SET TBLPROPERTIES ('upgraded_to' = '{target_table_key}');"
 
@@ -70,27 +65,40 @@ class Table:
     def sql_unset_upgraded_to(self):
         return f"ALTER {self.kind} {self.key} UNSET TBLPROPERTIES IF EXISTS('upgraded_to');"
 
+    @property
     def is_dbfs_root(self) -> bool:
         if not self.location:
             return False
-        for exception in self.DBFS_ROOT_PREFIX_EXCEPTIONS:
-            if self.location.startswith(exception):
-                return False
         for prefix in self.DBFS_ROOT_PREFIXES:
             if self.location.startswith(prefix):
+                for exception in self.DBFS_ROOT_PREFIX_EXCEPTIONS:
+                    if self.location.startswith(exception):
+                        return False
+                for db_datasets in self.DBFS_DB_DATASETS_PREFIXES:
+                    if self.location.startswith(db_datasets):
+                        return False
                 return True
         return False
 
-    def _sql_migrate_external(self, target_table_key):
+    @property
+    def is_db_dataset(self) -> bool:
+        if not self.location:
+            return False
+        for db_datasets in self.DBFS_DB_DATASETS_PREFIXES:
+            if self.location.startswith(db_datasets):
+                return True
+        return False
+
+    def sql_migrate_external(self, target_table_key):
         return f"SYNC TABLE {target_table_key} FROM {self.key};"
 
-    def _sql_migrate_managed(self, target_table_key):
+    def sql_migrate_dbfs(self, target_table_key):
         if not self.is_delta:
             msg = f"{self.key} is not DELTA: {self.table_format}"
             raise ValueError(msg)
         return f"CREATE TABLE IF NOT EXISTS {target_table_key} DEEP CLONE {self.key};"
 
-    def _sql_migrate_view(self, target_table_key):
+    def sql_migrate_view(self, target_table_key):
         return f"CREATE VIEW IF NOT EXISTS {target_table_key} AS {self.view_text};"
 
 
