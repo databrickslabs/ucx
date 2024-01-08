@@ -1,3 +1,4 @@
+import json
 from unittest.mock import MagicMock
 
 import pytest
@@ -398,6 +399,12 @@ def test_reflect_account_should_not_fail_if_group_not_in_the_account_anymore():
 
     wsclient.api_client.do.side_effect = reflect_account_side_effect
     GroupManager(backend, wsclient, inventory_database="inv").reflect_account_groups_on_workspace()
+
+    wsclient.api_client.do.assert_called_with(
+        'PUT',
+        f"/api/2.0/preview/permissionassignments/principals/{account_group1.id}",
+        data=json.dumps({"permissions": ["USER"]})
+    )
 
 
 def test_delete_original_workspace_groups_should_delete_relected_acc_groups_in_workspace():
