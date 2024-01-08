@@ -56,6 +56,9 @@ commands:
       - name: step
         description: name of the step
 
+  - name: migrate-tables
+    description: migrate HMS tables and views to UC
+
   - name: revert-migrated-tables
     description: remove notation on a migrated table for re-migration
     flags:

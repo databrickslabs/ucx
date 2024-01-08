@@ -139,6 +139,24 @@ def repair_run(w: WorkspaceClient, step):
 
 
 @ucx.command
+def migrate_tables(w: WorkspaceClient):
+    """Migrate tables from HMS to UC based on the mapping tables."""
+    prompts = Prompts()
+    installation_manager = InstallationManager(w)
+    installation = installation_manager.for_user(w.current_user.me())
+
+    if not installation:
+        logger.error(CANT_FIND_UCX_MSG)
+        return None
+    warehouse_id = installation.config.warehouse_id
+    sql_backend = StatementExecutionBackend(w, warehouse_id)
+    table_crawler = TablesCrawler(sql_backend, installation.config.inventory_database)
+    table_mapping = TableMapping(w, sql_backend)
+    table_migrate = TablesMigrate(table_crawler, w, sql_backend, table_mapping)
+    table_migrate.migrate_tables()
+
+
+@ucx.command
 def revert_migrated_tables(w: WorkspaceClient, schema: str, table: str, *, delete_managed: bool = False):
     """remove notation on a migrated table for re-migration"""
     prompts = Prompts()
@@ -157,9 +175,9 @@ def revert_migrated_tables(w: WorkspaceClient, schema: str, table: str, *, delet
     warehouse_id = installation.config.warehouse_id
     sql_backend = StatementExecutionBackend(w, warehouse_id)
     table_crawler = TablesCrawler(sql_backend, installation.config.inventory_database)
-    tmp = TableMapping(w, sql_backend)
-    tm = TablesMigrate(table_crawler, w, sql_backend, tmp)
-    if tm.print_revert_report(delete_managed=delete_managed) and prompts.confirm(
+    table_mapping = TableMapping(w, sql_backend)
+    table_migrate = TablesMigrate(table_crawler, w, sql_backend, table_mapping)
+    if table_migrate.print_revert_report(delete_managed=delete_managed) and prompts.confirm(
         "Would you like to continue?", max_attempts=2
     ):
         tm.revert_migrated_tables(schema, table, delete_managed=delete_managed)
