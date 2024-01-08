@@ -67,8 +67,8 @@ commands:
         description: Revert and delete managed tables
 
 
-  - name: migrate-uc-to-uc
-    description: migrate tables across schema/catalog withing a UC metastore
+  - name: move
+    description: move tables across schema/catalog withing a UC metastore
     flags:
       - name: from-catalog
         description: from catalog name
