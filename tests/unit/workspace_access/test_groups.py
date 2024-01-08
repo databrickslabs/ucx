@@ -401,9 +401,9 @@ def test_reflect_account_should_not_fail_if_group_not_in_the_account_anymore():
     GroupManager(backend, wsclient, inventory_database="inv").reflect_account_groups_on_workspace()
 
     wsclient.api_client.do.assert_called_with(
-        'PUT',
+        "PUT",
         f"/api/2.0/preview/permissionassignments/principals/{account_group1.id}",
-        data=json.dumps({"permissions": ["USER"]})
+        data=json.dumps({"permissions": ["USER"]}),
     )
 
 
