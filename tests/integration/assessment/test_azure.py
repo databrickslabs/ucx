@@ -1,10 +1,12 @@
+import logging
 from datetime import timedelta
 
+import pytest
 from databricks.sdk.errors import NotFound
 from databricks.sdk.retries import retried
 from databricks.sdk.service import compute, jobs
 
-from databricks.labs.ucx.assessment.azure import AzureServicePrincipalCrawler
+from databricks.labs.ucx.assessment.azure import AzureServicePrincipalCrawler, AzureResourcePermissions
 
 from .test_assessment import (
     _PIPELINE_CONF,
@@ -13,6 +15,15 @@ from .test_assessment import (
     _TEST_STORAGE_ACCOUNT,
     _TEST_TENANT_ID,
 )
+
+
+@pytest.mark.skip
+def test_azure_permissions(ws):
+    logging.getLogger('databricks').setLevel('DEBUG')
+    arp = AzureResourcePermissions(ws)
+    x = arp.role_assignments('/subscriptions/.../resourceGroups/.../providers/Microsoft.Storage/storageAccounts/...')
+    y = list(x)
+    assert y
 
 
 @retried(on=[NotFound], timeout=timedelta(minutes=3))

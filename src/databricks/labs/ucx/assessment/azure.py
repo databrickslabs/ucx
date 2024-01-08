@@ -5,6 +5,7 @@ from collections.abc import Iterable
 from dataclasses import dataclass
 
 from databricks.sdk import WorkspaceClient
+from databricks.sdk.core import AzureCliTokenSource, ApiClient, Config, credentials_provider
 from databricks.sdk.errors import NotFound
 from databricks.sdk.service.compute import ClusterSource, Policy
 
@@ -247,3 +248,38 @@ class AzureServicePrincipalCrawler(CrawlerBase[AzureServicePrincipalInfo]):
     def _try_fetch(self) -> Iterable[AzureServicePrincipalInfo]:
         for row in self._fetch(f"SELECT * FROM {self._schema}.{self._table}"):
             yield AzureServicePrincipalInfo(*row)
+
+
+@credentials_provider('azure-cli', ['host'])
+def _credentials(cfg: Config):
+    token_source = AzureCliTokenSource(cfg.arm_environment.service_management_endpoint)
+
+    def inner() -> dict[str, str]:
+        token = token_source.token()
+        return {'Authorization': f'{token.token_type} {token.access_token}'}
+
+    return inner
+
+
+class AzureResourcePermissions:
+    def __init__(self, ws: WorkspaceClient):
+        rm_host = ws.config.arm_environment.resource_manager_endpoint
+        self._resource_manager = ApiClient(Config(host=rm_host, credentials_provider=_credentials))
+
+    def role_assignments(self, resource_id: str):
+        """See https://learn.microsoft.com/en-us/rest/api/authorization/role-assignments/list-for-resource"""
+        role_assignments = []
+        role_definitions = {}
+        result = self._get(f'{resource_id}/providers/Microsoft.Authorization/roleAssignments')
+        for ra in result.get('value', []):
+            role_definition_id = ra.get('properties', {'roleDefinitionId': None})['roleDefinitionId']
+            if role_definition_id not in role_definitions:
+                role_definitions[role_definition_id] = self._get(role_definition_id)
+            ra['roleDefinition'] = role_definitions[role_definition_id]
+            role_assignments.append(ra)
+        return role_assignments
+
+    def _get(self, resource_id: str):
+        return self._resource_manager.do('GET', resource_id,
+                                         query={'api-version': '2022-04-01'},
+                                         headers={'Accept': 'application/json'})
