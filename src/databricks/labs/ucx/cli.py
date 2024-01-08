@@ -79,6 +79,13 @@ def sync_workspace_info(a: AccountClient):
     workspaces.sync_workspace_info()
 
 
+@ucx.command(is_account=True)
+def create_account_level_groups(a: AccountClient):
+    """upload workspace config to all workspaces in the account where ucx is installed"""
+    logger.info(f"Account ID: {a.config.account_id}")
+    workspaces = AccountWorkspaces(AccountConfig(connect=ConnectConfig()))
+    workspaces.create_account_level_groups()
+
 @ucx.command
 def manual_workspace_info(w: WorkspaceClient):
     """only supposed to be run if cannot get admins to run `databricks labs ucx sync-workspace-info`"""

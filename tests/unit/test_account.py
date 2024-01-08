@@ -4,7 +4,7 @@ from unittest.mock import create_autospec, patch
 
 from databricks.labs.blueprint.tui import MockPrompts
 from databricks.sdk import WorkspaceClient
-from databricks.sdk.service.iam import User
+from databricks.sdk.service.iam import User, Group, ComplexValue
 from databricks.sdk.service.provisioning import Workspace
 from databricks.sdk.service.workspace import ImportFormat
 
@@ -98,3 +98,44 @@ def test_manual_workspace_info(mocker):
         overwrite=True,
         format=ImportFormat.AUTO,
     )
+
+def test_acc_groups(mocker):
+    account_config = AccountConfig(
+        connect=ConnectConfig(host="https://accounts.cloud.databricks.com", account_id="123", token="abc")
+    )
+    # TODO: https://github.com/databricks/databricks-sdk-py/pull/480
+    acc_client = mocker.patch("databricks.sdk.AccountClient.__init__")
+    acc_client.config = account_config.to_databricks_config()
+
+    account_config.to_account_client = lambda: acc_client
+    # test for workspace filtering
+    account_config.include_workspace_names = ["foo"]
+
+    acc_client.workspaces.list.return_value = [
+        Workspace(workspace_name="foo", workspace_id=123, workspace_status_message="Running", deployment_name="abc"),
+        Workspace(workspace_name="bar", workspace_id=456, workspace_status_message="Running", deployment_name="def"),
+    ]
+
+    ws = mocker.patch("databricks.sdk.WorkspaceClient.__init__")
+
+    def workspace_client(host, product, **kwargs) -> WorkspaceClient:
+        assert host == "https://abc.cloud.databricks.com"
+        assert product == "ucx"
+        return ws
+
+    im = create_autospec(InstallationManager)
+    im.user_installations.return_value = [
+        Installation(config=WorkspaceConfig(inventory_database="ucx"), user=User(display_name="foo"), path="/Users/foo")
+    ]
+
+    group = Group(
+        display_name="de",
+        members=[ComplexValue(display="test-user-1", value="20"), ComplexValue(display="test-user-2", value="21")],
+    )
+
+    account_workspaces = AccountWorkspaces(account_config, workspace_client, lambda _: im)
+    account_workspaces.create_account_level_groups()
+
+    #TODO: do the tests
+
+

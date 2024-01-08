@@ -88,6 +88,42 @@ class AccountWorkspaces:
                 path = f"{installation.path}/{self.SYNC_FILE_NAME}"
                 ws.workspace.upload(path, info, overwrite=True, format=ImportFormat.AUTO)
 
+    def create_account_level_groups(self):
+        """
+        Crawl all workspaces, and create account level groups if a WS local group is not present in the account
+        """
+        acc_groups = {}
+        ac_grp_ids = self._ac.groups.list(attributes="id")
+        for acc_grp_id in ac_grp_ids:
+            full_account_group = self._ac.groups.get(acc_grp_id.id)
+            acc_groups[full_account_group.display_name] = full_account_group.members
+
+        workspace_clients = self.workspace_clients()
+        all_workspace_groups = {}
+        for client in workspace_clients:
+            ws_groups_ids = client.groups.list(attributes="id")
+            for grp_id in ws_groups_ids:
+                full_workpace_group = client.groups.get(grp_id.id)
+                if full_workpace_group.display_name in all_workspace_groups:
+                    if len(all_workspace_groups[full_workpace_group.display_name]) == full_workpace_group.members:
+                        logger.debug(f"Group {full_workpace_group.display_name} already found in another workspace")
+                    else:
+                        logger.warning(f"Workspace local group {full_workpace_group.display_name} does not have same members")
+                        # What to do in this situation ?
+                else:
+                    all_workspace_groups[full_workpace_group.display_name] = full_workpace_group.members
+
+        for group_name, members in all_workspace_groups.items():
+            if group_name in acc_groups:
+                if len(acc_groups[group_name]) == members:
+                    logger.info(f"Group {group_name} exist at account level")
+                else:
+                    logger.warning(f"Group {group_name} exist at account level but does not have same members")
+                    # What to do in this situation ?
+            else:
+                self._ac.groups.create(display_name=group_name, members=members)
+                logger.info(f"Group {group_name} created at the account")
+
 
 class WorkspaceInfo:
     def __init__(self, ws: WorkspaceClient, folder: str | None = None, new_installation_manager=InstallationManager):
