@@ -11,7 +11,7 @@ from databricks.labs.ucx.config import AccountConfig, ConnectConfig
 from databricks.labs.ucx.framework.crawlers import StatementExecutionBackend
 from databricks.labs.ucx.hive_metastore import ExternalLocations, TablesCrawler
 from databricks.labs.ucx.hive_metastore.mapping import TableMapping
-from databricks.labs.ucx.hive_metastore.table_migrate import TablesMigrate
+from databricks.labs.ucx.hive_metastore.table_migrate import TableMove, TablesMigrate
 from databricks.labs.ucx.install import WorkspaceInstaller
 from databricks.labs.ucx.installer import InstallationManager
 
@@ -166,7 +166,7 @@ def revert_migrated_tables(w: WorkspaceClient, schema: str, table: str, *, delet
 
 
 @ucx.command
-def migrate_uc_to_uc(
+def move(
     w: WorkspaceClient,
     from_catalog: str,
     from_schema: str,
@@ -182,12 +182,9 @@ def migrate_uc_to_uc(
         logger.error(CANT_FIND_UCX_MSG)
         return
     sql_backend = StatementExecutionBackend(w, installation.config.warehouse_id)
-    tmp = TableMapping(w, sql_backend)
-    tables = TablesMigrate(
-        TablesCrawler(sql_backend, installation.config.inventory_database),
+    tables = TableMove(
         w,
         sql_backend,
-        tmp,
     )
     if from_catalog == "" or to_catalog == "":
         logger.error("Please enter from_catalog and to_catalog details")
@@ -198,8 +195,8 @@ def migrate_uc_to_uc(
     if from_catalog == to_catalog and from_schema == to_schema:
         logger.error("please select a different schema or catalog to migrate to")
         return
-    logger.error(f"migrating tables {from_table} from {from_catalog}.{from_schema} to {to_catalog}.{to_schema}")
-    tables.move_migrated_tables(
+    logger.info(f"migrating tables {from_table} from {from_catalog}.{from_schema} to {to_catalog}.{to_schema}")
+    tables.move_tables(
         from_catalog,
         from_schema,
         from_table,

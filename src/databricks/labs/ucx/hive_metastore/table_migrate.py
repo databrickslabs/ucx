@@ -6,7 +6,7 @@ from databricks.labs.blueprint.parallel import Threads
 from databricks.sdk import WorkspaceClient
 from databricks.sdk.core import DatabricksError
 from databricks.sdk.errors import NotFound
-from databricks.sdk.service.catalog import PermissionsChange, SecurableType
+from databricks.sdk.service.catalog import PermissionsChange, SecurableType, TableType
 
 from databricks.labs.ucx.framework.crawlers import SqlBackend
 from databricks.labs.ucx.hive_metastore import TablesCrawler
@@ -188,16 +188,22 @@ class TablesMigrate:
             print("To revert and delete Migrated Tables, add --delete_managed true flag to the command.")
         return True
 
-    def _get_mapping_rules(self) -> dict[str, Rule]:
-        mapping_rules: dict[str, Rule] = {}
-        for rule in self._tm.load():
-            mapping_rules[rule.as_hms_table_key] = rule
-        return mapping_rules
 
-    def move_migrated_tables(
-        self, from_catalog: str, from_schema: str, from_table: str, to_catalog: str, to_schema: str
+class TableMove:
+    def __init__(
+        self,
+        ws: WorkspaceClient,
+        backend: SqlBackend,
     ):
-        self._ws.schemas.get(f"{from_catalog}.{from_schema}")
+        self._backend = backend
+        self._ws = ws
+
+    def move_tables(self, from_catalog: str, from_schema: str, from_table: str, to_catalog: str, to_schema: str):
+        try:
+            self._ws.schemas.get(f"{from_catalog}.{from_schema}")
+        except NotFound:
+            logger.error(f"schema {from_schema} not found in catalog {from_catalog}, enter correct schema details.")
+            return
         try:
             self._ws.schemas.get(f"{to_catalog}.{to_schema}")
         except NotFound:
@@ -216,14 +222,14 @@ class TablesMigrate:
                 )
                 continue
             except NotFound:
-                if table.table_type and table.table_type.value in ("EXTERNAL", "MANAGED"):
+                if table.table_type and table.table_type in (TableType.EXTERNAL, TableType.MANAGED):
                     table_tasks.append(
-                        partial(self._migrate_uc_table, from_catalog, from_schema, table.name, to_catalog, to_schema)
+                        partial(self._move_table, from_catalog, from_schema, table.name, to_catalog, to_schema)
                     )
                 else:
                     view_tasks.append(
                         partial(
-                            self._migrate_uc_view,
+                            self._move_view,
                             from_catalog,
                             from_schema,
                             table.name,
@@ -237,7 +243,7 @@ class TablesMigrate:
         Threads.strict(name="creating views", tasks=view_tasks)
         logger.info(f"migrated {len(list(view_tasks))} views to the new schema {to_schema}.")
 
-    def _migrate_uc_table(
+    def _move_table(
         self,
         from_catalog: str,
         from_schema: str,
@@ -249,9 +255,9 @@ class TablesMigrate:
         to_table_name = f"{to_catalog}.{to_schema}.{from_table}"
         try:
             create_sql = str(next(self._backend.fetch(f"SHOW CREATE TABLE {from_table_name}"))[0])
-            create_sql = create_sql.replace(from_catalog, to_catalog).replace(from_schema, to_schema)
+            create_table_sql = create_sql.replace(f"CREATE TABLE {from_table_name}", f"CREATE TABLE {to_table_name}")
             logger.debug(f"Creating table {from_table_name}.")
-            self._backend.execute(create_sql)
+            self._backend.execute(create_table_sql)
             grants = self._ws.grants.get(securable_type=SecurableType.TABLE, full_name=from_table_name)
             if grants.privilege_assignments is None:
                 return True
@@ -265,7 +271,7 @@ class TablesMigrate:
             logger.error(f"error applying permissions for {to_table_name}")
             return False
 
-    def _migrate_uc_view(
+    def _move_view(
         self,
         from_catalog: str,
         from_schema: str,

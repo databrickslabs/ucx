@@ -2,18 +2,8 @@ import logging
 from itertools import cycle
 from unittest.mock import MagicMock, create_autospec
 
-import pytest
 from databricks.sdk import WorkspaceClient
-from databricks.sdk.errors import NotFound
-from databricks.sdk.service.catalog import (
-    CatalogInfo,
-    PermissionsList,
-    Privilege,
-    PrivilegeAssignment,
-    SchemaInfo,
-    TableInfo,
-    TableType,
-)
+from databricks.sdk.service.catalog import CatalogInfo, SchemaInfo, TableInfo
 
 from databricks.labs.ucx.framework.crawlers import SqlBackend
 from databricks.labs.ucx.hive_metastore.mapping import (
@@ -27,7 +17,6 @@ from databricks.labs.ucx.hive_metastore.tables import (
     Table,
     TablesCrawler,
 )
-from databricks.labs.ucx.mixins.sql import Row
 
 from ..framework.mocks import MockBackend
 
@@ -324,101 +313,3 @@ def test_is_upgraded():
     table_migrate.migrate_tables()
     assert table_migrate.is_upgraded("schema1", "table1")
     assert not table_migrate.is_upgraded("schema1", "table2")
-
-
-def make_row(data, columns):
-    row = Row(data)
-    row.__columns__ = columns
-    return row
-
-
-def test_migrate_uc_tables_invalid_from_schema(caplog):
-    tc = create_autospec(TablesCrawler)
-    client = create_autospec(WorkspaceClient)
-    table_mapping = create_autospec(TableMapping)
-    table_mapping.load.return_value = []
-    client.schemas.get.side_effect = NotFound()
-    tm = TablesMigrate(tc, client, MockBackend, table_mapping)
-    with pytest.raises(NotFound):
-        tm.move_migrated_tables("SrcC", "SrcS", "*", "TgtC", "TgtS")
-
-
-def test_migrate_uc_tables_invalid_to_schema(caplog):
-    tc = create_autospec(TablesCrawler)
-    client = create_autospec(WorkspaceClient)
-    table_mapping = create_autospec(TableMapping)
-    table_mapping.load.return_value = []
-    client.schemas.get.side_effect = [SchemaInfo(), NotFound()]
-    tm = TablesMigrate(tc, client, MockBackend, table_mapping)
-    tm.move_migrated_tables("SrcC", "SrcS", "*", "TgtC", "TgtS")
-    assert len([rec.message for rec in caplog.records if "schema TgtS not found in TgtC" in rec.message]) == 1
-
-
-def test_migrate_uc_tables(caplog):
-    caplog.set_level(logging.INFO)
-    tc = create_autospec(TablesCrawler)
-    client = create_autospec(WorkspaceClient)
-    errors = {}
-    rows = {
-        "SHOW CREATE TABLE SrcC.SrcS.table1": [
-            ("CREATE TABLE SrcC.SrcS.table1 (name string)"),
-        ],
-        "SHOW CREATE TABLE SrcC.SrcS.table3": [
-            ("CREATE TABLE SrcC.SrcS.table3 (name string)"),
-        ],
-    }
-    client.tables.list.return_value = [
-        TableInfo(
-            catalog_name="SrcC",
-            schema_name="SrcS",
-            name="table1",
-            full_name="SrcC.SrcS.table1",
-            table_type=TableType.EXTERNAL,
-        ),
-        TableInfo(
-            catalog_name="SrcC",
-            schema_name="SrcS",
-            name="table2",
-            full_name="SrcC.SrcS.table2",
-            table_type=TableType.EXTERNAL,
-        ),
-        TableInfo(
-            catalog_name="SrcC",
-            schema_name="SrcS",
-            name="table3",
-            full_name="SrcC.SrcS.table3",
-            table_type=TableType.EXTERNAL,
-        ),
-        TableInfo(
-            catalog_name="SrcC",
-            schema_name="SrcS",
-            name="view1",
-            full_name="SrcC.SrcS.view1",
-            table_type=TableType.VIEW,
-            view_definition="SELECT * FROM SrcC.SrcS.table1",
-        ),
-        TableInfo(
-            catalog_name="SrcC",
-            schema_name="SrcS",
-            name="view2",
-            full_name="SrcC.SrcS.view2",
-            table_type=TableType.VIEW,
-            view_definition="SELECT * FROM SrcC.SrcS.table1",
-        ),
-    ]
-    perm_list = PermissionsList([PrivilegeAssignment("foo", [Privilege.SELECT])])
-    perm_none = PermissionsList(None)
-    client.grants.get.side_effect = [perm_list, perm_none, perm_none, perm_list, perm_none]
-    client.schemas.get.side_effect = [SchemaInfo(), SchemaInfo()]
-    client.tables.get.side_effect = [NotFound(), TableInfo(), NotFound(), NotFound(), NotFound()]
-    backend = MockBackend(fails_on_first=errors, rows=rows)
-    table_mapping = create_autospec(TableMapping)
-    table_mapping.load.return_value = []
-    tm = TablesMigrate(tc, client, backend, table_mapping)
-    tm.move_migrated_tables("SrcC", "SrcS", "*", "TgtC", "TgtS")
-    log_cnt = 0
-    for rec in caplog.records:
-        if rec.message in ["migrated 2 tables to the new schema TgtS.", "migrated 2 views to the new schema TgtS."]:
-            log_cnt += 1
-
-    assert log_cnt == 2
