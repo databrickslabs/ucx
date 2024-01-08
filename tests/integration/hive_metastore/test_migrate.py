@@ -198,6 +198,9 @@ def test_mapping_skips_tables_databases(ws, sql_backend, inventory_schema, make_
     src_schema1 = make_schema(catalog_name="hive_metastore")
     src_schema2 = make_schema(catalog_name="hive_metastore")
     table_to_migrate = make_table(schema_name=src_schema1.name)
+    table_databricks_dataset = make_table(
+        schema_name=src_schema1.name, external_csv="dbfs:/databricks-datasets/adult/adult.data"
+    )
     table_to_skip = make_table(schema_name=src_schema1.name)
     table_in_skipped_database = make_table(schema_name=src_schema2.name)
     all_tables = [table_to_migrate, table_to_skip, table_in_skipped_database]
@@ -223,6 +226,14 @@ def test_mapping_skips_tables_databases(ws, sql_backend, inventory_schema, make_
             dst_schema1.name,
             table_to_skip.name,
             table_to_skip.name,
+        ),
+        Rule(
+            "workspace",
+            dst_catalog.name,
+            src_schema1.name,
+            dst_schema1.name,
+            table_databricks_dataset.name,
+            table_databricks_dataset.name,
         ),
         Rule(
             "workspace",

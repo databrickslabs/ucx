@@ -134,6 +134,9 @@ class TableMapping:
             if rule.src_schema not in databases_in_scope:
                 logger.info(f"Table {rule.as_hms_table_key} is in a database that was marked to be skipped")
                 continue
+            if crawled_tables_keys[rule.as_hms_table_key].is_databricks_dataset:
+                logger.info(f"Table {rule.as_hms_table_key} is a db demo dataset and will not be upgraded")
+                continue
             tasks.append(
                 partial(self._get_table_in_scope_task, TableToMigrate(crawled_tables_keys[rule.as_hms_table_key], rule))
             )
