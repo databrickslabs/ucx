@@ -4,8 +4,7 @@ from functools import partial
 
 from databricks.labs.blueprint.parallel import Threads
 from databricks.sdk import WorkspaceClient
-from databricks.sdk.core import DatabricksError
-from databricks.sdk.errors import NotFound
+from databricks.sdk.errors import NotFound, PermissionDenied
 from databricks.sdk.service.catalog import PermissionsChange, SecurableType, TableType
 
 from databricks.labs.ucx.framework.crawlers import SqlBackend
@@ -208,15 +207,15 @@ class TableMove:
             self._ws.schemas.get(f"{to_catalog}.{to_schema}")
         except NotFound:
             logger.warning(f"schema {to_schema} not found in {to_catalog}, creating...")
-            self._ws.schemas.create(name=to_schema, catalog_name=to_catalog)
+            self._ws.schemas.create(to_schema, to_catalog)
 
-        tables = self._ws.tables.list(catalog_name=from_catalog, schema_name=from_schema)
+        tables = self._ws.tables.list(from_catalog, from_schema)
         table_tasks = []
         view_tasks = []
         filtered_tables = [table for table in tables if from_table in [table.name, "*"]]
         for table in filtered_tables:
             try:
-                self._ws.tables.get(full_name=f"{to_catalog}.{to_schema}.{table.name}")
+                self._ws.tables.get(f"{to_catalog}.{to_schema}.{table.name}")
                 logger.warning(
                     f"table {from_table} already present in {from_catalog}.{from_schema}. skipping this table..."
                 )
@@ -238,10 +237,10 @@ class TableMove:
                             table.view_definition,
                         )
                     )
-        Threads.strict(name="creating tables", tasks=table_tasks)
-        logger.info(f"migrated {len(list(table_tasks))} tables to the new schema {to_schema}.")
-        Threads.strict(name="creating views", tasks=view_tasks)
-        logger.info(f"migrated {len(list(view_tasks))} views to the new schema {to_schema}.")
+        Threads.strict("creating tables", table_tasks)
+        logger.info(f"moved {len(list(table_tasks))} tables to the new schema {to_schema}.")
+        Threads.strict("creating views", view_tasks)
+        logger.info(f"moved {len(list(view_tasks))} views to the new schema {to_schema}.")
 
     def _move_table(
         self,
@@ -258,18 +257,23 @@ class TableMove:
             create_table_sql = create_sql.replace(f"CREATE TABLE {from_table_name}", f"CREATE TABLE {to_table_name}")
             logger.debug(f"Creating table {from_table_name}.")
             self._backend.execute(create_table_sql)
-            grants = self._ws.grants.get(securable_type=SecurableType.TABLE, full_name=from_table_name)
+            grants = self._ws.grants.get(SecurableType.TABLE, from_table_name)
             if grants.privilege_assignments is None:
                 return True
             grants_changes = [
-                PermissionsChange(add=pair.privileges, principal=pair.principal)
-                for pair in grants.privilege_assignments
+                PermissionsChange(pair.privileges, pair.principal) for pair in grants.privilege_assignments
             ]
-            self._ws.grants.update(securable_type=SecurableType.TABLE, full_name=to_table_name, changes=grants_changes)
+            self._ws.grants.update(SecurableType.TABLE, to_table_name, changes=grants_changes)
             return True
-        except DatabricksError:
-            logger.error(f"error applying permissions for {to_table_name}")
-            return False
+
+        except NotFound as err:
+            if "[TABLE_OR_VIEW_NOT_FOUND]" in str(err):
+                logger.error(f"Could not find table {from_table_name}. Table not found.")
+            else:
+                logger.error(err)
+        except PermissionDenied:
+            logger.error(f"error applying permissions for table {to_table_name}")
+        return False
 
     def _move_view(
         self,
@@ -286,15 +290,19 @@ class TableMove:
             create_sql = f"CREATE VIEW {to_table_name} AS {view_text}"
             logger.debug(f"Creating view {to_table_name}.")
             self._backend.execute(create_sql)
-            grants = self._ws.grants.get(securable_type=SecurableType.TABLE, full_name=from_table_name)
+            grants = self._ws.grants.get(SecurableType.TABLE, from_table_name)
             if grants.privilege_assignments is None:
                 return True
             grants_changes = [
-                PermissionsChange(add=pair.privileges, principal=pair.principal)
-                for pair in grants.privilege_assignments
+                PermissionsChange(pair.privileges, pair.principal) for pair in grants.privilege_assignments
             ]
-            self._ws.grants.update(securable_type=SecurableType.TABLE, full_name=to_table_name, changes=grants_changes)
+            self._ws.grants.update(SecurableType.TABLE, to_table_name, changes=grants_changes)
             return True
-        except DatabricksError:
-            logger.error(f"error applying permissions for {to_table_name}")
-            return False
+        except NotFound as err:
+            if "[TABLE_OR_VIEW_NOT_FOUND]" in str(err):
+                logger.error(f"Could not find view {from_table_name}. View not found.")
+            else:
+                logger.error(err)
+        except PermissionDenied:
+            logger.error(f"error applying permissions for view {to_table_name}")
+        return False
