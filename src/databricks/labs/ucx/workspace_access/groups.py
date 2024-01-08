@@ -18,6 +18,7 @@ from databricks.sdk.errors.mapping import (
     InternalError,
     NotFound,
     ResourceConflict,
+    ResourceDoesNotExist,
 )
 from databricks.sdk.retries import retried
 from databricks.sdk.service import iam
@@ -506,6 +507,10 @@ class GroupManager(CrawlerBase[MigratedGroup]):
             return True
         except BadRequest:
             # already exists
+            return True
+        except ResourceDoesNotExist:
+            # the given account group has been removed after getting the group and before running this method
+            logger.warning("Group with ID: %s does not exist anymore in the Databricks account.", account_group_id)
             return True
 
     def _get_strategy(
