@@ -509,7 +509,7 @@ class GroupManager(CrawlerBase[MigratedGroup]):
             # already exists
             return True
         except ResourceDoesNotExist:
-            # the given account group has been removed after getting the group and before running this method
+            # the given group has been removed from the account after getting the group and before running this method
             logger.warning("Group with ID: %s does not exist anymore in the Databricks account.", account_group_id)
             return True
 
