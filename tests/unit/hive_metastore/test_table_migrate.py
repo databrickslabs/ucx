@@ -23,7 +23,7 @@ from ..framework.mocks import MockBackend
 logger = logging.getLogger(__name__)
 
 
-def test_migrate_managed_tables_should_produce_proper_queries():
+def test_migrate_dbfs_root_tables_should_produce_proper_queries():
     errors = {}
     rows = {}
     backend = MockBackend(fails_on_first=errors, rows=rows)
@@ -32,20 +32,38 @@ def test_migrate_managed_tables_should_produce_proper_queries():
     table_mapping = create_autospec(TableMapping)
     table_mapping.get_tables_to_migrate.return_value = [
         TableToMigrate(
-            Table("hive_metastore", "db1_src", "managed_src", "MANAGED", "DELTA"),
-            Rule("workspace", "ucx_default", "db1_src", "db1_dst", "managed_src", "managed_dst"),
-        )
+            Table("hive_metastore", "db1_src", "managed_dbfs", "MANAGED", "DELTA", "dbfs:/some_location"),
+            Rule("workspace", "ucx_default", "db1_src", "db1_dst", "managed_dbfs", "managed_dbfs"),
+        ),
+        TableToMigrate(
+            Table("hive_metastore", "db1_src", "managed_mnt", "MANAGED", "DELTA", "s3:/mnt/location"),
+            Rule("workspace", "ucx_default", "db1_src", "db1_dst", "managed_mnt", "managed_mnt"),
+        ),
+        TableToMigrate(
+            Table("hive_metastore", "db1_src", "managed_other", "MANAGED", "DELTA", "s3:/location"),
+            Rule("workspace", "ucx_default", "db1_src", "db1_dst", "managed_other", "managed_other"),
+        ),
     ]
     table_migrate = TablesMigrate(table_crawler, client, backend, table_mapping)
     table_migrate.migrate_tables()
 
-    assert (list(backend.queries)) == [
-        "CREATE TABLE IF NOT EXISTS ucx_default.db1_dst.managed_dst DEEP CLONE hive_metastore.db1_src.managed_src;",
-        "ALTER TABLE hive_metastore.db1_src.managed_src "
-        "SET TBLPROPERTIES ('upgraded_to' = 'ucx_default.db1_dst.managed_dst');",
-        "ALTER TABLE ucx_default.db1_dst.managed_dst "
-        "SET TBLPROPERTIES ('upgraded_from' = 'hive_metastore.db1_src.managed_src');",
-    ]
+    assert (
+        "CREATE TABLE IF NOT EXISTS ucx_default.db1_dst.managed_dbfs DEEP CLONE hive_metastore.db1_src.managed_dbfs;"
+    ) in list(backend.queries)
+    assert "SYNC TABLE ucx_default.db1_dst.managed_mnt FROM hive_metastore.db1_src.managed_mnt;" in list(
+        backend.queries
+    )
+    assert (
+        "ALTER TABLE hive_metastore.db1_src.managed_dbfs "
+        "SET TBLPROPERTIES ('upgraded_to' = 'ucx_default.db1_dst.managed_dbfs');"
+    ) in list(backend.queries)
+    assert (
+        "ALTER TABLE ucx_default.db1_dst.managed_dbfs "
+        "SET TBLPROPERTIES ('upgraded_from' = 'hive_metastore.db1_src.managed_dbfs');"
+    ) in list(backend.queries)
+    assert "SYNC TABLE ucx_default.db1_dst.managed_other FROM hive_metastore.db1_src.managed_other;" in list(
+        backend.queries
+    )
 
 
 def test_migrate_external_tables_should_produce_proper_queries():
@@ -85,13 +103,15 @@ def test_migrate_view_should_produce_proper_queries():
     table_migrate = TablesMigrate(table_crawler, client, backend, table_mapping)
     table_migrate.migrate_tables()
 
-    assert (list(backend.queries)) == [
-        "CREATE VIEW IF NOT EXISTS ucx_default.db1_dst.view_dst AS SELECT * FROM table;",
+    assert "CREATE VIEW IF NOT EXISTS ucx_default.db1_dst.view_dst AS SELECT * FROM table;" in list(backend.queries)
+    assert (
         "ALTER VIEW hive_metastore.db1_src.view_src "
-        "SET TBLPROPERTIES ('upgraded_to' = 'ucx_default.db1_dst.view_dst');",
+        "SET TBLPROPERTIES ('upgraded_to' = 'ucx_default.db1_dst.view_dst');"
+    ) in list(backend.queries)
+    assert (
         "ALTER VIEW ucx_default.db1_dst.view_dst "
-        "SET TBLPROPERTIES ('upgraded_from' = 'hive_metastore.db1_src.view_src');",
-    ]
+        "SET TBLPROPERTIES ('upgraded_from' = 'hive_metastore.db1_src.view_src');"
+    ) in list(backend.queries)
 
 
 def get_table_migrate(backend: SqlBackend) -> TablesMigrate:

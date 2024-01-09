@@ -40,7 +40,7 @@ class TableSizeCrawler(CrawlerBase):
         for table in self._tables_crawler.snapshot():
             if not table.kind == "TABLE":
                 continue
-            if not table.is_dbfs_root():
+            if not table.is_dbfs_root:
                 continue
             size_in_bytes = self.get_table_size(table.key)
             yield TableSize(
