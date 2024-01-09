@@ -71,11 +71,10 @@ def test_move_tables(ws, sql_backend, make_catalog, make_schema, make_table, mak
     ]
     expected_table_3_grant = [PrivilegeAssignment(group_a.display_name, [Privilege.SELECT])]
     expected_view_1_grant = [PrivilegeAssignment(group_b.display_name, [Privilege.SELECT])]
-
-    assert len([perm for perm in table_1_grant.privilege_assignments if perm in expected_table_1_grant]) == 1
-    assert len([perm for perm in table_2_grant.privilege_assignments if perm in expected_table_2_grant]) == 1
-    assert len([perm for perm in table_3_grant.privilege_assignments if perm in expected_table_3_grant]) == 1
-    assert len([perm for perm in view_1_grant.privilege_assignments if perm in expected_view_1_grant]) == 1
+    assert table_1_grant.privilege_assignments == expected_table_1_grant
+    assert table_2_grant.privilege_assignments == expected_table_2_grant
+    assert table_3_grant.privilege_assignments == expected_table_3_grant
+    assert view_1_grant.privilege_assignments == expected_view_1_grant
 
 
 @retried(on=[NotFound], timeout=timedelta(minutes=2))
