@@ -183,10 +183,7 @@ def move(
         logger.error(CANT_FIND_UCX_MSG)
         return
     sql_backend = StatementExecutionBackend(w, installation.config.warehouse_id)
-    tables = TableMove(
-        w,
-        sql_backend,
-    )
+    tables = TableMove(w, sql_backend)
     if from_catalog == "" or to_catalog == "":
         logger.error("Please enter from_catalog and to_catalog details")
         return

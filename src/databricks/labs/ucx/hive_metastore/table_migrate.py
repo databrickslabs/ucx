@@ -4,7 +4,7 @@ from functools import partial
 
 from databricks.labs.blueprint.parallel import Threads
 from databricks.sdk import WorkspaceClient
-from databricks.sdk.errors import NotFound, PermissionDenied
+from databricks.sdk.errors import NotFound
 from databricks.sdk.service.catalog import PermissionsChange, SecurableType, TableType
 
 from databricks.labs.ucx.framework.crawlers import SqlBackend
@@ -187,11 +187,7 @@ class TablesMigrate:
 
 
 class TableMove:
-    def __init__(
-        self,
-        ws: WorkspaceClient,
-        backend: SqlBackend,
-    ):
+    def __init__(self, ws: WorkspaceClient, backend: SqlBackend):
         self._backend = backend
         self._ws = ws
 
@@ -279,14 +275,11 @@ class TableMove:
                 drop_sql = f"DROP TABLE {from_table_name}"
                 self._backend.execute(drop_sql)
             return True
-
         except NotFound as err:
             if "[TABLE_OR_VIEW_NOT_FOUND]" in str(err):
                 logger.error(f"Could not find table {from_table_name}. Table not found.")
             else:
                 logger.error(err)
-        except PermissionDenied:
-            logger.error(f"error applying permissions for table {to_table_name}")
         return False
 
     def _move_view(
@@ -322,6 +315,4 @@ class TableMove:
                 logger.error(f"Could not find view {from_table_name}. View not found.")
             else:
                 logger.error(err)
-        except PermissionDenied:
-            logger.error(f"error applying permissions for view {to_table_name}")
         return False

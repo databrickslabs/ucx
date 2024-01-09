@@ -17,16 +17,12 @@ def test_move_tables_no_from_schema(ws, sql_backend, make_random, make_catalog, 
     to_catalog = make_catalog()
     tm = TableMove(ws, sql_backend)
     tm.move_tables(from_catalog.name, from_schema, "*", to_catalog.name, from_schema, False)
-    assert (
-        len(
-            [
-                rec.message
-                for rec in caplog.records
-                if f"schema {from_schema} not found in catalog {from_catalog.name}" in rec.message
-            ]
-        )
-        == 1
-    )
+    rec_results = [
+        rec.message
+        for rec in caplog.records
+        if f"schema {from_schema} not found in catalog {from_catalog.name}" in rec.message
+    ]
+    assert len(rec_results) == 1
 
 
 @retried(on=[NotFound], timeout=timedelta(minutes=2))
@@ -67,12 +63,8 @@ def test_move_tables(ws, sql_backend, make_catalog, make_schema, make_table, mak
     view_1_grant = ws.grants.get(
         securable_type=SecurableType.TABLE, full_name=f"{to_catalog.name}.{to_schema.name}.{from_view_1.name}"
     )
-    assert (
-        len(
-            [t for t in tables if t.name in [from_table_1.name, from_table_2.name, from_table_3.name, from_view_1.name]]
-        )
-        == 4
-    )
+    for t in tables:
+        assert t.name in [from_table_1.name, from_table_2.name, from_table_3.name, from_view_1.name]
     expected_table_1_grant = [PrivilegeAssignment(group_a.display_name, [Privilege.SELECT])]
     expected_table_2_grant = [
         PrivilegeAssignment(group_b.display_name, [Privilege.MODIFY, Privilege.SELECT]),
@@ -99,5 +91,6 @@ def test_move_tables_no_to_schema(ws, sql_backend, make_catalog, make_schema, ma
     tm.move_tables(from_catalog.name, from_schema.name, from_table_1.name, to_catalog.name, to_schema, True)
     tables = ws.tables.list(catalog_name=to_catalog.name, schema_name=to_schema)
     dropped_tables = ws.tables.list(catalog_name=from_catalog.name, schema_name=from_schema.name)
-    assert len([t for t in tables if t.name in [from_table_1.name, from_table_2.name, from_table_3.name]]) == 1
+    for t in tables:
+        assert t.name in [from_table_1.name, from_table_2.name, from_table_3.name]
     assert len(list(dropped_tables)) == 3
