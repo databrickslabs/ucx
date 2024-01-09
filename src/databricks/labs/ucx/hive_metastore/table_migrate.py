@@ -197,7 +197,15 @@ class TableMove:
         self._backend = backend
         self._ws = ws
 
-    def move_tables(self, from_catalog: str, from_schema: str, from_table: str, to_catalog: str, to_schema: str):
+    def move_tables(
+        self,
+        from_catalog: str,
+        from_schema: str,
+        from_table: str,
+        to_catalog: str,
+        to_schema: str,
+        del_table: bool,  # noqa: FBT001
+    ):
         try:
             self._ws.schemas.get(f"{from_catalog}.{from_schema}")
         except NotFound:
@@ -223,7 +231,9 @@ class TableMove:
             except NotFound:
                 if table.table_type and table.table_type in (TableType.EXTERNAL, TableType.MANAGED):
                     table_tasks.append(
-                        partial(self._move_table, from_catalog, from_schema, table.name, to_catalog, to_schema)
+                        partial(
+                            self._move_table, from_catalog, from_schema, table.name, to_catalog, to_schema, del_table
+                        )
                     )
                 else:
                     view_tasks.append(
@@ -234,6 +244,7 @@ class TableMove:
                             table.name,
                             to_catalog,
                             to_schema,
+                            del_table,
                             table.view_definition,
                         )
                     )
@@ -249,13 +260,14 @@ class TableMove:
         from_table: str,
         to_catalog: str,
         to_schema: str,
+        del_table: bool,  # noqa: FBT001
     ) -> bool:
         from_table_name = f"{from_catalog}.{from_schema}.{from_table}"
         to_table_name = f"{to_catalog}.{to_schema}.{from_table}"
         try:
             create_sql = str(next(self._backend.fetch(f"SHOW CREATE TABLE {from_table_name}"))[0])
             create_table_sql = create_sql.replace(f"CREATE TABLE {from_table_name}", f"CREATE TABLE {to_table_name}")
-            logger.debug(f"Creating table {from_table_name}.")
+            logger.debug(f"Creating table {to_table_name}.")
             self._backend.execute(create_table_sql)
             grants = self._ws.grants.get(SecurableType.TABLE, from_table_name)
             if grants.privilege_assignments is None:
@@ -264,6 +276,10 @@ class TableMove:
                 PermissionsChange(pair.privileges, pair.principal) for pair in grants.privilege_assignments
             ]
             self._ws.grants.update(SecurableType.TABLE, to_table_name, changes=grants_changes)
+            if del_table:
+                logger.debug(f"Dropping source table {from_table_name}.")
+                drop_sql = f"DROP TABLE {from_table_name}"
+                self._backend.execute(drop_sql)
             return True
 
         except NotFound as err:
@@ -282,6 +298,7 @@ class TableMove:
         from_table: str,
         to_catalog: str,
         to_schema: str,
+        del_view: bool,  # noqa: FBT001
         view_text: str | None = None,
     ) -> bool:
         from_table_name = f"{from_catalog}.{from_schema}.{from_table}"
@@ -297,6 +314,10 @@ class TableMove:
                 PermissionsChange(pair.privileges, pair.principal) for pair in grants.privilege_assignments
             ]
             self._ws.grants.update(SecurableType.TABLE, to_table_name, changes=grants_changes)
+            if del_view:
+                logger.debug(f"Dropping source view {from_table_name}.")
+                drop_sql = f"DROP VIEW {from_table_name}"
+                self._backend.execute(drop_sql)
             return True
         except NotFound as err:
             if "[TABLE_OR_VIEW_NOT_FOUND]" in str(err):

@@ -30,7 +30,7 @@ def test_move_tables_invalid_from_schema(caplog):
     client = create_autospec(WorkspaceClient)
     client.schemas.get.side_effect = NotFound()
     tm = TableMove(client, MockBackend)
-    tm.move_tables("SrcC", "SrcS", "*", "TgtC", "TgtS")
+    tm.move_tables("SrcC", "SrcS", "*", "TgtC", "TgtS", False)
     assert len([rec.message for rec in caplog.records if "schema SrcS not found in catalog SrcC" in rec.message]) == 1
 
 
@@ -38,7 +38,7 @@ def test_move_tables_invalid_to_schema(caplog):
     client = create_autospec(WorkspaceClient)
     client.schemas.get.side_effect = [SchemaInfo(), NotFound()]
     tm = TableMove(client, MockBackend)
-    tm.move_tables("SrcC", "SrcS", "*", "TgtC", "TgtS")
+    tm.move_tables("SrcC", "SrcS", "*", "TgtC", "TgtS", False)
     assert len([rec.message for rec in caplog.records if "schema TgtS not found in TgtC" in rec.message]) == 1
 
 
@@ -100,7 +100,7 @@ def test_move_tables(caplog):
     client.tables.get.side_effect = [NotFound(), TableInfo(), NotFound(), NotFound(), NotFound()]
     backend = MockBackend(fails_on_first=errors, rows=rows)
     tm = TableMove(client, backend)
-    tm.move_tables("SrcC", "SrcS", "*", "TgtC", "TgtS")
+    tm.move_tables("SrcC", "SrcS", "*", "TgtC", "TgtS", True)
     log_cnt = 0
     for rec in caplog.records:
         if rec.message in ["moved 2 tables to the new schema TgtS.", "moved 2 views to the new schema TgtS."]:

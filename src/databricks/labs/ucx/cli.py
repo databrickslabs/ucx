@@ -176,6 +176,7 @@ def move(
 ):
     """move a uc table/tables from one schema to another schema in same or different catalog"""
     logger.info("Running move command")
+    prompts = Prompts()
     installation_manager = InstallationManager(w)
     installation = installation_manager.for_user(w.current_user.me())
     if not installation:
@@ -195,14 +196,9 @@ def move(
     if from_catalog == to_catalog and from_schema == to_schema:
         logger.error("please select a different schema or catalog to migrate to")
         return
+    del_table = prompts.confirm(f"should we delete tables/view after moving to new schema {to_catalog}.{to_schema}")
     logger.info(f"migrating tables {from_table} from {from_catalog}.{from_schema} to {to_catalog}.{to_schema}")
-    tables.move_tables(
-        from_catalog,
-        from_schema,
-        from_table,
-        to_catalog,
-        to_schema,
-    )
+    tables.move_tables(from_catalog, from_schema, from_table, to_catalog, to_schema, del_table)
 
 
 if "__main__" == __name__:
