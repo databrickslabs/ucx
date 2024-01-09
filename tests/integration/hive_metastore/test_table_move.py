@@ -53,14 +53,7 @@ def test_move_tables(ws, sql_backend, make_catalog, make_schema, make_table, mak
     sql_backend.execute(f"GRANT SELECT,MODIFY ON TABLE {from_table_2.full_name} TO `{group_b.display_name}`")
     sql_backend.execute(f"GRANT SELECT ON VIEW {from_view_1.full_name} TO `{group_b.display_name}`")
     sql_backend.execute(f"GRANT SELECT ON TABLE {to_table_3.full_name} TO `{group_a.display_name}`")
-    tm.move_tables(
-        from_catalog.name,
-        from_schema.name,
-        "*",
-        to_catalog.name,
-        to_schema.name,
-        False
-    )
+    tm.move_tables(from_catalog.name, from_schema.name, "*", to_catalog.name, to_schema.name, False)
     tables = ws.tables.list(catalog_name=to_catalog.name, schema_name=to_schema.name)
     table_1_grant = ws.grants.get(
         securable_type=SecurableType.TABLE, full_name=f"{to_catalog.name}.{to_schema.name}.{from_table_1.name}"
@@ -103,14 +96,7 @@ def test_move_tables_no_to_schema(ws, sql_backend, make_catalog, make_schema, ma
     from_table_3 = make_table(catalog_name=from_catalog.name, schema_name=from_schema.name)
     to_catalog = make_catalog()
     to_schema = make_random(4)
-    tm.move_tables(
-        from_catalog.name,
-        from_schema.name,
-        from_table_1.name,
-        to_catalog.name,
-        to_schema,
-        True
-    )
+    tm.move_tables(from_catalog.name, from_schema.name, from_table_1.name, to_catalog.name, to_schema, True)
     tables = ws.tables.list(catalog_name=to_catalog.name, schema_name=to_schema)
     dropped_tables = ws.tables.list(catalog_name=from_catalog.name, schema_name=from_schema.name)
     assert len([t for t in tables if t.name in [from_table_1.name, from_table_2.name, from_table_3.name]]) == 1
