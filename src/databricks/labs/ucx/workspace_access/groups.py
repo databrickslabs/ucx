@@ -507,6 +507,10 @@ class GroupManager(CrawlerBase[MigratedGroup]):
         except BadRequest:
             # already exists
             return True
+        except NotFound:
+            # the given group has been removed from the account after getting the group and before running this method
+            logger.warning("Group with ID: %s does not exist anymore in the Databricks account.", account_group_id)
+            return True
 
     def _get_strategy(
         self, workspace_groups_in_workspace: dict[str, Group], account_groups_in_account: dict[str, Group]
