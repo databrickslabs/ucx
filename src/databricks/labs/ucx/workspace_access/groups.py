@@ -18,7 +18,6 @@ from databricks.sdk.errors.mapping import (
     InternalError,
     NotFound,
     ResourceConflict,
-    ResourceDoesNotExist,
 )
 from databricks.sdk.retries import retried
 from databricks.sdk.service import iam
