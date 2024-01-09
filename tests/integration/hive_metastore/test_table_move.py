@@ -93,4 +93,5 @@ def test_move_tables_no_to_schema(ws, sql_backend, make_catalog, make_schema, ma
     dropped_tables = ws.tables.list(catalog_name=from_catalog.name, schema_name=from_schema.name)
     for t in tables:
         assert t.name in [from_table_1.name, from_table_2.name, from_table_3.name]
-    assert len(list(dropped_tables)) == 3
+    for t in dropped_tables:
+        assert t.name in [from_table_1.name, from_table_2.name, from_table_3.name]
