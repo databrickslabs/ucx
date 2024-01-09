@@ -277,7 +277,7 @@ class TableMove:
             ]
             self._ws.grants.update(SecurableType.TABLE, to_table_name, changes=grants_changes)
             if del_table:
-                logger.debug(f"Dropping source table {from_table_name}.")
+                logger.info(f"dropping source table {from_table_name}")
                 drop_sql = f"DROP TABLE {from_table_name}"
                 self._backend.execute(drop_sql)
             return True
@@ -315,7 +315,7 @@ class TableMove:
             ]
             self._ws.grants.update(SecurableType.TABLE, to_table_name, changes=grants_changes)
             if del_view:
-                logger.debug(f"Dropping source view {from_table_name}.")
+                logger.info(f"dropping source view {from_table_name}")
                 drop_sql = f"DROP VIEW {from_table_name}"
                 self._backend.execute(drop_sql)
             return True

@@ -103,7 +103,8 @@ def test_move_tables(caplog):
     tm.move_tables("SrcC", "SrcS", "*", "TgtC", "TgtS", True)
     log_cnt = 0
     for rec in caplog.records:
-        if rec.message in ["moved 2 tables to the new schema TgtS.", "moved 2 views to the new schema TgtS."]:
+        if rec.message in ["moved 2 tables to the new schema TgtS.", "moved 2 views to the new schema TgtS.",
+                           "dropping source table SrcC.SrcS.table1", "dropping source view SrcC.SrcS.view2"]:
             log_cnt += 1
 
-    assert log_cnt == 2
+    assert log_cnt == 4
