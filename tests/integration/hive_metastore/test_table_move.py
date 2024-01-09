@@ -16,7 +16,7 @@ def test_move_tables_no_from_schema(ws, sql_backend, make_random, make_catalog, 
     from_schema = make_random(4)
     to_catalog = make_catalog()
     tm = TableMove(ws, sql_backend)
-    tm.move_tables(from_catalog.name, from_schema, "*", to_catalog.name, from_schema)
+    tm.move_tables(from_catalog.name, from_schema, "*", to_catalog.name, from_schema, False)
     assert (
         len(
             [
@@ -59,6 +59,7 @@ def test_move_tables(ws, sql_backend, make_catalog, make_schema, make_table, mak
         "*",
         to_catalog.name,
         to_schema.name,
+        False
     )
     tables = ws.tables.list(catalog_name=to_catalog.name, schema_name=to_schema.name)
     table_1_grant = ws.grants.get(
@@ -108,6 +109,9 @@ def test_move_tables_no_to_schema(ws, sql_backend, make_catalog, make_schema, ma
         from_table_1.name,
         to_catalog.name,
         to_schema,
+        True
     )
     tables = ws.tables.list(catalog_name=to_catalog.name, schema_name=to_schema)
+    dropped_tables = ws.tables.list(catalog_name=from_catalog.name, schema_name=from_schema.name)
     assert len([t for t in tables if t.name in [from_table_1.name, from_table_2.name, from_table_3.name]]) == 1
+    assert len(list(dropped_tables)) == 3
