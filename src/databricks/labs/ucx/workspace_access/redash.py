@@ -182,7 +182,7 @@ class RedashPermissionsSupport(AclSupport):
         acl_requests: list[sql.AccessControl] = []
         for access_control in acl:
             if access_control.user_name:
-                logger.debug(f"Including redash permissions acl for user `{access_control.user_name}`")
+                logger.debug(f"Including redash permissions acl for user: `{access_control.user_name}`")
                 acl_requests.append(access_control)
                 continue
 
@@ -190,17 +190,22 @@ class RedashPermissionsSupport(AclSupport):
                 continue
 
             if not migration_state.is_in_scope(access_control.group_name):
-                logger.debug(f"Including redash permissions acl for group `{access_control.group_name}`")
+                logger.debug(
+                    f"Including redash permissions acl for group not in the scope: `{access_control.group_name}`"
+                )
                 acl_requests.append(access_control)
                 continue
 
             target_principal = migration_state.get_target_principal(access_control.group_name)
-            if target_principal is None:
-                logger.debug(f"Including redash permissions acl for target group `{access_control.group_name}`")
+            if not target_principal:
+                logger.debug(
+                    f"Including redash permissions acl for group without target principal: "
+                    f"`{access_control.group_name}`"
+                )
                 acl_requests.append(access_control)
                 continue
 
-            logger.debug(f"Including redash permissions acl for group `{target_principal}`")
+            logger.debug(f"Including redash permissions acl for target group `{target_principal}`")
             new_acl_request = dataclasses.replace(access_control, group_name=target_principal)
             acl_requests.append(new_acl_request)
 

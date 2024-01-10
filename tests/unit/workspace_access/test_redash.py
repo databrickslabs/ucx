@@ -82,7 +82,11 @@ def test_apply(migration_state):
                 permission_level=sql.PermissionLevel.CAN_MANAGE,
             ),
             sql.AccessControl(
-                user_name="test_user",
+                user_name="test-user",
+                permission_level=sql.PermissionLevel.CAN_RUN,
+            ),
+            sql.AccessControl(
+                group_name="without-account-group",
                 permission_level=sql.PermissionLevel.CAN_RUN,
             ),
         ],
@@ -104,7 +108,11 @@ def test_apply(migration_state):
                 permission_level=sql.PermissionLevel.CAN_MANAGE,
             ),
             sql.AccessControl(
-                user_name="test_user",
+                user_name="test-user",
+                permission_level=sql.PermissionLevel.CAN_RUN,
+            ),
+            sql.AccessControl(
+                group_name="without-account-group",
                 permission_level=sql.PermissionLevel.CAN_RUN,
             ),
         ],
@@ -127,7 +135,11 @@ def test_apply(migration_state):
                         permission_level=sql.PermissionLevel.CAN_MANAGE,
                     ),
                     sql.AccessControl(
-                        user_name="test_user",
+                        user_name="test-user",
+                        permission_level=sql.PermissionLevel.CAN_RUN,
+                    ),
+                    sql.AccessControl(
+                        group_name="without-account-group",
                         permission_level=sql.PermissionLevel.CAN_RUN,
                     ),
                 ],
@@ -151,7 +163,11 @@ def test_apply(migration_state):
             permission_level=sql.PermissionLevel.CAN_MANAGE,
         ),
         sql.AccessControl(
-            user_name="test_user",
+            user_name="test-user",
+            permission_level=sql.PermissionLevel.CAN_RUN,
+        ),
+        sql.AccessControl(
+            group_name="without-account-group",
             permission_level=sql.PermissionLevel.CAN_RUN,
         ),
     ]
@@ -341,6 +357,7 @@ def test_load_as_dict():
 
     query_id = "query_test"
     group_name = "group_test"
+    user_name = "user_test"
 
     ws.queries.list.return_value = [
         sql.QueryInfo(
@@ -351,7 +368,11 @@ def test_load_as_dict():
     sample_permission = sql.GetResponse(
         object_id=query_id,
         object_type=sql.ObjectType.QUERY,
-        access_control_list=[sql.AccessControl(group_name=group_name, permission_level=sql.PermissionLevel.CAN_RUN)],
+        access_control_list=[
+            sql.AccessControl(group_name=group_name, permission_level=sql.PermissionLevel.CAN_RUN),
+            sql.AccessControl(user_name=user_name, permission_level=sql.PermissionLevel.CAN_MANAGE),
+            sql.AccessControl(permission_level=sql.PermissionLevel.CAN_MANAGE),
+        ],
     )
 
     ws.dbsql_permissions.get.return_value = sample_permission
@@ -363,9 +384,40 @@ def test_load_as_dict():
     policy_permissions = redash_permissions.load_as_dict(sql.ObjectTypePlural.QUERIES, query_id)
 
     assert sql.PermissionLevel.CAN_RUN == policy_permissions[group_name]
+    assert sql.PermissionLevel.CAN_MANAGE == policy_permissions[user_name]
+    assert sql.PermissionLevel.CAN_MANAGE == policy_permissions["UNKNOWN"]
 
 
-def test_load_as_dict_no_permissions():
+def test_load_as_dict_for_user():
+    ws = MagicMock()
+
+    query_id = "query_test"
+    user_name = "user_test"
+
+    ws.queries.list.return_value = [
+        sql.QueryInfo(
+            query_id=query_id,
+        )
+    ]
+
+    sample_permission = sql.GetResponse(
+        object_id=query_id,
+        object_type=sql.ObjectType.QUERY,
+        access_control_list=[sql.AccessControl(user_name=user_name, permission_level=sql.PermissionLevel.CAN_RUN)],
+    )
+
+    ws.dbsql_permissions.get.return_value = sample_permission
+    redash_permissions = RedashPermissionsSupport(
+        ws,
+        [redash.Listing(ws.queries.list, sql.ObjectTypePlural.QUERIES)],
+    )
+
+    policy_permissions = redash_permissions.load_as_dict(sql.ObjectTypePlural.QUERIES, query_id)
+
+    assert sql.PermissionLevel.CAN_RUN == policy_permissions[user_name]
+
+
+def test_load_as_dict_permissions_not_found():
     ws = MagicMock()
 
     sup = RedashPermissionsSupport(
@@ -391,5 +443,49 @@ def test_load_as_dict_handle_exception_when_getting_permissions():
     ws.permissions.get.side_effect = Mock(side_effect=NotFound(...))
 
     policy_permissions = sup.load_as_dict(sql.ObjectTypePlural.QUERIES, "query_test")
+
+    assert len(policy_permissions) == 0
+
+
+def test_load_as_dict_no_permissions():
+    ws = MagicMock()
+
+    sup = RedashPermissionsSupport(
+        ws=ws,
+        listings=[],
+    )
+
+    ws.dbsql_permissions.get.return_value = None
+
+    policy_permissions = sup.load_as_dict(sql.ObjectTypePlural.QUERIES, "query_test")
+
+    assert len(policy_permissions) == 0
+
+
+def test_load_as_dict_no_permission_level():
+    ws = MagicMock()
+
+    query_id = "query_test"
+    group_name = "group_test"
+
+    ws.queries.list.return_value = [
+        sql.QueryInfo(
+            query_id=query_id,
+        )
+    ]
+
+    sample_permission = sql.GetResponse(
+        object_id=query_id,
+        object_type=sql.ObjectType.QUERY,
+        access_control_list=[sql.AccessControl(group_name=group_name)],
+    )
+
+    ws.dbsql_permissions.get.return_value = sample_permission
+    redash_permissions = RedashPermissionsSupport(
+        ws,
+        [redash.Listing(ws.queries.list, sql.ObjectTypePlural.QUERIES)],
+    )
+
+    policy_permissions = redash_permissions.load_as_dict(sql.ObjectTypePlural.QUERIES, query_id)
 
     assert len(policy_permissions) == 0

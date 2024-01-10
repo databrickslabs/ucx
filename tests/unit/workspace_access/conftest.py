@@ -15,7 +15,17 @@ def migration_state() -> MigrationState:
             entitlements=None,
             external_id=None,
             roles=None,
-        )
+        ),
+        MigratedGroup(
+            id_in_workspace="without-account-group-ws",
+            name_in_workspace="without-account-group",
+            name_in_account="",
+            temporary_name="",
+            members=None,
+            entitlements=None,
+            external_id=None,
+            roles=None,
+        ),
     ]
     ms = MigrationState(grp)
     return ms
