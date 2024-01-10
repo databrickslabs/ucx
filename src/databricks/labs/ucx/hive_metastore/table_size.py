@@ -3,6 +3,8 @@ from collections.abc import Iterable
 from dataclasses import dataclass
 from functools import partial
 
+from databricks.sdk.errors import NotFound
+
 from databricks.labs.ucx.framework.crawlers import CrawlerBase, RuntimeBackend
 from databricks.labs.ucx.hive_metastore import TablesCrawler
 
@@ -55,6 +57,7 @@ class TableSizeCrawler(CrawlerBase):
     def snapshot(self) -> list[TableSize]:
         """
         Takes a snapshot of tables in the specified catalog and database.
+        Return 0 if the table cannot be found anymore.
 
         Returns:
             list[Table]: A list of Table objects representing the snapshot of tables.
@@ -63,4 +66,11 @@ class TableSizeCrawler(CrawlerBase):
 
     def get_table_size(self, table_full_name: str) -> int:
         logger.debug(f"Evaluating {table_full_name} table size.")
-        return self._spark._jsparkSession.table(table_full_name).queryExecution().analyzed().stats().sizeInBytes()
+        try:
+            return self._spark._jsparkSession.table(table_full_name).queryExecution().analyzed().stats().sizeInBytes()
+        except NotFound as nf:
+            if "[TABLE_OR_VIEW_NOT_FOUND]" in str(nf):
+                logger.error(f"Failed to evaluate {table_full_name} table size. Table not found.")
+            else:
+                logger.error(nf)
+            return 0
