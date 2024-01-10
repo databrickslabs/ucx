@@ -7,8 +7,14 @@ from collections.abc import Callable, Iterable, Iterator, Sequence
 from types import UnionType
 from typing import Any, ClassVar, Generic, Protocol, TypeVar
 
-from databricks.sdk import WorkspaceClient
-from databricks.sdk.errors import NotFound
+from databricks.sdk import WorkspaceClient, errors
+from databricks.sdk.errors import BadRequest, NotFound, PermissionDenied
+from databricks.sdk.service.sql import (
+    ServiceError,
+    ServiceErrorCode,
+    StatementState,
+    StatementStatus,
+)
 
 from databricks.labs.ucx.mixins.sql import Row, StatementExecutionExt
 
@@ -151,7 +157,18 @@ class RuntimeBackend(SqlBackend):
 
     def execute(self, sql):
         logger.debug(f"[spark][execute] {sql}")
-        self._spark.sql(sql)
+        try:
+            immediate_response = self._spark.sql(sql)
+            status = immediate_response.status
+        except Exception as e:
+            status = StatementStatus(state=StatementState.FAILED, error=ServiceError(message=str(e)))
+
+        if status is None:
+            status = StatementStatus(state=StatementState.FAILED)
+        if status.state == StatementState.SUCCEEDED:
+            return immediate_response
+
+        self._raise_if_needed(status)
 
     def fetch(self, sql) -> Iterator[Row]:
         logger.debug(f"[spark][fetch] {sql}")
@@ -166,6 +183,46 @@ class RuntimeBackend(SqlBackend):
         # pyspark deals well with lists of dataclass instances, as long as schema is provided
         df = self._spark.createDataFrame(rows, self._schema_for(klass))
         df.write.saveAsTable(full_name, mode=mode)
+
+    @staticmethod
+    def _raise_if_needed(status: StatementStatus):
+        if status.state not in [StatementState.FAILED, StatementState.CANCELED, StatementState.CLOSED]:
+            return
+        status_error = status.error
+        if status_error is None:
+            status_error = ServiceError(message="unknown", error_code=ServiceErrorCode.UNKNOWN)
+        error_message = status_error.message
+        if error_message is None:
+            error_message = ""
+        if "SCHEMA_NOT_FOUND" in error_message:
+            raise NotFound(error_message)
+        if "TABLE_OR_VIEW_NOT_FOUND" in error_message:
+            raise NotFound(error_message)
+        if "PARSE_SYNTAX_ERROR" in error_message:
+            raise BadRequest(error_message)
+        if "Operation not allowed" in error_message:
+            raise PermissionDenied(error_message)
+        mapping = {
+            ServiceErrorCode.ABORTED: errors.Aborted,
+            ServiceErrorCode.ALREADY_EXISTS: errors.AlreadyExists,
+            ServiceErrorCode.BAD_REQUEST: errors.BadRequest,
+            ServiceErrorCode.CANCELLED: errors.Cancelled,
+            ServiceErrorCode.DEADLINE_EXCEEDED: errors.DeadlineExceeded,
+            ServiceErrorCode.INTERNAL_ERROR: errors.InternalError,
+            ServiceErrorCode.IO_ERROR: errors.InternalError,
+            ServiceErrorCode.NOT_FOUND: errors.NotFound,
+            ServiceErrorCode.RESOURCE_EXHAUSTED: errors.ResourceExhausted,
+            ServiceErrorCode.SERVICE_UNDER_MAINTENANCE: errors.TemporarilyUnavailable,
+            ServiceErrorCode.TEMPORARILY_UNAVAILABLE: errors.TemporarilyUnavailable,
+            ServiceErrorCode.UNAUTHENTICATED: errors.Unauthenticated,
+            ServiceErrorCode.UNKNOWN: errors.Unknown,
+            ServiceErrorCode.WORKSPACE_TEMPORARILY_UNAVAILABLE: errors.TemporarilyUnavailable,
+        }
+        error_code = status_error.error_code
+        if error_code is None:
+            error_code = ServiceErrorCode.UNKNOWN
+        error_class = mapping.get(error_code, errors.Unknown)
+        raise error_class(error_message)
 
 
 class CrawlerBase(Generic[Result]):
