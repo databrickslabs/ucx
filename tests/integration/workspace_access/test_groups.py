@@ -212,7 +212,7 @@ def test_group_matching_names(ws, sql_backend, inventory_schema, make_ucx_group,
 
 
 # average runtime is 100 seconds
-@retried(on=[NotFound], timeout=timedelta(minutes=3))
+@retried(on=[NotFound], timeout=timedelta(minutes=15))
 def test_replace_workspace_groups_with_account_groups(
     ws,
     sql_backend,
