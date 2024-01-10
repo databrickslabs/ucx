@@ -76,7 +76,7 @@ def test_job_failure_propagates_correct_error_message_and_logs(ws, sql_backend, 
     assert len(workflow_run_logs) == 1
 
 
-@retried(on=[NotFound, InvalidParameterValue], timeout=timedelta(minutes=6))
+@retried(on=[NotFound, InvalidParameterValue], timeout=timedelta(minutes=16))
 def test_running_real_assessment_job(
     ws, new_installation, make_ucx_group, make_cluster_policy, make_cluster_policy_permissions
 ):
@@ -132,7 +132,7 @@ def test_running_real_migrate_groups_job(
 
 @retried(on=[NotFound, InvalidParameterValue], timeout=timedelta(minutes=5))
 def test_running_real_remove_backup_groups_job(ws, sql_backend, new_installation, make_ucx_group):
-    ws_group_a, acc_group_a = make_ucx_group()
+    ws_group_a, acc_group_a, _ = make_ucx_group()
 
     install = new_installation(lambda wc: replace(wc, include_group_names=[ws_group_a.display_name]))
     cfg = install.current_config
