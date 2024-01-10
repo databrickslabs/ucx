@@ -4,8 +4,9 @@ from dataclasses import dataclass
 from unittest import mock
 
 import pytest
-from databricks.sdk.errors import NotFound
+from databricks.sdk.errors import BadRequest, NotFound, PermissionDenied, Unknown
 from databricks.sdk.service import sql
+from databricks.sdk.service.sql import ServiceError, StatementState, StatementStatus
 
 from databricks.labs.ucx.framework.crawlers import (
     CrawlerBase,
@@ -244,3 +245,37 @@ def test_save_table_with_not_null_constraint_violated(mocker):
         assert (
             str(exc_info.value) == "Not null constraint violated for column key, row = {'key': None, 'value': 'value'}"
         )
+
+
+def test_raise_if_needed(mocker):
+    with mock.patch.dict(os.environ, {"DATABRICKS_RUNTIME_VERSION": "14.0"}):
+        pyspark_sql_session = mocker.Mock()
+        sys.modules["pyspark.sql.session"] = pyspark_sql_session
+
+        status_invalid_schema = StatementStatus(
+            state=StatementState.FAILED, error=ServiceError(message="SCHEMA_NOT_FOUND")
+        )
+        with pytest.raises(NotFound):
+            RuntimeBackend._raise_if_needed(status_invalid_schema)
+
+        status_invalid_table = StatementStatus(
+            state=StatementState.FAILED, error=ServiceError(message="TABLE_OR_VIEW_NOT_FOUND")
+        )
+        with pytest.raises(NotFound):
+            RuntimeBackend._raise_if_needed(status_invalid_table)
+
+        status_syntax_error = StatementStatus(
+            state=StatementState.FAILED, error=ServiceError(message="PARSE_SYNTAX_ERROR")
+        )
+        with pytest.raises(BadRequest):
+            RuntimeBackend._raise_if_needed(status_syntax_error)
+
+        status_permission_denied = StatementStatus(
+            state=StatementState.FAILED, error=ServiceError(message="Operation not allowed")
+        )
+        with pytest.raises(PermissionDenied):
+            RuntimeBackend._raise_if_needed(status_permission_denied)
+
+        status_unknown_error = StatementStatus(state=StatementState.FAILED, error=None)
+        with pytest.raises(Unknown):
+            RuntimeBackend._raise_if_needed(status_unknown_error)
