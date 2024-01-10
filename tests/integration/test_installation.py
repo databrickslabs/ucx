@@ -80,7 +80,7 @@ def test_job_failure_propagates_correct_error_message_and_logs(ws, sql_backend, 
 def test_running_real_assessment_job(
     ws, new_installation, make_ucx_group, make_cluster_policy, make_cluster_policy_permissions
 ):
-    ws_group_a, acc_group_a = make_ucx_group()
+    ws_group_a, acc_group_a, _ = make_ucx_group()
 
     cluster_policy = make_cluster_policy()
     make_cluster_policy_permissions(
@@ -101,7 +101,7 @@ def test_running_real_assessment_job(
 def test_running_real_migrate_groups_job(
     ws, sql_backend, new_installation, make_ucx_group, make_cluster_policy, make_cluster_policy_permissions
 ):
-    ws_group_a, acc_group_a = make_ucx_group()
+    ws_group_a, acc_group_a, _ = make_ucx_group()
 
     # perhaps we also want to do table grants here (to test acl cluster)
     cluster_policy = make_cluster_policy()
