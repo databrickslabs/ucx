@@ -4,7 +4,7 @@ from dataclasses import dataclass
 from unittest import mock
 
 import pytest
-from databricks.sdk.errors import NotFound
+from databricks.sdk.errors import BadRequest, NotFound, PermissionDenied, Unknown
 from databricks.sdk.service import sql
 
 from databricks.labs.ucx.framework.crawlers import (
@@ -244,3 +244,108 @@ def test_save_table_with_not_null_constraint_violated(mocker):
         assert (
             str(exc_info.value) == "Not null constraint violated for column key, row = {'key': None, 'value': 'value'}"
         )
+
+
+def test_raise_spark_sql_exceptions(mocker):
+    with mock.patch.dict(os.environ, {"DATABRICKS_RUNTIME_VERSION": "14.0"}):
+        pyspark_sql_session = mocker.Mock()
+        sys.modules["pyspark.sql.session"] = pyspark_sql_session
+
+        rb = RuntimeBackend
+        error_message_invalid_schema = "SCHEMA_NOT_FOUND foo schema does not exist"
+        with pytest.raises(NotFound):
+            rb._raise_spark_sql_exceptions(error_message_invalid_schema)
+
+        error_message_invalid_table = "TABLE_OR_VIEW_NOT_FOUND foo table does not exist"
+        with pytest.raises(NotFound):
+            rb._raise_spark_sql_exceptions(error_message_invalid_table)
+
+        error_message_invalid_syntax = "PARSE_SYNTAX_ERROR foo"
+        with pytest.raises(BadRequest):
+            rb._raise_spark_sql_exceptions(error_message_invalid_syntax)
+
+        error_message_permission_denied = "foo Operation not allowed"
+        with pytest.raises(PermissionDenied):
+            rb._raise_spark_sql_exceptions(error_message_permission_denied)
+
+        error_message_invalid_schema = "foo error failure"
+        with pytest.raises(Unknown):
+            rb._raise_spark_sql_exceptions(error_message_invalid_schema)
+
+
+def test_execute(mocker):
+    with mock.patch.dict(os.environ, {"DATABRICKS_RUNTIME_VERSION": "14.0"}):
+        pyspark_sql_session = mocker.Mock()
+        sys.modules["pyspark.sql.session"] = pyspark_sql_session
+        rb = RuntimeBackend()
+
+        sql_query = "SELECT * from bar"
+
+        pyspark_sql_session.SparkSession.builder.getOrCreate.return_value.sql.side_effect = Exception(
+            "SCHEMA_NOT_FOUND"
+        )
+        with pytest.raises(NotFound):
+            rb.execute(sql_query)
+
+        pyspark_sql_session.SparkSession.builder.getOrCreate.return_value.sql.side_effect = Exception(
+            "TABLE_OR_VIEW_NOT_FOUND"
+        )
+        with pytest.raises(NotFound):
+            rb.execute(sql_query)
+
+        pyspark_sql_session.SparkSession.builder.getOrCreate.return_value.sql.side_effect = Exception(
+            "PARSE_SYNTAX_ERROR"
+        )
+        with pytest.raises(BadRequest):
+            rb.execute(sql_query)
+
+        pyspark_sql_session.SparkSession.builder.getOrCreate.return_value.sql.side_effect = Exception(
+            "Operation not allowed"
+        )
+        with pytest.raises(PermissionDenied):
+            rb.execute(sql_query)
+
+        pyspark_sql_session.SparkSession.builder.getOrCreate.return_value.sql.side_effect = Exception(
+            "foo error occurred"
+        )
+        with pytest.raises(Unknown):
+            rb.execute(sql_query)
+
+
+def test_fetch(mocker):
+    with mock.patch.dict(os.environ, {"DATABRICKS_RUNTIME_VERSION": "14.0"}):
+        pyspark_sql_session = mocker.Mock()
+        sys.modules["pyspark.sql.session"] = pyspark_sql_session
+        rb = RuntimeBackend()
+
+        sql_query = "SELECT * from bar"
+
+        pyspark_sql_session.SparkSession.builder.getOrCreate.return_value.sql.side_effect = Exception(
+            "SCHEMA_NOT_FOUND"
+        )
+        with pytest.raises(NotFound):
+            rb.fetch(sql_query)
+
+        pyspark_sql_session.SparkSession.builder.getOrCreate.return_value.sql.side_effect = Exception(
+            "TABLE_OR_VIEW_NOT_FOUND"
+        )
+        with pytest.raises(NotFound):
+            rb.fetch(sql_query)
+
+        pyspark_sql_session.SparkSession.builder.getOrCreate.return_value.sql.side_effect = Exception(
+            "PARSE_SYNTAX_ERROR"
+        )
+        with pytest.raises(BadRequest):
+            rb.fetch(sql_query)
+
+        pyspark_sql_session.SparkSession.builder.getOrCreate.return_value.sql.side_effect = Exception(
+            "Operation not allowed"
+        )
+        with pytest.raises(PermissionDenied):
+            rb.fetch(sql_query)
+
+        pyspark_sql_session.SparkSession.builder.getOrCreate.return_value.sql.side_effect = Exception(
+            "foo error occurred"
+        )
+        with pytest.raises(Unknown):
+            rb.fetch(sql_query)
