@@ -206,6 +206,26 @@ def test_group_matching_names(ws, sql_backend, inventory_schema, make_ucx_group,
     validate_migrate_groups(group_manager, ws_group, accnt_group)
 
 
+@retried(on=[NotFound], timeout=timedelta(minutes=2))
+def test_group_matching_names_with_diff_users(ws, sql_backend, inventory_schema, make_ucx_group_with_diff_members, make_random):
+    rand_elem = make_random(4)
+    ws_group, accnt_group = make_ucx_group_with_diff_members(f"test_group_{rand_elem}", f"same_group_[{rand_elem}]")
+    logger.info(
+        f"Attempting Mapping From Workspace Group {ws_group.display_name} to "
+        f"Account Group {accnt_group.display_name}"
+    )
+    group_manager = GroupManager(
+        sql_backend,
+        ws,
+        inventory_schema,
+        [ws_group.display_name],
+        "ucx-temp-",
+        workspace_group_regex=r"([0-9a-zA-Z]*)$",
+        account_group_regex=r"\[([0-9a-zA-Z]*)\]",
+    )
+    validate_migrate_groups(group_manager, ws_group, accnt_group)
+
+
 # average runtime is 100 seconds
 @retried(on=[NotFound], timeout=timedelta(minutes=3))
 def test_replace_workspace_groups_with_account_groups(

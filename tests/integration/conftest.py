@@ -106,6 +106,24 @@ def make_ucx_group(make_random, make_group, make_acc_group, make_user):
 
 
 @pytest.fixture
+def make_ucx_group_with_diff_members(make_random, make_group, make_acc_group, make_user):
+    def inner(workspace_group_name=None, account_group_name=None):
+        if not workspace_group_name:
+            workspace_group_name = f"ucx_{make_random(4)}"
+        if not account_group_name:
+            account_group_name = workspace_group_name
+        user1 = make_user()
+        user2 = make_user()
+        members1 = [user1.id]
+        members2 = [user2.id]
+        ws_group = make_group(display_name=workspace_group_name, members=members1, entitlements=["allow-cluster-create"])
+        acc_group = make_acc_group(display_name=account_group_name, members=members2)
+        return ws_group, acc_group
+
+    return inner
+
+
+@pytest.fixture
 def make_group_pair(make_random, make_group):
     def inner() -> MigratedGroup:
         suffix = make_random(4)

@@ -38,6 +38,7 @@ class MigratedGroup:
     entitlements: str | None = None
     external_id: str | None = None
     roles: str | None = None
+    is_same_membership: bool | None = None
 
     @classmethod
     def partial_info(cls, workspace: iam.Group, account: iam.Group):
@@ -152,9 +153,15 @@ class MatchingNamesStrategy(GroupMigrationStrategy):
         for g in workspace_groups.values():
             temporary_name = f"{self.renamed_groups_prefix}{g.display_name}"
             account_group = self.account_groups_in_account.get(g.display_name)
+            members_in_ws = [x.get("display") for x in [gg.as_dict() for gg in g.members]] if g.members else []
+            members_in_ws.sort()
+
             if not account_group:
                 logger.info(f"Couldn't find a matching account group for {g.display_name} group")
                 continue
+            members_in_account = [x.get("display") for x in [gg.as_dict() for gg in account_group.members]] \
+                if account_group.members else []
+            members_in_account.sort()
             yield MigratedGroup(
                 id_in_workspace=g.id,
                 name_in_workspace=g.display_name,
@@ -164,6 +171,7 @@ class MatchingNamesStrategy(GroupMigrationStrategy):
                 members=json.dumps([gg.as_dict() for gg in g.members]) if g.members else None,
                 roles=json.dumps([gg.as_dict() for gg in g.roles]) if g.roles else None,
                 entitlements=json.dumps([gg.as_dict() for gg in g.entitlements]) if g.entitlements else None,
+                is_same_membership=members_in_ws == members_in_account
             )
 
 
@@ -189,6 +197,11 @@ class MatchByExternalIdStrategy(GroupMigrationStrategy):
         for g in workspace_groups.values():
             temporary_name = f"{self.renamed_groups_prefix}{g.display_name}"
             account_group = account_groups_by_id.get(g.external_id)
+            members_in_ws = [x.get("display") for x in [gg.as_dict() for gg in g.members]] if g.members else []
+            members_in_ws.sort()
+            members_in_account = [x.get("display") for x in [gg.as_dict() for gg in account_group.members]] \
+                if account_group.members else []
+            members_in_account.sort()
             if account_group:
                 yield MigratedGroup(
                     id_in_workspace=g.id,
@@ -199,6 +212,7 @@ class MatchByExternalIdStrategy(GroupMigrationStrategy):
                     members=json.dumps([gg.as_dict() for gg in g.members]) if g.members else None,
                     roles=json.dumps([gg.as_dict() for gg in g.roles]) if g.roles else None,
                     entitlements=json.dumps([gg.as_dict() for gg in g.entitlements]) if g.entitlements else None,
+                    is_same_membership=members_in_ws == members_in_account
                 )
             else:
                 logger.info(f"Couldn't find a matching account group for {g.display_name} group with external_id")
@@ -229,6 +243,12 @@ class RegexSubStrategy(GroupMigrationStrategy):
         for g in workspace_groups.values():
             temporary_name = f"{self.renamed_groups_prefix}{g.display_name}"
             name_in_account = self._safe_sub(g.display_name, self.workspace_group_regex, self.workspace_group_replace)
+            account_group = self.account_groups_in_account[name_in_account]
+            members_in_ws = [x.get("display") for x in [gg.as_dict() for gg in g.members]] if g.members else []
+            members_in_ws.sort()
+            members_in_account = [x.get("display") for x in [gg.as_dict() for gg in account_group.members]] \
+                if account_group.members else []
+            members_in_account.sort()
             yield MigratedGroup(
                 id_in_workspace=g.id,
                 name_in_workspace=g.display_name,
@@ -238,6 +258,7 @@ class RegexSubStrategy(GroupMigrationStrategy):
                 members=json.dumps([gg.as_dict() for gg in g.members]) if g.members else None,
                 roles=json.dumps([gg.as_dict() for gg in g.roles]) if g.roles else None,
                 entitlements=json.dumps([gg.as_dict() for gg in g.entitlements]) if g.entitlements else None,
+                is_same_membership=members_in_ws == members_in_account
             )
 
 
@@ -273,7 +294,12 @@ class RegexMatchStrategy(GroupMigrationStrategy):
         for group_match, ws_group in workspace_groups_by_match.items():
             temporary_name = f"{self.renamed_groups_prefix}{ws_group.display_name}"
             account_group = account_groups_by_match.get(group_match)
+            members_in_ws = [x.get("display") for x in [gg.as_dict() for gg in ws_group.members]] if ws_group.members else []
+            members_in_ws.sort()
             if account_group:
+                members_in_account = [x.get("display") for x in
+                                      [gg.as_dict() for gg in account_group.members]] if account_group.members else []
+                members_in_account.sort()
                 yield MigratedGroup(
                     id_in_workspace=ws_group.id,
                     name_in_workspace=ws_group.display_name,
@@ -285,6 +311,7 @@ class RegexMatchStrategy(GroupMigrationStrategy):
                     entitlements=json.dumps([gg.as_dict() for gg in ws_group.entitlements])
                     if ws_group.entitlements
                     else None,
+                    is_same_membership=members_in_ws == members_in_account
                 )
             else:
                 logger.info(f"Couldn't find a match for group {ws_group.display_name}")
