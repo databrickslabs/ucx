@@ -57,5 +57,4 @@ def test_table_size_table_not_found(mocker):
 
     results = tsc.snapshot()
 
-    assert len(results) == 1
-    assert TableSize("hive_metastore", "db1", "table1", 0) in results
+    assert len(results) == 0

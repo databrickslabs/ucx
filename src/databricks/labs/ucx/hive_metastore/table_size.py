@@ -45,6 +45,9 @@ class TableSizeCrawler(CrawlerBase):
             if not table.is_dbfs_root:
                 continue
             size_in_bytes = self.get_table_size(table.key)
+            if size_in_bytes is None:
+                continue  # table does not exist anymore
+
             yield TableSize(
                 catalog=table.catalog, database=table.database, name=table.name, size_in_bytes=size_in_bytes
             )
@@ -57,14 +60,14 @@ class TableSizeCrawler(CrawlerBase):
     def snapshot(self) -> list[TableSize]:
         """
         Takes a snapshot of tables in the specified catalog and database.
-        Return 0 if the table cannot be found anymore.
+        Return None if the table cannot be found anymore.
 
         Returns:
             list[Table]: A list of Table objects representing the snapshot of tables.
         """
         return self._snapshot(partial(self._try_load), partial(self._crawl))
 
-    def get_table_size(self, table_full_name: str) -> int:
+    def get_table_size(self, table_full_name: str) -> int | None:
         logger.debug(f"Evaluating {table_full_name} table size.")
         try:
             return self._spark._jsparkSession.table(table_full_name).queryExecution().analyzed().stats().sizeInBytes()
@@ -73,4 +76,4 @@ class TableSizeCrawler(CrawlerBase):
                 logger.error(f"Failed to evaluate {table_full_name} table size. Table not found.")
             else:
                 logger.error(nf)
-            return 0
+            return None
