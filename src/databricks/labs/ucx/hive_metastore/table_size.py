@@ -44,7 +44,7 @@ class TableSizeCrawler(CrawlerBase):
                 continue
             if not table.is_dbfs_root:
                 continue
-            size_in_bytes = self.get_table_size(table.key)
+            size_in_bytes = self._get_safe_table_size(table.key)
             if size_in_bytes is None:
                 continue  # table does not exist anymore
 
@@ -67,7 +67,7 @@ class TableSizeCrawler(CrawlerBase):
         """
         return self._snapshot(partial(self._try_load), partial(self._crawl))
 
-    def get_table_size(self, table_full_name: str) -> int | None:
+    def _get_safe_table_size(self, table_full_name: str) -> int | None:
         logger.debug(f"Evaluating {table_full_name} table size.")
         try:
             return self._spark._jsparkSession.table(table_full_name).queryExecution().analyzed().stats().sizeInBytes()
