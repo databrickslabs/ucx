@@ -8,7 +8,8 @@ from databricks.sdk.service import sql
 from databricks.labs.ucx.workspace_access import redash
 from databricks.labs.ucx.workspace_access.groups import GroupManager
 from databricks.labs.ucx.workspace_access.redash import RedashPermissionsSupport
-from integration.workspace_access import apply_tasks_crawlers, apply_tasks_appliers
+
+from . import apply_tasks_appliers, apply_tasks_crawlers
 
 logger = logging.getLogger(__name__)
 
