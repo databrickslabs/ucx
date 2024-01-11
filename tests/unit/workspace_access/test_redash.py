@@ -8,6 +8,7 @@ from databricks.sdk.errors import InternalError, NotFound, PermissionDenied
 from databricks.sdk.service import sql
 
 from databricks.labs.ucx.workspace_access import redash
+from databricks.labs.ucx.workspace_access.groups import MigratedGroup, MigrationState
 from databricks.labs.ucx.workspace_access.redash import (
     Listing,
     Permissions,
@@ -176,11 +177,139 @@ def test_apply(migration_state):
     )
 
 
+def test_apply_permissions_not_applied(migration_state):
+    ws = MagicMock()
+    ws.dbsql_permissions.get.return_value = None
+    ws.dbsql_permissions.set.return_value = sql.GetResponse(
+        object_type=sql.ObjectType.ALERT,
+        object_id="test",
+        access_control_list=[
+            sql.AccessControl(
+                group_name="test",
+                permission_level=sql.PermissionLevel.CAN_MANAGE,
+            ),
+            sql.AccessControl(
+                group_name="db-temp-test",
+                permission_level=sql.PermissionLevel.CAN_MANAGE,
+            ),
+        ],
+    )
+    sup = RedashPermissionsSupport(ws=ws, listings=[])
+    item = Permissions(
+        object_id="test",
+        object_type="alerts",
+        raw=json.dumps(
+            sql.GetResponse(
+                object_type=sql.ObjectType.ALERT,
+                object_id="test",
+                access_control_list=[
+                    sql.AccessControl(
+                        group_name="test",
+                        permission_level=sql.PermissionLevel.CAN_MANAGE,
+                    ),
+                ],
+            ).as_dict()
+        ),
+    )
+    task = sup.get_apply_task(item, migration_state)
+    task()
+    assert ws.dbsql_permissions.set.call_count == 1
+
+    expected_acl = [
+        sql.AccessControl(
+            group_name="test",
+            permission_level=sql.PermissionLevel.CAN_MANAGE,
+        ),
+        sql.AccessControl(
+            group_name="db-temp-test",
+            permission_level=sql.PermissionLevel.CAN_MANAGE,
+        ),
+    ]
+    assert sup._safe_get_dbsql_permissions(object_type=sql.ObjectTypePlural.ALERTS, object_id="test") is None
+    assert not sup._inflight_check(object_type=sql.ObjectTypePlural.ALERTS, object_id="test", acl=expected_acl)
+
+
+def test_apply_permissions_no_relevant_items(migration_state):
+    ws = MagicMock()
+    sup = RedashPermissionsSupport(ws=ws, listings=[])
+    item = Permissions(
+        object_id="test",
+        object_type="alerts",
+        raw=json.dumps(
+            sql.GetResponse(
+                object_type=sql.ObjectType.ALERT,
+                object_id="test",
+                access_control_list=[
+                    sql.AccessControl(
+                        group_name="irrelevant",
+                        permission_level=sql.PermissionLevel.CAN_MANAGE,
+                    ),
+                ],
+            ).as_dict()
+        ),
+    )
+    task = sup.get_apply_task(item, migration_state)
+    assert not task
+
+
+def test_apply_permissions_no_valid_groups():
+    ws = MagicMock()
+    migration_state = MigrationState(
+        [
+            MigratedGroup(
+                id_in_workspace="test",
+                name_in_workspace="",
+                name_in_account="",
+                temporary_name="",
+                members=None,
+                entitlements=None,
+                external_id=None,
+                roles=None,
+            ),
+        ]
+    )
+
+    ws.dbsql_permissions.set.return_value = sql.GetResponse(
+        object_type=sql.ObjectType.ALERT, object_id="test", access_control_list=[]
+    )
+    ws.dbsql_permissions.get.return_value = sql.GetResponse(
+        object_type=sql.ObjectType.ALERT, object_id="test", access_control_list=[]
+    )
+    sup = RedashPermissionsSupport(ws=ws, listings=[])
+    item = Permissions(
+        object_id="test",
+        object_type="alerts",
+        raw=json.dumps(
+            sql.GetResponse(
+                object_type=sql.ObjectType.ALERT,
+                object_id="test",
+                access_control_list=[
+                    sql.AccessControl(
+                        group_name="",
+                        permission_level=sql.PermissionLevel.CAN_MANAGE,
+                    ),
+                ],
+            ).as_dict()
+        ),
+    )
+    task = sup.get_apply_task(item, migration_state)
+    task()
+    assert sup._safe_get_dbsql_permissions(object_type=sql.ObjectTypePlural.ALERTS, object_id="test")
+    assert sup._safe_set_permissions(object_type=sql.ObjectTypePlural.ALERTS, object_id="test", acl=[])
+
+
 def test_safe_getter_known():
     ws = MagicMock()
     ws.dbsql_permissions.get.side_effect = NotFound(...)
     sup = RedashPermissionsSupport(ws=ws, listings=[])
     assert sup._safe_get_dbsql_permissions(object_type=sql.ObjectTypePlural.ALERTS, object_id="test") is None
+
+
+def test_safe_setter_known():
+    ws = MagicMock()
+    ws.dbsql_permissions.set.side_effect = NotFound(...)
+    sup = RedashPermissionsSupport(ws=ws, listings=[])
+    assert sup._safe_set_permissions(object_type=sql.ObjectTypePlural.ALERTS, object_id="test", acl=[]) is None
 
 
 def test_safe_getter_unknown():
@@ -388,35 +517,6 @@ def test_load_as_dict():
     assert sql.PermissionLevel.CAN_MANAGE == policy_permissions["UNKNOWN"]
 
 
-def test_load_as_dict_for_user():
-    ws = MagicMock()
-
-    query_id = "query_test"
-    user_name = "user_test"
-
-    ws.queries.list.return_value = [
-        sql.QueryInfo(
-            query_id=query_id,
-        )
-    ]
-
-    sample_permission = sql.GetResponse(
-        object_id=query_id,
-        object_type=sql.ObjectType.QUERY,
-        access_control_list=[sql.AccessControl(user_name=user_name, permission_level=sql.PermissionLevel.CAN_RUN)],
-    )
-
-    ws.dbsql_permissions.get.return_value = sample_permission
-    redash_permissions = RedashPermissionsSupport(
-        ws,
-        [redash.Listing(ws.queries.list, sql.ObjectTypePlural.QUERIES)],
-    )
-
-    policy_permissions = redash_permissions.load_as_dict(sql.ObjectTypePlural.QUERIES, query_id)
-
-    assert sql.PermissionLevel.CAN_RUN == policy_permissions[user_name]
-
-
 def test_load_as_dict_permissions_not_found():
     ws = MagicMock()
 
@@ -428,6 +528,34 @@ def test_load_as_dict_permissions_not_found():
     ws.permissions.get.side_effect = Mock(side_effect=NotFound(...))
 
     policy_permissions = sup.load_as_dict(sql.ObjectTypePlural.QUERIES, "query_test")
+
+    assert len(policy_permissions) == 0
+
+
+def test_load_as_dict_no_acls():
+    ws = MagicMock()
+
+    query_id = "query_test"
+
+    ws.queries.list.return_value = [
+        sql.QueryInfo(
+            query_id=query_id,
+        )
+    ]
+
+    sample_permission = sql.GetResponse(
+        object_id=query_id,
+        object_type=sql.ObjectType.QUERY,
+        access_control_list=[],
+    )
+
+    ws.dbsql_permissions.get.return_value = sample_permission
+    redash_permissions = RedashPermissionsSupport(
+        ws,
+        [redash.Listing(ws.queries.list, sql.ObjectTypePlural.QUERIES)],
+    )
+
+    policy_permissions = redash_permissions.load_as_dict(sql.ObjectTypePlural.QUERIES, query_id)
 
     assert len(policy_permissions) == 0
 

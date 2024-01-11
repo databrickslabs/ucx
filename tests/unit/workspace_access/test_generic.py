@@ -462,7 +462,7 @@ def test_safe_update_permissions_when_error_retriable():
     assert e.type == InternalError
 
 
-def test_load_as_dict_for_group():
+def test_load_as_dict():
     ws = MagicMock()
 
     cluster_id = "cluster_test"
@@ -520,6 +520,27 @@ def test_load_as_dict_permissions_not_found():
     ws.permissions.get.side_effect = Mock(side_effect=NotFound(...))
 
     policy_permissions = sup.load_as_dict("clusters", "cluster_test")
+
+    assert len(policy_permissions) == 0
+
+
+def test_load_as_dict_no_acls():
+    ws = MagicMock()
+
+    cluster_id = "cluster_test"
+
+    ws.clusters.list.return_value = [
+        compute.ClusterDetails(
+            cluster_id=cluster_id,
+        )
+    ]
+
+    sample_permission = iam.ObjectPermissions(object_id=cluster_id, object_type="clusters", access_control_list=[])
+
+    ws.permissions.get.return_value = sample_permission
+    sup = GenericPermissionsSupport(ws=ws, listings=[Listing(ws.clusters.list, "cluster_id", "clusters")])
+
+    policy_permissions = sup.load_as_dict("clusters", cluster_id)
 
     assert len(policy_permissions) == 0
 
