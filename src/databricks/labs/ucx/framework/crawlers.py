@@ -153,7 +153,6 @@ class RuntimeBackend(SqlBackend):
         logger.debug(f"[spark][execute] {sql}")
         try:
             immediate_response = self._spark.sql(sql)
-            # status = immediate_response.status
         except Exception as e:
             error_message = str(e)
             self._raise_spark_sql_exceptions(error_message)
