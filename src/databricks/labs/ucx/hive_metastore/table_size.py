@@ -74,6 +74,6 @@ class TableSizeCrawler(CrawlerBase):
         except Exception as e:
             if "[TABLE_OR_VIEW_NOT_FOUND]" in str(e):
                 logger.warning(f"Failed to evaluate {table_full_name} table size. Table not found.")
-            else:
-                raise e
-            return None
+                return None
+            raise e
+
