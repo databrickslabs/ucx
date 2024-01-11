@@ -72,11 +72,11 @@ def test_apply(migration_state):
         access_control_list=[
             sql.AccessControl(
                 group_name="test",
-                permission_level=sql.PermissionLevel.CAN_MANAGE,
+                permission_level=sql.PermissionLevel.CAN_EDIT,
             ),
             sql.AccessControl(
                 group_name="db-temp-test",
-                permission_level=sql.PermissionLevel.CAN_MANAGE,
+                permission_level=sql.PermissionLevel.CAN_EDIT,
             ),
             sql.AccessControl(
                 group_name="irrelevant",
@@ -98,11 +98,11 @@ def test_apply(migration_state):
         access_control_list=[
             sql.AccessControl(
                 group_name="test",
-                permission_level=sql.PermissionLevel.CAN_MANAGE,
+                permission_level=sql.PermissionLevel.CAN_EDIT,
             ),
             sql.AccessControl(
                 group_name="db-temp-test",
-                permission_level=sql.PermissionLevel.CAN_MANAGE,
+                permission_level=sql.PermissionLevel.CAN_EDIT,
             ),
             sql.AccessControl(
                 group_name="irrelevant",
@@ -129,7 +129,7 @@ def test_apply(migration_state):
                 access_control_list=[
                     sql.AccessControl(
                         group_name="test",
-                        permission_level=sql.PermissionLevel.CAN_MANAGE,
+                        permission_level=sql.PermissionLevel.CAN_EDIT,
                     ),
                     sql.AccessControl(
                         group_name="irrelevant",
@@ -153,11 +153,11 @@ def test_apply(migration_state):
     expected_payload = [
         sql.AccessControl(
             group_name="test",
-            permission_level=sql.PermissionLevel.CAN_MANAGE,
+            permission_level=sql.PermissionLevel.CAN_EDIT,
         ),
         sql.AccessControl(
             group_name="db-temp-test",
-            permission_level=sql.PermissionLevel.CAN_MANAGE,
+            permission_level=sql.PermissionLevel.CAN_EDIT,
         ),
         sql.AccessControl(
             group_name="irrelevant",
