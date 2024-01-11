@@ -1,5 +1,6 @@
 import sys
 
+import pytest
 from databricks.sdk.errors import NotFound
 
 from databricks.labs.ucx.hive_metastore.table_size import TableSize, TableSizeCrawler
@@ -51,13 +52,10 @@ def test_table_size_table_not_found_unknown_message(mocker):
     pyspark_sql_session = mocker.Mock()
     sys.modules["pyspark.sql.session"] = pyspark_sql_session
     tsc = TableSizeCrawler(backend, "inventory_database")
+    tsc._spark._jsparkSession.table().queryExecution().analyzed().stats().sizeInBytes.side_effect = Exception(...)
 
-    # table removed after crawling
-    tsc._spark._jsparkSession.table().queryExecution().analyzed().stats().sizeInBytes.side_effect = NotFound(...)
-
-    results = tsc.snapshot()
-
-    assert len(results) == 0
+    with pytest.raises(Exception) as e:
+        tsc.snapshot()
 
 
 def test_table_size_table_or_view_not_found(mocker):
@@ -75,7 +73,7 @@ def test_table_size_table_or_view_not_found(mocker):
     tsc = TableSizeCrawler(backend, "inventory_database")
 
     # table removed after crawling
-    tsc._spark._jsparkSession.table().queryExecution().analyzed().stats().sizeInBytes.side_effect = NotFound(
+    tsc._spark._jsparkSession.table().queryExecution().analyzed().stats().sizeInBytes.side_effect = Exception(
         "[TABLE_OR_VIEW_NOT_FOUND]"
     )
 
