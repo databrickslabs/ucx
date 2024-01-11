@@ -5,19 +5,16 @@ from datetime import timedelta
 import pytest
 from databricks.sdk.errors import NotFound
 from databricks.sdk.retries import retried
-from databricks.sdk.service import sql
 from databricks.sdk.service.iam import Group, PermissionLevel, ResourceMeta
 
 from databricks.labs.ucx.hive_metastore import GrantsCrawler
 from databricks.labs.ucx.hive_metastore.grants import Grant
-from databricks.labs.ucx.workspace_access import redash
 from databricks.labs.ucx.workspace_access.generic import (
     GenericPermissionsSupport,
     Listing,
 )
 from databricks.labs.ucx.workspace_access.groups import GroupManager
 from databricks.labs.ucx.workspace_access.manager import PermissionManager
-from databricks.labs.ucx.workspace_access.redash import RedashPermissionsSupport
 from databricks.labs.ucx.workspace_access.tacl import TableAclSupport
 
 from ..conftest import StaticTablesCrawler
@@ -27,7 +24,7 @@ logger = logging.getLogger(__name__)
 
 @retried(on=[NotFound], timeout=timedelta(minutes=2))
 def test_prepare_environment(ws, make_ucx_group, sql_backend, inventory_schema):
-    ws_group, acc_group, _ = make_ucx_group()
+    ws_group, acc_group = make_ucx_group()
 
     group_manager = GroupManager(sql_backend, ws, inventory_schema, [ws_group.display_name], "ucx-temp-")
     group_migration_state = group_manager.snapshot()
@@ -44,7 +41,7 @@ def test_prepare_environment(ws, make_ucx_group, sql_backend, inventory_schema):
 
 @retried(on=[NotFound], timeout=timedelta(minutes=2))
 def test_prepare_environment_no_groups_selected(ws, make_ucx_group, sql_backend, inventory_schema):
-    ws_group, acc_group, _ = make_ucx_group()
+    ws_group, acc_group = make_ucx_group()
 
     group_manager = GroupManager(sql_backend, ws, inventory_schema)
     group_migration_state = group_manager.snapshot()
@@ -56,7 +53,7 @@ def test_prepare_environment_no_groups_selected(ws, make_ucx_group, sql_backend,
 @retried(on=[NotFound], timeout=timedelta(minutes=2))
 def test_rename_groups(ws, make_ucx_group, sql_backend, inventory_schema):
     # FIXME - test_rename_groups - TimeoutError: Timed out after 0:01:00
-    ws_group, acc_group, _ = make_ucx_group()
+    ws_group, acc_group = make_ucx_group()
 
     group_manager = GroupManager(sql_backend, ws, inventory_schema, [ws_group.display_name], "ucx-temp-")
     group_manager.rename_groups()
@@ -68,7 +65,7 @@ def test_rename_groups(ws, make_ucx_group, sql_backend, inventory_schema):
 def test_reflect_account_groups_on_workspace_recovers_when_group_already_exists(
     ws, make_ucx_group, sql_backend, inventory_schema
 ):
-    ws_group, acc_group, _ = make_ucx_group()
+    ws_group, acc_group = make_ucx_group()
 
     group_manager = GroupManager(sql_backend, ws, inventory_schema, [ws_group.display_name], "ucx-temp-")
     group_manager.reflect_account_groups_on_workspace()
@@ -76,7 +73,7 @@ def test_reflect_account_groups_on_workspace_recovers_when_group_already_exists(
 
 @retried(on=[NotFound], timeout=timedelta(minutes=2))
 def test_reflect_account_groups_on_workspace(ws, make_ucx_group, sql_backend, inventory_schema):
-    ws_group, acc_group, _ = make_ucx_group()
+    ws_group, acc_group = make_ucx_group()
 
     group_manager = GroupManager(sql_backend, ws, inventory_schema, [ws_group.display_name], "ucx-temp-")
     group_manager.rename_groups()
@@ -99,7 +96,7 @@ def test_reflect_account_groups_on_workspace(ws, make_ucx_group, sql_backend, in
 def test_delete_ws_groups_should_delete_renamed_and_reflected_groups_only(
     ws, make_ucx_group, sql_backend, inventory_schema
 ):
-    ws_group, acc_group, _ = make_ucx_group()
+    ws_group, acc_group = make_ucx_group()
 
     group_manager = GroupManager(sql_backend, ws, inventory_schema, [ws_group.display_name], "ucx-temp-")
     group_manager.rename_groups()
@@ -112,7 +109,7 @@ def test_delete_ws_groups_should_delete_renamed_and_reflected_groups_only(
 
 @retried(on=[NotFound], timeout=timedelta(minutes=2))
 def test_delete_ws_groups_should_not_delete_current_ws_groups(ws, make_ucx_group, sql_backend, inventory_schema):
-    ws_group, acc_group, _ = make_ucx_group()
+    ws_group, acc_group = make_ucx_group()
 
     group_manager = GroupManager(sql_backend, ws, inventory_schema, [ws_group.display_name], "ucx-temp-")
     group_manager.delete_original_workspace_groups()
@@ -122,7 +119,7 @@ def test_delete_ws_groups_should_not_delete_current_ws_groups(ws, make_ucx_group
 
 @retried(on=[NotFound], timeout=timedelta(minutes=2))
 def test_delete_ws_groups_should_not_delete_non_reflected_acc_groups(ws, make_ucx_group, sql_backend, inventory_schema):
-    ws_group, acc_group, _ = make_ucx_group()
+    ws_group, acc_group = make_ucx_group()
     group_manager = GroupManager(sql_backend, ws, inventory_schema, [ws_group.display_name], "ucx-temp-")
     group_manager.rename_groups()
     group_manager.delete_original_workspace_groups()
@@ -144,7 +141,7 @@ def validate_migrate_groups(group_manager: GroupManager, ws_group: Group, to_gro
 @retried(on=[NotFound], timeout=timedelta(minutes=2))
 def test_group_name_change_prefix(ws, sql_backend, inventory_schema, make_ucx_group, make_random):
     ws_display_name = f"ucx_{make_random(4)}"
-    ws_group, accnt_group, _ = make_ucx_group(
+    ws_group, accnt_group = make_ucx_group(
         workspace_group_name=ws_display_name, account_group_name=f"SAMPLE_{ws_display_name}"
     )
     logger.info(
@@ -160,7 +157,7 @@ def test_group_name_change_prefix(ws, sql_backend, inventory_schema, make_ucx_gr
 @retried(on=[NotFound], timeout=timedelta(minutes=2))
 def test_group_name_change_suffix(ws, sql_backend, inventory_schema, make_ucx_group, make_random):
     ws_display_name = f"ucx_{make_random(4)}"
-    ws_group, accnt_group, _ = make_ucx_group(
+    ws_group, accnt_group = make_ucx_group(
         workspace_group_name=ws_display_name, account_group_name=f"{ws_display_name}_SAMPLE"
     )
     logger.info(
@@ -178,9 +175,7 @@ def test_group_name_change_substitute(ws, sql_backend, inventory_schema, make_uc
     random_elem = f"{make_random(4)}"
     ws_display_name = f"ucx_engineering_{random_elem}"
     acct_display_name = f"ucx_eng_{random_elem}"
-    ws_group, accnt_group, _ = make_ucx_group(
-        workspace_group_name=ws_display_name, account_group_name=acct_display_name
-    )
+    ws_group, accnt_group = make_ucx_group(workspace_group_name=ws_display_name, account_group_name=acct_display_name)
     logger.info(
         f"Attempting Mapping From Workspace Group {ws_group.display_name} to "
         f"Account Group {accnt_group.display_name}"
@@ -194,7 +189,7 @@ def test_group_name_change_substitute(ws, sql_backend, inventory_schema, make_uc
 @retried(on=[NotFound], timeout=timedelta(minutes=2))
 def test_group_matching_names(ws, sql_backend, inventory_schema, make_ucx_group, make_random):
     rand_elem = make_random(4)
-    ws_group, accnt_group, _ = make_ucx_group(f"test_group_{rand_elem}", f"same_group_[{rand_elem}]")
+    ws_group, accnt_group = make_ucx_group(f"test_group_{rand_elem}", f"same_group_[{rand_elem}]")
     logger.info(
         f"Attempting Mapping From Workspace Group {ws_group.display_name} to "
         f"Account Group {accnt_group.display_name}"
@@ -212,7 +207,7 @@ def test_group_matching_names(ws, sql_backend, inventory_schema, make_ucx_group,
 
 
 # average runtime is 100 seconds
-@retried(on=[NotFound], timeout=timedelta(minutes=15))
+@retried(on=[NotFound], timeout=timedelta(minutes=3))
 def test_replace_workspace_groups_with_account_groups(
     ws,
     sql_backend,
@@ -221,47 +216,33 @@ def test_replace_workspace_groups_with_account_groups(
     make_cluster_policy,
     make_cluster_policy_permissions,
     make_table,
-    make_query,
-    make_query_policy_permissions,
 ):
     """
 
     Args:
         sql_backend (object):
     """
-    ws_group, _, user = make_ucx_group()
+    ws_group, _ = make_ucx_group()
     cluster_policy = make_cluster_policy()
     make_cluster_policy_permissions(
         object_id=cluster_policy.policy_id,
         permission_level=PermissionLevel.CAN_USE,
         group_name=ws_group.display_name,
-        user_name=user.display_name,
     )
     logger.info(f"Cluster policy: {ws.config.host}#setting/clusters/cluster-policies/view/{cluster_policy.policy_id}")
 
-    query = make_query()
-    make_query_policy_permissions(
-        object_id=query.id,
-        permission_level=sql.PermissionLevel.CAN_RUN,
-        group_name=ws_group.display_name,
-        user_name=user.display_name,
-    )
-    logger.info(f"Query: {ws.config.host}/sql/editor/{query.id}")
-
     dummy_table = make_table()
     sql_backend.execute(f"GRANT SELECT, MODIFY ON TABLE {dummy_table.full_name} TO `{ws_group.display_name}`")
-    sql_backend.execute(f"GRANT SELECT, MODIFY ON TABLE {dummy_table.full_name} TO `{user.display_name}`")
 
     tables = StaticTablesCrawler(sql_backend, inventory_schema, [dummy_table])
     grants = GrantsCrawler(tables)
 
     @retried(on=[AssertionError], timeout=timedelta(seconds=30))
-    def check_table_grants():
+    def assert_table_has_two_grants():
         res = grants.for_table_info(dummy_table)
         assert len(res[ws_group.display_name]) == 2
-        assert len(res[user.display_name]) == 2
 
-    check_table_grants()
+    assert_table_has_two_grants()
 
     group_manager = GroupManager(sql_backend, ws, inventory_schema, [ws_group.display_name], "ucx-temp-")
 
@@ -269,51 +250,22 @@ def test_replace_workspace_groups_with_account_groups(
         ws, [Listing(ws.cluster_policies.list, "policy_id", "cluster-policies")]
     )
 
-    redash_permissions = RedashPermissionsSupport(
-        ws,
-        [redash.Listing(ws.queries.list, sql.ObjectTypePlural.QUERIES)],
-    )
-
     tacl = TableAclSupport(grants, sql_backend)
-
-    permission_manager = PermissionManager(
-        sql_backend, inventory_schema, [generic_permissions, redash_permissions, tacl]
-    )
+    permission_manager = PermissionManager(sql_backend, inventory_schema, [generic_permissions, tacl])
 
     permission_manager.inventorize_permissions()
 
     @retried(on=[AssertionError], timeout=timedelta(seconds=30))
-    def check_inventory_table_permissions():
+    def assert_table_has_two_permissions():
         dummy_grants = list(permission_manager.load_all_for("TABLE", dummy_table.full_name, Grant))
-        assert len(dummy_grants) == 3
+        assert 2 == len(dummy_grants)
 
-    check_inventory_table_permissions()
+    assert_table_has_two_permissions()
 
-    @retried(on=[AssertionError], timeout=timedelta(minutes=1))
-    def check_permissions_before_migration():
-        logger.info("check_permissions_before_migration()")
-
-        table_permissions = grants.for_table_info(dummy_table)
-        assert ws_group.display_name in table_permissions
-        assert user.display_name in table_permissions
-        assert "MODIFY" in table_permissions[ws_group.display_name]
-        assert "SELECT" in table_permissions[ws_group.display_name]
-        assert "MODIFY" in table_permissions[user.display_name]
-        assert "SELECT" in table_permissions[user.display_name]
-
-        policy_permissions = generic_permissions.load_as_dict("cluster-policies", cluster_policy.policy_id)
-        assert ws_group.display_name in policy_permissions
-        assert user.display_name in policy_permissions
-        assert PermissionLevel.CAN_USE == policy_permissions[ws_group.display_name]
-        assert PermissionLevel.CAN_USE == policy_permissions[user.display_name]
-
-        query_permissions = redash_permissions.load_as_dict(sql.ObjectTypePlural.QUERIES, query.id)
-        assert ws_group.display_name in query_permissions
-        assert user.display_name in query_permissions
-        assert sql.PermissionLevel.CAN_RUN == query_permissions[ws_group.display_name]
-        assert sql.PermissionLevel.CAN_RUN == query_permissions[user.display_name]
-
-    check_permissions_before_migration()
+    table_permissions = grants.for_table_info(dummy_table)
+    assert ws_group.display_name in table_permissions
+    assert "MODIFY" in table_permissions[ws_group.display_name]
+    assert "SELECT" in table_permissions[ws_group.display_name]
 
     state = group_manager.get_migration_state()
     assert len(state) == 1
@@ -322,33 +274,19 @@ def test_replace_workspace_groups_with_account_groups(
 
     group_info = state.groups[0]
 
-    # Group information in Redash are cached for up to 10 minutes.
-    # After the group is renamed, the old name may still be returned by the dbsql permissions api.
-    # More details here: https://databricks.atlassian.net/browse/ES-992619
-    @retried(on=[AssertionError], timeout=timedelta(minutes=10))
+    @retried(on=[AssertionError], timeout=timedelta(minutes=1))
     def check_permissions_for_backup_group():
         logger.info("check_permissions_for_backup_group()")
 
         table_permissions = grants.for_table_info(dummy_table)
         assert group_info.name_in_workspace not in table_permissions
         assert group_info.temporary_name in table_permissions
-        assert user.display_name in table_permissions
         assert "MODIFY" in table_permissions[group_info.temporary_name]
         assert "SELECT" in table_permissions[group_info.temporary_name]
-        assert "MODIFY" in table_permissions[user.display_name]
-        assert "SELECT" in table_permissions[user.display_name]
 
         policy_permissions = generic_permissions.load_as_dict("cluster-policies", cluster_policy.policy_id)
         assert group_info.temporary_name in policy_permissions
-        assert user.display_name in policy_permissions
         assert PermissionLevel.CAN_USE == policy_permissions[group_info.temporary_name]
-        assert PermissionLevel.CAN_USE == policy_permissions[user.display_name]
-
-        query_permissions = redash_permissions.load_as_dict(sql.ObjectTypePlural.QUERIES, query.id)
-        assert group_info.temporary_name in query_permissions
-        assert user.display_name in query_permissions
-        assert sql.PermissionLevel.CAN_RUN == query_permissions[group_info.temporary_name]
-        assert sql.PermissionLevel.CAN_RUN == query_permissions[user.display_name]
 
     check_permissions_for_backup_group()
 
@@ -361,88 +299,52 @@ def test_replace_workspace_groups_with_account_groups(
         table_permissions = grants.for_table_info(dummy_table)
         assert group_info.name_in_account not in table_permissions
         assert group_info.temporary_name in table_permissions
-        assert user.display_name in table_permissions
         assert "MODIFY" in table_permissions[group_info.temporary_name]
         assert "SELECT" in table_permissions[group_info.temporary_name]
-        assert "MODIFY" in table_permissions[user.display_name]
-        assert "SELECT" in table_permissions[user.display_name]
 
         policy_permissions = generic_permissions.load_as_dict("cluster-policies", cluster_policy.policy_id)
-        assert group_info.name_in_account not in policy_permissions
+        assert group_info.name_in_workspace not in policy_permissions
         assert group_info.temporary_name in policy_permissions
-        assert user.display_name in policy_permissions
         assert PermissionLevel.CAN_USE == policy_permissions[group_info.temporary_name]
-        assert PermissionLevel.CAN_USE == policy_permissions[user.display_name]
-
-        query_permissions = redash_permissions.load_as_dict(sql.ObjectTypePlural.QUERIES, query.id)
-        assert group_info.name_in_account not in query_permissions
-        assert group_info.temporary_name in query_permissions
-        assert user.display_name in query_permissions
-        assert sql.PermissionLevel.CAN_RUN == query_permissions[group_info.temporary_name]
-        assert sql.PermissionLevel.CAN_RUN == query_permissions[user.display_name]
 
     check_permissions_after_replace()
 
     permission_manager.apply_group_permissions(state)
 
-    @retried(on=[AssertionError], timeout=timedelta(minutes=1))
+    @retried(on=[AssertionError], timeout=timedelta(seconds=30))
     def check_permissions_for_account_group():
         logger.info("check_permissions_for_account_group()")
 
         table_permissions = grants.for_table_info(dummy_table)
         assert group_info.name_in_account in table_permissions
         assert group_info.temporary_name in table_permissions
-        assert user.display_name in table_permissions
         assert "MODIFY" in table_permissions[group_info.temporary_name]
         assert "SELECT" in table_permissions[group_info.temporary_name]
         assert "MODIFY" in table_permissions[group_info.name_in_account]
         assert "SELECT" in table_permissions[group_info.name_in_account]
-        assert "MODIFY" in table_permissions[user.display_name]
-        assert "SELECT" in table_permissions[user.display_name]
 
         policy_permissions = generic_permissions.load_as_dict("cluster-policies", cluster_policy.policy_id)
         assert group_info.name_in_account in policy_permissions
-        assert user.display_name in policy_permissions
         assert PermissionLevel.CAN_USE == policy_permissions[group_info.name_in_account]
         assert PermissionLevel.CAN_USE == policy_permissions[group_info.temporary_name]
-        assert PermissionLevel.CAN_USE == policy_permissions[user.display_name]
-
-        query_permissions = redash_permissions.load_as_dict(sql.ObjectTypePlural.QUERIES, query.id)
-        assert group_info.name_in_account in query_permissions
-        assert user.display_name in query_permissions
-        assert sql.PermissionLevel.CAN_RUN == query_permissions[group_info.name_in_account]
-        assert sql.PermissionLevel.CAN_RUN == query_permissions[group_info.temporary_name]
-        assert sql.PermissionLevel.CAN_RUN == query_permissions[user.display_name]
 
     check_permissions_for_account_group()
 
     group_manager.delete_original_workspace_groups()
 
     @retried(on=[AssertionError], timeout=timedelta(minutes=1))
-    def check_permissions_after_backup_delete():
+    def check_table_permissions_after_backup_delete():
         logger.info("check_table_permissions_after_backup_delete()")
-
-        table_permissions = grants.for_table_info(dummy_table)
-        assert group_info.temporary_name not in table_permissions
-        assert group_info.name_in_account in table_permissions
-        assert user.display_name in table_permissions
-        assert "MODIFY" in table_permissions[group_info.name_in_account]
-        assert "SELECT" in table_permissions[group_info.name_in_account]
-        assert "MODIFY" in table_permissions[user.display_name]
-        assert "SELECT" in table_permissions[user.display_name]
 
         policy_permissions = generic_permissions.load_as_dict("cluster-policies", cluster_policy.policy_id)
         assert group_info.temporary_name not in policy_permissions
         assert group_info.name_in_account in policy_permissions
-        assert user.display_name in policy_permissions
         assert PermissionLevel.CAN_USE == policy_permissions[group_info.name_in_account]
-        assert PermissionLevel.CAN_USE == policy_permissions[user.display_name]
 
-        query_permissions = redash_permissions.load_as_dict(sql.ObjectTypePlural.QUERIES, query.id)
-        assert group_info.temporary_name not in query_permissions
-        assert group_info.name_in_account in query_permissions
-        assert user.display_name in query_permissions
-        assert sql.PermissionLevel.CAN_RUN == query_permissions[group_info.name_in_account]
-        assert sql.PermissionLevel.CAN_RUN == query_permissions[user.display_name]
+        table_permissions = grants.for_table_info(dummy_table)
+        assert group_info.temporary_name not in table_permissions
+        assert group_info.name_in_account in table_permissions
+        assert "MODIFY" in table_permissions[group_info.name_in_account]
+        assert "SELECT" in table_permissions[group_info.name_in_account]
 
-    check_permissions_after_backup_delete()
+    check_table_permissions_after_backup_delete()

@@ -100,7 +100,7 @@ def make_ucx_group(make_random, make_group, make_acc_group, make_user):
         members = [user.id]
         ws_group = make_group(display_name=workspace_group_name, members=members, entitlements=["allow-cluster-create"])
         acc_group = make_acc_group(display_name=account_group_name, members=members)
-        return ws_group, acc_group, user
+        return ws_group, acc_group
 
     return inner
 
