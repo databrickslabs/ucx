@@ -3,8 +3,6 @@ from collections.abc import Iterable
 from dataclasses import dataclass
 from functools import partial
 
-from databricks.sdk.errors import NotFound
-
 from databricks.labs.ucx.framework.crawlers import CrawlerBase, RuntimeBackend
 from databricks.labs.ucx.hive_metastore import TablesCrawler
 
@@ -75,5 +73,4 @@ class TableSizeCrawler(CrawlerBase):
             if "[TABLE_OR_VIEW_NOT_FOUND]" in str(e):
                 logger.warning(f"Failed to evaluate {table_full_name} table size. Table not found.")
                 return None
-            raise e
-
+            raise RuntimeError(str(e)) from e

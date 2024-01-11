@@ -1,7 +1,6 @@
 import sys
 
 import pytest
-from databricks.sdk.errors import NotFound
 
 from databricks.labs.ucx.hive_metastore.table_size import TableSize, TableSizeCrawler
 from tests.unit.framework.mocks import MockBackend
@@ -54,7 +53,7 @@ def test_table_size_table_not_found_unknown_message(mocker):
     tsc = TableSizeCrawler(backend, "inventory_database")
     tsc._spark._jsparkSession.table().queryExecution().analyzed().stats().sizeInBytes.side_effect = Exception(...)
 
-    with pytest.raises(Exception) as e:
+    with pytest.raises(RuntimeError):
         tsc.snapshot()
 
 
