@@ -44,13 +44,17 @@ class RedashPermissionsSupport(AclSupport):
         self,
         ws: WorkspaceClient,
         listings: list[Listing],
+        set_permissions_timeout: timedelta | None = timedelta(minutes=1),
         # Group information in Redash are cached for up to 10 minutes causing inconsistencies.
-        # For example, if a group is renamed, the old name may still be returned by the dbsql permissions api.
+        # If a group is renamed, the old name may still be returned by the dbsql get permissions api.
+        # Note that the update/set API is strongly consistent and is not affected by this behaviour.
+        # The validation step should keep retrying for at least 10 mins until the get api returns the new group name.
         # More details here: https://databricks.atlassian.net/browse/ES-992619
         verify_timeout: timedelta | None = timedelta(minutes=11),
     ):
         self._ws = ws
         self._listings = listings
+        self._set_permissions_timeout = set_permissions_timeout
         self._verify_timeout = verify_timeout
 
     @staticmethod
@@ -161,7 +165,7 @@ class RedashPermissionsSupport(AclSupport):
         This affects the way how we prepare the new ACL request.
         """
 
-        set_retry_on_value_error = retried(on=[InternalError, ValueError], timeout=self._verify_timeout)
+        set_retry_on_value_error = retried(on=[InternalError, ValueError], timeout=self._set_permissions_timeout)
         set_retried_check = set_retry_on_value_error(self._safe_set_permissions)
         set_retried_check(object_type, object_id, acl)
 

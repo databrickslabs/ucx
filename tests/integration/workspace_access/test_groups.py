@@ -217,11 +217,6 @@ def test_replace_workspace_groups_with_account_groups(
     make_cluster_policy_permissions,
     make_table,
 ):
-    """
-
-    Args:
-        sql_backend (object):
-    """
     ws_group, _ = make_ucx_group()
     cluster_policy = make_cluster_policy()
     make_cluster_policy_permissions(
@@ -229,7 +224,6 @@ def test_replace_workspace_groups_with_account_groups(
         permission_level=PermissionLevel.CAN_USE,
         group_name=ws_group.display_name,
     )
-    logger.info(f"Cluster policy: {ws.config.host}#setting/clusters/cluster-policies/view/{cluster_policy.policy_id}")
 
     dummy_table = make_table()
     sql_backend.execute(f"GRANT SELECT, MODIFY ON TABLE {dummy_table.full_name} TO `{ws_group.display_name}`")
