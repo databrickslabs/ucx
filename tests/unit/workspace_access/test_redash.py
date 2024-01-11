@@ -380,9 +380,7 @@ def test_applier_task_failed():
         ],
     )
 
-    sup = RedashPermissionsSupport(
-        ws=ws, listings=[], verify_timeout=timedelta(seconds=1), set_permissions_timeout=timedelta(seconds=1)
-    )
+    sup = RedashPermissionsSupport(ws=ws, listings=[], verify_timeout=timedelta(seconds=1))
     with pytest.raises(TimeoutError) as e:
         sup._applier_task(
             sql.ObjectTypePlural.QUERIES,
@@ -403,9 +401,7 @@ def test_applier_task_failed_when_all_permissions_not_up_to_date():
         ],
     )
 
-    sup = RedashPermissionsSupport(
-        ws=ws, listings=[], verify_timeout=timedelta(seconds=1), set_permissions_timeout=timedelta(seconds=1)
-    )
+    sup = RedashPermissionsSupport(ws=ws, listings=[], verify_timeout=timedelta(seconds=1))
     with pytest.raises(TimeoutError) as e:
         sup._applier_task(
             sql.ObjectTypePlural.QUERIES,
@@ -422,9 +418,7 @@ def test_applier_task_when_set_error_non_retriable():
     ws = MagicMock()
     ws.dbsql_permissions.set.side_effect = PermissionDenied()
 
-    sup = RedashPermissionsSupport(
-        ws=ws, listings=[], verify_timeout=timedelta(seconds=1), set_permissions_timeout=timedelta(seconds=1)
-    )
+    sup = RedashPermissionsSupport(ws=ws, listings=[], verify_timeout=timedelta(seconds=1))
     with pytest.raises(TimeoutError) as e:
         sup._applier_task(
             sql.ObjectTypePlural.QUERIES,
@@ -442,9 +436,7 @@ def test_applier_task_when_set_error_retriable():
     ws = MagicMock()
     ws.dbsql_permissions.set.side_effect = InternalError()
 
-    sup = RedashPermissionsSupport(
-        ws=ws, listings=[], verify_timeout=timedelta(seconds=1), set_permissions_timeout=timedelta(seconds=1)
-    )
+    sup = RedashPermissionsSupport(ws=ws, listings=[], verify_timeout=timedelta(seconds=1))
     with pytest.raises(TimeoutError) as e:
         sup._applier_task(
             sql.ObjectTypePlural.QUERIES,
@@ -461,9 +453,7 @@ def test_applier_task_when_set_error_retriable():
 def test_safe_set_permissions_when_error_non_retriable():
     ws = MagicMock()
     ws.dbsql_permissions.set.side_effect = PermissionDenied(...)
-    sup = RedashPermissionsSupport(
-        ws=ws, listings=[], verify_timeout=timedelta(seconds=1), set_permissions_timeout=timedelta(seconds=1)
-    )
+    sup = RedashPermissionsSupport(ws=ws, listings=[], verify_timeout=timedelta(seconds=1))
     acl = [sql.AccessControl(group_name="group_1", permission_level=sql.PermissionLevel.CAN_MANAGE)]
     result = sup._safe_set_permissions(sql.ObjectTypePlural.QUERIES, "test", acl)
     assert result is None
@@ -472,9 +462,7 @@ def test_safe_set_permissions_when_error_non_retriable():
 def test_safe_set_permissions_when_error_retriable():
     ws = MagicMock()
     ws.dbsql_permissions.set.side_effect = InternalError(...)
-    sup = RedashPermissionsSupport(
-        ws=ws, listings=[], verify_timeout=timedelta(seconds=1), set_permissions_timeout=timedelta(seconds=1)
-    )
+    sup = RedashPermissionsSupport(ws=ws, listings=[], verify_timeout=timedelta(seconds=1))
     acl = [sql.AccessControl(group_name="group_1", permission_level=sql.PermissionLevel.CAN_MANAGE)]
     with pytest.raises(InternalError) as e:
         sup._safe_set_permissions(sql.ObjectTypePlural.QUERIES, "test", acl)

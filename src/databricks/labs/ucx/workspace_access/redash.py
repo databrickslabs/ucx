@@ -47,11 +47,11 @@ class RedashPermissionsSupport(AclSupport):
         # Group information in Redash are cached for up to 10 minutes causing inconsistencies.
         # For example, if a group is renamed, the old name may still be returned by the dbsql permissions api.
         # More details here: https://databricks.atlassian.net/browse/ES-992619
-        timeout: timedelta | None = timedelta(minutes=10),
+        verify_timeout: timedelta | None = timedelta(minutes=10),
     ):
         self._ws = ws
         self._listings = listings
-        self._timeout = timeout
+        self._verify_timeout = verify_timeout
 
     @staticmethod
     def _is_item_relevant(item: Permissions, migration_state: MigrationState) -> bool:
@@ -161,11 +161,11 @@ class RedashPermissionsSupport(AclSupport):
         This affects the way how we prepare the new ACL request.
         """
 
-        set_retry_on_value_error = retried(on=[InternalError, ValueError], timeout=self._timeout)
+        set_retry_on_value_error = retried(on=[InternalError, ValueError], timeout=self._verify_timeout)
         set_retried_check = set_retry_on_value_error(self._safe_set_permissions)
         set_retried_check(object_type, object_id, acl)
 
-        retry_on_value_error = retried(on=[InternalError, ValueError], timeout=self._timeout)
+        retry_on_value_error = retried(on=[InternalError, ValueError], timeout=self._verify_timeout)
         retried_check = retry_on_value_error(self._inflight_check)
         return retried_check(object_type, object_id, acl)
 
