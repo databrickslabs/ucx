@@ -47,7 +47,7 @@ class RedashPermissionsSupport(AclSupport):
         # Group information in Redash are cached for up to 10 minutes causing inconsistencies.
         # For example, if a group is renamed, the old name may still be returned by the dbsql permissions api.
         # More details here: https://databricks.atlassian.net/browse/ES-992619
-        verify_timeout: timedelta | None = timedelta(minutes=10),
+        verify_timeout: timedelta | None = timedelta(minutes=11),
     ):
         self._ws = ws
         self._listings = listings
