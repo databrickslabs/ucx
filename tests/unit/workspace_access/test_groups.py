@@ -12,7 +12,8 @@ from databricks.sdk.service.iam import ComplexValue, Group, ResourceMeta
 from databricks.labs.ucx.workspace_access.groups import (
     ConfigureGroups,
     GroupManager,
-    MigratedGroup, MigrationState,
+    MigratedGroup,
+    MigrationState,
 )
 from tests.unit.framework.mocks import MockBackend
 
