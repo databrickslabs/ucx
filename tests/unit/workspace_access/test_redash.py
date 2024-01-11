@@ -87,7 +87,7 @@ def test_apply(migration_state):
                 permission_level=sql.PermissionLevel.CAN_RUN,
             ),
             sql.AccessControl(
-                group_name="without-account-group",
+                group_name="no-corresponding-account-group",
                 permission_level=sql.PermissionLevel.CAN_RUN,
             ),
         ],
@@ -113,7 +113,7 @@ def test_apply(migration_state):
                 permission_level=sql.PermissionLevel.CAN_RUN,
             ),
             sql.AccessControl(
-                group_name="without-account-group",
+                group_name="no-corresponding-account-group",
                 permission_level=sql.PermissionLevel.CAN_RUN,
             ),
         ],
@@ -140,7 +140,7 @@ def test_apply(migration_state):
                         permission_level=sql.PermissionLevel.CAN_RUN,
                     ),
                     sql.AccessControl(
-                        group_name="without-account-group",
+                        group_name="no-corresponding-account-group",
                         permission_level=sql.PermissionLevel.CAN_RUN,
                     ),
                 ],
@@ -168,7 +168,7 @@ def test_apply(migration_state):
             permission_level=sql.PermissionLevel.CAN_RUN,
         ),
         sql.AccessControl(
-            group_name="without-account-group",
+            group_name="no-corresponding-account-group",
             permission_level=sql.PermissionLevel.CAN_RUN,
         ),
     ]

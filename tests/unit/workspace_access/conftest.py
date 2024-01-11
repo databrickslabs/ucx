@@ -17,8 +17,8 @@ def migration_state() -> MigrationState:
             roles=None,
         ),
         MigratedGroup(
-            id_in_workspace="without-account-group-ws",
-            name_in_workspace="without-account-group",
+            id_in_workspace="no-corresponding-account-group-ws",
+            name_in_workspace="no-corresponding-account-group",
             name_in_account="",
             temporary_name="",
             members=None,
