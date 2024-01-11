@@ -207,7 +207,9 @@ def test_group_matching_names(ws, sql_backend, inventory_schema, make_ucx_group,
 
 
 @retried(on=[NotFound], timeout=timedelta(minutes=2))
-def test_group_matching_names_with_diff_users(ws, sql_backend, inventory_schema, make_ucx_group_with_diff_members, make_random):
+def test_group_matching_names_with_diff_users(
+    ws, sql_backend, inventory_schema, make_ucx_group_with_diff_members, make_random
+):
     rand_elem = make_random(4)
     ws_group, accnt_group = make_ucx_group_with_diff_members(f"test_group_{rand_elem}", f"same_group_[{rand_elem}]")
     logger.info(

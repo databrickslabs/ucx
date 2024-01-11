@@ -116,7 +116,9 @@ def make_ucx_group_with_diff_members(make_random, make_group, make_acc_group, ma
         user2 = make_user()
         members1 = [user1.id]
         members2 = [user2.id]
-        ws_group = make_group(display_name=workspace_group_name, members=members1, entitlements=["allow-cluster-create"])
+        ws_group = make_group(
+            display_name=workspace_group_name, members=members1, entitlements=["allow-cluster-create"]
+        )
         acc_group = make_acc_group(display_name=account_group_name, members=members2)
         return ws_group, acc_group
 
