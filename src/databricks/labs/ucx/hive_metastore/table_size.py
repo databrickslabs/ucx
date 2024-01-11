@@ -73,7 +73,7 @@ class TableSizeCrawler(CrawlerBase):
             return self._spark._jsparkSession.table(table_full_name).queryExecution().analyzed().stats().sizeInBytes()
         except NotFound as nf:
             if "[TABLE_OR_VIEW_NOT_FOUND]" in str(nf):
-                logger.error(f"Failed to evaluate {table_full_name} table size. Table not found.")
+                logger.warning(f"Failed to evaluate {table_full_name} table size. Table not found.")
             else:
-                logger.error(nf)
+                logger.warning(nf)
             return None
