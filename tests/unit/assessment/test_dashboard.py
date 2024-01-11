@@ -33,7 +33,8 @@ def test_dashboard(mocker):
                     {
                         "jobs.sql:query_id": "91e51760-7653-4769-bc32-1595ce1892af",
                         "all_tables.sql:query_id": "4000e54c-4c51-45b3-b009-a4dd9a3b5599",
-                        "assessment_azure_05_0_azure_service_principals.sql:query_id": "11e51760-7653-4769-bc32-1595ce1892af",
+                        "assessment_azure_05_0_azure_service_principals.sql:query_id"
+                        "": "11e51760-7653-4769-bc32-1595ce1892af",
                     }
                 )
             )
@@ -47,7 +48,8 @@ def test_dashboard(mocker):
                             "queries": {
                                 "jobs.sql": "91e51760-7653-4769-bc32-1595ce1892af",
                                 "all_tables.sql": "4000e54c-4c51-45b3-b009-a4dd9a3b5599",
-                                "assessment_azure_05_0_azure_service_principals.sql": "11e51760-7653-4769-bc32-1595ce1892af",
+                                "assessment_azure_05_0_azure_service_principals.sql"
+                                "": "11e51760-7653-4769-bc32-1595ce1892af",
                             }
                         },
                     }
