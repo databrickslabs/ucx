@@ -86,6 +86,7 @@ def create_account_level_groups(a: AccountClient):
     workspaces = AccountWorkspaces(AccountConfig(connect=ConnectConfig()))
     workspaces.create_account_level_groups()
 
+
 @ucx.command
 def manual_workspace_info(w: WorkspaceClient):
     """only supposed to be run if cannot get admins to run `databricks labs ucx sync-workspace-info`"""

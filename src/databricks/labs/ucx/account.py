@@ -104,9 +104,9 @@ class AccountWorkspaces:
                 self._ac.groups.create(display_name=group_name, members=group.members)
                 logger.info(f"Group {group_name} created in the account")
 
-    def get_valid_workspaces_groups(self) -> dict[str:Group]:
-        all_workspaces_groups = {}
-        inconsistent_groups = []
+    def get_valid_workspaces_groups(self) -> dict[str, Group]:
+        all_workspaces_groups: dict[str, Group] = {}
+        inconsistent_groups: list[str] = []
         for client in self.workspace_clients():
             ws_group_ids = client.groups.list(attributes="id")
             for group_id in ws_group_ids:
@@ -117,7 +117,10 @@ class AccountWorkspaces:
                     logger.info(f"Group {group_name} has been found earlier and it didn't had same members, ignoring")
                 elif group_name in all_workspaces_groups:
                     if self.has_not_same_members(all_workspaces_groups[group_name], full_workspace_group):
-                        logger.warning(f"Group {full_workspace_group.display_name} does not have same amount of members in workspace {client.config.host}, it won't be migrated to the account")
+                        logger.warning(
+                            f"Group {full_workspace_group.display_name} does not have same amount of members "
+                            f"in workspace {client.config.host}, it won't be migrated to the account"
+                        )
                         inconsistent_groups.append(group_name)
                         all_workspaces_groups.pop(group_name)
                     else:
@@ -127,13 +130,12 @@ class AccountWorkspaces:
                     all_workspaces_groups[group_name] = full_workspace_group
         return all_workspaces_groups
 
-    def has_not_same_members(self, group_1:Group, group_2:Group) -> []:
+    def has_not_same_members(self, group_1: Group, group_2: Group) -> bool:
         ws_members_set = set([m.display for m in group_1.members] if group_1.members else [])
         ws_members_set_2 = set([m.display for m in group_2.members] if group_2.members else [])
         return bool((ws_members_set - ws_members_set_2).union(ws_members_set_2 - ws_members_set))
 
-
-    def get_account_groups(self) -> dict[str:Group]:
+    def get_account_groups(self) -> dict[str | None, list[ComplexValue] | None]:
         acc_groups = {}
         for acc_grp_id in self._ac.groups.list(attributes="id"):
             full_account_group = self._ac.groups.get(acc_grp_id.id)

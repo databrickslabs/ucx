@@ -1,10 +1,10 @@
 import io
 import json
-from unittest.mock import create_autospec, patch, MagicMock
+from unittest.mock import MagicMock, create_autospec, patch
 
 from databricks.labs.blueprint.tui import MockPrompts
 from databricks.sdk import WorkspaceClient
-from databricks.sdk.service.iam import User, Group, ComplexValue
+from databricks.sdk.service.iam import ComplexValue, Group, User
 from databricks.sdk.service.provisioning import Workspace
 from databricks.sdk.service.workspace import ImportFormat
 
@@ -99,6 +99,7 @@ def test_manual_workspace_info(mocker):
         format=ImportFormat.AUTO,
     )
 
+
 def test_create_acc_groups_should_create_acc_group_if_no_group_found(mocker):
     account_config = AccountConfig(
         connect=ConnectConfig(host="https://accounts.cloud.databricks.com", account_id="123", token="abc")
@@ -120,7 +121,7 @@ def test_create_acc_groups_should_create_acc_group_if_no_group_found(mocker):
         return mock1
 
     group = Group(
-        id= "12",
+        id="12",
         display_name="de",
         members=[ComplexValue(display="test-user-1", value="20"), ComplexValue(display="test-user-2", value="21")],
     )
@@ -132,11 +133,11 @@ def test_create_acc_groups_should_create_acc_group_if_no_group_found(mocker):
     account_workspaces.create_account_level_groups()
 
     acc_client.groups.create.assert_called_with(
-        display_name='de',
+        display_name="de",
         members=[
-            ComplexValue(display='test-user-1', primary=None, type=None, value='20'),
-            ComplexValue(display='test-user-2', primary=None, type=None, value='21')
-        ]
+            ComplexValue(display="test-user-1", primary=None, type=None, value="20"),
+            ComplexValue(display="test-user-2", primary=None, type=None, value="21"),
+        ],
     )
 
 
@@ -171,7 +172,7 @@ def test_create_acc_groups_should_filter_groups_in_other_workspaces(mocker):
     ]
 
     group = Group(
-        id= "12",
+        id="12",
         display_name="de",
         members=[ComplexValue(display="test-user-1", value="20"), ComplexValue(display="test-user-2", value="21")],
     )
@@ -186,12 +187,9 @@ def test_create_acc_groups_should_filter_groups_in_other_workspaces(mocker):
     account_workspaces.create_account_level_groups()
 
     acc_client.groups.create.assert_called_once_with(
-        display_name='de',
+        display_name="de",
         members=[
-            ComplexValue(display='test-user-1', primary=None, type=None, value='20'),
-            ComplexValue(display='test-user-2', primary=None, type=None, value='21')
-        ]
+            ComplexValue(display="test-user-1", primary=None, type=None, value="20"),
+            ComplexValue(display="test-user-2", primary=None, type=None, value="21"),
+        ],
     )
-
-
-
