@@ -79,3 +79,26 @@ def test_table_size_table_or_view_not_found(mocker):
     results = tsc.snapshot()
 
     assert len(results) == 0
+
+
+def test_table_size_when_table_corrupted(mocker):
+    errors = {}
+    rows = {
+        "table_size": [],
+        "hive_metastore.inventory_database.tables": [
+            ("hive_metastore", "db1", "table1", "MANAGED", "DELTA", "dbfs:/location/table", None),
+        ],
+        "SHOW DATABASES": [("db1",)],
+    }
+    backend = MockBackend(fails_on_first=errors, rows=rows)
+    pyspark_sql_session = mocker.Mock()
+    sys.modules["pyspark.sql.session"] = pyspark_sql_session
+    tsc = TableSizeCrawler(backend, "inventory_database")
+
+    tsc._spark._jsparkSession.table().queryExecution().analyzed().stats().sizeInBytes.side_effect = Exception(
+        "[DELTA_MISSING_TRANSACTION_LOG]"
+    )
+
+    results = tsc.snapshot()
+
+    assert len(results) == 0
