@@ -132,7 +132,7 @@ def test_move_tables_not_found_view_unknown_error(mocker, caplog):
     assert len([rec.message for rec in caplog.records if "unknown error" in rec.message]) == 1
 
 
-def test_move_all_tables(caplog):
+def test_move_all_tables_and_drop_source(caplog):
     caplog.set_level(logging.INFO)
     client = create_autospec(WorkspaceClient)
 
@@ -234,6 +234,57 @@ def test_move_all_tables(caplog):
         "Dropping source view SrcC.SrcS.view1",
         "Creating view TgtC.TgtS.view2",
         "Dropping source view SrcC.SrcS.view2",
+    ]
+
+    log_count = 0
+    for rec in caplog.records:
+        print(rec)
+        if rec.message in expected_messages:
+            log_count += 1
+
+    assert log_count == len(expected_messages)
+
+
+def test_move_one_table_without_dropping_source(caplog):
+    caplog.set_level(logging.INFO)
+    client = create_autospec(WorkspaceClient)
+
+    client.tables.list.return_value = [
+        TableInfo(
+            catalog_name="SrcC",
+            schema_name="SrcS",
+            name="table1",
+            full_name="SrcC.SrcS.table1",
+            table_type=TableType.EXTERNAL,
+        ),
+        TableInfo(
+            catalog_name="SrcC",
+            schema_name="SrcS",
+            name="table2",
+            full_name="SrcC.SrcS.table2",
+            table_type=TableType.EXTERNAL,
+        ),
+    ]
+
+    perm_none = PermissionsList(None)
+
+    rows = {
+        "SHOW CREATE TABLE SrcC.SrcS.table1": [
+            ["CREATE TABLE SrcC.SrcS.table1 (name string)"],
+        ]
+    }
+
+    client.grants.get.side_effect = [perm_none, perm_none, perm_none, perm_none]
+    client.schemas.get.side_effect = [SchemaInfo(), SchemaInfo()]
+    client.tables.get.side_effect = [NotFound(), NotFound(), NotFound(), NotFound()]
+    backend = MockBackend(rows=rows)
+    tm = TableMove(client, backend)
+    tm.move_tables("SrcC", "SrcS", "table1", "TgtC", "TgtS", False)
+
+    expected_messages = [
+        "Moved 1 tables to the new schema TgtS.",
+        "Moved 0 views to the new schema TgtS.",
+        "Creating table TgtC.TgtS.table1",
     ]
 
     log_count = 0
