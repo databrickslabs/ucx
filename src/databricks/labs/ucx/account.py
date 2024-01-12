@@ -6,6 +6,7 @@ import requests
 from databricks.labs.blueprint.tui import Prompts
 from databricks.sdk import WorkspaceClient
 from databricks.sdk.errors import NotFound
+from databricks.sdk.service.iam import ComplexValue, Group
 from databricks.sdk.service.provisioning import Workspace
 from databricks.sdk.service.workspace import ImportFormat
 
@@ -92,37 +93,52 @@ class AccountWorkspaces:
         """
         Crawl all workspaces, and create account level groups if a WS local group is not present in the account
         """
+        acc_groups = self.get_account_groups()
+
+        all_valid_workspace_groups = self.get_valid_workspaces_groups()
+
+        for group_name, group in all_valid_workspace_groups.items():
+            if group_name in acc_groups:
+                logger.info(f"Group {group_name} already exist in the account, ignoring")
+            else:
+                self._ac.groups.create(display_name=group_name, members=group.members)
+                logger.info(f"Group {group_name} created in the account")
+
+    def get_valid_workspaces_groups(self) -> dict[str:Group]:
+        all_workspaces_groups = {}
+        inconsistent_groups = []
+        for client in self.workspace_clients():
+            ws_group_ids = client.groups.list(attributes="id")
+            for group_id in ws_group_ids:
+                full_workspace_group = client.groups.get(group_id.id)
+                group_name = full_workspace_group.display_name
+
+                if group_name in inconsistent_groups:
+                    logger.info(f"Group {group_name} has been found earlier and it didn't had same members, ignoring")
+                elif group_name in all_workspaces_groups:
+                    if not self.has_same_members(all_workspaces_groups[group_name], full_workspace_group):
+                        logger.warning(f"Group {full_workspace_group.display_name} does not have same amount of members in workspace {client.config.host}, it won't be migrated to the account")
+                        inconsistent_groups.append(group_name)
+                        all_workspaces_groups.pop(group_name)
+                    else:
+                        logger.info(f"Workspace group {group_name} already found, ignoring")
+                else:
+                    logger.info(f"Found new group {group_name}")
+                    all_workspaces_groups[group_name] = full_workspace_group
+        return all_workspaces_groups
+
+    def has_same_members(self, group_1:Group, group_2:Group) -> []:
+        ws_members_set = set([m.display for m in group_1.members] if group_1.members else [])
+        ws_members_set_2 = set([m.display for m in group_2.members] if group_2.members else [])
+        return (ws_members_set - ws_members_set_2).union(ws_members_set_2 - ws_members_set)
+
+
+    def get_account_groups(self) -> dict[str:Group]:
         acc_groups = {}
-        ac_grp_ids = self._ac.groups.list(attributes="id")
-        for acc_grp_id in ac_grp_ids:
+        for acc_grp_id in self._ac.groups.list(attributes="id"):
             full_account_group = self._ac.groups.get(acc_grp_id.id)
             acc_groups[full_account_group.display_name] = full_account_group.members
-
-        workspace_clients = self.workspace_clients()
-        all_workspace_groups = {}
-        for client in workspace_clients:
-            ws_groups_ids = client.groups.list(attributes="id")
-            for grp_id in ws_groups_ids:
-                full_workpace_group = client.groups.get(grp_id.id)
-                if full_workpace_group.display_name in all_workspace_groups:
-                    if len(all_workspace_groups[full_workpace_group.display_name]) == full_workpace_group.members:
-                        logger.debug(f"Group {full_workpace_group.display_name} already found in another workspace")
-                    else:
-                        logger.warning(f"Workspace local group {full_workpace_group.display_name} does not have same members")
-                        # What to do in this situation ?
-                else:
-                    all_workspace_groups[full_workpace_group.display_name] = full_workpace_group.members
-
-        for group_name, members in all_workspace_groups.items():
-            if group_name in acc_groups:
-                if len(acc_groups[group_name]) == members:
-                    logger.info(f"Group {group_name} exist at account level")
-                else:
-                    logger.warning(f"Group {group_name} exist at account level but does not have same members")
-                    # What to do in this situation ?
-            else:
-                self._ac.groups.create(display_name=group_name, members=members)
-                logger.info(f"Group {group_name} created at the account")
+        return acc_groups
 
 
 class WorkspaceInfo:

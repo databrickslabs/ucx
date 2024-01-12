@@ -1,6 +1,6 @@
 import io
 import json
-from unittest.mock import create_autospec, patch
+from unittest.mock import create_autospec, patch, MagicMock
 
 from databricks.labs.blueprint.tui import MockPrompts
 from databricks.sdk import WorkspaceClient
@@ -99,7 +99,7 @@ def test_manual_workspace_info(mocker):
         format=ImportFormat.AUTO,
     )
 
-def test_acc_groups(mocker):
+def test_create_acc_groups_should_create_acc_group_if_no_group_found(mocker):
     account_config = AccountConfig(
         connect=ConnectConfig(host="https://accounts.cloud.databricks.com", account_id="123", token="abc")
     )
@@ -111,17 +111,14 @@ def test_acc_groups(mocker):
     # test for workspace filtering
     account_config.include_workspace_names = ["foo"]
 
+    mock1 = MagicMock()
     acc_client.workspaces.list.return_value = [
         Workspace(workspace_name="foo", workspace_id=123, workspace_status_message="Running", deployment_name="abc"),
         Workspace(workspace_name="bar", workspace_id=456, workspace_status_message="Running", deployment_name="def"),
     ]
 
-    ws = mocker.patch("databricks.sdk.WorkspaceClient.__init__")
-
-    def workspace_client(host, product, **kwargs) -> WorkspaceClient:
-        assert host == "https://abc.cloud.databricks.com"
-        assert product == "ucx"
-        return ws
+    def workspace_client(**kwargs) -> WorkspaceClient:
+        return mock1
 
     im = create_autospec(InstallationManager)
     im.user_installations.return_value = [
@@ -129,13 +126,25 @@ def test_acc_groups(mocker):
     ]
 
     group = Group(
+        id= "12",
         display_name="de",
         members=[ComplexValue(display="test-user-1", value="20"), ComplexValue(display="test-user-2", value="21")],
     )
 
+    mock1.groups.list.return_value = [group]
+    mock1.groups.get.return_value = group
+
     account_workspaces = AccountWorkspaces(account_config, workspace_client, lambda _: im)
     account_workspaces.create_account_level_groups()
 
-    #TODO: do the tests
+    acc_client.groups.create.assert_called_with(
+        display_name='de',
+        members=[
+            ComplexValue(display='test-user-1', primary=None, type=None, value='20'),
+            ComplexValue(display='test-user-2', primary=None, type=None, value='21')
+        ]
+    )
+
+
 
 
