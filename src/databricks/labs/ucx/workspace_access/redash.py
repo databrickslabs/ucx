@@ -41,10 +41,20 @@ class Listing:
 
 class RedashPermissionsSupport(AclSupport):
     def __init__(
-        self, ws: WorkspaceClient, listings: list[Listing], verify_timeout: timedelta | None = timedelta(minutes=1)
+        self,
+        ws: WorkspaceClient,
+        listings: list[Listing],
+        set_permissions_timeout: timedelta | None = timedelta(minutes=1),
+        # Group information in Redash are cached for up to 10 minutes causing inconsistencies.
+        # If a group is renamed, the old name may still be returned by the dbsql get permissions api.
+        # Note that the update/set API is strongly consistent and is not affected by this behaviour.
+        # The validation step should keep retrying for at least 10 mins until the get api returns the new group name.
+        # More details here: https://databricks.atlassian.net/browse/ES-992619
+        verify_timeout: timedelta | None = timedelta(minutes=11),
     ):
         self._ws = ws
         self._listings = listings
+        self._set_permissions_timeout = set_permissions_timeout
         self._verify_timeout = verify_timeout
 
     @staticmethod
@@ -85,6 +95,41 @@ class RedashPermissionsSupport(AclSupport):
             logger.warning(f"removed on backend: {object_type} {object_id}")
             return None
 
+    def _load_as_request(self, object_type: sql.ObjectTypePlural, object_id: str) -> list[sql.AccessControl]:
+        loaded = self._safe_get_dbsql_permissions(object_type, object_id)
+        if loaded is None:
+            return []
+        acl: list[sql.AccessControl] = []
+        if not loaded.access_control_list:
+            return acl
+
+        for v in loaded.access_control_list:
+            acl.append(
+                sql.AccessControl(
+                    permission_level=v.permission_level,
+                    group_name=v.group_name,
+                    user_name=v.user_name,
+                )
+            )
+        # sort to return deterministic results
+        return sorted(acl, key=lambda v: f"{v.group_name}:{v.user_name}")
+
+    def load_as_dict(self, object_type: sql.ObjectTypePlural, object_id: str) -> dict[str, sql.PermissionLevel]:
+        result = {}
+        for acl in self._load_as_request(object_type, object_id):
+            if not acl.permission_level:
+                continue
+            result[self._key_for_acl_dict(acl)] = acl.permission_level
+        return result
+
+    @staticmethod
+    def _key_for_acl_dict(acl: sql.AccessControl) -> str:
+        if acl.group_name is not None:
+            return acl.group_name
+        if acl.user_name is not None:
+            return acl.user_name
+        return "UNKNOWN"
+
     @rate_limited(max_requests=100)
     def _crawler_task(self, object_id: str, object_type: sql.ObjectTypePlural) -> Permissions | None:
         permissions = self._safe_get_dbsql_permissions(object_type=object_type, object_id=object_id)
@@ -120,7 +165,7 @@ class RedashPermissionsSupport(AclSupport):
         This affects the way how we prepare the new ACL request.
         """
 
-        set_retry_on_value_error = retried(on=[InternalError, ValueError], timeout=self._verify_timeout)
+        set_retry_on_value_error = retried(on=[InternalError, ValueError], timeout=self._set_permissions_timeout)
         set_retried_check = set_retry_on_value_error(self._safe_set_permissions)
         set_retried_check(object_type, object_id, acl)
 
@@ -133,22 +178,45 @@ class RedashPermissionsSupport(AclSupport):
     ) -> list[sql.AccessControl]:
         """
         Please note the comment above on how we apply these permissions.
+        Permissions are set/replaced and not updated/patched, therefore all existing ACLs need to be collected
+        including users and temp/backup groups.
         """
         acl_requests: list[sql.AccessControl] = []
         for access_control in acl:
+            if access_control.user_name:
+                logger.debug(f"Including redash permissions acl for user: `{access_control.user_name}`")
+                acl_requests.append(access_control)
+                continue
+
             if not access_control.group_name:
                 continue
+
             if not migration_state.is_in_scope(access_control.group_name):
-                logger.debug(f"Skipping redash item for `{access_control.group_name}`: not in scope")
+                logger.debug(
+                    f"Including redash permissions acl for group not in the scope: `{access_control.group_name}`"
+                )
                 acl_requests.append(access_control)
                 continue
+
             target_principal = migration_state.get_target_principal(access_control.group_name)
-            if target_principal is None:
-                logger.debug(f"Skipping redash item for `{access_control.group_name}`: no target principal")
+            if not target_principal:
+                logger.debug(
+                    f"Including redash permissions acl for group without target principal: "
+                    f"`{access_control.group_name}`"
+                )
                 acl_requests.append(access_control)
                 continue
+
+            logger.debug(f"Including redash permissions acl for target group `{target_principal}`")
             new_acl_request = dataclasses.replace(access_control, group_name=target_principal)
             acl_requests.append(new_acl_request)
+
+            temp_principal = migration_state.get_temp_principal(access_control.group_name)
+            if temp_principal is not None:
+                logger.debug(f"Including redash permissions acl for temp group `{temp_principal}`")
+                temp_group_new_acl_request = dataclasses.replace(access_control, group_name=temp_principal)
+                acl_requests.append(temp_group_new_acl_request)
+
         return acl_requests
 
     @rate_limited(burst_period_seconds=30)
