@@ -108,17 +108,62 @@ def test_create_acc_groups_should_create_acc_group_if_no_group_found(mocker):
     acc_client.config = account_config.to_databricks_config()
 
     account_config.to_account_client = lambda: acc_client
-    # test for workspace filtering
     account_config.include_workspace_names = ["foo"]
 
+    acc_client.workspaces.list.return_value = [
+        Workspace(workspace_name="foo", workspace_id=123, workspace_status_message="Running", deployment_name="abc")
+    ]
+
     mock1 = MagicMock()
+
+    def workspace_client(**kwargs) -> WorkspaceClient:
+        return mock1
+
+    group = Group(
+        id= "12",
+        display_name="de",
+        members=[ComplexValue(display="test-user-1", value="20"), ComplexValue(display="test-user-2", value="21")],
+    )
+
+    mock1.groups.list.return_value = [group]
+    mock1.groups.get.return_value = group
+
+    account_workspaces = AccountWorkspaces(account_config, workspace_client)
+    account_workspaces.create_account_level_groups()
+
+    acc_client.groups.create.assert_called_with(
+        display_name='de',
+        members=[
+            ComplexValue(display='test-user-1', primary=None, type=None, value='20'),
+            ComplexValue(display='test-user-2', primary=None, type=None, value='21')
+        ]
+    )
+
+
+def test_create_acc_groups_should_filter_groups_in_other_workspaces(mocker):
+    account_config = AccountConfig(
+        connect=ConnectConfig(host="https://accounts.cloud.databricks.com", account_id="123", token="abc")
+    )
+    # TODO: https://github.com/databricks/databricks-sdk-py/pull/480
+    acc_client = mocker.patch("databricks.sdk.AccountClient.__init__")
+    acc_client.config = account_config.to_databricks_config()
+
+    account_config.to_account_client = lambda: acc_client
+    account_config.include_workspace_names = ["foo", "bar"]
+
     acc_client.workspaces.list.return_value = [
         Workspace(workspace_name="foo", workspace_id=123, workspace_status_message="Running", deployment_name="abc"),
         Workspace(workspace_name="bar", workspace_id=456, workspace_status_message="Running", deployment_name="def"),
     ]
 
-    def workspace_client(**kwargs) -> WorkspaceClient:
-        return mock1
+    mock1 = MagicMock()
+    mock2 = MagicMock()
+
+    def workspace_client(host, product, **kwargs) -> WorkspaceClient:
+        if host == "https://abc.cloud.databricks.com":
+            return mock1
+        else:
+            return mock2
 
     im = create_autospec(InstallationManager)
     im.user_installations.return_value = [
@@ -134,17 +179,19 @@ def test_create_acc_groups_should_create_acc_group_if_no_group_found(mocker):
     mock1.groups.list.return_value = [group]
     mock1.groups.get.return_value = group
 
+    mock2.groups.list.return_value = [group]
+    mock2.groups.get.return_value = group
+
     account_workspaces = AccountWorkspaces(account_config, workspace_client, lambda _: im)
     account_workspaces.create_account_level_groups()
 
-    acc_client.groups.create.assert_called_with(
+    acc_client.groups.create.assert_called_once_with(
         display_name='de',
         members=[
             ComplexValue(display='test-user-1', primary=None, type=None, value='20'),
             ComplexValue(display='test-user-2', primary=None, type=None, value='21')
         ]
     )
-
 
 
 

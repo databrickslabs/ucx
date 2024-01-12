@@ -116,7 +116,7 @@ class AccountWorkspaces:
                 if group_name in inconsistent_groups:
                     logger.info(f"Group {group_name} has been found earlier and it didn't had same members, ignoring")
                 elif group_name in all_workspaces_groups:
-                    if not self.has_same_members(all_workspaces_groups[group_name], full_workspace_group):
+                    if self.has_not_same_members(all_workspaces_groups[group_name], full_workspace_group):
                         logger.warning(f"Group {full_workspace_group.display_name} does not have same amount of members in workspace {client.config.host}, it won't be migrated to the account")
                         inconsistent_groups.append(group_name)
                         all_workspaces_groups.pop(group_name)
@@ -127,10 +127,10 @@ class AccountWorkspaces:
                     all_workspaces_groups[group_name] = full_workspace_group
         return all_workspaces_groups
 
-    def has_same_members(self, group_1:Group, group_2:Group) -> []:
+    def has_not_same_members(self, group_1:Group, group_2:Group) -> []:
         ws_members_set = set([m.display for m in group_1.members] if group_1.members else [])
         ws_members_set_2 = set([m.display for m in group_2.members] if group_2.members else [])
-        return (ws_members_set - ws_members_set_2).union(ws_members_set_2 - ws_members_set)
+        return bool((ws_members_set - ws_members_set_2).union(ws_members_set_2 - ws_members_set))
 
 
     def get_account_groups(self) -> dict[str:Group]:
