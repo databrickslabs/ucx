@@ -44,7 +44,7 @@ class TableSizeCrawler(CrawlerBase):
                 continue
             size_in_bytes = self._safe_get_table_size(table.key)
             if size_in_bytes is None:
-                continue  # table does not exist anymore
+                continue  # table does not exist anymore or is corrupted
 
             yield TableSize(
                 catalog=table.catalog, database=table.database, name=table.name, size_in_bytes=size_in_bytes
@@ -72,5 +72,8 @@ class TableSizeCrawler(CrawlerBase):
         except Exception as e:
             if "[TABLE_OR_VIEW_NOT_FOUND]" in str(e):
                 logger.warning(f"Failed to evaluate {table_full_name} table size. Table not found.")
+                return None
+            if "[DELTA_MISSING_TRANSACTION_LOG]" in str(e):
+                logger.warning(f"Delta table {table_full_name} is corrupted: missing transaction log.")
                 return None
             raise RuntimeError(str(e)) from e
