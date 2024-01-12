@@ -279,7 +279,7 @@ def _redash_permissions_mapping():
 
     return [
         (
-            "query_policy",
+            "query",
             ObjectTypePlural.QUERIES,
             [
                 sql.PermissionLevel.CAN_VIEW,
@@ -290,7 +290,7 @@ def _redash_permissions_mapping():
             _simple,
         ),
         (
-            "alert_policy",
+            "alert",
             ObjectTypePlural.ALERTS,
             [
                 sql.PermissionLevel.CAN_VIEW,
@@ -301,7 +301,7 @@ def _redash_permissions_mapping():
             _simple,
         ),
         (
-            "dashboard_policy",
+            "dashboard",
             ObjectTypePlural.DASHBOARDS,
             [
                 sql.PermissionLevel.CAN_VIEW,
