@@ -68,6 +68,12 @@ class MigrationState:
             return None
         return mg.name_in_account
 
+    def get_temp_principal(self, name: str) -> str | None:
+        mg = self._name_to_group.get(name)
+        if mg is None:
+            return None
+        return mg.temporary_name
+
     def is_in_scope(self, name: str) -> bool:
         if name is None:
             return False
