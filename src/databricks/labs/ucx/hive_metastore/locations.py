@@ -205,14 +205,15 @@ class Mounts(CrawlerBase[Mount]):
     def _deduplicate_mounts(self, mounts: list) -> list:
         seen = set()
         deduplicated_mounts = []
-
-        ### Deduplicate Volume variations.
-
+        volume_flag = 0
         for obj in mounts:
+            if 'volume' in obj.name.lower():
+                volume_flag = 1
             obj_tuple = (obj.name, obj.source)
             if obj_tuple not in seen:
-                seen.add(obj_tuple)
-                deduplicated_mounts.append(obj)
+                if not volume_flag:
+                    seen.add(obj_tuple)
+                    deduplicated_mounts.append(obj)
         return deduplicated_mounts
 
     def inventorize_mounts(self):
