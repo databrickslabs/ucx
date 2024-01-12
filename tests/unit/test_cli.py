@@ -1,4 +1,4 @@
-from unittest.mock import create_autospec, patch
+from unittest.mock import MagicMock, create_autospec, patch
 
 from databricks.sdk import WorkspaceClient
 from databricks.sdk.errors import NotFound
@@ -6,6 +6,34 @@ from databricks.sdk.service import iam
 from databricks.sdk.service.iam import User
 
 from databricks.labs.ucx.cli import move, repair_run, skip
+
+
+def test_skip_with_table(mocker):
+    """
+    Test the skip function with schema and table specified.
+    :param mocker:
+    :return:
+    """
+    w = create_autospec(WorkspaceClient)
+    w.current_user.me = lambda: iam.User(user_name="foo", groups=[iam.ComplexValue(display="admins")])
+    mocker.patch("databricks.labs.ucx.installer.InstallationManager.for_user", return_value=MagicMock())
+    with patch("databricks.labs.ucx.hive_metastore.mapping.TableMapping.skip_table", return_value=None) as s:
+        skip(w, "schema", "table")
+        s.assert_called_once()
+
+
+def test_skip_with_schema(mocker):
+    """
+    Test the skip function with schema specified.
+    :param mocker:
+    :return:
+    """
+    w = create_autospec(WorkspaceClient)
+    w.current_user.me = lambda: iam.User(user_name="foo", groups=[iam.ComplexValue(display="admins")])
+    mocker.patch("databricks.labs.ucx.installer.InstallationManager.for_user", return_value=MagicMock())
+    with patch("databricks.labs.ucx.hive_metastore.mapping.TableMapping.skip_schema", return_value=None) as s:
+        skip(w, "schema", None)
+        s.assert_called_once()
 
 
 def test_skip_no_schema(caplog):
@@ -34,7 +62,7 @@ def test_repair_run(mocker, caplog):
     assert caplog.messages == ["Repair Running assessment Job"]
 
 
-def test_no_step_in_repair_run(mocker, caplog):
+def test_no_step_in_repair_run(mocker):
     w = create_autospec(WorkspaceClient)
     mocker.patch("databricks.labs.ucx.install.WorkspaceInstaller.__init__", return_value=None)
     mocker.patch("databricks.labs.ucx.install.WorkspaceInstaller.repair_run", return_value=None)
@@ -78,7 +106,7 @@ def test_move_no_schema(mocker, caplog):
     assert len([rec.message for rec in caplog.records if "Please enter from_schema, to_schema" in rec.message]) == 1
 
 
-def test_move(mocker, caplog, monkeypatch):
+def test_move(mocker, monkeypatch):
     w = create_autospec(WorkspaceClient)
     w.current_user.me = lambda: iam.User(user_name="foo", groups=[iam.ComplexValue(display="admins")])
     mocker.patch("databricks.labs.ucx.installer.InstallationManager.for_user", return_value=w.current_user)
