@@ -14,6 +14,7 @@ from databricks.labs.ucx.hive_metastore.mapping import TableMapping
 from databricks.labs.ucx.hive_metastore.table_migrate import TableMove, TablesMigrate
 from databricks.labs.ucx.install import WorkspaceInstaller
 from databricks.labs.ucx.installer import InstallationManager
+from databricks.labs.ucx.workspace_access.groups import GroupManager
 
 ucx = App(__file__)
 logger = get_logger(__file__)
@@ -136,6 +137,31 @@ def repair_run(w: WorkspaceClient, step):
     installer = WorkspaceInstaller(w)
     logger.info(f"Repair Running {step} Job")
     installer.repair_run(step)
+
+
+@ucx.command
+def validate_groups(w: WorkspaceClient):
+    """Validate the groups to see if the groups at account level and workspace level has different membership"""
+    installation_manager = InstallationManager(w)
+    installation = installation_manager.for_user(w.current_user.me())
+    warehouse_id = installation.config.warehouse_id
+    inventory_database = installation.config.inventory_database
+    renamed_group_prefix = installation.config.renamed_group_prefix
+    workspace_group_regex = installation.config.workspace_group_regex
+    workspace_group_replace = installation.config.workspace_group_replace
+    account_group_regex = installation.config.account_group_regex
+    include_group_names = installation.config.include_group_names
+    sql_backend = StatementExecutionBackend(w, warehouse_id)
+    if not installation:
+        logger.error(CANT_FIND_UCX_MSG)
+        return None
+    group_manager = GroupManager(sql_backend=sql_backend, ws=w, inventory_database=inventory_database,
+                                 include_group_names=include_group_names, renamed_group_prefix=renamed_group_prefix,
+                                 workspace_group_regex=workspace_group_regex,
+                                 workspace_group_replace=workspace_group_replace,
+                                 account_group_regex=account_group_regex)
+
+    print(group_manager.get_group_membership().value())
 
 
 @ucx.command

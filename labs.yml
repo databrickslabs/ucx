@@ -80,3 +80,6 @@ commands:
         description: target catalog to migrate schema to
       - name: to-schema
         description: target schema to migrate tables to
+
+  - name: validate-groups
+    description: Validate the groups to see if the groups at account level and workspace level have different membership
