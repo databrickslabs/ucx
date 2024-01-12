@@ -225,7 +225,9 @@ def test_group_matching_names_with_diff_users(
         workspace_group_regex=r"([0-9a-zA-Z]*)$",
         account_group_regex=r"\[([0-9a-zA-Z]*)\]",
     )
-    validate_migrate_groups(group_manager, ws_group, accnt_group)
+
+    t = group_manager.validate_group_membership()
+    assert len(t) > 0
 
 
 # average runtime is 100 seconds

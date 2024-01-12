@@ -81,5 +81,9 @@ commands:
       - name: to-schema
         description: target schema to migrate tables to
 
-  - name: validate-groups
+  - name: validate-groups-membership
     description: Validate the groups to see if the groups at account level and workspace level have different membership
+    table_template: |-
+      Workflow_Group_Name\tAccount_Group_Name
+      {{range .}}{{.wf_group_name}}\t{{.ac_group_name}}
+      {{end}}

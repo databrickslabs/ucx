@@ -140,7 +140,7 @@ def repair_run(w: WorkspaceClient, step):
 
 
 @ucx.command
-def validate_groups(w: WorkspaceClient):
+def validate_groups_membership(w: WorkspaceClient):
     """Validate the groups to see if the groups at account level and workspace level has different membership"""
     installation_manager = InstallationManager(w)
     installation = installation_manager.for_user(w.current_user.me())
@@ -155,13 +155,20 @@ def validate_groups(w: WorkspaceClient):
     if not installation:
         logger.error(CANT_FIND_UCX_MSG)
         return None
-    group_manager = GroupManager(sql_backend=sql_backend, ws=w, inventory_database=inventory_database,
-                                 include_group_names=include_group_names, renamed_group_prefix=renamed_group_prefix,
-                                 workspace_group_regex=workspace_group_regex,
-                                 workspace_group_replace=workspace_group_replace,
-                                 account_group_regex=account_group_regex)
+    group_manager = GroupManager(
+        sql_backend=sql_backend,
+        ws=w,
+        inventory_database=inventory_database,
+        include_group_names=include_group_names,
+        renamed_group_prefix=renamed_group_prefix,
+        workspace_group_regex=workspace_group_regex,
+        workspace_group_replace=workspace_group_replace,
+        account_group_regex=account_group_regex,
+    )
+    mismatch_groups = group_manager.validate_group_membership()
 
-    print(group_manager.get_group_membership().value())
+    if mismatch_groups:
+        print(json.dumps(mismatch_groups))
 
 
 @ucx.command
