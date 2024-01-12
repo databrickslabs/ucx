@@ -6,7 +6,11 @@ from databricks.sdk.errors import NotFound
 from databricks.sdk.retries import retried
 from databricks.sdk.service import compute, jobs
 
-from databricks.labs.ucx.assessment.azure import AzureServicePrincipalCrawler, AzureResourcePermissions
+from databricks.labs.ucx.assessment.azure import (
+    AzureResourcePermissions,
+    AzureServicePrincipalCrawler,
+)
+from databricks.labs.ucx.hive_metastore.locations import ExternalLocations
 
 from .test_assessment import (
     _PIPELINE_CONF,
@@ -19,9 +23,9 @@ from .test_assessment import (
 
 @pytest.mark.skip
 def test_azure_permissions(ws):
-    logging.getLogger('databricks').setLevel('DEBUG')
+    logging.getLogger("databricks").setLevel("DEBUG")
     arp = AzureResourcePermissions(ws)
-    x = arp.role_assignments('/subscriptions/.../resourceGroups/.../providers/Microsoft.Storage/storageAccounts/...')
+    x = arp.role_assignments("/subscriptions/.../resourceGroups/.../providers/Microsoft.Storage/storageAccounts/...")
     y = list(x)
     assert y
 
@@ -120,3 +124,9 @@ def test_spn_crawler_with_available_secrets(
 
     assert any(_ for _ in results if _.secret_scope == secret_scope)
     assert any(_ for _ in results if _.secret_key == secret_key)
+
+
+def test_azure_storage_accounts(ws, sql_backend, inventory_schema):
+    el = ExternalLocations(ws, sql_backend, inventory_schema)
+    ap = AzureResourcePermissions(ws, el)
+    ap._get_storage_resource_ids()
