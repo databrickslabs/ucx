@@ -293,10 +293,9 @@ class AzureResourcePermissions(CrawlerBase[AzureStorageSpnPermissionMapping]):
         super().__init__(
             sql_backend, "hive_metastore", inventory_schema, "azure_storage_accounts", AzureStorageSpnPermissionMapping
         )
-        self._rm_host = ws.config.arm_environment.resource_manager_endpoint
-        self._resource_manager = ApiClient(Config(host=self._rm_host, credentials_provider=_credentials))
-        self._backend = sql_backend
-        self._token_source = AzureCliTokenSource(self._rm_host)
+        rm_host = ws.config.arm_environment.resource_manager_endpoint
+        self._resource_manager = ApiClient(Config(host=rm_host, credentials_provider=_credentials))
+        self._token_source = AzureCliTokenSource(rm_host)
         self._locations = lc
         self._role_definitions = {}  # type: dict[str, str]
 
