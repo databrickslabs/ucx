@@ -128,5 +128,5 @@ def test_spn_crawler_with_available_secrets(
 
 def test_azure_storage_accounts(ws, sql_backend, inventory_schema):
     el = ExternalLocations(ws, sql_backend, inventory_schema)
-    ap = AzureResourcePermissions(ws, el)
-    ap._get_storage_resource_ids()
+    app = AzureResourcePermissions(ws, el)
+    app._get_storage_resource_ids()
