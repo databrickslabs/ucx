@@ -322,8 +322,10 @@ class AzureResourcePermissions(CrawlerBase[AzureStorageSpnPermissionMapping]):
     def _get_current_tenant_storage_accounts(self) -> Iterable[AzureStorageAccount]:
         storage_accounts = self._get_storage_accounts()
         if len(storage_accounts) == 0:
-            logger.info("There are no external table present with azure storage account. "
-                        "Please check if assessment job is run")
+            logger.info(
+                "There are no external table present with azure storage account. "
+                "Please check if assessment job is run"
+            )
         for sub in self._get_current_tenant_subscriptions():
             logger.info(f"Checking in subscription {sub.name} for storage accounts")
             path = f"/subscriptions/{sub.subscription_id}/providers/Microsoft.Storage/storageAccounts"
@@ -338,8 +340,10 @@ class AzureResourcePermissions(CrawlerBase[AzureStorageSpnPermissionMapping]):
         for sub in self._get_current_tenant_storage_accounts():
             role_assignments = self._get_role_assignments(sub.resource_id)
             if len(role_assignments) == 0:
-                logger.info(f"No spn configured for storage account {sub.name} "
-                            f"with blob reader/contributor/owner permission.")
+                logger.info(
+                    f"No spn configured for storage account {sub.name} "
+                    f"with blob reader/contributor/owner permission."
+                )
             for assignment in role_assignments:
                 storage_account_info = AzureStorageSpnPermissionMapping(
                     storage_acct_name=sub.name, spn_client_id=assignment["client_id"], role_name=assignment["role_name"]
