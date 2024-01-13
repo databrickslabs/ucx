@@ -1,5 +1,24 @@
 # Version changelog
 
+## 0.9.0
+
+* Added assessment step to estimate the size of DBFS root tables ([#741](https://github.com/databrickslabs/ucx/pull/741)).
+* Added `TableMapping` functionality to table migrate ([#752](https://github.com/databrickslabs/ucx/pull/752)).
+* Added `databricks labs ucx move` command to move tables and schemas between catalogs ([#756](https://github.com/databrickslabs/ucx/pull/756)).
+* Added functionality to determine migration method based on DBFS Root ([#759](https://github.com/databrickslabs/ucx/pull/759)).
+* Added `get_tables_to_migrate` functionality in the mapping module ([#755](https://github.com/databrickslabs/ucx/pull/755)).
+* Added retry and rate limit to rename workspace group operation and corrected rate limit for reflecting account groups to workspace ([#751](https://github.com/databrickslabs/ucx/pull/751)).
+* Adopted `databricks-labs-blueprint` library for common utilities to be reused in the other projects ([#758](https://github.com/databrickslabs/ucx/pull/758)).
+* Converted `RuntimeBackend` query executions exceptions to SDK exceptions ([#769](https://github.com/databrickslabs/ucx/pull/769)).
+* Fixed issue with missing users and temp groups after workspace-local groups migration and skip table when crawling table size if it does not exist anymore ([#770](https://github.com/databrickslabs/ucx/pull/770)).
+* Improved error handling by not failing group rename step if a group was removed from account before reflecting it to workspace ([#762](https://github.com/databrickslabs/ucx/pull/762)).
+* Improved error message inference from failed workflow runs ([#753](https://github.com/databrickslabs/ucx/pull/753)).
+* Moved `TablesMigrate` to a separate module ([#747](https://github.com/databrickslabs/ucx/pull/747)).
+* Reorganized assessment dashboard to increase readability ([#738](https://github.com/databrickslabs/ucx/pull/738)).
+* Updated databricks-sdk requirement from ~=0.16.0 to ~=0.17.0 ([#773](https://github.com/databrickslabs/ucx/pull/773)).
+* Verify metastore exists in current workspace ([#735](https://github.com/databrickslabs/ucx/pull/735)).
+
+
 ## 0.8.0
 
 * Added `databricks labs ucx repair-run --step ...` CLI command for repair run of any failed workflows, like `assessment`, `migrate-groups` etc. ([#724](https://github.com/databrickslabs/ucx/pull/724)).

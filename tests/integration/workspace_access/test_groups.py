@@ -217,11 +217,6 @@ def test_replace_workspace_groups_with_account_groups(
     make_cluster_policy_permissions,
     make_table,
 ):
-    """
-
-    Args:
-        sql_backend (object):
-    """
     ws_group, _ = make_ucx_group()
     cluster_policy = make_cluster_policy()
     make_cluster_policy_permissions(
@@ -229,7 +224,6 @@ def test_replace_workspace_groups_with_account_groups(
         permission_level=PermissionLevel.CAN_USE,
         group_name=ws_group.display_name,
     )
-    logger.info(f"Cluster policy: {ws.config.host}#setting/clusters/cluster-policies/view/{cluster_policy.policy_id}")
 
     dummy_table = make_table()
     sql_backend.execute(f"GRANT SELECT, MODIFY ON TABLE {dummy_table.full_name} TO `{ws_group.display_name}`")
@@ -285,6 +279,7 @@ def test_replace_workspace_groups_with_account_groups(
         assert "SELECT" in table_permissions[group_info.temporary_name]
 
         policy_permissions = generic_permissions.load_as_dict("cluster-policies", cluster_policy.policy_id)
+        assert group_info.temporary_name in policy_permissions
         assert PermissionLevel.CAN_USE == policy_permissions[group_info.temporary_name]
 
     check_permissions_for_backup_group()
@@ -303,6 +298,7 @@ def test_replace_workspace_groups_with_account_groups(
 
         policy_permissions = generic_permissions.load_as_dict("cluster-policies", cluster_policy.policy_id)
         assert group_info.name_in_workspace not in policy_permissions
+        assert group_info.temporary_name in policy_permissions
         assert PermissionLevel.CAN_USE == policy_permissions[group_info.temporary_name]
 
     check_permissions_after_replace()
@@ -322,6 +318,7 @@ def test_replace_workspace_groups_with_account_groups(
         assert "SELECT" in table_permissions[group_info.name_in_account]
 
         policy_permissions = generic_permissions.load_as_dict("cluster-policies", cluster_policy.policy_id)
+        assert group_info.name_in_account in policy_permissions
         assert PermissionLevel.CAN_USE == policy_permissions[group_info.name_in_account]
         assert PermissionLevel.CAN_USE == policy_permissions[group_info.temporary_name]
 
@@ -335,8 +332,11 @@ def test_replace_workspace_groups_with_account_groups(
 
         policy_permissions = generic_permissions.load_as_dict("cluster-policies", cluster_policy.policy_id)
         assert group_info.temporary_name not in policy_permissions
+        assert group_info.name_in_account in policy_permissions
+        assert PermissionLevel.CAN_USE == policy_permissions[group_info.name_in_account]
 
         table_permissions = grants.for_table_info(dummy_table)
+        assert group_info.temporary_name not in table_permissions
         assert group_info.name_in_account in table_permissions
         assert "MODIFY" in table_permissions[group_info.name_in_account]
         assert "SELECT" in table_permissions[group_info.name_in_account]

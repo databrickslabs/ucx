@@ -1,10 +1,11 @@
+import json
 from unittest.mock import MagicMock
 
 import pytest
 from _pytest.outcomes import fail
 from databricks.labs.blueprint.parallel import ManyError
 from databricks.labs.blueprint.tui import MockPrompts
-from databricks.sdk.errors import DatabricksError
+from databricks.sdk.errors import DatabricksError, ResourceDoesNotExist
 from databricks.sdk.service import iam
 from databricks.sdk.service.iam import ComplexValue, Group, ResourceMeta
 
@@ -12,6 +13,7 @@ from databricks.labs.ucx.workspace_access.groups import (
     ConfigureGroups,
     GroupManager,
     MigratedGroup,
+    MigrationState,
 )
 from tests.unit.framework.mocks import MockBackend
 
@@ -378,6 +380,32 @@ def test_reflect_account_should_fail_if_error_is_thrown():
 
     with pytest.raises(ManyError):
         gm.reflect_account_groups_on_workspace()
+
+
+def test_reflect_account_should_not_fail_if_group_not_in_the_account_anymore():
+    backend = MockBackend(rows={"SELECT": [("1", "de", "de", "test-group-de", "", "", "", "")]})
+    wsclient = MagicMock()
+    account_group1 = Group(id="11", display_name="de")
+
+    def reflect_account_side_effect(method, *args, **kwargs):
+        if method == "GET":
+            return {
+                "Resources": [g.as_dict() for g in [account_group1]],
+            }
+        if method == "PUT":
+            raise ResourceDoesNotExist(
+                "The group has been removed from the Databricks account after getting the group "
+                "and before reflecting it to the workspace."
+            )
+
+    wsclient.api_client.do.side_effect = reflect_account_side_effect
+    GroupManager(backend, wsclient, inventory_database="inv").reflect_account_groups_on_workspace()
+
+    wsclient.api_client.do.assert_called_with(
+        "PUT",
+        f"/api/2.0/preview/permissionassignments/principals/{account_group1.id}",
+        data=json.dumps({"permissions": ["USER"]}),
+    )
 
 
 def test_delete_original_workspace_groups_should_delete_relected_acc_groups_in_workspace():
@@ -778,3 +806,21 @@ def test_configure_match():
     cg.run()
     assert r"\[(#+)\]" == cg.workspace_group_regex
     assert r"\((#+)\)" == cg.account_group_regex
+
+
+def test_state():
+    groups = [
+        MigratedGroup(
+            id_in_workspace="1", name_in_workspace="test1", name_in_account="acc_test1", temporary_name="db-temp-test1"
+        )
+    ]
+
+    state = MigrationState(groups)
+
+    assert state.get_target_principal("test1") == "acc_test1"
+    assert state.get_temp_principal("test1") == "db-temp-test1"
+    assert state.is_in_scope("test1")
+
+    assert not state.get_target_principal("invalid_group_name")
+    assert not state.get_temp_principal("invalid_group_name")
+    assert not state.is_in_scope("invalid_group_name")

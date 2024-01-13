@@ -11,7 +11,7 @@ from databricks.labs.ucx.config import AccountConfig, ConnectConfig
 from databricks.labs.ucx.framework.crawlers import StatementExecutionBackend
 from databricks.labs.ucx.hive_metastore import ExternalLocations, TablesCrawler
 from databricks.labs.ucx.hive_metastore.mapping import TableMapping
-from databricks.labs.ucx.hive_metastore.table_migrate import TablesMigrate
+from databricks.labs.ucx.hive_metastore.table_migrate import TableMove, TablesMigrate
 from databricks.labs.ucx.install import WorkspaceInstaller
 from databricks.labs.ucx.installer import InstallationManager
 
@@ -64,11 +64,11 @@ def skip(w: WorkspaceClient, schema: str | None = None, table: str | None = None
         return None
     warehouse_id = installation.config.warehouse_id
     sql_backend = StatementExecutionBackend(w, warehouse_id)
-    mapping = TableMapping(w)
+    mapping = TableMapping(w, sql_backend)
     if table:
-        mapping.skip_table(sql_backend, schema, table)
+        mapping.skip_table(schema, table)
     else:
-        mapping.skip_schema(sql_backend, schema)
+        mapping.skip_schema(schema)
 
 
 @ucx.command(is_account=True)
@@ -90,7 +90,10 @@ def manual_workspace_info(w: WorkspaceClient):
 @ucx.command
 def create_table_mapping(w: WorkspaceClient):
     """create initial table mapping for review"""
-    table_mapping = TableMapping(w)
+    installation_manager = InstallationManager(w)
+    installation = installation_manager.for_user(w.current_user.me())
+    sql_backend = StatementExecutionBackend(w, installation.config.warehouse_id)
+    table_mapping = TableMapping(w, sql_backend)
     workspace_info = WorkspaceInfo(w)
     installation_manager = InstallationManager(w)
     installation = installation_manager.for_user(w.current_user.me())
@@ -121,9 +124,8 @@ def ensure_assessment_run(w: WorkspaceClient):
     if not installation:
         logger.error(CANT_FIND_UCX_MSG)
         return None
-    else:
-        workspace_installer = WorkspaceInstaller(w)
-        workspace_installer.validate_and_run("assessment")
+    workspace_installer = WorkspaceInstaller(w)
+    workspace_installer.validate_and_run("assessment")
 
 
 @ucx.command
@@ -155,12 +157,45 @@ def revert_migrated_tables(w: WorkspaceClient, schema: str, table: str, *, delet
     warehouse_id = installation.config.warehouse_id
     sql_backend = StatementExecutionBackend(w, warehouse_id)
     table_crawler = TablesCrawler(sql_backend, installation.config.inventory_database)
-    tmp = TableMapping(w)
+    tmp = TableMapping(w, sql_backend)
     tm = TablesMigrate(table_crawler, w, sql_backend, tmp)
     if tm.print_revert_report(delete_managed=delete_managed) and prompts.confirm(
         "Would you like to continue?", max_attempts=2
     ):
         tm.revert_migrated_tables(schema, table, delete_managed=delete_managed)
+
+
+@ucx.command
+def move(
+    w: WorkspaceClient,
+    from_catalog: str,
+    from_schema: str,
+    from_table: str,
+    to_catalog: str,
+    to_schema: str,
+):
+    """move a uc table/tables from one schema to another schema in same or different catalog"""
+    logger.info("Running move command")
+    prompts = Prompts()
+    installation_manager = InstallationManager(w)
+    installation = installation_manager.for_user(w.current_user.me())
+    if not installation:
+        logger.error(CANT_FIND_UCX_MSG)
+        return
+    sql_backend = StatementExecutionBackend(w, installation.config.warehouse_id)
+    tables = TableMove(w, sql_backend)
+    if from_catalog == "" or to_catalog == "":
+        logger.error("Please enter from_catalog and to_catalog details")
+        return
+    if from_schema == "" or to_schema == "" or from_table == "":
+        logger.error("Please enter from_schema, to_schema and from_table(enter * for migrating all tables) details.")
+        return
+    if from_catalog == to_catalog and from_schema == to_schema:
+        logger.error("please select a different schema or catalog to migrate to")
+        return
+    del_table = prompts.confirm(f"should we delete tables/view after moving to new schema {to_catalog}.{to_schema}")
+    logger.info(f"migrating tables {from_table} from {from_catalog}.{from_schema} to {to_catalog}.{to_schema}")
+    tables.move_tables(from_catalog, from_schema, from_table, to_catalog, to_schema, del_table)
 
 
 if "__main__" == __name__:

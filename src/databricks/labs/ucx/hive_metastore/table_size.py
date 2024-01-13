@@ -40,9 +40,12 @@ class TableSizeCrawler(CrawlerBase):
         for table in self._tables_crawler.snapshot():
             if not table.kind == "TABLE":
                 continue
-            if not table.is_dbfs_root():
+            if not table.is_dbfs_root:
                 continue
-            size_in_bytes = self.get_table_size(table.key)
+            size_in_bytes = self._safe_get_table_size(table.key)
+            if size_in_bytes is None:
+                continue  # table does not exist anymore or is corrupted
+
             yield TableSize(
                 catalog=table.catalog, database=table.database, name=table.name, size_in_bytes=size_in_bytes
             )
@@ -55,12 +58,22 @@ class TableSizeCrawler(CrawlerBase):
     def snapshot(self) -> list[TableSize]:
         """
         Takes a snapshot of tables in the specified catalog and database.
+        Return None if the table cannot be found anymore.
 
         Returns:
             list[Table]: A list of Table objects representing the snapshot of tables.
         """
         return self._snapshot(partial(self._try_load), partial(self._crawl))
 
-    def get_table_size(self, table_full_name: str) -> int:
+    def _safe_get_table_size(self, table_full_name: str) -> int | None:
         logger.debug(f"Evaluating {table_full_name} table size.")
-        return self._spark._jsparkSession.table(table_full_name).queryExecution().analyzed().stats().sizeInBytes()
+        try:
+            return self._spark._jsparkSession.table(table_full_name).queryExecution().analyzed().stats().sizeInBytes()
+        except Exception as e:
+            if "[TABLE_OR_VIEW_NOT_FOUND]" in str(e):
+                logger.warning(f"Failed to evaluate {table_full_name} table size. Table not found.")
+                return None
+            if "[DELTA_MISSING_TRANSACTION_LOG]" in str(e):
+                logger.warning(f"Delta table {table_full_name} is corrupted: missing transaction log.")
+                return None
+            raise RuntimeError(str(e)) from e

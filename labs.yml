@@ -66,3 +66,17 @@ commands:
       - name: delete_managed
         description: Revert and delete managed tables
 
+
+  - name: move
+    description: move tables across schema/catalog withing a UC metastore
+    flags:
+      - name: from-catalog
+        description: from catalog name
+      - name: from-schema
+        description: schema name to migrate.
+      - name: from-table
+        description: table names to migrate. enter * to migrate all tables
+      - name: to-catalog
+        description: target catalog to migrate schema to
+      - name: to-schema
+        description: target schema to migrate tables to

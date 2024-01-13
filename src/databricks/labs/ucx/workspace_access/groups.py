@@ -68,6 +68,12 @@ class MigrationState:
             return None
         return mg.name_in_account
 
+    def get_temp_principal(self, name: str) -> str | None:
+        mg = self._name_to_group.get(name)
+        if mg is None:
+            return None
+        return mg.temporary_name
+
     def is_in_scope(self, name: str) -> bool:
         if name is None:
             return False
@@ -506,6 +512,10 @@ class GroupManager(CrawlerBase[MigratedGroup]):
             return True
         except BadRequest:
             # already exists
+            return True
+        except NotFound:
+            # the given group has been removed from the account after getting the group and before running this method
+            logger.warning("Group with ID: %s does not exist anymore in the Databricks account.", account_group_id)
             return True
 
     def _get_strategy(

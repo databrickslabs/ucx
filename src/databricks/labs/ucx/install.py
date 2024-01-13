@@ -2,6 +2,7 @@ import functools
 import json
 import logging
 import os
+import re
 import sys
 import time
 import webbrowser
@@ -12,15 +13,33 @@ from typing import Any
 import yaml
 from databricks.labs.blueprint.entrypoint import get_logger
 from databricks.labs.blueprint.installer import InstallState
-from databricks.labs.blueprint.parallel import Threads
+from databricks.labs.blueprint.parallel import ManyError, Threads
 from databricks.labs.blueprint.tui import Prompts
 from databricks.labs.blueprint.wheels import ProductInfo, Wheels, find_project_root
 from databricks.sdk import WorkspaceClient
 from databricks.sdk.errors import (
+    Aborted,
+    AlreadyExists,
+    BadRequest,
+    Cancelled,
+    DatabricksError,
+    DataLoss,
+    DeadlineExceeded,
+    InternalError,
     InvalidParameterValue,
     NotFound,
+    NotImplemented,
     OperationFailed,
     PermissionDenied,
+    RequestLimitExceeded,
+    ResourceAlreadyExists,
+    ResourceConflict,
+    ResourceDoesNotExist,
+    ResourceExhausted,
+    TemporarilyUnavailable,
+    TooManyRequests,
+    Unauthenticated,
+    Unknown,
 )
 from databricks.sdk.service import compute, jobs
 from databricks.sdk.service.jobs import RunLifeCycleState, RunResultState
@@ -248,16 +267,18 @@ class WorkspaceInstaller:
         job_run_waiter = self._ws.jobs.run_now(job_id)
         try:
             job_run_waiter.result()
-        except OperationFailed:
+        except OperationFailed as err:
             # currently we don't have any good message from API, so we have to work around it.
             job_run = self._ws.jobs.get_run(job_run_waiter.run_id)
-            messages = []
+            errors: list[DatabricksError] = []
+            timeouts: list[DeadlineExceeded] = []
             assert job_run.tasks is not None
             for run_task in job_run.tasks:
                 if not run_task.state:
                     continue
                 if run_task.state.result_state == jobs.RunResultState.TIMEDOUT:
-                    messages.append(f"{run_task.task_key}: The run was stopped after reaching the timeout")
+                    msg = f"{run_task.task_key}: The run was stopped after reaching the timeout"
+                    timeouts.append(DeadlineExceeded(msg))
                     continue
                 if run_task.state.result_state != jobs.RunResultState.FAILED:
                     continue
@@ -267,13 +288,51 @@ class WorkspaceInstaller:
                     if run_output and run_output.error_trace:
                         sys.stderr.write(run_output.error_trace)
                 if run_output and run_output.error:
-                    messages.append(f"{run_task.task_key}: {run_output.error}")
-                else:
-                    messages.append(f"{run_task.task_key}: output unavailable")
+                    errors.append(self._infer_task_exception(f"{run_task.task_key}: {run_output.error}"))
             assert job_run.state is not None
             assert job_run.state.state_message is not None
-            msg = f'{job_run.state.state_message.rstrip(".")}: {", ".join(messages)}'
-            raise OperationFailed(msg) from None
+            if len(errors) == 1:
+                raise errors[0] from err
+            all_errors = errors + timeouts
+            if len(all_errors) == 0:
+                raise Unknown(job_run.state.state_message) from err
+            raise ManyError(all_errors) from err
+
+    @staticmethod
+    def _infer_task_exception(haystack: str) -> DatabricksError:
+        needles = [
+            BadRequest,
+            Unauthenticated,
+            PermissionDenied,
+            NotFound,
+            ResourceConflict,
+            TooManyRequests,
+            Cancelled,
+            InternalError,
+            NotImplemented,
+            TemporarilyUnavailable,
+            DeadlineExceeded,
+            InvalidParameterValue,
+            ResourceDoesNotExist,
+            Aborted,
+            AlreadyExists,
+            ResourceAlreadyExists,
+            ResourceExhausted,
+            RequestLimitExceeded,
+            Unknown,
+            DataLoss,
+        ]
+        constructors: dict[re.Pattern, type[DatabricksError]] = {
+            re.compile(r".*\[TABLE_OR_VIEW_NOT_FOUND] (.*)"): NotFound,
+            re.compile(r".*\[SCHEMA_NOT_FOUND] (.*)"): NotFound,
+        }
+        for klass in needles:
+            constructors[re.compile(f".*{klass.__name__}: (.*)")] = klass
+        for pattern, klass in constructors.items():
+            match = pattern.match(haystack)
+            if match:
+                return klass(match.group(1))
+        return Unknown(haystack)
 
     def _create_dashboards(self):
         logger.info("Creating dashboards...")
