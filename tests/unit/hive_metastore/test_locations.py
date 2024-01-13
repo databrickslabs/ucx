@@ -46,6 +46,20 @@ def test_list_mounts_should_return_a_deduped_list_of_mount_without_encryption_ty
     assert expected == backend.rows_written_for("hive_metastore.test.mounts", "append")
 
 
+def test_list_mounts_should_return_a_deduped_list_of_mount_without_variable_volume_names():
+    mounts = [
+        Mount(name="/Volume", source="DbfsReserved"),
+        Mount(name="/Volumes", source="DbfsReserved"),
+        Mount(name="/volume", source="DbfsReserved"),
+        Mount(name="/volumes", source="DbfsReserved"),
+    ]
+    client = MagicMock()
+    backend = MockBackend()
+    mount_list = Mounts(backend, client, "test")._deduplicate_mounts(mounts)
+
+    assert mount_list == [Mount("/Volume", "DbfsReserved")]
+
+
 def test_external_locations():
     crawler = ExternalLocations(Mock(), MockBackend(), "test")
     row_factory = type("Row", (Row,), {"__columns__": ["location", "storage_properties"]})
