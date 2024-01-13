@@ -58,7 +58,7 @@ class AzureStorageAccount:
 class AzureStorageSpnPermissionMapping:
     storage_acct_name: str
     spn_client_id: str
-    permission_list: list[str]
+    role_name: str
 
 
 class AzureServicePrincipalCrawler(CrawlerBase[AzureServicePrincipalInfo]):
@@ -288,13 +288,17 @@ def _credentials(cfg: Config):
     return inner
 
 
-class AzureResourcePermissions:
-    def __init__(self, ws: WorkspaceClient, lc: ExternalLocations):
+class AzureResourcePermissions(CrawlerBase[AzureStorageSpnPermissionMapping]):
+    def __init__(self, ws: WorkspaceClient, lc: ExternalLocations, sql_backend: SqlBackend, inventory_schema: str):
+        super().__init__(
+            sql_backend, "hive_metastore", inventory_schema, "azure_storage_accounts", AzureStorageSpnPermissionMapping
+        )
         self._rm_host = ws.config.arm_environment.resource_manager_endpoint
         self._resource_manager = ApiClient(Config(host=self._rm_host, credentials_provider=_credentials))
+        self._backend = sql_backend
         self._token_source = AzureCliTokenSource(self._rm_host)
         self._locations = lc
-        self._role_definitions = {}
+        self._role_definitions = {}  # type: dict[str, str]
 
     def _get_subscriptions(self) -> Iterable[AzureSubscription]:
         for sub in self._get("/subscriptions", api_version="2022-12-01").get("value", []):
@@ -326,43 +330,41 @@ class AzureResourcePermissions:
                         name=storage["name"], resource_id=storage["id"], subscription_id=sub["subscriptionId"]
                     )
 
-    def _get_permission_info(self, assignment: list[str]):
-        for sub in self._get_current_tenant_storage_accounts():
-            role_assignments = self._get_role_assignments(sub.resource_id)
-            for assignment in role_assignments:
-                permission_info = self._get_permission_info(assignment)
-                yield AzureStorageSpnPermissionMapping(
-                    storage_acct_name=sub.name, spn_client_id=permission_info.client_id
-                )
-            path = f"/subscriptions/{sub.subscription_id}/providers/Microsoft.Storage/storageAccounts"
-            # TODO
-            # for storage in self._get(path, "2023-01-01").get("value", []):
-
     def save_spn_permissions(self):
+        storage_account_infos = []
         for sub in self._get_current_tenant_storage_accounts():
             role_assignments = self._get_role_assignments(sub.resource_id)
             for assignment in role_assignments:
-                pass
-            # TODO
-            yield AzureStorageSpnPermissionMapping(storage_acct_name=sub.name, spn_client_id=permission_info.client_i)
-            path = f"/subscriptions/{sub.subscription_id}/providers/Microsoft.Storage/storageAccounts"
+                storage_account_info = AzureStorageSpnPermissionMapping(
+                    storage_acct_name=sub.name, spn_client_id=assignment["client_id"], role_name=assignment["role_name"]
+                )
+                storage_account_infos.append(storage_account_info)
+        self._append_records(storage_account_infos)
 
     def _get_role_assignments(self, resource_id: str):
         """See https://learn.microsoft.com/en-us/rest/api/authorization/role-assignments/list-for-resource"""
         role_assignments = []
         permission_info = {}
 
-        result = self._get(f"{resource_id}/providers/Microsoft.Authorization/roleAssignments")
+        result = self._get(f"{resource_id}/providers/Microsoft.Authorization/roleAssignments", "2022-04-01")
         for ra in result.get("value", []):
             principal_type = ra.get("properties", {"principalType": None})["principalType"]
             if principal_type == "ServicePrincipal":
+                spn_client_id = ra.get("properties", {"principalId": None})["principalType"]
                 role_definition_id = ra.get("properties", {"roleDefinitionId": None})["roleDefinitionId"]
                 if role_definition_id not in self._role_definitions:
-                    role_name = self._get(role_definition_id).get("roleName", "")
+                    role_name = self._get(role_definition_id, "2022-04-01").get("roleName", None)
                     self._role_definitions[role_definition_id] = role_name
-                    # TODO
-                permission_info["roleDefinition"] = self._role_definitions[role_definition_id]
-            role_assignments.append(ra)
+                else:
+                    role_name = self._role_definitions[role_definition_id]
+                if role_name in [
+                    "Storage Blob Data Contributor",
+                    "Storage Blob Data Owner",
+                    "Storage Blob Data Reader",
+                ]:
+                    permission_info["client_id"] = spn_client_id
+                    permission_info["role_name"] = role_name
+            role_assignments.append(permission_info)
         return role_assignments
 
     def _get(self, path: str, api_version: str):
