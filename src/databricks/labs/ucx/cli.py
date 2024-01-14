@@ -144,6 +144,9 @@ def validate_groups_membership(w: WorkspaceClient):
     """Validate the groups to see if the groups at account level and workspace level has different membership"""
     installation_manager = InstallationManager(w)
     installation = installation_manager.for_user(w.current_user.me())
+    if not installation:
+        logger.error(CANT_FIND_UCX_MSG)
+        return None
     warehouse_id = installation.config.warehouse_id
     inventory_database = installation.config.inventory_database
     renamed_group_prefix = installation.config.renamed_group_prefix
@@ -152,10 +155,7 @@ def validate_groups_membership(w: WorkspaceClient):
     account_group_regex = installation.config.account_group_regex
     include_group_names = installation.config.include_group_names
     sql_backend = StatementExecutionBackend(w, warehouse_id)
-    if not installation:
-        logger.error(CANT_FIND_UCX_MSG)
-        return None
-    logger.info("Validating Groups which are having different memberships between account and workspace level")
+    logger.info("Validating Groups which are having different memberships between account and workspace")
     group_manager = GroupManager(
         sql_backend=sql_backend,
         ws=w,

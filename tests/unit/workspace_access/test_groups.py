@@ -824,3 +824,62 @@ def test_state():
     assert not state.get_target_principal("invalid_group_name")
     assert not state.get_temp_principal("invalid_group_name")
     assert not state.is_in_scope("invalid_group_name")
+
+
+def test_validate_group_diff_membership():
+    backend = MockBackend()
+    wsclient = MagicMock()
+    group = Group(
+        id="1",
+        external_id="1234",
+        display_name="test_(1234)",
+        meta=ResourceMeta(resource_type="WorkspaceGroup"),
+        members=[ComplexValue(display="test-user-1", value="20"), ComplexValue(display="test-user-2", value="21")],
+        roles=[
+            ComplexValue(value="arn:aws:iam::123456789098:instance-profile/ip1"),
+            ComplexValue(value="arn:aws:iam::123456789098:instance-profile/ip2"),
+        ],
+        entitlements=[ComplexValue(value="allow-cluster-create"), ComplexValue(value="allow-instance-pool-create")],
+    )
+    wsclient.groups.list.return_value = [group]
+    wsclient.groups.get.return_value = group
+    account_admins_group = Group(id="1234", external_id="1234", display_name="ac_test_1234")
+    wsclient.api_client.do.return_value = {
+        "Resources": [g.as_dict() for g in [account_admins_group]],
+    }
+    grp_membership = GroupManager(
+        backend, wsclient, inventory_database="inv", workspace_group_regex=r"\(([1-9]+)\)", account_group_regex="[1-9]+"
+    ).validate_group_membership()
+    assert grp_membership == [{"wf_group_name": "test_(1234)", "ac_group_name": "ac_test_1234"}]
+
+
+def test_validate_group_same_membership():
+    backend = MockBackend()
+    wsclient = MagicMock()
+    group = Group(
+        id="1",
+        external_id="1234",
+        display_name="test_(1234)",
+        meta=ResourceMeta(resource_type="WorkspaceGroup"),
+        members=[ComplexValue(display="test-user-1", value="01"), ComplexValue(display="test-user-2", value="02")],
+        roles=[
+            ComplexValue(value="arn:aws:iam::123456789098:instance-profile/test_ip1"),
+            ComplexValue(value="arn:aws:iam::123456789098:instance-profile/test_ip2"),
+        ],
+        entitlements=[ComplexValue(value="allow-cluster-create"), ComplexValue(value="allow-instance-pool-create")],
+    )
+    wsclient.groups.list.return_value = [group]
+    wsclient.groups.get.return_value = group
+    account_admins_group = Group(
+        id="1234",
+        external_id="1234",
+        display_name="ac_test_1234",
+        members=[ComplexValue(display="test-user-1", value="01"), ComplexValue(display="test-user-2", value="02")],
+    )
+    wsclient.api_client.do.return_value = {
+        "Resources": [g.as_dict() for g in [account_admins_group]],
+    }
+    grp_membership = GroupManager(
+        backend, wsclient, inventory_database="inv", workspace_group_regex=r"\(([1-9]+)\)", account_group_regex="[1-9]+"
+    ).validate_group_membership()
+    assert grp_membership == []

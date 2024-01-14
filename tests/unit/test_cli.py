@@ -121,3 +121,11 @@ def test_validate_groups_membership(mocker, caplog):
     assert caplog.messages == [
         "Validating Groups which are having different memberships between account and workspace level"
     ]
+
+
+def test_validate_group_no_ucx(mocker, caplog):
+    w = create_autospec(WorkspaceClient)
+    w.current_user.me = lambda: iam.User(user_name="test_user", groups=[iam.ComplexValue(display="admins")])
+    mocker.patch("databricks.labs.ucx.installer.InstallationManager.for_user", return_value=None)
+    validate_groups_membership(w)
+    assert "Couldn't find UCX configuration" in caplog.messages[0]
