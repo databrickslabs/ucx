@@ -2,7 +2,7 @@
 # Setup UCX from Databricks web terminal
 
 - Start an *Unassigned* interactive cluster
-- Create a new notebook to attch to the cluster
+- Create a new notebook to attach to the cluster
 - Open a web terminal, expand to full page for better readability
 
 - Install / setup needed UCX dependencies
