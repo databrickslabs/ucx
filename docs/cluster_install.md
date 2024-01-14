@@ -1,6 +1,6 @@
 # Setup UCX from Databricks web terminal
-
-- Start an *Unassigned* interactive cluster
+For cases when your desktop or laptop will not support the `databricks labs install ucx` technical requirements such as Python 3.10, administrative access, python package access or network access but your Databricks cluster will have the internet access requirements same as described in the main README.md document.
+- Start an *Unassigned* interactive cluster 
 - Create a new notebook to attach to the cluster
 - Open the web terminal, expand to full page for better readability
 
