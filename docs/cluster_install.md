@@ -11,7 +11,7 @@ apt install python3.10-venv
 unset DATABRICKS_RUNTIME_VERSION
 ```
 
-Download and install databricks cli
+Download and install Databricks cli
 
 ```shell
 curl -fsSL https://raw.githubusercontent.com/databricks/setup-cli/main/install.sh | sh
@@ -23,14 +23,14 @@ Set PATH variable to point to new install
 export PATH=/usr/local/bin:$PATH
 ```
 
-Verify databricks cli
+Verify Databricks cli
 
 ```shell
 which databricks
 databricks --version
 ```
 
-Configure databricks cli to authenticate to correct workspace, add host name and PAT token
+Configure Databricks cli to authenticate to correct workspace, add host name and PAT token
 ```shell
 databricks configure
 ```
