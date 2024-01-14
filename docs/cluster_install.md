@@ -1,9 +1,8 @@
-
 # Setup UCX from Databricks web terminal
 
 - Start an *Unassigned* interactive cluster
 - Create a new notebook to attach to the cluster
-- Open a web terminal, expand to full page for better readability
+- Open the web terminal, expand to full page for better readability
 
 Install / setup needed UCX dependencies
 
@@ -40,7 +39,7 @@ Add account level config
 ```shell
 vi ~/.databrickcfg
 ```
-and based on your cloud provider, add
+and based on your cloud provider, add these config sections to `~/.databrickscfg` with your Databricks account_id
 ```ini
 [AZUCX]
 host       = https://accounts.azuredatabricks.net
@@ -53,14 +52,14 @@ host = https://accounts.cloud.databricks.com
 account_id = beefdead-beef-dead-beef-beefdeadbeef
 ```
 
-Verify configuration and databricks labs
+Verify configuration, connection and Databricks labs
 ```shell
 databricks auth env
 databricks clusters list
 databricks labs list
 ```
 
-Install UCX, do not select options to open config or README
+Install UCX, do not select options to open config.yml or README.py in a browser
 ```shell
 databricks labs install ucx
 ```
