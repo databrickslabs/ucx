@@ -6,41 +6,61 @@
 - Open a web terminal, expand to full page for better readability
 
 - Install / setup needed UCX dependencies
-`apt install python3.10-venv`
-`unset DATABRICKS_RUNTIME_VERSION`
+
+```shell
+apt install python3.10-venv
+unset DATABRICKS_RUNTIME_VERSION
+```
 
 - Download and install databricks cli
-`curl -fsSL https://raw.githubusercontent.com/databricks/setup-cli/main/install.sh | sh`
+
+```shell
+curl -fsSL https://raw.githubusercontent.com/databricks/setup-cli/main/install.sh | sh
+```
 
 - Set PATH variable to point to new install
-`export PATH=/usr/local/bin:$PATH`
+
+```shell
+export PATH=/usr/local/bin:$PATH
+```
 
 - Verify databricks cli
-`which databricks`
-`databricks --version`
+
+```shell
+which databricks
+databricks --version
+```
 
 - Configure databricks cli to authenticate to correct workspace, add host name and PAT token
-`databricks configure`
+```shell
+databricks configure
+```
 
 - add account level config
-`vi ~/.databrickcfg`
-and depending on your cloud, add
+```shell
+vi ~/.databrickcfg
 ```
+and based on your cloud provider, add
+```ini
 [AZUCX]
 host       = https://accounts.azuredatabricks.net
 account_id = beefdead-beef-dead-9999-beefdeadbeef
 ```
 or
-```
+```ini
 [AWSUCX]
 host = https://accounts.cloud.databricks.com
 account_id = beefdead-beef-dead-beef-beefdeadbeef
 ```
 
 - Verify configuration and databricks labs
-`databricks auth env`
-`databricks clusters list`
-`databricks labs list`
+```shell
+databricks auth env
+databricks clusters list
+databricks labs list
+```
 
 - Install UCX, do not select options to open config or README
-`databricks labs install ucx`
+```shell
+databricks labs install ucx
+```
