@@ -155,6 +155,7 @@ def validate_groups_membership(w: WorkspaceClient):
     if not installation:
         logger.error(CANT_FIND_UCX_MSG)
         return None
+    logger.info("Validating Groups which are having different memberships between account and workspace level")
     group_manager = GroupManager(
         sql_backend=sql_backend,
         ws=w,
@@ -166,9 +167,7 @@ def validate_groups_membership(w: WorkspaceClient):
         account_group_regex=account_group_regex,
     )
     mismatch_groups = group_manager.validate_group_membership()
-
-    if mismatch_groups:
-        print(json.dumps(mismatch_groups))
+    print(json.dumps(mismatch_groups))
 
 
 @ucx.command

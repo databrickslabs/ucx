@@ -5,7 +5,9 @@ from databricks.sdk.errors import NotFound
 from databricks.sdk.service import iam
 from databricks.sdk.service.iam import User
 
-from databricks.labs.ucx.cli import move, repair_run, skip
+from databricks.labs.ucx.cli import move, repair_run, skip, validate_groups_membership
+from databricks.labs.ucx.config import WorkspaceConfig
+from databricks.labs.ucx.installer import Installation
 
 
 def test_skip_no_schema(caplog):
@@ -87,3 +89,35 @@ def test_move(mocker, caplog, monkeypatch):
     with patch("databricks.labs.ucx.hive_metastore.table_migrate.TableMove.move_tables", return_value=None) as m:
         move(w, "SrcC", "SrcS", "*", "TgtC", "ToS")
         m.assert_called_once()
+
+
+def test_validate_groups_membership(mocker, caplog):
+    w = create_autospec(WorkspaceClient)
+    inst_data = Installation(
+        config=WorkspaceConfig(
+            inventory_database="test_database",
+            workspace_group_regex=None,
+            workspace_group_replace=None,
+            account_group_regex=None,
+            group_match_by_external_id=False,
+            include_group_names=None,
+            renamed_group_prefix="db-temp-",
+            warehouse_id="test_id",
+            database_to_catalog_mapping=None,
+            default_catalog="ucx_default",
+        ),
+        user="test_user",
+        path="/Users/test_userd@databricks.com/.ucx",
+    )
+    w.current_user.me = lambda: iam.User(user_name="me@example.com", groups=[iam.ComplexValue(display="admins")])
+    mocker.patch("databricks.labs.ucx.installer.InstallationManager.__init__", return_value=None)
+    mocker.patch("databricks.labs.ucx.installer.InstallationManager.for_user", return_value=inst_data)
+    mocker.patch("databricks.labs.ucx.workspace_access.groups.GroupManager.__init__", return_value=None)
+    mocker.patch(
+        "databricks.labs.ucx.workspace_access.groups.GroupManager.validate_group_membership",
+        return_value={"wf_group_name": "test_group", "ac_group_name": "test_group"},
+    )
+    validate_groups_membership(w)
+    assert caplog.messages == [
+        "Validating Groups which are having different memberships between account and workspace level"
+    ]
