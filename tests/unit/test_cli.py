@@ -118,9 +118,7 @@ def test_validate_groups_membership(mocker, caplog):
         return_value={"wf_group_name": "test_group", "ac_group_name": "test_group"},
     )
     validate_groups_membership(w)
-    assert caplog.messages == [
-        "Validating Groups which are having different memberships between account and workspace"
-    ]
+    assert caplog.messages == ["Validating Groups which are having different memberships between account and workspace"]
 
 
 def test_validate_group_no_ucx(mocker, caplog):
