@@ -206,7 +206,7 @@ class Mounts(CrawlerBase[Mount]):
         seen = set()
         deduplicated_mounts = []
         for obj in mounts:
-            if "volume" in obj.name.lower():
+            if "dbfsreserved" in obj.source.lower():
                 obj_tuple = ("/Volume", obj.source)
             else:
                 obj_tuple = (obj.name, obj.source)

@@ -47,17 +47,24 @@ def test_list_mounts_should_return_a_deduped_list_of_mount_without_encryption_ty
 
 
 def test_list_mounts_should_return_a_deduped_list_of_mount_without_variable_volume_names():
-    mounts = [
-        Mount(name="/Volume", source="DbfsReserved"),
-        Mount(name="/Volumes", source="DbfsReserved"),
-        Mount(name="/volume", source="DbfsReserved"),
-        Mount(name="/volumes", source="DbfsReserved"),
-    ]
     client = MagicMock()
-    backend = MockBackend()
-    mount_list = Mounts(backend, client, "test")._deduplicate_mounts(mounts)
+    client.dbutils.fs.mounts.return_value = [
+        MountInfo("/Volume", "DbfsReserved", "info_1"),
+        MountInfo("/Volumes", "DbfsReserved", "info_2"),
+        MountInfo("/volume", "DbfsReserved", "info_3"),
+        MountInfo("/volumes", "DbfsReserved", "info_4"),
+        MountInfo("mp_1", "path_1", "info_1"),
+        MountInfo("mp_2", "path_2", "info_2"),
+        MountInfo("mp_2", "path_2", "info_2"),
+    ]
 
-    assert mount_list == [Mount("/Volume", "DbfsReserved")]
+    backend = MockBackend()
+    instance = Mounts(backend, client, "test")
+
+    instance.inventorize_mounts()
+
+    expected = [Mount("/Volume", "DbfsReserved"), Mount("mp_1", "path_1"), Mount("mp_2", "path_2")]
+    assert expected == backend.rows_written_for("hive_metastore.test.mounts", "append")
 
 
 def test_external_locations():
