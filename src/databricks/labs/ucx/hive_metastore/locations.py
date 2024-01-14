@@ -205,9 +205,11 @@ class Mounts(CrawlerBase[Mount]):
     def _deduplicate_mounts(self, mounts: list) -> list:
         seen = set()
         deduplicated_mounts = []
-
         for obj in mounts:
-            obj_tuple = (obj.name, obj.source)
+            if "dbfsreserved" in obj.source.lower():
+                obj_tuple = ("/Volume", obj.source)
+            else:
+                obj_tuple = (obj.name, obj.source)
             if obj_tuple not in seen:
                 seen.add(obj_tuple)
                 deduplicated_mounts.append(obj)
