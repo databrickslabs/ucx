@@ -119,7 +119,7 @@ def test_validate_groups_membership(mocker, caplog):
     )
     validate_groups_membership(w)
     assert caplog.messages == [
-        "Validating Groups which are having different memberships between account and workspace level"
+        "Validating Groups which are having different memberships between account and workspace"
     ]
 
 
