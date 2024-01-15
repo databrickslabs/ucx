@@ -143,6 +143,7 @@ def test_azure_storage_accounts(ws, sql_backend, inventory_schema):
         assert acct.name == "labsazurethings"
 
 
+@pytest.mark.dependency(depends=["test_azure_storage_accounts"])
 def test_save_spn_permissions(ws, sql_backend, inventory_schema):
     logger = logging.getLogger(__name__)
     logger.setLevel("DEBUG")
