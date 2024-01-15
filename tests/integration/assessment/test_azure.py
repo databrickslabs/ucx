@@ -140,3 +140,19 @@ def test_azure_storage_accounts(ws, sql_backend, inventory_schema):
     az_res_perm = AzureResourcePermissions(ws, location, sql_backend, inventory_schema)
     for acct in az_res_perm._get_current_tenant_storage_accounts():
         assert acct.name == "labsazurethings"
+
+
+def test_save_spn_permissions(ws, sql_backend, inventory_schema):
+    logger = logging.getLogger(__name__)
+    logger.setLevel("DEBUG")
+    tables = [
+        ExternalLocation("abfss://things@labsazurethings.dfs.core.windows.net/folder1", 1),
+    ]
+    sql_backend.save_table(f"{inventory_schema}.external_locations", tables, ExternalLocation)
+    location = ExternalLocations(ws, sql_backend, inventory_schema)
+    az_res_perm = AzureResourcePermissions(ws, location, sql_backend, inventory_schema)
+    az_res_perm.save_spn_permissions()
+    sql_query = "SELECT storage_acct_name, spn_client_id, role_name"
+    results = sql_backend.fetch(sql_query)
+    for r in results:
+        assert r.name == "labsazurethings"
