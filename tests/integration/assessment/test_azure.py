@@ -172,7 +172,7 @@ def test_save_spn_permissions_local(ws, sql_backend, inventory_schema):
     logger = logging.getLogger(__name__)
     logger.setLevel("DEBUG")
     tables = [
-        ExternalLocation("abfss://deltalake@oneenvadls.dfs.core.windows.net/folder1", 1),
+        ExternalLocation("enterpath", 1),
     ]
     sql_backend.save_table(f"{inventory_schema}.external_locations", tables, ExternalLocation)
     location = ExternalLocations(ws, sql_backend, inventory_schema)
@@ -185,4 +185,4 @@ def test_save_spn_permissions_local(ws, sql_backend, inventory_schema):
     results = sql_backend.fetch(sql_query)
     for r in results:
         m = AzureStorageSpnPermissionMapping(*r)
-        assert m.storage_acct_name == "oneenvadls"
+        assert m.storage_acct_name == "enter storage account name"

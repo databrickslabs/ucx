@@ -56,7 +56,9 @@ class AzureStorageAccount:
 
 @dataclass
 class AzureStorageSpnPermissionMapping:
-    storage_acct_name: str
+    object_name: str
+    object_type: str
+    object_url: str
     spn_client_id: str
     role_name: str
 
@@ -300,9 +302,11 @@ class AzureResourcePermissions(CrawlerBase[AzureStorageSpnPermissionMapping]):
         self._role_definitions = {}  # type: dict[str, str]
 
     def _get_subscriptions(self) -> Iterable[AzureSubscription]:
-        for sub in self._get("/subscriptions", api_version="2022-12-01").get("value", []):
+        for subscription in self._get("/subscriptions", api_version="2022-12-01").get("value", []):
             yield AzureSubscription(
-                name=sub["displayName"], subscription_id=sub["subscriptionId"], tenant_id=sub["tenantId"]
+                name=subscription["displayName"],
+                subscription_id=subscription["subscriptionId"],
+                tenant_id=subscription["tenantId"],
             )
 
     def _tenant_id(self):
@@ -314,10 +318,10 @@ class AzureResourcePermissions(CrawlerBase[AzureStorageSpnPermissionMapping]):
 
     def _get_current_tenant_subscriptions(self):
         tenant_id = self._tenant_id()
-        for sub in self._get_subscriptions():
-            if sub.tenant_id != tenant_id:
+        for subscription in self._get_subscriptions():
+            if subscription.tenant_id != tenant_id:
                 continue
-            yield sub
+            yield subscription
 
     def _get_current_tenant_storage_accounts(self) -> Iterable[AzureStorageAccount]:
         storage_accounts = self._get_storage_accounts()
@@ -327,35 +331,38 @@ class AzureResourcePermissions(CrawlerBase[AzureStorageSpnPermissionMapping]):
                 "Please check if assessment job is run"
             )
             return
-        for sub in self._get_current_tenant_subscriptions():
-            logger.info(f"Checking in subscription {sub.name} for storage accounts")
-            path = f"/subscriptions/{sub.subscription_id}/providers/Microsoft.Storage/storageAccounts"
+        for subscription in self._get_current_tenant_subscriptions():
+            logger.info(f"Checking in subscription {subscription.name} for storage accounts")
+            path = f"/subscriptions/{subscription.subscription_id}/providers/Microsoft.Storage/storageAccounts"
             for storage in self._get(path, "2023-01-01").get("value", []):
                 if storage["name"] in storage_accounts:
                     yield AzureStorageAccount(
-                        name=storage["name"], resource_id=storage["id"], subscription_id=sub.subscription_id
+                        name=storage["name"], resource_id=storage["id"], subscription_id=subscription.subscription_id
                     )
 
     def save_spn_permissions(self):
         storage_account_infos = []
-        for sub in self._get_current_tenant_storage_accounts():
-            logger.info(f"Fetching role assignment for {sub.name}")
-            role_assignments = self._get_role_assignments(sub.resource_id)
+        for storage in self._get_current_tenant_storage_accounts():
+            logger.info(f"Fetching role assignment for {storage.name}")
+            role_assignments = self._get_role_assignments(storage.resource_id)
             if len(role_assignments) == 0:
                 logger.info(
-                    f"No spn configured for storage account {sub.name} "
+                    f"No spn configured for storage account {storage.name} "
                     f"with blob reader/contributor/owner permission."
                 )
                 continue
             for assignment in role_assignments:
                 storage_account_info = AzureStorageSpnPermissionMapping(
-                    storage_acct_name=sub.name, spn_client_id=assignment["client_id"], role_name=assignment["role_name"]
+                    object_name=storage.name,
+                    object_type="STORAGE",
+                    object_url=f"https://{storage.name}.dfs.core.windows.net/",
+                    spn_client_id=assignment["client_id"],
+                    role_name=assignment["role_name"],
                 )
                 storage_account_infos.append(storage_account_info)
         if len(storage_account_infos) == 0:
             logger.error("No storage account found in current tenant with spn permission")
             return
-        # self._backend.save_table("azure_storage_accounts", storage_account_infos, AzureStorageSpnPermissionMapping)
         self._append_records(storage_account_infos)
 
     def _get_role_assignments(self, resource_id: str) -> list[dict]:
@@ -364,11 +371,11 @@ class AzureResourcePermissions(CrawlerBase[AzureStorageSpnPermissionMapping]):
         permission_info = {}
 
         result = self._get(f"{resource_id}/providers/Microsoft.Authorization/roleAssignments", "2022-04-01")
-        for ra in result.get("value", []):
-            principal_type = ra.get("properties", {"principalType": None})["principalType"]
+        for role_assignment in result.get("value", []):
+            principal_type = role_assignment.get("properties", {"principalType": None})["principalType"]
             if principal_type == "ServicePrincipal":
-                spn_client_id = ra.get("properties", {"principalId": None})["principalId"]
-                role_definition_id = ra.get("properties", {"roleDefinitionId": None})["roleDefinitionId"]
+                spn_client_id = role_assignment.get("properties", {"principalId": None})["principalId"]
+                role_definition_id = role_assignment.get("properties", {"roleDefinitionId": None})["roleDefinitionId"]
                 if role_definition_id not in self._role_definitions:
                     role_name = self._get(role_definition_id, "2022-04-01").get("properties", {"roleName": None})[
                         "roleName"
@@ -394,9 +401,9 @@ class AzureResourcePermissions(CrawlerBase[AzureStorageSpnPermissionMapping]):
     def _get_storage_accounts(
         self,
     ) -> list[str]:
-        ext_locations = self._locations.snapshot()
+        external_locations = self._locations.snapshot()
         storage_accounts = []
-        for location in ext_locations:
+        for location in external_locations:
             if location.location.startswith("abfss://"):
                 start = location.location.index("@")
                 end = location.location.index(".dfs.core.windows.net")
