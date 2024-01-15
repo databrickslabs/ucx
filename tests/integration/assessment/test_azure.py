@@ -9,6 +9,7 @@ from databricks.sdk.service import compute, jobs
 from databricks.labs.ucx.assessment.azure import (
     AzureResourcePermissions,
     AzureServicePrincipalCrawler,
+    AzureStorageSpnPermissionMapping
 )
 from databricks.labs.ucx.hive_metastore.locations import (
     ExternalLocation,
@@ -152,7 +153,9 @@ def test_save_spn_permissions(ws, sql_backend, inventory_schema):
     location = ExternalLocations(ws, sql_backend, inventory_schema)
     az_res_perm = AzureResourcePermissions(ws, location, sql_backend, inventory_schema)
     az_res_perm.save_spn_permissions()
-    sql_query = "SELECT storage_acct_name, spn_client_id, role_name"
+    sql_backend.save_table(f"{inventory_schema}.azure_storage_accounts", tables, AzureStorageSpnPermissionMapping)
+    sql_query = f"SELECT storage_acct_name, spn_client_id, role_name from {inventory_schema}.azure_storage_accounts"
     results = sql_backend.fetch(sql_query)
     for r in results:
-        assert r.name == "labsazurethings"
+        m = AzureStorageSpnPermissionMapping(*r)
+        assert m.storage_acct_name == "labsazurethings"

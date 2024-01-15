@@ -339,6 +339,7 @@ class AzureResourcePermissions(CrawlerBase[AzureStorageSpnPermissionMapping]):
     def save_spn_permissions(self):
         storage_account_infos = []
         for sub in self._get_current_tenant_storage_accounts():
+            logger.info(f"Fetching role assignment for {sub.name}")
             role_assignments = self._get_role_assignments(sub.resource_id)
             if len(role_assignments) == 0:
                 logger.info(
