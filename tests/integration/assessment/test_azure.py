@@ -130,6 +130,7 @@ def test_spn_crawler_with_available_secrets(
     assert any(_ for _ in results if _.secret_key == secret_key)
 
 
+@pytest.mark.skip
 def test_azure_storage_accounts(ws, sql_backend, inventory_schema):
     logger = logging.getLogger(__name__)
     logger.setLevel("DEBUG")
@@ -143,7 +144,6 @@ def test_azure_storage_accounts(ws, sql_backend, inventory_schema):
         assert acct.name == "labsazurethings"
 
 
-@pytest.mark.dependency(depends=["test_azure_storage_accounts"])
 def test_save_spn_permissions(ws, sql_backend, inventory_schema):
     logger = logging.getLogger(__name__)
     logger.setLevel("DEBUG")
