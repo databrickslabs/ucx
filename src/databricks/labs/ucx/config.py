@@ -201,6 +201,9 @@ class WorkspaceConfig(_Config["WorkspaceConfig"]):
     database_to_catalog_mapping: dict[str, str] | None = None
     default_catalog: str | None = "ucx_default"
     log_level: str | None = "INFO"
+    # Truncate JSON fields in HTTP requests and responses above this limit.
+    # If this occurs, the log message will include the text `... (XXX additional elements)`
+    debug_truncate_bytes: int | None = 250000
 
     # Starting path for notebooks and directories crawler
     workspace_start_path: str = "/"
