@@ -139,4 +139,5 @@ def test_azure_storage_accounts(ws, sql_backend, inventory_schema):
     location = ExternalLocations(ws, sql_backend, inventory_schema)
     az_res_perm = AzureResourcePermissions(ws, location, sql_backend, inventory_schema)
     for acct in az_res_perm._get_current_tenant_storage_accounts():
-        logger.info(acct.name)
+        assert acct.name == "labsazurethings"
+
