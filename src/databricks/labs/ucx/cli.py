@@ -200,9 +200,7 @@ def move(
 
 
 @ucx.command
-def save_azure_storage_accounts(
-    w: WorkspaceClient,
-):
+def save_azure_storage_accounts(w: WorkspaceClient):
     """identifies all azure storage account used by external tables
     identifies all spn which has storage blob reader, blob contributor, blob owner access
     saves the data in ucx database."""
@@ -219,7 +217,7 @@ def save_azure_storage_accounts(
         return
     sql_backend = StatementExecutionBackend(w, installation.config.warehouse_id)
     location = ExternalLocations(w, sql_backend, installation.config.inventory_database)
-    az_res_perm = AzureResourcePermissions(w, location, sql_backend, installation.config.inventory_database)
+    az_res_perm = AzureResourcePermissions(w, location)
     logger.info("Generating azure storage accounts and service principal permission info")
     az_res_perm.save_spn_permissions()
 

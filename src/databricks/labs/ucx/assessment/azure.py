@@ -1,4 +1,7 @@
 import base64
+import csv
+import dataclasses
+import io
 import json
 import re
 from collections.abc import Iterable
@@ -13,6 +16,7 @@ from databricks.sdk.core import (
 )
 from databricks.sdk.errors import NotFound
 from databricks.sdk.service.compute import ClusterSource, Policy
+from databricks.sdk.service.workspace import ImportFormat
 
 from databricks.labs.ucx.assessment.crawlers import (
     _CLIENT_ENDPOINT_LENGTH,
@@ -291,10 +295,7 @@ def _credentials(cfg: Config):
 
 
 class AzureAPI:
-    def __init__(
-        self,
-        ws: WorkspaceClient,
-    ):
+    def __init__(self, ws: WorkspaceClient):
         rm_host = ws.config.arm_environment.resource_manager_endpoint
         self._resource_manager = ApiClient(Config(host=rm_host, credentials_provider=_credentials))
         self._token_source = AzureCliTokenSource(rm_host)
@@ -327,23 +328,16 @@ class AzureAPI:
         )
 
 
-class AzureResourcePermissions(CrawlerBase[AzureStorageSpnPermissionMapping]):
-    def __init__(
-        self,
-        ws: WorkspaceClient,
-        lc: ExternalLocations,
-        sql_backend: SqlBackend,
-        inventory_schema: str,
-    ):
-        super().__init__(
-            sql_backend, "hive_metastore", inventory_schema, "azure_storage_accounts", AzureStorageSpnPermissionMapping
-        )
-        rm_host = ws.config.arm_environment.resource_manager_endpoint
-        self._resource_manager = ApiClient(Config(host=rm_host, credentials_provider=_credentials))
-        self._token_source = AzureCliTokenSource(rm_host)
+class AzureResourcePermissions:
+    def __init__(self, ws: WorkspaceClient, lc: ExternalLocations, folder: str | None = None):
         self._locations = lc
         self._role_definitions = {}  # type: dict[str, str]
         self._azure_api = AzureAPI(ws)
+        self._ws = ws
+        self._field_names = [_.name for _ in dataclasses.fields(AzureStorageSpnPermissionMapping)]
+        if not folder:
+            folder = f"/Users/{ws.current_user.me().user_name}/.ucx"
+        self._folder = folder
 
     def _get_current_tenant_storage_accounts(self) -> Iterable[AzureStorageAccount]:
         storage_accounts = self._get_storage_accounts()
@@ -362,7 +356,7 @@ class AzureResourcePermissions(CrawlerBase[AzureStorageSpnPermissionMapping]):
                         name=storage["name"], resource_id=storage["id"], subscription_id=subscription.subscription_id
                     )
 
-    def save_spn_permissions(self):
+    def save_spn_permissions(self) -> str | None:
         storage_account_infos = []
         for storage in self._get_current_tenant_storage_accounts():
             logger.info(f"Fetching role assignment for {storage.name}")
@@ -384,8 +378,22 @@ class AzureResourcePermissions(CrawlerBase[AzureStorageSpnPermissionMapping]):
                 storage_account_infos.append(storage_account_info)
         if len(storage_account_infos) == 0:
             logger.error("No storage account found in current tenant with spn permission")
-            return
-        self._append_records(storage_account_infos)
+            return None
+        return self._save(storage_account_infos)
+
+    def _save(self, storage_infos: list[AzureStorageSpnPermissionMapping]) -> str:
+        buffer = io.StringIO()
+        writer = csv.DictWriter(buffer, self._field_names)
+        writer.writeheader()
+        for storage_info in storage_infos:
+            writer.writerow(dataclasses.asdict(storage_info))
+        buffer.seek(0)
+        return self._overwrite_mapping(buffer)
+
+    def _overwrite_mapping(self, buffer) -> str:
+        path = f"{self._folder}/azure_storage_account_info.csv"
+        self._ws.workspace.upload(path, buffer, overwrite=True, format=ImportFormat.AUTO)
+        return path
 
     def _get_role_assignments(self, resource_id: str) -> dict:
         """See https://learn.microsoft.com/en-us/rest/api/authorization/role-assignments/list-for-resource"""
@@ -409,24 +417,10 @@ class AzureResourcePermissions(CrawlerBase[AzureStorageSpnPermissionMapping]):
                     "Storage Blob Data Owner",
                     "Storage Blob Data Reader",
                 ]:
-                    # permission_info["client_id"] = spn_client_id
-                    # permission_info["role_name"] = role_name
                     permission_info[spn_client_id] = role_name
-                    # matching_perm = [
-                    #    perm
-                    #    for perm in role_assignment
-                    #    if perm["client_id"] == permission_info["client_id"]
-                    #    and perm["role_name"] == permission_info["role_name"]
-                    # ]
-                    # role_assignment_exists = len(matching_perm) > 0
-                    # if not role_assignment_exists:
-                    #    role_assignments.append(permission_info)
-        # return role_assignments
         return permission_info
 
-    def _get_storage_accounts(
-        self,
-    ) -> list[str]:
+    def _get_storage_accounts(self) -> list[str]:
         external_locations = self._locations.snapshot()
         storage_accounts = []
         for location in external_locations:
