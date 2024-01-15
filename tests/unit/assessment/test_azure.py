@@ -23,6 +23,7 @@ from databricks.sdk.service.sql import EndpointConfPair
 from databricks.sdk.service.workspace import GetSecretResponse
 
 from databricks.labs.ucx.assessment.azure import (
+    AzureAPI,
     AzureResourcePermissions,
     AzureServicePrincipalCrawler,
 )
@@ -1594,7 +1595,7 @@ _SECRET_VALUE = b"SGVsbG8sIFdvcmxkIQ=="
 _SECRET_PATTERN = r"{{(secrets.*?)}}"
 
 
-def test_save_spn_permissions_no_external_table():
+def test_save_spn_permissions_no_external_table(caplog):
     w = create_autospec(WorkspaceClient)
     rows = {
         "SELECT \\* FROM ucx.external_locations": [],
@@ -1602,8 +1603,9 @@ def test_save_spn_permissions_no_external_table():
     backend = MockBackend(rows=rows)
     location = ExternalLocations(w, backend, "ucx")
     az_res_perm = AzureResourcePermissions(w, location, backend, "ucx")
-    storage_accounts = az_res_perm._get_storage_accounts()
-    assert len(storage_accounts) == 0
+    storage_accounts = list(az_res_perm._get_current_tenant_storage_accounts())
+    assert [rec.message for rec in caplog.records if ("There are no external table present with azure storage account. "
+                                                      "Please check if assessment job is run") in rec.message]
 
 
 def test_save_spn_permissions_no_azure_storage_account():
@@ -1716,10 +1718,11 @@ def get_az_api_mapping(*args, **kwargs):
 
 def test_get_current_tenant_subscriptions(az_token, mocker):
     w = create_autospec(WorkspaceClient)
-    location = ExternalLocations(w, MockBackend(), "ucx")
-    az_res_perm = AzureResourcePermissions(w, location, MockBackend(), "ucx")
+    azure_api = AzureAPI(
+        w,
+    )
     mocker.patch("databricks.sdk.core.ApiClient.do", side_effect=get_az_api_mapping)
-    subs = list(az_res_perm._get_current_tenant_subscriptions())
+    subs = list(azure_api.get_current_tenant_subscriptions())
     assert subs[0].subscription_id == "002"
 
 
@@ -1761,8 +1764,9 @@ def test_get_role_assignments_with_spn_and_blob_permission(mocker, az_token):
     az_res_perm = AzureResourcePermissions(w, location, MockBackend(), "ucx")
     mocker.patch("databricks.sdk.core.ApiClient.do", side_effect=get_az_api_mapping)
     role_assignment = az_res_perm._get_role_assignments("0003")
-    assert role_assignment[0]["client_id"] == "user3"
-    assert role_assignment[0]["role_name"] == "Storage Blob Data Owner"
+    for client_id, role_name in role_assignment.items():
+        assert client_id == "user3"
+        assert role_name == "Storage Blob Data Owner"
 
 
 def test_save_spn_permissions_no_valid_storage_accounts(caplog, mocker, az_token):

@@ -167,22 +167,25 @@ def test_save_spn_permissions(ws, sql_backend, inventory_schema):
         assert m.storage_acct_name == "labsazurethings"
 
 
-@pytest.mark.skip
+# @pytest.mark.skip
 def test_save_spn_permissions_local(ws, sql_backend, inventory_schema):
     logger = logging.getLogger(__name__)
     logger.setLevel("DEBUG")
     tables = [
-        ExternalLocation("enterpath", 1),
+        ExternalLocation("storagepath", 1),
     ]
     sql_backend.save_table(f"{inventory_schema}.external_locations", tables, ExternalLocation)
     location = ExternalLocations(ws, sql_backend, inventory_schema)
     az_res_perm = AzureResourcePermissions(ws, location, sql_backend, inventory_schema)
     az_res_perm.save_spn_permissions()
     sql_query = (
-        f"SELECT storage_acct_name, spn_client_id, role_name from hive_metastore.{inventory_schema}"
+        f"SELECT object_name, object_type, object_url, spn_client_id, role_name from hive_metastore.{inventory_schema}"
         f".azure_storage_accounts"
     )
     results = sql_backend.fetch(sql_query)
     for r in results:
         m = AzureStorageSpnPermissionMapping(*r)
-        assert m.storage_acct_name == "enter storage account name"
+        assert m.object_name == "storageaccountname"
+        assert m.object_type == "STORAGE"
+        assert m.object_url == "url"
+        assert m.role_name == "Storage Blob Data Contributor"
