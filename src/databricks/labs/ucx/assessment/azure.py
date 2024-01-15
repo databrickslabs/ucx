@@ -326,13 +326,14 @@ class AzureResourcePermissions(CrawlerBase[AzureStorageSpnPermissionMapping]):
                 "There are no external table present with azure storage account. "
                 "Please check if assessment job is run"
             )
+            return
         for sub in self._get_current_tenant_subscriptions():
             logger.info(f"Checking in subscription {sub.name} for storage accounts")
             path = f"/subscriptions/{sub.subscription_id}/providers/Microsoft.Storage/storageAccounts"
             for storage in self._get(path, "2023-01-01").get("value", []):
                 if storage["name"] in storage_accounts:
                     yield AzureStorageAccount(
-                        name=storage["name"], resource_id=storage["id"], subscription_id=sub["subscriptionId"]
+                        name=storage["name"], resource_id=storage["id"], subscription_id=sub.subscription_id
                     )
 
     def save_spn_permissions(self):
@@ -344,6 +345,7 @@ class AzureResourcePermissions(CrawlerBase[AzureStorageSpnPermissionMapping]):
                     f"No spn configured for storage account {sub.name} "
                     f"with blob reader/contributor/owner permission."
                 )
+                continue
             for assignment in role_assignments:
                 storage_account_info = AzureStorageSpnPermissionMapping(
                     storage_acct_name=sub.name, spn_client_id=assignment["client_id"], role_name=assignment["role_name"]
@@ -352,9 +354,10 @@ class AzureResourcePermissions(CrawlerBase[AzureStorageSpnPermissionMapping]):
         if len(storage_account_infos) == 0:
             logger.error("No storage account found in current tenant with spn permission")
             return
+        # self._backend.save_table("azure_storage_accounts", storage_account_infos, AzureStorageSpnPermissionMapping)
         self._append_records(storage_account_infos)
 
-    def _get_role_assignments(self, resource_id: str):
+    def _get_role_assignments(self, resource_id: str) -> list[dict]:
         """See https://learn.microsoft.com/en-us/rest/api/authorization/role-assignments/list-for-resource"""
         role_assignments = []
         permission_info = {}
@@ -363,10 +366,10 @@ class AzureResourcePermissions(CrawlerBase[AzureStorageSpnPermissionMapping]):
         for ra in result.get("value", []):
             principal_type = ra.get("properties", {"principalType": None})["principalType"]
             if principal_type == "ServicePrincipal":
-                spn_client_id = ra.get("properties", {"principalId": None})["principalType"]
+                spn_client_id = ra.get("properties", {"principalId": None})["principalId"]
                 role_definition_id = ra.get("properties", {"roleDefinitionId": None})["roleDefinitionId"]
                 if role_definition_id not in self._role_definitions:
-                    role_name = self._get(role_definition_id, "2022-04-01").get("roleName", None)
+                    role_name = self._get(role_definition_id, "2022-04-01").get("name", None)
                     self._role_definitions[role_definition_id] = role_name
                 else:
                     role_name = self._role_definitions[role_definition_id]
@@ -377,7 +380,7 @@ class AzureResourcePermissions(CrawlerBase[AzureStorageSpnPermissionMapping]):
                 ]:
                     permission_info["client_id"] = spn_client_id
                     permission_info["role_name"] = role_name
-            role_assignments.append(permission_info)
+                    role_assignments.append(permission_info)
         return role_assignments
 
     def _get(self, path: str, api_version: str):
@@ -394,7 +397,7 @@ class AzureResourcePermissions(CrawlerBase[AzureStorageSpnPermissionMapping]):
             if location.location.startswith("abfss://"):
                 start = location.location.index("@")
                 end = location.location.index(".dfs.core.windows.net")
-                storage_acct = location.location[start:end]
+                storage_acct = location.location[start + 1 : end]
                 if storage_acct not in storage_accounts:
                     storage_accounts.append(storage_acct)
         return storage_accounts

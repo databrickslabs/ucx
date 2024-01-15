@@ -1,7 +1,11 @@
+import base64
 import json
-from unittest.mock import Mock
+from unittest.mock import Mock, create_autospec, patch
 
+import pytest
+from databricks.sdk import WorkspaceClient
 from databricks.sdk.errors import NotFound
+from databricks.sdk.oauth import Token
 from databricks.sdk.service.compute import (
     AutoScale,
     ClusterDetails,
@@ -18,8 +22,12 @@ from databricks.sdk.service.jobs import (
 from databricks.sdk.service.sql import EndpointConfPair
 from databricks.sdk.service.workspace import GetSecretResponse
 
-from databricks.labs.ucx.assessment.azure import AzureServicePrincipalCrawler
+from databricks.labs.ucx.assessment.azure import (
+    AzureResourcePermissions,
+    AzureServicePrincipalCrawler,
+)
 from databricks.labs.ucx.assessment.pipelines import PipelineInfo
+from databricks.labs.ucx.hive_metastore import ExternalLocations
 
 from ..framework.mocks import MockBackend
 
@@ -1584,3 +1592,197 @@ def mock_get_secret(secret_scope, secret_key):
 
 _SECRET_VALUE = b"SGVsbG8sIFdvcmxkIQ=="
 _SECRET_PATTERN = r"{{(secrets.*?)}}"
+
+
+def test_save_spn_permissions_no_external_table():
+    w = create_autospec(WorkspaceClient)
+    rows = {
+        "SELECT \\* FROM ucx.external_locations": [],
+    }
+    backend = MockBackend(rows=rows)
+    location = ExternalLocations(w, backend, "ucx")
+    az_res_perm = AzureResourcePermissions(w, location, backend, "ucx")
+    storage_accounts = az_res_perm._get_storage_accounts()
+    assert len(storage_accounts) == 0
+
+
+def test_save_spn_permissions_no_azure_storage_account():
+    w = create_autospec(WorkspaceClient)
+    rows = {
+        "SELECT \\* FROM ucx.external_locations": [["s3://bucket1/folder1", "0"]],
+    }
+    backend = MockBackend(rows=rows)
+    location = ExternalLocations(w, backend, "ucx")
+    az_res_perm = AzureResourcePermissions(w, location, backend, "ucx")
+    storage_accounts = az_res_perm._get_storage_accounts()
+    assert len(storage_accounts) == 0
+
+
+def test_save_spn_permissions_valid_azure_storage_account():
+    w = create_autospec(WorkspaceClient)
+    rows = {
+        "SELECT \\* FROM ucx.external_locations": [
+            ["s3://bucket1/folder1", "1"],
+            ["abfss://continer1@storage1.dfs.core.windows.net/folder1", "1"],
+        ],
+    }
+    backend = MockBackend(rows=rows)
+    location = ExternalLocations(w, backend, "ucx")
+    az_res_perm = AzureResourcePermissions(w, location, backend, "ucx")
+    storage_accounts = az_res_perm._get_storage_accounts()
+    assert storage_accounts[0] == "storage1"
+
+
+@pytest.fixture
+def az_token(mocker):
+    token = json.dumps({"aud": "foo", "tid": "bar"}).encode("utf-8")
+    str_token = base64.b64encode(token).decode("utf-8").replace("=", "")
+    tok = Token(access_token=f"header.{str_token}.sig")
+    mocker.patch("databricks.sdk.oauth.Refreshable.token", return_value=tok)
+
+
+def get_az_api_mapping(*args, **kwargs):
+    mapping = {
+        "/subscriptions": {
+            "value": [
+                {"displayName": "sub1", "subscriptionId": "001", "tenantId": "bar1"},
+                {"displayName": "sub2", "subscriptionId": "002", "tenantId": "bar"},
+                {"displayName": "sub3", "subscriptionId": "003", "tenantId": "bar3"},
+            ]
+        },
+        "/subscriptions/002/providers/Microsoft.Storage/storageAccounts": {
+            "value": [
+                {"name": "sto1", "id": "0001"},
+                {"name": "sto2", "id": "0002"},
+                {"name": "sto3", "id": "0003"},
+            ]
+        },
+        "0001/providers/Microsoft.Authorization/roleAssignments": {
+            "value": [
+                {
+                    "properties": {"principalId": "user1", "principalType": "User", "roleDefinitionId": "id001"},
+                    "id": "rol1",
+                },
+            ]
+        },
+        "0002/providers/Microsoft.Authorization/roleAssignments": {
+            "value": [
+                {
+                    "properties": {
+                        "principalId": "user2",
+                        "principalType": "ServicePrincipal",
+                        "roleDefinitionId": "id001",
+                    },
+                    "id": "rol1",
+                },
+            ]
+        },
+        "id001": {
+            "id": "role1",
+            "name": "Contributor",
+        },
+        "0003/providers/Microsoft.Authorization/roleAssignments": {
+            "value": [
+                {
+                    "properties": {
+                        "principalId": "user3",
+                        "principalType": "ServicePrincipal",
+                        "roleDefinitionId": "id002",
+                    },
+                    "id": "rol1",
+                },
+                {
+                    "properties": {
+                        "principalId": "user3",
+                        "principalType": "ServicePrincipal",
+                        "roleDefinitionId": "id002",
+                    },
+                    "id": "rol2",
+                },
+            ]
+        },
+        "id002": {
+            "id": "role2",
+            "name": "Storage Blob Data Owner",
+        },
+    }
+
+    return mapping[args[1]]
+
+
+def test_get_current_tenant_subscriptions(az_token, mocker):
+    w = create_autospec(WorkspaceClient)
+    location = ExternalLocations(w, MockBackend(), "ucx")
+    az_res_perm = AzureResourcePermissions(w, location, MockBackend(), "ucx")
+    mocker.patch("databricks.sdk.core.ApiClient.do", side_effect=get_az_api_mapping)
+    subs = list(az_res_perm._get_current_tenant_subscriptions())
+    assert subs[0].subscription_id == "002"
+
+
+def test_get_current_tenant_storage_accounts(mocker, az_token):
+    w = create_autospec(WorkspaceClient)
+    rows = {
+        "SELECT \\* FROM ucx.external_locations": [["abfss://continer1@sto2.dfs.core.windows.net/folder1", 1]],
+    }
+    backend = MockBackend(rows=rows)
+    location = ExternalLocations(w, backend, "ucx")
+    az_res_perm = AzureResourcePermissions(w, location, backend, "ucx")
+    mocker.patch("databricks.sdk.core.ApiClient.do", side_effect=get_az_api_mapping)
+    storage_accts = list(az_res_perm._get_current_tenant_storage_accounts())
+    assert storage_accts[0].name == "sto2"
+    assert storage_accts[0].resource_id == "0002"
+
+
+def test_get_role_assignments_with_no_spn(mocker, az_token):
+    w = create_autospec(WorkspaceClient)
+    location = ExternalLocations(w, MockBackend(), "ucx")
+    az_res_perm = AzureResourcePermissions(w, location, MockBackend(), "ucx")
+    mocker.patch("databricks.sdk.core.ApiClient.do", side_effect=get_az_api_mapping)
+    role_assignment = az_res_perm._get_role_assignments("0001")
+    assert len(role_assignment) == 0
+
+
+def test_get_role_assignments_with_spn_no_blob_permission(mocker, az_token):
+    w = create_autospec(WorkspaceClient)
+    location = ExternalLocations(w, MockBackend(), "ucx")
+    az_res_perm = AzureResourcePermissions(w, location, MockBackend(), "ucx")
+    mocker.patch("databricks.sdk.core.ApiClient.do", side_effect=get_az_api_mapping)
+    role_assignment = az_res_perm._get_role_assignments("0002")
+    assert len(role_assignment) == 0
+
+
+def test_get_role_assignments_with_spn_and_blob_permission(mocker, az_token):
+    w = create_autospec(WorkspaceClient)
+    location = ExternalLocations(w, MockBackend(), "ucx")
+    az_res_perm = AzureResourcePermissions(w, location, MockBackend(), "ucx")
+    mocker.patch("databricks.sdk.core.ApiClient.do", side_effect=get_az_api_mapping)
+    role_assignment = az_res_perm._get_role_assignments("0003")
+    assert role_assignment[0]["client_id"] == "user3"
+    assert role_assignment[0]["role_name"] == "Storage Blob Data Owner"
+
+
+def test_save_spn_permissions_no_valid_storage_accounts(caplog, mocker, az_token):
+    w = create_autospec(WorkspaceClient)
+    rows = {
+        "SELECT \\* FROM ucx.external_locations": [["abfss://continer1@sto2.dfs.core.windows.net/folder1", 1]],
+    }
+    backend = MockBackend(rows=rows)
+    location = ExternalLocations(w, backend, "ucx")
+    az_res_perm = AzureResourcePermissions(w, location, backend, "ucx")
+    mocker.patch("databricks.sdk.core.ApiClient.do", side_effect=get_az_api_mapping)
+    az_res_perm.save_spn_permissions()
+    assert [rec.message for rec in caplog.records if "No storage account found in current tenant" in rec.message]
+
+
+def test_save_spn_permissions_valid_storage_accounts(caplog, mocker, az_token):
+    w = create_autospec(WorkspaceClient)
+    rows = {
+        "SELECT \\* FROM ucx.external_locations": [["abfss://continer1@sto3.dfs.core.windows.net/folder1", 1]],
+    }
+    backend = MockBackend(rows=rows)
+    location = ExternalLocations(w, backend, "ucx")
+    az_res_perm = AzureResourcePermissions(w, location, backend, "ucx")
+    mocker.patch("databricks.sdk.core.ApiClient.do", side_effect=get_az_api_mapping)
+    with patch("databricks.labs.ucx.framework.crawlers.CrawlerBase._append_records", return_value=None) as m:
+        az_res_perm.save_spn_permissions()
+        m.assert_called_once()

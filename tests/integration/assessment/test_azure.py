@@ -10,7 +10,10 @@ from databricks.labs.ucx.assessment.azure import (
     AzureResourcePermissions,
     AzureServicePrincipalCrawler,
 )
-from databricks.labs.ucx.hive_metastore.locations import ExternalLocations
+from databricks.labs.ucx.hive_metastore.locations import (
+    ExternalLocation,
+    ExternalLocations,
+)
 
 from .test_assessment import (
     _PIPELINE_CONF,
@@ -127,6 +130,10 @@ def test_spn_crawler_with_available_secrets(
 
 
 def test_azure_storage_accounts(ws, sql_backend, inventory_schema):
+    tables = [
+        ExternalLocation("abfss://continer1@storage1.dfs.core.windows.net/folder1", 1),
+    ]
+    sql_backend.save_table(f"{inventory_schema}.external_locations", tables, ExternalLocation)
     location = ExternalLocations(ws, sql_backend, inventory_schema)
     az_res_perm = AzureResourcePermissions(ws, location, sql_backend, inventory_schema)
     az_res_perm.save_spn_permissions()
