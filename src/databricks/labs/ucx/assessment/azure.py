@@ -370,7 +370,9 @@ class AzureResourcePermissions(CrawlerBase[AzureStorageSpnPermissionMapping]):
                 spn_client_id = ra.get("properties", {"principalId": None})["principalId"]
                 role_definition_id = ra.get("properties", {"roleDefinitionId": None})["roleDefinitionId"]
                 if role_definition_id not in self._role_definitions:
-                    role_name = self._get(role_definition_id, "2022-04-01").get("name", None)
+                    role_name = self._get(role_definition_id, "2022-04-01").get("properties", {"roleName": None})[
+                        "roleName"
+                    ]
                     self._role_definitions[role_definition_id] = role_name
                 else:
                     role_name = self._role_definitions[role_definition_id]

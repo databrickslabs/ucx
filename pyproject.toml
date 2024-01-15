@@ -64,7 +64,7 @@ path = ".venv"
 [tool.hatch.envs.default.scripts]
 test        = "pytest -n auto --cov src --cov-report=xml --timeout 30 tests/unit --durations 20"
 coverage    = "pytest -n auto --cov src tests/unit --timeout 30 --cov-report=html --durations 20"
-integration = "pytest -n 10 --cov src tests/integration/assessment/test_azure.py --durations 20"
+integration = "pytest -n 10 --cov src tests/integration --durations 20"
 fmt         = ["isort .",
                "black .",
                "ruff  . --fix",

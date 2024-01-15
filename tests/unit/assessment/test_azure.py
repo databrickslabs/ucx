@@ -1679,7 +1679,9 @@ def get_az_api_mapping(*args, **kwargs):
         },
         "id001": {
             "id": "role1",
-            "name": "Contributor",
+            "properties": {
+                "roleName": "Contributor",
+            },
         },
         "0003/providers/Microsoft.Authorization/roleAssignments": {
             "value": [
@@ -1703,7 +1705,9 @@ def get_az_api_mapping(*args, **kwargs):
         },
         "id002": {
             "id": "role2",
-            "name": "Storage Blob Data Owner",
+            "properties": {
+                "roleName": "Storage Blob Data Owner",
+            },
         },
     }
 

@@ -9,6 +9,7 @@ from databricks.sdk.service import compute, jobs
 from databricks.labs.ucx.assessment.azure import (
     AzureResourcePermissions,
     AzureServicePrincipalCrawler,
+    AzureStorageSpnPermissionMapping,
 )
 from databricks.labs.ucx.hive_metastore.locations import (
     ExternalLocation,
@@ -139,10 +140,13 @@ def test_azure_storage_accounts(ws, sql_backend, inventory_schema):
     sql_backend.save_table(f"{inventory_schema}.external_locations", tables, ExternalLocation)
     location = ExternalLocations(ws, sql_backend, inventory_schema)
     az_res_perm = AzureResourcePermissions(ws, location, sql_backend, inventory_schema)
-    for acct in az_res_perm._get_current_tenant_storage_accounts():
+    accounts = list(az_res_perm._get_current_tenant_storage_accounts())
+    assert len(accounts) == 1
+    for acct in accounts:
         assert acct.name == "labsazurethings"
 
 
+@pytest.mark.skip
 def test_save_spn_permissions(ws, sql_backend, inventory_schema):
     logger = logging.getLogger(__name__)
     logger.setLevel("DEBUG")
@@ -152,14 +156,33 @@ def test_save_spn_permissions(ws, sql_backend, inventory_schema):
     sql_backend.save_table(f"{inventory_schema}.external_locations", tables, ExternalLocation)
     location = ExternalLocations(ws, sql_backend, inventory_schema)
     az_res_perm = AzureResourcePermissions(ws, location, sql_backend, inventory_schema)
-    for acct in az_res_perm._get_current_tenant_storage_accounts():
-        assert acct.name == "labsazurethings"
-    # az_res_perm.save_spn_permissions()
-    # sql_query = (
-    #    f"SELECT storage_acct_name, spn_client_id, role_name from hive_metastore.{inventory_schema}"
-    #    f".azure_storage_accounts"
-    # )
-    # results = sql_backend.fetch(sql_query)
-    # for r in results:
-    #    m = AzureStorageSpnPermissionMapping(*r)
-    #    assert m.storage_acct_name == "labsazurethings"
+    az_res_perm.save_spn_permissions()
+    sql_query = (
+        f"SELECT storage_acct_name, spn_client_id, role_name from hive_metastore.{inventory_schema}"
+        f".azure_storage_accounts"
+    )
+    results = sql_backend.fetch(sql_query)
+    for r in results:
+        m = AzureStorageSpnPermissionMapping(*r)
+        assert m.storage_acct_name == "labsazurethings"
+
+
+@pytest.mark.skip
+def test_save_spn_permissions_local(ws, sql_backend, inventory_schema):
+    logger = logging.getLogger(__name__)
+    logger.setLevel("DEBUG")
+    tables = [
+        ExternalLocation("abfss://deltalake@oneenvadls.dfs.core.windows.net/folder1", 1),
+    ]
+    sql_backend.save_table(f"{inventory_schema}.external_locations", tables, ExternalLocation)
+    location = ExternalLocations(ws, sql_backend, inventory_schema)
+    az_res_perm = AzureResourcePermissions(ws, location, sql_backend, inventory_schema)
+    az_res_perm.save_spn_permissions()
+    sql_query = (
+        f"SELECT storage_acct_name, spn_client_id, role_name from hive_metastore.{inventory_schema}"
+        f".azure_storage_accounts"
+    )
+    results = sql_backend.fetch(sql_query)
+    for r in results:
+        m = AzureStorageSpnPermissionMapping(*r)
+        assert m.storage_acct_name == "oneenvadls"
