@@ -9,7 +9,7 @@ from databricks.sdk.service import compute, jobs
 from databricks.labs.ucx.assessment.azure import (
     AzureResourcePermissions,
     AzureServicePrincipalCrawler,
-    AzureStorageSpnPermissionMapping
+    AzureStorageSpnPermissionMapping,
 )
 from databricks.labs.ucx.hive_metastore.locations import (
     ExternalLocation,
