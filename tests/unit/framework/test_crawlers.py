@@ -314,6 +314,13 @@ def test_execute(mocker):
             rb.execute(sql_query)
 
         pyspark_sql_session.SparkSession.builder.getOrCreate.return_value.sql.side_effect = Exception(
+            "Unexpected exception"
+        )
+
+        with pytest.raises(Exception):  # noqa: B017
+            rb.execute(sql_query)
+
+        pyspark_sql_session.SparkSession.builder.getOrCreate.return_value.sql.side_effect = Exception(
             "DELTA_MISSING_TRANSACTION_LOG"
         )
         with pytest.raises(DataLoss):
