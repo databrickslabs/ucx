@@ -155,7 +155,6 @@ def deploy_schema(sql_backend: SqlBackend, inventory_schema: str):
             functools.partial(table, "table_failures", TableError),
             functools.partial(table, "workspace_objects", WorkspaceObjectInfo),
             functools.partial(table, "permissions", Permissions),
-            functools.partial(table, "azure_storage_accounts", AzureServicePrincipalInfo),
         ],
     )
     deployer.deploy_view("objects", "queries/views/objects.sql")
