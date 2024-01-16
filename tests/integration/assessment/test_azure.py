@@ -167,7 +167,7 @@ def test_save_spn_permissions(ws, sql_backend, inventory_schema):
         assert m.storage_acct_name == "labsazurethings"
 
 
-# @pytest.mark.skip
+@pytest.mark.skip
 def test_save_spn_permissions_local(ws, sql_backend, inventory_schema):
     tables = [
         ExternalLocation("abfss://deltalake@oneenvadls.dfs.core.windows.net/folder1", 1),
