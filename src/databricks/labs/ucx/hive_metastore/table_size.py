@@ -70,10 +70,11 @@ class TableSizeCrawler(CrawlerBase):
         try:
             return self._spark._jsparkSession.table(table_full_name).queryExecution().analyzed().stats().sizeInBytes()
         except Exception as e:
-            if "[TABLE_OR_VIEW_NOT_FOUND]" in str(e):
+            if "[TABLE_OR_VIEW_NOT_FOUND]" in str(e) or "[DELTA_TABLE_NOT_FOUND]" in str(e):
                 logger.warning(f"Failed to evaluate {table_full_name} table size. Table not found.")
                 return None
             if "[DELTA_MISSING_TRANSACTION_LOG]" in str(e):
                 logger.warning(f"Delta table {table_full_name} is corrupted: missing transaction log.")
                 return None
-            raise RuntimeError(str(e)) from e
+            logger.error(e)
+            return None

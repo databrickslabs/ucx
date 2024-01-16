@@ -4,7 +4,7 @@ from dataclasses import dataclass
 from unittest import mock
 
 import pytest
-from databricks.sdk.errors import BadRequest, NotFound, PermissionDenied, Unknown
+from databricks.sdk.errors import BadRequest, NotFound, PermissionDenied, Unknown, DataLoss
 from databricks.sdk.service import sql
 
 from databricks.labs.ucx.framework.crawlers import (
@@ -260,6 +260,14 @@ def test_raise_spark_sql_exceptions(mocker):
         with pytest.raises(NotFound):
             rb._raise_spark_sql_exceptions(error_message_invalid_table)
 
+        error_message_invalid_table = "DELTA_TABLE_NOT_FOUND foo table does not exist"
+        with pytest.raises(NotFound):
+            rb._raise_spark_sql_exceptions(error_message_invalid_table)
+
+        error_message_invalid_table = "DELTA_MISSING_TRANSACTION_LOG foo table does not exist"
+        with pytest.raises(DataLoss):
+            rb._raise_spark_sql_exceptions(error_message_invalid_table)
+
         error_message_invalid_syntax = "PARSE_SYNTAX_ERROR foo"
         with pytest.raises(BadRequest):
             rb._raise_spark_sql_exceptions(error_message_invalid_syntax)
@@ -291,6 +299,18 @@ def test_execute(mocker):
             "TABLE_OR_VIEW_NOT_FOUND"
         )
         with pytest.raises(NotFound):
+            rb.execute(sql_query)
+
+        pyspark_sql_session.SparkSession.builder.getOrCreate.return_value.sql.side_effect = Exception(
+            "DELTA_TABLE_NOT_FOUND"
+        )
+        with pytest.raises(NotFound):
+            rb.execute(sql_query)
+
+        pyspark_sql_session.SparkSession.builder.getOrCreate.return_value.sql.side_effect = Exception(
+            "DELTA_MISSING_TRANSACTION_LOG"
+        )
+        with pytest.raises(DataLoss):
             rb.execute(sql_query)
 
         pyspark_sql_session.SparkSession.builder.getOrCreate.return_value.sql.side_effect = Exception(
@@ -330,6 +350,18 @@ def test_fetch(mocker):
             "TABLE_OR_VIEW_NOT_FOUND"
         )
         with pytest.raises(NotFound):
+            rb.fetch(sql_query)
+
+        pyspark_sql_session.SparkSession.builder.getOrCreate.return_value.sql.side_effect = Exception(
+            "DELTA_TABLE_NOT_FOUND"
+        )
+        with pytest.raises(NotFound):
+            rb.fetch(sql_query)
+
+        pyspark_sql_session.SparkSession.builder.getOrCreate.return_value.sql.side_effect = Exception(
+            "DELTA_MISSING_TRANSACTION_LOG"
+        )
+        with pytest.raises(DataLoss):
             rb.fetch(sql_query)
 
         pyspark_sql_session.SparkSession.builder.getOrCreate.return_value.sql.side_effect = Exception(

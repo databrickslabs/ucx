@@ -102,8 +102,10 @@ class TableMapping:
                 f"ALTER TABLE `{schema}`.`{table}` SET TBLPROPERTIES('{self.UCX_SKIP_PROPERTY}' = true)"
             )
         except NotFound as nf:
-            if "[TABLE_OR_VIEW_NOT_FOUND]" in str(nf):
+            if "[TABLE_OR_VIEW_NOT_FOUND]" in str(nf) or "[DELTA_TABLE_NOT_FOUND]" in str(nf):
                 logger.error(f"Failed to apply skip marker for Table {schema}.{table}. Table not found.")
+            elif "[DELTA_MISSING_TRANSACTION_LOG]" in str(nf):
+                logger.error(f"Delta table {schema}.{table} is corrupted: missing transaction log.")
             else:
                 logger.error(nf)
         except BadRequest as br:
