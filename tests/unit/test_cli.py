@@ -1,6 +1,6 @@
 from unittest.mock import MagicMock, create_autospec, patch
 
-from databricks.sdk import WorkspaceClient
+from databricks.sdk import AccountClient, WorkspaceClient
 from databricks.sdk.errors import NotFound
 from databricks.sdk.service import iam
 from databricks.sdk.service.iam import User
@@ -93,7 +93,7 @@ def test_skip_no_ucx(caplog, mocker):
 
 def test_sync_workspace_info():
     with patch("databricks.labs.ucx.account.AccountWorkspaces.sync_workspace_info", return_value=None) as s:
-        sync_workspace_info(MagicMock())
+        sync_workspace_info(create_autospec(AccountClient))
         s.assert_called_once()
 
 
