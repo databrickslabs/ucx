@@ -4,7 +4,13 @@ from dataclasses import dataclass
 from unittest import mock
 
 import pytest
-from databricks.sdk.errors import BadRequest, NotFound, PermissionDenied, Unknown, DataLoss
+from databricks.sdk.errors import (
+    BadRequest,
+    DataLoss,
+    NotFound,
+    PermissionDenied,
+    Unknown,
+)
 from databricks.sdk.service import sql
 
 from databricks.labs.ucx.framework.crawlers import (
