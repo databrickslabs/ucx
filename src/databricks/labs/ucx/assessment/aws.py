@@ -1,13 +1,14 @@
+import subprocess
+import json
+
+
+def run_command(command):
+    process = subprocess.Popen(command, stdout=subprocess.PIPE, stderr=subprocess.PIPE, shell=True)
+    output, error = process.communicate()
+    return process.returncode, output.decode("utf-8"), error.decode("utf-8")
+
 
 def iam_profiles():
-    import subprocess
-    import json
-
-    def run_command(command):
-        process = subprocess.Popen(command, stdout=subprocess.PIPE, stderr=subprocess.PIPE, shell=True)
-        output, error = process.communicate()
-        return process.returncode, output.decode("utf-8"), error.decode("utf-8")
-
     # List all IAM roles
     roles_command = "aws iam list-roles"
     code, roles_output, roles_error = run_command(roles_command)

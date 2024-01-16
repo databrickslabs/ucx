@@ -50,6 +50,9 @@ commands:
   - name: validate-external-locations
     description: validates and provides mapping to external table to external location and shared generation tf scripts
 
+  - name: aws-iam-profiles
+    description: validates and provides mapping to external table to external location and shared generation tf scripts
+
   - name: repair-run
     description: Repair Run the Failed Job
     flags:
