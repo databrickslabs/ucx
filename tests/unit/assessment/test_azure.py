@@ -1908,5 +1908,5 @@ def test_get_container_permission_info(mocker, az_token):
     role_assignments = az_res_perm._get_container_permission_info(storage_account)
     assert len(role_assignments) == 1
     for role_assignment in role_assignments:
-        assert role_assignment.spn_client_id == "user3"
-        assert role_assignment.role_name == "Storage Blob Data Owner"
+        assert role_assignment.principal == "user3"
+        assert role_assignment.privilege == "WRITE_FILES"

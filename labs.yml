@@ -80,5 +80,5 @@ commands:
       - name: to-schema
         description: target schema to migrate tables to
 
-  - name: save-azure-storage_accounts
+  - name: save-azure-storage-accounts
     description: Identifies all storage account used by tables, identify spn and its permission on each storage accounts

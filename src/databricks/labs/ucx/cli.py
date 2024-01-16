@@ -217,9 +217,9 @@ def save_azure_storage_accounts(w: WorkspaceClient):
         return
     sql_backend = StatementExecutionBackend(w, installation.config.warehouse_id)
     location = ExternalLocations(w, sql_backend, installation.config.inventory_database)
-    az_res_perm = AzureResourcePermissions(w, location)
+    azure_resource_permissions = AzureResourcePermissions(w, location)
     logger.info("Generating azure storage accounts and service principal permission info")
-    az_res_perm.save_spn_permissions()
+    azure_resource_permissions.save_spn_permissions()
 
 
 if "__main__" == __name__:
