@@ -5,26 +5,44 @@ from databricks.sdk.errors import NotFound
 from databricks.sdk.service import iam
 from databricks.sdk.service.iam import User
 
-from databricks.labs.ucx.cli import move, repair_run, skip, workflows, open_remote_config, installations, sync_workspace_info, manual_workspace_info, create_table_mapping
+from databricks.labs.ucx.cli import (
+    CANT_FIND_UCX_MSG,
+    create_table_mapping,
+    ensure_assessment_run,
+    installations,
+    manual_workspace_info,
+    move,
+    open_remote_config,
+    repair_run,
+    revert_migrated_tables,
+    skip,
+    sync_workspace_info,
+    validate_external_locations,
+    workflows,
+)
 
 
 def test_workflow(caplog):
     w = create_autospec(WorkspaceClient)
-    with patch("databricks.labs.ucx.install.WorkspaceInstaller.latest_job_status", return_value=[{"key":"dummy"}]) as l:
+    with patch(
+        "databricks.labs.ucx.install.WorkspaceInstaller.latest_job_status", return_value=[{"key": "dummy"}]
+    ) as latest_job_status:
         workflows(w)
-        caplog.messages == ["Fetching deployed jobs..."]
-        l.assert_called_once()
+        assert caplog.messages == ["Fetching deployed jobs..."]
+        latest_job_status.assert_called_once()
+
 
 def test_open_remote_config(mocker):
     w = create_autospec(WorkspaceClient)
     w.current_user.me = lambda: iam.User(user_name="foo", groups=[iam.ComplexValue(display="admins")])
-    ws_file_url = f"https://example.com/#workspace/Users/foo/.ucx/config.yml"
-    mocker.patch('databricks.labs.ucx.install.WorkspaceInstaller.notebook_link', return_value=ws_file_url)
-    with patch('webbrowser.open') as mock_webbrowser_open:
+    ws_file_url = "https://example.com/#workspace/Users/foo/.ucx/config.yml"
+    mocker.patch("databricks.labs.ucx.install.WorkspaceInstaller.notebook_link", return_value=ws_file_url)
+    with patch("webbrowser.open") as mock_webbrowser_open:
         open_remote_config(w)
         mock_webbrowser_open.assert_called_with(ws_file_url)
 
-def test_installations(mocker, caplog):
+
+def test_installations(mocker, capsys):
     w = create_autospec(WorkspaceClient)
     w.current_user.me = lambda: iam.User(user_name="foo", groups=[iam.ComplexValue(display="admins")])
     summary = {
@@ -34,16 +52,12 @@ def test_installations(mocker, caplog):
     }
     installation = MagicMock()
     installation.as_summary.return_value = summary
-    mocker.patch('databricks.labs.ucx.installer.InstallationManager.user_installations', return_value=[installation])
+    mocker.patch("databricks.labs.ucx.installer.InstallationManager.user_installations", return_value=[installation])
     installations(w)
-    caplog.messages == ['[{"user_name": "foo", "database": "ucx", "warehouse_id": "test"}]']
+    assert '{"user_name": "foo", "database": "ucx", "warehouse_id": "test"}' in capsys.readouterr().out
+
 
 def test_skip_with_table(mocker):
-    """
-    Test the skip function with schema and table specified.
-    :param mocker:
-    :return:
-    """
     w = create_autospec(WorkspaceClient)
     mocker.patch("databricks.labs.ucx.installer.InstallationManager.for_user", return_value=MagicMock())
     with patch("databricks.labs.ucx.hive_metastore.mapping.TableMapping.skip_table", return_value=None) as s:
@@ -52,11 +66,6 @@ def test_skip_with_table(mocker):
 
 
 def test_skip_with_schema(mocker):
-    """
-    Test the skip function with schema specified.
-    :param mocker:
-    :return:
-    """
     w = create_autospec(WorkspaceClient)
     mocker.patch("databricks.labs.ucx.installer.InstallationManager.for_user", return_value=MagicMock())
     with patch("databricks.labs.ucx.hive_metastore.mapping.TableMapping.skip_schema", return_value=None) as s:
@@ -103,6 +112,50 @@ def test_create_table_mapping(mocker):
         s.assert_called_once()
 
 
+def test_validate_external_locations(mocker):
+    w = create_autospec(WorkspaceClient)
+    mocker.patch("databricks.labs.ucx.installer.InstallationManager.for_user", return_value=MagicMock())
+    # test save_as_terraform_definitions_on_workspace is called
+    # also test if the saving tf scripts returns None
+    with patch(
+        "databricks.labs.ucx.hive_metastore.locations.ExternalLocations.save_as_terraform_definitions_on_workspace",
+        return_value=None,
+    ) as s, patch("webbrowser.open") as w:
+        validate_external_locations(w)
+        s.assert_called_once()
+        w.assert_not_called()
+    # test when tf scripts is written and user confirmed to open it over browser
+    path = "dummy/external_locations.tf"
+    with patch(
+        "databricks.labs.ucx.hive_metastore.locations.ExternalLocations.save_as_terraform_definitions_on_workspace",
+        return_value=path,
+    ) as s, patch("webbrowser.open") as w, patch("databricks.labs.blueprint.tui.Prompts.confirm", return_value=True):
+        validate_external_locations(w)
+        s.assert_called_once()
+        w.assert_called_with(f"{w.config.host}/#workspace{path}")
+    # test when tf scripts is written but user did not confirm to open it over browser
+    with patch(
+        "databricks.labs.ucx.hive_metastore.locations.ExternalLocations.save_as_terraform_definitions_on_workspace",
+        return_value=path,
+    ) as s, patch("webbrowser.open") as w, patch("databricks.labs.blueprint.tui.Prompts.confirm", return_value=False):
+        validate_external_locations(w)
+        s.assert_called_once()
+        w.assert_not_called()
+
+
+def test_ensure_assessment_run(mocker, caplog):
+    w = create_autospec(WorkspaceClient)
+    with patch("databricks.labs.ucx.installer.InstallationManager.for_user", return_value=None):
+        assert ensure_assessment_run(w) is None
+        assert caplog.messages == [CANT_FIND_UCX_MSG]
+
+    with patch("databricks.labs.ucx.installer.InstallationManager.for_user", return_value=MagicMock()), patch(
+        "databricks.labs.ucx.install.WorkspaceInstaller.validate_and_run", return_value=MagicMock()
+    ) as v:
+        ensure_assessment_run(w)
+        v.assert_called_with("assessment")
+
+
 def test_repair_run(mocker, caplog):
     w = create_autospec(WorkspaceClient)
     mocker.patch("databricks.labs.ucx.install.WorkspaceInstaller.__init__", return_value=None)
@@ -119,6 +172,53 @@ def test_no_step_in_repair_run(mocker):
         repair_run(w, "")
     except KeyError as e:
         assert e.args[0] == "You did not specify --step"
+
+
+def test_revert_migrated_tables(mocker, caplog):
+    w = create_autospec(WorkspaceClient)
+    # test with no schema and no table, user confirm to not retry
+    with patch("databricks.labs.ucx.installer.InstallationManager.for_user", return_value=MagicMock()), patch(
+        "databricks.labs.blueprint.tui.Prompts.confirm", return_value=False
+    ):
+        assert revert_migrated_tables(w, schema=None, table=None) is None
+    # test with no schema and no table, user confirm to retry, but no ucx installation found
+    with patch("databricks.labs.ucx.installer.InstallationManager.for_user", return_value=None), patch(
+        "databricks.labs.blueprint.tui.Prompts.confirm", return_value=True
+    ):
+        assert revert_migrated_tables(w, schema=None, table=None) is None
+        assert caplog.messages[0] == CANT_FIND_UCX_MSG
+    # test with schema or table, but no ucx installation found
+    with patch("databricks.labs.ucx.installer.InstallationManager.for_user", return_value=None):
+        assert revert_migrated_tables(w, schema="test", table=None) is None
+        assert caplog.messages[1] == CANT_FIND_UCX_MSG
+        assert revert_migrated_tables(w, schema=None, table="test") is None
+        assert caplog.messages[2] == CANT_FIND_UCX_MSG
+        assert revert_migrated_tables(w, schema="test", table="test") is None
+        assert caplog.messages[3] == CANT_FIND_UCX_MSG
+    # test revert_migrated_tables is executed when revert report print successfully and user confirm
+    with patch("databricks.labs.ucx.installer.InstallationManager.for_user", return_value=MagicMock()), patch(
+        "databricks.labs.ucx.hive_metastore.table_migrate.TablesMigrate.print_revert_report", return_value=True
+    ), patch("databricks.labs.blueprint.tui.Prompts.confirm", return_value=True), patch(
+        "databricks.labs.ucx.hive_metastore.table_migrate.TablesMigrate.revert_migrated_tables", return_value=None
+    ) as r:
+        revert_migrated_tables(w, schema="test", table="test")
+        r.assert_called_once()
+    # test revert_migrated_tables is not executed when revert report print failed
+    with patch("databricks.labs.ucx.installer.InstallationManager.for_user", return_value=MagicMock()), patch(
+        "databricks.labs.ucx.hive_metastore.table_migrate.TablesMigrate.print_revert_report", return_value=False
+    ), patch("databricks.labs.blueprint.tui.Prompts.confirm", return_value=True), patch(
+        "databricks.labs.ucx.hive_metastore.table_migrate.TablesMigrate.revert_migrated_tables", return_value=None
+    ) as r:
+        revert_migrated_tables(w, schema="test", table="test")
+        r.assert_not_called()
+    # test revert_migrated_tables is not executed when revert report print successfully but user does not confirm
+    with patch("databricks.labs.ucx.installer.InstallationManager.for_user", return_value=MagicMock()), patch(
+        "databricks.labs.ucx.hive_metastore.table_migrate.TablesMigrate.print_revert_report", return_value=True
+    ), patch("databricks.labs.blueprint.tui.Prompts.confirm", return_value=False), patch(
+        "databricks.labs.ucx.hive_metastore.table_migrate.TablesMigrate.revert_migrated_tables", return_value=None
+    ) as r:
+        revert_migrated_tables(w, schema="test", table="test")
+        r.assert_not_called()
 
 
 def test_move_no_ucx(mocker, caplog):
