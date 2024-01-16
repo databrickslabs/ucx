@@ -277,7 +277,7 @@ class CrawlerBase(Generic[Result]):
 
         Exceptions:
         - If a runtime error occurs during fetching (other than "TABLE_OR_VIEW_NOT_FOUND"), the original error is
-        re-raised.
+          re-raised.
 
         Returns:
         list[any]: A list of data records, either fetched or loaded.
