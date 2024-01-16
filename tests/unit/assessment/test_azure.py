@@ -1788,10 +1788,10 @@ def test_get_role_assignments_with_spn_and_blob_permission(mocker, az_token):
         location,
     )
     mocker.patch("databricks.sdk.core.ApiClient.do", side_effect=get_az_api_mapping)
-    role_assignment = az_res_perm._get_role_assignments("0003")
-    for client_id, role_name in role_assignment.items():
-        assert client_id == "user3"
-        assert role_name == "Storage Blob Data Owner"
+    role_assignments = az_res_perm._get_role_assignments("0003")
+    for role_assignment in role_assignments:
+        assert role_assignment.principal_id == "user3"
+        assert role_assignment.role_name == "Storage Blob Data Owner"
 
 
 def test_save_spn_permissions_no_valid_storage_accounts(caplog, mocker, az_token):

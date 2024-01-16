@@ -52,6 +52,14 @@ class AzureSubscription:
 
 
 @dataclass
+class AzureRoleAssignment:
+    resource_id: str
+    principal_id: str
+    principal_type: str
+    role_name: str
+
+
+@dataclass
 class AzureStorageAccount:
     name: str
     resource_id: str
@@ -299,6 +307,7 @@ class AzureAPI:
         rm_host = ws.config.arm_environment.resource_manager_endpoint
         self._resource_manager = ApiClient(Config(host=rm_host, credentials_provider=_credentials))
         self._token_source = AzureCliTokenSource(rm_host)
+        self._role_definitions = {}  # type: dict[str, str]
 
     def _get_subscriptions(self) -> Iterable[AzureSubscription]:
         for subscription in self.get("/subscriptions", api_version="2022-12-01").get("value", []):
@@ -326,6 +335,48 @@ class AzureAPI:
         return self._resource_manager.do(
             "GET", path, query={"api-version": api_version}, headers={"Accept": "application/json"}
         )
+
+    def _get_role_assignments(self, resource_id: str) -> dict:
+        """See https://learn.microsoft.com/en-us/rest/api/authorization/role-assignments/list-for-resource"""
+        # role_assignments = []
+        permission_info = {}
+        result = self.get(f"{resource_id}/providers/Microsoft.Authorization/roleAssignments", "2022-04-01")
+        for role_assignment in result.get("value", []):
+            principal_type = role_assignment.get("properties", {"principalType": None})["principalType"]
+            if principal_type == "ServicePrincipal":
+                spn_client_id = role_assignment.get("properties", {"principalId": None})["principalId"]
+                role_definition_id = role_assignment.get("properties", {"roleDefinitionId": None})["roleDefinitionId"]
+                if role_definition_id not in self._role_definitions:
+                    role_name = self.get(role_definition_id, "2022-04-01").get("properties", {"roleName": None})[
+                        "roleName"
+                    ]
+                    self._role_definitions[role_definition_id] = role_name
+                else:
+                    role_name = self._role_definitions[role_definition_id]
+                if role_name in [
+                    "Storage Blob Data Contributor",
+                    "Storage Blob Data Owner",
+                    "Storage Blob Data Reader",
+                ]:
+                    permission_info[spn_client_id] = role_name
+        return permission_info
+
+    def get_role_assignments(self, resource_id: str) -> Iterable[AzureRoleAssignment]:
+        """See https://learn.microsoft.com/en-us/rest/api/authorization/role-assignments/list-for-resource"""
+        result = self.get(f"{resource_id}/providers/Microsoft.Authorization/roleAssignments", "2022-04-01")
+        for role_assignment in result.get("value", []):
+            principal_type = role_assignment.get("properties", {"principalType": None})["principalType"]
+            spn_client_id = role_assignment.get("properties", {"principalId": None})["principalId"]
+            role_definition_id = role_assignment.get("properties", {"roleDefinitionId": None})["roleDefinitionId"]
+            if role_definition_id not in self._role_definitions:
+                role_name = self.get(role_definition_id, "2022-04-01").get("properties", {"roleName": None})["roleName"]
+                self._role_definitions[role_definition_id] = role_name
+            else:
+                role_name = self._role_definitions[role_definition_id]
+
+            yield AzureRoleAssignment(
+                resource_id=resource_id, principal_id=spn_client_id, principal_type=principal_type, role_name=role_name
+            )
 
 
 class AzureResourcePermissions:
@@ -367,13 +418,13 @@ class AzureResourcePermissions:
                     f"with blob reader/contributor/owner permission."
                 )
                 continue
-            for client_id, role_name in role_assignments.items():
+            for role_assignment in role_assignments:
                 storage_account_info = AzureStorageSpnPermissionMapping(
                     object_name=storage.name,
                     object_type="STORAGE",
                     object_url=f"https://{storage.name}.dfs.core.windows.net/",
-                    spn_client_id=client_id,
-                    role_name=role_name,
+                    spn_client_id=role_assignment.principal_id,
+                    role_name=role_assignment.role_name,
                 )
                 storage_account_infos.append(storage_account_info)
         if len(storage_account_infos) == 0:
@@ -395,29 +446,18 @@ class AzureResourcePermissions:
         self._ws.workspace.upload(path, buffer, overwrite=True, format=ImportFormat.AUTO)
         return path
 
-    def _get_role_assignments(self, resource_id: str) -> dict:
+    def _get_role_assignments(self, resource_id: str) -> list[AzureRoleAssignment]:
         """See https://learn.microsoft.com/en-us/rest/api/authorization/role-assignments/list-for-resource"""
-        # role_assignments = []
-        permission_info = {}
-        result = self._azure_api.get(f"{resource_id}/providers/Microsoft.Authorization/roleAssignments", "2022-04-01")
-        for role_assignment in result.get("value", []):
-            principal_type = role_assignment.get("properties", {"principalType": None})["principalType"]
-            if principal_type == "ServicePrincipal":
-                spn_client_id = role_assignment.get("properties", {"principalId": None})["principalId"]
-                role_definition_id = role_assignment.get("properties", {"roleDefinitionId": None})["roleDefinitionId"]
-                if role_definition_id not in self._role_definitions:
-                    role_name = self._azure_api.get(role_definition_id, "2022-04-01").get(
-                        "properties", {"roleName": None}
-                    )["roleName"]
-                    self._role_definitions[role_definition_id] = role_name
-                else:
-                    role_name = self._role_definitions[role_definition_id]
-                if role_name in [
+        permission_info = []
+        role_assignments = self._azure_api.get_role_assignments(resource_id)
+        for role_assignment in role_assignments:
+            if role_assignment.principal_type == "ServicePrincipal":
+                if role_assignment.role_name in [
                     "Storage Blob Data Contributor",
                     "Storage Blob Data Owner",
                     "Storage Blob Data Reader",
                 ]:
-                    permission_info[spn_client_id] = role_name
+                    permission_info.append(role_assignment)
         return permission_info
 
     def _get_storage_accounts(self) -> list[str]:
