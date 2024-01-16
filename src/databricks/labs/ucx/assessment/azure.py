@@ -316,7 +316,7 @@ class AzureAPI:
             yield AzureSubscription(
                 name=subscription["displayName"],
                 subscription_id=subscription["subscriptionId"],
-                tenant_id=subscription["tenantId"]
+                tenant_id=subscription["tenantId"],
             )
 
     def _tenant_id(self):
@@ -358,7 +358,7 @@ class AzureAPI:
                 principal_id=spn_client_id,
                 principal_type=principal_type,
                 role_name=role_name,
-                scope=scope
+                scope=scope,
             )
             if azure_role_assignment not in role_assignments:
                 role_assignments.append(azure_role_assignment)
@@ -402,7 +402,7 @@ class AzureResourcePermissions:
                         name=storage["name"],
                         resource_id=storage["id"],
                         subscription_id=subscription.subscription_id,
-                        resource_group=resource_group
+                        resource_group=resource_group,
                     )
 
     def save_spn_permissions(self) -> str | None:
@@ -422,7 +422,7 @@ class AzureResourcePermissions:
                     object_type="STORAGE",
                     object_url=f"https://{storage.name}.dfs.core.windows.net/",
                     spn_client_id=role_assignment.principal_id,
-                    role_name=role_assignment.role_name
+                    role_name=role_assignment.role_name,
                 )
                 storage_account_infos.append(storage_account_info)
             storage_container_infos = self._get_container_permission_info(storage)
