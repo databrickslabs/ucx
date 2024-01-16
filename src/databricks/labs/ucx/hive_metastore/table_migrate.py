@@ -281,8 +281,6 @@ class TableMove:
         except NotFound as err:
             if "[TABLE_OR_VIEW_NOT_FOUND]" in str(err) or "[DELTA_TABLE_NOT_FOUND]" in str(err):
                 logger.error(f"Could not find table {from_table_name}. Table not found.")
-            elif "[DELTA_MISSING_TRANSACTION_LOG]" in str(err):
-                logger.error(f"Delta table {from_table_name} is corrupted: missing transaction log.")
             else:
                 logger.error(err)
         return False
