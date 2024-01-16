@@ -76,5 +76,7 @@ class TableSizeCrawler(CrawlerBase):
             if "[DELTA_MISSING_TRANSACTION_LOG]" in str(e):
                 logger.warning(f"Delta table {table_full_name} is corrupted: missing transaction log.")
                 return None
-            logger.error(f"Failed to evaluate {table_full_name} table size: {e!s}", exc_info=True)
-            return None
+        except:  # noqa: E722
+            logger.error(f"Failed to evaluate {table_full_name} table size: ", exc_info=True)
+
+        return None

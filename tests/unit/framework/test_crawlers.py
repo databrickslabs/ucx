@@ -317,7 +317,7 @@ def test_execute(mocker):
             "Unexpected exception"
         )
 
-        with pytest.raises(Exception):  # noqa: B017
+        with pytest.raises(BaseException):  # noqa: B017
             rb.execute(sql_query)
 
         pyspark_sql_session.SparkSession.builder.getOrCreate.return_value.sql.side_effect = Exception(
