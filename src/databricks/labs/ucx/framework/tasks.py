@@ -1,6 +1,10 @@
 import logging
+import os
+import time
 from collections.abc import Callable
+from contextlib import contextmanager
 from dataclasses import dataclass
+from datetime import datetime, timedelta
 from functools import wraps
 from logging.handlers import TimedRotatingFileHandler
 from pathlib import Path
@@ -116,6 +120,42 @@ def task(
     return decorator
 
 
+@contextmanager
+def exclusive_open(filename: str, *args, timeout: int = 5, retry_time: float = 0.05, **kwargs):
+    """Open a file with exclusive access across multiple processes.
+    Requires write access to the directory containing the file.
+
+    Arguments are the same as the built-in open, except for two
+    additional keyword arguments:
+        timeout: Seconds to wait before giving up (or None to retry indefinitely).
+        retry_time: Seconds to wait before retrying the lock.
+
+    Returns a context manager that closes the file and releases the lock.
+    """
+    lockfile = filename + ".lock"
+    deadline = datetime.now() + timedelta(seconds=timeout)
+
+    # wait until the lock file can be opened
+    while True:
+        try:
+            fd = os.open(lockfile, os.O_CREAT | os.O_EXCL)
+            break
+        except FileExistsError:
+            if datetime.now() >= deadline:
+                raise
+            time.sleep(retry_time)
+
+    # open the actual file
+    try:
+        with open(filename, *args, **kwargs) as f:
+            yield f
+    finally:
+        try:
+            os.close(fd)
+        finally:
+            os.unlink(lockfile)
+
+
 def trigger(*argv):
     args = dict(a[2:].split("=") for a in argv if "--" == a[0:2])
     if "config" not in args:
@@ -168,8 +208,8 @@ def trigger(*argv):
 
     log_readme = log_path.joinpath("README.md")
     if not log_readme.exists():
-        # this may race when run from multiple tasks, but let's accept the risk for now.
-        with log_readme.open(mode="w") as f:
+        # this may race when run from multiple tasks, therefore it must be multiprocess safe
+        with exclusive_open(str(log_readme), mode="w") as f:
             f.write(f"# Logs for the UCX {current_task.workflow} workflow\n")
             f.write("This folder contains UCX log files.\n\n")
             f.write(f"See the [{current_task.workflow} job](/#job/{job_id}) and ")
