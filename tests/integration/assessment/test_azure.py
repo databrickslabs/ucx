@@ -9,7 +9,7 @@ from databricks.sdk.service import compute, jobs
 from databricks.labs.ucx.assessment.azure import (
     AzureResourcePermissions,
     AzureServicePrincipalCrawler,
-    AzureStorageSpnPermissionMapping,
+    StoragePermissionMapping,
 )
 from databricks.labs.ucx.hive_metastore.locations import (
     ExternalLocation,
@@ -163,7 +163,7 @@ def test_save_spn_permissions(ws, sql_backend, inventory_schema):
     )
     results = sql_backend.fetch(sql_query)
     for r in results:
-        m = AzureStorageSpnPermissionMapping(*r)
+        m = StoragePermissionMapping(*r)
         assert m.storage_acct_name == "labsazurethings"
 
 
