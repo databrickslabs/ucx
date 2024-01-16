@@ -26,6 +26,7 @@ from databricks.labs.ucx.assessment.azure import (
     AzureAPI,
     AzureResourcePermissions,
     AzureServicePrincipalCrawler,
+    AzureStorageAccount,
 )
 from databricks.labs.ucx.assessment.pipelines import PipelineInfo
 from databricks.labs.ucx.hive_metastore import ExternalLocations
@@ -1667,26 +1668,32 @@ def get_az_api_mapping(*args, **kwargs):
         },
         "/subscriptions/002/providers/Microsoft.Storage/storageAccounts": {
             "value": [
-                {"name": "sto1", "id": "0001"},
-                {"name": "sto2", "id": "0002"},
-                {"name": "sto3", "id": "0003"},
+                {"name": "sto1", "id": "resourceGroups/rg1/0001"},
+                {"name": "sto2", "id": "resourceGroups/rg1/0002"},
+                {"name": "sto3", "id": "resourceGroups/rg1/0003"},
             ]
         },
-        "0001/providers/Microsoft.Authorization/roleAssignments": {
+        "resourceGroups/rg1/0001/providers/Microsoft.Authorization/roleAssignments": {
             "value": [
                 {
-                    "properties": {"principalId": "user1", "principalType": "User", "roleDefinitionId": "id001"},
+                    "properties": {
+                        "principalId": "user1",
+                        "principalType": "User",
+                        "roleDefinitionId": "id001",
+                        "scope": "this",
+                    },
                     "id": "rol1",
                 },
             ]
         },
-        "0002/providers/Microsoft.Authorization/roleAssignments": {
+        "resourceGroups/rg1/0002/providers/Microsoft.Authorization/roleAssignments": {
             "value": [
                 {
                     "properties": {
                         "principalId": "user2",
                         "principalType": "ServicePrincipal",
                         "roleDefinitionId": "id001",
+                        "scope": "this",
                     },
                     "id": "rol1",
                 },
@@ -1698,13 +1705,14 @@ def get_az_api_mapping(*args, **kwargs):
                 "roleName": "Contributor",
             },
         },
-        "0003/providers/Microsoft.Authorization/roleAssignments": {
+        "resourceGroups/rg1/0003/providers/Microsoft.Authorization/roleAssignments": {
             "value": [
                 {
                     "properties": {
                         "principalId": "user3",
                         "principalType": "ServicePrincipal",
                         "roleDefinitionId": "id002",
+                        "scope": "this",
                     },
                     "id": "rol1",
                 },
@@ -1713,6 +1721,7 @@ def get_az_api_mapping(*args, **kwargs):
                         "principalId": "user3",
                         "principalType": "ServicePrincipal",
                         "roleDefinitionId": "id002",
+                        "scope": "this",
                     },
                     "id": "rol2",
                 },
@@ -1724,9 +1733,67 @@ def get_az_api_mapping(*args, **kwargs):
                 "roleName": "Storage Blob Data Owner",
             },
         },
+        "/subscriptions/002/resourceGroups/rg1/providers/Microsoft.Storage"
+        "/storageAccounts/sto2/blobServices/default/containers": {
+            "value": [
+                {"name": "container1", "id": "resourceGroups/rg1/0002/container1"},
+                {"name": "container2", "id": "resourceGroups/rg1/0002/container2"},
+                {"name": "container3", "id": "resourceGroups/rg1/0002/container3"},
+            ]
+        },
+        "resourceGroups/rg1/0002/container1/providers/Microsoft.Authorization/roleAssignments": {
+            "value": [
+                {
+                    "properties": {
+                        "principalId": "user2",
+                        "principalType": "ServicePrincipal",
+                        "roleDefinitionId": "id001",
+                        "scope": "this",
+                    },
+                    "id": "rol1",
+                },
+            ]
+        },
+        "resourceGroups/rg1/0002/container2/providers/Microsoft.Authorization/roleAssignments": {
+            "value": [
+                {
+                    "properties": {
+                        "principalId": "user1",
+                        "principalType": "User",
+                        "roleDefinitionId": "id001",
+                        "scope": "this",
+                    },
+                    "id": "rol1",
+                },
+            ]
+        },
+        "resourceGroups/rg1/0002/container3/providers/Microsoft.Authorization/roleAssignments": {
+            "value": [
+                {
+                    "properties": {
+                        "principalId": "user3",
+                        "principalType": "ServicePrincipal",
+                        "roleDefinitionId": "id002",
+                        "scope": "resourceGroups/rg1/0002/container3",
+                    },
+                    "id": "rol1",
+                },
+                {
+                    "properties": {
+                        "principalId": "user3",
+                        "principalType": "ServicePrincipal",
+                        "roleDefinitionId": "id002",
+                        "scope": "resourceGroups/rg1/0002/container3/providers/Microsoft.Authorization/roleAssignments",
+                    },
+                    "id": "rol2",
+                },
+            ]
+        },
     }
-
-    return mapping[args[1]]
+    if args[1] in mapping:
+        return mapping[args[1]]
+    else:
+        return {}
 
 
 def test_get_current_tenant_subscriptions(az_token, mocker):
@@ -1753,7 +1820,7 @@ def test_get_current_tenant_storage_accounts(mocker, az_token):
     mocker.patch("databricks.sdk.core.ApiClient.do", side_effect=get_az_api_mapping)
     storage_accts = list(az_res_perm._get_current_tenant_storage_accounts())
     assert storage_accts[0].name == "sto2"
-    assert storage_accts[0].resource_id == "0002"
+    assert storage_accts[0].resource_id == "resourceGroups/rg1/0002"
 
 
 def test_get_role_assignments_with_no_spn(mocker, az_token):
@@ -1764,7 +1831,7 @@ def test_get_role_assignments_with_no_spn(mocker, az_token):
         location,
     )
     mocker.patch("databricks.sdk.core.ApiClient.do", side_effect=get_az_api_mapping)
-    role_assignment = az_res_perm._get_role_assignments("0001")
+    role_assignment = az_res_perm._get_valid_role_assignments("resourceGroups/rg1/0001")
     assert len(role_assignment) == 0
 
 
@@ -1776,7 +1843,7 @@ def test_get_role_assignments_with_spn_no_blob_permission(mocker, az_token):
         location,
     )
     mocker.patch("databricks.sdk.core.ApiClient.do", side_effect=get_az_api_mapping)
-    role_assignment = az_res_perm._get_role_assignments("0002")
+    role_assignment = az_res_perm._get_valid_role_assignments("resourceGroups/rg1/0002")
     assert len(role_assignment) == 0
 
 
@@ -1788,7 +1855,8 @@ def test_get_role_assignments_with_spn_and_blob_permission(mocker, az_token):
         location,
     )
     mocker.patch("databricks.sdk.core.ApiClient.do", side_effect=get_az_api_mapping)
-    role_assignments = az_res_perm._get_role_assignments("0003")
+    role_assignments = az_res_perm._get_valid_role_assignments("resourceGroups/rg1/0003")
+    assert len(role_assignments) == 1
     for role_assignment in role_assignments:
         assert role_assignment.principal_id == "user3"
         assert role_assignment.role_name == "Storage Blob Data Owner"
@@ -1824,3 +1892,21 @@ def test_save_spn_permissions_valid_storage_accounts(caplog, mocker, az_token):
     mocker.patch("databricks.sdk.core.ApiClient.do", side_effect=get_az_api_mapping)
     az_res_perm.save_spn_permissions()
     w.workspace.upload.assert_called()
+
+
+def test_get_container_permission_info(mocker, az_token):
+    w = create_autospec(WorkspaceClient)
+    location = ExternalLocations(w, MockBackend(), "ucx")
+    az_res_perm = AzureResourcePermissions(
+        w,
+        location,
+    )
+    mocker.patch("databricks.sdk.core.ApiClient.do", side_effect=get_az_api_mapping)
+    storage_account = AzureStorageAccount(
+        name="sto2", resource_id="resourceGroups/rg1/0003", subscription_id="002", resource_group="rg1"
+    )
+    role_assignments = az_res_perm._get_container_permission_info(storage_account)
+    assert len(role_assignments) == 1
+    for role_assignment in role_assignments:
+        assert role_assignment.spn_client_id == "user3"
+        assert role_assignment.role_name == "Storage Blob Data Owner"

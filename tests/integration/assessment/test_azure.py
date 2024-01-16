@@ -148,7 +148,7 @@ def test_azure_storage_accounts(ws, sql_backend, inventory_schema):
 # @pytest.mark.skip
 def test_save_spn_permissions_local(ws, sql_backend, inventory_schema):
     tables = [
-        ExternalLocation("pathtostorageaccount", 1),
+        ExternalLocation("abfss://deltalake@oneenvadls.dfs.core.windows.net/folder1", 1),
     ]
     sql_backend.save_table(f"{inventory_schema}.external_locations", tables, ExternalLocation)
     location = ExternalLocations(ws, sql_backend, inventory_schema)
