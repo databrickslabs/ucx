@@ -1,6 +1,10 @@
 ## Changes
-
 <!-- Summary of your changes that are easy to understand. Add screenshots when necessary -->
+
+### Linked issues
+<!-- DOC: Link issue with a keyword: close, closes, closed, fix, fixes, fixed, resolve, resolves, resolved. See https://docs.github.com/en/issues/tracking-your-work-with-issues/linking-a-pull-request-to-an-issue#linking-a-pull-request-to-an-issue-using-a-keyword -->
+
+Resolves #..
 
 ### Functionality 
 
@@ -9,7 +13,7 @@
 - [ ] modified existing command: `databricks labs ucx ...`
 - [ ] added a new workflow
 - [ ] modified existing workflow: `...`
-- [ ] added new table
+- [ ] added a new table
 - [ ] modified existing table: `...`
 
 ### Tests
