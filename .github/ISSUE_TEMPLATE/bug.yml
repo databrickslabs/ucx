@@ -18,7 +18,11 @@ body:
   - type: textarea
     attributes:
       label: Current Behavior
-      description: A concise description of what you're experiencing.
+      description: |
+        A concise description of what you're experiencing.
+        **Do not paste links to attachments with logs and/or images, as all issues will attachments will get deleted.**
+        Use the `Relevant log output` field to paste redacted log output without personal identifying information (PII).
+        You can Ctrl/Cmd+V the screenshot, which would appear as a rendered image if it doesn't contain any PII.
     validations:
       required: false
   - type: textarea
