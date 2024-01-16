@@ -92,7 +92,9 @@ def test_skip_no_ucx(caplog, mocker):
 
 
 def test_sync_workspace_info():
-    with patch("databricks.labs.ucx.account.AccountWorkspaces.sync_workspace_info", return_value=None) as s:
+    with patch("databricks.labs.ucx.account.AccountWorkspaces.sync_workspace_info", return_value=None) as s, patch(
+        "databricks.labs.ucx.account.AccountWorkspaces.__init__", return_value=None
+    ):
         sync_workspace_info(create_autospec(AccountClient))
         s.assert_called_once()
 
