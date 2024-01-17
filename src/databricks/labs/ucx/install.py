@@ -916,9 +916,7 @@ class WorkspaceInstaller:
             latest_repair_run_id = run_details.repair_history[-1].id
             job_url = f"{self._ws.config.host}#job/{job_id}/run/{run_id}"
             logger.debug(f"Repair Running {workflow} job: {job_url}")
-            repair_run = self._ws.jobs.repair_run(
-                run_id=run_id, rerun_all_failed_tasks=True, latest_repair_id=latest_repair_run_id
-            )
+            self._ws.jobs.repair_run(run_id=run_id, rerun_all_failed_tasks=True, latest_repair_id=latest_repair_run_id)
             webbrowser.open(job_url)
         except InvalidParameterValue as e:
             logger.warning(f"skipping {workflow}: {e}")
