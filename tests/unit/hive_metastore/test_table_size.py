@@ -1,7 +1,5 @@
 import sys
 
-import pytest
-
 from databricks.labs.ucx.hive_metastore.table_size import TableSize, TableSizeCrawler
 from tests.unit.framework.mocks import MockBackend
 
@@ -38,7 +36,7 @@ def test_table_size_crawler(mocker):
     assert TableSize("hive_metastore", "db1", "table2", 200) in results
 
 
-def test_table_size_table_not_found_unknown_message(mocker):
+def test_table_size_unknown_error(mocker):
     errors = {}
     rows = {
         "table_size": [],
@@ -53,8 +51,9 @@ def test_table_size_table_not_found_unknown_message(mocker):
     tsc = TableSizeCrawler(backend, "inventory_database")
     tsc._spark._jsparkSession.table().queryExecution().analyzed().stats().sizeInBytes.side_effect = Exception(...)
 
-    with pytest.raises(RuntimeError):
-        tsc.snapshot()
+    results = tsc.snapshot()
+
+    assert len(results) == 0
 
 
 def test_table_size_table_or_view_not_found(mocker):
@@ -74,6 +73,30 @@ def test_table_size_table_or_view_not_found(mocker):
     # table removed after crawling
     tsc._spark._jsparkSession.table().queryExecution().analyzed().stats().sizeInBytes.side_effect = Exception(
         "[TABLE_OR_VIEW_NOT_FOUND]"
+    )
+
+    results = tsc.snapshot()
+
+    assert len(results) == 0
+
+
+def test_table_size_delta_table_not_found(mocker):
+    errors = {}
+    rows = {
+        "table_size": [],
+        "hive_metastore.inventory_database.tables": [
+            ("hive_metastore", "db1", "table1", "MANAGED", "DELTA", "dbfs:/location/table", None),
+        ],
+        "SHOW DATABASES": [("db1",)],
+    }
+    backend = MockBackend(fails_on_first=errors, rows=rows)
+    pyspark_sql_session = mocker.Mock()
+    sys.modules["pyspark.sql.session"] = pyspark_sql_session
+    tsc = TableSizeCrawler(backend, "inventory_database")
+
+    # table removed after crawling
+    tsc._spark._jsparkSession.table().queryExecution().analyzed().stats().sizeInBytes.side_effect = Exception(
+        "[DELTA_TABLE_NOT_FOUND]"
     )
 
     results = tsc.snapshot()

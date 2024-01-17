@@ -279,10 +279,10 @@ class TableMove:
 
             return True
         except NotFound as err:
-            if "[TABLE_OR_VIEW_NOT_FOUND]" in str(err):
+            if "[TABLE_OR_VIEW_NOT_FOUND]" in str(err) or "[DELTA_TABLE_NOT_FOUND]" in str(err):
                 logger.error(f"Could not find table {from_table_name}. Table not found.")
             else:
-                logger.error(err)
+                logger.error(f"Failed to move table {from_table_name}: {err!s}", exc_info=True)
         return False
 
     def _move_view(
@@ -320,5 +320,5 @@ class TableMove:
             if "[TABLE_OR_VIEW_NOT_FOUND]" in str(err):
                 logger.error(f"Could not find view {from_view_name}. View not found.")
             else:
-                logger.error(err)
+                logger.error(f"Failed to move view {from_view_name}: {err!s}", exc_info=True)
         return False
