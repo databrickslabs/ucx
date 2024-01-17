@@ -82,3 +82,7 @@ commands:
 
   - name: save-azure-storage-accounts
     description: Identifies all storage account used by tables, identify spn and its permission on each storage accounts
+    flags:
+      - name: subscription-id
+        description: Subscription to scan storage account in
+

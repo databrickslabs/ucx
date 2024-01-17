@@ -492,7 +492,7 @@ class AzureResourcePermissions:
             "Storage Blob Data Reader": Privilege.READ_FILES,
         }
 
-    def _map_storage(self, storage: AzureResource) -> list:
+    def _map_storage(self, storage: AzureResource) -> list[StoragePermissionMapping]:
         logger.info(f"Fetching role assignment for {storage.storage_account}")
         out = []
         for container in self._azurerm.containers(storage):
@@ -544,13 +544,6 @@ class AzureResourcePermissions:
         path = f"{self._folder}/azure_storage_account_info.csv"
         self._ws.workspace.upload(path, buffer, overwrite=True, format=ImportFormat.AUTO)
         return path
-
-    def _get_valid_role_assignments(self, resource_id: str) -> list[AzureRoleAssignment]:
-        permission_info = []
-        for role_assignment in self._azurerm.role_assignments(resource_id):
-            if role_assignment.role_name in self._levels:
-                permission_info.append(role_assignment)
-        return permission_info
 
     def _get_storage_accounts(self) -> list[str]:
         external_locations = self._locations.snapshot()
