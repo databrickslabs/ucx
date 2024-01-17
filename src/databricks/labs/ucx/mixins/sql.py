@@ -7,7 +7,7 @@ from datetime import timedelta
 from typing import Any
 
 from databricks.sdk import errors
-from databricks.sdk.errors import NotFound
+from databricks.sdk.errors import DataLoss, NotFound
 from databricks.sdk.service.sql import (
     ColumnInfoTypeName,
     Disposition,
@@ -106,6 +106,10 @@ class StatementExecutionExt(StatementExecutionAPI):
             raise NotFound(error_message)
         if "TABLE_OR_VIEW_NOT_FOUND" in error_message:
             raise NotFound(error_message)
+        if "DELTA_TABLE_NOT_FOUND" in error_message:
+            raise NotFound(error_message)
+        if "DELTA_MISSING_TRANSACTION_LOG" in error_message:
+            raise DataLoss(error_message)
         mapping = {
             ServiceErrorCode.ABORTED: errors.Aborted,
             ServiceErrorCode.ALREADY_EXISTS: errors.AlreadyExists,

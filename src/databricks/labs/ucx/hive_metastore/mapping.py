@@ -102,12 +102,12 @@ class TableMapping:
                 f"ALTER TABLE `{schema}`.`{table}` SET TBLPROPERTIES('{self.UCX_SKIP_PROPERTY}' = true)"
             )
         except NotFound as nf:
-            if "[TABLE_OR_VIEW_NOT_FOUND]" in str(nf):
+            if "[TABLE_OR_VIEW_NOT_FOUND]" in str(nf) or "[DELTA_TABLE_NOT_FOUND]" in str(nf):
                 logger.error(f"Failed to apply skip marker for Table {schema}.{table}. Table not found.")
             else:
-                logger.error(nf)
+                logger.error(f"Failed to apply skip marker for Table {schema}.{table}: {nf!s}", exc_info=True)
         except BadRequest as br:
-            logger.error(br)
+            logger.error(f"Failed to apply skip marker for Table {schema}.{table}: {br!s}", exc_info=True)
 
     def skip_schema(self, schema: str):
         # Marks a schema to be skipped in the migration process by applying a table property
