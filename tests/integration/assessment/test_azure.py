@@ -8,6 +8,7 @@ from databricks.sdk.service import compute, jobs
 
 from databricks.labs.ucx.assessment.azure import (
     AzureResourcePermissions,
+    AzureResources,
     AzureServicePrincipalCrawler,
     StoragePermissionMapping,
 )
@@ -23,15 +24,6 @@ from .test_assessment import (
     _TEST_STORAGE_ACCOUNT,
     _TEST_TENANT_ID,
 )
-
-
-@pytest.mark.skip
-def test_azure_permissions(ws):
-    logging.getLogger("databricks").setLevel("DEBUG")
-    arp = AzureResourcePermissions(ws)
-    x = arp.role_assignments("/subscriptions/.../resourceGroups/.../providers/Microsoft.Storage/storageAccounts/...")
-    y = list(x)
-    assert y
 
 
 @retried(on=[NotFound], timeout=timedelta(minutes=3))
@@ -174,9 +166,6 @@ def test_save_spn_permissions_local(ws, sql_backend, inventory_schema):
     ]
     sql_backend.save_table(f"{inventory_schema}.external_locations", tables, ExternalLocation)
     location = ExternalLocations(ws, sql_backend, inventory_schema)
-    az_res_perm = AzureResourcePermissions(
-        ws,
-        location,
-    )
+    az_res_perm = AzureResourcePermissions(ws, AzureResources(ws), location)
     path = az_res_perm.save_spn_permissions()
     assert ws.workspace.get_status(path)
