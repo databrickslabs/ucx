@@ -66,7 +66,6 @@ commands:
       - name: delete_managed
         description: Revert and delete managed tables
 
-
   - name: move
     description: move tables across schema/catalog withing a UC metastore
     flags:
@@ -80,3 +79,10 @@ commands:
         description: target catalog to migrate schema to
       - name: to-schema
         description: target schema to migrate tables to
+
+  - name: save-azure-storage-accounts
+    description: Identifies all storage account used by tables, identify spn and its permission on each storage accounts
+    flags:
+      - name: subscription-id
+        description: Subscription to scan storage account in
+
