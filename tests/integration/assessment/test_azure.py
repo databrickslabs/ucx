@@ -159,15 +159,15 @@ def test_save_spn_permissions(ws, sql_backend, inventory_schema):
         assert m.storage_acct_name == "labsazurethings"
 
 
-# @pytest.mark.skip
+@pytest.mark.skip
 def test_save_spn_permissions_local(ws, sql_backend, inventory_schema):
     tables = [
-        ExternalLocation("abfss://deltalake@oneenvadls.dfs.core.windows.net/folder1", 1),
+        ExternalLocation("abfss://contname@storagename.dfs.core.windows.net/folder1", 1),
     ]
     sql_backend.save_table(f"{inventory_schema}.external_locations", tables, ExternalLocation)
     location = ExternalLocations(ws, sql_backend, inventory_schema)
     az_res_perm = AzureResourcePermissions(
-        ws, AzureResources(ws, include_subscriptions="3f2e4d32-8e8d-46d6-82bc-5bb8d962328b"), location
+        ws, AzureResources(ws, include_subscriptions=""), location
     )
     path = az_res_perm.save_spn_permissions()
     assert ws.workspace.get_status(path)
