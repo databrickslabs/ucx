@@ -883,6 +883,8 @@ class WorkspaceInstaller:
 
     def repair_run(self, workflow):
         try:
+            start_time = time.time()
+            timeout = 20
             job_id = self._state.jobs.get(workflow)
             if not job_id:
                 logger.warning(f"{workflow} job does not exists hence skipping Repair Run")
@@ -893,13 +895,30 @@ class WorkspaceInstaller:
                 return
             latest_job_run = job_runs[0]
             state = latest_job_run.state
+
+            while not state.result_state and (time.time() - start_time < timeout):
+                logger.info("Waiting for the result_state to update the state")
+                time.sleep(10)
+                job_runs = list(self._ws.jobs.list_runs(job_id=job_id, limit=1))
+                latest_job_run = job_runs[0]
+                state = latest_job_run.state
+
+            if not state.result_state:
+                logger.warning(f"{workflow} job result state is not updated.Please try after some time")
+                return
+            logger.info(f"The status for the latest run is {state.result_state.value}")
+
             if state.result_state.value != "FAILED":
                 logger.warning(f"{workflow} job is not in FAILED state hence skipping Repair Run")
                 return
             run_id = latest_job_run.run_id
+            run_details = self._ws.jobs.get_run(run_id=run_id, include_history=True)
+            latest_repair_run_id = run_details.repair_history[-1].id
             job_url = f"{self._ws.config.host}#job/{job_id}/run/{run_id}"
             logger.debug(f"Repair Running {workflow} job: {job_url}")
-            self._ws.jobs.repair_run(run_id=run_id, rerun_all_failed_tasks=True)
+            repair_run = self._ws.jobs.repair_run(
+                run_id=run_id, rerun_all_failed_tasks=True, latest_repair_id=latest_repair_run_id
+            )
             webbrowser.open(job_url)
         except InvalidParameterValue as e:
             logger.warning(f"skipping {workflow}: {e}")

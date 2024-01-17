@@ -1179,3 +1179,22 @@ def test_repair_run_exception(ws):
     install._state.jobs = {"assessment": "123"}
     ws.jobs.list_runs.side_effect = InvalidParameterValue("Workflow does not exists")
     install.repair_run("assessment")
+
+
+def test_repair_run_result_state(ws, caplog):
+    base = [
+        BaseRun(
+            job_clusters=None,
+            job_id=677268692725050,
+            job_parameters=None,
+            number_in_job=725118654200173,
+            run_id=725118654200173,
+            run_name="[UCX] assessment",
+            state=RunState(result_state=None),
+        )
+    ]
+    install = WorkspaceInstaller(ws)
+    install._state.jobs = {"assessment": "123"}
+    ws.jobs.list_runs.return_value = base
+    ws.jobs.list_runs.repair_run = None
+    install.repair_run("assessment")
