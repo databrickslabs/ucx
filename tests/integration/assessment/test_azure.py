@@ -166,8 +166,6 @@ def test_save_spn_permissions_local(ws, sql_backend, inventory_schema):
     ]
     sql_backend.save_table(f"{inventory_schema}.external_locations", tables, ExternalLocation)
     location = ExternalLocations(ws, sql_backend, inventory_schema)
-    az_res_perm = AzureResourcePermissions(
-        ws, AzureResources(ws, include_subscriptions=""), location
-    )
+    az_res_perm = AzureResourcePermissions(ws, AzureResources(ws, include_subscriptions=""), location)
     path = az_res_perm.save_spn_permissions()
     assert ws.workspace.get_status(path)
