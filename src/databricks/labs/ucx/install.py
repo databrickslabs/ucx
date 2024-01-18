@@ -891,8 +891,7 @@ class WorkspaceInstaller:
         job_runs = list(self._ws.jobs.list_runs(job_id=job_id, limit=1))
         latest_job_run = job_runs[0]
         if not latest_job_run.state.result_state:
-            logger.info("Waiting for the result_state to update the state")
-            time.sleep(10)
+            raise AttributeError("no result state in job run")
         job_state = latest_job_run.state.result_state.value
         return job_state
 
