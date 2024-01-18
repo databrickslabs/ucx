@@ -1,4 +1,5 @@
 import logging
+from collections import defaultdict
 from datetime import timedelta
 
 from databricks.sdk.errors import NotFound
@@ -64,18 +65,17 @@ def test_all_grants_for_udfs_in_databases(sql_backend, inventory_schema, make_sc
     udf_b = make_udf(schema_name=schema.name)
 
     sql_backend.execute(f"GRANT SELECT ON FUNCTION {udf_a.full_name} TO `{group.display_name}`")
+    sql_backend.execute(f"GRANT READ_METADATA ON FUNCTION {udf_a.full_name} TO `{group.display_name}`")
     sql_backend.execute(f"ALTER FUNCTION {udf_a.full_name} OWNER TO `{group.display_name}`")
-    sql_backend.execute(f"GRANT READ_METADATA ON FUNCTION {udf_b.full_name} TO `{group.display_name}`")
+    sql_backend.execute(f"GRANT ALL PRIVILEGES ON FUNCTION {udf_b.full_name} TO `{group.display_name}`")
 
     tables = StaticTablesCrawler(sql_backend, inventory_schema, [])
     udfs = StaticUdfsCrawler(sql_backend, inventory_schema, [udf_a, udf_b])
     grants = GrantsCrawler(tables, udfs)
 
-    all_grants = set()
+    actual_grants = defaultdict(set)
     for grant in grants.snapshot():
-        logging.info(f"grant:\n{grant}\n  hive: {grant.hive_grant_sql()}\n  uc: {grant.uc_grant_sql()}")
-        all_grants.add(f"{grant.principal}.{grant.object_key}:{grant.action_type}")
+        actual_grants[f"{grant.principal}.{grant.object_key}"].add(grant.action_type)
 
-    assert f"{group.display_name}.{udf_a.full_name}:SELECT" in all_grants
-    assert f"{group.display_name}.{udf_a.full_name}:OWN" in all_grants
-    assert f"{group.display_name}.{udf_b.full_name}:READ_METADATA" in all_grants
+    assert {"SELECT", "READ_METADATA", "OWN"} == actual_grants[f"{group.display_name}.{udf_a.full_name}"]
+    assert {"SELECT", "READ_METADATA"} == actual_grants[f"{group.display_name}.{udf_b.full_name}"]

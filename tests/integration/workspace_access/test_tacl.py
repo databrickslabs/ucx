@@ -1,4 +1,5 @@
 import logging
+from collections import defaultdict
 
 from databricks.labs.ucx.hive_metastore import GrantsCrawler
 from databricks.labs.ucx.workspace_access.groups import MigratedGroup
@@ -123,3 +124,39 @@ def test_hms2hms_owner_permissions(sql_backend, inventory_schema, make_schema, m
         "SELECT",
         "USAGE",
     }, second.name_in_account
+
+
+def test_permission_for_udfs(sql_backend, inventory_schema, make_schema, make_udf, make_group_pair):
+    group = make_group_pair()
+    schema = make_schema()
+    udf_a = make_udf(schema_name=schema.name)
+    udf_b = make_udf(schema_name=schema.name)
+
+    sql_backend.execute(f"GRANT SELECT ON FUNCTION {udf_a.full_name} TO `{group.name_in_workspace}`")
+    sql_backend.execute(f"ALTER FUNCTION {udf_a.full_name} OWNER TO `{group.name_in_workspace}`")
+    sql_backend.execute(f"GRANT READ_METADATA ON FUNCTION {udf_b.full_name} TO `{group.name_in_workspace}`")
+
+    tables = StaticTablesCrawler(sql_backend, inventory_schema, [])
+    udfs = StaticUdfsCrawler(sql_backend, inventory_schema, [udf_a, udf_b])
+    grants = GrantsCrawler(tables, udfs)
+
+    all_initial_grants = set()
+    for grant in grants.snapshot():
+        all_initial_grants.add(f"{grant.principal}.{grant.object_key}:{grant.action_type}")
+
+    assert f"{group.name_in_workspace}.{udf_a.full_name}:SELECT" in all_initial_grants
+    assert f"{group.name_in_workspace}.{udf_a.full_name}:OWN" in all_initial_grants
+    assert f"{group.name_in_workspace}.{udf_b.full_name}:READ_METADATA" in all_initial_grants
+
+    tacl_support = TableAclSupport(grants, sql_backend)
+    apply_tasks(tacl_support, [group])
+
+    actual_udf_a_grants = defaultdict(set)
+    for grant in grants._grants(catalog=schema.catalog_name, database=schema.name, udf=udf_a.name):
+        actual_udf_a_grants[grant.principal].add(grant.action_type)
+    assert {"SELECT", "OWN"} == actual_udf_a_grants[group.name_in_account]
+
+    actual_udf_b_grants = defaultdict(set)
+    for grant in grants._grants(catalog=schema.catalog_name, database=schema.name, udf=udf_b.name):
+        actual_udf_b_grants[grant.principal].add(grant.action_type)
+    assert {"READ_METADATA"} == actual_udf_b_grants[group.name_in_account]

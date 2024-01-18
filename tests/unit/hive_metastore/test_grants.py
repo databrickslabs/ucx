@@ -332,7 +332,6 @@ def test_udf_grants_returning_error_when_describing():
         "SHOW USER FUNCTIONS FROM hive_metastore.test_database": [
             make_row(("hive_metastore.test_database.function_bad",), ["function"]),
             make_row(("hive_metastore.test_database.function_good",), ["function"]),
-            make_row((), ["function"]),
         ],
         "SHOW GRANTS ON FUNCTION hive_metastore.test_database.function_good": [("principal1", "OWN", "FUNCTION", "")],
         "DESCRIBE *": [
