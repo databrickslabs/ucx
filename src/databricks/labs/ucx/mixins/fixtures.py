@@ -21,6 +21,7 @@ from databricks.sdk.service import compute, iam, jobs, pipelines, sql, workspace
 from databricks.sdk.service.catalog import (
     CatalogInfo,
     DataSourceFormat,
+    FunctionInfo,
     SchemaInfo,
     TableInfo,
     TableType,
@@ -1015,6 +1016,47 @@ def make_table(ws, sql_backend, make_schema, make_random) -> Generator[Callable[
         except RuntimeError as e:
             if "Cannot drop a view" in str(e):
                 sql_backend.execute(f"DROP VIEW IF EXISTS {table_info.full_name}")
+            elif "SCHEMA_NOT_FOUND" in str(e):
+                logger.warning("Schema was already dropped while executing the test", exc_info=e)
+            else:
+                raise e
+
+    yield from factory("table", create, remove)
+
+
+@pytest.fixture
+def make_udf(sql_backend, make_schema, make_random) -> Generator[Callable[..., FunctionInfo], None, None]:
+    def create(
+        *, catalog_name="hive_metastore", schema_name: str | None = None, name: str | None = None
+    ) -> FunctionInfo:
+        if schema_name is None:
+            schema = make_schema(catalog_name=catalog_name)
+            catalog_name = schema.catalog_name
+            schema_name = schema.name
+
+        if name is None:
+            name = f"ucx_T{make_random(4)}".lower()
+
+        full_name = f"{catalog_name}.{schema_name}.{name}".lower()
+        ddl = f"CREATE FUNCTION {full_name}(x INT) RETURNS FLOAT CONTAINS SQL DETERMINISTIC RETURN 0;"
+
+        sql_backend.execute(ddl)
+        udf_info = FunctionInfo(
+            catalog_name=catalog_name,
+            schema_name=schema_name,
+            name=name,
+            full_name=full_name,
+        )
+
+        logger.info(f"Function {udf_info.full_name} crated")
+        return udf_info
+
+    def remove(udf_info: FunctionInfo):
+        try:
+            sql_backend.execute(f"DROP FUNCTION IF EXISTS {udf_info.full_name}")
+        except RuntimeError as e:
+            if "Cannot drop udf " in str(e):
+                sql_backend.execute(f"DROP FUNCTION IF EXISTS {udf_info.full_name}")
             elif "SCHEMA_NOT_FOUND" in str(e):
                 logger.warning("Schema was already dropped while executing the test", exc_info=e)
             else:

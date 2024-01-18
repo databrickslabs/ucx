@@ -63,7 +63,8 @@ class UdfsCrawler(CrawlerBase):
         catalog = "hive_metastore"
         for (database,) in self._all_databases():
             logger.debug(f"[{catalog}.{database}] listing udfs")
-            for udf in self._fetch(f"SHOW USER FUNCTIONS FROM {catalog}.{database}"):
+            for udf_row in self._fetch(f"SHOW USER FUNCTIONS FROM {catalog}.{database}"):
+                udf = udf_row[0]  # each function is returned as separate row
                 if udf.startswith(f"{catalog}.{database}"):
                     udf_name = udf[udf.rfind(".") + 1 :]  # remove catalog and database info from the name
                     tasks.append(partial(self._describe, catalog, database, udf_name))

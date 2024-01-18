@@ -4,7 +4,7 @@ from databricks.labs.ucx.hive_metastore import GrantsCrawler
 from databricks.labs.ucx.workspace_access.groups import MigratedGroup
 from databricks.labs.ucx.workspace_access.tacl import TableAclSupport
 
-from ..conftest import StaticTablesCrawler
+from ..conftest import StaticTablesCrawler, StaticUdfsCrawler
 from . import apply_tasks
 
 logger = logging.getLogger(__name__)
@@ -20,7 +20,8 @@ def test_permission_for_files_anonymous_func(sql_backend, inventory_schema, make
     sql_backend.execute(f"GRANT SELECT ON ANONYMOUS FUNCTION TO `{old.display_name}`")
 
     tables = StaticTablesCrawler(sql_backend, inventory_schema, [])
-    grants = GrantsCrawler(tables)
+    udfs = StaticUdfsCrawler(sql_backend, inventory_schema, [])
+    grants = GrantsCrawler(tables, udfs)
 
     tacl_support = TableAclSupport(grants, sql_backend)
     apply_tasks(tacl_support, [MigratedGroup.partial_info(old, new)])
@@ -70,7 +71,8 @@ def test_hms2hms_owner_permissions(sql_backend, inventory_schema, make_schema, m
     sql_backend.execute(f"GRANT SELECT, MODIFY ON TABLE {table_c.full_name} TO `{third.name_in_workspace}`")
 
     tables = StaticTablesCrawler(sql_backend, inventory_schema, [table_a, table_b, table_c])
-    grants = GrantsCrawler(tables)
+    udfs = StaticUdfsCrawler(sql_backend, inventory_schema, [])
+    grants = GrantsCrawler(tables, udfs)
 
     original_table_grants = {
         "a": grants.for_table_info(table_a),

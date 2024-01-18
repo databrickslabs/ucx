@@ -219,8 +219,8 @@ def test_crawler_udf_crawl():
                 make_row(("database_one",), ["databaseName"]),
             ],
             "SHOW USER FUNCTIONS FROM hive_metastore.database_one": [
-                ("hive_metastore.database_one.function_one"),
-                ("hive_metastore.database_one.function_two"),
+                make_row(("hive_metastore.database_one.function_one",), ["function"]),
+                make_row(("hive_metastore.database_one.function_two",), ["function"]),
             ],
             "DESCRIBE FUNCTION EXTENDED hive_metastore.database_one.*": [
                 ("Type: SCALAR"),
@@ -330,8 +330,9 @@ def test_udf_grants_returning_error_when_describing():
             make_row(("other_database",), ["databaseName"]),
         ],
         "SHOW USER FUNCTIONS FROM hive_metastore.test_database": [
-            ("hive_metastore.test_database.function_bad"),
-            ("hive_metastore.test_database.function_good"),
+            make_row(("hive_metastore.test_database.function_bad",), ["function"]),
+            make_row(("hive_metastore.test_database.function_good",), ["function"]),
+            make_row((), ["function"]),
         ],
         "SHOW GRANTS ON FUNCTION hive_metastore.test_database.function_good": [("principal1", "OWN", "FUNCTION", "")],
         "DESCRIBE *": [
