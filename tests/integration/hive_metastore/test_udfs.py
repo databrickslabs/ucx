@@ -21,10 +21,8 @@ def test_describe_all_udfs_in_databases(ws, sql_backend, inventory_schema, make_
 
     unique_udf_grants = {
         grant.name
-        for grant
-        in actual_grants
+        for grant in actual_grants
         if f"{grant.catalog}.{grant.database}.{grant.name}" in [udf_a.full_name, udf_b.full_name]
     }
 
     assert len(unique_udf_grants) == 2
-

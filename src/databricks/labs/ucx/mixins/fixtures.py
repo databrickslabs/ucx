@@ -15,7 +15,7 @@ from typing import BinaryIO, Optional
 import pytest
 from databricks.sdk import AccountClient, WorkspaceClient
 from databricks.sdk.core import DatabricksError
-from databricks.sdk.errors import ResourceConflict, NotFound
+from databricks.sdk.errors import NotFound, ResourceConflict
 from databricks.sdk.retries import retried
 from databricks.sdk.service import compute, iam, jobs, pipelines, sql, workspace
 from databricks.sdk.service.catalog import (
