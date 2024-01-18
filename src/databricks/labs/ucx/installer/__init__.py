@@ -60,7 +60,6 @@ class InstallationManager:
         except IllegalState:
             return None
 
-
     def user_installations(self) -> list[Installation]:
         tasks = []
         for user in self._ws.users.list(attributes="userName", count=500):
