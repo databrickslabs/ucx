@@ -1,11 +1,17 @@
+import logging
 import subprocess
 import json
+from dataclasses import dataclass
+
+logger = logging.getLogger(__name__)
 
 
-def run_command(command):
-    process = subprocess.Popen(command, stdout=subprocess.PIPE, stderr=subprocess.PIPE, shell=True)
-    output, error = process.communicate()
-    return process.returncode, output.decode("utf-8"), error.decode("utf-8")
+@dataclass
+class AWSRole:
+    path: str
+    role_name: str
+    role_id: str
+    arn: str
 
 
 def iam_profiles():
@@ -70,3 +76,66 @@ def iam_profiles():
     else:
         print("Error listing IAM roles.")
         print(roles_error)
+
+
+def run_command(command):
+    process = subprocess.Popen(command, stdout=subprocess.PIPE, stderr=subprocess.PIPE, shell=True)
+    output, error = process.communicate()
+    return process.returncode, output.decode("utf-8"), error.decode("utf-8")
+
+
+class AwsResources:
+    def __init__(self):
+        pass
+
+
+
+
+
+
+def validate_connection(profile: str):
+    validate_command = f"aws sts get-caller-identity --profile {profile}"
+    code, output, error = run_command(validate_command)
+    if code == 0:
+        logger.info(output)
+        return True
+    logger.error(error)
+    return False
+
+
+def get_roles_in_instance_profile(instance_profile_name: str):
+    get_instance_profile_cmd = f"aws iam get-instance-profile --instance-profile-name {instance_profile_name}"
+    code, output, error = run_command(get_instance_profile_cmd)
+    if code == 0:
+        ip_details = json.loads(output)
+        try:
+            for role in ip_details["InstanceProfile"]["Roles"]:
+                yield AWSRole(
+                    path=role["Path"],
+                    role_name=role["RoleName"],
+                    role_id=role["RoleId"],
+                    arn=role["Arn"]
+                )
+        except KeyError:
+            logger.error(f"Malformed response from AWS CLI {ip_details}")
+    logger.error(error)
+
+
+def get_policies_in_role(role_name: str):
+    get_policies_in_role_cmd = f"aws iam list-role-policies --role-name {role_name}"
+    code, output, error = run_command(get_policies_in_role_cmd)
+    if code == 0:
+        policies = json.loads(output)
+        for policy in policies.get("PolicyNames", []):
+            yield policy
+    logger.error(error)
+
+
+def get_attached_policies_in_role(role_name: str):
+    get_policies_in_role_cmd = f"aws iam list-attached-role-policies --role-name {role_name}"
+    code, output, error = run_command(get_policies_in_role_cmd)
+    if code == 0:
+        policies = json.loads(output)
+        for policy in policies.get("AttachedPolicies", []):
+            yield policy.get("PolicyName")
+    logger.error(error)
