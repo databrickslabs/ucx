@@ -48,7 +48,7 @@ class UdfsCrawler(CrawlerBase):
         Takes a snapshot of tables in the specified catalog and database.
 
         Returns:
-            list[Table]: A list of Udf objects representing the snapshot of tables.
+            list[Udf]: A list of Udf objects representing the snapshot of tables.
         """
         return self._snapshot(partial(self._try_load), partial(self._crawl))
 
