@@ -70,6 +70,8 @@ from databricks.labs.ucx.runtime import main
 from databricks.labs.ucx.workspace_access.base import Permissions
 from databricks.labs.ucx.workspace_access.generic import WorkspaceObjectInfo
 from databricks.labs.ucx.workspace_access.groups import ConfigureGroups, MigratedGroup
+from databricks.sdk.retries import retried
+from datetime import timedelta
 
 TAG_STEP = "step"
 TAG_APP = "App"
@@ -188,6 +190,9 @@ class WorkspaceInstaller:
         self._this_file = Path(__file__)
         self._dashboards: dict[str, str] = {}
         self._install_override_clusters = None
+        # if verify_timeout is None:
+        #     verify_timeout = timedelta(minutes=2)
+        # self._verify_timeout = verify_timeout
 
     def run(self):
         logger.info(f"Installing UCX v{self._product_info.version()}")
@@ -881,10 +886,15 @@ class WorkspaceInstaller:
                 continue
         return latest_status
 
+    def _get_result_state(self,job_id):
+        logger.info("Waiting for the result_state to update the state")
+        time.sleep(10)
+        job_runs = list(self._ws.jobs.list_runs(job_id=job_id, limit=1))
+        latest_job_run = job_runs[0]
+        return latest_job_run.state
+
     def repair_run(self, workflow):
         try:
-            start_time = time.time()
-            timeout = 20
             job_id = self._state.jobs.get(workflow)
             if not job_id:
                 logger.warning(f"{workflow} job does not exists hence skipping Repair Run")
@@ -894,14 +904,11 @@ class WorkspaceInstaller:
                 logger.warning(f"{workflow} job is not initialized yet. Can't trigger repair run now")
                 return
             latest_job_run = job_runs[0]
-            state = latest_job_run.state
-
-            while not state.result_state and (time.time() - start_time < timeout):
-                logger.info("Waiting for the result_state to update the state")
-                time.sleep(10)
-                job_runs = list(self._ws.jobs.list_runs(job_id=job_id, limit=1))
-                latest_job_run = job_runs[0]
-                state = latest_job_run.state
+            # state = latest_job_run.state
+            retry_on_attribute_error = retried(on=[AttributeError], timeout=timedelta(seconds=30))
+            retried_check = retry_on_attribute_error(self._get_result_state)
+            state = retried_check(job_id)
+            logger.info(f"STATE:::{state}")
 
             if not state.result_state:
                 logger.warning(f"{workflow} job result state is not updated.Please try after some time")
