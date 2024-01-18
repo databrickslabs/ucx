@@ -1,4 +1,5 @@
 import io
+from datetime import timedelta
 from pathlib import Path
 from typing import Any
 from unittest.mock import MagicMock, create_autospec, patch
@@ -1193,8 +1194,9 @@ def test_repair_run_result_state(ws, caplog):
             state=RunState(result_state=None),
         )
     ]
-    install = WorkspaceInstaller(ws)
+    install = WorkspaceInstaller(ws, verify_timeout=timedelta(seconds=5))
     install._state.jobs = {"assessment": "123"}
     ws.jobs.list_runs.return_value = base
     ws.jobs.list_runs.repair_run = None
     install.repair_run("assessment")
+    assert "Please try after some time" in caplog.text

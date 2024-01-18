@@ -7,6 +7,7 @@ import sys
 import time
 import webbrowser
 from dataclasses import replace
+from datetime import timedelta
 from pathlib import Path
 from typing import Any
 
@@ -41,6 +42,7 @@ from databricks.sdk.errors import (
     Unauthenticated,
     Unknown,
 )
+from databricks.sdk.retries import retried
 from databricks.sdk.service import compute, jobs
 from databricks.sdk.service.jobs import RunLifeCycleState, RunResultState
 from databricks.sdk.service.sql import EndpointInfoWarehouseType, SpotInstancePolicy
@@ -70,8 +72,6 @@ from databricks.labs.ucx.runtime import main
 from databricks.labs.ucx.workspace_access.base import Permissions
 from databricks.labs.ucx.workspace_access.generic import WorkspaceObjectInfo
 from databricks.labs.ucx.workspace_access.groups import ConfigureGroups, MigratedGroup
-from databricks.sdk.retries import retried
-from datetime import timedelta
 
 TAG_STEP = "step"
 TAG_APP = "App"
@@ -172,6 +172,7 @@ class WorkspaceInstaller:
         promtps: Prompts | None = None,
         wheels: Wheels | None = None,
         sql_backend: SqlBackend | None = None,
+        verify_timeout: timedelta | None = None,
     ):
         if "DATABRICKS_RUNTIME_VERSION" in os.environ:
             msg = "WorkspaceInstaller is not supposed to be executed in Databricks Runtime"
@@ -190,9 +191,9 @@ class WorkspaceInstaller:
         self._this_file = Path(__file__)
         self._dashboards: dict[str, str] = {}
         self._install_override_clusters = None
-        # if verify_timeout is None:
-        #     verify_timeout = timedelta(minutes=2)
-        # self._verify_timeout = verify_timeout
+        if verify_timeout is None:
+            verify_timeout = timedelta(minutes=2)
+        self._verify_timeout = verify_timeout
 
     def run(self):
         logger.info(f"Installing UCX v{self._product_info.version()}")
@@ -886,12 +887,14 @@ class WorkspaceInstaller:
                 continue
         return latest_status
 
-    def _get_result_state(self,job_id):
-        logger.info("Waiting for the result_state to update the state")
-        time.sleep(10)
+    def _get_result_state(self, job_id):
         job_runs = list(self._ws.jobs.list_runs(job_id=job_id, limit=1))
         latest_job_run = job_runs[0]
-        return latest_job_run.state
+        if not latest_job_run.state.result_state:
+            logger.info("Waiting for the result_state to update the state")
+            time.sleep(10)
+        job_state = latest_job_run.state.result_state.value
+        return job_state
 
     def repair_run(self, workflow):
         try:
@@ -904,18 +907,13 @@ class WorkspaceInstaller:
                 logger.warning(f"{workflow} job is not initialized yet. Can't trigger repair run now")
                 return
             latest_job_run = job_runs[0]
-            # state = latest_job_run.state
-            retry_on_attribute_error = retried(on=[AttributeError], timeout=timedelta(seconds=30))
+            retry_on_attribute_error = retried(on=[AttributeError], timeout=self._verify_timeout)
             retried_check = retry_on_attribute_error(self._get_result_state)
-            state = retried_check(job_id)
-            logger.info(f"STATE:::{state}")
+            state_value = retried_check(job_id)
 
-            if not state.result_state:
-                logger.warning(f"{workflow} job result state is not updated.Please try after some time")
-                return
-            logger.info(f"The status for the latest run is {state.result_state.value}")
+            logger.info(f"The status for the latest run is {state_value}")
 
-            if state.result_state.value != "FAILED":
+            if state_value != "FAILED":
                 logger.warning(f"{workflow} job is not in FAILED state hence skipping Repair Run")
                 return
             run_id = latest_job_run.run_id
@@ -927,6 +925,8 @@ class WorkspaceInstaller:
             webbrowser.open(job_url)
         except InvalidParameterValue as e:
             logger.warning(f"skipping {workflow}: {e}")
+        except TimeoutError as e:
+            logger.warning(f"Skipping the {workflow} due to time out: {e}. Please try after sometime")
 
     def uninstall(self):
         if self._prompts and not self._prompts.confirm(
