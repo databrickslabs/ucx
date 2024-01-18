@@ -15,6 +15,7 @@ from databricks.labs.ucx.cli import (
     open_remote_config,
     repair_run,
     revert_migrated_tables,
+    save_azure_storage_accounts,
     skip,
     sync_workspace_info,
     validate_external_locations,
@@ -265,4 +266,57 @@ def test_move(mocker, monkeypatch):
 
     with patch("databricks.labs.ucx.hive_metastore.table_migrate.TableMove.move_tables", return_value=None) as m:
         move(w, "SrcC", "SrcS", "*", "TgtC", "ToS")
+        m.assert_called_once()
+
+
+def test_save_azure_storage_accounts_no_ucx(mocker, caplog):
+    w = create_autospec(WorkspaceClient)
+    w.current_user.me = lambda: iam.User(user_name="foo", groups=[iam.ComplexValue(display="admins")])
+    mocker.patch("databricks.labs.ucx.installer.InstallationManager.for_user", return_value=None)
+    save_azure_storage_accounts(w, "")
+    assert [rec.message for rec in caplog.records if "UCX configuration" in rec.message]
+
+
+def test_save_azure_storage_accounts_not_azure(mocker, caplog):
+    w = create_autospec(WorkspaceClient)
+    w.config.is_azure = False
+    w.current_user.me = lambda: iam.User(user_name="foo", groups=[iam.ComplexValue(display="admins")])
+    mocker.patch("databricks.labs.ucx.installer.InstallationManager.for_user", return_value=w.current_user)
+    save_azure_storage_accounts(w, "")
+    assert [rec.message for rec in caplog.records if "Workspace is not on azure" in rec.message]
+
+
+def test_save_azure_storage_accounts_no_azure_cli(mocker, caplog):
+    w = create_autospec(WorkspaceClient)
+    w.config.auth_type = "azure_clis"
+    w.current_user.me = lambda: iam.User(user_name="foo", groups=[iam.ComplexValue(display="admins")])
+    mocker.patch("databricks.labs.ucx.installer.InstallationManager.for_user", return_value=w.current_user)
+    save_azure_storage_accounts(w, "")
+    assert [rec.message for rec in caplog.records if "In order to obtain AAD token" in rec.message]
+
+
+def test_save_azure_storage_accounts_no_subscription_id(mocker, caplog):
+    w = create_autospec(WorkspaceClient)
+    w.config.auth_type = "azure_cli"
+    w.config.is_azure = True
+    w.current_user.me = lambda: iam.User(user_name="foo", groups=[iam.ComplexValue(display="admins")])
+    mocker.patch("databricks.labs.ucx.installer.InstallationManager.for_user", return_value=w.current_user)
+    save_azure_storage_accounts(w, "")
+    assert [
+        rec.message
+        for rec in caplog.records
+        if "Please enter subscription id to scan storage account in." in rec.message
+    ]
+
+
+def test_save_azure_storage_accounts(mocker, caplog):
+    w = create_autospec(WorkspaceClient)
+    w.config.auth_type = "azure_cli"
+    w.config.is_azure = True
+    w.current_user.me = lambda: iam.User(user_name="foo", groups=[iam.ComplexValue(display="admins")])
+    mocker.patch("databricks.labs.ucx.installer.InstallationManager.for_user", return_value=w.current_user)
+    with patch(
+        "databricks.labs.ucx.assessment.azure.AzureResourcePermissions.save_spn_permissions", return_value=None
+    ) as m:
+        save_azure_storage_accounts(w, "test")
         m.assert_called_once()
