@@ -1,0 +1,6 @@
+{
+  "formatter": "../../../../../../.venv/bin/black .",
+  "batch": {
+    "model.py.tmpl": "model.py"
+  }
+}

@@ -155,6 +155,8 @@ ban-relative-imports = "all"
     "ARG001" # tests may not use the provided fixtures
 ]
 
+"src/databricks/labs/ucx/framework/lakeview/model.py" = ["C416", "ARG003"]
+
 "src/databricks/labs/ucx/mixins/redash.py" = ["A002", "A003", "N815"]
 
 [tool.coverage.run]
