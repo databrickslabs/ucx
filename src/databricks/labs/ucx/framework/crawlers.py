@@ -8,7 +8,13 @@ from types import UnionType
 from typing import Any, ClassVar, Generic, Protocol, TypeVar
 
 from databricks.sdk import WorkspaceClient
-from databricks.sdk.errors import BadRequest, NotFound, PermissionDenied, Unknown
+from databricks.sdk.errors import (
+    BadRequest,
+    DataLoss,
+    NotFound,
+    PermissionDenied,
+    Unknown,
+)
 
 from databricks.labs.ucx.mixins.sql import Row, StatementExecutionExt
 
@@ -183,6 +189,10 @@ class RuntimeBackend(SqlBackend):
             raise NotFound(error_message) from None
         elif "TABLE_OR_VIEW_NOT_FOUND" in error_message:
             raise NotFound(error_message) from None
+        elif "DELTA_TABLE_NOT_FOUND" in error_message:
+            raise NotFound(error_message) from None
+        elif "DELTA_MISSING_TRANSACTION_LOG" in error_message:
+            raise DataLoss(error_message) from None
         elif "PARSE_SYNTAX_ERROR" in error_message:
             raise BadRequest(error_message) from None
         elif "Operation not allowed" in error_message:

@@ -7,6 +7,10 @@ from databricks.labs.blueprint.tui import Prompts
 from databricks.sdk import AccountClient, WorkspaceClient
 
 from databricks.labs.ucx.account import AccountWorkspaces, WorkspaceInfo
+from databricks.labs.ucx.assessment.azure import (
+    AzureResourcePermissions,
+    AzureResources,
+)
 from databricks.labs.ucx.config import AccountConfig, ConnectConfig
 from databricks.labs.ucx.framework.crawlers import StatementExecutionBackend
 from databricks.labs.ucx.hive_metastore import ExternalLocations, TablesCrawler
@@ -228,6 +232,32 @@ def move(
     del_table = prompts.confirm(f"should we delete tables/view after moving to new schema {to_catalog}.{to_schema}")
     logger.info(f"migrating tables {from_table} from {from_catalog}.{from_schema} to {to_catalog}.{to_schema}")
     tables.move_tables(from_catalog, from_schema, from_table, to_catalog, to_schema, del_table)
+
+
+@ucx.command
+def save_azure_storage_accounts(w: WorkspaceClient, subscription_id: str):
+    """identifies all azure storage account used by external tables
+    identifies all spn which has storage blob reader, blob contributor, blob owner access
+    saves the data in ucx database."""
+    installation_manager = InstallationManager(w)
+    installation = installation_manager.for_user(w.current_user.me())
+    if not installation:
+        logger.error(CANT_FIND_UCX_MSG)
+        return
+    if not w.config.is_azure:
+        logger.error("Workspace is not on azure, please run this command on azure databricks workspaces.")
+        return
+    if w.config.auth_type != "azure_cli":
+        logger.error("In order to obtain AAD token, Please run azure cli to authenticate.")
+        return
+    if subscription_id == "":
+        logger.error("Please enter subscription id to scan storage account in.")
+        return
+    sql_backend = StatementExecutionBackend(w, installation.config.warehouse_id)
+    location = ExternalLocations(w, sql_backend, installation.config.inventory_database)
+    azure_resource_permissions = AzureResourcePermissions(w, AzureResources(w), location)
+    logger.info("Generating azure storage accounts and service principal permission info")
+    azure_resource_permissions.save_spn_permissions()
 
 
 if "__main__" == __name__:

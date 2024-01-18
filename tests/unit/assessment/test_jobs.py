@@ -100,6 +100,68 @@ def test_job_assessment():
     assert result_set[1].success == 0
 
 
+def test_job_assessment_no_job_tasks():
+    sample_jobs = [
+        BaseJob(
+            created_time=1694536604319,
+            creator_user_name="anonymous@databricks.com",
+            job_id=536591785949415,
+            settings=JobSettings(
+                compute=None,
+                continuous=None,
+                tasks=None,
+                timeout_seconds=0,
+            ),
+        ),
+    ]
+
+    sample_clusters = [
+        ClusterDetails(
+            autoscale=AutoScale(min_workers=1, max_workers=6),
+            spark_conf={"spark.databricks.delta.preview.enabled": "true"},
+            spark_context_id=5134472582179566666,
+            spark_env_vars=None,
+            spark_version="13.3.x-cpu-ml-scala2.12",
+            cluster_id="0810-229933-chicago99",
+            cluster_source=ClusterSource.JOB,
+        ),
+    ]
+    ws = Mock()
+    result_set = JobsCrawler(ws, MockBackend(), "ucx")._assess_jobs(
+        sample_jobs, {c.cluster_id: c for c in sample_clusters}
+    )
+    assert len(result_set) == 1
+    assert result_set[0].success == 1
+
+
+def test_job_assessment_no_job_settings():
+    sample_jobs = [
+        BaseJob(
+            created_time=1694536604319,
+            creator_user_name="anonymous@databricks.com",
+            job_id=536591785949415,
+            settings=None,
+        ),
+    ]
+
+    sample_clusters = [
+        ClusterDetails(
+            autoscale=AutoScale(min_workers=1, max_workers=6),
+            spark_conf={"spark.databricks.delta.preview.enabled": "true"},
+            spark_context_id=5134472582179566666,
+            spark_env_vars=None,
+            spark_version="13.3.x-cpu-ml-scala2.12",
+            cluster_id="0810-229933-chicago99",
+            cluster_source=ClusterSource.JOB,
+        ),
+    ]
+    ws = Mock()
+    result_set = JobsCrawler(ws, MockBackend(), "ucx")._assess_jobs(
+        sample_jobs, {c.cluster_id: c for c in sample_clusters}
+    )
+    assert len(result_set) == 0
+
+
 def test_job_assessment_for_azure_spark_config():
     sample_jobs = [
         BaseJob(
@@ -241,6 +303,47 @@ def test_job_assessment_for_azure_spark_config():
     assert result_set[0].success == 0
     assert result_set[1].success == 1
     assert result_set[2].success == 0
+
+
+def test_jobs_assessment_with_spn_cluster_no_job_tasks(mocker):
+    sample_jobs = [
+        BaseJob(
+            created_time=1694536604319,
+            creator_user_name="anonymous@databricks.com",
+            job_id=536591785949415,
+            settings=JobSettings(
+                compute=None,
+                continuous=None,
+                tasks=None,
+                timeout_seconds=0,
+            ),
+        )
+    ]
+
+    ws = mocker.Mock()
+    ws.clusters.list.return_value = []
+    ws.jobs.list.return_value = sample_jobs
+
+    jobs = AzureServicePrincipalCrawler(ws, MockBackend(), "ucx")._list_all_jobs_with_spn_in_spark_conf()
+    assert len(jobs) == 0
+
+
+def test_jobs_assessment_with_spn_cluster_no_job_settings(mocker):
+    sample_jobs = [
+        BaseJob(
+            created_time=1694536604319,
+            creator_user_name="anonymous@databricks.com",
+            job_id=536591785949415,
+            settings=None,
+        )
+    ]
+
+    ws = mocker.Mock()
+    ws.clusters.list.return_value = []
+    ws.jobs.list.return_value = sample_jobs
+
+    jobs = AzureServicePrincipalCrawler(ws, MockBackend(), "ucx")._list_all_jobs_with_spn_in_spark_conf()
+    assert len(jobs) == 0
 
 
 def test_jobs_assessment_with_spn_cluster_policy_not_found(mocker):

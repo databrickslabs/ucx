@@ -7,6 +7,7 @@ import sys
 import time
 import webbrowser
 from dataclasses import replace
+from datetime import datetime
 from pathlib import Path
 from typing import Any
 
@@ -99,12 +100,12 @@ dbutils.library.restartPython()
 
 import logging
 from pathlib import Path
+from databricks.labs.blueprint.logger import install_logger
 from databricks.labs.ucx.__about__ import __version__
 from databricks.labs.ucx.config import WorkspaceConfig
-from databricks.labs.ucx.framework import logger
 from databricks.sdk import WorkspaceClient
 
-logger._install()
+install_logger()
 logging.getLogger("databricks").setLevel("DEBUG")
 
 cfg = WorkspaceConfig.from_file(Path("/Workspace{config_file}"))
@@ -860,20 +861,44 @@ class WorkspaceInstaller:
                 spark_conf_dict[key[11:]] = cluster_policy[key]["value"]
         return instance_profile, spark_conf_dict
 
+    @staticmethod
+    def _readable_timedelta(epoch):
+        when = datetime.fromtimestamp(epoch)
+        duration = datetime.now() - when
+        data = {}
+        data["days"], remaining = divmod(duration.total_seconds(), 86_400)
+        data["hours"], remaining = divmod(remaining, 3_600)
+        data["minutes"], data["seconds"] = divmod(remaining, 60)
+
+        time_parts = ((name, round(value)) for name, value in data.items())
+        time_parts = [f"{value} {name[:-1] if value == 1 else name}" for name, value in time_parts if value > 0]
+        time_parts.append("ago")
+        if time_parts:
+            return " ".join(time_parts)
+        else:
+            return "less than 1 second ago"
+
     def latest_job_status(self) -> list[dict]:
         latest_status = []
         for step, job_id in self._state.jobs.items():
             try:
+                job_state = None
+                start_time = None
                 job_runs = list(self._ws.jobs.list_runs(job_id=int(job_id), limit=1))
-                if not job_runs:
-                    continue
-                state = job_runs[0].state
-                result_state = state.result_state if state else None
+                if job_runs:
+                    state = job_runs[0].state
+                    job_state = None
+                    if state and state.result_state:
+                        job_state = state.result_state.name
+                    elif state and state.life_cycle_state:
+                        job_state = state.life_cycle_state.name
+                    if job_runs[0].start_time:
+                        start_time = job_runs[0].start_time / 1000
                 latest_status.append(
                     {
                         "step": step,
-                        "state": "UNKNOWN" if not job_runs else str(result_state),
-                        "started": "<never run>" if not job_runs else job_runs[0].start_time,
+                        "state": "UNKNOWN" if not (job_runs and job_state) else job_state,
+                        "started": "<never run>" if not job_runs else self._readable_timedelta(start_time),
                     }
                 )
             except InvalidParameterValue as e:

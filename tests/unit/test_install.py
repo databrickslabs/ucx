@@ -365,7 +365,9 @@ def test_save_config(ws):
 
     ws.workspace.upload.assert_called_with(
         "/Users/me@example.com/.ucx/config.yml",
-        b"""default_catalog: ucx_default
+        b"""connect:
+  debug_truncate_bytes: 250000
+default_catalog: ucx_default
 inventory_database: ucx
 log_level: INFO
 num_threads: 8
@@ -387,7 +389,9 @@ def test_migrate_from_v1(ws, mocker):
     ws.current_user.me = lambda: iam.User(user_name="me@example.com", groups=[iam.ComplexValue(display="admins")])
     ws.config.host = "https://foo"
     ws.config.is_aws = True
-    config_bytes = b"""default_catalog: ucx_default
+    config_bytes = b"""connect:
+  debug_truncate_bytes: 250000
+default_catalog: ucx_default
 groups:
   auto: true
   backup_group_prefix: db-temp-
@@ -411,7 +415,9 @@ workspace_start_path: /
 
     ws.workspace.upload.assert_called_with(
         "/Users/me@example.com/.ucx/config.yml",
-        b"""default_catalog: ucx_default
+        b"""connect:
+  debug_truncate_bytes: 250000
+default_catalog: ucx_default
 inventory_database: ucx
 log_level: INFO
 num_threads: 8
@@ -433,7 +439,9 @@ def test_migrate_from_v1_selected_groups(ws, mocker):
     ws.current_user.me = lambda: iam.User(user_name="me@example.com", groups=[iam.ComplexValue(display="admins")])
     ws.config.host = "https://foo"
     ws.config.is_aws = True
-    config_bytes = b"""default_catalog: ucx_default
+    config_bytes = b"""connect:
+  debug_truncate_bytes: 250000
+default_catalog: ucx_default
 groups:
   backup_group_prefix: 'backup_baguette_prefix'
   selected:
@@ -459,7 +467,9 @@ workspace_start_path: /
 
     ws.workspace.upload.assert_called_with(
         "/Users/me@example.com/.ucx/config.yml",
-        b"""default_catalog: ucx_default
+        b"""connect:
+  debug_truncate_bytes: 250000
+default_catalog: ucx_default
 include_group_names:
 - '42'
 - '100'
@@ -500,7 +510,9 @@ def test_save_config_auto_groups(ws):
 
     ws.workspace.upload.assert_called_with(
         "/Users/me@example.com/.ucx/config.yml",
-        b"""default_catalog: ucx_default
+        b"""connect:
+  debug_truncate_bytes: 250000
+default_catalog: ucx_default
 inventory_database: ucx
 log_level: INFO
 num_threads: 8
@@ -538,7 +550,9 @@ def test_save_config_strip_group_names(ws):
 
     ws.workspace.upload.assert_called_with(
         "/Users/me@example.com/.ucx/config.yml",
-        b"""default_catalog: ucx_default
+        b"""connect:
+  debug_truncate_bytes: 250000
+default_catalog: ucx_default
 include_group_names:
 - g1
 - g2
@@ -598,7 +612,9 @@ def test_save_config_with_custom_policy(ws):
 
     ws.workspace.upload.assert_called_with(
         "/Users/me@example.com/.ucx/config.yml",
-        b"""custom_cluster_policy_id: 0123456789ABCDEF
+        b"""connect:
+  debug_truncate_bytes: 250000
+custom_cluster_policy_id: 0123456789ABCDEF
 default_catalog: ucx_default
 inventory_database: ucx
 log_level: INFO
@@ -655,7 +671,9 @@ def test_save_config_with_glue(ws):
 
     ws.workspace.upload.assert_called_with(
         "/Users/me@example.com/.ucx/config.yml",
-        b"""default_catalog: ucx_default
+        b"""connect:
+  debug_truncate_bytes: 250000
+default_catalog: ucx_default
 instance_profile: arn:aws:iam::111222333:instance-profile/foo-instance-profile
 inventory_database: ucx
 log_level: INFO
