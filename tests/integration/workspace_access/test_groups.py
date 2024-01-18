@@ -17,7 +17,7 @@ from databricks.labs.ucx.workspace_access.groups import GroupManager
 from databricks.labs.ucx.workspace_access.manager import PermissionManager
 from databricks.labs.ucx.workspace_access.tacl import TableAclSupport
 
-from ..conftest import StaticTablesCrawler
+from ..conftest import StaticTablesCrawler, StaticUdfsCrawler
 
 logger = logging.getLogger(__name__)
 
@@ -229,7 +229,8 @@ def test_replace_workspace_groups_with_account_groups(
     sql_backend.execute(f"GRANT SELECT, MODIFY ON TABLE {dummy_table.full_name} TO `{ws_group.display_name}`")
 
     tables = StaticTablesCrawler(sql_backend, inventory_schema, [dummy_table])
-    grants = GrantsCrawler(tables)
+    udfs = StaticUdfsCrawler(sql_backend, inventory_schema, [])
+    grants = GrantsCrawler(tables, udfs)
 
     @retried(on=[AssertionError], timeout=timedelta(seconds=30))
     def assert_table_has_two_grants():
