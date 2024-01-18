@@ -10,7 +10,7 @@ SELECT object_type, object_id, failures FROM (
   SELECT "tables" as object_type, CONCAT(t.catalog, '.', t.database, '.', t.name) AS object_id, 
   TO_JSON(
     FILTER(ARRAY(
-      IF(t.table_format != "delta", CONCAT("Non-DELTA format: ", t.table_format), NULL),
+      IF(NOT STARTSWITH(t.table_format, "DELTA"), CONCAT("Non-DELTA format: ", t.table_format), NULL),
       IF(STARTSWITH(t.location, "wasb"), "Unsupported Storage Type: wasb://", NULL),
       IF(STARTSWITH(t.location, "adl"), "Unsupported Storage Type: adl://", NULL),
       CASE
