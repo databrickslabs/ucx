@@ -21,8 +21,8 @@ class Udf:
     func_returns: str
     deterministic: bool
     data_access: str
-    comment: str
     body: str
+    comment: str = ""
 
     @property
     def key(self) -> str:
@@ -63,8 +63,7 @@ class UdfsCrawler(CrawlerBase):
         catalog = "hive_metastore"
         for (database,) in self._all_databases():
             logger.debug(f"[{catalog}.{database}] listing udfs")
-            for udf_row in self._fetch(f"SHOW USER FUNCTIONS FROM {catalog}.{database}"):
-                udf = udf_row[0]  # each function is returned as separate row
+            for (udf,) in self._fetch(f"SHOW USER FUNCTIONS FROM {catalog}.{database}"):
                 if udf.startswith(f"{catalog}.{database}"):
                     udf_name = udf[udf.rfind(".") + 1 :]  # remove catalog and database info from the name
                     tasks.append(partial(self._describe, catalog, database, udf_name))
@@ -72,14 +71,6 @@ class UdfsCrawler(CrawlerBase):
         if len(errors) > 0:
             logger.error(f"Detected {len(errors)} while scanning udfs in {catalog}")
         return catalog_tables
-
-    @staticmethod
-    def _safe_norm(value: str | None, *, lower: bool = True) -> str | None:
-        if not value:
-            return None
-        if lower:
-            return value.lower()
-        return value.upper()
 
     def _describe(self, catalog: str, database: str, udf: str) -> Udf | None:
         """Fetches metadata like udf type, input, returns, data access and body

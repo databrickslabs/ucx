@@ -1013,7 +1013,7 @@ def make_table(ws, sql_backend, make_schema, make_random) -> Generator[Callable[
     def remove(table_info: TableInfo):
         try:
             sql_backend.execute(f"DROP TABLE IF EXISTS {table_info.full_name}")
-        except NotFound as e:
+        except RuntimeError as e:
             if "Cannot drop a view" in str(e):
                 sql_backend.execute(f"DROP VIEW IF EXISTS {table_info.full_name}")
             elif "SCHEMA_NOT_FOUND" in str(e):
@@ -1054,7 +1054,7 @@ def make_udf(sql_backend, make_schema, make_random) -> Generator[Callable[..., F
     def remove(udf_info: FunctionInfo):
         try:
             sql_backend.execute(f"DROP FUNCTION IF EXISTS {udf_info.full_name}")
-        except NotFound as e:
+        except RuntimeError as e:
             if "SCHEMA_NOT_FOUND" in str(e):
                 logger.warning("Schema was already dropped while executing the test", exc_info=e)
             else:
