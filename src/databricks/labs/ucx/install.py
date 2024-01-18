@@ -906,6 +906,7 @@ class WorkspaceInstaller:
             if not job_runs:
                 logger.warning(f"{workflow} job is not initialized yet. Can't trigger repair run now")
                 return
+
             latest_job_run = job_runs[0]
             retry_on_attribute_error = retried(on=[AttributeError], timeout=self._verify_timeout)
             retried_check = retry_on_attribute_error(self._get_result_state)
