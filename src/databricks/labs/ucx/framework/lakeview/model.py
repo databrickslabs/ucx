@@ -298,7 +298,7 @@ class ColorEncodingForMultiSeries:
 @dataclass
 class ColorFieldEncoding:
     field_name: str
-    scale: Any
+    scale: CategoricalScale | QuantitativeScale | TemporalScale
     display_name: str | None = None
     legend: LegendSpec | None = None
 
@@ -311,7 +311,7 @@ class ColorFieldEncoding:
         if self.legend:
             body['legend'] = self.legend.as_dict()
         if self.scale:
-            body['scale'] = self.scale
+            body['scale'] = self.scale.as_dict()
         return body
 
     @classmethod
@@ -320,7 +320,7 @@ class ColorFieldEncoding:
             display_name=d.get('displayName', None),
             field_name=d.get('fieldName', None),
             legend=_from_dict(d, 'legend', LegendSpec),
-            scale=d.get('scale', None),
+            scale=_from_dict(d, 'scale', Scale),
         )
 
 
@@ -1255,6 +1255,20 @@ class RenderFieldEncoding:
 
 
 @dataclass
+class Scale:
+    @classmethod
+    def from_dict(cls, d: Dict[str, Any]) -> CategoricalScale | QuantitativeScale | TemporalScale:
+        if 'type' == 'categorical':
+            return CategoricalScale.from_dict(d)
+        elif 'type' == 'quantitative':
+            return QuantitativeScale.from_dict(d)
+        elif 'type' == 'temporal':
+            return TemporalScale.from_dict(d)
+        else:
+            raise KeyError(...)
+
+
+@dataclass
 class ScatterSpec:
     encodings: Any
     """Encoding map for the most common form of charts, which can have either a multi-X or multi-Y
@@ -1291,7 +1305,7 @@ class ScatterSpec:
 @dataclass
 class SingleFieldAxisEncoding:
     field_name: str
-    scale: Any
+    scale: CategoricalScale | QuantitativeScale | TemporalScale
     axis: AxisSpec | None = None
     display_name: str | None = None
 
@@ -1304,7 +1318,7 @@ class SingleFieldAxisEncoding:
         if self.field_name is not None:
             body['fieldName'] = self.field_name
         if self.scale:
-            body['scale'] = self.scale
+            body['scale'] = self.scale.as_dict()
         return body
 
     @classmethod
@@ -1313,7 +1327,7 @@ class SingleFieldAxisEncoding:
             axis=_from_dict(d, 'axis', AxisSpec),
             display_name=d.get('displayName', None),
             field_name=d.get('fieldName', None),
-            scale=d.get('scale', None),
+            scale=_from_dict(d, 'scale', Scale),
         )
 
 
@@ -1805,7 +1819,9 @@ class TextEntrySpecMatchMode(Enum):
 class Widget:
     name: str
     queries: List[NamedQuery] | None = None
-    spec: WidgetSpec | None = None
+    spec: DetailsV1Spec | TableV1Spec | CounterSpec | DatePickerSpec | DateRangePickerSpec | MultiSelectSpec | DropdownSpec | TextEntrySpec | SymbolMapSpec | TableV2Spec | WordCloudSpec | AreaSpec | BarSpec | LineSpec | PieSpec | PivotSpec | ScatterSpec | None = (
+        None
+    )
     textbox_spec: str | None = None
 
     def as_dict(self) -> dict[str, Any]:
@@ -1862,7 +1878,27 @@ class WidgetFrameSpec:
 @dataclass
 class WidgetSpec:
     @classmethod
-    def from_dict(cls, d: Dict[str, Any]) -> WidgetSpec:
+    def from_dict(
+        cls, d: Dict[str, Any]
+    ) -> (
+        DetailsV1Spec
+        | TableV1Spec
+        | CounterSpec
+        | DatePickerSpec
+        | DateRangePickerSpec
+        | MultiSelectSpec
+        | DropdownSpec
+        | TextEntrySpec
+        | SymbolMapSpec
+        | TableV2Spec
+        | WordCloudSpec
+        | AreaSpec
+        | BarSpec
+        | LineSpec
+        | PieSpec
+        | PivotSpec
+        | ScatterSpec
+    ):
         if 'version' == 1 and 'widgetType' == 'details':
             return DetailsV1Spec.from_dict(d)
         elif 'version' == 1 and 'widgetType' == 'table':

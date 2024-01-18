@@ -32,7 +32,7 @@ class {{.PascalName}}{{if eq "List" .PascalName}}Request{{end}}:{{if .Descriptio
         return body
     {{end}}
     @classmethod
-    def from_dict(cls, d: Dict[str, Any]) -> {{.PascalName}}{{if eq "List" .PascalName}}Request{{end}}:
+    def from_dict(cls, d: Dict[str, Any]) -> {{template "type" . }}:
         {{if .ChildTypes -}}
         {{range $i, $_ := .ChildTypes}}{{if $i}}el{{end}}if {{range $j, $_ := .TypeLookup}}{{if $j}} and {{end}}'{{.Name}}' == {{template "const" .Entity}}{{end}}:
             return {{template "type" .Entity}}.from_dict(d)
@@ -75,6 +75,7 @@ class {{.PascalName}}{{if eq "List" .PascalName}}Request{{end}}:{{if .Descriptio
 	{{- else if .ArrayValue }}List[{{template "type-nq" .ArrayValue}}]
 	{{- else if .MapValue }}Dict[str,{{template "type-nq" .MapValue}}]
 	{{- else if .IsExternal }}{{.Package.Name}}.{{.PascalName}}
+	{{- else if .ChildTypes }}{{range $i, $_ := .ChildTypes}}{{if $i}} | {{end}}{{template "type" .Entity}}{{end}}
 	{{- else if .IsObject }}{{.PascalName}}{{if eq "List" .PascalName}}Request{{end}}
 	{{- else if .Enum }}{{.PascalName}}
 	{{- else}}{{template "type-nq" .}}{{- end -}}
