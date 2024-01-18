@@ -176,7 +176,7 @@ class CategoricalColorScaleMappingEntry:
 @dataclass
 class CategoricalScale:
     mappings: List[CategoricalColorScaleMappingEntry] | None = None
-    sort: Any | None = None
+    sort: Sort | None = None
 
     def as_dict(self) -> dict[str, Any]:
         body: dict[str, Any] = {
@@ -185,12 +185,14 @@ class CategoricalScale:
         if self.mappings:
             body['mappings'] = [v.as_dict() for v in self.mappings]
         if self.sort:
-            body['sort'] = self.sort
+            body['sort'] = self.sort.as_dict()
         return body
 
     @classmethod
     def from_dict(cls, d: Dict[str, Any]) -> CategoricalScale:
-        return cls(mappings=_repeated_dict(d, 'mappings', CategoricalColorScaleMappingEntry), sort=d.get('sort', None))
+        return cls(
+            mappings=_repeated_dict(d, 'mappings', CategoricalColorScaleMappingEntry), sort=_from_dict(d, 'sort', Sort)
+        )
 
 
 @dataclass
@@ -1332,8 +1334,8 @@ class SingleFieldAxisEncoding:
 
 
 @dataclass
-class SortByChannel:
-    by: SortByChannelBy
+class Sort:
+    by: SortBy
 
     def as_dict(self) -> dict[str, Any]:
         body: dict[str, Any] = {}
@@ -1342,35 +1344,17 @@ class SortByChannel:
         return body
 
     @classmethod
-    def from_dict(cls, d: Dict[str, Any]) -> SortByChannel:
-        return cls(by=_enum(d, 'by', SortByChannelBy))
+    def from_dict(cls, d: Dict[str, Any]) -> Sort:
+        return cls(by=_enum(d, 'by', SortBy))
 
 
-class SortByChannelBy(Enum):
+class SortBy(Enum):
+    NATURAL_ORDER = 'natural-order'
+    NATURAL_ORDER_REVERSED = 'natural-order-reversed'
     X = 'x'
     X_REVERSED = 'x-reversed'
     Y = 'y'
     Y_REVERSED = 'y-reversed'
-
-
-@dataclass
-class SortByNaturalOrder:
-    by: SortByNaturalOrderBy
-
-    def as_dict(self) -> dict[str, Any]:
-        body: dict[str, Any] = {}
-        if self.by is not None:
-            body['by'] = self.by.value
-        return body
-
-    @classmethod
-    def from_dict(cls, d: Dict[str, Any]) -> SortByNaturalOrder:
-        return cls(by=_enum(d, 'by', SortByNaturalOrderBy))
-
-
-class SortByNaturalOrderBy(Enum):
-    NATURAL_ORDER = 'natural-order'
-    NATURAL_ORDER_REVERSED = 'natural-order-reversed'
 
 
 @dataclass
