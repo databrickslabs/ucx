@@ -1,3 +1,6 @@
+import csv
+import dataclasses
+import io
 import logging
 import re
 import subprocess
@@ -7,6 +10,7 @@ from typing import Callable, Iterable, List
 
 from databricks.sdk import WorkspaceClient
 from databricks.sdk.service.compute import InstanceProfile
+from databricks.sdk.service.workspace import ImportFormat
 
 from databricks.labs.ucx.framework.crawlers import CrawlerBase, SqlBackend
 
@@ -24,86 +28,38 @@ class AWSRole:
 @dataclass
 class AWSPolicyAction:
     resource_type: str
-    Action: set[str]
+    action: set[str]
     resource_path: str
 
 
 @dataclass
-class AWSInstanceProfileAccess:
+class AWSInstanceProfileAction:
     instance_profile_arn: str
-    iam_role_arn: str
+    resource_type: str
+    actions: str
+    resource_path: str
+    iam_role_arn: str|None = None
 
 
 @dataclass
 class AWSInstanceProfile:
-    instance_profile: str
-    resource_type: str
-    resource_path: str
-    actions: str
+    instance_profile_arn: str
+    iam_role_arn: str | None = None
 
+    ROLE_NAME_REGEX = "arn:aws:iam::[0-9]+:(?:instance-profile|role)\/([a-zA-Z0-9+=,.@_-]*)$"
 
-def iam_profiles():
-    # List all IAM roles
-    roles_command = "aws iam list-roles"
-    code, roles_output, roles_error = run_command(roles_command)
-
-    if code == 0:
-        roles_data = json.loads(roles_output)
-        roles = roles_data.get("Roles", [])
-
-        for role in roles:
-            role_name = role["RoleName"]
-            print(f"IAM Role: {role_name}")
-
-            # List attached policies
-            attached_policies_command = f"aws iam list-attached-role-policies --role-name {role_name}"
-            code, attached_policies_output, attached_policies_error = run_command(attached_policies_command)
-
-            if code == 0:
-                attached_policies_data = json.loads(attached_policies_output)
-                attached_policies = attached_policies_data.get("AttachedPolicies", [])
-                for policy in attached_policies:
-                    policy_name = policy["PolicyName"]
-                    print(f"  Attached Policy: {policy_name}")
-
-            # List inline policies
-            inline_policies_command = f"aws iam list-role-policies --role-name {role_name}"
-            code, inline_policies_output, inline_policies_error = run_command(inline_policies_command)
-
-            if code == 0:
-                inline_policies_data = json.loads(inline_policies_output)
-                inline_policies = inline_policies_data.get("PolicyNames", [])
-                for inline_policy in inline_policies:
-                    print(f"  Inline Policy: {inline_policy}")
-
-            # List S3 bucket permissions for the role
-            s3_permissions_command = f"aws s3api list-buckets"
-            code, s3_permissions_output, s3_permissions_error = run_command(s3_permissions_command)
-
-            if code == 0:
-                s3_buckets_data = json.loads(s3_permissions_output)
-                s3_buckets = s3_buckets_data.get("Buckets", [])
-                for bucket in s3_buckets:
-                    bucket_name = bucket["Name"]
-                    print(f"    S3 Bucket: {bucket_name}")
-
-                    # Check if the role has access to the bucket
-                    check_access_command = f"aws s3api get-bucket-policy-status --bucket {bucket_name}"
-                    code, access_output, access_error = run_command(check_access_command)
-
-                    if code == 0:
-                        access_data = json.loads(access_output)
-                        if access_data.get("IsPublic"):
-                            print("      Access: Public")
-                        else:
-                            print("      Access: Restricted")
-                    else:
-                        print("      Access: Unknown (Error checking access)")
-
-            print("\n")
-    else:
-        print("Error listing IAM roles.")
-        print(roles_error)
+    @property
+    def role_name(self):
+        if self.iam_role_arn:
+            arn = self.iam_role_arn
+        else:
+            arn = self.instance_profile_arn
+        role_match = re.match(self.ROLE_NAME_REGEX, arn)
+        if not role_match:
+            logger.error(f"Role ARN is mismatched {self.iam_role_arn}")
+            return None
+        else:
+            return role_match.group(1)
 
 
 def run_command(command):
@@ -113,7 +69,6 @@ def run_command(command):
 
 
 class AWSResources:
-
     S3_ACTIONS = {
         "s3:PutObject",
         "s3:GetObject",
@@ -122,7 +77,7 @@ class AWSResources:
     }
     S3_REGEX = "arn:aws:s3:::([a-zA-Z0-9+=,.@_-]*)\/\*"
 
-    def __init__(self, profile: str, command_runner: Callable[[str],str] = run_command):
+    def __init__(self, profile: str, command_runner: Callable[[str], str] = run_command):
         self._profile = profile
         self._command_runner = command_runner
 
@@ -192,18 +147,20 @@ class AWSResources:
                 for resource in action.get("Resource", []):
                     match = re.match(self.S3_REGEX, resource)
                     if match:
-                        yield AWSPolicyAction("s3", set(actions,), match.group(1))
+                        yield AWSPolicyAction("s3", set(actions, ), match.group(1))
         logger.error(error)
 
 
-class AWSInstanceProfileCrawler(CrawlerBase[InstanceProfile]):
+class AWSInstanceProfileCrawler(CrawlerBase[AWSInstanceProfile]):
     def __init__(self, ws: WorkspaceClient, sbe: SqlBackend, schema):
-        super().__init__(sbe, "hive_metastore", schema, "aws_instance_profile", InstanceProfile)
+        super().__init__(sbe, "hive_metastore", schema, "aws_instance_profile", AWSInstanceProfile)
         self._ws = ws
         self._schema = schema
 
-    def _crawl(self) -> Iterable[InstanceProfile]:
-        return list(self._ws.instance_profiles.list())
+    def _crawl(self) -> Iterable[AWSInstanceProfile]:
+        instance_profiles = self._ws.instance_profiles.list()
+        for instance_profile in instance_profiles:
+            yield AWSInstanceProfile(instance_profile.instance_profile_arn, instance_profile.iam_role_arn)
 
     def snapshot(self) -> Iterable[InstanceProfile]:
         return self._snapshot(self._try_fetch, self._crawl)
@@ -212,6 +169,7 @@ class AWSInstanceProfileCrawler(CrawlerBase[InstanceProfile]):
         for row in self._fetch(f"SELECT * FROM {self._schema}.{self._table}"):
             yield InstanceProfile(*row)
 
+
 class AWSResourcePermissions:
     def __init__(self, ws: WorkspaceClient, awsrm: AWSResources,
                  instance_profile_crawler: AWSInstanceProfileCrawler,
@@ -219,9 +177,44 @@ class AWSResourcePermissions:
         self._folder = folder
         self._awsrm = awsrm
         self._ws = ws
+        self._field_names = [_.name for _ in dataclasses.fields(AWSInstanceProfileAction)]
 
-    def _get_instance_profiles(self) -> list[str]:
-        instance_profiles = self._awsrm.snapshot()
+    def _get_instance_profiles(self) -> list[AWSInstanceProfile]:
+        return self._awsrm.snapshot()
 
+    def _get_s3_access(self) -> list[AWSInstanceProfileAction]:
+        valid_roles = self._get_instance_profiles()
+        for role in valid_roles:
+            policies = list(self._awsrm.list_policies_in_role(role.role_name))
+            for policy in policies:
+                actions = list(self._awsrm.get_role_policy(role, policy))
+                for action in actions:
+                    yield AWSInstanceProfileAction(role.instance_profile_arn,
+                                                   action.resource_type,
+                                                   str(action.action),
+                                                   action.resource_path,
+                                                   role.iam_role_arn)
 
+    def save_instance_profile_permissions(self) -> str | None:
+        instance_profile_access = self._get_s3_access()
+        if len(instance_profile_access) == 0:
+            logger.warning(
+                "No Mapping Was Generated. "
+                "Please check if assessment job is run"
+            )
+            return None
+        return self._save(instance_profile_access)
 
+    def _overwrite_mapping(self, buffer) -> str:
+        path = f"{self._folder}/aws_instance_profile_info.csv"
+        self._ws.workspace.upload(path, buffer, overwrite=True, format=ImportFormat.AUTO)
+        return path
+
+    def _save(self, instance_profile_actions: list[AWSInstanceProfileAction]) -> str:
+        buffer = io.StringIO()
+        writer = csv.DictWriter(buffer, self._field_names)
+        writer.writeheader()
+        for instance_profile_action in instance_profile_actions:
+            writer.writerow(dataclasses.asdict(instance_profile_action))
+        buffer.seek(0)
+        return self._overwrite_mapping(buffer)
