@@ -38,9 +38,6 @@ class InstallationManager:
     def for_user(self, user: User) -> Installation:
         try:
             assert user.user_name is not None
-            if user.user_name == "hari.selvarajan@databricks.com":
-                pass
-
             config_file = self._root / user.user_name / self._prefix / "config.yml"
             with self._ws.workspace.download(config_file.as_posix()) as f:
                 cfg = WorkspaceConfig.from_bytes(f.read())
