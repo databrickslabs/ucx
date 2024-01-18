@@ -1256,7 +1256,6 @@ class RenderFieldEncoding:
         return cls(display_name=d.get('displayName', None), field_name=d.get('fieldName', None))
 
 
-@dataclass
 class Scale:
     @classmethod
     def from_dict(cls, d: Dict[str, Any]) -> CategoricalScale | QuantitativeScale | TemporalScale:
@@ -1859,7 +1858,6 @@ class WidgetFrameSpec:
         )
 
 
-@dataclass
 class WidgetSpec:
     @classmethod
     def from_dict(
