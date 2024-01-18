@@ -1199,4 +1199,4 @@ def test_repair_run_result_state(ws, caplog):
     ws.jobs.list_runs.return_value = base
     ws.jobs.list_runs.repair_run = None
     install.repair_run("assessment")
-    assert "Please try after some time" in caplog.text
+    assert "Please try after sometime" in caplog.text

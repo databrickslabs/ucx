@@ -925,8 +925,8 @@ class WorkspaceInstaller:
             webbrowser.open(job_url)
         except InvalidParameterValue as e:
             logger.warning(f"skipping {workflow}: {e}")
-        except TimeoutError as e:
-            logger.warning(f"Skipping the {workflow} due to time out: {e}. Please try after sometime")
+        except TimeoutError:
+            logger.warning(f"Skipping the {workflow} due to time out. Please try after sometime")
 
     def uninstall(self):
         if self._prompts and not self._prompts.confirm(
