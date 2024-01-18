@@ -2,14 +2,13 @@ import logging
 
 import pytest
 
-from databricks.labs.ucx.assessment.aws import validate_connection, get_roles_in_instance_profile, get_policies_in_role, \
-    get_attached_policies_in_role
+from databricks.labs.ucx.assessment.aws import AWSResources
 
 
 def test_aws_validate(env_or_skip):
     profile = env_or_skip("AWS_DEFAULT_PROFILE")
-    assert validate_connection(profile)
-
+    aws = AWSResources(profile)
+    assert aws.validate_connection()
 
 def test_get_roles_in_ip():
     roles = list(get_roles_in_instance_profile("databricks-s3-access"))
@@ -27,5 +26,15 @@ def test_get_attached_policies():
     policies = list(get_attached_policies_in_role("databricks-s3-access"))
     print(policies)
     assert len(policies)==5
+
+
+def test_role_policy(env_or_skip):
+    profile = env_or_skip("AWS_DEFAULT_PROFILE")
+    aws = AWSResources(profile)
+    role_policy_actions = list(aws.get_role_policy("databricks-s3-access","databricks-s3-access"))
+    print(role_policy_actions)
+    assert len(role_policy_actions) == 15
+
+
 
 
