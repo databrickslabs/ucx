@@ -6,6 +6,7 @@ SELECT
         WHEN table IS NOT NULL THEN 'TABLE'
         WHEN database IS NOT NULL THEN 'DATABASE'
         WHEN catalog IS NOT NULL THEN 'CATALOG'
+        WHEN udf IS NOT NULL THEN 'UDF'
         ELSE 'UNKNOWN'
     END AS object_type,
     CASE
@@ -15,6 +16,7 @@ SELECT
         WHEN table IS NOT NULL THEN  CONCAT(catalog, '.', database, '.', table)
         WHEN database IS NOT NULL THEN  CONCAT(catalog, '.', database)
         WHEN catalog IS NOT NULL THEN catalog
+        WHEN udf IS NOT NULL THEN CONCAT(catalog, '.', database, '.', udf)
         ELSE 'UNKNOWN'
     END AS object_id,
     action_type,
@@ -28,5 +30,6 @@ SELECT
     principal,
     catalog,
     database,
-    table
+    table,
+    udf
 FROM $inventory.grants where database != split("$inventory",'[.]')[1]
