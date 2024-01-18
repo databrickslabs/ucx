@@ -61,9 +61,11 @@ class UdfsCrawler(CrawlerBase):
         """Crawls and lists udfs within the specified catalog and database."""
         tasks = []
         catalog = "hive_metastore"
+        # need to set the current catalog otherwise "SHOW USER FUNCTIONS FROM" is raising error:
+        # "target schema <database> is not in the current catalog"
+        self._exec(f"USE CATALOG {catalog};")
         for (database,) in self._all_databases():
             logger.debug(f"[{catalog}.{database}] listing udfs")
-            self._exec(f"USE CATALOG {catalog};")
             for (udf,) in self._fetch(f"SHOW USER FUNCTIONS FROM {catalog}.{database};"):
                 if udf.startswith(f"{catalog}.{database}"):
                     udf_name = udf[udf.rfind(".") + 1 :]  # remove catalog and database info from the name
