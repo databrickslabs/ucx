@@ -50,7 +50,7 @@ class UdfsCrawler(CrawlerBase):
         Returns:
             list[Udf]: A list of Udf objects representing the snapshot of tables.
         """
-        return self._snapshot(partial(self._try_load), partial(self._crawl))
+        return self._snapshot(self._try_load, self._crawl)
 
     def _try_load(self) -> Iterable[Udf]:
         """Tries to load udf information from the database or throws TABLE_OR_VIEW_NOT_FOUND error"""

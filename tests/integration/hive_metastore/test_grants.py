@@ -57,7 +57,7 @@ def test_all_grants_in_databases(sql_backend, inventory_schema, make_schema, mak
     assert all_grants[f"{group_b.display_name}.{table_e.full_name}"] == "MODIFY"
 
 
-@retried(on=[NotFound, TimeoutError], timeout=timedelta(minutes=3))
+@retried(on=[NotFound], timeout=timedelta(minutes=3))
 def test_all_grants_for_udfs_in_databases(sql_backend, inventory_schema, make_schema, make_udf, make_group):
     group = make_group()
     schema = make_schema()
