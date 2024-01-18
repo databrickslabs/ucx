@@ -1054,7 +1054,7 @@ def make_udf(sql_backend, make_schema, make_random) -> Generator[Callable[..., F
     def remove(udf_info: FunctionInfo):
         try:
             sql_backend.execute(f"DROP FUNCTION IF EXISTS {udf_info.full_name}")
-        except RuntimeError as e:
+        except NotFound as e:
             if "SCHEMA_NOT_FOUND" in str(e):
                 logger.warning("Schema was already dropped while executing the test", exc_info=e)
             else:
