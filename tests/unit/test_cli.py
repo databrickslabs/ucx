@@ -5,9 +5,6 @@ from databricks.sdk.errors import NotFound
 from databricks.sdk.service import iam
 from databricks.sdk.service.iam import User
 
-from databricks.labs.ucx.cli import move, repair_run, skip, validate_groups_membership
-from databricks.labs.ucx.config import WorkspaceConfig
-from databricks.labs.ucx.installer import Installation
 from databricks.labs.ucx.cli import (
     CANT_FIND_UCX_MSG,
     create_table_mapping,
@@ -22,8 +19,11 @@ from databricks.labs.ucx.cli import (
     skip,
     sync_workspace_info,
     validate_external_locations,
+    validate_groups_membership,
     workflows,
 )
+from databricks.labs.ucx.config import WorkspaceConfig
+from databricks.labs.ucx.installer import Installation
 
 
 def test_workflow(caplog):

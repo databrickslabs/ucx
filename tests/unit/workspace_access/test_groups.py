@@ -1,14 +1,16 @@
 import json
-from unittest.mock import MagicMock
+from unittest.mock import MagicMock, create_autospec
 
 import pytest
 from _pytest.outcomes import fail
 from databricks.labs.blueprint.parallel import ManyError
 from databricks.labs.blueprint.tui import MockPrompts
+from databricks.sdk import WorkspaceClient
 from databricks.sdk.errors import DatabricksError, ResourceDoesNotExist
 from databricks.sdk.service import iam
 from databricks.sdk.service.iam import ComplexValue, Group, ResourceMeta
 
+from databricks.labs.ucx.framework.crawlers import SqlBackend
 from databricks.labs.ucx.workspace_access.groups import (
     ConfigureGroups,
     GroupManager,
@@ -827,8 +829,8 @@ def test_state():
 
 
 def test_validate_group_diff_membership():
-    backend = MockBackend()
-    wsclient = MagicMock()
+    backend = create_autospec(SqlBackend)
+    wsclient = create_autospec(WorkspaceClient)
     group = Group(
         id="1",
         external_id="1234",

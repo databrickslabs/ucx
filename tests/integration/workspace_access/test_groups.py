@@ -208,10 +208,18 @@ def test_group_matching_names(ws, sql_backend, inventory_schema, make_ucx_group,
 
 @retried(on=[NotFound], timeout=timedelta(minutes=2))
 def test_group_matching_names_with_diff_users(
-    ws, sql_backend, inventory_schema, make_ucx_group_with_diff_members, make_random
+    ws, sql_backend, inventory_schema, make_random, make_user, make_group, make_acc_group
 ):
     rand_elem = make_random(4)
-    ws_group, accnt_group = make_ucx_group_with_diff_members(f"test_group_{rand_elem}", f"same_group_[{rand_elem}]")
+    workspace_group_name = f"test_group_{rand_elem}"
+    account_group_name = f"same_group_[{rand_elem}]"
+    user1 = make_user()
+    user2 = make_user()
+    members1 = [user1.id]
+    members2 = [user2.id]
+    ws_group = make_group(display_name=workspace_group_name, members=members1, entitlements=["allow-cluster-create"])
+    accnt_group = make_acc_group(display_name=account_group_name, members=members2)
+
     logger.info(
         f"Attempting Mapping From Workspace Group {ws_group.display_name} to "
         f"Account Group {accnt_group.display_name}"
