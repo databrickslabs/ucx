@@ -6,13 +6,12 @@ import logging
 import re
 import subprocess
 import typing
+from collections.abc import Callable, Iterable
 from dataclasses import dataclass
 from functools import lru_cache, partial
-from collections.abc import Callable, Iterable
 
 from databricks.labs.blueprint.parallel import Threads
 from databricks.sdk import WorkspaceClient
-from databricks.sdk.service.compute import InstanceProfile
 from databricks.sdk.service.workspace import ImportFormat
 
 from databricks.labs.ucx.framework.crawlers import CrawlerBase, SqlBackend
@@ -65,16 +64,17 @@ class AWSInstanceProfile:
             return role_match.group(1)
 
 
+@lru_cache(maxsize=1024)
 def run_command(command):
     logger.info(f"Invoking Command {command}")
-    process = subprocess.Popen(command, stdout=subprocess.PIPE, stderr=subprocess.PIPE, shell=True)
+    process = subprocess.Popen(command, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
     output, error = process.communicate()
     return process.returncode, output.decode("utf-8"), error.decode("utf-8")
 
 
 class AWSResources:
-    S3_ACTIONS = {"s3:PutObject", "s3:GetObject", "s3:DeleteObject", "s3:PutObjectAcl"}
-    S3_REGEX = r"arn:aws:s3:::([a-zA-Z0-9+=,.@_-]*)\/\*"
+    S3_ACTIONS: typing.ClassVar[set[str]] = {"s3:PutObject", "s3:GetObject", "s3:DeleteObject", "s3:PutObjectAcl"}
+    S3_REGEX: typing.ClassVar[str] = r"arn:aws:s3:::([a-zA-Z0-9+=,.@_-]*)\/\*"
 
     def __init__(self, profile: str, command_runner: Callable[[str], str] = run_command):
         self._profile = profile
@@ -98,8 +98,7 @@ class AWSResources:
             logger.error(error)
             return []
         policies = json.loads(output)
-        for policy in policies.get("PolicyNames", []):
-            yield policy
+        yield from policies.get("PolicyNames", [])
 
     def list_attached_policies_in_role(self, role_name: str):
         list_attached_policies_cmd = (
@@ -113,10 +112,12 @@ class AWSResources:
         for policy in policies.get("AttachedPolicies", []):
             yield policy.get("PolicyArn")
 
-    @lru_cache(maxsize=1024)
     def get_role_policy(self, role_name, policy_name: str | None = None, attached_policy_arn: str | None = None):
         if policy_name:
-            get_policy = f"aws iam get-role-policy --profile {self._profile} --role-name {role_name} --policy-name {policy_name} --no-paginate"
+            get_policy = (
+                f"aws iam get-role-policy --profile {self._profile} --role-name {role_name} "
+                f"--policy-name {policy_name} --no-paginate"
+            )
         elif attached_policy_arn:
             get_attached_policy = (
                 f"aws iam get-policy --profile {self._profile} --policy-arn {attached_policy_arn} --no-paginate"
@@ -152,9 +153,8 @@ class AWSResources:
                     if single_action in self.S3_ACTIONS:
                         s3_action.append(single_action)
                         continue
-            else:
-                if actions in self.S3_ACTIONS:
-                    s3_action = [actions]
+            elif actions in self.S3_ACTIONS:
+                s3_action = [actions]
 
             if not s3_action:
                 continue
@@ -178,18 +178,18 @@ class AWSInstanceProfileCrawler(CrawlerBase[AWSInstanceProfile]):
     def snapshot(self) -> Iterable[AWSInstanceProfile]:
         return self._snapshot(self._try_fetch, self._crawl)
 
-    def _try_fetch(self) -> Iterable[InstanceProfile]:
+    def _try_fetch(self) -> Iterable[AWSInstanceProfile]:
         for row in self._fetch(f"SELECT * FROM {self._schema}.{self._table}"):
             yield AWSInstanceProfile(*row)
 
 
 class AWSResourcePermissions:
     def __init__(
-            self,
-            ws: WorkspaceClient,
-            awsrm: AWSResources,
-            instance_profile_crawler: AWSInstanceProfileCrawler,
-            folder: str | None = None,
+        self,
+        ws: WorkspaceClient,
+        awsrm: AWSResources,
+        instance_profile_crawler: AWSInstanceProfileCrawler,
+        folder: str | None = None,
     ):
         if not folder:
             folder = f"/Users/{ws.current_user.me().user_name}/.ucx"
@@ -206,11 +206,9 @@ class AWSResourcePermissions:
         instance_profiles = self._get_instance_profiles()
         tasks = []
         for instance_profile in instance_profiles:
-            tasks.append(
-                partial(self._get_instance_profile_access_task, instance_profile)
-            )
+            tasks.append(partial(self._get_instance_profile_access_task, instance_profile))
 
-        return sum(Threads.strict("Scanning Instance Profiles", tasks),[])
+        return sum(Threads.strict("Scanning Instance Profiles", tasks), [])
 
     def _get_instance_profile_access_task(self, instance_profile: AWSInstanceProfile):
         return list(self._get_instance_profile_access(instance_profile))

@@ -1,5 +1,3 @@
-
-
 from databricks.labs.ucx.assessment.aws import (
     AWSInstanceProfileCrawler,
     AWSResourcePermissions,
@@ -22,7 +20,6 @@ def test_role_policy(env_or_skip):
 
 
 def test_instance_profile_crawler(env_or_skip, ws, sql_backend, inventory_schema):
-    profile = env_or_skip("AWS_DEFAULT_PROFILE")
     instance_profile_crawler = AWSInstanceProfileCrawler(ws, sql_backend, inventory_schema)
     instance_profiles = instance_profile_crawler.snapshot()
     assert instance_profiles
