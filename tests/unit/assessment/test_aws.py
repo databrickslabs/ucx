@@ -1,7 +1,17 @@
 import logging
+from unittest.mock import create_autospec
 
+from databricks.sdk import WorkspaceClient
+from databricks.sdk.service.compute import InstanceProfile
 
-from databricks.labs.ucx.assessment.aws import AWSPolicyAction, AWSResources
+from databricks.labs.ucx.assessment.aws import (
+    AWSInstanceProfile,
+    AWSInstanceProfileCrawler,
+    AWSPolicyAction,
+    AWSResources,
+)
+
+from ..framework.mocks import MockBackend
 
 logger = logging.getLogger(__name__)
 
@@ -204,3 +214,36 @@ def test_get_role_policy():
             resource_path="bucketC",
         ),
     ]
+
+
+def test_aws_instance_profile_crawler():
+    errors = {}
+    rows = {
+        "SELECT": [
+            ("arn:aws:iam::12345:instance-profile/Role1", "arn:aws:iam::12345:role/Role1"),
+            ("arn:aws:iam::12345:instance-profile/Role2", "arn:aws:iam::12345:role/Role2"),
+        ],
+    }
+    backend = MockBackend(fails_on_first=errors, rows=rows)
+    ws = create_autospec(WorkspaceClient)
+    instance_profile_crawler = AWSInstanceProfileCrawler(ws, backend, "ucx")
+    results = instance_profile_crawler.snapshot()
+    assert len(results) == 2
+    assert AWSInstanceProfile("arn:aws:iam::12345:instance-profile/Role1", "arn:aws:iam::12345:role/Role1") in results
+    assert AWSInstanceProfile("arn:aws:iam::12345:instance-profile/Role2", "arn:aws:iam::12345:role/Role2") in results
+
+    errors = {}
+    rows = {
+        "SELECT": [],
+    }
+    backend = MockBackend(fails_on_first=errors, rows=rows)
+    ws = create_autospec(WorkspaceClient)
+    ws.instance_profiles.list.return_value = [
+        InstanceProfile("arn:aws:iam::12345:instance-profile/Role1", "arn:aws:iam::12345:role/Role1"),
+        InstanceProfile("arn:aws:iam::12345:instance-profile/Role2", "arn:aws:iam::12345:role/Role2"),
+    ]
+    instance_profile_crawler = AWSInstanceProfileCrawler(ws, backend, "ucx")
+    results = instance_profile_crawler.snapshot()
+    assert len(results) == 2
+    assert AWSInstanceProfile("arn:aws:iam::12345:instance-profile/Role1", "arn:aws:iam::12345:role/Role1") in results
+    assert AWSInstanceProfile("arn:aws:iam::12345:instance-profile/Role2", "arn:aws:iam::12345:role/Role2") in results
