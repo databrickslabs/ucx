@@ -8,8 +8,7 @@ from databricks.labs.ucx.install import WorkspaceInstaller
 
 # @pytest.mark.skip("not working")
 def test_lvdash():
-    # ws = WorkspaceClient(profile='e2-demo-field-eng')
-    ws = WorkspaceClient(profile='logfood-master')
+    ws = WorkspaceClient(profile='e2-demo-field-eng')
     installer = WorkspaceInstaller(ws)
     local_query_files = find_project_root(__file__) / "src/databricks/labs/ucx/queries"
     install_state = InstallState(ws, product='ucx')
