@@ -1,7 +1,7 @@
 # Assessment Report Summary
 The Assessment Report (Main) is the output of the Databricks Labs UCX assessment workflow. This report queries the $inventory database (e.g. `ucx`) and summarizes the findings of the assessment. The link to the Assessment Report (Main) can be found in your home folder, under `.ucx` in the README.py file. The user may also directly navigate to the Assessment report by clicking on `Dashboards` icon on the left to find the Dashboard.
 
-# Metrics boxes
+# Assessment Dashlets
 ## Readiness
 This is an overall summary of rediness detailed in the Readiness dashlet. This value is based on the ratio of findings divided by the total number of assets scanned.
 
@@ -18,7 +18,7 @@ Total number of hive metastore tables discovered
 Total number of identified storage locations based on scanning Hive Metastore tables and schemas
 
 
-# Assessment Dashlets
+# Assessment Widgets
 ## Readiness
 This is a rough summary of the workspace readiness to run Unity Catalog governed workloads. Each line item is the percent of compatible items divided by the total items in the class.
 
