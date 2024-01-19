@@ -68,6 +68,12 @@ class MigrationState:
             return None
         return mg.name_in_account
 
+    def get_temp_principal(self, name: str) -> str | None:
+        mg = self._name_to_group.get(name)
+        if mg is None:
+            return None
+        return mg.temporary_name
+
     def is_in_scope(self, name: str) -> bool:
         if name is None:
             return False
@@ -400,6 +406,33 @@ class GroupManager(CrawlerBase[MigratedGroup]):
         strategy = self._get_strategy(workspace_groups_in_workspace, account_groups_in_account)
         yield from strategy.generate_migrated_groups()
 
+    def validate_group_membership(self) -> list[dict]:
+        workspace_groups_in_workspace = self._workspace_groups_in_workspace()
+        account_groups_in_account = self._account_groups_in_account()
+        strategy = self._get_strategy(workspace_groups_in_workspace, account_groups_in_account)
+        migrated_groups = strategy.generate_migrated_groups()
+        mismatch_group = []
+        for groups in migrated_groups:
+            ws_members_set = set([m.get("display") for m in json.loads(groups.members)] if groups.members else [])
+            account_group = account_groups_in_account[groups.name_in_account]
+            ac_members_set = set(
+                [a.as_dict().get("display") for a in account_group.members] if account_group.members else []
+            )
+            set_diff = (ws_members_set - ac_members_set).union(ac_members_set - ws_members_set)
+            if not set_diff:
+                continue
+            mismatch_group.append(
+                {
+                    "wf_group_name": groups.name_in_workspace,
+                    "ac_group_name": groups.name_in_account,
+                }
+            )
+        if not mismatch_group:
+            logger.info("There are no groups with different membership between account and workspace")
+        else:
+            logger.info("There are groups with different membership between account and workspace")
+        return mismatch_group
+
     def _workspace_groups_in_workspace(self) -> dict[str, Group]:
         attributes = "id,displayName,meta,externalId,members,roles,entitlements"
         groups = {}
@@ -506,6 +539,10 @@ class GroupManager(CrawlerBase[MigratedGroup]):
             return True
         except BadRequest:
             # already exists
+            return True
+        except NotFound:
+            # the given group has been removed from the account after getting the group and before running this method
+            logger.warning("Group with ID: %s does not exist anymore in the Databricks account.", account_group_id)
             return True
 
     def _get_strategy(

@@ -4,6 +4,8 @@ from functools import partial
 
 from databricks.labs.blueprint.parallel import Threads
 from databricks.sdk import WorkspaceClient
+from databricks.sdk.errors import NotFound
+from databricks.sdk.service.catalog import PermissionsChange, SecurableType, TableType
 
 from databricks.labs.ucx.framework.crawlers import SqlBackend
 from databricks.labs.ucx.hive_metastore import TablesCrawler
@@ -182,3 +184,141 @@ class TablesMigrate:
             print("Migrated Manged Tables (targets) will be left intact.")
             print("To revert and delete Migrated Tables, add --delete_managed true flag to the command.")
         return True
+
+
+class TableMove:
+    def __init__(self, ws: WorkspaceClient, backend: SqlBackend):
+        self._backend = backend
+        self._ws = ws
+
+    def move_tables(
+        self,
+        from_catalog: str,
+        from_schema: str,
+        from_table: str,
+        to_catalog: str,
+        to_schema: str,
+        del_table: bool,  # noqa: FBT001
+    ):
+        try:
+            self._ws.schemas.get(f"{from_catalog}.{from_schema}")
+        except NotFound:
+            logger.error(f"schema {from_schema} not found in catalog {from_catalog}, enter correct schema details.")
+            return
+        try:
+            self._ws.schemas.get(f"{to_catalog}.{to_schema}")
+        except NotFound:
+            logger.warning(f"schema {to_schema} not found in {to_catalog}, creating...")
+            self._ws.schemas.create(to_schema, to_catalog)
+
+        tables = self._ws.tables.list(from_catalog, from_schema)
+        table_tasks = []
+        view_tasks = []
+        filtered_tables = [table for table in tables if from_table in [table.name, "*"]]
+        for table in filtered_tables:
+            try:
+                self._ws.tables.get(f"{to_catalog}.{to_schema}.{table.name}")
+                logger.warning(
+                    f"table {from_table} already present in {from_catalog}.{from_schema}. skipping this table..."
+                )
+                continue
+            except NotFound:
+                if table.table_type and table.table_type in (TableType.EXTERNAL, TableType.MANAGED):
+                    table_tasks.append(
+                        partial(
+                            self._move_table, from_catalog, from_schema, table.name, to_catalog, to_schema, del_table
+                        )
+                    )
+                else:
+                    view_tasks.append(
+                        partial(
+                            self._move_view,
+                            from_catalog,
+                            from_schema,
+                            table.name,
+                            to_catalog,
+                            to_schema,
+                            del_table,
+                            table.view_definition,
+                        )
+                    )
+        Threads.strict("Creating tables", table_tasks)
+        logger.info(f"Moved {len(list(table_tasks))} tables to the new schema {to_schema}.")
+        Threads.strict("Creating views", view_tasks)
+        logger.info(f"Moved {len(list(view_tasks))} views to the new schema {to_schema}.")
+
+    def _move_table(
+        self,
+        from_catalog: str,
+        from_schema: str,
+        from_table: str,
+        to_catalog: str,
+        to_schema: str,
+        del_table: bool,  # noqa: FBT001
+    ) -> bool:
+        from_table_name = f"{from_catalog}.{from_schema}.{from_table}"
+        to_table_name = f"{to_catalog}.{to_schema}.{from_table}"
+        try:
+            create_sql = str(next(self._backend.fetch(f"SHOW CREATE TABLE {from_table_name}"))[0])
+            create_table_sql = create_sql.replace(f"CREATE TABLE {from_table_name}", f"CREATE TABLE {to_table_name}")
+            logger.info(f"Creating table {to_table_name}")
+            self._backend.execute(create_table_sql)
+
+            grants = self._ws.grants.get(SecurableType.TABLE, from_table_name)
+            if grants.privilege_assignments is not None:
+                logger.info(f"Applying grants on table {to_table_name}")
+                grants_changes = [
+                    PermissionsChange(pair.privileges, pair.principal) for pair in grants.privilege_assignments
+                ]
+                self._ws.grants.update(SecurableType.TABLE, to_table_name, changes=grants_changes)
+
+            if del_table:
+                logger.info(f"Dropping source table {from_table_name}")
+                drop_sql = f"DROP TABLE {from_table_name}"
+                self._backend.execute(drop_sql)
+
+            return True
+        except NotFound as err:
+            if "[TABLE_OR_VIEW_NOT_FOUND]" in str(err) or "[DELTA_TABLE_NOT_FOUND]" in str(err):
+                logger.error(f"Could not find table {from_table_name}. Table not found.")
+            else:
+                logger.error(f"Failed to move table {from_table_name}: {err!s}", exc_info=True)
+        return False
+
+    def _move_view(
+        self,
+        from_catalog: str,
+        from_schema: str,
+        from_view: str,
+        to_catalog: str,
+        to_schema: str,
+        del_view: bool,  # noqa: FBT001
+        view_text: str | None = None,
+    ) -> bool:
+        from_view_name = f"{from_catalog}.{from_schema}.{from_view}"
+        to_view_name = f"{to_catalog}.{to_schema}.{from_view}"
+        try:
+            create_sql = f"CREATE VIEW {to_view_name} AS {view_text}"
+            logger.info(f"Creating view {to_view_name}")
+            self._backend.execute(create_sql)
+
+            grants = self._ws.grants.get(SecurableType.TABLE, from_view_name)
+            if grants.privilege_assignments is not None:
+                logger.info(f"Applying grants on view {to_view_name}")
+                grants_changes = [
+                    PermissionsChange(pair.privileges, pair.principal) for pair in grants.privilege_assignments
+                ]
+                self._ws.grants.update(SecurableType.TABLE, to_view_name, changes=grants_changes)
+
+            if del_view:
+                logger.info(f"Dropping source view {from_view_name}")
+                drop_sql = f"DROP VIEW {from_view_name}"
+                self._backend.execute(drop_sql)
+
+            return True
+        except NotFound as err:
+            if "[TABLE_OR_VIEW_NOT_FOUND]" in str(err):
+                logger.error(f"Could not find view {from_view_name}. View not found.")
+            else:
+                logger.error(f"Failed to move view {from_view_name}: {err!s}", exc_info=True)
+        return False

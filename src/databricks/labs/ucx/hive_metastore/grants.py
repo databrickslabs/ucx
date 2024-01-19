@@ -9,6 +9,7 @@ from databricks.sdk.service.catalog import SchemaInfo, TableInfo
 
 from databricks.labs.ucx.framework.crawlers import CrawlerBase
 from databricks.labs.ucx.hive_metastore.tables import TablesCrawler
+from databricks.labs.ucx.hive_metastore.udfs import UdfsCrawler
 
 logger = logging.getLogger(__name__)
 
@@ -21,6 +22,7 @@ class Grant:
     database: str | None = None
     table: str | None = None
     view: str | None = None
+    udf: str | None = None
     any_file: bool = False
     anonymous_function: bool = False
 
@@ -31,6 +33,7 @@ class Grant:
         database: str | None = None,
         table: str | None = None,
         view: str | None = None,
+        udf: str | None = None,
         any_file: bool = False,
         anonymous_function: bool = False,
     ) -> tuple[str, str]:
@@ -42,6 +45,10 @@ class Grant:
             catalog = "hive_metastore" if catalog is None else catalog
             database = "default" if database is None else database
             return "VIEW", f"{catalog}.{database}.{view}"
+        if udf is not None:
+            catalog = "hive_metastore" if catalog is None else catalog
+            database = "default" if database is None else database
+            return "FUNCTION", f"{catalog}.{database}.{udf}"
         if database is not None:
             catalog = "hive_metastore" if catalog is None else catalog
             return "DATABASE", f"{catalog}.{database}"
@@ -53,7 +60,7 @@ class Grant:
         if catalog is not None:
             return "CATALOG", catalog
         msg = (
-            f"invalid grant keys: catalog={catalog}, database={database}, view={view}, "
+            f"invalid grant keys: catalog={catalog}, database={database}, view={view}, udf={udf}"
             f"any_file={any_file}, anonymous_function={anonymous_function}"
         )
         raise ValueError(msg)
@@ -69,6 +76,7 @@ class Grant:
             database=self.database,
             table=self.table,
             view=self.view,
+            udf=self.udf,
             any_file=self.any_file,
             anonymous_function=self.anonymous_function,
         )
@@ -135,9 +143,13 @@ class Grant:
 
 
 class GrantsCrawler(CrawlerBase[Grant]):
-    def __init__(self, tc: TablesCrawler):
+    def __init__(self, tc: TablesCrawler, udf: UdfsCrawler):
+        assert tc._backend == udf._backend
+        assert tc._catalog == udf._catalog
+        assert tc._schema == udf._schema
         super().__init__(tc._backend, tc._catalog, tc._schema, "grants", Grant)
         self._tc = tc
+        self._udf = udf
 
     def snapshot(self) -> Iterable[Grant]:
         return self._snapshot(partial(self._try_load), partial(self._crawl))
@@ -148,7 +160,7 @@ class GrantsCrawler(CrawlerBase[Grant]):
 
     def _crawl(self) -> Iterable[Grant]:
         """
-        Crawls and lists grants for all databases, tables,  views, any file
+        Crawls and lists grants for all databases, tables,  views, udfs, any file
         and anonymous function within hive_metastore.
 
         Returns:
@@ -159,12 +171,14 @@ class GrantsCrawler(CrawlerBase[Grant]):
           table/view-specific grants.
         - Iterates through tables in the specified database using the `_tc.snapshot` method.
         - For each table, adds tasks to fetch grants for the table or its view, depending on the kind of the table.
+        - Iterates through udfs in the specified database using the `_udf.snapshot` method.
+        - For each udf, adds tasks to fetch grants for the udf.
         - Executes the tasks concurrently using Threads.gather.
         - Flattens the list of retrieved grant lists into a single list of Grant objects.
 
         Note:
         - The method assumes that the `_grants` method fetches grants based on the provided parameters (catalog,
-          database, table, view, any file, anonymous function).
+          database, table, view, udfs, any file, anonymous function).
 
         Returns:
         list[Grant]: A list of Grant objects representing the grants found in hive_metastore.
@@ -181,6 +195,9 @@ class GrantsCrawler(CrawlerBase[Grant]):
             fn = partial(self._grants, catalog=catalog, database=table.database)
             # views are recognized as tables
             tasks.append(partial(fn, table=table.name))
+        for udf in self._udf.snapshot():
+            fn = partial(self._grants, catalog=catalog, database=udf.database)
+            tasks.append(partial(fn, udf=udf.name))
         catalog_grants, errors = Threads.gather(f"listing grants for {catalog}", tasks)
         if len(errors) > 0:
             raise ManyError(errors)
@@ -206,6 +223,7 @@ class GrantsCrawler(CrawlerBase[Grant]):
         database: str | None = None,
         table: str | None = None,
         view: str | None = None,
+        udf: str | None = None,
         any_file: bool = False,
         anonymous_function: bool = False,
     ) -> list[Grant]:
@@ -217,6 +235,7 @@ class GrantsCrawler(CrawlerBase[Grant]):
             database (str | None): The database name (optional).
             table (str | None): The table name (optional).
             view (str | None): The view name (optional).
+            udf (str | None): The udf name (optional).
             any_file (bool): Whether to include any file grants (optional).
             anonymous_function (bool): Whether to include anonymous function grants (optional).
 
@@ -245,13 +264,12 @@ class GrantsCrawler(CrawlerBase[Grant]):
             database=self._try_valid(database),
             table=self._try_valid(table),
             view=self._try_valid(view),
+            udf=self._try_valid(udf),
             any_file=any_file,
             anonymous_function=anonymous_function,
         )
         try:
             grants = []
-            # Added ANY FILE and ANONYMOUS FUNCTION in object_type_normalization
-            # to capture the same in grants. issue:#623
             object_type_normalization = {
                 "SCHEMA": "DATABASE",
                 "CATALOG$": "CATALOG",
@@ -271,6 +289,7 @@ class GrantsCrawler(CrawlerBase[Grant]):
                     action_type=action_type,
                     table=table,
                     view=view,
+                    udf=udf,
                     database=database,
                     catalog=catalog,
                     any_file=any_file,

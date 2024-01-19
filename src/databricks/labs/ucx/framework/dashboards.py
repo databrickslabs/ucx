@@ -47,7 +47,7 @@ class SimpleQuery:
 class VizColumn:
     name: str
     title: str
-    type: str = "string"  # noqa: A003
+    type: str = "string"
     imageUrlTemplate: str = "{{ @ }}"  # noqa: N815
     imageTitleTemplate: str = "{{ @ }}"  # noqa: N815
     linkUrlTemplate: str = "{{ @ }}"  # noqa: N815
@@ -298,7 +298,7 @@ class DashboardFromFiles:
             "query": query.query,
         }
         if query.key in self._state.queries:
-            return self._ws.queries.update(self._state.queries[query.key], **query_meta)
+            return self._ws.queries.update(self._state.queries[query.key], **query_meta, run_as_role=None)
 
         deployed_query = self._ws.queries.create(parent=parent, run_as_role=RunAsRole.VIEWER, **query_meta)
         assert deployed_query.id is not None

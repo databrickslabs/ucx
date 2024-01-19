@@ -65,6 +65,9 @@ class TableAclSupport(AclSupport):
             case "CATALOG":
                 catalog = object_id
                 return Grant(principal=principal, action_type=action_type, catalog=catalog)
+            case "FUNCTION":
+                catalog, database, udf = object_id.split(".")
+                return Grant(principal=principal, action_type=action_type, catalog=catalog, database=database, udf=udf)
             case "ANONYMOUS FUNCTION":
                 catalog = object_id
                 return Grant(principal=principal, action_type=action_type, catalog=catalog, anonymous_function=True)
@@ -73,7 +76,7 @@ class TableAclSupport(AclSupport):
                 return Grant(principal=principal, action_type=action_type, catalog=catalog, any_file=True)
 
     def object_types(self) -> set[str]:
-        return {"TABLE", "DATABASE", "VIEW", "CATALOG", "ANONYMOUS FUNCTION", "ANY FILE"}
+        return {"TABLE", "DATABASE", "VIEW", "CATALOG", "FUNCTION", "ANONYMOUS FUNCTION", "ANY FILE"}
 
     def get_apply_task(self, item: Permissions, migration_state: MigrationState):
         grant = Grant(**json.loads(item.raw))

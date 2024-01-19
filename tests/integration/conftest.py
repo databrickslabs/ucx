@@ -10,12 +10,13 @@ from databricks.sdk import AccountClient, WorkspaceClient
 from databricks.sdk.core import Config
 from databricks.sdk.errors import NotFound
 from databricks.sdk.retries import retried
-from databricks.sdk.service.catalog import TableInfo
+from databricks.sdk.service.catalog import FunctionInfo, TableInfo
 
 from databricks.labs.ucx.framework.crawlers import SqlBackend
 from databricks.labs.ucx.hive_metastore import TablesCrawler
 from databricks.labs.ucx.hive_metastore.mapping import Rule, TableMapping
 from databricks.labs.ucx.hive_metastore.tables import Table
+from databricks.labs.ucx.hive_metastore.udfs import Udf, UdfsCrawler
 from databricks.labs.ucx.mixins.fixtures import *  # noqa: F403
 from databricks.labs.ucx.workspace_access.groups import MigratedGroup
 
@@ -134,6 +135,29 @@ class StaticTablesCrawler(TablesCrawler):
 
     def snapshot(self) -> list[Table]:
         return self._tables
+
+
+class StaticUdfsCrawler(UdfsCrawler):
+    def __init__(self, sql_backend: SqlBackend, schema: str, udfs: list[FunctionInfo]):
+        super().__init__(sql_backend, schema)
+        self._udfs = [
+            Udf(
+                catalog=_.catalog_name,
+                database=_.schema_name,
+                name=_.name,
+                body="5",
+                comment="_",
+                data_access="CONTAINS SQL",
+                deterministic=True,
+                func_input="STRING",
+                func_returns="INT",
+                func_type="SQL",
+            )
+            for _ in udfs
+        ]
+
+    def snapshot(self) -> list[Udf]:
+        return self._udfs
 
 
 class StaticTableMapping(TableMapping):

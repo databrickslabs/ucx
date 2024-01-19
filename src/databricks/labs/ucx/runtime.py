@@ -19,6 +19,7 @@ from databricks.labs.ucx.hive_metastore import (
     TablesCrawler,
 )
 from databricks.labs.ucx.hive_metastore.table_size import TableSizeCrawler
+from databricks.labs.ucx.hive_metastore.udfs import UdfsCrawler
 from databricks.labs.ucx.workspace_access.generic import WorkspaceListing
 from databricks.labs.ucx.workspace_access.groups import GroupManager
 from databricks.labs.ucx.workspace_access.manager import PermissionManager
@@ -53,7 +54,8 @@ def crawl_grants(cfg: WorkspaceConfig):
     ACLs enabled and available for retrieval."""
     backend = RuntimeBackend()
     tables = TablesCrawler(backend, cfg.inventory_database)
-    grants = GrantsCrawler(tables)
+    udfs = UdfsCrawler(backend, cfg.inventory_database)
+    grants = GrantsCrawler(tables, udfs)
     grants.snapshot()
 
 

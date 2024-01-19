@@ -27,6 +27,9 @@ class ConnectConfig:
     cluster_id: str | None = None
     profile: str | None = None
     debug_headers: bool | None = False
+    # Truncate JSON fields in HTTP requests and responses above this limit.
+    # If this occurs, the log message will include the text `... (XXX additional elements)`
+    debug_truncate_bytes: int | None = 250000
     rate_limit: int | None = None
     max_connections_per_pool: int | None = None
     max_connection_pools: int | None = None
@@ -45,6 +48,7 @@ class ConnectConfig:
             cluster_id=cfg.cluster_id,
             profile=cfg.profile,
             debug_headers=cfg.debug_headers,
+            debug_truncate_bytes=cfg.debug_truncate_bytes,
             rate_limit=cfg.rate_limit,
             max_connection_pools=cfg.max_connection_pools,
             max_connections_per_pool=cfg.max_connections_per_pool,
@@ -64,6 +68,7 @@ class ConnectConfig:
             cluster_id=self.cluster_id,
             profile=self.profile,
             debug_headers=self.debug_headers,
+            debug_truncate_bytes=self.debug_truncate_bytes,
             rate_limit=self.rate_limit,
             max_connection_pools=self.max_connection_pools,
             max_connections_per_pool=self.max_connections_per_pool,
@@ -213,7 +218,8 @@ class WorkspaceConfig(_Config["WorkspaceConfig"]):
     @classmethod
     def from_dict(cls, raw: dict):
         raw = cls._migrate_from_v1(raw)
-        return cls(**raw)
+        connect = ConnectConfig.from_dict(raw.pop("connect", {}))
+        return cls(connect=connect, **raw)
 
     def to_workspace_client(self) -> WorkspaceClient:
         return WorkspaceClient(config=self.to_databricks_config())

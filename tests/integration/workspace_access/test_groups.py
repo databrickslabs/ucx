@@ -17,7 +17,7 @@ from databricks.labs.ucx.workspace_access.groups import GroupManager
 from databricks.labs.ucx.workspace_access.manager import PermissionManager
 from databricks.labs.ucx.workspace_access.tacl import TableAclSupport
 
-from ..conftest import StaticTablesCrawler
+from ..conftest import StaticTablesCrawler, StaticUdfsCrawler
 
 logger = logging.getLogger(__name__)
 
@@ -206,6 +206,38 @@ def test_group_matching_names(ws, sql_backend, inventory_schema, make_ucx_group,
     validate_migrate_groups(group_manager, ws_group, accnt_group)
 
 
+@retried(on=[NotFound], timeout=timedelta(minutes=2))
+def test_group_matching_names_with_diff_users(
+    ws, sql_backend, inventory_schema, make_random, make_user, make_group, make_acc_group
+):
+    rand_elem = make_random(4)
+    workspace_group_name = f"test_group_{rand_elem}"
+    account_group_name = f"same_group_[{rand_elem}]"
+    user1 = make_user()
+    user2 = make_user()
+    members1 = [user1.id]
+    members2 = [user2.id]
+    ws_group = make_group(display_name=workspace_group_name, members=members1, entitlements=["allow-cluster-create"])
+    accnt_group = make_acc_group(display_name=account_group_name, members=members2)
+
+    logger.info(
+        f"Attempting Mapping From Workspace Group {ws_group.display_name} to "
+        f"Account Group {accnt_group.display_name}"
+    )
+    group_manager = GroupManager(
+        sql_backend,
+        ws,
+        inventory_schema,
+        [ws_group.display_name],
+        "ucx-temp-",
+        workspace_group_regex=r"([0-9a-zA-Z]*)$",
+        account_group_regex=r"\[([0-9a-zA-Z]*)\]",
+    )
+
+    t = group_manager.validate_group_membership()
+    assert len(t) > 0
+
+
 # average runtime is 100 seconds
 @retried(on=[NotFound], timeout=timedelta(minutes=3))
 def test_replace_workspace_groups_with_account_groups(
@@ -217,11 +249,6 @@ def test_replace_workspace_groups_with_account_groups(
     make_cluster_policy_permissions,
     make_table,
 ):
-    """
-
-    Args:
-        sql_backend (object):
-    """
     ws_group, _ = make_ucx_group()
     cluster_policy = make_cluster_policy()
     make_cluster_policy_permissions(
@@ -229,13 +256,13 @@ def test_replace_workspace_groups_with_account_groups(
         permission_level=PermissionLevel.CAN_USE,
         group_name=ws_group.display_name,
     )
-    logger.info(f"Cluster policy: {ws.config.host}#setting/clusters/cluster-policies/view/{cluster_policy.policy_id}")
 
     dummy_table = make_table()
     sql_backend.execute(f"GRANT SELECT, MODIFY ON TABLE {dummy_table.full_name} TO `{ws_group.display_name}`")
 
     tables = StaticTablesCrawler(sql_backend, inventory_schema, [dummy_table])
-    grants = GrantsCrawler(tables)
+    udfs = StaticUdfsCrawler(sql_backend, inventory_schema, [])
+    grants = GrantsCrawler(tables, udfs)
 
     @retried(on=[AssertionError], timeout=timedelta(seconds=30))
     def assert_table_has_two_grants():
@@ -285,6 +312,7 @@ def test_replace_workspace_groups_with_account_groups(
         assert "SELECT" in table_permissions[group_info.temporary_name]
 
         policy_permissions = generic_permissions.load_as_dict("cluster-policies", cluster_policy.policy_id)
+        assert group_info.temporary_name in policy_permissions
         assert PermissionLevel.CAN_USE == policy_permissions[group_info.temporary_name]
 
     check_permissions_for_backup_group()
@@ -303,6 +331,7 @@ def test_replace_workspace_groups_with_account_groups(
 
         policy_permissions = generic_permissions.load_as_dict("cluster-policies", cluster_policy.policy_id)
         assert group_info.name_in_workspace not in policy_permissions
+        assert group_info.temporary_name in policy_permissions
         assert PermissionLevel.CAN_USE == policy_permissions[group_info.temporary_name]
 
     check_permissions_after_replace()
@@ -322,6 +351,7 @@ def test_replace_workspace_groups_with_account_groups(
         assert "SELECT" in table_permissions[group_info.name_in_account]
 
         policy_permissions = generic_permissions.load_as_dict("cluster-policies", cluster_policy.policy_id)
+        assert group_info.name_in_account in policy_permissions
         assert PermissionLevel.CAN_USE == policy_permissions[group_info.name_in_account]
         assert PermissionLevel.CAN_USE == policy_permissions[group_info.temporary_name]
 
@@ -335,8 +365,11 @@ def test_replace_workspace_groups_with_account_groups(
 
         policy_permissions = generic_permissions.load_as_dict("cluster-policies", cluster_policy.policy_id)
         assert group_info.temporary_name not in policy_permissions
+        assert group_info.name_in_account in policy_permissions
+        assert PermissionLevel.CAN_USE == policy_permissions[group_info.name_in_account]
 
         table_permissions = grants.for_table_info(dummy_table)
+        assert group_info.temporary_name not in table_permissions
         assert group_info.name_in_account in table_permissions
         assert "MODIFY" in table_permissions[group_info.name_in_account]
         assert "SELECT" in table_permissions[group_info.name_in_account]

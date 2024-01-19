@@ -467,6 +467,8 @@ def test_load_as_dict():
 
     cluster_id = "cluster_test"
     group_name = "group_test"
+    user_name = "user_test"
+    sp_name = "sp_test"
 
     ws.clusters.list.return_value = [
         compute.ClusterDetails(
@@ -481,7 +483,18 @@ def test_load_as_dict():
             iam.AccessControlResponse(
                 group_name=group_name,
                 all_permissions=[iam.Permission(inherited=False, permission_level=iam.PermissionLevel.CAN_USE)],
-            )
+            ),
+            iam.AccessControlResponse(
+                user_name=user_name,
+                all_permissions=[iam.Permission(inherited=False, permission_level=iam.PermissionLevel.CAN_RUN)],
+            ),
+            iam.AccessControlResponse(
+                service_principal_name=sp_name,
+                all_permissions=[iam.Permission(inherited=False, permission_level=iam.PermissionLevel.CAN_MANAGE)],
+            ),
+            iam.AccessControlResponse(
+                all_permissions=[iam.Permission(inherited=False, permission_level=iam.PermissionLevel.CAN_ATTACH_TO)],
+            ),
         ],
     )
 
@@ -491,9 +504,12 @@ def test_load_as_dict():
     policy_permissions = sup.load_as_dict("clusters", cluster_id)
 
     assert iam.PermissionLevel.CAN_USE == policy_permissions[group_name]
+    assert iam.PermissionLevel.CAN_RUN == policy_permissions[user_name]
+    assert iam.PermissionLevel.CAN_MANAGE == policy_permissions[sp_name]
+    assert iam.PermissionLevel.CAN_ATTACH_TO == policy_permissions["UNKNOWN"]
 
 
-def test_load_as_dict_no_permissions():
+def test_load_as_dict_permissions_not_found():
     ws = MagicMock()
 
     sup = GenericPermissionsSupport(
@@ -504,6 +520,27 @@ def test_load_as_dict_no_permissions():
     ws.permissions.get.side_effect = Mock(side_effect=NotFound(...))
 
     policy_permissions = sup.load_as_dict("clusters", "cluster_test")
+
+    assert len(policy_permissions) == 0
+
+
+def test_load_as_dict_no_acls():
+    ws = MagicMock()
+
+    cluster_id = "cluster_test"
+
+    ws.clusters.list.return_value = [
+        compute.ClusterDetails(
+            cluster_id=cluster_id,
+        )
+    ]
+
+    sample_permission = iam.ObjectPermissions(object_id=cluster_id, object_type="clusters", access_control_list=[])
+
+    ws.permissions.get.return_value = sample_permission
+    sup = GenericPermissionsSupport(ws=ws, listings=[Listing(ws.clusters.list, "cluster_id", "clusters")])
+
+    policy_permissions = sup.load_as_dict("clusters", cluster_id)
 
     assert len(policy_permissions) == 0
 
@@ -519,6 +556,52 @@ def test_load_as_dict_handle_exception_when_getting_permissions():
     ws.permissions.get.side_effect = Mock(side_effect=NotFound(...))
 
     policy_permissions = sup.load_as_dict("clusters", "cluster_test")
+
+    assert len(policy_permissions) == 0
+
+
+def test_load_as_dict_no_permissions():
+    ws = MagicMock()
+
+    sup = GenericPermissionsSupport(
+        ws=ws,
+        listings=[],
+    )
+
+    ws.permissions.get.return_value = None
+
+    policy_permissions = sup.load_as_dict("clusters", "cluster_test")
+
+    assert len(policy_permissions) == 0
+
+
+def test_load_as_dict_no_permission_level():
+    ws = MagicMock()
+
+    cluster_id = "cluster_test"
+    group_name = "group_test"
+
+    ws.clusters.list.return_value = [
+        compute.ClusterDetails(
+            cluster_id=cluster_id,
+        )
+    ]
+
+    sample_permission = iam.ObjectPermissions(
+        object_id=cluster_id,
+        object_type="clusters",
+        access_control_list=[
+            iam.AccessControlResponse(
+                group_name=group_name,
+                all_permissions=[iam.Permission(inherited=False)],
+            )
+        ],
+    )
+
+    ws.permissions.get.return_value = sample_permission
+    sup = GenericPermissionsSupport(ws=ws, listings=[Listing(ws.clusters.list, "cluster_id", "clusters")])
+
+    policy_permissions = sup.load_as_dict("clusters", cluster_id)
 
     assert len(policy_permissions) == 0
 

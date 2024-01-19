@@ -8,6 +8,7 @@ from databricks.labs.blueprint.parallel import ManyError, Threads
 from databricks.sdk import WorkspaceClient
 from databricks.sdk.errors import NotFound
 from databricks.sdk.service.iam import User
+from yaml import YAMLError
 
 from databricks.labs.ucx.config import WorkspaceConfig
 
@@ -46,6 +47,9 @@ class InstallationManager:
             raise NotFound(msg) from None
         except TypeError:
             msg = f"Installation is corrupt for {user.user_name}"
+            raise IllegalState(msg) from None
+        except YAMLError:
+            msg = f"Config file {config_file} is corrupted, check if it is in correct yaml format"
             raise IllegalState(msg) from None
 
     def _maybe_for_user(self, user: User) -> Installation | None:

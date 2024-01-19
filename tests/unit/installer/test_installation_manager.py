@@ -1,8 +1,10 @@
 import io
-from unittest.mock import MagicMock
+from unittest.mock import MagicMock, create_autospec
 
 import pytest
+from databricks.labs.blueprint.installer import IllegalState
 from databricks.labs.blueprint.parallel import ManyError
+from databricks.sdk import WorkspaceClient
 from databricks.sdk.errors import NotFound
 from databricks.sdk.service.iam import ComplexValue, User
 from databricks.sdk.service.jobs import (
@@ -58,6 +60,26 @@ def test_corrupt_config(mocker):
     ws.users.list.return_value = [User(user_name="foo")]
     ws.workspace.download.return_value = io.StringIO("version: 2\ntacl: true")
 
+    installation_manager = InstallationManager(ws)
+    user_installations = installation_manager.user_installations()
+    assert len(user_installations) == 0
+
+
+def test_for_user_corrupt_config_yaml(mocker):
+    ws = create_autospec(WorkspaceClient)
+    user = User(user_name="foo")
+    ws.users.list.return_value = [user]
+    ws.workspace.download.return_value = io.StringIO("version: 2\ntacl: extra colon: test")
+    installation_manager = InstallationManager(ws)
+    with pytest.raises(IllegalState):
+        installation_manager.for_user(user)
+
+
+def test_user_installations_corrupt_config_yaml(mocker):
+    ws = create_autospec(WorkspaceClient)
+    user = User(user_name="foo")
+    ws.users.list.return_value = [user]
+    ws.workspace.download.return_value = io.StringIO("version: 2\ntacl: extra colon: test")
     installation_manager = InstallationManager(ws)
     user_installations = installation_manager.user_installations()
     assert len(user_installations) == 0
