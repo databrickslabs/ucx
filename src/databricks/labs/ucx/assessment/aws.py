@@ -164,25 +164,6 @@ class AWSResources:
                     yield AWSPolicyAction("s3", set(s3_action), match.group(1))
 
 
-class AWSInstanceProfileCrawler(CrawlerBase[AWSInstanceProfile]):
-    def __init__(self, ws: WorkspaceClient, sbe: SqlBackend, schema):
-        super().__init__(sbe, "hive_metastore", schema, "aws_instance_profile", AWSInstanceProfile)
-        self._ws = ws
-        self._schema = schema
-
-    def _crawl(self) -> Iterable[AWSInstanceProfile]:
-        instance_profiles = self._ws.instance_profiles.list()
-        for instance_profile in instance_profiles:
-            yield AWSInstanceProfile(instance_profile.instance_profile_arn, instance_profile.iam_role_arn)
-
-    def snapshot(self) -> Iterable[AWSInstanceProfile]:
-        return self._snapshot(self._try_fetch, self._crawl)
-
-    def _try_fetch(self) -> Iterable[AWSInstanceProfile]:
-        for row in self._fetch(f"SELECT * FROM {self._schema}.{self._table}"):
-            yield AWSInstanceProfile(*row)
-
-
 class AWSResourcePermissions:
     def __init__(
         self,
@@ -200,10 +181,12 @@ class AWSResourcePermissions:
         self._field_names = [_.name for _ in dataclasses.fields(AWSInstanceProfileAction)]
 
     def _get_instance_profiles(self) -> Iterable[AWSInstanceProfile]:
-        return self._instance_profile_crawler.snapshot()
+        instance_profiles = self._ws.instance_profiles.list()
+        for instance_profile in instance_profiles:
+            yield AWSInstanceProfile(instance_profile.instance_profile_arn, instance_profile.iam_role_arn)
 
     def _get_instance_profiles_access(self):
-        instance_profiles = self._get_instance_profiles()
+        instance_profiles = list(self._get_instance_profiles())
         tasks = []
         for instance_profile in instance_profiles:
             tasks.append(partial(self._get_instance_profile_access_task, instance_profile))
