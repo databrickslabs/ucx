@@ -31,10 +31,16 @@ from databricks.labs.ucx.framework.lakeview.model import Dashboard
 # 		-
 # 	label: LabelEncoding
 # 		show (required)
-
-
-def is_assignable():
-    pass
+#
+# def test_xxx():
+#     d = {"y": {"fields": [
+#         {
+#             'fieldName': '..'
+#         }
+#     ], 'scale': {}}, "color": {"fields": [], 'scale': {}}}
+#     res, why = _is_assignable(ChartEncodingMapWithMultiY, d, [], snake_to_camel)
+#     assert not res
+#
 
 
 def test_lvdash():

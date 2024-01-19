@@ -2,17 +2,181 @@
 
 from __future__ import annotations
 
+import abc
+import dataclasses
+import types
+from collections.abc import Callable
 from dataclasses import dataclass
 from enum import Enum
-from typing import Any
+from typing import Any, get_args, get_type_hints
 
-from databricks.sdk.service._internal import (
-    _enum,
-    _from_dict,
-    _repeated_dict,
-)
+from databricks.sdk.service._internal import _enum, _from_dict, _repeated_dict
 
 Json = dict[str, Any]
+
+
+def _explain_why(type_ref: type, raw: Any, path: list[str]) -> str:
+    if raw is None:
+        raw = "value is missing"
+    return f'{".".join(path)}: not a {type_ref.__name__}: {raw}'
+
+
+def _snake_to_camel(snake_name: str) -> str:
+    words = snake_name.split("_")
+    return words[0] + "".join(word.capitalize() for word in words[1:])
+
+
+def _is_assignable(
+    type_ref: type, raw: Any, path: list[str], name_transform: Callable[[str], str]
+) -> tuple[bool, str | None]:
+    if dataclasses.is_dataclass(type_ref):
+        if not isinstance(raw, dict):
+            return False, _explain_why(dict, raw, path)
+        for field, hint in get_type_hints(type_ref).items():
+            field = name_transform(field)
+            valid, why_not = _is_assignable(hint, raw.get(field), [*path, field], name_transform)
+            if not valid:
+                return False, why_not
+        return True, None
+    if isinstance(type_ref, types.GenericAlias):
+        if not isinstance(raw, list):
+            return False, _explain_why(list, raw, path)
+        type_args = get_args(type_ref)
+        if not type_args:
+            raise TypeError(f"Missing type arguments: {type_args}")
+        item_ref = type_args[0]
+        for i, v in enumerate(raw):
+            valid, why_not = _is_assignable(item_ref, v, [*path, f"{i}"], name_transform)
+            if not valid:
+                return False, why_not
+        return True, None
+    if isinstance(type_ref, types.UnionType):
+        combo = []
+        for variant in get_args(type_ref):
+            valid, why_not = _is_assignable(variant, raw, [], name_transform)
+            if valid:
+                return True, None
+            if why_not:
+                combo.append(why_not)
+        return False, f'{".".join(path)}: union: {" or ".join(combo)}'
+    if type_ref == types.NoneType:
+        if raw is None:
+            return True, None
+        return False, None
+    if type_ref in (int, bool, float, str):
+        if type_ref == type(raw):
+            return True, None
+        return False, _explain_why(type_ref, raw, path)
+    return False, f'{".".join(path)}: unknown: {raw}'
+
+
+class BasicChartEncodingMap(abc.ABC):
+    @abc.abstractmethod
+    def as_dict(self) -> Json:
+        raise NotImplementedError
+
+    @classmethod
+    def from_dict(cls, d: Json) -> BasicChartEncodingMap:
+        reasons = []
+        yes, why_not = _is_assignable(ChartEncodingMapWithSingleXy, d, [], _snake_to_camel)
+        if yes:
+            return ChartEncodingMapWithSingleXy.from_dict(d)
+        if why_not:
+            reasons.append(why_not)
+        yes, why_not = _is_assignable(ChartEncodingMapWithMultiX, d, [], _snake_to_camel)
+        if yes:
+            return ChartEncodingMapWithMultiX.from_dict(d)
+        if why_not:
+            reasons.append(why_not)
+        yes, why_not = _is_assignable(ChartEncodingMapWithMultiY, d, [], _snake_to_camel)
+        if yes:
+            return ChartEncodingMapWithMultiY.from_dict(d)
+        if why_not:
+            reasons.append(why_not)
+        raise KeyError(" and ".join(reasons))
+
+
+class ControlEncoding(abc.ABC):
+    @abc.abstractmethod
+    def as_dict(self) -> Json:
+        raise NotImplementedError
+
+    @classmethod
+    def from_dict(cls, d: Json) -> ControlEncoding:
+        reasons = []
+        yes, why_not = _is_assignable(ControlFieldEncoding, d, [], _snake_to_camel)
+        if yes:
+            return ControlFieldEncoding.from_dict(d)
+        if why_not:
+            reasons.append(why_not)
+        yes, why_not = _is_assignable(ParameterEncoding, d, [], _snake_to_camel)
+        if yes:
+            return ParameterEncoding.from_dict(d)
+        if why_not:
+            reasons.append(why_not)
+        raise KeyError(" and ".join(reasons))
+
+
+class Scale(abc.ABC):
+    @abc.abstractmethod
+    def as_dict(self) -> Json:
+        raise NotImplementedError
+
+    @classmethod
+    def from_dict(cls, d: Json) -> Scale:
+        if d["type"] == "categorical":
+            return CategoricalScale.from_dict(d)
+        elif d["type"] == "quantitative":
+            return QuantitativeScale.from_dict(d)
+        elif d["type"] == "temporal":
+            return TemporalScale.from_dict(d)
+        else:
+            raise KeyError(f'unknown: type={d["type"]}')
+
+
+class WidgetSpec(abc.ABC):
+    @abc.abstractmethod
+    def as_dict(self) -> Json:
+        raise NotImplementedError
+
+    @classmethod
+    def from_dict(cls, d: Json) -> WidgetSpec:
+        if d["version"] == 1 and d["widgetType"] == "details":
+            return DetailsV1Spec.from_dict(d)
+        elif d["version"] == 1 and d["widgetType"] == "table":
+            return TableV1Spec.from_dict(d)
+        elif d["version"] == 2 and d["widgetType"] == "counter":
+            return CounterSpec.from_dict(d)
+        elif d["version"] == 2 and d["widgetType"] == "filter-date-picker":
+            return DatePickerSpec.from_dict(d)
+        elif d["version"] == 2 and d["widgetType"] == "filter-date-range-picker":
+            return DateRangePickerSpec.from_dict(d)
+        elif d["version"] == 2 and d["widgetType"] == "filter-multi-select":
+            return MultiSelectSpec.from_dict(d)
+        elif d["version"] == 2 and d["widgetType"] == "filter-single-select":
+            return DropdownSpec.from_dict(d)
+        elif d["version"] == 2 and d["widgetType"] == "filter-text-entry":
+            return TextEntrySpec.from_dict(d)
+        elif d["version"] == 2 and d["widgetType"] == "symbol-map":
+            return SymbolMapSpec.from_dict(d)
+        elif d["version"] == 2 and d["widgetType"] == "table":
+            return TableV2Spec.from_dict(d)
+        elif d["version"] == 2 and d["widgetType"] == "word-cloud":
+            return WordCloudSpec.from_dict(d)
+        elif d["version"] == 3 and d["widgetType"] == "area":
+            return AreaSpec.from_dict(d)
+        elif d["version"] == 3 and d["widgetType"] == "bar":
+            return BarSpec.from_dict(d)
+        elif d["version"] == 3 and d["widgetType"] == "line":
+            return LineSpec.from_dict(d)
+        elif d["version"] == 3 and d["widgetType"] == "pie":
+            return PieSpec.from_dict(d)
+        elif d["version"] == 3 and d["widgetType"] == "pivot":
+            return PivotSpec.from_dict(d)
+        elif d["version"] == 3 and d["widgetType"] == "scatter":
+            return ScatterSpec.from_dict(d)
+        else:
+            raise KeyError(f'unknown: version={d["version"]} widgetType={d["widgetType"]}')
 
 
 class Alignment(Enum):
@@ -69,8 +233,8 @@ class AngleFieldEncoding:
 
 
 @dataclass
-class AreaSpec:
-    encodings: Any
+class AreaSpec(WidgetSpec):
+    encodings: BasicChartEncodingMap
     """Encoding map for the most common form of charts, which can have either a multi-X or multi-Y
     encoding."""
     format: FormatConfig | None = None
@@ -83,7 +247,7 @@ class AreaSpec:
             "widgetType": "area",
         }
         if self.encodings:
-            body["encodings"] = self.encodings
+            body["encodings"] = self.encodings.as_dict()
         if self.format:
             body["format"] = self.format.as_dict()
         if self.frame:
@@ -95,7 +259,7 @@ class AreaSpec:
     @classmethod
     def from_dict(cls, d: Json) -> AreaSpec:
         return cls(
-            encodings=d.get("encodings", None),
+            encodings=_from_dict(d, "encodings", BasicChartEncodingMap),
             format=_from_dict(d, "format", FormatConfig),
             frame=_from_dict(d, "frame", WidgetFrameSpec),
             mark=_from_dict(d, "mark", MarkSpec),
@@ -126,8 +290,8 @@ class AxisSpec:
 
 
 @dataclass
-class BarSpec:
-    encodings: Any
+class BarSpec(WidgetSpec):
+    encodings: BasicChartEncodingMap
     """Encoding map for the most common form of charts, which can have either a multi-X or multi-Y
     encoding."""
     format: FormatConfig | None = None
@@ -140,7 +304,7 @@ class BarSpec:
             "widgetType": "bar",
         }
         if self.encodings:
-            body["encodings"] = self.encodings
+            body["encodings"] = self.encodings.as_dict()
         if self.format:
             body["format"] = self.format.as_dict()
         if self.frame:
@@ -152,7 +316,7 @@ class BarSpec:
     @classmethod
     def from_dict(cls, d: Json) -> BarSpec:
         return cls(
-            encodings=d.get("encodings", None),
+            encodings=_from_dict(d, "encodings", BasicChartEncodingMap),
             format=_from_dict(d, "format", FormatConfig),
             frame=_from_dict(d, "frame", WidgetFrameSpec),
             mark=_from_dict(d, "mark", MarkSpec),
@@ -178,7 +342,7 @@ class CategoricalColorScaleMappingEntry:
 
 
 @dataclass
-class CategoricalScale:
+class CategoricalScale(Scale):
     mappings: list[CategoricalColorScaleMappingEntry] | None = None
     sort: Sort | None = None
 
@@ -200,7 +364,7 @@ class CategoricalScale:
 
 
 @dataclass
-class ChartEncodingMapWithMultiX:
+class ChartEncodingMapWithMultiX(BasicChartEncodingMap):
     x: MultiFieldAxisEncoding
     color: ColorEncodingForMultiSeries | None = None
     label: LabelEncoding | None = None
@@ -229,7 +393,7 @@ class ChartEncodingMapWithMultiX:
 
 
 @dataclass
-class ChartEncodingMapWithMultiY:
+class ChartEncodingMapWithMultiY(BasicChartEncodingMap):
     y: MultiFieldAxisEncoding
     color: ColorEncodingForMultiSeries | None = None
     label: LabelEncoding | None = None
@@ -258,7 +422,7 @@ class ChartEncodingMapWithMultiY:
 
 
 @dataclass
-class ChartEncodingMapWithSingleXy:
+class ChartEncodingMapWithSingleXy(BasicChartEncodingMap):
     x: SingleFieldAxisEncoding
     color: ColorFieldEncoding | None = None
     label: LabelEncoding | None = None
@@ -304,7 +468,7 @@ class ColorEncodingForMultiSeries:
 @dataclass
 class ColorFieldEncoding:
     field_name: str
-    scale: CategoricalScale | QuantitativeScale | TemporalScale
+    scale: Scale
     display_name: str | None = None
     legend: LegendSpec | None = None
 
@@ -343,17 +507,43 @@ class ColumnType(Enum):
 
 @dataclass
 class ControlEncodingMap:
-    fields: Any | None = None
+    fields: list[ControlEncoding]
+    """Items of different type are not supported"""
 
     def as_dict(self) -> Json:
         body: Json = {}
         if self.fields:
-            body["fields"] = self.fields
+            body["fields"] = [v.as_dict() for v in self.fields]
         return body
 
     @classmethod
     def from_dict(cls, d: Json) -> ControlEncodingMap:
-        return cls(fields=d.get("fields", None))
+        return cls(fields=_repeated_dict(d, "fields", ControlEncoding))
+
+
+@dataclass
+class ControlFieldEncoding(ControlEncoding):
+    field_name: str
+    query_name: str
+    display_name: str | None = None
+
+    def as_dict(self) -> Json:
+        body: Json = {}
+        if self.display_name is not None:
+            body["displayName"] = self.display_name
+        if self.field_name is not None:
+            body["fieldName"] = self.field_name
+        if self.query_name is not None:
+            body["queryName"] = self.query_name
+        return body
+
+    @classmethod
+    def from_dict(cls, d: Json) -> ControlFieldEncoding:
+        return cls(
+            display_name=d.get("displayName", None),
+            field_name=d.get("fieldName", None),
+            query_name=d.get("queryName", None),
+        )
 
 
 @dataclass
@@ -402,7 +592,7 @@ class CounterFieldEncoding:
 
 
 @dataclass
-class CounterSpec:
+class CounterSpec(WidgetSpec):
     encodings: CounterEncodingMap
     format: FormatConfig | None = None
     frame: WidgetFrameSpec | None = None
@@ -476,7 +666,7 @@ class Dataset:
 
 
 @dataclass
-class DatePickerSpec:
+class DatePickerSpec(WidgetSpec):
     encodings: ControlEncodingMap
     exclude: bool | None = None
     frame: WidgetFrameSpec | None = None
@@ -504,7 +694,7 @@ class DatePickerSpec:
 
 
 @dataclass
-class DateRangePickerSpec:
+class DateRangePickerSpec(WidgetSpec):
     encodings: ControlEncodingMap
     exclude: bool | None = None
     frame: WidgetFrameSpec | None = None
@@ -576,7 +766,7 @@ class DetailsV1EncodingMap:
 
 
 @dataclass
-class DetailsV1Spec:
+class DetailsV1Spec(WidgetSpec):
     encodings: DetailsV1EncodingMap
     frame: WidgetFrameSpec | None = None
 
@@ -615,7 +805,7 @@ class DisplayType(Enum):
 
 
 @dataclass
-class DropdownSpec:
+class DropdownSpec(WidgetSpec):
     encodings: ControlEncodingMap
     exclude: bool | None = None
     frame: WidgetFrameSpec | None = None
@@ -658,31 +848,6 @@ class Field:
     @classmethod
     def from_dict(cls, d: Json) -> Field:
         return cls(expression=d.get("expression", None), name=d.get("name", None))
-
-
-@dataclass
-class FieldEncodingWithDataFor:
-    field_name: str
-    query_name: str
-    display_name: str | None = None
-
-    def as_dict(self) -> Json:
-        body: Json = {}
-        if self.display_name is not None:
-            body["displayName"] = self.display_name
-        if self.field_name is not None:
-            body["fieldName"] = self.field_name
-        if self.query_name is not None:
-            body["queryName"] = self.query_name
-        return body
-
-    @classmethod
-    def from_dict(cls, d: Json) -> FieldEncodingWithDataFor:
-        return cls(
-            display_name=d.get("displayName", None),
-            field_name=d.get("fieldName", None),
-            query_name=d.get("queryName", None),
-        )
 
 
 @dataclass
@@ -789,8 +954,8 @@ class LegendSpecPosition(Enum):
 
 
 @dataclass
-class LineSpec:
-    encodings: Any
+class LineSpec(WidgetSpec):
+    encodings: BasicChartEncodingMap
     """Encoding map for the most common form of charts, which can have either a multi-X or multi-Y
     encoding."""
     format: FormatConfig | None = None
@@ -803,7 +968,7 @@ class LineSpec:
             "widgetType": "line",
         }
         if self.encodings:
-            body["encodings"] = self.encodings
+            body["encodings"] = self.encodings.as_dict()
         if self.format:
             body["format"] = self.format.as_dict()
         if self.frame:
@@ -815,7 +980,7 @@ class LineSpec:
     @classmethod
     def from_dict(cls, d: Json) -> LineSpec:
         return cls(
-            encodings=d.get("encodings", None),
+            encodings=_from_dict(d, "encodings", BasicChartEncodingMap),
             format=_from_dict(d, "format", FormatConfig),
             frame=_from_dict(d, "frame", WidgetFrameSpec),
             mark=_from_dict(d, "mark", MarkSpec),
@@ -889,7 +1054,7 @@ class MultiFieldAxisEncoding:
 
 
 @dataclass
-class MultiSelectSpec:
+class MultiSelectSpec(WidgetSpec):
     encodings: ControlEncodingMap
     exclude: bool | None = None
     frame: WidgetFrameSpec | None = None
@@ -1000,7 +1165,7 @@ class PaginationSize(Enum):
 
 
 @dataclass
-class ParameterEncoding:
+class ParameterEncoding(ControlEncoding):
     dataset_name: str
     parameter_keyword: str
 
@@ -1043,7 +1208,7 @@ class PieEncodingMap:
 
 
 @dataclass
-class PieSpec:
+class PieSpec(WidgetSpec):
     encodings: PieEncodingMap
     format: FormatConfig | None = None
     frame: WidgetFrameSpec | None = None
@@ -1120,7 +1285,7 @@ class PivotEncodingMap:
 
 
 @dataclass
-class PivotSpec:
+class PivotSpec(WidgetSpec):
     encodings: PivotEncodingMap
     frame: WidgetFrameSpec | None = None
 
@@ -1185,7 +1350,7 @@ class QuantitativeDomain:
 
 
 @dataclass
-class QuantitativeScale:
+class QuantitativeScale(Scale):
     domain: QuantitativeDomain | None = None
     """If not specified, domain.min/max is the minimum/maximum value of the data. If specified, any
     value < domain.min or > domain.max will be clipped for x/y axes."""
@@ -1260,22 +1425,9 @@ class RenderFieldEncoding:
         return cls(display_name=d.get("displayName", None), field_name=d.get("fieldName", None))
 
 
-class Scale:
-    @classmethod
-    def from_dict(cls, d: Json) -> CategoricalScale | QuantitativeScale | TemporalScale:
-        if d["type"] == "categorical":
-            return CategoricalScale.from_dict(d)
-        elif d["type"] == "quantitative":
-            return QuantitativeScale.from_dict(d)
-        elif d["type"] == "temporal":
-            return TemporalScale.from_dict(d)
-        else:
-            raise KeyError(...)
-
-
 @dataclass
-class ScatterSpec:
-    encodings: Any
+class ScatterSpec(WidgetSpec):
+    encodings: BasicChartEncodingMap
     """Encoding map for the most common form of charts, which can have either a multi-X or multi-Y
     encoding."""
     format: FormatConfig | None = None
@@ -1288,7 +1440,7 @@ class ScatterSpec:
             "widgetType": "scatter",
         }
         if self.encodings:
-            body["encodings"] = self.encodings
+            body["encodings"] = self.encodings.as_dict()
         if self.format:
             body["format"] = self.format.as_dict()
         if self.frame:
@@ -1300,7 +1452,7 @@ class ScatterSpec:
     @classmethod
     def from_dict(cls, d: Json) -> ScatterSpec:
         return cls(
-            encodings=d.get("encodings", None),
+            encodings=_from_dict(d, "encodings", BasicChartEncodingMap),
             format=_from_dict(d, "format", FormatConfig),
             frame=_from_dict(d, "frame", WidgetFrameSpec),
             mark=_from_dict(d, "mark", MarkSpec),
@@ -1310,7 +1462,7 @@ class ScatterSpec:
 @dataclass
 class SingleFieldAxisEncoding:
     field_name: str
-    scale: CategoricalScale | QuantitativeScale | TemporalScale
+    scale: Scale
     axis: AxisSpec | None = None
     display_name: str | None = None
 
@@ -1382,7 +1534,7 @@ class SymbolMapEncodingMap:
 
 
 @dataclass
-class SymbolMapSpec:
+class SymbolMapSpec(WidgetSpec):
     encodings: SymbolMapEncodingMap
     frame: WidgetFrameSpec | None = None
 
@@ -1560,7 +1712,7 @@ class TableV1EncodingMap:
 
 
 @dataclass
-class TableV1Spec:
+class TableV1Spec(WidgetSpec):
     allow_html_by_default: bool
     """V1 uses `version` to determine if the v1 editor should set `allowHTML` by default."""
     condensed: bool
@@ -1725,7 +1877,7 @@ class TableV1SpecInvisibleColumnsItem:
 
 
 @dataclass
-class TableV2Spec:
+class TableV2Spec(WidgetSpec):
     encodings: TableEncodingMap
     frame: WidgetFrameSpec | None = None
 
@@ -1748,7 +1900,7 @@ class TableV2Spec:
 
 
 @dataclass
-class TemporalScale:
+class TemporalScale(Scale):
     def as_dict(self) -> Json:
         body: Json = {
             "type": "temporal",
@@ -1761,7 +1913,7 @@ class TemporalScale:
 
 
 @dataclass
-class TextEntrySpec:
+class TextEntrySpec(WidgetSpec):
     encodings: ControlEncodingMap
     exclude: bool | None = None
     frame: WidgetFrameSpec | None = None
@@ -1806,9 +1958,7 @@ class TextEntrySpecMatchMode(Enum):
 class Widget:
     name: str
     queries: list[NamedQuery] | None = None
-    spec: DetailsV1Spec | TableV1Spec | CounterSpec | DatePickerSpec | DateRangePickerSpec | MultiSelectSpec | DropdownSpec | TextEntrySpec | SymbolMapSpec | TableV2Spec | WordCloudSpec | AreaSpec | BarSpec | LineSpec | PieSpec | PivotSpec | ScatterSpec | None = (
-        None
-    )
+    spec: WidgetSpec | None = None
     textbox_spec: str | None = None
 
     def as_dict(self) -> Json:
@@ -1862,67 +2012,6 @@ class WidgetFrameSpec:
         )
 
 
-class WidgetSpec:
-    @classmethod
-    def from_dict(
-        cls, d: Json
-    ) -> (
-        DetailsV1Spec
-        | TableV1Spec
-        | CounterSpec
-        | DatePickerSpec
-        | DateRangePickerSpec
-        | MultiSelectSpec
-        | DropdownSpec
-        | TextEntrySpec
-        | SymbolMapSpec
-        | TableV2Spec
-        | WordCloudSpec
-        | AreaSpec
-        | BarSpec
-        | LineSpec
-        | PieSpec
-        | PivotSpec
-        | ScatterSpec
-    ):
-        if d["version"] == 1 and d["widgetType"] == "details":
-            return DetailsV1Spec.from_dict(d)
-        elif d["version"] == 1 and d["widgetType"] == "table":
-            return TableV1Spec.from_dict(d)
-        elif d["version"] == 2 and d["widgetType"] == "counter":
-            return CounterSpec.from_dict(d)
-        elif d["version"] == 2 and d["widgetType"] == "filter-date-picker":
-            return DatePickerSpec.from_dict(d)
-        elif d["version"] == 2 and d["widgetType"] == "filter-date-range-picker":
-            return DateRangePickerSpec.from_dict(d)
-        elif d["version"] == 2 and d["widgetType"] == "filter-multi-select":
-            return MultiSelectSpec.from_dict(d)
-        elif d["version"] == 2 and d["widgetType"] == "filter-single-select":
-            return DropdownSpec.from_dict(d)
-        elif d["version"] == 2 and d["widgetType"] == "filter-text-entry":
-            return TextEntrySpec.from_dict(d)
-        elif d["version"] == 2 and d["widgetType"] == "symbol-map":
-            return SymbolMapSpec.from_dict(d)
-        elif d["version"] == 2 and d["widgetType"] == "table":
-            return TableV2Spec.from_dict(d)
-        elif d["version"] == 2 and d["widgetType"] == "word-cloud":
-            return WordCloudSpec.from_dict(d)
-        elif d["version"] == 3 and d["widgetType"] == "area":
-            return AreaSpec.from_dict(d)
-        elif d["version"] == 3 and d["widgetType"] == "bar":
-            return BarSpec.from_dict(d)
-        elif d["version"] == 3 and d["widgetType"] == "line":
-            return LineSpec.from_dict(d)
-        elif d["version"] == 3 and d["widgetType"] == "pie":
-            return PieSpec.from_dict(d)
-        elif d["version"] == 3 and d["widgetType"] == "pivot":
-            return PivotSpec.from_dict(d)
-        elif d["version"] == 3 and d["widgetType"] == "scatter":
-            return ScatterSpec.from_dict(d)
-        else:
-            raise KeyError(...)
-
-
 @dataclass
 class WordCloudEncodingMap:
     size: RenderFieldEncoding | None = None
@@ -1942,7 +2031,7 @@ class WordCloudEncodingMap:
 
 
 @dataclass
-class WordCloudSpec:
+class WordCloudSpec(WidgetSpec):
     encodings: WordCloudEncodingMap
     frame: WidgetFrameSpec | None = None
 
