@@ -47,7 +47,7 @@ class SimpleQuery:
 class VizColumn:
     name: str
     title: str
-    type: str = "string"
+    type: str = "string"  # noqa: A003
     imageUrlTemplate: str = "{{ @ }}"  # noqa: N815
     imageTitleTemplate: str = "{{ @ }}"  # noqa: N815
     linkUrlTemplate: str = "{{ @ }}"  # noqa: N815

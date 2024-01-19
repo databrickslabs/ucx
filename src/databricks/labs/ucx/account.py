@@ -91,11 +91,12 @@ class AccountWorkspaces:
 
     def create_account_level_groups(self):
         """
-        Crawl all workspaces, and create account level groups if a WS local group is not present in the account
+        Crawl all workspaces, and create account level groups if a WS local group is not present in the account.
+        The feature is not configurable, meaning that it fetches all workspaces groups and all account groups.
         """
-        acc_groups = self.get_account_groups()
+        acc_groups = self._get_account_groups()
 
-        all_valid_workspace_groups = self.get_valid_workspaces_groups()
+        all_valid_workspace_groups = self._get_valid_workspaces_groups()
 
         for group_name, group in all_valid_workspace_groups.items():
             if group_name in acc_groups:
@@ -104,25 +105,22 @@ class AccountWorkspaces:
                 self._ac.groups.create(display_name=group_name, members=group.members)
                 logger.info(f"Group {group_name} created in the account")
 
-    def get_valid_workspaces_groups(self) -> dict[str, Group]:
+    def _get_valid_workspaces_groups(self) -> dict[str, Group]:
         all_workspaces_groups: dict[str, Group] = {}
-        inconsistent_groups: list[str] = []
         for client in self.workspace_clients():
             ws_group_ids = client.groups.list(attributes="id")
             for group_id in ws_group_ids:
                 full_workspace_group = client.groups.get(group_id.id)
                 group_name = full_workspace_group.display_name
 
-                if group_name in inconsistent_groups:
-                    logger.info(f"Group {group_name} has been found earlier and it didn't had same members, ignoring")
-                elif group_name in all_workspaces_groups:
-                    if self.has_not_same_members(all_workspaces_groups[group_name], full_workspace_group):
+                if group_name in all_workspaces_groups:
+                    if self._has_not_same_members(all_workspaces_groups[group_name], full_workspace_group):
                         logger.warning(
-                            f"Group {full_workspace_group.display_name} does not have same amount of members "
-                            f"in workspace {client.config.host}, it won't be migrated to the account"
+                            f"Group {group_name} does not have same amount of members "
+                            f"in workspace {client.config.host}, it will be created with account "
+                            f"name {client.config.host}_{group_name}"
                         )
-                        inconsistent_groups.append(group_name)
-                        all_workspaces_groups.pop(group_name)
+                        all_workspaces_groups[f"{client.config.host}_{group_name}"] = full_workspace_group
                     else:
                         logger.info(f"Workspace group {group_name} already found, ignoring")
                 else:
@@ -130,12 +128,12 @@ class AccountWorkspaces:
                     all_workspaces_groups[group_name] = full_workspace_group
         return all_workspaces_groups
 
-    def has_not_same_members(self, group_1: Group, group_2: Group) -> bool:
+    def _has_not_same_members(self, group_1: Group, group_2: Group) -> bool:
         ws_members_set = set([m.display for m in group_1.members] if group_1.members else [])
         ws_members_set_2 = set([m.display for m in group_2.members] if group_2.members else [])
         return bool((ws_members_set - ws_members_set_2).union(ws_members_set_2 - ws_members_set))
 
-    def get_account_groups(self) -> dict[str | None, list[ComplexValue] | None]:
+    def _get_account_groups(self) -> dict[str | None, list[ComplexValue] | None]:
         acc_groups = {}
         for acc_grp_id in self._ac.groups.list(attributes="id"):
             full_account_group = self._ac.groups.get(acc_grp_id.id)
