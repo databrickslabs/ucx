@@ -76,13 +76,13 @@ class AWSResources:
     S3_ACTIONS: typing.ClassVar[set[str]] = {"s3:PutObject", "s3:GetObject", "s3:DeleteObject", "s3:PutObjectAcl"}
     S3_REGEX: typing.ClassVar[str] = r"arn:aws:s3:::([a-zA-Z0-9+=,.@_-]*)\/\*"
 
-    def __init__(self, profile: str, command_runner: Callable[[str], str] = run_command):
+    def __init__(self, profile: str, command_runner: Callable[[str], tuple[int, str, str]] = run_command):
         self._profile = profile
         self._command_runner = command_runner
 
     def validate_connection(self):
         validate_command = f"aws sts get-caller-identity --profile {self._profile}"
-        code, output, error = run_command(validate_command)
+        code, output, error = self._command_runner(validate_command)
         if code == 0:
             logger.info(output)
             return True
@@ -93,7 +93,7 @@ class AWSResources:
         list_policies_cmd = (
             f"aws iam list-role-policies --profile {self._profile} --role-name {role_name} --no-paginate"
         )
-        code, output, error = run_command(list_policies_cmd)
+        code, output, error = self._command_runner(list_policies_cmd)
         if code != 0:
             logger.error(error)
             return []
@@ -104,7 +104,7 @@ class AWSResources:
         list_attached_policies_cmd = (
             f"aws iam list-attached-role-policies --profile {self._profile} --role-name {role_name} --no-paginate"
         )
-        code, output, error = run_command(list_attached_policies_cmd)
+        code, output, error = self._command_runner(list_attached_policies_cmd)
         if code != 0:
             logger.error(error)
             return []
@@ -122,7 +122,7 @@ class AWSResources:
             get_attached_policy = (
                 f"aws iam get-policy --profile {self._profile} --policy-arn {attached_policy_arn} --no-paginate"
             )
-            code, output, error = run_command(get_attached_policy)
+            code, output, error = self._command_runner(get_attached_policy)
             if code != 0:
                 logger.error(error)
                 return []
@@ -134,7 +134,7 @@ class AWSResources:
         else:
             logger.error("Failed to retrieve role. No role name or attached role ARN specified.")
             return []
-        code, output, error = run_command(get_policy)
+        code, output, error = self._command_runner(get_policy)
         if code != 0:
             logger.error(error)
             return []
