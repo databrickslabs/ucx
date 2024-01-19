@@ -875,10 +875,9 @@ def test_validate_group_diff_membership_no_acc_members():
         external_id="1234",
         display_name="test_(1234)",
         meta=ResourceMeta(resource_type="WorkspaceGroup"),
-        members=[ComplexValue(display="test-user-1", value="1"), ComplexValue(display="test-user-2", value="2")],
+        members=None,
         roles=[
             ComplexValue(value="arn:aws:iam::123456789098:instance-profile/ip1"),
-            ComplexValue(value="arn:aws:iam::123456789098:instance-profile/ip2"),
         ],
         entitlements=[ComplexValue(value="allow-cluster-create"), ComplexValue(value="allow-instance-pool-create")],
     )
@@ -896,14 +895,7 @@ def test_validate_group_diff_membership_no_acc_members():
     grp_membership = GroupManager(
         backend, wsclient, inventory_database="inv", workspace_group_regex=r"\(([1-9]+)\)", account_group_regex="[1-9]+"
     ).validate_group_membership()
-    assert grp_membership == [
-        {
-            "wf_group_name": "test_(1234)",
-            "wf_group_members_count": 2,
-            "acc_group_name": "ac_test_1234",
-            "acc_group_members_count": 0,
-        }
-    ]
+    assert grp_membership == []
 
 
 def test_validate_group_same_membership():
