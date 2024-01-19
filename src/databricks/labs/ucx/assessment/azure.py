@@ -1,12 +1,23 @@
 import base64
+import csv
+import dataclasses
+import io
 import json
 import re
 from collections.abc import Iterable
 from dataclasses import dataclass
 
 from databricks.sdk import WorkspaceClient
+from databricks.sdk.core import (
+    ApiClient,
+    AzureCliTokenSource,
+    Config,
+    credentials_provider,
+)
 from databricks.sdk.errors import NotFound
+from databricks.sdk.service.catalog import Privilege
 from databricks.sdk.service.compute import ClusterSource, Policy
+from databricks.sdk.service.workspace import ImportFormat
 
 from databricks.labs.ucx.assessment.crawlers import (
     _CLIENT_ENDPOINT_LENGTH,
@@ -17,6 +28,7 @@ from databricks.labs.ucx.assessment.crawlers import (
     logger,
 )
 from databricks.labs.ucx.framework.crawlers import CrawlerBase, SqlBackend
+from databricks.labs.ucx.hive_metastore.locations import ExternalLocations
 
 
 @dataclass
@@ -118,21 +130,23 @@ class AzureServicePrincipalCrawler(CrawlerBase[AzureServicePrincipalInfo]):
 
     def _get_cluster_configs_from_all_jobs(self, all_jobs, all_clusters_by_id):
         for j in all_jobs:
-            if j.settings.job_clusters is not None:
-                for jc in j.settings.job_clusters:
-                    if jc.new_cluster is None:
-                        continue
-                    yield j, jc.new_cluster
+            if j.settings is not None:
+                if j.settings.job_clusters is not None:
+                    for jc in j.settings.job_clusters:
+                        if jc.new_cluster is None:
+                            continue
+                        yield j, jc.new_cluster
 
-            for t in j.settings.tasks:
-                if t.existing_cluster_id is not None:
-                    interactive_cluster = all_clusters_by_id.get(t.existing_cluster_id, None)
-                    if interactive_cluster is None:
-                        continue
-                    yield j, interactive_cluster
+                if j.settings.tasks is not None:
+                    for t in j.settings.tasks:
+                        if t.existing_cluster_id is not None:
+                            interactive_cluster = all_clusters_by_id.get(t.existing_cluster_id, None)
+                            if interactive_cluster is None:
+                                continue
+                            yield j, interactive_cluster
 
-                elif t.new_cluster is not None:
-                    yield j, t.new_cluster
+                        elif t.new_cluster is not None:
+                            yield j, t.new_cluster
 
     def _get_relevant_service_principals(self) -> list:
         relevant_service_principals = []
@@ -247,3 +261,300 @@ class AzureServicePrincipalCrawler(CrawlerBase[AzureServicePrincipalInfo]):
     def _try_fetch(self) -> Iterable[AzureServicePrincipalInfo]:
         for row in self._fetch(f"SELECT * FROM {self._schema}.{self._table}"):
             yield AzureServicePrincipalInfo(*row)
+
+
+@dataclass
+class AzureSubscription:
+    name: str
+    subscription_id: str
+    tenant_id: str
+
+
+class AzureResource:
+    def __init__(self, resource_id: str):
+        self._pairs = {}
+        self._resource_id = resource_id
+        split = resource_id.lstrip("/").split("/")
+        if len(split) % 2 != 0:
+            msg = f"not a list of pairs: {resource_id}"
+            raise ValueError(msg)
+        i = 0
+        while i < len(split):
+            k = split[i]
+            v = split[i + 1]
+            i += 2
+            self._pairs[k] = v
+
+    @property
+    def subscription_id(self):
+        return self._pairs.get("subscriptions")
+
+    @property
+    def resource_group(self):
+        return self._pairs.get("resourceGroups")
+
+    @property
+    def storage_account(self):
+        return self._pairs.get("storageAccounts")
+
+    @property
+    def container(self):
+        return self._pairs.get("containers")
+
+    def __eq__(self, other):
+        if not isinstance(other, AzureResource):
+            return NotImplemented
+        return self._resource_id == other._resource_id
+
+    def __repr__(self):
+        properties = ["subscription_id", "resource_group", "storage_account", "container"]
+        pairs = [f"{_}={getattr(self, _)}" for _ in properties]
+        return f'AzureResource<{", ".join(pairs)}>'
+
+    def __str__(self):
+        return self._resource_id
+
+
+@dataclass
+class Principal:
+    client_id: str
+    display_name: str
+    object_id: str
+
+
+@dataclass
+class AzureRoleAssignment:
+    resource: AzureResource
+    scope: AzureResource
+    principal: Principal
+    role_name: str
+
+
+class AzureResources:
+    def __init__(self, ws: WorkspaceClient, *, include_subscriptions=None):
+        if not include_subscriptions:
+            include_subscriptions = []
+        rm_host = ws.config.arm_environment.resource_manager_endpoint
+        self._resource_manager = ApiClient(
+            Config(
+                host=rm_host,
+                credentials_provider=self._provider_for(ws.config.arm_environment.service_management_endpoint),
+            )
+        )
+        self._graph = ApiClient(
+            Config(
+                host="https://graph.microsoft.com",
+                credentials_provider=self._provider_for("https://graph.microsoft.com"),
+            )
+        )
+        self._token_source = AzureCliTokenSource(rm_host)
+        self._include_subscriptions = include_subscriptions
+        self._role_definitions = {}  # type: dict[str, str]
+        self._principals: dict[str, Principal | None] = {}
+
+    def _provider_for(self, endpoint: str):
+        @credentials_provider("azure-cli", ["host"])
+        def _credentials(_: Config):
+            token_source = AzureCliTokenSource(endpoint)
+
+            def inner() -> dict[str, str]:
+                token = token_source.token()
+                return {"Authorization": f"{token.token_type} {token.access_token}"}
+
+            return inner
+
+        return _credentials
+
+    def _get_subscriptions(self) -> Iterable[AzureSubscription]:
+        for subscription in self._get_resource("/subscriptions", api_version="2022-12-01").get("value", []):
+            yield AzureSubscription(
+                name=subscription["displayName"],
+                subscription_id=subscription["subscriptionId"],
+                tenant_id=subscription["tenantId"],
+            )
+
+    def _tenant_id(self):
+        token = self._token_source.token()
+        return token.jwt_claims().get("tid")
+
+    def subscriptions(self):
+        tenant_id = self._tenant_id()
+        for subscription in self._get_subscriptions():
+            if subscription.tenant_id != tenant_id:
+                continue
+            if subscription.subscription_id not in self._include_subscriptions:
+                continue
+            yield subscription
+
+    def _get_resource(self, path: str, api_version: str):
+        headers = {"Accept": "application/json"}
+        query = {"api-version": api_version}
+        return self._resource_manager.do("GET", path, query=query, headers=headers)
+
+    def storage_accounts(self) -> Iterable[AzureResource]:
+        for subscription in self.subscriptions():
+            logger.info(f"Checking in subscription {subscription.name} for storage accounts")
+            path = f"/subscriptions/{subscription.subscription_id}/providers/Microsoft.Storage/storageAccounts"
+            for storage in self._get_resource(path, "2023-01-01").get("value", []):
+                resource_id = storage.get("id")
+                if not resource_id:
+                    continue
+                yield AzureResource(resource_id)
+
+    def containers(self, storage: AzureResource):
+        for raw in self._get_resource(f"{storage}/blobServices/default/containers", "2023-01-01").get("value", []):
+            resource_id = raw.get("id")
+            if not resource_id:
+                continue
+            yield AzureResource(resource_id)
+
+    def _get_principal(self, principal_id: str) -> Principal | None:
+        if principal_id in self._principals:
+            return self._principals[principal_id]
+        try:
+            path = f"/v1.0/directoryObjects/{principal_id}"
+            raw: dict[str, str] = self._graph.do("GET", path)  # type: ignore[assignment]
+            client_id = raw.get("appId")
+            display_name = raw.get("displayName")
+            object_id = raw.get("id")
+            assert client_id is not None
+            assert display_name is not None
+            assert object_id is not None
+            self._principals[principal_id] = Principal(client_id, display_name, object_id)
+            return self._principals[principal_id]
+        except NotFound:
+            # don't load principals from external directories twice
+            self._principals[principal_id] = None
+            return self._principals[principal_id]
+
+    def role_assignments(
+        self, resource_id: str, *, principal_types: list[str] | None = None
+    ) -> Iterable[AzureRoleAssignment]:
+        """See https://learn.microsoft.com/en-us/rest/api/authorization/role-assignments/list-for-resource"""
+        if not principal_types:
+            principal_types = ["ServicePrincipal"]
+        result = self._get_resource(f"{resource_id}/providers/Microsoft.Authorization/roleAssignments", "2022-04-01")
+        for role_assignment in result.get("value", []):
+            assignment_properties = role_assignment.get("properties", {})
+            principal_type = assignment_properties.get("principalType")
+            if not principal_type:
+                continue
+            if principal_type not in principal_types:
+                continue
+            principal_id = assignment_properties.get("principalId")
+            if not principal_id:
+                continue
+            role_definition_id = assignment_properties.get("roleDefinitionId")
+            if not role_definition_id:
+                continue
+            scope = assignment_properties.get("scope")
+            if not scope:
+                continue
+            if role_definition_id not in self._role_definitions:
+                role_definition = self._get_resource(role_definition_id, "2022-04-01")
+                definition_properties = role_definition.get("properties", {})
+                role_name: str = definition_properties.get("roleName")
+                if not role_name:
+                    continue
+                self._role_definitions[role_definition_id] = role_name
+            principal = self._get_principal(principal_id)
+            if not principal:
+                continue
+            role_name = self._role_definitions[role_definition_id]
+            if scope == "/":
+                scope = resource_id
+            yield AzureRoleAssignment(
+                resource=AzureResource(resource_id),
+                scope=AzureResource(scope),
+                principal=principal,
+                role_name=role_name,
+            )
+
+
+@dataclass
+class StoragePermissionMapping:
+    prefix: str
+    client_id: str
+    principal: str
+    privilege: str
+
+
+class AzureResourcePermissions:
+    def __init__(self, ws: WorkspaceClient, azurerm: AzureResources, lc: ExternalLocations, folder: str | None = None):
+        self._locations = lc
+        self._azurerm = azurerm
+        self._ws = ws
+        self._field_names = [_.name for _ in dataclasses.fields(StoragePermissionMapping)]
+        if not folder:
+            folder = f"/Users/{ws.current_user.me().user_name}/.ucx"
+        self._folder = folder
+        self._levels = {
+            "Storage Blob Data Contributor": Privilege.WRITE_FILES,
+            "Storage Blob Data Owner": Privilege.WRITE_FILES,
+            "Storage Blob Data Reader": Privilege.READ_FILES,
+        }
+
+    def _map_storage(self, storage: AzureResource) -> list[StoragePermissionMapping]:
+        logger.info(f"Fetching role assignment for {storage.storage_account}")
+        out = []
+        for container in self._azurerm.containers(storage):
+            for role_assignment in self._azurerm.role_assignments(str(container)):
+                # one principal may be assigned multiple roles with overlapping dataActions, hence appearing
+                # here in duplicates. hence, role name -> permission level is not enough for the perfect scenario.
+                if role_assignment.role_name not in self._levels:
+                    continue
+                privilege = self._levels[role_assignment.role_name].value
+                out.append(
+                    StoragePermissionMapping(
+                        prefix=f"abfss://{container.container}@{container.storage_account}.dfs.core.windows.net/",
+                        client_id=role_assignment.principal.client_id,
+                        principal=role_assignment.principal.display_name,
+                        privilege=privilege,
+                    )
+                )
+        return out
+
+    def save_spn_permissions(self) -> str | None:
+        used_storage_accounts = self._get_storage_accounts()
+        if len(used_storage_accounts) == 0:
+            logger.warning(
+                "There are no external table present with azure storage account. "
+                "Please check if assessment job is run"
+            )
+            return None
+        storage_account_infos = []
+        for storage in self._azurerm.storage_accounts():
+            if storage.storage_account not in used_storage_accounts:
+                continue
+            for mapping in self._map_storage(storage):
+                storage_account_infos.append(mapping)
+        if len(storage_account_infos) == 0:
+            logger.error("No storage account found in current tenant with spn permission")
+            return None
+        return self._save(storage_account_infos)
+
+    def _save(self, storage_infos: list[StoragePermissionMapping]) -> str:
+        buffer = io.StringIO()
+        writer = csv.DictWriter(buffer, self._field_names)
+        writer.writeheader()
+        for storage_info in storage_infos:
+            writer.writerow(dataclasses.asdict(storage_info))
+        buffer.seek(0)
+        return self._overwrite_mapping(buffer)
+
+    def _overwrite_mapping(self, buffer) -> str:
+        path = f"{self._folder}/azure_storage_account_info.csv"
+        self._ws.workspace.upload(path, buffer, overwrite=True, format=ImportFormat.AUTO)
+        return path
+
+    def _get_storage_accounts(self) -> list[str]:
+        external_locations = self._locations.snapshot()
+        storage_accounts = []
+        for location in external_locations:
+            if location.location.startswith("abfss://"):
+                start = location.location.index("@")
+                end = location.location.index(".dfs.core.windows.net")
+                storage_acct = location.location[start + 1 : end]
+                if storage_acct not in storage_accounts:
+                    storage_accounts.append(storage_acct)
+        return storage_accounts

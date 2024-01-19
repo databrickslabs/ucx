@@ -15,6 +15,7 @@ from databricks.labs.ucx.framework.crawlers import (
     SqlBackend,
 )
 from databricks.labs.ucx.hive_metastore import GrantsCrawler, TablesCrawler
+from databricks.labs.ucx.hive_metastore.udfs import UdfsCrawler
 from databricks.labs.ucx.workspace_access import generic, redash, scim, secrets
 from databricks.labs.ucx.workspace_access.base import AclSupport, Permissions
 from databricks.labs.ucx.workspace_access.groups import MigrationState
@@ -71,7 +72,8 @@ class PermissionManager(CrawlerBase[Permissions]):
         secrets_support = secrets.SecretScopesSupport(ws)
         scim_support = scim.ScimSupport(ws)
         tables_crawler = TablesCrawler(sql_backend, inventory_database)
-        grants_crawler = GrantsCrawler(tables_crawler)
+        udfs_crawler = UdfsCrawler(sql_backend, inventory_database)
+        grants_crawler = GrantsCrawler(tables_crawler, udfs_crawler)
         tacl_support = TableAclSupport(grants_crawler, sql_backend)
         return cls(
             sql_backend, inventory_database, [generic_support, sql_support, secrets_support, scim_support, tacl_support]

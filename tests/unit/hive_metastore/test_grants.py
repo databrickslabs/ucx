@@ -2,6 +2,7 @@ import pytest
 
 from databricks.labs.ucx.hive_metastore.grants import Grant, GrantsCrawler
 from databricks.labs.ucx.hive_metastore.tables import TablesCrawler
+from databricks.labs.ucx.hive_metastore.udfs import UdfsCrawler
 from databricks.labs.ucx.mixins.sql import Row
 
 from ..framework.mocks import MockBackend
@@ -61,6 +62,15 @@ def test_type_and_key_anonymous_function():
     assert grant.object_key == ""
 
 
+def test_type_and_key_udf():
+    grant = Grant.type_and_key(catalog="hive_metastore", database="mydb", udf="myfunction")
+    assert grant == ("FUNCTION", "hive_metastore.mydb.myfunction")
+
+    grant = Grant(principal="user", action_type="SELECT", catalog="hive_metastore", database="mydb", udf="myfunction")
+    assert grant.this_type_and_key()[0] == "FUNCTION"
+    assert grant.object_key == "hive_metastore.mydb.myfunction"
+
+
 def test_type_and_key_invalid():
     with pytest.raises(ValueError):
         Grant.type_and_key()
@@ -87,6 +97,11 @@ def test_hive_database_own_sql():
     assert grant.hive_grant_sql() == ["ALTER DATABASE hive_metastore.mydb OWNER TO `user`"]
 
 
+def test_hive_udf_own_sql():
+    grant = Grant(principal="user", action_type="OWN", catalog="hive_metastore", database="mydb", udf="myfunction")
+    assert grant.hive_grant_sql() == ["ALTER FUNCTION hive_metastore.mydb.myfunction OWNER TO `user`"]
+
+
 def test_hive_revoke_sql():
     grant = Grant(principal="user", action_type="SELECT", catalog="hive_metastore", database="mydb", table="mytable")
     assert grant.hive_revoke_sql() == "REVOKE SELECT ON TABLE hive_metastore.mydb.mytable FROM `user`"
@@ -110,6 +125,10 @@ def test_hive_revoke_sql():
         (
             Grant("me", "INVALID", catalog="hive_metastore", database="mydb"),
             None,
+        ),
+        (
+            Grant("me", "SELECT", catalog="hive_metastore", database="mydb", udf="myfunction"),
+            "GRANT EXECUTE ON FUNCTION hive_metastore.mydb.myfunction TO `me`",
         ),
     ],
 )
@@ -150,7 +169,8 @@ ROWS = {
 def test_crawler_no_data():
     b = MockBackend()
     table = TablesCrawler(b, "schema")
-    crawler = GrantsCrawler(table)
+    udf = UdfsCrawler(b, "schema")
+    crawler = GrantsCrawler(table, udf)
     grants = crawler.snapshot()
     assert len(grants) == 0
 
@@ -186,27 +206,86 @@ def test_crawler_crawl():
         }
     )
     table = TablesCrawler(b, "schema")
-    crawler = GrantsCrawler(table)
+    udf = UdfsCrawler(b, "schema")
+    crawler = GrantsCrawler(table, udf)
     grants = crawler.snapshot()
     assert len(grants) == 3
 
 
-def test_crawler_snapshot():
-    # Test with no data
+def test_crawler_udf_crawl():
+    b = MockBackend(
+        rows={
+            "SHOW DATABASES": [
+                make_row(("database_one",), ["databaseName"]),
+            ],
+            "SHOW USER FUNCTIONS FROM hive_metastore.database_one": [
+                make_row(("hive_metastore.database_one.function_one",), ["function"]),
+                make_row(("hive_metastore.database_one.function_two",), ["function"]),
+            ],
+            "DESCRIBE FUNCTION EXTENDED hive_metastore.database_one.*": [
+                ("Type: SCALAR"),
+                ("Input: p INT"),
+                ("Returns: FLOAT"),
+                ("Deterministic: true"),
+                ("Data Access: CONTAINS SQL"),
+                ("Body: 1"),
+                ("ignore"),
+            ],
+            "SHOW GRANTS ON .*": [
+                make_row(("princ1", "SELECT", "FUNCTION", "ignored"), SHOW_COLS),
+            ],
+        }
+    )
+
+    table = TablesCrawler(b, "schema")
+    udf = UdfsCrawler(b, "schema")
+    crawler = GrantsCrawler(table, udf)
+    grants = crawler.snapshot()
+
+    assert len(grants) == 2
+    assert Grant(
+        principal="princ1",
+        action_type="SELECT",
+        catalog="hive_metastore",
+        database="database_one",
+        table=None,
+        view=None,
+        udf="function_one",
+        any_file=False,
+        anonymous_function=False,
+    ) == next(g for g in grants if g.udf == "function_one")
+    assert Grant(
+        principal="princ1",
+        action_type="SELECT",
+        catalog="hive_metastore",
+        database="database_one",
+        table=None,
+        view=None,
+        udf="function_two",
+        any_file=False,
+        anonymous_function=False,
+    ) == next(g for g in grants if g.udf == "function_two")
+
+
+def test_crawler_snapshot_when_no_data():
     b = MockBackend()
     table = TablesCrawler(b, "schema")
-    crawler = GrantsCrawler(table)
+    udf = UdfsCrawler(b, "schema")
+    crawler = GrantsCrawler(table, udf)
     snapshot = crawler.snapshot()
     assert len(snapshot) == 0
-    # Test with test data
+
+
+def test_crawler_snapshot_with_data():
     b = MockBackend(rows=ROWS)
     table = TablesCrawler(b, "schema")
-    crawler = GrantsCrawler(table)
+    udf = UdfsCrawler(b, "schema")
+    crawler = GrantsCrawler(table, udf)
     snapshot = crawler.snapshot()
     assert len(snapshot) == 3
 
 
-def test_grants_returning_error_when_describing():
+def test_grants_returning_error_when_showing_grants():
     errors = {"SHOW GRANTS ON TABLE hive_metastore.test_database.table1": "error"}
     rows = {
         "SHOW DATABASES": [
@@ -224,8 +303,10 @@ def test_grants_returning_error_when_describing():
         ],
     }
 
-    tc = TablesCrawler(MockBackend(fails_on_first=errors, rows=rows), "default")
-    crawler = GrantsCrawler(tc)
+    backend = MockBackend(fails_on_first=errors, rows=rows)
+    tc = TablesCrawler(backend, "default")
+    udf = UdfsCrawler(backend, "default")
+    crawler = GrantsCrawler(tc, udf)
 
     results = crawler._crawl()
     assert results == [
@@ -235,6 +316,115 @@ def test_grants_returning_error_when_describing():
             catalog="hive_metastore",
             database="test_database",
             table="table2",
+            any_file=False,
+            anonymous_function=False,
+        )
+    ]
+
+
+def test_grants_returning_error_when_describing():
+    errors = {"DESCRIBE TABLE EXTENDED hive_metastore.test_database.table1": "error"}
+    rows = {
+        "SHOW DATABASES": [
+            make_row(("test_database",), ["databaseName"]),
+        ],
+        "SHOW TABLES FROM hive_metastore.test_database": [
+            ("test_database", "table1", False),
+            ("test_database", "table2", False),
+        ],
+        "SHOW GRANTS ON TABLE hive_metastore.test_database.table2": [("principal1", "OWNER", "TABLE", "")],
+        "DESCRIBE *": [
+            ("Catalog", "catalog", ""),
+            ("Type", "delta", ""),
+        ],
+    }
+
+    backend = MockBackend(fails_on_first=errors, rows=rows)
+    tc = TablesCrawler(backend, "default")
+    udf = UdfsCrawler(backend, "default")
+    crawler = GrantsCrawler(tc, udf)
+
+    results = crawler._crawl()
+    assert results == [
+        Grant(
+            principal="principal1",
+            action_type="OWNER",
+            catalog="hive_metastore",
+            database="test_database",
+            table="table2",
+            any_file=False,
+            anonymous_function=False,
+        )
+    ]
+
+
+def test_udf_grants_returning_error_when_showing_grants():
+    errors = {"SHOW GRANTS ON FUNCTION hive_metastore.test_database.function_bad": "error"}
+    rows = {
+        "SHOW DATABASES": [
+            make_row(("test_database",), ["databaseName"]),
+            make_row(("other_database",), ["databaseName"]),
+        ],
+        "SHOW USER FUNCTIONS FROM hive_metastore.test_database": [
+            make_row(("hive_metastore.test_database.function_bad",), ["function"]),
+            make_row(("hive_metastore.test_database.function_good",), ["function"]),
+        ],
+        "SHOW GRANTS ON FUNCTION hive_metastore.test_database.function_good": [("principal1", "OWN", "FUNCTION", "")],
+        "DESCRIBE *": [
+            ("Type: SCALAR"),
+            ("Body: 1"),
+        ],
+    }
+
+    backend = MockBackend(fails_on_first=errors, rows=rows)
+    tc = TablesCrawler(backend, "default")
+    udf = UdfsCrawler(backend, "default")
+    crawler = GrantsCrawler(tc, udf)
+
+    results = crawler._crawl()
+    assert results == [
+        Grant(
+            principal="principal1",
+            action_type="OWN",
+            catalog="hive_metastore",
+            database="test_database",
+            udf="function_good",
+            any_file=False,
+            anonymous_function=False,
+        )
+    ]
+
+
+def test_udf_grants_returning_error_when_describing():
+    errors = {"DESCRIBE FUNCTION EXTENDED hive_metastore.test_database.function_bad": "error"}
+    rows = {
+        "SHOW DATABASES": [
+            make_row(("test_database",), ["databaseName"]),
+        ],
+        "SHOW USER FUNCTIONS FROM hive_metastore.test_database": [
+            make_row(("hive_metastore.test_database.function_bad",), ["function"]),
+            make_row(("hive_metastore.test_database.function_good",), ["function"]),
+        ],
+        "SHOW GRANTS ON FUNCTION hive_metastore.test_database.function_good": [("principal1", "OWN", "FUNCTION", "")],
+        "DESCRIBE *": [
+            ("Type: SCALAR"),
+            ("Body: 1"),
+        ],
+    }
+
+    backend = MockBackend(fails_on_first=errors, rows=rows)
+    tc = TablesCrawler(backend, "default")
+    udf = UdfsCrawler(backend, "default")
+    crawler = GrantsCrawler(tc, udf)
+
+    results = crawler._crawl()
+    assert results == [
+        Grant(
+            principal="principal1",
+            action_type="OWN",
+            catalog="hive_metastore",
+            database="test_database",
+            udf="function_good",
             any_file=False,
             anonymous_function=False,
         )

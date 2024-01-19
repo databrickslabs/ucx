@@ -1,4 +1,5 @@
 import logging
+from collections import defaultdict
 from datetime import timedelta
 
 from databricks.sdk.errors import NotFound
@@ -6,7 +7,7 @@ from databricks.sdk.retries import retried
 
 from databricks.labs.ucx.hive_metastore import GrantsCrawler
 
-from ..conftest import StaticTablesCrawler
+from ..conftest import StaticTablesCrawler, StaticUdfsCrawler
 
 logger = logging.getLogger(__name__)
 
@@ -36,7 +37,8 @@ def test_all_grants_in_databases(sql_backend, inventory_schema, make_schema, mak
 
     # 20 seconds less than TablesCrawler(sql_backend, inventory_schema)
     tables = StaticTablesCrawler(sql_backend, inventory_schema, [table_a, table_b, view_c, view_d, table_e])
-    grants = GrantsCrawler(tables)
+    udfs = StaticUdfsCrawler(sql_backend, inventory_schema, [])
+    grants = GrantsCrawler(tables, udfs)
 
     all_grants = {}
     for grant in grants.snapshot():
@@ -53,3 +55,27 @@ def test_all_grants_in_databases(sql_backend, inventory_schema, make_schema, mak
     assert all_grants[f"{group_b.display_name}.{view_c.full_name}"] == "MODIFY"
     assert all_grants[f"{group_b.display_name}.{view_d.full_name}"] == "MODIFY"
     assert all_grants[f"{group_b.display_name}.{table_e.full_name}"] == "MODIFY"
+
+
+@retried(on=[NotFound], timeout=timedelta(minutes=3))
+def test_all_grants_for_udfs_in_databases(sql_backend, inventory_schema, make_schema, make_udf, make_group):
+    group = make_group()
+    schema = make_schema()
+    udf_a = make_udf(schema_name=schema.name)
+    udf_b = make_udf(schema_name=schema.name)
+
+    sql_backend.execute(f"GRANT SELECT ON FUNCTION {udf_a.full_name} TO `{group.display_name}`")
+    sql_backend.execute(f"GRANT READ_METADATA ON FUNCTION {udf_a.full_name} TO `{group.display_name}`")
+    sql_backend.execute(f"ALTER FUNCTION {udf_a.full_name} OWNER TO `{group.display_name}`")
+    sql_backend.execute(f"GRANT ALL PRIVILEGES ON FUNCTION {udf_b.full_name} TO `{group.display_name}`")
+
+    tables = StaticTablesCrawler(sql_backend, inventory_schema, [])
+    udfs = StaticUdfsCrawler(sql_backend, inventory_schema, [udf_a, udf_b])
+    grants = GrantsCrawler(tables, udfs)
+
+    actual_grants = defaultdict(set)
+    for grant in grants.snapshot():
+        actual_grants[f"{grant.principal}.{grant.object_key}"].add(grant.action_type)
+
+    assert {"SELECT", "READ_METADATA", "OWN"} == actual_grants[f"{group.display_name}.{udf_a.full_name}"]
+    assert {"SELECT", "READ_METADATA"} == actual_grants[f"{group.display_name}.{udf_b.full_name}"]

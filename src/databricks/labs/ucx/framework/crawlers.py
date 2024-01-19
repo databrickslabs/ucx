@@ -8,7 +8,13 @@ from types import UnionType
 from typing import Any, ClassVar, Generic, Protocol, TypeVar
 
 from databricks.sdk import WorkspaceClient
-from databricks.sdk.errors import NotFound
+from databricks.sdk.errors import (
+    BadRequest,
+    DataLoss,
+    NotFound,
+    PermissionDenied,
+    Unknown,
+)
 
 from databricks.labs.ucx.mixins.sql import Row, StatementExecutionExt
 
@@ -151,11 +157,21 @@ class RuntimeBackend(SqlBackend):
 
     def execute(self, sql):
         logger.debug(f"[spark][execute] {sql}")
-        self._spark.sql(sql)
+        try:
+            immediate_response = self._spark.sql(sql)
+        except Exception as e:
+            error_message = str(e)
+            self._raise_spark_sql_exceptions(error_message)
+        return immediate_response
 
     def fetch(self, sql) -> Iterator[Row]:
         logger.debug(f"[spark][fetch] {sql}")
-        return self._spark.sql(sql).collect()
+        try:
+            fetch_query_response = self._spark.sql(sql).collect()
+        except Exception as e:
+            error_message = str(e)
+            self._raise_spark_sql_exceptions(error_message)
+        return fetch_query_response
 
     def save_table(self, full_name: str, rows: Sequence[DataclassInstance], klass: Dataclass, mode: str = "append"):
         rows = self._filter_none_rows(rows, klass)
@@ -166,6 +182,23 @@ class RuntimeBackend(SqlBackend):
         # pyspark deals well with lists of dataclass instances, as long as schema is provided
         df = self._spark.createDataFrame(rows, self._schema_for(klass))
         df.write.saveAsTable(full_name, mode=mode)
+
+    @staticmethod
+    def _raise_spark_sql_exceptions(error_message: str):
+        if "SCHEMA_NOT_FOUND" in error_message:
+            raise NotFound(error_message) from None
+        elif "TABLE_OR_VIEW_NOT_FOUND" in error_message:
+            raise NotFound(error_message) from None
+        elif "DELTA_TABLE_NOT_FOUND" in error_message:
+            raise NotFound(error_message) from None
+        elif "DELTA_MISSING_TRANSACTION_LOG" in error_message:
+            raise DataLoss(error_message) from None
+        elif "PARSE_SYNTAX_ERROR" in error_message:
+            raise BadRequest(error_message) from None
+        elif "Operation not allowed" in error_message:
+            raise PermissionDenied(error_message) from None
+        else:
+            raise Unknown(error_message) from None
 
 
 class CrawlerBase(Generic[Result]):

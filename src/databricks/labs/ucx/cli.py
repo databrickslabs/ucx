@@ -7,13 +7,18 @@ from databricks.labs.blueprint.tui import Prompts
 from databricks.sdk import AccountClient, WorkspaceClient
 
 from databricks.labs.ucx.account import AccountWorkspaces, WorkspaceInfo
+from databricks.labs.ucx.assessment.azure import (
+    AzureResourcePermissions,
+    AzureResources,
+)
 from databricks.labs.ucx.config import AccountConfig, ConnectConfig
 from databricks.labs.ucx.framework.crawlers import StatementExecutionBackend
 from databricks.labs.ucx.hive_metastore import ExternalLocations, TablesCrawler
 from databricks.labs.ucx.hive_metastore.mapping import TableMapping
-from databricks.labs.ucx.hive_metastore.table_migrate import TablesMigrate
+from databricks.labs.ucx.hive_metastore.table_migrate import TableMove, TablesMigrate
 from databricks.labs.ucx.install import WorkspaceInstaller
 from databricks.labs.ucx.installer import InstallationManager
+from databricks.labs.ucx.workspace_access.groups import GroupManager
 
 ucx = App(__file__)
 logger = get_logger(__file__)
@@ -139,6 +144,37 @@ def repair_run(w: WorkspaceClient, step):
 
 
 @ucx.command
+def validate_groups_membership(w: WorkspaceClient):
+    """Validate the groups to see if the groups at account level and workspace level has different membership"""
+    installation_manager = InstallationManager(w)
+    installation = installation_manager.for_user(w.current_user.me())
+    if not installation:
+        logger.error(CANT_FIND_UCX_MSG)
+        return None
+    warehouse_id = installation.config.warehouse_id
+    inventory_database = installation.config.inventory_database
+    renamed_group_prefix = installation.config.renamed_group_prefix
+    workspace_group_regex = installation.config.workspace_group_regex
+    workspace_group_replace = installation.config.workspace_group_replace
+    account_group_regex = installation.config.account_group_regex
+    include_group_names = installation.config.include_group_names
+    sql_backend = StatementExecutionBackend(w, warehouse_id)
+    logger.info("Validating Groups which are having different memberships between account and workspace")
+    group_manager = GroupManager(
+        sql_backend=sql_backend,
+        ws=w,
+        inventory_database=inventory_database,
+        include_group_names=include_group_names,
+        renamed_group_prefix=renamed_group_prefix,
+        workspace_group_regex=workspace_group_regex,
+        workspace_group_replace=workspace_group_replace,
+        account_group_regex=account_group_regex,
+    )
+    mismatch_groups = group_manager.validate_group_membership()
+    print(json.dumps(mismatch_groups))
+
+
+@ucx.command
 def revert_migrated_tables(w: WorkspaceClient, schema: str, table: str, *, delete_managed: bool = False):
     """remove notation on a migrated table for re-migration"""
     prompts = Prompts()
@@ -163,6 +199,65 @@ def revert_migrated_tables(w: WorkspaceClient, schema: str, table: str, *, delet
         "Would you like to continue?", max_attempts=2
     ):
         tm.revert_migrated_tables(schema, table, delete_managed=delete_managed)
+
+
+@ucx.command
+def move(
+    w: WorkspaceClient,
+    from_catalog: str,
+    from_schema: str,
+    from_table: str,
+    to_catalog: str,
+    to_schema: str,
+):
+    """move a uc table/tables from one schema to another schema in same or different catalog"""
+    logger.info("Running move command")
+    prompts = Prompts()
+    installation_manager = InstallationManager(w)
+    installation = installation_manager.for_user(w.current_user.me())
+    if not installation:
+        logger.error(CANT_FIND_UCX_MSG)
+        return
+    sql_backend = StatementExecutionBackend(w, installation.config.warehouse_id)
+    tables = TableMove(w, sql_backend)
+    if from_catalog == "" or to_catalog == "":
+        logger.error("Please enter from_catalog and to_catalog details")
+        return
+    if from_schema == "" or to_schema == "" or from_table == "":
+        logger.error("Please enter from_schema, to_schema and from_table(enter * for migrating all tables) details.")
+        return
+    if from_catalog == to_catalog and from_schema == to_schema:
+        logger.error("please select a different schema or catalog to migrate to")
+        return
+    del_table = prompts.confirm(f"should we delete tables/view after moving to new schema {to_catalog}.{to_schema}")
+    logger.info(f"migrating tables {from_table} from {from_catalog}.{from_schema} to {to_catalog}.{to_schema}")
+    tables.move_tables(from_catalog, from_schema, from_table, to_catalog, to_schema, del_table)
+
+
+@ucx.command
+def save_azure_storage_accounts(w: WorkspaceClient, subscription_id: str):
+    """identifies all azure storage account used by external tables
+    identifies all spn which has storage blob reader, blob contributor, blob owner access
+    saves the data in ucx database."""
+    installation_manager = InstallationManager(w)
+    installation = installation_manager.for_user(w.current_user.me())
+    if not installation:
+        logger.error(CANT_FIND_UCX_MSG)
+        return
+    if not w.config.is_azure:
+        logger.error("Workspace is not on azure, please run this command on azure databricks workspaces.")
+        return
+    if w.config.auth_type != "azure_cli":
+        logger.error("In order to obtain AAD token, Please run azure cli to authenticate.")
+        return
+    if subscription_id == "":
+        logger.error("Please enter subscription id to scan storage account in.")
+        return
+    sql_backend = StatementExecutionBackend(w, installation.config.warehouse_id)
+    location = ExternalLocations(w, sql_backend, installation.config.inventory_database)
+    azure_resource_permissions = AzureResourcePermissions(w, AzureResources(w), location)
+    logger.info("Generating azure storage accounts and service principal permission info")
+    azure_resource_permissions.save_spn_permissions()
 
 
 if "__main__" == __name__:

@@ -1,18 +1,21 @@
 import json
-from unittest.mock import MagicMock
+from unittest.mock import MagicMock, create_autospec
 
 import pytest
 from _pytest.outcomes import fail
 from databricks.labs.blueprint.parallel import ManyError
 from databricks.labs.blueprint.tui import MockPrompts
+from databricks.sdk import WorkspaceClient
 from databricks.sdk.errors import DatabricksError, ResourceDoesNotExist
 from databricks.sdk.service import iam
 from databricks.sdk.service.iam import ComplexValue, Group, ResourceMeta
 
+from databricks.labs.ucx.framework.crawlers import SqlBackend
 from databricks.labs.ucx.workspace_access.groups import (
     ConfigureGroups,
     GroupManager,
     MigratedGroup,
+    MigrationState,
 )
 from tests.unit.framework.mocks import MockBackend
 
@@ -805,3 +808,80 @@ def test_configure_match():
     cg.run()
     assert r"\[(#+)\]" == cg.workspace_group_regex
     assert r"\((#+)\)" == cg.account_group_regex
+
+
+def test_state():
+    groups = [
+        MigratedGroup(
+            id_in_workspace="1", name_in_workspace="test1", name_in_account="acc_test1", temporary_name="db-temp-test1"
+        )
+    ]
+
+    state = MigrationState(groups)
+
+    assert state.get_target_principal("test1") == "acc_test1"
+    assert state.get_temp_principal("test1") == "db-temp-test1"
+    assert state.is_in_scope("test1")
+
+    assert not state.get_target_principal("invalid_group_name")
+    assert not state.get_temp_principal("invalid_group_name")
+    assert not state.is_in_scope("invalid_group_name")
+
+
+def test_validate_group_diff_membership():
+    backend = create_autospec(SqlBackend)
+    wsclient = create_autospec(WorkspaceClient)
+    group = Group(
+        id="1",
+        external_id="1234",
+        display_name="test_(1234)",
+        meta=ResourceMeta(resource_type="WorkspaceGroup"),
+        members=[ComplexValue(display="test-user-1", value="20"), ComplexValue(display="test-user-2", value="21")],
+        roles=[
+            ComplexValue(value="arn:aws:iam::123456789098:instance-profile/ip1"),
+            ComplexValue(value="arn:aws:iam::123456789098:instance-profile/ip2"),
+        ],
+        entitlements=[ComplexValue(value="allow-cluster-create"), ComplexValue(value="allow-instance-pool-create")],
+    )
+    wsclient.groups.list.return_value = [group]
+    wsclient.groups.get.return_value = group
+    account_admins_group = Group(id="1234", external_id="1234", display_name="ac_test_1234")
+    wsclient.api_client.do.return_value = {
+        "Resources": [g.as_dict() for g in [account_admins_group]],
+    }
+    grp_membership = GroupManager(
+        backend, wsclient, inventory_database="inv", workspace_group_regex=r"\(([1-9]+)\)", account_group_regex="[1-9]+"
+    ).validate_group_membership()
+    assert grp_membership == [{"wf_group_name": "test_(1234)", "ac_group_name": "ac_test_1234"}]
+
+
+def test_validate_group_same_membership():
+    backend = MockBackend()
+    wsclient = MagicMock()
+    group = Group(
+        id="1",
+        external_id="1234",
+        display_name="test_(1234)",
+        meta=ResourceMeta(resource_type="WorkspaceGroup"),
+        members=[ComplexValue(display="test-user-1", value="01"), ComplexValue(display="test-user-2", value="02")],
+        roles=[
+            ComplexValue(value="arn:aws:iam::123456789098:instance-profile/test_ip1"),
+            ComplexValue(value="arn:aws:iam::123456789098:instance-profile/test_ip2"),
+        ],
+        entitlements=[ComplexValue(value="allow-cluster-create"), ComplexValue(value="allow-instance-pool-create")],
+    )
+    wsclient.groups.list.return_value = [group]
+    wsclient.groups.get.return_value = group
+    account_admins_group = Group(
+        id="1234",
+        external_id="1234",
+        display_name="ac_test_1234",
+        members=[ComplexValue(display="test-user-1", value="01"), ComplexValue(display="test-user-2", value="02")],
+    )
+    wsclient.api_client.do.return_value = {
+        "Resources": [g.as_dict() for g in [account_admins_group]],
+    }
+    grp_membership = GroupManager(
+        backend, wsclient, inventory_database="inv", workspace_group_regex=r"\(([1-9]+)\)", account_group_regex="[1-9]+"
+    ).validate_group_membership()
+    assert grp_membership == []
