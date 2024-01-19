@@ -32,7 +32,8 @@ databricks --version
 
 Configure Databricks cli to authenticate to correct workspace, add host name and PAT token:
 ```shell
-databricks configure
+EXPORT DATABRICKS_TOKEN=<PAT TOKEN>
+EXPORT DATABRICKS_HOST=<host url https://....com>
 ```
 
 Add account level config:
