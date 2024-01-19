@@ -14,8 +14,6 @@ from databricks.labs.blueprint.parallel import Threads
 from databricks.sdk import WorkspaceClient
 from databricks.sdk.service.workspace import ImportFormat
 
-from databricks.labs.ucx.framework.crawlers import CrawlerBase, SqlBackend
-
 logger = logging.getLogger(__name__)
 
 
@@ -82,33 +80,28 @@ class AWSResources:
 
     def validate_connection(self):
         validate_command = f"aws sts get-caller-identity --profile {self._profile}"
-        code, output, error = self._command_runner(validate_command)
-        if code == 0:
-            logger.info(output)
+        result = self._run_json_command(validate_command)
+        if result:
+            logger.info(result)
             return True
-        logger.error(error)
         return False
 
     def list_role_policies(self, role_name: str):
         list_policies_cmd = (
             f"aws iam list-role-policies --profile {self._profile} --role-name {role_name} --no-paginate"
         )
-        code, output, error = self._command_runner(list_policies_cmd)
-        if code != 0:
-            logger.error(error)
+        policies = self._run_json_command(list_policies_cmd)
+        if not policies:
             return []
-        policies = json.loads(output)
         yield from policies.get("PolicyNames", [])
 
     def list_attached_policies_in_role(self, role_name: str):
         list_attached_policies_cmd = (
             f"aws iam list-attached-role-policies --profile {self._profile} --role-name {role_name} --no-paginate"
         )
-        code, output, error = self._command_runner(list_attached_policies_cmd)
-        if code != 0:
-            logger.error(error)
+        policies = self._run_json_command(list_attached_policies_cmd)
+        if not policies:
             return []
-        policies = json.loads(output)
         for policy in policies.get("AttachedPolicies", []):
             yield policy.get("PolicyArn")
 
@@ -122,11 +115,10 @@ class AWSResources:
             get_attached_policy = (
                 f"aws iam get-policy --profile {self._profile} --policy-arn {attached_policy_arn} --no-paginate"
             )
-            code, output, error = self._command_runner(get_attached_policy)
-            if code != 0:
-                logger.error(error)
+            attached_policy = self._run_json_command(get_attached_policy)
+            if not attached_policy:
                 return []
-            policy_version = json.loads(output)["Policy"]["DefaultVersionId"]
+            policy_version = attached_policy["Policy"]["DefaultVersionId"]
             get_policy = (
                 f"aws iam get-policy-version --profile {self._profile} --policy-arn {attached_policy_arn} "
                 f"--version-id {policy_version} --no-paginate"
@@ -134,11 +126,9 @@ class AWSResources:
         else:
             logger.error("Failed to retrieve role. No role name or attached role ARN specified.")
             return []
-        code, output, error = self._command_runner(get_policy)
-        if code != 0:
-            logger.error(error)
+        policy = self._run_json_command(get_policy)
+        if not policy:
             return []
-        policy = json.loads(output)
         if policy_name:
             actions = policy["PolicyDocument"].get("Statement", [])
         else:
@@ -163,20 +153,25 @@ class AWSResources:
                 if match:
                     yield AWSPolicyAction("s3", set(s3_action), match.group(1))
 
+    def _run_json_command(self, command: str):
+        code, output, error = self._command_runner(command)
+        if code != 0:
+            logger.error(error)
+            return None
+        return json.loads(output)
+
 
 class AWSResourcePermissions:
     def __init__(
         self,
         ws: WorkspaceClient,
-        awsrm: AWSResources,
-        instance_profile_crawler: AWSInstanceProfileCrawler,
+        aws_resources: AWSResources,
         folder: str | None = None,
     ):
         if not folder:
             folder = f"/Users/{ws.current_user.me().user_name}/.ucx"
         self._folder = folder
-        self._awsrm = awsrm
-        self._instance_profile_crawler = instance_profile_crawler
+        self._aws_resources = aws_resources
         self._ws = ws
         self._field_names = [_.name for _ in dataclasses.fields(AWSInstanceProfileAction)]
 
@@ -197,9 +192,9 @@ class AWSResourcePermissions:
         return list(self._get_instance_profile_access(instance_profile))
 
     def _get_instance_profile_access(self, instance_profile: AWSInstanceProfile):
-        policies = list(self._awsrm.list_role_policies(instance_profile.role_name))
+        policies = list(self._aws_resources.list_role_policies(instance_profile.role_name))
         for policy in policies:
-            actions = list(self._awsrm.get_role_policy(instance_profile.role_name, policy_name=policy))
+            actions = list(self._aws_resources.get_role_policy(instance_profile.role_name, policy_name=policy))
             for action in actions:
                 yield AWSInstanceProfileAction(
                     instance_profile.instance_profile_arn,
@@ -208,9 +203,11 @@ class AWSResourcePermissions:
                     action.resource_path,
                     instance_profile.iam_role_arn,
                 )
-        attached_policies = list(self._awsrm.list_attached_policies_in_role(instance_profile.role_name))
+        attached_policies = list(self._aws_resources.list_attached_policies_in_role(instance_profile.role_name))
         for attached_policy in attached_policies:
-            actions = list(self._awsrm.get_role_policy(instance_profile.role_name, attached_policy_arn=attached_policy))
+            actions = list(
+                self._aws_resources.get_role_policy(instance_profile.role_name, attached_policy_arn=attached_policy)
+            )
             for action in actions:
                 yield AWSInstanceProfileAction(
                     instance_profile.instance_profile_arn,

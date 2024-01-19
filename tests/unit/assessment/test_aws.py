@@ -1,17 +1,6 @@
 import logging
-from unittest.mock import create_autospec
 
-from databricks.sdk import WorkspaceClient
-from databricks.sdk.service.compute import InstanceProfile
-
-from databricks.labs.ucx.assessment.aws import (
-    AWSInstanceProfile,
-    AWSInstanceProfileCrawler,
-    AWSPolicyAction,
-    AWSResources,
-)
-
-from ..framework.mocks import MockBackend
+from databricks.labs.ucx.assessment.aws import AWSPolicyAction, AWSResources
 
 logger = logging.getLogger(__name__)
 
@@ -214,5 +203,3 @@ def test_get_role_policy():
             resource_path="bucketC",
         ),
     ]
-
-
