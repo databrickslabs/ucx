@@ -867,7 +867,7 @@ def test_validate_group_diff_membership():
     ]
 
 
-def test_validate_group_diff_membership_no_acc_members():
+def test_validate_group_diff_membership_no_members():
     backend = create_autospec(SqlBackend)
     wsclient = create_autospec(WorkspaceClient)
     group = Group(
