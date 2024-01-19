@@ -424,7 +424,9 @@ class GroupManager(CrawlerBase[MigratedGroup]):
             mismatch_group.append(
                 {
                     "wf_group_name": groups.name_in_workspace,
-                    "ac_group_name": groups.name_in_account,
+                    "wf_group_members_count": len(ws_members_set),
+                    "acc_group_name": groups.name_in_account,
+                    "acc_group_members_count": len(ac_members_set),
                 }
             )
         if not mismatch_group:

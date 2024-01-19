@@ -852,7 +852,14 @@ def test_validate_group_diff_membership():
     grp_membership = GroupManager(
         backend, wsclient, inventory_database="inv", workspace_group_regex=r"\(([1-9]+)\)", account_group_regex="[1-9]+"
     ).validate_group_membership()
-    assert grp_membership == [{"wf_group_name": "test_(1234)", "ac_group_name": "ac_test_1234"}]
+    assert grp_membership == [
+        {
+            "wf_group_name": "test_(1234)",
+            "wf_group_members_count": 2,
+            "acc_group_name": "ac_test_1234",
+            "acc_group_members_count": 0,
+        }
+    ]
 
 
 def test_validate_group_same_membership():
