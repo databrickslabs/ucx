@@ -148,7 +148,7 @@ def test_get_role_policy():
                 }
             ]
         },
-        "VersionId": "v3",
+        "VersionId": "v1",
         "IsDefaultVersion": true,
         "CreateDate": "2024-01-01T00:00:00+00:00"
     }
@@ -158,7 +158,7 @@ def test_get_role_policy():
     def command_call(cmd: str):
         if cmd.startswith("aws iam get-role-policy"):
             return 0, get_role_policy_return, ""
-        elif cmd.startswith("aws iam get-policy"):
+        elif cmd.startswith("aws iam get-policy "):
             return 0, get_policy_return, ""
         elif cmd.startswith("aws iam get-policy-version"):
             return 0, get_policy_version_return, ""
