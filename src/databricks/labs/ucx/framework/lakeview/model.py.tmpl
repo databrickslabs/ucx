@@ -10,6 +10,8 @@ import random
 import logging
 from databricks.sdk.service._internal import _enum, _from_dict, _repeated_dict, _repeated_enum
 
+Json = dict[str, Any]
+
 {{range .Packages}}
 
 {{range .Types}}
@@ -25,16 +27,16 @@ class {{.PascalName}}{{if eq "List" .PascalName}}Request{{end}}:{{if .Descriptio
     """{{.Comment "    " 100 | trimSuffix "\""}}"""{{end}}
     {{- end}}
     {{if .HasJsonField -}}{{if not .ChildTypes}}
-    def as_dict(self) -> dict[str, Any]:
-        body: dict[str, Any] = { {{range .Fields | constOnly}}'{{.Name}}': {{template "const" .Entity}},{{end}} }
+    def as_dict(self) -> Json:
+        body: Json = { {{range .Fields | constOnly}}'{{.Name}}': {{template "const" .Entity}},{{end}} }
         {{range .Fields | alphanumOnly | noConst}}if self.{{template "safe-snake-name" .}}{{with .Entity.IsPrimitive}} is not None{{end}}: body['{{.Name}}'] = {{template "as_request_type" .}}
         {{end -}}
         return body
     {{end}}
     @classmethod
-    def from_dict(cls, d: Dict[str, Any]) -> {{template "type" . }}:
+    def from_dict(cls, d: Json) -> {{template "type" . }}:
         {{if .ChildTypes -}}
-        {{range $i, $_ := .ChildTypes}}{{if $i}}el{{end}}if {{range $j, $_ := .TypeLookup}}{{if $j}} and {{end}}'{{.Name}}' == {{template "const" .Entity}}{{end}}:
+        {{range $i, $_ := .ChildTypes}}{{if $i}}el{{end}}if {{range $j, $_ := .TypeLookup}}{{if $j}} and {{end}}d['{{.Name}}'] == {{template "const" .Entity}}{{end}}:
             return {{template "type" .Entity}}.from_dict(d)
         {{end}}else: raise KeyError(...)
         {{- else -}}

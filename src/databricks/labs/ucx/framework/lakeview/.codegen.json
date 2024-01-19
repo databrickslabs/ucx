@@ -1,5 +1,5 @@
 {
-  "formatter": "../../../../../../.venv/bin/black .",
+  "formatter": "../../../../../../.venv/bin/black . && ../../../../../../.venv/bin/ruff . --fix",
   "batch": {
     "model.py.tmpl": "model.py"
   }
