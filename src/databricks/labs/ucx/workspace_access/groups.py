@@ -413,9 +413,9 @@ class GroupManager(CrawlerBase[MigratedGroup]):
         migrated_groups = strategy.generate_migrated_groups()
         mismatch_group = []
         for groups in migrated_groups:
-            ws_members_set = set([m.get("display") for m in json.loads(groups.members)] if groups.members else [])
+            ws_members_set = {m.get("display") for m in json.loads(groups.members)} if groups.members else set()
             acc_group = self._get_group(account_groups_in_account[groups.name_in_account].id)
-            acc_members_set = set([a.as_dict().get("display") for a in acc_group.members] if acc_group.members else [])
+            acc_members_set = {a.as_dict().get("display") for a in acc_group.members} if acc_group.members else set()
             set_diff = (ws_members_set - acc_members_set).union(acc_members_set - ws_members_set)
             if not set_diff:
                 continue
