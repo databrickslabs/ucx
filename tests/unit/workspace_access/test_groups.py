@@ -836,7 +836,7 @@ def test_validate_group_diff_membership():
         external_id="1234",
         display_name="test_(1234)",
         meta=ResourceMeta(resource_type="WorkspaceGroup"),
-        members=[ComplexValue(display="test-user-1", value="20"), ComplexValue(display="test-user-2", value="21")],
+        members=[ComplexValue(display="test-user-1", value="1"), ComplexValue(display="test-user-2", value="2")],
         roles=[
             ComplexValue(value="arn:aws:iam::123456789098:instance-profile/ip1"),
             ComplexValue(value="arn:aws:iam::123456789098:instance-profile/ip2"),
@@ -844,11 +844,16 @@ def test_validate_group_diff_membership():
         entitlements=[ComplexValue(value="allow-cluster-create"), ComplexValue(value="allow-instance-pool-create")],
     )
     wsclient.groups.list.return_value = [group]
-    wsclient.groups.get.return_value = group
-    account_admins_group = Group(id="1234", external_id="1234", display_name="ac_test_1234")
+    account_admins_group = Group(
+        id="1234",
+        external_id="1234",
+        display_name="ac_test_1234",
+        members=[ComplexValue(display="test-user-3", value="3")],
+    )
     wsclient.api_client.do.return_value = {
         "Resources": [g.as_dict() for g in [account_admins_group]],
     }
+    wsclient.groups.get.side_effect = lambda group_id: group if group_id == "1" else account_admins_group
     grp_membership = GroupManager(
         backend, wsclient, inventory_database="inv", workspace_group_regex=r"\(([1-9]+)\)", account_group_regex="[1-9]+"
     ).validate_group_membership()
@@ -857,7 +862,7 @@ def test_validate_group_diff_membership():
             "wf_group_name": "test_(1234)",
             "wf_group_members_count": 2,
             "acc_group_name": "ac_test_1234",
-            "acc_group_members_count": 0,
+            "acc_group_members_count": 1,
         }
     ]
 

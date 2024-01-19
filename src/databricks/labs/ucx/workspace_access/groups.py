@@ -415,7 +415,7 @@ class GroupManager(CrawlerBase[MigratedGroup]):
         for groups in migrated_groups:
             ws_members_set = set([m.get("display") for m in json.loads(groups.members)] if groups.members else [])
             account_group = account_groups_in_account[groups.name_in_account]
-            account_group_members = self._ws.groups.get(account_group.id).members
+            account_group_members = self._get_group(account_group.id).members
             acc_members_set = set(
                 [a.as_dict().get("display") for a in account_group_members] if account_group_members else []
             )
