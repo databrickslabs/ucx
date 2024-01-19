@@ -96,3 +96,9 @@ commands:
       Workflow Group Name\tAccount Group Name
       {{range .}}{{.name_in_workspace}}\t{{.name_in_group}}
       {{end}}
+
+  - name: save-aws-iam-profiles
+    description: Identifies all storage account used by tables, identify spn and its permission on each storage accounts
+    flags:
+      - name: aws-profile
+        description: AWS Profile to use for authentication
