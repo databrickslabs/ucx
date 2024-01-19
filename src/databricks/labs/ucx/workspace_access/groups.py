@@ -408,17 +408,17 @@ class GroupManager(CrawlerBase[MigratedGroup]):
 
     def validate_group_membership(self) -> list[dict]:
         workspace_groups_in_workspace = self._workspace_groups_in_workspace()
-        account_groups_in_account = self._account_groups_in_account("id,displayName,externalId,members")
+        account_groups_in_account = self._account_groups_in_account()
         strategy = self._get_strategy(workspace_groups_in_workspace, account_groups_in_account)
         migrated_groups = strategy.generate_migrated_groups()
         mismatch_group = []
         for groups in migrated_groups:
             ws_members_set = set([m.get("display") for m in json.loads(groups.members)] if groups.members else [])
             account_group = account_groups_in_account[groups.name_in_account]
-            acc_members_set = set(
+            ac_members_set = set(
                 [a.as_dict().get("display") for a in account_group.members] if account_group.members else []
             )
-            set_diff = (ws_members_set - acc_members_set).union(acc_members_set - ws_members_set)
+            set_diff = (ws_members_set - ac_members_set).union(ac_members_set - ws_members_set)
             if not set_diff:
                 continue
             mismatch_group.append(
@@ -426,7 +426,7 @@ class GroupManager(CrawlerBase[MigratedGroup]):
                     "wf_group_name": groups.name_in_workspace,
                     "wf_group_members_count": len(ws_members_set),
                     "acc_group_name": groups.name_in_account,
-                    "acc_group_members_count": len(acc_members_set),
+                    "acc_group_members_count": len(ac_members_set),
                 }
             )
         if not mismatch_group:
@@ -452,9 +452,9 @@ class GroupManager(CrawlerBase[MigratedGroup]):
             groups[g.display_name] = g
         return groups
 
-    def _account_groups_in_account(self, scim_attributes="id,displayName,externalId") -> dict[str, Group]:
+    def _account_groups_in_account(self) -> dict[str, Group]:
         groups = {}
-        for g in self._list_account_groups(scim_attributes):
+        for g in self._list_account_groups("id,displayName,externalId"):
             if not g.display_name:
                 continue
             groups[g.display_name] = g
