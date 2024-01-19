@@ -7,7 +7,7 @@ import sys
 import time
 import webbrowser
 from dataclasses import replace
-from datetime import datetime
+from datetime import datetime, timedelta
 from pathlib import Path
 from typing import Any
 
@@ -42,6 +42,7 @@ from databricks.sdk.errors import (
     Unauthenticated,
     Unknown,
 )
+from databricks.sdk.retries import retried
 from databricks.sdk.service import compute, jobs
 from databricks.sdk.service.jobs import RunLifeCycleState, RunResultState
 from databricks.sdk.service.sql import EndpointInfoWarehouseType, SpotInstancePolicy
@@ -171,6 +172,7 @@ class WorkspaceInstaller:
         promtps: Prompts | None = None,
         wheels: Wheels | None = None,
         sql_backend: SqlBackend | None = None,
+        verify_timeout: timedelta | None = None,
     ):
         if "DATABRICKS_RUNTIME_VERSION" in os.environ:
             msg = "WorkspaceInstaller is not supposed to be executed in Databricks Runtime"
@@ -189,6 +191,9 @@ class WorkspaceInstaller:
         self._this_file = Path(__file__)
         self._dashboards: dict[str, str] = {}
         self._install_override_clusters = None
+        if verify_timeout is None:
+            verify_timeout = timedelta(minutes=2)
+        self._verify_timeout = verify_timeout
 
     def run(self):
         logger.info(f"Installing UCX v{self._product_info.version()}")
@@ -906,6 +911,14 @@ class WorkspaceInstaller:
                 continue
         return latest_status
 
+    def _get_result_state(self, job_id):
+        job_runs = list(self._ws.jobs.list_runs(job_id=job_id, limit=1))
+        latest_job_run = job_runs[0]
+        if not latest_job_run.state.result_state:
+            raise AttributeError("no result state in job run")
+        job_state = latest_job_run.state.result_state.value
+        return job_state
+
     def repair_run(self, workflow):
         try:
             job_id = self._state.jobs.get(workflow)
@@ -917,17 +930,26 @@ class WorkspaceInstaller:
                 logger.warning(f"{workflow} job is not initialized yet. Can't trigger repair run now")
                 return
             latest_job_run = job_runs[0]
-            state = latest_job_run.state
-            if state.result_state.value != "FAILED":
+            retry_on_attribute_error = retried(on=[AttributeError], timeout=self._verify_timeout)
+            retried_check = retry_on_attribute_error(self._get_result_state)
+            state_value = retried_check(job_id)
+
+            logger.info(f"The status for the latest run is {state_value}")
+
+            if state_value != "FAILED":
                 logger.warning(f"{workflow} job is not in FAILED state hence skipping Repair Run")
                 return
             run_id = latest_job_run.run_id
+            run_details = self._ws.jobs.get_run(run_id=run_id, include_history=True)
+            latest_repair_run_id = run_details.repair_history[-1].id
             job_url = f"{self._ws.config.host}#job/{job_id}/run/{run_id}"
             logger.debug(f"Repair Running {workflow} job: {job_url}")
-            self._ws.jobs.repair_run(run_id=run_id, rerun_all_failed_tasks=True)
+            self._ws.jobs.repair_run(run_id=run_id, rerun_all_failed_tasks=True, latest_repair_id=latest_repair_run_id)
             webbrowser.open(job_url)
         except InvalidParameterValue as e:
             logger.warning(f"skipping {workflow}: {e}")
+        except TimeoutError:
+            logger.warning(f"Skipping the {workflow} due to time out. Please try after sometime")
 
     def uninstall(self):
         if self._prompts and not self._prompts.confirm(
