@@ -63,6 +63,15 @@ def test_corrupt_config(mocker):
     assert len(user_installations) == 0
 
 
+def test_corrupt_config_yaml(mocker):
+    ws = mocker.patch("databricks.sdk.WorkspaceClient.__init__")
+    ws.users.list.return_value = [User(user_name="foo")]
+    ws.workspace.download.return_value = io.StringIO("version: 2\ntacl: extra colon: test")
+    installation_manager = InstallationManager(ws)
+    user_installations = installation_manager.user_installations()
+    assert len(user_installations) == 0
+
+
 def test_validate_assessment(mocker):
     ws = mocker.patch("databricks.sdk.WorkspaceClient.__init__")
     current_user = MagicMock()
