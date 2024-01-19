@@ -1,4 +1,5 @@
 import json
+import os
 import webbrowser
 
 from databricks.labs.blueprint.cli import App
@@ -7,6 +8,7 @@ from databricks.labs.blueprint.tui import Prompts
 from databricks.sdk import AccountClient, WorkspaceClient
 
 from databricks.labs.ucx.account import AccountWorkspaces, WorkspaceInfo
+from databricks.labs.ucx.assessment.aws import AWSResourcePermissions, AWSInstanceProfileCrawler, AWSResources
 from databricks.labs.ucx.assessment.azure import (
     AzureResourcePermissions,
     AzureResources,
@@ -226,6 +228,26 @@ def save_azure_storage_accounts(w: WorkspaceClient, subscription_id: str):
     azure_resource_permissions = AzureResourcePermissions(w, AzureResources(w), location)
     logger.info("Generating azure storage accounts and service principal permission info")
     azure_resource_permissions.save_spn_permissions()
+
+
+@ucx.command
+def save_aws_instance_profiles(w: WorkspaceClient, subscription_id: str):
+    """identifies all AWS instance profiles. Traverse the policy structure to identify access to S3 storage accounts."""
+    installation_manager = InstallationManager(w)
+    installation = installation_manager.for_user(w.current_user.me())
+    if not installation:
+        logger.error(CANT_FIND_UCX_MSG)
+        return
+    if not w.config.is_aws:
+        logger.error("Workspace is not on AWS, please run this command on AWS databricks workspaces.")
+        return
+    sql_backend = StatementExecutionBackend(w, installation.config.warehouse_id)
+    instance_profile_crawler = AWSInstanceProfileCrawler(w, sql_backend, installation.config.inventory_database)
+    profile = os.getenv("AWS_DEFAULT_PROFILE")
+    aws = AWSResources(profile)
+    aws_resource_permissions = AWSResourcePermissions(w,aws,instance_profile_crawler,installation.path)
+    logger.info("Generating azure storage accounts and service principal permission info")
+    aws_resource_permissions.save_instance_profile_permissions()
 
 
 if "__main__" == __name__:
