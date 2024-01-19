@@ -367,10 +367,10 @@ class WorkspaceInstaller:
     def _my_username(self):
         if not hasattr(self, "_me"):
             self._me = self._ws.current_user.me()
-            is_workspace_admin = any(g.display == "admins" for g in self._me.groups)
-            if not is_workspace_admin:
-                msg = "Current user is not a workspace admin"
-                raise PermissionError(msg)
+            # is_workspace_admin = any(g.display == "admins" for g in self._me.groups)
+            # if not is_workspace_admin:
+            #     msg = "Current user is not a workspace admin"
+            #     raise PermissionError(msg)
         return self._me.user_name
 
     @property

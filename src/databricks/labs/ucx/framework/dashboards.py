@@ -142,11 +142,9 @@ class DashboardFromFiles:
             logger.debug(f"Reading step folder {step_folder}...")
             dashboard_folders = [f for f in step_folder.glob("*") if f.is_dir()]
 
-            datasets: list[lakeview.Dataset] = []
-            pages: list[lakeview.Page] = []
-
             # Create separate dashboards per step, represented as second-level folders
             for dashboard_folder in dashboard_folders:
+
                 logger.debug(f"Reading dashboard folder {dashboard_folder}...")
                 main_name = step_folder.stem.title()
                 sub_name = dashboard_folder.stem.title()
@@ -157,24 +155,21 @@ class DashboardFromFiles:
                 # parent_folder_id = self._installed_query_state()
                 # data_source_id = self._dashboard_data_source()
 
+                datasets: list[lakeview.Dataset] = []
+                pages: list[lakeview.Page] = []
                 layout: list[lakeview.Layout] = []
                 for query in desired_queries:
-                    datasets.append(lakeview.Dataset(query.name, query.query))
+                    datasets.append(lakeview.Dataset(query.name, query.query, display_name=query.name))
                     fields = []
                     widget = lakeview.Widget(query.viz['name'], [
                         lakeview.NamedQuery(query.name, lakeview.Query(query.name, fields, disaggregated=True))
                     ], query.widget_spec())
-                    layout.append(lakeview.Layout(widget, query.position()))
+                    # layout.append(lakeview.Layout(widget, query.position()))
                 pages.append(lakeview.Page(dashboard_ref, layout, dashboard_name))
-            dash = lakeview.Dashboard(datasets, pages)
-            lvdash_json = json.dumps(dash.as_dict(), indent=2)
-            # self._ws.workspace.upload(f'{self._state.install_folder()}/{step_folder.name}.lvdash.json', lvdash_json, format=ImportFormat.AUTO, overwrite=True)
-            b64 = base64.b64encode(lvdash_json.encode('utf8'))
-            self._ws.workspace.import_(f'{self._state.install_folder()}/{step_folder.name}.lvdash.json',
-                                       content=b64.decode('utf8'),
-                                       format=ImportFormat.AUTO,
-                                       overwrite=True)
-            print(1)
+                dash = lakeview.Dashboard(datasets, pages)
+                lvdash_json = json.dumps(dash.as_dict(), indent=2)
+                self._ws.workspace.upload(f'{self._state.install_folder()}/{dashboard_ref}.lvdash.json', lvdash_json, format=ImportFormat.AUTO, overwrite=True)
+                print(1)
 
     def validate(self):
         step_folders = [f for f in self._local_folder.glob("*") if f.is_dir()]
