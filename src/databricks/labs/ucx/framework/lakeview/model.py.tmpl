@@ -9,6 +9,7 @@ import time
 import random
 import logging
 import types
+import enum
 import dataclasses
 import abc
 from databricks.sdk.service._internal import _enum, _from_dict, _repeated_dict, _repeated_enum
@@ -60,6 +61,13 @@ def _is_assignable(
             if why_not:
                 combo.append(why_not)
         return False, f'{".".join(path)}: union: {" or ".join(combo)}'
+    if isinstance(type_ref, abc.ABCMeta):
+        # until we generate method that returns subtypes
+        return True, None
+    if isinstance(type_ref, enum.EnumMeta):
+        if raw in type_ref._value2member_map_:
+            return True, None
+        return False, _explain_why(type_ref, raw, path)
     if type_ref == types.NoneType:
         if raw is None:
             return True, None

@@ -2,14 +2,14 @@
 
 from __future__ import annotations
 
-import abc
-import dataclasses
-import types
-from collections.abc import Callable
+import enum
 from dataclasses import dataclass
 from enum import Enum
 from typing import Any, get_args, get_type_hints
-
+from collections.abc import Callable
+import types
+import dataclasses
+import abc
 from databricks.sdk.service._internal import _enum, _from_dict, _repeated_dict
 
 Json = dict[str, Any]
@@ -59,6 +59,13 @@ def _is_assignable(
             if why_not:
                 combo.append(why_not)
         return False, f'{".".join(path)}: union: {" or ".join(combo)}'
+    if isinstance(type_ref, abc.ABCMeta):
+        # until we generate method that returns subtypes
+        return True, None
+    if isinstance(type_ref, enum.EnumMeta):
+        if raw in type_ref._value2member_map_:
+            return True, None
+        return False, _explain_why(type_ref, raw, path)
     if type_ref == types.NoneType:
         if raw is None:
             return True, None
@@ -1084,7 +1091,7 @@ class MultiSelectSpec(WidgetSpec):
 @dataclass
 class NamedQuery:
     name: str
-    query: Order
+    query: Query
 
     def as_dict(self) -> Json:
         body: Json = {}
@@ -1096,7 +1103,7 @@ class NamedQuery:
 
     @classmethod
     def from_dict(cls, d: Json) -> NamedQuery:
-        return cls(name=d.get("name", None), query=_from_dict(d, "query", Order))
+        return cls(name=d.get("name", None), query=_from_dict(d, "query", Query))
 
 
 @dataclass
