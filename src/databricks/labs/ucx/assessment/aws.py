@@ -67,7 +67,7 @@ class AWSInstanceProfile:
 @lru_cache(maxsize=1024)
 def run_command(command):
     logger.info(f"Invoking Command {command}")
-    process = subprocess.Popen(command, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+    process = subprocess.Popen(command, stdout=subprocess.PIPE, stderr=subprocess.PIPE, shell=True)
     output, error = process.communicate()
     return process.returncode, output.decode("utf-8"), error.decode("utf-8")
 
