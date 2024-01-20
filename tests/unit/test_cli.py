@@ -1,3 +1,4 @@
+import os
 from unittest.mock import MagicMock, create_autospec, patch
 
 from databricks.sdk import AccountClient, WorkspaceClient
@@ -15,6 +16,7 @@ from databricks.labs.ucx.cli import (
     open_remote_config,
     repair_run,
     revert_migrated_tables,
+    save_aws_iam_profiles,
     save_azure_storage_accounts,
     skip,
     sync_workspace_info,
@@ -361,3 +363,21 @@ def test_validate_group_no_ucx(mocker, caplog):
     mocker.patch("databricks.labs.ucx.installer.InstallationManager.for_user", return_value=None)
     validate_groups_membership(w)
     assert "Couldn't find UCX configuration" in caplog.messages[0]
+
+
+def test_save_aws_iam_profiles_no_profile(mocker, caplog):
+    w = create_autospec(WorkspaceClient)
+    w.current_user.me = lambda: iam.User(user_name="test_user", groups=[iam.ComplexValue(display="admins")])
+    mocker.patch("databricks.labs.ucx.installer.InstallationManager.for_user", return_value=None)
+    os.environ["AWS_DEFAULT_PROFILE"] = ""
+    save_aws_iam_profiles(w)
+    assert "AWS Profile is not specified." in caplog.messages[0]
+
+
+def test_save_aws_iam_profiles_no_cli(mocker, caplog):
+    w = create_autospec(WorkspaceClient)
+    w.current_user.me = lambda: iam.User(user_name="test_user", groups=[iam.ComplexValue(display="admins")])
+    mocker.patch("databricks.labs.ucx.assessment.aws.AWSResources.validate_connection", return_value=False)
+    os.environ["AWS_DEFAULT_PROFILE"] = ""
+    save_aws_iam_profiles(w, aws_profile="profile")
+    assert "AWS CLI is not configured properly." in caplog.messages[0]
