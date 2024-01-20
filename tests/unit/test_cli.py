@@ -374,10 +374,19 @@ def test_save_aws_iam_profiles_no_profile(mocker, caplog):
     assert "AWS Profile is not specified." in caplog.messages[0]
 
 
-def test_save_aws_iam_profiles_no_cli(mocker, caplog):
+def test_save_aws_iam_profiles_no_connection(mocker, caplog):
     w = create_autospec(WorkspaceClient)
     w.current_user.me = lambda: iam.User(user_name="test_user", groups=[iam.ComplexValue(display="admins")])
+    mocker.patch("shutil.which", return_value="/path/aws")
     mocker.patch("databricks.labs.ucx.assessment.aws.AWSResources.validate_connection", return_value=False)
     os.environ["AWS_DEFAULT_PROFILE"] = ""
     save_aws_iam_profiles(w, aws_profile="profile")
     assert "AWS CLI is not configured properly." in caplog.messages[0]
+
+
+def test_save_aws_iam_profiles_no_cli(mocker, caplog):
+    w = create_autospec(WorkspaceClient)
+    w.current_user.me = lambda: iam.User(user_name="test_user", groups=[iam.ComplexValue(display="admins")])
+    mocker.patch("shutil.which", return_value=None)
+    save_aws_iam_profiles(w, aws_profile="profile")
+    assert "Couldn't find AWS" in caplog.messages[0]
