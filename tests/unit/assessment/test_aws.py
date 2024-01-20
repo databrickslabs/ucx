@@ -242,7 +242,7 @@ def test_save_instance_profile_permissions():
         path: str,
         content: BinaryIO,
         *,
-        format: ImportFormat | None = None,
+        format: ImportFormat | None = None,  # noqa: A002
         language: Language | None = None,
         overwrite: bool | None = False,
     ) -> None:
