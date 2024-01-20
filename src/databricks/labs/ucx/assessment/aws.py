@@ -232,7 +232,7 @@ class AWSResourcePermissions:
     def save_instance_profile_permissions(self) -> str | None:
         instance_profile_access = list(self._get_instance_profiles_access())
         if len(instance_profile_access) == 0:
-            logger.warning("No Mapping Was Generated. Please check if assessment job is run")
+            logger.warning("No Mapping Was Generated.")
             return None
         return self._save(instance_profile_access)
 

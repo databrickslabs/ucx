@@ -1,5 +1,4 @@
 import logging
-import shutil
 from typing import BinaryIO
 from unittest.mock import create_autospec
 
@@ -9,9 +8,10 @@ from databricks.sdk.service.compute import InstanceProfile
 from databricks.sdk.service.workspace import ImportFormat, Language
 
 from databricks.labs.ucx.assessment.aws import (
+    AWSInstanceProfile,
     AWSPolicyAction,
     AWSResourcePermissions,
-    AWSResources, run_command, AWSInstanceProfile,
+    AWSResources,
 )
 
 logger = logging.getLogger(__name__)
@@ -302,10 +302,12 @@ def test_save_instance_profile_permissions():
     aws_resource_permissions = AWSResourcePermissions(ws, aws)
     aws_resource_permissions.save_instance_profile_permissions()
 
+
 def test_role_mismatched(caplog):
-    instance_profile = AWSInstanceProfile("test","fake")
-    role_name = instance_profile.role_name
+    instance_profile = AWSInstanceProfile("test", "fake")
+    assert not instance_profile.role_name
     assert "Role ARN is mismatched" in caplog.messages[0]
+
 
 def test_get_role_policy_missing_role(caplog):
     def command_call(cmd: str):
@@ -313,7 +315,17 @@ def test_get_role_policy_missing_role(caplog):
 
     aws = AWSResources("Fake_Profile", command_call)
 
-    role_policies = aws.get_role_policy("fake_role")
+    aws.get_role_policy("fake_role")
     assert "No role name or attached role ARN specified." in caplog.messages[0]
 
 
+def test_empty_mapping(caplog):
+    ws = create_autospec(WorkspaceClient)
+    ws.instance_profiles.list.return_value = [
+        InstanceProfile("arn:aws:iam::12345:instance-profile/role1", "arn:aws:iam::12345:role/role1")
+    ]
+    ws.current_user.me = lambda: iam.User(user_name="me@example.com", groups=[iam.ComplexValue(display="admins")])
+    aws = create_autospec(AWSResources)
+    aws_resource_permissions = AWSResourcePermissions(ws, aws)
+    aws_resource_permissions.save_instance_profile_permissions()
+    assert "No Mapping" in caplog.messages[0]
