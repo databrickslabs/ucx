@@ -11,7 +11,7 @@ from databricks.sdk.service.workspace import ImportFormat, Language
 from databricks.labs.ucx.assessment.aws import (
     AWSPolicyAction,
     AWSResourcePermissions,
-    AWSResources, run_command,
+    AWSResources, run_command, AWSInstanceProfile,
 )
 
 logger = logging.getLogger(__name__)
@@ -301,3 +301,19 @@ def test_save_instance_profile_permissions():
 
     aws_resource_permissions = AWSResourcePermissions(ws, aws)
     aws_resource_permissions.save_instance_profile_permissions()
+
+def test_role_mismatched(caplog):
+    instance_profile = AWSInstanceProfile("test","fake")
+    role_name = instance_profile.role_name
+    assert "Role ARN is mismatched" in caplog.messages[0]
+
+def test_get_role_policy_missing_role(caplog):
+    def command_call(cmd: str):
+        return 0, "", ""
+
+    aws = AWSResources("Fake_Profile", command_call)
+
+    role_policies = aws.get_role_policy("fake_role")
+    assert "No role name or attached role ARN specified." in caplog.messages[0]
+
+
