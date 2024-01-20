@@ -95,7 +95,7 @@ commands:
       {{end}}
 
   - name: save-aws-iam-profiles
-    description: Identifies all storage account used by tables, identify spn and its permission on each storage accounts
+    description: Identifies all instance profiles associated with the workspace and lists all the S3 buckets they have access to.
     flags:
       - name: aws-profile
         description: AWS Profile to use for authentication

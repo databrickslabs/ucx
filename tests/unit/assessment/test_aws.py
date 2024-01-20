@@ -1,4 +1,5 @@
 import logging
+import shutil
 from typing import BinaryIO
 from unittest.mock import create_autospec
 
@@ -10,7 +11,7 @@ from databricks.sdk.service.workspace import ImportFormat, Language
 from databricks.labs.ucx.assessment.aws import (
     AWSPolicyAction,
     AWSResourcePermissions,
-    AWSResources,
+    AWSResources, run_command,
 )
 
 logger = logging.getLogger(__name__)
