@@ -4,7 +4,7 @@ This document describes the Assessment Report generated from the UCX tools. The 
 # Assessment Report Summary
 The Assessment Report (Main) is the output of the Databricks Labs UCX assessment workflow. This report queries the $inventory database (e.g. `ucx`) and summarizes the findings of the assessment. The link to the Assessment Report (Main) can be found in your home folder, under `.ucx` in the README.py file. The user may also directly navigate to the Assessment report by clicking on `Dashboards` icon on the left to find the Dashboard.
 
-# Assessment Dashlets
+# Assessment Widgets
 <img width="1655" alt="image" src="https://github.com/databrickslabs/ucx/assets/1122251/808f7c68-fcc7-4caa-bab2-03f49a382256">
 
 ## Readiness
