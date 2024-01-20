@@ -93,7 +93,7 @@ class AWSResources:
         policies = self._run_json_command(list_policies_cmd)
         if not policies:
             return []
-        yield from policies.get("PolicyNames", [])
+        return policies.get("PolicyNames", [])
 
     def list_attached_policies_in_role(self, role_name: str):
         list_attached_policies_cmd = (
@@ -102,8 +102,10 @@ class AWSResources:
         policies = self._run_json_command(list_attached_policies_cmd)
         if not policies:
             return []
+        attached_policies = []
         for policy in policies.get("AttachedPolicies", []):
-            yield policy.get("PolicyArn")
+            attached_policies.append(policy.get("PolicyArn"))
+        return attached_policies
 
     def get_role_policy(self, role_name, policy_name: str | None = None, attached_policy_arn: str | None = None):
         if policy_name:
@@ -133,6 +135,7 @@ class AWSResources:
             actions = policy["PolicyDocument"].get("Statement", [])
         else:
             actions = policy["PolicyVersion"]["Document"].get("Statement", [])
+        policy_actions = []
         for action in actions:
             if action.get("Effect", "Deny") != "Allow":
                 continue
@@ -151,10 +154,11 @@ class AWSResources:
             for resource in action.get("Resource", []):
                 match = re.match(self.S3_REGEX, resource)
                 if match:
-                    yield AWSPolicyAction("s3", set(s3_action), match.group(1))
+                    policy_actions.append(AWSPolicyAction("s3", set(s3_action), match.group(1)))
+        return policy_actions
 
     def _run_json_command(self, command: str):
-        code, output, error = self._command_runner(command)
+        code, output, error = self._command_runner(command + " --output json")
         if code != 0:
             logger.error(error)
             return None
@@ -177,8 +181,13 @@ class AWSResourcePermissions:
 
     def _get_instance_profiles(self) -> Iterable[AWSInstanceProfile]:
         instance_profiles = self._ws.instance_profiles.list()
+        result_instance_profiles = []
         for instance_profile in instance_profiles:
-            yield AWSInstanceProfile(instance_profile.instance_profile_arn, instance_profile.iam_role_arn)
+            result_instance_profiles.append(
+                AWSInstanceProfile(instance_profile.instance_profile_arn, instance_profile.iam_role_arn)
+            )
+
+        return result_instance_profiles
 
     def _get_instance_profiles_access(self):
         instance_profiles = list(self._get_instance_profiles())
@@ -189,33 +198,36 @@ class AWSResourcePermissions:
         return sum(Threads.strict("Scanning Instance Profiles", tasks), [])
 
     def _get_instance_profile_access_task(self, instance_profile: AWSInstanceProfile):
-        return list(self._get_instance_profile_access(instance_profile))
-
-    def _get_instance_profile_access(self, instance_profile: AWSInstanceProfile):
+        policy_actions = []
         policies = list(self._aws_resources.list_role_policies(instance_profile.role_name))
         for policy in policies:
-            actions = list(self._aws_resources.get_role_policy(instance_profile.role_name, policy_name=policy))
+            actions = self._aws_resources.get_role_policy(instance_profile.role_name, policy_name=policy)
             for action in actions:
-                yield AWSInstanceProfileAction(
-                    instance_profile.instance_profile_arn,
-                    action.resource_type,
-                    str(action.action),
-                    action.resource_path,
-                    instance_profile.iam_role_arn,
+                policy_actions.append(
+                    AWSInstanceProfileAction(
+                        instance_profile.instance_profile_arn,
+                        action.resource_type,
+                        str(action.action),
+                        action.resource_path,
+                        instance_profile.iam_role_arn,
+                    )
                 )
-        attached_policies = list(self._aws_resources.list_attached_policies_in_role(instance_profile.role_name))
+        attached_policies = self._aws_resources.list_attached_policies_in_role(instance_profile.role_name)
         for attached_policy in attached_policies:
             actions = list(
                 self._aws_resources.get_role_policy(instance_profile.role_name, attached_policy_arn=attached_policy)
             )
             for action in actions:
-                yield AWSInstanceProfileAction(
-                    instance_profile.instance_profile_arn,
-                    action.resource_type,
-                    str(action.action),
-                    action.resource_path,
-                    instance_profile.iam_role_arn,
+                policy_actions.append(
+                    AWSInstanceProfileAction(
+                        instance_profile.instance_profile_arn,
+                        action.resource_type,
+                        str(action.action),
+                        action.resource_path,
+                        instance_profile.iam_role_arn,
+                    )
                 )
+        return policy_actions
 
     def save_instance_profile_permissions(self) -> str | None:
         instance_profile_access = list(self._get_instance_profiles_access())

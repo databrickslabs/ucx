@@ -10,7 +10,7 @@ def test_aws_validate(env_or_skip):
 def test_role_policy(env_or_skip):
     profile = env_or_skip("AWS_DEFAULT_PROFILE")
     aws = AWSResources(profile)
-    role_policy_actions = list(aws.get_role_policy("databricks-s3-access", "databricks-s3-access"))
+    role_policy_actions = aws.get_role_policy("databricks-s3-access", "databricks-s3-access")
     print(role_policy_actions)
     assert len(role_policy_actions) == 15
 

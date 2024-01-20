@@ -1,6 +1,17 @@
 import logging
+from typing import BinaryIO
+from unittest.mock import create_autospec
 
-from databricks.labs.ucx.assessment.aws import AWSPolicyAction, AWSResources
+from databricks.sdk import WorkspaceClient
+from databricks.sdk.service import iam
+from databricks.sdk.service.compute import InstanceProfile
+from databricks.sdk.service.workspace import ImportFormat, Language
+
+from databricks.labs.ucx.assessment.aws import (
+    AWSPolicyAction,
+    AWSResourcePermissions,
+    AWSResources,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -44,7 +55,7 @@ def test_list_role_policies():
         return 0, command_return, ""
 
     aws = AWSResources("Fake_Profile", command_call)
-    role_policies = list(aws.list_role_policies("fake_role"))
+    role_policies = aws.list_role_policies("fake_role")
     assert role_policies == ["Policy1", "Policy2", "Policy3"]
 
 
@@ -70,7 +81,7 @@ def test_list_attached_policies_in_role():
         return 0, command_return, ""
 
     aws = AWSResources("Fake_Profile", command_call)
-    role_policies = list(aws.list_attached_policies_in_role("fake_role"))
+    role_policies = aws.list_attached_policies_in_role("fake_role")
     assert role_policies == ["arn:aws:iam::aws:policy/Policy1", "arn:aws:iam::aws:policy/Policy2"]
 
 
@@ -166,7 +177,7 @@ def test_get_role_policy():
             return -1, "", "Error"
 
     aws = AWSResources("Fake_Profile", command_call)
-    role_policy = list(aws.get_role_policy("fake_role", policy_name="fake_policy"))
+    role_policy = aws.get_role_policy("fake_role", policy_name="fake_policy")
     assert role_policy == [
         AWSPolicyAction(
             resource_type="s3",
@@ -185,7 +196,7 @@ def test_get_role_policy():
         ),
     ]
 
-    role_policy = list(aws.get_role_policy("fake_role", attached_policy_arn="arn:aws:iam::12345:policy/policy"))
+    role_policy = aws.get_role_policy("fake_role", attached_policy_arn="arn:aws:iam::12345:policy/policy")
     assert role_policy == [
         AWSPolicyAction(
             resource_type="s3",
@@ -203,3 +214,89 @@ def test_get_role_policy():
             resource_path="bucketC",
         ),
     ]
+
+
+def test_save_instance_profile_permissions():
+    ws = create_autospec(WorkspaceClient)
+    ws.instance_profiles.list.return_value = [
+        InstanceProfile("arn:aws:iam::12345:instance-profile/role1", "arn:aws:iam::12345:role/role1")
+    ]
+    ws.current_user.me = lambda: iam.User(user_name="me@example.com", groups=[iam.ComplexValue(display="admins")])
+
+    expected_csv_entries = [
+        "arn:aws:iam::12345:instance-profile/role1,s3",
+        "bucket1,arn:aws:iam::12345:role/role1",
+        "arn:aws:iam::12345:instance-profile/role1,s3",
+        "bucket2,arn:aws:iam::12345:role/role1",
+        "arn:aws:iam::12345:instance-profile/role1,s3",
+        "bucket3,arn:aws:iam::12345:role/role1",
+        "arn:aws:iam::12345:instance-profile/role1,s3",
+        "bucketA,arn:aws:iam::12345:role/role1",
+        "arn:aws:iam::12345:instance-profile/role1,s3",
+        "bucketB,arn:aws:iam::12345:role/role1",
+        "arn:aws:iam::12345:instance-profile/role1,s3",
+        "bucketC,arn:aws:iam::12345:role/role1",
+    ]
+
+    def upload(
+        path: str,
+        content: BinaryIO,
+        *,
+        format: ImportFormat | None = None,
+        language: Language | None = None,
+        overwrite: bool | None = False,
+    ) -> None:
+        csv_text = str(content.read())
+        for entry in expected_csv_entries:
+            assert entry in csv_text
+
+    ws.workspace.upload = upload
+    aws = create_autospec(AWSResources)
+    aws.get_role_policy.side_effect = [
+        [
+            AWSPolicyAction(
+                resource_type="s3",
+                action={"s3:GetObject", "s3:PutObject", "s3:DeleteObject", "s3:PutObjectAcl"},
+                resource_path="bucket1",
+            ),
+            AWSPolicyAction(
+                resource_type="s3",
+                action={"s3:GetObject", "s3:PutObject", "s3:DeleteObject", "s3:PutObjectAcl"},
+                resource_path="bucket2",
+            ),
+            AWSPolicyAction(
+                resource_type="s3",
+                action={"s3:GetObject", "s3:PutObject", "s3:DeleteObject", "s3:PutObjectAcl"},
+                resource_path="bucket3",
+            ),
+        ],
+        [],
+        [],
+        [
+            AWSPolicyAction(
+                resource_type="s3",
+                action={"s3:GetObject", "s3:PutObject", "s3:DeleteObject", "s3:PutObjectAcl"},
+                resource_path="bucketA",
+            ),
+            AWSPolicyAction(
+                resource_type="s3",
+                action={"s3:GetObject", "s3:PutObject", "s3:DeleteObject", "s3:PutObjectAcl"},
+                resource_path="bucketB",
+            ),
+            AWSPolicyAction(
+                resource_type="s3",
+                action={"s3:GetObject", "s3:PutObject", "s3:DeleteObject", "s3:PutObjectAcl"},
+                resource_path="bucketC",
+            ),
+        ],
+        [],
+        [],
+    ]
+    aws.list_role_policies.return_value = ["Policy1", "Policy2", "Policy3"]
+    aws.list_attached_policies_in_role.return_value = [
+        "arn:aws:iam::aws:policy/Policy1",
+        "arn:aws:iam::aws:policy/Policy2",
+    ]
+
+    aws_resource_permissions = AWSResourcePermissions(ws, aws)
+    aws_resource_permissions.save_instance_profile_permissions()
