@@ -414,18 +414,18 @@ class AzureResources:
         try:
             path = f"/v1.0/directoryObjects/{principal_id}"
             raw: dict[str, str] = self._graph.do("GET", path)  # type: ignore[assignment]
-            client_id = raw.get("appId")
-            display_name = raw.get("displayName")
-            object_id = raw.get("id")
-            assert client_id is not None
-            assert display_name is not None
-            assert object_id is not None
-            self._principals[principal_id] = Principal(client_id, display_name, object_id)
-            return self._principals[principal_id]
         except NotFound:
             # don't load principals from external directories twice
             self._principals[principal_id] = None
             return self._principals[principal_id]
+        client_id = raw.get("appId")
+        display_name = raw.get("displayName")
+        object_id = raw.get("id")
+        assert client_id is not None
+        assert display_name is not None
+        assert object_id is not None
+        self._principals[principal_id] = Principal(client_id, display_name, object_id)
+        return self._principals[principal_id]
 
     def role_assignments(
         self, resource_id: str, *, principal_types: list[str] | None = None

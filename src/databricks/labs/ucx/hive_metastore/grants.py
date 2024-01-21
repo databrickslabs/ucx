@@ -239,9 +239,6 @@ class GrantsCrawler(CrawlerBase[Grant]):
             any_file (bool): Whether to include any file grants (optional).
             anonymous_function (bool): Whether to include anonymous function grants (optional).
 
-        Yields:
-            Iterator[Grant]: An iterator of Grant objects representing the fetched grants.
-
         Behavior:
         - Normalizes the provided parameters and constructs an object type and key using
           the `Grant.type_and_key` method.
@@ -297,7 +294,7 @@ class GrantsCrawler(CrawlerBase[Grant]):
                 )
                 grants.append(grant)
             return grants
-        except Exception as e:
+        except Exception as e:  # pylint: disable=broad-exception-caught
             # TODO: https://github.com/databrickslabs/ucx/issues/406
             logger.error(f"Couldn't fetch grants for object {on_type} {key}: {e}")
             return []

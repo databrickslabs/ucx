@@ -10,7 +10,7 @@ import sys
 from collections.abc import Callable, Generator, MutableMapping
 from datetime import timedelta
 from pathlib import Path
-from typing import BinaryIO, Optional
+from typing import BinaryIO
 
 import pytest
 from databricks.sdk import AccountClient, WorkspaceClient
@@ -36,6 +36,9 @@ from databricks.sdk.service.sql import (
 from databricks.sdk.service.workspace import ImportFormat
 
 from databricks.labs.ucx.framework.crawlers import StatementExecutionBackend
+
+# this file will get to databricks-labs-pytester project and be maintained/refactored there
+# pylint: disable=redefined-outer-name,too-many-try-statements,import-outside-toplevel,unnecessary-lambda
 
 logger = logging.getLogger(__name__)
 
@@ -325,10 +328,9 @@ class _PermissionsChange:
     def _principal(acr: iam.AccessControlRequest) -> str:
         if acr.user_name is not None:
             return f"user_name {acr.user_name}"
-        elif acr.group_name is not None:
+        if acr.group_name is not None:
             return f"group_name {acr.group_name}"
-        else:
-            return f"service_principal_name {acr.service_principal_name}"
+        return f"service_principal_name {acr.service_principal_name}"
 
     def _list(self, acl: list[iam.AccessControlRequest]):
         return ", ".join(f"{self._principal(_)} {_.permission_level.value}" for _ in acl)
@@ -347,8 +349,7 @@ class _RedashPermissionsChange:
     def _principal(acr: sql.AccessControl) -> str:
         if acr.user_name is not None:
             return f"user_name {acr.user_name}"
-        else:
-            return f"group_name {acr.group_name}"
+        return f"group_name {acr.group_name}"
 
     def _list(self, acl: list[sql.AccessControl]):
         return ", ".join(f"{self._principal(_)} {_.permission_level.value}" for _ in acl)
@@ -385,7 +386,7 @@ def _make_permissions_factory(name, resource_type, levels, id_retriever):
             group_name: str | None = None,
             user_name: str | None = None,
             service_principal_name: str | None = None,
-            access_control_list: Optional["list[iam.AccessControlRequest]"] = None,
+            access_control_list: list[iam.AccessControlRequest] | None = None,
         ):
             nothing_specified = permission_level is None and access_control_list is None
             both_specified = permission_level is not None and access_control_list is not None
@@ -456,7 +457,7 @@ def _make_redash_permissions_factory(name, resource_type, levels, id_retriever):
             permission_level: sql.PermissionLevel | None = None,
             group_name: str | None = None,
             user_name: str | None = None,
-            access_control_list: Optional["list[sql.AccessControl]"] = None,
+            access_control_list: list[sql.AccessControl] | None = None,
         ):
             nothing_specified = permission_level is None and access_control_list is None
             both_specified = permission_level is not None and access_control_list is not None
@@ -831,10 +832,7 @@ def make_warehouse(ws, make_random):
 
 
 def _is_in_debug() -> bool:
-    return os.path.basename(sys.argv[0]) in [
-        "_jb_pytest_runner.py",
-        "testlauncher.py",
-    ]
+    return os.path.basename(sys.argv[0]) in {"_jb_pytest_runner.py", "testlauncher.py"}
 
 
 @pytest.fixture

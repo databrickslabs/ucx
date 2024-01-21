@@ -84,7 +84,7 @@ class Table:
     def is_format_supported_for_sync(self) -> bool:
         if self.table_format is None:
             return False
-        return self.table_format.upper() in ("DELTA", "PARQUET", "CSV", "JSON", "ORC", "TEXT")
+        return self.table_format.upper() in {"DELTA", "PARQUET", "CSV", "JSON", "ORC", "TEXT"}
 
     @property
     def is_databricks_dataset(self) -> bool:
@@ -224,7 +224,7 @@ class TablesCrawler(CrawlerBase):
                 ),
                 storage_properties=self._parse_table_props(describe.get("Storage Properties", "").lower()),  # type: ignore[arg-type]
             )
-        except Exception as e:
+        except Exception as e:  # pylint: disable=broad-exception-caught
             # TODO: https://github.com/databrickslabs/ucx/issues/406
             logger.error(f"Couldn't fetch information for table {full_name} : {e}")
             return None

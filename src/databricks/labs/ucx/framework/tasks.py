@@ -41,14 +41,12 @@ class Task:
         if self.cloud:
             if self.cloud.lower() == "aws":
                 return config.is_aws
-            elif self.cloud.lower() == "azure":
+            if self.cloud.lower() == "azure":
                 return config.is_azure
-            elif self.cloud.lower() == "gcp":
+            if self.cloud.lower() == "gcp":
                 return config.is_gcp
-            else:
-                return True
-        else:
             return True
+        return True
 
 
 def _remove_extra_indentation(doc: str) -> str:

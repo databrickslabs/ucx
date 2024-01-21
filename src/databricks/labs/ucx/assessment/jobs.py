@@ -36,23 +36,24 @@ class JobsCrawler(CrawlerBase[JobInfo]):
     @staticmethod
     def _get_cluster_configs_from_all_jobs(all_jobs, all_clusters_by_id):
         for j in all_jobs:
-            if j.settings is not None:
-                if j.settings.job_clusters is not None:
-                    for jc in j.settings.job_clusters:
-                        if jc.new_cluster is None:
-                            continue
-                        yield j, jc.new_cluster
+            if j.settings is None:
+                continue
+            if j.settings.job_clusters is not None:
+                for jc in j.settings.job_clusters:
+                    if jc.new_cluster is None:
+                        continue
+                    yield j, jc.new_cluster
+            if j.settings.tasks is None:
+                continue
+            for t in j.settings.tasks:
+                if t.existing_cluster_id is not None:
+                    interactive_cluster = all_clusters_by_id.get(t.existing_cluster_id, None)
+                    if interactive_cluster is None:
+                        continue
+                    yield j, interactive_cluster
 
-                if j.settings.tasks is not None:
-                    for t in j.settings.tasks:
-                        if t.existing_cluster_id is not None:
-                            interactive_cluster = all_clusters_by_id.get(t.existing_cluster_id, None)
-                            if interactive_cluster is None:
-                                continue
-                            yield j, interactive_cluster
-
-                        elif t.new_cluster is not None:
-                            yield j, t.new_cluster
+                elif t.new_cluster is not None:
+                    yield j, t.new_cluster
 
     def _crawl(self) -> Iterable[JobInfo]:
         all_jobs = list(self._ws.jobs.list(expand_tasks=True))

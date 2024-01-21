@@ -27,7 +27,7 @@ classifiers = [
     "Programming Language :: Python :: Implementation :: CPython",
 ]
 dependencies = ["databricks-sdk~=0.17.0",
-                "databricks-labs-blueprint",
+                "databricks-labs-blueprint~=0.1.0",
                 "PyYAML>=6.0.0,<7.0.0"]
 
 [project.entry-points.databricks]
@@ -42,6 +42,7 @@ path = "src/databricks/labs/ucx/__about__.py"
 
 [tool.hatch.envs.default]
 dependencies = [
+    "pylint",
     "coverage[toml]>=6.5",
     "pytest",
     "pytest-xdist",
@@ -73,6 +74,7 @@ verify      = ["black --check .",
                "isort . --check-only",
                "ruff .",
                "mypy ."]
+lint-tmp     = "pylint src"
 
 [tool.isort]
 skip_glob = ["notebooks/*.py"]
@@ -136,6 +138,8 @@ ignore = [
     "I001",
     # Ignore Exception must not use a string literal, assign to variable first
     "EM101",
+    # Ignore the error message will be duplicated in the traceback, which can make the traceback less readable.
+    "EM102",
 ]
 extend-exclude = [
     "notebooks/*.py"

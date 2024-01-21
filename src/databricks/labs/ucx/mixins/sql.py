@@ -60,9 +60,9 @@ class Row(tuple):
             idx = self.__columns__.index(col)
             return self[idx]
         except IndexError:
-            raise AttributeError(col)  # noqa: B904
+            raise AttributeError(col) from None
         except ValueError:
-            raise AttributeError(col)  # noqa: B904
+            raise AttributeError(col) from None
 
     def __repr__(self):
         return f"Row({', '.join(f'{k}={v}' for (k, v) in zip(self.__columns__, self, strict=True))})"
@@ -244,7 +244,7 @@ class StatementExecutionExt(StatementExecutionAPI):
         row_factory = type("Row", (Row,), {"__columns__": col_names})
         result_data = execute_response.result
         if result_data is None:
-            return []
+            return
         while True:
             data_array = result_data.data_array
             if not data_array:
