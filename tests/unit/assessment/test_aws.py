@@ -97,12 +97,7 @@ def test_get_role_policy():
                 {
                     "Effect": "Allow",
                     "Action": [
-                        "s3:PutObject",
-                        "s3:GetObject",
-                        "s3:DeleteObject",
-                        "s3:PutObjectAcl",
-                        "s3:GetBucketNotification",
-                        "s3:PutBucketNotification"
+                        "s3:GetObject"
                     ],
                     "Resource": [
                         "arn:aws:s3:::bucket1/*",
@@ -182,17 +177,17 @@ def test_get_role_policy():
     assert role_policy == [
         AWSPolicyAction(
             resource_type="s3",
-            action={"s3:GetObject", "s3:PutObject", "s3:DeleteObject", "s3:PutObjectAcl"},
+            privilege="READ_FILES",
             resource_path="bucket1",
         ),
         AWSPolicyAction(
             resource_type="s3",
-            action={"s3:GetObject", "s3:PutObject", "s3:DeleteObject", "s3:PutObjectAcl"},
+            privilege="READ_FILES",
             resource_path="bucket2",
         ),
         AWSPolicyAction(
             resource_type="s3",
-            action={"s3:GetObject", "s3:PutObject", "s3:DeleteObject", "s3:PutObjectAcl"},
+            privilege="READ_FILES",
             resource_path="bucket3",
         ),
     ]
@@ -201,17 +196,17 @@ def test_get_role_policy():
     assert role_policy == [
         AWSPolicyAction(
             resource_type="s3",
-            action={"s3:GetObject", "s3:PutObject", "s3:DeleteObject", "s3:PutObjectAcl"},
+            privilege="WRITE_FILES",
             resource_path="bucketA",
         ),
         AWSPolicyAction(
             resource_type="s3",
-            action={"s3:GetObject", "s3:PutObject", "s3:DeleteObject", "s3:PutObjectAcl"},
+            privilege="WRITE_FILES",
             resource_path="bucketB",
         ),
         AWSPolicyAction(
             resource_type="s3",
-            action={"s3:GetObject", "s3:PutObject", "s3:DeleteObject", "s3:PutObjectAcl"},
+            privilege="WRITE_FILES",
             resource_path="bucketC",
         ),
     ]
@@ -226,16 +221,22 @@ def test_save_instance_profile_permissions():
 
     expected_csv_entries = [
         "arn:aws:iam::12345:instance-profile/role1,s3",
+        "READ_FILES",
         "bucket1,arn:aws:iam::12345:role/role1",
         "arn:aws:iam::12345:instance-profile/role1,s3",
+        "READ_FILES",
         "bucket2,arn:aws:iam::12345:role/role1",
         "arn:aws:iam::12345:instance-profile/role1,s3",
+        "READ_FILES",
         "bucket3,arn:aws:iam::12345:role/role1",
         "arn:aws:iam::12345:instance-profile/role1,s3",
+        "WRITE_FILES",
         "bucketA,arn:aws:iam::12345:role/role1",
         "arn:aws:iam::12345:instance-profile/role1,s3",
+        "WRITE_FILES",
         "bucketB,arn:aws:iam::12345:role/role1",
         "arn:aws:iam::12345:instance-profile/role1,s3",
+        "WRITE_FILES",
         "bucketC,arn:aws:iam::12345:role/role1",
     ]
 
@@ -257,17 +258,17 @@ def test_save_instance_profile_permissions():
         [
             AWSPolicyAction(
                 resource_type="s3",
-                action={"s3:GetObject", "s3:PutObject", "s3:DeleteObject", "s3:PutObjectAcl"},
+                privilege="READ_FILES",
                 resource_path="bucket1",
             ),
             AWSPolicyAction(
                 resource_type="s3",
-                action={"s3:GetObject", "s3:PutObject", "s3:DeleteObject", "s3:PutObjectAcl"},
+                privilege="READ_FILES",
                 resource_path="bucket2",
             ),
             AWSPolicyAction(
                 resource_type="s3",
-                action={"s3:GetObject", "s3:PutObject", "s3:DeleteObject", "s3:PutObjectAcl"},
+                privilege="READ_FILES",
                 resource_path="bucket3",
             ),
         ],
@@ -276,17 +277,17 @@ def test_save_instance_profile_permissions():
         [
             AWSPolicyAction(
                 resource_type="s3",
-                action={"s3:GetObject", "s3:PutObject", "s3:DeleteObject", "s3:PutObjectAcl"},
+                privilege="WRITE_FILES",
                 resource_path="bucketA",
             ),
             AWSPolicyAction(
                 resource_type="s3",
-                action={"s3:GetObject", "s3:PutObject", "s3:DeleteObject", "s3:PutObjectAcl"},
+                privilege="WRITE_FILES",
                 resource_path="bucketB",
             ),
             AWSPolicyAction(
                 resource_type="s3",
-                action={"s3:GetObject", "s3:PutObject", "s3:DeleteObject", "s3:PutObjectAcl"},
+                privilege="WRITE_FILES",
                 resource_path="bucketC",
             ),
         ],

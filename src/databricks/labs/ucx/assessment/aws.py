@@ -12,6 +12,7 @@ from functools import lru_cache, partial
 
 from databricks.labs.blueprint.parallel import Threads
 from databricks.sdk import WorkspaceClient
+from databricks.sdk.service.catalog import Privilege
 from databricks.sdk.service.workspace import ImportFormat
 
 logger = logging.getLogger(__name__)
@@ -28,7 +29,7 @@ class AWSRole:
 @dataclass
 class AWSPolicyAction:
     resource_type: str
-    action: set[str]
+    privilege: str
     resource_path: str
 
 
@@ -36,7 +37,7 @@ class AWSPolicyAction:
 class AWSInstanceProfileAction:
     instance_profile_arn: str
     resource_type: str
-    actions: str
+    privilege: str
     resource_path: str
     iam_role_arn: str | None = None
 
@@ -72,6 +73,7 @@ def run_command(command):
 
 class AWSResources:
     S3_ACTIONS: typing.ClassVar[set[str]] = {"s3:PutObject", "s3:GetObject", "s3:DeleteObject", "s3:PutObjectAcl"}
+    S3_READONLY: typing.ClassVar[str] = "s3:GetObject"
     S3_REGEX: typing.ClassVar[str] = r"arn:aws:s3:::([a-zA-Z0-9+=,.@_-]*)\/\*"
 
     def __init__(self, profile: str, command_runner: Callable[[str], tuple[int, str, str]] = run_command):
@@ -149,12 +151,18 @@ class AWSResources:
             elif actions in self.S3_ACTIONS:
                 s3_action = [actions]
 
-            if not s3_action:
+            if not s3_action or self.S3_READONLY not in s3_action:
                 continue
+            privilege = Privilege.WRITE_FILES.value
+            for s3_action_type in self.S3_ACTIONS:
+                if s3_action_type not in s3_action:
+                    privilege = Privilege.READ_FILES.value
+                    continue
+
             for resource in action.get("Resource", []):
                 match = re.match(self.S3_REGEX, resource)
                 if match:
-                    policy_actions.append(AWSPolicyAction("s3", set(s3_action), match.group(1)))
+                    policy_actions.append(AWSPolicyAction("s3", privilege, match.group(1)))
         return policy_actions
 
     def _run_json_command(self, command: str):
@@ -207,7 +215,7 @@ class AWSResourcePermissions:
                     AWSInstanceProfileAction(
                         instance_profile.instance_profile_arn,
                         action.resource_type,
-                        str(action.action),
+                        action.privilege,
                         action.resource_path,
                         instance_profile.iam_role_arn,
                     )
@@ -222,7 +230,7 @@ class AWSResourcePermissions:
                     AWSInstanceProfileAction(
                         instance_profile.instance_profile_arn,
                         action.resource_type,
-                        str(action.action),
+                        action.privilege,
                         action.resource_path,
                         instance_profile.iam_role_arn,
                     )
