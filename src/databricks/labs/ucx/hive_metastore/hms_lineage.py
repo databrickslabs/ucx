@@ -35,11 +35,9 @@ class HiveMetastoreLineageEnabler:
                 return script_content
         return None
 
-    def _get_init_script_content(self):
-        try:
-            return base64.b64encode(global_init_script.encode()).decode()
-        except Exception:
-            print("The init script content was not found.")
+    @staticmethod
+    def _get_init_script_content():
+        return base64.b64encode(global_init_script.encode()).decode()
 
     def add_global_init_script(self) -> str:
         content = self._get_init_script_content()

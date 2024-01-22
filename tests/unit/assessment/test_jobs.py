@@ -1,6 +1,7 @@
-from unittest.mock import Mock
+from unittest.mock import Mock, create_autospec
 
 import pytest
+from databricks.sdk import WorkspaceClient
 from databricks.sdk.errors import DatabricksError, InternalError, NotFound
 from databricks.sdk.service.compute import (
     AutoScale,
@@ -520,8 +521,9 @@ def test_job_cluster_init_script():
             cluster_source=ClusterSource.JOB,
         )
     ]
-    ws = Mock()
+    ws = create_autospec(WorkspaceClient)
     ws.workspace.export().content = "JXNoCmVjaG8gIj0="
+    ws.dbfs.read().data = "JXNoCmVjaG8gIj0="
     result_set = JobsCrawler(ws, MockBackend(), "ucx")._assess_jobs(
         sample_jobs, {c.cluster_id: c for c in sample_clusters}
     )
@@ -630,8 +632,9 @@ def test_job_cluster_init_script_check_dbfs():
             cluster_source=ClusterSource.JOB,
         )
     ]
-    ws = Mock()
+    ws = create_autospec(WorkspaceClient)
     ws.workspace.export().content = "JXNoCmVjaG8gIj0="
+    ws.dbfs.read().data = "JXNoCmVjaG8gIj0="
     result_set = JobsCrawler(ws, MockBackend(), "ucx")._assess_jobs(
         sample_jobs, {c.cluster_id: c for c in sample_clusters}
     )

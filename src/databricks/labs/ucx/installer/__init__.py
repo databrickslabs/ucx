@@ -3,12 +3,12 @@ import logging
 from dataclasses import dataclass
 from pathlib import Path
 
+import yaml
 from databricks.labs.blueprint.installer import IllegalState
 from databricks.labs.blueprint.parallel import ManyError, Threads
 from databricks.sdk import WorkspaceClient
 from databricks.sdk.errors import NotFound
 from databricks.sdk.service.iam import User
-from yaml import YAMLError
 
 from databricks.labs.ucx.config import WorkspaceConfig
 
@@ -48,7 +48,7 @@ class InstallationManager:
         except TypeError:
             msg = f"Installation is corrupt for {user.user_name}"
             raise IllegalState(msg) from None
-        except YAMLError:
+        except yaml.YAMLError:
             msg = f"Config file {config_file} is corrupted, check if it is in correct yaml format"
             raise IllegalState(msg) from None
 

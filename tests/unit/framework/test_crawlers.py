@@ -230,13 +230,13 @@ def test_runtime_backend_save_table_with_row_containing_none_with_nullable_class
 
 
 @dataclass
-class TestClass:
+class DummyClass:
     key: str
     value: str | None = None
 
 
 def test_save_table_with_not_null_constraint_violated(mocker):
-    rows = [TestClass("1", "test"), TestClass("2", None), TestClass(None, "value")]
+    rows = [DummyClass("1", "test"), DummyClass("2", None), DummyClass(None, "value")]
 
     with mock.patch.dict(os.environ, {"DATABRICKS_RUNTIME_VERSION": "14.0"}):
         pyspark_sql_session = mocker.Mock()
@@ -245,7 +245,7 @@ def test_save_table_with_not_null_constraint_violated(mocker):
         rb = RuntimeBackend()
 
         with pytest.raises(Exception) as exc_info:
-            rb.save_table("a.b.c", rows, TestClass)
+            rb.save_table("a.b.c", rows, DummyClass)
 
         assert (
             str(exc_info.value) == "Not null constraint violated for column key, row = {'key': None, 'value': 'value'}"
