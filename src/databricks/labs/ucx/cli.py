@@ -61,12 +61,12 @@ def skip(w: WorkspaceClient, schema: str | None = None, table: str | None = None
     logger.info("Running skip command")
     if not schema:
         logger.error("--schema is a required parameter.")
-        return None
+        return
     installation_manager = InstallationManager(w)
     installation = installation_manager.for_user(w.current_user.me())
     if not installation:
         logger.error(CANT_FIND_UCX_MSG)
-        return None
+        return
     warehouse_id = installation.config.warehouse_id
     sql_backend = StatementExecutionBackend(w, warehouse_id)
     mapping = TableMapping(w, sql_backend)
@@ -136,7 +136,7 @@ def ensure_assessment_run(w: WorkspaceClient):
     installation = installation_manager.for_user(w.current_user.me())
     if not installation:
         logger.error(CANT_FIND_UCX_MSG)
-        return None
+        return
     workspace_installer = WorkspaceInstaller(w)
     workspace_installer.validate_and_run("assessment")
 
@@ -158,7 +158,7 @@ def validate_groups_membership(w: WorkspaceClient):
     installation = installation_manager.for_user(w.current_user.me())
     if not installation:
         logger.error(CANT_FIND_UCX_MSG)
-        return None
+        return
     warehouse_id = installation.config.warehouse_id
     inventory_database = installation.config.inventory_database
     renamed_group_prefix = installation.config.renamed_group_prefix
@@ -194,10 +194,10 @@ def revert_migrated_tables(w: WorkspaceClient, schema: str, table: str, *, delet
             " Would you like to continue?",
             max_attempts=2,
         ):
-            return None
+            return
     if not installation:
         logger.error(CANT_FIND_UCX_MSG)
-        return None
+        return
     warehouse_id = installation.config.warehouse_id
     sql_backend = StatementExecutionBackend(w, warehouse_id)
     table_crawler = TablesCrawler(sql_backend, installation.config.inventory_database)
@@ -268,5 +268,5 @@ def save_azure_storage_accounts(w: WorkspaceClient, subscription_id: str):
     azure_resource_permissions.save_spn_permissions()
 
 
-if "__main__" == __name__:
+if __name__ == "__main__":
     ucx()

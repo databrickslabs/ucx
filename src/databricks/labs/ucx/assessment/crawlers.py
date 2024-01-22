@@ -2,6 +2,8 @@ import base64
 import logging
 import re
 
+from databricks.sdk.errors import NotFound
+
 logger = logging.getLogger(__name__)
 
 INCOMPATIBLE_SPARK_CONFIG_KEYS = [
@@ -33,7 +35,7 @@ def _get_init_script_data(w, init_script_info):
                 try:
                     data = w.dbfs.read(file_api_format_destination).data
                     return base64.b64decode(data).decode("utf-8")
-                except Exception:
+                except NotFound:
                     return None
     if init_script_info.workspace:
         workspace_file_destination = init_script_info.workspace.destination
@@ -41,8 +43,9 @@ def _get_init_script_data(w, init_script_info):
             try:
                 data = w.workspace.export(workspace_file_destination).content
                 return base64.b64decode(data).decode("utf-8")
-            except Exception:
+            except NotFound:
                 return None
+    return None
 
 
 def _azure_sp_conf_in_init_scripts(init_script_data: str) -> bool:

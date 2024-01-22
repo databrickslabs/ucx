@@ -5,7 +5,6 @@ from collections.abc import Callable, Iterable, Iterator
 from dataclasses import dataclass
 from datetime import timedelta
 from functools import partial
-from typing import Optional
 
 from databricks.labs.blueprint.limiter import rate_limited
 from databricks.labs.blueprint.parallel import ManyError, Threads
@@ -91,7 +90,7 @@ class GenericPermissionsSupport(AclSupport):
     @staticmethod
     def _is_item_relevant(item: Permissions, migration_state: MigrationState) -> bool:
         # passwords and tokens are represented on the workspace-level
-        if item.object_id in ("tokens", "passwords"):
+        if item.object_id in {"tokens", "passwords"}:
             return True
         object_permissions = iam.ObjectPermissions.from_dict(json.loads(item.raw))
         assert object_permissions.access_control_list is not None
@@ -104,7 +103,7 @@ class GenericPermissionsSupport(AclSupport):
 
     @staticmethod
     def _response_to_request(
-        acls: Optional["list[iam.AccessControlResponse]"] = None,
+        acls: list[iam.AccessControlResponse] | None = None,
     ) -> list[iam.AccessControlRequest]:
         results: list[iam.AccessControlRequest] = []
         if not acls:
@@ -128,12 +127,11 @@ class GenericPermissionsSupport(AclSupport):
             remote_permission_as_request = self._response_to_request(remote_permission.access_control_list)
             if all(elem in remote_permission_as_request for elem in acl):
                 return True
-            else:
-                msg = f"""Couldn't apply appropriate permission for object type {object_type} with id {object_id}
-                    acl to be applied={acl}
-                    acl found in the object={remote_permission_as_request}
-                    """
-                raise ValueError(msg)
+            msg = f"""Couldn't apply appropriate permission for object type {object_type} with id {object_id}
+                acl to be applied={acl}
+                acl found in the object={remote_permission_as_request}
+                """
+            raise ValueError(msg)
         return False
 
     @rate_limited(max_requests=30)
@@ -314,6 +312,7 @@ class WorkspaceListing(Listing, CrawlerBase[WorkspaceObjectInfo]):
         self._inventory_database = inventory_database
 
     def _crawl(self) -> Iterable[WorkspaceObjectInfo]:
+        # pylint: disable-next=import-outside-toplevel,redefined-outer-name
         from databricks.labs.ucx.workspace_access.listing import WorkspaceListing
 
         ws_listing = WorkspaceListing(self._ws, num_threads=self._num_threads, with_directories=False)
@@ -384,9 +383,7 @@ def models_listing(ws: WorkspaceClient, num_threads: int):
 def experiments_listing(ws: WorkspaceClient):
     def inner() -> Iterator[ml.Experiment]:
         for experiment in ws.experiments.list_experiments():
-            """
-            We filter-out notebook-based experiments, because they are covered by notebooks listing
-            """
+            # We filter-out notebook-based experiments, because they are covered by notebooks listing in
             # workspace-based notebook experiment
             if experiment.tags:
                 nb_tag = [t for t in experiment.tags if t.key == "mlflow.experimentType" and t.value == "NOTEBOOK"]
@@ -403,5 +400,5 @@ def experiments_listing(ws: WorkspaceClient):
 
 
 def tokens_and_passwords():
-    for _value in ["tokens", "passwords"]:
+    for _value in ("tokens", "passwords"):
         yield GenericPermissionsInfo(_value, "authorization")

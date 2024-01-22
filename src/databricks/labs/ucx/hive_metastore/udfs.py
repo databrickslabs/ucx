@@ -99,6 +99,6 @@ class UdfsCrawler(CrawlerBase):
                 comment=describe.get("Comment", "UNKNOWN"),
                 body=describe.get("Body", "UNKNOWN"),
             )
-        except Exception as e:
+        except Exception as e:  # pylint: disable=broad-exception-caught
             logger.error(f"Couldn't fetch information for udf {full_name} : {e}")
             return None

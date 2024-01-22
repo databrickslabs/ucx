@@ -18,7 +18,7 @@ from databricks.labs.blueprint.parallel import ManyError, Threads
 from databricks.labs.blueprint.tui import Prompts
 from databricks.labs.blueprint.wheels import ProductInfo, Wheels, find_project_root
 from databricks.sdk import WorkspaceClient
-from databricks.sdk.errors import (
+from databricks.sdk.errors import (  # pylint: disable=redefined-builtin
     Aborted,
     AlreadyExists,
     BadRequest,
@@ -135,7 +135,8 @@ logger = logging.getLogger(__name__)
 
 
 def deploy_schema(sql_backend: SqlBackend, inventory_schema: str):
-    from databricks.labs import ucx
+    # we need to import it like this because we expect a module instance
+    from databricks.labs import ucx  # pylint: disable=import-outside-toplevel
 
     deployer = SchemaDeployer(sql_backend, inventory_schema, ucx)
     deployer.deploy_schema()
@@ -163,7 +164,7 @@ def deploy_schema(sql_backend: SqlBackend, inventory_schema: str):
     deployer.deploy_view("grant_detail", "queries/views/grant_detail.sql")
 
 
-class WorkspaceInstaller:
+class WorkspaceInstaller:  # pylint: disable=too-many-instance-attributes
     def __init__(
         self,
         ws: WorkspaceClient,
@@ -424,11 +425,10 @@ class WorkspaceInstaller:
         ws_file_url = self.notebook_link(self.config_file)
         try:
             if "version: 1" in self._raw_previous_config():
-                logger.info("old version detected, attempting to migrate to new config")
                 self._config = self.current_config
                 self._write_config(overwrite=True)
                 return
-            elif "version: 2" in self._raw_previous_config():
+            if "version: 2" in self._raw_previous_config():
                 logger.info(f"UCX is already configured. See {ws_file_url}")
                 return
         except NotFound:
@@ -574,6 +574,7 @@ class WorkspaceInstaller:
         new_job = self._ws.jobs.create(**settings)
         assert new_job.job_id is not None
         self._state.jobs[step_name] = str(new_job.job_id)
+        return None
 
     def _deployed_steps_pre_v06(self):
         deployed_steps = {}
@@ -846,8 +847,7 @@ class WorkspaceInstaller:
         instance_pool = def_json.get("instance_pool_id")
         if instance_pool is not None:
             return True
-        else:
-            return False
+        return False
 
     @staticmethod
     def _get_ext_hms_conf_from_policy(cluster_policy):
@@ -880,36 +880,37 @@ class WorkspaceInstaller:
         time_parts.append("ago")
         if time_parts:
             return " ".join(time_parts)
-        else:
-            return "less than 1 second ago"
+        return "less than 1 second ago"
 
     def latest_job_status(self) -> list[dict]:
         latest_status = []
         for step, job_id in self._state.jobs.items():
             try:
-                job_state = None
-                start_time = None
-                job_runs = list(self._ws.jobs.list_runs(job_id=int(job_id), limit=1))
-                if job_runs:
-                    state = job_runs[0].state
-                    job_state = None
-                    if state and state.result_state:
-                        job_state = state.result_state.name
-                    elif state and state.life_cycle_state:
-                        job_state = state.life_cycle_state.name
-                    if job_runs[0].start_time:
-                        start_time = job_runs[0].start_time / 1000
-                latest_status.append(
-                    {
-                        "step": step,
-                        "state": "UNKNOWN" if not (job_runs and job_state) else job_state,
-                        "started": "<never run>" if not job_runs else self._readable_timedelta(start_time),
-                    }
-                )
+                step_status = self._step_status(job_id, step)
+                latest_status.append(step_status)
             except InvalidParameterValue as e:
                 logger.warning(f"skipping {step}: {e}")
                 continue
         return latest_status
+
+    def _step_status(self, job_id, step):
+        job_state = None
+        start_time = None
+        job_runs = list(self._ws.jobs.list_runs(job_id=int(job_id), limit=1))
+        if job_runs:
+            state = job_runs[0].state
+            job_state = None
+            if state and state.result_state:
+                job_state = state.result_state.name
+            elif state and state.life_cycle_state:
+                job_state = state.life_cycle_state.name
+            if job_runs[0].start_time:
+                start_time = job_runs[0].start_time / 1000
+        return {
+            "step": step,
+            "state": "UNKNOWN" if not (job_runs and job_state) else job_state,
+            "started": "<never run>" if not job_runs else self._readable_timedelta(start_time),
+        }
 
     def _get_result_state(self, job_id):
         job_runs = list(self._ws.jobs.list_runs(job_id=job_id, limit=1))
@@ -921,25 +922,7 @@ class WorkspaceInstaller:
 
     def repair_run(self, workflow):
         try:
-            job_id = self._state.jobs.get(workflow)
-            if not job_id:
-                logger.warning(f"{workflow} job does not exists hence skipping Repair Run")
-                return
-            job_runs = list(self._ws.jobs.list_runs(job_id=job_id, limit=1))
-            if not job_runs:
-                logger.warning(f"{workflow} job is not initialized yet. Can't trigger repair run now")
-                return
-            latest_job_run = job_runs[0]
-            retry_on_attribute_error = retried(on=[AttributeError], timeout=self._verify_timeout)
-            retried_check = retry_on_attribute_error(self._get_result_state)
-            state_value = retried_check(job_id)
-
-            logger.info(f"The status for the latest run is {state_value}")
-
-            if state_value != "FAILED":
-                logger.warning(f"{workflow} job is not in FAILED state hence skipping Repair Run")
-                return
-            run_id = latest_job_run.run_id
+            job_id, run_id = self._repair_workflow(workflow)
             run_details = self._ws.jobs.get_run(run_id=run_id, include_history=True)
             latest_repair_run_id = run_details.repair_history[-1].id
             job_url = f"{self._ws.config.host}#job/{job_id}/run/{run_id}"
@@ -950,6 +933,23 @@ class WorkspaceInstaller:
             logger.warning(f"skipping {workflow}: {e}")
         except TimeoutError:
             logger.warning(f"Skipping the {workflow} due to time out. Please try after sometime")
+
+    def _repair_workflow(self, workflow):
+        job_id = self._state.jobs.get(workflow)
+        if not job_id:
+            raise InvalidParameterValue("job does not exists hence skipping repair")
+        job_runs = list(self._ws.jobs.list_runs(job_id=job_id, limit=1))
+        if not job_runs:
+            raise InvalidParameterValue("job is not initialized yet. Can't trigger repair run now")
+        latest_job_run = job_runs[0]
+        retry_on_attribute_error = retried(on=[AttributeError], timeout=self._verify_timeout)
+        retried_check = retry_on_attribute_error(self._get_result_state)
+        state_value = retried_check(job_id)
+        logger.info(f"The status for the latest run is {state_value}")
+        if state_value != "FAILED":
+            raise InvalidParameterValue("job is not in FAILED state hence skipping repair")
+        run_id = latest_job_run.run_id
+        return job_id, run_id
 
     def uninstall(self):
         if self._prompts and not self._prompts.confirm(
@@ -1042,6 +1042,6 @@ if __name__ == "__main__":
     logger = get_logger(__file__)
     logger.setLevel("INFO")
 
-    ws = WorkspaceClient(product="ucx", product_version=__version__)
-    installer = WorkspaceInstaller(ws, promtps=Prompts())
+    workspace_client = WorkspaceClient(product="ucx", product_version=__version__)
+    installer = WorkspaceInstaller(workspace_client, promtps=Prompts())
     installer.run()

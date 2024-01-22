@@ -132,8 +132,7 @@ def test_move_tables_not_found_view_unknown_error(mocker, caplog):
     assert len([rec.message for rec in caplog.records if "unknown error" in rec.message]) == 1
 
 
-def test_move_all_tables_and_drop_source(caplog):
-    caplog.set_level(logging.INFO)
+def test_move_all_tables_and_drop_source():
     client = create_autospec(WorkspaceClient)
 
     client.tables.list.return_value = [
@@ -221,32 +220,21 @@ def test_move_all_tables_and_drop_source(caplog):
     tm = TableMove(client, backend)
     tm.move_tables("SrcC", "SrcS", "*", "TgtC", "TgtS", True)
 
-    expected_messages = [
-        "Moved 2 tables to the new schema TgtS.",
-        "Moved 2 views to the new schema TgtS.",
-        "Creating table TgtC.TgtS.table1",
-        "Applying grants on table TgtC.TgtS.table1",
-        "Dropping source table SrcC.SrcS.table1",
-        "Creating table TgtC.TgtS.table2",
-        "Dropping source table SrcC.SrcS.table2",
-        "Creating view TgtC.TgtS.view1",
-        "Applying grants on view TgtC.TgtS.view1",
-        "Dropping source view SrcC.SrcS.view1",
-        "Creating view TgtC.TgtS.view2",
-        "Dropping source view SrcC.SrcS.view2",
-    ]
-
-    log_count = 0
-    for rec in caplog.records:
-        print(rec)
-        if rec.message in expected_messages:
-            log_count += 1
-
-    assert log_count == len(expected_messages)
+    assert [
+        "CREATE TABLE SrcC.SrcS.table1 (name string)",
+        "CREATE TABLE TgtC.TgtS.table1 (name string)",
+        "CREATE VIEW TgtC.TgtS.view1 AS SELECT * FROM SrcC.SrcS.table1",
+        "CREATE VIEW TgtC.TgtS.view2 AS SELECT * FROM SrcC.SrcS.table1",
+        "DROP TABLE SrcC.SrcS.table1",
+        "DROP TABLE SrcC.SrcS.table2",
+        "DROP VIEW SrcC.SrcS.view1",
+        "DROP VIEW SrcC.SrcS.view2",
+        "SHOW CREATE TABLE SrcC.SrcS.table1",
+        "SHOW CREATE TABLE SrcC.SrcS.table2",
+    ] == sorted(backend.queries)
 
 
-def test_move_one_table_without_dropping_source(caplog):
-    caplog.set_level(logging.INFO)
+def test_move_one_table_without_dropping_source():
     client = create_autospec(WorkspaceClient)
 
     client.tables.list.return_value = [
@@ -281,16 +269,6 @@ def test_move_one_table_without_dropping_source(caplog):
     tm = TableMove(client, backend)
     tm.move_tables("SrcC", "SrcS", "table1", "TgtC", "TgtS", False)
 
-    expected_messages = [
-        "Moved 1 tables to the new schema TgtS.",
-        "Moved 0 views to the new schema TgtS.",
-        "Creating table TgtC.TgtS.table1",
-    ]
-
-    log_count = 0
-    for rec in caplog.records:
-        print(rec)
-        if rec.message in expected_messages:
-            log_count += 1
-
-    assert log_count == len(expected_messages)
+    assert ["CREATE TABLE TgtC.TgtS.table1 (name string)", "SHOW CREATE TABLE SrcC.SrcS.table1"] == sorted(
+        backend.queries
+    )
