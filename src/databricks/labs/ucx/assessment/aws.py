@@ -157,10 +157,8 @@ class AWSResources:
             for resource in action.get("Resource", []):
                 match = re.match(self.S3_REGEX, resource)
                 if match:
-                    s3_resource_path = f"s3://{match.group(1)}"
-                    policy_actions.append(AWSPolicyAction("s3", privilege, s3_resource_path))
-                    s3a_resource_path = f"s3a://{match.group(1)}"
-                    policy_actions.append(AWSPolicyAction("s3", privilege, s3a_resource_path))
+                    policy_actions.append(AWSPolicyAction("s3", privilege, f"s3://{match.group(1)}"))
+                    policy_actions.append(AWSPolicyAction("s3", privilege, f"s3a://{match.group(1)}"))
         return policy_actions
 
     def _run_json_command(self, command: str):
