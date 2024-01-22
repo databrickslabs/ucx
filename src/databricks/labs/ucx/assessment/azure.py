@@ -27,6 +27,7 @@ from databricks.labs.ucx.assessment.crawlers import (
     _azure_sp_conf_present_check,
     logger,
 )
+from databricks.labs.ucx.assessment.jobs import JobsMixin
 from databricks.labs.ucx.framework.crawlers import CrawlerBase, SqlBackend
 from databricks.labs.ucx.hive_metastore.locations import ExternalLocations
 
@@ -45,7 +46,7 @@ class AzureServicePrincipalInfo:
     storage_account: str
 
 
-class AzureServicePrincipalCrawler(CrawlerBase[AzureServicePrincipalInfo]):
+class AzureServicePrincipalCrawler(CrawlerBase[AzureServicePrincipalInfo], JobsMixin):
     def __init__(self, ws: WorkspaceClient, sbe: SqlBackend, schema):
         super().__init__(sbe, "hive_metastore", schema, "azure_service_principals", AzureServicePrincipalInfo)
         self._ws = ws
@@ -127,27 +128,6 @@ class AzureServicePrincipalCrawler(CrawlerBase[AzureServicePrincipalInfo]):
                     }
                 )
         return spn_list
-
-    def _get_cluster_configs_from_all_jobs(self, all_jobs, all_clusters_by_id):
-        for j in all_jobs:
-            if not j.settings:
-                continue
-            if j.settings.job_clusters is not None:
-                for jc in j.settings.job_clusters:
-                    if jc.new_cluster is None:
-                        continue
-                    yield j, jc.new_cluster
-            if not j.settings.tasks:
-                continue
-            for t in j.settings.tasks:
-                if t.existing_cluster_id is not None:
-                    interactive_cluster = all_clusters_by_id.get(t.existing_cluster_id, None)
-                    if interactive_cluster is None:
-                        continue
-                    yield j, interactive_cluster
-
-                elif t.new_cluster is not None:
-                    yield j, t.new_cluster
 
     def _get_relevant_service_principals(self) -> list:
         relevant_service_principals = []

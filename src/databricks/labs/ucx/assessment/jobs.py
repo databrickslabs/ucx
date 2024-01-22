@@ -28,11 +28,7 @@ class JobInfo:
     creator: str | None = None
 
 
-class JobsCrawler(CrawlerBase[JobInfo]):
-    def __init__(self, ws: WorkspaceClient, sbe: SqlBackend, schema):
-        super().__init__(sbe, "hive_metastore", schema, "jobs", JobInfo)
-        self._ws = ws
-
+class JobsMixin:
     @staticmethod
     def _get_cluster_configs_from_all_jobs(all_jobs, all_clusters_by_id):
         for j in all_jobs:
@@ -54,6 +50,12 @@ class JobsCrawler(CrawlerBase[JobInfo]):
 
                 elif t.new_cluster is not None:
                     yield j, t.new_cluster
+
+
+class JobsCrawler(CrawlerBase[JobInfo], JobsMixin):
+    def __init__(self, ws: WorkspaceClient, sbe: SqlBackend, schema):
+        super().__init__(sbe, "hive_metastore", schema, "jobs", JobInfo)
+        self._ws = ws
 
     def _crawl(self) -> Iterable[JobInfo]:
         all_jobs = list(self._ws.jobs.list(expand_tasks=True))
