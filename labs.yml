@@ -95,9 +95,9 @@ commands:
       {{end}}
 
   - name: save-aws-iam-profiles
-    description: '
-    Identifies all Instance Profiles and map their access to S3 buckets.
-    Requires a working setup of AWS CLI.'
+    description: | 
+      Identifies all Instance Profiles and map their access to S3 buckets.
+      Requires a working setup of AWS CLI.
     flags:
       - name: aws-profile
         description: AWS Profile to use for authentication
