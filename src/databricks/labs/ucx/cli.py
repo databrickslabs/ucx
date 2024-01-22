@@ -276,6 +276,7 @@ def save_aws_iam_profiles(w: WorkspaceClient, aws_profile: str | None = None):
     """
     if not shutil.which("aws"):
         logger.error("Couldn't find AWS CLI in path.Please obtain and install the CLI from https://aws.amazon.com/cli/")
+        return
     if not aws_profile:
         aws_profile = os.getenv("AWS_DEFAULT_PROFILE")
     if not aws_profile:

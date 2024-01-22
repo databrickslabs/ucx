@@ -4,6 +4,7 @@ import io
 import json
 import logging
 import re
+import shutil
 import subprocess
 import typing
 from collections.abc import Callable, Iterable
@@ -65,7 +66,7 @@ class AWSInstanceProfile:
 @lru_cache(maxsize=1024)
 def run_command(command):
     logger.info(f"Invoking Command {command}")
-    process = subprocess.Popen(command, stdout=subprocess.PIPE, stderr=subprocess.PIPE, shell=True)  # noqa: S602
+    process = subprocess.Popen(command.split(), stdout=subprocess.PIPE, stderr=subprocess.PIPE)
     output, error = process.communicate()
     return process.returncode, output.decode("utf-8"), error.decode("utf-8")
 
@@ -162,7 +163,8 @@ class AWSResources:
         return policy_actions
 
     def _run_json_command(self, command: str):
-        code, output, error = self._command_runner(f"aws {command} --output json --no-paginate")
+        aws_cmd = shutil.which("aws")
+        code, output, error = self._command_runner(f"{aws_cmd} {command} --output json --no-paginate")
         if code != 0:
             logger.error(error)
             return None
