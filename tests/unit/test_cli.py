@@ -369,8 +369,9 @@ def test_validate_group_no_ucx(mocker, caplog):
 def test_save_aws_iam_profiles_no_profile(mocker, caplog):
     w = create_autospec(WorkspaceClient)
     w.current_user.me = lambda: iam.User(user_name="test_user", groups=[iam.ComplexValue(display="admins")])
+    mocker.patch("shutil.which", return_value="/path/aws")
     mocker.patch("databricks.labs.ucx.installer.InstallationManager.for_user", return_value=None)
-    os.environ["AWS_DEFAULT_PROFILE"] = ""
+    mocker.patch("os.getenv", return_value=None)
     save_aws_iam_profiles(w)
     assert "AWS Profile is not specified." in caplog.messages[0]
 
