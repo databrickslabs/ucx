@@ -304,6 +304,7 @@ def save_aws_iam_profiles(w: WorkspaceClient, aws_profile: str | None = None):
         aws,
     )
     aws_pm.save_instance_profile_permissions()
+    return None
 
 
 if __name__ == "__main__":

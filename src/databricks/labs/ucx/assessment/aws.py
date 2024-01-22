@@ -59,16 +59,15 @@ class AWSInstanceProfile:
         if not role_match:
             logger.error(f"Role ARN is mismatched {self.iam_role_arn}")
             return None
-        else:
-            return role_match.group(1)
+        return role_match.group(1)
 
 
 @lru_cache(maxsize=1024)
 def run_command(command):
     logger.info(f"Invoking Command {command}")
-    process = subprocess.Popen(command, stdout=subprocess.PIPE, stderr=subprocess.PIPE, shell=True)  # noqa: S602
-    output, error = process.communicate()
-    return process.returncode, output.decode("utf-8"), error.decode("utf-8")
+    with subprocess.Popen(command, stdout=subprocess.PIPE, stderr=subprocess.PIPE, shell=True) as process:  # noqa: S602
+        output, error = process.communicate()
+        return process.returncode, output.decode("utf-8"), error.decode("utf-8")
 
 
 class AWSResources:
