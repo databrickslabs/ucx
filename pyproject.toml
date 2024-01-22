@@ -104,16 +104,6 @@ ignore = [
     "T201",
     # Allow asserts
     "S101",
-    # Ignore complexity
-    "C901",
-    # Too many return statements
-    "PLR0911",
-    # Too many branches
-    "PLR0912",
-    # Too many arguments in function definition
-    "PLR0913",
-    # Too many statements
-    "PLR0915",
     # Ignore Exception must not use a string literal, assign to variable first
     "EM101",
     # Ignore the error message will be duplicated in the traceback, which can make the traceback less readable.
