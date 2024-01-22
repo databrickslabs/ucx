@@ -379,10 +379,11 @@ def test_save_aws_iam_profiles_no_connection(mocker, caplog):
     w = create_autospec(WorkspaceClient)
     w.current_user.me = lambda: iam.User(user_name="test_user", groups=[iam.ComplexValue(display="admins")])
     mocker.patch("shutil.which", return_value="/path/aws")
-    mocker.patch("subprocess.Popen.__init__", return_value=None)
+
     pop = create_autospec(subprocess.Popen)
     pop.communicate.return_value = (bytes("message", "utf-8"), bytes("error", "utf-8"))
     pop.returncode = 127
+    mocker.patch("subprocess.Popen.__init__", return_value=None)
     mocker.patch("subprocess.Popen", return_value=pop)
     save_aws_iam_profiles(w, aws_profile="profile")
     assert "AWS CLI is not configured properly." in caplog.messages[len(caplog.messages) - 1]

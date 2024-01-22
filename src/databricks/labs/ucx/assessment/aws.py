@@ -65,9 +65,9 @@ class AWSInstanceProfile:
 @lru_cache(maxsize=1024)
 def run_command(command):
     logger.info(f"Invoking Command {command}")
-    with subprocess.Popen(command, stdout=subprocess.PIPE, stderr=subprocess.PIPE, shell=True) as process:  # noqa: S602
-        output, error = process.communicate()
-        return process.returncode, output.decode("utf-8"), error.decode("utf-8")
+    process = subprocess.Popen(command, stdout=subprocess.PIPE, stderr=subprocess.PIPE, shell=True)  # noqa: S602
+    output, error = process.communicate()
+    return process.returncode, output.decode("utf-8"), error.decode("utf-8")
 
 
 class AWSResources:
@@ -80,7 +80,7 @@ class AWSResources:
         self._command_runner = command_runner
 
     def validate_connection(self):
-        validate_command = f"aws sts get-caller-identity --profile {self._profile}"
+        validate_command = f"sts get-caller-identity --profile {self._profile}"
         result = self._run_json_command(validate_command)
         if result:
             logger.info(result)
@@ -88,9 +88,7 @@ class AWSResources:
         return False
 
     def list_role_policies(self, role_name: str):
-        list_policies_cmd = (
-            f"aws iam list-role-policies --profile {self._profile} --role-name {role_name} --no-paginate"
-        )
+        list_policies_cmd = f"iam list-role-policies --profile {self._profile} --role-name {role_name}"
         policies = self._run_json_command(list_policies_cmd)
         if not policies:
             return []
@@ -98,7 +96,7 @@ class AWSResources:
 
     def list_attached_policies_in_role(self, role_name: str):
         list_attached_policies_cmd = (
-            f"aws iam list-attached-role-policies --profile {self._profile} --role-name {role_name} --no-paginate"
+            f"iam list-attached-role-policies --profile {self._profile} --role-name {role_name}"
         )
         policies = self._run_json_command(list_attached_policies_cmd)
         if not policies:
@@ -111,19 +109,17 @@ class AWSResources:
     def get_role_policy(self, role_name, policy_name: str | None = None, attached_policy_arn: str | None = None):
         if policy_name:
             get_policy = (
-                f"aws iam get-role-policy --profile {self._profile} --role-name {role_name} "
+                f"iam get-role-policy --profile {self._profile} --role-name {role_name} "
                 f"--policy-name {policy_name} --no-paginate"
             )
         elif attached_policy_arn:
-            get_attached_policy = (
-                f"aws iam get-policy --profile {self._profile} --policy-arn {attached_policy_arn} --no-paginate"
-            )
+            get_attached_policy = f"iam get-policy --profile {self._profile} --policy-arn {attached_policy_arn}"
             attached_policy = self._run_json_command(get_attached_policy)
             if not attached_policy:
                 return []
             policy_version = attached_policy["Policy"]["DefaultVersionId"]
             get_policy = (
-                f"aws iam get-policy-version --profile {self._profile} --policy-arn {attached_policy_arn} "
+                f"iam get-policy-version --profile {self._profile} --policy-arn {attached_policy_arn} "
                 f"--version-id {policy_version} --no-paginate"
             )
         else:
@@ -168,7 +164,7 @@ class AWSResources:
         return policy_actions
 
     def _run_json_command(self, command: str):
-        code, output, error = self._command_runner(command + " --output json")
+        code, output, error = self._command_runner(f"aws {command} --output json --no-paginate")
         if code != 0:
             logger.error(error)
             return None
