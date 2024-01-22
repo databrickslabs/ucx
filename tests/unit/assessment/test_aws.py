@@ -178,17 +178,32 @@ def test_get_role_policy():
         AWSPolicyAction(
             resource_type="s3",
             privilege="READ_FILES",
-            resource_path="bucket1",
+            resource_path="s3://bucket1",
         ),
         AWSPolicyAction(
             resource_type="s3",
             privilege="READ_FILES",
-            resource_path="bucket2",
+            resource_path="s3a://bucket1",
         ),
         AWSPolicyAction(
             resource_type="s3",
             privilege="READ_FILES",
-            resource_path="bucket3",
+            resource_path="s3://bucket2",
+        ),
+        AWSPolicyAction(
+            resource_type="s3",
+            privilege="READ_FILES",
+            resource_path="s3a://bucket2",
+        ),
+        AWSPolicyAction(
+            resource_type="s3",
+            privilege="READ_FILES",
+            resource_path="s3://bucket3",
+        ),
+        AWSPolicyAction(
+            resource_type="s3",
+            privilege="READ_FILES",
+            resource_path="s3a://bucket3",
         ),
     ]
 
@@ -197,17 +212,32 @@ def test_get_role_policy():
         AWSPolicyAction(
             resource_type="s3",
             privilege="WRITE_FILES",
-            resource_path="bucketA",
+            resource_path="s3://bucketA",
         ),
         AWSPolicyAction(
             resource_type="s3",
             privilege="WRITE_FILES",
-            resource_path="bucketB",
+            resource_path="s3a://bucketA",
         ),
         AWSPolicyAction(
             resource_type="s3",
             privilege="WRITE_FILES",
-            resource_path="bucketC",
+            resource_path="s3://bucketB",
+        ),
+        AWSPolicyAction(
+            resource_type="s3",
+            privilege="WRITE_FILES",
+            resource_path="s3a://bucketB",
+        ),
+        AWSPolicyAction(
+            resource_type="s3",
+            privilege="WRITE_FILES",
+            resource_path="s3://bucketC",
+        ),
+        AWSPolicyAction(
+            resource_type="s3",
+            privilege="WRITE_FILES",
+            resource_path="s3a://bucketC",
         ),
     ]
 
@@ -222,22 +252,22 @@ def test_save_instance_profile_permissions():
     expected_csv_entries = [
         "arn:aws:iam::12345:instance-profile/role1,s3",
         "READ_FILES",
-        "bucket1,arn:aws:iam::12345:role/role1",
+        "s3://bucket1,arn:aws:iam::12345:role/role1",
         "arn:aws:iam::12345:instance-profile/role1,s3",
         "READ_FILES",
-        "bucket2,arn:aws:iam::12345:role/role1",
+        "s3://bucket2,arn:aws:iam::12345:role/role1",
         "arn:aws:iam::12345:instance-profile/role1,s3",
         "READ_FILES",
-        "bucket3,arn:aws:iam::12345:role/role1",
+        "s3://bucket3,arn:aws:iam::12345:role/role1",
         "arn:aws:iam::12345:instance-profile/role1,s3",
         "WRITE_FILES",
-        "bucketA,arn:aws:iam::12345:role/role1",
+        "s3://bucketA,arn:aws:iam::12345:role/role1",
         "arn:aws:iam::12345:instance-profile/role1,s3",
         "WRITE_FILES",
-        "bucketB,arn:aws:iam::12345:role/role1",
+        "s3://bucketB,arn:aws:iam::12345:role/role1",
         "arn:aws:iam::12345:instance-profile/role1,s3",
         "WRITE_FILES",
-        "bucketC,arn:aws:iam::12345:role/role1",
+        "s3://bucketC,arn:aws:iam::12345:role/role1",
     ]
 
     def upload(
@@ -259,17 +289,17 @@ def test_save_instance_profile_permissions():
             AWSPolicyAction(
                 resource_type="s3",
                 privilege="READ_FILES",
-                resource_path="bucket1",
+                resource_path="s3://bucket1",
             ),
             AWSPolicyAction(
                 resource_type="s3",
                 privilege="READ_FILES",
-                resource_path="bucket2",
+                resource_path="s3://bucket2",
             ),
             AWSPolicyAction(
                 resource_type="s3",
                 privilege="READ_FILES",
-                resource_path="bucket3",
+                resource_path="s3://bucket3",
             ),
         ],
         [],
@@ -278,17 +308,17 @@ def test_save_instance_profile_permissions():
             AWSPolicyAction(
                 resource_type="s3",
                 privilege="WRITE_FILES",
-                resource_path="bucketA",
+                resource_path="s3://bucketA",
             ),
             AWSPolicyAction(
                 resource_type="s3",
                 privilege="WRITE_FILES",
-                resource_path="bucketB",
+                resource_path="s3://bucketB",
             ),
             AWSPolicyAction(
                 resource_type="s3",
                 privilege="WRITE_FILES",
-                resource_path="bucketC",
+                resource_path="s3://bucketC",
             ),
         ],
         [],

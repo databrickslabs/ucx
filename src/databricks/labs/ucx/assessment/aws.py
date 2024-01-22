@@ -74,7 +74,7 @@ def run_command(command):
 class AWSResources:
     S3_ACTIONS: typing.ClassVar[set[str]] = {"s3:PutObject", "s3:GetObject", "s3:DeleteObject", "s3:PutObjectAcl"}
     S3_READONLY: typing.ClassVar[str] = "s3:GetObject"
-    S3_REGEX: typing.ClassVar[str] = r"arn:aws:s3:::([a-zA-Z0-9+=,.@_-]*)\/\*"
+    S3_REGEX: typing.ClassVar[str] = r"arn:aws:s3:::([a-zA-Z0-9+=,.@_-]*)\/\*$"
 
     def __init__(self, profile: str, command_runner: Callable[[str], tuple[int, str, str]] = run_command):
         self._profile = profile
@@ -162,7 +162,10 @@ class AWSResources:
             for resource in action.get("Resource", []):
                 match = re.match(self.S3_REGEX, resource)
                 if match:
-                    policy_actions.append(AWSPolicyAction("s3", privilege, match.group(1)))
+                    s3_resource_path = f"s3://{match.group(1)}"
+                    policy_actions.append(AWSPolicyAction("s3", privilege, s3_resource_path))
+                    s3a_resource_path = f"s3a://{match.group(1)}"
+                    policy_actions.append(AWSPolicyAction("s3", privilege, s3a_resource_path))
         return policy_actions
 
     def _run_json_command(self, command: str):

@@ -281,7 +281,7 @@ def save_aws_iam_profiles(w: WorkspaceClient, aws_profile: str | None = None):
     if not aws_profile:
         logger.error(
             "AWS Profile is not specified. Use the environment variable [AWS_DEFAULT_PROFILE] "
-            "or use the aws-profile parameter."
+            "or use the '--aws-profile=[profile-name]' parameter."
         )
         return None
     aws = AWSResources(aws_profile)
