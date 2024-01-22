@@ -163,11 +163,11 @@ def test_get_role_policy():
     """
 
     def command_call(cmd: str):
-        if cmd.startswith("aws iam get-role-policy"):
+        if "iam get-role-policy" in cmd:
             return 0, get_role_policy_return, ""
-        elif cmd.startswith("aws iam get-policy "):
+        elif "iam get-policy " in cmd:
             return 0, get_policy_return, ""
-        elif cmd.startswith("aws iam get-policy-version"):
+        elif "iam get-policy-version" in cmd:
             return 0, get_policy_version_return, ""
         else:
             return -1, "", "Error"
