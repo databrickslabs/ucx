@@ -1,12 +1,11 @@
 [MAIN]
 
+# Minimum supported python version
+py-version = 3.10
+
 # Python code to execute, usually for sys.path manipulation such as
 # pygtk.require().
 #init-hook=
-
-# Files or directories to be skipped. They should be base names, not
-# paths.
-ignore=CVS
 
 # Add files or directories matching the regex patterns to the ignore-list. The
 # regex matches against paths and can be in Posix or Windows format.
@@ -38,7 +37,7 @@ load-plugins=
 
 # Use multiple processes to speed up Pylint. Specifying 0 will auto-detect the
 # number of processors available to use.
-jobs=1
+jobs=0
 
 # When enabled, pylint would attempt to guess common misconfiguration and emit
 # user-friendly hints instead of false-positive error messages.
@@ -52,9 +51,6 @@ unsafe-load-any-extension=no
 # be loaded. Extensions are loading into the active Python interpreter and may
 # run arbitrary code
 extension-pkg-allow-list=
-
-# Minimum supported python version
-py-version = 3.10
 
 # Control the amount of potential inferred values when inferring a single
 # object. This can help the performance when dealing with large functions or
@@ -348,7 +344,6 @@ mixin-class-rgx=.*MixIn
 # and thus existing member attributes cannot be deduced by static analysis). It
 # supports qualified module names, as well as Unix pattern matching.
 ignored-modules=
-    databricks.labs.ucx.mixins
 
 # List of class names for which member attributes should not be checked (useful
 # for classes with dynamically set attributes). This supports the use of

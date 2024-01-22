@@ -1,6 +1,7 @@
-from unittest.mock import Mock
+from unittest.mock import Mock, create_autospec
 
 import pytest
+from databricks.sdk import WorkspaceClient
 from databricks.sdk.errors import DatabricksError, InternalError, NotFound
 from databricks.sdk.service.compute import (
     AutoScale,
@@ -387,9 +388,10 @@ def test_cluster_init_script_check_dbfs(mocker):
             ],
         )
     ]
-    ws = mocker.Mock()
+    ws = create_autospec(WorkspaceClient)
     ws.clusters.list.return_value = sample_clusters
     ws.dbfs.read().data = "JXNoCmVjaG8gIj0="
+    ws.workspace.export().content = "JXNoCmVjaG8gIj0="
     init_crawler = ClustersCrawler(ws, MockBackend(), "ucx").snapshot()
     assert len(init_crawler) == 1
 
