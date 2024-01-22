@@ -74,17 +74,18 @@ class JobsCrawler(CrawlerBase[JobInfo]):
                 )
 
             job_settings = job.settings
-            if job_settings is not None:
-                job_name = job_settings.name
-                if not job_name:
-                    job_name = "Unknown"
-                job_details[job.job_id] = JobInfo(
-                    job_id=str(job.job_id),
-                    job_name=job_name,
-                    creator=job.creator_user_name,
-                    success=1,
-                    failures="[]",
-                )
+            if not job_settings:
+                continue
+            job_name = job_settings.name
+            if not job_name:
+                job_name = "Unknown"
+            job_details[job.job_id] = JobInfo(
+                job_id=str(job.job_id),
+                job_name=job_name,
+                creator=job.creator_user_name,
+                success=1,
+                failures="[]",
+            )
 
         for job, cluster_config in self._get_cluster_configs_from_all_jobs(all_jobs, all_clusters_by_id):
             support_status = spark_version_compatibility(cluster_config.spark_version)
@@ -95,17 +96,7 @@ class JobsCrawler(CrawlerBase[JobInfo]):
                 job_assessment[job_id].add(f"not supported DBR: {cluster_config.spark_version}")
 
             if cluster_config.spark_conf is not None:
-                for k in INCOMPATIBLE_SPARK_CONFIG_KEYS:
-                    if k in cluster_config.spark_conf:
-                        job_assessment[job_id].add(f"unsupported config: {k}")
-
-                for value in cluster_config.spark_conf.values():
-                    if "dbfs:/mnt" in value or "/dbfs/mnt" in value:
-                        job_assessment[job_id].add(f"using DBFS mount in configuration: {value}")
-
-                # Checking if Azure cluster config is present in spark config
-                if _azure_sp_conf_present_check(cluster_config.spark_conf):
-                    job_assessment[job_id].add(f"{_AZURE_SP_CONF_FAILURE_MSG} Job cluster.")
+                self._job_spark_conf(cluster_config, job_assessment, job_id)
 
             # Checking if Azure cluster config is present in cluster policies
             if cluster_config.policy_id:
@@ -120,19 +111,34 @@ class JobsCrawler(CrawlerBase[JobInfo]):
                         job_assessment[job_id].add(f"{_AZURE_SP_CONF_FAILURE_MSG} Job cluster.")
 
             if cluster_config.init_scripts:
-                for init_script_info in cluster_config.init_scripts:
-                    init_script_data = _get_init_script_data(self._ws, init_script_info)
-                    if not init_script_data:
-                        continue
-                    if not _azure_sp_conf_in_init_scripts(init_script_data):
-                        continue
-                    job_assessment[job_id].add(f"{_AZURE_SP_CONF_FAILURE_MSG} Job cluster.")
+                self._init_scripts(cluster_config, job_assessment, job_id)
 
-        for job_key in job_details.keys():
+        # TODO: next person looking at this - rewrite, as this code makes no sense
+        for job_key in job_details.keys():  # pylint: disable=consider-using-dict-items,consider-iterating-dictionary
             job_details[job_key].failures = json.dumps(list(job_assessment[job_key]))
             if len(job_assessment[job_key]) > 0:
                 job_details[job_key].success = 0
         return list(job_details.values())
+
+    def _init_scripts(self, cluster_config, job_assessment, job_id):
+        for init_script_info in cluster_config.init_scripts:
+            init_script_data = _get_init_script_data(self._ws, init_script_info)
+            if not init_script_data:
+                continue
+            if not _azure_sp_conf_in_init_scripts(init_script_data):
+                continue
+            job_assessment[job_id].add(f"{_AZURE_SP_CONF_FAILURE_MSG} Job cluster.")
+
+    def _job_spark_conf(self, cluster_config, job_assessment, job_id):
+        for k in INCOMPATIBLE_SPARK_CONFIG_KEYS:
+            if k in cluster_config.spark_conf:
+                job_assessment[job_id].add(f"unsupported config: {k}")
+        for value in cluster_config.spark_conf.values():
+            if "dbfs:/mnt" in value or "/dbfs/mnt" in value:
+                job_assessment[job_id].add(f"using DBFS mount in configuration: {value}")
+        # Checking if Azure cluster config is present in spark config
+        if _azure_sp_conf_present_check(cluster_config.spark_conf):
+            job_assessment[job_id].add(f"{_AZURE_SP_CONF_FAILURE_MSG} Job cluster.")
 
     def _safe_get_cluster_policy(self, policy_id: str) -> Policy | None:
         try:

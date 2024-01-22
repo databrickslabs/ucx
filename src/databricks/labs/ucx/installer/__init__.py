@@ -2,13 +2,13 @@ import functools
 import logging
 from dataclasses import dataclass
 from pathlib import Path
+from yaml import YAMLError
 
 from databricks.labs.blueprint.installer import IllegalState
 from databricks.labs.blueprint.parallel import ManyError, Threads
 from databricks.sdk import WorkspaceClient
 from databricks.sdk.errors import NotFound
 from databricks.sdk.service.iam import User
-from yaml import YAMLError
 
 from databricks.labs.ucx.config import WorkspaceConfig
 
