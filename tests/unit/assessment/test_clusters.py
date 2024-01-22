@@ -14,9 +14,9 @@ from databricks.sdk.service.compute import (
 
 from databricks.labs.ucx.assessment.azure import AzureServicePrincipalCrawler
 from databricks.labs.ucx.assessment.clusters import ClusterInfo, ClustersCrawler
-from . import workspace_client_mock
 
 from ..framework.mocks import MockBackend
+from . import workspace_client_mock
 
 
 def test_cluster_assessment(mocker):
@@ -109,7 +109,7 @@ def test_cluster_assessment(mocker):
 
 
 def test_cluster_assessment_cluster_policy_no_spark_conf():
-    ws = workspace_client_mock(clusters='no-spark-conf.json')
+    ws = workspace_client_mock(clusters="no-spark-conf.json")
     crawler = ClustersCrawler(ws, MockBackend(), "ucx")
     result_set1 = list(crawler.snapshot())
     assert len(result_set1) == 1

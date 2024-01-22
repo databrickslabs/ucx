@@ -1,13 +1,12 @@
 import json
 import pathlib
-import typing
 from unittest.mock import create_autospec
-
 
 from databricks.sdk import WorkspaceClient
 from databricks.sdk.service.compute import ClusterDetails, Policy
 
 __dir = pathlib.Path(__file__).parent
+
 
 def _load_fixture(filename: str):
     with (__dir / filename).open("r") as f:
@@ -15,13 +14,13 @@ def _load_fixture(filename: str):
 
 
 def _load_list(cls: type, filename: str):
-    return [cls.from_dict(_) for _ in _load_fixture(filename)]
+    return [cls.from_dict(_) for _ in _load_fixture(filename)]  # type: ignore[attr-defined]
 
 
 def _cluster_policy(policy_id: str):
-    fixture = _load_fixture(f'policies/{policy_id}.json')
-    definition = json.dumps(fixture['definition'])
-    overrides = json.dumps(fixture['policy_family_definition_overrides'])
+    fixture = _load_fixture(f"policies/{policy_id}.json")
+    definition = json.dumps(fixture["definition"])
+    overrides = json.dumps(fixture["policy_family_definition_overrides"])
     return Policy(description=definition, policy_family_definition_overrides=overrides)
 
 
