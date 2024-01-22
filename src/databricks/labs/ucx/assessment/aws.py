@@ -204,7 +204,7 @@ class AWSResourcePermissions:
         tasks = []
         for instance_profile in instance_profiles:
             tasks.append(partial(self._get_instance_profile_access_task, instance_profile))
-
+# Aggregating the outputs from all the tasks
         return sum(Threads.strict("Scanning Instance Profiles", tasks), [])
 
     def _get_instance_profile_access_task(self, instance_profile: AWSInstanceProfile):
