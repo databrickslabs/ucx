@@ -1,4 +1,3 @@
-import os
 import subprocess
 from unittest.mock import MagicMock, create_autospec, patch
 
