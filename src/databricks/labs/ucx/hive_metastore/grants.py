@@ -265,7 +265,7 @@ class GrantsCrawler(CrawlerBase[Grant]):
             any_file=any_file,
             anonymous_function=anonymous_function,
         )
-        try:
+        try:  # pylint: disable=too-many-try-statements
             grants = []
             object_type_normalization = {
                 "SCHEMA": "DATABASE",
