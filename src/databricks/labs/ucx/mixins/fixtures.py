@@ -935,6 +935,7 @@ def make_schema(ws, sql_backend, make_random) -> Generator[Callable[..., SchemaI
 
 
 @pytest.fixture
+# pylint: disable-next=too-many-statements
 def make_table(ws, sql_backend, make_schema, make_random) -> Generator[Callable[..., TableInfo], None, None]:
     def create(
         *,
@@ -954,7 +955,7 @@ def make_table(ws, sql_backend, make_schema, make_random) -> Generator[Callable[
             schema_name = schema.name
         if name is None:
             name = f"ucx_T{make_random(4)}".lower()
-        table_type = None
+        table_type: TableType | None = None
         data_source_format = None
         storage_location = None
         full_name = f"{catalog_name}.{schema_name}.{name}".lower()
@@ -965,7 +966,7 @@ def make_table(ws, sql_backend, make_schema, make_random) -> Generator[Callable[
             # temporary (if not view)
             ddl = f"{ddl} AS {ctas}"
         elif non_delta:
-            table_type = TableType.MANAGED
+            table_type = TableType.MANAGED  # pylint: disable=redefined-variable-type
             data_source_format = DataSourceFormat.JSON
             storage_location = "dbfs:/databricks-datasets/iot-stream/data-device"
             ddl = f"{ddl} USING json LOCATION '{storage_location}'"

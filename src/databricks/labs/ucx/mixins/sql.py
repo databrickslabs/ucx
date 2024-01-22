@@ -194,10 +194,7 @@ class StatementExecutionExt(StatementExecutionAPI):
                 )
             status_message = f"current status: {state.value}"
             self._raise_if_needed(result_status)
-            sleep = attempt
-            if sleep > MAX_SLEEP_PER_ATTEMPT:
-                # sleep 10s max per attempt
-                sleep = MAX_SLEEP_PER_ATTEMPT
+            sleep = min(attempt, MAX_SLEEP_PER_ATTEMPT)
             _LOG.debug(f"SQL statement {statement_id}: {status_message} (sleeping ~{sleep}s)")
             time.sleep(sleep + random.random())
             attempt += 1
@@ -218,6 +215,32 @@ class StatementExecutionExt(StatementExecutionAPI):
         execute_response = self.execute(
             warehouse_id, statement, byte_limit=byte_limit, catalog=catalog, schema=schema, timeout=timeout
         )
+        col_conv, row_factory = self._row_converters(execute_response)
+        result_data = execute_response.result
+        if result_data is None:
+            return
+        while True:
+            data_array = result_data.data_array
+            if not data_array:
+                data_array = []
+            for data in data_array:
+                # enumerate() + iterator + tuple constructor makes it more performant
+                # on larger humber of records for Python, even though it's less
+                # readable code.
+                row = []
+                for i, value in enumerate(data):
+                    if value is None:
+                        row.append(None)
+                    else:
+                        row.append(col_conv[i](value))
+                yield row_factory(row)
+            if result_data.next_chunk_index is None:
+                return
+            # TODO: replace once ES-828324 is fixed
+            json_response = self._api.do("GET", result_data.next_chunk_internal_link)
+            result_data = ResultData.from_dict(json_response)
+
+    def _row_converters(self, execute_response):
         col_names = []
         col_conv = []
         manifest = execute_response.manifest
@@ -242,26 +265,4 @@ class StatementExecutionExt(StatementExecutionAPI):
                 raise ValueError(msg)
             col_conv.append(conv)
         row_factory = type("Row", (Row,), {"__columns__": col_names})
-        result_data = execute_response.result
-        if result_data is None:
-            return
-        while True:
-            data_array = result_data.data_array
-            if not data_array:
-                data_array = []
-            for data in data_array:
-                # enumerate() + iterator + tuple constructor makes it more performant
-                # on larger humber of records for Python, even though it's less
-                # readable code.
-                row = []
-                for i, value in enumerate(data):
-                    if value is None:
-                        row.append(None)
-                    else:
-                        row.append(col_conv[i](value))
-                yield row_factory(row)
-            if result_data.next_chunk_index is None:
-                return
-            # TODO: replace once ES-828324 is fixed
-            json_response = self._api.do("GET", result_data.next_chunk_internal_link)
-            result_data = ResultData.from_dict(json_response)
+        return col_conv, row_factory

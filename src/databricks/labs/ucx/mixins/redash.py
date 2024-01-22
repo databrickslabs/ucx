@@ -5,7 +5,7 @@ from databricks.sdk.service._internal import _from_dict
 from databricks.sdk.service.sql import Visualization, Widget, WidgetPosition
 
 # this file is going away soon
-# pylint: disable=redefined-builtin,too-many-instance-attributes
+# pylint: disable=redefined-builtin
 
 
 @dataclass

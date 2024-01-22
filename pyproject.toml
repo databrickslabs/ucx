@@ -63,7 +63,7 @@ python="3.10"
 path = ".venv"
 
 [tool.hatch.envs.default.scripts]
-test        = "pytest -n auto --cov src --cov-report=xml --timeout 30 tests/unit --durations 20"
+test        = "pytest -n 4 --cov src --cov-report=xml --timeout 30 tests/unit --durations 20"
 coverage    = "pytest -n auto --cov src tests/unit --timeout 30 --cov-report=html --durations 20"
 integration = "pytest -n 10 --cov src tests/integration --durations 20"
 fmt         = ["isort .",
@@ -74,7 +74,7 @@ verify      = ["black --check .",
                "isort . --check-only",
                "ruff .",
                "mypy ."]
-lint-tmp     = "pylint src"
+lint-tmp     = "pylint --output-format=colorized -j 0 src"
 
 [tool.isort]
 skip_glob = ["notebooks/*.py"]

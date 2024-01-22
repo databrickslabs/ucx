@@ -275,8 +275,7 @@ class GrantsCrawler(CrawlerBase[Grant]):
             }
             for row in self._fetch(f"SHOW GRANTS ON {on_type} {key}"):
                 (principal, action_type, object_type, _) = row
-                if object_type in object_type_normalization:
-                    object_type = object_type_normalization[object_type]
+                object_type = object_type_normalization.get(object_type, object_type)
                 if on_type != object_type:
                     continue
                 # we have to return concrete list, as with yield we're executing
