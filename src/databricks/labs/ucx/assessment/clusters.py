@@ -4,7 +4,7 @@ from dataclasses import dataclass
 
 from databricks.sdk import WorkspaceClient
 from databricks.sdk.errors import NotFound
-from databricks.sdk.service.compute import ClusterSource, Policy
+from databricks.sdk.service.compute import ClusterSource, Policy, ClusterDetails
 
 from databricks.labs.ucx.assessment.crawlers import (
     _AZURE_SP_CONF_FAILURE_MSG,
@@ -67,6 +67,36 @@ class ClustersMixin:
                 continue
             failures.append(f"{_AZURE_SP_CONF_FAILURE_MSG} cluster.")
 
+    def _check_cluster_failures(self, cluster: ClusterDetails):
+        failures = []
+        if not cluster.creator_user_name:
+            logger.warning(
+                f"Cluster {cluster.cluster_id} have Unknown creator, it means that the original creator "
+                f"has been deleted and should be re-created"
+            )
+            failures.append("Unknown Creator")
+        cluster_info = ClusterInfo(
+            cluster_id=cluster.cluster_id,
+            cluster_name=cluster.cluster_name,
+            creator=cluster.creator_user_name,
+            success=1,
+            failures="[]",
+        )
+        support_status = spark_version_compatibility(cluster.spark_version)
+        if support_status != "supported":
+            failures.append(f"not supported DBR: {cluster.spark_version}")
+        if cluster.spark_conf is not None:
+            self._check_spark_conf(cluster, failures)
+        # Checking if Azure cluster config is present in cluster policies
+        if cluster.policy_id:
+            self._check_cluster_policy(cluster, failures)
+        if cluster.init_scripts:
+            self._check_init_scripts(cluster, failures)
+        cluster_info.failures = json.dumps(failures)
+        if len(failures) > 0:
+            cluster_info.success = 0
+        return cluster_info
+
 
 class ClustersCrawler(CrawlerBase[ClusterInfo], ClustersMixin):
     def __init__(self, ws: WorkspaceClient, sbe: SqlBackend, schema):
@@ -81,37 +111,7 @@ class ClustersCrawler(CrawlerBase[ClusterInfo], ClustersMixin):
         for cluster in all_clusters:
             if cluster.cluster_source == ClusterSource.JOB:
                 continue
-            if not cluster.creator_user_name:
-                logger.warning(
-                    f"Cluster {cluster.cluster_id} have Unknown creator, it means that the original creator "
-                    f"has been deleted and should be re-created"
-                )
-            cluster_info = ClusterInfo(
-                cluster_id=cluster.cluster_id,
-                cluster_name=cluster.cluster_name,
-                creator=cluster.creator_user_name,
-                success=1,
-                failures="[]",
-            )
-            support_status = spark_version_compatibility(cluster.spark_version)
-            failures = []
-            if support_status != "supported":
-                failures.append(f"not supported DBR: {cluster.spark_version}")
-
-            if cluster.spark_conf is not None:
-                self._check_spark_conf(cluster, failures)
-
-            # Checking if Azure cluster config is present in cluster policies
-            if cluster.policy_id:
-                self._check_cluster_policy(cluster, failures)
-
-            if cluster.init_scripts:
-                self._check_init_scripts(cluster, failures)
-
-            cluster_info.failures = json.dumps(failures)
-            if len(failures) > 0:
-                cluster_info.success = 0
-            yield cluster_info
+            yield self._check_cluster_failures(cluster)
 
     def snapshot(self) -> Iterable[ClusterInfo]:
         return self._snapshot(self._try_fetch, self._crawl)

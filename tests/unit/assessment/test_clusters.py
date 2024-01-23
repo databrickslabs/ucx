@@ -1,3 +1,4 @@
+import json
 import re
 from unittest.mock import Mock, create_autospec
 
@@ -20,87 +21,10 @@ from ..framework.mocks import MockBackend
 from . import workspace_client_mock
 
 
-def test_cluster_assessment(mocker):
-    sample_clusters = [
-        ClusterDetails(
-            autoscale=AutoScale(min_workers=1, max_workers=6),
-            spark_conf={"spark.databricks.delta.preview.enabled": "true"},
-            spark_context_id=5134472582179565315,
-            spark_env_vars=None,
-            spark_version="13.3.x-cpu-ml-scala2.12",
-            cluster_id="0807-225846-motto493",
-        ),
-        ClusterDetails(
-            autoscale=AutoScale(min_workers=1, max_workers=6),
-            spark_conf={"spark.databricks.delta.preview.enabled": "true"},
-            spark_context_id=5134472582179565315,
-            spark_env_vars=None,
-            spark_version="9.3.x-cpu-ml-scala2.12",
-            cluster_id="0810-225833-atlanta69",
-        ),
-        ClusterDetails(
-            cluster_name="Tech Summit FY24 Cluster",
-            autoscale=AutoScale(min_workers=1, max_workers=6),
-            spark_conf={
-                "spark.hadoop.fs.azure.account."
-                "oauth2.client.id.abcde.dfs.core.windows.net": "{{secrets/abcff/sp_app_client_id}}",
-                "spark.hadoop.fs.azure.account."
-                "oauth2.client.endpoint.abcde.dfs.core.windows.net": "https://login.microsoftonline.com/dedededede"
-                "/token",
-                "spark.hadoop.fs.azure.account."
-                "oauth2.client.secret.abcde.dfs.core.windows.net": "{{secrets/abcff/sp_secret}}",
-            },
-            spark_context_id=5134472582179565315,
-            spark_env_vars=None,
-            spark_version="13.3.x-cpu-ml-scala2.12",
-            cluster_id="0915-190044-3dqy6751",
-        ),
-        ClusterDetails(
-            cluster_name="Tech Summit FY24 Cluster-1",
-            autoscale=AutoScale(min_workers=1, max_workers=6),
-            spark_context_id=5134472582179565315,
-            spark_env_vars=None,
-            policy_id="D96308F1BF0003A7",
-            spark_version="13.3.x-cpu-ml-scala2.12",
-            cluster_id="0915-190044-3dqy6751",
-        ),
-    ]
-
-    ws = Mock()
-
-    ws.cluster_policies.get().definition = (
-        '{\n  "spark_conf.fs.azure.account.auth.type": {\n    '
-        '"type": "fixed",\n    "value": "OAuth",\n   '
-        ' "hidden": true\n  },\n  "spark_conf.fs.azure.account.oauth.provider.type": {\n   '
-        ' "type": "fixed",\n    "value": '
-        '"org.apache.hadoop.fs.azurebfs.oauth2.ClientCredsTokenProvider",\n    '
-        '"hidden": true\n  },\n  "spark_conf.fs.azure.account.oauth2.client.id": {\n    '
-        '"type": "fixed",\n    "value": "fsfsfsfsffsfsf",\n    "hidden": true\n  },\n  '
-        '"spark_conf.fs.azure.account.oauth2.client.secret": {\n    "type": "fixed",\n    '
-        '"value": "gfgfgfgfggfggfgfdds",\n    "hidden": true\n  },\n  '
-        '"spark_conf.fs.azure.account.oauth2.client.endpoint": {\n    '
-        '"type": "fixed",\n    '
-        '"value": "https://login.microsoftonline.com/1234ededed/oauth2/token",\n    '
-        '"hidden": true\n  }\n}'
-    )
-    ws.cluster_policies.get().policy_family_definition_overrides = (
-        '{\n  "spark_conf.fs.azure.account.auth.type": {\n    '
-        '"type": "fixed",\n    "value": "OAuth",\n   '
-        ' "hidden": true\n  },\n  "spark_conf.fs.azure.account.oauth.provider.type": {\n   '
-        ' "type": "fixed",\n    "value": '
-        '"org.apache.hadoop.fs.azurebfs.oauth2.ClientCredsTokenProvider",\n    '
-        '"hidden": true\n  },\n  "spark_conf.fs.azure.account.oauth2.client.id": {\n    '
-        '"type": "fixed",\n    "value": "fsfsfsfsffsfsf",\n    "hidden": true\n  },\n  '
-        '"spark_conf.fs.azure.account.oauth2.client.secret": {\n    "type": "fixed",\n    '
-        '"value": "gfgfgfgfggfggfgfdds",\n    "hidden": true\n  },\n  '
-        '"spark_conf.fs.azure.account.oauth2.client.endpoint": {\n    '
-        '"type": "fixed",\n    '
-        '"value": "https://login.microsoftonline.com/1234ededed/oauth2/token",\n    '
-        '"hidden": true\n  }\n}'
-    )
-
-    crawler = ClustersCrawler(ws, MockBackend(), "ucx")._assess_clusters(sample_clusters)
-    result_set = list(crawler)
+def test_cluster_assessment():
+    ws = workspace_client_mock(clusters="assortment-conf.json")
+    crawler = ClustersCrawler(ws, MockBackend(), "ucx")
+    result_set = list(crawler.snapshot())
 
     assert len(result_set) == 4
     assert result_set[0].success == 1
@@ -357,7 +281,7 @@ def test_cluster_init_script_check_dbfs(mocker):
     assert len(init_crawler) == 1
 
 
-def test_cluster_without_owner_should_have_empty_creator_name(mocker):
+def test_cluster_without_owner_should_have_empty_creator_name():
     sample_clusters = [
         ClusterDetails(
             autoscale=AutoScale(min_workers=1, max_workers=6),
@@ -369,7 +293,7 @@ def test_cluster_without_owner_should_have_empty_creator_name(mocker):
             cluster_name="Tech Summit FY24 Cluster-1",
         )
     ]
-    ws = mocker.Mock()
+    ws = create_autospec(WorkspaceClient)
     mockbackend = MockBackend()
 
     ws.clusters.list.return_value = sample_clusters
@@ -380,8 +304,8 @@ def test_cluster_without_owner_should_have_empty_creator_name(mocker):
             cluster_id="0810-225833-atlanta69",
             cluster_name="Tech Summit FY24 Cluster-1",
             creator=None,
-            success=1,
-            failures="[]",
+            success=0,
+            failures='["Unknown Creator"]',
         )
     ]
 
@@ -390,8 +314,9 @@ def test_cluster_with_multiple_failures():
     ws = workspace_client_mock(clusters="multiple-failures-conf.json")
     crawler = ClustersCrawler(ws, MockBackend(), "ucx")
     result_set = list(crawler.snapshot())
-    fail_regex = "(\"[^\"]*\")"
     assert len(result_set) == 1
     assert result_set[0].success == 0
-    match = re.findall(fail_regex, result_set[0].failures)
-    assert len(match) == 2
+    failures = json.loads(result_set[0].failures)
+    assert 'unsupported config: spark.databricks.passthrough.enabled' in failures
+    assert 'not supported DBR: 9.3.x-cpu-ml-scala2.12' in failures
+

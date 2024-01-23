@@ -7,6 +7,7 @@ from databricks.sdk.errors import NotFound
 from databricks.sdk.service.compute import Policy
 from databricks.sdk.service.jobs import BaseJob
 
+from databricks.labs.ucx.assessment.clusters import ClustersMixin
 from databricks.labs.ucx.assessment.crawlers import (
     _AZURE_SP_CONF_FAILURE_MSG,
     INCOMPATIBLE_SPARK_CONFIG_KEYS,
@@ -28,7 +29,7 @@ class JobInfo:
     creator: str | None = None
 
 
-class JobsMixin:
+class JobsMixin(ClustersMixin):
     @staticmethod
     def _get_cluster_configs_from_all_jobs(all_jobs, all_clusters_by_id):
         for j in all_jobs:
@@ -90,30 +91,12 @@ class JobsCrawler(CrawlerBase[JobInfo], JobsMixin):
             )
 
         for job, cluster_config in self._get_cluster_configs_from_all_jobs(all_jobs, all_clusters_by_id):
-            support_status = spark_version_compatibility(cluster_config.spark_version)
             job_id = job.job_id
             if not job_id:
                 continue
-            if support_status != "supported":
-                job_assessment[job_id].add(f"not supported DBR: {cluster_config.spark_version}")
-
-            if cluster_config.spark_conf is not None:
-                self._job_spark_conf(cluster_config, job_assessment, job_id)
-
-            # Checking if Azure cluster config is present in cluster policies
-            if cluster_config.policy_id:
-                policy = self._safe_get_cluster_policy(cluster_config.policy_id)
-                if policy is None:
-                    continue
-                if policy.definition:
-                    if _azure_sp_conf_present_check(json.loads(policy.definition)):
-                        job_assessment[job_id].add(f"{_AZURE_SP_CONF_FAILURE_MSG} Job cluster.")
-                if policy.policy_family_definition_overrides:
-                    if _azure_sp_conf_present_check(json.loads(policy.policy_family_definition_overrides)):
-                        job_assessment[job_id].add(f"{_AZURE_SP_CONF_FAILURE_MSG} Job cluster.")
-
-            if cluster_config.init_scripts:
-                self._init_scripts(cluster_config, job_assessment, job_id)
+            cluster_failures = self._check_cluster_failures(cluster_config)
+            for failure in cluster_failures.failures:
+                job_assessment[job_id].add(failure)
 
         # TODO: next person looking at this - rewrite, as this code makes no sense
         for job_key in job_details.keys():  # pylint: disable=consider-using-dict-items,consider-iterating-dictionary
