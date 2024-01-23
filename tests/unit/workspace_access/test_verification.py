@@ -1,4 +1,7 @@
+from unittest.mock import create_autospec
+
 import pytest
+from databricks.sdk import WorkspaceClient
 from databricks.sdk.errors import PermissionDenied
 from databricks.sdk.service.catalog import MetastoreAssignment
 
@@ -38,13 +41,12 @@ def test_validate_no_metastore_exists(mocker):
         verify_metastore_obj.verify_metastore()
 
 
-def test_permission_denied_error(mocker):
-    ws = mocker.patch("databricks.sdk.WorkspaceClient.__init__")
-    ws.metastores = mocker.patch("databricks.sdk.WorkspaceClient.metastores")
+def test_permission_denied_error():
+    ws = create_autospec(WorkspaceClient)
     ws.metastores.current.side_effect = PermissionDenied()
     ws.metastores.current.return_value = None
     ws.return_value = None
 
     verify_metastore_obj = VerifyHasMetastore(ws)
 
-    assert verify_metastore_obj.verify_metastore() is None
+    assert not verify_metastore_obj.verify_metastore()

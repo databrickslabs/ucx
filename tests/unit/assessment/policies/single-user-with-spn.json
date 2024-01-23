@@ -1,0 +1,82 @@
+{
+  "definition": {
+    "node_type_id": {
+      "type": "allowlist",
+      "values": [
+        "Standard_DS3_v2",
+        "Standard_DS4_v2",
+        "Standard_DS5_v2",
+        "Standard_NC4as_T4_v3"
+      ],
+      "defaultValue": "Standard_DS3_v2"
+    },
+    "spark_version": {
+      "type": "unlimited",
+      "defaultValue": "auto:latest-ml"
+    },
+    "runtime_engine": {
+      "type": "fixed",
+      "value": "STANDARD",
+      "hidden": true
+    },
+    "num_workers": {
+      "type": "fixed",
+      "value": 0,
+      "hidden": true
+    },
+    "data_security_mode": {
+      "type": "allowlist",
+      "values": [
+        "SINGLE_USER",
+        "LEGACY_SINGLE_USER",
+        "LEGACY_SINGLE_USER_STANDARD"
+      ],
+      "defaultValue": "SINGLE_USER",
+      "hidden": true
+    },
+    "driver_instance_pool_id": {
+      "type": "forbidden",
+      "hidden": true
+    },
+    "cluster_type": {
+      "type": "fixed",
+      "value": "all-purpose"
+    },
+    "instance_pool_id": {
+      "type": "forbidden",
+      "hidden": true
+    },
+    "azure_attributes.availability": {
+      "type": "fixed",
+      "value": "ON_DEMAND_AZURE",
+      "hidden": true
+    },
+    "spark_conf.spark.databricks.cluster.profile": {
+      "type": "fixed",
+      "value": "singleNode",
+      "hidden": true
+    },
+    "autotermination_minutes": {
+      "type": "unlimited",
+      "defaultValue": 4320,
+      "isOptional": true
+    }
+  },
+  "policy_family_definition_overrides": {
+    "not.spark.conf": {
+      "type": "fixed",
+      "value": "OAuth",
+      "hidden": true
+    },
+    "not.a.type": {
+      "type": "fixed",
+      "value": "not.a.matching.type",
+      "hidden": true
+    },
+    "not.a.matching.type": {
+      "type": "fixed",
+      "value": "https://login.microsoftonline.com/1234ededed/oauth2/token",
+      "hidden": true
+    }
+  }
+}

@@ -1,5 +1,28 @@
 # Version changelog
 
+## 0.10.0
+
+* Added `databricks labs ucx validate-groups-membership` command to validate groups to see if they have same membership across acount and workspace level ([#772](https://github.com/databrickslabs/ucx/pull/772)).
+* Added baseline for getting Azure Resource Role Assignments ([#764](https://github.com/databrickslabs/ucx/pull/764)).
+* Added issue and pull request templates ([#791](https://github.com/databrickslabs/ucx/pull/791)).
+* Added linked issues to PR template ([#793](https://github.com/databrickslabs/ucx/pull/793)).
+* Added optional `debug_truncate_bytes` parameter to the config and extend the default log truncation limit ([#782](https://github.com/databrickslabs/ucx/pull/782)).
+* Added support for crawling grants and applying Hive Metastore UDF ACLs ([#812](https://github.com/databrickslabs/ucx/pull/812)).
+* Changed Python requirement from 3.10.6 to 3.10 ([#805](https://github.com/databrickslabs/ucx/pull/805)).
+* Extend error handling of delta issues in crawlers and hive metastore ([#795](https://github.com/databrickslabs/ucx/pull/795)).
+* Fixed `databricks labs ucx repair-run` command to execute correctly ([#801](https://github.com/databrickslabs/ucx/pull/801)).
+* Fixed handling of `DELTASHARING` table format ([#802](https://github.com/databrickslabs/ucx/pull/802)).
+* Fixed listing of workflows via CLI ([#811](https://github.com/databrickslabs/ucx/pull/811)).
+* Fixed logger import path for DEBUG notebook ([#792](https://github.com/databrickslabs/ucx/pull/792)).
+* Fixed move table command to delete table/view regardless if permissions are present, skipping corrupted tables when crawling table size and making existing tests more stable ([#777](https://github.com/databrickslabs/ucx/pull/777)).
+* Fixed the issue of `databricks labs ucx installations` and `databricks labs ucx manual-workspace-info` ([#814](https://github.com/databrickslabs/ucx/pull/814)).
+* Increase the unit test coverage for cli.py ([#800](https://github.com/databrickslabs/ucx/pull/800)).
+* Mount Point crawler lists /Volume with four variations which is confusing ([#779](https://github.com/databrickslabs/ucx/pull/779)).
+* Updated README.md to remove mention of deprecated install.sh ([#781](https://github.com/databrickslabs/ucx/pull/781)).
+* Updated `bug` issue template ([#797](https://github.com/databrickslabs/ucx/pull/797)).
+* Fixed writing log readme in multiprocess safe way ([#794](https://github.com/databrickslabs/ucx/pull/794)).
+
+
 ## 0.9.0
 
 * Added assessment step to estimate the size of DBFS root tables ([#741](https://github.com/databrickslabs/ucx/pull/741)).

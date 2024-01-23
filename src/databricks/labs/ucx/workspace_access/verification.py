@@ -106,10 +106,10 @@ class VerifyHasMetastore:
                 self.metastore_id = current_metastore.metastore_id
                 self.workspace_id = current_metastore.workspace_id
                 return True
-            else:
-                raise MetastoreNotFoundError
+            raise MetastoreNotFoundError
         except PermissionDenied:
             logger.error("Permission Denied while trying to access metastore")
+            return False
 
 
 class MetastoreNotFoundError(Exception):

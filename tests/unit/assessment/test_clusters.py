@@ -1,6 +1,7 @@
-from unittest.mock import Mock
+from unittest.mock import Mock, create_autospec
 
 import pytest
+from databricks.sdk import WorkspaceClient
 from databricks.sdk.errors import DatabricksError, InternalError, NotFound
 from databricks.sdk.service.compute import (
     AutoScale,
@@ -15,6 +16,7 @@ from databricks.labs.ucx.assessment.azure import AzureServicePrincipalCrawler
 from databricks.labs.ucx.assessment.clusters import ClusterInfo, ClustersCrawler
 
 from ..framework.mocks import MockBackend
+from . import workspace_client_mock
 
 
 def test_cluster_assessment(mocker):
@@ -106,51 +108,10 @@ def test_cluster_assessment(mocker):
     assert result_set[3].success == 0
 
 
-def test_cluster_assessment_cluster_policy_no_spark_conf(mocker):
-    sample_clusters1 = [
-        ClusterDetails(
-            cluster_name="Tech Summit FY24 Cluster-2",
-            autoscale=AutoScale(min_workers=1, max_workers=6),
-            spark_context_id=5134472582179565315,
-            spark_env_vars=None,
-            policy_id="D96308F1BF0003A8",
-            spark_version="13.3.x-cpu-ml-scala2.12",
-            cluster_id="0915-190044-3dqy6751",
-        )
-    ]
-    ws = Mock()
-    ws.cluster_policies.get().definition = (
-        '{"node_type_id":{"type":"allowlist","values":["Standard_DS3_v2",'
-        '"Standard_DS4_v2","Standard_DS5_v2","Standard_NC4as_T4_v3"],"defaultValue":'
-        '"Standard_DS3_v2"},"spark_version":{"type":"unlimited","defaultValue":"auto:latest-ml"},'
-        '"runtime_engine":{"type":"fixed","value":"STANDARD","hidden":true},'
-        '"num_workers":{"type":"fixed","value":0,"hidden":true},"data_security_mode":'
-        '{"type":"allowlist","values":["SINGLE_USER","LEGACY_SINGLE_USER","LEGACY_SINGLE_USER_STANDARD"],'
-        '"defaultValue":"SINGLE_USER","hidden":true},"driver_instance_pool_id":{"type":"forbidden","hidden":true},'
-        '"cluster_type":{"type":"fixed","value":"all-purpose"},"instance_pool_id":{"type":"forbidden","hidden":true},'
-        '"azure_attributes.availability":{"type":"fixed","value":"ON_DEMAND_AZURE","hidden":true},'
-        '"spark_conf.spark.databricks.cluster.profile":{"type":"fixed","value":"singleNode","hidden":true},'
-        '"autotermination_minutes":{"type":"unlimited","defaultValue":4320,"isOptional":true}}'
-    )
-
-    ws.cluster_policies.get().policy_family_definition_overrides = (
-        '{\n  "not.spark.conf": {\n    '
-        '"type": "fixed",\n    "value": "OAuth",\n   '
-        ' "hidden": true\n  },\n  "not.a.type": {\n   '
-        ' "type": "fixed",\n    "value": '
-        '"not.a.matching.type",\n    '
-        '"hidden": true\n  },\n  "not.a.matching.type": {\n    '
-        '"type": "fixed",\n    "value": "fsfsfsfsffsfsf",\n    "hidden": true\n  },\n  '
-        '"not.a.matching.type": {\n    "type": "fixed",\n    '
-        '"value": "gfgfgfgfggfggfgfdds",\n    "hidden": true\n  },\n  '
-        '"not.a.matching.type": {\n    '
-        '"type": "fixed",\n    '
-        '"value": "https://login.microsoftonline.com/1234ededed/oauth2/token",\n    '
-        '"hidden": true\n  }\n}'
-    )
-
-    crawler = ClustersCrawler(ws, MockBackend(), "ucx")._assess_clusters(sample_clusters1)
-    result_set1 = list(crawler)
+def test_cluster_assessment_cluster_policy_no_spark_conf():
+    ws = workspace_client_mock(clusters="no-spark-conf.json")
+    crawler = ClustersCrawler(ws, MockBackend(), "ucx")
+    result_set1 = list(crawler.snapshot())
     assert len(result_set1) == 1
     assert result_set1[0].success == 1
 
@@ -387,9 +348,10 @@ def test_cluster_init_script_check_dbfs(mocker):
             ],
         )
     ]
-    ws = mocker.Mock()
+    ws = create_autospec(WorkspaceClient)
     ws.clusters.list.return_value = sample_clusters
     ws.dbfs.read().data = "JXNoCmVjaG8gIj0="
+    ws.workspace.export().content = "JXNoCmVjaG8gIj0="
     init_crawler = ClustersCrawler(ws, MockBackend(), "ucx").snapshot()
     assert len(init_crawler) == 1
 

@@ -1194,7 +1194,7 @@ def test_repair_run_result_state(ws, caplog):
             state=RunState(result_state=None),
         )
     ]
-    install = WorkspaceInstaller(ws, verify_timeout=timedelta(seconds=5))
+    install = WorkspaceInstaller(ws, verify_timeout=timedelta(seconds=1))
     install._state.jobs = {"assessment": "123"}
     ws.jobs.list_runs.return_value = base
     ws.jobs.list_runs.repair_run = None

@@ -197,11 +197,12 @@ class TableMapping:
                 return True
             upgraded_from = table_info.properties.get("upgraded_from")
             if upgraded_from and upgraded_from != src_table.key:
-                msg = f"Expected to be migrated from {src_table.key}, but got {upgraded_from}. "
-                "You can skip this error using the CLI command: "
-                "databricks labs ucx skip "
-                f"--schema {src_table.database} --table {src_table.name}"
-                raise ResourceConflict(msg)
+                raise ResourceConflict(
+                    f"Expected to be migrated from {src_table.key}, but got {upgraded_from}. "
+                    "You can skip this error using the CLI command: "
+                    "databricks labs ucx skip "
+                    f"--schema {src_table.database} --table {src_table.name}"
+                )
             return True
         except NotFound:
             return False

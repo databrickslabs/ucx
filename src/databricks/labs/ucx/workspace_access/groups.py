@@ -77,8 +77,7 @@ class MigrationState:
     def is_in_scope(self, name: str) -> bool:
         if name is None:
             return False
-        else:
-            return name in self._name_to_group
+        return name in self._name_to_group
 
     def __len__(self):
         return len(self._name_to_group)
@@ -119,12 +118,10 @@ class GroupMigrationStrategy:
             match = re.search(match_re, group_name)
             if not match:
                 return group_name
-            else:
-                match_groups = match.groups()
+            match_groups = match.groups()
             if match_groups:
                 return match_groups[0]
-            else:
-                return match.group()
+            return match.group()
         except re.error:
             return group_name
 
@@ -299,7 +296,7 @@ class RegexMatchStrategy(GroupMigrationStrategy):
 class GroupManager(CrawlerBase[MigratedGroup]):
     _SYSTEM_GROUPS: ClassVar[list[str]] = ["users", "admins", "account users"]
 
-    def __init__(
+    def __init__(  # pylint: disable=too-many-arguments
         self,
         sql_backend: SqlBackend,
         ws: WorkspaceClient,
