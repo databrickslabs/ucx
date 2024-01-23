@@ -2,6 +2,7 @@ import logging
 from typing import BinaryIO
 from unittest.mock import create_autospec
 
+import pytest
 from databricks.sdk import WorkspaceClient
 from databricks.sdk.service import iam
 from databricks.sdk.service.compute import InstanceProfile
@@ -12,6 +13,7 @@ from databricks.labs.ucx.assessment.aws import (
     AWSPolicyAction,
     AWSResourcePermissions,
     AWSResources,
+    run_command,
 )
 
 logger = logging.getLogger(__name__)
@@ -360,3 +362,10 @@ def test_empty_mapping(caplog):
     aws_resource_permissions = AWSResourcePermissions(ws, aws)
     aws_resource_permissions.save_instance_profile_permissions()
     assert "No Mapping" in caplog.messages[0]
+
+
+def test_command(caplog):
+    return_code, output, error = run_command("echo success")
+    assert return_code == 0
+    with pytest.raises(FileNotFoundError) as exception:
+        run_command("no_way_this_command_would_work")
