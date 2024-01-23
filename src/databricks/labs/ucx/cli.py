@@ -1,4 +1,6 @@
 import json
+import os
+import shutil
 import webbrowser
 
 from databricks.labs.blueprint.cli import App
@@ -7,6 +9,7 @@ from databricks.labs.blueprint.tui import Prompts
 from databricks.sdk import AccountClient, WorkspaceClient
 
 from databricks.labs.ucx.account import AccountWorkspaces, WorkspaceInfo
+from databricks.labs.ucx.assessment.aws import AWSResourcePermissions, AWSResources
 from databricks.labs.ucx.assessment.azure import (
     AzureResourcePermissions,
     AzureResources,
@@ -258,6 +261,51 @@ def save_azure_storage_accounts(w: WorkspaceClient, subscription_id: str):
     azure_resource_permissions = AzureResourcePermissions(w, AzureResources(w), location)
     logger.info("Generating azure storage accounts and service principal permission info")
     azure_resource_permissions.save_spn_permissions()
+
+
+@ucx.command
+def save_aws_iam_profiles(w: WorkspaceClient, aws_profile: str | None = None):
+    """identifies all Instance Profiles and map their access to S3 buckets.
+    Requires a working setup of AWS CLI.
+    https://aws.amazon.com/cli/
+    The command saves a CSV to the UCX installation folder with the mapping.
+
+    The user has to be authenticated with AWS and the have the permissions to browse the resources and iam services.
+    More information can be found here:
+    https://docs.aws.amazon.com/IAM/latest/UserGuide/access_permissions-required.html
+    """
+    if not shutil.which("aws"):
+        logger.error("Couldn't find AWS CLI in path.Please obtain and install the CLI from https://aws.amazon.com/cli/")
+        return None
+    if not aws_profile:
+        aws_profile = os.getenv("AWS_DEFAULT_PROFILE")
+    if not aws_profile:
+        logger.error(
+            "AWS Profile is not specified. Use the environment variable [AWS_DEFAULT_PROFILE] "
+            "or use the '--aws-profile=[profile-name]' parameter."
+        )
+        return None
+    aws = AWSResources(aws_profile)
+    if not aws.validate_connection():
+        logger.error("AWS CLI is not configured properly.")
+        return None
+
+    installation_manager = InstallationManager(w)
+    installation = installation_manager.for_user(w.current_user.me())
+    if not installation:
+        logger.error(CANT_FIND_UCX_MSG)
+        return None
+
+    if not w.config.is_aws:
+        logger.error("Workspace is not on AWS, please run this command on AWS databricks workspaces.")
+        return None
+
+    aws_pm = AWSResourcePermissions(
+        w,
+        aws,
+    )
+    aws_pm.save_instance_profile_permissions()
+    return None
 
 
 if __name__ == "__main__":
