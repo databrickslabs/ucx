@@ -369,3 +369,4 @@ def test_command(caplog):
     assert return_code == 0
     with pytest.raises(FileNotFoundError) as exception:
         run_command("no_way_this_command_would_work")
+        print(exception)
