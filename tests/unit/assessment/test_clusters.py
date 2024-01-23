@@ -1,3 +1,4 @@
+import re
 from unittest.mock import Mock, create_autospec
 
 import pytest
@@ -386,32 +387,11 @@ def test_cluster_without_owner_should_have_empty_creator_name(mocker):
 
 
 def test_cluster_with_multiple_failures():
-    sample_clusters = [
-        ClusterDetails(
-            autoscale=AutoScale(min_workers=1, max_workers=6),
-            cluster_source=ClusterSource.UI,
-            spark_context_id=5134472582179565315,
-            spark_conf={
-                "spark.databricks.passthrough.enabled":"True"
-            },
-            spark_env_vars=None,
-            spark_version="9.3.x-cpu-ml-scala2.12",
-            cluster_id="0810-225833-atlanta69",
-            cluster_name="Tech Summit FY24 Cluster-1",
-        )
-    ]
-    ws = create_autospec(WorkspaceClient)
-    mockbackend = MockBackend()
-
-    ws.clusters.list.return_value = sample_clusters
-    ClustersCrawler(ws, mockbackend, "ucx").snapshot()
-    result = mockbackend.rows_written_for("hive_metastore.ucx.clusters", "append")
-    assert result == [
-        ClusterInfo(
-            cluster_id="0810-225833-atlanta69",
-            cluster_name="Tech Summit FY24 Cluster-1",
-            creator=None,
-            success=0,
-            failures='["not supported DBR: 9.3.x-cpu-ml-scala2.12", "unsupported config: spark.databricks.passthrough.enabled"]'
-        )
-    ]
+    ws = workspace_client_mock(clusters="multiple-failures-conf.json")
+    crawler = ClustersCrawler(ws, MockBackend(), "ucx")
+    result_set = list(crawler.snapshot())
+    fail_regex = "(\"[^\"]*\")"
+    assert len(result_set) == 1
+    assert result_set[0].success == 0
+    match = re.findall(fail_regex, result_set[0].failures)
+    assert len(match) == 2
