@@ -58,7 +58,8 @@ class SecretScopesSupport(AclSupport):
 
         def apply_acls():
             for acl in new_acls:
-                self._rate_limited_put_acl(item.object_id, acl.principal, acl.permission)
+                # self._rate_limited_put_acl(item.object_id, acl.principal, acl.permission)
+                self._applier_task("secrets", item.object_id, acl)
             return True
 
         return partial(apply_acls)
@@ -75,16 +76,32 @@ class SecretScopesSupport(AclSupport):
                 return acl.permission
         return None
 
-    def _reapply_on_failure(self, scope_name: str, group_name: str, expected_permission: workspace.AclPermission):
+    def verify(self, object_type: str, object_id: str, acl: workspace.AclItem) -> bool:
         # in-flight check for the applied permissions
         # the api might be inconsistent, therefore we need to check that the permissions were applied
-        applied_permission = self.secret_scope_permission(scope_name, group_name)
+        principal = acl.principal
+        expected_permission = acl.permission
+        applied_permission = self.secret_scope_permission(object_id, principal)
         if applied_permission != expected_permission:
-            # try to apply again if the permissions are not equal: sometimes the list_acls api is inconsistent
-            logger.info(f"Applying permissions again {expected_permission} to {group_name} for {scope_name}")
-            self._ws.secrets.put_acl(scope_name, group_name, expected_permission)
             msg = (
                 f"Applied permission {applied_permission} is not equal to expected "
+                f"permission {expected_permission} for scope: {object_id} and group: {principal}!"
+            )
+            logger.debug(msg)
+            return False
+        return True
+
+    def _reapply_on_failure(self, object_type: str, object_id: str, acl: workspace.AclItem):
+        scope_name = object_id
+        group_name = acl.principal
+        expected_permission = acl.permission
+        # the api might be inconsistent, therefore we need to check that the permissions were applied
+        if not self.verify(object_type, object_id, acl):
+            # try to apply again if the permissions are not equal: sometimes the list_acls api is inconsistent
+            logger.debug(f"Applying permissions again {expected_permission} to {group_name} for {scope_name}")
+            self._ws.secrets.put_acl(scope_name, group_name, expected_permission)
+            msg = (
+                f"Applied permissions are not equal to expected "
                 f"permission {expected_permission} for {scope_name} and {group_name}!"
             )
             raise ValueError(msg)
@@ -97,3 +114,13 @@ class SecretScopesSupport(AclSupport):
         retry_on_value_error = retried(on=[ValueError], timeout=self._verify_timeout)
         retried_check = retry_on_value_error(self._reapply_on_failure)
         retried_check(object_id, principal, permission)
+
+    @rate_limited(max_requests=1100, burst_period_seconds=60)
+    def _applier_task(self, object_type: str, object_id: str, acl: workspace.AclItem):
+        principal = acl.principal
+        permission = acl.permission
+        self._ws.secrets.put_acl(object_id, principal, permission)
+
+        retry_on_value_error = retried(on=[ValueError], timeout=self._verify_timeout)
+        retried_check = retry_on_value_error(self._reapply_on_failure)
+        retried_check(object_type, object_id, acl)
