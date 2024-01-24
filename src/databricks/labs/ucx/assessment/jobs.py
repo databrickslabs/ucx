@@ -10,6 +10,9 @@ from databricks.sdk.service.jobs import BaseJob
 from databricks.labs.ucx.assessment.crawlers import (
     _AZURE_SP_CONF_FAILURE_MSG,
     INCOMPATIBLE_SPARK_CONFIG_KEYS,
+    _check_spark_conf,
+    _check_cluster_policy,
+    _check_init_scripts,
     _azure_sp_conf_in_init_scripts,
     _azure_sp_conf_present_check,
     _get_init_script_data,
@@ -90,15 +93,18 @@ class JobsCrawler(CrawlerBase[JobInfo], JobsMixin):
             )
 
         for job, cluster_config in self._get_cluster_configs_from_all_jobs(all_jobs, all_clusters_by_id):
-            support_status = spark_version_compatibility(cluster_config.spark_version)
             job_id = job.job_id
             if not job_id:
                 continue
+
+            # check spark version
+            support_status = spark_version_compatibility(cluster_config.spark_version)
             if support_status != "supported":
                 job_assessment[job_id].add(f"not supported DBR: {cluster_config.spark_version}")
 
+            # check spark version
             if cluster_config.spark_conf is not None:
-                self._job_spark_conf(cluster_config, job_assessment, job_id)
+                job_assessment[job_id].update(_check_spark_conf(cluster_config.spark_conf, "cluster"))
 
             # Checking if Azure cluster config is present in cluster policies
             if cluster_config.policy_id:

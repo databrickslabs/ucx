@@ -1,8 +1,11 @@
 import base64
+import json
 import logging
 import re
 
+from databricks.sdk import WorkspaceClient
 from databricks.sdk.errors import NotFound
+from databricks.sdk.service.compute import Policy
 
 logger = logging.getLogger(__name__)
 
@@ -90,3 +93,42 @@ def spark_version_compatibility(spark_version: str) -> str:
     if (10, 0) <= version < (11, 3):
         return "kinda works"
     return "supported"
+
+def _check_spark_conf(conf:dict[str, str], source) -> list[str]:
+    failures = []
+    for k in INCOMPATIBLE_SPARK_CONFIG_KEYS:
+        if k in conf:
+            failures.append(f"unsupported config: {k}")
+    for value in conf.values():
+        if "dbfs:/mnt" in value or "/dbfs/mnt" in value:
+            failures.append(f"using DBFS mount in configuration: {value}")
+    # Checking if Azure cluster config is present in spark config
+    if _azure_sp_conf_present_check(conf):
+        failures.append(f"{_AZURE_SP_CONF_FAILURE_MSG} {source}.")
+    return failures
+
+def _safe_get_cluster_policy(ws:WorkspaceClient, policy_id: str) -> Policy | None:
+    try:
+        return ws.cluster_policies.get(policy_id)
+    except NotFound:
+        logger.warning(f"The cluster policy was deleted: {policy_id}")
+        return None
+
+def _check_cluster_policy(cluster, failures):
+    policy = _safe_get_cluster_policy(cluster.policy_id)
+    if policy:
+        if policy.definition:
+            if _azure_sp_conf_present_check(json.loads(policy.definition)):
+                failures.append(f"{_AZURE_SP_CONF_FAILURE_MSG} cluster.")
+        if policy.policy_family_definition_overrides:
+            if _azure_sp_conf_present_check(json.loads(policy.policy_family_definition_overrides)):
+                failures.append(f"{_AZURE_SP_CONF_FAILURE_MSG} cluster.")
+
+def _check_init_scripts(ws:WorkspaceClient, cluster, failures):
+    for init_script_info in cluster.init_scripts:
+        init_script_data = _get_init_script_data(ws, init_script_info)
+        if not init_script_data:
+            continue
+        if not _azure_sp_conf_in_init_scripts(init_script_data):
+            continue
+        failures.append(f"{_AZURE_SP_CONF_FAILURE_MSG} cluster.")

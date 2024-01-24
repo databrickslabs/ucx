@@ -7,6 +7,7 @@ from databricks.sdk import WorkspaceClient
 from databricks.labs.ucx.assessment.crawlers import (
     _AZURE_SP_CONF_FAILURE_MSG,
     _azure_sp_conf_present_check,
+    _check_spark_conf,
     logger,
 )
 from databricks.labs.ucx.framework.crawlers import CrawlerBase, SqlBackend
@@ -50,8 +51,7 @@ class PipelinesCrawler(CrawlerBase[PipelineInfo]):
             assert pipeline_response.spec is not None
             pipeline_config = pipeline_response.spec.configuration
             if pipeline_config:
-                if _azure_sp_conf_present_check(pipeline_config):
-                    failures.append(f"{_AZURE_SP_CONF_FAILURE_MSG} pipeline.")
+                failures.extend(_check_spark_conf(pipeline_config, "pipeline"))
 
             pipeline_info.failures = json.dumps(failures)
             if len(failures) > 0:
