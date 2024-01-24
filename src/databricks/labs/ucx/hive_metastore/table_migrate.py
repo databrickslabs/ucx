@@ -259,7 +259,6 @@ class TableMove:
         from_table: str,
         to_catalog: str,
         to_schema: str,
-        to_view: str,
     ):
         try:
             self._ws.schemas.get(f"{from_catalog}.{from_schema}")
@@ -285,9 +284,7 @@ class TableMove:
             except NotFound:
                 if table.table_type and table.table_type in (TableType.EXTERNAL, TableType.MANAGED):
                     alias_tasks.append(
-                        partial(
-                            self._alias_table, from_catalog, from_schema, table.name, to_catalog, to_schema
-                        )
+                        partial(self._alias_table, from_catalog, from_schema, table.name, to_catalog, to_schema)
                     )
                     continue
                 if table.view_definition:
@@ -343,23 +340,19 @@ class TableMove:
         from_table: str,
         to_catalog: str,
         to_schema: str,
-        to_view: str,
     ) -> bool:
         from_table_name = f"{from_catalog}.{from_schema}.{from_table}"
         to_table_name = f"{to_catalog}.{to_schema}.{from_table}"
         try:
-            self._recreate_table(from_table_name, to_table_name)
+            self._create_view(from_table_name, to_table_name)
             self._reapply_grants(from_table_name, to_table_name)
-            if del_table:
-                logger.info(f"Dropping source table {from_table_name}")
-                drop_sql = f"DROP TABLE {from_table_name}"
-                self._backend.execute(drop_sql)
             return True
         except NotFound as err:
             if "[TABLE_OR_VIEW_NOT_FOUND]" in str(err) or "[DELTA_TABLE_NOT_FOUND]" in str(err):
                 logger.error(f"Could not find table {from_table_name}. Table not found.")
             else:
-                logger.error(f"Failed to move table {from_table_name}: {err!s}", exc_info=True)
+                logger.error(f"Failed to alias table {from_table_name}: {err!s}", exc_info=True)
+            return False
 
     def _reapply_grants(self, from_table_name, to_table_name):
         grants = self._ws.grants.get(SecurableType.TABLE, from_table_name)

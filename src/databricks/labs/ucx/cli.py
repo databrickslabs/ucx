@@ -245,7 +245,6 @@ def alias(
     from_table: str,
     to_catalog: str,
     to_schema: str,
-    to_view: str|None = None
 ):
     """move a uc table/tables from one schema to another schema in same or different catalog"""
     logger.info("Running alias command")
@@ -266,7 +265,7 @@ def alias(
         logger.error("please select a different schema or catalog to migrate to")
         return
     logger.info(f"aliasing table {from_table} from {from_catalog}.{from_schema} to {to_catalog}.{to_schema}")
-    tables.alias_table(from_catalog, from_schema, from_table, to_catalog, to_schema, to_view)
+    tables.alias_tables(from_catalog, from_schema, from_table, to_catalog, to_schema)
 
 
 @ucx.command
