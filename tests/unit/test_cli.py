@@ -8,6 +8,7 @@ from databricks.sdk.service.iam import User
 
 from databricks.labs.ucx.cli import (
     CANT_FIND_UCX_MSG,
+    alias,
     create_table_mapping,
     ensure_assessment_run,
     installations,
@@ -22,10 +23,10 @@ from databricks.labs.ucx.cli import (
     sync_workspace_info,
     validate_external_locations,
     validate_groups_membership,
-    workflows, alias,
+    workflows,
 )
 from databricks.labs.ucx.config import WorkspaceConfig
-from databricks.labs.ucx.installer import Installation, InstallationManager
+from databricks.labs.ucx.installer import Installation
 
 
 def test_workflow(caplog):
