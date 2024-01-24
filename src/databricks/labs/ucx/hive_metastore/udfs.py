@@ -54,7 +54,7 @@ class UdfsCrawler(CrawlerBase):
 
     def _try_load(self) -> Iterable[Udf]:
         """Tries to load udf information from the database or throws TABLE_OR_VIEW_NOT_FOUND error"""
-        for row in self._fetch(f"SELECT * FROM {self._full_name}"):
+        for row in self._fetch(f"SELECT * FROM {self.escape(self._full_name)}"):
             yield Udf(*row)
 
     def _crawl(self) -> Iterable[Udf]:
@@ -63,10 +63,10 @@ class UdfsCrawler(CrawlerBase):
         catalog = "hive_metastore"
         # need to set the current catalog otherwise "SHOW USER FUNCTIONS FROM" is raising error:
         # "target schema <database> is not in the current catalog"
-        self._exec(f"USE CATALOG {catalog};")
+        self._exec(f"USE CATALOG {self.escape(catalog)};")
         for (database,) in self._all_databases():
             logger.debug(f"[{catalog}.{database}] listing udfs")
-            for (udf,) in self._fetch(f"SHOW USER FUNCTIONS FROM {catalog}.{database};"):
+            for (udf,) in self._fetch(f"SHOW USER FUNCTIONS FROM {self.escape(catalog)}.{self.escape(database)};"):
                 if udf.startswith(f"{catalog}.{database}"):
                     udf_name = udf[udf.rfind(".") + 1 :]  # remove catalog and database info from the name
                     tasks.append(partial(self._describe, catalog, database, udf_name))
@@ -83,7 +83,7 @@ class UdfsCrawler(CrawlerBase):
         try:
             logger.debug(f"[{full_name}] fetching udf metadata")
             describe = {}
-            for key_value in self._fetch(f"DESCRIBE FUNCTION EXTENDED {full_name}"):
+            for key_value in self._fetch(f"DESCRIBE FUNCTION EXTENDED {self.escape(full_name)}"):
                 if ":" in key_value:  # skip free text configs that don't have a key
                     key, value = key_value.split(":")
                     describe[key] = value.strip()

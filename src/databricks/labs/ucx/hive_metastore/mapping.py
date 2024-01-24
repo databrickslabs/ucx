@@ -12,7 +12,7 @@ from databricks.sdk.errors import BadRequest, NotFound, ResourceConflict
 from databricks.sdk.service.workspace import ImportFormat
 
 from databricks.labs.ucx.account import WorkspaceInfo
-from databricks.labs.ucx.framework.crawlers import SqlBackend
+from databricks.labs.ucx.framework.crawlers import CrawlerBase, SqlBackend
 from databricks.labs.ucx.hive_metastore import TablesCrawler
 from databricks.labs.ucx.hive_metastore.tables import Table
 
@@ -99,7 +99,7 @@ class TableMapping:
         # Marks a table to be skipped in the migration process by applying a table property
         try:
             self._backend.execute(
-                f"ALTER TABLE `{schema}`.`{table}` SET TBLPROPERTIES('{self.UCX_SKIP_PROPERTY}' = true)"
+                f"ALTER TABLE {TablesCrawler.escape(schema)}.{TablesCrawler.escape(table)} SET TBLPROPERTIES('{self.UCX_SKIP_PROPERTY}' = true)"
             )
         except NotFound as nf:
             if "[TABLE_OR_VIEW_NOT_FOUND]" in str(nf) or "[DELTA_TABLE_NOT_FOUND]" in str(nf):
@@ -112,7 +112,9 @@ class TableMapping:
     def skip_schema(self, schema: str):
         # Marks a schema to be skipped in the migration process by applying a table property
         try:
-            self._backend.execute(f"ALTER SCHEMA `{schema}` SET DBPROPERTIES('{self.UCX_SKIP_PROPERTY}' = true)")
+            self._backend.execute(
+                f"ALTER SCHEMA {CrawlerBase.escape(schema)} SET DBPROPERTIES('{self.UCX_SKIP_PROPERTY}' = true)"
+            )
         except NotFound as nf:
             if "[SCHEMA_NOT_FOUND]" in str(nf):
                 logger.error(f"Failed to apply skip marker for Schema {schema}. Schema not found.")
@@ -156,7 +158,7 @@ class TableMapping:
 
     def _get_database_in_scope_task(self, database: str) -> str | None:
         describe = {}
-        for value in self._backend.fetch(f"DESCRIBE SCHEMA EXTENDED {database}"):
+        for value in self._backend.fetch(f"DESCRIBE SCHEMA EXTENDED {CrawlerBase.escape(database)}"):
             describe[value["database_description_item"]] = value["database_description_value"]
         if self.UCX_SKIP_PROPERTY in TablesCrawler.parse_database_props(describe.get("Properties", "").lower()):
             logger.info(f"Database {database} is marked to be skipped")
@@ -170,7 +172,9 @@ class TableMapping:
         if self._exists_in_uc(table, rule.as_uc_table_key):
             logger.info(f"The intended target for {table.key}, {rule.as_uc_table_key}, already exists.")
             return None
-        result = self._backend.fetch(f"SHOW TBLPROPERTIES `{table.database}`.`{table.name}`")
+        result = self._backend.fetch(
+            f"SHOW TBLPROPERTIES {CrawlerBase.escape(table.database)}.{CrawlerBase.escape(table.name)}"
+        )
         for value in result:
             if value["key"] == self.UCX_SKIP_PROPERTY:
                 logger.info(f"{table.key} is marked to be skipped")

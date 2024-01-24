@@ -95,13 +95,13 @@ class Grant:
 
     def hive_revoke_sql(self) -> str:
         object_type, object_key = self.this_type_and_key()
-        return f"REVOKE {self.action_type} ON {object_type} {object_key} FROM `{self.principal}`"
+        return f"REVOKE {self.action_type} ON {object_type} {CrawlerBase.escape(object_key)} FROM `{self.principal}`"
 
     def _set_owner_sql(self, object_type, object_key):
-        return f"ALTER {object_type} {object_key} OWNER TO `{self.principal}`"
+        return f"ALTER {object_type} {CrawlerBase.escape(object_key)} OWNER TO `{self.principal}`"
 
     def _apply_grant_sql(self, action_type, object_type, object_key):
-        return f"GRANT {action_type} ON {object_type} {object_key} TO `{self.principal}`"
+        return f"GRANT {action_type} ON {object_type} {CrawlerBase.escape(object_key)} TO `{self.principal}`"
 
     def _uc_action(self, action_type):
         def inner(object_type, object_key):
@@ -155,7 +155,7 @@ class GrantsCrawler(CrawlerBase[Grant]):
         return self._snapshot(partial(self._try_load), partial(self._crawl))
 
     def _try_load(self):
-        for row in self._fetch(f"SELECT * FROM {self._full_name}"):
+        for row in self._fetch(f"SELECT * FROM {self.escape(self._full_name)}"):
             yield Grant(*row)
 
     def _crawl(self) -> Iterable[Grant]:
@@ -189,7 +189,7 @@ class GrantsCrawler(CrawlerBase[Grant]):
         tasks.append(partial(self._grants, catalog=catalog, any_file=True))
         tasks.append(partial(self._grants, catalog=catalog, anonymous_function=True))
         # scan all databases, even empty ones
-        for row in self._fetch(f"SHOW DATABASES FROM {catalog}"):
+        for row in self._fetch(f"SHOW DATABASES FROM {self.escape(catalog)}"):
             tasks.append(partial(self._grants, catalog=catalog, database=row.databaseName))
         for table in self._tc.snapshot():
             fn = partial(self._grants, catalog=catalog, database=table.database)
@@ -273,7 +273,7 @@ class GrantsCrawler(CrawlerBase[Grant]):
                 "ANY_FILE": "ANY FILE",
                 "ANONYMOUS_FUNCTION": "ANONYMOUS FUNCTION",
             }
-            for row in self._fetch(f"SHOW GRANTS ON {on_type} {key}"):
+            for row in self._fetch(f"SHOW GRANTS ON {on_type} {self.escape(key)}"):
                 (principal, action_type, object_type, _) = row
                 object_type = object_type_normalization.get(object_type, object_type)
                 if on_type != object_type:

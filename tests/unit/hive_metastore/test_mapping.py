@@ -131,12 +131,10 @@ def test_skip_happy_path(mocker, caplog):
     sbe = mocker.patch("databricks.labs.ucx.framework.crawlers.StatementExecutionBackend.__init__")
     mapping = TableMapping(ws, sbe)
     mapping.skip_table(schema="schema", table="table")
-    sbe.execute.assert_called_with(
-        f"ALTER TABLE `schema`.`table` SET TBLPROPERTIES('{mapping.UCX_SKIP_PROPERTY}' = true)"
-    )
+    sbe.execute.assert_called_with(f"ALTER TABLE schema.table SET TBLPROPERTIES('{mapping.UCX_SKIP_PROPERTY}' = true)")
     assert len(caplog.records) == 0
     mapping.skip_schema(schema="schema")
-    sbe.execute.assert_called_with(f"ALTER SCHEMA `schema` SET DBPROPERTIES('{mapping.UCX_SKIP_PROPERTY}' = true)")
+    sbe.execute.assert_called_with(f"ALTER SCHEMA schema SET DBPROPERTIES('{mapping.UCX_SKIP_PROPERTY}' = true)")
     assert len(caplog.records) == 0
 
 
@@ -174,13 +172,13 @@ def test_skip_tables_marked_for_skipping_or_upgraded():
             ["test_schema2"],
             ["test_schema3"],
         ],
-        "SHOW TBLPROPERTIES `test_schema1`.`test_table1`": [
+        "SHOW TBLPROPERTIES test_schema1.test_table1": [
             {"key": "upgraded_to", "value": "fake_dest"},
         ],
-        "SHOW TBLPROPERTIES `test_schema1`.`test_view1`": [
+        "SHOW TBLPROPERTIES test_schema1.test_view1": [
             {"key": "databricks.labs.ucx.skip", "value": "true"},
         ],
-        "SHOW TBLPROPERTIES `test_schema1`.`test_table2`": [
+        "SHOW TBLPROPERTIES test_schema1.test_table2": [
             {"key": "upgraded_to", "value": "fake_dest"},
         ],
         "DESCRIBE SCHEMA EXTENDED test_schema1": [],
@@ -280,7 +278,7 @@ def test_skip_tables_marked_for_skipping_or_upgraded():
 def test_table_with_no_target_reverted():
     errors = {}
     rows = {
-        "SHOW TBLPROPERTIES `schema1`.`table1`": [
+        "SHOW TBLPROPERTIES schema1.table1": [
             {"key": "upgraded_to", "value": "non.existing.table"},
         ],
     }
@@ -429,8 +427,8 @@ def test_skipping_rules_database_skipped():
     ]
     table_mapping.get_tables_to_migrate(tables_crawler)
 
-    assert "SHOW TBLPROPERTIES `schema1`.`table1`" in backend.queries
-    assert "SHOW TBLPROPERTIES `schema2`.`table2`" not in backend.queries
+    assert "SHOW TBLPROPERTIES schema1.table1" in backend.queries
+    assert "SHOW TBLPROPERTIES schema2.table2" not in backend.queries
 
 
 def test_skip_missing_table_in_snapshot():
