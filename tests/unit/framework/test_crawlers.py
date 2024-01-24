@@ -61,9 +61,11 @@ def test_escaped_path():
     assert "a" == cb.escape("a")
     assert "a.b" == cb.escape("a.b")
     assert "`a`.`b`.`c`" == cb.escape("`a`.`b`.`c`")
+    assert "`a.b`.`c`" == cb.escape("`a.b`.`c`")
     assert "`a-b`.c.d" == cb.escape("a-b.c.d")
     assert "a.`b-c`.d" == cb.escape("a.b-c.d")
     assert "a.b.`c-d`" == cb.escape("a.b.c-d")
+    assert "`✨`.`🍰`.`✨`" == cb.escape("✨.🍰.✨")
     # test with escaping enforced
     assert "`a`" == cb.escape("a", False)
     assert "`a`.`b`" == cb.escape("a.b", False)
