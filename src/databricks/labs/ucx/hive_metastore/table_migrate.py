@@ -247,6 +247,62 @@ class TableMove:
         Threads.strict("Creating views", view_tasks)
         logger.info(f"Moved {len(list(view_tasks))} views to the new schema {to_schema}.")
 
+    def alias_tables(
+        self,
+        from_catalog: str,
+        from_schema: str,
+        from_table: str,
+        to_catalog: str,
+        to_schema: str,
+        to_view: str,
+    ):
+        try:
+            self._ws.schemas.get(f"{from_catalog}.{from_schema}")
+        except NotFound:
+            logger.error(f"schema {from_schema} not found in catalog {from_catalog}, enter correct schema details.")
+            return
+        try:
+            self._ws.schemas.get(f"{to_catalog}.{to_schema}")
+        except NotFound:
+            logger.warning(f"schema {to_schema} not found in {to_catalog}, creating...")
+            self._ws.schemas.create(to_schema, to_catalog)
+
+        tables = self._ws.tables.list(from_catalog, from_schema)
+        table_tasks = []
+        view_tasks = []
+        filtered_tables = [table for table in tables if from_table in [table.name, "*"]]
+        for table in filtered_tables:
+            try:
+                self._ws.tables.get(f"{to_catalog}.{to_schema}.{table.name}")
+                logger.warning(
+                    f"table {from_table} already present in {from_catalog}.{from_schema}. skipping this table..."
+                )
+                continue
+            except NotFound:
+                if table.table_type and table.table_type in (TableType.EXTERNAL, TableType.MANAGED):
+                    table_tasks.append(
+                        partial(
+                            self._move_table, from_catalog, from_schema, table.name, to_catalog, to_schema, del_table
+                        )
+                    )
+                else:
+                    view_tasks.append(
+                        partial(
+                            self._move_view,
+                            from_catalog,
+                            from_schema,
+                            table.name,
+                            to_catalog,
+                            to_schema,
+                            False,
+                            table.view_definition,
+                        )
+                    )
+        Threads.strict("Creating aliases", table_tasks)
+        logger.info(f"Moved {len(list(table_tasks))} tables to the new schema {to_schema}.")
+        Threads.strict(" views", view_tasks)
+        logger.info(f"Moved {len(list(view_tasks))} views to the new schema {to_schema}.")
+
     def _move_table(
         self,
         from_catalog: str,
@@ -272,6 +328,31 @@ class TableMove:
             else:
                 logger.error(f"Failed to move table {from_table_name}: {err!s}", exc_info=True)
         return False
+
+    def _alias_table(
+        self,
+        from_catalog: str,
+        from_schema: str,
+        from_table: str,
+        to_catalog: str,
+        to_schema: str,
+        to_view: str,
+    ) -> bool:
+        from_table_name = f"{from_catalog}.{from_schema}.{from_table}"
+        to_table_name = f"{to_catalog}.{to_schema}.{from_table}"
+        try:
+            self._recreate_table(from_table_name, to_table_name)
+            self._reapply_grants(from_table_name, to_table_name)
+            if del_table:
+                logger.info(f"Dropping source table {from_table_name}")
+                drop_sql = f"DROP TABLE {from_table_name}"
+                self._backend.execute(drop_sql)
+            return True
+        except NotFound as err:
+            if "[TABLE_OR_VIEW_NOT_FOUND]" in str(err) or "[DELTA_TABLE_NOT_FOUND]" in str(err):
+                logger.error(f"Could not find table {from_table_name}. Table not found.")
+            else:
+                logger.error(f"Failed to move table {from_table_name}: {err!s}", exc_info=True)
 
     def _reapply_grants(self, from_table_name, to_table_name):
         grants = self._ws.grants.get(SecurableType.TABLE, from_table_name)

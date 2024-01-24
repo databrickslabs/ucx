@@ -238,6 +238,38 @@ def move(
 
 
 @ucx.command
+def alias(
+    w: WorkspaceClient,
+    from_catalog: str,
+    from_schema: str,
+    from_table: str,
+    to_catalog: str,
+    to_schema: str,
+    to_view: str|None = None
+):
+    """move a uc table/tables from one schema to another schema in same or different catalog"""
+    logger.info("Running alias command")
+    installation_manager = InstallationManager(w)
+    installation = installation_manager.for_user(w.current_user.me())
+    if not installation:
+        logger.error(CANT_FIND_UCX_MSG)
+        return
+    sql_backend = StatementExecutionBackend(w, installation.config.warehouse_id)
+    tables = TableMove(w, sql_backend)
+    if from_catalog == "" or to_catalog == "":
+        logger.error("Please enter from_catalog and to_catalog details")
+        return
+    if from_schema == "" or to_schema == "" or from_table == "":
+        logger.error("Please enter from_schema, to_schema and from_table(enter * for migrating all tables) details.")
+        return
+    if from_catalog == to_catalog and from_schema == to_schema:
+        logger.error("please select a different schema or catalog to migrate to")
+        return
+    logger.info(f"aliasing table {from_table} from {from_catalog}.{from_schema} to {to_catalog}.{to_schema}")
+    tables.alias_table(from_catalog, from_schema, from_table, to_catalog, to_schema, to_view)
+
+
+@ucx.command
 def save_azure_storage_accounts(w: WorkspaceClient, subscription_id: str):
     """identifies all azure storage account used by external tables
     identifies all spn which has storage blob reader, blob contributor, blob owner access

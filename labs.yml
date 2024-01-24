@@ -80,6 +80,25 @@ commands:
       - name: to-schema
         description: target schema to migrate tables to
 
+  - name: alias
+    description: |
+      alias tables across schema/catalog withing a UC metastore 
+      create a view pointing to the "from" table
+      if a view is aliased, recreates the same view in the target schema/catalog
+    flags:
+      - name: from-catalog
+        description: from catalog name
+      - name: from-schema
+        description: from schema
+      - name: from-table
+        description: table names to alias. enter * to migrate all tables
+      - name: to-catalog
+        description: target catalog to migrate schema to
+      - name: to-schema
+        description: target schema to migrate tables to
+      - name: to-view
+        description: optional, view name to migrate to
+
   - name: save-azure-storage-accounts
     description: Identifies all storage account used by tables, identify spn and its permission on each storage accounts
     flags:
