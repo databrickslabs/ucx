@@ -95,7 +95,7 @@ class JobsCrawler(CrawlerBase[JobInfo], JobsMixin):
             if not job_id:
                 continue
             cluster_failures = self._check_cluster_failures(cluster_config)
-            for failure in cluster_failures.failures:
+            for failure in json.loads(cluster_failures.failures):
                 job_assessment[job_id].add(failure)
 
         # TODO: next person looking at this - rewrite, as this code makes no sense

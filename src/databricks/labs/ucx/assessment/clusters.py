@@ -74,7 +74,6 @@ class ClustersMixin:
                 f"Cluster {cluster.cluster_id} have Unknown creator, it means that the original creator "
                 f"has been deleted and should be re-created"
             )
-            failures.append("Unknown Creator")
         cluster_info = ClusterInfo(
             cluster_id=cluster.cluster_id,
             cluster_name=cluster.cluster_name,
