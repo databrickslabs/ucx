@@ -229,7 +229,8 @@ class TableMove:
                             self._move_table, from_catalog, from_schema, table.name, to_catalog, to_schema, del_table
                         )
                     )
-                else:
+                    continue
+                if table.view_definition:
                     view_tasks.append(
                         partial(
                             self._move_view,
@@ -242,6 +243,10 @@ class TableMove:
                             table.view_definition,
                         )
                     )
+                    continue
+                logger.warning(
+                    f"table {from_table} was not identified as a valid table or view. skipping this table..."
+                )
         Threads.strict("Creating tables", table_tasks)
         logger.info(f"Moved {len(list(table_tasks))} tables to the new schema {to_schema}.")
         Threads.strict("Creating views", view_tasks)
@@ -268,8 +273,7 @@ class TableMove:
             self._ws.schemas.create(to_schema, to_catalog)
 
         tables = self._ws.tables.list(from_catalog, from_schema)
-        table_tasks = []
-        view_tasks = []
+        alias_tasks = []
         filtered_tables = [table for table in tables if from_table in [table.name, "*"]]
         for table in filtered_tables:
             try:
@@ -280,13 +284,14 @@ class TableMove:
                 continue
             except NotFound:
                 if table.table_type and table.table_type in (TableType.EXTERNAL, TableType.MANAGED):
-                    table_tasks.append(
+                    alias_tasks.append(
                         partial(
-                            self._move_table, from_catalog, from_schema, table.name, to_catalog, to_schema, del_table
+                            self._alias_table, from_catalog, from_schema, table.name, to_catalog, to_schema
                         )
                     )
-                else:
-                    view_tasks.append(
+                    continue
+                if table.view_definition:
+                    alias_tasks.append(
                         partial(
                             self._move_view,
                             from_catalog,
@@ -298,10 +303,12 @@ class TableMove:
                             table.view_definition,
                         )
                     )
-        Threads.strict("Creating aliases", table_tasks)
-        logger.info(f"Moved {len(list(table_tasks))} tables to the new schema {to_schema}.")
-        Threads.strict(" views", view_tasks)
-        logger.info(f"Moved {len(list(view_tasks))} views to the new schema {to_schema}.")
+                    continue
+                logger.warning(
+                    f"table {from_table} was not identified as a valid table or view. skipping this table..."
+                )
+        Threads.strict("Creating aliases", alias_tasks)
+        logger.info(f"Created {len(list(alias_tasks))} table and view aliases in the new schema {to_schema}.")
 
     def _move_table(
         self,
@@ -368,6 +375,11 @@ class TableMove:
         create_table_sql = create_sql.replace(f"CREATE TABLE {from_table_name}", f"CREATE TABLE {to_table_name}")
         logger.info(f"Creating table {to_table_name}")
         self._backend.execute(create_table_sql)
+
+    def _create_view(self, from_table_name, to_table_name):
+        create_view_sql = f"CREATE VIEW {to_table_name} AS SELECT * FROM {from_table_name}"
+        logger.info(f"Creating view {to_table_name} on {from_table_name}")
+        self._backend.execute(create_view_sql)
 
     def _move_view(
         self,
