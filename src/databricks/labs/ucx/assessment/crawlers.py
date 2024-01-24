@@ -63,7 +63,9 @@ def _azure_sp_conf_present_check(config: dict) -> bool:
     return False
 
 
-def spark_version_compatibility(spark_version: str) -> str:
+def spark_version_compatibility(spark_version: str | None) -> str:
+    if not spark_version:
+        return "unreported version"
     first_comp_custom_rt = 3
     first_comp_custom_x = 2
     dbr_version_components = spark_version.split("-")

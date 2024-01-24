@@ -4,7 +4,7 @@ from dataclasses import dataclass
 
 from databricks.sdk import WorkspaceClient
 from databricks.sdk.errors import NotFound
-from databricks.sdk.service.compute import ClusterSource, Policy, ClusterDetails
+from databricks.sdk.service.compute import ClusterDetails, ClusterSource, Policy
 
 from databricks.labs.ucx.assessment.crawlers import (
     _AZURE_SP_CONF_FAILURE_MSG,
@@ -75,7 +75,7 @@ class ClustersMixin:
                 f"has been deleted and should be re-created"
             )
         cluster_info = ClusterInfo(
-            cluster_id=cluster.cluster_id,
+            cluster_id=cluster.cluster_id if cluster.cluster_id else "",
             cluster_name=cluster.cluster_name,
             creator=cluster.creator_user_name,
             success=1,

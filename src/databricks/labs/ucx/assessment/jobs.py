@@ -3,20 +3,10 @@ from collections.abc import Iterable
 from dataclasses import dataclass
 
 from databricks.sdk import WorkspaceClient
-from databricks.sdk.errors import NotFound
-from databricks.sdk.service.compute import Policy
 from databricks.sdk.service.jobs import BaseJob
 
 from databricks.labs.ucx.assessment.clusters import ClustersMixin
-from databricks.labs.ucx.assessment.crawlers import (
-    _AZURE_SP_CONF_FAILURE_MSG,
-    INCOMPATIBLE_SPARK_CONFIG_KEYS,
-    _azure_sp_conf_in_init_scripts,
-    _azure_sp_conf_present_check,
-    _get_init_script_data,
-    logger,
-    spark_version_compatibility,
-)
+from databricks.labs.ucx.assessment.crawlers import logger
 from databricks.labs.ucx.framework.crawlers import CrawlerBase, SqlBackend
 
 
@@ -104,33 +94,6 @@ class JobsCrawler(CrawlerBase[JobInfo], JobsMixin):
             if len(job_assessment[job_key]) > 0:
                 job_details[job_key].success = 0
         return list(job_details.values())
-
-    def _init_scripts(self, cluster_config, job_assessment, job_id):
-        for init_script_info in cluster_config.init_scripts:
-            init_script_data = _get_init_script_data(self._ws, init_script_info)
-            if not init_script_data:
-                continue
-            if not _azure_sp_conf_in_init_scripts(init_script_data):
-                continue
-            job_assessment[job_id].add(f"{_AZURE_SP_CONF_FAILURE_MSG} Job cluster.")
-
-    def _job_spark_conf(self, cluster_config, job_assessment, job_id):
-        for k in INCOMPATIBLE_SPARK_CONFIG_KEYS:
-            if k in cluster_config.spark_conf:
-                job_assessment[job_id].add(f"unsupported config: {k}")
-        for value in cluster_config.spark_conf.values():
-            if "dbfs:/mnt" in value or "/dbfs/mnt" in value:
-                job_assessment[job_id].add(f"using DBFS mount in configuration: {value}")
-        # Checking if Azure cluster config is present in spark config
-        if _azure_sp_conf_present_check(cluster_config.spark_conf):
-            job_assessment[job_id].add(f"{_AZURE_SP_CONF_FAILURE_MSG} Job cluster.")
-
-    def _safe_get_cluster_policy(self, policy_id: str) -> Policy | None:
-        try:
-            return self._ws.cluster_policies.get(policy_id)
-        except NotFound:
-            logger.warning(f"The cluster policy was deleted: {policy_id}")
-            return None
 
     def snapshot(self) -> Iterable[JobInfo]:
         return self._snapshot(self._try_fetch, self._crawl)

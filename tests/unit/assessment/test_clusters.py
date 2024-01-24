@@ -1,9 +1,7 @@
 import json
-import re
-from unittest.mock import Mock, create_autospec
+from unittest.mock import MagicMock
 
 import pytest
-from databricks.sdk import WorkspaceClient
 from databricks.sdk.errors import DatabricksError, InternalError, NotFound
 from databricks.sdk.service.compute import (
     AutoScale,
@@ -41,44 +39,23 @@ def test_cluster_assessment_cluster_policy_no_spark_conf():
     assert result_set1[0].success == 1
 
 
-def test_cluster_assessment_cluster_policy_not_found(mocker):
-    sample_clusters1 = [
-        ClusterDetails(
-            cluster_name="cluster1",
-            autoscale=AutoScale(min_workers=1, max_workers=6),
-            spark_context_id=5134472582179565315,
-            spark_env_vars=None,
-            policy_id="D96308F1BF0003A8",
-            spark_version="13.3.x-cpu-ml-scala2.12",
-            cluster_id="0915-190044-3dqy6751",
-        )
-    ]
-    ws = Mock()
+def test_cluster_assessment_cluster_policy_not_found(caplog):
+    ws = workspace_client_mock(clusters="assortment-conf.json")
+    ws.cluster_policies.get = MagicMock()
     ws.cluster_policies.get.side_effect = NotFound("NO_POLICY")
-    clusters_crawler = ClustersCrawler(ws, MockBackend(), "ucx")
-    crawler = clusters_crawler._assess_clusters(sample_clusters1)
-    results = list(crawler)
-    assert len(results) == 1
+    crawler = ClustersCrawler(ws, MockBackend(), "ucx")
+    list(crawler.snapshot())
+    assert "The cluster policy was deleted" in caplog.messages[len(caplog.messages) - 1]
 
 
-def test_cluster_assessment_cluster_policy_exception(mocker):
-    sample_clusters1 = [
-        ClusterDetails(
-            cluster_name="cluster1",
-            autoscale=AutoScale(min_workers=1, max_workers=6),
-            spark_context_id=5134472582179565315,
-            spark_env_vars=None,
-            policy_id="D96308F1BF0003A8",
-            spark_version="13.3.x-cpu-ml-scala2.12",
-            cluster_id="0915-190044-3dqy6751",
-        )
-    ]
-    ws = Mock()
+def test_cluster_assessment_cluster_policy_exception():
+    ws = workspace_client_mock(clusters="assortment-conf.json")
+    ws.cluster_policies.get = MagicMock()
     ws.cluster_policies.get.side_effect = InternalError(...)
-    crawler = ClustersCrawler(ws, MockBackend(), "ucx")._assess_clusters(sample_clusters1)
+    crawler = ClustersCrawler(ws, MockBackend(), "ucx")
 
     with pytest.raises(DatabricksError):
-        list(crawler)
+        list(crawler.snapshot())
 
 
 def test_cluster_assessment_with_spn_cluster_policy_not_found(mocker):
@@ -233,48 +210,8 @@ def test_cluster_init_script(mocker):
     assert len(init_crawler) == 1
 
 
-def test_cluster_init_script_check_dbfs(mocker):
-    sample_clusters = [
-        ClusterDetails(
-            autoscale=AutoScale(min_workers=1, max_workers=6),
-            cluster_source=ClusterSource.UI,
-            spark_context_id=5134472582179565315,
-            spark_env_vars=None,
-            spark_version="12.3.x-cpu-ml-scala2.12",
-            cluster_id="0810-225833-atlanta69",
-            cluster_name="Tech Summit FY24 Cluster-1",
-            init_scripts=[
-                InitScriptInfo(
-                    dbfs=DbfsStorageInfo(destination="dbfs:"),
-                    s3=None,
-                    volumes=None,
-                    workspace=None,
-                ),
-                InitScriptInfo(
-                    dbfs=DbfsStorageInfo(destination="dbfs"),
-                    s3=None,
-                    volumes=None,
-                    workspace=None,
-                ),
-                InitScriptInfo(
-                    dbfs=DbfsStorageInfo(destination=":/users/test@test.com/init_scripts/test.sh"),
-                    s3=None,
-                    volumes=None,
-                    workspace=None,
-                ),
-                InitScriptInfo(
-                    dbfs=None,
-                    s3=None,
-                    volumes=None,
-                    workspace=WorkspaceStorageInfo(
-                        destination="/Users/dipankar.kushari@databricks.com/init_script_1.sh"
-                    ),
-                ),
-            ],
-        )
-    ]
-    ws = create_autospec(WorkspaceClient)
-    ws.clusters.list.return_value = sample_clusters
+def test_cluster_init_script_check_dbfs():
+    ws = workspace_client_mock(clusters="dbfs-init-scripts.json")
     ws.dbfs.read().data = "JXNoCmVjaG8gIj0="
     ws.workspace.export().content = "JXNoCmVjaG8gIj0="
     init_crawler = ClustersCrawler(ws, MockBackend(), "ucx").snapshot()
@@ -282,30 +219,17 @@ def test_cluster_init_script_check_dbfs(mocker):
 
 
 def test_cluster_without_owner_should_have_empty_creator_name():
-    sample_clusters = [
-        ClusterDetails(
-            autoscale=AutoScale(min_workers=1, max_workers=6),
-            cluster_source=ClusterSource.UI,
-            spark_context_id=5134472582179565315,
-            spark_env_vars=None,
-            spark_version="12.3.x-cpu-ml-scala2.12",
-            cluster_id="0810-225833-atlanta69",
-            cluster_name="Tech Summit FY24 Cluster-1",
-        )
-    ]
-    ws = create_autospec(WorkspaceClient)
+    ws = workspace_client_mock(clusters="no-spark-conf.json")
     mockbackend = MockBackend()
-
-    ws.clusters.list.return_value = sample_clusters
     ClustersCrawler(ws, mockbackend, "ucx").snapshot()
     result = mockbackend.rows_written_for("hive_metastore.ucx.clusters", "append")
     assert result == [
         ClusterInfo(
-            cluster_id="0810-225833-atlanta69",
-            cluster_name="Tech Summit FY24 Cluster-1",
+            cluster_id="0915-190044-3dqy6751",
+            cluster_name="Tech Summit FY24 Cluster-2",
             creator=None,
-            success=0,
-            failures='["Unknown Creator"]',
+            success=1,
+            failures='[]',
         )
     ]
 
@@ -319,4 +243,3 @@ def test_cluster_with_multiple_failures():
     failures = json.loads(result_set[0].failures)
     assert 'unsupported config: spark.databricks.passthrough.enabled' in failures
     assert 'not supported DBR: 9.3.x-cpu-ml-scala2.12' in failures
-
