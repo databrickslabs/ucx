@@ -216,9 +216,17 @@ class WorkspaceInstaller:  # pylint: disable=too-many-instance-attributes
         logger.info(msg)
 
     def _create_database(self):
-        if self._sql_backend is None:
-            self._sql_backend = StatementExecutionBackend(self._ws, self.current_config.warehouse_id)
-        deploy_schema(self._sql_backend, self.current_config.inventory_database)
+        try:
+            if self._sql_backend is None:
+                self._sql_backend = StatementExecutionBackend(self._ws, self.current_config.warehouse_id)
+            deploy_schema(self._sql_backend, self.current_config.inventory_database)
+        except BadRequest as ex:
+            if "UNRESOLVED_COLUMN.WITH_SUGGESTION" in ex:
+                logger.warning("The UCX version is not matcing with the installed version."
+                               "Kindly uninstall and Install the new version")
+            else:
+                logger.warning(ex)
+
 
     def _install_spark_config_for_hms_lineage(self):
         hms_lineage = HiveMetastoreLineageEnabler(ws=self._ws)
