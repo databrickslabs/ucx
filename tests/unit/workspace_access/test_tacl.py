@@ -1,4 +1,5 @@
 import json
+import pytest
 
 from databricks.labs.ucx.hive_metastore import GrantsCrawler, TablesCrawler
 from databricks.labs.ucx.hive_metastore.grants import Grant
@@ -235,19 +236,67 @@ def test_tacl_crawler_multiple_permissions():
 def test_tacl_applier(mocker):
     sql_backend = MockBackend()
     grants_crawler = mocker.Mock()
-    grants_crawler._grants.return_value = [
-        Grant(
-            principal="account-abc",
-            action_type="SELECT",
-            catalog="catalog_a",
-            database="database_b",
-            table="table_c",
-            view=None,
-            udf=None,
-            any_file=False,
-            anonymous_function=False,
+    grant = Grant(
+        principal="account-abc",
+        action_type="SELECT",
+        catalog="catalog_a",
+        database="database_b",
+        table="table_c",
+        view=None,
+        udf=None,
+        any_file=False,
+        anonymous_function=False,
+    )
+    grants_crawler._grants.return_value = [grant]
+    table_acl_support = TableAclSupport(grants_crawler, sql_backend)
+
+    permissions = Permissions(
+        object_type="TABLE",
+        object_id="catalog_a.database_b.table_c",
+        raw=json.dumps(
+            {
+                "principal": "abc",
+                "action_type": "SELECT",
+                "catalog": "catalog_a",
+                "database": "database_b",
+                "table": "table_c",
+            }
+        ),
+    )
+    grp = [
+        MigratedGroup(
+            id_in_workspace=None,
+            name_in_workspace="abc",
+            name_in_account="account-abc",
+            temporary_name="tmp-backup-abc",
+            members=None,
+            entitlements=None,
+            external_id=None,
+            roles=None,
         )
     ]
+    migration_state = MigrationState(grp)
+    task = table_acl_support.get_apply_task(permissions, migration_state)
+    task()
+    assert table_acl_support.verify("TABLE", "catalog_a.database_b.table_c", grant)
+    assert ["GRANT SELECT ON TABLE catalog_a.database_b.table_c TO `account-abc`"] == sql_backend.queries
+
+
+def test_tacl_applier_not_applied_1(mocker):
+    sql_backend = MockBackend()
+    grants_crawler = mocker.Mock()
+    grant = Grant(
+        principal="account-abc",
+        action_type="SELECT",
+        catalog="catalog_a",
+        database="database_b",
+        table="table_c",
+        view=None,
+        udf=None,
+        any_file=False,
+        anonymous_function=False,
+    )
+    grants_crawler._grants.return_value = None
     table_acl_support = TableAclSupport(grants_crawler, sql_backend)
 
     permissions = Permissions(
@@ -279,6 +328,58 @@ def test_tacl_applier(mocker):
     task = table_acl_support.get_apply_task(permissions, migration_state)
     task()
 
+    assert ["GRANT SELECT ON TABLE catalog_a.database_b.table_c TO `account-abc`"] == sql_backend.queries
+    assert not table_acl_support.verify("TABLE", "catalog_a.database_b.table_c", grant)
+
+
+def test_tacl_applier_not_applied_2(mocker):
+    sql_backend = MockBackend()
+    grants_crawler = mocker.Mock()
+    grant = Grant(
+        principal="account-abc",
+        action_type="MODIFY",
+        catalog="catalog_a",
+        database="database_b",
+        table="table_c",
+        view=None,
+        udf=None,
+        any_file=False,
+        anonymous_function=False,
+    )
+    grants_crawler._grants.return_value = [grant]
+    table_acl_support = TableAclSupport(grants_crawler, sql_backend)
+
+    permissions = Permissions(
+        object_type="TABLE",
+        object_id="catalog_a.database_b.table_c",
+        raw=json.dumps(
+            {
+                "principal": "abc",
+                "action_type": "SELECT",
+                "catalog": "catalog_a",
+                "database": "database_b",
+                "table": "table_c",
+            }
+        ),
+    )
+    grp = [
+        MigratedGroup(
+            id_in_workspace=None,
+            name_in_workspace="abc",
+            name_in_account="account-abc",
+            temporary_name="tmp-backup-abc",
+            members=None,
+            entitlements=None,
+            external_id=None,
+            roles=None,
+        )
+    ]
+    migration_state = MigrationState(grp)
+    task = table_acl_support.get_apply_task(permissions, migration_state)
+    
+    with pytest.raises(ValueError):
+        task()
+        
     assert ["GRANT SELECT ON TABLE catalog_a.database_b.table_c TO `account-abc`"] == sql_backend.queries
 
 
@@ -357,7 +458,7 @@ def test_tacl_applier_multiple_actions(mocker):
             udf=None,
             any_file=False,
             anonymous_function=False,
-        )
+        ),
     ]
     table_acl_support = TableAclSupport(grants_crawler, sql_backend)
 

@@ -27,9 +27,13 @@ def test_applier():
 
             def test_task():
                 self.called = True
+                self.verify(item.object_type, item.object_id, [])
                 print("here!")
 
             return partial(test_task)
+
+        def verify(self, object_type: str, object_id: str, acl: list) -> bool:
+            return True
 
     applier = SampleApplier()
     positive_item = Permissions(object_id="test", object_type="test", raw="test")
