@@ -6,6 +6,7 @@ from typing import Union
 
 from databricks.sdk.service import iam, workspace, sql
 from databricks.labs.ucx.workspace_access.groups import MigrationState
+from databricks.labs.ucx.hive_metastore.grants import Grant
 
 logger = Logger(__name__)
 
@@ -40,6 +41,6 @@ class AclSupport:
         self,
         object_type: str,
         object_id: str,
-        acl: list[Union[iam.AccessControlRequest, workspace.AclItem, sql.AccessControl]],
+        acl: Union[list[Union[iam.AccessControlRequest, workspace.AclItem, sql.AccessControl]], Grant],
     ) -> bool:
         """This method verifies that all the crawled permissions are applied correctly to the destination group."""

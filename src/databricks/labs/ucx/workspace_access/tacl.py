@@ -86,9 +86,10 @@ class TableAclSupport(AclSupport):
             return None
         target_grant = dataclasses.replace(grant, principal=target_principal)
         # this has to be executed on tacl cluster, otherwise - use SQLExecutionAPI backend & Warehouse
-        return partial(self._apply_grant, target_grant)
+        object_type, object_id = target_grant.this_type_and_key()
+        return partial(self._apply_grant, object_type, object_id, target_grant)
 
-    def _apply_grant(self, grant: Grant):
+    def _apply_grant(self, object_type: str, object_id: str, grant: Grant):
         """
         Apply grants and OWN permission serially for the same principal, object_id and object_type.
         Executing grants (using GRANT statement) and OWN permission (using ALTER statement) concurrently
@@ -97,4 +98,30 @@ class TableAclSupport(AclSupport):
         """
         for sql in grant.hive_grant_sql():
             self._sql_backend.execute(sql)
+
+        self.verify(object_type, object_id, grant)
         return True
+
+    def verify(self, object_type: str, object_id: str, acl: Grant) -> bool:
+        grant_dict = dataclasses.asdict(acl)
+        del grant_dict["action_type"]
+        del grant_dict["principal"]
+        grants_on_object = self._grants_crawler._grants(**grant_dict)
+        
+        if grants_on_object:
+            action_types_for_current_principal = [
+                grant.action_type for grant in grants_on_object if grant.principal == acl.principal
+            ]
+
+            acl_action_types = acl.action_type.split(", ")
+
+            if all(action_type in action_types_for_current_principal for action_type in acl_action_types):
+                return True
+
+            else:
+                msg = f"""Couldn't apply appropriate ACL for object type: {object_type} with name: {object_id}
+                    acl to be applied for principal {acl.principal}={acl_action_types}
+                    acl found in the object for principal={action_types_for_current_principal}
+                    """
+                raise ValueError(msg)
+        return False
