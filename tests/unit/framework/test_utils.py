@@ -14,6 +14,7 @@ def test_escaped_path():
     assert "a.`b-c`.d" == escape_sql_identifier("a.b-c.d")
     assert "a.b.`c-d`" == escape_sql_identifier("a.b.c-d")
     assert "`✨`.`🍰`.`✨`" == escape_sql_identifier("✨.🍰.✨")
+    assert "a.b.`c.d`" == escape_sql_identifier("a.b.c.d")
     # test with escaping enforced
     assert "`a`" == escape_sql_identifier("a", False)
     assert "`a`.`b`" == escape_sql_identifier("a.b", False)
@@ -21,3 +22,4 @@ def test_escaped_path():
     assert "`a-b`.`c`.`d`" == escape_sql_identifier("a-b.c.d", False)
     assert "`a`.`b-c`.`d`" == escape_sql_identifier("a.b-c.d", False)
     assert "`a`.`b`.`c-d`" == escape_sql_identifier("a.b.c-d", False)
+    assert "`a`.`b`.`c.d`" == escape_sql_identifier("a.b.c.d", False)
