@@ -4,10 +4,12 @@ from unittest.mock import MagicMock, create_autospec
 from databricks.sdk import WorkspaceClient
 from databricks.sdk.errors import NotFound
 from databricks.sdk.service.catalog import (
+    PermissionsChange,
     PermissionsList,
     Privilege,
     PrivilegeAssignment,
     SchemaInfo,
+    SecurableType,
     TableInfo,
     TableType,
 )
@@ -428,4 +430,78 @@ def test_move_one_table_without_dropping_source():
 
     assert ["CREATE TABLE TgtC.TgtS.table1 (name string)", "SHOW CREATE TABLE SrcC.SrcS.table1"] == sorted(
         backend.queries
+    )
+
+
+def test_move_apply_grants():
+    client = create_autospec(WorkspaceClient)
+
+    client.tables.list.return_value = [
+        TableInfo(
+            catalog_name="SrcC",
+            schema_name="SrcS",
+            name="table1",
+            full_name="SrcC.SrcS.table1",
+            table_type=TableType.EXTERNAL,
+        ),
+    ]
+
+    perm = PermissionsList([PrivilegeAssignment("user@email.com", [Privilege.SELECT, Privilege.MODIFY])])
+
+    rows = {
+        "SHOW CREATE TABLE SrcC.SrcS.table1": [
+            ["CREATE TABLE SrcC.SrcS.table1 (name string)"],
+        ]
+    }
+
+    client.grants.get.return_value = perm
+    client.schemas.get.side_effect = [SchemaInfo(), SchemaInfo()]
+    client.tables.get.side_effect = [NotFound(), NotFound(), NotFound(), NotFound()]
+    client.grants.update = MagicMock()
+    backend = MockBackend(rows=rows)
+    tm = TableMove(client, backend)
+    tm.move_tables("SrcC", "SrcS", "table1", "TgtC", "TgtS", False)
+
+    assert ["CREATE TABLE TgtC.TgtS.table1 (name string)", "SHOW CREATE TABLE SrcC.SrcS.table1"] == sorted(
+        backend.queries
+    )
+    client.grants.update.assert_called_with(
+        SecurableType.TABLE,
+        'TgtC.TgtS.table1',
+        changes=[PermissionsChange([Privilege.SELECT, Privilege.MODIFY], "user@email.com")],
+    )
+
+
+def test_alias_apply_grants():
+    client = create_autospec(WorkspaceClient)
+
+    client.tables.list.return_value = [
+        TableInfo(
+            catalog_name="SrcC",
+            schema_name="SrcS",
+            name="table1",
+            full_name="SrcC.SrcS.table1",
+            table_type=TableType.EXTERNAL,
+        ),
+    ]
+
+    perm = PermissionsList([PrivilegeAssignment("user@email.com", [Privilege.SELECT, Privilege.MODIFY])])
+
+    rows = {
+        "SHOW CREATE TABLE SrcC.SrcS.table1": [
+            ["CREATE TABLE SrcC.SrcS.table1 (name string)"],
+        ]
+    }
+
+    client.grants.get.return_value = perm
+    client.schemas.get.side_effect = [SchemaInfo(), SchemaInfo()]
+    client.tables.get.side_effect = [NotFound(), NotFound(), NotFound(), NotFound()]
+    client.grants.update = MagicMock()
+    backend = MockBackend(rows=rows)
+    tm = TableMove(client, backend)
+    tm.alias_tables("SrcC", "SrcS", "table1", "TgtC", "TgtS")
+
+    assert ["CREATE VIEW TgtC.TgtS.table1 AS SELECT * FROM SrcC.SrcS.table1"] == sorted(backend.queries)
+    client.grants.update.assert_called_with(
+        SecurableType.TABLE, 'TgtC.TgtS.table1', changes=[PermissionsChange([Privilege.SELECT], "user@email.com")]
     )
