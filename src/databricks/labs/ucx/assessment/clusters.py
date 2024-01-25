@@ -68,21 +68,12 @@ class ClustersMixin:
                 continue
             failures.append(f"{_AZURE_SP_CONF_FAILURE_MSG} cluster.")
 
-    def _check_cluster_failures(self, cluster: ClusterDetails | compute.ClusterSpec):
+    def _check_cluster_failures(self, cluster: ClusterDetails):
         failures = []
-        if isinstance(cluster, ClusterDetails) and not cluster.creator_user_name:
-            logger.warning(
-                f"Cluster {cluster.cluster_id} have Unknown creator, it means that the original creator "
-                f"has been deleted and should be re-created"
-            )
-        cluster_id = cluster.cluster_id if isinstance(cluster, ClusterDetails) and cluster.cluster_id else ""
-        creator_user_name = (
-            cluster.creator_user_name if isinstance(cluster, ClusterDetails) and cluster.creator_user_name else None
-        )
         cluster_info = ClusterInfo(
-            cluster_id=cluster_id,
+            cluster_id=cluster.cluster_id,
             cluster_name=cluster.cluster_name,
-            creator=creator_user_name,
+            creator=cluster.creator_user_name,
             success=1,
             failures="[]",
         )
@@ -115,6 +106,11 @@ class ClustersCrawler(CrawlerBase[ClusterInfo], ClustersMixin):
         for cluster in all_clusters:
             if cluster.cluster_source == ClusterSource.JOB:
                 continue
+            if not cluster.creator_user_name:
+                logger.warning(
+                    f"Cluster {cluster.cluster_id} have Unknown creator, it means that the original creator "
+                    f"has been deleted and should be re-created"
+                )
             yield self._check_cluster_failures(cluster)
 
     def snapshot(self) -> Iterable[ClusterInfo]:
