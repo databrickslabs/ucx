@@ -8,6 +8,7 @@ from databricks.sdk import WorkspaceClient
 from databricks.labs.ucx.assessment.crawlers import (
     _AZURE_SP_CONF_FAILURE_MSG,
     _azure_sp_conf_in_init_scripts,
+    _check_init_script,
     logger,
 )
 from databricks.labs.ucx.framework.crawlers import CrawlerBase, SqlBackend
@@ -52,9 +53,8 @@ class GlobalInitScriptCrawler(CrawlerBase[GlobalInitScriptInfo]):
             global_init_script = base64.b64decode(script.script).decode("utf-8")
             if not global_init_script:
                 continue
-            if _azure_sp_conf_in_init_scripts(global_init_script):
-                failures.append(f"{_AZURE_SP_CONF_FAILURE_MSG} global init script.")
-                global_init_script_info.failures = json.dumps(failures)
+            failures.extend(_check_init_script(global_init_script, "global init script"))
+            global_init_script_info.failures = json.dumps(failures)
 
             if len(failures) > 0:
                 global_init_script_info.success = 0

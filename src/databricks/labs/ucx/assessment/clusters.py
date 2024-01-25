@@ -9,7 +9,7 @@ from databricks.sdk.service.compute import ClusterSource, Policy
 from databricks.labs.ucx.assessment.crawlers import (
     _check_spark_conf,
     _check_cluster_policy,
-    _check_init_scripts,
+    _check_cluster_init_script,
     logger,
     spark_version_compatibility,
 )
@@ -63,10 +63,11 @@ class ClustersCrawler(CrawlerBase[ClusterInfo]):
 
             # Checking if Azure cluster config is present in cluster policies
             if cluster.policy_id:
-                _check_cluster_policy(self._ws, cluster, failures)
+                failures.extend(_check_cluster_policy(self._ws, cluster, "cluster"))
 
+            # check init scripts
             if cluster.init_scripts:
-                _check_init_scripts(self._ws, cluster, failures)
+                failures.extend(_check_cluster_init_script(self._ws, cluster.init_scripts, "cluster"))
 
             cluster_info.failures = json.dumps(failures)
             if len(failures) > 0:

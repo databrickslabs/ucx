@@ -114,21 +114,31 @@ def _safe_get_cluster_policy(ws:WorkspaceClient, policy_id: str) -> Policy | Non
         logger.warning(f"The cluster policy was deleted: {policy_id}")
         return None
 
-def _check_cluster_policy(cluster, failures):
-    policy = _safe_get_cluster_policy(cluster.policy_id)
+def _check_cluster_policy(ws:WorkspaceClient, cluster, source):
+    failures = []
+    policy = _safe_get_cluster_policy(ws, cluster.policy_id)
     if policy:
         if policy.definition:
             if _azure_sp_conf_present_check(json.loads(policy.definition)):
-                failures.append(f"{_AZURE_SP_CONF_FAILURE_MSG} cluster.")
+                failures.append(f"{_AZURE_SP_CONF_FAILURE_MSG} {source}.")
         if policy.policy_family_definition_overrides:
             if _azure_sp_conf_present_check(json.loads(policy.policy_family_definition_overrides)):
-                failures.append(f"{_AZURE_SP_CONF_FAILURE_MSG} cluster.")
+                failures.append(f"{_AZURE_SP_CONF_FAILURE_MSG} {source}.")
+    return failures
 
-def _check_init_scripts(ws:WorkspaceClient, cluster, failures):
-    for init_script_info in cluster.init_scripts:
+
+def _check_cluster_init_script(ws:WorkspaceClient, init_scripts, source):
+    failures = []
+    for init_script_info in init_scripts:
         init_script_data = _get_init_script_data(ws, init_script_info)
-        if not init_script_data:
-            continue
-        if not _azure_sp_conf_in_init_scripts(init_script_data):
-            continue
-        failures.append(f"{_AZURE_SP_CONF_FAILURE_MSG} cluster.")
+        failures.extend(_check_init_script(init_script_data, source))
+    return failures
+
+
+def _check_init_script(init_script_data, source):
+    failures = []
+    if not init_script_data:
+        return failures
+    if _azure_sp_conf_in_init_scripts(init_script_data):
+        failures.append(f"{_AZURE_SP_CONF_FAILURE_MSG} {source}.")
+    return failures

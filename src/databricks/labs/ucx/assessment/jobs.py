@@ -12,7 +12,7 @@ from databricks.labs.ucx.assessment.crawlers import (
     INCOMPATIBLE_SPARK_CONFIG_KEYS,
     _check_spark_conf,
     _check_cluster_policy,
-    _check_init_scripts,
+    _check_cluster_init_script,
     _azure_sp_conf_in_init_scripts,
     _azure_sp_conf_present_check,
     _get_init_script_data,
@@ -102,24 +102,17 @@ class JobsCrawler(CrawlerBase[JobInfo], JobsMixin):
             if support_status != "supported":
                 job_assessment[job_id].add(f"not supported DBR: {cluster_config.spark_version}")
 
-            # check spark version
+            # check spark config
             if cluster_config.spark_conf is not None:
-                job_assessment[job_id].update(_check_spark_conf(cluster_config.spark_conf, "cluster"))
+                job_assessment[job_id].update(_check_spark_conf(cluster_config.spark_conf, "Job cluster"))
 
             # Checking if Azure cluster config is present in cluster policies
             if cluster_config.policy_id:
-                policy = self._safe_get_cluster_policy(cluster_config.policy_id)
-                if policy is None:
-                    continue
-                if policy.definition:
-                    if _azure_sp_conf_present_check(json.loads(policy.definition)):
-                        job_assessment[job_id].add(f"{_AZURE_SP_CONF_FAILURE_MSG} Job cluster.")
-                if policy.policy_family_definition_overrides:
-                    if _azure_sp_conf_present_check(json.loads(policy.policy_family_definition_overrides)):
-                        job_assessment[job_id].add(f"{_AZURE_SP_CONF_FAILURE_MSG} Job cluster.")
+                job_assessment[job_id].update(_check_cluster_policy(self._ws, cluster_config, "Job cluster"))
 
+            # check init scripts
             if cluster_config.init_scripts:
-                self._init_scripts(cluster_config, job_assessment, job_id)
+                job_assessment[job_id].update(_check_cluster_init_script(self._ws, cluster_config.init_scripts, "Job cluster"))
 
         # TODO: next person looking at this - rewrite, as this code makes no sense
         for job_key in job_details.keys():  # pylint: disable=consider-using-dict-items,consider-iterating-dictionary
