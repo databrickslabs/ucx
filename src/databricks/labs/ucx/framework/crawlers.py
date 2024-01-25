@@ -2,7 +2,6 @@ import dataclasses
 import logging
 import os
 import pkgutil
-import string
 from abc import ABC, abstractmethod
 from collections.abc import Callable, Iterable, Iterator, Sequence
 from types import UnionType
@@ -20,7 +19,6 @@ from databricks.sdk.errors import (
 from databricks.labs.ucx.mixins.sql import Row, StatementExecutionExt
 
 logger = logging.getLogger(__name__)
-allowed_object_chars = set(string.ascii_letters + string.digits + '_')
 
 
 class DataclassInstance(Protocol):
@@ -232,28 +230,6 @@ class CrawlerBase(Generic[Result]):
             str: The full table name.
         """
         return f"{self._catalog}.{self._schema}.{self._table}"
-
-    @staticmethod
-    def escape(path: str, optional: bool | None = True) -> str:
-        """
-        Escapes the path components to make them SQL safe.
-
-        Args:
-            path (str): The dot-separated path of a catalog object.
-            optional (bool): If `True` then do not escape if no special characters are present.
-
-        Returns:
-             str: The path with all parts escaped in backticks.
-        """
-        parts = path.split(".")
-        escaped = []
-        for part in parts:
-            if not part.startswith("`") and not part.endswith("`"):
-                part = part.strip("`")
-                if not optional or not set(part) <= allowed_object_chars:
-                    part = f"`{part}`"
-            escaped.append(part)
-        return ".".join(escaped)
 
     @staticmethod
     def _valid(name: str) -> str:

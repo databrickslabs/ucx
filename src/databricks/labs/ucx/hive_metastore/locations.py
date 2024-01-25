@@ -10,6 +10,7 @@ from databricks.sdk import WorkspaceClient
 from databricks.sdk.service.workspace import ImportFormat
 
 from databricks.labs.ucx.framework.crawlers import CrawlerBase, SqlBackend
+from databricks.labs.ucx.framework.utils import escape_sql_identifier
 from databricks.labs.ucx.mixins.sql import Row
 
 logger = logging.getLogger(__name__)
@@ -110,7 +111,7 @@ class ExternalLocations(CrawlerBase[ExternalLocation]):
     def _external_location_list(self) -> Iterable[ExternalLocation]:
         tables = list(
             self._backend.fetch(
-                f"SELECT location, storage_properties FROM {self.escape(self._schema)}.tables WHERE location IS NOT NULL"
+                f"SELECT location, storage_properties FROM {escape_sql_identifier(self._schema)}.tables WHERE location IS NOT NULL"
             )
         )
         mounts = Mounts(self._backend, self._ws, self._schema).snapshot()
@@ -120,7 +121,9 @@ class ExternalLocations(CrawlerBase[ExternalLocation]):
         return self._snapshot(self._try_fetch, self._external_location_list)
 
     def _try_fetch(self) -> Iterable[ExternalLocation]:
-        for row in self._fetch(f"SELECT * FROM {self.escape(self._schema)}.{self.escape(self._table)}"):
+        for row in self._fetch(
+            f"SELECT * FROM {escape_sql_identifier(self._schema)}.{escape_sql_identifier(self._table)}"
+        ):
             yield ExternalLocation(*row)
 
     def _get_ext_location_definitions(self, missing_locations: list[ExternalLocation]) -> list:
@@ -227,5 +230,7 @@ class Mounts(CrawlerBase[Mount]):
         return self._snapshot(self._try_fetch, self._list_mounts)
 
     def _try_fetch(self) -> Iterable[Mount]:
-        for row in self._fetch(f"SELECT * FROM {self.escape(self._schema)}.{self.escape(self._table)}"):
+        for row in self._fetch(
+            f"SELECT * FROM {escape_sql_identifier(self._schema)}.{escape_sql_identifier(self._table)}"
+        ):
             yield Mount(*row)

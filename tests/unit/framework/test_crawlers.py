@@ -51,30 +51,6 @@ def test_full_name():
     assert "a.b.c" == cb._full_name
 
 
-def test_escaped_path():
-    cb = CrawlerBase(MockBackend(), "a", "b", "c", Bar)
-    assert "a.b.c" == cb.escape(cb._full_name)
-    # test with optional escaping
-    assert "a" == cb.escape("a")
-    assert "a.b" == cb.escape("a.b")
-    assert "a.b.c" == cb.escape("a.b.c")
-    assert "a" == cb.escape("a")
-    assert "a.b" == cb.escape("a.b")
-    assert "`a`.`b`.`c`" == cb.escape("`a`.`b`.`c`")
-    assert "`a.b`.`c`" == cb.escape("`a.b`.`c`")
-    assert "`a-b`.c.d" == cb.escape("a-b.c.d")
-    assert "a.`b-c`.d" == cb.escape("a.b-c.d")
-    assert "a.b.`c-d`" == cb.escape("a.b.c-d")
-    assert "`✨`.`🍰`.`✨`" == cb.escape("✨.🍰.✨")
-    # test with escaping enforced
-    assert "`a`" == cb.escape("a", False)
-    assert "`a`.`b`" == cb.escape("a.b", False)
-    assert "`a`.`b`.`c`" == cb.escape("a.b.c", False)
-    assert "`a-b`.`c`.`d`" == cb.escape("a-b.c.d", False)
-    assert "`a`.`b-c`.`d`" == cb.escape("a.b-c.d", False)
-    assert "`a`.`b`.`c-d`" == cb.escape("a.b.c-d", False)
-
-
 def test_snapshot_appends_to_existing_table():
     b = MockBackend()
     cb = CrawlerBase(b, "a", "b", "c", Bar)
