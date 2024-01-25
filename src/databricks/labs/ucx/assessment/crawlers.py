@@ -5,7 +5,10 @@ import re
 
 from databricks.sdk import WorkspaceClient
 from databricks.sdk.errors import NotFound
-from databricks.sdk.service.compute import Policy
+from databricks.sdk.service import compute
+from databricks.sdk.service.compute import ClusterDetails, Policy
+
+from databricks.labs.ucx.assessment.clusters import ClusterInfo
 
 logger = logging.getLogger(__name__)
 
@@ -66,7 +69,9 @@ def _azure_sp_conf_present_check(config: dict) -> bool:
     return False
 
 
-def spark_version_compatibility(spark_version: str) -> str:
+def spark_version_compatibility(spark_version: str | None) -> str:
+    if not spark_version:
+        return "unreported version"
     first_comp_custom_rt = 3
     first_comp_custom_x = 2
     dbr_version_components = spark_version.split("-")
@@ -142,3 +147,37 @@ def _check_init_script(init_script_data, source):
     if _azure_sp_conf_in_init_scripts(init_script_data):
         failures.append(f"{_AZURE_SP_CONF_FAILURE_MSG} {source}.")
     return failures
+
+
+def _check_cluster_failures(ws:WorkspaceClient, cluster: ClusterDetails | compute.ClusterSpec, source):
+    failures = []
+    if isinstance(cluster, ClusterDetails) and not cluster.creator_user_name:
+        logger.warning(
+            f"Cluster {cluster.cluster_id} have Unknown creator, it means that the original creator "
+            f"has been deleted and should be re-created"
+        )
+    cluster_id = cluster.cluster_id if isinstance(cluster, ClusterDetails) and cluster.cluster_id else ""
+    creator_user_name = (
+        cluster.creator_user_name if isinstance(cluster, ClusterDetails) and cluster.creator_user_name else None
+    )
+    cluster_info = ClusterInfo(
+        cluster_id=cluster_id,
+        cluster_name=cluster.cluster_name,
+        creator=creator_user_name,
+        success=1,
+        failures="[]",
+    )
+    support_status = spark_version_compatibility(cluster.spark_version)
+    if support_status != "supported":
+        failures.append(f"not supported DBR: {cluster.spark_version}")
+    if cluster.spark_conf is not None:
+        failures.extend(_check_spark_conf(cluster.spark_conf, source))
+    # Checking if Azure cluster config is present in cluster policies
+    if cluster.policy_id:
+        failures.extend(_check_cluster_policy(ws, cluster, source))
+    if cluster.init_scripts:
+        failures.extend(_check_cluster_init_script(ws, cluster.init_scripts, source))
+    cluster_info.failures = json.dumps(failures)
+    if len(failures) > 0:
+        cluster_info.success = 0
+    return cluster_info
