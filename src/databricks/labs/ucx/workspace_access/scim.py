@@ -94,9 +94,12 @@ class ScimSupport(AclSupport):
             raw=json.dumps([e.as_dict() for e in getattr(group, property_name)]),
         )
 
-    def _inflight_check(self, group_id: str, value: list[iam.ComplexValue], property_name: str):
+    def verify(self, object_type: str, object_id: str, acl: list[iam.ComplexValue]):
         # in-flight check for the applied permissions
         # the api might be inconsistent, therefore we need to check that the permissions were applied
+        property_name = object_type
+        group_id = object_id
+        value = acl
         group = self._safe_get_group(group_id)
         if group:
             if property_name == "roles" and group.roles:
@@ -126,8 +129,8 @@ class ScimSupport(AclSupport):
         patch_retried_check(group_id, operations, schemas)
 
         retry_on_value_error = retried(on=[*retryable_errors, ValueError], timeout=self._verify_timeout)
-        retried_check = retry_on_value_error(self._inflight_check)
-        return retried_check(group_id, value, property_name)
+        retried_check = retry_on_value_error(self.verify)
+        return retried_check(property_name, group_id, value)
 
     def _safe_patch_group(
         self, group_id: str, operations: list[Patch] | None = None, schemas: list[PatchSchema] | None = None
