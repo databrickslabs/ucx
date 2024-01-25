@@ -85,7 +85,7 @@ class SecretScopesSupport(AclSupport):
         if applied_permission != expected_permission:
             msg = (
                 f"Applied permission {applied_permission} is not equal to expected "
-                f"permission {expected_permission} for scope: {object_id} and group: {principal}!"
+                f"permission {expected_permission} for object type {object_type}: {object_id} and group: {principal}!"
             )
             logger.debug(msg)
             return False

@@ -2,11 +2,11 @@ from abc import abstractmethod
 from collections.abc import Callable, Iterable
 from dataclasses import dataclass
 from logging import Logger
-from typing import Union
 
-from databricks.sdk.service import iam, workspace, sql
-from databricks.labs.ucx.workspace_access.groups import MigrationState
+from databricks.sdk.service import iam, sql, workspace
+
 from databricks.labs.ucx.hive_metastore.grants import Grant
+from databricks.labs.ucx.workspace_access.groups import MigrationState
 
 logger = Logger(__name__)
 
@@ -41,6 +41,6 @@ class AclSupport:
         self,
         object_type: str,
         object_id: str,
-        acl: Union[list[Union[iam.AccessControlRequest, workspace.AclItem, sql.AccessControl]], Grant],
+        acl: list[iam.AccessControlRequest | workspace.AclItem | sql.AccessControl] | Grant,
     ) -> bool:
         """This method verifies that all the crawled permissions are applied correctly to the destination group."""
