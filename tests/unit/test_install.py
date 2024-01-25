@@ -1206,7 +1206,7 @@ def test_repair_run_result_state(ws, caplog):
 def test_create_database(ws, mocker, caplog):
     install = WorkspaceInstaller(
         ws,
-        sql_backend=MockBackend(),
+        sql_backend=None,
         promtps=MockPrompts(
             {
                 r".*PRO or SERVERLESS SQL warehouse.*": "1",
