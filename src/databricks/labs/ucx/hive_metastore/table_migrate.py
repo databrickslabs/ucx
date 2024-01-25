@@ -365,10 +365,10 @@ class TableMove:
             logger.info(f"Applying grants on table {to_table_name}")
             grants_changes = []
             for permission in grants.privilege_assignments:
-                if not target_view:
-                    grants_changes.append(PermissionsChange(permission.privileges, permission.principal))
-                    continue
                 if not permission.privileges:
+                    continue
+                if not target_view:
+                    grants_changes.append(PermissionsChange(list(permission.privileges), permission.principal))
                     continue
                 privileges = set()
                 for privilege in permission.privileges:
