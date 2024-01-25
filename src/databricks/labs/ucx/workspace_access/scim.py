@@ -100,7 +100,7 @@ class ScimSupport(AclSupport):
         object_type: str,
         object_id: str,
         acl: list[iam.AccessControlRequest | sql.AccessControl | iam.ComplexValue] | Grant | workspace.AclItem,
-    ) -> bool:  
+    ) -> bool:
         # in-flight check for the applied permissions
         # the api might be inconsistent, therefore we need to check that the permissions were applied
         if isinstance(acl, list) and len(acl) > 0 and isinstance(acl[0], iam.ComplexValue):
