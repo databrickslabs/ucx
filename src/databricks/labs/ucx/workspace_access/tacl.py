@@ -126,10 +126,9 @@ class TableAclSupport(AclSupport):
                 if all(action_type in action_types_for_current_principal for action_type in acl_action_types):
                     return True
 
-                else:
-                    msg = f"""Couldn't apply appropriate ACL for object type: {object_type} with name: {object_id} 
-                        acl to be applied for principal {acl.principal}={acl_action_types} 
-                        acl found in the object for principal={action_types_for_current_principal}
-                        """
-                    raise ValueError(msg)
+                msg = f"""Couldn't apply appropriate ACL for object type: {object_type} with name: {object_id} 
+                    acl to be applied for principal {acl.principal}={acl_action_types} 
+                    acl found in the object for principal={action_types_for_current_principal}
+                    """
+                raise ValueError(msg)
         return False
