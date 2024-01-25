@@ -70,7 +70,7 @@ def test_move_tables_not_found_table_error(mocker, caplog):
 def test_move_tables_not_found_table_unknown_error(caplog):
     client = create_autospec(WorkspaceClient)
     client.schemas.get.side_effect = [SchemaInfo(), NotFound()]
-    backend = backend = create_autospec(StatementExecutionBackend)
+    backend = create_autospec(StatementExecutionBackend)
     backend.execute.side_effect = NotFound("unknown error")
 
     client.tables.list.return_value = [

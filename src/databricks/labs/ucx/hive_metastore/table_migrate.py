@@ -385,7 +385,7 @@ class TableMove:
         logger.info(f"Creating table {to_table_name}")
         self._backend.execute(create_table_sql)
 
-    def _create_view(self, from_table_name, to_table_name):
+    def _create_alias_view(self, from_table_name, to_table_name):
         create_view_sql = f"CREATE VIEW {to_table_name} AS SELECT * FROM {from_table_name}"
         logger.info(f"Creating view {to_table_name} on {from_table_name}")
         self._backend.execute(create_view_sql)

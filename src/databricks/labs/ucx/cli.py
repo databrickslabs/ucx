@@ -247,7 +247,6 @@ def alias(
     to_schema: str,
 ):
     """move a uc table/tables from one schema to another schema in same or different catalog"""
-    logger.info("Running alias command")
     installation_manager = InstallationManager(w)
     installation = installation_manager.for_user(w.current_user.me())
     if not installation:
