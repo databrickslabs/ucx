@@ -5,7 +5,7 @@ from functools import partial
 from databricks.labs.blueprint.parallel import Threads
 from databricks.sdk import WorkspaceClient
 from databricks.sdk.errors import NotFound
-from databricks.sdk.service.catalog import PermissionsChange, SecurableType, TableType
+from databricks.sdk.service.catalog import PermissionsChange, SecurableType, TableType, Privilege
 
 from databricks.labs.ucx.framework.crawlers import SqlBackend
 from databricks.labs.ucx.hive_metastore import TablesCrawler
@@ -17,11 +17,11 @@ logger = logging.getLogger(__name__)
 
 class TablesMigrate:
     def __init__(
-        self,
-        tc: TablesCrawler,
-        ws: WorkspaceClient,
-        backend: SqlBackend,
-        tm: TableMapping,
+            self,
+            tc: TablesCrawler,
+            ws: WorkspaceClient,
+            backend: SqlBackend,
+            tm: TableMapping,
     ):
         self._tc = tc
         self._backend = backend
@@ -102,7 +102,7 @@ class TablesMigrate:
         return upgraded_tables
 
     def revert_migrated_tables(
-        self, schema: str | None = None, table: str | None = None, *, delete_managed: bool = False
+            self, schema: str | None = None, table: str | None = None, *, delete_managed: bool = False
     ):
         self._init_seen_tables()
         upgraded_tables = self._get_tables_to_revert(schema=schema, table=table)
@@ -192,13 +192,13 @@ class TableMove:
         self._ws = ws
 
     def move_tables(
-        self,
-        from_catalog: str,
-        from_schema: str,
-        from_table: str,
-        to_catalog: str,
-        to_schema: str,
-        del_table: bool,  # noqa: FBT001
+            self,
+            from_catalog: str,
+            from_schema: str,
+            from_table: str,
+            to_catalog: str,
+            to_schema: str,
+            del_table: bool,  # noqa: FBT001
     ):
         try:
             self._ws.schemas.get(f"{from_catalog}.{from_schema}")
@@ -253,12 +253,12 @@ class TableMove:
         logger.info(f"Moved {len(list(view_tasks))} views to the new schema {to_schema}.")
 
     def alias_tables(
-        self,
-        from_catalog: str,
-        from_schema: str,
-        from_table: str,
-        to_catalog: str,
-        to_schema: str,
+            self,
+            from_catalog: str,
+            from_schema: str,
+            from_table: str,
+            to_catalog: str,
+            to_schema: str,
     ):
         try:
             self._ws.schemas.get(f"{from_catalog}.{from_schema}")
@@ -308,13 +308,13 @@ class TableMove:
         logger.info(f"Created {len(list(alias_tasks))} table and view aliases in the new schema {to_schema}.")
 
     def _move_table(
-        self,
-        from_catalog: str,
-        from_schema: str,
-        from_table: str,
-        to_catalog: str,
-        to_schema: str,
-        del_table: bool,  # noqa: FBT001
+            self,
+            from_catalog: str,
+            from_schema: str,
+            from_table: str,
+            to_catalog: str,
+            to_schema: str,
+            del_table: bool,  # noqa: FBT001
     ) -> bool:
         from_table_name = f"{from_catalog}.{from_schema}.{from_table}"
         to_table_name = f"{to_catalog}.{to_schema}.{from_table}"
@@ -334,18 +334,18 @@ class TableMove:
         return False
 
     def _alias_table(
-        self,
-        from_catalog: str,
-        from_schema: str,
-        from_table: str,
-        to_catalog: str,
-        to_schema: str,
+            self,
+            from_catalog: str,
+            from_schema: str,
+            from_table: str,
+            to_catalog: str,
+            to_schema: str,
     ) -> bool:
         from_table_name = f"{from_catalog}.{from_schema}.{from_table}"
         to_table_name = f"{to_catalog}.{to_schema}.{from_table}"
         try:
             self._create_view(from_table_name, to_table_name)
-            self._reapply_grants(from_table_name, to_table_name)
+            self._reapply_grants(from_table_name, to_table_name, target_view=True)
             return True
         except NotFound as err:
             if "[TABLE_OR_VIEW_NOT_FOUND]" in str(err) or "[DELTA_TABLE_NOT_FOUND]" in str(err):
@@ -354,13 +354,22 @@ class TableMove:
                 logger.error(f"Failed to alias table {from_table_name}: {err!s}", exc_info=True)
             return False
 
-    def _reapply_grants(self, from_table_name, to_table_name):
+    def _reapply_grants(self, from_table_name, to_table_name, *, target_view: bool = False):
         grants = self._ws.grants.get(SecurableType.TABLE, from_table_name)
         if grants.privilege_assignments is not None:
             logger.info(f"Applying grants on table {to_table_name}")
-            grants_changes = [
-                PermissionsChange(pair.privileges, pair.principal) for pair in grants.privilege_assignments
-            ]
+            grants_changes = []
+            for permission in grants.privilege_assignments:
+                if not target_view:
+                    grants_changes.append(PermissionsChange(permission.privileges, permission.principal))
+                    continue
+                privileges = []
+                for privilege in permission.privileges:
+                    if privilege != Privilege.MODIFY:
+                        privileges.append(privilege)
+                if privileges:
+                    grants_changes.append(PermissionsChange(privileges, permission.principal))
+
             self._ws.grants.update(SecurableType.TABLE, to_table_name, changes=grants_changes)
 
     def _recreate_table(self, from_table_name, to_table_name):
@@ -375,14 +384,14 @@ class TableMove:
         self._backend.execute(create_view_sql)
 
     def _move_view(
-        self,
-        from_catalog: str,
-        from_schema: str,
-        from_view: str,
-        to_catalog: str,
-        to_schema: str,
-        del_view: bool,  # noqa: FBT001
-        view_text: str | None = None,
+            self,
+            from_catalog: str,
+            from_schema: str,
+            from_view: str,
+            to_catalog: str,
+            to_schema: str,
+            del_view: bool,  # noqa: FBT001
+            view_text: str | None = None,
     ) -> bool:
         from_view_name = f"{from_catalog}.{from_schema}.{from_view}"
         to_view_name = f"{to_catalog}.{to_schema}.{from_view}"

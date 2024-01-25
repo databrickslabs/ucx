@@ -182,9 +182,7 @@ def test_alias_tables(ws, sql_backend, make_catalog, make_schema, make_table, ma
         assert t.name in [from_table_1.name, from_table_2.name, from_table_3.name, from_view_1.name]
 
     expected_table_1_grant = [PrivilegeAssignment(group_a.display_name, [Privilege.SELECT])]
-    expected_table_2_grant = [
-        PrivilegeAssignment(group_b.display_name, [Privilege.MODIFY, Privilege.SELECT]),
-    ]
+    expected_table_2_grant = [PrivilegeAssignment(group_b.display_name, [Privilege.SELECT])]
     expected_table_3_grant = [PrivilegeAssignment(group_a.display_name, [Privilege.SELECT])]
     expected_view_1_grant = [PrivilegeAssignment(group_b.display_name, [Privilege.SELECT])]
 
