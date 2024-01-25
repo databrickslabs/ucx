@@ -11,12 +11,12 @@ from databricks.labs.blueprint.parallel import ManyError
 from databricks.labs.blueprint.tui import MockPrompts
 from databricks.labs.blueprint.wheels import Wheels, find_project_root
 from databricks.sdk.errors import (
+    BadRequest,
     InvalidParameterValue,
     NotFound,
     OperationFailed,
     PermissionDenied,
     Unknown,
-    BadRequest,
 )
 from databricks.sdk.service import iam, jobs, sql
 from databricks.sdk.service.compute import (
@@ -1203,7 +1203,7 @@ def test_repair_run_result_state(ws, caplog):
     assert "Please try after sometime" in caplog.text
 
 
-def test_create_database(ws, mocker):
+def test_create_database(ws, mocker, caplog):
     install = WorkspaceInstaller(
         ws,
         sql_backend=MockBackend(),
@@ -1214,10 +1214,34 @@ def test_create_database(ws, mocker):
             }
         ),
     )
-    mocker.patch("databricks.labs.ucx.install.deploy_schema",
-                 side_effect=BadRequest("[UNRESOLVED_COLUMN.WITH_SUGGESTION] A column, variable, or "
-                                        "function parameter with name `udf` cannot be resolved"))
+    mocker.patch(
+        "databricks.labs.ucx.install.deploy_schema",
+        side_effect=BadRequest(
+            "[UNRESOLVED_COLUMN.WITH_SUGGESTION] A column, variable, or "
+            "function parameter with name `udf` cannot be resolved"
+        ),
+    )
     mocker.patch("databricks.labs.ucx.framework.crawlers.SqlBackend.execute", return_value=None)
     config_bytes = yaml.dump(WorkspaceConfig(inventory_database="testdb", warehouse_id="123").as_dict()).encode("utf8")
     ws.workspace.download = lambda _: io.BytesIO(config_bytes)
     install._create_database()
+    assert "Kindly uninstall and reinstall UCX" in caplog.text
+
+
+def test_create_database_diff_error(ws, mocker, caplog):
+    install = WorkspaceInstaller(
+        ws,
+        sql_backend=MockBackend(),
+        promtps=MockPrompts(
+            {
+                r".*PRO or SERVERLESS SQL warehouse.*": "1",
+                r".*": "",
+            }
+        ),
+    )
+    mocker.patch("databricks.labs.ucx.install.deploy_schema", side_effect=BadRequest("Unknown Error"))
+    mocker.patch("databricks.labs.ucx.framework.crawlers.SqlBackend.execute", return_value=None)
+    config_bytes = yaml.dump(WorkspaceConfig(inventory_database="testdb", warehouse_id="123").as_dict()).encode("utf8")
+    ws.workspace.download = lambda _: io.BytesIO(config_bytes)
+    install._create_database()
+    assert "The UCX Installation Failed" in caplog.text
