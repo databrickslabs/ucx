@@ -163,7 +163,7 @@ def test_alias_tables(ws, sql_backend, make_catalog, make_schema, make_table, ma
     sql_backend.execute(f"GRANT SELECT ON VIEW {from_view_1.full_name} TO `{group_b.display_name}`")
     sql_backend.execute(f"GRANT SELECT ON TABLE {to_table_3.full_name} TO `{group_a.display_name}`")
 
-    tm.alias_tables(from_catalog.name, from_schema.name, "*", to_catalog.name, to_schema.name, False)
+    tm.alias_tables(from_catalog.name, from_schema.name, "*", to_catalog.name, to_schema.name)
 
     to_tables = ws.tables.list(catalog_name=to_catalog.name, schema_name=to_schema.name)
     table_1_grant = ws.grants.get(
