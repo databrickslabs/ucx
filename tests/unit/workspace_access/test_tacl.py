@@ -234,7 +234,21 @@ def test_tacl_crawler_multiple_permissions():
 
 def test_tacl_applier(mocker):
     sql_backend = MockBackend()
-    table_acl_support = TableAclSupport(mocker.Mock(), sql_backend)
+    grants_crawler = mocker.Mock()
+    grants_crawler._grants.return_value = [
+        Grant(
+            principal="account-abc",
+            action_type="SELECT",
+            catalog="catalog_a",
+            database="database_b",
+            table="table_c",
+            view=None,
+            udf=None,
+            any_file=False,
+            anonymous_function=False,
+        )
+    ]
+    table_acl_support = TableAclSupport(grants_crawler, sql_backend)
 
     permissions = Permissions(
         object_type="TABLE",
@@ -270,7 +284,21 @@ def test_tacl_applier(mocker):
 
 def test_tacl_udf_applier(mocker):
     sql_backend = MockBackend()
-    table_acl_support = TableAclSupport(mocker.Mock(), sql_backend)
+    grants_crawler = mocker.Mock()
+    grants_crawler._grants.return_value = [
+        Grant(
+            principal="account-abc",
+            action_type="SELECT",
+            catalog="catalog_a",
+            database="database_b",
+            table=None,
+            view=None,
+            udf="function_c",
+            any_file=False,
+            anonymous_function=False,
+        )
+    ]
+    table_acl_support = TableAclSupport(grants_crawler, sql_backend)
 
     permissions = Permissions(
         object_type="FUNCTION",
@@ -306,7 +334,32 @@ def test_tacl_udf_applier(mocker):
 
 def test_tacl_applier_multiple_actions(mocker):
     sql_backend = MockBackend()
-    table_acl_support = TableAclSupport(mocker.Mock(), sql_backend)
+    grants_crawler = mocker.Mock()
+    grants_crawler._grants.return_value = [
+        Grant(
+            principal="account-abc",
+            action_type="SELECT",
+            catalog="catalog_a",
+            database="database_b",
+            table="table_c",
+            view=None,
+            udf=None,
+            any_file=False,
+            anonymous_function=False,
+        ),
+        Grant(
+            principal="account-abc",
+            action_type="MODIFY",
+            catalog="catalog_a",
+            database="database_b",
+            table="table_c",
+            view=None,
+            udf=None,
+            any_file=False,
+            anonymous_function=False,
+        )
+    ]
+    table_acl_support = TableAclSupport(grants_crawler, sql_backend)
 
     permissions = Permissions(
         object_type="TABLE",

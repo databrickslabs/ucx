@@ -144,7 +144,7 @@ class RedashPermissionsSupport(AclSupport):
     def verify(self, object_type: str, object_id: str, acl: list[sql.AccessControl]) -> bool:
         # in-flight check for the applied permissions
         # the api might be inconsistent, therefore we need to check that the permissions were applied
-        object_type_plural = getattr(sql.ObjectTypePlural, object_type)
+        object_type_plural = next((otp for otp in sql.ObjectTypePlural if otp.value == object_type))
         remote_permission = self._safe_get_dbsql_permissions(object_type_plural, object_id)
         if remote_permission:
             assert remote_permission.access_control_list is not None

@@ -226,7 +226,7 @@ def test_apply_permissions_not_applied(migration_state):
         ),
     ]
     assert sup._safe_get_dbsql_permissions(object_type=sql.ObjectTypePlural.ALERTS, object_id="test") is None
-    assert not sup._inflight_check(object_type=sql.ObjectTypePlural.ALERTS, object_id="test", acl=expected_acl)
+    assert not sup.verify(object_type=sql.ObjectTypePlural.ALERTS.value, object_id="test", acl=expected_acl)
 
 
 def test_apply_permissions_no_relevant_items(migration_state):
