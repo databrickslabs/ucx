@@ -349,7 +349,7 @@ class TableMove:
         from_table_name = f"{from_catalog}.{from_schema}.{from_table}"
         to_table_name = f"{to_catalog}.{to_schema}.{from_table}"
         try:
-            self._create_view(from_table_name, to_table_name)
+            self._create_alias_view(from_table_name, to_table_name)
             self._reapply_grants(from_table_name, to_table_name, target_view=True)
             return True
         except NotFound as err:
