@@ -1,4 +1,5 @@
 import json
+
 import pytest
 
 from databricks.labs.ucx.hive_metastore import GrantsCrawler, TablesCrawler
@@ -376,10 +377,10 @@ def test_tacl_applier_not_applied_2(mocker):
     ]
     migration_state = MigrationState(grp)
     task = table_acl_support.get_apply_task(permissions, migration_state)
-    
+
     with pytest.raises(ValueError):
         task()
-        
+
     assert ["GRANT SELECT ON TABLE catalog_a.database_b.table_c TO `account-abc`"] == sql_backend.queries
 
 

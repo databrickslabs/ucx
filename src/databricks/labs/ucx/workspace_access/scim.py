@@ -14,9 +14,10 @@ from databricks.sdk.errors import (
     ResourceConflict,
 )
 from databricks.sdk.retries import retried
-from databricks.sdk.service import iam
+from databricks.sdk.service import iam, sql, workspace
 from databricks.sdk.service.iam import Group, Patch, PatchSchema
 
+from databricks.labs.ucx.hive_metastore.grants import Grant
 from databricks.labs.ucx.workspace_access.base import AclSupport, Permissions
 from databricks.labs.ucx.workspace_access.groups import MigrationState
 
@@ -94,25 +95,31 @@ class ScimSupport(AclSupport):
             raw=json.dumps([e.as_dict() for e in getattr(group, property_name)]),
         )
 
-    def verify(self, object_type: str, object_id: str, acl: list[iam.ComplexValue]):
+    def verify(
+        self,
+        object_type: str,
+        object_id: str,
+        acl: list[iam.AccessControlRequest | sql.AccessControl | iam.ComplexValue] | Grant | workspace.AclItem,
+    ) -> bool:  
         # in-flight check for the applied permissions
         # the api might be inconsistent, therefore we need to check that the permissions were applied
-        property_name = object_type
-        group_id = object_id
-        value = acl
-        group = self._safe_get_group(group_id)
-        if group:
-            if property_name == "roles" and group.roles:
-                if all(elem in group.roles for elem in value):
-                    return True
-            if property_name == "entitlements" and group.entitlements:
-                if all(elem in group.entitlements for elem in value):
-                    return True
-            msg = f"""Couldn't apply appropriate role for group {group_id}
-                            acl to be applied={[e.as_dict() for e in value]}
-                            acl found in the object={group.as_dict()}
-                            """
-            raise ValueError(msg)
+        if isinstance(acl, list) and len(acl) > 0 and isinstance(acl[0], iam.ComplexValue):
+            property_name = object_type
+            group_id = object_id
+            value = acl
+            group = self._safe_get_group(group_id)
+            if group:
+                if property_name == "roles" and group.roles:
+                    if all(elem in group.roles for elem in value):
+                        return True
+                if property_name == "entitlements" and group.entitlements:
+                    if all(elem in group.entitlements for elem in value):
+                        return True
+                msg = f"""Couldn't apply appropriate role for group {group_id}
+                                acl to be applied={[e.as_dict() for e in value]} 
+                                acl found in the object={group.as_dict()}
+                                """
+                raise ValueError(msg)
         return False
 
     @rate_limited(max_requests=10, burst_period_seconds=60)

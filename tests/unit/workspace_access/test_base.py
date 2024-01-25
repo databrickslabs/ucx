@@ -1,6 +1,9 @@
 from collections.abc import Callable, Iterable
 from functools import partial
 
+from databricks.sdk.service import iam, sql, workspace
+
+from databricks.labs.ucx.hive_metastore.grants import Grant
 from databricks.labs.ucx.workspace_access.base import AclSupport, Permissions
 from databricks.labs.ucx.workspace_access.groups import MigratedGroup, MigrationState
 
@@ -32,7 +35,12 @@ def test_applier():
 
             return partial(test_task)
 
-        def verify(self, object_type: str, object_id: str, acl: list) -> bool:
+        def verify(
+            self,
+            object_type: str,
+            object_id: str,
+            acl: list[iam.AccessControlRequest | sql.AccessControl | iam.ComplexValue] | Grant | workspace.AclItem,
+        ) -> bool:
             return True
 
     applier = SampleApplier()

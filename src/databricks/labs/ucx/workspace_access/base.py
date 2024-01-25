@@ -41,6 +41,6 @@ class AclSupport:
         self,
         object_type: str,
         object_id: str,
-        acl: list[iam.AccessControlRequest | workspace.AclItem | sql.AccessControl | iam.ComplexValue] | Grant,
+        acl: list[iam.AccessControlRequest | sql.AccessControl | iam.ComplexValue] | Grant | workspace.AclItem,
     ) -> bool:
         """This method verifies that all the crawled permissions are applied correctly to the destination group."""

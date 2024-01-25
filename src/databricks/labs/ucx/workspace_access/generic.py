@@ -19,10 +19,11 @@ from databricks.sdk.errors import (
     TemporarilyUnavailable,
 )
 from databricks.sdk.retries import retried
-from databricks.sdk.service import iam, ml
+from databricks.sdk.service import iam, ml, sql, workspace
 from databricks.sdk.service.iam import PermissionLevel
 
 from databricks.labs.ucx.framework.crawlers import CrawlerBase, SqlBackend
+from databricks.labs.ucx.hive_metastore.grants import Grant
 from databricks.labs.ucx.workspace_access.base import AclSupport, Permissions
 from databricks.labs.ucx.workspace_access.groups import MigrationState
 
@@ -119,13 +120,18 @@ class GenericPermissionsSupport(AclSupport):
                 )
         return results
 
-    def verify(self, object_type: str, object_id: str, acl: list[iam.AccessControlRequest]) -> bool:
+    def verify(
+        self,
+        object_type: str,
+        object_id: str,
+        acl: list[iam.AccessControlRequest | sql.AccessControl | iam.ComplexValue] | Grant | workspace.AclItem,
+    ) -> bool:
         # in-flight check for the applied permissions
         # the api might be inconsistent, therefore we need to check that the permissions were applied
         remote_permission = self._safe_get_permissions(object_type, object_id)
         if remote_permission:
             remote_permission_as_request = self._response_to_request(remote_permission.access_control_list)
-            if all(elem in remote_permission_as_request for elem in acl):
+            if all(elem in remote_permission_as_request for elem in acl):  # type: ignore[union-attr]
                 return True
             msg = f"""Couldn't apply appropriate permission for object type {object_type} with id {object_id}
                 acl to be applied={acl}

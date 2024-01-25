@@ -10,9 +10,10 @@ from databricks.labs.blueprint.limiter import rate_limited
 from databricks.sdk import WorkspaceClient
 from databricks.sdk.errors import InternalError, NotFound, PermissionDenied
 from databricks.sdk.retries import retried
-from databricks.sdk.service import sql
+from databricks.sdk.service import iam, sql, workspace
 from databricks.sdk.service.sql import ObjectTypePlural, SetResponse
 
+from databricks.labs.ucx.hive_metastore.grants import Grant
 from databricks.labs.ucx.workspace_access.base import AclSupport, Permissions
 from databricks.labs.ucx.workspace_access.groups import MigrationState
 
@@ -141,14 +142,19 @@ class RedashPermissionsSupport(AclSupport):
             )
         return None
 
-    def verify(self, object_type: str, object_id: str, acl: list[sql.AccessControl]) -> bool:
+    def verify(
+        self,
+        object_type: str,
+        object_id: str,
+        acl: list[iam.AccessControlRequest | sql.AccessControl | iam.ComplexValue] | Grant | workspace.AclItem,
+    ) -> bool:
         # in-flight check for the applied permissions
         # the api might be inconsistent, therefore we need to check that the permissions were applied
         object_type_plural = next((otp for otp in sql.ObjectTypePlural if otp.value == object_type))
         remote_permission = self._safe_get_dbsql_permissions(object_type_plural, object_id)
         if remote_permission:
             assert remote_permission.access_control_list is not None
-            if all(elem in remote_permission.access_control_list for elem in acl):
+            if all(elem in remote_permission.access_control_list for elem in acl):  # type: ignore[union-attr]
                 return True
             msg = f"""
             Couldn't apply appropriate permission for object type {object_type} with id {object_id}
