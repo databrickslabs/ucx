@@ -225,7 +225,7 @@ class WorkspaceInstaller:  # pylint: disable=too-many-instance-attributes
                 logger.warning(
                     "The UCX version is not matching with the installed version."
                     "Kindly uninstall and reinstall UCX.\n"
-                    "Please Follow the Below Command to unsinstall and Install UCX\n"
+                    "Please Follow the Below Command to uninstall and Install UCX\n"
                     "UCX Uninstall: databricks labs uninstall ucx.\n"
                     "UCX Install: databricks labs install ucx"
                 )
