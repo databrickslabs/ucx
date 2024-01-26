@@ -8,6 +8,7 @@ from databricks.sdk.service.iam import User
 
 from databricks.labs.ucx.cli import (
     CANT_FIND_UCX_MSG,
+    alias,
     create_table_mapping,
     ensure_assessment_run,
     installations,
@@ -271,6 +272,51 @@ def test_move(mocker, monkeypatch):
 
     with patch("databricks.labs.ucx.hive_metastore.table_migrate.TableMove.move_tables", return_value=None) as m:
         move(w, "SrcC", "SrcS", "*", "TgtC", "ToS")
+        m.assert_called_once()
+
+
+def test_alias_no_ucx(mocker, caplog):
+    w = create_autospec(WorkspaceClient)
+    w.current_user.me = lambda: iam.User(user_name="foo", groups=[iam.ComplexValue(display="admins")])
+    mocker.patch("databricks.labs.ucx.installer.InstallationManager.for_user", return_value=None)
+    alias(w, "", "", "", "", "")
+    assert [rec.message for rec in caplog.records if "UCX configuration" in rec.message]
+
+
+def test_alias_no_catalog(mocker, caplog):
+    w = create_autospec(WorkspaceClient)
+    w.current_user.me = lambda: iam.User(user_name="foo", groups=[iam.ComplexValue(display="admins")])
+    mocker.patch("databricks.labs.ucx.installer.InstallationManager.for_user", return_value=w.current_user)
+    alias(w, "", "", "", "", "")
+    assert (
+        len([rec.message for rec in caplog.records if "Please enter from_catalog and to_catalog" in rec.message]) == 1
+    )
+
+
+def test_alias_same_schema(mocker, caplog):
+    w = create_autospec(WorkspaceClient)
+    w.current_user.me = lambda: iam.User(user_name="foo", groups=[iam.ComplexValue(display="admins")])
+    mocker.patch("databricks.labs.ucx.installer.InstallationManager.for_user", return_value=w.current_user)
+    alias(w, "SrcCat", "SrcS", "*", "SrcCat", "SrcS")
+    assert len([rec.message for rec in caplog.records if "please select a different schema" in rec.message]) == 1
+
+
+def test_alias_no_schema(mocker, caplog):
+    w = create_autospec(WorkspaceClient)
+    w.current_user.me = lambda: iam.User(user_name="foo", groups=[iam.ComplexValue(display="admins")])
+    mocker.patch("databricks.labs.ucx.installer.InstallationManager.for_user", return_value=w.current_user)
+    alias(w, "SrcCat", "", "*", "TgtCat", "")
+    assert len([rec.message for rec in caplog.records if "Please enter from_schema, to_schema" in rec.message]) == 1
+
+
+def test_alias(mocker, monkeypatch):
+    w = create_autospec(WorkspaceClient)
+    w.current_user.me = lambda: iam.User(user_name="foo", groups=[iam.ComplexValue(display="admins")])
+    mocker.patch("databricks.labs.ucx.installer.InstallationManager.for_user", return_value=w.current_user)
+    monkeypatch.setattr("builtins.input", lambda _: "yes")
+
+    with patch("databricks.labs.ucx.hive_metastore.table_migrate.TableMove.alias_tables", return_value=None) as m:
+        alias(w, "SrcC", "SrcS", "*", "TgtC", "ToS")
         m.assert_called_once()
 
 
