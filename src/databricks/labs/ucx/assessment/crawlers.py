@@ -8,7 +8,6 @@ from databricks.sdk.errors import NotFound
 from databricks.sdk.service import compute
 from databricks.sdk.service.compute import ClusterDetails, Policy
 
-
 logger = logging.getLogger(__name__)
 
 INCOMPATIBLE_SPARK_CONFIG_KEYS = [
@@ -98,7 +97,8 @@ def spark_version_compatibility(spark_version: str | None) -> str:
         return "kinda works"
     return "supported"
 
-def _check_spark_conf(conf:dict[str, str], source) -> list[str]:
+
+def _check_spark_conf(conf: dict[str, str], source) -> list[str]:
     failures = []
     for k in INCOMPATIBLE_SPARK_CONFIG_KEYS:
         if k in conf:
@@ -111,14 +111,16 @@ def _check_spark_conf(conf:dict[str, str], source) -> list[str]:
         failures.append(f"{_AZURE_SP_CONF_FAILURE_MSG} {source}.")
     return failures
 
-def _safe_get_cluster_policy(ws:WorkspaceClient, policy_id: str) -> Policy | None:
+
+def _safe_get_cluster_policy(ws: WorkspaceClient, policy_id: str) -> Policy | None:
     try:
         return ws.cluster_policies.get(policy_id)
     except NotFound:
         logger.warning(f"The cluster policy was deleted: {policy_id}")
         return None
 
-def _check_cluster_policy(ws:WorkspaceClient, cluster, source):
+
+def _check_cluster_policy(ws: WorkspaceClient, cluster, source):
     failures = []
     policy = _safe_get_cluster_policy(ws, cluster.policy_id)
     if policy:
@@ -131,7 +133,7 @@ def _check_cluster_policy(ws:WorkspaceClient, cluster, source):
     return failures
 
 
-def _check_cluster_init_script(ws:WorkspaceClient, init_scripts, source):
+def _check_cluster_init_script(ws: WorkspaceClient, init_scripts, source):
     failures = []
     for init_script_info in init_scripts:
         init_script_data = _get_init_script_data(ws, init_script_info)
@@ -148,7 +150,7 @@ def _check_init_script(init_script_data, source):
     return failures
 
 
-def _check_cluster_failures(ws:WorkspaceClient, cluster: ClusterDetails | compute.ClusterSpec, source):
+def _check_cluster_failures(ws: WorkspaceClient, cluster: ClusterDetails | compute.ClusterSpec, source):
     failures = []
 
     support_status = spark_version_compatibility(cluster.spark_version)

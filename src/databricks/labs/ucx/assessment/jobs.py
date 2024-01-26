@@ -5,8 +5,7 @@ from dataclasses import dataclass
 from databricks.sdk import WorkspaceClient
 from databricks.sdk.service.jobs import BaseJob
 
-from databricks.labs.ucx.assessment.crawlers import _check_cluster_failures
-from databricks.labs.ucx.assessment.crawlers import logger
+from databricks.labs.ucx.assessment.crawlers import _check_cluster_failures, logger
 from databricks.labs.ucx.framework.crawlers import CrawlerBase, SqlBackend
 
 

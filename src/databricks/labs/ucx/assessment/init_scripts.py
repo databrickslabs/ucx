@@ -5,12 +5,7 @@ from dataclasses import dataclass
 
 from databricks.sdk import WorkspaceClient
 
-from databricks.labs.ucx.assessment.crawlers import (
-    _AZURE_SP_CONF_FAILURE_MSG,
-    _azure_sp_conf_in_init_scripts,
-    _check_init_script,
-    logger,
-)
+from databricks.labs.ucx.assessment.crawlers import _check_init_script, logger
 from databricks.labs.ucx.framework.crawlers import CrawlerBase, SqlBackend
 
 

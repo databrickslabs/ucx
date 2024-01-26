@@ -4,12 +4,7 @@ from dataclasses import dataclass
 
 from databricks.sdk import WorkspaceClient
 
-from databricks.labs.ucx.assessment.crawlers import (
-    _AZURE_SP_CONF_FAILURE_MSG,
-    _azure_sp_conf_present_check,
-    _check_spark_conf,
-    logger,
-)
+from databricks.labs.ucx.assessment.crawlers import _check_spark_conf, logger
 from databricks.labs.ucx.framework.crawlers import CrawlerBase, SqlBackend
 
 

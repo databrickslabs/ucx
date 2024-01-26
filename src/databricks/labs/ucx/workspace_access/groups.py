@@ -285,9 +285,9 @@ class RegexMatchStrategy(GroupMigrationStrategy):
                     external_id=account_group.external_id,
                     members=json.dumps([gg.as_dict() for gg in ws_group.members]) if ws_group.members else None,
                     roles=json.dumps([gg.as_dict() for gg in ws_group.roles]) if ws_group.roles else None,
-                    entitlements=json.dumps([gg.as_dict() for gg in ws_group.entitlements])
-                    if ws_group.entitlements
-                    else None,
+                    entitlements=(
+                        json.dumps([gg.as_dict() for gg in ws_group.entitlements]) if ws_group.entitlements else None
+                    ),
                 )
             else:
                 logger.info(f"Couldn't find a match for group {ws_group.display_name}")

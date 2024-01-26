@@ -5,8 +5,7 @@ from dataclasses import dataclass
 from databricks.sdk import WorkspaceClient
 from databricks.sdk.service.compute import ClusterSource
 
-from databricks.labs.ucx.assessment.crawlers import _check_cluster_failures,logger
-
+from databricks.labs.ucx.assessment.crawlers import _check_cluster_failures, logger
 from databricks.labs.ucx.framework.crawlers import CrawlerBase, SqlBackend
 
 
@@ -44,12 +43,11 @@ class ClustersCrawler(CrawlerBase[ClusterInfo]):
                 success=1,
                 failures="[]",
             )
-            failures=_check_cluster_failures(self._ws ,cluster, "cluster")
+            failures = _check_cluster_failures(self._ws, cluster, "cluster")
             if len(failures) > 0:
                 cluster_info.success = 0
                 cluster_info.failures = json.dumps(failures)
             yield cluster_info
-
 
     def snapshot(self) -> Iterable[ClusterInfo]:
         return self._snapshot(self._try_fetch, self._crawl)
