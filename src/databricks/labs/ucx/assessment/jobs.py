@@ -108,3 +108,20 @@ class JobsCrawler(CrawlerBase[JobInfo], JobsMixin, CheckClusterMixin):
     def _try_fetch(self) -> Iterable[JobInfo]:
         for row in self._fetch(f"SELECT * FROM {self._schema}.{self._table}"):
             yield JobInfo(*row)
+
+class JobsRunCrawler(CrawlerBase[JobInfo], JobsMixin):
+    def __init__(self, ws: WorkspaceClient, sbe: SqlBackend, schema):
+        super().__init__(sbe, "hive_metastore", schema, "jobs", JobInfo)
+        self._ws = ws
+
+    def _crawl(self) -> Iterable[JobInfo]:
+        all_jobs = list(self._ws.jobs.list(expand_tasks=True))
+        all_clusters = {c.cluster_id: c for c in self._ws.clusters.list()}
+        return self._assess_jobs(all_jobs, all_clusters)
+
+    def snapshot(self) -> Iterable[JobInfo]:
+        return self._snapshot(self._try_fetch, self._crawl)
+
+    def _try_fetch(self) -> Iterable[JobInfo]:
+        for row in self._fetch(f"SELECT * FROM {self._schema}.{self._table}"):
+            yield JobInfo(*row)
