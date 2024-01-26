@@ -85,8 +85,7 @@ class JobsCrawler(CrawlerBase[JobInfo], JobsMixin):
             if not job_id:
                 continue
             cluster_failures = _check_cluster_failures(self._ws, cluster_config, "Job cluster")
-            for failure in json.loads(cluster_failures.failures):
-                job_assessment[job_id].add(failure)
+            job_assessment[job_id].update(cluster_failures)
 
         # TODO: next person looking at this - rewrite, as this code makes no sense
         for job_key in job_details.keys():  # pylint: disable=consider-using-dict-items,consider-iterating-dictionary

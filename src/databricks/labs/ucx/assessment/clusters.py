@@ -5,7 +5,7 @@ from dataclasses import dataclass
 from databricks.sdk import WorkspaceClient
 from databricks.sdk.service.compute import ClusterSource
 
-from databricks.labs.ucx.assessment.crawlers import _check_cluster_failures
+from databricks.labs.ucx.assessment.crawlers import _check_cluster_failures,logger
 
 from databricks.labs.ucx.framework.crawlers import CrawlerBase, SqlBackend
 
@@ -32,7 +32,23 @@ class ClustersCrawler(CrawlerBase[ClusterInfo]):
         for cluster in all_clusters:
             if cluster.cluster_source == ClusterSource.JOB:
                 continue
-            yield _check_cluster_failures(self._ws ,cluster, "cluster")
+            if not cluster.creator_user_name:
+                logger.warning(
+                    f"Cluster {cluster.cluster_id} have Unknown creator, it means that the original creator "
+                    f"has been deleted and should be re-created"
+                )
+            cluster_info = ClusterInfo(
+                cluster_id=cluster.cluster_id if cluster.cluster_id else "",
+                cluster_name=cluster.cluster_name,
+                creator=cluster.creator_user_name,
+                success=1,
+                failures="[]",
+            )
+            failures=_check_cluster_failures(self._ws ,cluster, "cluster")
+            if len(failures) > 0:
+                cluster_info.success = 0
+                cluster_info.failures = json.dumps(failures)
+            yield cluster_info
 
 
     def snapshot(self) -> Iterable[ClusterInfo]:

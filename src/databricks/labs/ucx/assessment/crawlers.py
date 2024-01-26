@@ -8,7 +8,6 @@ from databricks.sdk.errors import NotFound
 from databricks.sdk.service import compute
 from databricks.sdk.service.compute import ClusterDetails, Policy
 
-from databricks.labs.ucx.assessment.clusters import ClusterInfo
 
 logger = logging.getLogger(__name__)
 
@@ -151,22 +150,7 @@ def _check_init_script(init_script_data, source):
 
 def _check_cluster_failures(ws:WorkspaceClient, cluster: ClusterDetails | compute.ClusterSpec, source):
     failures = []
-    if isinstance(cluster, ClusterDetails) and not cluster.creator_user_name:
-        logger.warning(
-            f"Cluster {cluster.cluster_id} have Unknown creator, it means that the original creator "
-            f"has been deleted and should be re-created"
-        )
-    cluster_id = cluster.cluster_id if isinstance(cluster, ClusterDetails) and cluster.cluster_id else ""
-    creator_user_name = (
-        cluster.creator_user_name if isinstance(cluster, ClusterDetails) and cluster.creator_user_name else None
-    )
-    cluster_info = ClusterInfo(
-        cluster_id=cluster_id,
-        cluster_name=cluster.cluster_name,
-        creator=creator_user_name,
-        success=1,
-        failures="[]",
-    )
+
     support_status = spark_version_compatibility(cluster.spark_version)
     if support_status != "supported":
         failures.append(f"not supported DBR: {cluster.spark_version}")
@@ -177,7 +161,5 @@ def _check_cluster_failures(ws:WorkspaceClient, cluster: ClusterDetails | comput
         failures.extend(_check_cluster_policy(ws, cluster, source))
     if cluster.init_scripts:
         failures.extend(_check_cluster_init_script(ws, cluster.init_scripts, source))
-    cluster_info.failures = json.dumps(failures)
-    if len(failures) > 0:
-        cluster_info.success = 0
-    return cluster_info
+
+    return failures
