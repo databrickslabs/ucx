@@ -35,7 +35,7 @@ This is a rough summary of the workspace readiness to run Unity Catalog governed
 This is a summary count, per finding type of all of the findings identified during the assessment workflow. The assessment summary will help identify areas that need focus (e.g. Tables on DBFS or Clusters that need DBR upgrades)
 
 ## Table counts by storage
-This is a summary count of Hive Metastore tables, per storage type (DBFS Root, DBFS Mount, Cloud Storage; referred as External). This also gives a summary count of tables using storage types which are unsupported (such as WASB or ADL in Azure) in Unity Catalog. Count of tables created using Databricks Demo Datasets are also identified here
+This is a summary count of Hive Metastore tables, per storage type (DBFS Root, DBFS Mount, Cloud Storage (referred as External)). This also gives a summary count of tables using storage types which are unsupported (such as WASB or ADL in Azure) in Unity Catalog. Count of tables created using Databricks Demo Datasets are also identified here
 
 ## Table counts by schema and format
 This is a summary count of Delta format and Non Delta format Hive Metastore (HMS) tables for each HMS schema    
