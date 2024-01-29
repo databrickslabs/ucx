@@ -15,6 +15,5 @@ SELECT
            ELSE "EXTERNAL"
        END AS storage
 FROM $inventory.tables)
-WHERE storage IN ('DBFS ROOT', 'DBFS MOUNT', 'EXTERNAL')
 GROUP BY storage
 ORDER BY storage;
