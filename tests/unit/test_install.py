@@ -1224,8 +1224,10 @@ def test_create_database(ws, mocker, caplog):
     mocker.patch("databricks.labs.ucx.framework.crawlers.SqlBackend.execute", return_value=None)
     config_bytes = yaml.dump(WorkspaceConfig(inventory_database="testdb", warehouse_id="123").as_dict()).encode("utf8")
     ws.workspace.download = lambda _: io.BytesIO(config_bytes)
-    install._create_database()
-    assert "Kindly uninstall and reinstall UCX" in caplog.text
+    with pytest.raises(BadRequest) as failure:
+        install._create_database()
+
+    assert "Kindly uninstall and reinstall UCX" in str(failure.value)
 
 
 def test_create_database_diff_error(ws, mocker, caplog):
@@ -1243,5 +1245,7 @@ def test_create_database_diff_error(ws, mocker, caplog):
     mocker.patch("databricks.labs.ucx.framework.crawlers.SqlBackend.execute", return_value=None)
     config_bytes = yaml.dump(WorkspaceConfig(inventory_database="testdb", warehouse_id="123").as_dict()).encode("utf8")
     ws.workspace.download = lambda _: io.BytesIO(config_bytes)
-    install._create_database()
-    assert "The UCX Installation Failed" in caplog.text
+    with pytest.raises(BadRequest) as failure:
+        install._create_database()
+
+    assert "The UCX Installation Failed" in str(failure.value)

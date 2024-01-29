@@ -222,15 +222,14 @@ class WorkspaceInstaller:  # pylint: disable=too-many-instance-attributes
             deploy_schema(self._sql_backend, self.current_config.inventory_database)
         except BadRequest as ex:
             if "UNRESOLVED_COLUMN.WITH_SUGGESTION" in str(ex):
-                logger.warning(
-                    "The UCX version is not matching with the installed version."
-                    "Kindly uninstall and reinstall UCX.\n"
-                    "Please Follow the Below Command to uninstall and Install UCX\n"
-                    "UCX Uninstall: databricks labs uninstall ucx.\n"
-                    "UCX Install: databricks labs install ucx"
-                )
+                msg = "The UCX version is not matching with the installed version." \
+                      "Kindly uninstall and reinstall UCX.\n." \
+                      "Please Follow the Below Command to uninstall and Install UCX\n" \
+                      "UCX Uninstall: databricks labs uninstall ucx.\n" \
+                      "UCX Install: databricks labs install ucx"
+                raise BadRequest(msg)
             else:
-                logger.warning(f"The UCX Installation Failed while creating database with the error: {ex}")
+                raise BadRequest(f"The UCX Installation Failed while creating database with the error: {ex}")
 
     def _install_spark_config_for_hms_lineage(self):
         hms_lineage = HiveMetastoreLineageEnabler(ws=self._ws)
