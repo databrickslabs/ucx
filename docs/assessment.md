@@ -26,7 +26,7 @@ Total number of identified storage locations based on scanning Hive Metastore ta
 Assessment widgets query tables in the $inventory database and summarize or detail out findings.
 
 The second row of the report starts with "Readiness", "Assessment Summary", "Table counts by storage" and "Table counts by schema and format"
-<img width="1235" alt="image" src="![image](https://github.com/databrickslabs/ucx/assets/106815134/df9894e6-280f-4b6f-b03e-064b4a270cc3)">
+<img width="1235" alt="image" src="https://github.com/databrickslabs/ucx/assets/106815134/df9894e6-280f-4b6f-b03e-064b4a270cc3">
 
 ## Readiness
 This is a rough summary of the workspace readiness to run Unity Catalog governed workloads. Each line item is the percent of compatible items divided by the total items in the class.
