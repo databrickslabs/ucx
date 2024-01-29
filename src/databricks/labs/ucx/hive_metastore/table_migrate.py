@@ -1,5 +1,6 @@
 import logging
 from collections import defaultdict
+from enum import Enum
 from functools import partial
 
 from databricks.labs.blueprint.parallel import Threads
@@ -21,18 +22,24 @@ logger = logging.getLogger(__name__)
 
 
 class TablesMigrate:
+
+    TableType = Enum("TableType", ["External", "DBFS_Root", "View"])
+
     def __init__(
         self,
         tc: TablesCrawler,
         ws: WorkspaceClient,
         backend: SqlBackend,
         tm: TableMapping,
+        *,
+        table_type: TableType | None = None,
     ):
         self._tc = tc
         self._backend = backend
         self._ws = ws
         self._tm = tm
         self._seen_tables: dict[str, str] = {}
+        self._table_type = TableType
 
     def migrate_tables(self):
         self._init_seen_tables()
