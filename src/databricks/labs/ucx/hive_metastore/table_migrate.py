@@ -47,6 +47,12 @@ class TablesMigrate:
                 tasks.append(partial(self._migrate_table, table.src, table.rule))
         Threads.strict("migrate tables", tasks)
 
+    def _prep_migrate_aws(self):
+        pass
+
+    def _prep_migrate_azure(self):
+        pass
+
     def _migrate_table(self, src_table: Table, rule: Rule):
         if self._table_already_upgraded(rule.as_uc_table_key):
             logger.info(f"Table {src_table.key} already upgraded to {rule.as_uc_table_key}")
