@@ -850,9 +850,17 @@ def test_validate_group_diff_membership():
         display_name="ac_test_1234",
         members=[ComplexValue(display="test-user-3", value="3")],
     )
-    wsclient.api_client.do.return_value = {
-        "Resources": [g.as_dict() for g in [account_admins_group]],
-    }
+
+    def do_api_side_effect(*args, **kwargs):
+        if args[0] == "GET":
+            if args[1] == "/api/2.0/account/scim/v2/Groups":
+                return {"Resources": [g.as_dict() for g in [account_admins_group]]}
+            else:
+                return account_admins_group.as_dict()
+        else:
+            raise RuntimeError()
+
+    wsclient.api_client.do.side_effect = do_api_side_effect
     wsclient.groups.get.side_effect = lambda group_id: group if group_id == "1" else account_admins_group
     grp_membership = GroupManager(
         backend, wsclient, inventory_database="inv", workspace_group_regex=r"\(([1-9]+)\)", account_group_regex="[1-9]+"
@@ -888,9 +896,17 @@ def test_validate_group_diff_membership_no_members():
         display_name="ac_test_1234",
         members=None,
     )
-    wsclient.api_client.do.return_value = {
-        "Resources": [g.as_dict() for g in [account_admins_group]],
-    }
+
+    def do_api_side_effect(*args, **kwargs):
+        if args[0] == "GET":
+            if args[1] == "/api/2.0/account/scim/v2/Groups":
+                return {"Resources": [g.as_dict() for g in [account_admins_group]]}
+            else:
+                return account_admins_group.as_dict()
+        else:
+            raise RuntimeError()
+
+    wsclient.api_client.do.side_effect = do_api_side_effect
     wsclient.groups.get.side_effect = lambda group_id: group if group_id == "1" else account_admins_group
     grp_membership = GroupManager(
         backend, wsclient, inventory_database="inv", workspace_group_regex=r"\(([1-9]+)\)", account_group_regex="[1-9]+"
@@ -919,9 +935,17 @@ def test_validate_group_diff_membership_no_account_group_found():
         display_name="ac_test_1234",
         members=None,
     )
-    wsclient.api_client.do.return_value = {
-        "Resources": [g.as_dict() for g in [account_admins_group]],
-    }
+
+    def do_api_side_effect(*args, **kwargs):
+        if args[0] == "GET":
+            if args[1] == "/api/2.0/account/scim/v2/Groups":
+                return {"Resources": [g.as_dict() for g in [account_admins_group]]}
+            else:
+                return account_admins_group.as_dict()
+        else:
+            raise RuntimeError()
+
+    wsclient.api_client.do.side_effect = do_api_side_effect
     wsclient.groups.get.side_effect = lambda group_id: group if group_id == "1" else None
     grp_membership = GroupManager(
         backend, wsclient, inventory_database="inv", workspace_group_regex=r"\(([1-9]+)\)", account_group_regex="[1-9]+"
@@ -952,9 +976,17 @@ def test_validate_group_same_membership():
         display_name="ac_test_1234",
         members=[ComplexValue(display="test-user-1", value="01"), ComplexValue(display="test-user-2", value="02")],
     )
-    wsclient.api_client.do.return_value = {
-        "Resources": [g.as_dict() for g in [account_admins_group]],
-    }
+
+    def do_api_side_effect(*args, **kwargs):
+        if args[0] == "GET":
+            if args[1] == "/api/2.0/account/scim/v2/Groups":
+                return {"Resources": [g.as_dict() for g in [account_admins_group]]}
+            else:
+                return account_admins_group.as_dict()
+        else:
+            raise RuntimeError()
+
+    wsclient.api_client.do.side_effect = do_api_side_effect
     grp_membership = GroupManager(
         backend, wsclient, inventory_database="inv", workspace_group_regex=r"\(([1-9]+)\)", account_group_regex="[1-9]+"
     ).validate_group_membership()
