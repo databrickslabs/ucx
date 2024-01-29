@@ -4,13 +4,18 @@ import random
 import time
 from collections.abc import Iterator
 from datetime import timedelta
+from typing import Any
 
+from databricks.sdk import errors
+from databricks.sdk.errors import DataLoss, NotFound
 from databricks.sdk.service.sql import (
     ColumnInfoTypeName,
     Disposition,
     ExecuteStatementResponse,
     Format,
     ResultData,
+    ServiceError,
+    ServiceErrorCode,
     StatementExecutionAPI,
     StatementState,
     StatementStatus,
@@ -37,7 +42,7 @@ class _RowCreator(tuple):
 
 class Row(tuple):
     # Python SDK convention
-    def as_dict(self) -> dict[str, any]:
+    def as_dict(self) -> dict[str, Any]:
         return dict(zip(self.__columns__, self, strict=True))
 
     # PySpark convention
@@ -55,9 +60,9 @@ class Row(tuple):
             idx = self.__columns__.index(col)
             return self[idx]
         except IndexError:
-            raise AttributeError(col)  # noqa: B904
+            raise AttributeError(col) from None
         except ValueError:
-            raise AttributeError(col)  # noqa: B904
+            raise AttributeError(col) from None
 
     def __repr__(self):
         return f"Row({', '.join(f'{k}={v}' for (k, v) in zip(self.__columns__, self, strict=True))})"
@@ -91,10 +96,41 @@ class StatementExecutionExt(StatementExecutionAPI):
     def _raise_if_needed(status: StatementStatus):
         if status.state not in [StatementState.FAILED, StatementState.CANCELED, StatementState.CLOSED]:
             return
-        msg = status.state.value
-        if status.error is not None:
-            msg = f"{msg}: {status.error.error_code.value} {status.error.message}"
-        raise RuntimeError(msg)
+        status_error = status.error
+        if status_error is None:
+            status_error = ServiceError(message="unknown", error_code=ServiceErrorCode.UNKNOWN)
+        error_message = status_error.message
+        if error_message is None:
+            error_message = ""
+        if "SCHEMA_NOT_FOUND" in error_message:
+            raise NotFound(error_message)
+        if "TABLE_OR_VIEW_NOT_FOUND" in error_message:
+            raise NotFound(error_message)
+        if "DELTA_TABLE_NOT_FOUND" in error_message:
+            raise NotFound(error_message)
+        if "DELTA_MISSING_TRANSACTION_LOG" in error_message:
+            raise DataLoss(error_message)
+        mapping = {
+            ServiceErrorCode.ABORTED: errors.Aborted,
+            ServiceErrorCode.ALREADY_EXISTS: errors.AlreadyExists,
+            ServiceErrorCode.BAD_REQUEST: errors.BadRequest,
+            ServiceErrorCode.CANCELLED: errors.Cancelled,
+            ServiceErrorCode.DEADLINE_EXCEEDED: errors.DeadlineExceeded,
+            ServiceErrorCode.INTERNAL_ERROR: errors.InternalError,
+            ServiceErrorCode.IO_ERROR: errors.InternalError,
+            ServiceErrorCode.NOT_FOUND: errors.NotFound,
+            ServiceErrorCode.RESOURCE_EXHAUSTED: errors.ResourceExhausted,
+            ServiceErrorCode.SERVICE_UNDER_MAINTENANCE: errors.TemporarilyUnavailable,
+            ServiceErrorCode.TEMPORARILY_UNAVAILABLE: errors.TemporarilyUnavailable,
+            ServiceErrorCode.UNAUTHENTICATED: errors.Unauthenticated,
+            ServiceErrorCode.UNKNOWN: errors.Unknown,
+            ServiceErrorCode.WORKSPACE_TEMPORARILY_UNAVAILABLE: errors.TemporarilyUnavailable,
+        }
+        error_code = status_error.error_code
+        if error_code is None:
+            error_code = ServiceErrorCode.UNKNOWN
+        error_class = mapping.get(error_code, errors.Unknown)
+        raise error_class(error_message)
 
     def execute(
         self,
@@ -128,30 +164,41 @@ class StatementExecutionExt(StatementExecutionAPI):
             wait_timeout=wait_timeout,
         )
 
-        if immediate_response.status.state == StatementState.SUCCEEDED:
+        status = immediate_response.status
+        if status is None:
+            status = StatementStatus(state=StatementState.FAILED)
+        if status.state == StatementState.SUCCEEDED:
             return immediate_response
 
-        self._raise_if_needed(immediate_response.status)
+        self._raise_if_needed(status)
 
         attempt = 1
         status_message = "polling..."
         deadline = time.time() + timeout.total_seconds()
+        statement_id = immediate_response.statement_id
+        if not statement_id:
+            msg = f"No statement id: {immediate_response}"
+            raise ValueError(msg)
         while time.time() < deadline:
-            res = self.get_statement(immediate_response.statement_id)
-            if res.status.state == StatementState.SUCCEEDED:
+            res = self.get_statement(statement_id)
+            result_status = res.status
+            if not result_status:
+                msg = f"Result status is none: {res}"
+                raise ValueError(msg)
+            state = result_status.state
+            if not state:
+                state = StatementState.FAILED
+            if state == StatementState.SUCCEEDED:
                 return ExecuteStatementResponse(
-                    manifest=res.manifest, result=res.result, statement_id=res.statement_id, status=res.status
+                    manifest=res.manifest, result=res.result, statement_id=statement_id, status=result_status
                 )
-            status_message = f"current status: {res.status.state.value}"
-            self._raise_if_needed(res.status)
-            sleep = attempt
-            if sleep > MAX_SLEEP_PER_ATTEMPT:
-                # sleep 10s max per attempt
-                sleep = MAX_SLEEP_PER_ATTEMPT
-            _LOG.debug(f"SQL statement {res.statement_id}: {status_message} (sleeping ~{sleep}s)")
+            status_message = f"current status: {state.value}"
+            self._raise_if_needed(result_status)
+            sleep = min(attempt, MAX_SLEEP_PER_ATTEMPT)
+            _LOG.debug(f"SQL statement {statement_id}: {status_message} (sleeping ~{sleep}s)")
             time.sleep(sleep + random.random())
             attempt += 1
-        self.cancel_execution(immediate_response.statement_id)
+        self.cancel_execution(statement_id)
         msg = f"timed out after {timeout}: {status_message}"
         raise TimeoutError(msg)
 
@@ -168,21 +215,15 @@ class StatementExecutionExt(StatementExecutionAPI):
         execute_response = self.execute(
             warehouse_id, statement, byte_limit=byte_limit, catalog=catalog, schema=schema, timeout=timeout
         )
-        col_names = []
-        col_conv = []
-        for col in execute_response.manifest.schema.columns:
-            col_names.append(col.name)
-            conv = self.type_converters.get(col.type_name, None)
-            if conv is None:
-                msg = f"{col.name} has no {col.type_name.value} converter"
-                raise ValueError(msg)
-            col_conv.append(conv)
-        row_factory = type("Row", (Row,), {"__columns__": col_names})
+        col_conv, row_factory = self._row_converters(execute_response)
         result_data = execute_response.result
         if result_data is None:
-            return []
+            return
         while True:
-            for data in result_data.data_array:
+            data_array = result_data.data_array
+            if not data_array:
+                data_array = []
+            for data in data_array:
                 # enumerate() + iterator + tuple constructor makes it more performant
                 # on larger humber of records for Python, even though it's less
                 # readable code.
@@ -198,3 +239,30 @@ class StatementExecutionExt(StatementExecutionAPI):
             # TODO: replace once ES-828324 is fixed
             json_response = self._api.do("GET", result_data.next_chunk_internal_link)
             result_data = ResultData.from_dict(json_response)
+
+    def _row_converters(self, execute_response):
+        col_names = []
+        col_conv = []
+        manifest = execute_response.manifest
+        if not manifest:
+            msg = f"missing manifest: {execute_response}"
+            raise ValueError(msg)
+        manifest_schema = manifest.schema
+        if not manifest_schema:
+            msg = f"missing schema: {manifest}"
+            raise ValueError(msg)
+        columns = manifest_schema.columns
+        if not columns:
+            columns = []
+        for col in columns:
+            col_names.append(col.name)
+            type_name = col.type_name
+            if not type_name:
+                type_name = ColumnInfoTypeName.NULL
+            conv = self.type_converters.get(type_name, None)
+            if conv is None:
+                msg = f"{col.name} has no {type_name.value} converter"
+                raise ValueError(msg)
+            col_conv.append(conv)
+        row_factory = type("Row", (Row,), {"__columns__": col_names})
+        return col_conv, row_factory

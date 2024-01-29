@@ -1,7 +1,7 @@
 import pytest
+from databricks.labs.blueprint.commands import CommandExecutor
 
-from databricks.labs.ucx.hive_metastore.mounts import Mount
-from databricks.labs.ucx.mixins.compute import CommandExecutor
+from databricks.labs.ucx.hive_metastore.locations import Mount
 
 
 @pytest.mark.skip(reason="Needs to have mountpoints already created ")

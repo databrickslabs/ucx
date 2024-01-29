@@ -1,10 +1,15 @@
 import logging
+from datetime import timedelta
+
+from databricks.sdk.errors import NotFound
+from databricks.sdk.retries import retried
 
 from databricks.labs.ucx.hive_metastore import TablesCrawler
 
 logger = logging.getLogger(__name__)
 
 
+@retried(on=[NotFound], timeout=timedelta(minutes=5))
 def test_describe_all_tables_in_databases(ws, sql_backend, inventory_schema, make_schema, make_table, env_or_skip):
     logger.info("setting up fixtures")
 

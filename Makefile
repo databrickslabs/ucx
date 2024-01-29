@@ -1,27 +1,28 @@
-all: clean lint fmt test
+all: clean lint fmt test coverage
 
 clean:
-	rm -fr htmlcov .mypy_cache .pytest_cache .ruff_cache .coverage coverage.xml
-	hatch env remove unit
+	rm -fr .venv clean htmlcov .mypy_cache .pytest_cache .ruff_cache .coverage coverage.xml
+	rm -fr **/*.pyc
 
-dev:
+.venv/bin/python:
 	pip install hatch
 	hatch env create
-	hatch run pip install -e '.[test]'
-	hatch run which python
+
+dev: .venv/bin/python
+	@hatch run which python
 
 lint:
-	hatch run lint:verify
+	hatch run verify
 
 fmt:
-	hatch run lint:fmt
+	hatch run fmt
 
 test:
-	hatch run unit:test
+	hatch run test
 
 integration:
-	hatch run integration:test
+	hatch run integration
 
-test-cov:
-	hatch run unit:test-cov-report && open htmlcov/index.html
+coverage:
+	hatch run coverage && open htmlcov/index.html
 

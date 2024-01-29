@@ -1,8 +1,9 @@
 import logging
 import re
-from collections.abc import Iterator
+from collections.abc import Iterator, Sequence
 
-from databricks.labs.ucx.framework.crawlers import SqlBackend
+from databricks.labs.ucx.framework.crawlers import DataclassInstance, SqlBackend
+from databricks.labs.ucx.mixins.sql import Row
 
 logger = logging.getLogger(__name__)
 
@@ -13,10 +14,10 @@ class MockBackend(SqlBackend):
         if not rows:
             rows = {}
         self._rows = rows
-        self._save_table = []
-        self.queries = []
+        self._save_table: list[tuple[str, Sequence[DataclassInstance], str]] = []
+        self.queries: list[str] = []
 
-    def _sql(self, sql):
+    def _sql(self, sql: str):
         logger.debug(f"Mock backend.sql() received SQL: {sql}")
         seen_before = sql in self.queries
         self.queries.append(sql)
@@ -28,24 +29,24 @@ class MockBackend(SqlBackend):
     def execute(self, sql):
         self._sql(sql)
 
-    def fetch(self, sql) -> Iterator[any]:
+    def fetch(self, sql) -> Iterator[Row]:
         self._sql(sql)
         rows = []
         if self._rows:
             for pattern in self._rows.keys():
                 r = re.compile(pattern)
-                if r.match(sql):
+                if r.search(sql):
                     logger.debug(f"Found match: {sql}")
                     rows.extend(self._rows[pattern])
         logger.debug(f"Returning rows: {rows}")
         return iter(rows)
 
-    def save_table(self, full_name: str, rows: list[any], klass, mode: str = "append"):
+    def save_table(self, full_name: str, rows: Sequence[DataclassInstance], klass, mode: str = "append"):
         if klass.__class__ == type:
             self._save_table.append((full_name, rows, mode))
 
-    def rows_written_for(self, full_name: str, mode: str) -> list[any]:
-        rows = []
+    def rows_written_for(self, full_name: str, mode: str) -> list[DataclassInstance]:
+        rows: list[DataclassInstance] = []
         for stub_full_name, stub_rows, stub_mode in self._save_table:
             if not (stub_full_name == full_name and stub_mode == mode):
                 continue

@@ -4,36 +4,17 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Any, Generic, TypeVar
 
+import yaml
 from databricks.sdk import AccountClient, WorkspaceClient
 from databricks.sdk.core import Config
 
 from databricks.labs.ucx.__about__ import __version__
 
-__all__ = ["GroupsConfig", "AccountConfig", "WorkspaceConfig"]
-
-
-# TODO: flatten down
-@dataclass
-class GroupsConfig:
-    selected: list[str] | None = None
-    auto: bool | None = None
-    backup_group_prefix: str | None = "db-temp-"
-
-    def __post_init__(self):
-        if not self.selected and self.auto is None:
-            msg = "Either selected or auto must be set"
-            raise ValueError(msg)
-        if self.selected and self.auto is False:
-            msg = "No selected groups provided, but auto-collection is disabled"
-            raise ValueError(msg)
-
-    @classmethod
-    def from_dict(cls, raw: dict):
-        return cls(**raw)
+__all__ = ["AccountConfig", "WorkspaceConfig"]
 
 
 @dataclass
-class ConnectConfig:
+class ConnectConfig:  # pylint: disable=too-many-instance-attributes
     # Keep all the fields in sync with databricks.sdk.core.Config
     host: str | None = None
     account_id: str | None = None
@@ -47,6 +28,9 @@ class ConnectConfig:
     cluster_id: str | None = None
     profile: str | None = None
     debug_headers: bool | None = False
+    # Truncate JSON fields in HTTP requests and responses above this limit.
+    # If this occurs, the log message will include the text `... (XXX additional elements)`
+    debug_truncate_bytes: int | None = 250000
     rate_limit: int | None = None
     max_connections_per_pool: int | None = None
     max_connection_pools: int | None = None
@@ -65,6 +49,7 @@ class ConnectConfig:
             cluster_id=cfg.cluster_id,
             profile=cfg.profile,
             debug_headers=cfg.debug_headers,
+            debug_truncate_bytes=cfg.debug_truncate_bytes,
             rate_limit=cfg.rate_limit,
             max_connection_pools=cfg.max_connection_pools,
             max_connections_per_pool=cfg.max_connections_per_pool,
@@ -84,6 +69,7 @@ class ConnectConfig:
             cluster_id=self.cluster_id,
             profile=self.profile,
             debug_headers=self.debug_headers,
+            debug_truncate_bytes=self.debug_truncate_bytes,
             rate_limit=self.rate_limit,
             max_connection_pools=self.max_connection_pools,
             max_connections_per_pool=self.max_connections_per_pool,
@@ -97,7 +83,8 @@ class ConnectConfig:
 
 
 # Used to set the right expectation about configuration file schema
-_CONFIG_VERSION = 1
+# TODO: config versions migrate
+_CONFIG_VERSION = 2
 
 T = TypeVar("T")
 
@@ -107,29 +94,17 @@ class _Config(Generic[T]):
 
     @classmethod
     @abstractmethod
-    def from_dict(cls, raw: dict) -> T:
-        ...
+    def from_dict(cls, raw: dict[str, Any]) -> T: ...
 
     @classmethod
-    def from_bytes(cls, raw: str) -> T:
-        from yaml import safe_load
-
-        raw = safe_load(raw)
-        return cls.from_dict({} if not raw else raw)
+    def from_bytes(cls, raw_str: str | bytes) -> T:
+        raw: dict[str, Any] = yaml.safe_load(raw_str)
+        empty: dict[str, Any] = {}
+        return cls.from_dict(empty if not raw else raw)
 
     @classmethod
     def from_file(cls, config_file: Path) -> T:
         return cls.from_bytes(config_file.read_text())
-
-    @classmethod
-    def _verify_version(cls, raw):
-        stored_version = raw.pop("version", None)
-        if stored_version != _CONFIG_VERSION:
-            msg = (
-                f"Unsupported config version: {stored_version}. "
-                f"UCX v{__version__} expects config version to be {_CONFIG_VERSION}"
-            )
-            raise ValueError(msg)
 
     def __post_init__(self):
         if self.connect is None:
@@ -143,12 +118,10 @@ class _Config(Generic[T]):
         return connect.to_databricks_config()
 
     def as_dict(self) -> dict[str, Any]:
-        from dataclasses import fields, is_dataclass
-
         def inner(x):
-            if is_dataclass(x):
+            if dataclasses.is_dataclass(x):
                 result = []
-                for f in fields(x):
+                for f in dataclasses.fields(x):
                     value = inner(getattr(x, f.name))
                     if not value:
                         continue
@@ -195,40 +168,72 @@ class AccountConfig(_Config["AccountConfig"]):
     def to_account_client(self) -> AccountClient:
         return AccountClient(config=self.to_databricks_config())
 
+    @classmethod
+    def _verify_version(cls, raw: dict):
+        stored_version = raw.pop("version", None)
+        if stored_version == _CONFIG_VERSION:
+            return raw
+        if stored_version == 1:
+            raw["include_group_names"] = (
+                raw.get("groups", {"selected": []})["selected"] if "selected" in raw["groups"] else None
+            )
+            raw["renamed_group_prefix"] = raw.get("groups", {"backup_group_prefix": "db-temp-"})["backup_group_prefix"]
+            raw.pop("groups", None)
+            return raw
+        msg = f"Unknown config version: {stored_version}"
+        raise ValueError(msg)
+
 
 @dataclass
-class WorkspaceConfig(_Config["WorkspaceConfig"]):
+class WorkspaceConfig(_Config["WorkspaceConfig"]):  # pylint: disable=too-many-instance-attributes
     inventory_database: str
-    groups: GroupsConfig
-    instance_pool_id: str = None
-    warehouse_id: str = None
+    # Group name conversion parameters.
+    workspace_group_regex: str | None = None
+    workspace_group_replace: str | None = None
+    account_group_regex: str | None = None
+    group_match_by_external_id: bool = False
+    # Includes group names for migration. If not specified, all matching groups will be picked up
+    include_group_names: list[str] | None = None
+    renamed_group_prefix: str | None = "ucx-renamed-"
+    instance_pool_id: str | None = None
+    warehouse_id: str | None = None
     connect: ConnectConfig | None = None
     num_threads: int | None = 10
+    database_to_catalog_mapping: dict[str, str] | None = None
+    default_catalog: str | None = "ucx_default"
     log_level: str | None = "INFO"
-    database_to_catalog_mapping: dict[str, str] = None
-    default_catalog: str = "ucx_default"
 
     # Starting path for notebooks and directories crawler
     workspace_start_path: str = "/"
+    instance_profile: str | None = None
+    spark_conf: dict[str, str] | None = None
+
+    override_clusters: dict[str, str] | None = None
+    custom_cluster_policy_id: str | None = None
 
     @classmethod
     def from_dict(cls, raw: dict):
-        cls._verify_version(raw)
-        return cls(
-            inventory_database=raw.get("inventory_database"),
-            groups=GroupsConfig.from_dict(raw.get("groups", {})),
-            connect=ConnectConfig.from_dict(raw.get("connect", {})),
-            instance_pool_id=raw.get("instance_pool_id", None),
-            warehouse_id=raw.get("warehouse_id", None),
-            num_threads=raw.get("num_threads", 10),
-            log_level=raw.get("log_level", "INFO"),
-            database_to_catalog_mapping=raw.get("database_to_catalog_mapping", None),
-            default_catalog=raw.get("default_catalog", "main"),
-            workspace_start_path=raw.get("workspace_start_path", "/"),
-        )
+        raw = cls._migrate_from_v1(raw)
+        connect = ConnectConfig.from_dict(raw.pop("connect", {}))
+        return cls(connect=connect, **raw)
 
     def to_workspace_client(self) -> WorkspaceClient:
         return WorkspaceClient(config=self.to_databricks_config())
 
     def replace_inventory_variable(self, text: str) -> str:
         return text.replace("$inventory", f"hive_metastore.{self.inventory_database}")
+
+    @classmethod
+    def _migrate_from_v1(cls, raw: dict):
+        stored_version = raw.pop("version", None)
+        if stored_version == _CONFIG_VERSION:
+            return raw
+        if stored_version == 1:
+            raw["include_group_names"] = (
+                raw.get("groups", {"selected": []})["selected"] if "selected" in raw["groups"] else None
+            )
+            raw["renamed_group_prefix"] = raw.get("groups", {"backup_group_prefix": "db-temp-"})["backup_group_prefix"]
+            raw.pop("groups", None)
+            return raw
+        msg = f"Unknown config version: {stored_version}"
+        raise ValueError(msg)

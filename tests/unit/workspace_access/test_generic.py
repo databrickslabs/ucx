@@ -1,9 +1,21 @@
 import json
-import unittest.mock
+from datetime import timedelta
 from unittest.mock import MagicMock, Mock, patch
 
+import pytest
+from databricks.labs.blueprint.parallel import ManyError
 from databricks.sdk.core import DatabricksError
+from databricks.sdk.errors import Aborted, InternalError, NotFound, PermissionDenied
 from databricks.sdk.service import compute, iam, ml
+from databricks.sdk.service.compute import ClusterDetails
+from databricks.sdk.service.iam import (
+    AccessControlResponse,
+    ObjectPermissions,
+    Permission,
+    PermissionLevel,
+)
+from databricks.sdk.service.jobs import BaseJob
+from databricks.sdk.service.pipelines import PipelineStateInfo
 from databricks.sdk.service.workspace import Language, ObjectInfo, ObjectType
 
 from databricks.labs.ucx.mixins.sql import Row
@@ -63,7 +75,7 @@ def test_apply(migration_state):
     ws = MagicMock()
 
     acl1 = iam.AccessControlResponse(
-        all_permissions=[iam.Permission(permission_level=iam.PermissionLevel.CAN_USE)], group_name="db-temp-test"
+        all_permissions=[iam.Permission(permission_level=iam.PermissionLevel.CAN_USE)], group_name="test"
     )
     ws.permissions.get.return_value = iam.ObjectPermissions(access_control_list=[acl1])
     sup = GenericPermissionsSupport(ws=ws, listings=[])  # no listings since only apply is tested
@@ -91,13 +103,13 @@ def test_apply(migration_state):
         ),
     )
 
-    _task = sup.get_apply_task(item, migration_state, "backup")
+    _task = sup.get_apply_task(item, migration_state)
     _task()
     ws.permissions.update.assert_called_once()
 
     expected_acl_payload = [
         iam.AccessControlRequest(
-            group_name="db-temp-test",
+            group_name="test",
             permission_level=iam.PermissionLevel.CAN_USE,
         )
     ]
@@ -114,9 +126,9 @@ def test_relevance():
     assert result is True
 
 
-def test_safe_get():
+def test_safe_get_permissions_when_error_non_retriable():
     ws = MagicMock()
-    ws.permissions.get.side_effect = DatabricksError(error_code="RESOURCE_DOES_NOT_EXIST")
+    ws.permissions.get.side_effect = NotFound(...)
     sup = GenericPermissionsSupport(ws=ws, listings=[])
     result = sup._safe_get_permissions("clusters", "test")
     assert result is None
@@ -127,6 +139,15 @@ def test_safe_get():
     #     sup._safe_get_permissions("clusters", "test")
 
 
+def test_safe_get_permissions_when_error_retriable():
+    ws = MagicMock()
+    ws.permissions.get.side_effect = Aborted(...)
+    sup = GenericPermissionsSupport(ws=ws, listings=[])
+    with pytest.raises(DatabricksError) as e:
+        sup._safe_get_permissions("clusters", "test")
+    assert e.type == Aborted
+
+
 def test_no_permissions():
     ws = MagicMock()
     ws.clusters.list.return_value = [
@@ -134,7 +155,7 @@ def test_no_permissions():
             cluster_id="test",
         )
     ]
-    ws.permissions.get.side_effect = DatabricksError(error_code="RESOURCE_DOES_NOT_EXIST")
+    ws.permissions.get.side_effect = NotFound(...)
     sup = GenericPermissionsSupport(
         ws=ws,
         listings=[
@@ -161,7 +182,7 @@ def test_passwords_tokens_crawler(migration_state):
 
     temp_acl = [
         iam.AccessControlResponse(
-            group_name="db-temp-test",
+            group_name="test",
             all_permissions=[iam.Permission(inherited=False, permission_level=iam.PermissionLevel.CAN_USE)],
         )
     ]
@@ -179,13 +200,13 @@ def test_passwords_tokens_crawler(migration_state):
     for item in auth_items:
         assert item.object_id in ["tokens", "passwords"]
         assert item.object_type == "authorization"
-        applier = sup.get_apply_task(item, migration_state, "backup")
+        applier = sup.get_apply_task(item, migration_state)
         applier()
         ws.permissions.update.assert_called_once_with(
             item.object_type,
             item.object_id,
             access_control_list=[
-                iam.AccessControlRequest(group_name="db-temp-test", permission_level=iam.PermissionLevel.CAN_USE)
+                iam.AccessControlRequest(group_name="test", permission_level=iam.PermissionLevel.CAN_USE)
             ],
         )
         ws.permissions.update.reset_mock()
@@ -193,7 +214,7 @@ def test_passwords_tokens_crawler(migration_state):
 
 def test_models_listing():
     ws = MagicMock()
-    ws.model_registry.list_models.return_value = [ml.Model(name="test")]
+    ws.model_registry.list_models.return_value = [ml.Model(name="test"), ml.Model(name="test2")]
     ws.model_registry.get_model.return_value = ml.GetModelResponse(
         registered_model_databricks=ml.ModelDatabricks(
             id="some-id",
@@ -201,11 +222,22 @@ def test_models_listing():
         )
     )
 
-    wrapped = Listing(models_listing(ws), id_attribute="id", object_type="registered-models")
+    wrapped = Listing(models_listing(ws, 2), id_attribute="id", object_type="registered-models")
     result = list(wrapped)
-    assert len(result) == 1
+    assert len(result) == 2
     assert result[0].object_id == "some-id"
     assert result[0].request_type == "registered-models"
+
+
+def test_models_listing_failure_raise_error():
+    ws = MagicMock()
+    ws.model_registry.list_models.return_value = [ml.Model(name="test")]
+    ws.model_registry.get_model.side_effect = InternalError(...)
+
+    wrapped = Listing(models_listing(ws, 2), id_attribute="id", object_type="registered-models")
+    with pytest.raises(ManyError) as e:
+        list(wrapped)
+    assert e.type == ManyError
 
 
 def test_experiment_listing():
@@ -264,7 +296,7 @@ def test_applier_task_should_return_true_if_permission_is_up_to_date():
     )
     ws.permissions.get.return_value = iam.ObjectPermissions(access_control_list=[acl1, acl2])
 
-    sup = GenericPermissionsSupport(ws=ws, listings=[])
+    sup = GenericPermissionsSupport(ws=ws, listings=[], verify_timeout=timedelta(seconds=1))
     result = sup._applier_task(
         object_type="clusters",
         object_id="cluster_id",
@@ -285,7 +317,7 @@ def test_applier_task_should_return_true_if_permission_is_up_to_date_with_multip
     )
 
     ws.permissions.get.return_value = iam.ObjectPermissions(access_control_list=[acl])
-    sup = GenericPermissionsSupport(ws=ws, listings=[])
+    sup = GenericPermissionsSupport(ws=ws, listings=[], verify_timeout=timedelta(seconds=1))
 
     result = sup._applier_task(
         object_type="clusters",
@@ -298,23 +330,23 @@ def test_applier_task_should_return_true_if_permission_is_up_to_date_with_multip
     assert result
 
 
-def test_applier_task_should_return_false_if_permission_couldnt_be_applied():
+def test_applier_task_failed():
     ws = MagicMock()
     acl = iam.AccessControlResponse(all_permissions=[], group_name="group")
 
     ws.permissions.update.return_value = iam.ObjectPermissions(access_control_list=[acl])
     ws.permissions.get.return_value = iam.ObjectPermissions(access_control_list=[acl])
-    sup = GenericPermissionsSupport(ws=ws, listings=[])
+    sup = GenericPermissionsSupport(ws=ws, listings=[], verify_timeout=timedelta(seconds=1))
+    with pytest.raises(TimeoutError) as e:
+        sup._applier_task(
+            object_type="clusters",
+            object_id="cluster_id",
+            acl=[iam.AccessControlRequest(group_name="group", permission_level=iam.PermissionLevel.CAN_USE)],
+        )
+    assert "Timed out after" in str(e.value)
 
-    result = sup._applier_task(
-        object_type="clusters",
-        object_id="cluster_id",
-        acl=[iam.AccessControlRequest(group_name="group", permission_level=iam.PermissionLevel.CAN_USE)],
-    )
-    assert not result
 
-
-def test_applier_task_should_return_false_if_all_permission_couldnt_be_applied():
+def test_applier_task_failed_when_all_permissions_not_up_to_date():
     ws = MagicMock()
     group_1_acl = iam.AccessControlResponse(
         all_permissions=[
@@ -333,53 +365,217 @@ def test_applier_task_should_return_false_if_all_permission_couldnt_be_applied()
     )
     ws.permissions.update.return_value = iam.ObjectPermissions(access_control_list=[group_1_acl, group_2_acl])
     ws.permissions.get.return_value = iam.ObjectPermissions(access_control_list=[group_1_acl, group_2_acl])
-    sup = GenericPermissionsSupport(ws=ws, listings=[])
+    sup = GenericPermissionsSupport(ws=ws, listings=[], verify_timeout=timedelta(seconds=1))
+    with pytest.raises(TimeoutError) as e:
+        sup._applier_task(
+            object_type="clusters",
+            object_id="cluster_id",
+            acl=[
+                iam.AccessControlRequest(group_name="group_1", permission_level=iam.PermissionLevel.CAN_USE),
+                iam.AccessControlRequest(group_name="group_1", permission_level=iam.PermissionLevel.CAN_MANAGE),
+            ],
+        )
+    assert "Timed out after" in str(e.value)
 
+
+def test_applier_task_failed_when_get_error_retriable():
+    ws = MagicMock()
+    group_1_acl = iam.AccessControlResponse(
+        all_permissions=[
+            iam.Permission(permission_level=iam.PermissionLevel.CAN_USE),
+        ],
+        group_name="group_1",
+    )
+    group_2_acl = iam.AccessControlResponse(
+        all_permissions=[
+            iam.Permission(permission_level=iam.PermissionLevel.CAN_USE),
+        ],
+        group_name="group_2",
+    )
+    ws.permissions.update.return_value = iam.ObjectPermissions(access_control_list=[group_1_acl, group_2_acl])
+    ws.permissions.get.side_effect = Aborted(...)
+    sup = GenericPermissionsSupport(ws=ws, listings=[], verify_timeout=timedelta(seconds=1))
+    with pytest.raises(TimeoutError) as e:
+        sup._applier_task(
+            object_type="clusters",
+            object_id="cluster_id",
+            acl=[
+                iam.AccessControlRequest(group_name="group_1", permission_level=iam.PermissionLevel.CAN_USE),
+            ],
+        )
+    assert "Timed out" in str(e.value)
+
+
+def test_applier_task_failed_when_get_error_non_retriable():
+    ws = MagicMock()
+    group_1_acl = iam.AccessControlResponse(
+        all_permissions=[
+            iam.Permission(permission_level=iam.PermissionLevel.CAN_USE),
+        ],
+        group_name="group_1",
+    )
+    group_2_acl = iam.AccessControlResponse(
+        all_permissions=[
+            iam.Permission(permission_level=iam.PermissionLevel.CAN_USE),
+        ],
+        group_name="group_2",
+    )
+    ws.permissions.update.return_value = iam.ObjectPermissions(access_control_list=[group_1_acl, group_2_acl])
+    ws.permissions.get.side_effect = PermissionDenied(...)
+    sup = GenericPermissionsSupport(ws=ws, listings=[], verify_timeout=timedelta(seconds=1))
     result = sup._applier_task(
         object_type="clusters",
         object_id="cluster_id",
         acl=[
             iam.AccessControlRequest(group_name="group_1", permission_level=iam.PermissionLevel.CAN_USE),
-            iam.AccessControlRequest(group_name="group_1", permission_level=iam.PermissionLevel.CAN_MANAGE),
         ],
     )
-    assert not result
+    assert result is False
 
 
-def test_applier_task_should_be_called_three_times_if_permission_couldnt_be_applied():
+def test_safe_update_permissions_when_error_non_retriable():
     ws = MagicMock()
-    acl = iam.AccessControlResponse(all_permissions=[], group_name="group")
+    ws.permissions.update.side_effect = PermissionDenied(...)
 
-    ws.permissions.update.return_value = iam.ObjectPermissions(access_control_list=[acl])
-    ws.permissions.get.return_value = iam.ObjectPermissions(access_control_list=[acl])
-    sup = GenericPermissionsSupport(ws=ws, listings=[])
+    sup = GenericPermissionsSupport(ws=ws, listings=[], verify_timeout=timedelta(seconds=1))
 
-    input_acl = [iam.AccessControlRequest(group_name="group", permission_level=iam.PermissionLevel.CAN_USE)]
-    sup._applier_task(
+    result = sup._safe_update_permissions(
         object_type="clusters",
         object_id="cluster_id",
-        acl=input_acl,
+        acl=[iam.AccessControlRequest(group_name="group", permission_level=iam.PermissionLevel.CAN_USE)],
     )
+    assert result is None
 
-    assert len(ws.permissions.update.mock_calls) == 3
-    assert ws.permissions.update.has_calls(
-        [
-            unittest.mock.call(object_type="clusters", object_id="cluster_id", acl=input_acl),
-            unittest.mock.call(object_type="clusters", object_id="cluster_id", acl=input_acl),
-            unittest.mock.call(object_type="clusters", object_id="cluster_id", acl=input_acl),
-        ]
-    )
-    assert len(ws.permissions.get.mock_calls) == 3
-    assert ws.permissions.get.has_calls(
-        [
-            unittest.mock.call(object_type="clusters", object_id="cluster_id"),
-            unittest.mock.call(object_type="clusters", object_id="cluster_id"),
-            unittest.mock.call(object_type="clusters", object_id="cluster_id"),
-        ]
-    )
+
+def test_safe_update_permissions_when_error_retriable():
+    ws = MagicMock()
+    ws.permissions.update.side_effect = InternalError(...)
+
+    sup = GenericPermissionsSupport(ws=ws, listings=[], verify_timeout=timedelta(seconds=1))
+
+    with pytest.raises(DatabricksError) as e:
+        sup._safe_update_permissions(
+            object_type="clusters",
+            object_id="cluster_id",
+            acl=[iam.AccessControlRequest(group_name="group", permission_level=iam.PermissionLevel.CAN_USE)],
+        )
+    assert e.type == InternalError
 
 
 def test_load_as_dict():
+    ws = MagicMock()
+
+    cluster_id = "cluster_test"
+    group_name = "group_test"
+    user_name = "user_test"
+    sp_name = "sp_test"
+
+    ws.clusters.list.return_value = [
+        compute.ClusterDetails(
+            cluster_id=cluster_id,
+        )
+    ]
+
+    sample_permission = iam.ObjectPermissions(
+        object_id=cluster_id,
+        object_type="clusters",
+        access_control_list=[
+            iam.AccessControlResponse(
+                group_name=group_name,
+                all_permissions=[iam.Permission(inherited=False, permission_level=iam.PermissionLevel.CAN_USE)],
+            ),
+            iam.AccessControlResponse(
+                user_name=user_name,
+                all_permissions=[iam.Permission(inherited=False, permission_level=iam.PermissionLevel.CAN_RUN)],
+            ),
+            iam.AccessControlResponse(
+                service_principal_name=sp_name,
+                all_permissions=[iam.Permission(inherited=False, permission_level=iam.PermissionLevel.CAN_MANAGE)],
+            ),
+            iam.AccessControlResponse(
+                all_permissions=[iam.Permission(inherited=False, permission_level=iam.PermissionLevel.CAN_ATTACH_TO)],
+            ),
+        ],
+    )
+
+    ws.permissions.get.return_value = sample_permission
+    sup = GenericPermissionsSupport(ws=ws, listings=[Listing(ws.clusters.list, "cluster_id", "clusters")])
+
+    policy_permissions = sup.load_as_dict("clusters", cluster_id)
+
+    assert iam.PermissionLevel.CAN_USE == policy_permissions[group_name]
+    assert iam.PermissionLevel.CAN_RUN == policy_permissions[user_name]
+    assert iam.PermissionLevel.CAN_MANAGE == policy_permissions[sp_name]
+    assert iam.PermissionLevel.CAN_ATTACH_TO == policy_permissions["UNKNOWN"]
+
+
+def test_load_as_dict_permissions_not_found():
+    ws = MagicMock()
+
+    sup = GenericPermissionsSupport(
+        ws=ws,
+        listings=[],
+    )
+
+    ws.permissions.get.side_effect = Mock(side_effect=NotFound(...))
+
+    policy_permissions = sup.load_as_dict("clusters", "cluster_test")
+
+    assert len(policy_permissions) == 0
+
+
+def test_load_as_dict_no_acls():
+    ws = MagicMock()
+
+    cluster_id = "cluster_test"
+
+    ws.clusters.list.return_value = [
+        compute.ClusterDetails(
+            cluster_id=cluster_id,
+        )
+    ]
+
+    sample_permission = iam.ObjectPermissions(object_id=cluster_id, object_type="clusters", access_control_list=[])
+
+    ws.permissions.get.return_value = sample_permission
+    sup = GenericPermissionsSupport(ws=ws, listings=[Listing(ws.clusters.list, "cluster_id", "clusters")])
+
+    policy_permissions = sup.load_as_dict("clusters", cluster_id)
+
+    assert len(policy_permissions) == 0
+
+
+def test_load_as_dict_handle_exception_when_getting_permissions():
+    ws = MagicMock()
+
+    sup = GenericPermissionsSupport(
+        ws=ws,
+        listings=[],
+    )
+
+    ws.permissions.get.side_effect = Mock(side_effect=NotFound(...))
+
+    policy_permissions = sup.load_as_dict("clusters", "cluster_test")
+
+    assert len(policy_permissions) == 0
+
+
+def test_load_as_dict_no_permissions():
+    ws = MagicMock()
+
+    sup = GenericPermissionsSupport(
+        ws=ws,
+        listings=[],
+    )
+
+    ws.permissions.get.return_value = None
+
+    policy_permissions = sup.load_as_dict("clusters", "cluster_test")
+
+    assert len(policy_permissions) == 0
+
+
+def test_load_as_dict_no_permission_level():
     ws = MagicMock()
 
     cluster_id = "cluster_test"
@@ -397,7 +593,7 @@ def test_load_as_dict():
         access_control_list=[
             iam.AccessControlResponse(
                 group_name=group_name,
-                all_permissions=[iam.Permission(inherited=False, permission_level=iam.PermissionLevel.CAN_USE)],
+                all_permissions=[iam.Permission(inherited=False)],
             )
         ],
     )
@@ -406,36 +602,6 @@ def test_load_as_dict():
     sup = GenericPermissionsSupport(ws=ws, listings=[Listing(ws.clusters.list, "cluster_id", "clusters")])
 
     policy_permissions = sup.load_as_dict("clusters", cluster_id)
-
-    assert iam.PermissionLevel.CAN_USE == policy_permissions[group_name]
-
-
-def test_load_as_dict_no_permissions():
-    ws = MagicMock()
-
-    sup = GenericPermissionsSupport(
-        ws=ws,
-        listings=[],
-    )
-
-    ws.permissions.get.side_effect = Mock(side_effect=DatabricksError(error_code="RESOURCE_DOES_NOT_EXIST"))
-
-    policy_permissions = sup.load_as_dict("clusters", "cluster_test")
-
-    assert len(policy_permissions) == 0
-
-
-def test_load_as_dict_handle_exception_when_getting_permissions():
-    ws = MagicMock()
-
-    sup = GenericPermissionsSupport(
-        ws=ws,
-        listings=[],
-    )
-
-    ws.permissions.get.side_effect = Mock(side_effect=DatabricksError(error_code="RESOURCE_DOES_NOT_EXIST"))
-
-    policy_permissions = sup.load_as_dict("clusters", "cluster_test")
 
     assert len(policy_permissions) == 0
 
@@ -458,7 +624,7 @@ def test_workspaceobject_try_fetch():
     result_set = list(crawler._try_fetch())
 
     assert len(result_set) == 2
-    assert result_set[0] == WorkspaceObjectInfo("NOTEBOOK", 123, "/rootobj/notebook1", "PYTHON")
+    assert result_set[0] == WorkspaceObjectInfo("/rootobj/notebook1", "NOTEBOOK", 123, "PYTHON")
 
 
 def test_workspaceobject_crawl():
@@ -487,7 +653,34 @@ def test_workspaceobject_crawl():
         result_set = list(crawler)
 
     assert len(result_set) == 2
-    assert result_set[0] == WorkspaceObjectInfo("NOTEBOOK", "123", "/rootobj/notebook1", "PYTHON")
+    assert result_set[0] == WorkspaceObjectInfo("/rootobj/notebook1", "NOTEBOOK", "123", "PYTHON")
+
+
+def test_workspaceobject_withexperiment_crawl():
+    sample_objects = [
+        ObjectInfo(
+            object_type=ObjectType.NOTEBOOK,
+            path="/rootobj/notebook1",
+            language=Language.PYTHON,
+            created_at=0,
+            modified_at=0,
+            object_id=123,
+            size=0,
+        ),
+        ObjectInfo(
+            path="/rootobj/experiment1",
+            created_at=0,
+            modified_at=0,
+            object_id=456,
+        ),
+    ]
+    ws = Mock()
+    with patch("databricks.labs.ucx.workspace_access.listing.WorkspaceListing.walk", return_value=sample_objects):
+        crawler = WorkspaceListing(ws, MockBackend(), "ucx")._crawl()
+        result_set = list(crawler)
+
+    assert len(result_set) == 1
+    assert result_set[0] == WorkspaceObjectInfo("/rootobj/notebook1", "NOTEBOOK", "123", "PYTHON")
 
 
 def test_workspace_snapshot():
@@ -513,4 +706,111 @@ def test_workspace_snapshot():
     result_set = crawler.snapshot()
 
     assert len(result_set) == 2
-    assert result_set[0] == WorkspaceObjectInfo("NOTEBOOK", "123", "/rootobj/notebook1", "PYTHON")
+    assert result_set[0] == WorkspaceObjectInfo("/rootobj/notebook1", "NOTEBOOK", "123", "PYTHON")
+
+
+def test_eligibles_assets_with_owner_should_be_accepted():
+    ws = MagicMock()
+    ws.jobs.list.return_value = [BaseJob(job_id=13)]
+    ws.pipelines.list_pipelines.return_value = [PipelineStateInfo(pipeline_id="12")]
+
+    def perms(object_type: str, object_id: str):
+        if object_type == "jobs":
+            return ObjectPermissions(
+                object_id=object_id,
+                object_type=object_type,
+                access_control_list=[
+                    AccessControlResponse(
+                        group_name="de", all_permissions=[Permission(permission_level=PermissionLevel.IS_OWNER)]
+                    ),
+                    AccessControlResponse(
+                        group_name="ds", all_permissions=[Permission(permission_level=PermissionLevel.CAN_USE)]
+                    ),
+                ],
+            )
+        elif object_type == "pipelines":
+            return ObjectPermissions(
+                object_id=object_id,
+                object_type=object_type,
+                access_control_list=[
+                    AccessControlResponse(
+                        group_name="de", all_permissions=[Permission(permission_level=PermissionLevel.IS_OWNER)]
+                    ),
+                    AccessControlResponse(
+                        group_name="de", all_permissions=[Permission(permission_level=PermissionLevel.CAN_RUN)]
+                    ),
+                ],
+            )
+
+    ws.permissions.get.side_effect = perms
+
+    sup = GenericPermissionsSupport(
+        ws=ws,
+        listings=[
+            Listing(ws.jobs.list, "job_id", "jobs"),
+            Listing(ws.pipelines.list_pipelines, "pipeline_id", "pipelines"),
+        ],
+    )
+    tasks = []
+    for executable in list(sup.get_crawler_tasks()):
+        task = executable()
+        if task is not None:
+            tasks.append(task)
+    assert len(tasks) == 2
+
+
+def test_eligibles_assets_without_owner_should_be_ignored():
+    ws = MagicMock()
+    ws.clusters.list.return_value = [ClusterDetails(cluster_id="1234")]
+    ws.jobs.list.return_value = [BaseJob(job_id=13)]
+    ws.pipelines.list_pipelines.return_value = [PipelineStateInfo(pipeline_id="12")]
+
+    def perms(object_type: str, object_id: str):
+        if object_type == "clusters":
+            return ObjectPermissions(
+                object_id=object_id,
+                object_type=object_type,
+                access_control_list=[
+                    AccessControlResponse(
+                        group_name="de", all_permissions=[Permission(permission_level=PermissionLevel.CAN_USE)]
+                    )
+                ],
+            )
+        elif object_type == "pipelines":
+            return ObjectPermissions(
+                object_id=object_id,
+                object_type=object_type,
+                access_control_list=[
+                    AccessControlResponse(
+                        group_name="de", all_permissions=[Permission(permission_level=PermissionLevel.CAN_USE)]
+                    )
+                ],
+            )
+        elif object_type == "jobs":
+            return ObjectPermissions(
+                object_id=object_id,
+                object_type=object_type,
+                access_control_list=[
+                    AccessControlResponse(
+                        group_name="ds", all_permissions=[Permission(permission_level=PermissionLevel.CAN_USE)]
+                    ),
+                ],
+            )
+
+    ws.permissions.get.side_effect = perms
+
+    sup = GenericPermissionsSupport(
+        ws=ws,
+        listings=[
+            Listing(ws.clusters.list, "cluster_id", "clusters"),
+            Listing(ws.jobs.list, "job_id", "jobs"),
+            Listing(ws.pipelines.list_pipelines, "pipeline_id", "pipelines"),
+        ],
+    )
+    tasks = []
+    for executable in list(sup.get_crawler_tasks()):
+        task = executable()
+        if task is not None:
+            tasks.append(task)
+    assert len(tasks) == 1
+    assert tasks[0].object_type == "clusters"

@@ -51,6 +51,50 @@ issues without relying on external systems. Focus on testing the edge cases of t
 things may fail. See [this example](https://github.com/databricks/databricks-sdk-py/pull/295) as a reference of an extensive
 unit test coverage suite and the clear difference between _unit tests_ and _integration tests_.
 
+## Common fixes for `mypy` errors
+
+See https://mypy.readthedocs.io/en/stable/cheat_sheet_py3.html for more details
+
+### ..., expression has type "None", variable has type "str"
+
+* Add `assert ... is not None` if it's a body of a method. Example:
+
+```
+# error: Argument 1 to "delete" of "DashboardWidgetsAPI" has incompatible type "str | None"; expected "str"
+self._ws.dashboard_widgets.delete(widget.id)
+```
+
+after
+
+```
+assert widget.id is not None
+self._ws.dashboard_widgets.delete(widget.id)
+```
+
+* Add `... | None` if it's in the dataclass. Example: `cloud: str = None` -> `cloud: str | None = None`
+
+### ..., has incompatible type "Path"; expected "str"
+
+Add `.as_posix()` to convert Path to str
+
+###  Argument 2 to "get" of "dict" has incompatible type "None"; expected ...
+
+Add a valid default value for the dictionary return. 
+
+Example: 
+```python
+def viz_type(self) -> str:
+    return self.viz.get("type", None)
+```
+
+after:
+
+Example: 
+```python
+def viz_type(self) -> str:
+    return self.viz.get("type", "UNKNOWN")
+```
+
 ## Integration Testing Infrastructure
 
 Integration tests must accompany all new code additions. Integration tests help us validate that various parts of 
@@ -82,6 +126,32 @@ for the latest reference of environment variables related to authentication.
   access control. The value is a unique cluster ID, like "0824-161440-...".
 - `TEST_USER_ISOLATION_CLUSTER_ID`: This environment variable contains the identifier for the cluster used in testing
   user isolation. The value is a unique cluster ID, like "0825-164947-...".
+
+With the final results looking like (Note, for Azure Cloud, no `DATABRICKS_TOKEN` value):
+```shell
+export DATABRICKS_ACCOUNT_ID=999f9f99-89ba-4dd2-9999-a3301d0f21c0
+export DATABRICKS_HOST=https://adb-8590162618999999.14.azuredatabricks.net
+export DATABRICKS_CLUSTER_ID=8888-999999-6w1gh5v6
+export TEST_DEFAULT_WAREHOUSE_ID=a73e69a521a9c91c
+export TEST_DEFAULT_CLUSTER_ID=8888-999999-6w1gh5v6
+export TEST_LEGACY_TABLE_ACL_CLUSTER_ID=8888-999999-9fafnezi
+export TEST_INSTANCE_POOL_ID=7777-999999-save46-pool-cghrk21s
+```
+
+The test workspace must have test user accounts, matching displayName pattern `test-uesr-*`
+To create test users:
+
+```shell
+databricks users create --active --display-name "test-user-1" --user-name "first.last-t1@example.com"
+databricks users create --active --display-name "test-user-2" --user-name "first.last-t2@example.com"
+```
+
+Before running integration tests on Azure Cloud, you must login (and clear any TOKEN authenticaton):
+
+```shell
+az login
+unset DATABRICKS_TOKEN
+```
 
 Use the following command to run the integration tests:
 
@@ -117,6 +187,22 @@ in turn, contributes to the overall reliability and quality of our software.
 
 Currently, VSCode IDE is not supported, as it does not offer interactive debugging single integration tests. 
 However, it's possible that this limitation may be addressed in the future.
+
+### Flaky tests
+
+You can add `@retried` decorator to deal with [flaky tests](https://docs.pytest.org/en/latest/explanation/flaky.html):
+
+```python
+from datetime import timedelta
+
+from databricks.sdk.errors import NotFound
+from databricks.sdk.retries import retried
+
+@retried(on=[NotFound], timeout=timedelta(minutes=5))
+def test_something(ws):
+    ...
+
+```
 
 ## Local Setup
 
@@ -234,5 +320,25 @@ Coverage HTML written to dir htmlcov
 ========================================================================================== 103 passed in 12.61s ==========================================================================================
 $ 
 ```
+
+Sometimes, when multiple Python versions are installed in the workstation used for UCX development, one might encounter the following:
+
+```sh
+$ make dev
+ERROR: Environment `default` is incompatible: cannot locate Python: 3.10
+```
+
+The easiest fix is to reinstall Python 3.10. If required remove the installed hatch package manager and reinstall it:
+
+```sh
+$ deactivate
+$ brew install python@3.10
+$ rm -rf venv
+$ pip3 uninstall hatch
+$ python3.10 -m pip install hatch
+$ make dev
+$ make test
+```
+Note: Before performing a clean install deactivate the virtual environment and follow the commands given above.
 
 Note: The initial `hatch env show` is just to list the environments managed by Hatch and is not needed.

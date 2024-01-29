@@ -1,9 +1,11 @@
-import dataclasses
 from dataclasses import dataclass
-from typing import Any, Optional
+from typing import Any
 
 from databricks.sdk.service._internal import _from_dict
-from databricks.sdk.service.sql import Visualization, Widget
+from databricks.sdk.service.sql import Visualization, Widget, WidgetPosition
+
+# this file is going away soon
+# pylint: disable=redefined-builtin
 
 
 @dataclass
@@ -12,12 +14,12 @@ class WidgetOptions:
     description: str | None = None
     is_hidden: bool | None = None
     parameter_mappings: Any | None = None
-    position: Optional["WidgetPosition"] = None
+    position: WidgetPosition | None = None
     title: str | None = None
     updated_at: str | None = None
 
     def as_dict(self) -> dict:
-        body = {}
+        body: dict[str, Any] = {}
         if self.created_at is not None:
             body["created_at"] = self.created_at
         if self.description is not None:
@@ -35,7 +37,7 @@ class WidgetOptions:
         return body
 
     @classmethod
-    def from_dict(cls, d: dict[str, any]) -> "WidgetOptions":
+    def from_dict(cls, d: dict[str, Any]) -> "WidgetOptions":
         return cls(
             created_at=d.get("created_at", None),
             description=d.get("description", None),
@@ -44,42 +46,6 @@ class WidgetOptions:
             position=_from_dict(d, "position", WidgetPosition),
             title=d.get("title", None),
             updated_at=d.get("updated_at", None),
-        )
-
-
-@dataclass
-class WidgetPosition:
-    """Coordinates of this widget on a dashboard. This portion of the API changes frequently and is
-    unsupported."""
-
-    auto_height: bool | None = None
-    col: int | None = None
-    row: int | None = None
-    size_x: int | None = None
-    size_y: int | None = None
-
-    def as_dict(self) -> dict:
-        body = {}
-        if self.auto_height is not None:
-            body["autoHeight"] = self.auto_height
-        if self.col is not None:
-            body["col"] = self.col
-        if self.row is not None:
-            body["row"] = self.row
-        if self.size_x is not None:
-            body["sizeX"] = self.size_x
-        if self.size_y is not None:
-            body["sizeY"] = self.size_y
-        return body
-
-    @classmethod
-    def from_dict(cls, d: dict[str, any]) -> "WidgetPosition":
-        return cls(
-            auto_height=d.get("autoHeight", None),
-            col=d.get("col", None),
-            row=d.get("row", None),
-            size_x=d.get("sizeX", None),
-            size_y=d.get("sizeY", None),
         )
 
 
@@ -114,7 +80,7 @@ class DashboardWidgetsAPI:
 
         :returns: :class:`Widget`
         """
-        body = {}
+        body: dict[str, str | dict | int] = {}
         if dashboard_id is not None:
             body["dashboard_id"] = dashboard_id
         if options is not None:
@@ -157,7 +123,7 @@ class DashboardWidgetsAPI:
 
         :returns: :class:`Widget`
         """
-        body = {}
+        body: dict[str, str | dict | int] = {}
         if dashboard_id is not None:
             body["dashboard_id"] = dashboard_id
         if options is not None:
@@ -190,7 +156,7 @@ class QueryVisualizationsAPI:
         name: str | None = None,
         updated_at: str | None = None,
     ) -> Visualization:
-        body = {}
+        body: dict[str, Any] = {}
         if query_id is not None:
             body["query_id"] = query_id
         if type is not None:
@@ -218,55 +184,3 @@ class QueryVisualizationsAPI:
             "Accept": "application/json",
         }
         self._api.do("DELETE", f"/api/2.0/preview/sql/visualizations/{id}", headers=headers)
-
-
-@dataclass
-class VizColumn:
-    name: str
-    title: str
-    type: str = "string"
-    imageUrlTemplate: str = "{{ @ }}"
-    imageTitleTemplate: str = "{{ @ }}"
-    linkUrlTemplate: str = "{{ @ }}"
-    linkTextTemplate: str = "{{ @ }}"
-    linkTitleTemplate: str = "{{ @ }}"
-    linkOpenInNewTab: bool = True
-    displayAs: str = "string"
-    visible: bool = True
-    order: int = 100000
-    allowSearch: bool = False
-    alignContent: str = "left"
-    allowHTML: bool = False
-    highlightLinks: bool = False
-    useMonospaceFont: bool = False
-    preserveWhitespace: bool = False
-
-    def as_dict(self):
-        return dataclasses.asdict(self)
-
-
-class QueryVisualizationsExt(QueryVisualizationsAPI):
-    def create_table(
-        self,
-        query_id: str,
-        name: str,
-        columns: list[VizColumn],
-        *,
-        items_per_page: int = 25,
-        condensed=True,
-        with_row_number=False,
-        description: str | None = None,
-    ):
-        return self.create(
-            query_id,
-            "TABLE",
-            {
-                "itemsPerPage": items_per_page,
-                "condensed": condensed,
-                "withRowNumber": with_row_number,
-                "version": 2,
-                "columns": [x.as_dict() for x in columns],
-            },
-            name=name,
-            description=description,
-        )

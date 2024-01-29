@@ -1,8 +1,16 @@
 import os
 import sys
 from dataclasses import dataclass
+from unittest import mock
 
 import pytest
+from databricks.sdk.errors import (
+    BadRequest,
+    DataLoss,
+    NotFound,
+    PermissionDenied,
+    Unknown,
+)
 from databricks.sdk.service import sql
 
 from databricks.labs.ucx.framework.crawlers import (
@@ -23,7 +31,7 @@ class Foo:
 @dataclass
 class Baz:
     first: str
-    second: str = None
+    second: str | None = None
 
 
 @dataclass
@@ -59,7 +67,7 @@ def test_snapshot_appends_to_new_table():
 
     def fetcher():
         msg = ".. TABLE_OR_VIEW_NOT_FOUND .."
-        raise RuntimeError(msg)
+        raise NotFound(msg)
 
     result = cb._snapshot(fetcher=fetcher, loader=lambda: [Foo(first="first", second=True)])
 
@@ -163,8 +171,6 @@ def test_statement_execution_backend_save_table_in_batches_of_two(mocker):
 
 
 def test_runtime_backend_execute(mocker):
-    from unittest import mock
-
     with mock.patch.dict(os.environ, {"DATABRICKS_RUNTIME_VERSION": "14.0"}):
         pyspark_sql_session = mocker.Mock()
         sys.modules["pyspark.sql.session"] = pyspark_sql_session
@@ -177,8 +183,6 @@ def test_runtime_backend_execute(mocker):
 
 
 def test_runtime_backend_fetch(mocker):
-    from unittest import mock
-
     with mock.patch.dict(os.environ, {"DATABRICKS_RUNTIME_VERSION": "14.0"}):
         pyspark_sql_session = mocker.Mock()
         sys.modules["pyspark.sql.session"] = pyspark_sql_session
@@ -194,15 +198,13 @@ def test_runtime_backend_fetch(mocker):
 
 
 def test_runtime_backend_save_table(mocker):
-    from unittest import mock
-
     with mock.patch.dict(os.environ, {"DATABRICKS_RUNTIME_VERSION": "14.0"}):
         pyspark_sql_session = mocker.Mock()
         sys.modules["pyspark.sql.session"] = pyspark_sql_session
 
         rb = RuntimeBackend()
 
-        rb.save_table("a.b.c", [Foo("aaa", True), Foo("bbb", False)], Bar)
+        rb.save_table("a.b.c", [Foo("aaa", True), Foo("bbb", False)], Foo)
 
         rb._spark.createDataFrame.assert_called_with(
             [Foo(first="aaa", second=True), Foo(first="bbb", second=False)],
@@ -212,7 +214,29 @@ def test_runtime_backend_save_table(mocker):
 
 
 def test_runtime_backend_save_table_with_row_containing_none_with_nullable_class(mocker):
-    from unittest import mock
+    with mock.patch.dict(os.environ, {"DATABRICKS_RUNTIME_VERSION": "14.0"}):
+        pyspark_sql_session = mocker.Mock()
+        sys.modules["pyspark.sql.session"] = pyspark_sql_session
+
+        rb = RuntimeBackend()
+
+        rb.save_table("a.b.c", [Baz("aaa", "ccc"), Baz("bbb", None)], Baz)
+
+        rb._spark.createDataFrame.assert_called_with(
+            [Baz(first="aaa", second="ccc"), Baz(first="bbb", second=None)],
+            "first STRING NOT NULL, second STRING",
+        )
+        rb._spark.createDataFrame().write.saveAsTable.assert_called_with("a.b.c", mode="append")
+
+
+@dataclass
+class DummyClass:
+    key: str
+    value: str | None = None
+
+
+def test_save_table_with_not_null_constraint_violated(mocker):
+    rows = [DummyClass("1", "test"), DummyClass("2", None), DummyClass(None, "value")]
 
     with mock.patch.dict(os.environ, {"DATABRICKS_RUNTIME_VERSION": "14.0"}):
         pyspark_sql_session = mocker.Mock()
@@ -220,10 +244,153 @@ def test_runtime_backend_save_table_with_row_containing_none_with_nullable_class
 
         rb = RuntimeBackend()
 
-        rb.save_table("a.b.c", [Baz("aaa", "ccc"), Baz("bbb", None)], Bar)
+        with pytest.raises(Exception) as exc_info:
+            rb.save_table("a.b.c", rows, DummyClass)
 
-        rb._spark.createDataFrame.assert_called_with(
-            [Baz(first="aaa", second="ccc"), Baz(first="bbb", second=None)],
-            "first STRING NOT NULL, second STRING",
+        assert (
+            str(exc_info.value) == "Not null constraint violated for column key, row = {'key': None, 'value': 'value'}"
         )
-        rb._spark.createDataFrame().write.saveAsTable.assert_called_with("a.b.c", mode="append")
+
+
+def test_raise_spark_sql_exceptions(mocker):
+    with mock.patch.dict(os.environ, {"DATABRICKS_RUNTIME_VERSION": "14.0"}):
+        pyspark_sql_session = mocker.Mock()
+        sys.modules["pyspark.sql.session"] = pyspark_sql_session
+
+        rb = RuntimeBackend
+        error_message_invalid_schema = "SCHEMA_NOT_FOUND foo schema does not exist"
+        with pytest.raises(NotFound):
+            rb._raise_spark_sql_exceptions(error_message_invalid_schema)
+
+        error_message_invalid_table = "TABLE_OR_VIEW_NOT_FOUND foo table does not exist"
+        with pytest.raises(NotFound):
+            rb._raise_spark_sql_exceptions(error_message_invalid_table)
+
+        error_message_invalid_table = "DELTA_TABLE_NOT_FOUND foo table does not exist"
+        with pytest.raises(NotFound):
+            rb._raise_spark_sql_exceptions(error_message_invalid_table)
+
+        error_message_invalid_table = "DELTA_MISSING_TRANSACTION_LOG foo table does not exist"
+        with pytest.raises(DataLoss):
+            rb._raise_spark_sql_exceptions(error_message_invalid_table)
+
+        error_message_invalid_syntax = "PARSE_SYNTAX_ERROR foo"
+        with pytest.raises(BadRequest):
+            rb._raise_spark_sql_exceptions(error_message_invalid_syntax)
+
+        error_message_permission_denied = "foo Operation not allowed"
+        with pytest.raises(PermissionDenied):
+            rb._raise_spark_sql_exceptions(error_message_permission_denied)
+
+        error_message_invalid_schema = "foo error failure"
+        with pytest.raises(Unknown):
+            rb._raise_spark_sql_exceptions(error_message_invalid_schema)
+
+
+def test_execute(mocker):
+    with mock.patch.dict(os.environ, {"DATABRICKS_RUNTIME_VERSION": "14.0"}):
+        pyspark_sql_session = mocker.Mock()
+        sys.modules["pyspark.sql.session"] = pyspark_sql_session
+        rb = RuntimeBackend()
+
+        sql_query = "SELECT * from bar"
+
+        pyspark_sql_session.SparkSession.builder.getOrCreate.return_value.sql.side_effect = Exception(
+            "SCHEMA_NOT_FOUND"
+        )
+        with pytest.raises(NotFound):
+            rb.execute(sql_query)
+
+        pyspark_sql_session.SparkSession.builder.getOrCreate.return_value.sql.side_effect = Exception(
+            "TABLE_OR_VIEW_NOT_FOUND"
+        )
+        with pytest.raises(NotFound):
+            rb.execute(sql_query)
+
+        pyspark_sql_session.SparkSession.builder.getOrCreate.return_value.sql.side_effect = Exception(
+            "DELTA_TABLE_NOT_FOUND"
+        )
+        with pytest.raises(NotFound):
+            rb.execute(sql_query)
+
+        pyspark_sql_session.SparkSession.builder.getOrCreate.return_value.sql.side_effect = Exception(
+            "Unexpected exception"
+        )
+
+        with pytest.raises(BaseException):  # noqa: B017
+            rb.execute(sql_query)
+
+        pyspark_sql_session.SparkSession.builder.getOrCreate.return_value.sql.side_effect = Exception(
+            "DELTA_MISSING_TRANSACTION_LOG"
+        )
+        with pytest.raises(DataLoss):
+            rb.execute(sql_query)
+
+        pyspark_sql_session.SparkSession.builder.getOrCreate.return_value.sql.side_effect = Exception(
+            "PARSE_SYNTAX_ERROR"
+        )
+        with pytest.raises(BadRequest):
+            rb.execute(sql_query)
+
+        pyspark_sql_session.SparkSession.builder.getOrCreate.return_value.sql.side_effect = Exception(
+            "Operation not allowed"
+        )
+        with pytest.raises(PermissionDenied):
+            rb.execute(sql_query)
+
+        pyspark_sql_session.SparkSession.builder.getOrCreate.return_value.sql.side_effect = Exception(
+            "foo error occurred"
+        )
+        with pytest.raises(Unknown):
+            rb.execute(sql_query)
+
+
+def test_fetch(mocker):
+    with mock.patch.dict(os.environ, {"DATABRICKS_RUNTIME_VERSION": "14.0"}):
+        pyspark_sql_session = mocker.Mock()
+        sys.modules["pyspark.sql.session"] = pyspark_sql_session
+        rb = RuntimeBackend()
+
+        sql_query = "SELECT * from bar"
+
+        pyspark_sql_session.SparkSession.builder.getOrCreate.return_value.sql.side_effect = Exception(
+            "SCHEMA_NOT_FOUND"
+        )
+        with pytest.raises(NotFound):
+            rb.fetch(sql_query)
+
+        pyspark_sql_session.SparkSession.builder.getOrCreate.return_value.sql.side_effect = Exception(
+            "TABLE_OR_VIEW_NOT_FOUND"
+        )
+        with pytest.raises(NotFound):
+            rb.fetch(sql_query)
+
+        pyspark_sql_session.SparkSession.builder.getOrCreate.return_value.sql.side_effect = Exception(
+            "DELTA_TABLE_NOT_FOUND"
+        )
+        with pytest.raises(NotFound):
+            rb.fetch(sql_query)
+
+        pyspark_sql_session.SparkSession.builder.getOrCreate.return_value.sql.side_effect = Exception(
+            "DELTA_MISSING_TRANSACTION_LOG"
+        )
+        with pytest.raises(DataLoss):
+            rb.fetch(sql_query)
+
+        pyspark_sql_session.SparkSession.builder.getOrCreate.return_value.sql.side_effect = Exception(
+            "PARSE_SYNTAX_ERROR"
+        )
+        with pytest.raises(BadRequest):
+            rb.fetch(sql_query)
+
+        pyspark_sql_session.SparkSession.builder.getOrCreate.return_value.sql.side_effect = Exception(
+            "Operation not allowed"
+        )
+        with pytest.raises(PermissionDenied):
+            rb.fetch(sql_query)
+
+        pyspark_sql_session.SparkSession.builder.getOrCreate.return_value.sql.side_effect = Exception(
+            "foo error occurred"
+        )
+        with pytest.raises(Unknown):
+            rb.fetch(sql_query)

@@ -1,14 +1,14 @@
 import logging
 import re
-import string
-from collections.abc import Iterator
+import typing
+from collections.abc import Iterable, Iterator
 from dataclasses import dataclass
 from functools import partial
 
-from databricks.sdk import WorkspaceClient
+from databricks.labs.blueprint.parallel import Threads
 
 from databricks.labs.ucx.framework.crawlers import CrawlerBase, SqlBackend
-from databricks.labs.ucx.framework.parallel import Threads
+from databricks.labs.ucx.framework.utils import escape_sql_identifier
 from databricks.labs.ucx.mixins.sql import Row
 
 logger = logging.getLogger(__name__)
@@ -22,9 +22,26 @@ class Table:
     object_type: str
     table_format: str
 
-    location: str = None
-    view_text: str = None
-    upgraded_to: str = None
+    location: str | None = None
+    view_text: str | None = None
+    upgraded_to: str | None = None
+
+    storage_properties: str | None = None
+
+    DBFS_ROOT_PREFIXES: typing.ClassVar[list[str]] = [
+        "/dbfs/",
+        "dbfs:/",
+    ]
+
+    DBFS_ROOT_PREFIX_EXCEPTIONS: typing.ClassVar[list[str]] = [
+        "/dbfs/mnt",
+        "dbfs:/mnt",
+    ]
+
+    DBFS_DATABRICKS_DATASETS_PREFIXES: typing.ClassVar[list[str]] = [
+        "/dbfs/databricks-datasets",
+        "dbfs:/databricks-datasets",
+    ]
 
     @property
     def is_delta(self) -> bool:
@@ -40,37 +57,72 @@ class Table:
     def kind(self) -> str:
         return "VIEW" if self.view_text is not None else "TABLE"
 
-    def _sql_external(self, catalog):
-        return f"SYNC TABLE {catalog}.{self.database}.{self.name} FROM {self.key};"
+    def sql_alter_to(self, target_table_key):
+        return f"ALTER {self.kind} {self.key} SET TBLPROPERTIES ('upgraded_to' = '{target_table_key}');"
 
-    def _sql_managed(self, catalog):
+    def sql_alter_from(self, target_table_key):
+        return f"ALTER {self.kind} {target_table_key} SET TBLPROPERTIES ('upgraded_from' = '{self.key}');"
+
+    def sql_unset_upgraded_to(self):
+        return f"ALTER {self.kind} {self.key} UNSET TBLPROPERTIES IF EXISTS('upgraded_to');"
+
+    @property
+    def is_dbfs_root(self) -> bool:
+        if not self.location:
+            return False
+        for prefix in self.DBFS_ROOT_PREFIXES:
+            if self.location.startswith(prefix):
+                for exception in self.DBFS_ROOT_PREFIX_EXCEPTIONS:
+                    if self.location.startswith(exception):
+                        return False
+                for db_datasets in self.DBFS_DATABRICKS_DATASETS_PREFIXES:
+                    if self.location.startswith(db_datasets):
+                        return False
+                return True
+        return False
+
+    @property
+    def is_format_supported_for_sync(self) -> bool:
+        if self.table_format is None:
+            return False
+        return self.table_format.upper() in {"DELTA", "PARQUET", "CSV", "JSON", "ORC", "TEXT"}
+
+    @property
+    def is_databricks_dataset(self) -> bool:
+        if not self.location:
+            return False
+        for db_datasets in self.DBFS_DATABRICKS_DATASETS_PREFIXES:
+            if self.location.startswith(db_datasets):
+                return True
+        return False
+
+    def sql_migrate_external(self, target_table_key):
+        return f"SYNC TABLE {escape_sql_identifier(target_table_key)} FROM {escape_sql_identifier(self.key)};"
+
+    def sql_migrate_dbfs(self, target_table_key):
         if not self.is_delta:
             msg = f"{self.key} is not DELTA: {self.table_format}"
             raise ValueError(msg)
-        return f"CREATE TABLE IF NOT EXISTS {catalog}.{self.database}.{self.name} DEEP CLONE {self.key};"
+        return f"CREATE TABLE IF NOT EXISTS {escape_sql_identifier(target_table_key)} DEEP CLONE {escape_sql_identifier(self.key)};"
 
-    def _sql_view(self, catalog):
-        return f"CREATE VIEW IF NOT EXISTS {catalog}.{self.database}.{self.name} AS {self.view_text};"
+    def sql_migrate_view(self, target_table_key):
+        return f"CREATE VIEW IF NOT EXISTS {escape_sql_identifier(target_table_key)} AS {self.view_text};"
 
-    def uc_create_sql(self, catalog):
-        if self.kind == "VIEW":
-            return self._sql_view(catalog)
-        elif self.object_type == "EXTERNAL":
-            return self._sql_external(catalog)
-        else:
-            return self._sql_managed(catalog)
 
-    def sql_alter_to(self, catalog):
-        return (
-            f"ALTER {self.kind} {self.key} SET"
-            f" TBLPROPERTIES ('upgraded_to' = '{catalog}.{self.database}.{self.name}');"
-        )
+@dataclass
+class TableError:
+    catalog: str
+    database: str
+    name: str | None = None
+    error: str | None = None
 
-    def sql_alter_from(self, catalog):
-        return (
-            f"ALTER {self.kind} {catalog}.{self.database}.{self.name} SET"
-            f" TBLPROPERTIES ('upgraded_from' = '{self.key}');"
-        )
+
+@dataclass
+class MigrationCount:
+    database: str
+    managed_tables: int = 0
+    external_tables: int = 0
+    views: int = 0
 
 
 class TablesCrawler(CrawlerBase):
@@ -97,18 +149,25 @@ class TablesCrawler(CrawlerBase):
         return self._snapshot(partial(self._try_load), partial(self._crawl))
 
     @staticmethod
-    def _parse_table_props(tbl_props: string) -> {}:
+    def _parse_table_props(tbl_props: str) -> dict:
         pattern = r"([^,\[\]]+)=([^,\[\]]+)"
         key_value_pairs = re.findall(pattern, tbl_props)
         # Convert key-value pairs to dictionary
         return dict(key_value_pairs)
 
-    def _try_load(self):
+    @staticmethod
+    def parse_database_props(tbl_props: str) -> dict:
+        pattern = r"([^,^\(^\)\[\]]+),([^,^\(^\)\[\]]+)"
+        key_value_pairs = re.findall(pattern, tbl_props)
+        # Convert key-value pairs to dictionary
+        return dict(key_value_pairs)
+
+    def _try_load(self) -> Iterable[Table]:
         """Tries to load table information from the database or throws TABLE_OR_VIEW_NOT_FOUND error"""
-        for row in self._fetch(f"SELECT * FROM {self._full_name}"):
+        for row in self._fetch(f"SELECT * FROM {escape_sql_identifier(self._full_name)}"):
             yield Table(*row)
 
-    def _crawl(self) -> list[Table]:
+    def _crawl(self) -> Iterable[Table]:
         """Crawls and lists tables within the specified catalog and database.
 
         After performing initial scan of all tables, starts making parallel
@@ -126,13 +185,23 @@ class TablesCrawler(CrawlerBase):
         catalog = "hive_metastore"
         for (database,) in self._all_databases():
             logger.debug(f"[{catalog}.{database}] listing tables")
-            for _, table, _is_tmp in self._fetch(f"SHOW TABLES FROM {catalog}.{database}"):
+            for _, table, _is_tmp in self._fetch(
+                f"SHOW TABLES FROM {escape_sql_identifier(catalog)}.{escape_sql_identifier(database)}"
+            ):
                 tasks.append(partial(self._describe, catalog, database, table))
         catalog_tables, errors = Threads.gather(f"listing tables in {catalog}", tasks)
         if len(errors) > 0:
             # TODO: https://github.com/databrickslabs/ucx/issues/406
             logger.error(f"Detected {len(errors)} while scanning tables in {catalog}")
         return catalog_tables
+
+    @staticmethod
+    def _safe_norm(value: str | None, *, lower: bool = True) -> str | None:
+        if not value:
+            return None
+        if lower:
+            return value.lower()
+        return value.upper()
 
     def _describe(self, catalog: str, database: str, table: str) -> Table | None:
         """Fetches metadata like table type, data format, external table location,
@@ -143,82 +212,22 @@ class TablesCrawler(CrawlerBase):
         try:
             logger.debug(f"[{full_name}] fetching table metadata")
             describe = {}
-            for key, value, _ in self._fetch(f"DESCRIBE TABLE EXTENDED {full_name}"):
+            for key, value, _ in self._fetch(f"DESCRIBE TABLE EXTENDED {escape_sql_identifier(full_name)}"):
                 describe[key] = value
             return Table(
-                catalog=describe["Catalog"],
-                database=database,
-                name=table,
-                object_type=describe["Type"],
-                table_format=describe.get("Provider", "").upper(),
+                catalog=catalog.lower(),
+                database=database.lower(),
+                name=table.lower(),
+                object_type=describe.get("Type", "UNKNOWN").upper(),
+                table_format=describe.get("Provider", "UNKNOWN").upper(),
                 location=describe.get("Location", None),
                 view_text=describe.get("View Text", None),
-                upgraded_to=self._parse_table_props(describe.get("Table Properties", "")).get("upgraded_to", None),
+                upgraded_to=self._parse_table_props(describe.get("Table Properties", "").lower()).get(
+                    "upgraded_to", None
+                ),
+                storage_properties=self._parse_table_props(describe.get("Storage Properties", "").lower()),  # type: ignore[arg-type]
             )
-        except Exception as e:
+        except Exception as e:  # pylint: disable=broad-exception-caught
             # TODO: https://github.com/databrickslabs/ucx/issues/406
             logger.error(f"Couldn't fetch information for table {full_name} : {e}")
             return None
-
-
-class TablesMigrate:
-    def __init__(
-        self,
-        tc: TablesCrawler,
-        ws: WorkspaceClient,
-        backend: SqlBackend,
-        default_catalog=None,
-        database_to_catalog_mapping: dict[str, str] | None = None,
-    ):
-        self._tc = tc
-        self._backend = backend
-        self._ws = ws
-        self._database_to_catalog_mapping = database_to_catalog_mapping
-        self._default_catalog = self._init_default_catalog(default_catalog)
-        self._seen_tables = {}
-
-    @staticmethod
-    def _init_default_catalog(default_catalog):
-        if default_catalog:
-            return default_catalog
-        else:
-            return "ucx_default"  # TODO : Fetch current workspace name and append it to the default catalog.
-
-    def migrate_tables(self):
-        self._init_seen_tables()
-        tasks = []
-        for table in self._tc.snapshot():
-            target_catalog = self._default_catalog
-            if self._database_to_catalog_mapping:
-                target_catalog = self._database_to_catalog_mapping[table.database]
-            tasks.append(partial(self._migrate_table, target_catalog, table))
-        _, errors = Threads.gather("migrate tables", tasks)
-        if len(errors) > 0:
-            # TODO: https://github.com/databrickslabs/ucx/issues/406
-            logger.error(f"Detected {len(errors)} errors while migrating tables")
-
-    def _migrate_table(self, target_catalog, table):
-        sql = table.uc_create_sql(target_catalog)
-        logger.debug(f"Migrating table {table.key} to using SQL query: {sql}")
-        target = f"{target_catalog}.{table.database}.{table.name}".lower()
-
-        if self._table_already_upgraded(target):
-            logger.info(f"Table {table.key} already upgraded to {self._seen_tables[target]}")
-        elif table.object_type == "MANAGED":
-            self._backend.execute(sql)
-            self._backend.execute(table.sql_alter_to(target_catalog))
-            self._backend.execute(table.sql_alter_from(target_catalog))
-            self._seen_tables[target] = table.key
-        else:
-            logger.info(f"Table {table.key} is a {table.object_type} and is not supported for migration yet ")
-        return True
-
-    def _init_seen_tables(self):
-        for catalog in self._ws.catalogs.list():
-            for schema in self._ws.schemas.list(catalog_name=catalog.name):
-                for table in self._ws.tables.list(catalog_name=catalog.name, schema_name=schema.name):
-                    if table.properties is not None and "upgraded_from" in table.properties:
-                        self._seen_tables[table.full_name.lower()] = table.properties["upgraded_from"].lower()
-
-    def _table_already_upgraded(self, target) -> bool:
-        return target in self._seen_tables

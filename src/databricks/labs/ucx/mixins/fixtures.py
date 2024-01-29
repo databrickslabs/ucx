@@ -7,19 +7,38 @@ import shutil
 import string
 import subprocess
 import sys
-from collections.abc import Callable, MutableMapping
+from collections.abc import Callable, Generator, MutableMapping
+from datetime import timedelta
 from pathlib import Path
-from typing import BinaryIO, Optional
+from typing import BinaryIO
 
 import pytest
 from databricks.sdk import AccountClient, WorkspaceClient
 from databricks.sdk.core import DatabricksError
-from databricks.sdk.service import compute, iam, jobs, pipelines, workspace
-from databricks.sdk.service.catalog import CatalogInfo, SchemaInfo, TableInfo
-from databricks.sdk.service.sql import CreateWarehouseRequestWarehouseType
+from databricks.sdk.errors import NotFound, ResourceConflict
+from databricks.sdk.retries import retried
+from databricks.sdk.service import compute, iam, jobs, pipelines, sql, workspace
+from databricks.sdk.service.catalog import (
+    CatalogInfo,
+    DataSourceFormat,
+    FunctionInfo,
+    SchemaInfo,
+    TableInfo,
+    TableType,
+)
+from databricks.sdk.service.sql import (
+    CreateWarehouseRequestWarehouseType,
+    GetResponse,
+    ObjectTypePlural,
+    Query,
+    QueryInfo,
+)
 from databricks.sdk.service.workspace import ImportFormat
 
 from databricks.labs.ucx.framework.crawlers import StatementExecutionBackend
+
+# this file will get to databricks-labs-pytester project and be maintained/refactored there
+# pylint: disable=redefined-outer-name,too-many-try-statements,import-outside-toplevel,unnecessary-lambda
 
 logger = logging.getLogger(__name__)
 
@@ -157,7 +176,12 @@ def _permissions_mapping():
         (
             "pipeline",
             "pipelines",
-            [PermissionLevel.CAN_VIEW, PermissionLevel.CAN_RUN, PermissionLevel.CAN_MANAGE, PermissionLevel.IS_OWNER],
+            [
+                PermissionLevel.CAN_VIEW,
+                PermissionLevel.CAN_RUN,
+                PermissionLevel.CAN_MANAGE,
+                PermissionLevel.IS_OWNER,  # cannot be a group
+            ],
             _simple,
         ),
         (
@@ -166,8 +190,8 @@ def _permissions_mapping():
             [
                 PermissionLevel.CAN_VIEW,
                 PermissionLevel.CAN_MANAGE_RUN,
-                PermissionLevel.IS_OWNER,
                 PermissionLevel.CAN_MANAGE,
+                PermissionLevel.IS_OWNER,  # cannot be a group
             ],
             _simple,
         ),
@@ -253,6 +277,47 @@ def _permissions_mapping():
     ]
 
 
+def _redash_permissions_mapping():
+    def _simple(_, object_id):
+        return object_id
+
+    return [
+        (
+            "query",
+            ObjectTypePlural.QUERIES,
+            [
+                sql.PermissionLevel.CAN_VIEW,
+                sql.PermissionLevel.CAN_RUN,
+                sql.PermissionLevel.CAN_MANAGE,
+                sql.PermissionLevel.CAN_EDIT,
+            ],
+            _simple,
+        ),
+        (
+            "alert",
+            ObjectTypePlural.ALERTS,
+            [
+                sql.PermissionLevel.CAN_VIEW,
+                sql.PermissionLevel.CAN_RUN,
+                sql.PermissionLevel.CAN_MANAGE,
+                sql.PermissionLevel.CAN_EDIT,
+            ],
+            _simple,
+        ),
+        (
+            "dashboard",
+            ObjectTypePlural.DASHBOARDS,
+            [
+                sql.PermissionLevel.CAN_VIEW,
+                sql.PermissionLevel.CAN_RUN,
+                sql.PermissionLevel.CAN_MANAGE,
+                sql.PermissionLevel.CAN_EDIT,
+            ],
+            _simple,
+        ),
+    ]
+
+
 class _PermissionsChange:
     def __init__(self, object_id: str, before: list[iam.AccessControlRequest], after: list[iam.AccessControlRequest]):
         self._object_id = object_id
@@ -263,10 +328,9 @@ class _PermissionsChange:
     def _principal(acr: iam.AccessControlRequest) -> str:
         if acr.user_name is not None:
             return f"user_name {acr.user_name}"
-        elif acr.group_name is not None:
+        if acr.group_name is not None:
             return f"group_name {acr.group_name}"
-        else:
-            return f"service_principal_name {acr.service_principal_name}"
+        return f"service_principal_name {acr.service_principal_name}"
 
     def _list(self, acl: list[iam.AccessControlRequest]):
         return ", ".join(f"{self._principal(_)} {_.permission_level.value}" for _ in acl)
@@ -275,19 +339,44 @@ class _PermissionsChange:
         return f"{self._object_id} [{self._list(self._before)}] -> [{self._list(self._after)}]"
 
 
+class _RedashPermissionsChange:
+    def __init__(self, object_id: str, before: list[sql.AccessControl], after: list[sql.AccessControl]):
+        self._object_id = object_id
+        self._before = before
+        self._after = after
+
+    @staticmethod
+    def _principal(acr: sql.AccessControl) -> str:
+        if acr.user_name is not None:
+            return f"user_name {acr.user_name}"
+        return f"group_name {acr.group_name}"
+
+    def _list(self, acl: list[sql.AccessControl]):
+        return ", ".join(f"{self._principal(_)} {_.permission_level.value}" for _ in acl)
+
+    def __repr__(self):
+        return f"{self._object_id} [{self._list(self._before)}] -> [{self._list(self._after)}]"
+
+
 def _make_permissions_factory(name, resource_type, levels, id_retriever):
     def _non_inherited(x: iam.ObjectPermissions):
-        return [
-            iam.AccessControlRequest(
-                permission_level=permission.permission_level,
-                group_name=access_control.group_name,
-                user_name=access_control.user_name,
-                service_principal_name=access_control.service_principal_name,
-            )
-            for access_control in x.access_control_list
-            for permission in access_control.all_permissions
-            if not permission.inherited
-        ]
+        out: list[iam.AccessControlRequest] = []
+        assert x.access_control_list is not None
+        for access_control in x.access_control_list:
+            if not access_control.all_permissions:
+                continue
+            for permission in access_control.all_permissions:
+                if not permission.inherited:
+                    continue
+                out.append(
+                    iam.AccessControlRequest(
+                        permission_level=permission.permission_level,
+                        group_name=access_control.group_name,
+                        user_name=access_control.user_name,
+                        service_principal_name=access_control.service_principal_name,
+                    )
+                )
+        return out
 
     def _make_permissions(ws):
         def create(
@@ -297,7 +386,7 @@ def _make_permissions_factory(name, resource_type, levels, id_retriever):
             group_name: str | None = None,
             user_name: str | None = None,
             service_principal_name: str | None = None,
-            access_control_list: Optional["list[iam.AccessControlRequest]"] = None,
+            access_control_list: list[iam.AccessControlRequest] | None = None,
         ):
             nothing_specified = permission_level is None and access_control_list is None
             both_specified = permission_level is not None and access_control_list is not None
@@ -309,17 +398,33 @@ def _make_permissions_factory(name, resource_type, levels, id_retriever):
             initial = _non_inherited(ws.permissions.get(resource_type, object_id))
             if access_control_list is None:
                 if permission_level not in levels:
+                    assert permission_level is not None
                     names = ", ".join(_.value for _ in levels)
                     msg = f"invalid permission level: {permission_level.value}. Valid levels: {names}"
                     raise ValueError(msg)
-                access_control_list = [
-                    iam.AccessControlRequest(
-                        group_name=group_name,
-                        user_name=user_name,
-                        service_principal_name=service_principal_name,
-                        permission_level=permission_level,
+
+                access_control_list = []
+                if group_name is not None:
+                    access_control_list.append(
+                        iam.AccessControlRequest(
+                            group_name=group_name,
+                            permission_level=permission_level,
+                        )
                     )
-                ]
+                if user_name is not None:
+                    access_control_list.append(
+                        iam.AccessControlRequest(
+                            user_name=user_name,
+                            permission_level=permission_level,
+                        )
+                    )
+                if service_principal_name is not None:
+                    access_control_list.append(
+                        iam.AccessControlRequest(
+                            service_principal_name=service_principal_name,
+                            permission_level=permission_level,
+                        )
+                    )
             ws.permissions.update(resource_type, object_id, access_control_list=access_control_list)
             return _PermissionsChange(object_id, initial, access_control_list)
 
@@ -331,10 +436,84 @@ def _make_permissions_factory(name, resource_type, levels, id_retriever):
     return _make_permissions
 
 
+def _make_redash_permissions_factory(name, resource_type, levels, id_retriever):
+    def _non_inherited(x: GetResponse):
+        out: list[sql.AccessControl] = []
+        assert x.access_control_list is not None
+        for access_control in x.access_control_list:
+            out.append(
+                sql.AccessControl(
+                    permission_level=access_control.permission_level,
+                    group_name=access_control.group_name,
+                    user_name=access_control.user_name,
+                )
+            )
+        return out
+
+    def _make_permissions(ws):
+        def create(
+            *,
+            object_id: str,
+            permission_level: sql.PermissionLevel | None = None,
+            group_name: str | None = None,
+            user_name: str | None = None,
+            access_control_list: list[sql.AccessControl] | None = None,
+        ):
+            nothing_specified = permission_level is None and access_control_list is None
+            both_specified = permission_level is not None and access_control_list is not None
+            if nothing_specified or both_specified:
+                msg = "either permission_level or access_control_list has to be specified"
+                raise ValueError(msg)
+
+            object_id = id_retriever(ws, object_id)
+            initial = _non_inherited(ws.dbsql_permissions.get(resource_type, object_id))
+
+            if access_control_list is None:
+                if permission_level not in levels:
+                    assert permission_level is not None
+                    names = ", ".join(_.value for _ in levels)
+                    msg = f"invalid permission level: {permission_level.value}. Valid levels: {names}"
+                    raise ValueError(msg)
+
+                access_control_list = []
+                if group_name is not None:
+                    access_control_list.append(
+                        sql.AccessControl(
+                            group_name=group_name,
+                            permission_level=permission_level,
+                        )
+                    )
+                if user_name is not None:
+                    access_control_list.append(
+                        sql.AccessControl(
+                            user_name=user_name,
+                            permission_level=permission_level,
+                        )
+                    )
+
+            ws.dbsql_permissions.set(resource_type, object_id, access_control_list=access_control_list)
+            return _RedashPermissionsChange(object_id, initial, access_control_list)
+
+        def remove(change: _RedashPermissionsChange):
+            ws.dbsql_permissions.set(
+                sql.ObjectTypePlural(resource_type), change._object_id, access_control_list=change._before
+            )
+
+        yield from factory(f"{name} permissions", create, remove)
+
+    return _make_permissions
+
+
 for name, resource_type, levels, id_retriever in _permissions_mapping():
     # wrap function factory, otherwise loop scope sticks the wrong way
     locals()[f"make_{name}_permissions"] = pytest.fixture(
         _make_permissions_factory(name, resource_type, levels, id_retriever)
+    )
+
+for name, resource_type, levels, id_retriever in _redash_permissions_mapping():
+    # wrap function factory, otherwise loop scope sticks the wrong way
+    locals()[f"make_{name}_permissions"] = pytest.fixture(
+        _make_redash_permissions_factory(name, resource_type, levels, id_retriever)
     )
 
 
@@ -409,6 +588,7 @@ def _scim_values(ids: list[str]) -> list[iam.ComplexValue]:
 
 
 def _make_group(name, cfg, interface, make_random):
+    @retried(on=[ResourceConflict], timeout=timedelta(seconds=30))
     def create(
         *,
         members: list[str] | None = None,
@@ -652,10 +832,7 @@ def make_warehouse(ws, make_random):
 
 
 def _is_in_debug() -> bool:
-    return os.path.basename(sys.argv[0]) in [
-        "_jb_pytest_runner.py",
-        "testlauncher.py",
-    ]
+    return os.path.basename(sys.argv[0]) in {"_jb_pytest_runner.py", "testlauncher.py"}
 
 
 @pytest.fixture
@@ -700,7 +877,7 @@ def debug_env(monkeypatch, debug_env_name) -> MutableMapping[str, str]:
 def env_or_skip(debug_env) -> Callable[[str], str]:
     skip = pytest.skip
     if _is_in_debug():
-        skip = pytest.fail
+        skip = pytest.fail  # type: ignore[assignment]
 
     def inner(var: str) -> str:
         if var not in debug_env:
@@ -711,7 +888,7 @@ def env_or_skip(debug_env) -> Callable[[str], str]:
 
 
 @pytest.fixture
-def sql_backend(ws, env_or_skip):
+def sql_backend(ws, env_or_skip) -> StatementExecutionBackend:
     warehouse_id = env_or_skip("TEST_DEFAULT_WAREHOUSE_ID")
     return StatementExecutionBackend(ws, warehouse_id)
 
@@ -722,7 +899,7 @@ def inventory_schema(make_schema):
 
 
 @pytest.fixture
-def make_catalog(ws, sql_backend, make_random) -> Callable[..., CatalogInfo]:
+def make_catalog(ws, sql_backend, make_random) -> Generator[Callable[..., CatalogInfo], None, None]:
     def create() -> CatalogInfo:
         name = f"ucx_C{make_random(4)}".lower()
         sql_backend.execute(f"CREATE CATALOG {name}")
@@ -737,10 +914,10 @@ def make_catalog(ws, sql_backend, make_random) -> Callable[..., CatalogInfo]:
 
 
 @pytest.fixture
-def make_schema(ws, sql_backend, make_random) -> Callable[..., SchemaInfo]:
+def make_schema(ws, sql_backend, make_random) -> Generator[Callable[..., SchemaInfo], None, None]:
     def create(*, catalog_name: str = "hive_metastore", name: str | None = None) -> SchemaInfo:
         if name is None:
-            name = f"ucx_S{make_random(4)}"
+            name = f"ucx_S{make_random(4)}".lower()
         full_name = f"{catalog_name}.{name}".lower()
         sql_backend.execute(f"CREATE SCHEMA {full_name}")
         schema_info = SchemaInfo(catalog_name=catalog_name, name=name, full_name=full_name)
@@ -758,7 +935,8 @@ def make_schema(ws, sql_backend, make_random) -> Callable[..., SchemaInfo]:
 
 
 @pytest.fixture
-def make_table(ws, sql_backend, make_schema, make_random) -> Callable[..., TableInfo]:
+# pylint: disable-next=too-many-statements
+def make_table(ws, sql_backend, make_schema, make_random) -> Generator[Callable[..., TableInfo], None, None]:
     def create(
         *,
         catalog_name="hive_metastore",
@@ -767,6 +945,7 @@ def make_table(ws, sql_backend, make_schema, make_random) -> Callable[..., Table
         ctas: str | None = None,
         non_delta: bool = False,
         external: bool = False,
+        external_csv: str | None = None,
         view: bool = False,
         tbl_properties: dict[str, str] | None = None,
     ) -> TableInfo:
@@ -775,29 +954,55 @@ def make_table(ws, sql_backend, make_schema, make_random) -> Callable[..., Table
             catalog_name = schema.catalog_name
             schema_name = schema.name
         if name is None:
-            name = f"ucx_T{make_random(4)}"
+            name = f"ucx_T{make_random(4)}".lower()
+        table_type: TableType | None = None
+        data_source_format = None
+        storage_location = None
         full_name = f"{catalog_name}.{schema_name}.{name}".lower()
         ddl = f'CREATE {"VIEW" if view else "TABLE"} {full_name}'
+        if view:
+            table_type = TableType.VIEW
         if ctas is not None:
             # temporary (if not view)
             ddl = f"{ddl} AS {ctas}"
         elif non_delta:
-            location = "dbfs:/databricks-datasets/iot-stream/data-device"
-            ddl = f"{ddl} USING json LOCATION '{location}'"
+            table_type = TableType.MANAGED  # pylint: disable=redefined-variable-type
+            data_source_format = DataSourceFormat.JSON
+            storage_location = "dbfs:/databricks-datasets/iot-stream/data-device"
+            ddl = f"{ddl} USING json LOCATION '{storage_location}'"
+        elif external_csv is not None:
+            table_type = TableType.EXTERNAL
+            data_source_format = DataSourceFormat.CSV
+            storage_location = external_csv
+            ddl = f"{ddl} USING CSV OPTIONS (header=true) LOCATION '{storage_location}'"
         elif external:
             # external table
+            table_type = TableType.EXTERNAL
+            data_source_format = DataSourceFormat.DELTASHARING
             url = "s3a://databricks-datasets-oregon/delta-sharing/share/open-datasets.share"
-            share = f"{url}#delta_sharing.default.lending_club"
-            ddl = f"{ddl} USING deltaSharing LOCATION '{share}'"
+            storage_location = f"{url}#delta_sharing.default.lending_club"
+            ddl = f"{ddl} USING deltaSharing LOCATION '{storage_location}'"
         else:
             # managed table
+            table_type = TableType.MANAGED
+            data_source_format = DataSourceFormat.DELTA
+            storage_location = f"dbfs:/user/hive/warehouse/{schema_name}/{name}"
             ddl = f"{ddl} (id INT, value STRING)"
         if tbl_properties:
-            tbl_properties = ",".join([f" '{k}' = '{v}' " for k, v in tbl_properties.items()])
-            ddl = f"{ddl} TBLPROPERTIES ({tbl_properties})"
+            str_properties = ",".join([f" '{k}' = '{v}' " for k, v in tbl_properties.items()])
+            ddl = f"{ddl} TBLPROPERTIES ({str_properties})"
 
         sql_backend.execute(ddl)
-        table_info = TableInfo(catalog_name=catalog_name, schema_name=schema_name, name=name, full_name=full_name)
+        table_info = TableInfo(
+            catalog_name=catalog_name,
+            schema_name=schema_name,
+            name=name,
+            full_name=full_name,
+            properties=tbl_properties,
+            storage_location=storage_location,
+            table_type=table_type,
+            data_source_format=data_source_format,
+        )
         logger.info(
             f"Table {table_info.full_name}: "
             f"{ws.config.host}/explore/data/{table_info.catalog_name}/{table_info.schema_name}/{table_info.name}"
@@ -810,7 +1015,70 @@ def make_table(ws, sql_backend, make_schema, make_random) -> Callable[..., Table
         except RuntimeError as e:
             if "Cannot drop a view" in str(e):
                 sql_backend.execute(f"DROP VIEW IF EXISTS {table_info.full_name}")
+            elif "SCHEMA_NOT_FOUND" in str(e):
+                logger.warning("Schema was already dropped while executing the test", exc_info=e)
             else:
                 raise e
 
     yield from factory("table", create, remove)
+
+
+@pytest.fixture
+def make_udf(sql_backend, make_schema, make_random) -> Generator[Callable[..., FunctionInfo], None, None]:
+    def create(
+        *, catalog_name="hive_metastore", schema_name: str | None = None, name: str | None = None
+    ) -> FunctionInfo:
+        if schema_name is None:
+            schema = make_schema(catalog_name=catalog_name)
+            catalog_name = schema.catalog_name
+            schema_name = schema.name
+
+        if name is None:
+            name = f"ucx_T{make_random(4)}".lower()
+
+        full_name = f"{catalog_name}.{schema_name}.{name}".lower()
+        ddl = f"CREATE FUNCTION {full_name}(x INT) RETURNS FLOAT CONTAINS SQL DETERMINISTIC RETURN 0;"
+
+        sql_backend.execute(ddl)
+        udf_info = FunctionInfo(
+            catalog_name=catalog_name,
+            schema_name=schema_name,
+            name=name,
+            full_name=full_name,
+        )
+
+        logger.info(f"Function {udf_info.full_name} crated")
+        return udf_info
+
+    def remove(udf_info: FunctionInfo):
+        try:
+            sql_backend.execute(f"DROP FUNCTION IF EXISTS {udf_info.full_name}")
+        except NotFound as e:
+            if "SCHEMA_NOT_FOUND" in str(e):
+                logger.warning("Schema was already dropped while executing the test", exc_info=e)
+            else:
+                raise e
+
+    yield from factory("table", create, remove)
+
+
+@pytest.fixture
+def make_query(ws, make_table, make_random):
+    def create() -> QueryInfo:
+        table = make_table()
+        query_name = f"ucx_query_Q{make_random(4)}"
+        query = ws.queries.create(
+            name=f"{query_name}",
+            description="TEST QUERY FOR UCX",
+            query=f"SELECT * FROM {table.schema_name}.{table.name}",
+        )
+        logger.info(f"Query Created {query_name}: {ws.config.host}/sql/editor/{query.id}")
+        return query
+
+    def remove(query: Query):
+        try:
+            ws.queries.delete(query_id=query.id)
+        except RuntimeError as e:
+            logger.info(f"Can't drop query {e}")
+
+    yield from factory("query", create, remove)

@@ -106,6 +106,7 @@ venv/
 ENV/
 env.bak/
 venv.bak/
+.env
 
 # Spyder project settings
 .spyderproject
@@ -149,3 +150,4 @@ dev/cleanup.py
 .vscode
 
 .python-version
+.databricks-login.json

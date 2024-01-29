@@ -1,14 +1,16 @@
 import logging
 from collections import defaultdict
-from collections.abc import Iterator
+from collections.abc import Iterable
 from dataclasses import dataclass
 from functools import partial
 
+from databricks.labs.blueprint.parallel import ManyError, Threads
 from databricks.sdk.service.catalog import SchemaInfo, TableInfo
 
 from databricks.labs.ucx.framework.crawlers import CrawlerBase
-from databricks.labs.ucx.framework.parallel import Threads
+from databricks.labs.ucx.framework.utils import escape_sql_identifier
 from databricks.labs.ucx.hive_metastore.tables import TablesCrawler
+from databricks.labs.ucx.hive_metastore.udfs import UdfsCrawler
 
 logger = logging.getLogger(__name__)
 
@@ -17,10 +19,11 @@ logger = logging.getLogger(__name__)
 class Grant:
     principal: str
     action_type: str
-    catalog: str
-    database: str = None
-    table: str = None
-    view: str = None
+    catalog: str | None = None
+    database: str | None = None
+    table: str | None = None
+    view: str | None = None
+    udf: str | None = None
     any_file: bool = False
     anonymous_function: bool = False
 
@@ -31,9 +34,10 @@ class Grant:
         database: str | None = None,
         table: str | None = None,
         view: str | None = None,
+        udf: str | None = None,
         any_file: bool = False,
         anonymous_function: bool = False,
-    ) -> (str, str):
+    ) -> tuple[str, str]:
         if table is not None:
             catalog = "hive_metastore" if catalog is None else catalog
             database = "default" if database is None else database
@@ -42,6 +46,10 @@ class Grant:
             catalog = "hive_metastore" if catalog is None else catalog
             database = "default" if database is None else database
             return "VIEW", f"{catalog}.{database}.{view}"
+        if udf is not None:
+            catalog = "hive_metastore" if catalog is None else catalog
+            database = "default" if database is None else database
+            return "FUNCTION", f"{catalog}.{database}.{udf}"
         if database is not None:
             catalog = "hive_metastore" if catalog is None else catalog
             return "DATABASE", f"{catalog}.{database}"
@@ -53,7 +61,7 @@ class Grant:
         if catalog is not None:
             return "CATALOG", catalog
         msg = (
-            f"invalid grant keys: catalog={catalog}, database={database}, view={view}, "
+            f"invalid grant keys: catalog={catalog}, database={database}, view={view}, udf={udf}"
             f"any_file={any_file}, anonymous_function={anonymous_function}"
         )
         raise ValueError(msg)
@@ -69,25 +77,36 @@ class Grant:
             database=self.database,
             table=self.table,
             view=self.view,
+            udf=self.udf,
             any_file=self.any_file,
             anonymous_function=self.anonymous_function,
         )
 
-    def hive_grant_sql(self) -> str:
+    def hive_grant_sql(self) -> list[str]:
         object_type, object_key = self.this_type_and_key()
         # See https://docs.databricks.com/en/sql/language-manual/security-grant.html
-        return f"GRANT {self.action_type} ON {object_type} {object_key} TO `{self.principal}`"
+        statements = []
+        actions = self.action_type.split(", ")
+        if "OWN" in actions:
+            actions.remove("OWN")
+            statements.append(self._set_owner_sql(object_type, object_key))
+        if actions:
+            statements.append(self._apply_grant_sql(", ".join(actions), object_type, object_key))
+        return statements
 
     def hive_revoke_sql(self) -> str:
         object_type, object_key = self.this_type_and_key()
-        return f"REVOKE {self.action_type} ON {object_type} {object_key} FROM `{self.principal}`"
+        return f"REVOKE {self.action_type} ON {object_type} {escape_sql_identifier(object_key)} FROM `{self.principal}`"
 
-    def _set_owner(self, object_type, object_key):
-        return f"ALTER {object_type} {object_key} OWNER TO `{self.principal}`"
+    def _set_owner_sql(self, object_type, object_key):
+        return f"ALTER {object_type} {escape_sql_identifier(object_key)} OWNER TO `{self.principal}`"
+
+    def _apply_grant_sql(self, action_type, object_type, object_key):
+        return f"GRANT {action_type} ON {object_type} {escape_sql_identifier(object_key)} TO `{self.principal}`"
 
     def _uc_action(self, action_type):
         def inner(object_type, object_key):
-            return f"GRANT {action_type} ON {object_type} {object_key} TO `{self.principal}`"
+            return self._apply_grant_sql(action_type, object_type, object_key)
 
         return inner
 
@@ -107,15 +126,15 @@ class Grant:
             ("TABLE", "SELECT"): self._uc_action("SELECT"),
             ("TABLE", "MODIFY"): self._uc_action("MODIFY"),
             ("TABLE", "READ_METADATA"): self._uc_action("BROWSE"),
-            ("TABLE", "OWN"): self._set_owner,
+            ("TABLE", "OWN"): self._set_owner_sql,
             ("DATABASE", "USAGE"): self._uc_action("USE SCHEMA"),
             ("DATABASE", "CREATE"): self._uc_action("CREATE TABLE"),
             ("DATABASE", "CREATE_NAMED_FUNCTION"): self._uc_action("CREATE FUNCTION"),
             ("DATABASE", "SELECT"): self._uc_action("SELECT"),
             ("DATABASE", "MODIFY"): self._uc_action("MODIFY"),
-            ("DATABASE", "OWN"): self._set_owner,
+            ("DATABASE", "OWN"): self._set_owner_sql,
             ("DATABASE", "READ_METADATA"): self._uc_action("BROWSE"),
-            ("CATALOG", "OWN"): self._set_owner,
+            ("CATALOG", "OWN"): self._set_owner_sql,
         }
         make_query = hive_to_uc.get((object_type, self.action_type), None)
         if make_query is None:
@@ -124,21 +143,26 @@ class Grant:
         return make_query(object_type, object_key)
 
 
-class GrantsCrawler(CrawlerBase):
-    def __init__(self, tc: TablesCrawler):
+class GrantsCrawler(CrawlerBase[Grant]):
+    def __init__(self, tc: TablesCrawler, udf: UdfsCrawler):
+        assert tc._backend == udf._backend
+        assert tc._catalog == udf._catalog
+        assert tc._schema == udf._schema
         super().__init__(tc._backend, tc._catalog, tc._schema, "grants", Grant)
         self._tc = tc
+        self._udf = udf
 
-    def snapshot(self) -> list[Grant]:
+    def snapshot(self) -> Iterable[Grant]:
         return self._snapshot(partial(self._try_load), partial(self._crawl))
 
     def _try_load(self):
-        for row in self._fetch(f"SELECT * FROM {self._full_name}"):
+        for row in self._fetch(f"SELECT * FROM {escape_sql_identifier(self._full_name)}"):
             yield Grant(*row)
 
-    def _crawl(self) -> list[Grant]:
+    def _crawl(self) -> Iterable[Grant]:
         """
-        Crawls and lists grants for all databases, tables, and views within hive_metastore.
+        Crawls and lists grants for all databases, tables,  views, udfs, any file
+        and anonymous function within hive_metastore.
 
         Returns:
             list[Grant]: A list of Grant objects representing the listed grants.
@@ -148,29 +172,36 @@ class GrantsCrawler(CrawlerBase):
           table/view-specific grants.
         - Iterates through tables in the specified database using the `_tc.snapshot` method.
         - For each table, adds tasks to fetch grants for the table or its view, depending on the kind of the table.
+        - Iterates through udfs in the specified database using the `_udf.snapshot` method.
+        - For each udf, adds tasks to fetch grants for the udf.
         - Executes the tasks concurrently using Threads.gather.
         - Flattens the list of retrieved grant lists into a single list of Grant objects.
 
         Note:
         - The method assumes that the `_grants` method fetches grants based on the provided parameters (catalog,
-          database, table, view).
+          database, table, view, udfs, any file, anonymous function).
 
         Returns:
         list[Grant]: A list of Grant objects representing the grants found in hive_metastore.
         """
         catalog = "hive_metastore"
         tasks = [partial(self._grants, catalog=catalog)]
+        # Scanning ANY FILE and ANONYMOUS FUNCTION grants
+        tasks.append(partial(self._grants, catalog=catalog, any_file=True))
+        tasks.append(partial(self._grants, catalog=catalog, anonymous_function=True))
         # scan all databases, even empty ones
-        for row in self._fetch(f"SHOW DATABASES FROM {catalog}"):
+        for row in self._fetch(f"SHOW DATABASES FROM {escape_sql_identifier(catalog)}"):
             tasks.append(partial(self._grants, catalog=catalog, database=row.databaseName))
         for table in self._tc.snapshot():
             fn = partial(self._grants, catalog=catalog, database=table.database)
             # views are recognized as tables
             tasks.append(partial(fn, table=table.name))
+        for udf in self._udf.snapshot():
+            fn = partial(self._grants, catalog=catalog, database=udf.database)
+            tasks.append(partial(fn, udf=udf.name))
         catalog_grants, errors = Threads.gather(f"listing grants for {catalog}", tasks)
         if len(errors) > 0:
-            # TODO: https://github.com/databrickslabs/ucx/issues/406
-            logger.error(f"Detected {len(errors)} during scanning for grants in {catalog}")
+            raise ManyError(errors)
         return [grant for grants in catalog_grants for grant in grants]
 
     def for_table_info(self, table: TableInfo):
@@ -193,9 +224,10 @@ class GrantsCrawler(CrawlerBase):
         database: str | None = None,
         table: str | None = None,
         view: str | None = None,
+        udf: str | None = None,
         any_file: bool = False,
         anonymous_function: bool = False,
-    ) -> Iterator[Grant]:
+    ) -> list[Grant]:
         """
         Fetches and yields grant information for the specified database objects.
 
@@ -204,11 +236,9 @@ class GrantsCrawler(CrawlerBase):
             database (str | None): The database name (optional).
             table (str | None): The table name (optional).
             view (str | None): The view name (optional).
+            udf (str | None): The udf name (optional).
             any_file (bool): Whether to include any file grants (optional).
             anonymous_function (bool): Whether to include anonymous function grants (optional).
-
-        Yields:
-            Iterator[Grant]: An iterator of Grant objects representing the fetched grants.
 
         Behavior:
         - Normalizes the provided parameters and constructs an object type and key using
@@ -232,28 +262,39 @@ class GrantsCrawler(CrawlerBase):
             database=self._try_valid(database),
             table=self._try_valid(table),
             view=self._try_valid(view),
+            udf=self._try_valid(udf),
             any_file=any_file,
             anonymous_function=anonymous_function,
         )
-        try:
-            object_type_normalization = {"SCHEMA": "DATABASE", "CATALOG$": "CATALOG"}
-            for row in self._fetch(f"SHOW GRANTS ON {on_type} {key}"):
+        try:  # pylint: disable=too-many-try-statements
+            grants = []
+            object_type_normalization = {
+                "SCHEMA": "DATABASE",
+                "CATALOG$": "CATALOG",
+                "ANY_FILE": "ANY FILE",
+                "ANONYMOUS_FUNCTION": "ANONYMOUS FUNCTION",
+            }
+            for row in self._fetch(f"SHOW GRANTS ON {on_type} {escape_sql_identifier(key)}"):
                 (principal, action_type, object_type, _) = row
-                if object_type in object_type_normalization:
-                    object_type = object_type_normalization[object_type]
+                object_type = object_type_normalization.get(object_type, object_type)
                 if on_type != object_type:
                     continue
-                yield Grant(
+                # we have to return concrete list, as with yield we're executing
+                # everything on the main thread.
+                grant = Grant(
                     principal=principal,
                     action_type=action_type,
                     table=table,
                     view=view,
+                    udf=udf,
                     database=database,
                     catalog=catalog,
                     any_file=any_file,
                     anonymous_function=anonymous_function,
                 )
-        except Exception as e:
+                grants.append(grant)
+            return grants
+        except Exception as e:  # pylint: disable=broad-exception-caught
             # TODO: https://github.com/databrickslabs/ucx/issues/406
             logger.error(f"Couldn't fetch grants for object {on_type} {key}: {e}")
             return []

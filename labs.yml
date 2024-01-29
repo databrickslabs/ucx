@@ -1,0 +1,120 @@
+---
+name: ucx
+description: Unity Catalog Migration Toolkit (UCX)
+install:
+  script: src/databricks/labs/ucx/install.py
+uninstall:
+  script: src/databricks/labs/ucx/uninstall.py
+entrypoint: src/databricks/labs/ucx/cli.py
+min_python: 3.10
+commands:
+  - name: open-remote-config
+    description: Opens remote configuration in the browser
+
+  - name: workflows
+    description: Show deployed workflows and their state
+    table_template: |-
+      Step\tState\tStarted
+      {{range .}}{{.step}}\t{{.state}}\t{{.started}}
+      {{end}}
+
+
+  - name: installations
+    description: Show installations by different users on the same workspace
+    table_template: |-
+      User\tDatabase\tWarehouse
+      {{range .}}{{.user_name}}\t{{.database}}\t{{.warehouse_id}}
+      {{end}}
+
+  - name: skip
+    description: Create a skip comment on a schema or a table
+    flags:
+      - name: schema
+        description: Schema Name to Skip
+      - name: table
+        description: Table Name to Skip
+
+  - name: sync-workspace-info
+    is_account_level: true
+    description: upload workspace config to all workspaces in the account where ucx is installed
+
+  - name: manual-workspace-info
+    description: only supposed to be run if cannot get admins to run `databricks labs ucx sync-workspace-info`
+
+  - name: create-table-mapping
+    description: create initial table mapping for review
+
+  - name: ensure-assessment-run
+    description: ensure the assessment job was run on a workspace
+
+  - name: validate-external-locations
+    description: validates and provides mapping to external table to external location and shared generation tf scripts
+
+  - name: repair-run
+    description: Repair Run the Failed Job
+    flags:
+      - name: step
+        description: name of the step
+
+  - name: revert-migrated-tables
+    description: remove notation on a migrated table for re-migration
+    flags:
+      - name: schema
+        description: Schema to revert (if left blank all schemas in the workspace will be reverted)
+      - name: table
+        description: Table to revert (if left blank all tables in the schema will be reverted). Requires schema parameter to be specified.)
+      - name: delete_managed
+        description: Revert and delete managed tables
+
+  - name: move
+    description: move tables across schema/catalog withing a UC metastore
+    flags:
+      - name: from-catalog
+        description: from catalog name
+      - name: from-schema
+        description: schema name to migrate.
+      - name: from-table
+        description: table names to migrate. enter * to migrate all tables
+      - name: to-catalog
+        description: target catalog to migrate schema to
+      - name: to-schema
+        description: target schema to migrate tables to
+
+  - name: alias
+    description: |
+      alias tables across schema/catalog withing a UC metastore 
+      create a view pointing to the "from" table
+      if a view is aliased, recreates the same view in the target schema/catalog
+    flags:
+      - name: from-catalog
+        description: from catalog name
+      - name: from-schema
+        description: from schema
+      - name: from-table
+        description: table names to alias. enter * to migrate all tables
+      - name: to-catalog
+        description: target catalog to migrate schema to
+      - name: to-schema
+        description: target schema to migrate tables to
+
+  - name: save-azure-storage-accounts
+    description: Identifies all storage account used by tables, identify spn and its permission on each storage accounts
+    flags:
+      - name: subscription-id
+        description: Subscription to scan storage account in
+
+
+  - name: validate-groups-membership
+    description: Validate the groups to see if the groups at account level and workspace level have different membership
+    table_template: |-
+      Workflow Group Name\tAccount Group Name
+      {{range .}}{{.name_in_workspace}}\t{{.name_in_group}}
+      {{end}}
+
+  - name: save-aws-iam-profiles
+    description: | 
+      Identifies all Instance Profiles and map their access to S3 buckets.
+      Requires a working setup of AWS CLI.
+    flags:
+      - name: aws-profile
+        description: AWS Profile to use for authentication
