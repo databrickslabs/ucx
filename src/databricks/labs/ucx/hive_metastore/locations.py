@@ -10,6 +10,7 @@ from databricks.sdk import WorkspaceClient
 from databricks.sdk.service.workspace import ImportFormat
 
 from databricks.labs.ucx.framework.crawlers import CrawlerBase, SqlBackend
+from databricks.labs.ucx.framework.utils import escape_sql_identifier
 from databricks.labs.ucx.mixins.sql import Row
 
 logger = logging.getLogger(__name__)
@@ -67,51 +68,50 @@ class ExternalLocations(CrawlerBase[ExternalLocation]):
                     if not dupe:
                         external_locations.append(ExternalLocation(os.path.dirname(location) + "/", 1))
                 if location.startswith("jdbc"):
-                    dupe = False
-                    pattern = r"(\w+)=(.*?)(?=\s*,|\s*\])"
-
-                    # Find all matches in the input string
-                    # Storage properties is of the format
-                    # "[personalAccessToken=*********(redacted), \
-                    #  httpPath=/sql/1.0/warehouses/65b52fb5bd86a7be, host=dbc-test1-aa11.cloud.databricks.com, \
-                    #  dbtable=samples.nyctaxi.trips]"
-                    matches = re.findall(pattern, table.storage_properties)
-
-                    # Create a dictionary from the matches
-                    result_dict = dict(matches)
-
-                    # Fetch the value of host from the newly created dict
-                    host = result_dict.get("host", "")
-                    port = result_dict.get("port", "")
-                    database = result_dict.get("database", "")
-                    httppath = result_dict.get("httpPath", "")
-                    provider = result_dict.get("provider", "")
-                    # dbtable = result_dict.get("dbtable", "")
-
-                    # currently supporting databricks and mysql external tables
-                    # add other jdbc types
-                    if "databricks" in location.lower():
-                        jdbc_location = f"jdbc:databricks://{host};httpPath={httppath}"
-                    elif "mysql" in location.lower():
-                        jdbc_location = f"jdbc:mysql://{host}:{port}/{database}"
-                    elif not provider == "":
-                        jdbc_location = f"jdbc:{provider.lower()}://{host}:{port}/{database}"
-                    else:
-                        jdbc_location = f"{location.lower()}/{host}:{port}/{database}"
-                    for ext_loc in external_locations:
-                        if ext_loc.location == jdbc_location:
-                            ext_loc.table_count += 1
-                            dupe = True
-                            break
-                    if not dupe:
-                        external_locations.append(ExternalLocation(jdbc_location, 1))
+                    self._add_jdbc_location(external_locations, location, table)
 
         return external_locations
+
+    def _add_jdbc_location(self, external_locations, location, table):
+        dupe = False
+        pattern = r"(\w+)=(.*?)(?=\s*,|\s*\])"
+        # Find all matches in the input string
+        # Storage properties is of the format
+        # "[personalAccessToken=*********(redacted), \
+        #  httpPath=/sql/1.0/warehouses/65b52fb5bd86a7be, host=dbc-test1-aa11.cloud.databricks.com, \
+        #  dbtable=samples.nyctaxi.trips]"
+        matches = re.findall(pattern, table.storage_properties)
+        # Create a dictionary from the matches
+        result_dict = dict(matches)
+        # Fetch the value of host from the newly created dict
+        host = result_dict.get("host", "")
+        port = result_dict.get("port", "")
+        database = result_dict.get("database", "")
+        httppath = result_dict.get("httpPath", "")
+        provider = result_dict.get("provider", "")
+        # dbtable = result_dict.get("dbtable", "")
+        # currently supporting databricks and mysql external tables
+        # add other jdbc types
+        if "databricks" in location.lower():
+            jdbc_location = f"jdbc:databricks://{host};httpPath={httppath}"
+        elif "mysql" in location.lower():
+            jdbc_location = f"jdbc:mysql://{host}:{port}/{database}"
+        elif not provider == "":
+            jdbc_location = f"jdbc:{provider.lower()}://{host}:{port}/{database}"
+        else:
+            jdbc_location = f"{location.lower()}/{host}:{port}/{database}"
+        for ext_loc in external_locations:
+            if ext_loc.location == jdbc_location:
+                ext_loc.table_count += 1
+                dupe = True
+                break
+        if not dupe:
+            external_locations.append(ExternalLocation(jdbc_location, 1))
 
     def _external_location_list(self) -> Iterable[ExternalLocation]:
         tables = list(
             self._backend.fetch(
-                f"SELECT location, storage_properties FROM {self._schema}.tables WHERE location IS NOT NULL"
+                f"SELECT location, storage_properties FROM {escape_sql_identifier(self._schema)}.tables WHERE location IS NOT NULL"
             )
         )
         mounts = Mounts(self._backend, self._ws, self._schema).snapshot()
@@ -121,7 +121,9 @@ class ExternalLocations(CrawlerBase[ExternalLocation]):
         return self._snapshot(self._try_fetch, self._external_location_list)
 
     def _try_fetch(self) -> Iterable[ExternalLocation]:
-        for row in self._fetch(f"SELECT * FROM {self._schema}.{self._table}"):
+        for row in self._fetch(
+            f"SELECT * FROM {escape_sql_identifier(self._schema)}.{escape_sql_identifier(self._table)}"
+        ):
             yield ExternalLocation(*row)
 
     def _get_ext_location_definitions(self, missing_locations: list[ExternalLocation]) -> list:
@@ -228,5 +230,7 @@ class Mounts(CrawlerBase[Mount]):
         return self._snapshot(self._try_fetch, self._list_mounts)
 
     def _try_fetch(self) -> Iterable[Mount]:
-        for row in self._fetch(f"SELECT * FROM {self._schema}.{self._table}"):
+        for row in self._fetch(
+            f"SELECT * FROM {escape_sql_identifier(self._schema)}.{escape_sql_identifier(self._table)}"
+        ):
             yield Mount(*row)

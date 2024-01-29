@@ -149,13 +149,12 @@ class RedashPermissionsSupport(AclSupport):
             assert remote_permission.access_control_list is not None
             if all(elem in remote_permission.access_control_list for elem in acl):
                 return True
-            else:
-                msg = f"""
-                Couldn't apply appropriate permission for object type {object_type} with id {object_id}
-                acl to be applied={acl}
-                acl found in the object={remote_permission}
-                """
-                raise ValueError(msg)
+            msg = f"""
+            Couldn't apply appropriate permission for object type {object_type} with id {object_id}
+            acl to be applied={acl}
+            acl found in the object={remote_permission}
+            """
+            raise ValueError(msg)
         return False
 
     @rate_limited(max_requests=30)
@@ -236,12 +235,11 @@ class RedashPermissionsSupport(AclSupport):
             assert res.access_control_list is not None
             if hash_permissions(acl).issubset(hash_permissions(res.access_control_list)):
                 return res
-            else:
-                msg = (
-                    f"Failed to set permission and will be retried for {object_type} {object_id}, "
-                    f"doing another attempt..."
-                )
-                raise ValueError(msg)
+            msg = (
+                f"Failed to set permission and will be retried for {object_type} {object_id}, "
+                f"doing another attempt..."
+            )
+            raise ValueError(msg)
         except PermissionDenied:
             logger.warning(f"Permission denied: {object_type} {object_id}")
             return None

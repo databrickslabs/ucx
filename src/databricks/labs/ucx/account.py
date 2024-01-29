@@ -47,7 +47,7 @@ class AccountWorkspaces:
     def _get_cloud(self) -> str:
         if self._ac.config.is_azure:
             return "azure"
-        elif self._ac.config.is_gcp:
+        if self._ac.config.is_gcp:
             return "gcp"
         return "aws"
 
@@ -76,7 +76,6 @@ class AccountWorkspaces:
         Create a json dump for each Workspace in account
         For each user that has ucx installed in their workspace,
         upload the json dump of workspace info in the .ucx folder
-        :return:
         """
         workspaces = []
         for workspace in self._configured_workspaces():

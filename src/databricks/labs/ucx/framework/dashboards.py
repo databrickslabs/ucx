@@ -44,7 +44,7 @@ class SimpleQuery:
 
 
 @dataclass
-class VizColumn:
+class VizColumn:  # pylint: disable=too-many-instance-attributes)
     name: str
     title: str
     type: str = "string"
@@ -160,7 +160,7 @@ class DashboardFromFiles:
         return widget_options
 
     def _state_pre_v06(self):
-        try:
+        try:  # pylint: disable=too-many-try-statements)
             query_state = f"{self._remote_folder}/state.json"
             state = json.load(self._ws.workspace.download(query_state))
             to_remove = []
@@ -282,6 +282,7 @@ class DashboardFromFiles:
         viz = self._ws.query_visualizations.create(self._state.queries[query.key], **viz_args)
         assert viz.id is not None
         self._state.viz[query.key] = viz.id
+        return None
 
     def _get_viz_options(self, query: SimpleQuery):
         viz_types: dict[str, Callable[..., dict]] = {"table": self._table_viz_args, "counter": self._counter_viz_args}
@@ -308,6 +309,7 @@ class DashboardFromFiles:
             access_control_list=[AccessControl(group_name="users", permission_level=PermissionLevel.CAN_RUN)],
         )
         self._state.queries[query.key] = deployed_query.id
+        return None
 
     @staticmethod
     def _table_viz_args(
@@ -336,7 +338,7 @@ class DashboardFromFiles:
         }
 
     @staticmethod
-    def _counter_viz_args(
+    def _counter_viz_args(  # pylint: disable=too-many-arguments
         name: str,
         value_column: str,
         *,

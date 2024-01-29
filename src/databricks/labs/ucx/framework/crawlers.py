@@ -147,6 +147,7 @@ class StatementExecutionBackend(SqlBackend):
 
 class RuntimeBackend(SqlBackend):
     def __init__(self):
+        # pylint: disable-next=import-error,import-outside-toplevel
         from pyspark.sql.session import SparkSession  # type: ignore[import-not-found]
 
         if "DATABRICKS_RUNTIME_VERSION" not in os.environ:
@@ -159,7 +160,7 @@ class RuntimeBackend(SqlBackend):
         logger.debug(f"[spark][execute] {sql}")
         try:
             immediate_response = self._spark.sql(sql)
-        except Exception as e:
+        except Exception as e:  # pylint: disable=broad-exception-caught
             error_message = str(e)
             self._raise_spark_sql_exceptions(error_message)
         return immediate_response
@@ -168,7 +169,7 @@ class RuntimeBackend(SqlBackend):
         logger.debug(f"[spark][fetch] {sql}")
         try:
             fetch_query_response = self._spark.sql(sql).collect()
-        except Exception as e:
+        except Exception as e:  # pylint: disable=broad-exception-caught
             error_message = str(e)
             self._raise_spark_sql_exceptions(error_message)
         return fetch_query_response
@@ -187,18 +188,17 @@ class RuntimeBackend(SqlBackend):
     def _raise_spark_sql_exceptions(error_message: str):
         if "SCHEMA_NOT_FOUND" in error_message:
             raise NotFound(error_message) from None
-        elif "TABLE_OR_VIEW_NOT_FOUND" in error_message:
+        if "TABLE_OR_VIEW_NOT_FOUND" in error_message:
             raise NotFound(error_message) from None
-        elif "DELTA_TABLE_NOT_FOUND" in error_message:
+        if "DELTA_TABLE_NOT_FOUND" in error_message:
             raise NotFound(error_message) from None
-        elif "DELTA_MISSING_TRANSACTION_LOG" in error_message:
+        if "DELTA_MISSING_TRANSACTION_LOG" in error_message:
             raise DataLoss(error_message) from None
-        elif "PARSE_SYNTAX_ERROR" in error_message:
+        if "PARSE_SYNTAX_ERROR" in error_message:
             raise BadRequest(error_message) from None
-        elif "Operation not allowed" in error_message:
+        if "Operation not allowed" in error_message:
             raise PermissionDenied(error_message) from None
-        else:
-            raise Unknown(error_message) from None
+        raise Unknown(error_message) from None
 
 
 class CrawlerBase(Generic[Result]):

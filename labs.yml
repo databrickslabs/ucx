@@ -80,6 +80,23 @@ commands:
       - name: to-schema
         description: target schema to migrate tables to
 
+  - name: alias
+    description: |
+      alias tables across schema/catalog withing a UC metastore 
+      create a view pointing to the "from" table
+      if a view is aliased, recreates the same view in the target schema/catalog
+    flags:
+      - name: from-catalog
+        description: from catalog name
+      - name: from-schema
+        description: from schema
+      - name: from-table
+        description: table names to alias. enter * to migrate all tables
+      - name: to-catalog
+        description: target catalog to migrate schema to
+      - name: to-schema
+        description: target schema to migrate tables to
+
   - name: save-azure-storage-accounts
     description: Identifies all storage account used by tables, identify spn and its permission on each storage accounts
     flags:
@@ -93,3 +110,11 @@ commands:
       Workspace Group Name\tMembers Count\tAccount Group Name\tMembers Count
       {{range .}}{{.wf_group_name}}\t{{.wf_group_members_count}}\t{{.acc_group_name}}\t{{.acc_group_members_count}}
       {{end}}
+
+  - name: save-aws-iam-profiles
+    description: | 
+      Identifies all Instance Profiles and map their access to S3 buckets.
+      Requires a working setup of AWS CLI.
+    flags:
+      - name: aws-profile
+        description: AWS Profile to use for authentication

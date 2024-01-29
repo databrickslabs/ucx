@@ -84,7 +84,7 @@ class WorkspaceListing:
             initial_future.add_done_callback(self._progress_report)
             futures_to_objects = {initial_future: root_object}
             while futures_to_objects:
-                futures_done, futures_not_done = wait(futures_to_objects, return_when=FIRST_COMPLETED)
+                futures_done, _ = wait(futures_to_objects, return_when=FIRST_COMPLETED)
 
                 for future in futures_done:
                     futures_to_objects.pop(future)

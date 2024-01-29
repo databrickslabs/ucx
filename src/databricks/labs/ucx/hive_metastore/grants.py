@@ -8,6 +8,7 @@ from databricks.labs.blueprint.parallel import ManyError, Threads
 from databricks.sdk.service.catalog import SchemaInfo, TableInfo
 
 from databricks.labs.ucx.framework.crawlers import CrawlerBase
+from databricks.labs.ucx.framework.utils import escape_sql_identifier
 from databricks.labs.ucx.hive_metastore.tables import TablesCrawler
 from databricks.labs.ucx.hive_metastore.udfs import UdfsCrawler
 
@@ -95,13 +96,13 @@ class Grant:
 
     def hive_revoke_sql(self) -> str:
         object_type, object_key = self.this_type_and_key()
-        return f"REVOKE {self.action_type} ON {object_type} {object_key} FROM `{self.principal}`"
+        return f"REVOKE {self.action_type} ON {object_type} {escape_sql_identifier(object_key)} FROM `{self.principal}`"
 
     def _set_owner_sql(self, object_type, object_key):
-        return f"ALTER {object_type} {object_key} OWNER TO `{self.principal}`"
+        return f"ALTER {object_type} {escape_sql_identifier(object_key)} OWNER TO `{self.principal}`"
 
     def _apply_grant_sql(self, action_type, object_type, object_key):
-        return f"GRANT {action_type} ON {object_type} {object_key} TO `{self.principal}`"
+        return f"GRANT {action_type} ON {object_type} {escape_sql_identifier(object_key)} TO `{self.principal}`"
 
     def _uc_action(self, action_type):
         def inner(object_type, object_key):
@@ -155,7 +156,7 @@ class GrantsCrawler(CrawlerBase[Grant]):
         return self._snapshot(partial(self._try_load), partial(self._crawl))
 
     def _try_load(self):
-        for row in self._fetch(f"SELECT * FROM {self._full_name}"):
+        for row in self._fetch(f"SELECT * FROM {escape_sql_identifier(self._full_name)}"):
             yield Grant(*row)
 
     def _crawl(self) -> Iterable[Grant]:
@@ -189,7 +190,7 @@ class GrantsCrawler(CrawlerBase[Grant]):
         tasks.append(partial(self._grants, catalog=catalog, any_file=True))
         tasks.append(partial(self._grants, catalog=catalog, anonymous_function=True))
         # scan all databases, even empty ones
-        for row in self._fetch(f"SHOW DATABASES FROM {catalog}"):
+        for row in self._fetch(f"SHOW DATABASES FROM {escape_sql_identifier(catalog)}"):
             tasks.append(partial(self._grants, catalog=catalog, database=row.databaseName))
         for table in self._tc.snapshot():
             fn = partial(self._grants, catalog=catalog, database=table.database)
@@ -239,9 +240,6 @@ class GrantsCrawler(CrawlerBase[Grant]):
             any_file (bool): Whether to include any file grants (optional).
             anonymous_function (bool): Whether to include anonymous function grants (optional).
 
-        Yields:
-            Iterator[Grant]: An iterator of Grant objects representing the fetched grants.
-
         Behavior:
         - Normalizes the provided parameters and constructs an object type and key using
           the `Grant.type_and_key` method.
@@ -268,7 +266,7 @@ class GrantsCrawler(CrawlerBase[Grant]):
             any_file=any_file,
             anonymous_function=anonymous_function,
         )
-        try:
+        try:  # pylint: disable=too-many-try-statements
             grants = []
             object_type_normalization = {
                 "SCHEMA": "DATABASE",
@@ -276,10 +274,9 @@ class GrantsCrawler(CrawlerBase[Grant]):
                 "ANY_FILE": "ANY FILE",
                 "ANONYMOUS_FUNCTION": "ANONYMOUS FUNCTION",
             }
-            for row in self._fetch(f"SHOW GRANTS ON {on_type} {key}"):
+            for row in self._fetch(f"SHOW GRANTS ON {on_type} {escape_sql_identifier(key)}"):
                 (principal, action_type, object_type, _) = row
-                if object_type in object_type_normalization:
-                    object_type = object_type_normalization[object_type]
+                object_type = object_type_normalization.get(object_type, object_type)
                 if on_type != object_type:
                     continue
                 # we have to return concrete list, as with yield we're executing
@@ -297,7 +294,7 @@ class GrantsCrawler(CrawlerBase[Grant]):
                 )
                 grants.append(grant)
             return grants
-        except Exception as e:
+        except Exception as e:  # pylint: disable=broad-exception-caught
             # TODO: https://github.com/databrickslabs/ucx/issues/406
             logger.error(f"Couldn't fetch grants for object {on_type} {key}: {e}")
             return []

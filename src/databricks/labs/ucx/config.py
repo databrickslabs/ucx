@@ -4,6 +4,7 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Any, Generic, TypeVar
 
+import yaml
 from databricks.sdk import AccountClient, WorkspaceClient
 from databricks.sdk.core import Config
 
@@ -13,7 +14,7 @@ __all__ = ["AccountConfig", "WorkspaceConfig"]
 
 
 @dataclass
-class ConnectConfig:
+class ConnectConfig:  # pylint: disable=too-many-instance-attributes
     # Keep all the fields in sync with databricks.sdk.core.Config
     host: str | None = None
     account_id: str | None = None
@@ -93,14 +94,11 @@ class _Config(Generic[T]):
 
     @classmethod
     @abstractmethod
-    def from_dict(cls, raw: dict[str, Any]) -> T:
-        ...
+    def from_dict(cls, raw: dict[str, Any]) -> T: ...
 
     @classmethod
     def from_bytes(cls, raw_str: str | bytes) -> T:
-        from yaml import safe_load
-
-        raw: dict[str, Any] = safe_load(raw_str)
+        raw: dict[str, Any] = yaml.safe_load(raw_str)
         empty: dict[str, Any] = {}
         return cls.from_dict(empty if not raw else raw)
 
@@ -120,12 +118,10 @@ class _Config(Generic[T]):
         return connect.to_databricks_config()
 
     def as_dict(self) -> dict[str, Any]:
-        from dataclasses import fields, is_dataclass
-
         def inner(x):
-            if is_dataclass(x):
+            if dataclasses.is_dataclass(x):
                 result = []
-                for f in fields(x):
+                for f in dataclasses.fields(x):
                     value = inner(getattr(x, f.name))
                     if not value:
                         continue
@@ -189,7 +185,7 @@ class AccountConfig(_Config["AccountConfig"]):
 
 
 @dataclass
-class WorkspaceConfig(_Config["WorkspaceConfig"]):
+class WorkspaceConfig(_Config["WorkspaceConfig"]):  # pylint: disable=too-many-instance-attributes
     inventory_database: str
     # Group name conversion parameters.
     workspace_group_regex: str | None = None

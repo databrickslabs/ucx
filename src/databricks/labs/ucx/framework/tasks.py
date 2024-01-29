@@ -1,3 +1,4 @@
+import contextlib
 import logging
 import os
 from collections.abc import Callable
@@ -41,14 +42,12 @@ class Task:
         if self.cloud:
             if self.cloud.lower() == "aws":
                 return config.is_aws
-            elif self.cloud.lower() == "azure":
+            if self.cloud.lower() == "azure":
                 return config.is_azure
-            elif self.cloud.lower() == "gcp":
+            if self.cloud.lower() == "gcp":
                 return config.is_gcp
-            else:
-                return True
-        else:
             return True
+        return True
 
 
 def _remove_extra_indentation(doc: str) -> str:
@@ -120,38 +119,100 @@ def task(
     return decorator
 
 
-@retried(on=[FileExistsError], timeout=timedelta(seconds=5))
-def _create_lock(lockfile_name):
-    while True:  # wait until the lock file can be opened
-        f = os.open(lockfile_name, os.O_CREAT | os.O_EXCL)
-        break
-    return f
+class TaskLogger(contextlib.AbstractContextManager):
+    # files are available in the workspace only once their handlers are closed,
+    # so we rotate files log every 10 minutes.
+    #
+    # See https://docs.python.org/3/library/logging.handlers.html#logging.handlers.TimedRotatingFileHandler
+    # See https://docs.python.org/3/howto/logging-cookbook.html
 
+    def __init__(
+        self, install_dir: Path, workflow: str, workflow_id: str, task_name: str, workflow_run_id: str, log_level="INFO"
+    ):
+        self._log_level = log_level
+        self._workflow = workflow
+        self._workflow_id = workflow_id
+        self._workflow_run_id = workflow_run_id
+        self._databricks_logger = logging.getLogger("databricks")
+        self._app_logger = logging.getLogger("databricks.labs.ucx")
+        self._log_path = install_dir / "logs" / self._workflow / f"run-{self._workflow_run_id}"
+        self._log_file = self._log_path / f"{task_name}.log"
+        self._app_logger.info(f"UCX v{__version__} After job finishes, see debug logs at {self._log_file}")
 
-@contextmanager
-def _exclusive_open(filename: str, *args, **kwargs):
-    """Open a file with exclusive access across multiple processes.
-    Requires write access to the directory containing the file.
+    def __repr__(self):
+        return self._log_file.as_posix()
 
-    Arguments are the same as the built-in open.
+    def __enter__(self):
+        self._log_path.mkdir(parents=True, exist_ok=True)
+        self._init_debug_logfile()
+        self._init_run_readme()
+        self._databricks_logger.setLevel(logging.DEBUG)
+        self._app_logger.setLevel(logging.DEBUG)
+        console_handler = install_logger(self._log_level)
+        self._databricks_logger.removeHandler(console_handler)
+        self._databricks_logger.addHandler(self._file_handler)
+        return self
 
-    Returns a context manager that closes the file and releases the lock.
-    """
-    lockfile_name = filename + ".lock"
-    lockfile = _create_lock(lockfile_name)
+    def __exit__(self, _t, error, _tb):
+        if error:
+            log_file_for_cli = str(self._log_file).removeprefix("/Workspace")
+            cli_command = f"databricks workspace export /{log_file_for_cli}"
+            self._app_logger.error(f"Execute `{cli_command}` locally to troubleshoot with more details. {error}")
+            self._databricks_logger.debug("Task crash details", exc_info=error)
+        self._file_handler.flush()
+        self._file_handler.close()
 
-    try:
-        with open(filename, *args, **kwargs) as f:
-            yield f
-    finally:
+    def _init_debug_logfile(self):
+        log_format = "%(asctime)s %(levelname)s [%(name)s] {%(threadName)s} %(message)s"
+        log_formatter = logging.Formatter(fmt=log_format, datefmt="%H:%M:%S")
+        self._file_handler = TimedRotatingFileHandler(self._log_file.as_posix(), when="M", interval=10)
+        self._file_handler.setFormatter(log_formatter)
+        self._file_handler.setLevel(logging.DEBUG)
+
+    def _init_run_readme(self):
+        log_readme = self._log_path.joinpath("README.md")
+        if log_readme.exists():
+            return
+        # this may race when run from multiple tasks, therefore it must be multiprocess safe
+        with self._exclusive_open(str(log_readme), mode="w") as f:
+            f.write(f"# Logs for the UCX {self._workflow} workflow\n")
+            f.write("This folder contains UCX log files.\n\n")
+            f.write(f"See the [{self._workflow} job](/#job/{self._workflow_id}) and ")
+            f.write(f"[run #{self._workflow_run_id}](/#job/{self._workflow_id}/run/{self._workflow_run_id})\n")
+
+    @classmethod
+    @contextmanager
+    def _exclusive_open(cls, filename: str, **kwargs):
+        """Open a file with exclusive access across multiple processes.
+        Requires write access to the directory containing the file.
+
+        Arguments are the same as the built-in open.
+
+        Returns a context manager that closes the file and releases the lock.
+        """
+        lockfile_name = filename + ".lock"
+        lockfile = cls._create_lock(lockfile_name)
+
         try:
-            os.close(lockfile)
+            with open(filename, encoding="utf8", **kwargs) as f:
+                yield f
         finally:
-            os.unlink(lockfile_name)
+            try:
+                os.close(lockfile)
+            finally:
+                os.unlink(lockfile_name)
+
+    @staticmethod
+    @retried(on=[FileExistsError], timeout=timedelta(seconds=5))
+    def _create_lock(lockfile_name):
+        while True:  # wait until the lock file can be opened
+            f = os.open(lockfile_name, os.O_CREAT | os.O_EXCL)
+            break
+        return f
 
 
 def trigger(*argv):
-    args = dict(a[2:].split("=") for a in argv if "--" == a[0:2])
+    args = dict(a[2:].split("=") for a in argv if a[0:2] == "--")
     if "config" not in args:
         msg = "no --config specified"
         raise KeyError(msg)
@@ -171,52 +232,14 @@ def trigger(*argv):
 
     config_path = Path(args["config"])
     cfg = WorkspaceConfig.from_file(config_path)
-
-    # see https://docs.python.org/3/howto/logging-cookbook.html
-    databricks_logger = logging.getLogger("databricks")
-    databricks_logger.setLevel(logging.DEBUG)
-
-    ucx_logger = logging.getLogger("databricks.labs.ucx")
-    ucx_logger.setLevel(logging.DEBUG)
-
-    log_path = config_path.parent / "logs" / current_task.workflow / f"run-{workflow_run_id}"
-    log_path.mkdir(parents=True, exist_ok=True)
-
-    log_file = log_path / f"{task_name}.log"
-
-    # files are available in the workspace only once their handlers are closed,
-    # so we rotate files log every 10 minutes.
-    #
-    # See https://docs.python.org/3/library/logging.handlers.html#logging.handlers.TimedRotatingFileHandler
-    file_handler = TimedRotatingFileHandler(log_file.as_posix(), when="M", interval=10)
-    log_format = "%(asctime)s %(levelname)s [%(name)s] {%(threadName)s} %(message)s"
-    log_formatter = logging.Formatter(fmt=log_format, datefmt="%H:%M:%S")
-    file_handler.setFormatter(log_formatter)
-    file_handler.setLevel(logging.DEBUG)
-
-    console_handler = install_logger(cfg.log_level)
-    databricks_logger.removeHandler(console_handler)
-    databricks_logger.addHandler(file_handler)
-
-    ucx_logger.info(f"UCX v{__version__} After job finishes, see debug logs at {log_file}")
-
-    log_readme = log_path.joinpath("README.md")
-    if not log_readme.exists():
-        # this may race when run from multiple tasks, therefore it must be multiprocess safe
-        with _exclusive_open(str(log_readme), mode="w") as f:
-            f.write(f"# Logs for the UCX {current_task.workflow} workflow\n")
-            f.write("This folder contains UCX log files.\n\n")
-            f.write(f"See the [{current_task.workflow} job](/#job/{job_id}) and ")
-            f.write(f"[run #{workflow_run_id}](/#job/{job_id}/run/{workflow_run_id})\n")
-
-    try:
+    with TaskLogger(
+        config_path.parent,
+        workflow=current_task.workflow,
+        workflow_id=job_id,
+        task_name=task_name,
+        workflow_run_id=workflow_run_id,
+        log_level=cfg.log_level,
+    ) as task_logger:
+        ucx_logger = logging.getLogger("databricks.labs.ucx")
+        ucx_logger.info(f"UCX v{__version__} After job finishes, see debug logs at {task_logger}")
         current_task.fn(cfg)
-    except BaseException as error:
-        log_file_for_cli = str(log_file).lstrip("/Workspace")
-        cli_command = f"databricks workspace export /{log_file_for_cli}"
-        ucx_logger.error(f"Task crashed. Execute `{cli_command}` locally to troubleshoot with more details. {error}")
-        databricks_logger.debug("Task crash details", exc_info=error)
-        file_handler.flush()
-        raise
-    finally:
-        file_handler.close()
