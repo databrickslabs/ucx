@@ -38,7 +38,7 @@ This is a summary count, per finding type of all of the findings identified duri
 This is a summary count of Hive Metastore tables, per storage type (DBFS Root, DBFS Mount, Cloud Storage (referred as External)). This also gives a summary count of tables using storage types which are unsupported (such as WASB or ADL in Azure) in Unity Catalog. Count of tables created using Databricks Demo Datasets are also identified here
 
 ## Table counts by schema and format
-This is a summary count of Delta format and Non Delta format Hive Metastore (HMS) tables for each HMS schema    
+This is a summary count by Hive Metastore (HMS) table formats (Delta and Non Delta) for each HMS schema    
 
 The third row continues with "Database Summary"
 <img width="1220" alt="image" src="https://github.com/databrickslabs/ucx/assets/1122251/28742e33-d3e3-4eb8-832f-1edd34999fa2">
