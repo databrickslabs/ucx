@@ -195,6 +195,7 @@ class WorkspaceInstaller:  # pylint: disable=too-many-instance-attributes
         if verify_timeout is None:
             verify_timeout = timedelta(minutes=2)
         self._verify_timeout = verify_timeout
+        self._custom_cluster_policy_id = ""
 
     def run(self):
         logger.info(f"Installing UCX v{self._product_info.version()}")
@@ -480,11 +481,23 @@ class WorkspaceInstaller:  # pylint: disable=too-many-instance-attributes
                 cluster_policy = json.loads(self._prompts.choice_from_dict("Choose a cluster policy", cluster_policies))
                 instance_profile, spark_conf_dict = self._get_ext_hms_conf_from_policy(cluster_policy)
 
-        if self._prompts.confirm("Do you want to follow a policy to create clusters?"):
-            cluster_policies_list = {f"{_.name} ({_.policy_id})": _.policy_id for _ in self._ws.cluster_policies.list()}
-            custom_cluster_policy_id = self._prompts.choice_from_dict("Choose a cluster policy", cluster_policies_list)
-        else:
-            custom_cluster_policy_id = None
+        logger.info("Creating UCX cluster policy.")
+
+        try:
+            for policy in self._ws.cluster_policies.list():
+                if policy.name == "ucx-policy":
+                    logger.info("UCX Cluster policy already exists, reusing the same")
+                    self._custom_cluster_policy_id = policy.policy_id
+                    break
+
+            if self._custom_cluster_policy_id is None:
+                self._custom_cluster_policy_id = self._ws.cluster_policies.create(
+                    name="ucx-policy",
+                    definition=self._cluster_policy_definition(spark_conf_dict),
+                    description="Custom cluster policy for UCX",
+                ).policy_id
+        except InvalidParameterValue:
+            logger.info("UCX Cluster policy already exists, reusing the same")
 
         self._config = WorkspaceConfig(
             inventory_database=inventory_database,
@@ -500,7 +513,7 @@ class WorkspaceInstaller:  # pylint: disable=too-many-instance-attributes
             instance_profile=instance_profile,
             spark_conf=spark_conf_dict,
             override_clusters=self._install_override_clusters,
-            custom_cluster_policy_id=custom_cluster_policy_id,
+            custom_cluster_policy_id=self._custom_cluster_policy_id,
         )
 
         self._write_config(overwrite=False)
@@ -536,6 +549,10 @@ class WorkspaceInstaller:  # pylint: disable=too-many-instance-attributes
                 self._state.jobs[step] = job_id
         logger.debug(f"Creating jobs from tasks in {main.__name__}")
         remote_wheel = self._upload_wheel()
+        self._ws.cluster_policies.edit(policy_id=self._custom_cluster_policy_id,
+                                       name="ucx-policy",
+                                       definition=self._cluster_policy_definition(self.current_config.spark_conf),
+                                       libraries=[compute.Library(whl=f"dbfs:{remote_wheel}")])
         desired_steps = {t.workflow for t in _TASKS.values() if t.cloud_compatible(self._ws.config)}
         wheel_runner = None
 
@@ -753,7 +770,7 @@ class WorkspaceInstaller:  # pylint: disable=too-many-instance-attributes
         return replace(
             jobs_task,
             # TODO: check when we can install wheels from WSFS properly
-            libraries=[compute.Library(whl=f"dbfs:{remote_wheel}")],
+            # libraries=[compute.Library(whl=f"dbfs:{remote_wheel}")],
             python_wheel_task=jobs.PythonWheelTask(
                 package_name="databricks_labs_ucx",
                 entry_point="runtime",  # [project.entry-points.databricks] in pyproject.toml
@@ -771,11 +788,13 @@ class WorkspaceInstaller:  # pylint: disable=too-many-instance-attributes
             spark_conf = spark_conf | self.current_config.spark_conf
         spec = self._cluster_node_type(
             compute.ClusterSpec(
-                spark_version=self._ws.clusters.select_spark_version(latest=True),
+                # spark_version=self._ws.clusters.select_spark_version(latest=True),
                 data_security_mode=compute.DataSecurityMode.LEGACY_SINGLE_USER,
-                spark_conf=spark_conf,
+                # spark_conf=spark_conf,
                 custom_tags={"ResourceClass": "SingleNode"},
                 num_workers=0,
+                policy_id=self._custom_cluster_policy_id
+
             )
         )
         if self._config.custom_cluster_policy_id is not None:
@@ -805,6 +824,25 @@ class WorkspaceInstaller:  # pylint: disable=too-many-instance-attributes
                 )
             )
         return clusters
+
+    def _cluster_policy_definition(self, conf: dict) -> str:
+        policy_definition = {
+            "spark_version": {"type": "fixed", "value": self._ws.clusters.select_spark_version(latest=True)},
+            "custom_tags.ResourceClass": {"type": "fixed", "value": "SingleNode"},
+            "node_type_id": {"type": "fixed", "value": self._ws.clusters.select_node_type(local_disk=True)}
+        }
+        if conf:
+            for key, value in conf.items():
+                policy_definition[f"spark_conf.{key}"] = {"type": "fixed", "value": value}
+        if self._ws.config.is_aws:
+            policy_definition["aws_attributes.availability"] = {"type": "fixed", "value": compute.AwsAvailability.ON_DEMAND.value}
+        elif self._ws.config.is_azure:
+            pass
+            policy_definition["azure_attributes.availability"] = {"type": "fixed", "value": compute.AzureAvailability.ON_DEMAND_AZURE.value}
+        else:
+            policy_definition["gcp_attributes.availability"] = {"type": "fixed", "value": compute.GcpAvailability.ON_DEMAND_GCP}
+        return json.dumps(policy_definition)
+
 
     def _cluster_node_type(self, spec: compute.ClusterSpec) -> compute.ClusterSpec:
         cfg = self.current_config
@@ -971,6 +1009,7 @@ class WorkspaceInstaller:  # pylint: disable=too-many-instance-attributes
         self._remove_database()
         self._remove_jobs()
         self._remove_warehouse()
+        self._remove_policies()
         self._remove_install_folder()
         logger.info("UnInstalling UCX complete")
 
@@ -984,6 +1023,13 @@ class WorkspaceInstaller:  # pylint: disable=too-many-instance-attributes
             self._sql_backend = StatementExecutionBackend(self._ws, self.current_config.warehouse_id)
         deployer = SchemaDeployer(self._sql_backend, self.current_config.inventory_database, Any)
         deployer.delete_schema()
+
+    def _remove_policies(self):
+        logger.info("Deleting cluster policy")
+        try:
+            self._ws.cluster_policies.delete(policy_id=self.current_config.custom_cluster_policy_id)
+        except InvalidParameterValue:
+            logger.error(f"UCX Policy already deleted")
 
     def _remove_jobs(self):
         logger.info("Deleting jobs")

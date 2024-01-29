@@ -3,7 +3,7 @@ import logging
 from collections.abc import Callable
 from dataclasses import replace
 from datetime import timedelta
-
+from databricks.labs.blueprint.tui import MockPrompts
 import pytest
 from databricks.labs.blueprint.parallel import Threads
 from databricks.sdk.errors import InvalidParameterValue, NotFound
@@ -20,6 +20,7 @@ from databricks.labs.ucx.workspace_access.groups import GroupManager
 from databricks.labs.ucx.workspace_access.manager import PermissionManager
 
 logger = logging.getLogger(__name__)
+WAREHOUSE_ID = "1ea03a36113ad8bb"
 
 
 @pytest.fixture
@@ -30,13 +31,23 @@ def new_installation(ws, sql_backend, env_or_skip, inventory_schema, make_random
         prefix = make_random(4)
         renamed_group_prefix = f"rename-{prefix}-"
         workspace_start_path = f"/Users/{ws.current_user.me().user_name}/.{prefix}"
-
-        wc = WorkspaceConfig(
-            inventory_database=inventory_schema,
-            log_level="DEBUG",
-            renamed_group_prefix=renamed_group_prefix,
-            workspace_start_path=workspace_start_path,
+        prompts = MockPrompts(
+            {
+                r".*PRO or SERVERLESS SQL warehouse.*": "1",
+                r"Choose how to map the workspace groups.*": "1",
+                r".*connect to the external metastore?.*": "yes",
+                r".*Inventory Database.*": inventory_schema,
+                r".*Backup prefix*": renamed_group_prefix,
+                r".*": "",
+            }
         )
+
+        # wc = WorkspaceConfig(
+        #     inventory_database=inventory_schema,
+        #     log_level="DEBUG",
+        #     renamed_group_prefix=renamed_group_prefix,
+        #     workspace_start_path=workspace_start_path,
+        # )
         default_cluster_id = env_or_skip("TEST_DEFAULT_CLUSTER_ID")
         tacl_cluster_id = env_or_skip("TEST_LEGACY_TABLE_ACL_CLUSTER_ID")
         Threads.strict(
@@ -46,12 +57,21 @@ def new_installation(ws, sql_backend, env_or_skip, inventory_schema, make_random
                 functools.partial(ws.clusters.ensure_cluster_is_running, tacl_cluster_id),
             ],
         )
-        if config_transform:
-            wc = config_transform(wc)
+
         overrides = {"main": default_cluster_id, "tacl": tacl_cluster_id}
-        install = WorkspaceInstaller.run_for_config(
-            ws, wc, sql_backend=sql_backend, prefix=prefix, override_clusters=overrides
-        )
+        install = WorkspaceInstaller(ws, promtps=prompts, sql_backend=sql_backend)
+        install._configure()
+
+
+        #install = WorkspaceInstaller.run_for_config(
+        #    ws, wc, sql_backend=sql_backend, prefix=prefix, override_clusters=overrides
+        #)
+
+        install.current_config.override_clusters = overrides
+        install.current_config.workspace_start_path = workspace_start_path
+        if config_transform:
+            install._config = config_transform(install.current_config)
+        install._run_configured()
         cleanup.append(install)
         return install
 
@@ -62,7 +82,9 @@ def new_installation(ws, sql_backend, env_or_skip, inventory_schema, make_random
 
 
 @retried(on=[NotFound, TimeoutError], timeout=timedelta(minutes=5))
-def test_job_failure_propagates_correct_error_message_and_logs(ws, sql_backend, new_installation):
+def test_job_failure_propagates_correct_error_message_and_logs(ws, sql_backend, new_installation, make_cluster_policy):
+    # make_cluster_policy()
+
     install = new_installation()
 
     sql_backend.execute(f"DROP SCHEMA {install.current_config.inventory_database} CASCADE")
@@ -180,3 +202,4 @@ def test_uninstallation(ws, sql_backend, new_installation):
         ws.jobs.get(job_id=assessment_job_id)
     with pytest.raises(NotFound):
         sql_backend.execute(f"show tables from hive_metastore.{install.current_config.inventory_database}")
+
