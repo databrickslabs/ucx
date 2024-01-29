@@ -26,6 +26,7 @@ Total number of identified storage locations based on scanning Hive Metastore ta
 Assessment widgets query tables in the $inventory database and summarize or detail out findings.
 
 The second row of the report starts with "Readiness", "Assessment Summary", "Table counts by storage" and "Table counts by schema and format"
+
 <img width="1512" alt="image" src="https://github.com/databrickslabs/ucx/assets/106815134/41904d8a-c746-4191-be08-2e9e2090935d">
 
 ## Readiness
