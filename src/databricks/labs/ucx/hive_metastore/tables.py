@@ -3,6 +3,7 @@ import re
 import typing
 from collections.abc import Iterable, Iterator
 from dataclasses import dataclass
+from enum import Enum, auto
 from functools import partial
 
 from databricks.labs.blueprint.parallel import Threads
@@ -12,6 +13,15 @@ from databricks.labs.ucx.framework.utils import escape_sql_identifier
 from databricks.labs.ucx.mixins.sql import Row
 
 logger = logging.getLogger(__name__)
+
+
+class TableMigrationType(Enum):
+    EXTERNAL = auto()
+    DBFS_ROOT_DELTA = auto()
+    DBFS_ROOT_NON_DELTA = auto()
+    VIEW = auto()
+    DB_DATASET = auto()
+    UNKNOWN = auto()
 
 
 @dataclass
@@ -42,6 +52,8 @@ class Table:
         "/dbfs/databricks-datasets",
         "dbfs:/databricks-datasets",
     ]
+
+
 
     @property
     def is_delta(self) -> bool:
@@ -95,6 +107,20 @@ class Table:
             if self.location.startswith(db_datasets):
                 return True
         return False
+
+    @property
+    def table_migration_type(self) -> TableMigrationType:
+        if self.is_databricks_dataset:
+            return TableMigrationType.DB_DATASET
+        if self.is_dbfs_root and self.table_format == "DELTA":
+            return TableMigrationType.DBFS_ROOT_DELTA
+        if self.is_dbfs_root:
+            return TableMigrationType.DBFS_ROOT_NON_DELTA
+        if self.kind == "TABLE" and self.is_format_supported_for_sync:
+            return TableMigrationType.EXTERNAL
+        if self.kind == "VIEW":
+            return TableMigrationType.VIEW
+        return TableMigrationType.UNKNOWN
 
     def sql_migrate_external(self, target_table_key):
         return f"SYNC TABLE {escape_sql_identifier(target_table_key)} FROM {escape_sql_identifier(self.key)};"
@@ -186,7 +212,7 @@ class TablesCrawler(CrawlerBase):
         for (database,) in self._all_databases():
             logger.debug(f"[{catalog}.{database}] listing tables")
             for _, table, _is_tmp in self._fetch(
-                f"SHOW TABLES FROM {escape_sql_identifier(catalog)}.{escape_sql_identifier(database)}"
+                    f"SHOW TABLES FROM {escape_sql_identifier(catalog)}.{escape_sql_identifier(database)}"
             ):
                 tasks.append(partial(self._describe, catalog, database, table))
         catalog_tables, errors = Threads.gather(f"listing tables in {catalog}", tasks)
@@ -225,7 +251,8 @@ class TablesCrawler(CrawlerBase):
                 upgraded_to=self._parse_table_props(describe.get("Table Properties", "").lower()).get(
                     "upgraded_to", None
                 ),
-                storage_properties=self._parse_table_props(describe.get("Storage Properties", "").lower()),  # type: ignore[arg-type]
+                storage_properties=self._parse_table_props(describe.get("Storage Properties", "").lower()),
+                # type: ignore[arg-type]
             )
         except Exception as e:  # pylint: disable=broad-exception-caught
             # TODO: https://github.com/databrickslabs/ucx/issues/406
