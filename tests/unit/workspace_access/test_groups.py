@@ -6,7 +6,7 @@ from _pytest.outcomes import fail
 from databricks.labs.blueprint.parallel import ManyError
 from databricks.labs.blueprint.tui import MockPrompts
 from databricks.sdk import WorkspaceClient
-from databricks.sdk.errors import DatabricksError, ResourceDoesNotExist
+from databricks.sdk.errors import DatabricksError, NotFound, ResourceDoesNotExist
 from databricks.sdk.service import iam
 from databricks.sdk.service.iam import ComplexValue, Group, ResourceMeta
 
@@ -983,6 +983,46 @@ def test_validate_group_same_membership():
                 return {"Resources": [g.as_dict() for g in [account_admins_group]]}
             else:
                 return account_admins_group.as_dict()
+        else:
+            raise RuntimeError()
+
+    wsclient.api_client.do.side_effect = do_api_side_effect
+    grp_membership = GroupManager(
+        backend, wsclient, inventory_database="inv", workspace_group_regex=r"\(([1-9]+)\)", account_group_regex="[1-9]+"
+    ).validate_group_membership()
+    assert grp_membership == []
+
+
+def test_validate_acc_group_removed_after_listing():
+    backend = MockBackend()
+    wsclient = MagicMock()
+    group = Group(
+        id="1",
+        external_id="1234",
+        display_name="test_(1234)",
+        meta=ResourceMeta(resource_type="WorkspaceGroup"),
+        members=[ComplexValue(display="test-user-1", value="01"), ComplexValue(display="test-user-2", value="02")],
+        roles=[
+            ComplexValue(value="arn:aws:iam::123456789098:instance-profile/test_ip1"),
+            ComplexValue(value="arn:aws:iam::123456789098:instance-profile/test_ip2"),
+        ],
+        entitlements=[ComplexValue(value="allow-cluster-create"), ComplexValue(value="allow-instance-pool-create")],
+    )
+    wsclient.groups.list.return_value = [group]
+    wsclient.groups.get.return_value = group
+    account_admins_group = Group(
+        id="1234",
+        external_id="1234",
+        display_name="ac_test_1234",
+        members=[ComplexValue(display="test-user-1", value="01"), ComplexValue(display="test-user-2", value="02")],
+    )
+
+    def do_api_side_effect(*args, **kwargs):
+        if args[0] == "GET":
+            if args[1] == "/api/2.0/account/scim/v2/Groups":
+                return {"Resources": [g.as_dict() for g in [account_admins_group]]}
+            else:
+                raise NotFound()
         else:
             raise RuntimeError()
 
