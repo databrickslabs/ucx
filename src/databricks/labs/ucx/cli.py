@@ -13,13 +13,12 @@ from databricks.sdk.errors import NotFound
 from databricks.labs.ucx.account import AccountWorkspaces, WorkspaceInfo
 from databricks.labs.ucx.assessment.aws import AWSResourcePermissions
 from databricks.labs.ucx.assessment.azure import AzureResourcePermissions
-from databricks.labs.ucx.config import AccountConfig, ConnectConfig, WorkspaceConfig
+from databricks.labs.ucx.config import WorkspaceConfig
 from databricks.labs.ucx.framework.crawlers import StatementExecutionBackend
 from databricks.labs.ucx.hive_metastore import ExternalLocations, TablesCrawler
 from databricks.labs.ucx.hive_metastore.mapping import TableMapping
 from databricks.labs.ucx.hive_metastore.table_migrate import TableMove, TablesMigrate
 from databricks.labs.ucx.install import WorkspaceInstallation
-from databricks.labs.ucx.installer import InstallationManager
 from databricks.labs.ucx.workspace_access.groups import GroupManager
 
 ucx = App(__file__)
@@ -54,10 +53,12 @@ def installations(w: WorkspaceClient):
     for installation in Installation.existing(w, 'ucx'):
         try:
             config = installation.load(WorkspaceConfig)
-            all_users.append({
-                'database': config.inventory_database,
-                'path': installation.install_folder(),
-            })
+            all_users.append(
+                {
+                    'database': config.inventory_database,
+                    'path': installation.install_folder(),
+                }
+            )
         except NotFound:
             continue
         except SerdeError:

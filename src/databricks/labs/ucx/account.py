@@ -1,18 +1,14 @@
-import json
 import logging
 from typing import ClassVar
 
 import requests
 from databricks.labs.blueprint.installation import Installation
 from databricks.labs.blueprint.tui import Prompts
-from databricks.sdk import WorkspaceClient, AccountClient
+from databricks.sdk import AccountClient, WorkspaceClient
 from databricks.sdk.errors import NotFound
 from databricks.sdk.service.provisioning import Workspace
-from databricks.sdk.service.workspace import ImportFormat
 
 from databricks.labs.ucx.__about__ import __version__
-from databricks.labs.ucx.config import AccountConfig
-from databricks.labs.ucx.installer import InstallationManager
 
 logger = logging.getLogger(__name__)
 
@@ -68,7 +64,7 @@ class AccountWorkspaces:
         """
         workspaces = []
         for workspace in self._workspaces():
-            workspaces.append(workspace.as_dict())
+            workspaces.append(workspace)
         for ws in self.workspace_clients():
             for installation in Installation.existing(ws, "ucx"):
                 installation.save(workspaces, filename=self.SYNC_FILE_NAME)

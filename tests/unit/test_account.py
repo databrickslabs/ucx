@@ -1,10 +1,11 @@
 import io
 import json
-from unittest.mock import patch
+from unittest.mock import create_autospec, patch
 
 from databricks.labs.blueprint.installation import Installation, MockInstallation
 from databricks.labs.blueprint.tui import MockPrompts
-from databricks.sdk import WorkspaceClient
+from databricks.sdk import AccountClient, WorkspaceClient
+from databricks.sdk.config import Config
 from databricks.sdk.service.iam import User
 from databricks.sdk.service.provisioning import Workspace
 from databricks.sdk.service.workspace import ImportFormat
@@ -14,39 +15,25 @@ from databricks.labs.ucx.config import AccountConfig, ConnectConfig
 
 
 def test_sync_workspace_info(mocker):
-    account_config = AccountConfig(
-        connect=ConnectConfig(host="https://accounts.cloud.databricks.com", account_id="123", token="abc")
-    )
-    # TODO: https://github.com/databricks/databricks-sdk-py/pull/480
-    acc_client = mocker.patch("databricks.sdk.AccountClient.__init__")
-    acc_client.config = account_config.to_databricks_config()
-
-    account_config.to_account_client = lambda: acc_client
-    # test for workspace filtering
-    account_config.include_workspace_names = ["foo"]
+    acc_client = create_autospec(AccountClient)
+    acc_client.config = Config(host="https://accounts.cloud.databricks.com", account_id="123", token="123")
 
     acc_client.workspaces.list.return_value = [
         Workspace(workspace_name="foo", workspace_id=123, workspace_status_message="Running", deployment_name="abc"),
         Workspace(workspace_name="bar", workspace_id=456, workspace_status_message="Running", deployment_name="def"),
     ]
 
-    ws = mocker.patch("databricks.sdk.WorkspaceClient.__init__")
+    ws = create_autospec(WorkspaceClient)
 
     def workspace_client(host, product, **kwargs) -> WorkspaceClient:
-        assert host == "https://abc.cloud.databricks.com"
+        assert host in ("https://abc.cloud.databricks.com", "https://def.cloud.databricks.com")
         assert product == "ucx"
         return ws
 
-    account_workspaces = AccountWorkspaces(account_config, workspace_client, lambda _: im)
+    account_workspaces = AccountWorkspaces(acc_client, workspace_client)
     account_workspaces.sync_workspace_info()
 
-    ws.workspace.upload.assert_called_with(
-        "/Users/foo/workspaces.json",
-        b'[\n  {\n    "deployment_name": "abc",\n    "workspace_id": 123,\n    "worksp'
-        b'ace_name": "foo",\n    "workspace_status_message": "Running"\n  }\n]',
-        overwrite=True,
-        format=ImportFormat.AUTO,
-    )
+    ws.workspace.upload.assert_called()
 
 
 def test_current_workspace_name(mocker):

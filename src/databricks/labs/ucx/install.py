@@ -173,19 +173,6 @@ class WorkspaceInstaller:
         self._installation = installation
         self._prompts = prompts
 
-    #
-    # @classmethod
-    # def create(cls, ws: WorkspaceClient) -> "WorkspaceInstaller":
-    #     product_info = ProductInfo(__file__)
-    #     installation = Installation(ws, product_info.product_name())
-    #     wheels = WheelsV2(installation, product_info)
-    #     prompts = Prompts()
-    #     return cls()
-    #
-    # @classmethod
-    # def integration_tests(cls, ws: WorkspaceClient, prefix: str):
-    #     installation = Installation(ws, prefix)
-
     def run(self):
         logger.info(f"Installing UCX v{PRODUCT_INFO.version()}")
         config = self.configure()

@@ -24,7 +24,6 @@ from databricks.sdk.service.sql import (
     EndpointInfo,
     EndpointInfoWarehouseType,
     Query,
-    State,
     Visualization,
     Widget,
 )

@@ -216,7 +216,7 @@ class WorkspaceConfig:  # pylint: disable=too-many-instance-attributes
     custom_cluster_policy_id: str | None = None
 
     def to_workspace_client(self) -> WorkspaceClient:
-        return WorkspaceClient(config=self.to_databricks_config())
+        return WorkspaceClient(config=self.connect)
 
     def replace_inventory_variable(self, text: str) -> str:
         return text.replace("$inventory", f"hive_metastore.{self.inventory_database}")

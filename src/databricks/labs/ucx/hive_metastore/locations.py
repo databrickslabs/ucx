@@ -1,4 +1,3 @@
-import io
 import logging
 import os
 import re
@@ -8,7 +7,6 @@ from typing import ClassVar
 
 from databricks.labs.blueprint.installation import Installation
 from databricks.sdk import WorkspaceClient
-from databricks.sdk.service.workspace import ImportFormat
 
 from databricks.labs.ucx.framework.crawlers import CrawlerBase, SqlBackend
 from databricks.labs.ucx.framework.utils import escape_sql_identifier
