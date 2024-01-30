@@ -206,7 +206,7 @@ def alias(
         logger.error("Please enter from_catalog and to_catalog details")
         return
     if from_schema == "" or to_schema == "" or from_table == "":
-        logger.error("Please enter from_schema, to_schema and from_table(enter * for migrating all tables) details.")
+        logger.error("Please enter from_schema, to_schema and from_table (enter * for migrating all tables) details.")
         return
     if from_catalog == to_catalog and from_schema == to_schema:
         logger.error("please select a different schema or catalog to migrate to")

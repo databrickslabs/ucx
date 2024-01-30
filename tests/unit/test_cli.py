@@ -229,86 +229,52 @@ def test_move_no_schema(ws, caplog):
     assert 'Please enter from_schema, to_schema and from_table (enter * for migrating all tables) details.' in caplog.messages
 
 
-def test_move(mocker, monkeypatch):
-    w = create_autospec(WorkspaceClient)
-    w.current_user.me = lambda: iam.User(user_name="foo", groups=[iam.ComplexValue(display="admins")])
-    mocker.patch("databricks.labs.ucx.installer.InstallationManager.for_user", return_value=w.current_user)
-    monkeypatch.setattr("builtins.input", lambda _: "yes")
+def test_move(ws):
+    with patch("databricks.labs.blueprint.tui.Prompts.confirm", return_value=True):
+        move(ws, "SrcC", "SrcS", "*", "TgtC", "ToS")
 
-    with patch("databricks.labs.ucx.hive_metastore.table_migrate.TableMove.move_tables", return_value=None) as m:
-        move(w, "SrcC", "SrcS", "*", "TgtC", "ToS")
-        m.assert_called_once()
+    ws.tables.list.assert_called_once()
 
 
-def test_alias_no_ucx(mocker, caplog):
-    w = create_autospec(WorkspaceClient)
-    w.current_user.me = lambda: iam.User(user_name="foo", groups=[iam.ComplexValue(display="admins")])
-    mocker.patch("databricks.labs.ucx.installer.InstallationManager.for_user", return_value=None)
-    alias(w, "", "", "", "", "")
-    assert [rec.message for rec in caplog.records if "UCX configuration" in rec.message]
+def test_alias_no_catalog(ws, caplog):
+    alias(ws, "", "", "", "", "")
+
+    assert "Please enter from_catalog and to_catalog details" in caplog.messages
 
 
-def test_alias_no_catalog(mocker, caplog):
-    w = create_autospec(WorkspaceClient)
-    w.current_user.me = lambda: iam.User(user_name="foo", groups=[iam.ComplexValue(display="admins")])
-    mocker.patch("databricks.labs.ucx.installer.InstallationManager.for_user", return_value=w.current_user)
-    alias(w, "", "", "", "", "")
-    assert (
-        len([rec.message for rec in caplog.records if "Please enter from_catalog and to_catalog" in rec.message]) == 1
-    )
+def test_alias_same_schema(ws, caplog):
+    alias(ws, "SrcCat", "SrcS", "*", "SrcCat", "SrcS")
+
+    assert 'please select a different schema or catalog to migrate to' in caplog.messages
 
 
-def test_alias_same_schema(mocker, caplog):
-    w = create_autospec(WorkspaceClient)
-    w.current_user.me = lambda: iam.User(user_name="foo", groups=[iam.ComplexValue(display="admins")])
-    mocker.patch("databricks.labs.ucx.installer.InstallationManager.for_user", return_value=w.current_user)
-    alias(w, "SrcCat", "SrcS", "*", "SrcCat", "SrcS")
-    assert len([rec.message for rec in caplog.records if "please select a different schema" in rec.message]) == 1
+def test_alias_no_schema(ws, caplog):
+    alias(ws, "SrcCat", "", "*", "TgtCat", "")
+
+    assert 'Please enter from_schema, to_schema and from_table (enter * for migrating all tables) details.' in caplog.messages
 
 
-def test_alias_no_schema(mocker, caplog):
-    w = create_autospec(WorkspaceClient)
-    w.current_user.me = lambda: iam.User(user_name="foo", groups=[iam.ComplexValue(display="admins")])
-    mocker.patch("databricks.labs.ucx.installer.InstallationManager.for_user", return_value=w.current_user)
-    alias(w, "SrcCat", "", "*", "TgtCat", "")
-    assert len([rec.message for rec in caplog.records if "Please enter from_schema, to_schema" in rec.message]) == 1
+def test_alias(ws):
+    with patch("databricks.labs.blueprint.tui.Prompts.confirm", return_value=True):
+        alias(ws, "SrcC", "SrcS", "*", "TgtC", "ToS")
+
+    ws.tables.list.assert_called_once()
 
 
-def test_alias(mocker, monkeypatch):
-    w = create_autospec(WorkspaceClient)
-    w.current_user.me = lambda: iam.User(user_name="foo", groups=[iam.ComplexValue(display="admins")])
-    mocker.patch("databricks.labs.ucx.installer.InstallationManager.for_user", return_value=w.current_user)
-    monkeypatch.setattr("builtins.input", lambda _: "yes")
+def test_save_azure_storage_accounts_not_azure(ws, caplog):
+    ws.config.is_azure = False
 
-    with patch("databricks.labs.ucx.hive_metastore.table_migrate.TableMove.alias_tables", return_value=None) as m:
-        alias(w, "SrcC", "SrcS", "*", "TgtC", "ToS")
-        m.assert_called_once()
+    save_azure_storage_accounts(ws, "")
+
+    assert 'Workspace is not on azure, please run this command on azure databricks workspaces.' in caplog.messages
 
 
-def test_save_azure_storage_accounts_no_ucx(mocker, caplog):
-    w = create_autospec(WorkspaceClient)
-    w.current_user.me = lambda: iam.User(user_name="foo", groups=[iam.ComplexValue(display="admins")])
-    mocker.patch("databricks.labs.ucx.installer.InstallationManager.for_user", return_value=None)
-    save_azure_storage_accounts(w, "")
-    assert [rec.message for rec in caplog.records if "UCX configuration" in rec.message]
+def test_save_azure_storage_accounts_no_azure_cli(ws, caplog):
+    ws.config.auth_type = "azure_clis"
 
+    save_azure_storage_accounts(ws, "")
 
-def test_save_azure_storage_accounts_not_azure(mocker, caplog):
-    w = create_autospec(WorkspaceClient)
-    w.config.is_azure = False
-    w.current_user.me = lambda: iam.User(user_name="foo", groups=[iam.ComplexValue(display="admins")])
-    mocker.patch("databricks.labs.ucx.installer.InstallationManager.for_user", return_value=w.current_user)
-    save_azure_storage_accounts(w, "")
-    assert [rec.message for rec in caplog.records if "Workspace is not on azure" in rec.message]
-
-
-def test_save_azure_storage_accounts_no_azure_cli(mocker, caplog):
-    w = create_autospec(WorkspaceClient)
-    w.config.auth_type = "azure_clis"
-    w.current_user.me = lambda: iam.User(user_name="foo", groups=[iam.ComplexValue(display="admins")])
-    mocker.patch("databricks.labs.ucx.installer.InstallationManager.for_user", return_value=w.current_user)
-    save_azure_storage_accounts(w, "")
-    assert [rec.message for rec in caplog.records if "In order to obtain AAD token" in rec.message]
+    assert 'In order to obtain AAD token, Please run azure cli to authenticate.' in caplog.messages
 
 
 def test_save_azure_storage_accounts_no_subscription_id(mocker, caplog):
