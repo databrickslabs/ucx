@@ -167,8 +167,6 @@ def validate_groups_membership(w: WorkspaceClient):
 def revert_migrated_tables(w: WorkspaceClient, schema: str, table: str, *, delete_managed: bool = False):
     """remove notation on a migrated table for re-migration"""
     prompts = Prompts()
-    installation_manager = InstallationManager(w)
-    installation = installation_manager.for_user(w.current_user.me())
     if not schema and not table:
         if not prompts.confirm(
             "You haven't specified a schema or a table. All migrated tables will be reverted."
@@ -176,14 +174,7 @@ def revert_migrated_tables(w: WorkspaceClient, schema: str, table: str, *, delet
             max_attempts=2,
         ):
             return
-    if not installation:
-        logger.error(CANT_FIND_UCX_MSG)
-        return
-    warehouse_id = installation.config.warehouse_id
-    sql_backend = StatementExecutionBackend(w, warehouse_id)
-    table_crawler = TablesCrawler(sql_backend, installation.config.inventory_database)
-    tmp = TableMapping(w, sql_backend)
-    tm = TablesMigrate(table_crawler, w, sql_backend, tmp)
+    tm = TablesMigrate.for_cli(w)
     if tm.print_revert_report(delete_managed=delete_managed) and prompts.confirm(
         "Would you like to continue?", max_attempts=2
     ):
@@ -202,13 +193,7 @@ def move(
     """move a uc table/tables from one schema to another schema in same or different catalog"""
     logger.info("Running move command")
     prompts = Prompts()
-    installation_manager = InstallationManager(w)
-    installation = installation_manager.for_user(w.current_user.me())
-    if not installation:
-        logger.error(CANT_FIND_UCX_MSG)
-        return
-    sql_backend = StatementExecutionBackend(w, installation.config.warehouse_id)
-    tables = TableMove(w, sql_backend)
+    tables = TableMove.for_cli(w)
     if from_catalog == "" or to_catalog == "":
         logger.error("Please enter from_catalog and to_catalog details")
         return
@@ -233,13 +218,7 @@ def alias(
     to_schema: str,
 ):
     """move a uc table/tables from one schema to another schema in same or different catalog"""
-    installation_manager = InstallationManager(w)
-    installation = installation_manager.for_user(w.current_user.me())
-    if not installation:
-        logger.error(CANT_FIND_UCX_MSG)
-        return
-    sql_backend = StatementExecutionBackend(w, installation.config.warehouse_id)
-    tables = TableMove(w, sql_backend)
+    tables = TableMove.for_cli(w)
     if from_catalog == "" or to_catalog == "":
         logger.error("Please enter from_catalog and to_catalog details")
         return
