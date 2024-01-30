@@ -42,6 +42,13 @@ def setup_tacl(_: WorkspaceConfig):
     """(Optimization) Starts `tacl` job cluster in parallel to crawling tables."""
 
 
+def _must_truncate_bytes(cfg: WorkspaceConfig) -> int:
+    if not cfg.connect:
+        return 96
+    truncate_bytes = cfg.connect.debug_truncate_bytes
+    return truncate_bytes if truncate_bytes else 96
+
+
 @task("assessment", depends_on=[crawl_tables, setup_tacl], job_cluster="tacl")
 def crawl_grants(cfg: WorkspaceConfig):
     """Scans the previously created Delta table named `$inventory_database.tables` and issues a `SHOW GRANTS`
@@ -52,9 +59,9 @@ def crawl_grants(cfg: WorkspaceConfig):
 
     Note: This job runs on a separate cluster (named `tacl`) as it requires the proper configuration to have the Table
     ACLs enabled and available for retrieval."""
-    backend = RuntimeBackend()
-    tables = TablesCrawler(backend, cfg.inventory_database)
-    udfs = UdfsCrawler(backend, cfg.inventory_database)
+    sql_backend = RuntimeBackend(debug_truncate_bytes=_must_truncate_bytes(cfg))
+    tables = TablesCrawler(sql_backend, cfg.inventory_database)
+    udfs = UdfsCrawler(sql_backend, cfg.inventory_database)
     grants = GrantsCrawler(tables, udfs)
     grants.snapshot()
 
@@ -65,8 +72,8 @@ def estimate_table_size_for_migration(cfg: WorkspaceConfig):
     "synced". These tables will have to be cloned in the migration process.
     Assesses the size of these tables and create `$inventory_database.table_size` table to list these sizes.
     The table size is a factor in deciding whether to clone these tables."""
-    backend = RuntimeBackend()
-    table_size = TableSizeCrawler(backend, cfg.inventory_database)
+    sql_backend = RuntimeBackend(debug_truncate_bytes=_must_truncate_bytes(cfg))
+    table_size = TableSizeCrawler(sql_backend, cfg.inventory_database)
     table_size.snapshot()
 
 
@@ -79,7 +86,8 @@ def crawl_mounts(cfg: WorkspaceConfig):
     The assessment involves scanning the workspace to compile a list of all existing mount points and subsequently
     storing this information in the `$inventory.mounts` table. This is crucial for planning the migration."""
     ws = WorkspaceClient(config=cfg.to_databricks_config())
-    mounts = Mounts(backend=RuntimeBackend(), ws=ws, inventory_database=cfg.inventory_database)
+    sql_backend = RuntimeBackend(debug_truncate_bytes=_must_truncate_bytes(cfg))
+    mounts = Mounts(backend=sql_backend, ws=ws, inventory_database=cfg.inventory_database)
     mounts.snapshot()
 
 
@@ -94,7 +102,8 @@ def guess_external_locations(cfg: WorkspaceConfig):
       - Scanning all these locations to identify folders that can act as shared path prefixes
       - These identified external locations will be created subsequently prior to the actual table migration"""
     ws = WorkspaceClient(config=cfg.to_databricks_config())
-    crawler = ExternalLocations(ws, RuntimeBackend(), cfg.inventory_database)
+    sql_backend = RuntimeBackend(debug_truncate_bytes=_must_truncate_bytes(cfg))
+    crawler = ExternalLocations(ws, sql_backend, cfg.inventory_database)
     crawler.snapshot()
 
 
@@ -110,7 +119,8 @@ def assess_jobs(cfg: WorkspaceConfig):
       - Clusters referencing DBFS locations in one or more config options
     """
     ws = WorkspaceClient(config=cfg.to_databricks_config())
-    crawler = JobsCrawler(ws, RuntimeBackend(), cfg.inventory_database)
+    sql_backend = RuntimeBackend(debug_truncate_bytes=_must_truncate_bytes(cfg))
+    crawler = JobsCrawler(ws, sql_backend, cfg.inventory_database)
     crawler.snapshot()
 
 
@@ -126,7 +136,8 @@ def assess_clusters(cfg: WorkspaceConfig):
       - Clusters referencing DBFS locations in one or more config options
     """
     ws = WorkspaceClient(config=cfg.to_databricks_config())
-    crawler = ClustersCrawler(ws, RuntimeBackend(), cfg.inventory_database)
+    sql_backend = RuntimeBackend(debug_truncate_bytes=_must_truncate_bytes(cfg))
+    crawler = ClustersCrawler(ws, sql_backend, cfg.inventory_database)
     crawler.snapshot()
 
 
@@ -142,7 +153,8 @@ def assess_pipelines(cfg: WorkspaceConfig):
     Subsequently, a list of all the pipelines with matching configurations are stored in the
     `$inventory.pipelines` table."""
     ws = WorkspaceClient(config=cfg.to_databricks_config())
-    crawler = PipelinesCrawler(ws, RuntimeBackend(), cfg.inventory_database)
+    sql_backend = RuntimeBackend(debug_truncate_bytes=_must_truncate_bytes(cfg))
+    crawler = PipelinesCrawler(ws, sql_backend, cfg.inventory_database)
     crawler.snapshot()
 
 
@@ -159,7 +171,8 @@ def assess_azure_service_principals(cfg: WorkspaceConfig):
     in the `$inventory.azure_service_principals` table."""
     ws = WorkspaceClient(config=cfg.to_databricks_config())
     if ws.config.is_azure:
-        crawler = AzureServicePrincipalCrawler(ws, RuntimeBackend(), cfg.inventory_database)
+        sql_backend = RuntimeBackend(debug_truncate_bytes=_must_truncate_bytes(cfg))
+        crawler = AzureServicePrincipalCrawler(ws, sql_backend, cfg.inventory_database)
         crawler.snapshot()
 
 
@@ -171,7 +184,8 @@ def assess_global_init_scripts(cfg: WorkspaceConfig):
     It looks in:
       - the list of all the global init scripts are saved in the `$inventory.azure_service_principals` table."""
     ws = WorkspaceClient(config=cfg.to_databricks_config())
-    crawler = GlobalInitScriptCrawler(ws, RuntimeBackend(), cfg.inventory_database)
+    sql_backend = RuntimeBackend(debug_truncate_bytes=_must_truncate_bytes(cfg))
+    crawler = GlobalInitScriptCrawler(ws, sql_backend, cfg.inventory_database)
     crawler.snapshot()
 
 
@@ -183,8 +197,9 @@ def workspace_listing(cfg: WorkspaceConfig):
     It uses multi-threading to parallelize the listing process to speed up execution on big workspaces.
     It accepts starting path as the parameter defaulted to the root path '/'."""
     ws = WorkspaceClient(config=cfg.to_databricks_config())
+    sql_backend = RuntimeBackend(debug_truncate_bytes=_must_truncate_bytes(cfg))
     crawler = WorkspaceListing(
-        ws, RuntimeBackend(), cfg.inventory_database, num_threads=cfg.num_threads, start_path=cfg.workspace_start_path
+        ws, sql_backend, cfg.inventory_database, num_threads=cfg.num_threads, start_path=cfg.workspace_start_path
     )
     crawler.snapshot()
 
@@ -197,9 +212,10 @@ def crawl_permissions(cfg: WorkspaceConfig):
     This is the first step for the _group migration_ process, which is continued in the `migrate-groups` workflow.
     This step includes preparing Legacy Table ACLs for local group migration."""
     ws = WorkspaceClient(config=cfg.to_databricks_config())
+    sql_backend = RuntimeBackend(debug_truncate_bytes=_must_truncate_bytes(cfg))
     permission_manager = PermissionManager.factory(
         ws,
-        RuntimeBackend(),
+        sql_backend,
         cfg.inventory_database,
         num_threads=cfg.num_threads,
         workspace_start_path=cfg.workspace_start_path,
@@ -211,7 +227,7 @@ def crawl_permissions(cfg: WorkspaceConfig):
 @task("assessment")
 def crawl_groups(cfg: WorkspaceConfig):
     """Scans all groups for the local group migration scope"""
-    sql_backend = RuntimeBackend()
+    sql_backend = RuntimeBackend(debug_truncate_bytes=_must_truncate_bytes(cfg))
     ws = WorkspaceClient(config=cfg.to_databricks_config())
     group_manager = GroupManager(
         sql_backend,
@@ -251,7 +267,7 @@ def assessment_report(_: WorkspaceConfig):
 @task("migrate-groups", depends_on=[crawl_groups])
 def rename_workspace_local_groups(cfg: WorkspaceConfig):
     """Renames workspace local groups by adding `ucx-renamed-` prefix."""
-    sql_backend = RuntimeBackend()
+    sql_backend = RuntimeBackend(debug_truncate_bytes=_must_truncate_bytes(cfg))
     ws = WorkspaceClient(config=cfg.to_databricks_config())
     verify_has_metastore = VerifyHasMetastore(ws)
     if verify_has_metastore.verify_metastore():
@@ -275,7 +291,7 @@ def rename_workspace_local_groups(cfg: WorkspaceConfig):
 def reflect_account_groups_on_workspace(cfg: WorkspaceConfig):
     """Adds matching account groups to this workspace. The matching account level group(s) must preexist(s) for this
     step to be successful. This process does not create the account level group(s)."""
-    sql_backend = RuntimeBackend()
+    sql_backend = RuntimeBackend(debug_truncate_bytes=_must_truncate_bytes(cfg))
     ws = WorkspaceClient(config=cfg.to_databricks_config())
     group_manager = GroupManager(
         sql_backend,
@@ -302,10 +318,10 @@ def apply_permissions_to_account_groups(cfg: WorkspaceConfig):
     permissions, Secret Scopes, Notebooks, Directories, Repos, Files.
 
     See [interactive tutorial here](https://app.getreprise.com/launch/myM3VNn/)."""
-    backend = RuntimeBackend()
+    sql_backend = RuntimeBackend(debug_truncate_bytes=_must_truncate_bytes(cfg))
     ws = WorkspaceClient(config=cfg.to_databricks_config())
     group_manager = GroupManager(
-        backend,
+        sql_backend,
         ws,
         cfg.inventory_database,
         cfg.include_group_names,
@@ -323,7 +339,7 @@ def apply_permissions_to_account_groups(cfg: WorkspaceConfig):
 
     permission_manager = PermissionManager.factory(
         ws,
-        backend,
+        sql_backend,
         cfg.inventory_database,
         num_threads=cfg.num_threads,
         workspace_start_path=cfg.workspace_start_path,
@@ -336,10 +352,10 @@ def delete_backup_groups(cfg: WorkspaceConfig):
     """Last step of the group migration process. Removes all workspace-level backup groups, along with their
     permissions. Execute this workflow only after you've confirmed that workspace-local migration worked
     successfully for all the groups involved."""
-    backend = RuntimeBackend()
+    sql_backend = RuntimeBackend(debug_truncate_bytes=_must_truncate_bytes(cfg))
     ws = WorkspaceClient(config=cfg.to_databricks_config())
     group_manager = GroupManager(
-        backend,
+        sql_backend,
         ws,
         cfg.inventory_database,
         cfg.include_group_names,
@@ -356,7 +372,8 @@ def delete_backup_groups(cfg: WorkspaceConfig):
 def destroy_schema(cfg: WorkspaceConfig):
     """This _clean-up_ workflow allows to removes the `$inventory` database, with all the inventory tables created by
     the previous workflow runs. Use this to reset the entire state and start with the assessment step again."""
-    RuntimeBackend().execute(f"DROP DATABASE {cfg.inventory_database} CASCADE")
+    sql_backend = RuntimeBackend(debug_truncate_bytes=_must_truncate_bytes(cfg))
+    sql_backend.execute(f"DROP DATABASE {cfg.inventory_database} CASCADE")
 
 
 def main(*argv):
