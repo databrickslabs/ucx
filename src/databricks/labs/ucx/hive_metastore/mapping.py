@@ -1,6 +1,4 @@
-import csv
 import dataclasses
-import io
 import logging
 import re
 from dataclasses import dataclass
@@ -10,7 +8,6 @@ from databricks.labs.blueprint.installation import Installation
 from databricks.labs.blueprint.parallel import Threads
 from databricks.sdk import WorkspaceClient
 from databricks.sdk.errors import BadRequest, NotFound, ResourceConflict
-from databricks.sdk.service.workspace import ImportFormat
 
 from databricks.labs.ucx.account import WorkspaceInfo
 from databricks.labs.ucx.config import WorkspaceConfig

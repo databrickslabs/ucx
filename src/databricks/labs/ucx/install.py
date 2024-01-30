@@ -63,10 +63,10 @@ from databricks.labs.ucx.framework.crawlers import (
 from databricks.labs.ucx.framework.dashboards import DashboardFromFiles
 from databricks.labs.ucx.framework.tasks import _TASKS, Task
 from databricks.labs.ucx.hive_metastore.grants import Grant
-from databricks.labs.ucx.installer.hms_lineage import HiveMetastoreLineageEnabler
 from databricks.labs.ucx.hive_metastore.locations import ExternalLocation, Mount
 from databricks.labs.ucx.hive_metastore.table_size import TableSize
 from databricks.labs.ucx.hive_metastore.tables import Table, TableError
+from databricks.labs.ucx.installer.hms_lineage import HiveMetastoreLineageEnabler
 from databricks.labs.ucx.runtime import main
 from databricks.labs.ucx.workspace_access.base import Permissions
 from databricks.labs.ucx.workspace_access.generic import WorkspaceObjectInfo

@@ -1,7 +1,12 @@
 import logging
+
 import pytest
 
-from databricks.labs.ucx.framework.tasks import TaskLogger, Task, _remove_extra_indentation
+from databricks.labs.ucx.framework.tasks import (
+    Task,
+    TaskLogger,
+    _remove_extra_indentation,
+)
 
 
 def test_replace_pydoc():
@@ -28,7 +33,6 @@ def test_task_cloud(ws):
 
     filter_tasks = sorted([t.name for t in tasks if t.cloud_compatible(ws.config)])
     assert filter_tasks == ["n3"]
-
 
 
 def test_task_logger(tmp_path):

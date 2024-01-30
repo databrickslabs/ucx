@@ -1,4 +1,3 @@
-import functools
 import logging
 from dataclasses import dataclass
 from pathlib import Path
@@ -6,7 +5,6 @@ from pathlib import Path
 import yaml
 from databricks.labs.blueprint.installation import Installation, SerdeError
 from databricks.labs.blueprint.installer import IllegalState
-from databricks.labs.blueprint.parallel import ManyError, Threads
 from databricks.sdk import WorkspaceClient
 from databricks.sdk.errors import NotFound
 from databricks.sdk.service.iam import User
@@ -57,11 +55,11 @@ class InstallationManager:
         installations = []
         for inst in Installation.existing(self._ws, 'ucx'):
             try:
-                installations.append(InstallationUCX(
-                    config=inst.load(WorkspaceConfig),
-                    path=inst.install_folder(),
-                    username=inst.username()
-                ))
+                installations.append(
+                    InstallationUCX(
+                        config=inst.load(WorkspaceConfig), path=inst.install_folder(), username=inst.username()
+                    )
+                )
             except NotFound:
                 continue
             except SerdeError:

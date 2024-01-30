@@ -86,12 +86,19 @@ def test_save_mapping():
 
     table_mapping.save(tables_crawler, workspace_info)
 
-    installation.assert_file_written('mapping.csv', [{'catalog_name': 'foo_bar',
-                  'dst_schema': 'foo',
-                  'dst_table': 'bar',
-                  'src_schema': 'foo',
-                  'src_table': 'bar',
-                  'workspace_name': 'foo-bar'}])
+    installation.assert_file_written(
+        'mapping.csv',
+        [
+            {
+                'catalog_name': 'foo_bar',
+                'dst_schema': 'foo',
+                'dst_table': 'bar',
+                'src_schema': 'foo',
+                'src_table': 'bar',
+                'workspace_name': 'foo-bar',
+            }
+        ],
+    )
 
 
 def test_load_mapping_not_found():
@@ -112,12 +119,20 @@ def test_load_mapping():
     errors = {}
     rows = {}
     backend = MockBackend(fails_on_first=errors, rows=rows)
-    installation = MockInstallation({'mapping.csv': [{'catalog_name': 'foo_bar',
-                  'dst_schema': 'foo',
-                  'dst_table': 'bar',
-                  'src_schema': 'foo',
-                  'src_table': 'bar',
-                  'workspace_name': 'foo-bar'}]})
+    installation = MockInstallation(
+        {
+            'mapping.csv': [
+                {
+                    'catalog_name': 'foo_bar',
+                    'dst_schema': 'foo',
+                    'dst_table': 'bar',
+                    'src_schema': 'foo',
+                    'src_table': 'bar',
+                    'workspace_name': 'foo-bar',
+                }
+            ]
+        }
+    )
     table_mapping = TableMapping(installation, ws, backend)
 
     rules = table_mapping.load()

@@ -20,7 +20,7 @@ from databricks.labs.ucx.framework.crawlers import StatementExecutionBackend
 from databricks.labs.ucx.hive_metastore import ExternalLocations, TablesCrawler
 from databricks.labs.ucx.hive_metastore.mapping import TableMapping
 from databricks.labs.ucx.hive_metastore.table_migrate import TableMove, TablesMigrate
-from databricks.labs.ucx.install import WorkspaceInstaller, WorkspaceInstallation
+from databricks.labs.ucx.install import WorkspaceInstallation
 from databricks.labs.ucx.installer import InstallationManager
 from databricks.labs.ucx.workspace_access.groups import GroupManager
 

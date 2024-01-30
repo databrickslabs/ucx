@@ -32,24 +32,21 @@ from databricks.labs.ucx.cli import (
 from databricks.labs.ucx.config import WorkspaceConfig
 from databricks.labs.ucx.installer import InstallationUCX
 
+
 @pytest.fixture
 def ws():
     state = {
-        "/Users/foo/.ucx/config.yml": yaml.dump({
-            '$version': 2,
-            'inventory_database': 'ucx',
-            'connect': {
-                'host': 'foo',
-                'token': 'bar',
+        "/Users/foo/.ucx/config.yml": yaml.dump(
+            {
+                '$version': 2,
+                'inventory_database': 'ucx',
+                'connect': {
+                    'host': 'foo',
+                    'token': 'bar',
+                },
             }
-        }),
-        '/Users/foo/.ucx/state.json': json.dumps({
-            'resources': {
-                'jobs': {
-                    'assessment': '123'
-                }
-            }
-        })
+        ),
+        '/Users/foo/.ucx/state.json': json.dumps({'resources': {'jobs': {'assessment': '123'}}}),
     }
 
     ws = create_autospec(WorkspaceClient)
@@ -72,9 +69,7 @@ def test_open_remote_config(ws):
 
 
 def test_installations(ws, mocker, capsys):
-    ws.users.list.return_value = [
-        iam.User(user_name='foo')
-    ]
+    ws.users.list.return_value = [iam.User(user_name='foo')]
     installations(ws)
     assert '{"user_name": "foo", "database": "ucx", "warehouse_id": "test"}' in capsys.readouterr().out
 
