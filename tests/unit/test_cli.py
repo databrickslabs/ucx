@@ -30,7 +30,7 @@ from databricks.labs.ucx.cli import (
     workflows,
 )
 from databricks.labs.ucx.config import WorkspaceConfig
-from databricks.labs.ucx.installer import Installation
+from databricks.labs.ucx.installer import InstallationUCX
 
 @pytest.fixture
 def ws():
@@ -414,7 +414,7 @@ def test_save_azure_storage_accounts(mocker, caplog):
 
 def test_validate_groups_membership(mocker, caplog):
     w = create_autospec(WorkspaceClient)
-    inst_data = Installation(
+    inst_data = InstallationUCX(
         config=WorkspaceConfig(
             inventory_database="test_database",
             workspace_group_regex=None,
@@ -427,7 +427,7 @@ def test_validate_groups_membership(mocker, caplog):
             database_to_catalog_mapping=None,
             default_catalog="ucx_default",
         ),
-        user="test_user",
+        username="test_user",
         path="/Users/test_userd@databricks.com/.ucx",
     )
     w.current_user.me = lambda: iam.User(user_name="me@example.com", groups=[iam.ComplexValue(display="admins")])

@@ -5,6 +5,7 @@ import webbrowser
 
 from databricks.labs.blueprint.cli import App
 from databricks.labs.blueprint.entrypoint import get_logger
+from databricks.labs.blueprint.installation import Installation
 from databricks.labs.blueprint.tui import Prompts
 from databricks.sdk import AccountClient, WorkspaceClient
 
@@ -52,6 +53,8 @@ def installations(w: WorkspaceClient):
     """Show installations by different users on the same workspace"""
     installation_manager = InstallationManager(w)
     logger.info("Fetching installations...")
+
+    Installation.existing(w, 'ucx')
     all_users = [_.as_summary() for _ in installation_manager.user_installations()]
     print(json.dumps(all_users))
 
@@ -63,14 +66,7 @@ def skip(w: WorkspaceClient, schema: str | None = None, table: str | None = None
     if not schema:
         logger.error("--schema is a required parameter.")
         return
-    installation_manager = InstallationManager(w)
-    installation = installation_manager.for_user(w.current_user.me())
-    if not installation:
-        logger.error(CANT_FIND_UCX_MSG)
-        return
-    warehouse_id = installation.config.warehouse_id
-    sql_backend = StatementExecutionBackend(w, warehouse_id)
-    mapping = TableMapping(w, sql_backend)
+    mapping = TableMapping.current(w)
     if table:
         mapping.skip_table(schema, table)
     else:
@@ -96,10 +92,7 @@ def manual_workspace_info(w: WorkspaceClient):
 @ucx.command
 def create_table_mapping(w: WorkspaceClient):
     """create initial table mapping for review"""
-    installation_manager = InstallationManager(w)
-    installation = installation_manager.for_user(w.current_user.me())
-    sql_backend = StatementExecutionBackend(w, installation.config.warehouse_id)
-    table_mapping = TableMapping(w, sql_backend)
+    table_mapping = TableMapping.current(w)
     workspace_info = WorkspaceInfo(w)
     installation_manager = InstallationManager(w)
     installation = installation_manager.for_user(w.current_user.me())

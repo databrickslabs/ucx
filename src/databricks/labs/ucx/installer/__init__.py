@@ -4,6 +4,7 @@ from dataclasses import dataclass
 from pathlib import Path
 
 import yaml
+from databricks.labs.blueprint.installation import Installation, SerdeError
 from databricks.labs.blueprint.installer import IllegalState
 from databricks.labs.blueprint.parallel import ManyError, Threads
 from databricks.sdk import WorkspaceClient
@@ -16,14 +17,14 @@ logger = logging.getLogger(__name__)
 
 
 @dataclass
-class Installation:
+class InstallationUCX:
     config: WorkspaceConfig
-    user: User
+    username: str
     path: str
 
     def as_summary(self) -> dict:
         return {
-            "user_name": self.user.user_name,
+            "user_name": self.username,
             "database": self.config.inventory_database,
             "warehouse_id": self.config.warehouse_id,
         }
@@ -35,13 +36,13 @@ class InstallationManager:
         self._root = Path("/Users")
         self._prefix = prefix
 
-    def for_user(self, user: User) -> Installation:
+    def for_user(self, user: User) -> InstallationUCX:
         try:
             assert user.user_name is not None
             config_file = self._root / user.user_name / self._prefix / "config.yml"
             with self._ws.workspace.download(config_file.as_posix()) as f:
                 cfg = WorkspaceConfig.from_bytes(f.read())
-                return Installation(cfg, user, config_file.parent.as_posix())
+                return InstallationUCX(cfg, user, config_file.parent.as_posix())
         except NotFound:
             msg = f"Not installed for {user.user_name}"
             raise NotFound(msg) from None
@@ -52,19 +53,17 @@ class InstallationManager:
             msg = f"Config file {config_file} is corrupted, check if it is in correct yaml format"
             raise IllegalState(msg) from None
 
-    def _maybe_for_user(self, user: User) -> Installation | None:
-        try:
-            return self.for_user(user)
-        except NotFound:
-            return None
-        except IllegalState:
-            return None
-
-    def user_installations(self) -> list[Installation]:
-        tasks = []
-        for user in self._ws.users.list(attributes="userName", count=500):
-            tasks.append(functools.partial(self._maybe_for_user, user))
-        installations, errors = Threads.gather("detecting installations", tasks)
-        if errors:
-            raise ManyError(errors)
-        return sorted(installations, key=lambda i: (i.config.inventory_database, i.user.user_name))
+    def user_installations(self) -> list[InstallationUCX]:
+        installations = []
+        for inst in Installation.existing(self._ws, 'ucx'):
+            try:
+                installations.append(InstallationUCX(
+                    config=inst.load(WorkspaceConfig),
+                    path=inst.install_folder(),
+                    username=inst.username()
+                ))
+            except NotFound:
+                continue
+            except SerdeError:
+                continue
+        return sorted(installations, key=lambda i: (i.config.inventory_database, i.username))

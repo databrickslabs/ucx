@@ -10,7 +10,7 @@ from databricks.sdk.service.workspace import ImportFormat
 
 from databricks.labs.ucx.account import AccountWorkspaces, WorkspaceInfo
 from databricks.labs.ucx.config import AccountConfig, ConnectConfig, WorkspaceConfig
-from databricks.labs.ucx.installer import Installation, InstallationManager
+from databricks.labs.ucx.installer import InstallationUCX, InstallationManager
 
 
 def test_sync_workspace_info(mocker):
@@ -39,7 +39,7 @@ def test_sync_workspace_info(mocker):
 
     im = create_autospec(InstallationManager)
     im.user_installations.return_value = [
-        Installation(config=WorkspaceConfig(inventory_database="ucx"), user=User(display_name="foo"), path="/Users/foo")
+        InstallationUCX(config=WorkspaceConfig(inventory_database="ucx"), username=User(display_name="foo"), path="/Users/foo")
     ]
 
     account_workspaces = AccountWorkspaces(account_config, workspace_client, lambda _: im)
@@ -75,7 +75,7 @@ def test_manual_workspace_info(mocker):
 
     im = create_autospec(InstallationManager)
     im.user_installations.return_value = [
-        Installation(config=WorkspaceConfig(inventory_database="ucx"), user=User(display_name="foo"), path="/Users/foo")
+        InstallationUCX(config=WorkspaceConfig(inventory_database="ucx"), username=User(display_name="foo"), path="/Users/foo")
     ]
 
     ws.config.host = "localhost"

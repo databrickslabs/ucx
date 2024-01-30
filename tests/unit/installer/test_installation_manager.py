@@ -28,7 +28,7 @@ def test_happy_path(mocker):
     user_installations = installation_manager.user_installations()
     assert len(user_installations) == 1
 
-    assert user_installations[0].user.user_name == "foo"
+    assert user_installations[0].username.user_name == "foo"
     assert user_installations[0].config.inventory_database == "bar"
 
 
