@@ -7,6 +7,7 @@ import re
 from collections.abc import Iterable
 from dataclasses import dataclass
 
+from databricks.labs.blueprint.installation import Installation
 from databricks.sdk import WorkspaceClient
 from databricks.sdk.core import (
     ApiClient,
@@ -28,7 +29,8 @@ from databricks.labs.ucx.assessment.crawlers import (
     logger,
 )
 from databricks.labs.ucx.assessment.jobs import JobsMixin
-from databricks.labs.ucx.framework.crawlers import CrawlerBase, SqlBackend
+from databricks.labs.ucx.config import WorkspaceConfig
+from databricks.labs.ucx.framework.crawlers import CrawlerBase, SqlBackend, StatementExecutionBackend
 from databricks.labs.ucx.hive_metastore.locations import ExternalLocations
 
 
@@ -461,19 +463,26 @@ class StoragePermissionMapping:
 
 
 class AzureResourcePermissions:
-    def __init__(self, ws: WorkspaceClient, azurerm: AzureResources, lc: ExternalLocations, folder: str | None = None):
+    def __init__(self, installation: Installation, ws: WorkspaceClient, azurerm: AzureResources, lc: ExternalLocations):
+        self._filename = 'azure_storage_account_info.csv'
+        self._installation = installation
         self._locations = lc
         self._azurerm = azurerm
         self._ws = ws
-        self._field_names = [_.name for _ in dataclasses.fields(StoragePermissionMapping)]
-        if not folder:
-            folder = f"/Users/{ws.current_user.me().user_name}/.ucx"
-        self._folder = folder
         self._levels = {
             "Storage Blob Data Contributor": Privilege.WRITE_FILES,
             "Storage Blob Data Owner": Privilege.WRITE_FILES,
             "Storage Blob Data Reader": Privilege.READ_FILES,
         }
+
+    @classmethod
+    def for_cli(cls, ws: WorkspaceClient, product='ucx'):
+        installation = Installation.current(ws, product)
+        config = installation.load(WorkspaceConfig)
+        sql_backend = StatementExecutionBackend(ws, config.warehouse_id)
+        azurerm = AzureResources(ws)
+        locations = ExternalLocations(ws, sql_backend, config.inventory_database)
+        return cls(installation, ws, azurerm, locations)
 
     def _map_storage(self, storage: AzureResource) -> list[StoragePermissionMapping]:
         logger.info(f"Fetching role assignment for {storage.storage_account}")
@@ -512,21 +521,7 @@ class AzureResourcePermissions:
         if len(storage_account_infos) == 0:
             logger.error("No storage account found in current tenant with spn permission")
             return None
-        return self._save(storage_account_infos)
-
-    def _save(self, storage_infos: list[StoragePermissionMapping]) -> str:
-        buffer = io.StringIO()
-        writer = csv.DictWriter(buffer, self._field_names)
-        writer.writeheader()
-        for storage_info in storage_infos:
-            writer.writerow(dataclasses.asdict(storage_info))
-        buffer.seek(0)
-        return self._overwrite_mapping(buffer)
-
-    def _overwrite_mapping(self, buffer) -> str:
-        path = f"{self._folder}/azure_storage_account_info.csv"
-        self._ws.workspace.upload(path, buffer, overwrite=True, format=ImportFormat.AUTO)
-        return path
+        return self._installation.save(storage_account_infos, filename=self._filename)
 
     def _get_storage_accounts(self) -> list[str]:
         external_locations = self._locations.snapshot()
