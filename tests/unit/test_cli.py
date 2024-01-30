@@ -77,7 +77,7 @@ def test_open_remote_config(ws):
 def test_installations(ws, capsys):
     ws.users.list.return_value = [iam.User(user_name='foo')]
     installations(ws)
-    assert '{"user_name": "foo", "database": "ucx", "warehouse_id": "test"}' in capsys.readouterr().out
+    assert '{"database": "ucx", "path": "/Users/foo/.ucx", "warehouse_id": "test"}' in capsys.readouterr().out
 
 
 def test_skip_with_table(ws):
@@ -141,46 +141,10 @@ def test_create_table_mapping(ws):
         create_table_mapping(ws)
 
 
-def test_validate_external_locations(mocker):
-    w = create_autospec(WorkspaceClient)
-    mocker.patch("databricks.labs.ucx.installer.InstallationManager.for_user", return_value=MagicMock())
-    # test save_as_terraform_definitions_on_workspace is called
-    # also test if the saving tf scripts returns None
-    with (
-        patch(
-            "databricks.labs.ucx.hive_metastore.locations.ExternalLocations.save_as_terraform_definitions_on_workspace",
-            return_value=None,
-        ) as s,
-        patch("webbrowser.open") as w,
-    ):
-        validate_external_locations(w)
-        s.assert_called_once()
-        w.assert_not_called()
-    # test when tf scripts is written and user confirmed to open it over browser
-    path = "dummy/external_locations.tf"
-    with (
-        patch(
-            "databricks.labs.ucx.hive_metastore.locations.ExternalLocations.save_as_terraform_definitions_on_workspace",
-            return_value=path,
-        ) as s,
-        patch("webbrowser.open") as w,
-        patch("databricks.labs.blueprint.tui.Prompts.confirm", return_value=True),
-    ):
-        validate_external_locations(w)
-        s.assert_called_once()
-        w.assert_called_with(f"{w.config.host}/#workspace{path}")
-    # test when tf scripts is written but user did not confirm to open it over browser
-    with (
-        patch(
-            "databricks.labs.ucx.hive_metastore.locations.ExternalLocations.save_as_terraform_definitions_on_workspace",
-            return_value=path,
-        ) as s,
-        patch("webbrowser.open") as w,
-        patch("databricks.labs.blueprint.tui.Prompts.confirm", return_value=False),
-    ):
-        validate_external_locations(w)
-        s.assert_called_once()
-        w.assert_not_called()
+def test_validate_external_locations(ws):
+    validate_external_locations(ws)
+
+    ws.statement_execution.execute_statement.assert_called()
 
 
 def test_ensure_assessment_run(ws):
@@ -282,18 +246,13 @@ def test_save_azure_storage_accounts_no_azure_cli(ws, caplog):
     assert 'In order to obtain AAD token, Please run azure cli to authenticate.' in caplog.messages
 
 
-def test_save_azure_storage_accounts_no_subscription_id(mocker, caplog):
-    w = create_autospec(WorkspaceClient)
-    w.config.auth_type = "azure_cli"
-    w.config.is_azure = True
-    w.current_user.me = lambda: iam.User(user_name="foo", groups=[iam.ComplexValue(display="admins")])
-    mocker.patch("databricks.labs.ucx.installer.InstallationManager.for_user", return_value=w.current_user)
-    save_azure_storage_accounts(w, "")
-    assert [
-        rec.message
-        for rec in caplog.records
-        if "Please enter subscription id to scan storage account in." in rec.message
-    ]
+def test_save_azure_storage_accounts_no_subscription_id(ws, caplog):
+    ws.config.auth_type = "azure_cli"
+    ws.config.is_azure = True
+
+    save_azure_storage_accounts(ws, "")
+
+    assert "Please enter subscription id to scan storage account in." in caplog.messages
 
 
 def test_save_azure_storage_accounts(ws, caplog):

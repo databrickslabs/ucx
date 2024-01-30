@@ -1,6 +1,8 @@
 import logging
+from unittest.mock import create_autospec
 
 import pytest
+from databricks.sdk import WorkspaceClient
 
 from databricks.labs.ucx.framework.tasks import (
     Task,
@@ -23,7 +25,11 @@ Test3"""
     )
 
 
-def test_task_cloud(ws):
+def test_task_cloud():
+    ws = create_autospec(WorkspaceClient)
+    ws.config.is_aws = True
+    ws.config.is_azure = False
+    ws.config.is_gcp = False
 
     tasks = [
         Task(task_id=0, workflow="wl_1", name="n3", doc="d3", fn=lambda: None, cloud="aws"),

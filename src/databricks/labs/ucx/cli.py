@@ -57,6 +57,7 @@ def installations(w: WorkspaceClient):
                 {
                     'database': config.inventory_database,
                     'path': installation.install_folder(),
+                    'warehouse_id': config.warehouse_id,
                 }
             )
         except NotFound:

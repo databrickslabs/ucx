@@ -45,7 +45,7 @@ def test_cluster_assessment_cluster_policy_not_found(caplog):
     ws.cluster_policies.get.side_effect = NotFound("NO_POLICY")
     crawler = ClustersCrawler(ws, MockBackend(), "ucx")
     list(crawler.snapshot())
-    assert "The cluster policy was deleted" in caplog.messages[len(caplog.messages) - 1]
+    assert "The cluster policy was deleted: single-user-with-spn" in caplog.messages
 
 
 def test_cluster_assessment_cluster_policy_exception():
