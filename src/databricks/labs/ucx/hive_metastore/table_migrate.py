@@ -40,7 +40,7 @@ class TablesMigrate:
         tables_to_migrate = self._tm.get_tables_to_migrate(self._tc)
         tasks = []
         for table in tables_to_migrate:
-            if not what or table.what == what:
+            if not what or table.src.what == what:
                 tasks.append(partial(self._migrate_table, table.src, table.rule))
         Threads.strict("migrate tables", tasks)
 

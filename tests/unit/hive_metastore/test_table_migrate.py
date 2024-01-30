@@ -15,7 +15,7 @@ from databricks.labs.ucx.hive_metastore.table_migrate import TablesMigrate
 from databricks.labs.ucx.hive_metastore.tables import (
     MigrationCount,
     Table,
-    TablesCrawler,
+    TablesCrawler, What,
 )
 
 from ..framework.mocks import MockBackend
@@ -64,6 +64,25 @@ def test_migrate_dbfs_root_tables_should_produce_proper_queries():
     assert "SYNC TABLE ucx_default.db1_dst.managed_other FROM hive_metastore.db1_src.managed_other;" in list(
         backend.queries
     )
+
+
+def test_migrate_dbfs_root_tables_should_be_skipped_when_upgrading_external():
+    errors = {}
+    rows = {}
+    backend = MockBackend(fails_on_first=errors, rows=rows)
+    table_crawler = TablesCrawler(backend, "inventory_database")
+    client = MagicMock()
+    table_mapping = create_autospec(TableMapping)
+    table_mapping.get_tables_to_migrate.return_value = [
+        TableToMigrate(
+            Table("hive_metastore", "db1_src", "managed_dbfs", "MANAGED", "DELTA", "dbfs:/some_location"),
+            Rule("workspace", "ucx_default", "db1_src", "db1_dst", "managed_dbfs", "managed_dbfs"),
+        ),
+    ]
+    table_migrate = TablesMigrate(table_crawler, client, backend, table_mapping)
+    table_migrate.migrate_tables(what=What.EXTERNAL)
+
+    assert len(backend.queries) == 0
 
 
 def test_migrate_external_tables_should_produce_proper_queries():
