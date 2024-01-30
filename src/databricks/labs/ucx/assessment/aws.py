@@ -179,8 +179,7 @@ class AWSResourcePermissions:
         installation = Installation.current(ws, product)
         aws = AWSResources(aws_profile)
         if not aws.validate_connection():
-            logger.error("AWS CLI is not configured properly.")
-            return None
+            raise ResourceWarning("AWS CLI is not configured properly.")
         return cls(installation, ws, aws)
 
     def _get_instance_profiles(self) -> Iterable[AWSInstanceProfile]:

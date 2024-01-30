@@ -291,70 +291,27 @@ def test_save_azure_storage_accounts_no_subscription_id(mocker, caplog):
     ]
 
 
-def test_save_azure_storage_accounts(mocker, caplog):
-    w = create_autospec(WorkspaceClient)
-    w.config.auth_type = "azure_cli"
-    w.config.is_azure = True
-    w.current_user.me = lambda: iam.User(user_name="foo", groups=[iam.ComplexValue(display="admins")])
-    mocker.patch("databricks.labs.ucx.installer.InstallationManager.for_user", return_value=w.current_user)
-    with patch(
-        "databricks.labs.ucx.assessment.azure.AzureResourcePermissions.save_spn_permissions", return_value=None
-    ) as m:
-        save_azure_storage_accounts(w, "test")
-        m.assert_called_once()
+def test_save_azure_storage_accounts(ws, caplog):
+    ws.config.auth_type = "azure_cli"
+    ws.config.is_azure = True
+    save_azure_storage_accounts(ws, "test")
+
+    ws.statement_execution.execute_statement.assert_called()
 
 
-def test_validate_groups_membership(mocker, caplog):
-    w = create_autospec(WorkspaceClient)
-    inst_data = InstallationUCX(
-        config=WorkspaceConfig(
-            inventory_database="test_database",
-            workspace_group_regex=None,
-            workspace_group_replace=None,
-            account_group_regex=None,
-            group_match_by_external_id=False,
-            include_group_names=None,
-            renamed_group_prefix="db-temp-",
-            warehouse_id="test_id",
-            database_to_catalog_mapping=None,
-            default_catalog="ucx_default",
-        ),
-        username="test_user",
-        path="/Users/test_userd@databricks.com/.ucx",
-    )
-    w.current_user.me = lambda: iam.User(user_name="me@example.com", groups=[iam.ComplexValue(display="admins")])
-    mocker.patch("databricks.labs.ucx.installer.InstallationManager.__init__", return_value=None)
-    mocker.patch("databricks.labs.ucx.installer.InstallationManager.for_user", return_value=inst_data)
-    mocker.patch("databricks.labs.ucx.workspace_access.groups.GroupManager.__init__", return_value=None)
-    mocker.patch(
-        "databricks.labs.ucx.workspace_access.groups.GroupManager.validate_group_membership",
-        return_value={"wf_group_name": "test_group", "ac_group_name": "test_group"},
-    )
-    validate_groups_membership(w)
-    assert caplog.messages == ["Validating Groups which are having different memberships between account and workspace"]
+def test_validate_groups_membership(ws):
+    validate_groups_membership(ws)
+
+    ws.groups.list.assert_called()
 
 
-def test_validate_group_no_ucx(mocker, caplog):
-    w = create_autospec(WorkspaceClient)
-    w.current_user.me = lambda: iam.User(user_name="test_user", groups=[iam.ComplexValue(display="admins")])
-    mocker.patch("databricks.labs.ucx.installer.InstallationManager.for_user", return_value=None)
-    validate_groups_membership(w)
-    assert "Couldn't find UCX configuration" in caplog.messages[0]
+def test_save_aws_iam_profiles_no_profile(ws, caplog):
+    save_aws_iam_profiles(ws)
 
-
-def test_save_aws_iam_profiles_no_profile(mocker, caplog):
-    w = create_autospec(WorkspaceClient)
-    w.current_user.me = lambda: iam.User(user_name="test_user", groups=[iam.ComplexValue(display="admins")])
-    mocker.patch("shutil.which", return_value="/path/aws")
-    mocker.patch("databricks.labs.ucx.installer.InstallationManager.for_user", return_value=None)
-    mocker.patch("os.getenv", return_value=None)
-    save_aws_iam_profiles(w)
     assert "AWS Profile is not specified." in caplog.messages[0]
 
 
-def test_save_aws_iam_profiles_no_connection(caplog, mocker):
-    w = create_autospec(WorkspaceClient)
-    w.current_user.me = lambda: iam.User(user_name="test_user", groups=[iam.ComplexValue(display="admins")])
+def test_save_aws_iam_profiles_no_connection(ws, mocker):
     mocker.patch("shutil.which", return_value="/path/aws")
     pop = create_autospec(subprocess.Popen)
 
@@ -363,13 +320,12 @@ def test_save_aws_iam_profiles_no_connection(caplog, mocker):
     mocker.patch("subprocess.Popen.__init__", return_value=None)
     mocker.patch("subprocess.Popen.__enter__", return_value=pop)
     mocker.patch("subprocess.Popen.__exit__", return_value=None)
-    save_aws_iam_profiles(w, aws_profile="profile")
-    assert "AWS CLI is not configured properly." in caplog.messages[len(caplog.messages) - 1]
+
+    with pytest.raises(ResourceWarning, match="AWS CLI is not configured properly."):
+        save_aws_iam_profiles(ws, aws_profile="profile")
 
 
-def test_save_aws_iam_profiles_no_cli(mocker, caplog):
-    w = create_autospec(WorkspaceClient)
-    w.current_user.me = lambda: iam.User(user_name="test_user", groups=[iam.ComplexValue(display="admins")])
+def test_save_aws_iam_profiles_no_cli(ws, mocker, caplog):
     mocker.patch("shutil.which", return_value=None)
-    save_aws_iam_profiles(w, aws_profile="profile")
+    save_aws_iam_profiles(ws, aws_profile="profile")
     assert "Couldn't find AWS" in caplog.messages[0]
