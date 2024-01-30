@@ -1,12 +1,15 @@
 import json
+import logging
 from collections.abc import Iterable
 from dataclasses import dataclass
 
 from databricks.sdk import WorkspaceClient
 from databricks.sdk.service.jobs import BaseJob
 
-from databricks.labs.ucx.assessment.crawlers import _check_cluster_failures, logger
+from databricks.labs.ucx.assessment.clusters import CheckClusterMixin
 from databricks.labs.ucx.framework.crawlers import CrawlerBase, SqlBackend
+
+logger = logging.getLogger(__name__)
 
 
 @dataclass
@@ -42,7 +45,7 @@ class JobsMixin:
                     yield j, t.new_cluster
 
 
-class JobsCrawler(CrawlerBase[JobInfo], JobsMixin):
+class JobsCrawler(CrawlerBase[JobInfo], JobsMixin, CheckClusterMixin):
     def __init__(self, ws: WorkspaceClient, sbe: SqlBackend, schema):
         super().__init__(sbe, "hive_metastore", schema, "jobs", JobInfo)
         self._ws = ws
@@ -83,7 +86,7 @@ class JobsCrawler(CrawlerBase[JobInfo], JobsMixin):
             job_id = job.job_id
             if not job_id:
                 continue
-            cluster_failures = _check_cluster_failures(self._ws, cluster_config, "Job cluster")
+            cluster_failures = self.check_cluster_failures(cluster_config, "Job cluster")
             job_assessment[job_id].update(cluster_failures)
 
         # TODO: next person looking at this - rewrite, as this code makes no sense

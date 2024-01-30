@@ -1,11 +1,14 @@
 import json
+import logging
 from collections.abc import Iterable
 from dataclasses import dataclass
 
 from databricks.sdk import WorkspaceClient
 
-from databricks.labs.ucx.assessment.crawlers import _check_spark_conf, logger
+from databricks.labs.ucx.assessment.clusters import CheckClusterMixin
 from databricks.labs.ucx.framework.crawlers import CrawlerBase, SqlBackend
+
+logger = logging.getLogger(__name__)
 
 
 @dataclass
@@ -17,7 +20,7 @@ class PipelineInfo:
     creator_name: str | None = None
 
 
-class PipelinesCrawler(CrawlerBase[PipelineInfo]):
+class PipelinesCrawler(CrawlerBase[PipelineInfo], CheckClusterMixin):
     def __init__(self, ws: WorkspaceClient, sbe: SqlBackend, schema):
         super().__init__(sbe, "hive_metastore", schema, "pipelines", PipelineInfo)
         self._ws = ws
@@ -46,7 +49,7 @@ class PipelinesCrawler(CrawlerBase[PipelineInfo]):
             assert pipeline_response.spec is not None
             pipeline_config = pipeline_response.spec.configuration
             if pipeline_config:
-                failures.extend(_check_spark_conf(pipeline_config, "pipeline"))
+                failures.extend(self.check_spark_conf(pipeline_config, "pipeline"))
 
             pipeline_info.failures = json.dumps(failures)
             if len(failures) > 0:

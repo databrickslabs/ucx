@@ -1,12 +1,18 @@
 import base64
 import json
+import logging
 from collections.abc import Iterable
 from dataclasses import dataclass
 
 from databricks.sdk import WorkspaceClient
 
-from databricks.labs.ucx.assessment.crawlers import _check_init_script, logger
+from databricks.labs.ucx.assessment.crawlers import (
+    _AZURE_SP_CONF_FAILURE_MSG,
+    _azure_sp_conf_in_init_scripts,
+)
 from databricks.labs.ucx.framework.crawlers import CrawlerBase, SqlBackend
+
+logger = logging.getLogger(__name__)
 
 
 @dataclass
@@ -19,7 +25,19 @@ class GlobalInitScriptInfo:
     enabled: bool | None = None
 
 
-class GlobalInitScriptCrawler(CrawlerBase[GlobalInitScriptInfo]):
+class CheckInitScriptMixin:
+    _ws: WorkspaceClient
+
+    def check_init_script(self, init_script_data: str | None, source: str) -> list[str]:
+        failures: list[str] = []
+        if not init_script_data:
+            return failures
+        if _azure_sp_conf_in_init_scripts(init_script_data):
+            failures.append(f"{_AZURE_SP_CONF_FAILURE_MSG} {source}.")
+        return failures
+
+
+class GlobalInitScriptCrawler(CrawlerBase[GlobalInitScriptInfo], CheckInitScriptMixin):
     def __init__(self, ws: WorkspaceClient, sbe: SqlBackend, schema):
         super().__init__(sbe, "hive_metastore", schema, "global_init_scripts", GlobalInitScriptInfo)
         self._ws = ws
@@ -48,7 +66,7 @@ class GlobalInitScriptCrawler(CrawlerBase[GlobalInitScriptInfo]):
             global_init_script = base64.b64decode(script.script).decode("utf-8")
             if not global_init_script:
                 continue
-            failures.extend(_check_init_script(global_init_script, "global init script"))
+            failures.extend(self.check_init_script(global_init_script, "global init script"))
             global_init_script_info.failures = json.dumps(failures)
 
             if len(failures) > 0:
