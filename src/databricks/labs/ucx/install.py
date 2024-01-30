@@ -63,7 +63,7 @@ from databricks.labs.ucx.framework.crawlers import (
 from databricks.labs.ucx.framework.dashboards import DashboardFromFiles
 from databricks.labs.ucx.framework.tasks import _TASKS, Task
 from databricks.labs.ucx.hive_metastore.grants import Grant
-from databricks.labs.ucx.hive_metastore.hms_lineage import HiveMetastoreLineageEnabler
+from databricks.labs.ucx.installer.hms_lineage import HiveMetastoreLineageEnabler
 from databricks.labs.ucx.hive_metastore.locations import ExternalLocation, Mount
 from databricks.labs.ucx.hive_metastore.table_size import TableSize
 from databricks.labs.ucx.hive_metastore.tables import Table, TableError
@@ -208,7 +208,7 @@ class WorkspaceInstaller:
         except NotFound as err:
             logger.debug(f"Cannot find previous installation: {err}")
         logger.info("Please answer a couple of questions to configure Unity Catalog migration")
-        self._install_spark_config_for_hms_lineage()
+        HiveMetastoreLineageEnabler(self._ws).apply(self._prompts)
         inventory_database = self._prompts.question(
             "Inventory Database stored in hive_metastore", default="ucx", valid_regex=r"^\w+$"
         )
@@ -279,35 +279,6 @@ class WorkspaceInstaller:
             webbrowser.open(ws_file_url)
         return config
 
-    def _install_spark_config_for_hms_lineage(self):
-        hms_lineage = HiveMetastoreLineageEnabler(self._ws)
-        logger.info(
-            "Enabling HMS Lineage: "
-            "HMS Lineage feature creates one system table named "
-            "system.hms_to_uc_migration.table_access and "
-            "helps in your migration process from HMS to UC by allowing you to programmatically query HMS "
-            "lineage data."
-        )
-        logger.info("Checking if Global Init Script with Required Spark Config already exists and enabled.")
-        gscript = hms_lineage.check_lineage_spark_config_exists()
-        if gscript:
-            if gscript.enabled:
-                logger.info("Global Init Script already exists and enabled. Skipped creating a new one.")
-            elif not gscript.enabled and self._prompts:
-                if self._prompts.confirm(
-                    "Your Global Init Script with required spark config is disabled, Do you want to enable it?"
-                ):
-                    logger.info("Enabling Global Init Script...")
-                    hms_lineage.enable_global_init_script(gscript)
-                else:
-                    logger.info("No change to Global Init Script is made.")
-        elif not gscript and self._prompts:
-            if self._prompts.confirm(
-                "No Global Init Script with Required Spark Config exists, Do you want to create one?"
-            ):
-                logger.info("Creating Global Init Script...")
-                hms_lineage.add_global_init_script()
-
     @staticmethod
     def _get_ext_hms_conf_from_policy(cluster_policy):
         spark_conf_dict = {}
@@ -360,7 +331,7 @@ class WorkspaceInstallation:
         self._this_file = Path(__file__)
 
     def run(self):
-        logger.info(f"Installing UCX v{PRODUCT_INFO.version()}")
+
         self._run_configured()
 
     @classmethod
@@ -389,6 +360,7 @@ class WorkspaceInstallation:
     #     return workspace_installer
 
     def _run_configured(self):
+        logger.info(f"Installing UCX v{PRODUCT_INFO.version()}")
         Threads.strict(
             "installing components",
             [
@@ -646,10 +618,10 @@ class WorkspaceInstallation:
                 md.append("\n\n")
         preamble = ["# Databricks notebook source", "# MAGIC %md"]
         intro = "\n".join(preamble + [f"# MAGIC {line}" for line in md])
-        url = self._installation.upload('README.py', intro.encode("utf8"))
-        if self._prompts and self._prompts.confirm(f"Open job overview in your browser? {url}"):
-            webbrowser.open(url)
-        return url
+        readme_url = self._installation.workspace_link('README.py')
+        if self._prompts and self._prompts.confirm(f"Open job overview in your browser? {readme_url}"):
+            webbrowser.open(readme_url)
+        return readme_url
 
     def _replace_inventory_variable(self, text: str) -> str:
         return text.replace("$inventory", f"hive_metastore.{self._config.inventory_database}")
@@ -951,8 +923,6 @@ class WorkspaceInstallation:
         ):
             return
         logger.info(f"Deleting inventory database {self._config.inventory_database}")
-        if self._sql_backend is None:
-            self._sql_backend = StatementExecutionBackend(self._ws, self._config.warehouse_id)
         deployer = SchemaDeployer(self._sql_backend, self._config.inventory_database, Any)
         deployer.delete_schema()
 

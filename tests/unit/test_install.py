@@ -5,7 +5,7 @@ from unittest.mock import MagicMock, create_autospec, patch
 
 import pytest
 import yaml
-from databricks.labs.blueprint.installation import MockInstallation
+from databricks.labs.blueprint.installation import MockInstallation, Installation
 from databricks.labs.blueprint.installer import InstallState
 from databricks.labs.blueprint.parallel import ManyError
 from databricks.labs.blueprint.tui import MockPrompts
@@ -117,6 +117,11 @@ def mock_installation():
 
 
 @pytest.fixture
+def mock_installation_with_jobs():
+    return MockInstallation({'state.json': {'resources': {'jobs': {"assessment": "123"}, 'dashboards': {'assessment_main': 'abc'}}}})
+
+
+@pytest.fixture
 def any_prompt():
     return MockPrompts({".*": ""})
 
@@ -209,7 +214,7 @@ def test_writeable_dbfs(ws, tmp_path, mock_installation, any_prompt):
     assert 'tacl' in job_clusters
 
 
-def test_run_workflow_creates_proper_failure(ws, mocker, any_prompt):
+def test_run_workflow_creates_proper_failure(ws, mocker, any_prompt, mock_installation_with_jobs):
     def run_now(job_id):
         assert 111 == job_id
 
@@ -237,9 +242,7 @@ def test_run_workflow_creates_proper_failure(ws, mocker, any_prompt):
     wheels = create_autospec(WheelsV2)
     installer = WorkspaceInstallation(
         WorkspaceConfig(inventory_database='ucx'),
-        MockInstallation(
-            {'state.json': {'resources': {'jobs': {"foo": "111"}, 'dashboards': {'assessment_main': 'abc'}}}}
-        ),
+        mock_installation_with_jobs,
         sql_backend,
         wheels,
         ws,
@@ -247,12 +250,12 @@ def test_run_workflow_creates_proper_failure(ws, mocker, any_prompt):
         timedelta(seconds=1),
     )
     with pytest.raises(Unknown) as failure:
-        installer.run_workflow("foo")
+        installer.run_workflow("assessment")
 
     assert "stuff: does not compute" == str(failure.value)
 
 
-def test_run_workflow_creates_failure_from_mapping(ws, mocker, mock_installation, any_prompt):
+def test_run_workflow_creates_failure_from_mapping(ws, mocker, mock_installation, any_prompt, mock_installation_with_jobs):
     def run_now(job_id):
         assert 111 == job_id
 
@@ -282,9 +285,7 @@ def test_run_workflow_creates_failure_from_mapping(ws, mocker, mock_installation
     wheels = create_autospec(WheelsV2)
     installer = WorkspaceInstallation(
         WorkspaceConfig(inventory_database='ucx'),
-        MockInstallation(
-            {'state.json': {'resources': {'jobs': {"foo": "111"}, 'dashboards': {'assessment_main': 'abc'}}}}
-        ),
+        mock_installation_with_jobs,
         sql_backend,
         wheels,
         ws,
@@ -292,12 +293,12 @@ def test_run_workflow_creates_failure_from_mapping(ws, mocker, mock_installation
         timedelta(seconds=1),
     )
     with pytest.raises(PermissionDenied) as failure:
-        installer.run_workflow("foo")
+        installer.run_workflow("assessment")
 
     assert str(failure.value) == "does not compute"
 
 
-def test_run_workflow_creates_failure_many_error(ws, mocker, any_prompt):
+def test_run_workflow_creates_failure_many_error(ws, mocker, any_prompt,mock_installation_with_jobs):
     def run_now(job_id):
         assert 111 == job_id
 
@@ -337,9 +338,7 @@ def test_run_workflow_creates_failure_many_error(ws, mocker, any_prompt):
     wheels = create_autospec(WheelsV2)
     installer = WorkspaceInstallation(
         WorkspaceConfig(inventory_database='ucx'),
-        MockInstallation(
-            {'state.json': {'resources': {'jobs': {"foo": "111"}, 'dashboards': {'assessment_main': 'abc'}}}}
-        ),
+        mock_installation_with_jobs,
         sql_backend,
         wheels,
         ws,
@@ -347,7 +346,7 @@ def test_run_workflow_creates_failure_many_error(ws, mocker, any_prompt):
         timedelta(seconds=1),
     )
     with pytest.raises(ManyError) as failure:
-        installer.run_workflow("foo")
+        installer.run_workflow("assessment")
 
     assert str(failure.value) == (
         "Detected 3 failures: "
@@ -544,7 +543,7 @@ def test_main_with_existing_conf_does_not_recreate_config(ws, mocker, mock_insta
     )
     workspace_installation.run()
 
-    webbrowser_open.assert_called_with("https://foo/#workspace/Users/me@example.com/.ucx/README.py")
+    webbrowser_open.assert_called_with('https://localhost/#workspace~/mock/README.py')
 
 
 def test_query_metadata(ws):
@@ -552,307 +551,120 @@ def test_query_metadata(ws):
     DashboardFromFiles(ws, InstallState(ws, "any"), local_query_files, "any", "any").validate()
 
 
-def test_create_readme(ws, mocker):
-    webbrowser_open = mocker.patch("webbrowser.open")
+def test_remove_database(ws):
+    sql_backend = MockBackend()
+    wheels = create_autospec(WheelsV2)
+    ws = create_autospec(WorkspaceClient)
+    prompts = MockPrompts({
+        r'Do you want to uninstall ucx.*': 'yes',
+        r'Do you want to delete the inventory database.*': 'yes',
+    })
+    installation = create_autospec(Installation)
+    config = WorkspaceConfig(inventory_database='ucx')
+    timeout = timedelta(seconds=1)
+    workspace_installation = WorkspaceInstallation(config, installation, sql_backend, wheels, ws, prompts, timeout)
 
-    ws.current_user.me = lambda: iam.User(user_name="me@example.com", groups=[iam.ComplexValue(display="admins")])
-    ws.config.host = "https://foo"
-    config_bytes = yaml.dump(WorkspaceConfig(inventory_database="a").as_dict()).encode("utf8")
-    ws.workspace.download = lambda _: io.BytesIO(config_bytes)
+    workspace_installation.uninstall()
 
-    from databricks.labs.ucx.framework.tasks import Task
-
-    tasks = [
-        Task(task_id=0, workflow="wl_1", name="n3", doc="d3", fn=lambda: None),
-        Task(task_id=1, workflow="wl_2", name="n2", doc="d2", fn=lambda: None),
-        Task(task_id=2, workflow="wl_1", name="n1", doc="d1", fn=lambda: None),
-    ]
-
-    with mocker.patch.object(WorkspaceInstaller, attribute="_sorted_tasks", return_value=tasks):
-        install = WorkspaceInstaller(
-            ws,
-            promtps=MockPrompts(
-                {
-                    r".*PRO or SERVERLESS SQL warehouse.*": "1",
-                    r"Open job overview.*": "yes",
-                    r".*": "",
-                }
-            ),
-        )
-        install._deployed_steps = {"wl_1": 1, "wl_2": 2}
-        install._create_readme()
-
-    webbrowser_open.assert_called_with("https://foo/#workspace/Users/me@example.com/.ucx/README.py")
-
-    _, args, kwargs = ws.mock_calls[0]
-    assert args[0] == "/Users/me@example.com/.ucx/README.py"
-
-
-
-
-def test_global_init_script_already_exists_enabled(ws):
-    ginit_scripts = [
-        GlobalInitScriptDetails(
-            created_at=1695045723722,
-            created_by="test@abc.com",
-            enabled=True,
-            name="test123",
-            position=0,
-            script_id="12345",
-            updated_at=1695046359612,
-            updated_by="test@abc.com",
-        )
-    ]
-    ws.global_init_scripts.list.return_value = ginit_scripts
-    ws.global_init_scripts.get.return_value = GlobalInitScriptDetailsWithContent(
-        created_at=1695045723722,
-        created_by="test@abc.com",
-        enabled=True,
-        name="test123",
-        position=0,
-        script="aWYgW1sgJERCX0lTX0RSSVZFUiA9ICJUUlVFIiB"
-        "dXTsgdGhlbgogIGRyaXZlcl9jb25mPSR7REJfSE9NRX0"
-        "vZHJpdmVyL2NvbmYvc3BhcmstYnJhbmNoLmNvbmYKICBpZ"
-        "iBbICEgLWUgJGRyaXZlcl9jb25mIF0gOyB0aGVuCiAgICB0b"
-        "3VjaCAkZHJpdmVyX2NvbmYKICBmaQpjYXQgPDwgRU9GID4+ICAkZ"
-        "HJpdmVyX2NvbmYKICBbZHJpdmVyXSB7CiAgICJzcGFyay5kYXRhYnJpY2tzLm"
-        "RhdGFMaW5lYWdlLmVuYWJsZWQiID0gdHJ1ZQogICB9CkVPRgpmaQ==",
-        script_id="12C100F8BB38B002",
-        updated_at=1695046359612,
-        updated_by="test@abc.com",
-    )
-    install = WorkspaceInstaller(ws)
-    install._install_spark_config_for_hms_lineage()
-
-
-def test_global_init_script_already_exists_disabled(ws):
-    ginit_scripts = [
-        GlobalInitScriptDetails(
-            created_at=1695045723722,
-            created_by="test@abc.com",
-            enabled=False,
-            name="test123",
-            position=0,
-            script_id="12345",
-            updated_at=1695046359612,
-            updated_by="test@abc.com",
-        )
-    ]
-    ws.global_init_scripts.list.return_value = ginit_scripts
-    ws.global_init_scripts.get.return_value = GlobalInitScriptDetailsWithContent(
-        created_at=1695045723722,
-        created_by="test@abc.com",
-        enabled=False,
-        name="test123",
-        position=0,
-        script="aWYgW1sgJERCX0lTX0RSSVZFUiA9ICJUUlVFIiB"
-        "dXTsgdGhlbgogIGRyaXZlcl9jb25mPSR7REJfSE9NRX0"
-        "vZHJpdmVyL2NvbmYvc3BhcmstYnJhbmNoLmNvbmYKICBpZ"
-        "iBbICEgLWUgJGRyaXZlcl9jb25mIF0gOyB0aGVuCiAgICB0b"
-        "3VjaCAkZHJpdmVyX2NvbmYKICBmaQpjYXQgPDwgRU9GID4+ICAkZ"
-        "HJpdmVyX2NvbmYKICBbZHJpdmVyXSB7CiAgICJzcGFyay5kYXRhYnJpY2tzLm"
-        "RhdGFMaW5lYWdlLmVuYWJsZWQiID0gdHJ1ZQogICB9CkVPRgpmaQ==",
-        script_id="12C100F8BB38B002",
-        updated_at=1695046359612,
-        updated_by="test@abc.com",
-    )
-    install = WorkspaceInstaller(
-        ws,
-        promtps=MockPrompts(
-            {
-                r".*PRO or SERVERLESS SQL warehouse.*": "1",
-                r"Open job overview.*": "yes",
-                r".*": "",
-            }
-        ),
-    )
-    install._install_spark_config_for_hms_lineage()
-
-
-def test_global_init_script_exists_disabled_not_enabled(ws):
-    ginit_scripts = [
-        GlobalInitScriptDetails(
-            created_at=1695045723722,
-            created_by="test@abc.com",
-            enabled=False,
-            name="test123",
-            position=0,
-            script_id="12345",
-            updated_at=1695046359612,
-            updated_by="test@abc.com",
-        )
-    ]
-    ws.global_init_scripts.list.return_value = ginit_scripts
-    ws.global_init_scripts.get.return_value = GlobalInitScriptDetailsWithContent(
-        created_at=1695045723722,
-        created_by="test@abc.com",
-        enabled=False,
-        name="test123",
-        position=0,
-        script="aWYgW1sgJERCX0lTX0RSSVZFUiA9ICJUUlVFIiB"
-        "dXTsgdGhlbgogIGRyaXZlcl9jb25mPSR7REJfSE9NRX0"
-        "vZHJpdmVyL2NvbmYvc3BhcmstYnJhbmNoLmNvbmYKICBpZ"
-        "iBbICEgLWUgJGRyaXZlcl9jb25mIF0gOyB0aGVuCiAgICB0b"
-        "3VjaCAkZHJpdmVyX2NvbmYKICBmaQpjYXQgPDwgRU9GID4+ICAkZ"
-        "HJpdmVyX2NvbmYKICBbZHJpdmVyXSB7CiAgICJzcGFyay5kYXRhYnJpY2tzLm"
-        "RhdGFMaW5lYWdlLmVuYWJsZWQiID0gdHJ1ZQogICB9CkVPRgpmaQ==",
-        script_id="12C100F8BB38B002",
-        updated_at=1695046359612,
-        updated_by="test@abc.com",
-    )
-    install = WorkspaceInstaller(
-        ws,
-        promtps=MockPrompts(
-            {
-                r".*PRO or SERVERLESS SQL warehouse.*": "1",
-                r"Open job overview.*": "yes",
-                r".*": "",
-            }
-        ),
-    )
-    install._install_spark_config_for_hms_lineage()
-
-
-@patch("builtins.open", new_callable=MagicMock)
-@patch("builtins.input", new_callable=MagicMock)
-def test_global_init_script_create_new(mock_open, mock_input, ws):
-    expected_content = """if [[ $DB_IS_DRIVER = "TRUE" ]]; then
-      driver_conf=${DB_HOME}/driver/conf/spark-branch.conf
-      if [ ! -e $driver_conf ] ; then
-        touch $driver_conf
-      fi
-    cat << EOF >>  $driver_conf
-      [driver] {
-       "spark.databricks.dataLineage.enabled" = true
-       }
-    EOF
-    fi
-        """
-    mock_file = MagicMock()
-    mock_file.read.return_value = expected_content
-    mock_open.return_value = mock_file
-    mock_input.return_value = "yes"
-
-    install = WorkspaceInstaller(
-        ws,
-        promtps=MockPrompts(
-            {
-                r".*PRO or SERVERLESS SQL warehouse.*": "1",
-                r"Open job overview.*": "yes",
-                r".*": "",
-            }
-        ),
-    )
-    install._install_spark_config_for_hms_lineage()
-
-
-def test_remove_database(ws, mocker):
-    install = WorkspaceInstaller(
-        ws,
-        sql_backend=MockBackend(),
-        promtps=MockPrompts(
-            {
-                r".*PRO or SERVERLESS SQL warehouse.*": "1",
-                r".*": "",
-            }
-        ),
-    )
-    mocker.patch("databricks.labs.ucx.framework.crawlers.SqlBackend.execute", return_value=None)
-
-    config_bytes = yaml.dump(WorkspaceConfig(inventory_database="testdb", warehouse_id="123").as_dict()).encode("utf8")
-    ws.workspace.download = lambda _: io.BytesIO(config_bytes)
-    install._remove_database()
+    assert sql_backend.queries == ['DROP SCHEMA IF EXISTS hive_metastore.ucx CASCADE']
 
 
 def test_remove_jobs_no_state(ws):
-    install = WorkspaceInstaller(ws)
-    install._state.jobs = {}
-    install._remove_jobs()
+    sql_backend = MockBackend()
+    wheels = create_autospec(WheelsV2)
+    ws = create_autospec(WorkspaceClient)
+    prompts = MockPrompts({
+        r'Do you want to uninstall ucx.*': 'yes',
+        'Do you want to delete the inventory database ucx too?': 'no',
+    })
+    installation = create_autospec(Installation)
+    config = WorkspaceConfig(inventory_database='ucx')
+    timeout = timedelta(seconds=1)
+    workspace_installation = WorkspaceInstallation(config, installation, sql_backend, wheels, ws, prompts, timeout)
+
+    workspace_installation.uninstall()
+
+    ws.jobs.delete.assert_not_called()
 
 
-def test_remove_jobs_with_state_missing_job(ws):
-    install = WorkspaceInstaller(ws)
-    install._state.jobs = {"job1": "123"}
+def test_remove_jobs_with_state_missing_job(ws, caplog, mock_installation_with_jobs):
     ws.jobs.delete.side_effect = InvalidParameterValue("job id 123 not found")
-    install._remove_jobs()
 
+    sql_backend = MockBackend()
+    wheels = create_autospec(WheelsV2)
+    prompts = MockPrompts({
+        r'Do you want to uninstall ucx.*': 'yes',
+        'Do you want to delete the inventory database ucx too?': 'no',
+    })
+    config = WorkspaceConfig(inventory_database='ucx')
+    timeout = timedelta(seconds=1)
+    workspace_installation = WorkspaceInstallation(config, mock_installation_with_jobs, sql_backend, wheels, ws, prompts, timeout)
 
-def test_remove_jobs_job(ws):
-    install = WorkspaceInstaller(ws)
-    install._state.jobs = {"job1": "123"}
-    install._remove_jobs()
+    with caplog.at_level('ERROR'):
+        workspace_installation.uninstall()
+        assert 'Already deleted: foo job_id=123.' in caplog.messages
+
+    mock_installation_with_jobs.assert_removed()
 
 
 def test_remove_warehouse(ws):
-    install = WorkspaceInstaller(ws)
-    config_bytes = yaml.dump(WorkspaceConfig(inventory_database="testdb", warehouse_id="123").as_dict()).encode("utf8")
-    ws.workspace.download = lambda _: io.BytesIO(config_bytes)
     ws.warehouses.get.return_value = sql.GetWarehouseResponse(id="123", name="Unity Catalog Migration 123456")
-    ws.warehouses.delete.return_value = None
-    install._remove_warehouse()
+
+    sql_backend = MockBackend()
+    wheels = create_autospec(WheelsV2)
+    prompts = MockPrompts({
+        r'Do you want to uninstall ucx.*': 'yes',
+        'Do you want to delete the inventory database ucx too?': 'no',
+    })
+    installation = create_autospec(Installation)
+    config = WorkspaceConfig(inventory_database='ucx', warehouse_id="123")
+    timeout = timedelta(seconds=1)
+    workspace_installation = WorkspaceInstallation(config, installation, sql_backend, wheels, ws, prompts, timeout)
+
+    workspace_installation.uninstall()
+
+    ws.warehouses.delete.assert_called_once()
 
 
-def test_remove_warehouse_not_exists(ws):
-    install = WorkspaceInstaller(ws)
-    config_bytes = yaml.dump(WorkspaceConfig(inventory_database="testdb", warehouse_id="123").as_dict()).encode("utf8")
-    ws.workspace.download = lambda _: io.BytesIO(config_bytes)
+def test_not_remove_warehouse_with_a_different_prefix(ws):
+    ws.warehouses.get.return_value = sql.GetWarehouseResponse(id="123", name="Starter Endpoint")
 
-    ws.warehouses.get.return_value = sql.GetWarehouseResponse(id="123", name="Unity Catalog Migration 123456")
+    sql_backend = MockBackend()
+    wheels = create_autospec(WheelsV2)
+    prompts = MockPrompts({
+        r'Do you want to uninstall ucx.*': 'yes',
+        'Do you want to delete the inventory database ucx too?': 'no',
+    })
+    installation = create_autospec(Installation)
+    config = WorkspaceConfig(inventory_database='ucx', warehouse_id="123")
+    timeout = timedelta(seconds=1)
+    workspace_installation = WorkspaceInstallation(config, installation, sql_backend, wheels, ws, prompts, timeout)
+
+    workspace_installation.uninstall()
+
+    ws.warehouses.delete.assert_not_called()
+
+
+def test_remove_warehouse_not_exists(ws, caplog):
     ws.warehouses.delete.side_effect = InvalidParameterValue("warehouse id 123 not found")
-    install._remove_warehouse()
+
+    sql_backend = MockBackend()
+    wheels = create_autospec(WheelsV2)
+    prompts = MockPrompts({
+        r'Do you want to uninstall ucx.*': 'yes',
+        'Do you want to delete the inventory database ucx too?': 'no',
+    })
+    installation = create_autospec(Installation)
+    config = WorkspaceConfig(inventory_database='ucx')
+    timeout = timedelta(seconds=1)
+    workspace_installation = WorkspaceInstallation(config, installation, sql_backend, wheels, ws, prompts, timeout)
+
+    with caplog.at_level('ERROR'):
+        workspace_installation.uninstall()
+        assert 'Error accessing warehouse details' in caplog.messages
 
 
-def test_remove_install_folder(ws):
-    install = WorkspaceInstaller(ws)
-    ws.workspace.delete.return_value = None
-    install._remove_install_folder()
-
-
-def test_remove_install_folder_not_exists(ws):
-    install = WorkspaceInstaller(ws)
-    ws.workspace.delete.side_effect = InvalidParameterValue("folder not found")
-    install._remove_install_folder()
-
-
-def test_uninstall(ws, mocker):
-    install = WorkspaceInstaller(
-        ws,
-        sql_backend=MockBackend(),
-        promtps=MockPrompts(
-            {
-                r".*PRO or SERVERLESS SQL warehouse.*": "1",
-                r".*": "",
-            }
-        ),
-    )
-    mocker.patch("databricks.labs.ucx.framework.crawlers.SqlBackend.execute", return_value=None)
-    config_bytes = yaml.dump(WorkspaceConfig(inventory_database="testdb", warehouse_id="123").as_dict()).encode("utf8")
-    ws.workspace.download = lambda _: io.BytesIO(config_bytes)
-    install._state.jobs = {"job1": "123"}
-    ws.warehouses.get.return_value = sql.GetWarehouseResponse(id="123", name="Customer Warehouse 123456")
-    ws.workspace.delete.return_value = None
-    install.uninstall()
-
-
-def test_uninstall_no_config_file(ws, mocker):
-    install = WorkspaceInstaller(
-        ws,
-        sql_backend=MockBackend(),
-        promtps=MockPrompts(
-            {
-                r".*PRO or SERVERLESS SQL warehouse.*": "1",
-                r".*": "",
-            }
-        ),
-    )
-    mocker.patch("databricks.labs.ucx.framework.crawlers.SqlBackend.execute", return_value=None)
-    config_bytes = yaml.dump(WorkspaceConfig(inventory_database="testdb", warehouse_id="123").as_dict()).encode("utf8")
-    ws.workspace.download = lambda _: io.BytesIO(config_bytes)
-    ws.workspace.get_status.side_effect = NotFound(...)
-    install.uninstall()
-
-
-def test_repair_run(ws, mocker):
+def test_repair_run(ws, mocker, any_prompt, mock_installation_with_jobs):
     base = [
         BaseRun(
             job_clusters=None,
@@ -864,15 +676,20 @@ def test_repair_run(ws, mocker):
             state=RunState(result_state=RunResultState.FAILED),
         )
     ]
-    install = WorkspaceInstaller(ws, promtps=MockPrompts({".*": ""}))
     mocker.patch("webbrowser.open")
-    install._state.jobs = {"assessment": "123"}
     ws.jobs.list_runs.return_value = base
     ws.jobs.list_runs.repair_run = None
-    install.repair_run("assessment")
+
+    sql_backend = MockBackend()
+    wheels = create_autospec(WheelsV2)
+    config = WorkspaceConfig(inventory_database='ucx')
+    timeout = timedelta(seconds=1)
+    workspace_installation = WorkspaceInstallation(config, mock_installation_with_jobs, sql_backend, wheels, ws, any_prompt, timeout)
+
+    workspace_installation.repair_run("assessment")
 
 
-def test_repair_run_success(ws, caplog):
+def test_repair_run_success(ws, caplog, mock_installation_with_jobs, any_prompt):
     base = [
         BaseRun(
             job_clusters=None,
@@ -884,15 +701,22 @@ def test_repair_run_success(ws, caplog):
             state=RunState(result_state=RunResultState.SUCCESS),
         )
     ]
-    install = WorkspaceInstaller(ws)
-    install._state.jobs = {"assessment": "123"}
     ws.jobs.list_runs.return_value = base
     ws.jobs.list_runs.repair_run = None
-    install.repair_run("assessment")
+
+    sql_backend = MockBackend()
+    wheels = create_autospec(WheelsV2)
+    config = WorkspaceConfig(inventory_database='ucx')
+    timeout = timedelta(seconds=1)
+    workspace_installation = WorkspaceInstallation(config, mock_installation_with_jobs, sql_backend, wheels, ws,
+                                                   any_prompt, timeout)
+
+    workspace_installation.repair_run("assessment")
+
     assert "job is not in FAILED state" in caplog.text
 
 
-def test_repair_run_no_job_id(ws):
+def test_repair_run_no_job_id(ws, mock_installation, any_prompt, caplog):
     base = [
         BaseRun(
             job_clusters=None,
@@ -904,29 +728,53 @@ def test_repair_run_no_job_id(ws):
             state=RunState(result_state=RunResultState.SUCCESS),
         )
     ]
-    install = WorkspaceInstaller(ws)
-    install._state.jobs = {"assessment": ""}
     ws.jobs.list_runs.return_value = base
     ws.jobs.list_runs.repair_run = None
-    install.repair_run("workflow")
+
+    sql_backend = MockBackend()
+    wheels = create_autospec(WheelsV2)
+    config = WorkspaceConfig(inventory_database='ucx')
+    timeout = timedelta(seconds=1)
+    workspace_installation = WorkspaceInstallation(config, mock_installation, sql_backend, wheels, ws,
+                                                   any_prompt, timeout)
+
+    with caplog.at_level('WARNING'):
+        workspace_installation.repair_run("assessment")
+        assert 'skipping assessment: job does not exists hence skipping repair' in caplog.messages
 
 
-def test_repair_run_no_job_run(ws):
-    install = WorkspaceInstaller(ws)
-    install._state.jobs = {"assessment": "677268692725050"}
+def test_repair_run_no_job_run(ws, mock_installation_with_jobs, any_prompt, caplog):
     ws.jobs.list_runs.return_value = ""
     ws.jobs.list_runs.repair_run = None
-    install.repair_run("assessment")
+
+    sql_backend = MockBackend()
+    wheels = create_autospec(WheelsV2)
+    config = WorkspaceConfig(inventory_database='ucx')
+    timeout = timedelta(seconds=1)
+    workspace_installation = WorkspaceInstallation(config, mock_installation_with_jobs, sql_backend, wheels, ws,
+                                                   any_prompt, timeout)
+
+    with caplog.at_level('WARNING'):
+        workspace_installation.repair_run("assessment")
+        assert "skipping assessment: job is not initialized yet. Can't trigger repair run now" in caplog.messages
 
 
-def test_repair_run_exception(ws):
-    install = WorkspaceInstaller(ws)
-    install._state.jobs = {"assessment": "123"}
+def test_repair_run_exception(ws, mock_installation_with_jobs, any_prompt, caplog):
     ws.jobs.list_runs.side_effect = InvalidParameterValue("Workflow does not exists")
-    install.repair_run("assessment")
+
+    sql_backend = MockBackend()
+    wheels = create_autospec(WheelsV2)
+    config = WorkspaceConfig(inventory_database='ucx')
+    timeout = timedelta(seconds=1)
+    workspace_installation = WorkspaceInstallation(config, mock_installation_with_jobs, sql_backend, wheels, ws,
+                                                   any_prompt, timeout)
+
+    with caplog.at_level('WARNING'):
+        workspace_installation.repair_run("assessment")
+        assert "skipping assessment: Workflow does not exists" in caplog.messages
 
 
-def test_repair_run_result_state(ws, caplog):
+def test_repair_run_result_state(ws, caplog, mock_installation_with_jobs, any_prompt):
     base = [
         BaseRun(
             job_clusters=None,
@@ -938,11 +786,17 @@ def test_repair_run_result_state(ws, caplog):
             state=RunState(result_state=None),
         )
     ]
-    install = WorkspaceInstaller(ws, verify_timeout=timedelta(seconds=1))
-    install._state.jobs = {"assessment": "123"}
     ws.jobs.list_runs.return_value = base
     ws.jobs.list_runs.repair_run = None
-    install.repair_run("assessment")
+
+    sql_backend = MockBackend()
+    wheels = create_autospec(WheelsV2)
+    config = WorkspaceConfig(inventory_database='ucx')
+    timeout = timedelta(seconds=1)
+    workspace_installation = WorkspaceInstallation(config, mock_installation_with_jobs, sql_backend, wheels, ws,
+                                                   any_prompt, timeout)
+
+    workspace_installation.repair_run("assessment")
     assert "Please try after sometime" in caplog.text
 
 
