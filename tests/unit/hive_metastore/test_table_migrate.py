@@ -81,7 +81,7 @@ def test_migrate_dbfs_root_tables_should_be_skipped_when_upgrading_external():
         ),
     ]
     table_migrate = TablesMigrate(table_crawler, client, backend, table_mapping)
-    table_migrate.migrate_tables(what=What.EXTERNAL)
+    table_migrate.migrate_tables(what=What.EXTERNAL_SYNC)
 
     assert len(backend.queries) == 0
 

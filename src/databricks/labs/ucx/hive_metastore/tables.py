@@ -16,7 +16,8 @@ logger = logging.getLogger(__name__)
 
 
 class What(Enum):
-    EXTERNAL = auto()
+    EXTERNAL_SYNC = auto()
+    EXTERNAL_NO_SYNC = auto()
     DBFS_ROOT_DELTA = auto()
     DBFS_ROOT_NON_DELTA = auto()
     VIEW = auto()
@@ -115,7 +116,9 @@ class Table:
         if self.is_dbfs_root:
             return What.DBFS_ROOT_NON_DELTA
         if self.kind == "TABLE" and self.is_format_supported_for_sync:
-            return What.EXTERNAL
+            return What.EXTERNAL_SYNC
+        if self.kind == "TABLE":
+            return What.EXTERNAL_NO_SYNC
         if self.kind == "VIEW":
             return What.VIEW
         return What.UNKNOWN

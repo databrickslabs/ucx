@@ -146,8 +146,16 @@ def test_tables_returning_error_when_describing():
             What.DBFS_ROOT_NON_DELTA,
         ),
         (Table("a", "b", "c", "MANAGED", "DELTA", location="/dbfs/somelocation/tablename"), True, What.DBFS_ROOT_DELTA),
-        (Table("a", "b", "c", "MANAGED", "DELTA", location="dbfs:/mnt/somelocation/tablename"), False, What.EXTERNAL),
-        (Table("a", "b", "c", "MANAGED", "DELTA", location="/dbfs/mnt/somelocation/tablename"), False, What.EXTERNAL),
+        (
+            Table("a", "b", "c", "MANAGED", "DELTA", location="dbfs:/mnt/somelocation/tablename"),
+            False,
+            What.EXTERNAL_SYNC,
+        ),
+        (
+            Table("a", "b", "c", "MANAGED", "DELTA", location="/dbfs/mnt/somelocation/tablename"),
+            False,
+            What.EXTERNAL_SYNC,
+        ),
         (
             Table("a", "b", "c", "MANAGED", "DELTA", location="dbfs:/databricks-datasets/somelocation/tablename"),
             False,
@@ -158,8 +166,8 @@ def test_tables_returning_error_when_describing():
             False,
             What.DB_DATASET,
         ),
-        (Table("a", "b", "c", "MANAGED", "DELTA", location="s3:/somelocation/tablename"), False, What.EXTERNAL),
-        (Table("a", "b", "c", "MANAGED", "DELTA", location="adls:/somelocation/tablename"), False, What.EXTERNAL),
+        (Table("a", "b", "c", "MANAGED", "DELTA", location="s3:/somelocation/tablename"), False, What.EXTERNAL_SYNC),
+        (Table("a", "b", "c", "MANAGED", "DELTA", location="adls:/somelocation/tablename"), False, What.EXTERNAL_SYNC),
     ],
 )
 def test_is_dbfs_root(table, dbfs_root, what):
@@ -203,8 +211,11 @@ def test_is_supported_for_sync(table, supported):
 @pytest.mark.parametrize(
     'table,what',
     [
-        (Table("a", "b", "c", "EXTERNAL", "DELTA", location="s3://external_location/table"), What.EXTERNAL),
-        (Table("a", "b", "c", "EXTERNAL", "UNSUPPORTED_FORMAT", location="s3://external_location/table"), What.UNKNOWN),
+        (Table("a", "b", "c", "EXTERNAL", "DELTA", location="s3://external_location/table"), What.EXTERNAL_SYNC),
+        (
+            Table("a", "b", "c", "EXTERNAL", "UNSUPPORTED_FORMAT", location="s3://external_location/table"),
+            What.EXTERNAL_NO_SYNC,
+        ),
         (Table("a", "b", "c", "MANAGED", "DELTA", location="dbfs:/somelocation/tablename"), What.DBFS_ROOT_DELTA),
         (Table("a", "b", "c", "MANAGED", "PARQUET", location="dbfs:/somelocation/tablename"), What.DBFS_ROOT_NON_DELTA),
         (Table("a", "b", "c", "VIEW", "VIEW", view_text="select * from some_table"), What.VIEW),

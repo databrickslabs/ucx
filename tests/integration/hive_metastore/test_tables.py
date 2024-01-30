@@ -45,7 +45,7 @@ def test_describe_all_tables_in_databases(ws, sql_backend, inventory_schema, mak
     assert all_tables[tmp_table.full_name].object_type == "MANAGED"
     assert all_tables[tmp_table.full_name].what == What.DBFS_ROOT_DELTA
     assert all_tables[external_table.full_name].object_type == "EXTERNAL"
-    assert all_tables[external_table.full_name].what == What.UNKNOWN
+    assert all_tables[external_table.full_name].what == What.EXTERNAL_NO_SYNC
     assert all_tables[view.full_name].object_type == "VIEW"
     assert all_tables[view.full_name].view_text == "SELECT 2+2 AS four"
     assert all_tables[view.full_name].what == What.VIEW

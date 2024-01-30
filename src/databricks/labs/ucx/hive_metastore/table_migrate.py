@@ -50,7 +50,7 @@ class TablesMigrate:
             return True
         if src_table.what == What.DBFS_ROOT_DELTA:
             return self._migrate_dbfs_root_table(src_table, rule)
-        if src_table.what == What.EXTERNAL:
+        if src_table.what == What.EXTERNAL_SYNC:
             return self._migrate_external_table(src_table, rule)
         if src_table.what == What.VIEW:
             return self._migrate_view(src_table, rule)
