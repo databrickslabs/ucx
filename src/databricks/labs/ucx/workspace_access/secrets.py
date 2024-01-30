@@ -102,10 +102,7 @@ class SecretScopesSupport(AclSupport):
     def verify(self, item: Permissions) -> bool:
         acls = [workspace.AclItem.from_dict(acl) for acl in json.loads(item.raw)]
         for acl in acls:
-            if not self._verify(
-                scope_name=item.object_id, group_name=acl.principal, expected_permission=acl.permission
-            ):
-                return False
+            self._verify(scope_name=item.object_id, group_name=acl.principal, expected_permission=acl.permission)
         return True
 
     @rate_limited(max_requests=1100, burst_period_seconds=60)
