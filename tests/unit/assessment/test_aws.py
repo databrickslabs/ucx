@@ -374,7 +374,7 @@ def test_empty_mapping(caplog):
     installation = MockInstallation()
     aws_resource_permissions = AWSResourcePermissions(installation, ws, aws)
     aws_resource_permissions.save_instance_profile_permissions()
-    assert "No Mapping" in caplog.messages[0]
+    assert 'No Mapping Was Generated.' in caplog.messages
 
 
 def test_command(caplog):

@@ -8,10 +8,8 @@ from databricks.sdk import AccountClient, WorkspaceClient
 from databricks.sdk.config import Config
 from databricks.sdk.service.iam import User
 from databricks.sdk.service.provisioning import Workspace
-from databricks.sdk.service.workspace import ImportFormat
 
 from databricks.labs.ucx.account import AccountWorkspaces, WorkspaceInfo
-from databricks.labs.ucx.config import AccountConfig, ConnectConfig
 
 
 def test_sync_workspace_info(mocker):

@@ -157,23 +157,26 @@ def test_save_external_location_mapping_missing_location():
     installation = create_autospec(Installation)
     location_crawler.save_as_terraform_definitions_on_workspace(installation)
 
-    installation.upload.assert_called_with("external_locations.tf", (
-        'resource "databricks_external_location" "test_location_test1" { \n'
-        '    name = "test_location_test1"\n'
-        '    url  = "s3://test_location/test1"\n'
-        "    credential_name = databricks_storage_credential.<storage_credential_reference>.id\n"
-        "}\n\n"
-        'resource "databricks_external_location" "test_location2_test2" { \n'
-        '    name = "test_location2_test2"\n'
-        '    url  = "gcs://test_location2/test2"\n'
-        "    credential_name = databricks_storage_credential.<storage_credential_reference>.id\n"
-        "}\n\n"
-        'resource "databricks_external_location" "cont1_storagetest1_test2" { \n'
-        '    name = "cont1_storagetest1_test2"\n'
-        '    url  = "abfss://cont1@storagetest1.dfs.core.windows.net/test2"\n'
-        "    credential_name = databricks_storage_credential.<storage_credential_reference>.id\n"
-        "}\n"
-    ).encode("utf8"))
+    installation.upload.assert_called_with(
+        "external_locations.tf",
+        (
+            'resource "databricks_external_location" "test_location_test1" { \n'
+            '    name = "test_location_test1"\n'
+            '    url  = "s3://test_location/test1"\n'
+            "    credential_name = databricks_storage_credential.<storage_credential_reference>.id\n"
+            "}\n\n"
+            'resource "databricks_external_location" "test_location2_test2" { \n'
+            '    name = "test_location2_test2"\n'
+            '    url  = "gcs://test_location2/test2"\n'
+            "    credential_name = databricks_storage_credential.<storage_credential_reference>.id\n"
+            "}\n\n"
+            'resource "databricks_external_location" "cont1_storagetest1_test2" { \n'
+            '    name = "cont1_storagetest1_test2"\n'
+            '    url  = "abfss://cont1@storagetest1.dfs.core.windows.net/test2"\n'
+            "    credential_name = databricks_storage_credential.<storage_credential_reference>.id\n"
+            "}\n"
+        ).encode("utf8"),
+    )
 
 
 def test_save_external_location_mapping_no_missing_location():

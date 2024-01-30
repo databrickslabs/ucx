@@ -1,25 +1,21 @@
 import os.path
 
-from databricks.labs.ucx.config import ConnectConfig, WorkspaceConfig
+from databricks.sdk.config import Config
+
+from databricks.labs.ucx.config import WorkspaceConfig
 from databricks.labs.ucx.framework.tasks import _TASKS, Task
 from databricks.labs.ucx.runtime import assess_azure_service_principals
 
 
 def azure_mock_config(mocker) -> WorkspaceConfig:
     config = WorkspaceConfig(
-        connect=ConnectConfig(
+        connect=Config(
             host="adb-9999999999999999.14.azuredatabricks.net",
             token="dapifaketoken",
         ),
         inventory_database="ucx",
     )
     return config
-
-
-def test_azure_mock(mocker):
-    cfg = azure_mock_config(mocker)
-    assert cfg is not None
-    assert cfg.connect.to_databricks_config() is not None
 
 
 def test_azure_crawler(mocker):

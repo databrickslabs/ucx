@@ -1,7 +1,7 @@
 import io
 import json
 import subprocess
-from unittest.mock import MagicMock, create_autospec, patch
+from unittest.mock import create_autospec, patch
 
 import pytest
 import yaml

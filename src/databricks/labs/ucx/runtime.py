@@ -169,7 +169,7 @@ def assess_azure_service_principals(cfg: WorkspaceConfig):
 
     Subsequently, the list of all the Azure Service Principals referred in those configurations are saved
     in the `$inventory.azure_service_principals` table."""
-    ws = WorkspaceClient(config=cfg.to_databricks_config())
+    ws = WorkspaceClient(config=cfg.connect)  # TODO: fix it more holistically, like loading config file in tasks.py
     if ws.config.is_azure:
         sql_backend = RuntimeBackend(debug_truncate_bytes=_must_truncate_bytes(cfg))
         crawler = AzureServicePrincipalCrawler(ws, sql_backend, cfg.inventory_database)
