@@ -2,6 +2,7 @@ import io
 import json
 from unittest.mock import create_autospec, patch
 
+from databricks.labs.blueprint.installation import Installation
 from databricks.labs.blueprint.tui import MockPrompts
 from databricks.sdk import WorkspaceClient
 from databricks.sdk.service.iam import User
@@ -66,22 +67,15 @@ def test_current_workspace_name(mocker):
         response = mocker.Mock()
         response.headers = {"x-databricks-org-id": "123"}
         requests_get.return_value = response
-
-        wir = WorkspaceInfo(ws, "/foo")
+        installation = Installation(ws, 'ucx')
+        wir = WorkspaceInfo(installation, ws)
         assert "some" == wir.current()
 
 
 def test_manual_workspace_info(mocker):
     ws = mocker.patch("databricks.sdk.WorkspaceClient.__init__")
     ws.config.host = "localhost"
-
-    im = create_autospec(InstallationManager)
-    im.user_installations.return_value = [
-        InstallationUCX(
-            config=WorkspaceConfig(inventory_database="ucx"), username=User(display_name="foo"), path="/Users/foo"
-        )
-    ]
-
+    ws.users.list.return_value = [User(user_name="foo")]
     ws.config.host = "localhost"
     ws.config.user_agent = "ucx"
     ws.config.authenticate.return_value = {"Foo": "bar"}
@@ -90,8 +84,8 @@ def test_manual_workspace_info(mocker):
         response = mocker.Mock()
         response.headers = {"x-databricks-org-id": "123"}
         requests_get.return_value = response
-
-        wir = WorkspaceInfo(ws, "/foo", lambda _: im)
+        installation = Installation(ws, 'ucx')
+        wir = WorkspaceInfo(installation, ws)
         prompts = MockPrompts({r"Workspace name for 123": "some-name", r"Next workspace id": "stop"})
 
         wir.manual_workspace_info(prompts)

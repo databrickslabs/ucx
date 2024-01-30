@@ -12,7 +12,7 @@ from databricks.sdk import AccountClient, WorkspaceClient
 from databricks.labs.ucx.account import AccountWorkspaces, WorkspaceInfo
 from databricks.labs.ucx.assessment.aws import AWSResourcePermissions
 from databricks.labs.ucx.assessment.azure import AzureResourcePermissions
-from databricks.labs.ucx.config import AccountConfig, ConnectConfig
+from databricks.labs.ucx.config import AccountConfig, ConnectConfig, WorkspaceConfig
 from databricks.labs.ucx.framework.crawlers import StatementExecutionBackend
 from databricks.labs.ucx.hive_metastore import ExternalLocations, TablesCrawler
 from databricks.labs.ucx.hive_metastore.mapping import TableMapping
@@ -91,10 +91,10 @@ def create_table_mapping(w: WorkspaceClient):
     """create initial table mapping for review"""
     table_mapping = TableMapping.current(w)
     workspace_info = WorkspaceInfo(w)
-    installation_manager = InstallationManager(w)
-    installation = installation_manager.for_user(w.current_user.me())
-    sql_backend = StatementExecutionBackend(w, installation.config.warehouse_id)
-    tables_crawler = TablesCrawler(sql_backend, installation.config.inventory_database)
+    installation = Installation.current(w, 'ucx')
+    config = installation.load(WorkspaceConfig)
+    sql_backend = StatementExecutionBackend(w, config.warehouse_id)
+    tables_crawler = TablesCrawler(sql_backend, config.inventory_database)
     path = table_mapping.save(tables_crawler, workspace_info)
     webbrowser.open(f"{w.config.host}/#workspace{path}")
 
@@ -132,29 +132,19 @@ def repair_run(w: WorkspaceClient, step):
 @ucx.command
 def validate_groups_membership(w: WorkspaceClient):
     """Validate the groups to see if the groups at account level and workspace level has different membership"""
-    installation_manager = InstallationManager(w)
-    installation = installation_manager.for_user(w.current_user.me())
-    if not installation:
-        logger.error(CANT_FIND_UCX_MSG)
-        return
-    warehouse_id = installation.config.warehouse_id
-    inventory_database = installation.config.inventory_database
-    renamed_group_prefix = installation.config.renamed_group_prefix
-    workspace_group_regex = installation.config.workspace_group_regex
-    workspace_group_replace = installation.config.workspace_group_replace
-    account_group_regex = installation.config.account_group_regex
-    include_group_names = installation.config.include_group_names
-    sql_backend = StatementExecutionBackend(w, warehouse_id)
+    installation = Installation.current(w, 'ucx')
+    config = installation.load(WorkspaceConfig)
+    sql_backend = StatementExecutionBackend(w, config.warehouse_id)
     logger.info("Validating Groups which are having different memberships between account and workspace")
     group_manager = GroupManager(
         sql_backend=sql_backend,
         ws=w,
-        inventory_database=inventory_database,
-        include_group_names=include_group_names,
-        renamed_group_prefix=renamed_group_prefix,
-        workspace_group_regex=workspace_group_regex,
-        workspace_group_replace=workspace_group_replace,
-        account_group_regex=account_group_regex,
+        inventory_database=config.inventory_database,
+        include_group_names=config.include_group_names,
+        renamed_group_prefix=config.renamed_group_prefix,
+        workspace_group_regex=config.workspace_group_regex,
+        workspace_group_replace=config.workspace_group_replace,
+        account_group_regex=config.account_group_regex,
     )
     mismatch_groups = group_manager.validate_group_membership()
     print(json.dumps(mismatch_groups))
@@ -190,7 +180,6 @@ def move(
     """move a uc table/tables from one schema to another schema in same or different catalog"""
     logger.info("Running move command")
     prompts = Prompts()
-    tables = TableMove.for_cli(w)
     if from_catalog == "" or to_catalog == "":
         logger.error("Please enter from_catalog and to_catalog details")
         return
@@ -200,6 +189,7 @@ def move(
     if from_catalog == to_catalog and from_schema == to_schema:
         logger.error("please select a different schema or catalog to migrate to")
         return
+    tables = TableMove.for_cli(w)
     del_table = prompts.confirm(f"should we delete tables/view after moving to new schema {to_catalog}.{to_schema}")
     logger.info(f"migrating tables {from_table} from {from_catalog}.{from_schema} to {to_catalog}.{to_schema}")
     tables.move_tables(from_catalog, from_schema, from_table, to_catalog, to_schema, del_table)
@@ -215,7 +205,6 @@ def alias(
     to_schema: str,
 ):
     """move a uc table/tables from one schema to another schema in same or different catalog"""
-    tables = TableMove.for_cli(w)
     if from_catalog == "" or to_catalog == "":
         logger.error("Please enter from_catalog and to_catalog details")
         return
@@ -225,6 +214,7 @@ def alias(
     if from_catalog == to_catalog and from_schema == to_schema:
         logger.error("please select a different schema or catalog to migrate to")
         return
+    tables = TableMove.for_cli(w)
     logger.info(f"aliasing table {from_table} from {from_catalog}.{from_schema} to {to_catalog}.{to_schema}")
     tables.alias_tables(from_catalog, from_schema, from_table, to_catalog, to_schema)
 

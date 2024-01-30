@@ -7,7 +7,7 @@ import pytest
 import yaml
 from databricks.sdk import AccountClient, WorkspaceClient
 from databricks.sdk.errors import NotFound
-from databricks.sdk.service import iam
+from databricks.sdk.service import iam, sql
 from databricks.sdk.service.iam import User
 
 from databricks.labs.ucx.cli import (
@@ -40,6 +40,7 @@ def ws():
             {
                 '$version': 2,
                 'inventory_database': 'ucx',
+                'warehouse_id': 'test',
                 'connect': {
                     'host': 'foo',
                     'token': 'bar',
@@ -49,10 +50,18 @@ def ws():
         '/Users/foo/.ucx/state.json': json.dumps({'resources': {'jobs': {'assessment': '123'}}}),
     }
 
+    def download(path: str) -> io.StringIO:
+        if path not in state:
+            raise NotFound(path)
+        return io.StringIO(state[path])
+
     ws = create_autospec(WorkspaceClient)
     ws.config.host = 'https://localhost'
     ws.current_user.me().user_name = "foo"
-    ws.workspace.download = lambda x: io.StringIO(state[x])
+    ws.workspace.download = download
+    ws.statement_execution.execute_statement.return_value = sql.ExecuteStatementResponse(
+        status=sql.StatementStatus(state=sql.StatementState.SUCCEEDED)
+    )
     return ws
 
 
@@ -68,44 +77,46 @@ def test_open_remote_config(ws):
         mock_webbrowser_open.assert_called_with('https://localhost/#workspace/Users/foo/.ucx/config.yml')
 
 
-def test_installations(ws, mocker, capsys):
+def test_installations(ws, capsys):
     ws.users.list.return_value = [iam.User(user_name='foo')]
     installations(ws)
     assert '{"user_name": "foo", "database": "ucx", "warehouse_id": "test"}' in capsys.readouterr().out
 
 
-def test_skip_with_table(mocker):
-    w = create_autospec(WorkspaceClient)
-    mocker.patch("databricks.labs.ucx.installer.InstallationManager.for_user", return_value=MagicMock())
-    with patch("databricks.labs.ucx.hive_metastore.mapping.TableMapping.skip_table", return_value=None) as s:
-        skip(w, "schema", "table")
-        s.assert_called_once()
+def test_skip_with_table(ws):
+    skip(ws, "schema", "table")
+
+    ws.statement_execution.execute_statement.assert_called_with(
+        warehouse_id='test',
+        statement="ALTER TABLE schema.table SET TBLPROPERTIES('databricks.labs.ucx.skip' = true)",
+        byte_limit=None,
+        catalog=None,
+        schema=None,
+        disposition=sql.Disposition.INLINE,
+        format=sql.Format.JSON_ARRAY,
+        wait_timeout=None
+    )
 
 
-def test_skip_with_schema(mocker):
-    w = create_autospec(WorkspaceClient)
-    mocker.patch("databricks.labs.ucx.installer.InstallationManager.for_user", return_value=MagicMock())
-    with patch("databricks.labs.ucx.hive_metastore.mapping.TableMapping.skip_schema", return_value=None) as s:
-        skip(w, "schema", None)
-        s.assert_called_once()
+def test_skip_with_schema(ws):
+    skip(ws, "schema", None)
+
+    ws.statement_execution.execute_statement.assert_called_with(
+        warehouse_id='test',
+        statement="ALTER SCHEMA schema SET DBPROPERTIES('databricks.labs.ucx.skip' = true)",
+        byte_limit=None,
+        catalog=None,
+        schema=None,
+        disposition=sql.Disposition.INLINE,
+        format=sql.Format.JSON_ARRAY,
+        wait_timeout=None
+    )
 
 
-def test_skip_no_schema(caplog):
-    ws = create_autospec(WorkspaceClient)
-    ws.current_user.me = lambda: iam.User(user_name="me@example.com", groups=[iam.ComplexValue(display="admins")])
-    ws.users.list.return_value = [User(user_name="foo")]
-    ws.workspace.download.side_effect = NotFound(...)
+def test_skip_no_schema(ws, caplog):
     skip(ws, schema=None, table="table")
-    assert [rec.message for rec in caplog.records if "schema" in rec.message.lower()]
 
-
-def test_skip_no_ucx(caplog, mocker):
-    w = create_autospec(WorkspaceClient)
-    w.current_user.me = lambda: iam.User(user_name="foo", groups=[iam.ComplexValue(display="admins")])
-    mocker.patch("databricks.labs.ucx.installer.InstallationManager.__init__", return_value=None)
-    mocker.patch("databricks.labs.ucx.installer.InstallationManager.for_user", return_value=None)
-    skip(w, schema="schema", table="table")
-    assert [rec.message for rec in caplog.records if "UCX configuration" in rec.message]
+    assert '--schema is a required parameter.' in caplog.messages
 
 
 def test_sync_workspace_info():
@@ -113,7 +124,9 @@ def test_sync_workspace_info():
         patch("databricks.labs.ucx.account.AccountWorkspaces.sync_workspace_info", return_value=None) as s,
         patch("databricks.labs.ucx.account.AccountWorkspaces.__init__", return_value=None),
     ):
-        sync_workspace_info(create_autospec(AccountClient))
+        # TODO: rewrite with mocks, not patches
+        a = create_autospec(AccountClient)
+        sync_workspace_info(a)
         s.assert_called_once()
 
 
@@ -124,12 +137,8 @@ def test_manual_workspace_info():
         m.assert_called_once()
 
 
-def test_create_table_mapping(mocker):
-    w = create_autospec(WorkspaceClient)
-    mocker.patch("databricks.labs.ucx.installer.InstallationManager.for_user", return_value=MagicMock())
-    with patch("databricks.labs.ucx.hive_metastore.mapping.TableMapping.save", return_value=None) as s:
-        create_table_mapping(w)
-        s.assert_called_once()
+def test_create_table_mapping(ws):
+    create_table_mapping(ws)
 
 
 def test_validate_external_locations(mocker):

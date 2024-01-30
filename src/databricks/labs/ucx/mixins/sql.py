@@ -1,3 +1,4 @@
+import functools
 import json
 import logging
 import random
@@ -6,7 +7,7 @@ from collections.abc import Iterator
 from datetime import timedelta
 from typing import Any
 
-from databricks.sdk import errors
+from databricks.sdk import WorkspaceClient, errors
 from databricks.sdk.errors import DataLoss, NotFound
 from databricks.sdk.service.sql import (
     ColumnInfoTypeName,
@@ -16,7 +17,6 @@ from databricks.sdk.service.sql import (
     ResultData,
     ServiceError,
     ServiceErrorCode,
-    StatementExecutionAPI,
     StatementState,
     StatementStatus,
 )
@@ -68,9 +68,12 @@ class Row(tuple):
         return f"Row({', '.join(f'{k}={v}' for (k, v) in zip(self.__columns__, self, strict=True))})"
 
 
-class StatementExecutionExt(StatementExecutionAPI):
-    def __init__(self, api_client):
-        super().__init__(api_client)
+class StatementExecutionExt:
+    def __init__(self, ws: WorkspaceClient):
+        self._api = ws.api_client
+        self.execute_statement = functools.partial(ws.statement_execution.execute_statement)
+        self.cancel_execution = functools.partial(ws.statement_execution.cancel_execution)
+        self.get_statement = functools.partial(ws.statement_execution.get_statement)
         self.type_converters = {
             ColumnInfoTypeName.ARRAY: json.loads,
             # ColumnInfoTypeName.BINARY: not_supported(ColumnInfoTypeName.BINARY),

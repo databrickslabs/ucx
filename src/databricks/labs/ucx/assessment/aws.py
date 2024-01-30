@@ -13,7 +13,6 @@ from databricks.labs.blueprint.parallel import Threads
 from databricks.sdk import WorkspaceClient
 from databricks.sdk.service.catalog import Privilege
 
-
 logger = logging.getLogger(__name__)
 
 

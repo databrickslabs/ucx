@@ -3,6 +3,7 @@ import logging
 from typing import ClassVar
 
 import requests
+from databricks.labs.blueprint.installation import Installation
 from databricks.labs.blueprint.tui import Prompts
 from databricks.sdk import WorkspaceClient
 from databricks.sdk.errors import NotFound
@@ -89,12 +90,9 @@ class AccountWorkspaces:
 
 
 class WorkspaceInfo:
-    def __init__(self, ws: WorkspaceClient, folder: str | None = None, new_installation_manager=InstallationManager):
-        if not folder:
-            folder = f"/Users/{ws.current_user.me().user_name}/.ucx"
+    def __init__(self, installation: Installation, ws: WorkspaceClient):
+        self._installation = installation
         self._ws = ws
-        self._folder = folder
-        self._new_installation_manager = new_installation_manager
 
     def _current_workspace_id(self) -> int:
         headers = self._ws.config.authenticate()
@@ -109,12 +107,10 @@ class WorkspaceInfo:
     def _load_workspace_info(self) -> dict[int, Workspace]:
         try:
             id_to_workspace = {}
-            with self._ws.workspace.download(f"{self._folder}/{AccountWorkspaces.SYNC_FILE_NAME}") as f:
-                for workspace_metadata in json.loads(f.read()):
-                    workspace = Workspace.from_dict(workspace_metadata)
-                    assert workspace.workspace_id is not None
-                    id_to_workspace[workspace.workspace_id] = workspace
-                return id_to_workspace
+            for workspace in self._installation.load(list[Workspace], filename=AccountWorkspaces.SYNC_FILE_NAME):
+                assert workspace.workspace_id is not None
+                id_to_workspace[workspace.workspace_id] = workspace
+            return id_to_workspace
         except NotFound:
             msg = "Please run as account-admin: databricks labs ucx sync-workspace-info"
             raise ValueError(msg) from None
@@ -148,11 +144,6 @@ class WorkspaceInfo:
             if answer == "stop":
                 break
             workspace_id = int(answer)
-        info = json.dumps(workspaces, indent=2).encode("utf8")
-        installation_manager = self._new_installation_manager(self._ws)
-        logger.info("Detecting UCX installations on current workspace...")
-        for installation in installation_manager.user_installations():
-            path = f"{installation.path}/{AccountWorkspaces.SYNC_FILE_NAME}"
-            logger.info(f"Overwriting {path}")
-            self._ws.workspace.upload(path, info, overwrite=True, format=ImportFormat.AUTO)  # type: ignore[arg-type]
+        for installation in Installation.existing(self._ws, 'ucx'):
+            installation.save(workspaces, filename=AccountWorkspaces.SYNC_FILE_NAME)
         logger.info("Synchronised workspace id mapping for installations on current workspace")
