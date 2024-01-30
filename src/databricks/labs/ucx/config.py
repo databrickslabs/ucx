@@ -4,6 +4,7 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Any, Generic, TypeVar
 
+import databricks.sdk.config
 import yaml
 from databricks.sdk import AccountClient, WorkspaceClient
 from databricks.sdk.core import Config
@@ -185,7 +186,10 @@ class AccountConfig(_Config["AccountConfig"]):
 
 
 @dataclass
-class WorkspaceConfig(_Config["WorkspaceConfig"]):  # pylint: disable=too-many-instance-attributes
+class WorkspaceConfig:  # pylint: disable=too-many-instance-attributes
+    __file__ = "config.yml"
+    __version__ = 2
+
     inventory_database: str
     # Group name conversion parameters.
     workspace_group_regex: str | None = None
@@ -197,7 +201,7 @@ class WorkspaceConfig(_Config["WorkspaceConfig"]):  # pylint: disable=too-many-i
     renamed_group_prefix: str | None = "ucx-renamed-"
     instance_pool_id: str | None = None
     warehouse_id: str | None = None
-    connect: ConnectConfig | None = None
+    connect: databricks.sdk.core.Config | None = None
     num_threads: int | None = 10
     database_to_catalog_mapping: dict[str, str] | None = None
     default_catalog: str | None = "ucx_default"
@@ -211,12 +215,6 @@ class WorkspaceConfig(_Config["WorkspaceConfig"]):  # pylint: disable=too-many-i
     override_clusters: dict[str, str] | None = None
     custom_cluster_policy_id: str | None = None
 
-    @classmethod
-    def from_dict(cls, raw: dict):
-        raw = cls._migrate_from_v1(raw)
-        connect = ConnectConfig.from_dict(raw.pop("connect", {}))
-        return cls(connect=connect, **raw)
-
     def to_workspace_client(self) -> WorkspaceClient:
         return WorkspaceClient(config=self.to_databricks_config())
 
@@ -224,7 +222,7 @@ class WorkspaceConfig(_Config["WorkspaceConfig"]):  # pylint: disable=too-many-i
         return text.replace("$inventory", f"hive_metastore.{self.inventory_database}")
 
     @classmethod
-    def _migrate_from_v1(cls, raw: dict):
+    def v1_migrate(cls, raw: dict) -> dict:
         stored_version = raw.pop("version", None)
         if stored_version == _CONFIG_VERSION:
             return raw

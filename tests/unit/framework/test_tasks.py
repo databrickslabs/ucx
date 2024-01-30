@@ -1,8 +1,34 @@
 import logging
-
 import pytest
 
-from databricks.labs.ucx.framework.tasks import TaskLogger
+from databricks.labs.ucx.framework.tasks import TaskLogger, Task, _remove_extra_indentation
+
+
+def test_replace_pydoc():
+    doc = _remove_extra_indentation(
+        """Test1
+        Test2
+    Test3"""
+    )
+    assert (
+        doc
+        == """Test1
+    Test2
+Test3"""
+    )
+
+
+def test_task_cloud(ws):
+
+    tasks = [
+        Task(task_id=0, workflow="wl_1", name="n3", doc="d3", fn=lambda: None, cloud="aws"),
+        Task(task_id=1, workflow="wl_2", name="n2", doc="d2", fn=lambda: None, cloud="azure"),
+        Task(task_id=2, workflow="wl_1", name="n1", doc="d1", fn=lambda: None, cloud="gcp"),
+    ]
+
+    filter_tasks = sorted([t.name for t in tasks if t.cloud_compatible(ws.config)])
+    assert filter_tasks == ["n3"]
+
 
 
 def test_task_logger(tmp_path):
