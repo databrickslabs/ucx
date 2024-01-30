@@ -6,6 +6,7 @@ from collections.abc import Iterable
 from dataclasses import dataclass
 from typing import ClassVar
 
+from databricks.labs.blueprint.installation import Installation
 from databricks.sdk import WorkspaceClient
 from databricks.sdk.service.workspace import ImportFormat
 
@@ -174,7 +175,7 @@ class ExternalLocations(CrawlerBase[ExternalLocation]):
             missing_locations.append(loc)
         return matching_locations, missing_locations
 
-    def save_as_terraform_definitions_on_workspace(self, folder: str) -> str | None:
+    def save_as_terraform_definitions_on_workspace(self, installation: Installation):
         matching_locations, missing_locations = self._match_table_external_locations()
         if len(matching_locations) > 0:
             logger.info("following external locations are already configured.")
@@ -185,18 +186,12 @@ class ExternalLocations(CrawlerBase[ExternalLocation]):
             logger.info("following external location need to be created.")
             for _ in missing_locations:
                 logger.info(f"{_.table_count} tables can be migrated using external location {_.location}.")
-            buffer = io.StringIO()
+            buffer = []
             for script in self._get_ext_location_definitions(missing_locations):
-                buffer.write(script)
-            buffer.seek(0)
-            return self._overwrite_mapping(folder, buffer)
+                buffer.append(script)
+            return installation.upload('external_locations.tf', ("\n".join(buffer)).encode('utf8'))
         logger.info("no additional external location to be created.")
         return None
-
-    def _overwrite_mapping(self, folder, buffer) -> str:
-        path = f"{folder}/external_locations.tf"
-        self._ws.workspace.upload(path, buffer, overwrite=True, format=ImportFormat.AUTO)
-        return path
 
 
 class Mounts(CrawlerBase[Mount]):

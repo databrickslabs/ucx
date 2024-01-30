@@ -5,9 +5,10 @@ import webbrowser
 
 from databricks.labs.blueprint.cli import App
 from databricks.labs.blueprint.entrypoint import get_logger
-from databricks.labs.blueprint.installation import Installation
+from databricks.labs.blueprint.installation import Installation, SerdeError
 from databricks.labs.blueprint.tui import Prompts
 from databricks.sdk import AccountClient, WorkspaceClient
+from databricks.sdk.errors import NotFound
 
 from databricks.labs.ucx.account import AccountWorkspaces, WorkspaceInfo
 from databricks.labs.ucx.assessment.aws import AWSResourcePermissions
@@ -48,11 +49,19 @@ def open_remote_config(w: WorkspaceClient):
 @ucx.command
 def installations(w: WorkspaceClient):
     """Show installations by different users on the same workspace"""
-    installation_manager = InstallationManager(w)
     logger.info("Fetching installations...")
-
-    Installation.existing(w, 'ucx')
-    all_users = [_.as_summary() for _ in installation_manager.user_installations()]
+    all_users = []
+    for installation in Installation.existing(w, 'ucx'):
+        try:
+            config = installation.load(WorkspaceConfig)
+            all_users.append({
+                'database': config.inventory_database,
+                'path': installation.install_folder(),
+            })
+        except NotFound:
+            continue
+        except SerdeError:
+            continue
     print(json.dumps(all_users))
 
 
@@ -74,7 +83,7 @@ def skip(w: WorkspaceClient, schema: str | None = None, table: str | None = None
 def sync_workspace_info(a: AccountClient):
     """upload workspace config to all workspaces in the account where ucx is installed"""
     logger.info(f"Account ID: {a.config.account_id}")
-    workspaces = AccountWorkspaces(AccountConfig(connect=ConnectConfig()))
+    workspaces = AccountWorkspaces(a)
     workspaces.sync_workspace_info()
 
 
@@ -104,11 +113,11 @@ def create_table_mapping(w: WorkspaceClient):
 def validate_external_locations(w: WorkspaceClient):
     """validates and provides mapping to external table to external location and shared generation tf scripts"""
     prompts = Prompts()
-    installation_manager = InstallationManager(w)
-    installation = installation_manager.for_user(w.current_user.me())
-    sql_backend = StatementExecutionBackend(w, installation.config.warehouse_id)
-    location_crawler = ExternalLocations(w, sql_backend, installation.config.inventory_database)
-    path = location_crawler.save_as_terraform_definitions_on_workspace(installation.path)
+    installation = Installation.current(w, 'ucx')
+    config = installation.load(WorkspaceConfig)
+    sql_backend = StatementExecutionBackend(w, config.warehouse_id)
+    location_crawler = ExternalLocations(w, sql_backend, config.inventory_database)
+    path = location_crawler.save_as_terraform_definitions_on_workspace(installation)
     if path and prompts.confirm(f"external_locations.tf file written to {path}. Do you want to open it?"):
         webbrowser.open(f"{w.config.host}/#workspace{path}")
 
