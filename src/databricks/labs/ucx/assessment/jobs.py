@@ -4,6 +4,7 @@ from collections.abc import Iterable
 from dataclasses import dataclass
 
 from databricks.sdk import WorkspaceClient
+from databricks.sdk.service.compute import ClusterDetails
 from databricks.sdk.service.jobs import BaseJob
 
 from databricks.labs.ucx.assessment.clusters import CheckClusterMixin
@@ -86,7 +87,8 @@ class JobsCrawler(CrawlerBase[JobInfo], JobsMixin, CheckClusterMixin):
             job_id = job.job_id
             if not job_id:
                 continue
-            cluster_failures = self.check_cluster_failures(cluster_config, "Job cluster")
+            cluster_details = ClusterDetails.from_dict(cluster_config.as_dict())
+            cluster_failures = self.check_cluster_failures(cluster_details, "Job cluster")
             job_assessment[job_id].update(cluster_failures)
 
         # TODO: next person looking at this - rewrite, as this code makes no sense
