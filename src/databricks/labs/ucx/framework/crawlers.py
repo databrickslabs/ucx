@@ -99,6 +99,24 @@ class SqlBackend(ABC):
             return f"{j[:num_bytes]}... ({diff} more bytes)"
         return j
 
+    @staticmethod
+    def _api_error_from_message(error_message: str) -> DatabricksError:
+        if "SCHEMA_NOT_FOUND" in error_message:
+            return NotFound(error_message)
+        if "TABLE_OR_VIEW_NOT_FOUND" in error_message:
+            return NotFound(error_message)
+        if "DELTA_TABLE_NOT_FOUND" in error_message:
+            return NotFound(error_message)
+        if "DELTA_MISSING_TRANSACTION_LOG" in error_message:
+            return DataLoss(error_message)
+        if "UNRESOLVED_COLUMN.WITH_SUGGESTION" in error_message:
+            return BadRequest(error_message)
+        if "PARSE_SYNTAX_ERROR" in error_message:
+            return BadRequest(error_message)
+        if "Operation not allowed" in error_message:
+            return PermissionDenied(error_message)
+        return Unknown(error_message)
+
 
 class StatementExecutionBackend(SqlBackend):
     def __init__(self, ws: WorkspaceClient, warehouse_id, *, max_records_per_batch: int = 1000):
@@ -174,7 +192,7 @@ class RuntimeBackend(SqlBackend):
             self._spark.sql(sql)
         except Exception as e:
             error_message = str(e)
-            raise self._api_error_from_spark_error(error_message) from None
+            raise self._api_error_from_message(error_message) from None
 
     def fetch(self, sql: str) -> Iterator[Row]:
         logger.debug(f"[spark][fetch] {self._only_n_bytes(sql, self._debug_truncate_bytes)}")
@@ -182,7 +200,7 @@ class RuntimeBackend(SqlBackend):
             return self._spark.sql(sql).collect()
         except Exception as e:
             error_message = str(e)
-            raise self._api_error_from_spark_error(error_message) from None
+            raise self._api_error_from_message(error_message) from None
 
     def save_table(self, full_name: str, rows: Sequence[DataclassInstance], klass: Dataclass, mode: str = "append"):
         rows = self._filter_none_rows(rows, klass)
@@ -193,22 +211,6 @@ class RuntimeBackend(SqlBackend):
         # pyspark deals well with lists of dataclass instances, as long as schema is provided
         df = self._spark.createDataFrame(rows, self._schema_for(klass))
         df.write.saveAsTable(full_name, mode=mode)
-
-    @staticmethod
-    def _api_error_from_spark_error(error_message: str) -> DatabricksError:
-        if "SCHEMA_NOT_FOUND" in error_message:
-            return NotFound(error_message)
-        if "TABLE_OR_VIEW_NOT_FOUND" in error_message:
-            return NotFound(error_message)
-        if "DELTA_TABLE_NOT_FOUND" in error_message:
-            return NotFound(error_message)
-        if "DELTA_MISSING_TRANSACTION_LOG" in error_message:
-            return DataLoss(error_message)
-        if "PARSE_SYNTAX_ERROR" in error_message:
-            return BadRequest(error_message)
-        if "Operation not allowed" in error_message:
-            return PermissionDenied(error_message)
-        return Unknown(error_message)
 
 
 class CrawlerBase(Generic[Result]):

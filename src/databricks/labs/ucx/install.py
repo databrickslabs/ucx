@@ -330,10 +330,6 @@ class WorkspaceInstallation:
         self._state = InstallState.from_installation(installation)
         self._this_file = Path(__file__)
 
-    def run(self):
-
-        self._run_configured()
-
     @classmethod
     def current(cls, ws: WorkspaceClient):
         installation = Installation.current(ws, PRODUCT_INFO.product_name())
@@ -359,7 +355,7 @@ class WorkspaceInstallation:
     #     workspace_installer._run_configured()
     #     return workspace_installer
 
-    def _run_configured(self):
+    def run(self):
         logger.info(f"Installing UCX v{PRODUCT_INFO.version()}")
         Threads.strict(
             "installing components",
@@ -375,7 +371,7 @@ class WorkspaceInstallation:
     def _create_database(self):
         try:
             deploy_schema(self._sql_backend, self._config.inventory_database)
-        except BadRequest as err:
+        except Exception as err:
             if "UNRESOLVED_COLUMN.WITH_SUGGESTION" in str(err):
                 msg = (
                     "The UCX version is not matching with the installed version."
@@ -385,8 +381,7 @@ class WorkspaceInstallation:
                     "UCX Install: databricks labs install ucx"
                 )
                 raise BadRequest(msg) from err
-            msg = f"The UCX Installation Failed while creating database with the error: {err}"
-            raise BadRequest(msg) from err
+            raise err
 
     def _create_dashboards(self):
         logger.info("Creating dashboards...")

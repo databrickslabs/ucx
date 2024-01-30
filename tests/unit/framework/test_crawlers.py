@@ -264,7 +264,7 @@ def test_save_table_with_not_null_constraint_violated(mocker):
     ],
 )
 def test_raise_spark_sql_exceptions(msg, t):
-    err = RuntimeBackend._api_error_from_spark_error(msg)
+    err = RuntimeBackend._api_error_from_message(msg)
     # here we compare the type, so that pytest assert rewrite kick in
     assert type(err) == t
 

@@ -126,6 +126,27 @@ def any_prompt():
     return MockPrompts({".*": ""})
 
 
+def test_create_database(ws, caplog, mock_installation, any_prompt):
+    sql_backend = MockBackend(fails_on_first={
+        'CREATE TABLE': '[UNRESOLVED_COLUMN.WITH_SUGGESTION] A column, variable is incorrect'
+    })
+    wheels = create_autospec(WheelsV2)
+    workspace_installation = WorkspaceInstallation(
+        WorkspaceConfig(inventory_database='ucx'),
+        mock_installation,
+        sql_backend,
+        wheels,
+        ws,
+        any_prompt,
+        timedelta(seconds=1),
+    )
+
+    with pytest.raises(ManyError) as failure:
+        workspace_installation.run()
+
+    assert "Kindly uninstall and reinstall UCX" in str(failure.value)
+
+
 def test_install_cluster_override_jobs(ws, mock_installation, any_prompt):
     sql_backend = MockBackend()
     wheels = create_autospec(WheelsV2)
@@ -216,7 +237,7 @@ def test_writeable_dbfs(ws, tmp_path, mock_installation, any_prompt):
 
 def test_run_workflow_creates_proper_failure(ws, mocker, any_prompt, mock_installation_with_jobs):
     def run_now(job_id):
-        assert 111 == job_id
+        assert 123 == job_id
 
         def result():
             raise OperationFailed(...)
@@ -257,7 +278,7 @@ def test_run_workflow_creates_proper_failure(ws, mocker, any_prompt, mock_instal
 
 def test_run_workflow_creates_failure_from_mapping(ws, mocker, mock_installation, any_prompt, mock_installation_with_jobs):
     def run_now(job_id):
-        assert 111 == job_id
+        assert 123 == job_id
 
         def result():
             raise OperationFailed(...)
@@ -300,7 +321,7 @@ def test_run_workflow_creates_failure_from_mapping(ws, mocker, mock_installation
 
 def test_run_workflow_creates_failure_many_error(ws, mocker, any_prompt,mock_installation_with_jobs):
     def run_now(job_id):
-        assert 111 == job_id
+        assert 123 == job_id
 
         def result():
             raise OperationFailed(...)
@@ -602,7 +623,7 @@ def test_remove_jobs_with_state_missing_job(ws, caplog, mock_installation_with_j
 
     with caplog.at_level('ERROR'):
         workspace_installation.uninstall()
-        assert 'Already deleted: foo job_id=123.' in caplog.messages
+        assert 'Already deleted: assessment job_id=123.' in caplog.messages
 
     mock_installation_with_jobs.assert_removed()
 
@@ -798,51 +819,3 @@ def test_repair_run_result_state(ws, caplog, mock_installation_with_jobs, any_pr
 
     workspace_installation.repair_run("assessment")
     assert "Please try after sometime" in caplog.text
-
-
-def test_create_database(ws, mocker, caplog):
-    install = WorkspaceInstaller(
-        ws,
-        sql_backend=None,
-        promtps=MockPrompts(
-            {
-                r".*PRO or SERVERLESS SQL warehouse.*": "1",
-                r".*": "",
-            }
-        ),
-    )
-    mocker.patch(
-        "databricks.labs.ucx.install.deploy_schema",
-        side_effect=BadRequest(
-            "[UNRESOLVED_COLUMN.WITH_SUGGESTION] A column, variable, or "
-            "function parameter with name `udf` cannot be resolved"
-        ),
-    )
-    mocker.patch("databricks.labs.ucx.framework.crawlers.SqlBackend.execute", return_value=None)
-    config_bytes = yaml.dump(WorkspaceConfig(inventory_database="testdb", warehouse_id="123").as_dict()).encode("utf8")
-    ws.workspace.download = lambda _: io.BytesIO(config_bytes)
-    with pytest.raises(BadRequest) as failure:
-        install._create_database()
-
-    assert "Kindly uninstall and reinstall UCX" in str(failure.value)
-
-
-def test_create_database_diff_error(ws, mocker, caplog):
-    install = WorkspaceInstaller(
-        ws,
-        sql_backend=MockBackend(),
-        promtps=MockPrompts(
-            {
-                r".*PRO or SERVERLESS SQL warehouse.*": "1",
-                r".*": "",
-            }
-        ),
-    )
-    mocker.patch("databricks.labs.ucx.install.deploy_schema", side_effect=BadRequest("Unknown Error"))
-    mocker.patch("databricks.labs.ucx.framework.crawlers.SqlBackend.execute", return_value=None)
-    config_bytes = yaml.dump(WorkspaceConfig(inventory_database="testdb", warehouse_id="123").as_dict()).encode("utf8")
-    ws.workspace.download = lambda _: io.BytesIO(config_bytes)
-    with pytest.raises(BadRequest) as failure:
-        install._create_database()
-
-    assert "The UCX Installation Failed" in str(failure.value)
