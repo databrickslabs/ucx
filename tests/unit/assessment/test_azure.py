@@ -281,7 +281,9 @@ def test_save_spn_permissions_no_external_table(caplog):
     backend = MockBackend(rows=rows)
     location = ExternalLocations(w, backend, "ucx")
     installation = MockInstallation()
-    azure_resource_permission = AzureResourcePermissions(installation, w, AzureResources(w, include_subscriptions="002"), location)
+    azure_resource_permission = AzureResourcePermissions(
+        installation, w, AzureResources(w, include_subscriptions="002"), location
+    )
     azure_resource_permission.save_spn_permissions()
     msg = "There are no external table present with azure storage account. Please check if assessment job is run"
     assert [rec.message for rec in caplog.records if msg in rec.message]
@@ -293,7 +295,9 @@ def test_save_spn_permissions_no_azure_storage_account():
     backend = MockBackend(rows=rows)
     location = ExternalLocations(w, backend, "ucx")
     installation = MockInstallation()
-    azure_resource_permission = AzureResourcePermissions(installation, w, AzureResources(w, include_subscriptions="002"), location)
+    azure_resource_permission = AzureResourcePermissions(
+        installation, w, AzureResources(w, include_subscriptions="002"), location
+    )
     storage_accounts = azure_resource_permission._get_storage_accounts()
     assert len(storage_accounts) == 0
 
@@ -309,7 +313,9 @@ def test_save_spn_permissions_valid_azure_storage_account():
     backend = MockBackend(rows=rows)
     location = ExternalLocations(w, backend, "ucx")
     installation = MockInstallation()
-    azure_resource_permission = AzureResourcePermissions(installation, w, AzureResources(w, include_subscriptions="002"), location)
+    azure_resource_permission = AzureResourcePermissions(
+        installation, w, AzureResources(w, include_subscriptions="002"), location
+    )
     storage_accounts = azure_resource_permission._get_storage_accounts()
     assert storage_accounts[0] == "storage1"
 
@@ -319,7 +325,9 @@ def test_map_storage_with_spn_no_blob_permission(mocker, az_token):
     location = ExternalLocations(w, MockBackend(), "ucx")
     resource_id = "subscriptions/002/resourceGroups/rg1/storageAccounts/sto3"
     installation = MockInstallation()
-    azure_resource_permission = AzureResourcePermissions(installation, w, AzureResources(w, include_subscriptions="002"), location)
+    azure_resource_permission = AzureResourcePermissions(
+        installation, w, AzureResources(w, include_subscriptions="002"), location
+    )
     mocker.patch("databricks.sdk.core.ApiClient.do", side_effect=get_az_api_mapping)
     storage_permission_mappings = azure_resource_permission._map_storage(AzureResource(resource_id))
     assert len(storage_permission_mappings) == 0
@@ -330,7 +338,9 @@ def test_get_role_assignments_with_spn_and_blob_permission(mocker, az_token):
     location = ExternalLocations(w, MockBackend(), "ucx")
     resource_id = "subscriptions/002/resourceGroups/rg1/storageAccounts/sto2"
     installation = MockInstallation()
-    azure_resource_permission = AzureResourcePermissions(installation, w, AzureResources(w, include_subscriptions="002"), location)
+    azure_resource_permission = AzureResourcePermissions(
+        installation, w, AzureResources(w, include_subscriptions="002"), location
+    )
     mocker.patch("databricks.sdk.core.ApiClient.do", side_effect=get_az_api_mapping)
     storage_permission_mappings = azure_resource_permission._map_storage(AzureResource(resource_id))
     assert len(storage_permission_mappings) == 2
@@ -348,7 +358,9 @@ def test_save_spn_permissions_no_valid_storage_accounts(caplog, mocker, az_token
     backend = MockBackend(rows=rows)
     location = ExternalLocations(w, backend, "ucx")
     installation = MockInstallation()
-    azure_resource_permission = AzureResourcePermissions(installation, w, AzureResources(w, include_subscriptions="002"), location)
+    azure_resource_permission = AzureResourcePermissions(
+        installation, w, AzureResources(w, include_subscriptions="002"), location
+    )
     azure_resource_permission.save_spn_permissions()
     assert [rec.message for rec in caplog.records if "No storage account found in current tenant" in rec.message]
 
@@ -360,16 +372,27 @@ def test_save_spn_permissions_valid_storage_accounts(caplog, mocker, az_token):
     backend = MockBackend(rows=rows)
     location = ExternalLocations(w, backend, "ucx")
     installation = MockInstallation()
-    azure_resource_permission = AzureResourcePermissions(installation, w, AzureResources(w, include_subscriptions="002"), location)
+    azure_resource_permission = AzureResourcePermissions(
+        installation, w, AzureResources(w, include_subscriptions="002"), location
+    )
     azure_resource_permission.save_spn_permissions()
-    installation.assert_file_written('azure_storage_account_info.csv', [{'client_id': 'appIduser3',
-  'prefix': 'abfss://container3@sto2.dfs.core.windows.net/',
-  'principal': 'disNameuser3',
-  'privilege': 'WRITE_FILES'},
- {'client_id': 'appIduser3',
-  'prefix': 'abfss://container3@sto2.dfs.core.windows.net/',
-  'principal': 'disNameuser3',
-  'privilege': 'WRITE_FILES'}])
+    installation.assert_file_written(
+        'azure_storage_account_info.csv',
+        [
+            {
+                'client_id': 'appIduser3',
+                'prefix': 'abfss://container3@sto2.dfs.core.windows.net/',
+                'principal': 'disNameuser3',
+                'privilege': 'WRITE_FILES',
+            },
+            {
+                'client_id': 'appIduser3',
+                'prefix': 'abfss://container3@sto2.dfs.core.windows.net/',
+                'principal': 'disNameuser3',
+                'privilege': 'WRITE_FILES',
+            },
+        ],
+    )
 
 
 def test_azure_spn_info_without_secret(mocker):

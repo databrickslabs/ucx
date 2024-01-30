@@ -1,7 +1,4 @@
 import base64
-import csv
-import dataclasses
-import io
 import json
 import re
 from collections.abc import Iterable
@@ -18,7 +15,6 @@ from databricks.sdk.core import (
 from databricks.sdk.errors import NotFound
 from databricks.sdk.service.catalog import Privilege
 from databricks.sdk.service.compute import ClusterSource, Policy
-from databricks.sdk.service.workspace import ImportFormat
 
 from databricks.labs.ucx.assessment.crawlers import (
     _CLIENT_ENDPOINT_LENGTH,
@@ -30,7 +26,11 @@ from databricks.labs.ucx.assessment.crawlers import (
 )
 from databricks.labs.ucx.assessment.jobs import JobsMixin
 from databricks.labs.ucx.config import WorkspaceConfig
-from databricks.labs.ucx.framework.crawlers import CrawlerBase, SqlBackend, StatementExecutionBackend
+from databricks.labs.ucx.framework.crawlers import (
+    CrawlerBase,
+    SqlBackend,
+    StatementExecutionBackend,
+)
 from databricks.labs.ucx.hive_metastore.locations import ExternalLocations
 
 

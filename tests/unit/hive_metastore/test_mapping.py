@@ -2,7 +2,7 @@ import io
 from unittest.mock import MagicMock, call, create_autospec
 
 import pytest
-from databricks.labs.blueprint.installation import MockInstallation, Installation
+from databricks.labs.blueprint.installation import Installation, MockInstallation
 from databricks.labs.blueprint.parallel import ManyError
 from databricks.sdk import WorkspaceClient
 from databricks.sdk.errors import NotFound

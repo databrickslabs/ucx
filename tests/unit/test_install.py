@@ -16,10 +16,7 @@ from databricks.sdk.errors import (
     Unknown,
 )
 from databricks.sdk.service import iam, jobs, sql
-from databricks.sdk.service.compute import (
-    Policy,
-    State,
-)
+from databricks.sdk.service.compute import Policy, State
 from databricks.sdk.service.jobs import BaseRun, RunResultState, RunState
 from databricks.sdk.service.sql import (
     Dashboard,
