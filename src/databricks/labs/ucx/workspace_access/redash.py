@@ -160,14 +160,11 @@ class RedashPermissionsSupport(AclSupport):
     def verify(self, item: Permissions) -> bool:
         acl = sql.GetResponse.from_dict(json.loads(item.raw))
         assert acl.access_control_list is not None
-        try:
-            return self._verify(
+        return self._verify(
                 object_type=sql.ObjectTypePlural(item.object_type),
                 object_id=item.object_id,
                 acl=acl.access_control_list,
             )
-        except ValueError:
-            return False
 
     @rate_limited(max_requests=30)
     def _applier_task(self, object_type: sql.ObjectTypePlural, object_id: str, acl: list[sql.AccessControl]):
