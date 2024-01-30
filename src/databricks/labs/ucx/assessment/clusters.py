@@ -1,21 +1,29 @@
+import base64
 import json
+import logging
 from collections.abc import Iterable
 from dataclasses import dataclass
 
 from databricks.sdk import WorkspaceClient
 from databricks.sdk.errors import NotFound
-from databricks.sdk.service.compute import ClusterDetails, ClusterSource, Policy
+from databricks.sdk.service.compute import (
+    ClusterDetails,
+    ClusterSource,
+    InitScriptInfo,
+    Policy,
+)
 
 from databricks.labs.ucx.assessment.crawlers import (
     _AZURE_SP_CONF_FAILURE_MSG,
+    _INIT_SCRIPT_DBFS_PATH,
     INCOMPATIBLE_SPARK_CONFIG_KEYS,
-    _azure_sp_conf_in_init_scripts,
     _azure_sp_conf_present_check,
-    _get_init_script_data,
-    logger,
     spark_version_compatibility,
 )
+from databricks.labs.ucx.assessment.init_scripts import CheckInitScriptMixin
 from databricks.labs.ucx.framework.crawlers import CrawlerBase, SqlBackend
+
+logger = logging.getLogger(__name__)
 
 
 @dataclass
@@ -27,7 +35,7 @@ class ClusterInfo:
     creator: str | None = None
 
 
-class ClustersMixin:
+class CheckClusterMixin(CheckInitScriptMixin):
     _ws: WorkspaceClient
 
     def _safe_get_cluster_policy(self, policy_id: str) -> Policy | None:
@@ -37,62 +45,77 @@ class ClustersMixin:
             logger.warning(f"The cluster policy was deleted: {policy_id}")
             return None
 
-    def _check_spark_conf(self, cluster, failures):
-        for k in INCOMPATIBLE_SPARK_CONFIG_KEYS:
-            if k in cluster.spark_conf:
-                failures.append(f"unsupported config: {k}")
-        for value in cluster.spark_conf.values():
-            if "dbfs:/mnt" in value or "/dbfs/mnt" in value:
-                failures.append(f"using DBFS mount in configuration: {value}")
-        # Checking if Azure cluster config is present in spark config
-        if _azure_sp_conf_present_check(cluster.spark_conf):
-            failures.append(f"{_AZURE_SP_CONF_FAILURE_MSG} cluster.")
-
-    def _check_cluster_policy(self, cluster, failures):
-        policy = self._safe_get_cluster_policy(cluster.policy_id)
+    def _check_cluster_policy(self, policy_id: str, source: str) -> list[str]:
+        failures: list[str] = []
+        policy = self._safe_get_cluster_policy(policy_id)
         if policy:
             if policy.definition:
                 if _azure_sp_conf_present_check(json.loads(policy.definition)):
-                    failures.append(f"{_AZURE_SP_CONF_FAILURE_MSG} cluster.")
+                    failures.append(f"{_AZURE_SP_CONF_FAILURE_MSG} {source}.")
             if policy.policy_family_definition_overrides:
                 if _azure_sp_conf_present_check(json.loads(policy.policy_family_definition_overrides)):
-                    failures.append(f"{_AZURE_SP_CONF_FAILURE_MSG} cluster.")
+                    failures.append(f"{_AZURE_SP_CONF_FAILURE_MSG} {source}.")
+        return failures
 
-    def _check_init_scripts(self, cluster, failures):
-        for init_script_info in cluster.init_scripts:
-            init_script_data = _get_init_script_data(self._ws, init_script_info)
-            if not init_script_data:
-                continue
-            if not _azure_sp_conf_in_init_scripts(init_script_data):
-                continue
-            failures.append(f"{_AZURE_SP_CONF_FAILURE_MSG} cluster.")
+    def _get_init_script_data(self, init_script_info: InitScriptInfo) -> str | None:
+        if init_script_info.dbfs is not None and init_script_info.dbfs.destination is not None:
+            if len(init_script_info.dbfs.destination.split(":")) == _INIT_SCRIPT_DBFS_PATH:
+                file_api_format_destination = init_script_info.dbfs.destination.split(":")[1]
+                if file_api_format_destination:
+                    try:
+                        data = self._ws.dbfs.read(file_api_format_destination).data
+                        if data is not None:
+                            return base64.b64decode(data).decode("utf-8")
+                    except NotFound:
+                        return None
+        if init_script_info.workspace is not None and init_script_info.workspace.destination is not None:
+            workspace_file_destination = init_script_info.workspace.destination
+            try:
+                data = self._ws.workspace.export(workspace_file_destination).content
+                if data is not None:
+                    return base64.b64decode(data).decode("utf-8")
+            except NotFound:
+                return None
+        return None
 
-    def _check_cluster_failures(self, cluster: ClusterDetails):
-        failures = []
-        cluster_info = ClusterInfo(
-            cluster_id=cluster.cluster_id if cluster.cluster_id else "",
-            cluster_name=cluster.cluster_name,
-            creator=cluster.creator_user_name,
-            success=1,
-            failures="[]",
-        )
+    def _check_cluster_init_script(self, init_scripts: list[InitScriptInfo], source: str) -> list[str]:
+        failures: list[str] = []
+        for init_script_info in init_scripts:
+            init_script_data = self._get_init_script_data(init_script_info)
+            failures.extend(self.check_init_script(init_script_data, source))
+        return failures
+
+    def check_spark_conf(self, conf: dict[str, str], source: str) -> list[str]:
+        failures: list[str] = []
+        for k in INCOMPATIBLE_SPARK_CONFIG_KEYS:
+            if k in conf:
+                failures.append(f"unsupported config: {k}")
+        for value in conf.values():
+            if "dbfs:/mnt" in value or "/dbfs/mnt" in value:
+                failures.append(f"using DBFS mount in configuration: {value}")
+        # Checking if Azure cluster config is present in spark config
+        if _azure_sp_conf_present_check(conf):
+            failures.append(f"{_AZURE_SP_CONF_FAILURE_MSG} {source}.")
+        return failures
+
+    def check_cluster_failures(self, cluster: ClusterDetails, source: str) -> list[str]:
+        failures: list[str] = []
+
         support_status = spark_version_compatibility(cluster.spark_version)
         if support_status != "supported":
             failures.append(f"not supported DBR: {cluster.spark_version}")
         if cluster.spark_conf is not None:
-            self._check_spark_conf(cluster, failures)
+            failures.extend(self.check_spark_conf(cluster.spark_conf, source))
         # Checking if Azure cluster config is present in cluster policies
-        if cluster.policy_id:
-            self._check_cluster_policy(cluster, failures)
-        if cluster.init_scripts:
-            self._check_init_scripts(cluster, failures)
-        cluster_info.failures = json.dumps(failures)
-        if len(failures) > 0:
-            cluster_info.success = 0
-        return cluster_info
+        if cluster.policy_id is not None:
+            failures.extend(self._check_cluster_policy(cluster.policy_id, source))
+        if cluster.init_scripts is not None:
+            failures.extend(self._check_cluster_init_script(cluster.init_scripts, source))
+
+        return failures
 
 
-class ClustersCrawler(CrawlerBase[ClusterInfo], ClustersMixin):
+class ClustersCrawler(CrawlerBase[ClusterInfo], CheckClusterMixin):
     def __init__(self, ws: WorkspaceClient, sbe: SqlBackend, schema):
         super().__init__(sbe, "hive_metastore", schema, "clusters", ClusterInfo)
         self._ws = ws
@@ -110,7 +133,18 @@ class ClustersCrawler(CrawlerBase[ClusterInfo], ClustersMixin):
                     f"Cluster {cluster.cluster_id} have Unknown creator, it means that the original creator "
                     f"has been deleted and should be re-created"
                 )
-            yield self._check_cluster_failures(cluster)
+            cluster_info = ClusterInfo(
+                cluster_id=cluster.cluster_id if cluster.cluster_id else "",
+                cluster_name=cluster.cluster_name,
+                creator=cluster.creator_user_name,
+                success=1,
+                failures="[]",
+            )
+            failures = self.check_cluster_failures(cluster, "cluster")
+            if len(failures) > 0:
+                cluster_info.success = 0
+                cluster_info.failures = json.dumps(failures)
+            yield cluster_info
 
     def snapshot(self) -> Iterable[ClusterInfo]:
         return self._snapshot(self._try_fetch, self._crawl)
