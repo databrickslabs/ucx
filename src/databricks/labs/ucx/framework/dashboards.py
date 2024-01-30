@@ -47,7 +47,7 @@ class SimpleQuery:
 class VizColumn:  # pylint: disable=too-many-instance-attributes)
     name: str
     title: str
-    type: str = "string"  # noqa: A003
+    type: str = "string"
     imageUrlTemplate: str = "{{ @ }}"  # noqa: N815
     imageTitleTemplate: str = "{{ @ }}"  # noqa: N815
     linkUrlTemplate: str = "{{ @ }}"  # noqa: N815
