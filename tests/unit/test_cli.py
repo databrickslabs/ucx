@@ -1,6 +1,10 @@
+import io
+import json
 import subprocess
 from unittest.mock import MagicMock, create_autospec, patch
 
+import pytest
+import yaml
 from databricks.sdk import AccountClient, WorkspaceClient
 from databricks.sdk.errors import NotFound
 from databricks.sdk.service import iam
@@ -28,39 +32,50 @@ from databricks.labs.ucx.cli import (
 from databricks.labs.ucx.config import WorkspaceConfig
 from databricks.labs.ucx.installer import Installation
 
-
-def test_workflow(caplog):
-    w = create_autospec(WorkspaceClient)
-    with patch(
-        "databricks.labs.ucx.install.WorkspaceInstaller.latest_job_status", return_value=[{"key": "dummy"}]
-    ) as latest_job_status:
-        workflows(w)
-        assert caplog.messages == ["Fetching deployed jobs..."]
-        latest_job_status.assert_called_once()
-
-
-def test_open_remote_config(mocker):
-    w = create_autospec(WorkspaceClient)
-    w.current_user.me = lambda: iam.User(user_name="foo", groups=[iam.ComplexValue(display="admins")])
-    ws_file_url = "https://example.com/#workspace/Users/foo/.ucx/config.yml"
-    mocker.patch("databricks.labs.ucx.install.WorkspaceInstaller.notebook_link", return_value=ws_file_url)
-    with patch("webbrowser.open") as mock_webbrowser_open:
-        open_remote_config(w)
-        mock_webbrowser_open.assert_called_with(ws_file_url)
-
-
-def test_installations(mocker, capsys):
-    w = create_autospec(WorkspaceClient)
-    w.current_user.me = lambda: iam.User(user_name="foo", groups=[iam.ComplexValue(display="admins")])
-    summary = {
-        "user_name": "foo",
-        "database": "ucx",
-        "warehouse_id": "test",
+@pytest.fixture
+def ws():
+    state = {
+        "/Users/foo/.ucx/config.yml": yaml.dump({
+            '$version': 2,
+            'inventory_database': 'ucx',
+            'connect': {
+                'host': 'foo',
+                'token': 'bar',
+            }
+        }),
+        '/Users/foo/.ucx/state.json': json.dumps({
+            'resources': {
+                'jobs': {
+                    'assessment': '123'
+                }
+            }
+        })
     }
-    installation = MagicMock()
-    installation.as_summary.return_value = summary
-    mocker.patch("databricks.labs.ucx.installer.InstallationManager.user_installations", return_value=[installation])
-    installations(w)
+
+    ws = create_autospec(WorkspaceClient)
+    ws.config.host = 'https://localhost'
+    ws.current_user.me().user_name = "foo"
+    ws.workspace.download = lambda x: io.StringIO(state[x])
+    return ws
+
+
+def test_workflow(ws, caplog):
+    workflows(ws)
+    assert caplog.messages == ["Fetching deployed jobs..."]
+    ws.jobs.list_runs.assert_called_once()
+
+
+def test_open_remote_config(ws):
+    with patch("webbrowser.open") as mock_webbrowser_open:
+        open_remote_config(ws)
+        mock_webbrowser_open.assert_called_with('https://localhost/#workspace/Users/foo/.ucx/config.yml')
+
+
+def test_installations(ws, mocker, capsys):
+    ws.users.list.return_value = [
+        iam.User(user_name='foo')
+    ]
+    installations(ws)
     assert '{"user_name": "foo", "database": "ucx", "warehouse_id": "test"}' in capsys.readouterr().out
 
 

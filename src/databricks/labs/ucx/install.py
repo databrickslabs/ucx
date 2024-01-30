@@ -335,25 +335,10 @@ class WorkspaceInstallation:
         installation = Installation.current(ws, PRODUCT_INFO.product_name())
         config = installation.load(WorkspaceConfig)
         sql_backend = StatementExecutionBackend(ws, config.warehouse_id)
-
-    # @staticmethod
-    # def run_for_config(
-    #         ws: WorkspaceClient,
-    #         config: WorkspaceConfig,
-    #         *,
-    #         prefix="ucx",
-    #         wheels: Wheels | None = None,
-    #         override_clusters: dict[str, str] | None = None,
-    #         sql_backend: SqlBackend | None = None,
-    # ) -> "WorkspaceInstaller":
-    #     workspace_installer = WorkspaceInstaller(ws, prefix=prefix, wheels=wheels, sql_backend=sql_backend)
-    #     logger.info(f"Installing UCX v{PRODUCT_INFO.version()} on {ws.config.host}")
-    #     workspace_installer._config = config  # type: ignore[has-type]
-    #     workspace_installer._write_config(overwrite=False)
-    #     workspace_installer.current_config.override_clusters = override_clusters
-    #     # TODO: rather introduce a method `is_configured`, as we may want to reconfigure workspaces for some reason
-    #     workspace_installer._run_configured()
-    #     return workspace_installer
+        wheels = WheelsV2(installation, PRODUCT_INFO)
+        prompts = Prompts()
+        timeout = timedelta(minutes=2)
+        return WorkspaceInstallation(config, installation, sql_backend, wheels, ws, prompts, timeout)
 
     def run(self):
         logger.info(f"Installing UCX v{PRODUCT_INFO.version()}")
@@ -367,6 +352,9 @@ class WorkspaceInstallation:
         )
         readme_url = self._create_readme()
         logger.info(f"Installation completed successfully! Please refer to the {readme_url} for the next steps.")
+
+    def config_file_link(self):
+        return self._installation.workspace_link('config.yml')
 
     def _create_database(self):
         try:
