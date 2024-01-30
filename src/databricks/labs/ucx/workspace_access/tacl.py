@@ -3,9 +3,10 @@ import dataclasses
 import functools
 import json
 from collections.abc import Callable, Iterator
+from datetime import timedelta
 from functools import partial
 
-from databricks.sdk.service import iam, sql, workspace
+from databricks.sdk.retries import retried
 
 from databricks.labs.ucx.framework.crawlers import SqlBackend
 from databricks.labs.ucx.hive_metastore import GrantsCrawler
@@ -15,9 +16,15 @@ from databricks.labs.ucx.workspace_access.groups import MigrationState
 
 
 class TableAclSupport(AclSupport):
-    def __init__(self, grants_crawler: GrantsCrawler, sql_backend: SqlBackend):
+    def __init__(
+        self,
+        grants_crawler: GrantsCrawler,
+        sql_backend: SqlBackend,
+        verify_timeout: timedelta | None = timedelta(minutes=1),
+    ):
         self._grants_crawler = grants_crawler
         self._sql_backend = sql_backend
+        self._verify_timeout = verify_timeout
 
     def get_crawler_tasks(self) -> Iterator[Callable[..., Permissions | None]]:
         # Table ACL permissions (grant/revoke and ownership) are not atomic. When granting the permissions,
@@ -88,47 +95,46 @@ class TableAclSupport(AclSupport):
             return None
         target_grant = dataclasses.replace(grant, principal=target_principal)
         # this has to be executed on tacl cluster, otherwise - use SQLExecutionAPI backend & Warehouse
-        object_type, object_id = target_grant.this_type_and_key()
-        return partial(self._apply_grant, object_type, object_id, target_grant)
+        return partial(self._apply_grant, target_grant)
 
-    def _apply_grant(self, object_type: str, object_id: str, grant: Grant):
+    def _apply_grant(self, grant: Grant):
         """
         Apply grants and OWN permission serially for the same principal, object_id and object_type.
         Executing grants (using GRANT statement) and OWN permission (using ALTER statement) concurrently
         could cause permission lost due to limitations in the Table ACLs.
         More info here: https://databricks.atlassian.net/browse/ES-976290
         """
-        for sql_command in grant.hive_grant_sql():
-            self._sql_backend.execute(sql_command)
+        for sql in grant.hive_grant_sql():
+            self._sql_backend.execute(sql)
 
-        self.verify(object_type, object_id, grant)
-        return True
+        object_type, object_id = grant.this_type_and_key()
+        retry_on_value_error = retried(on=[ValueError], timeout=self._verify_timeout)
+        retried_check = retry_on_value_error(self._verify)
+        return retried_check(object_type, object_id, grant)
 
-    def verify(
-        self,
-        object_type: str,
-        object_id: str,
-        acl: list[iam.AccessControlRequest | sql.AccessControl | iam.ComplexValue] | Grant | workspace.AclItem,
-    ) -> bool:
-        if isinstance(acl, Grant):
-            grant_dict = dataclasses.asdict(acl)
-            del grant_dict["action_type"]
-            del grant_dict["principal"]
-            grants_on_object = self._grants_crawler._grants(**grant_dict)
+    def _verify(self, object_type: str, object_id: str, acl: Grant) -> bool:
+        grant_dict = dataclasses.asdict(acl)
+        del grant_dict["action_type"]
+        del grant_dict["principal"]
+        grants_on_object = self._grants_crawler._grants(**grant_dict)
 
-            if grants_on_object:
-                action_types_for_current_principal = [
-                    grant.action_type for grant in grants_on_object if grant.principal == acl.principal
-                ]
+        if grants_on_object:
+            action_types_for_current_principal = [
+                grant.action_type for grant in grants_on_object if grant.principal == acl.principal
+            ]
 
-                acl_action_types = acl.action_type.split(", ")
+            acl_action_types = acl.action_type.split(", ")
 
-                if all(action_type in action_types_for_current_principal for action_type in acl_action_types):
-                    return True
+            if all(action_type in action_types_for_current_principal for action_type in acl_action_types):
+                return True
 
-                msg = f"""Couldn't apply appropriate ACL for object type: {object_type} with name: {object_id} 
-                    acl to be applied for principal {acl.principal}={acl_action_types} 
-                    acl found in the object for principal={action_types_for_current_principal}
-                    """
-                raise ValueError(msg)
+            msg = f"""Couldn't apply appropriate ACL for object type: {object_type} with name: {object_id} 
+                            acl to be applied for principal {acl.principal}={acl_action_types} 
+                            acl found in the object for principal={action_types_for_current_principal}
+                            """
+            raise ValueError(msg)
         return False
+
+    def verify(self, item: Permissions) -> bool:
+        grant = Grant(**json.loads(item.raw))
+        return self._verify(item.object_type, item.object_id, grant)

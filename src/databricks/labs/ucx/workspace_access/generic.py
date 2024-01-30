@@ -19,11 +19,10 @@ from databricks.sdk.errors import (
     TemporarilyUnavailable,
 )
 from databricks.sdk.retries import retried
-from databricks.sdk.service import iam, ml, sql, workspace
+from databricks.sdk.service import iam, ml
 from databricks.sdk.service.iam import PermissionLevel
 
 from databricks.labs.ucx.framework.crawlers import CrawlerBase, SqlBackend
-from databricks.labs.ucx.hive_metastore.grants import Grant
 from databricks.labs.ucx.workspace_access.base import AclSupport, Permissions
 from databricks.labs.ucx.workspace_access.groups import MigrationState
 
@@ -120,18 +119,13 @@ class GenericPermissionsSupport(AclSupport):
                 )
         return results
 
-    def verify(
-        self,
-        object_type: str,
-        object_id: str,
-        acl: list[iam.AccessControlRequest | sql.AccessControl | iam.ComplexValue] | Grant | workspace.AclItem,
-    ) -> bool:
+    def _verify(self, object_type: str, object_id: str, acl: list[iam.AccessControlRequest]):
         # in-flight check for the applied permissions
         # the api might be inconsistent, therefore we need to check that the permissions were applied
         remote_permission = self._safe_get_permissions(object_type, object_id)
         if remote_permission:
             remote_permission_as_request = self._response_to_request(remote_permission.access_control_list)
-            if all(elem in remote_permission_as_request for elem in acl):  # type: ignore[union-attr]
+            if all(elem in remote_permission_as_request for elem in acl):
                 return True
             msg = f"""Couldn't apply appropriate permission for object type {object_type} with id {object_id}
                 acl to be applied={acl}
@@ -139,6 +133,11 @@ class GenericPermissionsSupport(AclSupport):
                 """
             raise ValueError(msg)
         return False
+
+    def verify(self, item: Permissions) -> bool:
+        acl = iam.ObjectPermissions.from_dict(json.loads(item.raw))
+        permissions_as_request = self._response_to_request(acl.access_control_list)
+        return self._verify(object_type=item.object_type, object_id=item.object_id, acl=permissions_as_request)
 
     @rate_limited(max_requests=30)
     def _applier_task(self, object_type: str, object_id: str, acl: list[iam.AccessControlRequest]):
@@ -151,7 +150,7 @@ class GenericPermissionsSupport(AclSupport):
         update_retried_check(object_type, object_id, acl)
 
         retry_on_value_error = retried(on=[*retryable_exceptions, ValueError], timeout=self._verify_timeout)
-        retried_check = retry_on_value_error(self.verify)
+        retried_check = retry_on_value_error(self._verify)
         return retried_check(object_type, object_id, acl)
 
     @rate_limited(max_requests=100)

@@ -10,10 +10,9 @@ from databricks.labs.blueprint.limiter import rate_limited
 from databricks.sdk import WorkspaceClient
 from databricks.sdk.errors import InternalError, NotFound, PermissionDenied
 from databricks.sdk.retries import retried
-from databricks.sdk.service import iam, sql, workspace
+from databricks.sdk.service import sql
 from databricks.sdk.service.sql import ObjectTypePlural, SetResponse
 
-from databricks.labs.ucx.hive_metastore.grants import Grant
 from databricks.labs.ucx.workspace_access.base import AclSupport, Permissions
 from databricks.labs.ucx.workspace_access.groups import MigrationState
 
@@ -142,19 +141,13 @@ class RedashPermissionsSupport(AclSupport):
             )
         return None
 
-    def verify(
-        self,
-        object_type: str,
-        object_id: str,
-        acl: list[iam.AccessControlRequest | sql.AccessControl | iam.ComplexValue] | Grant | workspace.AclItem,
-    ) -> bool:
+    def _verify(self, object_type: sql.ObjectTypePlural, object_id: str, acl: list[sql.AccessControl]):
         # in-flight check for the applied permissions
         # the api might be inconsistent, therefore we need to check that the permissions were applied
-        object_type_plural = next((otp for otp in sql.ObjectTypePlural if otp.value == object_type))
-        remote_permission = self._safe_get_dbsql_permissions(object_type_plural, object_id)
+        remote_permission = self._safe_get_dbsql_permissions(object_type, object_id)
         if remote_permission:
             assert remote_permission.access_control_list is not None
-            if all(elem in remote_permission.access_control_list for elem in acl):  # type: ignore[union-attr]
+            if all(elem in remote_permission.access_control_list for elem in acl):
                 return True
             msg = f"""
             Couldn't apply appropriate permission for object type {object_type} with id {object_id}
@@ -163,6 +156,18 @@ class RedashPermissionsSupport(AclSupport):
             """
             raise ValueError(msg)
         return False
+
+    def verify(self, item: Permissions) -> bool:
+        acl = sql.GetResponse.from_dict(json.loads(item.raw))
+        assert acl.access_control_list is not None
+        try:
+            return self._verify(
+                object_type=sql.ObjectTypePlural(item.object_type),
+                object_id=item.object_id,
+                acl=acl.access_control_list,
+            )
+        except ValueError:
+            return False
 
     @rate_limited(max_requests=30)
     def _applier_task(self, object_type: sql.ObjectTypePlural, object_id: str, acl: list[sql.AccessControl]):
@@ -176,8 +181,8 @@ class RedashPermissionsSupport(AclSupport):
         set_retried_check(object_type, object_id, acl)
 
         retry_on_value_error = retried(on=[InternalError, ValueError], timeout=self._verify_timeout)
-        retried_check = retry_on_value_error(self.verify)
-        return retried_check(object_type.value, object_id, acl)
+        retried_check = retry_on_value_error(self._verify)
+        return retried_check(object_type, object_id, acl)
 
     def _prepare_new_acl(
         self, acl: list[sql.AccessControl], migration_state: MigrationState

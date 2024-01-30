@@ -226,7 +226,18 @@ def test_apply_permissions_not_applied(migration_state):
         ),
     ]
     assert sup._safe_get_dbsql_permissions(object_type=sql.ObjectTypePlural.ALERTS, object_id="test") is None
-    assert not sup.verify(object_type=sql.ObjectTypePlural.ALERTS.value, object_id="test", acl=expected_acl)
+
+    item = Permissions(
+        object_id="test",
+        object_type=sql.ObjectTypePlural.ALERTS.value,
+        raw=json.dumps(
+            sql.GetResponse(
+                object_type=sql.ObjectType.ALERT, object_id="test", access_control_list=expected_acl
+            ).as_dict()
+        ),
+    )
+
+    assert not sup.verify(item)
 
 
 def test_apply_permissions_no_relevant_items(migration_state):
@@ -234,7 +245,7 @@ def test_apply_permissions_no_relevant_items(migration_state):
     sup = RedashPermissionsSupport(ws=ws, listings=[])
     item = Permissions(
         object_id="test",
-        object_type="alerts",
+        object_type=sql.ObjectTypePlural.ALERTS.value,
         raw=json.dumps(
             sql.GetResponse(
                 object_type=sql.ObjectType.ALERT,
@@ -278,7 +289,7 @@ def test_apply_permissions_no_valid_groups():
     sup = RedashPermissionsSupport(ws=ws, listings=[])
     item = Permissions(
         object_id="test",
-        object_type="alerts",
+        object_type=sql.ObjectTypePlural.ALERTS.value,
         raw=json.dumps(
             sql.GetResponse(
                 object_type=sql.ObjectType.ALERT,

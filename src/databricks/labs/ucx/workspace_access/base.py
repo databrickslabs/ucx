@@ -3,9 +3,6 @@ from collections.abc import Callable, Iterable
 from dataclasses import dataclass
 from logging import Logger
 
-from databricks.sdk.service import iam, sql, workspace
-
-from databricks.labs.ucx.hive_metastore.grants import Grant
 from databricks.labs.ucx.workspace_access.groups import MigrationState
 
 logger = Logger(__name__)
@@ -37,10 +34,5 @@ class AclSupport:
         """This method returns a set of strings, that represent object types that are applicable by this instance."""
 
     @abstractmethod
-    def verify(
-        self,
-        object_type: str,
-        object_id: str,
-        acl: list[iam.AccessControlRequest | sql.AccessControl | iam.ComplexValue] | Grant | workspace.AclItem,
-    ) -> bool:
+    def verify(self, item: Permissions) -> bool:
         """This method verifies that all the crawled permissions are applied correctly to the destination group."""
