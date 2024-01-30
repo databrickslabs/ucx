@@ -138,8 +138,7 @@ class WorkspaceInfo:
             workspace_name = prompts.question(
                 f"Workspace name for {workspace_id}", default=f"workspace-{workspace_id}", valid_regex=r"^[\w-]+$"
             )
-            workspace = Workspace(workspace_id=int(workspace_id), workspace_name=workspace_name)
-            workspaces.append(workspace.as_dict())
+            workspaces.append(Workspace(workspace_id=int(workspace_id), workspace_name=workspace_name))
             answer = prompts.question("Next workspace id", valid_number=True, default="stop")
             if answer == "stop":
                 break

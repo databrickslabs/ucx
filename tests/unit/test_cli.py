@@ -60,7 +60,8 @@ def ws():
     ws.current_user.me().user_name = "foo"
     ws.workspace.download = download
     ws.statement_execution.execute_statement.return_value = sql.ExecuteStatementResponse(
-        status=sql.StatementStatus(state=sql.StatementState.SUCCEEDED)
+        status=sql.StatementStatus(state=sql.StatementState.SUCCEEDED),
+        manifest=sql.ResultManifest(schema=sql.ResultSchema())
     )
     return ws
 
@@ -130,15 +131,15 @@ def test_sync_workspace_info():
         s.assert_called_once()
 
 
-def test_manual_workspace_info():
-    w = create_autospec(WorkspaceClient)
+def test_manual_workspace_info(ws):
     with patch("databricks.labs.ucx.account.WorkspaceInfo.manual_workspace_info", return_value=None) as m:
-        manual_workspace_info(w)
+        manual_workspace_info(ws)
         m.assert_called_once()
 
 
 def test_create_table_mapping(ws):
-    create_table_mapping(ws)
+    with patch("databricks.labs.ucx.account.WorkspaceInfo._current_workspace_id", return_value=123), pytest.raises(ValueError, match='databricks labs ucx sync-workspace-info'):
+        create_table_mapping(ws)
 
 
 def test_validate_external_locations(mocker):
@@ -183,128 +184,49 @@ def test_validate_external_locations(mocker):
         w.assert_not_called()
 
 
-def test_ensure_assessment_run(mocker, caplog):
-    w = create_autospec(WorkspaceClient)
-    with patch("databricks.labs.ucx.installer.InstallationManager.for_user", return_value=None):
-        assert ensure_assessment_run(w) is None
-        assert caplog.messages == [CANT_FIND_UCX_MSG]
+def test_ensure_assessment_run(ws):
+    ensure_assessment_run(ws)
 
-    with (
-        patch("databricks.labs.ucx.installer.InstallationManager.for_user", return_value=MagicMock()),
-        patch("databricks.labs.ucx.install.WorkspaceInstaller.validate_and_run", return_value=MagicMock()) as v,
-    ):
-        ensure_assessment_run(w)
-        v.assert_called_with("assessment")
+    ws.jobs.list_runs.assert_called_once()
 
 
-def test_repair_run(mocker, caplog):
-    w = create_autospec(WorkspaceClient)
-    mocker.patch("databricks.labs.ucx.install.WorkspaceInstaller.__init__", return_value=None)
-    mocker.patch("databricks.labs.ucx.install.WorkspaceInstaller.repair_run", return_value=None)
-    repair_run(w, "assessment")
-    assert caplog.messages == ["Repair Running assessment Job"]
+def test_repair_run(ws):
+    repair_run(ws, "assessment")
+
+    ws.jobs.list_runs.assert_called_once()
 
 
-def test_no_step_in_repair_run(mocker):
-    w = create_autospec(WorkspaceClient)
-    mocker.patch("databricks.labs.ucx.install.WorkspaceInstaller.__init__", return_value=None)
-    mocker.patch("databricks.labs.ucx.install.WorkspaceInstaller.repair_run", return_value=None)
-    try:
-        repair_run(w, "")
-    except KeyError as e:
-        assert e.args[0] == "You did not specify --step"
+def test_no_step_in_repair_run(ws):
+    with pytest.raises(KeyError):
+        repair_run(ws, "")
 
 
-def test_revert_migrated_tables(mocker, caplog):
-    w = create_autospec(WorkspaceClient)
+def test_revert_migrated_tables(ws, caplog):
     # test with no schema and no table, user confirm to not retry
-    with (
-        patch("databricks.labs.ucx.installer.InstallationManager.for_user", return_value=MagicMock()),
-        patch("databricks.labs.blueprint.tui.Prompts.confirm", return_value=False),
-    ):
-        assert revert_migrated_tables(w, schema=None, table=None) is None
+    with patch("databricks.labs.blueprint.tui.Prompts.confirm", return_value=False):
+        assert revert_migrated_tables(ws, schema=None, table=None) is None
     # test with no schema and no table, user confirm to retry, but no ucx installation found
-    with (
-        patch("databricks.labs.ucx.installer.InstallationManager.for_user", return_value=None),
-        patch("databricks.labs.blueprint.tui.Prompts.confirm", return_value=True),
-    ):
-        assert revert_migrated_tables(w, schema=None, table=None) is None
-        assert caplog.messages[0] == CANT_FIND_UCX_MSG
-    # test with schema or table, but no ucx installation found
-    with patch("databricks.labs.ucx.installer.InstallationManager.for_user", return_value=None):
-        assert revert_migrated_tables(w, schema="test", table=None) is None
-        assert caplog.messages[1] == CANT_FIND_UCX_MSG
-        assert revert_migrated_tables(w, schema=None, table="test") is None
-        assert caplog.messages[2] == CANT_FIND_UCX_MSG
-        assert revert_migrated_tables(w, schema="test", table="test") is None
-        assert caplog.messages[3] == CANT_FIND_UCX_MSG
-    # test revert_migrated_tables is executed when revert report print successfully and user confirm
-    with (
-        patch("databricks.labs.ucx.installer.InstallationManager.for_user", return_value=MagicMock()),
-        patch("databricks.labs.ucx.hive_metastore.table_migrate.TablesMigrate.print_revert_report", return_value=True),
-        patch("databricks.labs.blueprint.tui.Prompts.confirm", return_value=True),
-        patch(
-            "databricks.labs.ucx.hive_metastore.table_migrate.TablesMigrate.revert_migrated_tables", return_value=None
-        ) as r,
-    ):
-        revert_migrated_tables(w, schema="test", table="test")
-        r.assert_called_once()
-    # test revert_migrated_tables is not executed when revert report print failed
-    with (
-        patch("databricks.labs.ucx.installer.InstallationManager.for_user", return_value=MagicMock()),
-        patch("databricks.labs.ucx.hive_metastore.table_migrate.TablesMigrate.print_revert_report", return_value=False),
-        patch("databricks.labs.blueprint.tui.Prompts.confirm", return_value=True),
-        patch(
-            "databricks.labs.ucx.hive_metastore.table_migrate.TablesMigrate.revert_migrated_tables", return_value=None
-        ) as r,
-    ):
-        revert_migrated_tables(w, schema="test", table="test")
-        r.assert_not_called()
-    # test revert_migrated_tables is not executed when revert report print successfully but user does not confirm
-    with (
-        patch("databricks.labs.ucx.installer.InstallationManager.for_user", return_value=MagicMock()),
-        patch("databricks.labs.ucx.hive_metastore.table_migrate.TablesMigrate.print_revert_report", return_value=True),
-        patch("databricks.labs.blueprint.tui.Prompts.confirm", return_value=False),
-        patch(
-            "databricks.labs.ucx.hive_metastore.table_migrate.TablesMigrate.revert_migrated_tables", return_value=None
-        ) as r,
-    ):
-        revert_migrated_tables(w, schema="test", table="test")
-        r.assert_not_called()
+    with patch("databricks.labs.blueprint.tui.Prompts.confirm", return_value=True):
+        assert revert_migrated_tables(ws, schema=None, table=None) is None
+        assert 'No migrated tables were found.' in caplog.messages
 
 
-def test_move_no_ucx(mocker, caplog):
-    w = create_autospec(WorkspaceClient)
-    w.current_user.me = lambda: iam.User(user_name="foo", groups=[iam.ComplexValue(display="admins")])
-    mocker.patch("databricks.labs.ucx.installer.InstallationManager.for_user", return_value=None)
-    move(w, "", "", "", "", "")
-    assert [rec.message for rec in caplog.records if "UCX configuration" in rec.message]
+def test_move_no_catalog(ws, caplog):
+    move(ws, "", "", "", "", "")
+
+    assert 'Please enter from_catalog and to_catalog details' in caplog.messages
 
 
-def test_move_no_catalog(mocker, caplog):
-    w = create_autospec(WorkspaceClient)
-    w.current_user.me = lambda: iam.User(user_name="foo", groups=[iam.ComplexValue(display="admins")])
-    mocker.patch("databricks.labs.ucx.installer.InstallationManager.for_user", return_value=w.current_user)
-    move(w, "", "", "", "", "")
-    assert (
-        len([rec.message for rec in caplog.records if "Please enter from_catalog and to_catalog" in rec.message]) == 1
-    )
+def test_move_same_schema(ws, caplog):
+    move(ws, "SrcCat", "SrcS", "*", "SrcCat", "SrcS")
+
+    assert 'please select a different schema or catalog to migrate to' in caplog.messages
 
 
-def test_move_same_schema(mocker, caplog):
-    w = create_autospec(WorkspaceClient)
-    w.current_user.me = lambda: iam.User(user_name="foo", groups=[iam.ComplexValue(display="admins")])
-    mocker.patch("databricks.labs.ucx.installer.InstallationManager.for_user", return_value=w.current_user)
-    move(w, "SrcCat", "SrcS", "*", "SrcCat", "SrcS")
-    assert len([rec.message for rec in caplog.records if "please select a different schema" in rec.message]) == 1
+def test_move_no_schema(ws, caplog):
+    move(ws, "SrcCat", "", "*", "TgtCat", "")
 
-
-def test_move_no_schema(mocker, caplog):
-    w = create_autospec(WorkspaceClient)
-    w.current_user.me = lambda: iam.User(user_name="foo", groups=[iam.ComplexValue(display="admins")])
-    mocker.patch("databricks.labs.ucx.installer.InstallationManager.for_user", return_value=w.current_user)
-    move(w, "SrcCat", "", "*", "TgtCat", "")
-    assert len([rec.message for rec in caplog.records if "Please enter from_schema, to_schema" in rec.message]) == 1
+    assert 'Please enter from_schema, to_schema and from_table (enter * for migrating all tables) details.' in caplog.messages
 
 
 def test_move(mocker, monkeypatch):

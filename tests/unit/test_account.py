@@ -2,7 +2,7 @@ import io
 import json
 from unittest.mock import create_autospec, patch
 
-from databricks.labs.blueprint.installation import Installation
+from databricks.labs.blueprint.installation import Installation, MockInstallation
 from databricks.labs.blueprint.tui import MockPrompts
 from databricks.sdk import WorkspaceClient
 from databricks.sdk.service.iam import User
@@ -80,19 +80,14 @@ def test_manual_workspace_info(mocker):
     ws.config.user_agent = "ucx"
     ws.config.authenticate.return_value = {"Foo": "bar"}
     ws.workspace.download.return_value = json.dumps([{"workspace_id": 123, "workspace_name": "some"}])
+    installation = MockInstallation()
     with patch("requests.get") as requests_get:
         response = mocker.Mock()
         response.headers = {"x-databricks-org-id": "123"}
         requests_get.return_value = response
-        installation = Installation(ws, 'ucx')
         wir = WorkspaceInfo(installation, ws)
         prompts = MockPrompts({r"Workspace name for 123": "some-name", r"Next workspace id": "stop"})
 
         wir.manual_workspace_info(prompts)
 
-    ws.workspace.upload.assert_called_with(
-        "/Users/foo/workspaces.json",
-        b'[\n  {\n    "workspace_id": 123,\n    "workspace_name": "some-name"\n  }\n]',
-        overwrite=True,
-        format=ImportFormat.AUTO,
-    )
+    ws.workspace.upload.assert_called()

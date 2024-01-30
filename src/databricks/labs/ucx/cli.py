@@ -82,7 +82,8 @@ def sync_workspace_info(a: AccountClient):
 def manual_workspace_info(w: WorkspaceClient):
     """only supposed to be run if cannot get admins to run `databricks labs ucx sync-workspace-info`"""
     prompts = Prompts()
-    workspace_info = WorkspaceInfo(w)
+    installation = Installation.current(w, 'ucx')
+    workspace_info = WorkspaceInfo(installation, w)
     workspace_info.manual_workspace_info(prompts)
 
 
@@ -90,8 +91,8 @@ def manual_workspace_info(w: WorkspaceClient):
 def create_table_mapping(w: WorkspaceClient):
     """create initial table mapping for review"""
     table_mapping = TableMapping.current(w)
-    workspace_info = WorkspaceInfo(w)
     installation = Installation.current(w, 'ucx')
+    workspace_info = WorkspaceInfo(installation, w)
     config = installation.load(WorkspaceConfig)
     sql_backend = StatementExecutionBackend(w, config.warehouse_id)
     tables_crawler = TablesCrawler(sql_backend, config.inventory_database)
@@ -155,16 +156,12 @@ def revert_migrated_tables(w: WorkspaceClient, schema: str, table: str, *, delet
     """remove notation on a migrated table for re-migration"""
     prompts = Prompts()
     if not schema and not table:
-        if not prompts.confirm(
-            "You haven't specified a schema or a table. All migrated tables will be reverted."
-            " Would you like to continue?",
-            max_attempts=2,
-        ):
+        question = "You haven't specified a schema or a table. All migrated tables will be reverted. Continue?"
+        if not prompts.confirm(question, max_attempts=2):
             return
     tm = TablesMigrate.for_cli(w)
-    if tm.print_revert_report(delete_managed=delete_managed) and prompts.confirm(
-        "Would you like to continue?", max_attempts=2
-    ):
+    revert = tm.print_revert_report(delete_managed=delete_managed)
+    if revert and prompts.confirm("Would you like to continue?", max_attempts=2):
         tm.revert_migrated_tables(schema, table, delete_managed=delete_managed)
 
 
@@ -184,7 +181,7 @@ def move(
         logger.error("Please enter from_catalog and to_catalog details")
         return
     if from_schema == "" or to_schema == "" or from_table == "":
-        logger.error("Please enter from_schema, to_schema and from_table(enter * for migrating all tables) details.")
+        logger.error("Please enter from_schema, to_schema and from_table (enter * for migrating all tables) details.")
         return
     if from_catalog == to_catalog and from_schema == to_schema:
         logger.error("please select a different schema or catalog to migrate to")
