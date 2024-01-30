@@ -1,6 +1,6 @@
 import pytest
 
-from databricks.labs.ucx.hive_metastore.tables import Table, TablesCrawler
+from databricks.labs.ucx.hive_metastore.tables import Table, TablesCrawler, What
 
 from ..framework.mocks import MockBackend
 
@@ -137,37 +137,60 @@ def test_tables_returning_error_when_describing():
 
 
 def test_is_dbfs_root():
-    assert Table("a", "b", "c", "MANAGED", "DELTA", location="dbfs:/somelocation/tablename").is_dbfs_root
-    assert Table("a", "b", "c", "MANAGED", "DELTA", location="/dbfs/somelocation/tablename").is_dbfs_root
-    assert not Table("a", "b", "c", "MANAGED", "DELTA", location="dbfs:/mnt/somelocation/tablename").is_dbfs_root
-    assert not Table("a", "b", "c", "MANAGED", "DELTA", location="/dbfs/mnt/somelocation/tablename").is_dbfs_root
-    assert not Table(
-        "a", "b", "c", "MANAGED", "DELTA", location="dbfs:/databricks-datasets/somelocation/tablename"
-    ).is_dbfs_root
-    assert not Table(
-        "a", "b", "c", "MANAGED", "DELTA", location="/dbfs/databricks-datasets/somelocation/tablename"
-    ).is_dbfs_root
-    assert not Table("a", "b", "c", "MANAGED", "DELTA", location="s3:/somelocation/tablename").is_dbfs_root
-    assert not Table("a", "b", "c", "MANAGED", "DELTA", location="adls:/somelocation/tablename").is_dbfs_root
+    table_a = Table("a", "b", "c", "MANAGED", "DELTA", location="dbfs:/somelocation/tablename")
+    assert table_a.is_dbfs_root
+    assert table_a.what == What.DBFS_ROOT_DELTA
+    table_b = Table("a", "b", "c", "MANAGED", "PARQUET", location="dbfs:/somelocation/tablename")
+    assert table_b.is_dbfs_root
+    assert table_b.what == What.DBFS_ROOT_NON_DELTA
+    table_c = Table("a", "b", "c", "MANAGED", "DELTA", location="/dbfs/somelocation/tablename")
+    assert table_c.is_dbfs_root
+    assert table_c.what == What.DBFS_ROOT_DELTA
+    table_d = Table("a", "b", "c", "MANAGED", "DELTA", location="dbfs:/mnt/somelocation/tablename")
+    assert not table_d.is_dbfs_root
+    assert table_d.what == What.EXTERNAL
+    table_e = Table("a", "b", "c", "MANAGED", "DELTA", location="/dbfs/mnt/somelocation/tablename")
+    assert not table_e.is_dbfs_root
+    assert table_e.what == What.EXTERNAL
+    table_f = Table("a", "b", "c", "MANAGED", "DELTA", location="dbfs:/databricks-datasets/somelocation/tablename")
+    assert not table_f.is_dbfs_root
+    assert table_f.what == What.DB_DATASET
+    table_g = Table("a", "b", "c", "MANAGED", "DELTA", location="/dbfs/databricks-datasets/somelocation/tablename")
+    assert not table_g.is_dbfs_root
+    assert table_g.what == What.DB_DATASET
+    table_h = Table("a", "b", "c", "MANAGED", "DELTA", location="s3:/somelocation/tablename")
+    assert not table_h.is_dbfs_root
+    assert table_h.what == What.EXTERNAL
+    table_i = Table("a", "b", "c", "MANAGED", "DELTA", location="adls:/somelocation/tablename")
+    assert not table_i.is_dbfs_root
+    assert table_i.what == What.EXTERNAL
 
 
 def test_is_db_dataset():
-    assert not Table("a", "b", "c", "MANAGED", "DELTA", location="dbfs:/somelocation/tablename").is_databricks_dataset
-    assert not Table("a", "b", "c", "MANAGED", "DELTA", location="/dbfs/somelocation/tablename").is_databricks_dataset
-    assert not Table(
-        "a", "b", "c", "MANAGED", "DELTA", location="dbfs:/mnt/somelocation/tablename"
-    ).is_databricks_dataset
-    assert not Table(
-        "a", "b", "c", "MANAGED", "DELTA", location="/dbfs/mnt/somelocation/tablename"
-    ).is_databricks_dataset
-    assert Table(
-        "a", "b", "c", "MANAGED", "DELTA", location="dbfs:/databricks-datasets/somelocation/tablename"
-    ).is_databricks_dataset
-    assert Table(
-        "a", "b", "c", "MANAGED", "DELTA", location="/dbfs/databricks-datasets/somelocation/tablename"
-    ).is_databricks_dataset
-    assert not Table("a", "b", "c", "MANAGED", "DELTA", location="s3:/somelocation/tablename").is_databricks_dataset
-    assert not Table("a", "b", "c", "MANAGED", "DELTA", location="adls:/somelocation/tablename").is_databricks_dataset
+    table_a = Table("a", "b", "c", "MANAGED", "DELTA", location="dbfs:/somelocation/tablename")
+    assert not table_a.is_databricks_dataset
+    assert not table_a.what == What.DB_DATASET
+    table_b = Table("a", "b", "c", "MANAGED", "DELTA", location="/dbfs/somelocation/tablename")
+    assert not table_b.is_databricks_dataset
+    assert not table_b.what == What.DB_DATASET
+    table_c = Table("a", "b", "c", "MANAGED", "DELTA", location="dbfs:/mnt/somelocation/tablename")
+    assert not table_c.is_databricks_dataset
+    assert not table_c.what == What.DB_DATASET
+    table_d = Table("a", "b", "c", "MANAGED", "DELTA", location="/dbfs/mnt/somelocation/tablename")
+    assert not table_d.is_databricks_dataset
+    assert not table_d.what == What.DB_DATASET
+    table_e = Table("a", "b", "c", "MANAGED", "DELTA", location="dbfs:/databricks-datasets/somelocation/tablename")
+    assert table_e.is_databricks_dataset
+    assert table_e.what == What.DB_DATASET
+    table_f = Table("a", "b", "c", "MANAGED", "DELTA", location="/dbfs/databricks-datasets/somelocation/tablename")
+    assert table_f.is_databricks_dataset
+    assert table_f.what == What.DB_DATASET
+    table_g = Table("a", "b", "c", "MANAGED", "DELTA", location="s3:/somelocation/tablename")
+    assert not table_g.is_databricks_dataset
+    assert not table_g.what == What.DB_DATASET
+    table_h = Table("a", "b", "c", "MANAGED", "DELTA", location="adls:/somelocation/tablename")
+    assert not table_h.is_databricks_dataset
+    assert not table_h.what == What.DB_DATASET
 
 
 def test_is_supported_for_sync():
@@ -184,4 +207,24 @@ def test_is_supported_for_sync():
     ).is_format_supported_for_sync
     assert not (
         Table("a", "b", "c", "EXTERNAL", "AVRO", location="dbfs:/somelocation/tablename").is_format_supported_for_sync
+    )
+
+
+def test_table_what():
+    assert Table("a", "b", "c", "EXTERNAL", "DELTA", location="s3://external_location/table").what == What.EXTERNAL
+    assert (
+        Table("a", "b", "c", "EXTERNAL", "UNSUPPORTED_FORMAT", location="s3://external_location/table").what
+        == What.UNKNOWN
+    )
+    assert (
+        Table("a", "b", "c", "MANAGED", "DELTA", location="dbfs:/somelocation/tablename").what == What.DBFS_ROOT_DELTA
+    )
+    assert (
+        Table("a", "b", "c", "MANAGED", "PARQUET", location="dbfs:/somelocation/tablename").what
+        == What.DBFS_ROOT_NON_DELTA
+    )
+    assert Table("a", "b", "c", "VIEW", "VIEW", view_text="select * from some_table").what == What.VIEW
+    assert (
+        Table("a", "b", "c", "MANAGED", "DELTA", location="dbfs:/databricks-datasets/somelocation/tablename").what
+        == What.DB_DATASET
     )

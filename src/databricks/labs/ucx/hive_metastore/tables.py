@@ -53,8 +53,6 @@ class Table:
         "dbfs:/databricks-datasets",
     ]
 
-
-
     @property
     def is_delta(self) -> bool:
         if self.table_format is None:
@@ -212,7 +210,7 @@ class TablesCrawler(CrawlerBase):
         for (database,) in self._all_databases():
             logger.debug(f"[{catalog}.{database}] listing tables")
             for _, table, _is_tmp in self._fetch(
-                    f"SHOW TABLES FROM {escape_sql_identifier(catalog)}.{escape_sql_identifier(database)}"
+                f"SHOW TABLES FROM {escape_sql_identifier(catalog)}.{escape_sql_identifier(database)}"
             ):
                 tasks.append(partial(self._describe, catalog, database, table))
         catalog_tables, errors = Threads.gather(f"listing tables in {catalog}", tasks)
@@ -251,8 +249,7 @@ class TablesCrawler(CrawlerBase):
                 upgraded_to=self._parse_table_props(describe.get("Table Properties", "").lower()).get(
                     "upgraded_to", None
                 ),
-                storage_properties=self._parse_table_props(describe.get("Storage Properties", "").lower()),
-                # type: ignore[arg-type]
+                storage_properties=self._parse_table_props(describe.get("Storage Properties", "").lower()),  # type: ignore[arg-type]
             )
         except Exception as e:  # pylint: disable=broad-exception-caught
             # TODO: https://github.com/databrickslabs/ucx/issues/406

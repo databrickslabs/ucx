@@ -35,7 +35,7 @@ class TablesMigrate:
         self._tm = tm
         self._seen_tables: dict[str, str] = {}
 
-    def migrate_tables(self, *, what: What = None):
+    def migrate_tables(self, *, what: What | None = None):
         self._init_seen_tables()
         tables_to_migrate = self._tm.get_tables_to_migrate(self._tc)
         tasks = []
