@@ -2,7 +2,7 @@ import io
 from unittest.mock import MagicMock, call, create_autospec
 
 import pytest
-from databricks.labs.blueprint.installation import MockInstallation
+from databricks.labs.blueprint.installation import MockInstallation, Installation
 from databricks.labs.blueprint.parallel import ManyError
 from databricks.sdk import WorkspaceClient
 from databricks.sdk.errors import NotFound
@@ -282,7 +282,7 @@ def test_skip_tables_marked_for_skipping_or_upgraded():
         "foo-bar,cat1,test_schema3,schema3,test_table4,test_table4\r\n"
     )
     table_crawler.snapshot.return_value = test_tables
-    installation = MockInstallation()
+    installation = Installation(client, "ucx")
     table_mapping = TableMapping(installation, client, backend)
 
     tables_to_migrate = table_mapping.get_tables_to_migrate(table_crawler)
@@ -313,7 +313,8 @@ def test_table_with_no_target_reverted():
     client = create_autospec(WorkspaceClient)
     client.tables.get.side_effect = NotFound()
 
-    table_mapping = TableMapping(client, backend)
+    installation = Installation(client, "ucx")
+    table_mapping = TableMapping(installation, client, backend)
     table_to_migrate = Table(
         object_type="EXTERNAL",
         table_format="DELTA",
@@ -344,7 +345,8 @@ def test_skipping_rules_existing_targets():
         properties={"upgraded_from": "hive_metastore.schema1.table1"},
     )
 
-    table_mapping = TableMapping(client, backend)
+    installation = Installation(client, "ucx")
+    table_mapping = TableMapping(installation, client, backend)
     tables_crawler = create_autospec(TablesCrawler)
     tables_crawler.snapshot.return_value = [
         Table(
@@ -378,7 +380,8 @@ def test_mismatch_from_table_raises_exception():
         properties={"upgraded_from": "hive_metastore.schema1.bad_table"},
     )
 
-    table_mapping = TableMapping(client, backend)
+    installation = Installation(client, "ucx")
+    table_mapping = TableMapping(installation, client, backend)
     tables_crawler = create_autospec(TablesCrawler)
     tables_crawler.snapshot.return_value = [
         Table(
@@ -404,7 +407,8 @@ def test_table_not_in_crawled_tables():
     errors = {}
     rows = {}
     backend = MockBackend(fails_on_first=errors, rows=rows)
-    table_mapping = TableMapping(client, backend)
+    installation = Installation(client, "ucx")
+    table_mapping = TableMapping(installation, client, backend)
     tables_crawler = create_autospec(TablesCrawler)
     tables_crawler.snapshot.return_value = []
     table_mapping.get_tables_to_migrate(tables_crawler)
@@ -434,7 +438,8 @@ def test_skipping_rules_database_skipped():
     client.schemas.list.return_value = []
     client.tables.list.return_value = []
 
-    table_mapping = TableMapping(client, backend)
+    installation = Installation(client, "ucx")
+    table_mapping = TableMapping(installation, client, backend)
     tables_crawler = create_autospec(TablesCrawler)
     tables_crawler.snapshot.return_value = [
         Table(
@@ -486,7 +491,8 @@ def test_skip_missing_table_in_snapshot():
     client.schemas.list.return_value = []
     client.tables.list.return_value = []
 
-    table_mapping = TableMapping(client, backend)
+    installation = MockInstallation({'mapping.csv': []})
+    table_mapping = TableMapping(installation, client, backend)
     table_mapping.get_tables_to_migrate(tables_crawler)
 
     assert not backend.queries
@@ -535,7 +541,8 @@ def test_skipping_rules_target_exists():
         ),
     ]
 
-    table_mapping = TableMapping(client, backend)
+    installation = Installation(client, "ucx")
+    table_mapping = TableMapping(installation, client, backend)
 
     assert len(table_mapping.get_tables_to_migrate(tables_crawler)) == 1
 
@@ -560,7 +567,8 @@ def test_is_target_exists():
         ),
     ]
 
-    table_mapping = TableMapping(client, backend)
+    installation = Installation(client, "ucx")
+    table_mapping = TableMapping(installation, client, backend)
 
     src_table = Table(
         catalog="hive_metastore", database="schema1", name="dest1", object_type="MANAGED", table_format="DELTA"

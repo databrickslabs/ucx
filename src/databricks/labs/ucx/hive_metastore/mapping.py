@@ -87,7 +87,7 @@ class TableMapping:
 
     def load(self) -> list[Rule]:
         try:
-            return self._installation.load(list[Rule], filename='mapping.csv')
+            return self._installation.load(list[Rule], filename=self._filename)
         except NotFound:
             msg = "Please run: databricks labs ucx table-mapping"
             raise ValueError(msg) from None
