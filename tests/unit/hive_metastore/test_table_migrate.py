@@ -16,6 +16,7 @@ from databricks.labs.ucx.hive_metastore.tables import (
     MigrationCount,
     Table,
     TablesCrawler,
+    What,
 )
 
 from ..framework.mocks import MockBackend
@@ -66,6 +67,25 @@ def test_migrate_dbfs_root_tables_should_produce_proper_queries():
     )
 
 
+def test_migrate_dbfs_root_tables_should_be_skipped_when_upgrading_external():
+    errors = {}
+    rows = {}
+    backend = MockBackend(fails_on_first=errors, rows=rows)
+    table_crawler = TablesCrawler(backend, "inventory_database")
+    client = MagicMock()
+    table_mapping = create_autospec(TableMapping)
+    table_mapping.get_tables_to_migrate.return_value = [
+        TableToMigrate(
+            Table("hive_metastore", "db1_src", "managed_dbfs", "MANAGED", "DELTA", "dbfs:/some_location"),
+            Rule("workspace", "ucx_default", "db1_src", "db1_dst", "managed_dbfs", "managed_dbfs"),
+        ),
+    ]
+    table_migrate = TablesMigrate(table_crawler, client, backend, table_mapping)
+    table_migrate.migrate_tables(what=What.EXTERNAL_SYNC)
+
+    assert len(backend.queries) == 0
+
+
 def test_migrate_external_tables_should_produce_proper_queries():
     errors = {}
     rows = {}
@@ -85,6 +105,58 @@ def test_migrate_external_tables_should_produce_proper_queries():
     assert (list(backend.queries)) == [
         "SYNC TABLE ucx_default.db1_dst.external_dst FROM hive_metastore.db1_src.external_src;"
     ]
+
+
+def test_migrate_already_upgraded_table_should_produce_no_queries():
+    errors = {}
+    rows = {}
+    backend = MockBackend(fails_on_first=errors, rows=rows)
+    table_crawler = TablesCrawler(backend, "inventory_database")
+    client = create_autospec(WorkspaceClient)
+    client.catalogs.list.return_value = [CatalogInfo(name="cat1")]
+    client.schemas.list.return_value = [
+        SchemaInfo(catalog_name="cat1", name="test_schema1"),
+    ]
+    client.tables.list.return_value = [
+        TableInfo(
+            catalog_name="cat1",
+            schema_name="schema1",
+            name="dest1",
+            full_name="cat1.schema1.dest1",
+            properties={"upgraded_from": "hive_metastore.db1_src.external_src"},
+        ),
+    ]
+
+    table_mapping = create_autospec(TableMapping)
+    table_mapping.get_tables_to_migrate.return_value = [
+        TableToMigrate(
+            Table("hive_metastore", "db1_src", "external_src", "EXTERNAL", "DELTA"),
+            Rule("workspace", "cat1", "db1_src", "schema1", "external_src", "dest1"),
+        )
+    ]
+    table_migrate = TablesMigrate(table_crawler, client, backend, table_mapping)
+    table_migrate.migrate_tables()
+
+    assert len(backend.queries) == 0
+
+
+def test_migrate_unsupported_format_table_should_produce_no_queries():
+    errors = {}
+    rows = {}
+    backend = MockBackend(fails_on_first=errors, rows=rows)
+    table_crawler = TablesCrawler(backend, "inventory_database")
+    client = create_autospec(WorkspaceClient)
+    table_mapping = create_autospec(TableMapping)
+    table_mapping.get_tables_to_migrate.return_value = [
+        TableToMigrate(
+            Table("hive_metastore", "db1_src", "external_src", "EXTERNAL", "UNSUPPORTED_FORMAT"),
+            Rule("workspace", "cat1", "db1_src", "schema1", "external_src", "dest1"),
+        )
+    ]
+    table_migrate = TablesMigrate(table_crawler, client, backend, table_mapping)
+    table_migrate.migrate_tables()
+
+    assert len(backend.queries) == 0
 
 
 def test_migrate_view_should_produce_proper_queries():

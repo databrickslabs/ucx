@@ -15,12 +15,13 @@ from databricks.sdk.service.catalog import (
 from databricks.labs.ucx.framework.crawlers import SqlBackend
 from databricks.labs.ucx.hive_metastore import TablesCrawler
 from databricks.labs.ucx.hive_metastore.mapping import Rule, TableMapping
-from databricks.labs.ucx.hive_metastore.tables import MigrationCount, Table
+from databricks.labs.ucx.hive_metastore.tables import MigrationCount, Table, What
 
 logger = logging.getLogger(__name__)
 
 
 class TablesMigrate:
+
     def __init__(
         self,
         tc: TablesCrawler,
@@ -34,23 +35,24 @@ class TablesMigrate:
         self._tm = tm
         self._seen_tables: dict[str, str] = {}
 
-    def migrate_tables(self):
+    def migrate_tables(self, *, what: What | None = None):
         self._init_seen_tables()
         tables_to_migrate = self._tm.get_tables_to_migrate(self._tc)
         tasks = []
         for table in tables_to_migrate:
-            tasks.append(partial(self._migrate_table, table.src, table.rule))
+            if not what or table.src.what == what:
+                tasks.append(partial(self._migrate_table, table.src, table.rule))
         Threads.strict("migrate tables", tasks)
 
     def _migrate_table(self, src_table: Table, rule: Rule):
         if self._table_already_upgraded(rule.as_uc_table_key):
             logger.info(f"Table {src_table.key} already upgraded to {rule.as_uc_table_key}")
             return True
-        if src_table.kind == "TABLE" and src_table.table_format == "DELTA" and src_table.is_dbfs_root:
+        if src_table.what == What.DBFS_ROOT_DELTA:
             return self._migrate_dbfs_root_table(src_table, rule)
-        if src_table.kind == "TABLE" and src_table.is_format_supported_for_sync:
+        if src_table.what == What.EXTERNAL_SYNC:
             return self._migrate_external_table(src_table, rule)
-        if src_table.kind == "VIEW":
+        if src_table.what == What.VIEW:
             return self._migrate_view(src_table, rule)
         logger.info(f"Table {src_table.key} is not supported for migration")
         return True
