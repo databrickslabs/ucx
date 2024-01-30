@@ -15,7 +15,7 @@ from databricks.labs.ucx.mixins.sql import Row
 logger = logging.getLogger(__name__)
 
 
-class TableMigrationType(Enum):
+class What(Enum):
     EXTERNAL = auto()
     DBFS_ROOT_DELTA = auto()
     DBFS_ROOT_NON_DELTA = auto()
@@ -109,18 +109,18 @@ class Table:
         return False
 
     @property
-    def table_migration_type(self) -> TableMigrationType:
+    def what(self) -> What:
         if self.is_databricks_dataset:
-            return TableMigrationType.DB_DATASET
+            return What.DB_DATASET
         if self.is_dbfs_root and self.table_format == "DELTA":
-            return TableMigrationType.DBFS_ROOT_DELTA
+            return What.DBFS_ROOT_DELTA
         if self.is_dbfs_root:
-            return TableMigrationType.DBFS_ROOT_NON_DELTA
+            return What.DBFS_ROOT_NON_DELTA
         if self.kind == "TABLE" and self.is_format_supported_for_sync:
-            return TableMigrationType.EXTERNAL
+            return What.EXTERNAL
         if self.kind == "VIEW":
-            return TableMigrationType.VIEW
-        return TableMigrationType.UNKNOWN
+            return What.VIEW
+        return What.UNKNOWN
 
     def sql_migrate_external(self, target_table_key):
         return f"SYNC TABLE {escape_sql_identifier(target_table_key)} FROM {escape_sql_identifier(self.key)};"

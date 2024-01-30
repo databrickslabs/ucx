@@ -15,7 +15,7 @@ from databricks.sdk.service.catalog import (
 from databricks.labs.ucx.framework.crawlers import SqlBackend
 from databricks.labs.ucx.hive_metastore import TablesCrawler
 from databricks.labs.ucx.hive_metastore.mapping import Rule, TableMapping
-from databricks.labs.ucx.hive_metastore.tables import MigrationCount, Table, TableMigrationType
+from databricks.labs.ucx.hive_metastore.tables import MigrationCount, Table, What
 
 logger = logging.getLogger(__name__)
 
@@ -28,40 +28,31 @@ class TablesMigrate:
         ws: WorkspaceClient,
         backend: SqlBackend,
         tm: TableMapping,
-        *,
-        table_migration_type: TableMigrationType = None,
     ):
         self._tc = tc
         self._backend = backend
         self._ws = ws
         self._tm = tm
         self._seen_tables: dict[str, str] = {}
-        self._table_migration_type = table_migration_type
 
-    def migrate_tables(self):
+    def migrate_tables(self, *, what: What = None):
         self._init_seen_tables()
         tables_to_migrate = self._tm.get_tables_to_migrate(self._tc)
         tasks = []
         for table in tables_to_migrate:
-            if not self._table_migration_type or table.table_migration_type == self._table_migration_type:
+            if not what or table.what == what:
                 tasks.append(partial(self._migrate_table, table.src, table.rule))
         Threads.strict("migrate tables", tasks)
-
-    def _prep_migrate_aws(self):
-        pass
-
-    def _prep_migrate_azure(self):
-        pass
 
     def _migrate_table(self, src_table: Table, rule: Rule):
         if self._table_already_upgraded(rule.as_uc_table_key):
             logger.info(f"Table {src_table.key} already upgraded to {rule.as_uc_table_key}")
             return True
-        if src_table.table_migration_type == TableMigrationType.DBFS_ROOT_DELTA:
+        if src_table.what == What.DBFS_ROOT_DELTA:
             return self._migrate_dbfs_root_table(src_table, rule)
-        if src_table.table_migration_type == TableMigrationType.EXTERNAL:
+        if src_table.what == What.EXTERNAL:
             return self._migrate_external_table(src_table, rule)
-        if src_table.table_migration_type == TableMigrationType.VIEW:
+        if src_table.what == What.VIEW:
             return self._migrate_view(src_table, rule)
         logger.info(f"Table {src_table.key} is not supported for migration")
         return True
