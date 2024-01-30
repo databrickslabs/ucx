@@ -948,5 +948,7 @@ if __name__ == "__main__":
     logger.setLevel("INFO")
 
     workspace_client = WorkspaceClient(product="ucx", product_version=__version__)
-    installer = WorkspaceInstaller(workspace_client, promtps=Prompts())
+    # TODO: this is broken - make it "current_installation_factory" function
+    installation = Installation.current(workspace_client, PRODUCT_INFO.product_name())
+    installer = WorkspaceInstaller(Prompts(), installation, workspace_client)
     installer.run()

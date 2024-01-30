@@ -3,7 +3,11 @@ from collections.abc import Iterable
 from dataclasses import dataclass
 from functools import partial
 
-from databricks.labs.ucx.framework.crawlers import CrawlerBase, RuntimeBackend
+from databricks.labs.ucx.framework.crawlers import (
+    CrawlerBase,
+    RuntimeBackend,
+    SqlBackend,
+)
 from databricks.labs.ucx.hive_metastore import TablesCrawler
 
 logger = logging.getLogger(__name__)
@@ -18,7 +22,7 @@ class TableSize:
 
 
 class TableSizeCrawler(CrawlerBase):
-    def __init__(self, backend: RuntimeBackend, schema):
+    def __init__(self, backend: SqlBackend, schema):
         """
         Initializes a TablesSizeCrawler instance.
 
@@ -29,6 +33,7 @@ class TableSizeCrawler(CrawlerBase):
         # pylint: disable-next=import-error,import-outside-toplevel
         from pyspark.sql.session import SparkSession  # type: ignore[import-not-found]
 
+        assert isinstance(backend, RuntimeBackend)
         self._backend: RuntimeBackend = backend
         super().__init__(backend, "hive_metastore", schema, "table_size", TableSize)
         self._tables_crawler = TablesCrawler(backend, schema)

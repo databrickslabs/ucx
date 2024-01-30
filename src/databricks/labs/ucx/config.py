@@ -21,6 +21,7 @@ class WorkspaceConfig:  # pylint: disable=too-many-instance-attributes
     include_group_names: list[str] | None = None
     renamed_group_prefix: str | None = "ucx-renamed-"
     instance_pool_id: str | None = None
+    # in v3, warehouse_id should be part of connect
     warehouse_id: str | None = None
     connect: databricks.sdk.core.Config | None = None
     num_threads: int | None = 10
