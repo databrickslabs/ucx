@@ -5,7 +5,12 @@ from functools import partial
 from databricks.labs.blueprint.parallel import Threads
 from databricks.sdk import WorkspaceClient
 from databricks.sdk.errors import NotFound
-from databricks.sdk.service.catalog import PermissionsChange, SecurableType, TableType
+from databricks.sdk.service.catalog import (
+    PermissionsChange,
+    Privilege,
+    SecurableType,
+    TableType,
+)
 
 from databricks.labs.ucx.framework.crawlers import SqlBackend
 from databricks.labs.ucx.hive_metastore import TablesCrawler
@@ -229,7 +234,8 @@ class TableMove:
                             self._move_table, from_catalog, from_schema, table.name, to_catalog, to_schema, del_table
                         )
                     )
-                else:
+                    continue
+                if table.view_definition:
                     view_tasks.append(
                         partial(
                             self._move_view,
@@ -242,10 +248,69 @@ class TableMove:
                             table.view_definition,
                         )
                     )
+                    continue
+                logger.warning(
+                    f"table {from_table} was not identified as a valid table or view. skipping this table..."
+                )
         Threads.strict("Creating tables", table_tasks)
         logger.info(f"Moved {len(list(table_tasks))} tables to the new schema {to_schema}.")
         Threads.strict("Creating views", view_tasks)
         logger.info(f"Moved {len(list(view_tasks))} views to the new schema {to_schema}.")
+
+    def alias_tables(
+        self,
+        from_catalog: str,
+        from_schema: str,
+        from_table: str,
+        to_catalog: str,
+        to_schema: str,
+    ):
+        try:
+            self._ws.schemas.get(f"{from_catalog}.{from_schema}")
+        except NotFound:
+            logger.error(f"schema {from_schema} not found in catalog {from_catalog}, enter correct schema details.")
+            return
+        try:
+            self._ws.schemas.get(f"{to_catalog}.{to_schema}")
+        except NotFound:
+            logger.warning(f"schema {to_schema} not found in {to_catalog}, creating...")
+            self._ws.schemas.create(to_schema, to_catalog)
+
+        tables = self._ws.tables.list(from_catalog, from_schema)
+        alias_tasks = []
+        filtered_tables = [table for table in tables if from_table in [table.name, "*"]]
+        for table in filtered_tables:
+            try:
+                self._ws.tables.get(f"{to_catalog}.{to_schema}.{table.name}")
+                logger.warning(
+                    f"table {from_table} already present in {from_catalog}.{from_schema}. skipping this table..."
+                )
+                continue
+            except NotFound:
+                if table.table_type and table.table_type in (TableType.EXTERNAL, TableType.MANAGED):
+                    alias_tasks.append(
+                        partial(self._alias_table, from_catalog, from_schema, table.name, to_catalog, to_schema)
+                    )
+                    continue
+                if table.view_definition:
+                    alias_tasks.append(
+                        partial(
+                            self._move_view,
+                            from_catalog,
+                            from_schema,
+                            table.name,
+                            to_catalog,
+                            to_schema,
+                            False,
+                            table.view_definition,
+                        )
+                    )
+                    continue
+                logger.warning(
+                    f"table {from_table} was not identified as a valid table or view. skipping this table..."
+                )
+        Threads.strict("Creating aliases", alias_tasks)
+        logger.info(f"Created {len(list(alias_tasks))} table and view aliases in the new schema {to_schema}.")
 
     def _move_table(
         self,
@@ -273,13 +338,45 @@ class TableMove:
                 logger.error(f"Failed to move table {from_table_name}: {err!s}", exc_info=True)
         return False
 
-    def _reapply_grants(self, from_table_name, to_table_name):
+    def _alias_table(
+        self,
+        from_catalog: str,
+        from_schema: str,
+        from_table: str,
+        to_catalog: str,
+        to_schema: str,
+    ) -> bool:
+        from_table_name = f"{from_catalog}.{from_schema}.{from_table}"
+        to_table_name = f"{to_catalog}.{to_schema}.{from_table}"
+        try:
+            self._create_alias_view(from_table_name, to_table_name)
+            self._reapply_grants(from_table_name, to_table_name, target_view=True)
+            return True
+        except NotFound as err:
+            if "[TABLE_OR_VIEW_NOT_FOUND]" in str(err) or "[DELTA_TABLE_NOT_FOUND]" in str(err):
+                logger.error(f"Could not find table {from_table_name}. Table not found.")
+            else:
+                logger.error(f"Failed to alias table {from_table_name}: {err!s}", exc_info=True)
+            return False
+
+    def _reapply_grants(self, from_table_name, to_table_name, *, target_view: bool = False):
         grants = self._ws.grants.get(SecurableType.TABLE, from_table_name)
         if grants.privilege_assignments is not None:
             logger.info(f"Applying grants on table {to_table_name}")
-            grants_changes = [
-                PermissionsChange(pair.privileges, pair.principal) for pair in grants.privilege_assignments
-            ]
+            grants_changes = []
+            for permission in grants.privilege_assignments:
+                if not permission.privileges:
+                    continue
+                if not target_view:
+                    grants_changes.append(PermissionsChange(list(permission.privileges), permission.principal))
+                    continue
+                privileges = set()
+                for privilege in permission.privileges:
+                    if privilege != Privilege.MODIFY:
+                        privileges.add(privilege)
+                if privileges:
+                    grants_changes.append(PermissionsChange(list(privileges), permission.principal))
+
             self._ws.grants.update(SecurableType.TABLE, to_table_name, changes=grants_changes)
 
     def _recreate_table(self, from_table_name, to_table_name):
@@ -287,6 +384,11 @@ class TableMove:
         create_table_sql = create_sql.replace(f"CREATE TABLE {from_table_name}", f"CREATE TABLE {to_table_name}")
         logger.info(f"Creating table {to_table_name}")
         self._backend.execute(create_table_sql)
+
+    def _create_alias_view(self, from_table_name, to_table_name):
+        create_view_sql = f"CREATE VIEW {to_table_name} AS SELECT * FROM {from_table_name}"
+        logger.info(f"Creating view {to_table_name} on {from_table_name}")
+        self._backend.execute(create_view_sql)
 
     def _move_view(
         self,

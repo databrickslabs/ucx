@@ -285,9 +285,9 @@ class RegexMatchStrategy(GroupMigrationStrategy):
                     external_id=account_group.external_id,
                     members=json.dumps([gg.as_dict() for gg in ws_group.members]) if ws_group.members else None,
                     roles=json.dumps([gg.as_dict() for gg in ws_group.roles]) if ws_group.roles else None,
-                    entitlements=json.dumps([gg.as_dict() for gg in ws_group.entitlements])
-                    if ws_group.entitlements
-                    else None,
+                    entitlements=(
+                        json.dumps([gg.as_dict() for gg in ws_group.entitlements]) if ws_group.entitlements else None
+                    ),
                 )
             else:
                 logger.info(f"Couldn't find a match for group {ws_group.display_name}")
@@ -409,19 +409,24 @@ class GroupManager(CrawlerBase[MigratedGroup]):
         strategy = self._get_strategy(workspace_groups_in_workspace, account_groups_in_account)
         migrated_groups = strategy.generate_migrated_groups()
         mismatch_group = []
-        for groups in migrated_groups:
-            ws_members_set = set([m.get("display") for m in json.loads(groups.members)] if groups.members else [])
-            account_group = account_groups_in_account[groups.name_in_account]
-            ac_members_set = set(
-                [a.as_dict().get("display") for a in account_group.members] if account_group.members else []
-            )
-            set_diff = (ws_members_set - ac_members_set).union(ac_members_set - ws_members_set)
+        retry_on_internal_error = retried(on=[InternalError], timeout=self._verify_timeout)
+        get_account_group = retry_on_internal_error(self._get_account_group)
+        for ws_group in migrated_groups:
+            # Users with the same display name but different email will be deduplicated!
+            ws_members_set = {m.get("display") for m in json.loads(ws_group.members)} if ws_group.members else set()
+            acc_group = get_account_group(account_groups_in_account[ws_group.name_in_account].id)
+            if not acc_group:
+                continue  # group not present anymore
+            acc_members_set = {a.as_dict().get("display") for a in acc_group.members} if acc_group.members else set()
+            set_diff = (ws_members_set - acc_members_set).union(acc_members_set - ws_members_set)
             if not set_diff:
                 continue
             mismatch_group.append(
                 {
-                    "wf_group_name": groups.name_in_workspace,
-                    "ac_group_name": groups.name_in_account,
+                    "wf_group_name": ws_group.name_in_workspace,
+                    "wf_group_members_count": len(ws_members_set),
+                    "acc_group_name": ws_group.name_in_account,
+                    "acc_group_members_count": len(acc_members_set),
                 }
             )
         if not mismatch_group:
@@ -498,6 +503,16 @@ class GroupManager(CrawlerBase[MigratedGroup]):
         except NotFound:
             # during integration tests, we may get certain groups removed,
             # which will cause timeout errors because of groups no longer there.
+            return None
+
+    @rate_limited(max_requests=20)
+    def _get_account_group(self, group_id: str) -> Group | None:
+        try:
+            raw = self._ws.api_client.do("GET", f"/api/2.0/account/scim/v2/Groups/{group_id}")
+            return iam.Group.from_dict(raw)  # type: ignore[arg-type]
+        except NotFound:
+            # the given group has been removed from the account after getting the group and before running this method
+            logger.warning("Group with ID: %s does not exist anymore in the Databricks account.", group_id)
             return None
 
     def _list_account_groups(self, scim_attributes: str) -> list[iam.Group]:
