@@ -523,55 +523,26 @@ def test_save_config_with_glue(ws, mock_installation):
     )
 
 
-def test_main_with_existing_conf_does_not_recreate_config(ws, mocker):
-    mock_file = MagicMock()
-    mocker.patch("builtins.open", return_value=mock_file)
-    mocker.patch("base64.b64encode")
+def test_main_with_existing_conf_does_not_recreate_config(ws, mocker, mock_installation):
     webbrowser_open = mocker.patch("webbrowser.open")
-
-    ws.current_user.me = lambda: iam.User(user_name="me@example.com", groups=[iam.ComplexValue(display="admins")])
-    ws.config.host = "https://foo"
-    ws.config.is_aws = True
-    ws.config.is_azure = False
-    ws.config.is_gcp = False
-    config_bytes = b"""default_catalog: ucx_default
-include_group_names:
-- '42'
-instance_profile: arn:aws:iam::111222333:instance-profile/foo-instance-profile
-inventory_database: '42'
-log_level: '42'
-num_threads: 42
-renamed_group_prefix: '42'
-spark_conf:
-  spark.databricks.hive.metastore.glueCatalog.enabled: 'true'
-version: 2
-warehouse_id: abc
-workspace_start_path: /
-"""
-
-    ws.workspace.download = lambda _: io.BytesIO(config_bytes)
-    ws.workspace.get_status = lambda _: ObjectInfo(object_id=123)
-    ws.data_sources.list = lambda: [DataSource(id="bcd", warehouse_id="abc")]
-    ws.warehouses.list = lambda **_: [EndpointInfo(name="abc", id="abc", warehouse_type=EndpointInfoWarehouseType.PRO)]
-    ws.dashboards.create.return_value = Dashboard(id="abc")
-    ws.queries.create.return_value = Query(id="abc")
-    ws.query_visualizations.create.return_value = Visualization(id="abc")
-    ws.dashboard_widgets.create.return_value = Widget(id="abc")
-    wheels = create_autospec(Wheels)
-    install = WorkspaceInstaller(
-        ws,
-        sql_backend=MockBackend(),
-        promtps=MockPrompts(
-            {
-                r".*PRO or SERVERLESS SQL warehouse.*": "1",
-                r"Open job overview.*": "yes",
-                r".*": "",
-            }
-        ),
-        wheels=wheels,
+    sql_backend = MockBackend()
+    prompts = MockPrompts(
+        {
+            r".*PRO or SERVERLESS SQL warehouse.*": "1",
+            r"Open job overview.*": "yes",
+            r".*": "",
+        }
     )
-    install._build_wheel = lambda _: Path(__file__)
-    install.run()
+    workspace_installation = WorkspaceInstallation(
+        WorkspaceConfig(inventory_database="..."),
+        mock_installation,
+        sql_backend,
+        create_autospec(WheelsV2),
+        ws,
+        prompts,
+        verify_timeout=timedelta(seconds=1),
+    )
+    workspace_installation.run()
 
     webbrowser_open.assert_called_with("https://foo/#workspace/Users/me@example.com/.ucx/README.py")
 
