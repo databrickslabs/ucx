@@ -601,6 +601,7 @@ class WorkspaceInstallation:
                 md.append("\n\n")
         preamble = ["# Databricks notebook source", "# MAGIC %md"]
         intro = "\n".join(preamble + [f"# MAGIC {line}" for line in md])
+        self._installation.upload('README.py', intro.encode('utf8'))
         readme_url = self._installation.workspace_link('README.py')
         if self._prompts and self._prompts.confirm(f"Open job overview in your browser? {readme_url}"):
             webbrowser.open(readme_url)

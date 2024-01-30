@@ -5,7 +5,7 @@ from typing import ClassVar
 import requests
 from databricks.labs.blueprint.installation import Installation
 from databricks.labs.blueprint.tui import Prompts
-from databricks.sdk import WorkspaceClient
+from databricks.sdk import WorkspaceClient, AccountClient
 from databricks.sdk.errors import NotFound
 from databricks.sdk.service.provisioning import Workspace
 from databricks.sdk.service.workspace import ImportFormat
@@ -26,24 +26,12 @@ class AccountWorkspaces:
 
     SYNC_FILE_NAME: ClassVar[str] = "workspaces.json"
 
-    def __init__(
-        self, cfg: AccountConfig, new_workspace_client=WorkspaceClient, new_installation_manager=InstallationManager
-    ):
+    def __init__(self, ac: AccountClient, new_workspace_client=WorkspaceClient):
         self._new_workspace_client = new_workspace_client
-        self._new_installation_manager = new_installation_manager
-        self._ac = cfg.to_account_client()
-        self._cfg = cfg
+        self._ac = ac
 
-    def _configured_workspaces(self):
-        for workspace in self._ac.workspaces.list():
-            if self._cfg.include_workspace_names:
-                if workspace.workspace_name not in self._cfg.include_workspace_names:
-                    logger.debug(
-                        f"skipping {workspace.workspace_name} ({workspace.workspace_id} because "
-                        f"its not explicitly included"
-                    )
-                    continue
-            yield workspace
+    def _workspaces(self):
+        return self._ac.workspaces.list()
 
     def _get_cloud(self) -> str:
         if self._ac.config.is_azure:
@@ -67,7 +55,7 @@ class AccountWorkspaces:
         :return: list[WorkspaceClient]
         """
         clients = []
-        for workspace in self._configured_workspaces():
+        for workspace in self._workspaces():
             ws = self.client_for(workspace)
             clients.append(ws)
         return clients
@@ -79,14 +67,11 @@ class AccountWorkspaces:
         upload the json dump of workspace info in the .ucx folder
         """
         workspaces = []
-        for workspace in self._configured_workspaces():
+        for workspace in self._workspaces():
             workspaces.append(workspace.as_dict())
-        info = json.dumps(workspaces, indent=2).encode("utf8")
         for ws in self.workspace_clients():
-            installation_manager = self._new_installation_manager(ws)
-            for installation in installation_manager.user_installations():
-                path = f"{installation.path}/{self.SYNC_FILE_NAME}"
-                ws.workspace.upload(path, info, overwrite=True, format=ImportFormat.AUTO)
+            for installation in Installation.existing(ws, "ucx"):
+                installation.save(workspaces, filename=self.SYNC_FILE_NAME)
 
 
 class WorkspaceInfo:

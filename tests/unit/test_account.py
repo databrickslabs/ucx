@@ -1,6 +1,6 @@
 import io
 import json
-from unittest.mock import create_autospec, patch
+from unittest.mock import patch
 
 from databricks.labs.blueprint.installation import Installation, MockInstallation
 from databricks.labs.blueprint.tui import MockPrompts
@@ -10,8 +10,7 @@ from databricks.sdk.service.provisioning import Workspace
 from databricks.sdk.service.workspace import ImportFormat
 
 from databricks.labs.ucx.account import AccountWorkspaces, WorkspaceInfo
-from databricks.labs.ucx.config import AccountConfig, ConnectConfig, WorkspaceConfig
-from databricks.labs.ucx.installer import InstallationManager, InstallationUCX
+from databricks.labs.ucx.config import AccountConfig, ConnectConfig
 
 
 def test_sync_workspace_info(mocker):
@@ -37,13 +36,6 @@ def test_sync_workspace_info(mocker):
         assert host == "https://abc.cloud.databricks.com"
         assert product == "ucx"
         return ws
-
-    im = create_autospec(InstallationManager)
-    im.user_installations.return_value = [
-        InstallationUCX(
-            config=WorkspaceConfig(inventory_database="ucx"), username=User(display_name="foo"), path="/Users/foo"
-        )
-    ]
 
     account_workspaces = AccountWorkspaces(account_config, workspace_client, lambda _: im)
     account_workspaces.sync_workspace_info()

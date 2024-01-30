@@ -8,10 +8,8 @@ import yaml
 from databricks.sdk import AccountClient, WorkspaceClient
 from databricks.sdk.errors import NotFound
 from databricks.sdk.service import iam, sql
-from databricks.sdk.service.iam import User
 
 from databricks.labs.ucx.cli import (
-    CANT_FIND_UCX_MSG,
     alias,
     create_table_mapping,
     ensure_assessment_run,
@@ -29,8 +27,6 @@ from databricks.labs.ucx.cli import (
     validate_groups_membership,
     workflows,
 )
-from databricks.labs.ucx.config import WorkspaceConfig
-from databricks.labs.ucx.installer import InstallationUCX
 
 
 @pytest.fixture
@@ -61,7 +57,7 @@ def ws():
     ws.workspace.download = download
     ws.statement_execution.execute_statement.return_value = sql.ExecuteStatementResponse(
         status=sql.StatementStatus(state=sql.StatementState.SUCCEEDED),
-        manifest=sql.ResultManifest(schema=sql.ResultSchema())
+        manifest=sql.ResultManifest(schema=sql.ResultSchema()),
     )
     return ws
 
@@ -95,7 +91,7 @@ def test_skip_with_table(ws):
         schema=None,
         disposition=sql.Disposition.INLINE,
         format=sql.Format.JSON_ARRAY,
-        wait_timeout=None
+        wait_timeout=None,
     )
 
 
@@ -110,7 +106,7 @@ def test_skip_with_schema(ws):
         schema=None,
         disposition=sql.Disposition.INLINE,
         format=sql.Format.JSON_ARRAY,
-        wait_timeout=None
+        wait_timeout=None,
     )
 
 
@@ -138,7 +134,10 @@ def test_manual_workspace_info(ws):
 
 
 def test_create_table_mapping(ws):
-    with patch("databricks.labs.ucx.account.WorkspaceInfo._current_workspace_id", return_value=123), pytest.raises(ValueError, match='databricks labs ucx sync-workspace-info'):
+    with (
+        patch("databricks.labs.ucx.account.WorkspaceInfo._current_workspace_id", return_value=123),
+        pytest.raises(ValueError, match='databricks labs ucx sync-workspace-info'),
+    ):
         create_table_mapping(ws)
 
 
@@ -226,7 +225,10 @@ def test_move_same_schema(ws, caplog):
 def test_move_no_schema(ws, caplog):
     move(ws, "SrcCat", "", "*", "TgtCat", "")
 
-    assert 'Please enter from_schema, to_schema and from_table (enter * for migrating all tables) details.' in caplog.messages
+    assert (
+        'Please enter from_schema, to_schema and from_table (enter * for migrating all tables) details.'
+        in caplog.messages
+    )
 
 
 def test_move(ws):
@@ -251,7 +253,10 @@ def test_alias_same_schema(ws, caplog):
 def test_alias_no_schema(ws, caplog):
     alias(ws, "SrcCat", "", "*", "TgtCat", "")
 
-    assert 'Please enter from_schema, to_schema and from_table (enter * for migrating all tables) details.' in caplog.messages
+    assert (
+        'Please enter from_schema, to_schema and from_table (enter * for migrating all tables) details.'
+        in caplog.messages
+    )
 
 
 def test_alias(ws):
