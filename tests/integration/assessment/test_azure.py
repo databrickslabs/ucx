@@ -110,9 +110,9 @@ def test_spn_crawler_with_available_secrets(
     _pipeline_conf_with_avlbl_secret["fs.azure.account.oauth2.client.id.SA1.dfs.core.windows.net"] = (
         "{" + (f"{{secrets/{secret_scope}/{secret_key}}}") + "}"
     )
-    _pipeline_conf_with_avlbl_secret["fs.azure.account.oauth2.client.endpoint.SA1.dfs.core.windows.net"] = (
-        "https://login.microsoftonline.com/dummy_tenant/oauth2/token"
-    )
+    _pipeline_conf_with_avlbl_secret[
+        "fs.azure.account.oauth2.client.endpoint.SA1.dfs.core.windows.net"
+    ] = "https://login.microsoftonline.com/dummy_tenant/oauth2/token"
     make_job()
     make_pipeline(configuration=_pipeline_conf_with_avlbl_secret)
     spn_crawler = AzureServicePrincipalCrawler(ws=ws, sbe=sql_backend, schema=inventory_schema)
