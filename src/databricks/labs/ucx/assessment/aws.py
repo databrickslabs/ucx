@@ -76,7 +76,7 @@ class AWSResources:
     S3_REGEX: typing.ClassVar[str] = r"arn:aws:s3:::([a-zA-Z0-9+=,.@_-]*)\/\*$"
     UC_MASTER_ROLES_ARN: typing.ClassVar[list[str]] = [
         "arn:aws:iam::414351767826:role/unity-catalog-prod-UCMasterRole-14S5ZJVKOTYTL",
-        "arn:aws:iam::707343435239:role/unity-catalog-dev-UCMasterRole-G3MMN8SP21FO"
+        "arn:aws:iam::707343435239:role/unity-catalog-dev-UCMasterRole-G3MMN8SP21FO",
     ]
 
     def __init__(self, profile: str, command_runner: Callable[[str], tuple[int, str, str]] = run_command):
@@ -111,49 +111,49 @@ class AWSResources:
         return attached_policies
 
     def list_all_uc_roles(self):
-        list_roles_cmd = (
-            f"iam list-roles --profile {self._profile}"
-        )
+        list_roles_cmd = f"iam list-roles --profile {self._profile}"
         roles = self._run_json_command(list_roles_cmd)
         uc_roles = []
         for role in roles["Roles"]:
-            try:
-                policy_document = role["AssumeRolePolicyDocument"]
-                for statement in policy_document["Statement"]:
+            policy_document = role.get("AssumeRolePolicyDocument")
+            if not policy_document:
+                continue
+            for statement in policy_document["Statement"]:
+                try:
                     if statement["Effect"] != "Allow":
                         continue
                     if statement["Action"] != "sts:AssumeRole":
                         continue
                     principal = statement["Principal"].get("AWS")
-                    if not principal:
-                        continue
-                    if isinstance(principal, list):
-                        is_uc_principal = False
-                        for single_principal in principal:
-                            if single_principal in self.UC_MASTER_ROLES_ARN:
-                                is_uc_principal = True
-                                continue
-                        if not is_uc_principal:
+                except KeyError:
+                    continue
+                if not principal:
+                    continue
+                if isinstance(principal, list):
+                    is_uc_principal = False
+                    for single_principal in principal:
+                        if single_principal in self.UC_MASTER_ROLES_ARN:
+                            is_uc_principal = True
                             continue
-                    elif principal not in self.UC_MASTER_ROLES_ARN:
+                    if not is_uc_principal:
                         continue
-                    uc_roles.append(
-                        AWSRole(
-                            role_id=role.get("RoleId"),
-                            role_name=role.get("RoleName"),
-                            arn=role.get("Arn"),
-                            path=role.get("Path")
-                        )
+                elif principal not in self.UC_MASTER_ROLES_ARN:
+                    continue
+                uc_roles.append(
+                    AWSRole(
+                        role_id=role.get("RoleId"),
+                        role_name=role.get("RoleName"),
+                        arn=role.get("Arn"),
+                        path=role.get("Path"),
                     )
-            except KeyError:
-                continue
+                )
+
         return uc_roles
 
     def get_role_policy(self, role_name, policy_name: str | None = None, attached_policy_arn: str | None = None):
         if policy_name:
             get_policy = (
-                f"iam get-role-policy --profile {self._profile} --role-name {role_name} "
-                f"--policy-name {policy_name}"
+                f"iam get-role-policy --profile {self._profile} --role-name {role_name} " f"--policy-name {policy_name}"
             )
         elif attached_policy_arn:
             get_attached_policy = f"iam get-policy --profile {self._profile} --policy-arn {attached_policy_arn}"
@@ -228,7 +228,12 @@ class AWSResourcePermissions:
         self._field_names = [_.name for _ in dataclasses.fields(AWSRoleAction)]
 
     def save_ucx_compatible_roles(self):
-        pass
+        uc_role_access = list(self._get_role_access())
+        if len(uc_role_access) == 0:
+            logger.warning("No Mapping Was Generated.")
+            return None
+        path = f"{self._folder}/uc_roles_access.csv"
+        return self._save(uc_role_access, path)
 
     def _get_instance_profiles(self) -> Iterable[AWSInstanceProfile]:
         instance_profiles = self._ws.instance_profiles.list()
@@ -244,10 +249,19 @@ class AWSResourcePermissions:
         instance_profiles = list(self._get_instance_profiles())
         tasks = []
         for instance_profile in instance_profiles:
-            tasks.append(partial(self._get_role_access_task,
-                                 instance_profile.instance_profile_arn, instance_profile.role_name))
+            tasks.append(
+                partial(self._get_role_access_task, instance_profile.instance_profile_arn, instance_profile.role_name)
+            )
         # Aggregating the outputs from all the tasks
         return sum(Threads.strict("Scanning Instance Profiles", tasks), [])
+
+    def _get_role_access(self):
+        roles = list(self._aws_resources.list_all_uc_roles())
+        tasks = []
+        for role in roles:
+            tasks.append(partial(self._get_role_access_task, role.arn, role.role_name))
+        # Aggregating the outputs from all the tasks
+        return sum(Threads.strict("Scanning Roles", tasks), [])
 
     def _get_role_access_task(self, arn: str, role_name: str):
         policy_actions = []
@@ -265,9 +279,7 @@ class AWSResourcePermissions:
                 )
         attached_policies = self._aws_resources.list_attached_policies_in_role(role_name)
         for attached_policy in attached_policies:
-            actions = list(
-                self._aws_resources.get_role_policy(role_name, attached_policy_arn=attached_policy)
-            )
+            actions = list(self._aws_resources.get_role_policy(role_name, attached_policy_arn=attached_policy))
             for action in actions:
                 policy_actions.append(
                     AWSRoleAction(
@@ -291,7 +303,7 @@ class AWSResourcePermissions:
         self._ws.workspace.upload(path, buffer, overwrite=True, format=ImportFormat.AUTO)
         return path
 
-    def _save(self, instance_profile_actions: list[any], path) -> str:
+    def _save(self, instance_profile_actions: list[AWSRoleAction], path) -> str:
         buffer = io.StringIO()
         writer = csv.DictWriter(buffer, self._field_names)
         writer.writeheader()

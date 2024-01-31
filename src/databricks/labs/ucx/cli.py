@@ -274,7 +274,7 @@ def save_aws_iam_profiles(w: WorkspaceClient, aws_profile: str | None = None):
 
 
 @ucx.command
-def uc_comaptible_roles(w: WorkspaceClient, *,aws_profile: str | None = None):
+def save_uc_compatible_roles(w: WorkspaceClient, *, aws_profile: str | None = None):
     """identifies all Instance Profiles and map their access to S3 buckets.
     Requires a working setup of AWS CLI.
     https://aws.amazon.com/cli/
