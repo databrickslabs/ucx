@@ -989,7 +989,7 @@ class WorkspaceInstaller:  # pylint: disable=too-many-instance-attributes
         try:
             self._ws.workspace.get_status(self.config_file)
             self._ws.workspace.get_status(self._install_folder)
-            self._ws.workspace.get_status(self._state._state_file())
+            self._ws.workspace.get_status(self._state._state_file)
         except NotFound:
             logger.error(
                 f"Check if {self._install_folder} is present along with {self.config_file} and "
