@@ -126,9 +126,9 @@ class TableAclSupport(AclSupport):
             if all(action_type in action_types_for_current_principal for action_type in acl_action_types):
                 return True
             msg = (
-                f"Couldn't find permission for object type {object_type}, id {object_id} and principal {acl.principal}" 
-                f"acl to be applied={acl_action_types}" 
-                f"acl found in the object={action_types_for_current_principal}"
+                f"Couldn't find permission for object type {object_type}, id {object_id} and principal {acl.principal}\n"
+                f"acl to be applied={acl_action_types}\n"
+                f"acl found in the object={action_types_for_current_principal}\n"
             )
             raise ValueError(msg)
         return False

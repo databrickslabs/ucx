@@ -108,9 +108,9 @@ class ScimSupport(AclSupport):
                 if all(elem in group.entitlements for elem in value):
                     return True
             msg = (
-                f"Couldn't find role for group {group_id}"
-                f"acl to be applied={[e.as_dict() for e in value]}"
-                f"acl found in the object={group.as_dict()}"
+                f"Couldn't find role for group {group_id}\n"
+                f"acl to be applied={[e.as_dict() for e in value]}\n"
+                f"acl found in the object={group.as_dict()}\n"
             )
             raise ValueError(msg)
         return False

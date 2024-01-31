@@ -129,9 +129,9 @@ class GenericPermissionsSupport(AclSupport):
             if all(elem in remote_permission_as_request for elem in acl):
                 return True
             msg = (
-                f"Couldn't find permission for object type {object_type} with id {object_id}"
-                f"acl to be applied={acl}"
-                f"acl found in the object={remote_permission_as_request}"
+                f"Couldn't find permission for object type {object_type} with id {object_id}\n"
+                f"acl to be applied={acl}\n"
+                f"acl found in the object={remote_permission_as_request}\n"
             )
             raise ValueError(msg)
         return False

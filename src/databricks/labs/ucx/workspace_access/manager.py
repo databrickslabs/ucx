@@ -91,7 +91,7 @@ class PermissionManager(CrawlerBase[Permissions]):
         self._save(items)
         logger.info(f"Saved {len(items)} to {self._full_name}")
 
-    def apply_group_permissions(self, migration_state: MigrationState):
+    def apply_group_permissions(self, migration_state: MigrationState) -> bool:
         # list shall be sorted prior to using group by
         if len(migration_state) == 0:
             logger.info("No valid groups selected, nothing to do.")
@@ -140,10 +140,10 @@ class PermissionManager(CrawlerBase[Permissions]):
         logger.info("Permissions were applied")
         return True
 
-    def verify_group_permissions(self):
+    def verify_group_permissions(self) -> bool:
         items = sorted(self.load_all(), key=lambda i: i.object_type)
-        logger.info(f"Verifying permissions applied to destination groups. Total permissions found: {len(items)}")
-        verifier_tasks: list[Callable[..., bool]] = []  # type: ignore[annotation-unchecked]
+        logger.info(f"Total permissions found: {len(items)}")
+        verifier_tasks: list[Callable[..., bool]] = []
         appliers = self._appliers()
 
         for object_type, items_subset in groupby(items, key=lambda i: i.object_type):
@@ -152,7 +152,7 @@ class PermissionManager(CrawlerBase[Permissions]):
                 raise ValueError(msg)
 
             relevant_support = appliers[object_type]
-            tasks_for_support: list[Callable[..., bool]] = []  # type: ignore[annotation-unchecked]
+            tasks_for_support: list[Callable[..., bool]] = []
             for item in items_subset:
                 if not item:
                     continue
@@ -165,13 +165,9 @@ class PermissionManager(CrawlerBase[Permissions]):
             logger.info(f"Total tasks for {object_type}: {len(tasks_for_support)}")
             verifier_tasks.extend(tasks_for_support)
 
-        logger.info(f"Starting to verify permissions applied to destination groups. Total tasks: {len(verifier_tasks)}")
-
-        _, errors = Threads.strict("verify group permissions", verifier_tasks)
-        if len(errors) > 0:
-            logger.error(f"Detected {len(errors)} while verifying permissions applied to destination groups")
-            raise ManyError(errors)
-        logger.info("Permissions for destination groups were verified")
+        logger.info(f"Starting to verify permissions. Total tasks: {len(verifier_tasks)}")
+        Threads.strict("verify group permissions", verifier_tasks)
+        logger.info("All permissions validated successfully. No issues found.")
         return True
 
     def _appliers(self) -> dict[str, AclSupport]:
