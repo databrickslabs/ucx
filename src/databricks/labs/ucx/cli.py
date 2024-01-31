@@ -22,6 +22,7 @@ from databricks.labs.ucx.hive_metastore.table_migrate import TableMove, TablesMi
 from databricks.labs.ucx.install import WorkspaceInstaller
 from databricks.labs.ucx.installer import InstallationManager
 from databricks.labs.ucx.workspace_access.groups import GroupManager
+from databricks.labs.ucx.workspace_access.manager import PermissionManager
 
 ucx = App(__file__)
 logger = get_logger(__file__)
@@ -144,6 +145,26 @@ def repair_run(w: WorkspaceClient, step):
     installer = WorkspaceInstaller(w)
     logger.info(f"Repair Running {step} Job")
     installer.repair_run(step)
+
+
+@ucx.command
+def validate_groups_permissions(w: WorkspaceClient):
+    """Validate that all the crawled permissions are applied correctly to the destination groups"""
+    logger.info("Running validation of permissions applied to groups.")
+    installation_manager = InstallationManager(w)
+    installation = installation_manager.for_user(w.current_user.me())
+    if not installation:
+        logger.error(CANT_FIND_UCX_MSG)
+        return
+    sql_backend = StatementExecutionBackend(w, installation.config.warehouse_id)
+    permission_manager = PermissionManager.factory(
+        w,
+        sql_backend,
+        installation.config.inventory_database,
+        num_threads=installation.config.num_threads,
+        workspace_start_path=installation.config.workspace_start_path,
+    )
+    permission_manager.verify_group_permissions()
 
 
 @ucx.command

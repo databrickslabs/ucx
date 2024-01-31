@@ -141,6 +141,7 @@ class RedashPermissionsSupport(AclSupport):
             )
         return None
 
+    @rate_limited(max_requests=100)
     def _verify(self, object_type: sql.ObjectTypePlural, object_id: str, acl: list[sql.AccessControl]):
         # in-flight check for the applied permissions
         # the api might be inconsistent, therefore we need to check that the permissions were applied
@@ -157,14 +158,10 @@ class RedashPermissionsSupport(AclSupport):
             raise ValueError(msg)
         return False
 
-    def verify(self, item: Permissions) -> bool:
+    def get_verify_task(self, item: Permissions) -> Callable[[], bool]:
         acl = sql.GetResponse.from_dict(json.loads(item.raw))
         assert acl.access_control_list is not None
-        return self._verify(
-            object_type=sql.ObjectTypePlural(item.object_type),
-            object_id=item.object_id,
-            acl=acl.access_control_list,
-        )
+        return partial(self._verify, sql.ObjectTypePlural(item.object_type), item.object_id, acl.access_control_list)
 
     @rate_limited(max_requests=30)
     def _applier_task(self, object_type: sql.ObjectTypePlural, object_id: str, acl: list[sql.AccessControl]):

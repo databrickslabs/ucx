@@ -111,6 +111,9 @@ commands:
       {{range .}}{{.wf_group_name}}\t{{.wf_group_members_count}}\t{{.acc_group_name}}\t{{.acc_group_members_count}}
       {{end}}
 
+  - name: validate-groups-permissions
+    description: Validate that all the crawled permissions are applied correctly to the destination groups
+
   - name: save-aws-iam-profiles
     description: | 
       Identifies all Instance Profiles and map their access to S3 buckets.

@@ -135,6 +135,6 @@ class TableAclSupport(AclSupport):
             raise ValueError(msg)
         return False
 
-    def verify(self, item: Permissions) -> bool:
+    def get_verify_task(self, item: Permissions) -> Callable[[], bool]:
         grant = Grant(**json.loads(item.raw))
-        return self._verify(item.object_type, item.object_id, grant)
+        return partial(self._verify, item.object_type, item.object_id, grant)

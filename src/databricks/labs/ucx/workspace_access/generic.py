@@ -119,6 +119,7 @@ class GenericPermissionsSupport(AclSupport):
                 )
         return results
 
+    @rate_limited(max_requests=100)
     def _verify(self, object_type: str, object_id: str, acl: list[iam.AccessControlRequest]):
         # in-flight check for the applied permissions
         # the api might be inconsistent, therefore we need to check that the permissions were applied
@@ -134,10 +135,11 @@ class GenericPermissionsSupport(AclSupport):
             raise ValueError(msg)
         return False
 
-    def verify(self, item: Permissions) -> bool:
+    def get_verify_task(self, item: Permissions) -> Callable[[], bool]:
         acl = iam.ObjectPermissions.from_dict(json.loads(item.raw))
+        assert acl.access_control_list is not None
         permissions_as_request = self._response_to_request(acl.access_control_list)
-        return self._verify(object_type=item.object_type, object_id=item.object_id, acl=permissions_as_request)
+        return partial(self._verify, item.object_type, item.object_id, permissions_as_request)
 
     @rate_limited(max_requests=30)
     def _applier_task(self, object_type: str, object_id: str, acl: list[iam.AccessControlRequest]):

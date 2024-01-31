@@ -1,5 +1,6 @@
 import json
 import logging
+from collections.abc import Callable
 from datetime import timedelta
 from functools import partial
 
@@ -94,6 +95,7 @@ class ScimSupport(AclSupport):
             raw=json.dumps([e.as_dict() for e in getattr(group, property_name)]),
         )
 
+    @rate_limited(max_requests=255, burst_period_seconds=60)
     def _verify(self, group_id: str, value: list[iam.ComplexValue], property_name: str):
         # in-flight check for the applied permissions
         # the api might be inconsistent, therefore we need to check that the permissions were applied
@@ -112,9 +114,9 @@ class ScimSupport(AclSupport):
             raise ValueError(msg)
         return False
 
-    def verify(self, item: Permissions) -> bool:
+    def get_verify_task(self, item: Permissions) -> Callable[[], bool]:
         value = [iam.ComplexValue.from_dict(e) for e in json.loads(item.raw)]
-        return self._verify(group_id=item.object_id, value=value, property_name=item.object_type)
+        return partial(self._verify, item.object_id, value, item.object_type)
 
     @rate_limited(max_requests=10, burst_period_seconds=60)
     def _applier_task(self, group_id: str, value: list[iam.ComplexValue], property_name: str):

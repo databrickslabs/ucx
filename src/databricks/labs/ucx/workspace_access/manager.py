@@ -140,6 +140,46 @@ class PermissionManager(CrawlerBase[Permissions]):
         logger.info("Permissions were applied")
         return True
 
+    def verify_group_permissions(self):
+        items = sorted(self.load_all(), key=lambda i: i.object_type)
+        logger.info(f"Verifying permissions applied to groups. Total permissions found: {len(items)}")
+        verifier_tasks: list[Callable[..., bool]] = []  # type: ignore[annotation-unchecked]
+        supports_to_items = {
+            support: list(items_subset) for support, items_subset in groupby(items, key=lambda i: i.object_type)
+        }
+
+        appliers = self._appliers()
+
+        # check that all supports are valid.
+        for object_type in supports_to_items:
+            if object_type not in appliers:
+                msg = f"Could not find support for {object_type}. Please check the inventory table."
+                raise ValueError(msg)
+
+        for object_type, items_subset in supports_to_items.items():
+            relevant_support = appliers[object_type]
+            tasks_for_support: list[Callable[..., bool]] = []  # type: ignore[annotation-unchecked]
+            for item in items_subset:
+                if not item:
+                    continue
+                task = relevant_support.get_verify_task(item)
+                if not task:
+                    continue
+                tasks_for_support.append(task)
+            if len(tasks_for_support) == 0:
+                continue
+            logger.info(f"Total tasks for {object_type}: {len(tasks_for_support)}")
+            verifier_tasks.extend(tasks_for_support)
+
+        logger.info(f"Starting to verify permissions applied to groups. Total tasks: {len(verifier_tasks)}")
+
+        _, errors = Threads.gather("verify group permissions", verifier_tasks)
+        if len(errors) > 0:
+            logger.error(f"Detected {len(errors)} while verifying permissions applied to groups")
+            raise ManyError(errors)
+        logger.info("Group permissions were verified")
+        return True
+
     def _appliers(self) -> dict[str, AclSupport]:
         appliers: dict[str, AclSupport] = {}
         for support in self._acl_support:

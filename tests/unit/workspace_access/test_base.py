@@ -31,8 +31,12 @@ def test_applier():
 
             return partial(test_task)
 
-        def verify(self, item: Permissions) -> bool:
-            return True
+        def get_verify_task(self, item: Permissions):
+            def test_task():
+                self.called = True
+                print("here!")
+
+            return partial(test_task)
 
     applier = SampleApplier()
     positive_item = Permissions(object_id="test", object_type="test", raw="test")
@@ -52,6 +56,10 @@ def test_applier():
     )
 
     task = applier.get_apply_task(positive_item, migration_state)
+    task()
+    assert applier.called
+
+    task = applier.get_verify_task(positive_item)
     task()
     assert applier.called
 

@@ -215,29 +215,9 @@ def test_apply_permissions_not_applied(migration_state):
     task()
     assert ws.dbsql_permissions.set.call_count == 1
 
-    expected_acl = [
-        sql.AccessControl(
-            group_name="test",
-            permission_level=sql.PermissionLevel.CAN_MANAGE,
-        ),
-        sql.AccessControl(
-            group_name="db-temp-test",
-            permission_level=sql.PermissionLevel.CAN_MANAGE,
-        ),
-    ]
-    assert sup._safe_get_dbsql_permissions(object_type=sql.ObjectTypePlural.ALERTS, object_id="test") is None
-
-    item = Permissions(
-        object_id="test",
-        object_type=sql.ObjectTypePlural.ALERTS.value,
-        raw=json.dumps(
-            sql.GetResponse(
-                object_type=sql.ObjectType.ALERT, object_id="test", access_control_list=expected_acl
-            ).as_dict()
-        ),
-    )
-
-    assert not sup.verify(item)
+    task = sup.get_verify_task(item)
+    task()
+    assert ws.dbsql_permissions.get.call_count == 2
 
 
 def test_apply_permissions_no_relevant_items(migration_state):

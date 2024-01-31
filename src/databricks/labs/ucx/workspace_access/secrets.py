@@ -1,5 +1,6 @@
 import json
 import logging
+from collections.abc import Callable, Iterable
 from datetime import timedelta
 from functools import partial
 
@@ -7,6 +8,7 @@ from databricks.labs.blueprint.limiter import rate_limited
 from databricks.sdk import WorkspaceClient
 from databricks.sdk.retries import retried
 from databricks.sdk.service import workspace
+from databricks.sdk.service.workspace import AclItem
 
 from databricks.labs.ucx.workspace_access.base import AclSupport, Permissions
 from databricks.labs.ucx.workspace_access.groups import MigrationState
@@ -86,6 +88,7 @@ class SecretScopesSupport(AclSupport):
             raise
         return True
 
+    @rate_limited(max_requests=1100, burst_period_seconds=60)
     def _verify(self, scope_name: str, group_name: str, expected_permission: workspace.AclPermission):
         # in-flight check for the applied permissions
         # the api might be inconsistent, therefore we need to check that the permissions were applied
@@ -96,14 +99,18 @@ class SecretScopesSupport(AclSupport):
                 f"permission {expected_permission} for {scope_name} and {group_name}!"
             )
             raise ValueError(msg)
-        logger.info(f"Permissions matched for {scope_name}, {group_name} and {expected_permission}!")
         return True
 
-    def verify(self, item: Permissions) -> bool:
+    def get_verify_task(self, item: Permissions) -> Callable[[], bool]:
         acls = [workspace.AclItem.from_dict(acl) for acl in json.loads(item.raw)]
-        for acl in acls:
-            self._verify(scope_name=item.object_id, group_name=acl.principal, expected_permission=acl.permission)
-        return True
+
+        def _verify_acls(scope_name: str, acls: Iterable[AclItem]):
+            for acl in acls:
+                assert acl.permission is not None
+                assert acl.principal is not None
+                self._verify(scope_name, acl.principal, acl.permission)
+
+        return partial(_verify_acls, item.object_id, acls)
 
     @rate_limited(max_requests=1100, burst_period_seconds=60)
     def _applier_task(self, object_id: str, principal: str, permission: workspace.AclPermission):
