@@ -1,4 +1,5 @@
 import io
+import json
 from datetime import timedelta
 from pathlib import Path
 from typing import Any
@@ -19,6 +20,7 @@ from databricks.sdk.errors import (
 )
 from databricks.sdk.service import iam, jobs, sql
 from databricks.sdk.service.compute import (
+    CreatePolicyResponse,
     GlobalInitScriptDetails,
     GlobalInitScriptDetailsWithContent,
     Policy,
@@ -139,6 +141,9 @@ def mock_create_job_for_writable_dbfs(**args):
 def test_install_cluster_override_jobs(ws, mocker, tmp_path):
     config_bytes = yaml.dump(WorkspaceConfig(inventory_database="a").as_dict()).encode("utf8")
     ws.workspace.download = lambda _: io.BytesIO(config_bytes)
+    ws.cluster_policies.create.return_value = CreatePolicyResponse(policy_id="foo")
+    ws.clusters.select_spark_version = lambda latest: "14.2.x-scala2.12"
+    ws.clusters.select_node_type = lambda local_disk: "Standard_F4s"
     ws.jobs.create = mock_create_job
     wheels = create_autospec(Wheels)
     install = WorkspaceInstaller(ws, wheels=wheels, promtps=MockPrompts({".*": ""}))
@@ -152,6 +157,9 @@ def test_write_protected_dbfs(ws, tmp_path):
     """Simulate write protected DBFS AND override clusters"""
     config_bytes = yaml.dump(WorkspaceConfig(inventory_database="a").as_dict()).encode("utf8")
     ws.workspace.download = lambda _: io.BytesIO(config_bytes)
+    ws.cluster_policies.create.return_value = CreatePolicyResponse(policy_id="foo")
+    ws.clusters.select_spark_version = lambda latest: "14.2.x-scala2.12"
+    ws.clusters.select_node_type = lambda local_disk: "Standard_F4s"
     ws.jobs.create = mock_create_job
 
     wheels = create_autospec(Wheels)
@@ -182,6 +190,8 @@ def test_writeable_dbfs(ws, tmp_path):
     """Ensure configure does not add cluster override for happy path of writable DBFS"""
     config_bytes = yaml.dump(WorkspaceConfig(inventory_database="a").as_dict()).encode("utf8")
     ws.workspace.download = lambda _: io.BytesIO(config_bytes)
+    ws.clusters.select_spark_version = lambda latest: "14.2.x-scala2.12"
+    ws.clusters.select_node_type = lambda local_disk: "Standard_F4s"
     ws.jobs.create = mock_create_job_for_writable_dbfs
 
     wheels = create_autospec(Wheels)
@@ -214,6 +224,9 @@ def test_unexpected_dbfs_upload_error(ws, tmp_path):
 def test_replace_clusters_for_integration_tests(ws):
     config_bytes = yaml.dump(WorkspaceConfig(inventory_database="a").as_dict()).encode("utf8")
     ws.workspace.download = lambda _: io.BytesIO(config_bytes)
+    ws.cluster_policies.create.return_value = CreatePolicyResponse(policy_id="foo")
+    ws.clusters.select_spark_version = lambda latest: "14.2.x-scala2.12"
+    ws.clusters.select_node_type = lambda local_disk: "Standard_F4s"
     wheels = create_autospec(Wheels)
     return_value = WorkspaceInstaller.run_for_config(
         ws,
@@ -349,6 +362,9 @@ def test_save_config(ws):
         EndpointInfo(name="abc", id="abc", warehouse_type=EndpointInfoWarehouseType.PRO, state=State.RUNNING)
     ]
     ws.cluster_policies.list = lambda: []
+    ws.cluster_policies.create.return_value = CreatePolicyResponse(policy_id="foo")
+    ws.clusters.select_spark_version = lambda latest: "14.2.x-scala2.12"
+    ws.clusters.select_node_type = lambda local_disk: "Standard_F4s"
     ws.workspace.download = not_found
 
     install = WorkspaceInstaller(
@@ -368,6 +384,7 @@ def test_save_config(ws):
         "/Users/me@example.com/.ucx/config.yml",
         b"""connect:
   debug_truncate_bytes: 250000
+custom_cluster_policy_id: foo
 default_catalog: ucx_default
 inventory_database: ucx
 log_level: INFO
@@ -496,6 +513,9 @@ def test_save_config_auto_groups(ws):
         EndpointInfo(name="abc", id="abc", warehouse_type=EndpointInfoWarehouseType.PRO, state=State.RUNNING)
     ]
     ws.cluster_policies.list = lambda: []
+    ws.cluster_policies.create.return_value = CreatePolicyResponse(policy_id="foo")
+    ws.clusters.select_spark_version = lambda latest: "14.2.x-scala2.12"
+    ws.clusters.select_node_type = lambda local_disk: "Standard_F4s"
 
     install = WorkspaceInstaller(
         ws,
@@ -513,6 +533,7 @@ def test_save_config_auto_groups(ws):
         "/Users/me@example.com/.ucx/config.yml",
         b"""connect:
   debug_truncate_bytes: 250000
+custom_cluster_policy_id: foo
 default_catalog: ucx_default
 inventory_database: ucx
 log_level: INFO
@@ -533,6 +554,9 @@ def test_save_config_strip_group_names(ws):
         EndpointInfo(name="abc", id="abc", warehouse_type=EndpointInfoWarehouseType.PRO, state=State.RUNNING)
     ]
     ws.cluster_policies.list = lambda: []
+    ws.cluster_policies.create.return_value = CreatePolicyResponse(policy_id="foo")
+    ws.clusters.select_spark_version = lambda latest: "14.2.x-scala2.12"
+    ws.clusters.select_node_type = lambda local_disk: "Standard_F4s"
 
     install = WorkspaceInstaller(
         ws,
@@ -553,6 +577,7 @@ def test_save_config_strip_group_names(ws):
         "/Users/me@example.com/.ucx/config.yml",
         b"""connect:
   debug_truncate_bytes: 250000
+custom_cluster_policy_id: foo
 default_catalog: ucx_default
 include_group_names:
 - g1
@@ -571,31 +596,86 @@ workspace_start_path: /
     )
 
 
-def test_save_config_with_custom_policy(ws):
-    policy_def = b"""{
-      "aws_attributes.instance_profile_arn": {
-        "type": "fixed",
-        "value": "arn:aws:iam::111222333:instance-profile/foo-instance-profile",
-        "hidden": false
-      },
-      "spark_conf.spark.databricks.hive.metastore.glueCatalog.enabled": {
-        "type": "fixed",
-        "value": "true",
-        "hidden": true
-      }
-    }"""
+def test_cluster_policy_definition_azure_hms(ws):
+    install = WorkspaceInstaller(
+        ws,
+    )
+    ws.config.is_aws = False
+    ws.config.is_azure = True
+    ws.config.is_gcp = False
+    ws.clusters.select_spark_version = lambda latest: "14.2.x-scala2.12"
+    ws.clusters.select_node_type = lambda local_disk: "Standard_F4s"
+    conf = {
+        "spark.hadoop.javax.jdo.option.ConnectionURL": "url",
+        "spark.hadoop.javax.jdo.option.ConnectionUserName": "user1",
+        "spark.hadoop.javax.jdo.option.ConnectionPassword": "pwd",
+        "spark.hadoop.javax.jdo.option.ConnectionDriverName": "SQLServerDriver",
+        "sql.hive.metastore.version": "0.13",
+        "sql.hive.metastore.jars": "jar1",
+    }
+    instance_profile = "role_arn_1"
+    policy_definition = install._cluster_policy_definition(conf, instance_profile)
+    policy_definition_dict = json.loads(policy_definition)
+    assert policy_definition_dict["spark_conf.spark.hadoop.javax.jdo.option.ConnectionURL"]["value"] == "url"
+    assert policy_definition_dict["spark_conf.spark.hadoop.javax.jdo.option.ConnectionUserName"]["value"] == "user1"
+    assert policy_definition_dict["spark_conf.spark.hadoop.javax.jdo.option.ConnectionPassword"]["value"] == "pwd"
+    assert (
+        policy_definition_dict["spark_conf.spark.hadoop.javax.jdo.option.ConnectionDriverName"]["value"]
+        == "SQLServerDriver"
+    )
+    assert policy_definition_dict["spark_conf.sql.hive.metastore.version"]["value"] == "0.13"
+    assert policy_definition_dict["spark_conf.sql.hive.metastore.jars"]["value"] == "jar1"
+    assert policy_definition_dict["azure_attributes.availability"]["value"] == "ON_DEMAND_AZURE"
+    assert policy_definition_dict["spark_version"]["value"] == "14.2.x-scala2.12"
+    assert policy_definition_dict["node_type_id"]["value"] == "Standard_F4s"
 
+
+def test_cluster_policy_definition_aws_glue(ws):
+    install = WorkspaceInstaller(
+        ws,
+    )
+    ws.config.is_aws = True
+    ws.config.is_azure = False
+    ws.config.is_gcp = False
+    ws.clusters.select_spark_version = lambda latest: "14.2.x-scala2.12"
+    ws.clusters.select_node_type = lambda local_disk: "Standard_F4s"
+    conf = {"spark.databricks.hive.metastore.glueCatalog.enabled": "True"}
+    instance_profile = "role_arn_1"
+    policy_definition = install._cluster_policy_definition(conf, instance_profile)
+    policy_definition_dict = json.loads(policy_definition)
+    assert policy_definition_dict["spark_conf.spark.databricks.hive.metastore.glueCatalog.enabled"]["value"] == "True"
+    assert policy_definition_dict["aws_attributes.availability"]["value"] == "ON_DEMAND"
+    assert policy_definition_dict["spark_version"]["value"] == "14.2.x-scala2.12"
+    assert policy_definition_dict["node_type_id"]["value"] == "Standard_F4s"
+    assert policy_definition_dict["aws_attributes.instance_profile_arn"]["value"] == "role_arn_1"
+
+
+def test_cluster_policy_definition_gcp(ws):
+    install = WorkspaceInstaller(
+        ws,
+    )
+    ws.config.is_aws = False
+    ws.config.is_azure = False
+    ws.config.is_gcp = True
+    ws.clusters.select_spark_version = lambda latest: "14.2.x-scala2.12"
+    ws.clusters.select_node_type = lambda local_disk: "Standard_F4s"
+
+    policy_definition = install._cluster_policy_definition(None, "")
+    policy_definition_dict = json.loads(policy_definition)
+    assert policy_definition_dict["gcp_attributes.availability"]["value"] == "ON_DEMAND_GCP"
+    assert policy_definition_dict["spark_version"]["value"] == "14.2.x-scala2.12"
+    assert policy_definition_dict["node_type_id"]["value"] == "Standard_F4s"
+
+
+def test_save_config_with_custom_policy(ws):
     ws.workspace.get_status.side_effect = NotFound(...)
     ws.warehouses.list = lambda **_: [
         EndpointInfo(id="abc", warehouse_type=EndpointInfoWarehouseType.PRO, state=State.RUNNING)
     ]
-    ws.cluster_policies.list = lambda: [
-        Policy(
-            name="dummy",
-            policy_id="0123456789ABCDEF",
-            definition=policy_def.decode("utf-8"),
-        )
-    ]
+
+    ws.cluster_policies.create.return_value = CreatePolicyResponse(policy_id="foo")
+    ws.clusters.select_spark_version = lambda latest: "14.2.x-scala2.12"
+    ws.clusters.select_node_type = lambda local_disk: "Standard_F4s"
 
     install = WorkspaceInstaller(
         ws,
@@ -604,7 +684,6 @@ def test_save_config_with_custom_policy(ws):
                 r".*PRO or SERVERLESS SQL warehouse.*": "1",
                 r".*follow a policy.*": "yes",
                 r"Choose how to map the workspace groups.*": "2",
-                r".*Choose a cluster policy.*": "0",
                 r".*": "",
             }
         ),
@@ -615,7 +694,7 @@ def test_save_config_with_custom_policy(ws):
         "/Users/me@example.com/.ucx/config.yml",
         b"""connect:
   debug_truncate_bytes: 250000
-custom_cluster_policy_id: 0123456789ABCDEF
+custom_cluster_policy_id: foo
 default_catalog: ucx_default
 inventory_database: ucx
 log_level: INFO
@@ -655,6 +734,9 @@ def test_save_config_with_glue(ws):
             definition=policy_def.decode("utf-8"),
         )
     ]
+    ws.cluster_policies.create.return_value = CreatePolicyResponse(policy_id="foo")
+    ws.clusters.select_spark_version = lambda latest: "14.2.x-scala2.12"
+    ws.clusters.select_node_type = lambda local_disk: "Standard_F4s"
 
     install = WorkspaceInstaller(
         ws,
@@ -674,6 +756,7 @@ def test_save_config_with_glue(ws):
         "/Users/me@example.com/.ucx/config.yml",
         b"""connect:
   debug_truncate_bytes: 250000
+custom_cluster_policy_id: foo
 default_catalog: ucx_default
 instance_profile: arn:aws:iam::111222333:instance-profile/foo-instance-profile
 inventory_database: ucx
@@ -698,6 +781,9 @@ def test_main_with_existing_conf_does_not_recreate_config(ws, mocker):
     webbrowser_open = mocker.patch("webbrowser.open")
 
     ws.current_user.me = lambda: iam.User(user_name="me@example.com", groups=[iam.ComplexValue(display="admins")])
+    ws.cluster_policies.create.return_value = CreatePolicyResponse(policy_id="foo")
+    ws.clusters.select_spark_version = lambda latest: "14.2.x-scala2.12"
+    ws.clusters.select_node_type = lambda local_disk: "Standard_F4s"
     ws.config.host = "https://foo"
     ws.config.is_aws = True
     ws.config.is_azure = False
@@ -1009,6 +1095,7 @@ def test_remove_database(ws, mocker):
         promtps=MockPrompts(
             {
                 r".*PRO or SERVERLESS SQL warehouse.*": "1",
+                r".*Do you want to delete the inventory.*": "Yes",
                 r".*": "",
             }
         ),
@@ -1077,6 +1164,7 @@ def test_uninstall(ws, mocker):
         promtps=MockPrompts(
             {
                 r".*PRO or SERVERLESS SQL warehouse.*": "1",
+                r".*Do you want to uninstall .*": "Yes",
                 r".*": "",
             }
         ),

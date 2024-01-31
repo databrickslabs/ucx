@@ -1,11 +1,13 @@
 import functools
+import json
 import logging
 from collections.abc import Callable
 from dataclasses import replace
 from datetime import timedelta
-from databricks.labs.blueprint.tui import MockPrompts
+
 import pytest
 from databricks.labs.blueprint.parallel import Threads
+from databricks.labs.blueprint.tui import MockPrompts
 from databricks.sdk.errors import InvalidParameterValue, NotFound
 from databricks.sdk.retries import retried
 from databricks.sdk.service.iam import PermissionLevel
@@ -38,16 +40,10 @@ def new_installation(ws, sql_backend, env_or_skip, inventory_schema, make_random
                 r".*connect to the external metastore?.*": "yes",
                 r".*Inventory Database.*": inventory_schema,
                 r".*Backup prefix*": renamed_group_prefix,
+                r".*Do you want to uninstall*": "yes",
                 r".*": "",
             }
         )
-
-        # wc = WorkspaceConfig(
-        #     inventory_database=inventory_schema,
-        #     log_level="DEBUG",
-        #     renamed_group_prefix=renamed_group_prefix,
-        #     workspace_start_path=workspace_start_path,
-        # )
         default_cluster_id = env_or_skip("TEST_DEFAULT_CLUSTER_ID")
         tacl_cluster_id = env_or_skip("TEST_LEGACY_TABLE_ACL_CLUSTER_ID")
         Threads.strict(
@@ -57,16 +53,9 @@ def new_installation(ws, sql_backend, env_or_skip, inventory_schema, make_random
                 functools.partial(ws.clusters.ensure_cluster_is_running, tacl_cluster_id),
             ],
         )
-
         overrides = {"main": default_cluster_id, "tacl": tacl_cluster_id}
         install = WorkspaceInstaller(ws, promtps=prompts, sql_backend=sql_backend)
         install._configure()
-
-
-        #install = WorkspaceInstaller.run_for_config(
-        #    ws, wc, sql_backend=sql_backend, prefix=prefix, override_clusters=overrides
-        #)
-
         install.current_config.override_clusters = overrides
         install.current_config.workspace_start_path = workspace_start_path
         if config_transform:
@@ -82,9 +71,42 @@ def new_installation(ws, sql_backend, env_or_skip, inventory_schema, make_random
 
 
 @retried(on=[NotFound, TimeoutError], timeout=timedelta(minutes=5))
-def test_job_failure_propagates_correct_error_message_and_logs(ws, sql_backend, new_installation, make_cluster_policy):
-    # make_cluster_policy()
+def test_job_cluster_policy(ws, new_installation):
+    install = new_installation(lambda wc: replace(wc, override_clusters=None))
+    cluster_policy = ws.cluster_policies.get(policy_id=install.current_config.custom_cluster_policy_id)
+    policy_definition = json.loads(cluster_policy.definition)
 
+    assert cluster_policy.name == f"ucx-policy-{install.current_config.inventory_database}"
+
+    assert policy_definition["spark_version"]["value"] == "14.2.x-scala2.12"
+    assert policy_definition["node_type_id"]["value"] == "Standard_F4s"
+    assert policy_definition["azure_attributes.availability"]["value"] == "ON_DEMAND_AZURE"
+
+
+@pytest.mark.skip
+@retried(on=[NotFound, TimeoutError], timeout=timedelta(minutes=15))
+def test_new_job_cluster_with_policy_assessment(
+    ws, new_installation, make_ucx_group, make_cluster_policy, make_cluster_policy_permissions
+):
+    ws_group_a, acc_group_a = make_ucx_group()
+    cluster_policy = make_cluster_policy()
+    make_cluster_policy_permissions(
+        object_id=cluster_policy.policy_id,
+        permission_level=PermissionLevel.CAN_USE,
+        group_name=ws_group_a.display_name,
+    )
+    install = new_installation(
+        lambda wc: replace(wc, override_clusters=None, include_group_names=[ws_group_a.display_name])
+    )
+    install.run_workflow("assessment")
+    generic_permissions = GenericPermissionsSupport(ws, [])
+    before = generic_permissions.load_as_dict("cluster-policies", cluster_policy.policy_id)
+    assert before[ws_group_a.display_name] == PermissionLevel.CAN_USE
+
+
+@retried(on=[NotFound, TimeoutError], timeout=timedelta(minutes=5))
+def test_job_failure_propagates_correct_error_message_and_logs(ws, sql_backend, new_installation, make_cluster_policy):
+    make_cluster_policy()
     install = new_installation()
 
     sql_backend.execute(f"DROP SCHEMA {install.current_config.inventory_database} CASCADE")
@@ -202,4 +224,3 @@ def test_uninstallation(ws, sql_backend, new_installation):
         ws.jobs.get(job_id=assessment_job_id)
     with pytest.raises(NotFound):
         sql_backend.execute(f"show tables from hive_metastore.{install.current_config.inventory_database}")
-

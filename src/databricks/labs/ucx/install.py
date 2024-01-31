@@ -483,21 +483,12 @@ class WorkspaceInstaller:  # pylint: disable=too-many-instance-attributes
 
         logger.info("Creating UCX cluster policy.")
 
-        try:
-            for policy in self._ws.cluster_policies.list():
-                if policy.name == "ucx-policy":
-                    logger.info("UCX Cluster policy already exists, reusing the same")
-                    self._custom_cluster_policy_id = policy.policy_id
-                    break
-
-            if self._custom_cluster_policy_id is None:
-                self._custom_cluster_policy_id = self._ws.cluster_policies.create(
-                    name="ucx-policy",
-                    definition=self._cluster_policy_definition(spark_conf_dict),
-                    description="Custom cluster policy for UCX",
-                ).policy_id
-        except InvalidParameterValue:
-            logger.info("UCX Cluster policy already exists, reusing the same")
+        # creating a cluster policy unique per installation by using the inventory database name
+        self._custom_cluster_policy_id = self._ws.cluster_policies.create(
+            name=f"ucx-policy-{inventory_database}",
+            definition=self._cluster_policy_definition(spark_conf_dict, instance_profile),
+            description="Custom cluster policy for UCX",
+        ).policy_id
 
         self._config = WorkspaceConfig(
             inventory_database=inventory_database,
@@ -549,17 +540,21 @@ class WorkspaceInstaller:  # pylint: disable=too-many-instance-attributes
                 self._state.jobs[step] = job_id
         logger.debug(f"Creating jobs from tasks in {main.__name__}")
         remote_wheel = self._upload_wheel()
-        self._ws.cluster_policies.edit(policy_id=self._custom_cluster_policy_id,
-                                       name="ucx-policy",
-                                       definition=self._cluster_policy_definition(self.current_config.spark_conf),
-                                       libraries=[compute.Library(whl=f"dbfs:{remote_wheel}")])
+        self._ws.cluster_policies.edit(
+            policy_id=self._custom_cluster_policy_id,
+            name=f"ucx-policy-{self.current_config.inventory_database}",
+            definition=self._cluster_policy_definition(
+                self.current_config.spark_conf, self.current_config.instance_profile
+            ),
+            libraries=[compute.Library(whl=f"dbfs:{remote_wheel}")],
+        )
         desired_steps = {t.workflow for t in _TASKS.values() if t.cloud_compatible(self._ws.config)}
         wheel_runner = None
 
         if self.current_config.override_clusters:
             wheel_runner = self._upload_wheel_runner(remote_wheel)
         for step_name in desired_steps:
-            settings = self._job_settings(step_name, remote_wheel)
+            settings = self._job_settings(step_name)
             if self.current_config.override_clusters:
                 settings = self._apply_cluster_overrides(settings, self.current_config.override_clusters, wheel_runner)
             self._deploy_workflow(step_name, settings)
@@ -678,7 +673,7 @@ class WorkspaceInstaller:  # pylint: disable=too-many-instance-attributes
     def notebook_link(self, path: str) -> str:
         return f"{self._ws.config.host}/#workspace{path}"
 
-    def _job_settings(self, step_name: str, remote_wheel: str):
+    def _job_settings(self, step_name: str):
         email_notifications = None
         if not self.current_config.override_clusters and "@" in self._my_username:
             # set email notifications only if we're running the real
@@ -697,7 +692,7 @@ class WorkspaceInstaller:  # pylint: disable=too-many-instance-attributes
             "tags": {TAG_APP: self._app, "version": f"v{version}"},
             "job_clusters": self._job_clusters({t.job_cluster for t in tasks}),
             "email_notifications": email_notifications,
-            "tasks": [self._job_task(task, remote_wheel) for task in tasks],
+            "tasks": [self._job_task(task) for task in tasks],
         }
 
     def _upload_wheel_runner(self, remote_wheel: str):
@@ -724,7 +719,7 @@ class WorkspaceInstaller:  # pylint: disable=too-many-instance-attributes
                 job_task.notebook_task = jobs.NotebookTask(notebook_path=wheel_runner, base_parameters=params)
         return settings
 
-    def _job_task(self, task: Task, remote_wheel: str) -> jobs.Task:
+    def _job_task(self, task: Task) -> jobs.Task:
         jobs_task = jobs.Task(
             task_key=task.name,
             job_cluster_key=task.job_cluster,
@@ -734,7 +729,7 @@ class WorkspaceInstaller:  # pylint: disable=too-many-instance-attributes
             return self._job_dashboard_task(jobs_task, task)
         if task.notebook:
             return self._job_notebook_task(jobs_task, task)
-        return self._job_wheel_task(jobs_task, task, remote_wheel)
+        return self._job_wheel_task(jobs_task, task)
 
     def _job_dashboard_task(self, jobs_task: jobs.Task, task: Task) -> jobs.Task:
         assert task.dashboard is not None
@@ -766,11 +761,10 @@ class WorkspaceInstaller:  # pylint: disable=too-many-instance-attributes
             ),
         )
 
-    def _job_wheel_task(self, jobs_task: jobs.Task, task: Task, remote_wheel: str) -> jobs.Task:
+    def _job_wheel_task(self, jobs_task: jobs.Task, task: Task) -> jobs.Task:
         return replace(
             jobs_task,
             # TODO: check when we can install wheels from WSFS properly
-            # libraries=[compute.Library(whl=f"dbfs:{remote_wheel}")],
             python_wheel_task=jobs.PythonWheelTask(
                 package_name="databricks_labs_ucx",
                 entry_point="runtime",  # [project.entry-points.databricks] in pyproject.toml
@@ -784,21 +778,17 @@ class WorkspaceInstaller:  # pylint: disable=too-many-instance-attributes
             "spark.databricks.cluster.profile": "singleNode",
             "spark.master": "local[*]",
         }
-        if self.current_config.spark_conf is not None:
-            spark_conf = spark_conf | self.current_config.spark_conf
-        spec = self._cluster_node_type(
-            compute.ClusterSpec(
+        spec = compute.ClusterSpec(
                 # spark_version=self._ws.clusters.select_spark_version(latest=True),
                 data_security_mode=compute.DataSecurityMode.LEGACY_SINGLE_USER,
-                # spark_conf=spark_conf,
+                spark_conf=spark_conf,
                 custom_tags={"ResourceClass": "SingleNode"},
                 num_workers=0,
-                policy_id=self._custom_cluster_policy_id
-
+                policy_id=self._custom_cluster_policy_id,
             )
-        )
-        if self._config.custom_cluster_policy_id is not None:
-            spec = replace(spec, policy_id=self._config.custom_cluster_policy_id)
+
+        # if self._config.custom_cluster_policy_id is not None:
+        #    spec = replace(spec, policy_id=self._config.custom_cluster_policy_id)
         if self._ws.config.is_aws and spec.aws_attributes is not None:
             # TODO: we might not need spec.aws_attributes, if we have a cluster policy
             aws_attributes = replace(spec.aws_attributes, instance_profile_arn=self._config.instance_profile)
@@ -825,42 +815,37 @@ class WorkspaceInstaller:  # pylint: disable=too-many-instance-attributes
             )
         return clusters
 
-    def _cluster_policy_definition(self, conf: dict) -> str:
+    def _cluster_policy_definition(self, conf: dict, instance_profile: str) -> str:
         policy_definition = {
             "spark_version": {"type": "fixed", "value": self._ws.clusters.select_spark_version(latest=True)},
-            "custom_tags.ResourceClass": {"type": "fixed", "value": "SingleNode"},
-            "node_type_id": {"type": "fixed", "value": self._ws.clusters.select_node_type(local_disk=True)}
+            "node_type_id": {"type": "fixed", "value": self._ws.clusters.select_node_type(local_disk=True)},
         }
         if conf:
             for key, value in conf.items():
-                policy_definition[f"spark_conf.{key}"] = {"type": "fixed", "value": value}
+                if key.startswith("spark.hadoop.javax.jdo.option") or key.startswith("sql.hive.metastore"):
+                    policy_definition[f"spark_conf.{key}"] = {"type": "fixed", "value": value}
+                elif self._ws.config.is_aws and key.startswith("spark.databricks.hive.metastore.glueCatalog.enabled"):
+                    policy_definition[f"spark_conf.{key}"] = {"type": "fixed", "value": value}
+                else:
+                    continue
+
         if self._ws.config.is_aws:
-            policy_definition["aws_attributes.availability"] = {"type": "fixed", "value": compute.AwsAvailability.ON_DEMAND.value}
+            policy_definition["aws_attributes.availability"] = {
+                "type": "fixed",
+                "value": compute.AwsAvailability.ON_DEMAND.value,
+            }
+            policy_definition["aws_attributes.instance_profile_arn"] = {"type": "fixed", "value": instance_profile}
         elif self._ws.config.is_azure:
-            pass
-            policy_definition["azure_attributes.availability"] = {"type": "fixed", "value": compute.AzureAvailability.ON_DEMAND_AZURE.value}
+            policy_definition["azure_attributes.availability"] = {
+                "type": "fixed",
+                "value": compute.AzureAvailability.ON_DEMAND_AZURE.value,
+            }
         else:
-            policy_definition["gcp_attributes.availability"] = {"type": "fixed", "value": compute.GcpAvailability.ON_DEMAND_GCP}
+            policy_definition["gcp_attributes.availability"] = {
+                "type": "fixed",
+                "value": compute.GcpAvailability.ON_DEMAND_GCP.value,
+            }
         return json.dumps(policy_definition)
-
-
-    def _cluster_node_type(self, spec: compute.ClusterSpec) -> compute.ClusterSpec:
-        cfg = self.current_config
-        valid_node_type = False
-        if cfg.custom_cluster_policy_id is not None:
-            if self._check_policy_has_instance_pool(cfg.custom_cluster_policy_id):
-                valid_node_type = True
-        if not valid_node_type:
-            if cfg.instance_pool_id is not None:
-                return replace(spec, instance_pool_id=cfg.instance_pool_id)
-            spec = replace(spec, node_type_id=self._ws.clusters.select_node_type(local_disk=True))
-        if self._ws.config.is_aws:
-            return replace(spec, aws_attributes=compute.AwsAttributes(availability=compute.AwsAvailability.ON_DEMAND))
-        if self._ws.config.is_azure:
-            return replace(
-                spec, azure_attributes=compute.AzureAttributes(availability=compute.AzureAvailability.ON_DEMAND_AZURE)
-            )
-        return replace(spec, gcp_attributes=compute.GcpAttributes(availability=compute.GcpAvailability.ON_DEMAND_GCP))
 
     def _instance_profiles(self):
         return {"No Instance Profile": None} | {
@@ -878,14 +863,6 @@ class WorkspaceInstaller:  # pylint: disable=too-many-instance-attributes
                 if key.startswith("spark_config.spark.sql.hive.metastore"):
                     yield policy
                     break
-
-    def _check_policy_has_instance_pool(self, policy_id):
-        policy = self._ws.cluster_policies.get(policy_id=policy_id)
-        def_json = json.loads(policy.definition)
-        instance_pool = def_json.get("instance_pool_id")
-        if instance_pool is not None:
-            return True
-        return False
 
     @staticmethod
     def _get_ext_hms_conf_from_policy(cluster_policy):
@@ -1029,7 +1006,7 @@ class WorkspaceInstaller:  # pylint: disable=too-many-instance-attributes
         try:
             self._ws.cluster_policies.delete(policy_id=self.current_config.custom_cluster_policy_id)
         except InvalidParameterValue:
-            logger.error(f"UCX Policy already deleted")
+            logger.error("UCX Policy already deleted")
 
     def _remove_jobs(self):
         logger.info("Deleting jobs")
