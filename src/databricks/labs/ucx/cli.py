@@ -273,5 +273,10 @@ def save_aws_iam_profiles(w: WorkspaceClient, aws_profile: str | None = None):
     return None
 
 
+@ucx.command
+def migrate_azure_sp(w: WorkspaceClient):
+
+
+
 if __name__ == "__main__":
     ucx()
