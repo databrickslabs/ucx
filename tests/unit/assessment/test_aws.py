@@ -1,17 +1,19 @@
 import logging
+from typing import BinaryIO
 from unittest.mock import create_autospec
 
 import pytest
-from databricks.labs.blueprint.installation import MockInstallation
 from databricks.sdk import WorkspaceClient
 from databricks.sdk.service import iam
 from databricks.sdk.service.compute import InstanceProfile
+from databricks.sdk.service.workspace import ImportFormat, Language
 
 from databricks.labs.ucx.assessment.aws import (
     AWSInstanceProfile,
     AWSPolicyAction,
     AWSResourcePermissions,
     AWSResources,
+    AWSRole,
     run_command,
 )
 
@@ -243,11 +245,125 @@ def test_get_role_policy():
     ]
 
 
+def test_get_uc_roles():
+    list_roles_return = """
+    {
+        "Roles": [
+            {
+                "Path": "/",
+                "RoleName": "NON-UC-Role",
+                "RoleId": "12345",
+                "Arn": "arn:aws:iam::123456789:role/non-uc-role",
+                "CreateDate": "2024-01-01T00:00:00+00:00",
+                "AssumeRolePolicyDocument": {
+                    "Version": "2024-01-01",
+                    "Statement": [
+                        {
+                            "Effect": "Allow",
+                            "Principal": {
+                                "Service": "ec2.amazonaws.com"
+                            },
+                            "Action": "sts:AssumeRole"
+                        }
+                    ]
+                },
+                "MaxSessionDuration": 3600
+            },
+            {
+                "Path": "/",
+                "RoleName": "uc-role-1",
+                "RoleId": "12345",
+                "Arn": "arn:aws:iam::123456789:role/uc-role-1",
+                "CreateDate": "2024-01-01T00:00:00+00:00",
+                "AssumeRolePolicyDocument": {
+                    "Version": "2024-01-01",
+                    "Statement": [
+                        {
+                            "Effect": "Allow",
+                            "Principal": {
+                                "AWS": [
+                                    "arn:aws:iam::123456789:role/uc-role",
+                                    "arn:aws:iam::414351767826:role/unity-catalog-prod-UCMasterRole-14S5ZJVKOTYTL"
+                                ]
+                            },
+                            "Action": "sts:AssumeRole",
+                            "Condition": {
+                                "StringEquals": {
+                                    "sts:ExternalId": "1122334455"
+                                }
+                            }
+                        }
+                    ]
+                }
+            },
+            {
+                "Path": "/",
+                "RoleName": "uc-role-2",
+                "RoleId": "123456",
+                "Arn": "arn:aws:iam::123456789:role/uc-role-2",
+                "CreateDate": "2024-01-01T00:00:00+00:00",
+                "AssumeRolePolicyDocument": {
+                    "Version": "2024-01-01",
+                    "Statement": [
+                        {
+                            "Effect": "Allow",
+                            "Principal": {
+                                "AWS": "arn:aws:iam::414351767826:role/unity-catalog-prod-UCMasterRole-14S5ZJVKOTYTL"
+                            },
+                            "Action": "sts:AssumeRole",
+                            "Condition": {
+                                "StringEquals": {
+                                    "sts:ExternalId": "1122334466"
+                                }
+                            }
+                        }
+                    ]
+                }
+            }
+        ]
+    }
+    """
+
+    def command_call(cmd: str):
+        return 0, list_roles_return, ""
+
+    aws = AWSResources("Fake_Profile", command_call)
+    uc_roles = aws.list_all_uc_roles()
+    assert uc_roles == [
+        AWSRole(path='/', role_name='uc-role-1', role_id='12345', arn='arn:aws:iam::123456789:role/uc-role-1'),
+        AWSRole(path='/', role_name='uc-role-2', role_id='123456', arn='arn:aws:iam::123456789:role/uc-role-2'),
+    ]
+
+
 def test_save_instance_profile_permissions():
     ws = create_autospec(WorkspaceClient)
     ws.instance_profiles.list.return_value = [
         InstanceProfile("arn:aws:iam::12345:instance-profile/role1", "arn:aws:iam::12345:role/role1")
     ]
+    ws.current_user.me = lambda: iam.User(user_name="me@example.com", groups=[iam.ComplexValue(display="admins")])
+
+    expected_csv_entries = [
+        "arn:aws:iam::12345:instance-profile/role1,s3,READ_FILES,s3://bucket1",
+        "arn:aws:iam::12345:instance-profile/role1,s3,READ_FILES,s3://bucket2",
+        "arn:aws:iam::12345:instance-profile/role1,s3,READ_FILES,s3://bucket3",
+        "arn:aws:iam::12345:instance-profile/role1,s3,WRITE_FILES,s3://bucketA",
+        "arn:aws:iam::12345:instance-profile/role1,s3,WRITE_FILES,s3://bucketB",
+        "arn:aws:iam::12345:instance-profile/role1,s3,WRITE_FILES,s3://bucketC",
+    ]
+
+    def upload(
+        path: str,
+        content: BinaryIO,
+        *,
+        format: ImportFormat | None = None,  # noqa: A002
+        language: Language | None = None,
+        overwrite: bool | None = False,
+    ) -> None:
+        csv_text = str(content.read())
+        for entry in expected_csv_entries:
+            assert entry in csv_text
+
+    ws.workspace.upload = upload
     aws = create_autospec(AWSResources)
     aws.get_role_policy.side_effect = [
         [
@@ -295,57 +411,88 @@ def test_save_instance_profile_permissions():
         "arn:aws:iam::aws:policy/Policy2",
     ]
 
-    installation = MockInstallation()
-    aws_resource_permissions = AWSResourcePermissions(installation, ws, aws)
+    aws_resource_permissions = AWSResourcePermissions(ws, aws)
     aws_resource_permissions.save_instance_profile_permissions()
 
-    installation.assert_file_written(
-        'aws_instance_profile_info.csv',
+
+def test_save_uc_compatible_roles():
+    ws = create_autospec(WorkspaceClient)
+    ws.current_user.me = lambda: iam.User(user_name="me@example.com", groups=[iam.ComplexValue(display="admins")])
+
+    expected_csv_entries = [
+        "arn:aws:iam::12345:role/uc-role1,s3,READ_FILES,s3://bucket1",
+        "arn:aws:iam::12345:role/uc-role1,s3,READ_FILES,s3://bucket2",
+        "arn:aws:iam::12345:role/uc-role1,s3,READ_FILES,s3://bucket3",
+        "arn:aws:iam::12345:role/uc-role1,s3,WRITE_FILES,s3://bucketA",
+        "arn:aws:iam::12345:role/uc-role1,s3,WRITE_FILES,s3://bucketB",
+        "arn:aws:iam::12345:role/uc-role1,s3,WRITE_FILES,s3://bucketC",
+    ]
+
+    def upload(
+        path: str,
+        content: BinaryIO,
+        *,
+        format: ImportFormat | None = None,  # noqa: A002
+        language: Language | None = None,
+        overwrite: bool | None = False,
+    ) -> None:
+        csv_text = str(content.read())
+        for entry in expected_csv_entries:
+            assert entry in csv_text
+
+    ws.workspace.upload = upload
+    aws = create_autospec(AWSResources)
+    aws.get_role_policy.side_effect = [
         [
-            {
-                'iam_role_arn': 'arn:aws:iam::12345:role/role1',
-                'instance_profile_arn': 'arn:aws:iam::12345:instance-profile/role1',
-                'privilege': 'READ_FILES',
-                'resource_path': 's3://bucket1',
-                'resource_type': 's3',
-            },
-            {
-                'iam_role_arn': 'arn:aws:iam::12345:role/role1',
-                'instance_profile_arn': 'arn:aws:iam::12345:instance-profile/role1',
-                'privilege': 'READ_FILES',
-                'resource_path': 's3://bucket2',
-                'resource_type': 's3',
-            },
-            {
-                'iam_role_arn': 'arn:aws:iam::12345:role/role1',
-                'instance_profile_arn': 'arn:aws:iam::12345:instance-profile/role1',
-                'privilege': 'READ_FILES',
-                'resource_path': 's3://bucket3',
-                'resource_type': 's3',
-            },
-            {
-                'iam_role_arn': 'arn:aws:iam::12345:role/role1',
-                'instance_profile_arn': 'arn:aws:iam::12345:instance-profile/role1',
-                'privilege': 'WRITE_FILES',
-                'resource_path': 's3://bucketA',
-                'resource_type': 's3',
-            },
-            {
-                'iam_role_arn': 'arn:aws:iam::12345:role/role1',
-                'instance_profile_arn': 'arn:aws:iam::12345:instance-profile/role1',
-                'privilege': 'WRITE_FILES',
-                'resource_path': 's3://bucketB',
-                'resource_type': 's3',
-            },
-            {
-                'iam_role_arn': 'arn:aws:iam::12345:role/role1',
-                'instance_profile_arn': 'arn:aws:iam::12345:instance-profile/role1',
-                'privilege': 'WRITE_FILES',
-                'resource_path': 's3://bucketC',
-                'resource_type': 's3',
-            },
+            AWSPolicyAction(
+                resource_type="s3",
+                privilege="READ_FILES",
+                resource_path="s3://bucket1",
+            ),
+            AWSPolicyAction(
+                resource_type="s3",
+                privilege="READ_FILES",
+                resource_path="s3://bucket2",
+            ),
+            AWSPolicyAction(
+                resource_type="s3",
+                privilege="READ_FILES",
+                resource_path="s3://bucket3",
+            ),
         ],
-    )
+        [],
+        [],
+        [
+            AWSPolicyAction(
+                resource_type="s3",
+                privilege="WRITE_FILES",
+                resource_path="s3://bucketA",
+            ),
+            AWSPolicyAction(
+                resource_type="s3",
+                privilege="WRITE_FILES",
+                resource_path="s3://bucketB",
+            ),
+            AWSPolicyAction(
+                resource_type="s3",
+                privilege="WRITE_FILES",
+                resource_path="s3://bucketC",
+            ),
+        ],
+        [],
+        [],
+    ]
+    aws.list_role_policies.return_value = ["Policy1", "Policy2", "Policy3"]
+    aws.list_attached_policies_in_role.return_value = [
+        "arn:aws:iam::aws:policy/Policy1",
+        "arn:aws:iam::aws:policy/Policy2",
+    ]
+    aws.list_all_uc_roles.return_value = [
+        AWSRole(path='/', role_name='uc-role1', role_id='12345', arn='arn:aws:iam::12345:role/uc-role1')
+    ]
+
+    aws_resource_permissions = AWSResourcePermissions(ws, aws)
+    aws_resource_permissions.save_uc_compatible_roles()
 
 
 def test_role_mismatched(caplog):
@@ -371,10 +518,9 @@ def test_empty_mapping(caplog):
     ]
     ws.current_user.me = lambda: iam.User(user_name="me@example.com", groups=[iam.ComplexValue(display="admins")])
     aws = create_autospec(AWSResources)
-    installation = MockInstallation()
-    aws_resource_permissions = AWSResourcePermissions(installation, ws, aws)
+    aws_resource_permissions = AWSResourcePermissions(ws, aws)
     aws_resource_permissions.save_instance_profile_permissions()
-    assert 'No Mapping Was Generated.' in caplog.messages
+    assert "No Mapping" in caplog.messages[0]
 
 
 def test_command(caplog):

@@ -314,7 +314,7 @@ def save_uc_compatible_roles(w: WorkspaceClient, *, aws_profile: str | None = No
         w,
         aws,
     )
-    aws_pm.save_ucx_compatible_roles()
+    aws_pm.save_uc_compatible_roles()
     return None
 
 

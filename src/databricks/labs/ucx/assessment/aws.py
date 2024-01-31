@@ -227,7 +227,7 @@ class AWSResourcePermissions:
         self._ws = ws
         self._field_names = [_.name for _ in dataclasses.fields(AWSRoleAction)]
 
-    def save_ucx_compatible_roles(self):
+    def save_uc_compatible_roles(self):
         uc_role_access = list(self._get_role_access())
         if len(uc_role_access) == 0:
             logger.warning("No Mapping Was Generated.")
