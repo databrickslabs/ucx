@@ -114,6 +114,9 @@ def test_running_real_assessment_job(
     )
 
     install = new_installation(lambda wc: replace(wc, include_group_names=[ws_group_a.display_name]))
+    # TODO: flaky on databricks.sdk.errors.sdk.OperationFailed: failed to reach TERMINATED or SKIPPED,
+    # got RunLifeCycleState.INTERNAL_ERROR: Task workspace_listing failed with message: Workload failed, see run output
+    # for details. This caused all downstream tasks to get skipped.
     install.run_workflow("assessment")
 
     generic_permissions = GenericPermissionsSupport(ws, [])
@@ -143,7 +146,7 @@ def test_running_real_migrate_groups_job(
     )
 
     install = new_installation(lambda wc: replace(wc, include_group_names=[ws_group_a.display_name]))
-    inventory_database = install.current_config.inventory_database
+    inventory_database = install.config.inventory_database
     permission_manager = PermissionManager(sql_backend, inventory_database, [generic_permissions])
     permission_manager.inventorize_permissions()
 
@@ -151,7 +154,7 @@ def test_running_real_migrate_groups_job(
 
     found = generic_permissions.load_as_dict("cluster-policies", cluster_policy.policy_id)
     assert found[acc_group_a.display_name] == PermissionLevel.CAN_USE
-    assert found[f"{install.current_config.renamed_group_prefix}{ws_group_a.display_name}"] == PermissionLevel.CAN_USE
+    assert found[f"{install.config.renamed_group_prefix}{ws_group_a.display_name}"] == PermissionLevel.CAN_USE
 
 
 @retried(on=[NotFound, InvalidParameterValue], timeout=timedelta(minutes=5))
@@ -159,7 +162,7 @@ def test_running_real_remove_backup_groups_job(ws, sql_backend, new_installation
     ws_group_a, acc_group_a = make_ucx_group()
 
     install = new_installation(lambda wc: replace(wc, include_group_names=[ws_group_a.display_name]))
-    cfg = install.current_config
+    cfg = install.config
     group_manager = GroupManager(
         sql_backend, ws, cfg.inventory_database, cfg.include_group_names, cfg.renamed_group_prefix
     )
@@ -177,11 +180,11 @@ def test_running_real_remove_backup_groups_job(ws, sql_backend, new_installation
 def test_repair_run_workflow_job(ws, mocker, new_installation, sql_backend):
     install = new_installation()
     mocker.patch("webbrowser.open")
-    sql_backend.execute(f"DROP SCHEMA {install.current_config.inventory_database} CASCADE")
+    sql_backend.execute(f"DROP SCHEMA {install.config.inventory_database} CASCADE")
     with pytest.raises(NotFound):
         install.run_workflow("099-destroy-schema")
 
-    sql_backend.execute(f"CREATE SCHEMA IF NOT EXISTS {install.current_config.inventory_database}")
+    sql_backend.execute(f"CREATE SCHEMA IF NOT EXISTS {install.config.inventory_database}")
 
     install.repair_run("099-destroy-schema")
     workflow_job_id = install._state.jobs["099-destroy-schema"]
@@ -195,12 +198,11 @@ def test_repair_run_workflow_job(ws, mocker, new_installation, sql_backend):
 @retried(on=[NotFound], timeout=timedelta(minutes=5))
 def test_uninstallation(ws, sql_backend, new_installation):
     install = new_installation()
-    install_folder = install._install_folder
     assessment_job_id = install._state.jobs["assessment"]
     install.uninstall()
     with pytest.raises(NotFound):
-        ws.workspace.get_status(install_folder)
+        ws.workspace.get_status(install.folder)
     with pytest.raises(InvalidParameterValue):
         ws.jobs.get(job_id=assessment_job_id)
     with pytest.raises(NotFound):
-        sql_backend.execute(f"show tables from hive_metastore.{install.current_config.inventory_database}")
+        sql_backend.execute(f"show tables from hive_metastore.{install.config.inventory_database}")
