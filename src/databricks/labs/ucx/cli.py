@@ -20,7 +20,7 @@ from databricks.labs.ucx.hive_metastore import ExternalLocations, TablesCrawler
 from databricks.labs.ucx.hive_metastore.mapping import TableMapping
 from databricks.labs.ucx.hive_metastore.table_migrate import TableMove, TablesMigrate
 from databricks.labs.ucx.install import WorkspaceInstaller
-from databricks.labs.ucx.installer import InstallationManager
+from databricks.labs.ucx.installer import InstallationManager, Installation
 from databricks.labs.ucx.workspace_access.groups import GroupManager
 from databricks.labs.ucx.workspace_access.manager import PermissionManager
 
@@ -150,7 +150,7 @@ def repair_run(w: WorkspaceClient, step):
 @ucx.command
 def validate_groups_permissions(w: WorkspaceClient):
     """Validate that all the crawled permissions are applied correctly to the destination groups"""
-    logger.info("Running validation of permissions applied to groups.")
+    logger.info("Running validation of permissions applied to destination groups.")
     installation_manager = InstallationManager(w)
     installation = installation_manager.for_user(w.current_user.me())
     if not installation:

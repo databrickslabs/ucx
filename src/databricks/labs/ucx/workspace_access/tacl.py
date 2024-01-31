@@ -122,16 +122,14 @@ class TableAclSupport(AclSupport):
             action_types_for_current_principal = [
                 grant.action_type for grant in grants_on_object if grant.principal == acl.principal
             ]
-
             acl_action_types = acl.action_type.split(", ")
-
             if all(action_type in action_types_for_current_principal for action_type in acl_action_types):
                 return True
-
-            msg = f"""Couldn't apply appropriate ACL for object type: {object_type} with name: {object_id} 
-                            acl to be applied for principal {acl.principal}={acl_action_types} 
-                            acl found in the object for principal={action_types_for_current_principal}
-                            """
+            msg = (
+                f"Couldn't find permission for object type {object_type}, id {object_id} and principal {acl.principal}" 
+                f"acl to be applied={acl_action_types}" 
+                f"acl found in the object={action_types_for_current_principal}"
+            )
             raise ValueError(msg)
         return False
 

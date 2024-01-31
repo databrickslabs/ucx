@@ -95,8 +95,9 @@ class SecretScopesSupport(AclSupport):
         applied_permission = self.secret_scope_permission(scope_name, group_name)
         if applied_permission != expected_permission:
             msg = (
-                f"Applied permission {applied_permission} is not equal to expected "
-                f"permission {expected_permission} for {scope_name} and {group_name}!"
+                f"Couldn't find permission for scope {scope_name} and group {group_name}"
+                f"acl to be applied={expected_permission}"
+                f"acl found in the object={applied_permission}"
             )
             raise ValueError(msg)
         return True

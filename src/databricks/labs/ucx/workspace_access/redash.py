@@ -150,11 +150,11 @@ class RedashPermissionsSupport(AclSupport):
             assert remote_permission.access_control_list is not None
             if all(elem in remote_permission.access_control_list for elem in acl):
                 return True
-            msg = f"""
-            Couldn't apply appropriate permission for object type {object_type} with id {object_id}
-            acl to be applied={acl}
-            acl found in the object={remote_permission}
-            """
+            msg = (
+                f"Couldn't find permission for object type {object_type} with id {object_id}"
+                f"acl to be applied={acl}"
+                f"acl found in the object={remote_permission}"
+            )
             raise ValueError(msg)
         return False
 

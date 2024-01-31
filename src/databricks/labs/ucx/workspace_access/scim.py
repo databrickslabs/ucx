@@ -107,10 +107,11 @@ class ScimSupport(AclSupport):
             if property_name == "entitlements" and group.entitlements:
                 if all(elem in group.entitlements for elem in value):
                     return True
-            msg = f"""Couldn't apply appropriate role for group {group_id}
-                            acl to be applied={[e.as_dict() for e in value]}
-                            acl found in the object={group.as_dict()}
-                            """
+            msg = (
+                f"Couldn't find role for group {group_id}"
+                f"acl to be applied={[e.as_dict() for e in value]}"
+                f"acl found in the object={group.as_dict()}"
+            )
             raise ValueError(msg)
         return False
 

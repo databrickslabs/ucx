@@ -128,10 +128,11 @@ class GenericPermissionsSupport(AclSupport):
             remote_permission_as_request = self._response_to_request(remote_permission.access_control_list)
             if all(elem in remote_permission_as_request for elem in acl):
                 return True
-            msg = f"""Couldn't apply appropriate permission for object type {object_type} with id {object_id}
-                acl to be applied={acl}
-                acl found in the object={remote_permission_as_request}
-                """
+            msg = (
+                f"Couldn't find permission for object type {object_type} with id {object_id}"
+                f"acl to be applied={acl}"
+                f"acl found in the object={remote_permission_as_request}"
+            )
             raise ValueError(msg)
         return False
 
