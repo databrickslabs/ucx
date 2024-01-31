@@ -2,6 +2,7 @@ import dataclasses
 import logging
 import os
 import pkgutil
+import re
 from abc import ABC, abstractmethod
 from collections.abc import Callable, Iterable, Iterator, Sequence
 from types import UnionType
@@ -92,8 +93,11 @@ class SqlBackend(ABC):
             results.append(row)
         return results
 
-    @staticmethod
-    def _only_n_bytes(j: str, num_bytes: int = 96) -> str:
+    _whitespace = re.compile(r'\s{2,}')
+
+    @classmethod
+    def _only_n_bytes(cls, j: str, num_bytes: int = 96) -> str:
+        j = cls._whitespace.sub(' ', j)
         diff = len(j.encode('utf-8')) - num_bytes
         if diff > 0:
             return f"{j[:num_bytes]}... ({diff} more bytes)"
@@ -175,7 +179,7 @@ class StatementExecutionBackend(SqlBackend):
 
 
 class RuntimeBackend(SqlBackend):
-    def __init__(self, debug_truncate_bytes=96):
+    def __init__(self, debug_truncate_bytes: int | None = None):
         # pylint: disable-next=import-error,import-outside-toplevel
         from pyspark.sql.session import SparkSession  # type: ignore[import-not-found]
 
@@ -184,7 +188,7 @@ class RuntimeBackend(SqlBackend):
             raise RuntimeError(msg)
 
         self._spark = SparkSession.builder.getOrCreate()
-        self._debug_truncate_bytes = debug_truncate_bytes
+        self._debug_truncate_bytes = debug_truncate_bytes if debug_truncate_bytes else 96
 
     def execute(self, sql: str) -> None:
         logger.debug(f"[spark][execute] {self._only_n_bytes(sql, self._debug_truncate_bytes)}")

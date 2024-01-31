@@ -237,7 +237,7 @@ def trigger(*argv):
 
     cfg = Installation.load_local(WorkspaceConfig, config_path)
     sql_backend = RuntimeBackend(debug_truncate_bytes=cfg.connect.debug_truncate_bytes)
-    workspace_client = WorkspaceClient(config=cfg, product='ucx', product_version=__version__)
+    workspace_client = WorkspaceClient(config=cfg.connect, product='ucx', product_version=__version__)
 
     with TaskLogger(
         config_path.parent,

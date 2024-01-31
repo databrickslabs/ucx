@@ -3,19 +3,18 @@ import logging
 from collections.abc import Callable
 from dataclasses import replace
 from datetime import timedelta
-from unittest.mock import create_autospec
 
 import pytest
 from databricks.labs.blueprint.installation import Installation
 from databricks.labs.blueprint.parallel import Threads
-from databricks.labs.blueprint.tui import Prompts
+from databricks.labs.blueprint.tui import MockPrompts
 from databricks.labs.blueprint.wheels import WheelsV2
 from databricks.sdk.errors import InvalidParameterValue, NotFound
 from databricks.sdk.retries import retried
 from databricks.sdk.service.iam import PermissionLevel
 
 from databricks.labs.ucx.config import WorkspaceConfig
-from databricks.labs.ucx.install import WorkspaceInstallation, PRODUCT_INFO
+from databricks.labs.ucx.install import PRODUCT_INFO, WorkspaceInstallation
 from databricks.labs.ucx.workspace_access.generic import (
     GenericPermissionsSupport,
     Listing,
@@ -30,8 +29,13 @@ logger = logging.getLogger(__name__)
 def new_installation(ws, sql_backend, env_or_skip, inventory_schema, make_random):
     cleanup = []
 
-    prompts = create_autospec(Prompts)
-    prompts.confirm.return_value = True
+    prompts = MockPrompts(
+        {
+            r'Open job overview in your browser.*': 'no',
+            r'Do you want to uninstall ucx.*': 'yes',
+            r'Do you want to delete the inventory database.*': 'yes',
+        }
+    )
 
     def factory(config_transform: Callable[[WorkspaceConfig], WorkspaceConfig] | None = None):
         prefix = make_random(4)
@@ -56,6 +60,8 @@ def new_installation(ws, sql_backend, env_or_skip, inventory_schema, make_random
         if config_transform:
             workspace_config = config_transform(workspace_config)
         installation = Installation(ws, prefix)
+        installation.save(workspace_config)
+
         # TODO: see if we want to move building wheel as a context manager for yield factory,
         # so that we can shave off couple of seconds and build wheel only once per session
         # instead of every test

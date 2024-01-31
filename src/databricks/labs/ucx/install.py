@@ -81,8 +81,7 @@ EXTRA_TASK_PARAMS = {
     "run_id": "{{run_id}}",
     "parent_run_id": "{{parent_run_id}}",
 }
-DEBUG_NOTEBOOK = """
-# Databricks notebook source
+DEBUG_NOTEBOOK = """# Databricks notebook source
 # MAGIC %md
 # MAGIC # Debug companion for UCX installation (see [README]({readme_link}))
 # MAGIC
@@ -113,8 +112,7 @@ ws = WorkspaceClient()
 print(__version__)
 """
 
-TEST_RUNNER_NOTEBOOK = """
-# Databricks notebook source
+TEST_RUNNER_NOTEBOOK = """# Databricks notebook source
 # MAGIC %pip install /Workspace{remote_wheel}
 dbutils.library.restartPython()
 
@@ -597,7 +595,7 @@ class WorkspaceInstallation:
         preamble = ["# Databricks notebook source", "# MAGIC %md"]
         intro = "\n".join(preamble + [f"# MAGIC {line}" for line in md])
         self._installation.upload('README.py', intro.encode('utf8'))
-        readme_url = self._installation.workspace_link('README.py')
+        readme_url = self._installation.workspace_link('README')
         if self._prompts and self._prompts.confirm(f"Open job overview in your browser? {readme_url}"):
             webbrowser.open(readme_url)
         return readme_url
@@ -606,7 +604,7 @@ class WorkspaceInstallation:
         return text.replace("$inventory", f"hive_metastore.{self._config.inventory_database}")
 
     def _create_debug(self, remote_wheel: str):
-        readme_link = self._installation.workspace_link('README.py')
+        readme_link = self._installation.workspace_link('README')
         job_links = ", ".join(
             f"[{self._name(step_name)}]({self._ws.config.host}#job/{job_id})"
             for step_name, job_id in self._state.jobs.items()
