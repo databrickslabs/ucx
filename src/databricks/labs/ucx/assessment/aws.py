@@ -41,6 +41,14 @@ class AWSInstanceProfileAction:
 
 
 @dataclass
+class AWSRoleAction:
+    iam_role_arn: str
+    resource_type: str
+    privilege: str
+    resource_path: str
+
+
+@dataclass
 class AWSInstanceProfile:
     instance_profile_arn: str
     iam_role_arn: str | None = None
@@ -114,7 +122,7 @@ class AWSResources:
         )
         roles = self._run_json_command(list_roles_cmd)
         uc_roles = []
-        for role in roles:
+        for role in roles["Roles"]:
             try:
                 policy_document = role["AssumeRolePolicyDocument"]
                 for statement in policy_document["Statement"]:
@@ -135,14 +143,14 @@ class AWSResources:
                             continue
                     elif principal not in self.UC_MASTER_ROLES_ARN:
                         continue
-                uc_roles.append(
-                    AWSRole(
-                        role_id=role.get("RoleId"),
-                        role_name=role.get("RoleName"),
-                        arn=role.get("Arn"),
-                        path=role.get("Path")
+                    uc_roles.append(
+                        AWSRole(
+                            role_id=role.get("RoleId"),
+                            role_name=role.get("RoleName"),
+                            arn=role.get("Arn"),
+                            path=role.get("Path")
+                        )
                     )
-                )
             except KeyError:
                 continue
         return uc_roles
@@ -151,7 +159,7 @@ class AWSResources:
         if policy_name:
             get_policy = (
                 f"iam get-role-policy --profile {self._profile} --role-name {role_name} "
-                f"--policy-name {policy_name} --no-paginate"
+                f"--policy-name {policy_name}"
             )
         elif attached_policy_arn:
             get_attached_policy = f"iam get-policy --profile {self._profile} --policy-arn {attached_policy_arn}"
@@ -161,7 +169,7 @@ class AWSResources:
             policy_version = attached_policy["Policy"]["DefaultVersionId"]
             get_policy = (
                 f"iam get-policy-version --profile {self._profile} --policy-arn {attached_policy_arn} "
-                f"--version-id {policy_version} --no-paginate"
+                f"--version-id {policy_version}"
             )
         else:
             logger.error("Failed to retrieve role. No role name or attached role ARN specified.")
@@ -204,7 +212,7 @@ class AWSResources:
 
     def _run_json_command(self, command: str):
         aws_cmd = shutil.which("aws")
-        code, output, error = self._command_runner(f"{aws_cmd} {command} --output json --no-paginate")
+        code, output, error = self._command_runner(f"{aws_cmd} {command} --output json")
         if code != 0:
             logger.error(error)
             return None
