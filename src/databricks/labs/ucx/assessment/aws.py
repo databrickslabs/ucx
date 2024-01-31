@@ -236,6 +236,9 @@ class AWSResourcePermissions:
             return None
         return self._installation.save(uc_role_access, filename='uc_roles_access.csv')
 
+    def save_ucx_compatible_roles(self):
+        pass
+
     def _get_instance_profiles(self) -> Iterable[AWSInstanceProfile]:
         instance_profiles = self._ws.instance_profiles.list()
         result_instance_profiles = []
