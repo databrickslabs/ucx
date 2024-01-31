@@ -325,9 +325,12 @@ def test_uninstallation(ws, sql_backend, new_installation):
 
 
 @retried(on=[NotFound], timeout=timedelta(minutes=5))
-def test_single_user_installation(ws, sql_backend, new_installation):
+def test_single_user_installation(new_installation):
     install_single_user = new_installation(single_user_install=True)
     install_single_user.uninstall()
 
+
+# @retried(on=[NotFound], timeout=timedelta(minutes=5))
+def test_workspace_root_installation(new_installation):
     install_workspace_root = new_installation(single_user_install=False)
     install_workspace_root.uninstall()
