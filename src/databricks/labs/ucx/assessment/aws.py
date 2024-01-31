@@ -108,6 +108,45 @@ class AWSResources:
             attached_policies.append(policy.get("PolicyArn"))
         return attached_policies
 
+    def list_all_uc_roles(self):
+        list_roles_cmd = (
+            f"iam list-roles --profile {self._profile}"
+        )
+        roles = self._run_json_command(list_roles_cmd)
+        uc_roles = []
+        for role in roles:
+            try:
+                policy_document = role["AssumeRolePolicyDocument"]
+                for statement in policy_document["Statement"]:
+                    if statement["Effect"] != "Allow":
+                        continue
+                    if statement["Action"] != "sts:AssumeRole":
+                        continue
+                    principal = statement["Principal"].get("AWS")
+                    if not principal:
+                        continue
+                    if isinstance(principal, list):
+                        is_uc_principal = False
+                        for single_principal in principal:
+                            if single_principal in self.UC_MASTER_ROLES_ARN:
+                                is_uc_principal = True
+                                continue
+                        if not is_uc_principal:
+                            continue
+                    elif principal not in self.UC_MASTER_ROLES_ARN:
+                        continue
+                uc_roles.append(
+                    AWSRole(
+                        role_id=role.get("RoleId"),
+                        role_name=role.get("RoleName"),
+                        arn=role.get("Arn"),
+                        path=role.get("Path")
+                    )
+                )
+            except KeyError:
+                continue
+        return uc_roles
+
     def get_role_policy(self, role_name, policy_name: str | None = None, attached_policy_arn: str | None = None):
         if policy_name:
             get_policy = (
