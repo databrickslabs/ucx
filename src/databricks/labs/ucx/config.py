@@ -94,8 +94,7 @@ class _Config(Generic[T]):
 
     @classmethod
     @abstractmethod
-    def from_dict(cls, raw: dict[str, Any]) -> T:
-        ...
+    def from_dict(cls, raw: dict[str, Any]) -> T: ...
 
     @classmethod
     def from_bytes(cls, raw_str: str | bytes) -> T:

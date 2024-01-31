@@ -21,6 +21,7 @@ logger = logging.getLogger(__name__)
 
 
 class TablesMigrate:
+
     def __init__(
         self,
         tc: TablesCrawler,
