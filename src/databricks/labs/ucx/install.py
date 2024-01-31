@@ -779,13 +779,13 @@ class WorkspaceInstaller:  # pylint: disable=too-many-instance-attributes
             "spark.master": "local[*]",
         }
         spec = compute.ClusterSpec(
-                # spark_version=self._ws.clusters.select_spark_version(latest=True),
-                data_security_mode=compute.DataSecurityMode.LEGACY_SINGLE_USER,
-                spark_conf=spark_conf,
-                custom_tags={"ResourceClass": "SingleNode"},
-                num_workers=0,
-                policy_id=self._custom_cluster_policy_id,
-            )
+            # spark_version=self._ws.clusters.select_spark_version(latest=True),
+            data_security_mode=compute.DataSecurityMode.LEGACY_SINGLE_USER,
+            spark_conf=spark_conf,
+            custom_tags={"ResourceClass": "SingleNode"},
+            num_workers=0,
+            policy_id=self._custom_cluster_policy_id,
+        )
 
         # if self._config.custom_cluster_policy_id is not None:
         #    spec = replace(spec, policy_id=self._config.custom_cluster_policy_id)
