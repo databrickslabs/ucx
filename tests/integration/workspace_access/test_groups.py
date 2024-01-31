@@ -238,6 +238,36 @@ def test_group_matching_names_with_diff_users(
     assert len(t) > 0
 
 
+@retried(on=[NotFound], timeout=timedelta(minutes=2))
+def test_group_matching_names_with_same_users(
+    ws, sql_backend, inventory_schema, make_random, make_user, make_group, make_acc_group
+):
+    rand_elem = make_random(4)
+    workspace_group_name = f"test_group_{rand_elem}"
+    account_group_name = f"same_group_[{rand_elem}]"
+    user1 = make_user()
+    members1 = [user1.id]
+    members2 = [user1.id]
+    ws_group = make_group(display_name=workspace_group_name, members=members1, entitlements=["allow-cluster-create"])
+    acc_group = make_acc_group(display_name=account_group_name, members=members2)
+
+    logger.info(
+        f"Attempting Mapping From Workspace Group {ws_group.display_name} to Account Group {acc_group.display_name}"
+    )
+    group_manager = GroupManager(
+        sql_backend,
+        ws,
+        inventory_schema,
+        [ws_group.display_name],
+        "ucx-temp-",
+        workspace_group_regex=r"([0-9a-zA-Z]*)$",
+        account_group_regex=r"\[([0-9a-zA-Z]*)\]",
+    )
+
+    t = group_manager.validate_group_membership()
+    assert len(t) == 0
+
+
 # average runtime is 100 seconds
 @retried(on=[NotFound], timeout=timedelta(minutes=3))
 def test_replace_workspace_groups_with_account_groups(
