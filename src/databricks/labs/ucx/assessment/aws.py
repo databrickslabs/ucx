@@ -182,6 +182,9 @@ class AWSResourcePermissions:
             raise ResourceWarning("AWS CLI is not configured properly.")
         return cls(installation, ws, aws)
 
+    def save_ucx_compatible_roles(self):
+        pass
+
     def _get_instance_profiles(self) -> Iterable[AWSInstanceProfile]:
         instance_profiles = self._ws.instance_profiles.list()
         result_instance_profiles = []
