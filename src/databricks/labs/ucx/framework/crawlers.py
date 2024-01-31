@@ -10,6 +10,7 @@ from typing import Any, ClassVar, Generic, Protocol, TypeVar
 from databricks.sdk import WorkspaceClient
 from databricks.sdk.errors import (
     BadRequest,
+    DatabricksError,
     DataLoss,
     NotFound,
     PermissionDenied,
@@ -32,11 +33,11 @@ ResultFn = Callable[[], Iterable[Result]]
 
 class SqlBackend(ABC):
     @abstractmethod
-    def execute(self, sql):
+    def execute(self, sql: str) -> None:
         raise NotImplementedError
 
     @abstractmethod
-    def fetch(self, sql) -> Iterator[Any]:
+    def fetch(self, sql: str) -> Iterator[Any]:
         raise NotImplementedError
 
     @abstractmethod
@@ -91,19 +92,29 @@ class SqlBackend(ABC):
             results.append(row)
         return results
 
+    @staticmethod
+    def _only_n_bytes(j: str, num_bytes: int = 96) -> str:
+        diff = len(j.encode('utf-8')) - num_bytes
+        if diff > 0:
+            return f"{j[:num_bytes]}... ({diff} more bytes)"
+        return j
+
 
 class StatementExecutionBackend(SqlBackend):
     def __init__(self, ws: WorkspaceClient, warehouse_id, *, max_records_per_batch: int = 1000):
         self._sql = StatementExecutionExt(ws.api_client)
         self._warehouse_id = warehouse_id
         self._max_records_per_batch = max_records_per_batch
+        debug_truncate_bytes = ws.config.debug_truncate_bytes
+        # while unit-testing, this value will contain a mock
+        self._debug_truncate_bytes = debug_truncate_bytes if isinstance(debug_truncate_bytes, int) else 96
 
-    def execute(self, sql):
-        logger.debug(f"[api][execute] {sql}")
+    def execute(self, sql: str) -> None:
+        logger.debug(f"[api][execute] {self._only_n_bytes(sql, self._debug_truncate_bytes)}")
         self._sql.execute(self._warehouse_id, sql)
 
-    def fetch(self, sql) -> Iterator[Row]:
-        logger.debug(f"[api][fetch] {sql}")
+    def fetch(self, sql: str) -> Iterator[Row]:
+        logger.debug(f"[api][fetch] {self._only_n_bytes(sql, self._debug_truncate_bytes)}")
         return self._sql.execute_fetch_all(self._warehouse_id, sql)
 
     def save_table(self, full_name: str, rows: Sequence[DataclassInstance], klass: Dataclass, mode="append"):
@@ -146,7 +157,7 @@ class StatementExecutionBackend(SqlBackend):
 
 
 class RuntimeBackend(SqlBackend):
-    def __init__(self):
+    def __init__(self, debug_truncate_bytes=96):
         # pylint: disable-next=import-error,import-outside-toplevel
         from pyspark.sql.session import SparkSession  # type: ignore[import-not-found]
 
@@ -155,24 +166,23 @@ class RuntimeBackend(SqlBackend):
             raise RuntimeError(msg)
 
         self._spark = SparkSession.builder.getOrCreate()
+        self._debug_truncate_bytes = debug_truncate_bytes
 
-    def execute(self, sql):
-        logger.debug(f"[spark][execute] {sql}")
+    def execute(self, sql: str) -> None:
+        logger.debug(f"[spark][execute] {self._only_n_bytes(sql, self._debug_truncate_bytes)}")
         try:
-            immediate_response = self._spark.sql(sql)
-        except Exception as e:  # pylint: disable=broad-exception-caught
+            self._spark.sql(sql)
+        except Exception as e:
             error_message = str(e)
-            self._raise_spark_sql_exceptions(error_message)
-        return immediate_response
+            raise self._api_error_from_spark_error(error_message) from None
 
-    def fetch(self, sql) -> Iterator[Row]:
-        logger.debug(f"[spark][fetch] {sql}")
+    def fetch(self, sql: str) -> Iterator[Row]:
+        logger.debug(f"[spark][fetch] {self._only_n_bytes(sql, self._debug_truncate_bytes)}")
         try:
-            fetch_query_response = self._spark.sql(sql).collect()
-        except Exception as e:  # pylint: disable=broad-exception-caught
+            return self._spark.sql(sql).collect()
+        except Exception as e:
             error_message = str(e)
-            self._raise_spark_sql_exceptions(error_message)
-        return fetch_query_response
+            raise self._api_error_from_spark_error(error_message) from None
 
     def save_table(self, full_name: str, rows: Sequence[DataclassInstance], klass: Dataclass, mode: str = "append"):
         rows = self._filter_none_rows(rows, klass)
@@ -185,20 +195,20 @@ class RuntimeBackend(SqlBackend):
         df.write.saveAsTable(full_name, mode=mode)
 
     @staticmethod
-    def _raise_spark_sql_exceptions(error_message: str):
+    def _api_error_from_spark_error(error_message: str) -> DatabricksError:
         if "SCHEMA_NOT_FOUND" in error_message:
-            raise NotFound(error_message) from None
+            return NotFound(error_message)
         if "TABLE_OR_VIEW_NOT_FOUND" in error_message:
-            raise NotFound(error_message) from None
+            return NotFound(error_message)
         if "DELTA_TABLE_NOT_FOUND" in error_message:
-            raise NotFound(error_message) from None
+            return NotFound(error_message)
         if "DELTA_MISSING_TRANSACTION_LOG" in error_message:
-            raise DataLoss(error_message) from None
+            return DataLoss(error_message)
         if "PARSE_SYNTAX_ERROR" in error_message:
-            raise BadRequest(error_message) from None
+            return BadRequest(error_message)
         if "Operation not allowed" in error_message:
-            raise PermissionDenied(error_message) from None
-        raise Unknown(error_message) from None
+            return PermissionDenied(error_message)
+        return Unknown(error_message)
 
 
 class CrawlerBase(Generic[Result]):

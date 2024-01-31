@@ -243,3 +243,25 @@ def test_cluster_with_multiple_failures():
     failures = json.loads(result_set[0].failures)
     assert 'unsupported config: spark.databricks.passthrough.enabled' in failures
     assert 'not supported DBR: 9.3.x-cpu-ml-scala2.12' in failures
+
+
+def test_cluster_with_job_source():
+    ws = workspace_client_mock(clusters="job-source-cluster.json")
+    crawler = ClustersCrawler(ws, MockBackend(), "ucx")
+    result_set = list(crawler.snapshot())
+
+    assert len(result_set) == 1
+    assert result_set[0].cluster_id == "0123-190044-1122334411"
+
+
+def test_try_fetch():
+    ws = workspace_client_mock(clusters="assortment-conf.json")
+    mockBackend = MagicMock()
+    mockBackend.fetch.return_value = [("000", 1, "123")]
+    crawler = ClustersCrawler(ws, mockBackend, "ucx")
+    result_set = list(crawler.snapshot())
+
+    assert len(result_set) == 1
+    assert result_set[0].cluster_id == "000"
+    assert result_set[0].success == 1
+    assert result_set[0].failures == "123"

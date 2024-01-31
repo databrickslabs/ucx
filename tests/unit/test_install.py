@@ -12,6 +12,7 @@ from databricks.labs.blueprint.parallel import ManyError
 from databricks.labs.blueprint.tui import MockPrompts
 from databricks.labs.blueprint.wheels import Wheels, find_project_root
 from databricks.sdk.errors import (
+    BadRequest,
     InvalidParameterValue,
     NotFound,
     OperationFailed,
@@ -1288,3 +1289,51 @@ def test_repair_run_result_state(ws, caplog):
     ws.jobs.list_runs.repair_run = None
     install.repair_run("assessment")
     assert "Please try after sometime" in caplog.text
+
+
+def test_create_database(ws, mocker, caplog):
+    install = WorkspaceInstaller(
+        ws,
+        sql_backend=None,
+        promtps=MockPrompts(
+            {
+                r".*PRO or SERVERLESS SQL warehouse.*": "1",
+                r".*": "",
+            }
+        ),
+    )
+    mocker.patch(
+        "databricks.labs.ucx.install.deploy_schema",
+        side_effect=BadRequest(
+            "[UNRESOLVED_COLUMN.WITH_SUGGESTION] A column, variable, or "
+            "function parameter with name `udf` cannot be resolved"
+        ),
+    )
+    mocker.patch("databricks.labs.ucx.framework.crawlers.SqlBackend.execute", return_value=None)
+    config_bytes = yaml.dump(WorkspaceConfig(inventory_database="testdb", warehouse_id="123").as_dict()).encode("utf8")
+    ws.workspace.download = lambda _: io.BytesIO(config_bytes)
+    with pytest.raises(BadRequest) as failure:
+        install._create_database()
+
+    assert "Kindly uninstall and reinstall UCX" in str(failure.value)
+
+
+def test_create_database_diff_error(ws, mocker, caplog):
+    install = WorkspaceInstaller(
+        ws,
+        sql_backend=MockBackend(),
+        promtps=MockPrompts(
+            {
+                r".*PRO or SERVERLESS SQL warehouse.*": "1",
+                r".*": "",
+            }
+        ),
+    )
+    mocker.patch("databricks.labs.ucx.install.deploy_schema", side_effect=BadRequest("Unknown Error"))
+    mocker.patch("databricks.labs.ucx.framework.crawlers.SqlBackend.execute", return_value=None)
+    config_bytes = yaml.dump(WorkspaceConfig(inventory_database="testdb", warehouse_id="123").as_dict()).encode("utf8")
+    ws.workspace.download = lambda _: io.BytesIO(config_bytes)
+    with pytest.raises(BadRequest) as failure:
+        install._create_database()
+
+    assert "The UCX Installation Failed" in str(failure.value)

@@ -1,6 +1,6 @@
 import pytest
 
-from databricks.labs.ucx.hive_metastore.tables import Table, TablesCrawler
+from databricks.labs.ucx.hive_metastore.tables import Table, TablesCrawler, What
 
 from ..framework.mocks import MockBackend
 
@@ -136,52 +136,94 @@ def test_tables_returning_error_when_describing():
     assert len(results) == 1
 
 
-def test_is_dbfs_root():
-    assert Table("a", "b", "c", "MANAGED", "DELTA", location="dbfs:/somelocation/tablename").is_dbfs_root
-    assert Table("a", "b", "c", "MANAGED", "DELTA", location="/dbfs/somelocation/tablename").is_dbfs_root
-    assert not Table("a", "b", "c", "MANAGED", "DELTA", location="dbfs:/mnt/somelocation/tablename").is_dbfs_root
-    assert not Table("a", "b", "c", "MANAGED", "DELTA", location="/dbfs/mnt/somelocation/tablename").is_dbfs_root
-    assert not Table(
-        "a", "b", "c", "MANAGED", "DELTA", location="dbfs:/databricks-datasets/somelocation/tablename"
-    ).is_dbfs_root
-    assert not Table(
-        "a", "b", "c", "MANAGED", "DELTA", location="/dbfs/databricks-datasets/somelocation/tablename"
-    ).is_dbfs_root
-    assert not Table("a", "b", "c", "MANAGED", "DELTA", location="s3:/somelocation/tablename").is_dbfs_root
-    assert not Table("a", "b", "c", "MANAGED", "DELTA", location="adls:/somelocation/tablename").is_dbfs_root
+@pytest.mark.parametrize(
+    'table,dbfs_root,what',
+    [
+        (Table("a", "b", "c", "MANAGED", "DELTA", location="dbfs:/somelocation/tablename"), True, What.DBFS_ROOT_DELTA),
+        (
+            Table("a", "b", "c", "MANAGED", "PARQUET", location="dbfs:/somelocation/tablename"),
+            True,
+            What.DBFS_ROOT_NON_DELTA,
+        ),
+        (Table("a", "b", "c", "MANAGED", "DELTA", location="/dbfs/somelocation/tablename"), True, What.DBFS_ROOT_DELTA),
+        (
+            Table("a", "b", "c", "MANAGED", "DELTA", location="dbfs:/mnt/somelocation/tablename"),
+            False,
+            What.EXTERNAL_SYNC,
+        ),
+        (
+            Table("a", "b", "c", "MANAGED", "DELTA", location="/dbfs/mnt/somelocation/tablename"),
+            False,
+            What.EXTERNAL_SYNC,
+        ),
+        (
+            Table("a", "b", "c", "MANAGED", "DELTA", location="dbfs:/databricks-datasets/somelocation/tablename"),
+            False,
+            What.DB_DATASET,
+        ),
+        (
+            Table("a", "b", "c", "MANAGED", "DELTA", location="/dbfs/databricks-datasets/somelocation/tablename"),
+            False,
+            What.DB_DATASET,
+        ),
+        (Table("a", "b", "c", "MANAGED", "DELTA", location="s3:/somelocation/tablename"), False, What.EXTERNAL_SYNC),
+        (Table("a", "b", "c", "MANAGED", "DELTA", location="adls:/somelocation/tablename"), False, What.EXTERNAL_SYNC),
+    ],
+)
+def test_is_dbfs_root(table, dbfs_root, what):
+    assert table.is_dbfs_root == dbfs_root
+    assert table.what == what
 
 
-def test_is_db_dataset():
-    assert not Table("a", "b", "c", "MANAGED", "DELTA", location="dbfs:/somelocation/tablename").is_databricks_dataset
-    assert not Table("a", "b", "c", "MANAGED", "DELTA", location="/dbfs/somelocation/tablename").is_databricks_dataset
-    assert not Table(
-        "a", "b", "c", "MANAGED", "DELTA", location="dbfs:/mnt/somelocation/tablename"
-    ).is_databricks_dataset
-    assert not Table(
-        "a", "b", "c", "MANAGED", "DELTA", location="/dbfs/mnt/somelocation/tablename"
-    ).is_databricks_dataset
-    assert Table(
-        "a", "b", "c", "MANAGED", "DELTA", location="dbfs:/databricks-datasets/somelocation/tablename"
-    ).is_databricks_dataset
-    assert Table(
-        "a", "b", "c", "MANAGED", "DELTA", location="/dbfs/databricks-datasets/somelocation/tablename"
-    ).is_databricks_dataset
-    assert not Table("a", "b", "c", "MANAGED", "DELTA", location="s3:/somelocation/tablename").is_databricks_dataset
-    assert not Table("a", "b", "c", "MANAGED", "DELTA", location="adls:/somelocation/tablename").is_databricks_dataset
+@pytest.mark.parametrize(
+    'table,db_dataset',
+    [
+        (Table("a", "b", "c", "MANAGED", "DELTA", location="dbfs:/somelocation/tablename"), False),
+        (Table("a", "b", "c", "MANAGED", "DELTA", location="/dbfs/somelocation/tablename"), False),
+        (Table("a", "b", "c", "MANAGED", "DELTA", location="dbfs:/mnt/somelocation/tablename"), False),
+        (Table("a", "b", "c", "MANAGED", "DELTA", location="/dbfs/mnt/somelocation/tablename"), False),
+        (Table("a", "b", "c", "MANAGED", "DELTA", location="dbfs:/databricks-datasets/somelocation/tablename"), True),
+        (Table("a", "b", "c", "MANAGED", "DELTA", location="/dbfs/databricks-datasets/somelocation/tablename"), True),
+        (Table("a", "b", "c", "MANAGED", "DELTA", location="s3:/somelocation/tablename"), False),
+        (Table("a", "b", "c", "MANAGED", "DELTA", location="adls:/somelocation/tablename"), False),
+    ],
+)
+def test_is_db_dataset(table, db_dataset):
+    assert table.is_databricks_dataset == db_dataset
+    assert (table.what == What.DB_DATASET) == db_dataset
 
 
-def test_is_supported_for_sync():
-    assert Table(
-        "a", "b", "c", "EXTERNAL", "DELTA", location="dbfs:/somelocation/tablename"
-    ).is_format_supported_for_sync
-    assert Table("a", "b", "c", "EXTERNAL", "CSV", location="dbfs:/somelocation/tablename").is_format_supported_for_sync
-    assert Table(
-        "a", "b", "c", "EXTERNAL", "TEXT", location="dbfs:/somelocation/tablename"
-    ).is_format_supported_for_sync
-    assert Table("a", "b", "c", "EXTERNAL", "ORC", location="dbfs:/somelocation/tablename").is_format_supported_for_sync
-    assert Table(
-        "a", "b", "c", "EXTERNAL", "JSON", location="dbfs:/somelocation/tablename"
-    ).is_format_supported_for_sync
-    assert not (
-        Table("a", "b", "c", "EXTERNAL", "AVRO", location="dbfs:/somelocation/tablename").is_format_supported_for_sync
-    )
+@pytest.mark.parametrize(
+    'table,supported',
+    [
+        (Table("a", "b", "c", "EXTERNAL", "DELTA", location="dbfs:/somelocation/tablename"), True),
+        (Table("a", "b", "c", "EXTERNAL", "CSV", location="dbfs:/somelocation/tablename"), True),
+        (Table("a", "b", "c", "EXTERNAL", "TEXT", location="dbfs:/somelocation/tablename"), True),
+        (Table("a", "b", "c", "EXTERNAL", "ORC", location="dbfs:/somelocation/tablename"), True),
+        (Table("a", "b", "c", "EXTERNAL", "JSON", location="dbfs:/somelocation/tablename"), True),
+        (Table("a", "b", "c", "EXTERNAL", "AVRO", location="dbfs:/somelocation/tablename"), False),
+    ],
+)
+def test_is_supported_for_sync(table, supported):
+    assert table.is_format_supported_for_sync == supported
+
+
+@pytest.mark.parametrize(
+    'table,what',
+    [
+        (Table("a", "b", "c", "EXTERNAL", "DELTA", location="s3://external_location/table"), What.EXTERNAL_SYNC),
+        (
+            Table("a", "b", "c", "EXTERNAL", "UNSUPPORTED_FORMAT", location="s3://external_location/table"),
+            What.EXTERNAL_NO_SYNC,
+        ),
+        (Table("a", "b", "c", "MANAGED", "DELTA", location="dbfs:/somelocation/tablename"), What.DBFS_ROOT_DELTA),
+        (Table("a", "b", "c", "MANAGED", "PARQUET", location="dbfs:/somelocation/tablename"), What.DBFS_ROOT_NON_DELTA),
+        (Table("a", "b", "c", "VIEW", "VIEW", view_text="select * from some_table"), What.VIEW),
+        (
+            Table("a", "b", "c", "MANAGED", "DELTA", location="dbfs:/databricks-datasets/somelocation/tablename"),
+            What.DB_DATASET,
+        ),
+    ],
+)
+def test_table_what(table, what):
+    assert table.what == what

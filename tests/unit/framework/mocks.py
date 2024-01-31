@@ -9,16 +9,17 @@ logger = logging.getLogger(__name__)
 
 
 class MockBackend(SqlBackend):
-    def __init__(self, *, fails_on_first: dict | None = None, rows: dict | None = None):
+    def __init__(self, *, fails_on_first: dict | None = None, rows: dict | None = None, debug_truncate_bytes=96):
         self._fails_on_first = fails_on_first
         if not rows:
             rows = {}
         self._rows = rows
         self._save_table: list[tuple[str, Sequence[DataclassInstance], str]] = []
+        self._debug_truncate_bytes = debug_truncate_bytes
         self.queries: list[str] = []
 
     def _sql(self, sql: str):
-        logger.debug(f"Mock backend.sql() received SQL: {sql}")
+        logger.debug(f"Mock backend.sql() received SQL: {self._only_n_bytes(sql, self._debug_truncate_bytes)}")
         seen_before = sql in self.queries
         self.queries.append(sql)
         if not seen_before and self._fails_on_first is not None:
