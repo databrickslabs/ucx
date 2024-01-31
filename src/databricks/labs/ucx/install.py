@@ -327,6 +327,14 @@ class WorkspaceInstallation:
         timeout = timedelta(minutes=2)
         return WorkspaceInstallation(config, installation, sql_backend, wheels, ws, prompts, timeout)
 
+    @property
+    def config(self):
+        return self._config
+
+    @property
+    def folder(self):
+        return self._installation.install_folder()
+
     def run(self):
         logger.info(f"Installing UCX v{PRODUCT_INFO.version()}")
         Threads.strict(

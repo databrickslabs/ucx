@@ -3,15 +3,19 @@ import logging
 from collections.abc import Callable
 from dataclasses import replace
 from datetime import timedelta
+from unittest.mock import create_autospec
 
 import pytest
+from databricks.labs.blueprint.installation import Installation
 from databricks.labs.blueprint.parallel import Threads
+from databricks.labs.blueprint.tui import Prompts
+from databricks.labs.blueprint.wheels import WheelsV2
 from databricks.sdk.errors import InvalidParameterValue, NotFound
 from databricks.sdk.retries import retried
 from databricks.sdk.service.iam import PermissionLevel
 
 from databricks.labs.ucx.config import WorkspaceConfig
-from databricks.labs.ucx.install import WorkspaceInstaller
+from databricks.labs.ucx.install import WorkspaceInstallation, PRODUCT_INFO
 from databricks.labs.ucx.workspace_access.generic import (
     GenericPermissionsSupport,
     Listing,
@@ -26,17 +30,13 @@ logger = logging.getLogger(__name__)
 def new_installation(ws, sql_backend, env_or_skip, inventory_schema, make_random):
     cleanup = []
 
+    prompts = create_autospec(Prompts)
+    prompts.confirm.return_value = True
+
     def factory(config_transform: Callable[[WorkspaceConfig], WorkspaceConfig] | None = None):
         prefix = make_random(4)
         renamed_group_prefix = f"rename-{prefix}-"
         workspace_start_path = f"/Users/{ws.current_user.me().user_name}/.{prefix}"
-
-        wc = WorkspaceConfig(
-            inventory_database=inventory_schema,
-            log_level="DEBUG",
-            renamed_group_prefix=renamed_group_prefix,
-            workspace_start_path=workspace_start_path,
-        )
         default_cluster_id = env_or_skip("TEST_DEFAULT_CLUSTER_ID")
         tacl_cluster_id = env_or_skip("TEST_LEGACY_TABLE_ACL_CLUSTER_ID")
         Threads.strict(
@@ -46,33 +46,51 @@ def new_installation(ws, sql_backend, env_or_skip, inventory_schema, make_random
                 functools.partial(ws.clusters.ensure_cluster_is_running, tacl_cluster_id),
             ],
         )
-        if config_transform:
-            wc = config_transform(wc)
-        overrides = {"main": default_cluster_id, "tacl": tacl_cluster_id}
-        install = WorkspaceInstaller.run_for_config(
-            ws, wc, sql_backend=sql_backend, prefix=prefix, override_clusters=overrides
+        workspace_config = WorkspaceConfig(
+            inventory_database=inventory_schema,
+            log_level="DEBUG",
+            renamed_group_prefix=renamed_group_prefix,
+            workspace_start_path=workspace_start_path,
+            override_clusters={"main": default_cluster_id, "tacl": tacl_cluster_id},
         )
-        cleanup.append(install)
-        return install
+        if config_transform:
+            workspace_config = config_transform(workspace_config)
+        installation = Installation(ws, prefix)
+        # TODO: see if we want to move building wheel as a context manager for yield factory,
+        # so that we can shave off couple of seconds and build wheel only once per session
+        # instead of every test
+        wheels = WheelsV2(installation, PRODUCT_INFO)
+        workspace_installation = WorkspaceInstallation(
+            workspace_config,
+            installation,
+            sql_backend,
+            wheels,
+            ws,
+            prompts,
+            verify_timeout=timedelta(minutes=2),
+        )
+        workspace_installation.run()
+        cleanup.append(workspace_installation)
+        return workspace_installation
 
     yield factory
 
-    for installation in cleanup:
-        installation.uninstall()
+    for pending in cleanup:
+        pending.uninstall()
 
 
 @retried(on=[NotFound, TimeoutError], timeout=timedelta(minutes=5))
 def test_job_failure_propagates_correct_error_message_and_logs(ws, sql_backend, new_installation):
     install = new_installation()
 
-    sql_backend.execute(f"DROP SCHEMA {install.current_config.inventory_database} CASCADE")
+    sql_backend.execute(f"DROP SCHEMA {install.config.inventory_database} CASCADE")
 
     with pytest.raises(NotFound) as failure:
         install.run_workflow("099-destroy-schema")
 
     assert "cannot be found" in str(failure.value)
 
-    workflow_run_logs = list(ws.workspace.list(f"{install._install_folder}/logs"))
+    workflow_run_logs = list(ws.workspace.list(f"{install.folder}/logs"))
     assert len(workflow_run_logs) == 1
 
 
