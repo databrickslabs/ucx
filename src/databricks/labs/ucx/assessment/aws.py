@@ -244,33 +244,34 @@ class AWSResourcePermissions:
         instance_profiles = list(self._get_instance_profiles())
         tasks = []
         for instance_profile in instance_profiles:
-            tasks.append(partial(self._get_instance_profile_access_task, instance_profile))
+            tasks.append(partial(self._get_role_access_task,
+                                 instance_profile.instance_profile_arn, instance_profile.role_name))
         # Aggregating the outputs from all the tasks
         return sum(Threads.strict("Scanning Instance Profiles", tasks), [])
 
-    def _get_instance_profile_access_task(self, instance_profile: AWSInstanceProfile):
+    def _get_role_access_task(self, arn: str, role_name: str):
         policy_actions = []
-        policies = list(self._aws_resources.list_role_policies(instance_profile.role_name))
+        policies = list(self._aws_resources.list_role_policies(role_name))
         for policy in policies:
-            actions = self._aws_resources.get_role_policy(instance_profile.role_name, policy_name=policy)
+            actions = self._aws_resources.get_role_policy(role_name, policy_name=policy)
             for action in actions:
                 policy_actions.append(
                     AWSRoleAction(
-                        instance_profile.instance_profile_arn,
+                        arn,
                         action.resource_type,
                         action.privilege,
                         action.resource_path,
                     )
                 )
-        attached_policies = self._aws_resources.list_attached_policies_in_role(instance_profile.role_name)
+        attached_policies = self._aws_resources.list_attached_policies_in_role(role_name)
         for attached_policy in attached_policies:
             actions = list(
-                self._aws_resources.get_role_policy(instance_profile.role_name, attached_policy_arn=attached_policy)
+                self._aws_resources.get_role_policy(role_name, attached_policy_arn=attached_policy)
             )
             for action in actions:
                 policy_actions.append(
                     AWSRoleAction(
-                        instance_profile.instance_profile_arn,
+                        arn,
                         action.resource_type,
                         action.privilege,
                         action.resource_path,
@@ -283,18 +284,18 @@ class AWSResourcePermissions:
         if len(instance_profile_access) == 0:
             logger.warning("No Mapping Was Generated.")
             return None
-        return self._save(instance_profile_access)
-
-    def _overwrite_mapping(self, buffer) -> str:
         path = f"{self._folder}/aws_instance_profile_info.csv"
+        return self._save(instance_profile_access, path)
+
+    def _overwrite_mapping(self, buffer, path) -> str:
         self._ws.workspace.upload(path, buffer, overwrite=True, format=ImportFormat.AUTO)
         return path
 
-    def _save(self, instance_profile_actions: list[any]) -> str:
+    def _save(self, instance_profile_actions: list[any], path) -> str:
         buffer = io.StringIO()
         writer = csv.DictWriter(buffer, self._field_names)
         writer.writeheader()
         for instance_profile_action in instance_profile_actions:
             writer.writerow(dataclasses.asdict(instance_profile_action))
         buffer.seek(0)
-        return self._overwrite_mapping(buffer)
+        return self._overwrite_mapping(buffer, path)
