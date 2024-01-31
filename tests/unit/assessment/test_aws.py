@@ -409,6 +409,89 @@ def test_get_uc_roles_missing_keys():
                         }
                     ]
                 }
+            },
+            {
+                "Path": "/",
+                "RoleName": "uc-role-3",
+                "RoleId": "123456",
+                "Arn": "arn:aws:iam::123456789:role/uc-role-3",
+                "CreateDate": "2024-01-01T00:00:00+00:00"
+
+            },
+            {
+                "Path": "/",
+                "RoleName": "uc-role-4",
+                "RoleId": "123456",
+                "Arn": "arn:aws:iam::123456789:role/uc-role-4",
+                "CreateDate": "2024-01-01T00:00:00+00:00",
+                "AssumeRolePolicyDocument": {
+                    "Version": "2024-01-01",
+                    "Statement": [
+                        {
+                            "Effect": "Deny",
+                            "Principal": {
+                                "AWS": "arn:aws:iam::414351767826:role/unity-catalog-prod-UCMasterRole-14S5ZJVKOTYTL"
+                            },
+                            "Action": "sts:DontAssumeRole",
+                            "Condition": {
+                                "StringEquals": {
+                                    "sts:ExternalId": "1122334466"
+                                }
+                            }
+                        }
+                    ]
+                }
+            },
+            {
+                "Path": "/",
+                "RoleName": "uc-role-5",
+                "RoleId": "12345",
+                "Arn": "arn:aws:iam::123456789:role/uc-role-5",
+                "CreateDate": "2024-01-01T00:00:00+00:00",
+                "AssumeRolePolicyDocument": {
+                    "Version": "2024-01-01",
+                    "Statement": [
+                        {
+                            "Effect": "Allow",
+                            "Principal": {
+                                "AWS": [
+                                    "arn:aws:iam::123456789:role/uc-role-5",
+                                    "arn:aws:iam::123456789:role/another-role"
+                                ]
+                            },
+                            "Action": "sts:AssumeRole",
+                            "Condition": {
+                                "StringEquals": {
+                                    "sts:ExternalId": "1122334455"
+                                }
+                            }
+                        }
+                    ]
+                }
+            },
+            {
+                "Path": "/",
+                "RoleName": "uc-role-6",
+                "RoleId": "12345",
+                "Arn": "arn:aws:iam::123456789:role/uc-role-6",
+                "CreateDate": "2024-01-01T00:00:00+00:00",
+                "AssumeRolePolicyDocument": {
+                    "Version": "2024-01-01",
+                    "Statement": [
+                        {
+                            "Effect": "Allow",
+                            "Principal": {
+                                "AWS": "arn:aws:iam::123456789:role/uc-role-5"
+                            },
+                            "Action": "sts:AssumeRole",
+                            "Condition": {
+                                "StringEquals": {
+                                    "sts:ExternalId": "1122334455"
+                                }
+                            }
+                        }
+                    ]
+                }
             }
         ]
     }
@@ -598,7 +681,16 @@ def test_get_role_policy_missing_role(caplog):
     assert "No role name or attached role ARN specified." in caplog.messages[0]
 
 
-def test_empty_mapping(caplog):
+def test_instance_profiles_empty_mapping(caplog):
+    ws = create_autospec(WorkspaceClient)
+    ws.current_user.me = lambda: iam.User(user_name="me@example.com", groups=[iam.ComplexValue(display="admins")])
+    aws = create_autospec(AWSResources)
+    aws_resource_permissions = AWSResourcePermissions(ws, aws)
+    aws_resource_permissions.save_instance_profile_permissions()
+    assert "No Mapping" in caplog.messages[0]
+
+
+def test_uc_roles_empty_mapping(caplog):
     ws = create_autospec(WorkspaceClient)
     ws.instance_profiles.list.return_value = [
         InstanceProfile("arn:aws:iam::12345:instance-profile/role1", "arn:aws:iam::12345:role/role1")
@@ -606,7 +698,7 @@ def test_empty_mapping(caplog):
     ws.current_user.me = lambda: iam.User(user_name="me@example.com", groups=[iam.ComplexValue(display="admins")])
     aws = create_autospec(AWSResources)
     aws_resource_permissions = AWSResourcePermissions(ws, aws)
-    aws_resource_permissions.save_instance_profile_permissions()
+    aws_resource_permissions.save_uc_compatible_roles()
     assert "No Mapping" in caplog.messages[0]
 
 
