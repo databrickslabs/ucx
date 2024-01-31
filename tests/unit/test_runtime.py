@@ -1,13 +1,17 @@
 import os.path
+from unittest.mock import create_autospec
 
+from databricks.sdk import WorkspaceClient
 from databricks.sdk.config import Config
 
 from databricks.labs.ucx.config import WorkspaceConfig
 from databricks.labs.ucx.framework.tasks import _TASKS, Task
 from databricks.labs.ucx.runtime import assess_azure_service_principals
 
+from .framework.mocks import MockBackend
 
-def azure_mock_config(mocker) -> WorkspaceConfig:
+
+def azure_mock_config() -> WorkspaceConfig:
     config = WorkspaceConfig(
         connect=Config(
             host="adb-9999999999999999.14.azuredatabricks.net",
@@ -25,7 +29,7 @@ def test_azure_crawler(mocker):
     with mock.patch.dict(os.environ, {"DATABRICKS_RUNTIME_VERSION": "14.0"}):
         pyspark_sql_session = mocker.Mock()
         sys.modules["pyspark.sql.session"] = pyspark_sql_session
-        cfg = azure_mock_config(mocker)
+        cfg = azure_mock_config()
 
         _fetch = mocker.patch(
             "databricks.labs.ucx.framework.crawlers.RuntimeBackend.fetch",
@@ -33,7 +37,9 @@ def test_azure_crawler(mocker):
                 ["1", "secret_scope", "secret_key", "tenant_id", "storage_account"],
             ],
         )
-        assess_azure_service_principals(cfg)
+        ws = create_autospec(WorkspaceClient)
+        sql_backend = MockBackend()
+        assess_azure_service_principals(cfg, ws, sql_backend)
 
 
 def test_tasks(mocker):

@@ -45,7 +45,6 @@ class TablesMigrate:
         table_mapping = TableMapping(installation, ws, sql_backend)
         return cls(table_crawler, ws, sql_backend, table_mapping)
 
-
     def migrate_tables(self, *, what: What | None = None):
         self._init_seen_tables()
         tables_to_migrate = self._tm.get_tables_to_migrate(self._tc)
