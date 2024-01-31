@@ -335,6 +335,93 @@ def test_get_uc_roles():
     ]
 
 
+def test_get_uc_roles_missing_keys():
+    list_roles_return = """
+    {
+        "Roles": [
+            {
+                "Path": "/",
+                "RoleName": "NON-UC-Role",
+                "RoleId": "12345",
+                "Arn": "arn:aws:iam::123456789:role/non-uc-role",
+                "CreateDate": "2024-01-01T00:00:00+00:00",
+                "AssumeRolePolicyDocument": {
+                    "Version": "2024-01-01",
+                    "Statement": [
+                        {
+                            "Defect": "Allow",
+                            "Principal": {
+                                "Service": "ec2.amazonaws.com"
+                            },
+                            "Action": "sts:AssumeRole"
+                        }
+                    ]
+                },
+                "MaxSessionDuration": 3600
+            },
+            {
+                "Path": "/",
+                "RoleName": "uc-role-1",
+                "RoleId": "12345",
+                "Arn": "arn:aws:iam::123456789:role/uc-role-1",
+                "CreateDate": "2024-01-01T00:00:00+00:00",
+                "AssumeRolePolicyDocument": {
+                    "Version": "2024-01-01",
+                    "Statement": [
+                        {
+                            "Effect": "Allow",
+                            "Principal": {
+                                "AWS": [
+                                    "arn:aws:iam::123456789:role/uc-role",
+                                    "arn:aws:iam::414351767826:role/unity-catalog-prod-UCMasterRole-14S5ZJVKOTYTL"
+                                ]
+                            },
+                            "Non-Action": "sts:AssumeRole",
+                            "Condition": {
+                                "StringEquals": {
+                                    "sts:ExternalId": "1122334455"
+                                }
+                            }
+                        }
+                    ]
+                }
+            },
+            {
+                "Path": "/",
+                "RoleName": "uc-role-2",
+                "RoleId": "123456",
+                "Arn": "arn:aws:iam::123456789:role/uc-role-2",
+                "CreateDate": "2024-01-01T00:00:00+00:00",
+                "AssumeRolePolicyDocument": {
+                    "Version": "2024-01-01",
+                    "Statement": [
+                        {
+                            "Effect": "Allow",
+                            "Principal": {
+                                "AWS": "arn:aws:iam::414351767826:role/unity-catalog-prod-UCMasterRole-14S5ZJVKOTYTL"
+                            },
+                            "Action": "sts:DontAssumeRole",
+                            "Condition": {
+                                "StringEquals": {
+                                    "sts:ExternalId": "1122334466"
+                                }
+                            }
+                        }
+                    ]
+                }
+            }
+        ]
+    }
+    """
+
+    def command_call(cmd: str):
+        return 0, list_roles_return, ""
+
+    aws = AWSResources("Fake_Profile", command_call)
+    uc_roles = aws.list_all_uc_roles()
+    assert not uc_roles
+
+
 def test_save_instance_profile_permissions():
     ws = create_autospec(WorkspaceClient)
     ws.instance_profiles.list.return_value = [

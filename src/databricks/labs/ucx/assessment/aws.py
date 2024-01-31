@@ -119,14 +119,16 @@ class AWSResources:
             if not policy_document:
                 continue
             for statement in policy_document["Statement"]:
-                try:
-                    if statement["Effect"] != "Allow":
-                        continue
-                    if statement["Action"] != "sts:AssumeRole":
-                        continue
-                    principal = statement["Principal"].get("AWS")
-                except KeyError:
+                effect = statement.get("Effect")
+                action = statement.get("Action")
+                principal = statement.get("Principal")
+                if not (effect and action and principal):
                     continue
+                if effect != "Allow":
+                    continue
+                if action != "sts:AssumeRole":
+                    continue
+                principal = principal.get("AWS")
                 if not principal:
                     continue
                 if isinstance(principal, list):
