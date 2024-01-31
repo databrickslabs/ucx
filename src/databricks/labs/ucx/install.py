@@ -390,6 +390,7 @@ class WorkspaceInstallation:
         )
         dash.create_dashboards()
 
+
     def run_workflow(self, step: str):
         job_id = int(self._state.jobs[step])
         logger.debug(f"starting {step} job: {self._ws.config.host}#job/{job_id}")
@@ -955,6 +956,18 @@ class WorkspaceInstallation:
     def validate_and_run(self, step: str):
         if not self.validate_step(step):
             self.run_workflow(step)
+
+    def check_installation_conflicts(self, inventory_database) -> bool:
+        logger.info("Checking current installations....")
+        installation_manager = InstallationManager(self._ws)
+        logger.info("Fetching installations...")
+        all_users = [_.as_summary() for _ in installation_manager.user_installations()]
+
+        for user in all_users:
+            if inventory_database == user['database']:
+                return True
+
+        return False
 
 
 if __name__ == "__main__":

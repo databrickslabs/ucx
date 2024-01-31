@@ -322,3 +322,12 @@ def test_uninstallation(ws, sql_backend, new_installation):
         ws.jobs.get(job_id=assessment_job_id)
     with pytest.raises(NotFound):
         sql_backend.execute(f"show tables from hive_metastore.{install.config.inventory_database}")
+
+
+@retried(on=[NotFound], timeout=timedelta(minutes=5))
+def test_single_user_installation(ws, sql_backend, new_installation):
+    install_single_user = new_installation(single_user_install=True)
+    install_single_user.uninstall()
+
+    install_workspace_root = new_installation(single_user_install=False)
+    install_workspace_root.uninstall()
