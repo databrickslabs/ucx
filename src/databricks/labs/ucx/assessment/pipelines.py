@@ -51,14 +51,15 @@ class PipelinesCrawler(CrawlerBase[PipelineInfo], CheckClusterMixin):
             if pipeline_config:
                 failures.extend(self.check_spark_conf(pipeline_config, "pipeline"))
             pipeline_cluster = pipeline_response.spec.clusters
-            for cluster in pipeline_cluster:
-                if cluster.spark_conf is not None:
-                    failures.extend(self.check_spark_conf(cluster.spark_conf, "pipeline cluster"))
-                # Checking if cluster config is present in cluster policies
-                if cluster.policy_id is not None:
-                    failures.extend(self._check_cluster_policy(cluster.policy_id, "pipeline cluster"))
-                if cluster.init_scripts is not None:
-                    failures.extend(self._check_cluster_init_script(cluster.init_scripts, "pipeline cluster"))
+            if pipeline_cluster:
+                for cluster in pipeline_cluster:
+                    if cluster.spark_conf is not None:
+                        failures.extend(self.check_spark_conf(cluster.spark_conf, "pipeline cluster"))
+                    # Checking if cluster config is present in cluster policies
+                    if cluster.policy_id is not None:
+                        failures.extend(self._check_cluster_policy(cluster.policy_id, "pipeline cluster"))
+                    if cluster.init_scripts is not None:
+                        failures.extend(self._check_cluster_init_script(cluster.init_scripts, "pipeline cluster"))
 
             pipeline_info.failures = json.dumps(failures)
             if len(failures) > 0:
