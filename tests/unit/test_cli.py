@@ -25,7 +25,7 @@ from databricks.labs.ucx.cli import (
     sync_workspace_info,
     validate_external_locations,
     validate_groups_membership,
-    workflows,
+    workflows, save_uc_compatible_roles,
 )
 
 
@@ -265,14 +265,12 @@ def test_save_azure_storage_accounts(ws, caplog):
 
 def test_validate_groups_membership(ws):
     validate_groups_membership(ws)
-
     ws.groups.list.assert_called()
 
 
 def test_save_aws_iam_profiles_no_profile(ws, caplog):
     save_aws_iam_profiles(ws)
-
-    assert "AWS Profile is not specified." in caplog.messages[0]
+    assert any({"AWS Profile is not specified." in message for message in caplog.messages})
 
 
 def test_save_aws_iam_profiles_no_connection(ws, mocker):
@@ -292,4 +290,29 @@ def test_save_aws_iam_profiles_no_connection(ws, mocker):
 def test_save_aws_iam_profiles_no_cli(ws, mocker, caplog):
     mocker.patch("shutil.which", return_value=None)
     save_aws_iam_profiles(ws, aws_profile="profile")
-    assert "Couldn't find AWS" in caplog.messages[0]
+    assert any({"Couldn't find AWS" in message for message in caplog.messages})
+
+
+def test_save_uc_roles_no_profile(ws, caplog):
+    save_uc_compatible_roles(ws)
+    assert any({"AWS Profile is not specified." in message for message in caplog.messages})
+
+
+def test_save_uc_roles_no_connection(ws, mocker):
+    mocker.patch("shutil.which", return_value="/path/aws")
+    pop = create_autospec(subprocess.Popen)
+
+    pop.communicate.return_value = (bytes("message", "utf-8"), bytes("error", "utf-8"))
+    pop.returncode = 127
+    mocker.patch("subprocess.Popen.__init__", return_value=None)
+    mocker.patch("subprocess.Popen.__enter__", return_value=pop)
+    mocker.patch("subprocess.Popen.__exit__", return_value=None)
+
+    with pytest.raises(ResourceWarning, match="AWS CLI is not configured properly."):
+        save_uc_compatible_roles(ws, aws_profile="profile")
+
+
+def test_save_uc_roles_no_cli(ws, mocker, caplog):
+    mocker.patch("shutil.which", return_value=None)
+    save_uc_compatible_roles(ws, aws_profile="profile")
+    assert any({"Couldn't find AWS" in message for message in caplog.messages})
