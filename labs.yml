@@ -22,8 +22,8 @@ commands:
   - name: installations
     description: Show installations by different users on the same workspace
     table_template: |-
-      User\tDatabase\tWarehouse
-      {{range .}}{{.user_name}}\t{{.database}}\t{{.warehouse_id}}
+      Path\tDatabase\tWarehouse
+      {{range .}}{{.path}}\t{{.database}}\t{{.warehouse_id}}
       {{end}}
 
   - name: skip
