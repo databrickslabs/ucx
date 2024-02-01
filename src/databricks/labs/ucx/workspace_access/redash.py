@@ -1,3 +1,4 @@
+# pylint: disable=duplicate-code
 import dataclasses
 import json
 import logging

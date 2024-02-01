@@ -1,3 +1,4 @@
+# pylint: disable=duplicate-code
 import datetime
 import json
 import logging
