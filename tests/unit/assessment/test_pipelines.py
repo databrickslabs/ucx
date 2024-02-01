@@ -1,16 +1,17 @@
 from unittest.mock import Mock, create_autospec
-from databricks.sdk import WorkspaceClient
 
-from databricks.sdk.service.pipelines import PipelineState, PipelineStateInfo, PipelineCluster
+from databricks.sdk import WorkspaceClient
+from databricks.sdk.service.compute import DbfsStorageInfo, InitScriptInfo
+from databricks.sdk.service.pipelines import (
+    PipelineCluster,
+    PipelineState,
+    PipelineStateInfo,
+)
 
 from databricks.labs.ucx.assessment.azure import AzureServicePrincipalCrawler
 from databricks.labs.ucx.assessment.pipelines import PipelineInfo, PipelinesCrawler
 
 from ..framework.mocks import MockBackend
-from databricks.sdk.service.compute import (
-    DbfsStorageInfo,
-    InitScriptInfo,
-)
 
 
 def test_pipeline_assessment_with_config(mocker):
