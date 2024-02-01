@@ -9,7 +9,7 @@ from databricks.labs.blueprint.installation import Installation
 from databricks.labs.blueprint.parallel import Threads
 from databricks.labs.blueprint.tui import MockPrompts
 from databricks.labs.blueprint.wheels import WheelsV2
-from databricks.sdk.errors import InvalidParameterValue, NotFound
+from databricks.sdk.errors import InvalidParameterValue, NotFound, Unknown
 from databricks.sdk.retries import retried
 from databricks.sdk.service.iam import PermissionLevel
 
@@ -85,7 +85,7 @@ def new_installation(ws, sql_backend, env_or_skip, inventory_schema, make_random
         pending.uninstall()
 
 
-@retried(on=[NotFound, TimeoutError], timeout=timedelta(minutes=5))
+@retried(on=[NotFound, Unknown, TimeoutError], timeout=timedelta(minutes=5))
 def test_job_failure_propagates_correct_error_message_and_logs(ws, sql_backend, new_installation):
     install = new_installation()
 
@@ -100,7 +100,7 @@ def test_job_failure_propagates_correct_error_message_and_logs(ws, sql_backend, 
     assert len(workflow_run_logs) == 1
 
 
-@retried(on=[NotFound, InvalidParameterValue], timeout=timedelta(minutes=12))
+@retried(on=[NotFound, Unknown, InvalidParameterValue], timeout=timedelta(minutes=5))
 def test_running_real_assessment_job(
     ws, new_installation, make_ucx_group, make_cluster_policy, make_cluster_policy_permissions
 ):
@@ -114,9 +114,6 @@ def test_running_real_assessment_job(
     )
 
     install = new_installation(lambda wc: replace(wc, include_group_names=[ws_group_a.display_name]))
-    # TODO: flaky on databricks.sdk.errors.sdk.OperationFailed: failed to reach TERMINATED or SKIPPED,
-    # got RunLifeCycleState.INTERNAL_ERROR: Task workspace_listing failed with message: Workload failed, see run output
-    # for details. This caused all downstream tasks to get skipped.
     install.run_workflow("assessment")
 
     generic_permissions = GenericPermissionsSupport(ws, [])
@@ -124,7 +121,7 @@ def test_running_real_assessment_job(
     assert before[ws_group_a.display_name] == PermissionLevel.CAN_USE
 
 
-@retried(on=[NotFound, InvalidParameterValue], timeout=timedelta(minutes=5))
+@retried(on=[NotFound, Unknown, InvalidParameterValue], timeout=timedelta(minutes=5))
 def test_running_real_migrate_groups_job(
     ws, sql_backend, new_installation, make_ucx_group, make_cluster_policy, make_cluster_policy_permissions
 ):

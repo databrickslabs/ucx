@@ -239,9 +239,11 @@ class StatementExecutionExt:
                 yield row_factory(row)
             if result_data.next_chunk_index is None:
                 return
+            if not result_data.next_chunk_internal_link:
+                continue
             # TODO: replace once ES-828324 is fixed
             json_response = self._api.do("GET", result_data.next_chunk_internal_link)
-            result_data = ResultData.from_dict(json_response)
+            result_data = ResultData.from_dict(json_response)  # type: ignore[arg-type]
 
     def _row_converters(self, execute_response):
         col_names = []

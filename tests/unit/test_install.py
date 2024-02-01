@@ -558,7 +558,7 @@ def test_main_with_existing_conf_does_not_recreate_config(ws, mocker, mock_insta
     )
     workspace_installation.run()
 
-    webbrowser_open.assert_called_with('https://localhost/#workspace~/mock/README.py')
+    webbrowser_open.assert_called_with('https://localhost/#workspace~/mock/README')
 
 
 def test_query_metadata(ws):

@@ -45,7 +45,11 @@ from databricks.sdk.errors import (  # pylint: disable=redefined-builtin
 from databricks.sdk.retries import retried
 from databricks.sdk.service import compute, jobs
 from databricks.sdk.service.jobs import RunLifeCycleState, RunResultState
-from databricks.sdk.service.sql import EndpointInfoWarehouseType, SpotInstancePolicy
+from databricks.sdk.service.sql import (
+    CreateWarehouseRequestWarehouseType,
+    EndpointInfoWarehouseType,
+    SpotInstancePolicy,
+)
 
 from databricks.labs.ucx.__about__ import __version__
 from databricks.labs.ucx.assessment.azure import AzureServicePrincipalInfo
@@ -213,7 +217,7 @@ class WorkspaceInstaller:
             new_warehouse = self._ws.warehouses.create(
                 name=f"{WAREHOUSE_PREFIX} {time.time_ns()}",
                 spot_instance_policy=SpotInstancePolicy.COST_OPTIMIZED,
-                warehouse_type=EndpointInfoWarehouseType.PRO,
+                warehouse_type=CreateWarehouseRequestWarehouseType.PRO,
                 cluster_size="Small",
                 max_num_clusters=1,
             )
@@ -249,7 +253,7 @@ class WorkspaceInstaller:
             workspace_group_regex=configure_groups.workspace_group_regex,
             workspace_group_replace=configure_groups.workspace_group_replace,
             account_group_regex=configure_groups.account_group_regex,
-            group_match_by_external_id=configure_groups.group_match_by_external_id,
+            group_match_by_external_id=configure_groups.group_match_by_external_id,  # type: ignore[arg-type]
             include_group_names=configure_groups.include_group_names,
             renamed_group_prefix=configure_groups.renamed_group_prefix,
             warehouse_id=warehouse_id,
@@ -955,6 +959,6 @@ if __name__ == "__main__":
 
     workspace_client = WorkspaceClient(product="ucx", product_version=__version__)
     # TODO: this is broken - make it "current_installation_factory" function
-    installation = Installation.current(workspace_client, PRODUCT_INFO.product_name())
-    installer = WorkspaceInstaller(Prompts(), installation, workspace_client)
+    current = Installation.current(workspace_client, PRODUCT_INFO.product_name())
+    installer = WorkspaceInstaller(Prompts(), current, workspace_client)
     installer.run()
