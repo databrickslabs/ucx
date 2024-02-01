@@ -5,6 +5,7 @@ import webbrowser
 
 from databricks.labs.blueprint.cli import App
 from databricks.labs.blueprint.entrypoint import get_logger
+from databricks.labs.blueprint.installation import Installation, SerdeError
 from databricks.labs.blueprint.tui import Prompts
 from databricks.sdk import AccountClient, WorkspaceClient
 from databricks.sdk.errors import NotFound
@@ -270,6 +271,11 @@ def save_aws_iam_profiles(w: WorkspaceClient, aws_profile: str | None = None):
     aws_permissions = AWSResourcePermissions.for_cli(w, aws_profile)
     aws_permissions.save_instance_profile_permissions()
     return None
+
+
+if __name__ == "__main__":
+    ucx()
+
 
 
 @ucx.command
