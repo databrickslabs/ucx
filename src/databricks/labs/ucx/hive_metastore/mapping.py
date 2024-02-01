@@ -1,4 +1,3 @@
-import dataclasses
 import logging
 import re
 from dataclasses import dataclass
@@ -57,12 +56,11 @@ class TableToMigrate:
 class TableMapping:
     UCX_SKIP_PROPERTY = "databricks.labs.ucx.skip"
 
-    def __init__(self, installation: Installation, ws: WorkspaceClient, backend: SqlBackend):
+    def __init__(self, installation: Installation, ws: WorkspaceClient, sql_backend: SqlBackend):
         self._filename = 'mapping.csv'
         self._installation = installation
         self._ws = ws
-        self._backend = backend
-        self._field_names = [_.name for _ in dataclasses.fields(Rule)]
+        self._sql_backend = sql_backend
 
     @classmethod
     def current(cls, ws: WorkspaceClient, product='ucx'):
@@ -95,7 +93,7 @@ class TableMapping:
     def skip_table(self, schema: str, table: str):
         # Marks a table to be skipped in the migration process by applying a table property
         try:
-            self._backend.execute(
+            self._sql_backend.execute(
                 f"ALTER TABLE {escape_sql_identifier(schema)}.{escape_sql_identifier(table)} SET TBLPROPERTIES('{self.UCX_SKIP_PROPERTY}' = true)"
             )
         except NotFound as nf:
@@ -109,7 +107,7 @@ class TableMapping:
     def skip_schema(self, schema: str):
         # Marks a schema to be skipped in the migration process by applying a table property
         try:
-            self._backend.execute(
+            self._sql_backend.execute(
                 f"ALTER SCHEMA {escape_sql_identifier(schema)} SET DBPROPERTIES('{self.UCX_SKIP_PROPERTY}' = true)"
             )
         except NotFound as nf:
@@ -150,7 +148,7 @@ class TableMapping:
 
     def _get_database_in_scope_task(self, database: str) -> str | None:
         describe = {}
-        for value in self._backend.fetch(f"DESCRIBE SCHEMA EXTENDED {escape_sql_identifier(database)}"):
+        for value in self._sql_backend.fetch(f"DESCRIBE SCHEMA EXTENDED {escape_sql_identifier(database)}"):
             describe[value["database_description_item"]] = value["database_description_value"]
         if self.UCX_SKIP_PROPERTY in TablesCrawler.parse_database_props(describe.get("Properties", "").lower()):
             logger.info(f"Database {database} is marked to be skipped")
@@ -164,7 +162,7 @@ class TableMapping:
         if self._exists_in_uc(table, rule.as_uc_table_key):
             logger.info(f"The intended target for {table.key}, {rule.as_uc_table_key}, already exists.")
             return None
-        result = self._backend.fetch(
+        result = self._sql_backend.fetch(
             f"SHOW TBLPROPERTIES {escape_sql_identifier(table.database)}.{escape_sql_identifier(table.name)}"
         )
         for value in result:
@@ -181,7 +179,7 @@ class TableMapping:
                     )
                     return None
                 logger.info(f"The upgrade_to target for {table.key} is missing. Unsetting the upgrade_to property")
-                self._backend.execute(table.sql_unset_upgraded_to())
+                self._sql_backend.execute(table.sql_unset_upgraded_to())
 
         return table_to_migrate
 

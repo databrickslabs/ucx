@@ -1,7 +1,6 @@
 from dataclasses import dataclass
 
-import databricks.sdk.config
-from databricks.sdk import WorkspaceClient
+from databricks.sdk.core import Config
 
 __all__ = ["WorkspaceConfig"]
 
@@ -23,7 +22,7 @@ class WorkspaceConfig:  # pylint: disable=too-many-instance-attributes
     instance_pool_id: str | None = None
     # in v3, warehouse_id should be part of connect
     warehouse_id: str | None = None
-    connect: databricks.sdk.core.Config | None = None
+    connect: Config | None = None
     num_threads: int | None = 10
     database_to_catalog_mapping: dict[str, str] | None = None
     default_catalog: str | None = "ucx_default"
@@ -36,9 +35,6 @@ class WorkspaceConfig:  # pylint: disable=too-many-instance-attributes
 
     override_clusters: dict[str, str] | None = None
     custom_cluster_policy_id: str | None = None
-
-    def to_workspace_client(self) -> WorkspaceClient:
-        return WorkspaceClient(config=self.connect)
 
     def replace_inventory_variable(self, text: str) -> str:
         return text.replace("$inventory", f"hive_metastore.{self.inventory_database}")
