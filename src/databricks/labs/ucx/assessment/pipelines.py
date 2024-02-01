@@ -58,7 +58,7 @@ class PipelinesCrawler(CrawlerBase[PipelineInfo], CheckClusterMixin):
                     # Checking if cluster config is present in cluster policies
                     if cluster.policy_id is not None:
                         failures.extend(self._check_cluster_policy(cluster.policy_id, "pipeline cluster"))
-                    if cluster.init_scripts is not None:
+                    if cluster.init_scripts:
                         failures.extend(self._check_cluster_init_script(cluster.init_scripts, "pipeline cluster"))
 
             pipeline_info.failures = json.dumps(failures)

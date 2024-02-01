@@ -242,3 +242,34 @@ def test_pipeline_without_owners_should_have_empty_creator_name():
             failures="[]",
         )
     ]
+
+
+def test_pipeline_assessment_with_no_cluster_config(mocker):
+    sample_pipelines = [
+        PipelineStateInfo(
+            cluster_id=None,
+            creator_user_name="abcde.defgh@databricks.com",
+            latest_updates=None,
+            name="New DLT Pipeline",
+            pipeline_id="0112eae7-9d11-4b40-a2b8-6c83cb3c7407",
+            run_as_user_name="abcde.defgh@databricks.com",
+            state=PipelineState.IDLE,
+        )
+    ]
+
+    ws = create_autospec(WorkspaceClient)
+    config_dict = {
+        "spark.hadoop.fs.azure.account.auth.type.abcde.dfs.core.windows.net": "SAS",
+        "spark.hadoop.fs.azure.sas.token.provider.type.abcde.dfs."
+        "core.windows.net": "org.apache.hadoop.fs.azurebfs.sas.FixedSASTokenProvider",
+        "spark.hadoop.fs.azure.sas.fixed.token.abcde.dfs.core.windows.net": "{{secrets/abcde_access/sasFixedToken}}",
+    }
+    pipeline_cluster = []
+    ws.pipelines.get().spec.configuration = config_dict
+    ws.pipelines.get().spec.clusters = pipeline_cluster
+
+    crawler = PipelinesCrawler(ws, MockBackend(), "ucx")._assess_pipelines(sample_pipelines)
+    result_set = list(crawler)
+
+    assert len(result_set) == 1
+    assert result_set[0].success == 0
