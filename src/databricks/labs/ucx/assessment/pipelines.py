@@ -50,14 +50,16 @@ class PipelinesCrawler(CrawlerBase[PipelineInfo], CheckClusterMixin):
             pipeline_config = pipeline_response.spec.configuration
             if pipeline_config:
                 failures.extend(self.check_spark_conf(pipeline_config, "pipeline"))
-            pipeline_cluster = pipeline_response.spec.clusters[0]
-            if pipeline_cluster.spark_conf is not None:
-                failures.extend(self.check_spark_conf(pipeline_cluster.spark_conf, "pipeline cluster"))
-            # Checking if Azure cluster config is present in cluster policies
-            if pipeline_cluster.policy_id is not None:
-                failures.extend(self._check_cluster_policy(pipeline_cluster.policy_id, "pipeline cluster"))
-            if pipeline_cluster.init_scripts is not None:
-                failures.extend(self._check_cluster_init_script(pipeline_cluster.init_scripts, "pipeline cluster"))
+            pipeline_cluster = pipeline_response.spec.clusters
+            for cluster in pipeline_cluster:
+                if cluster.spark_conf is not None:
+                    failures.extend(self.check_spark_conf(cluster.spark_conf, "pipeline cluster"))
+                # Checking if cluster config is present in cluster policies
+                if cluster.policy_id is not None:
+                    failures.extend(self._check_cluster_policy(cluster.policy_id, "pipeline cluster"))
+                if cluster.init_scripts is not None:
+                    failures.extend(self._check_cluster_init_script(cluster.init_scripts, "pipeline cluster"))
+
 
             pipeline_info.failures = json.dumps(failures)
             if len(failures) > 0:

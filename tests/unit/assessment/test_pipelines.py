@@ -1,4 +1,5 @@
-from unittest.mock import Mock,MagicMock
+from unittest.mock import Mock, create_autospec
+from databricks.sdk import WorkspaceClient
 
 from databricks.sdk.service.pipelines import PipelineState, PipelineStateInfo, PipelineCluster
 
@@ -6,6 +7,10 @@ from databricks.labs.ucx.assessment.azure import AzureServicePrincipalCrawler
 from databricks.labs.ucx.assessment.pipelines import PipelineInfo, PipelinesCrawler
 
 from ..framework.mocks import MockBackend
+from databricks.sdk.service.compute import (
+    DbfsStorageInfo,
+    InitScriptInfo,
+)
 
 
 def test_pipeline_assessment_with_config(mocker):
@@ -21,7 +26,7 @@ def test_pipeline_assessment_with_config(mocker):
         )
     ]
 
-    ws = MagicMock()
+    ws = create_autospec(WorkspaceClient)
     config_dict = {
         "spark.hadoop.fs.azure.account.auth.type.abcde.dfs.core.windows.net": "SAS",
         "spark.hadoop.fs.azure.sas.token.provider.type.abcde.dfs."
@@ -31,12 +36,49 @@ def test_pipeline_assessment_with_config(mocker):
     pipeline_cluster = [PipelineCluster(apply_policy_default_values=None, autoscale=None, aws_attributes=None,
                                         azure_attributes=None, cluster_log_conf=None,
                                         custom_tags={'cluster_type': 'default'}, driver_instance_pool_id=None,
-                                        driver_node_type_id=None, gcp_attributes=None, init_scripts=[],
+                                        driver_node_type_id=None, gcp_attributes=None,
+                                        init_scripts=[InitScriptInfo(dbfs=DbfsStorageInfo(destination="dbfs:/users/test@test.com/init_scripts/test.sh"),
+                                                                     s3=None,
+                                                                     volumes=None,
+                                                                     workspace=None,)],
                                         instance_pool_id=None,
-                                        label='default', node_type_id='Standard_F4s', num_workers=1, policy_id=None,
-                                        spark_conf=None, spark_env_vars=None, ssh_public_keys=None)]
+                                        label='default', node_type_id='Standard_F4s', num_workers=1, policy_id="test_id",
+                                        spark_conf={"spark.databricks.delta.preview.enabled": "true"},
+                                        spark_env_vars=None, ssh_public_keys=None)]
     ws.pipelines.get().spec.configuration = config_dict
     ws.pipelines.get().spec.clusters = pipeline_cluster
+    ws.cluster_policies.get().definition = (
+        '{\n  "spark_conf.fs.azure.account.auth.type": {\n    '
+        '"type": "fixed",\n    "value": "OAuth",\n   '
+        ' "hidden": true\n  },\n  "spark_conf.fs.azure.account.oauth.provider.type": {\n   '
+        ' "type": "fixed",\n    "value": '
+        '"org.apache.hadoop.fs.azurebfs.oauth2.ClientCredsTokenProvider",\n    '
+        '"hidden": true\n  },\n  "spark_conf.fs.azure.account.oauth2.client.id": {\n    '
+        '"type": "fixed",\n    "value": "fsfsfsfsffsfsf",\n    "hidden": true\n  },\n  '
+        '"spark_conf.fs.azure.account.oauth2.client.secret": {\n    "type": "fixed",\n    '
+        '"value": "gfgfgfgfggfggfgfdds",\n    "hidden": true\n  },\n  '
+        '"spark_conf.fs.azure.account.oauth2.client.endpoint": {\n    '
+        '"type": "fixed",\n    '
+        '"value": "https://login.microsoftonline.com/1234ededed/oauth2/token",\n    '
+        '"hidden": true\n  }\n}'
+    )
+    ws.cluster_policies.get().policy_family_definition_overrides = (
+        '{\n  "spark_conf.fs.azure.account.auth.type": {\n    '
+        '"type": "fixed",\n    "value": "OAuth",\n   '
+        ' "hidden": true\n  },\n  "spark_conf.fs.azure.account.oauth.provider.type": {\n   '
+        ' "type": "fixed",\n    "value": '
+        '"org.apache.hadoop.fs.azurebfs.oauth2.ClientCredsTokenProvider",\n    '
+        '"hidden": true\n  },\n  "spark_conf.fs.azure.account.oauth2.client.id": {\n    '
+        '"type": "fixed",\n    "value": "fsfsfsfsffsfsf",\n    "hidden": true\n  },\n  '
+        '"spark_conf.fs.azure.account.oauth2.client.secret": {\n    "type": "fixed",\n    '
+        '"value": "gfgfgfgfggfggfgfdds",\n    "hidden": true\n  },\n  '
+        '"spark_conf.fs.azure.account.oauth2.client.endpoint": {\n    '
+        '"type": "fixed",\n    '
+        '"value": "https://login.microsoftonline.com/1234ededed/oauth2/token",\n    '
+        '"hidden": true\n  }\n}'
+    )
+    ws.workspace.export().content = "JXNoCmVjaG8gIj0="
+    ws.dbfs.read().data = "JXNoCmVjaG8gIj0="
 
     crawler = PipelinesCrawler(ws, MockBackend(), "ucx")._assess_pipelines(sample_pipelines)
     result_set = list(crawler)
@@ -57,7 +99,7 @@ def test_pipeline_assessment_without_config(mocker):
             state=PipelineState.IDLE,
         )
     ]
-    ws = MagicMock()
+    ws = create_autospec(WorkspaceClient)
     config_dict = {}
     pipeline_cluster = [PipelineCluster(apply_policy_default_values=None, autoscale=None, aws_attributes=None,
                                         azure_attributes=None, cluster_log_conf=None,
@@ -85,7 +127,7 @@ def test_pipeline_snapshot_with_config():
             failures="",
         )
     ]
-    mock_ws = Mock()
+    mock_ws = create_autospec(WorkspaceClient)
     crawler = PipelinesCrawler(mock_ws, MockBackend(), "ucx")
     crawler._try_fetch = Mock(return_value=[])
     crawler._crawl = Mock(return_value=sample_pipelines)
@@ -106,7 +148,7 @@ def test_pipeline_list_with_no_config():
             failures="",
         )
     ]
-    mock_ws = Mock()
+    mock_ws = create_autospec(WorkspaceClient)
     mock_ws.pipelines.list_pipelines.return_value = sample_pipelines
     config_dict = {"spark.hadoop.fs.azure1.account.oauth2.client.id.abcde.dfs.core.windows.net": "wewewerty"}
     mock_ws.pipelines.get().spec.configuration = config_dict
@@ -128,7 +170,7 @@ def test_pipeline_without_owners_should_have_empty_creator_name():
         )
     ]
 
-    ws = Mock()
+    ws = create_autospec(WorkspaceClient)
     ws.pipelines.list_pipelines.return_value = sample_pipelines
     pipeline_cluster = [PipelineCluster(apply_policy_default_values=None, autoscale=None, aws_attributes=None,
                                         azure_attributes=None, cluster_log_conf=None,
