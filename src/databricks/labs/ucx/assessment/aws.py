@@ -1,6 +1,3 @@
-import csv
-import dataclasses
-import io
 import json
 import logging
 import re
@@ -11,10 +8,10 @@ from collections.abc import Callable, Iterable
 from dataclasses import dataclass
 from functools import lru_cache, partial
 
+from databricks.labs.blueprint.installation import Installation
 from databricks.labs.blueprint.parallel import Threads
 from databricks.sdk import WorkspaceClient
 from databricks.sdk.service.catalog import Privilege
-from databricks.sdk.service.workspace import ImportFormat
 
 logger = logging.getLogger(__name__)
 
@@ -219,26 +216,25 @@ class AWSResources:
 
 
 class AWSResourcePermissions:
-    def __init__(
-        self,
-        ws: WorkspaceClient,
-        aws_resources: AWSResources,
-        folder: str | None = None,
-    ):
-        if not folder:
-            folder = f"/Users/{ws.current_user.me().user_name}/.ucx"
-        self._folder = folder
+    def __init__(self, installation: Installation, ws: WorkspaceClient, aws_resources: AWSResources):
+        self._installation = installation
         self._aws_resources = aws_resources
         self._ws = ws
-        self._field_names = [_.name for _ in dataclasses.fields(AWSRoleAction)]
+
+    @classmethod
+    def for_cli(cls, ws: WorkspaceClient, aws_profile, product='ucx'):
+        installation = Installation.current(ws, product)
+        aws = AWSResources(aws_profile)
+        if not aws.validate_connection():
+            raise ResourceWarning("AWS CLI is not configured properly.")
+        return cls(installation, ws, aws)
 
     def save_uc_compatible_roles(self):
         uc_role_access = list(self._get_role_access())
         if len(uc_role_access) == 0:
             logger.warning("No Mapping Was Generated.")
             return None
-        path = f"{self._folder}/uc_roles_access.csv"
-        return self._save(uc_role_access, path)
+        return self._installation.save(uc_role_access, filename='uc_roles_access.csv')
 
     def _get_instance_profiles(self) -> Iterable[AWSInstanceProfile]:
         instance_profiles = self._ws.instance_profiles.list()
@@ -301,18 +297,4 @@ class AWSResourcePermissions:
         if len(instance_profile_access) == 0:
             logger.warning("No Mapping Was Generated.")
             return None
-        path = f"{self._folder}/aws_instance_profile_info.csv"
-        return self._save(instance_profile_access, path)
-
-    def _overwrite_mapping(self, buffer, path) -> str:
-        self._ws.workspace.upload(path, buffer, overwrite=True, format=ImportFormat.AUTO)
-        return path
-
-    def _save(self, instance_profile_actions: list[AWSRoleAction], path) -> str:
-        buffer = io.StringIO()
-        writer = csv.DictWriter(buffer, self._field_names)
-        writer.writeheader()
-        for instance_profile_action in instance_profile_actions:
-            writer.writerow(dataclasses.asdict(instance_profile_action))
-        buffer.seek(0)
-        return self._overwrite_mapping(buffer, path)
+        return self._installation.save(instance_profile_access, filename='aws_instance_profile_info.csv')

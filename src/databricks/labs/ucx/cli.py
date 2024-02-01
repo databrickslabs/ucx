@@ -273,14 +273,10 @@ def save_aws_iam_profiles(w: WorkspaceClient, aws_profile: str | None = None):
     return None
 
 
-if __name__ == "__main__":
-    ucx()
-
-
-
 @ucx.command
 def save_uc_compatible_roles(w: WorkspaceClient, *, aws_profile: str | None = None):
-    """identifies all Instance Profiles and map their access to S3 buckets.
+    """extracts all the iam roles with trust relationships to the UC master role.
+     Map these roles to the S3 buckets they have access to.
     Requires a working setup of AWS CLI.
     https://aws.amazon.com/cli/
     The command saves a CSV to the UCX installation folder with the mapping.
@@ -300,26 +296,8 @@ def save_uc_compatible_roles(w: WorkspaceClient, *, aws_profile: str | None = No
             "or use the '--aws-profile=[profile-name]' parameter."
         )
         return None
-    aws = AWSResources(aws_profile)
-    if not aws.validate_connection():
-        logger.error("AWS CLI is not configured properly.")
-        return None
-
-    installation_manager = InstallationManager(w)
-    installation = installation_manager.for_user(w.current_user.me())
-    if not installation:
-        logger.error(CANT_FIND_UCX_MSG)
-        return None
-
-    if not w.config.is_aws:
-        logger.error("Workspace is not on AWS, please run this command on AWS databricks workspaces.")
-        return None
-
-    aws_pm = AWSResourcePermissions(
-        w,
-        aws,
-    )
-    aws_pm.save_uc_compatible_roles()
+    aws_permissions = AWSResourcePermissions.for_cli(w, aws_profile)
+    aws_permissions.save_uc_compatible_roles()
     return None
 
 
