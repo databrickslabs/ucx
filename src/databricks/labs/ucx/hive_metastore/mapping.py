@@ -1,18 +1,17 @@
-import csv
-import dataclasses
-import io
 import logging
 import re
 from dataclasses import dataclass
 from functools import partial
 
+from databricks.labs.blueprint.installation import Installation
 from databricks.labs.blueprint.parallel import Threads
 from databricks.sdk import WorkspaceClient
 from databricks.sdk.errors import BadRequest, NotFound, ResourceConflict
-from databricks.sdk.service.workspace import ImportFormat
 
 from databricks.labs.ucx.account import WorkspaceInfo
-from databricks.labs.ucx.framework.crawlers import SqlBackend
+from databricks.labs.ucx.config import WorkspaceConfig
+from databricks.labs.ucx.framework.crawlers import SqlBackend, StatementExecutionBackend
+from databricks.labs.ucx.framework.utils import escape_sql_identifier
 from databricks.labs.ucx.hive_metastore import TablesCrawler
 from databricks.labs.ucx.hive_metastore.tables import Table
 
@@ -57,13 +56,18 @@ class TableToMigrate:
 class TableMapping:
     UCX_SKIP_PROPERTY = "databricks.labs.ucx.skip"
 
-    def __init__(self, ws: WorkspaceClient, backend: SqlBackend, folder: str | None = None):
-        if not folder:
-            folder = f"/Users/{ws.current_user.me().user_name}/.ucx"
+    def __init__(self, installation: Installation, ws: WorkspaceClient, sql_backend: SqlBackend):
+        self._filename = 'mapping.csv'
+        self._installation = installation
         self._ws = ws
-        self._folder = folder
-        self._backend = backend
-        self._field_names = [_.name for _ in dataclasses.fields(Rule)]
+        self._sql_backend = sql_backend
+
+    @classmethod
+    def current(cls, ws: WorkspaceClient, product='ucx'):
+        installation = Installation.current(ws, product)
+        config = installation.load(WorkspaceConfig)
+        sql_backend = StatementExecutionBackend(ws, config.warehouse_id)
+        return cls(installation, ws, sql_backend)
 
     def current_tables(self, tables: TablesCrawler, workspace_name: str, catalog_name: str):
         tables_snapshot = tables.snapshot()
@@ -76,21 +80,12 @@ class TableMapping:
     def save(self, tables: TablesCrawler, workspace_info: WorkspaceInfo) -> str:
         workspace_name = workspace_info.current()
         default_catalog_name = re.sub(r"\W+", "_", workspace_name)
-        buffer = io.StringIO()
-        writer = csv.DictWriter(buffer, self._field_names)
-        writer.writeheader()
-        for rule in self.current_tables(tables, workspace_name, default_catalog_name):
-            writer.writerow(dataclasses.asdict(rule))
-        buffer.seek(0)
-        return self._overwrite_mapping(buffer)
+        current_tables = self.current_tables(tables, workspace_name, default_catalog_name)
+        return self._installation.save(list(current_tables), filename=self._filename)
 
     def load(self) -> list[Rule]:
         try:
-            rules = []
-            remote = self._ws.workspace.download(f"{self._folder}/mapping.csv")
-            for row in csv.DictReader(remote):  # type: ignore[arg-type]
-                rules.append(Rule(**row))
-            return rules
+            return self._installation.load(list[Rule], filename=self._filename)
         except NotFound:
             msg = "Please run: databricks labs ucx table-mapping"
             raise ValueError(msg) from None
@@ -98,8 +93,8 @@ class TableMapping:
     def skip_table(self, schema: str, table: str):
         # Marks a table to be skipped in the migration process by applying a table property
         try:
-            self._backend.execute(
-                f"ALTER TABLE `{schema}`.`{table}` SET TBLPROPERTIES('{self.UCX_SKIP_PROPERTY}' = true)"
+            self._sql_backend.execute(
+                f"ALTER TABLE {escape_sql_identifier(schema)}.{escape_sql_identifier(table)} SET TBLPROPERTIES('{self.UCX_SKIP_PROPERTY}' = true)"
             )
         except NotFound as nf:
             if "[TABLE_OR_VIEW_NOT_FOUND]" in str(nf) or "[DELTA_TABLE_NOT_FOUND]" in str(nf):
@@ -112,7 +107,9 @@ class TableMapping:
     def skip_schema(self, schema: str):
         # Marks a schema to be skipped in the migration process by applying a table property
         try:
-            self._backend.execute(f"ALTER SCHEMA `{schema}` SET DBPROPERTIES('{self.UCX_SKIP_PROPERTY}' = true)")
+            self._sql_backend.execute(
+                f"ALTER SCHEMA {escape_sql_identifier(schema)} SET DBPROPERTIES('{self.UCX_SKIP_PROPERTY}' = true)"
+            )
         except NotFound as nf:
             if "[SCHEMA_NOT_FOUND]" in str(nf):
                 logger.error(f"Failed to apply skip marker for Schema {schema}. Schema not found.")
@@ -143,11 +140,6 @@ class TableMapping:
 
         return Threads.strict("checking all database properties", tasks)
 
-    def _overwrite_mapping(self, buffer) -> str:
-        path = f"{self._folder}/mapping.csv"
-        self._ws.workspace.upload(path, buffer, overwrite=True, format=ImportFormat.AUTO)
-        return path
-
     def _get_databases_in_scope(self, databases: set[str]):
         tasks = []
         for database in databases:
@@ -156,7 +148,7 @@ class TableMapping:
 
     def _get_database_in_scope_task(self, database: str) -> str | None:
         describe = {}
-        for value in self._backend.fetch(f"DESCRIBE SCHEMA EXTENDED {database}"):
+        for value in self._sql_backend.fetch(f"DESCRIBE SCHEMA EXTENDED {escape_sql_identifier(database)}"):
             describe[value["database_description_item"]] = value["database_description_value"]
         if self.UCX_SKIP_PROPERTY in TablesCrawler.parse_database_props(describe.get("Properties", "").lower()):
             logger.info(f"Database {database} is marked to be skipped")
@@ -170,7 +162,9 @@ class TableMapping:
         if self._exists_in_uc(table, rule.as_uc_table_key):
             logger.info(f"The intended target for {table.key}, {rule.as_uc_table_key}, already exists.")
             return None
-        result = self._backend.fetch(f"SHOW TBLPROPERTIES `{table.database}`.`{table.name}`")
+        result = self._sql_backend.fetch(
+            f"SHOW TBLPROPERTIES {escape_sql_identifier(table.database)}.{escape_sql_identifier(table.name)}"
+        )
         for value in result:
             if value["key"] == self.UCX_SKIP_PROPERTY:
                 logger.info(f"{table.key} is marked to be skipped")
@@ -185,7 +179,7 @@ class TableMapping:
                     )
                     return None
                 logger.info(f"The upgrade_to target for {table.key} is missing. Unsetting the upgrade_to property")
-                self._backend.execute(table.sql_unset_upgraded_to())
+                self._sql_backend.execute(table.sql_unset_upgraded_to())
 
         return table_to_migrate
 

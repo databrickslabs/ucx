@@ -1,4 +1,3 @@
-import io
 import logging
 import os
 import re
@@ -6,10 +5,11 @@ from collections.abc import Iterable
 from dataclasses import dataclass
 from typing import ClassVar
 
+from databricks.labs.blueprint.installation import Installation
 from databricks.sdk import WorkspaceClient
-from databricks.sdk.service.workspace import ImportFormat
 
 from databricks.labs.ucx.framework.crawlers import CrawlerBase, SqlBackend
+from databricks.labs.ucx.framework.utils import escape_sql_identifier
 from databricks.labs.ucx.mixins.sql import Row
 
 logger = logging.getLogger(__name__)
@@ -110,7 +110,7 @@ class ExternalLocations(CrawlerBase[ExternalLocation]):
     def _external_location_list(self) -> Iterable[ExternalLocation]:
         tables = list(
             self._backend.fetch(
-                f"SELECT location, storage_properties FROM {self._schema}.tables WHERE location IS NOT NULL"
+                f"SELECT location, storage_properties FROM {escape_sql_identifier(self._schema)}.tables WHERE location IS NOT NULL"
             )
         )
         mounts = Mounts(self._backend, self._ws, self._schema).snapshot()
@@ -120,7 +120,9 @@ class ExternalLocations(CrawlerBase[ExternalLocation]):
         return self._snapshot(self._try_fetch, self._external_location_list)
 
     def _try_fetch(self) -> Iterable[ExternalLocation]:
-        for row in self._fetch(f"SELECT * FROM {self._schema}.{self._table}"):
+        for row in self._fetch(
+            f"SELECT * FROM {escape_sql_identifier(self._schema)}.{escape_sql_identifier(self._table)}"
+        ):
             yield ExternalLocation(*row)
 
     def _get_ext_location_definitions(self, missing_locations: list[ExternalLocation]) -> list:
@@ -171,7 +173,7 @@ class ExternalLocations(CrawlerBase[ExternalLocation]):
             missing_locations.append(loc)
         return matching_locations, missing_locations
 
-    def save_as_terraform_definitions_on_workspace(self, folder: str) -> str | None:
+    def save_as_terraform_definitions_on_workspace(self, installation: Installation):
         matching_locations, missing_locations = self._match_table_external_locations()
         if len(matching_locations) > 0:
             logger.info("following external locations are already configured.")
@@ -182,18 +184,12 @@ class ExternalLocations(CrawlerBase[ExternalLocation]):
             logger.info("following external location need to be created.")
             for _ in missing_locations:
                 logger.info(f"{_.table_count} tables can be migrated using external location {_.location}.")
-            buffer = io.StringIO()
+            buffer = []
             for script in self._get_ext_location_definitions(missing_locations):
-                buffer.write(script)
-            buffer.seek(0)
-            return self._overwrite_mapping(folder, buffer)
+                buffer.append(script)
+            return installation.upload('external_locations.tf', ("\n".join(buffer)).encode('utf8'))
         logger.info("no additional external location to be created.")
         return None
-
-    def _overwrite_mapping(self, folder, buffer) -> str:
-        path = f"{folder}/external_locations.tf"
-        self._ws.workspace.upload(path, buffer, overwrite=True, format=ImportFormat.AUTO)
-        return path
 
 
 class Mounts(CrawlerBase[Mount]):
@@ -227,5 +223,7 @@ class Mounts(CrawlerBase[Mount]):
         return self._snapshot(self._try_fetch, self._list_mounts)
 
     def _try_fetch(self) -> Iterable[Mount]:
-        for row in self._fetch(f"SELECT * FROM {self._schema}.{self._table}"):
+        for row in self._fetch(
+            f"SELECT * FROM {escape_sql_identifier(self._schema)}.{escape_sql_identifier(self._table)}"
+        ):
             yield Mount(*row)

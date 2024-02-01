@@ -3,14 +3,26 @@ import re
 import typing
 from collections.abc import Iterable, Iterator
 from dataclasses import dataclass
+from enum import Enum, auto
 from functools import partial
 
 from databricks.labs.blueprint.parallel import Threads
 
 from databricks.labs.ucx.framework.crawlers import CrawlerBase, SqlBackend
+from databricks.labs.ucx.framework.utils import escape_sql_identifier
 from databricks.labs.ucx.mixins.sql import Row
 
 logger = logging.getLogger(__name__)
+
+
+class What(Enum):
+    EXTERNAL_SYNC = auto()
+    EXTERNAL_NO_SYNC = auto()
+    DBFS_ROOT_DELTA = auto()
+    DBFS_ROOT_NON_DELTA = auto()
+    VIEW = auto()
+    DB_DATASET = auto()
+    UNKNOWN = auto()
 
 
 @dataclass
@@ -95,17 +107,33 @@ class Table:
                 return True
         return False
 
+    @property
+    def what(self) -> What:
+        if self.is_databricks_dataset:
+            return What.DB_DATASET
+        if self.is_dbfs_root and self.table_format == "DELTA":
+            return What.DBFS_ROOT_DELTA
+        if self.is_dbfs_root:
+            return What.DBFS_ROOT_NON_DELTA
+        if self.kind == "TABLE" and self.is_format_supported_for_sync:
+            return What.EXTERNAL_SYNC
+        if self.kind == "TABLE":
+            return What.EXTERNAL_NO_SYNC
+        if self.kind == "VIEW":
+            return What.VIEW
+        return What.UNKNOWN
+
     def sql_migrate_external(self, target_table_key):
-        return f"SYNC TABLE {target_table_key} FROM {self.key};"
+        return f"SYNC TABLE {escape_sql_identifier(target_table_key)} FROM {escape_sql_identifier(self.key)};"
 
     def sql_migrate_dbfs(self, target_table_key):
         if not self.is_delta:
             msg = f"{self.key} is not DELTA: {self.table_format}"
             raise ValueError(msg)
-        return f"CREATE TABLE IF NOT EXISTS {target_table_key} DEEP CLONE {self.key};"
+        return f"CREATE TABLE IF NOT EXISTS {escape_sql_identifier(target_table_key)} DEEP CLONE {escape_sql_identifier(self.key)};"
 
     def sql_migrate_view(self, target_table_key):
-        return f"CREATE VIEW IF NOT EXISTS {target_table_key} AS {self.view_text};"
+        return f"CREATE VIEW IF NOT EXISTS {escape_sql_identifier(target_table_key)} AS {self.view_text};"
 
 
 @dataclass
@@ -163,7 +191,7 @@ class TablesCrawler(CrawlerBase):
 
     def _try_load(self) -> Iterable[Table]:
         """Tries to load table information from the database or throws TABLE_OR_VIEW_NOT_FOUND error"""
-        for row in self._fetch(f"SELECT * FROM {self._full_name}"):
+        for row in self._fetch(f"SELECT * FROM {escape_sql_identifier(self._full_name)}"):
             yield Table(*row)
 
     def _crawl(self) -> Iterable[Table]:
@@ -184,7 +212,9 @@ class TablesCrawler(CrawlerBase):
         catalog = "hive_metastore"
         for (database,) in self._all_databases():
             logger.debug(f"[{catalog}.{database}] listing tables")
-            for _, table, _is_tmp in self._fetch(f"SHOW TABLES FROM {catalog}.{database}"):
+            for _, table, _is_tmp in self._fetch(
+                f"SHOW TABLES FROM {escape_sql_identifier(catalog)}.{escape_sql_identifier(database)}"
+            ):
                 tasks.append(partial(self._describe, catalog, database, table))
         catalog_tables, errors = Threads.gather(f"listing tables in {catalog}", tasks)
         if len(errors) > 0:
@@ -209,7 +239,7 @@ class TablesCrawler(CrawlerBase):
         try:
             logger.debug(f"[{full_name}] fetching table metadata")
             describe = {}
-            for key, value, _ in self._fetch(f"DESCRIBE TABLE EXTENDED {full_name}"):
+            for key, value, _ in self._fetch(f"DESCRIBE TABLE EXTENDED {escape_sql_identifier(full_name)}"):
                 describe[key] = value
             return Table(
                 catalog=catalog.lower(),

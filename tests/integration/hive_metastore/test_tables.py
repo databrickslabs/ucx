@@ -5,6 +5,7 @@ from databricks.sdk.errors import NotFound
 from databricks.sdk.retries import retried
 
 from databricks.labs.ucx.hive_metastore import TablesCrawler
+from databricks.labs.ucx.hive_metastore.tables import What
 
 logger = logging.getLogger(__name__)
 
@@ -38,8 +39,13 @@ def test_describe_all_tables_in_databases(ws, sql_backend, inventory_schema, mak
 
     assert len(all_tables) >= 5
     assert all_tables[non_delta.full_name].table_format == "JSON"
+    assert all_tables[non_delta.full_name].what == What.DB_DATASET
     assert all_tables[managed_table.full_name].object_type == "MANAGED"
+    assert all_tables[managed_table.full_name].what == What.DBFS_ROOT_DELTA
     assert all_tables[tmp_table.full_name].object_type == "MANAGED"
+    assert all_tables[tmp_table.full_name].what == What.DBFS_ROOT_DELTA
     assert all_tables[external_table.full_name].object_type == "EXTERNAL"
+    assert all_tables[external_table.full_name].what == What.EXTERNAL_NO_SYNC
     assert all_tables[view.full_name].object_type == "VIEW"
     assert all_tables[view.full_name].view_text == "SELECT 2+2 AS four"
+    assert all_tables[view.full_name].what == What.VIEW

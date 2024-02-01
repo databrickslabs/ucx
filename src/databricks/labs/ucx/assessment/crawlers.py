@@ -1,8 +1,5 @@
-import base64
 import logging
 import re
-
-from databricks.sdk.errors import NotFound
 
 logger = logging.getLogger(__name__)
 
@@ -27,27 +24,6 @@ _CLIENT_ENDPOINT_LENGTH = 6
 _INIT_SCRIPT_DBFS_PATH = 2
 
 
-def _get_init_script_data(w, init_script_info):
-    if init_script_info.dbfs:
-        if len(init_script_info.dbfs.destination.split(":")) == _INIT_SCRIPT_DBFS_PATH:
-            file_api_format_destination = init_script_info.dbfs.destination.split(":")[1]
-            if file_api_format_destination:
-                try:
-                    data = w.dbfs.read(file_api_format_destination).data
-                    return base64.b64decode(data).decode("utf-8")
-                except NotFound:
-                    return None
-    if init_script_info.workspace:
-        workspace_file_destination = init_script_info.workspace.destination
-        if workspace_file_destination:
-            try:
-                data = w.workspace.export(workspace_file_destination).content
-                return base64.b64decode(data).decode("utf-8")
-            except NotFound:
-                return None
-    return None
-
-
 def _azure_sp_conf_in_init_scripts(init_script_data: str) -> bool:
     for conf in _AZURE_SP_CONF:
         if re.search(conf, init_script_data):
@@ -63,7 +39,9 @@ def _azure_sp_conf_present_check(config: dict) -> bool:
     return False
 
 
-def spark_version_compatibility(spark_version: str) -> str:
+def spark_version_compatibility(spark_version: str | None) -> str:
+    if not spark_version:
+        return "unreported version"
     first_comp_custom_rt = 3
     first_comp_custom_x = 2
     dbr_version_components = spark_version.split("-")

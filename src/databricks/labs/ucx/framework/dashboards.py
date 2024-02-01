@@ -1,9 +1,7 @@
 import dataclasses
-import json
 import logging
 from collections.abc import Callable
 from dataclasses import dataclass
-from json import JSONDecodeError
 from pathlib import Path
 
 from databricks.labs.blueprint.installer import InstallState
@@ -159,29 +157,6 @@ class DashboardFromFiles:
         )
         return widget_options
 
-    def _state_pre_v06(self):
-        try:  # pylint: disable=too-many-try-statements)
-            query_state = f"{self._remote_folder}/state.json"
-            state = json.load(self._ws.workspace.download(query_state))
-            to_remove = []
-            for k, v in state.items():
-                if k.endswith("dashboard_id"):
-                    continue
-                if not k.endswith("query_id"):
-                    continue
-                try:
-                    self._ws.queries.get(v)
-                except NotFound:
-                    to_remove.append(k)
-            for key in to_remove:
-                del state[key]
-            return state
-        except NotFound:
-            self._ws.workspace.mkdirs(self._remote_folder)
-            return {}
-        except JSONDecodeError:
-            return {}
-
     def _remote_folder_object(self) -> workspace.ObjectInfo:
         try:
             return self._ws.workspace.get_status(self._remote_folder)
@@ -190,18 +165,6 @@ class DashboardFromFiles:
             return self._remote_folder_object()
 
     def _installed_query_state(self):
-        if not self._state.dashboards:
-            for k, v in self._state_pre_v06().items():
-                prefix, suffix = [*k.split(":"), None][:2]
-                match suffix:
-                    case "dashboard_id":
-                        self._state.dashboards[prefix] = v
-                    case "query_id":
-                        self._state.queries[prefix] = v
-                    case "viz_id":
-                        self._state.viz[prefix] = v
-                    case "widget_id":
-                        self._state.widgets[prefix] = v
         object_info = self._remote_folder_object()
         parent = f"folders/{object_info.object_id}"
         return parent

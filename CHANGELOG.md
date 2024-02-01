@@ -1,5 +1,32 @@
 # Version changelog
 
+## 0.11.1
+
+* Added "what" property for migration to scope down table migrations ([#856](https://github.com/databrickslabs/ucx/pull/856)).
+* Added job count in the assessment dashboard ([#858](https://github.com/databrickslabs/ucx/pull/858)).
+* Adopted `installation` package from `databricks-labs-blueprint` ([#860](https://github.com/databrickslabs/ucx/pull/860)).
+* Debug logs to print only the first 96 bytes of SQL query by default, tunable by `debug_truncate_bytes` SDK configuration property ([#859](https://github.com/databrickslabs/ucx/pull/859)).
+* Extract command codes and unify the checks for spark_conf, cluster_policy, init_scripts ([#855](https://github.com/databrickslabs/ucx/pull/855)).
+* Improved installation failure with actionable message ([#840](https://github.com/databrickslabs/ucx/pull/840)).
+* Improved validating groups membership cli command ([#816](https://github.com/databrickslabs/ucx/pull/816)).
+
+Dependency updates:
+
+ * Updated databricks-labs-blueprint requirement from ~=0.1.0 to ~=0.2.4 ([#867](https://github.com/databrickslabs/ucx/pull/867)).
+
+## 0.11.0
+
+* Added `databricks labs ucx alias` command to create a view of tables from one schema/catalog in another schema/catalog ([#837](https://github.com/databrickslabs/ucx/pull/837)).
+* Added `databricks labs ucx save-aws-iam-profiles` command to scan instance profiles identify AWS S3 access and save a CSV with permissions ([#817](https://github.com/databrickslabs/ucx/pull/817)).
+* Added total view counts in the assessment dashboard ([#834](https://github.com/databrickslabs/ucx/pull/834)).
+* Cleaned up `assess_jobs` and `assess_clusters` tasks in the `assessment` workflow to improve testing and reduce redundancy.([#825](https://github.com/databrickslabs/ucx/pull/825)).
+* Added documentation for the assessment report ([#806](https://github.com/databrickslabs/ucx/pull/806)).
+* Fixed escaping for SQL object names ([#836](https://github.com/databrickslabs/ucx/pull/836)).
+
+Dependency updates:
+
+ * Updated databricks-sdk requirement from ~=0.17.0 to ~=0.18.0 ([#832](https://github.com/databrickslabs/ucx/pull/832)).
+
 ## 0.10.0
 
 * Added `databricks labs ucx validate-groups-membership` command to validate groups to see if they have same membership across acount and workspace level ([#772](https://github.com/databrickslabs/ucx/pull/772)).

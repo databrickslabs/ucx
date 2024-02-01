@@ -1,18 +1,15 @@
-import json
 import logging
 from typing import ClassVar
 
 import requests
+from databricks.labs.blueprint.installation import Installation
 from databricks.labs.blueprint.tui import Prompts
-from databricks.sdk import WorkspaceClient
+from databricks.sdk import AccountClient, WorkspaceClient
 from databricks.sdk.errors import NotFound
 from databricks.sdk.service.iam import ComplexValue, Group
 from databricks.sdk.service.provisioning import Workspace
-from databricks.sdk.service.workspace import ImportFormat
 
 from databricks.labs.ucx.__about__ import __version__
-from databricks.labs.ucx.config import AccountConfig
-from databricks.labs.ucx.installer import InstallationManager
 
 logger = logging.getLogger(__name__)
 
@@ -26,24 +23,12 @@ class AccountWorkspaces:
 
     SYNC_FILE_NAME: ClassVar[str] = "workspaces.json"
 
-    def __init__(
-        self, cfg: AccountConfig, new_workspace_client=WorkspaceClient, new_installation_manager=InstallationManager
-    ):
+    def __init__(self, ac: AccountClient, new_workspace_client=WorkspaceClient):
         self._new_workspace_client = new_workspace_client
-        self._new_installation_manager = new_installation_manager
-        self._ac = cfg.to_account_client()
-        self._cfg = cfg
+        self._ac = ac
 
-    def _configured_workspaces(self):
-        for workspace in self._ac.workspaces.list():
-            if self._cfg.include_workspace_names:
-                if workspace.workspace_name not in self._cfg.include_workspace_names:
-                    logger.debug(
-                        f"skipping {workspace.workspace_name} ({workspace.workspace_id} because "
-                        f"its not explicitly included"
-                    )
-                    continue
-            yield workspace
+    def _workspaces(self):
+        return self._ac.workspaces.list()
 
     def _get_cloud(self) -> str:
         if self._ac.config.is_azure:
@@ -67,7 +52,7 @@ class AccountWorkspaces:
         :return: list[WorkspaceClient]
         """
         clients = []
-        for workspace in self._configured_workspaces():
+        for workspace in self._workspaces():
             ws = self.client_for(workspace)
             clients.append(ws)
         return clients
@@ -79,14 +64,11 @@ class AccountWorkspaces:
         upload the json dump of workspace info in the .ucx folder
         """
         workspaces = []
-        for workspace in self._configured_workspaces():
-            workspaces.append(workspace.as_dict())
-        info = json.dumps(workspaces, indent=2).encode("utf8")
+        for workspace in self._workspaces():
+            workspaces.append(workspace)
         for ws in self.workspace_clients():
-            installation_manager = self._new_installation_manager(ws)
-            for installation in installation_manager.user_installations():
-                path = f"{installation.path}/{self.SYNC_FILE_NAME}"
-                ws.workspace.upload(path, info, overwrite=True, format=ImportFormat.AUTO)
+            for installation in Installation.existing(ws, "ucx"):
+                installation.save(workspaces, filename=self.SYNC_FILE_NAME)
 
     def create_account_level_groups(self):
         """
@@ -141,12 +123,9 @@ class AccountWorkspaces:
 
 
 class WorkspaceInfo:
-    def __init__(self, ws: WorkspaceClient, folder: str | None = None, new_installation_manager=InstallationManager):
-        if not folder:
-            folder = f"/Users/{ws.current_user.me().user_name}/.ucx"
+    def __init__(self, installation: Installation, ws: WorkspaceClient):
+        self._installation = installation
         self._ws = ws
-        self._folder = folder
-        self._new_installation_manager = new_installation_manager
 
     def _current_workspace_id(self) -> int:
         headers = self._ws.config.authenticate()
@@ -161,12 +140,10 @@ class WorkspaceInfo:
     def _load_workspace_info(self) -> dict[int, Workspace]:
         try:
             id_to_workspace = {}
-            with self._ws.workspace.download(f"{self._folder}/{AccountWorkspaces.SYNC_FILE_NAME}") as f:
-                for workspace_metadata in json.loads(f.read()):
-                    workspace = Workspace.from_dict(workspace_metadata)
-                    assert workspace.workspace_id is not None
-                    id_to_workspace[workspace.workspace_id] = workspace
-                return id_to_workspace
+            for workspace in self._installation.load(list[Workspace], filename=AccountWorkspaces.SYNC_FILE_NAME):
+                assert workspace.workspace_id is not None
+                id_to_workspace[workspace.workspace_id] = workspace
+            return id_to_workspace
         except NotFound:
             msg = "Please run as account-admin: databricks labs ucx sync-workspace-info"
             raise ValueError(msg) from None
@@ -194,17 +171,11 @@ class WorkspaceInfo:
             workspace_name = prompts.question(
                 f"Workspace name for {workspace_id}", default=f"workspace-{workspace_id}", valid_regex=r"^[\w-]+$"
             )
-            workspace = Workspace(workspace_id=int(workspace_id), workspace_name=workspace_name)
-            workspaces.append(workspace.as_dict())
+            workspaces.append(Workspace(workspace_id=int(workspace_id), workspace_name=workspace_name))
             answer = prompts.question("Next workspace id", valid_number=True, default="stop")
             if answer == "stop":
                 break
             workspace_id = int(answer)
-        info = json.dumps(workspaces, indent=2).encode("utf8")
-        installation_manager = self._new_installation_manager(self._ws)
-        logger.info("Detecting UCX installations on current workspace...")
-        for installation in installation_manager.user_installations():
-            path = f"{installation.path}/{AccountWorkspaces.SYNC_FILE_NAME}"
-            logger.info(f"Overwriting {path}")
-            self._ws.workspace.upload(path, info, overwrite=True, format=ImportFormat.AUTO)  # type: ignore[arg-type]
+        for installation in Installation.existing(self._ws, 'ucx'):
+            installation.save(workspaces, filename=AccountWorkspaces.SYNC_FILE_NAME)
         logger.info("Synchronised workspace id mapping for installations on current workspace")
