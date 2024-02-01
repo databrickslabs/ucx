@@ -991,8 +991,7 @@ class WorkspaceInstaller:  # pylint: disable=too-many-instance-attributes
             self._ws.workspace.get_status(self._install_folder)
         except NotFound:
             logger.error(
-                f"Check if {self._install_folder} is present along with {self.config_file} and "
-                f"{self._state._state_file}."
+                f"Check if {self._install_folder} is present along with {self.config_file}"
             )
             return
         self._remove_database()

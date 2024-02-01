@@ -41,6 +41,7 @@ def new_installation(ws, sql_backend, env_or_skip, inventory_schema, make_random
                 r".*Inventory Database.*": inventory_schema,
                 r".*Backup prefix*": renamed_group_prefix,
                 r".*Do you want to uninstall*": "yes",
+                r".*Do you want to delete the inventory database *": "yes",
                 r".*": "",
             }
         )
@@ -54,7 +55,7 @@ def new_installation(ws, sql_backend, env_or_skip, inventory_schema, make_random
             ],
         )
         overrides = {"main": default_cluster_id, "tacl": tacl_cluster_id}
-        install = WorkspaceInstaller(ws, promtps=prompts, sql_backend=sql_backend)
+        install = WorkspaceInstaller(ws, promtps=prompts, sql_backend=sql_backend, prefix=prefix)
         install._configure()
         install.current_config.override_clusters = overrides
         install.current_config.workspace_start_path = workspace_start_path
