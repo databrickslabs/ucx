@@ -34,7 +34,7 @@ def ws():
     state = {
         "/Users/foo/.ucx/config.yml": yaml.dump(
             {
-                '$version': 2,
+                'version': 2,
                 'inventory_database': 'ucx',
                 'warehouse_id': 'test',
                 'connect': {

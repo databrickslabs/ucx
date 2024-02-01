@@ -273,13 +273,15 @@ def test_skip_tables_marked_for_skipping_or_upgraded():
             name="test_table4",
         ),
     ]
-    client.workspace.download.return_value = io.StringIO(
-        "workspace_name,catalog_name,src_schema,dst_schema,src_table,dst_table\r\n"
-        "foo-bar,cat1,test_schema1,schema1,test_table1,test_table1\r\n"
-        "foo-bar,cat1,test_schema1,schema1,test_view1,test_view1\r\n"
-        "foo-bar,cat1,test_schema1,schema1,test_table2,test_table2\r\n"
-        "foo-bar,cat1,test_schema2,schema2,test_table3,test_table3\r\n"
-        "foo-bar,cat1,test_schema3,schema3,test_table4,test_table4\r\n"
+    client.workspace.download.return_value = io.BytesIO(
+        (
+            "workspace_name,catalog_name,src_schema,dst_schema,src_table,dst_table\r\n"
+            "foo-bar,cat1,test_schema1,schema1,test_table1,test_table1\r\n"
+            "foo-bar,cat1,test_schema1,schema1,test_view1,test_view1\r\n"
+            "foo-bar,cat1,test_schema1,schema1,test_table2,test_table2\r\n"
+            "foo-bar,cat1,test_schema2,schema2,test_table3,test_table3\r\n"
+            "foo-bar,cat1,test_schema3,schema3,test_table4,test_table4\r\n"
+        ).encode("utf8")
     )
     table_crawler.snapshot.return_value = test_tables
     installation = Installation(client, "ucx")
@@ -329,9 +331,9 @@ def test_table_with_no_target_reverted():
 
 def test_skipping_rules_existing_targets():
     client = create_autospec(WorkspaceClient)
-    client.workspace.download.return_value = io.StringIO(
+    client.workspace.download.return_value = io.BytesIO(
         "workspace_name,catalog_name,src_schema,dst_schema,src_table,dst_table\r\n"
-        "fake_ws,cat1,schema1,schema1,table1,dest1\r\n"
+        "fake_ws,cat1,schema1,schema1,table1,dest1\r\n".encode("utf8")
     )
     errors = {}
     rows = {}
@@ -364,9 +366,9 @@ def test_skipping_rules_existing_targets():
 
 def test_mismatch_from_table_raises_exception():
     client = create_autospec(WorkspaceClient)
-    client.workspace.download.return_value = io.StringIO(
+    client.workspace.download.return_value = io.BytesIO(
         "workspace_name,catalog_name,src_schema,dst_schema,src_table,dst_table\r\n"
-        "fake_ws,cat1,schema1,schema1,table1,dest1\r\n"
+        "fake_ws,cat1,schema1,schema1,table1,dest1\r\n".encode("utf8")
     )
     errors = {}
     rows = {}
@@ -400,9 +402,9 @@ def test_mismatch_from_table_raises_exception():
 
 def test_table_not_in_crawled_tables():
     client = create_autospec(WorkspaceClient)
-    client.workspace.download.return_value = io.StringIO(
+    client.workspace.download.return_value = io.BytesIO(
         "workspace_name,catalog_name,src_schema,dst_schema,src_table,dst_table\r\n"
-        "fake_ws,cat1,schema1,schema1,table1,dest1\r\n"
+        "fake_ws,cat1,schema1,schema1,table1,dest1\r\n".encode("utf8")
     )
     errors = {}
     rows = {}
@@ -418,10 +420,10 @@ def test_table_not_in_crawled_tables():
 
 def test_skipping_rules_database_skipped():
     client = MagicMock()
-    client.workspace.download.return_value = io.StringIO(
+    client.workspace.download.return_value = io.BytesIO(
         "workspace_name,catalog_name,src_schema,dst_schema,src_table,dst_table\r\n"
         "fake_ws,cat1,schema1,schema1,table1,dest1\r\n"
-        "fake_ws,cat1,schema2,schema2,table2,dest2\r\n"
+        "fake_ws,cat1,schema2,schema2,table2,dest2\r\n".encode("utf8")
     )
     errors = {}
     rows = {
@@ -500,10 +502,10 @@ def test_skip_missing_table_in_snapshot():
 
 def test_skipping_rules_target_exists():
     client = MagicMock()
-    client.workspace.download.return_value = io.StringIO(
+    client.workspace.download.return_value = io.BytesIO(
         "workspace_name,catalog_name,src_schema,dst_schema,src_table,dst_table\r\n"
         "fake_ws,cat1,schema2,schema2,table2,dest2\r\n"
-        "fake_ws,cat1,schema2,schema2,table2,dest2\r\n"
+        "fake_ws,cat1,schema2,schema2,table2,dest2\r\n".encode("utf8")
     )
     tables_crawler = create_autospec(TablesCrawler)
     tables_crawler.snapshot.return_value = [

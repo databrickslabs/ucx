@@ -28,7 +28,7 @@ def test_dashboard(mocker):
     installation = MockInstallation(
         {
             'state.json': {
-                "$version": 1,
+                "version": 1,
                 "resources": {
                     "queries": {
                         "jobs.sql": "91e51760-7653-4769-bc32-1595ce1892af",
@@ -38,7 +38,7 @@ def test_dashboard(mocker):
                 },
             },
             'config.yml': {
-                '$version': 2,
+                'version': 2,
                 'inventory_database': 'a',
             },
         }

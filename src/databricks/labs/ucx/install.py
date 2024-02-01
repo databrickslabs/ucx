@@ -958,7 +958,6 @@ if __name__ == "__main__":
     logger.setLevel("INFO")
 
     workspace_client = WorkspaceClient(product="ucx", product_version=__version__)
-    # TODO: this is broken - make it "current_installation_factory" function
     current = Installation.current(workspace_client, PRODUCT_INFO.product_name())
     installer = WorkspaceInstaller(Prompts(), current, workspace_client)
     installer.run()

@@ -41,7 +41,7 @@ class WorkspaceConfig:  # pylint: disable=too-many-instance-attributes
 
     @classmethod
     def v1_migrate(cls, raw: dict) -> dict:
-        stored_version = raw.pop("version", None)  # TODO: perhaps blueprint should not use $version?...
+        stored_version = raw.pop("version", None)
         if stored_version == cls.__version__:
             return raw
         if stored_version == 1:

@@ -193,7 +193,7 @@ def test_write_protected_dbfs(ws, tmp_path, mock_installation):
     mock_installation.assert_file_written(
         'config.yml',
         {
-            '$version': 2,
+            'version': 2,
             'default_catalog': 'ucx_default',
             'inventory_database': 'ucx',
             'log_level': 'INFO',
@@ -395,7 +395,7 @@ def test_save_config(ws, mock_installation):
     mock_installation.assert_file_written(
         'config.yml',
         {
-            '$version': 2,
+            'version': 2,
             'default_catalog': 'ucx_default',
             'inventory_database': 'ucx',
             'log_level': 'INFO',
@@ -422,7 +422,7 @@ def test_save_config_strip_group_names(ws, mock_installation):
     mock_installation.assert_file_written(
         'config.yml',
         {
-            '$version': 2,
+            'version': 2,
             'default_catalog': 'ucx_default',
             'include_group_names': ['g1', 'g2', 'g99'],
             'inventory_database': 'ucx',
@@ -473,7 +473,7 @@ def test_save_config_with_custom_policy(ws, mock_installation):
     mock_installation.assert_file_written(
         'config.yml',
         {
-            '$version': 2,
+            'version': 2,
             'custom_cluster_policy_id': '0123456789ABCDEF',
             'default_catalog': 'ucx_default',
             'inventory_database': 'ucx',
@@ -523,7 +523,7 @@ def test_save_config_with_glue(ws, mock_installation):
     mock_installation.assert_file_written(
         'config.yml',
         {
-            '$version': 2,
+            'version': 2,
             'default_catalog': 'ucx_default',
             'instance_profile': 'arn:aws:iam::111222333:instance-profile/foo-instance-profile',
             'inventory_database': 'ucx',
