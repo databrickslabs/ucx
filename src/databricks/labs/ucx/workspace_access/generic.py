@@ -139,7 +139,10 @@ class GenericPermissionsSupport(AclSupport):
 
     def get_verify_task(self, item: Permissions) -> Callable[[], bool]:
         acl = iam.ObjectPermissions.from_dict(json.loads(item.raw))
-        assert acl.access_control_list is not None
+        if not acl.access_control_list:
+            raise ValueError(
+                f"Access control list not present for object type " f"{item.object_type} and object id {item.object_id}"
+            )
         permissions_as_request = self._response_to_request(acl.access_control_list)
         return partial(self._verify, item.object_type, item.object_id, permissions_as_request)
 

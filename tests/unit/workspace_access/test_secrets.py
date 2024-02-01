@@ -163,3 +163,105 @@ def test_secret_scopes_reapply_check_exception_type():
         sup._applier_task("test", "db-temp-test", expected_permission)
     except Exception as e:
         assert isinstance(e, TimeoutError)
+
+
+def test_verify_task_should_return_true_if_permissions_applied():
+    ws = MagicMock()
+    sup = SecretScopesSupport(ws=ws)
+    item = Permissions(
+        object_id="test",
+        object_type="secrets",
+        raw=json.dumps(
+            [
+                workspace.AclItem(
+                    principal="test",
+                    permission=workspace.AclPermission.MANAGE,
+                ).as_dict()
+            ]
+        ),
+    )
+
+    ws.secrets.list_acls.return_value = [
+        workspace.AclItem(
+            principal="test",
+            permission=workspace.AclPermission.MANAGE,
+        ),
+        workspace.AclItem(
+            principal="irrelevant",
+            permission=workspace.AclPermission.READ,
+        ),
+    ]
+
+    task = sup.get_verify_task(item)
+    result = task()
+    assert result
+
+
+def test_verify_task_should_fail_if_permissions_not_applied():
+    ws = MagicMock()
+    sup = SecretScopesSupport(ws=ws)
+    item = Permissions(
+        object_id="test",
+        object_type="secrets",
+        raw=json.dumps(
+            [
+                workspace.AclItem(
+                    principal="test",
+                    permission=workspace.AclPermission.MANAGE,
+                ).as_dict()
+            ]
+        ),
+    )
+
+    ws.secrets.list_acls.return_value = [
+        workspace.AclItem(
+            principal="test",
+            permission=workspace.AclPermission.READ,
+        )
+    ]
+
+    task = sup.get_verify_task(item)
+    with pytest.raises(ValueError):
+        task()
+
+
+def test_verify_task_should_fail_if_principal_not_given():
+    ws = MagicMock()
+    sup = SecretScopesSupport(ws=ws)
+    item = Permissions(
+        object_id="test",
+        object_type="secrets",
+        raw=json.dumps(
+            [
+                workspace.AclItem(
+                    principal=None,
+                    permission=workspace.AclPermission.MANAGE,
+                ).as_dict()
+            ]
+        ),
+    )
+
+    task = sup.get_verify_task(item)
+    with pytest.raises(AssertionError):
+        task()
+
+
+def test_verify_task_should_fail_if_permission_not_given():
+    ws = MagicMock()
+    sup = SecretScopesSupport(ws=ws)
+    item = Permissions(
+        object_id="test",
+        object_type="secrets",
+        raw=json.dumps(
+            [
+                workspace.AclItem(
+                    principal="test",
+                    permission=None,
+                ).as_dict()
+            ]
+        ),
+    )
+
+    task = sup.get_verify_task(item)
+    with pytest.raises(AssertionError):
+        task()

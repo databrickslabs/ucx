@@ -814,3 +814,116 @@ def test_eligibles_assets_without_owner_should_be_ignored():
             tasks.append(task)
     assert len(tasks) == 1
     assert tasks[0].object_type == "clusters"
+
+
+def test_verify_task_should_return_true_if_permissions_applied():
+    ws = MagicMock()
+
+    acl1 = iam.AccessControlResponse(
+        all_permissions=[iam.Permission(permission_level=iam.PermissionLevel.CAN_USE)], group_name="test"
+    )
+    ws.permissions.get.return_value = iam.ObjectPermissions(access_control_list=[acl1])
+    sup = GenericPermissionsSupport(ws=ws, listings=[])  # no listings since only verify is tested
+
+    item = Permissions(
+        object_id="test",
+        object_type="clusters",
+        raw=json.dumps(
+            iam.ObjectPermissions(
+                object_id="test",
+                object_type="clusters",
+                access_control_list=[
+                    iam.AccessControlResponse(
+                        group_name="test",
+                        all_permissions=[iam.Permission(inherited=False, permission_level=iam.PermissionLevel.CAN_USE)],
+                    )
+                ],
+            ).as_dict()
+        ),
+    )
+
+    _task = sup.get_verify_task(item)
+    result = _task()
+    ws.permissions.get.assert_called_once_with("clusters", "test")
+    assert result
+
+
+def test_verify_task_should_return_false_if_permissions_not_found():
+    ws = MagicMock()
+
+    ws.permissions.get.side_effect = NotFound(...)
+    sup = GenericPermissionsSupport(ws=ws, listings=[])  # no listings since only verify is tested
+
+    item = Permissions(
+        object_id="test",
+        object_type="clusters",
+        raw=json.dumps(
+            iam.ObjectPermissions(
+                object_id="test",
+                object_type="clusters",
+                access_control_list=[
+                    iam.AccessControlResponse(
+                        group_name="test",
+                        all_permissions=[iam.Permission(inherited=False, permission_level=iam.PermissionLevel.CAN_USE)],
+                    )
+                ],
+            ).as_dict()
+        ),
+    )
+
+    _task = sup.get_verify_task(item)
+    result = _task()
+    ws.permissions.get.assert_called_once_with("clusters", "test")
+    assert not result
+
+
+def test_verify_task_should_fail_if_permissions_missing():
+    ws = MagicMock()
+
+    acl1 = iam.AccessControlResponse(
+        all_permissions=[iam.Permission(permission_level=iam.PermissionLevel.CAN_MANAGE)], group_name="test"
+    )
+    ws.permissions.get.return_value = iam.ObjectPermissions(access_control_list=[acl1])
+    sup = GenericPermissionsSupport(ws=ws, listings=[])  # no listings since only verify is tested
+
+    item = Permissions(
+        object_id="test",
+        object_type="clusters",
+        raw=json.dumps(
+            iam.ObjectPermissions(
+                object_id="test",
+                object_type="clusters",
+                access_control_list=[
+                    iam.AccessControlResponse(
+                        group_name="test",
+                        all_permissions=[iam.Permission(inherited=False, permission_level=iam.PermissionLevel.CAN_USE)],
+                    )
+                ],
+            ).as_dict()
+        ),
+    )
+
+    _task = sup.get_verify_task(item)
+    with pytest.raises(ValueError):
+        _task()
+
+
+def test_verify_task_should_fail_if_acls_missing():
+    ws = MagicMock()
+
+    sup = GenericPermissionsSupport(ws=ws, listings=[])  # no listings since only verify is tested
+
+    item = Permissions(
+        object_id="test",
+        object_type="clusters",
+        raw=json.dumps(
+            iam.ObjectPermissions(
+                object_id="test",
+                object_type="clusters",
+                access_control_list=[],
+            ).as_dict()
+        ),
+    )
+
+    with pytest.raises(ValueError):
+        sup.get_verify_task(item)

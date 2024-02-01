@@ -110,6 +110,7 @@ class SecretScopesSupport(AclSupport):
                 assert acl.permission is not None
                 assert acl.principal is not None
                 self._verify(scope_name, acl.principal, acl.permission)
+            return True
 
         return partial(_verify_acls, item.object_id, acls)
 

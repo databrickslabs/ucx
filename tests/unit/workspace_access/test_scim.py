@@ -3,7 +3,7 @@ from unittest.mock import MagicMock
 
 import pytest
 from databricks.sdk.core import DatabricksError
-from databricks.sdk.errors import InternalError, PermissionDenied
+from databricks.sdk.errors import InternalError, NotFound, PermissionDenied
 from databricks.sdk.service import iam
 from databricks.sdk.service.iam import Group, PatchOp, PatchSchema, ResourceMeta
 
@@ -203,3 +203,70 @@ def test_get_apply_task_should_ignore_groups_not_in_migration_state():
         external_id="12",
     )
     assert sup.get_apply_task(item, MigrationState([mggrp])) is None
+
+
+def test_verify_task_should_return_true_if_permissions_applied():
+    ws = MagicMock()
+    ws.groups.list.return_value = [
+        Group(
+            id="1",
+            display_name="de",
+            entitlements=[iam.ComplexValue(value="forbidden-cluster-create")],
+            meta=ResourceMeta(resource_type="WorkspaceGroup"),
+        ),
+        Group(id="12", display_name="ANOTHER", meta=ResourceMeta(resource_type="Group")),
+    ]
+    ws.groups.get.return_value = Group(
+        id="1", display_name="de", entitlements=[iam.ComplexValue(value="forbidden-cluster-create")]
+    )
+    sup = ScimSupport(ws=ws, verify_timeout=timedelta(seconds=1))
+
+    item = Permissions(object_id="1", object_type="entitlements", raw='[{"value": "forbidden-cluster-create"}]')
+
+    task = sup.get_verify_task(item)
+    result = task()
+    assert result
+
+
+def test_verify_task_should_fail_if_permissions_not_applied():
+    ws = MagicMock()
+    ws.groups.list.return_value = [
+        Group(
+            id="1",
+            display_name="de",
+            entitlements=[iam.ComplexValue(value="forbidden-cluster-create")],
+            meta=ResourceMeta(resource_type="WorkspaceGroup"),
+        ),
+        Group(id="12", display_name="ANOTHER", meta=ResourceMeta(resource_type="Group")),
+    ]
+    ws.groups.get.return_value = Group(
+        id="1", display_name="de", entitlements=[iam.ComplexValue(value="forbidden-cluster-create")]
+    )
+    sup = ScimSupport(ws=ws, verify_timeout=timedelta(seconds=1))
+
+    item = Permissions(object_id="1", object_type="entitlements", raw='[{"value": "wrong"}]')
+
+    task = sup.get_verify_task(item)
+    with pytest.raises(ValueError):
+        task()
+
+
+def test_verify_task_should_return_false_if_group_not_found():
+    ws = MagicMock()
+    ws.groups.list.return_value = [
+        Group(
+            id="1",
+            display_name="de",
+            entitlements=[iam.ComplexValue(value="forbidden-cluster-create")],
+            meta=ResourceMeta(resource_type="WorkspaceGroup"),
+        ),
+        Group(id="12", display_name="ANOTHER", meta=ResourceMeta(resource_type="Group")),
+    ]
+    ws.groups.get.side_effect = NotFound(...)
+    sup = ScimSupport(ws=ws, verify_timeout=timedelta(seconds=1))
+
+    item = Permissions(object_id="1", object_type="entitlements", raw='[{"value": "forbidden-cluster-create"}]')
+
+    task = sup.get_verify_task(item)
+    result = task()
+    assert not result

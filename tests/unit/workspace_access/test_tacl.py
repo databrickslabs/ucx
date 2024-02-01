@@ -1,5 +1,7 @@
 import json
 
+import pytest
+
 from databricks.labs.ucx.hive_metastore import GrantsCrawler, TablesCrawler
 from databricks.labs.ucx.hive_metastore.grants import Grant
 from databricks.labs.ucx.hive_metastore.udfs import UdfsCrawler
@@ -476,3 +478,93 @@ def test_tacl_applier_no_target_principal(mocker):
     assert task is None
 
     assert [] == sql_backend.queries
+
+
+def test_verify_task_should_return_true_if_permissions_applied():
+    sql_backend = MockBackend(
+        rows={
+            "SHOW GRANTS ON TABLE catalog_a.database_b.table_c": [
+                make_row(("abc", "SELECT", "TABLE", "table_c"), SHOW_COLS),
+            ],
+        }
+    )
+    tables_crawler = TablesCrawler(sql_backend, "test")
+    udf_crawler = UdfsCrawler(sql_backend, "test")
+    grants_crawler = GrantsCrawler(tables_crawler, udf_crawler)
+    table_acl_support = TableAclSupport(grants_crawler, sql_backend)
+
+    permissions = Permissions(
+        object_type="TABLE",
+        object_id="catalog_a.database_b.table_c",
+        raw=json.dumps(
+            {
+                "principal": "abc",
+                "action_type": "SELECT",
+                "catalog": "catalog_a",
+                "database": "database_b",
+                "table": "table_c",
+            }
+        ),
+    )
+
+    task = table_acl_support.get_verify_task(permissions)
+    result = task()
+    assert result
+
+
+def test_verify_task_should_fail_if_permissions_not_applied():
+    sql_backend = MockBackend(
+        rows={
+            "SHOW GRANTS ON TABLE catalog_a.database_b.table_c": [
+                make_row(("abc", "MODIFY", "TABLE", "table_c"), SHOW_COLS),
+            ],
+        }
+    )
+    tables_crawler = TablesCrawler(sql_backend, "test")
+    udf_crawler = UdfsCrawler(sql_backend, "test")
+    grants_crawler = GrantsCrawler(tables_crawler, udf_crawler)
+    table_acl_support = TableAclSupport(grants_crawler, sql_backend)
+
+    permissions = Permissions(
+        object_type="TABLE",
+        object_id="catalog_a.database_b.table_c",
+        raw=json.dumps(
+            {
+                "principal": "abc",
+                "action_type": "SELECT",
+                "catalog": "catalog_a",
+                "database": "database_b",
+                "table": "table_c",
+            }
+        ),
+    )
+
+    task = table_acl_support.get_verify_task(permissions)
+    with pytest.raises(ValueError):
+        task()
+
+
+def test_verify_task_should_return_false_if_not_grants_present():
+    sql_backend = MockBackend()
+    tables_crawler = TablesCrawler(sql_backend, "test")
+    udf_crawler = UdfsCrawler(sql_backend, "test")
+    grants_crawler = GrantsCrawler(tables_crawler, udf_crawler)
+    table_acl_support = TableAclSupport(grants_crawler, sql_backend)
+
+    permissions = Permissions(
+        object_type="TABLE",
+        object_id="catalog_a.database_b.table_c",
+        raw=json.dumps(
+            {
+                "principal": "abc",
+                "action_type": "SELECT",
+                "catalog": "catalog_a",
+                "database": "database_b",
+                "table": "table_c",
+            }
+        ),
+    )
+
+    task = table_acl_support.get_verify_task(permissions)
+    result = task()
+    assert not result
