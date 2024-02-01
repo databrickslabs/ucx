@@ -2,6 +2,7 @@ import dataclasses
 import logging
 import os
 import pkgutil
+import re
 from abc import ABC, abstractmethod
 from collections.abc import Callable, Iterable, Iterator, Sequence
 from types import UnionType
@@ -92,17 +93,38 @@ class SqlBackend(ABC):
             results.append(row)
         return results
 
-    @staticmethod
-    def _only_n_bytes(j: str, num_bytes: int = 96) -> str:
+    _whitespace = re.compile(r'\s{2,}')
+
+    @classmethod
+    def _only_n_bytes(cls, j: str, num_bytes: int = 96) -> str:
+        j = cls._whitespace.sub(' ', j)
         diff = len(j.encode('utf-8')) - num_bytes
         if diff > 0:
             return f"{j[:num_bytes]}... ({diff} more bytes)"
         return j
 
+    @staticmethod
+    def _api_error_from_message(error_message: str) -> DatabricksError:
+        if "SCHEMA_NOT_FOUND" in error_message:
+            return NotFound(error_message)
+        if "TABLE_OR_VIEW_NOT_FOUND" in error_message:
+            return NotFound(error_message)
+        if "DELTA_TABLE_NOT_FOUND" in error_message:
+            return NotFound(error_message)
+        if "DELTA_MISSING_TRANSACTION_LOG" in error_message:
+            return DataLoss(error_message)
+        if "UNRESOLVED_COLUMN.WITH_SUGGESTION" in error_message:
+            return BadRequest(error_message)
+        if "PARSE_SYNTAX_ERROR" in error_message:
+            return BadRequest(error_message)
+        if "Operation not allowed" in error_message:
+            return PermissionDenied(error_message)
+        return Unknown(error_message)
+
 
 class StatementExecutionBackend(SqlBackend):
     def __init__(self, ws: WorkspaceClient, warehouse_id, *, max_records_per_batch: int = 1000):
-        self._sql = StatementExecutionExt(ws.api_client)
+        self._sql = StatementExecutionExt(ws)
         self._warehouse_id = warehouse_id
         self._max_records_per_batch = max_records_per_batch
         debug_truncate_bytes = ws.config.debug_truncate_bytes
@@ -157,7 +179,7 @@ class StatementExecutionBackend(SqlBackend):
 
 
 class RuntimeBackend(SqlBackend):
-    def __init__(self, debug_truncate_bytes=96):
+    def __init__(self, debug_truncate_bytes: int | None = None):
         # pylint: disable-next=import-error,import-outside-toplevel
         from pyspark.sql.session import SparkSession  # type: ignore[import-not-found]
 
@@ -166,7 +188,7 @@ class RuntimeBackend(SqlBackend):
             raise RuntimeError(msg)
 
         self._spark = SparkSession.builder.getOrCreate()
-        self._debug_truncate_bytes = debug_truncate_bytes
+        self._debug_truncate_bytes = debug_truncate_bytes if debug_truncate_bytes else 96
 
     def execute(self, sql: str) -> None:
         logger.debug(f"[spark][execute] {self._only_n_bytes(sql, self._debug_truncate_bytes)}")
@@ -174,7 +196,7 @@ class RuntimeBackend(SqlBackend):
             self._spark.sql(sql)
         except Exception as e:
             error_message = str(e)
-            raise self._api_error_from_spark_error(error_message) from None
+            raise self._api_error_from_message(error_message) from None
 
     def fetch(self, sql: str) -> Iterator[Row]:
         logger.debug(f"[spark][fetch] {self._only_n_bytes(sql, self._debug_truncate_bytes)}")
@@ -182,7 +204,7 @@ class RuntimeBackend(SqlBackend):
             return self._spark.sql(sql).collect()
         except Exception as e:
             error_message = str(e)
-            raise self._api_error_from_spark_error(error_message) from None
+            raise self._api_error_from_message(error_message) from None
 
     def save_table(self, full_name: str, rows: Sequence[DataclassInstance], klass: Dataclass, mode: str = "append"):
         rows = self._filter_none_rows(rows, klass)
@@ -193,22 +215,6 @@ class RuntimeBackend(SqlBackend):
         # pyspark deals well with lists of dataclass instances, as long as schema is provided
         df = self._spark.createDataFrame(rows, self._schema_for(klass))
         df.write.saveAsTable(full_name, mode=mode)
-
-    @staticmethod
-    def _api_error_from_spark_error(error_message: str) -> DatabricksError:
-        if "SCHEMA_NOT_FOUND" in error_message:
-            return NotFound(error_message)
-        if "TABLE_OR_VIEW_NOT_FOUND" in error_message:
-            return NotFound(error_message)
-        if "DELTA_TABLE_NOT_FOUND" in error_message:
-            return NotFound(error_message)
-        if "DELTA_MISSING_TRANSACTION_LOG" in error_message:
-            return DataLoss(error_message)
-        if "PARSE_SYNTAX_ERROR" in error_message:
-            return BadRequest(error_message)
-        if "Operation not allowed" in error_message:
-            return PermissionDenied(error_message)
-        return Unknown(error_message)
 
 
 class CrawlerBase(Generic[Result]):

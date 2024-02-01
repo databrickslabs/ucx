@@ -25,7 +25,7 @@ class MockBackend(SqlBackend):
         if not seen_before and self._fails_on_first is not None:
             for match, failure in self._fails_on_first.items():
                 if match in sql:
-                    raise RuntimeError(failure)
+                    raise self._api_error_from_message(failure) from None
 
     def execute(self, sql):
         self._sql(sql)
