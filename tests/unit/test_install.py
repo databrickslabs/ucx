@@ -46,6 +46,7 @@ from databricks.labs.ucx.config import WorkspaceConfig
 from databricks.labs.ucx.framework.dashboards import DashboardFromFiles
 from databricks.labs.ucx.install import WorkspaceInstallation, WorkspaceInstaller
 
+
 from ..unit.framework.mocks import MockBackend
 
 
