@@ -1,5 +1,4 @@
 import logging
-from typing import BinaryIO
 from unittest.mock import create_autospec
 
 import pytest
@@ -7,7 +6,6 @@ from databricks.labs.blueprint.installation import MockInstallation
 from databricks.sdk import WorkspaceClient
 from databricks.sdk.service import iam
 from databricks.sdk.service.compute import InstanceProfile
-from databricks.sdk.service.workspace import ImportFormat, Language
 
 from databricks.labs.ucx.assessment.aws import (
     AWSInstanceProfile,
@@ -609,15 +607,6 @@ def test_save_uc_compatible_roles():
     ws = create_autospec(WorkspaceClient)
     ws.current_user.me = lambda: iam.User(user_name="me@example.com", groups=[iam.ComplexValue(display="admins")])
 
-    expected_csv_entries = [
-        "arn:aws:iam::12345:role/uc-role1,s3,READ_FILES,s3://bucket1",
-        "arn:aws:iam::12345:role/uc-role1,s3,READ_FILES,s3://bucket2",
-        "arn:aws:iam::12345:role/uc-role1,s3,READ_FILES,s3://bucket3",
-        "arn:aws:iam::12345:role/uc-role1,s3,WRITE_FILES,s3://bucketA",
-        "arn:aws:iam::12345:role/uc-role1,s3,WRITE_FILES,s3://bucketB",
-        "arn:aws:iam::12345:role/uc-role1,s3,WRITE_FILES,s3://bucketC",
-    ]
-
     aws = create_autospec(AWSResources)
     aws.get_role_policy.side_effect = [
         [
@@ -672,30 +661,46 @@ def test_save_uc_compatible_roles():
     aws_resource_permissions = AWSResourcePermissions(installation, ws, aws)
     aws_resource_permissions.save_uc_compatible_roles()
     installation.assert_file_written(
-        'uc_roles_access.csv', [{'privilege': 'READ_FILES',
-                                  'resource_path': 's3://bucket1',
-                                  'resource_type': 's3',
-                                  'role_arn': 'arn:aws:iam::12345:role/uc-role1'},
-                                 {'privilege': 'READ_FILES',
-                                  'resource_path': 's3://bucket2',
-                                  'resource_type': 's3',
-                                  'role_arn': 'arn:aws:iam::12345:role/uc-role1'},
-                                 {'privilege': 'READ_FILES',
-                                  'resource_path': 's3://bucket3',
-                                  'resource_type': 's3',
-                                  'role_arn': 'arn:aws:iam::12345:role/uc-role1'},
-                                 {'privilege': 'WRITE_FILES',
-                                  'resource_path': 's3://bucketA',
-                                  'resource_type': 's3',
-                                  'role_arn': 'arn:aws:iam::12345:role/uc-role1'},
-                                 {'privilege': 'WRITE_FILES',
-                                  'resource_path': 's3://bucketB',
-                                  'resource_type': 's3',
-                                  'role_arn': 'arn:aws:iam::12345:role/uc-role1'},
-                                 {'privilege': 'WRITE_FILES',
-                                  'resource_path': 's3://bucketC',
-                                  'resource_type': 's3',
-                                  'role_arn': 'arn:aws:iam::12345:role/uc-role1'}])
+        'uc_roles_access.csv',
+        [
+            {
+                'privilege': 'READ_FILES',
+                'resource_path': 's3://bucket1',
+                'resource_type': 's3',
+                'role_arn': 'arn:aws:iam::12345:role/uc-role1',
+            },
+            {
+                'privilege': 'READ_FILES',
+                'resource_path': 's3://bucket2',
+                'resource_type': 's3',
+                'role_arn': 'arn:aws:iam::12345:role/uc-role1',
+            },
+            {
+                'privilege': 'READ_FILES',
+                'resource_path': 's3://bucket3',
+                'resource_type': 's3',
+                'role_arn': 'arn:aws:iam::12345:role/uc-role1',
+            },
+            {
+                'privilege': 'WRITE_FILES',
+                'resource_path': 's3://bucketA',
+                'resource_type': 's3',
+                'role_arn': 'arn:aws:iam::12345:role/uc-role1',
+            },
+            {
+                'privilege': 'WRITE_FILES',
+                'resource_path': 's3://bucketB',
+                'resource_type': 's3',
+                'role_arn': 'arn:aws:iam::12345:role/uc-role1',
+            },
+            {
+                'privilege': 'WRITE_FILES',
+                'resource_path': 's3://bucketC',
+                'resource_type': 's3',
+                'role_arn': 'arn:aws:iam::12345:role/uc-role1',
+            },
+        ],
+    )
 
 
 def test_role_mismatched(caplog):

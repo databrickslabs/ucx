@@ -21,11 +21,12 @@ from databricks.labs.ucx.cli import (
     revert_migrated_tables,
     save_aws_iam_profiles,
     save_azure_storage_accounts,
+    save_uc_compatible_roles,
     skip,
     sync_workspace_info,
     validate_external_locations,
     validate_groups_membership,
-    workflows, save_uc_compatible_roles,
+    workflows,
 )
 
 
