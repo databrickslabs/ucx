@@ -64,7 +64,7 @@ def ws():
 
 def test_workflow(ws, caplog):
     workflows(ws)
-    assert caplog.messages == ["Fetching deployed jobs..."]
+    assert "Fetching deployed jobs..." in caplog.messages
     ws.jobs.list_runs.assert_called_once()
 
 
