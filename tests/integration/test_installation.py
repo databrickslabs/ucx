@@ -330,7 +330,7 @@ def test_single_user_installation(new_installation):
     install_single_user.uninstall()
 
 
-# @retried(on=[NotFound], timeout=timedelta(minutes=5))
+@retried(on=[NotFound], timeout=timedelta(minutes=5))
 def test_workspace_root_installation(new_installation):
     install_workspace_root = new_installation(single_user_install=False)
     install_workspace_root.uninstall()
