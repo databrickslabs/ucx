@@ -111,10 +111,13 @@ class AWSResources:
         return attached_policies
 
     def list_all_uc_roles(self):
-        list_roles_cmd = f"iam list-roles --profile {self._profile}"
-        roles = self._run_json_command(list_roles_cmd)
+        roles = self._run_json_command(f"iam list-roles --profile {self._profile}")
         uc_roles = []
-        for role in roles["Roles"]:
+        roles = roles.get("Roles")
+        if not roles:
+            logger.warning("list-roles couldn't find any roles")
+            return uc_roles
+        for role in roles:
             policy_document = role.get("AssumeRolePolicyDocument")
             if not policy_document:
                 continue
