@@ -1,5 +1,5 @@
 -- viz type=table, name=Assessment Summary, search_by=failure, columns=failure,count
--- widget title=Assessment Summary, row=1, col=2, size_x=4, size_y=8
+-- widget title=Assessment Summary, row=2, col=2, size_x=4, size_y=11
 WITH raw AS (
   SELECT EXPLODE(FROM_JSON(failures, 'array<string>')) AS failure FROM $inventory.objects WHERE failures <> '[]'
 )
