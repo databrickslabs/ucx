@@ -33,18 +33,35 @@ def test_pipeline_assessment_with_config(mocker):
         "core.windows.net": "org.apache.hadoop.fs.azurebfs.sas.FixedSASTokenProvider",
         "spark.hadoop.fs.azure.sas.fixed.token.abcde.dfs.core.windows.net": "{{secrets/abcde_access/sasFixedToken}}",
     }
-    pipeline_cluster = [PipelineCluster(apply_policy_default_values=None, autoscale=None, aws_attributes=None,
-                                        azure_attributes=None, cluster_log_conf=None,
-                                        custom_tags={'cluster_type': 'default'}, driver_instance_pool_id=None,
-                                        driver_node_type_id=None, gcp_attributes=None,
-                                        init_scripts=[InitScriptInfo(dbfs=DbfsStorageInfo(destination="dbfs:/users/test@test.com/init_scripts/test.sh"),
-                                                                     s3=None,
-                                                                     volumes=None,
-                                                                     workspace=None,)],
-                                        instance_pool_id=None,
-                                        label='default', node_type_id='Standard_F4s', num_workers=1, policy_id="test_id",
-                                        spark_conf={"spark.databricks.delta.preview.enabled": "true"},
-                                        spark_env_vars=None, ssh_public_keys=None)]
+    pipeline_cluster = [
+        PipelineCluster(
+            apply_policy_default_values=None,
+            autoscale=None,
+            aws_attributes=None,
+            azure_attributes=None,
+            cluster_log_conf=None,
+            custom_tags={'cluster_type': 'default'},
+            driver_instance_pool_id=None,
+            driver_node_type_id=None,
+            gcp_attributes=None,
+            init_scripts=[
+                InitScriptInfo(
+                    dbfs=DbfsStorageInfo(destination="dbfs:/users/test@test.com/init_scripts/test.sh"),
+                    s3=None,
+                    volumes=None,
+                    workspace=None,
+                )
+            ],
+            instance_pool_id=None,
+            label='default',
+            node_type_id='Standard_F4s',
+            num_workers=1,
+            policy_id="test_id",
+            spark_conf={"spark.databricks.delta.preview.enabled": "true"},
+            spark_env_vars=None,
+            ssh_public_keys=None,
+        )
+    ]
     ws.pipelines.get().spec.configuration = config_dict
     ws.pipelines.get().spec.clusters = pipeline_cluster
     ws.cluster_policies.get().definition = (
@@ -101,13 +118,28 @@ def test_pipeline_assessment_without_config(mocker):
     ]
     ws = create_autospec(WorkspaceClient)
     config_dict = {}
-    pipeline_cluster = [PipelineCluster(apply_policy_default_values=None, autoscale=None, aws_attributes=None,
-                                        azure_attributes=None, cluster_log_conf=None,
-                                        custom_tags={'cluster_type': 'default'}, driver_instance_pool_id=None,
-                                        driver_node_type_id=None, gcp_attributes=None, init_scripts=[],
-                                        instance_pool_id=None,
-                                        label='default', node_type_id='Standard_F4s', num_workers=1, policy_id=None,
-                                        spark_conf=None, spark_env_vars=None, ssh_public_keys=None)]
+    pipeline_cluster = [
+        PipelineCluster(
+            apply_policy_default_values=None,
+            autoscale=None,
+            aws_attributes=None,
+            azure_attributes=None,
+            cluster_log_conf=None,
+            custom_tags={'cluster_type': 'default'},
+            driver_instance_pool_id=None,
+            driver_node_type_id=None,
+            gcp_attributes=None,
+            init_scripts=[],
+            instance_pool_id=None,
+            label='default',
+            node_type_id='Standard_F4s',
+            num_workers=1,
+            policy_id=None,
+            spark_conf=None,
+            spark_env_vars=None,
+            ssh_public_keys=None,
+        )
+    ]
     ws.pipelines.get().spec.configuration = config_dict
     ws.pipelines.get().spec.clusters = pipeline_cluster
     crawler = PipelinesCrawler(ws, MockBackend(), "ucx")._assess_pipelines(sample_pipelines)
@@ -172,13 +204,28 @@ def test_pipeline_without_owners_should_have_empty_creator_name():
 
     ws = create_autospec(WorkspaceClient)
     ws.pipelines.list_pipelines.return_value = sample_pipelines
-    pipeline_cluster = [PipelineCluster(apply_policy_default_values=None, autoscale=None, aws_attributes=None,
-                                        azure_attributes=None, cluster_log_conf=None,
-                                        custom_tags={'cluster_type': 'default'}, driver_instance_pool_id=None,
-                                        driver_node_type_id=None, gcp_attributes=None, init_scripts=[],
-                                        instance_pool_id=None,
-                                        label='default', node_type_id='Standard_F4s', num_workers=1, policy_id=None,
-                                        spark_conf=None, spark_env_vars=None, ssh_public_keys=None)]
+    pipeline_cluster = [
+        PipelineCluster(
+            apply_policy_default_values=None,
+            autoscale=None,
+            aws_attributes=None,
+            azure_attributes=None,
+            cluster_log_conf=None,
+            custom_tags={'cluster_type': 'default'},
+            driver_instance_pool_id=None,
+            driver_node_type_id=None,
+            gcp_attributes=None,
+            init_scripts=[],
+            instance_pool_id=None,
+            label='default',
+            node_type_id='Standard_F4s',
+            num_workers=1,
+            policy_id=None,
+            spark_conf=None,
+            spark_env_vars=None,
+            ssh_public_keys=None,
+        )
+    ]
     ws.pipelines.get().spec.configuration = {}
     ws.pipelines.get().spec.clusters = pipeline_cluster
     mockbackend = MockBackend()
