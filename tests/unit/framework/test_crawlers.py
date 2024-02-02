@@ -2,8 +2,10 @@ import os
 import sys
 from dataclasses import dataclass
 from unittest import mock
+from unittest.mock import create_autospec
 
 import pytest
+from databricks.sdk import WorkspaceClient
 from databricks.sdk.errors import (
     BadRequest,
     DataLoss,
@@ -88,16 +90,16 @@ def test_snapshot_wrong_error():
 
 
 def test_statement_execution_backend_execute_happy(mocker):
-    execute_statement = mocker.patch("databricks.sdk.service.sql.StatementExecutionAPI.execute_statement")
-    execute_statement.return_value = sql.ExecuteStatementResponse(
+    ws = create_autospec(WorkspaceClient)
+    ws.statement_execution.execute_statement.return_value = sql.ExecuteStatementResponse(
         status=sql.StatementStatus(state=sql.StatementState.SUCCEEDED)
     )
 
-    seb = StatementExecutionBackend(mocker.Mock(), "abc")
+    seb = StatementExecutionBackend(ws, "abc")
 
     seb.execute("CREATE TABLE foo")
 
-    execute_statement.assert_called_with(
+    ws.statement_execution.execute_statement.assert_called_with(
         warehouse_id="abc",
         statement="CREATE TABLE foo",
         catalog=None,
@@ -252,39 +254,21 @@ def test_save_table_with_not_null_constraint_violated(mocker):
         )
 
 
-def test_raise_spark_sql_exceptions(mocker):
-    with mock.patch.dict(os.environ, {"DATABRICKS_RUNTIME_VERSION": "14.0"}):
-        pyspark_sql_session = mocker.Mock()
-        sys.modules["pyspark.sql.session"] = pyspark_sql_session
-
-        rb = RuntimeBackend
-        error_message_invalid_schema = "SCHEMA_NOT_FOUND foo schema does not exist"
-        with pytest.raises(NotFound):
-            rb._raise_spark_sql_exceptions(error_message_invalid_schema)
-
-        error_message_invalid_table = "TABLE_OR_VIEW_NOT_FOUND foo table does not exist"
-        with pytest.raises(NotFound):
-            rb._raise_spark_sql_exceptions(error_message_invalid_table)
-
-        error_message_invalid_table = "DELTA_TABLE_NOT_FOUND foo table does not exist"
-        with pytest.raises(NotFound):
-            rb._raise_spark_sql_exceptions(error_message_invalid_table)
-
-        error_message_invalid_table = "DELTA_MISSING_TRANSACTION_LOG foo table does not exist"
-        with pytest.raises(DataLoss):
-            rb._raise_spark_sql_exceptions(error_message_invalid_table)
-
-        error_message_invalid_syntax = "PARSE_SYNTAX_ERROR foo"
-        with pytest.raises(BadRequest):
-            rb._raise_spark_sql_exceptions(error_message_invalid_syntax)
-
-        error_message_permission_denied = "foo Operation not allowed"
-        with pytest.raises(PermissionDenied):
-            rb._raise_spark_sql_exceptions(error_message_permission_denied)
-
-        error_message_invalid_schema = "foo error failure"
-        with pytest.raises(Unknown):
-            rb._raise_spark_sql_exceptions(error_message_invalid_schema)
+@pytest.mark.parametrize(
+    'msg,t',
+    [
+        ("SCHEMA_NOT_FOUND foo schema does not exist", NotFound),
+        ("DELTA_TABLE_NOT_FOUND foo table does not exist", NotFound),
+        ("DELTA_MISSING_TRANSACTION_LOG foo table does not exist", DataLoss),
+        ("PARSE_SYNTAX_ERROR foo", BadRequest),
+        ("foo Operation not allowed", PermissionDenied),
+        ("foo error failure", Unknown),
+    ],
+)
+def test_raise_spark_sql_exceptions(msg, t):
+    err = RuntimeBackend._api_error_from_message(msg)
+    # here we compare the type, so that pytest assert rewrite kick in
+    assert type(err) == t
 
 
 def test_execute(mocker):

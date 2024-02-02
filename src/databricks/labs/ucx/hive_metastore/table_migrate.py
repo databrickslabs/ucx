@@ -2,6 +2,7 @@ import logging
 from collections import defaultdict
 from functools import partial
 
+from databricks.labs.blueprint.installation import Installation
 from databricks.labs.blueprint.parallel import Threads
 from databricks.sdk import WorkspaceClient
 from databricks.sdk.errors import NotFound
@@ -12,10 +13,11 @@ from databricks.sdk.service.catalog import (
     TableType,
 )
 
-from databricks.labs.ucx.framework.crawlers import SqlBackend
+from databricks.labs.ucx.config import WorkspaceConfig
+from databricks.labs.ucx.framework.crawlers import SqlBackend, StatementExecutionBackend
 from databricks.labs.ucx.hive_metastore import TablesCrawler
 from databricks.labs.ucx.hive_metastore.mapping import Rule, TableMapping
-from databricks.labs.ucx.hive_metastore.tables import MigrationCount, Table
+from databricks.labs.ucx.hive_metastore.tables import MigrationCount, Table, What
 
 logger = logging.getLogger(__name__)
 
@@ -34,23 +36,33 @@ class TablesMigrate:
         self._tm = tm
         self._seen_tables: dict[str, str] = {}
 
-    def migrate_tables(self):
+    @classmethod
+    def for_cli(cls, ws: WorkspaceClient, product='ucx'):
+        installation = Installation.current(ws, product)
+        config = installation.load(WorkspaceConfig)
+        sql_backend = StatementExecutionBackend(ws, config.warehouse_id)
+        table_crawler = TablesCrawler(sql_backend, config.inventory_database)
+        table_mapping = TableMapping(installation, ws, sql_backend)
+        return cls(table_crawler, ws, sql_backend, table_mapping)
+
+    def migrate_tables(self, *, what: What | None = None):
         self._init_seen_tables()
         tables_to_migrate = self._tm.get_tables_to_migrate(self._tc)
         tasks = []
         for table in tables_to_migrate:
-            tasks.append(partial(self._migrate_table, table.src, table.rule))
+            if not what or table.src.what == what:
+                tasks.append(partial(self._migrate_table, table.src, table.rule))
         Threads.strict("migrate tables", tasks)
 
     def _migrate_table(self, src_table: Table, rule: Rule):
         if self._table_already_upgraded(rule.as_uc_table_key):
             logger.info(f"Table {src_table.key} already upgraded to {rule.as_uc_table_key}")
             return True
-        if src_table.kind == "TABLE" and src_table.table_format == "DELTA" and src_table.is_dbfs_root:
+        if src_table.what == What.DBFS_ROOT_DELTA:
             return self._migrate_dbfs_root_table(src_table, rule)
-        if src_table.kind == "TABLE" and src_table.is_format_supported_for_sync:
+        if src_table.what == What.EXTERNAL_SYNC:
             return self._migrate_external_table(src_table, rule)
-        if src_table.kind == "VIEW":
+        if src_table.what == What.VIEW:
             return self._migrate_view(src_table, rule)
         logger.info(f"Table {src_table.key} is not supported for migration")
         return True
@@ -195,6 +207,13 @@ class TableMove:
     def __init__(self, ws: WorkspaceClient, backend: SqlBackend):
         self._backend = backend
         self._ws = ws
+
+    @classmethod
+    def for_cli(cls, ws: WorkspaceClient, product='ucx'):
+        installation = Installation.current(ws, product)
+        config = installation.load(WorkspaceConfig)
+        sql_backend = StatementExecutionBackend(ws, config.warehouse_id)
+        return cls(ws, sql_backend)
 
     def move_tables(
         self,

@@ -3,6 +3,7 @@ import re
 import typing
 from collections.abc import Iterable, Iterator
 from dataclasses import dataclass
+from enum import Enum, auto
 from functools import partial
 
 from databricks.labs.blueprint.parallel import Threads
@@ -12,6 +13,16 @@ from databricks.labs.ucx.framework.utils import escape_sql_identifier
 from databricks.labs.ucx.mixins.sql import Row
 
 logger = logging.getLogger(__name__)
+
+
+class What(Enum):
+    EXTERNAL_SYNC = auto()
+    EXTERNAL_NO_SYNC = auto()
+    DBFS_ROOT_DELTA = auto()
+    DBFS_ROOT_NON_DELTA = auto()
+    VIEW = auto()
+    DB_DATASET = auto()
+    UNKNOWN = auto()
 
 
 @dataclass
@@ -95,6 +106,22 @@ class Table:
             if self.location.startswith(db_datasets):
                 return True
         return False
+
+    @property
+    def what(self) -> What:
+        if self.is_databricks_dataset:
+            return What.DB_DATASET
+        if self.is_dbfs_root and self.table_format == "DELTA":
+            return What.DBFS_ROOT_DELTA
+        if self.is_dbfs_root:
+            return What.DBFS_ROOT_NON_DELTA
+        if self.kind == "TABLE" and self.is_format_supported_for_sync:
+            return What.EXTERNAL_SYNC
+        if self.kind == "TABLE":
+            return What.EXTERNAL_NO_SYNC
+        if self.kind == "VIEW":
+            return What.VIEW
+        return What.UNKNOWN
 
     def sql_migrate_external(self, target_table_key):
         return f"SYNC TABLE {escape_sql_identifier(target_table_key)} FROM {escape_sql_identifier(self.key)};"

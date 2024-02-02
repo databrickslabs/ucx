@@ -1,12 +1,11 @@
 import logging
-from typing import BinaryIO
 from unittest.mock import create_autospec
 
 import pytest
+from databricks.labs.blueprint.installation import MockInstallation
 from databricks.sdk import WorkspaceClient
 from databricks.sdk.service import iam
 from databricks.sdk.service.compute import InstanceProfile
-from databricks.sdk.service.workspace import ImportFormat, Language
 
 from databricks.labs.ucx.assessment.aws import (
     AWSInstanceProfile,
@@ -249,42 +248,6 @@ def test_save_instance_profile_permissions():
     ws.instance_profiles.list.return_value = [
         InstanceProfile("arn:aws:iam::12345:instance-profile/role1", "arn:aws:iam::12345:role/role1")
     ]
-    ws.current_user.me = lambda: iam.User(user_name="me@example.com", groups=[iam.ComplexValue(display="admins")])
-
-    expected_csv_entries = [
-        "arn:aws:iam::12345:instance-profile/role1,s3",
-        "READ_FILES",
-        "s3://bucket1,arn:aws:iam::12345:role/role1",
-        "arn:aws:iam::12345:instance-profile/role1,s3",
-        "READ_FILES",
-        "s3://bucket2,arn:aws:iam::12345:role/role1",
-        "arn:aws:iam::12345:instance-profile/role1,s3",
-        "READ_FILES",
-        "s3://bucket3,arn:aws:iam::12345:role/role1",
-        "arn:aws:iam::12345:instance-profile/role1,s3",
-        "WRITE_FILES",
-        "s3://bucketA,arn:aws:iam::12345:role/role1",
-        "arn:aws:iam::12345:instance-profile/role1,s3",
-        "WRITE_FILES",
-        "s3://bucketB,arn:aws:iam::12345:role/role1",
-        "arn:aws:iam::12345:instance-profile/role1,s3",
-        "WRITE_FILES",
-        "s3://bucketC,arn:aws:iam::12345:role/role1",
-    ]
-
-    def upload(
-        path: str,
-        content: BinaryIO,
-        *,
-        format: ImportFormat | None = None,  # noqa: A002
-        language: Language | None = None,
-        overwrite: bool | None = False,
-    ) -> None:
-        csv_text = str(content.read())
-        for entry in expected_csv_entries:
-            assert entry in csv_text
-
-    ws.workspace.upload = upload
     aws = create_autospec(AWSResources)
     aws.get_role_policy.side_effect = [
         [
@@ -332,8 +295,57 @@ def test_save_instance_profile_permissions():
         "arn:aws:iam::aws:policy/Policy2",
     ]
 
-    aws_resource_permissions = AWSResourcePermissions(ws, aws)
+    installation = MockInstallation()
+    aws_resource_permissions = AWSResourcePermissions(installation, ws, aws)
     aws_resource_permissions.save_instance_profile_permissions()
+
+    installation.assert_file_written(
+        'aws_instance_profile_info.csv',
+        [
+            {
+                'iam_role_arn': 'arn:aws:iam::12345:role/role1',
+                'instance_profile_arn': 'arn:aws:iam::12345:instance-profile/role1',
+                'privilege': 'READ_FILES',
+                'resource_path': 's3://bucket1',
+                'resource_type': 's3',
+            },
+            {
+                'iam_role_arn': 'arn:aws:iam::12345:role/role1',
+                'instance_profile_arn': 'arn:aws:iam::12345:instance-profile/role1',
+                'privilege': 'READ_FILES',
+                'resource_path': 's3://bucket2',
+                'resource_type': 's3',
+            },
+            {
+                'iam_role_arn': 'arn:aws:iam::12345:role/role1',
+                'instance_profile_arn': 'arn:aws:iam::12345:instance-profile/role1',
+                'privilege': 'READ_FILES',
+                'resource_path': 's3://bucket3',
+                'resource_type': 's3',
+            },
+            {
+                'iam_role_arn': 'arn:aws:iam::12345:role/role1',
+                'instance_profile_arn': 'arn:aws:iam::12345:instance-profile/role1',
+                'privilege': 'WRITE_FILES',
+                'resource_path': 's3://bucketA',
+                'resource_type': 's3',
+            },
+            {
+                'iam_role_arn': 'arn:aws:iam::12345:role/role1',
+                'instance_profile_arn': 'arn:aws:iam::12345:instance-profile/role1',
+                'privilege': 'WRITE_FILES',
+                'resource_path': 's3://bucketB',
+                'resource_type': 's3',
+            },
+            {
+                'iam_role_arn': 'arn:aws:iam::12345:role/role1',
+                'instance_profile_arn': 'arn:aws:iam::12345:instance-profile/role1',
+                'privilege': 'WRITE_FILES',
+                'resource_path': 's3://bucketC',
+                'resource_type': 's3',
+            },
+        ],
+    )
 
 
 def test_role_mismatched(caplog):
@@ -359,9 +371,10 @@ def test_empty_mapping(caplog):
     ]
     ws.current_user.me = lambda: iam.User(user_name="me@example.com", groups=[iam.ComplexValue(display="admins")])
     aws = create_autospec(AWSResources)
-    aws_resource_permissions = AWSResourcePermissions(ws, aws)
+    installation = MockInstallation()
+    aws_resource_permissions = AWSResourcePermissions(installation, ws, aws)
     aws_resource_permissions.save_instance_profile_permissions()
-    assert "No Mapping" in caplog.messages[0]
+    assert 'No Mapping Was Generated.' in caplog.messages
 
 
 def test_command(caplog):
