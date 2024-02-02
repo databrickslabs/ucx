@@ -8,7 +8,7 @@ from databricks.sdk import WorkspaceClient
 from databricks.sdk.service.workspace import ExportFormat
 
 from databricks.labs.ucx.assessment.azure import AzureResourcePermissions, AzureResources, \
-    StoragePermissionMapping
+    StoragePermissionMapping, AzureServicePrincipalCrawler
 from databricks.labs.ucx.config import WorkspaceConfig
 from databricks.labs.ucx.framework.crawlers import StatementExecutionBackend
 from databricks.labs.ucx.hive_metastore.locations import ExternalLocations
@@ -33,14 +33,20 @@ class ServicePrincipalMigrationInfo(StoragePermissionMapping):
         attrs.update(kwargs)
         return cls(**attrs)
 
-class AzureServicePrincipalMigration(AzureResourcePermissions):
+class AzureServicePrincipalMigration:
 
-    def __init__(self, installation: Installation, ws: WorkspaceClient, azurerm: AzureResources,
-                 lc: ExternalLocations, customized_csv: str, replace_with_ac: bool):
-        super().__init__(installation, ws, azurerm, lc)
+    def __init__(self, installation: Installation, ws: WorkspaceClient, azure_resource_permissions: AzureResourcePermissions,
+                 azure_sp_crawler: AzureServicePrincipalCrawler, customized_csv: str, replace_with_access_connector: bool):
+        self._installation = installation
+        self._ws = ws
+        self._azure_resource_permissions = azure_resource_permissions
+        self._azure_sp_crawler = azure_sp_crawler
+
         if customized_csv is not None:
-            self._filename = customized_csv
-        self._use_ac = replace_with_ac if replace_with_ac is not None else False
+            self._csv = customized_csv
+        else:
+            self._csv = azure_resource_permissions.filename
+        self._use_access_connector = replace_with_access_connector if replace_with_access_connector is not None else False
 
 
     @classmethod
@@ -50,7 +56,11 @@ class AzureServicePrincipalMigration(AzureResourcePermissions):
         sql_backend = StatementExecutionBackend(ws, config.warehouse_id)
         azurerm = AzureResources(ws)
         locations = ExternalLocations(ws, sql_backend, config.inventory_database)
-        return cls(installation, ws, azurerm, locations, customized_csv, replace_with_ac)
+
+        azure_resource_permissions = AzureResourcePermissions(installation, ws, azurerm, locations)
+        azure_sp_crawler = AzureServicePrincipalCrawler(ws, sql_backend, config.inventory_database)
+
+        return cls(installation, ws, azure_resource_permissions, azure_sp_crawler, customized_csv, replace_with_ac)
 
 
     def _load_sp_csv(self):
@@ -58,7 +68,7 @@ class AzureServicePrincipalMigration(AzureResourcePermissions):
         Load SP info from azure_storage_account_info.csv
         :return:
         """
-        storage_account_infos = self._installation.load(list[StoragePermissionMapping], self._filename)
+        storage_account_infos = self._installation.load(list[StoragePermissionMapping], self._csv)
         first_field_name = fields(StoragePermissionMapping)
 
         for storage_account_info in storage_account_infos:
@@ -68,15 +78,13 @@ class AzureServicePrincipalMigration(AzureResourcePermissions):
                 #TODO: record and persist this skip in a table
                 continue
 
-            use_ac = False
-            if self._use_ac:
-                use_ac = True
-            elif first_field_value.startswith("-"):
-                use_ac = True
+            use_access_connector = self._use_access_connector
+            if first_field_value.startswith("-"):
+                use_access_connector = True
 
             sp_migration_info = ServicePrincipalMigrationInfo.from_storage_permission_mapping(
                 storage_account_info,
-                replace_with_access_connector = use_ac,
+                replace_with_access_connector = use_access_connector,
                 already_in_storage_credential = False,
                 client_secret = "",
                 if_managed_identity = False

@@ -534,3 +534,7 @@ class AzureResourcePermissions:
                 if storage_acct not in storage_accounts:
                     storage_accounts.append(storage_acct)
         return storage_accounts
+
+    @property
+    def filename(self):
+        return self._filename

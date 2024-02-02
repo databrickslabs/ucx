@@ -290,7 +290,9 @@ def migrate_azure_service_principals(w: WorkspaceClient, new_csv_name: str, repl
     to have all storage credentials to be created with new Access Connector, or put - at the beginning of the line in
     azure_storage_account_info.csv to only do it for certain Azure Service Principals.
     """
-
+    if not w.config.is_azure:
+        logger.error("Workspace is not on azure, please run this command on azure databricks workspaces.")
+        return
 
     return
 
