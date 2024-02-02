@@ -5,7 +5,7 @@ from dataclasses import dataclass, fields
 
 from databricks.labs.blueprint.installation import Installation
 from databricks.sdk import WorkspaceClient
-from databricks.sdk.service.workspace import ExportFormat
+from databricks.sdk.errors import Unauthenticated, PermissionDenied, NotFound, InternalError
 
 from databricks.labs.ucx.assessment.azure import AzureResourcePermissions, AzureResources, \
     StoragePermissionMapping, AzureServicePrincipalCrawler
@@ -37,6 +37,7 @@ class AzureServicePrincipalMigration:
 
     def __init__(self, installation: Installation, ws: WorkspaceClient, azure_resource_permissions: AzureResourcePermissions,
                  azure_sp_crawler: AzureServicePrincipalCrawler, customized_csv: str, replace_with_access_connector: bool):
+        self._final_sp_list = None
         self._installation = installation
         self._ws = ws
         self._azure_resource_permissions = azure_resource_permissions
@@ -102,6 +103,7 @@ class AzureServicePrincipalMigration:
         # TODO: has role assignment on storage, what ID will be returned by providers/Microsoft.Authorization/roleAssignments
         return
 
+
     def _list_storage_credentials(self):
         # list existed storage credentials
         # for SP storage credentials, capture its application_id
@@ -113,15 +115,58 @@ class AzureServicePrincipalMigration:
         return {}
 
 
-    def _check_sp_sc(self, sp_list, sc_set):
+    def _check_sp_in_storage_credentials(self, sp_list, sc_set):
         # if sp is already used, take it off from the sp_list
         return list()
 
 
-    def _fetch_client_secret(self, sp_list):
+    def _fetch_client_secret(self, sp_list: list[ServicePrincipalMigrationInfo]):
         # check AzureServicePrincipalInfo from AzureServicePrincipalCrawler, if AzureServicePrincipalInfo
         # has secret_scope and secret_key not empty, fetch the client_secret and put it to the
         # client_secret field
+
+        # fetch client_secrets of crawled service principal, if any
+        azure_sp_info_with_client_secret = {}
+        azure_sp_infos = self._azure_sp_crawler.snapshot()
+
+        for azure_sp_info in azure_sp_infos:
+            if azure_sp_info.secret_scope and azure_sp_info.secret_key:
+                try:
+                    secret_response = self._ws.secrets.get_secret(azure_sp_info.secret_scope, azure_sp_info.secret_key)
+
+                    # decode the binary string from GetSecretResponse to utf-8 string
+                    # TODO: handle different encoding if we have feedback from the customer
+                    binary_value_str = secret_response.value
+                    num_bytes = len(binary_value_str) // 8 + (1 if len(binary_value_str) % 8 else 0)
+                    byte_array = int(binary_value_str, 2).to_bytes(num_bytes, 'big')
+                    try:
+                        secret_value = byte_array.decode('utf-8')
+                        azure_sp_info_with_client_secret.update(azure_sp_info.application_id, secret_value)
+                    except UnicodeDecodeError as e:
+                        logger.info(f"Secret {azure_sp_info.secret_scope}.{azure_sp_info.secret_key} does not exists. "
+                                    f"Cannot fetch the service principal client_secret for {azure_sp_info.application_id}. "
+                                    f"Will not reuse this client_secret")
+                except Unauthenticated:
+                    logger.info(f"User is unauthenticated to fetch secret value. Cannot fetch the service principal "
+                                 f"client_secret for {azure_sp_info.application_id}. Will not reuse this client_secret")
+                except PermissionDenied:
+                    logger.info(f"User does not have permission to read secret value for {azure_sp_info.secret_scope}.{azure_sp_info.secret_key}. "
+                                 f"Cannot fetch the service principal client_secret for {azure_sp_info.application_id}. "
+                                 f"Will not reuse this client_secret")
+                except NotFound:
+                    logger.info(f"Secret {azure_sp_info.secret_scope}.{azure_sp_info.secret_key} does not exists. "
+                                 f"Cannot fetch the service principal client_secret for {azure_sp_info.application_id}. "
+                                 f"Will not reuse this client_secret")
+                except InternalError:
+                    logger.info(f"InternalError while reading secret {azure_sp_info.secret_scope}.{azure_sp_info.secret_key}. "
+                                f"Cannot fetch the service principal client_secret for {azure_sp_info.application_id}. "
+                                f"Will not reuse this client_secret")
+
+        # update the list of ServicePrincipalMigrationInfo with client_secret if found
+        for sp in sp_list:
+            if sp.client_id in azure_sp_info_with_client_secret:
+                sp.client_secret = azure_sp_info_with_client_secret[sp.client_id]
+
         return
 
 
@@ -143,9 +188,9 @@ class AzureServicePrincipalMigration:
         # further check if the sp is Service Principal or Managed Identity
         self._check_sp_type(loaded_sp_list)
         # list existed storage credentials
-        sc_set = self._list_sc()
+        sc_set = self._list_storage_credentials()
         # check if the sp is already used in UC storage credential
-        filtered_sp_list = self._check_sp_sc(loaded_sp_list, sc_set)
+        filtered_sp_list = self._check_sp_in_storage_credentials(loaded_sp_list, sc_set)
         # fetch sp client_secret if any
         self._fetch_client_secret(filtered_sp_list)
         # output the action plan for customer to confirm
@@ -183,6 +228,6 @@ class AzureServicePrincipalMigration:
                 # If SP with replace_with_ac = false and empty client_secret, create a new client_secret and use it to create SC
                 self._create_sc_with_new_client_secret(sp)
 
-
+        # TODO: validate the created storage credentials
 
 

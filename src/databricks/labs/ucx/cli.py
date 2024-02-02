@@ -297,5 +297,11 @@ def migrate_azure_service_principals(w: WorkspaceClient, new_csv_name: str, repl
     return
 
 
+@ucx.command
+def migrate_azure_service_principals_retry(w: WorkspaceClient, failure_file: str):
+    """
+    Retry migration based on the output file with failed migration recorded
+    """
+
 if __name__ == "__main__":
     ucx()
