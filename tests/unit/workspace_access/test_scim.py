@@ -1,7 +1,8 @@
 from datetime import timedelta
-from unittest.mock import MagicMock
+from unittest.mock import MagicMock, create_autospec
 
 import pytest
+from databricks.sdk import WorkspaceClient
 from databricks.sdk.core import DatabricksError
 from databricks.sdk.errors import InternalError, NotFound, PermissionDenied
 from databricks.sdk.service import iam
@@ -206,7 +207,7 @@ def test_get_apply_task_should_ignore_groups_not_in_migration_state():
 
 
 def test_verify_task_should_return_true_if_permissions_applied():
-    ws = MagicMock()
+    ws = create_autospec(WorkspaceClient)
     ws.groups.list.return_value = [
         Group(
             id="1",
@@ -229,7 +230,7 @@ def test_verify_task_should_return_true_if_permissions_applied():
 
 
 def test_verify_task_should_fail_if_permissions_not_applied():
-    ws = MagicMock()
+    ws = create_autospec(WorkspaceClient)
     ws.groups.list.return_value = [
         Group(
             id="1",
@@ -252,7 +253,7 @@ def test_verify_task_should_fail_if_permissions_not_applied():
 
 
 def test_verify_task_should_return_false_if_group_not_found():
-    ws = MagicMock()
+    ws = create_autospec(WorkspaceClient)
     ws.groups.list.return_value = [
         Group(
             id="1",

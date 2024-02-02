@@ -1,8 +1,9 @@
 import json
 from datetime import timedelta
-from unittest.mock import MagicMock, call
+from unittest.mock import MagicMock, call, create_autospec
 
 import pytest
+from databricks.sdk import WorkspaceClient
 from databricks.sdk.service import workspace
 
 from databricks.labs.ucx.workspace_access.groups import MigrationState
@@ -166,7 +167,7 @@ def test_secret_scopes_reapply_check_exception_type():
 
 
 def test_verify_task_should_return_true_if_permissions_applied():
-    ws = MagicMock()
+    ws = create_autospec(WorkspaceClient)
     sup = SecretScopesSupport(ws=ws)
     item = Permissions(
         object_id="test",
@@ -198,7 +199,7 @@ def test_verify_task_should_return_true_if_permissions_applied():
 
 
 def test_verify_task_should_fail_if_permissions_not_applied():
-    ws = MagicMock()
+    ws = create_autospec(WorkspaceClient)
     sup = SecretScopesSupport(ws=ws)
     item = Permissions(
         object_id="test",
@@ -226,7 +227,7 @@ def test_verify_task_should_fail_if_permissions_not_applied():
 
 
 def test_verify_task_should_fail_if_principal_not_given():
-    ws = MagicMock()
+    ws = create_autospec(WorkspaceClient)
     sup = SecretScopesSupport(ws=ws)
     item = Permissions(
         object_id="test",
@@ -247,7 +248,7 @@ def test_verify_task_should_fail_if_principal_not_given():
 
 
 def test_verify_task_should_fail_if_permission_not_given():
-    ws = MagicMock()
+    ws = create_autospec(WorkspaceClient)
     sup = SecretScopesSupport(ws=ws)
     item = Permissions(
         object_id="test",

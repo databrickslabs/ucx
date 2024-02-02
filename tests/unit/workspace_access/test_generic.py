@@ -1,9 +1,10 @@
 import json
 from datetime import timedelta
-from unittest.mock import MagicMock, Mock, patch
+from unittest.mock import MagicMock, Mock, patch, create_autospec
 
 import pytest
 from databricks.labs.blueprint.parallel import ManyError
+from databricks.sdk import WorkspaceClient
 from databricks.sdk.core import DatabricksError
 from databricks.sdk.errors import Aborted, InternalError, NotFound, PermissionDenied
 from databricks.sdk.service import compute, iam, ml
@@ -817,7 +818,7 @@ def test_eligibles_assets_without_owner_should_be_ignored():
 
 
 def test_verify_task_should_return_true_if_permissions_applied():
-    ws = MagicMock()
+    ws = create_autospec(WorkspaceClient)
 
     acl1 = iam.AccessControlResponse(
         all_permissions=[iam.Permission(permission_level=iam.PermissionLevel.CAN_USE)], group_name="test"
@@ -849,7 +850,7 @@ def test_verify_task_should_return_true_if_permissions_applied():
 
 
 def test_verify_task_should_return_false_if_permissions_not_found():
-    ws = MagicMock()
+    ws = create_autospec(WorkspaceClient)
 
     ws.permissions.get.side_effect = NotFound(...)
     sup = GenericPermissionsSupport(ws=ws, listings=[])  # no listings since only verify is tested
@@ -878,7 +879,7 @@ def test_verify_task_should_return_false_if_permissions_not_found():
 
 
 def test_verify_task_should_fail_if_permissions_missing():
-    ws = MagicMock()
+    ws = create_autospec(WorkspaceClient)
 
     acl1 = iam.AccessControlResponse(
         all_permissions=[iam.Permission(permission_level=iam.PermissionLevel.CAN_MANAGE)], group_name="test"
@@ -909,7 +910,7 @@ def test_verify_task_should_fail_if_permissions_missing():
 
 
 def test_verify_task_should_fail_if_acls_missing():
-    ws = MagicMock()
+    ws = create_autospec(WorkspaceClient)
 
     sup = GenericPermissionsSupport(ws=ws, listings=[])  # no listings since only verify is tested
 

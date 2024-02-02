@@ -1,8 +1,9 @@
 import json
 from datetime import timedelta
-from unittest.mock import MagicMock, Mock
+from unittest.mock import MagicMock, Mock, create_autospec
 
 import pytest
+from databricks.sdk import WorkspaceClient
 from databricks.sdk.core import DatabricksError
 from databricks.sdk.errors import InternalError, NotFound, PermissionDenied
 from databricks.sdk.service import sql
@@ -607,7 +608,7 @@ def test_load_as_dict_no_permission_level():
 
 
 def test_verify_task_should_return_true_if_permissions_applied():
-    ws = MagicMock()
+    ws = create_autospec(WorkspaceClient)
     ws.dbsql_permissions.get.return_value = sql.GetResponse(
         object_type=sql.ObjectType.ALERT,
         object_id="test",
@@ -642,7 +643,7 @@ def test_verify_task_should_return_true_if_permissions_applied():
 
 
 def test_verify_task_should_return_false_if_permissions_not_found():
-    ws = MagicMock()
+    ws = create_autospec(WorkspaceClient)
     ws.dbsql_permissions.get.side_effect = NotFound(...)
 
     sup = RedashPermissionsSupport(ws=ws, listings=[])
@@ -668,7 +669,7 @@ def test_verify_task_should_return_false_if_permissions_not_found():
 
 
 def test_verify_task_should_fail_if_permissions_not_matching():
-    ws = MagicMock()
+    ws = create_autospec(WorkspaceClient)
     ws.dbsql_permissions.get.return_value = sql.GetResponse(
         object_type=sql.ObjectType.ALERT,
         object_id="test",
@@ -703,7 +704,7 @@ def test_verify_task_should_fail_if_permissions_not_matching():
 
 
 def test_verify_task_should_fail_if_acl_empty():
-    ws = MagicMock()
+    ws = create_autospec(WorkspaceClient)
 
     sup = RedashPermissionsSupport(ws=ws, listings=[])
     item = Permissions(
@@ -719,7 +720,7 @@ def test_verify_task_should_fail_if_acl_empty():
 
 
 def test_verify_task_should_fail_if_acl_missing():
-    ws = MagicMock()
+    ws = create_autospec(WorkspaceClient)
     ws.dbsql_permissions.get.return_value = sql.GetResponse(
         object_type=sql.ObjectType.ALERT,
         object_id="test",
