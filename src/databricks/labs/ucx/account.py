@@ -6,6 +6,7 @@ from databricks.labs.blueprint.installation import Installation
 from databricks.labs.blueprint.tui import Prompts
 from databricks.sdk import AccountClient, WorkspaceClient
 from databricks.sdk.errors import NotFound
+from databricks.sdk.service import iam
 from databricks.sdk.service.iam import ComplexValue, Group
 from databricks.sdk.service.provisioning import Workspace
 
@@ -71,26 +72,41 @@ class AccountWorkspaces:
                 installation.save(workspaces, filename=self.SYNC_FILE_NAME)
 
     def create_account_level_groups(self):
-        """
-        Crawl all workspaces, and create account level groups if a WS local group is not present in the account.
-        The feature is not configurable, meaning that it fetches all workspaces groups and all account groups.
-        """
         acc_groups = self._get_account_groups()
-
         all_valid_workspace_groups = self._get_valid_workspaces_groups()
 
-        for group_name, group in all_valid_workspace_groups.items():
+        for group_name, valid_group in all_valid_workspace_groups.items():
             if group_name in acc_groups:
                 logger.info(f"Group {group_name} already exist in the account, ignoring")
             else:
-                self._ac.groups.create(display_name=group_name, members=group.members)
+                acc_group = self._ac.groups.create(display_name=group_name)
+
+                if len(acc_group.members) > 1:
+                    self._add_members_to_acc_group(acc_group.id, group_name, valid_group)
+
                 logger.info(f"Group {group_name} created in the account")
+
+    def _add_members_to_acc_group(self, acc_group_id: str, group_name: str, valid_group: Group):
+        for chunk in self._chunks(valid_group.members, 20):
+            logger.debug(f"Adding 20 members to acc group {group_name}")
+            self._ac.groups.patch(
+                acc_group_id,
+                operations=[iam.Patch(op=iam.PatchOp.ADD, path="members", value=[x.as_dict() for x in chunk])],
+                schemas=[iam.PatchSchema.URN_IETF_PARAMS_SCIM_API_MESSAGES_2_0_PATCH_OP],
+            )
+
+    def _chunks(self, lst, n):
+        """Yield successive n-sized chunks from lst."""
+        for i in range(0, len(lst), n):
+            yield lst[i : i + n]
 
     def _get_valid_workspaces_groups(self) -> dict[str, Group]:
         all_workspaces_groups: dict[str, Group] = {}
+
         for client in self.workspace_clients():
             ws_group_ids = client.groups.list(attributes="id")
             for group_id in ws_group_ids:
+                assert group_id.id is not None
                 full_workspace_group = client.groups.get(group_id.id)
                 group_name = full_workspace_group.display_name
 
@@ -106,6 +122,7 @@ class AccountWorkspaces:
                         logger.info(f"Workspace group {group_name} already found, ignoring")
                 else:
                     logger.info(f"Found new group {group_name}")
+                    assert group_name is not None
                     all_workspaces_groups[group_name] = full_workspace_group
         return all_workspaces_groups
 
@@ -117,6 +134,7 @@ class AccountWorkspaces:
     def _get_account_groups(self) -> dict[str | None, list[ComplexValue] | None]:
         acc_groups = {}
         for acc_grp_id in self._ac.groups.list(attributes="id"):
+            assert acc_grp_id.id is not None
             full_account_group = self._ac.groups.get(acc_grp_id.id)
             acc_groups[full_account_group.display_name] = full_account_group.members
         return acc_groups

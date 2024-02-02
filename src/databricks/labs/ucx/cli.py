@@ -91,9 +91,18 @@ def sync_workspace_info(a: AccountClient):
 
 @ucx.command(is_account=True)
 def create_account_level_groups(a: AccountClient):
-    """upload workspace config to all workspaces in the account where ucx is installed"""
+    """
+    Crawl all workspaces, and create account level groups if a WS local group is not present in the account.
+    The feature is not configurable, meaning that it fetches all workspaces groups and all account groups.
+
+    The following scenarios are supported, if a group X:
+    - Exist in workspaces A,B,C and it has same members in there, it will be created in the account
+    - Exist in workspaces A,B but not in C, it will be created in the account
+    - Exist in workspaces A,B,C and it has same members in A,B, but not in C, then, X and C_X will be created in the
+    account
+    """
     logger.info(f"Account ID: {a.config.account_id}")
-    workspaces = AccountWorkspaces(AccountConfig(connect=ConnectConfig()))
+    workspaces = AccountWorkspaces(a)
     workspaces.create_account_level_groups()
 
 
