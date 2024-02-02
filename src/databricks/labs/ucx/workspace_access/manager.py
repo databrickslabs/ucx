@@ -154,20 +154,18 @@ class PermissionManager(CrawlerBase[Permissions]):
             relevant_support = appliers[object_type]
             tasks_for_support: list[Callable[..., bool]] = []
             for item in items_subset:
-                if not item:
-                    continue
                 task = relevant_support.get_verify_task(item)
                 if not task:
                     continue
                 tasks_for_support.append(task)
-            if len(tasks_for_support) == 0:
-                continue
+
             logger.info(f"Total tasks for {object_type}: {len(tasks_for_support)}")
             verifier_tasks.extend(tasks_for_support)
 
         logger.info(f"Starting to verify permissions. Total tasks: {len(verifier_tasks)}")
         Threads.strict("verify group permissions", verifier_tasks)
         logger.info("All permissions validated successfully. No issues found.")
+
         return True
 
     def _appliers(self) -> dict[str, AclSupport]:
