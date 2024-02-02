@@ -1,6 +1,6 @@
 import io
 import json
-from unittest.mock import MagicMock, create_autospec, patch
+from unittest.mock import create_autospec, patch
 
 from databricks.labs.blueprint.installation import Installation, MockInstallation
 from databricks.labs.blueprint.tui import MockPrompts
@@ -234,8 +234,8 @@ def test_create_acc_groups_should_create_acc_group_if_exist_in_other_workspaces_
         Workspace(workspace_name="bar", workspace_id=456, workspace_status_message="Running", deployment_name="def"),
     ]
 
-    ws1 = MagicMock()
-    ws2 = MagicMock()
+    ws1 = create_autospec(WorkspaceClient)
+    ws2 = create_autospec(WorkspaceClient)
 
     def workspace_client(host, product, **kwargs) -> WorkspaceClient:
         if host == "https://abc.cloud.databricks.com":
