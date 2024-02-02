@@ -162,9 +162,9 @@ class AzureServicePrincipalMigration:
                                 f"Cannot fetch the service principal client_secret for {azure_sp_info.application_id}. "
                                 f"Will not reuse this client_secret")
 
-        # update the list of ServicePrincipalMigrationInfo with client_secret if found
+        # update the list of ServicePrincipalMigrationInfo if client_secret is found
         for sp in sp_list:
-            if sp.client_id in azure_sp_info_with_client_secret:
+            if sp.if_managed_identity is False and sp.client_id in azure_sp_info_with_client_secret:
                 sp.client_secret = azure_sp_info_with_client_secret[sp.client_id]
 
         return
