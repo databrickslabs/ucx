@@ -95,9 +95,22 @@ class AzureServicePrincipalMigration:
 
     def _check_sp_type(self, sp_list):
         # check if the sp with given client_id is Service Principal or Managed Identity
-        # May use https://learn.microsoft.com/en-us/graph/api/directoryobject-getbyids?view=graph-rest-1.0&tabs=http
-        # Managed Identity should have "@odata.type": "#microsoft.graph.managedIdentity"
-        # https://learn.microsoft.com/en-us/graph/api/resources/managedidentity?view=graph-rest-beta (warning: beta api)
+
+        # May use https://learn.microsoft.com/en-us/graph/api/directoryobject-getbyids?view=graph-rest-1.0&tabs=http, like
+        # https://graph.microsoft.com/v1.0/directoryObjects/f0f68337-7c83-4a53-8f95-be4
+        # Managed Identity should have "servicePrincipalType": "ManagedIdentity" in response
+        #   user assigned managed identity should have
+        #     "alternativeNames": [
+        #         "isExplicit=True",
+        #         "/subscriptions/3f2e4d32-8e8d-46d6-82bc-5bb8d962328b/resourcegroups/ziyuanqin-uc-test/providers/Microsoft.ManagedIdentity/userAssignedIdentities/ziyuan-user-assigned-mi"
+        #     ],
+        #   system assigned managed identity should have
+        #     "alternativeNames": [
+        #         "isExplicit=False",
+        #         "/subscriptions/3f2e4d32-8e8d-46d6-82bc-5bb8d962328b/resourcegroups/pepsi_rg/providers/Microsoft.Databricks/accessConnectors/ag-conn-access-connector"
+        #     ],
+        # Service Principal should have "servicePrincipalType": "Application"
+        #
         # update if_mi field of the sp in sp_list
         # TODO: find out if azure databricks access connector with system assigned managed identity
         # TODO: has role assignment on storage, what ID will be returned by providers/Microsoft.Authorization/roleAssignments
@@ -108,8 +121,10 @@ class AzureServicePrincipalMigration:
         # list existed storage credentials
         # for SP storage credentials, capture its application_id
         # for MI storage credentials:
-        #   if managed_identity_id is not empty capture it,
-        #   else capture the access_connector_id
+        #   if managed_identity_id is not empty capture it, this will be the id of the user assigned managed identity, like:
+        #       /subscriptions/3f2e4d32-8e8d-46d6-82bc-5bb8d962328b/resourcegroups/ziyuanqin-uc-test/providers/Microsoft.ManagedIdentity/userAssignedIdentities/ziyuan-user-assigned-mi
+        #   else capture the access_connector_id, this is the resource id of the access connector, like:
+        #       /subscriptions/3f2e4d32-8e8d-46d6-82bc-5bb8d962328b/resourceGroups/pepsi_rg/providers/Microsoft.Databricks/accessConnectors/ag-conn-access-connector
         # TODO: UC only has access_connector_id (resource id) for access connector with system assigned managed identity
         # TODO: need to find the mapping between the access_connector_id and principalId from providers/Microsoft.Authorization/roleAssignments
         return {}
@@ -117,6 +132,7 @@ class AzureServicePrincipalMigration:
 
     def _check_sp_in_storage_credentials(self, sp_list, sc_set):
         # if sp is already used, take it off from the sp_list
+        # TODO: PrincipalID in
         return list()
 
 

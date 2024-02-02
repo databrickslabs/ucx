@@ -303,6 +303,7 @@ class Principal:
     client_id: str
     display_name: str
     object_id: str
+    principal_type: str
 
 
 @dataclass
@@ -404,10 +405,12 @@ class AzureResources:
         client_id = raw.get("appId")
         display_name = raw.get("displayName")
         object_id = raw.get("id")
+        principal_type = raw.get("servicePrincipalType")
         assert client_id is not None
         assert display_name is not None
         assert object_id is not None
-        self._principals[principal_id] = Principal(client_id, display_name, object_id)
+        assert principal_type is not None
+        self._principals[principal_id] = Principal(client_id, display_name, object_id, principal_type)
         return self._principals[principal_id]
 
     def role_assignments(
@@ -458,6 +461,8 @@ class AzureResources:
 class StoragePermissionMapping:
     prefix: str
     client_id: str
+    principal_id: str
+    principal_type: str
     principal: str
     privilege: str
 
@@ -498,6 +503,8 @@ class AzureResourcePermissions:
                     StoragePermissionMapping(
                         prefix=f"abfss://{container.container}@{container.storage_account}.dfs.core.windows.net/",
                         client_id=role_assignment.principal.client_id,
+                        principal_id=role_assignment.principal.object_id,
+                        principal_type=role_assignment.principal.principal_type,
                         principal=role_assignment.principal.display_name,
                         privilege=privilege,
                     )
