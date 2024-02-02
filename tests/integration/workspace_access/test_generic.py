@@ -1,7 +1,7 @@
 import json
 from datetime import timedelta
 
-from databricks.labs.blueprint.parallel import Threads
+import pytest
 from databricks.sdk.errors import BadRequest, NotFound
 from databricks.sdk.retries import retried
 from databricks.sdk.service import iam
@@ -409,8 +409,8 @@ def test_verify_permissions(ws, make_group, make_job, make_job_permissions):
     )
 
     task = generic_permissions.get_verify_task(item)
-    _, errs = Threads.gather("verify_tasks", [task])  # type: ignore[arg-type]
-    assert not errs
+    result = task()
+    assert result
 
 
 @retried(on=[BadRequest], timeout=timedelta(minutes=3))
@@ -440,9 +440,7 @@ def test_verify_permissions_missing(ws, make_group, make_job, make_job_permissio
                 access_control_list=[
                     iam.AccessControlResponse(
                         group_name=group_a.display_name,
-                        all_permissions=[
-                            iam.Permission(inherited=False, permission_level=iam.PermissionLevel.CAN_USE)
-                        ],
+                        all_permissions=[iam.Permission(inherited=False, permission_level=iam.PermissionLevel.CAN_USE)],
                     )
                 ],
             ).as_dict()
@@ -450,6 +448,5 @@ def test_verify_permissions_missing(ws, make_group, make_job, make_job_permissio
     )
 
     task = generic_permissions.get_verify_task(item)
-    _, errs = Threads.gather("verify_tasks", [task])  # type: ignore[arg-type]
-    assert len(errs) == 1
-    assert isinstance(errs[0], ValueError)
+    with pytest.raises(ValueError):
+        task()
