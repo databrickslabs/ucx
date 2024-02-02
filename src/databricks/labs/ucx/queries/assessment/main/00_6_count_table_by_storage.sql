@@ -1,5 +1,5 @@
 -- viz type=table, name=Table counts by storage, columns=Storage,count
--- widget title=Table counts by storage, row=1, col=4, size_x=2, size_y=4
+-- widget title=Table counts by storage, row=2, col=2, size_x=2, size_y=5
 SELECT storage, COUNT(*) count
 FROM (
 SELECT
