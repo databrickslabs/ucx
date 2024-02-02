@@ -493,7 +493,7 @@ def test_verify_task_should_return_true_if_permissions_applied():
     grants_crawler = GrantsCrawler(tables_crawler, udf_crawler)
     table_acl_support = TableAclSupport(grants_crawler, sql_backend)
 
-    permissions = Permissions(
+    item = Permissions(
         object_type="TABLE",
         object_id="catalog_a.database_b.table_c",
         raw=json.dumps(
@@ -507,7 +507,7 @@ def test_verify_task_should_return_true_if_permissions_applied():
         ),
     )
 
-    task = table_acl_support.get_verify_task(permissions)
+    task = table_acl_support.get_verify_task(item)
     result = task()
     assert result
 
@@ -525,7 +525,7 @@ def test_verify_task_should_fail_if_permissions_not_applied():
     grants_crawler = GrantsCrawler(tables_crawler, udf_crawler)
     table_acl_support = TableAclSupport(grants_crawler, sql_backend)
 
-    permissions = Permissions(
+    item = Permissions(
         object_type="TABLE",
         object_id="catalog_a.database_b.table_c",
         raw=json.dumps(
@@ -539,7 +539,7 @@ def test_verify_task_should_fail_if_permissions_not_applied():
         ),
     )
 
-    task = table_acl_support.get_verify_task(permissions)
+    task = table_acl_support.get_verify_task(item)
     with pytest.raises(ValueError):
         task()
 
@@ -551,7 +551,7 @@ def test_verify_task_should_return_false_if_not_grants_present():
     grants_crawler = GrantsCrawler(tables_crawler, udf_crawler)
     table_acl_support = TableAclSupport(grants_crawler, sql_backend)
 
-    permissions = Permissions(
+    item = Permissions(
         object_type="TABLE",
         object_id="catalog_a.database_b.table_c",
         raw=json.dumps(
@@ -565,6 +565,6 @@ def test_verify_task_should_return_false_if_not_grants_present():
         ),
     )
 
-    task = table_acl_support.get_verify_task(permissions)
+    task = table_acl_support.get_verify_task(item)
     result = task()
     assert not result

@@ -226,6 +226,7 @@ def test_verify_task_should_return_true_if_permissions_applied():
 
     task = sup.get_verify_task(item)
     result = task()
+
     assert result
 
 
@@ -248,6 +249,7 @@ def test_verify_task_should_fail_if_permissions_not_applied():
     item = Permissions(object_id="1", object_type="entitlements", raw='[{"value": "wrong"}]')
 
     task = sup.get_verify_task(item)
+
     with pytest.raises(ValueError):
         task()
 
@@ -270,4 +272,5 @@ def test_verify_task_should_return_false_if_group_not_found():
 
     task = sup.get_verify_task(item)
     result = task()
+
     assert not result

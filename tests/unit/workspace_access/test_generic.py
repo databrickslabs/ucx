@@ -846,6 +846,7 @@ def test_verify_task_should_return_true_if_permissions_applied():
     _task = sup.get_verify_task(item)
     result = _task()
     ws.permissions.get.assert_called_once_with("clusters", "test")
+
     assert result
 
 
@@ -875,6 +876,7 @@ def test_verify_task_should_return_false_if_permissions_not_found():
     _task = sup.get_verify_task(item)
     result = _task()
     ws.permissions.get.assert_called_once_with("clusters", "test")
+
     assert not result
 
 
@@ -905,6 +907,7 @@ def test_verify_task_should_fail_if_permissions_missing():
     )
 
     _task = sup.get_verify_task(item)
+
     with pytest.raises(ValueError):
         _task()
 

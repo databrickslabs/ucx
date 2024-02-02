@@ -623,7 +623,7 @@ def test_verify_task_should_return_true_if_permissions_applied():
     sup = RedashPermissionsSupport(ws=ws, listings=[])
     item = Permissions(
         object_id="test",
-        object_type="alerts",
+        object_type=sql.ObjectTypePlural.ALERTS.value,
         raw=json.dumps(
             sql.GetResponse(
                 object_type=sql.ObjectType.ALERT,
@@ -639,6 +639,7 @@ def test_verify_task_should_return_true_if_permissions_applied():
     )
     task = sup.get_verify_task(item)
     result = task()
+
     assert result
 
 
@@ -649,7 +650,7 @@ def test_verify_task_should_return_false_if_permissions_not_found():
     sup = RedashPermissionsSupport(ws=ws, listings=[])
     item = Permissions(
         object_id="test",
-        object_type="alerts",
+        object_type=sql.ObjectTypePlural.ALERTS.value,
         raw=json.dumps(
             sql.GetResponse(
                 object_type=sql.ObjectType.ALERT,
@@ -665,6 +666,7 @@ def test_verify_task_should_return_false_if_permissions_not_found():
     )
     task = sup.get_verify_task(item)
     result = task()
+
     assert not result
 
 
@@ -684,7 +686,7 @@ def test_verify_task_should_fail_if_permissions_not_matching():
     sup = RedashPermissionsSupport(ws=ws, listings=[])
     item = Permissions(
         object_id="test",
-        object_type="alerts",
+        object_type=sql.ObjectTypePlural.ALERTS.value,
         raw=json.dumps(
             sql.GetResponse(
                 object_type=sql.ObjectType.ALERT,
@@ -699,6 +701,7 @@ def test_verify_task_should_fail_if_permissions_not_matching():
         ),
     )
     task = sup.get_verify_task(item)
+
     with pytest.raises(ValueError):
         task()
 
@@ -709,7 +712,7 @@ def test_verify_task_should_fail_if_acl_empty():
     sup = RedashPermissionsSupport(ws=ws, listings=[])
     item = Permissions(
         object_id="test",
-        object_type="alerts",
+        object_type=sql.ObjectTypePlural.ALERTS.value,
         raw=json.dumps(
             sql.GetResponse(object_type=sql.ObjectType.ALERT, object_id="test", access_control_list=[]).as_dict()
         ),
@@ -730,7 +733,7 @@ def test_verify_task_should_fail_if_acl_missing():
     sup = RedashPermissionsSupport(ws=ws, listings=[])
     item = Permissions(
         object_id="test",
-        object_type="alerts",
+        object_type=sql.ObjectTypePlural.ALERTS.value,
         raw=json.dumps(
             sql.GetResponse(
                 object_type=sql.ObjectType.ALERT,
@@ -745,5 +748,6 @@ def test_verify_task_should_fail_if_acl_missing():
         ),
     )
     task = sup.get_verify_task(item)
+
     with pytest.raises(AssertionError):
         task()

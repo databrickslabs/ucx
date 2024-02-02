@@ -195,6 +195,7 @@ def test_verify_task_should_return_true_if_permissions_applied():
 
     task = sup.get_verify_task(item)
     result = task()
+
     assert result
 
 
@@ -222,6 +223,7 @@ def test_verify_task_should_fail_if_permissions_not_applied():
     ]
 
     task = sup.get_verify_task(item)
+
     with pytest.raises(ValueError):
         task()
 
@@ -243,6 +245,7 @@ def test_verify_task_should_fail_if_principal_not_given():
     )
 
     task = sup.get_verify_task(item)
+
     with pytest.raises(AssertionError):
         task()
 
@@ -264,5 +267,6 @@ def test_verify_task_should_fail_if_permission_not_given():
     )
 
     task = sup.get_verify_task(item)
+
     with pytest.raises(AssertionError):
         task()

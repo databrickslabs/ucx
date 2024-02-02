@@ -1,3 +1,4 @@
+import json
 import logging
 from datetime import timedelta
 from unittest import skip
@@ -7,6 +8,7 @@ from databricks.sdk.retries import retried
 from databricks.sdk.service import iam, sql
 
 from databricks.labs.ucx.workspace_access import redash
+from databricks.labs.ucx.workspace_access.base import Permissions
 from databricks.labs.ucx.workspace_access.groups import MigratedGroup, MigrationState
 from databricks.labs.ucx.workspace_access.redash import RedashPermissionsSupport
 
@@ -108,3 +110,49 @@ def test_permissions_for_redash_after_group_is_renamed(
     query_permissions = redash_permissions.load_as_dict(sql.ObjectTypePlural.QUERIES, query.id)
     assert sql.PermissionLevel.CAN_EDIT == query_permissions[ws_group.display_name]
     assert sql.PermissionLevel.CAN_EDIT == query_permissions[acc_group.display_name]
+
+
+@retried(on=[NotFound], timeout=timedelta(minutes=3))
+def test_verify_permissions_for_redash(
+    ws,
+    sql_backend,
+    inventory_schema,
+    make_group,
+    make_query,
+    make_query_permissions,
+):
+    ws_group = make_group()
+
+    query = make_query()
+    make_query_permissions(
+        object_id=query.id,
+        permission_level=sql.PermissionLevel.CAN_EDIT,
+        group_name=ws_group.display_name,
+    )
+
+    redash_permissions = RedashPermissionsSupport(
+        ws,
+        [redash.Listing(ws.queries.list, sql.ObjectTypePlural.QUERIES)],
+    )
+
+    item = Permissions(
+        object_id=query.id,
+        object_type=sql.ObjectTypePlural.QUERIES.value,
+        raw=json.dumps(
+            sql.GetResponse(
+                object_type=sql.ObjectType.QUERY,
+                object_id="test",
+                access_control_list=[
+                    sql.AccessControl(
+                        group_name=ws_group.display_name,
+                        permission_level=sql.PermissionLevel.CAN_EDIT,
+                    )
+                ],
+            ).as_dict()
+        ),
+    )
+
+    task = redash_permissions.get_verify_task(item)
+    result = task()
+
+    assert result
