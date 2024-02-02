@@ -1,20 +1,23 @@
 import csv
 import io
 import logging
-from dataclasses import dataclass
+from dataclasses import dataclass, fields
 
+from databricks.labs.blueprint.installation import Installation
 from databricks.sdk import WorkspaceClient
 from databricks.sdk.service.workspace import ExportFormat
+
+from databricks.labs.ucx.assessment.azure import AzureResourcePermissions, AzureResources, \
+    StoragePermissionMapping
+from databricks.labs.ucx.config import WorkspaceConfig
+from databricks.labs.ucx.framework.crawlers import StatementExecutionBackend
+from databricks.labs.ucx.hive_metastore.locations import ExternalLocations
 
 logger = logging.getLogger(__name__)
 
 
 @dataclass
-class ServicePrincipalMigrationInfo:
-    prefix: str
-    client_id: str
-    principal: str
-    privilege: str
+class ServicePrincipalMigrationInfo(StoragePermissionMapping):
     # if create access manager and managed identity for this SP
     replace_with_ac: bool
     # if a storage credential using this SP already exists
@@ -24,20 +27,62 @@ class ServicePrincipalMigrationInfo:
     # if this is a managed identity
     if_mi: bool
 
+    @classmethod
+    def from_storage_permission_mapping(cls, storage_permission_mapping, **kwargs):
+        attrs = {field.name: getattr(storage_permission_mapping, field.name) for field in fields(storage_permission_mapping)}
+        attrs.update(kwargs)
+        return cls(**attrs)
 
-class AzureServicePrincipalMigration:
+class AzureServicePrincipalMigration(AzureResourcePermissions):
 
-    def __init__(self, ws: WorkspaceClient, csv: str, replace_with_ac: bool):
-        self._ws = ws
-        self._csv = csv if csv is not None else f"/Users/{ws.current_user.me().user_name}/.ucx/azure_storage_account_info.csv"
+    def __init__(self, installation: Installation, ws: WorkspaceClient, azurerm: AzureResources,
+                 lc: ExternalLocations, customized_csv: str, replace_with_ac: bool):
+        super().__init__(installation, ws, azurerm, lc)
+        if customized_csv is not None:
+            self._filename = customized_csv
         self._use_ac = replace_with_ac if replace_with_ac is not None else False
+
+
+    @classmethod
+    def for_cli(cls, ws: WorkspaceClient, customized_csv: str, replace_with_ac: bool, product='ucx'):
+        installation = Installation.current(ws, product)
+        config = installation.load(WorkspaceConfig)
+        sql_backend = StatementExecutionBackend(ws, config.warehouse_id)
+        azurerm = AzureResources(ws)
+        locations = ExternalLocations(ws, sql_backend, config.inventory_database)
+        return cls(installation, ws, azurerm, locations, customized_csv, replace_with_ac)
+
 
     def _load_sp_csv(self):
         """
         Load SP info from azure_storage_account_info.csv
         :return:
         """
-        #TODO: check the download status
+        storage_account_infos = self._installation.load(list[StoragePermissionMapping], self._filename)
+        first_field_name = fields(StoragePermissionMapping)
+
+        for storage_account_info in storage_account_infos:
+            first_field_value = getattr(storage_account_info, first_field_name)
+            if first_field_value is None or first_field_value.startswith("#"):
+                logger.info(f"Skip migrate Azure Service Principal: {storage_account_info} to UC storage credential")
+                #TODO: record and persist this skip in a table
+                continue
+
+            use_ac = False
+            if self._use_ac:
+                use_ac = True
+            elif first_field_value.startswith("-"):
+                use_ac = True
+
+            sp_migration_info = ServicePrincipalMigrationInfo.from_storage_permission_mapping(
+                storage_account_info,
+                replace_with_ac = use_ac,
+                already_in_sc = False,
+                client_secret = "",
+                if_mi = False
+            )
+            yield sp_migration_info
+
         csv_source = self._ws.workspace.download(self._csv, format=ExportFormat.AUTO)
         csv_textio = io.TextIOWrapper(csv_source, encoding='utf-8')
 
