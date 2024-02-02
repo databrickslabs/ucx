@@ -1,11 +1,10 @@
-import csv
-import io
+import base64
 import logging
 from dataclasses import dataclass, fields
 
 from databricks.labs.blueprint.installation import Installation
 from databricks.sdk import WorkspaceClient
-from databricks.sdk.errors import Unauthenticated, PermissionDenied, NotFound, InternalError
+from databricks.sdk.errors import Unauthenticated, PermissionDenied, ResourceDoesNotExist, InternalError
 
 from databricks.labs.ucx.assessment.azure import AzureResourcePermissions, AzureResources, \
     StoragePermissionMapping, AzureServicePrincipalCrawler
@@ -146,41 +145,48 @@ class AzureServicePrincipalMigration:
         azure_sp_infos = self._azure_sp_crawler.snapshot()
 
         for azure_sp_info in azure_sp_infos:
-            if azure_sp_info.secret_scope and azure_sp_info.secret_key:
-                try:
-                    secret_response = self._ws.secrets.get_secret(azure_sp_info.secret_scope, azure_sp_info.secret_key)
+            if azure_sp_info.secret_scope is None:
+                continue
+            if azure_sp_info.secret_key is None:
+                continue
 
-                    # decode the binary string from GetSecretResponse to utf-8 string
-                    # TODO: handle different encoding if we have feedback from the customer
-                    binary_value_str = secret_response.value
-                    num_bytes = len(binary_value_str) // 8 + (1 if len(binary_value_str) % 8 else 0)
-                    byte_array = int(binary_value_str, 2).to_bytes(num_bytes, 'big')
-                    try:
-                        secret_value = byte_array.decode('utf-8')
-                        azure_sp_info_with_client_secret.update(azure_sp_info.application_id, secret_value)
-                    except UnicodeDecodeError as e:
-                        logger.info(f"Secret {azure_sp_info.secret_scope}.{azure_sp_info.secret_key} does not exists. "
-                                    f"Cannot fetch the service principal client_secret for {azure_sp_info.application_id}. "
-                                    f"Will not reuse this client_secret")
-                except Unauthenticated:
-                    logger.info(f"User is unauthenticated to fetch secret value. Cannot fetch the service principal "
-                                 f"client_secret for {azure_sp_info.application_id}. Will not reuse this client_secret")
-                except PermissionDenied:
-                    logger.info(f"User does not have permission to read secret value for {azure_sp_info.secret_scope}.{azure_sp_info.secret_key}. "
-                                 f"Cannot fetch the service principal client_secret for {azure_sp_info.application_id}. "
-                                 f"Will not reuse this client_secret")
-                except NotFound:
-                    logger.info(f"Secret {azure_sp_info.secret_scope}.{azure_sp_info.secret_key} does not exists. "
-                                 f"Cannot fetch the service principal client_secret for {azure_sp_info.application_id}. "
-                                 f"Will not reuse this client_secret")
-                except InternalError:
-                    logger.info(f"InternalError while reading secret {azure_sp_info.secret_scope}.{azure_sp_info.secret_key}. "
-                                f"Cannot fetch the service principal client_secret for {azure_sp_info.application_id}. "
-                                f"Will not reuse this client_secret")
+            try:
+                secret_response = self._ws.secrets.get_secret(azure_sp_info.secret_scope, azure_sp_info.secret_key)
+            except Unauthenticated:
+                logger.info(f"User is unauthenticated to fetch secret value. Cannot fetch the service principal "
+                             f"client_secret for {azure_sp_info.application_id}. Will not reuse this client_secret")
+                continue
+            except PermissionDenied:
+                logger.info(f"User does not have permission to read secret value for {azure_sp_info.secret_scope}.{azure_sp_info.secret_key}. "
+                             f"Cannot fetch the service principal client_secret for {azure_sp_info.application_id}. "
+                             f"Will not reuse this client_secret")
+                continue
+            except ResourceDoesNotExist:
+                logger.info(f"Secret {azure_sp_info.secret_scope}.{azure_sp_info.secret_key} does not exists. "
+                             f"Cannot fetch the service principal client_secret for {azure_sp_info.application_id}. "
+                             f"Will not reuse this client_secret")
+                continue
+            except InternalError:
+                logger.info(f"InternalError while reading secret {azure_sp_info.secret_scope}.{azure_sp_info.secret_key}. "
+                            f"Cannot fetch the service principal client_secret for {azure_sp_info.application_id}. "
+                            f"Will not reuse this client_secret")
+                continue
+
+            # decode the bytes string from GetSecretResponse to utf-8 string
+            # TODO: handle different encoding if we have feedback from the customer
+            try:
+                secret_value = base64.b64decode(secret_response.value).decode("utf-8")
+                azure_sp_info_with_client_secret.update(azure_sp_info.application_id, secret_value)
+            except UnicodeDecodeError:
+                logger.info(f"Secret {azure_sp_info.secret_scope}.{azure_sp_info.secret_key} has Base64 bytes that cannot be decoded to utf-8 string . "
+                            f"Cannot fetch the service principal client_secret for {azure_sp_info.application_id}. "
+                            f"Will not reuse this client_secret")
 
         # update the list of ServicePrincipalMigrationInfo if client_secret is found
         for sp in sp_list:
-            if sp.if_managed_identity is False and sp.client_id in azure_sp_info_with_client_secret:
+            if sp.if_managed_identity is True:
+               continue
+            if sp.client_id in azure_sp_info_with_client_secret:
                 sp.client_secret = azure_sp_info_with_client_secret[sp.client_id]
 
         return
