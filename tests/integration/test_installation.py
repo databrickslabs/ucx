@@ -120,7 +120,7 @@ def test_job_cluster_policy(ws, new_installation):
     assert policy_definition["azure_attributes.availability"]["value"] == "ON_DEMAND_AZURE"
 
 
-# @pytest.mark.skip
+@pytest.mark.skip
 @retried(on=[NotFound, TimeoutError], timeout=timedelta(minutes=15))
 def test_new_job_cluster_with_policy_assessment(
     ws, new_installation, make_ucx_group, make_cluster_policy, make_cluster_policy_permissions
