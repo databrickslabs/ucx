@@ -44,9 +44,6 @@ commands:
   - name: create-table-mapping
     description: create initial table mapping for review
 
-  - name: create-account-groups
-    description: creates account level groups for all groups in all workspaces.
-
   - name: ensure-assessment-run
     description: ensure the assessment job was run on a workspace
 
@@ -121,3 +118,6 @@ commands:
     flags:
       - name: aws-profile
         description: AWS Profile to use for authentication
+
+  - name: create-account-groups
+    description: Creates account level groups for all groups in all workspaces.
