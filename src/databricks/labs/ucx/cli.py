@@ -146,18 +146,15 @@ def repair_run(w: WorkspaceClient, step):
 def validate_groups_permissions(w: WorkspaceClient):
     """Validate that all the crawled permissions are applied correctly to the destination groups"""
     logger.info("Running validation of permissions applied to destination groups.")
-    installation_manager = InstallationManager(w)
-    installation = installation_manager.for_user(w.current_user.me())
-    if not installation:
-        logger.error(CANT_FIND_UCX_MSG)
-        return
-    sql_backend = StatementExecutionBackend(w, installation.config.warehouse_id)
+    installation = Installation.current(w, 'ucx')
+    config = installation.load(WorkspaceConfig)
+    sql_backend = StatementExecutionBackend(w, config.warehouse_id)
     permission_manager = PermissionManager.factory(
         w,
         sql_backend,
-        installation.config.inventory_database,
-        num_threads=installation.config.num_threads,
-        workspace_start_path=installation.config.workspace_start_path,
+        config.inventory_database,
+        num_threads=config.num_threads,
+        workspace_start_path=config.workspace_start_path,
     )
     permission_manager.verify_group_permissions()
 

@@ -1,6 +1,6 @@
 import json
 from datetime import timedelta
-from unittest.mock import MagicMock, Mock, patch, create_autospec
+from unittest.mock import MagicMock, Mock, create_autospec, patch
 
 import pytest
 from databricks.labs.blueprint.parallel import ManyError
