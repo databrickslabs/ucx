@@ -2,6 +2,7 @@ import logging
 from collections import defaultdict
 from functools import partial
 
+from databricks.labs.blueprint.installation import Installation
 from databricks.labs.blueprint.parallel import Threads
 from databricks.sdk import WorkspaceClient
 from databricks.sdk.errors import NotFound
@@ -12,7 +13,8 @@ from databricks.sdk.service.catalog import (
     TableType,
 )
 
-from databricks.labs.ucx.framework.crawlers import SqlBackend
+from databricks.labs.ucx.config import WorkspaceConfig
+from databricks.labs.ucx.framework.crawlers import SqlBackend, StatementExecutionBackend
 from databricks.labs.ucx.hive_metastore import TablesCrawler
 from databricks.labs.ucx.hive_metastore.mapping import Rule, TableMapping
 from databricks.labs.ucx.hive_metastore.tables import MigrationCount, Table, What
@@ -33,6 +35,15 @@ class TablesMigrate:
         self._ws = ws
         self._tm = tm
         self._seen_tables: dict[str, str] = {}
+
+    @classmethod
+    def for_cli(cls, ws: WorkspaceClient, product='ucx'):
+        installation = Installation.current(ws, product)
+        config = installation.load(WorkspaceConfig)
+        sql_backend = StatementExecutionBackend(ws, config.warehouse_id)
+        table_crawler = TablesCrawler(sql_backend, config.inventory_database)
+        table_mapping = TableMapping(installation, ws, sql_backend)
+        return cls(table_crawler, ws, sql_backend, table_mapping)
 
     def migrate_tables(self, *, what: What | None = None):
         self._init_seen_tables()
@@ -196,6 +207,13 @@ class TableMove:
     def __init__(self, ws: WorkspaceClient, backend: SqlBackend):
         self._backend = backend
         self._ws = ws
+
+    @classmethod
+    def for_cli(cls, ws: WorkspaceClient, product='ucx'):
+        installation = Installation.current(ws, product)
+        config = installation.load(WorkspaceConfig)
+        sql_backend = StatementExecutionBackend(ws, config.warehouse_id)
+        return cls(ws, sql_backend)
 
     def move_tables(
         self,

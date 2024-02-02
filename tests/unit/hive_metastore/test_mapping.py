@@ -2,12 +2,14 @@ import io
 from unittest.mock import MagicMock, call, create_autospec
 
 import pytest
+from databricks.labs.blueprint.installation import Installation, MockInstallation
 from databricks.labs.blueprint.parallel import ManyError
 from databricks.sdk import WorkspaceClient
 from databricks.sdk.errors import NotFound
 from databricks.sdk.service.catalog import TableInfo
 
 from databricks.labs.ucx.account import WorkspaceInfo
+from databricks.labs.ucx.framework.crawlers import SqlBackend
 from databricks.labs.ucx.hive_metastore.mapping import (
     Rule,
     TableMapping,
@@ -22,7 +24,8 @@ def test_current_tables_empty_fails():
     errors = {}
     rows = {}
     backend = MockBackend(fails_on_first=errors, rows=rows)
-    table_mapping = TableMapping(ws, backend, "~/.ucx")
+    installation = MockInstallation()
+    table_mapping = TableMapping(installation, ws, backend)
 
     tables_crawler = create_autospec(TablesCrawler)
     tables_crawler.snapshot.return_value = []
@@ -36,7 +39,8 @@ def test_current_tables_some_rules():
     errors = {}
     rows = {}
     backend = MockBackend(fails_on_first=errors, rows=rows)
-    table_mapping = TableMapping(ws, backend, "~/.ucx")
+    installation = MockInstallation()
+    table_mapping = TableMapping(installation, ws, backend)
 
     tables_crawler = create_autospec(TablesCrawler)
     tables_crawler.snapshot.return_value = [
@@ -63,7 +67,8 @@ def test_save_mapping():
     errors = {}
     rows = {}
     backend = MockBackend(fails_on_first=errors, rows=rows)
-    table_mapping = TableMapping(ws, backend, "~/.ucx")
+    installation = MockInstallation()
+    table_mapping = TableMapping(installation, ws, backend)
 
     tables_crawler = create_autospec(TablesCrawler)
     tables_crawler.snapshot.return_value = [
@@ -81,12 +86,19 @@ def test_save_mapping():
 
     table_mapping.save(tables_crawler, workspace_info)
 
-    (path, content), _ = ws.workspace.upload.call_args
-    assert "~/.ucx/mapping.csv" == path
-    assert (
-        "workspace_name,catalog_name,src_schema,dst_schema,src_table,dst_table\r\n"
-        "foo-bar,foo_bar,foo,foo,bar,bar\r\n"
-    ) == content.read()
+    installation.assert_file_written(
+        'mapping.csv',
+        [
+            {
+                'catalog_name': 'foo_bar',
+                'dst_schema': 'foo',
+                'dst_table': 'bar',
+                'src_schema': 'foo',
+                'src_table': 'bar',
+                'workspace_name': 'foo-bar',
+            }
+        ],
+    )
 
 
 def test_load_mapping_not_found():
@@ -95,22 +107,33 @@ def test_load_mapping_not_found():
     errors = {}
     rows = {}
     backend = MockBackend(fails_on_first=errors, rows=rows)
-    table_mapping = TableMapping(ws, backend, "~/.ucx")
+    installation = MockInstallation()
+    table_mapping = TableMapping(installation, ws, backend)
 
     with pytest.raises(ValueError):
         table_mapping.load()
 
 
 def test_load_mapping():
-    ws = MagicMock()
-    ws.workspace.download.return_value = io.StringIO(
-        "workspace_name,catalog_name,src_schema,dst_schema,src_table,dst_table\r\n"
-        "foo-bar,foo_bar,foo,foo,bar,bar\r\n"
-    )
+    ws = create_autospec(WorkspaceClient)
     errors = {}
     rows = {}
     backend = MockBackend(fails_on_first=errors, rows=rows)
-    table_mapping = TableMapping(ws, backend, "~/.ucx")
+    installation = MockInstallation(
+        {
+            'mapping.csv': [
+                {
+                    'catalog_name': 'foo_bar',
+                    'dst_schema': 'foo',
+                    'dst_table': 'bar',
+                    'src_schema': 'foo',
+                    'src_table': 'bar',
+                    'workspace_name': 'foo-bar',
+                }
+            ]
+        }
+    )
+    table_mapping = TableMapping(installation, ws, backend)
 
     rules = table_mapping.load()
 
@@ -126,10 +149,11 @@ def test_load_mapping():
     ] == rules
 
 
-def test_skip_happy_path(mocker, caplog):
-    ws = mocker.patch("databricks.sdk.WorkspaceClient.__init__")
-    sbe = mocker.patch("databricks.labs.ucx.framework.crawlers.StatementExecutionBackend.__init__")
-    mapping = TableMapping(ws, sbe)
+def test_skip_happy_path(caplog):
+    ws = create_autospec(WorkspaceClient)
+    sbe = create_autospec(SqlBackend)
+    installation = MockInstallation()
+    mapping = TableMapping(installation, ws, sbe)
     mapping.skip_table(schema="schema", table="table")
     sbe.execute.assert_called_with(f"ALTER TABLE schema.table SET TBLPROPERTIES('{mapping.UCX_SKIP_PROPERTY}' = true)")
     assert len(caplog.records) == 0
@@ -138,21 +162,23 @@ def test_skip_happy_path(mocker, caplog):
     assert len(caplog.records) == 0
 
 
-def test_skip_missing_schema(mocker, caplog):
-    ws = mocker.patch("databricks.sdk.WorkspaceClient.__init__")
-    sbe = mocker.patch("databricks.labs.ucx.framework.crawlers.StatementExecutionBackend.__init__")
+def test_skip_missing_schema(caplog):
+    ws = create_autospec(WorkspaceClient)
+    sbe = create_autospec(SqlBackend)
+    installation = MockInstallation()
     sbe.execute.side_effect = NotFound("[SCHEMA_NOT_FOUND]")
-    mapping = TableMapping(ws, sbe)
+    mapping = TableMapping(installation, ws, sbe)
     mapping.skip_schema(schema="schema")
     assert [rec.message for rec in caplog.records if "schema not found" in rec.message.lower()]
 
 
-def test_skip_missing_table(mocker, caplog):
-    ws = mocker.patch("databricks.sdk.WorkspaceClient.__init__")
-    sbe = mocker.patch("databricks.labs.ucx.framework.crawlers.StatementExecutionBackend.__init__")
+def test_skip_missing_table(caplog):
+    ws = create_autospec(WorkspaceClient)
+    sbe = create_autospec(SqlBackend)
+    installation = MockInstallation()
     sbe.execute.side_effect = NotFound("[TABLE_OR_VIEW_NOT_FOUND]")
-    mapping = TableMapping(ws, sbe)
-    mapping.skip_table(sbe, table="table")
+    mapping = TableMapping(installation, ws, sbe)
+    mapping.skip_table('foo', table="table")
     assert [rec.message for rec in caplog.records if "table not found" in rec.message.lower()]
 
 
@@ -247,16 +273,19 @@ def test_skip_tables_marked_for_skipping_or_upgraded():
             name="test_table4",
         ),
     ]
-    client.workspace.download.return_value = io.StringIO(
-        "workspace_name,catalog_name,src_schema,dst_schema,src_table,dst_table\r\n"
-        "foo-bar,cat1,test_schema1,schema1,test_table1,test_table1\r\n"
-        "foo-bar,cat1,test_schema1,schema1,test_view1,test_view1\r\n"
-        "foo-bar,cat1,test_schema1,schema1,test_table2,test_table2\r\n"
-        "foo-bar,cat1,test_schema2,schema2,test_table3,test_table3\r\n"
-        "foo-bar,cat1,test_schema3,schema3,test_table4,test_table4\r\n"
+    client.workspace.download.return_value = io.BytesIO(
+        (
+            "workspace_name,catalog_name,src_schema,dst_schema,src_table,dst_table\r\n"
+            "foo-bar,cat1,test_schema1,schema1,test_table1,test_table1\r\n"
+            "foo-bar,cat1,test_schema1,schema1,test_view1,test_view1\r\n"
+            "foo-bar,cat1,test_schema1,schema1,test_table2,test_table2\r\n"
+            "foo-bar,cat1,test_schema2,schema2,test_table3,test_table3\r\n"
+            "foo-bar,cat1,test_schema3,schema3,test_table4,test_table4\r\n"
+        ).encode("utf8")
     )
     table_crawler.snapshot.return_value = test_tables
-    table_mapping = TableMapping(client, backend)
+    installation = Installation(client, "ucx")
+    table_mapping = TableMapping(installation, client, backend)
 
     tables_to_migrate = table_mapping.get_tables_to_migrate(table_crawler)
     assert len(tables_to_migrate) == 2
@@ -286,7 +315,8 @@ def test_table_with_no_target_reverted():
     client = create_autospec(WorkspaceClient)
     client.tables.get.side_effect = NotFound()
 
-    table_mapping = TableMapping(client, backend)
+    installation = Installation(client, "ucx")
+    table_mapping = TableMapping(installation, client, backend)
     table_to_migrate = Table(
         object_type="EXTERNAL",
         table_format="DELTA",
@@ -301,9 +331,9 @@ def test_table_with_no_target_reverted():
 
 def test_skipping_rules_existing_targets():
     client = create_autospec(WorkspaceClient)
-    client.workspace.download.return_value = io.StringIO(
+    client.workspace.download.return_value = io.BytesIO(
         "workspace_name,catalog_name,src_schema,dst_schema,src_table,dst_table\r\n"
-        "fake_ws,cat1,schema1,schema1,table1,dest1\r\n"
+        "fake_ws,cat1,schema1,schema1,table1,dest1\r\n".encode("utf8")
     )
     errors = {}
     rows = {}
@@ -317,7 +347,8 @@ def test_skipping_rules_existing_targets():
         properties={"upgraded_from": "hive_metastore.schema1.table1"},
     )
 
-    table_mapping = TableMapping(client, backend)
+    installation = Installation(client, "ucx")
+    table_mapping = TableMapping(installation, client, backend)
     tables_crawler = create_autospec(TablesCrawler)
     tables_crawler.snapshot.return_value = [
         Table(
@@ -335,9 +366,9 @@ def test_skipping_rules_existing_targets():
 
 def test_mismatch_from_table_raises_exception():
     client = create_autospec(WorkspaceClient)
-    client.workspace.download.return_value = io.StringIO(
+    client.workspace.download.return_value = io.BytesIO(
         "workspace_name,catalog_name,src_schema,dst_schema,src_table,dst_table\r\n"
-        "fake_ws,cat1,schema1,schema1,table1,dest1\r\n"
+        "fake_ws,cat1,schema1,schema1,table1,dest1\r\n".encode("utf8")
     )
     errors = {}
     rows = {}
@@ -351,7 +382,8 @@ def test_mismatch_from_table_raises_exception():
         properties={"upgraded_from": "hive_metastore.schema1.bad_table"},
     )
 
-    table_mapping = TableMapping(client, backend)
+    installation = Installation(client, "ucx")
+    table_mapping = TableMapping(installation, client, backend)
     tables_crawler = create_autospec(TablesCrawler)
     tables_crawler.snapshot.return_value = [
         Table(
@@ -370,14 +402,15 @@ def test_mismatch_from_table_raises_exception():
 
 def test_table_not_in_crawled_tables():
     client = create_autospec(WorkspaceClient)
-    client.workspace.download.return_value = io.StringIO(
+    client.workspace.download.return_value = io.BytesIO(
         "workspace_name,catalog_name,src_schema,dst_schema,src_table,dst_table\r\n"
-        "fake_ws,cat1,schema1,schema1,table1,dest1\r\n"
+        "fake_ws,cat1,schema1,schema1,table1,dest1\r\n".encode("utf8")
     )
     errors = {}
     rows = {}
     backend = MockBackend(fails_on_first=errors, rows=rows)
-    table_mapping = TableMapping(client, backend)
+    installation = Installation(client, "ucx")
+    table_mapping = TableMapping(installation, client, backend)
     tables_crawler = create_autospec(TablesCrawler)
     tables_crawler.snapshot.return_value = []
     table_mapping.get_tables_to_migrate(tables_crawler)
@@ -387,10 +420,10 @@ def test_table_not_in_crawled_tables():
 
 def test_skipping_rules_database_skipped():
     client = MagicMock()
-    client.workspace.download.return_value = io.StringIO(
+    client.workspace.download.return_value = io.BytesIO(
         "workspace_name,catalog_name,src_schema,dst_schema,src_table,dst_table\r\n"
         "fake_ws,cat1,schema1,schema1,table1,dest1\r\n"
-        "fake_ws,cat1,schema2,schema2,table2,dest2\r\n"
+        "fake_ws,cat1,schema2,schema2,table2,dest2\r\n".encode("utf8")
     )
     errors = {}
     rows = {
@@ -407,7 +440,8 @@ def test_skipping_rules_database_skipped():
     client.schemas.list.return_value = []
     client.tables.list.return_value = []
 
-    table_mapping = TableMapping(client, backend)
+    installation = Installation(client, "ucx")
+    table_mapping = TableMapping(installation, client, backend)
     tables_crawler = create_autospec(TablesCrawler)
     tables_crawler.snapshot.return_value = [
         Table(
@@ -459,7 +493,8 @@ def test_skip_missing_table_in_snapshot():
     client.schemas.list.return_value = []
     client.tables.list.return_value = []
 
-    table_mapping = TableMapping(client, backend)
+    installation = MockInstallation({'mapping.csv': []})
+    table_mapping = TableMapping(installation, client, backend)
     table_mapping.get_tables_to_migrate(tables_crawler)
 
     assert not backend.queries
@@ -467,10 +502,10 @@ def test_skip_missing_table_in_snapshot():
 
 def test_skipping_rules_target_exists():
     client = MagicMock()
-    client.workspace.download.return_value = io.StringIO(
+    client.workspace.download.return_value = io.BytesIO(
         "workspace_name,catalog_name,src_schema,dst_schema,src_table,dst_table\r\n"
         "fake_ws,cat1,schema2,schema2,table2,dest2\r\n"
-        "fake_ws,cat1,schema2,schema2,table2,dest2\r\n"
+        "fake_ws,cat1,schema2,schema2,table2,dest2\r\n".encode("utf8")
     )
     tables_crawler = create_autospec(TablesCrawler)
     tables_crawler.snapshot.return_value = [
@@ -508,7 +543,8 @@ def test_skipping_rules_target_exists():
         ),
     ]
 
-    table_mapping = TableMapping(client, backend)
+    installation = Installation(client, "ucx")
+    table_mapping = TableMapping(installation, client, backend)
 
     assert len(table_mapping.get_tables_to_migrate(tables_crawler)) == 1
 
@@ -533,7 +569,8 @@ def test_is_target_exists():
         ),
     ]
 
-    table_mapping = TableMapping(client, backend)
+    installation = Installation(client, "ucx")
+    table_mapping = TableMapping(installation, client, backend)
 
     src_table = Table(
         catalog="hive_metastore", database="schema1", name="dest1", object_type="MANAGED", table_format="DELTA"

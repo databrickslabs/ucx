@@ -2,8 +2,10 @@ import os
 import sys
 from dataclasses import dataclass
 from unittest import mock
+from unittest.mock import create_autospec
 
 import pytest
+from databricks.sdk import WorkspaceClient
 from databricks.sdk.errors import (
     BadRequest,
     DataLoss,
@@ -88,16 +90,16 @@ def test_snapshot_wrong_error():
 
 
 def test_statement_execution_backend_execute_happy(mocker):
-    execute_statement = mocker.patch("databricks.sdk.service.sql.StatementExecutionAPI.execute_statement")
-    execute_statement.return_value = sql.ExecuteStatementResponse(
+    ws = create_autospec(WorkspaceClient)
+    ws.statement_execution.execute_statement.return_value = sql.ExecuteStatementResponse(
         status=sql.StatementStatus(state=sql.StatementState.SUCCEEDED)
     )
 
-    seb = StatementExecutionBackend(mocker.Mock(), "abc")
+    seb = StatementExecutionBackend(ws, "abc")
 
     seb.execute("CREATE TABLE foo")
 
-    execute_statement.assert_called_with(
+    ws.statement_execution.execute_statement.assert_called_with(
         warehouse_id="abc",
         statement="CREATE TABLE foo",
         catalog=None,
@@ -264,7 +266,7 @@ def test_save_table_with_not_null_constraint_violated(mocker):
     ],
 )
 def test_raise_spark_sql_exceptions(msg, t):
-    err = RuntimeBackend._api_error_from_spark_error(msg)
+    err = RuntimeBackend._api_error_from_message(msg)
     # here we compare the type, so that pytest assert rewrite kick in
     assert type(err) == t
 

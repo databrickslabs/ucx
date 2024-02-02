@@ -1,5 +1,19 @@
 # Version changelog
 
+## 0.11.1
+
+* Added "what" property for migration to scope down table migrations ([#856](https://github.com/databrickslabs/ucx/pull/856)).
+* Added job count in the assessment dashboard ([#858](https://github.com/databrickslabs/ucx/pull/858)).
+* Adopted `installation` package from `databricks-labs-blueprint` ([#860](https://github.com/databrickslabs/ucx/pull/860)).
+* Debug logs to print only the first 96 bytes of SQL query by default, tunable by `debug_truncate_bytes` SDK configuration property ([#859](https://github.com/databrickslabs/ucx/pull/859)).
+* Extract command codes and unify the checks for spark_conf, cluster_policy, init_scripts ([#855](https://github.com/databrickslabs/ucx/pull/855)).
+* Improved installation failure with actionable message ([#840](https://github.com/databrickslabs/ucx/pull/840)).
+* Improved validating groups membership cli command ([#816](https://github.com/databrickslabs/ucx/pull/816)).
+
+Dependency updates:
+
+ * Updated databricks-labs-blueprint requirement from ~=0.1.0 to ~=0.2.4 ([#867](https://github.com/databrickslabs/ucx/pull/867)).
+
 ## 0.11.0
 
 * Added `databricks labs ucx alias` command to create a view of tables from one schema/catalog in another schema/catalog ([#837](https://github.com/databrickslabs/ucx/pull/837)).
