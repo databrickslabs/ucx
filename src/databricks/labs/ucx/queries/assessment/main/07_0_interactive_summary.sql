@@ -24,10 +24,23 @@ select col1 as pattern, col2 as issue from values
     ('applyInPandas', 			'AF310.1 - applyInPandas'),
     ('mapInPandas', 			'AF310.2 - mapInPandas'),
     ('dbutils.fs.', 			'AF311 - dbutils.fs'),
-    ('dbutils.credentials.', 		'AF312 - credential passthrough') -- credential passthrough
+    ('dbutils.credentials.', 		'AF312 - credential passthrough'), -- credential passthrough,
+    ('dbfs:/mnt', 			'AF313.1 - mount points'),
+    ('dbfs:/', 			'AF313 - dbfs usage'),
+    ('sparknlp',     			'AF314 - Spark NLP John Snow Labs'),
+    ('xgboost.spark', 'AF315 - XGBoost Spark'),
+    ('catboost_spark', 'AF316 - CatBoost Spark'),
+    ('ai.catboost:catboost-spark', 'AF316 - CatBoost Spark'),
+    ('hyperopt', 'AF317 - Hyperopt'),
+    ('SparkTrials', 'AF317 - Hyperopt'),
+    ('horovod.spark', 'AF318 - Horovod'),
+    ('UserDefinedAggregateFunction', 'AF319 - UDAF scala issue'),
+    ('applyInPandasWithState', 'AF321 - streaming applyInPandasWithState'),
+    ('ray.util.spark', 'AF322 - Apache Ray'),
+    ('databricks.automl', 'AF323 - Databricks Auto ML')
 ),
 sparkcontext (
-    select explode(split("_jvm, _jvm.org.apache.log4j, emptyRDD, range, init_batched_serializer, parallelize, pickleFile, textFile, wholeTextFiles, binaryFiles, binaryRecords, sequenceFile, newAPIHadoopFile, newAPIHadoopRDD, hadoopFile, hadoopRDD, union, runJob, setSystemProperty, uiWebUrl, stop, setJobGroup, setLocalProperty, getConf",', ')) as pattern,
+    select explode(split(".rdd, _jvm, _jvm.org.apache.log4j, emptyRDD, range, init_batched_serializer, parallelize, pickleFile, textFile, wholeTextFiles, binaryFiles, binaryRecords, sequenceFile, newAPIHadoopFile, newAPIHadoopRDD, hadoopFile, hadoopRDD, union, runJob, setSystemProperty, uiWebUrl, stop, setJobGroup, setLocalProperty, getConf",', ')) as pattern,
     					'AF303.1 - RDD' as issue
     UNION ALL
     select explode(split("from pyspark.sql import SQLContext, import org.apache.spark.sql.SQLContext, spark.sparkContext ", ', ')) as pattern,				'AF303.2 - SQLContext' as issue
