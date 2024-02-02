@@ -19,13 +19,13 @@ logger = logging.getLogger(__name__)
 @dataclass
 class ServicePrincipalMigrationInfo(StoragePermissionMapping):
     # if create access manager and managed identity for this SP
-    replace_with_ac: bool
+    replace_with_access_connector: bool
     # if a storage credential using this SP already exists
-    already_in_sc: bool
+    already_in_storage_credential: bool
     # SP's client_secret stored in Databricks secret
     client_secret: str
     # if this is a managed identity
-    if_mi: bool
+    if_managed_identity: bool
 
     @classmethod
     def from_storage_permission_mapping(cls, storage_permission_mapping, **kwargs):
@@ -76,37 +76,10 @@ class AzureServicePrincipalMigration(AzureResourcePermissions):
 
             sp_migration_info = ServicePrincipalMigrationInfo.from_storage_permission_mapping(
                 storage_account_info,
-                replace_with_ac = use_ac,
-                already_in_sc = False,
+                replace_with_access_connector = use_ac,
+                already_in_storage_credential = False,
                 client_secret = "",
-                if_mi = False
-            )
-            yield sp_migration_info
-
-        csv_source = self._ws.workspace.download(self._csv, format=ExportFormat.AUTO)
-        csv_textio = io.TextIOWrapper(csv_source, encoding='utf-8')
-
-        csv_reader = csv.DictReader(csv_textio)
-        first_col = csv_reader.fieldnames[0]
-        for row in csv_reader:
-            if row[first_col].startswith("#"):
-                logger.info(f"Skip migrate Azure Service Principal: {row} to UC storage credential")
-                #TODO: record and persist this skip in a table
-                continue
-            use_ac = False
-            if self._use_ac:
-                use_ac = True
-            elif row[first_col].startswith("-"):
-                use_ac = True
-            sp_migration_info = ServicePrincipalMigrationInfo(
-                prefix = row["prefix"],
-                client_id = row["client_id"],
-                principal = row["principal"],
-                privilege = row["privilege"],
-                replace_with_ac = use_ac,
-                already_in_sc = False,
-                client_secret = "",
-                if_mi = False
+                if_managed_identity = False
             )
             yield sp_migration_info
 
@@ -121,7 +94,7 @@ class AzureServicePrincipalMigration(AzureResourcePermissions):
         # TODO: has role assignment on storage, what ID will be returned by providers/Microsoft.Authorization/roleAssignments
         return
 
-    def _list_sc(self):
+    def _list_storage_credentials(self):
         # list existed storage credentials
         # for SP storage credentials, capture its application_id
         # for MI storage credentials:
