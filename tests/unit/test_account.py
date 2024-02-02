@@ -230,8 +230,8 @@ def test_create_acc_groups_should_create_acc_group_if_exist_in_other_workspaces_
     acc_client.config = Config(host="https://accounts.cloud.databricks.com", account_id="123", token="123")
 
     acc_client.workspaces.list.return_value = [
-        Workspace(workspace_name="foo", workspace_id=123, workspace_status_message="Running", deployment_name="abc"),
-        Workspace(workspace_name="bar", workspace_id=456, workspace_status_message="Running", deployment_name="def"),
+        Workspace(workspace_name="ws1", workspace_id=123, workspace_status_message="Running", deployment_name="abc"),
+        Workspace(workspace_name="ws2", workspace_id=456, workspace_status_message="Running", deployment_name="def"),
     ]
 
     ws1 = create_autospec(WorkspaceClient)
@@ -256,14 +256,12 @@ def test_create_acc_groups_should_create_acc_group_if_exist_in_other_workspaces_
 
     ws1.groups.list.return_value = [group]
     ws1.groups.get.return_value = group
-    ws1.config.host = "https://host_1"
 
     ws2.groups.list.return_value = [group_2]
     ws2.groups.get.return_value = group_2
-    ws2.config.host = "https://host_2"
 
     account_workspaces = AccountWorkspaces(acc_client, workspace_client)
     account_workspaces.create_account_level_groups()
 
     acc_client.groups.create.assert_any_call(display_name="de")
-    acc_client.groups.create.assert_any_call(display_name="https://host_2_de")
+    acc_client.groups.create.assert_any_call(display_name="ws2_de")

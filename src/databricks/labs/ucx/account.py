@@ -6,8 +6,7 @@ from databricks.labs.blueprint.installation import Installation
 from databricks.labs.blueprint.tui import Prompts
 from databricks.sdk import AccountClient, WorkspaceClient
 from databricks.sdk.errors import NotFound
-from databricks.sdk.service import iam
-from databricks.sdk.service.iam import ComplexValue, Group
+from databricks.sdk.service.iam import ComplexValue, Group, Patch, PatchOp, PatchSchema
 from databricks.sdk.service.provisioning import Workspace
 
 from databricks.labs.ucx.__about__ import __version__
@@ -78,21 +77,22 @@ class AccountWorkspaces:
         for group_name, valid_group in all_valid_workspace_groups.items():
             if group_name in acc_groups:
                 logger.info(f"Group {group_name} already exist in the account, ignoring")
-            else:
-                acc_group = self._ac.groups.create(display_name=group_name)
+                continue
 
-                if len(acc_group.members) > 1:
-                    self._add_members_to_acc_group(acc_group.id, group_name, valid_group)
+            acc_group = self._ac.groups.create(display_name=group_name)
 
-                logger.info(f"Group {group_name} created in the account")
+            if len(acc_group.members) > 0:
+                self._add_members_to_acc_group(acc_group.id, group_name, valid_group)
+
+            logger.info(f"Group {group_name} created in the account")
 
     def _add_members_to_acc_group(self, acc_group_id: str, group_name: str, valid_group: Group):
         for chunk in self._chunks(valid_group.members, 20):
             logger.debug(f"Adding 20 members to acc group {group_name}")
             self._ac.groups.patch(
                 acc_group_id,
-                operations=[iam.Patch(op=iam.PatchOp.ADD, path="members", value=[x.as_dict() for x in chunk])],
-                schemas=[iam.PatchSchema.URN_IETF_PARAMS_SCIM_API_MESSAGES_2_0_PATCH_OP],
+                operations=[Patch(op=PatchOp.ADD, path="members", value=[x.as_dict() for x in chunk])],
+                schemas=[PatchSchema.URN_IETF_PARAMS_SCIM_API_MESSAGES_2_0_PATCH_OP],
             )
 
     def _chunks(self, lst, n):
@@ -103,35 +103,41 @@ class AccountWorkspaces:
     def _get_valid_workspaces_groups(self) -> dict[str, Group]:
         all_workspaces_groups: dict[str, Group] = {}
 
-        for client in self.workspace_clients():
+        for workspace in self._workspaces():
+            client = self.client_for(workspace)
             ws_group_ids = client.groups.list(attributes="id")
             for group_id in ws_group_ids:
                 if not group_id.id:
                     continue
+
                 full_workspace_group = client.groups.get(group_id.id)
                 group_name = full_workspace_group.display_name
 
                 if group_name in all_workspaces_groups:
-                    if self._has_not_same_members(all_workspaces_groups[group_name], full_workspace_group):
-                        logger.warning(
-                            f"Group {group_name} does not have same amount of members "
-                            f"in workspace {client.config.host}, it will be created with account "
-                            f"name {client.config.host}_{group_name}"
-                        )
-                        all_workspaces_groups[f"{client.config.host}_{group_name}"] = full_workspace_group
-                    else:
+                    if self._has_same_members(all_workspaces_groups[group_name], full_workspace_group):
                         logger.info(f"Workspace group {group_name} already found, ignoring")
-                else:
-                    logger.info(f"Found new group {group_name}")
-                    if not group_name:
                         continue
-                    all_workspaces_groups[group_name] = full_workspace_group
+
+                    logger.warning(
+                        f"Group {group_name} does not have the same amount of members "
+                        f"in workspace {client.config.host}, it will be created with account "
+                        f"name {workspace.workspace_name}_{group_name}"
+                    )
+                    all_workspaces_groups[f"{workspace.workspace_name}_{group_name}"] = full_workspace_group
+                    continue
+
+                if not group_name:
+                    continue
+
+                logger.info(f"Found new group {group_name}")
+                all_workspaces_groups[group_name] = full_workspace_group
+
         return all_workspaces_groups
 
-    def _has_not_same_members(self, group_1: Group, group_2: Group) -> bool:
-        ws_members_set = set([m.display for m in group_1.members] if group_1.members else [])
+    def _has_same_members(self, group_1: Group, group_2: Group) -> bool:
+        ws_members_set_1 = set([m.display for m in group_1.members] if group_1.members else [])
         ws_members_set_2 = set([m.display for m in group_2.members] if group_2.members else [])
-        return bool((ws_members_set - ws_members_set_2).union(ws_members_set_2 - ws_members_set))
+        return not bool((ws_members_set_1 - ws_members_set_2).union(ws_members_set_2 - ws_members_set_1))
 
     def _get_account_groups(self) -> dict[str | None, list[ComplexValue] | None]:
         acc_groups = {}
