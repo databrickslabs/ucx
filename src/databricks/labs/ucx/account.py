@@ -106,7 +106,8 @@ class AccountWorkspaces:
         for client in self.workspace_clients():
             ws_group_ids = client.groups.list(attributes="id")
             for group_id in ws_group_ids:
-                assert group_id.id is not None
+                if not group_id.id:
+                    continue
                 full_workspace_group = client.groups.get(group_id.id)
                 group_name = full_workspace_group.display_name
 
@@ -122,7 +123,8 @@ class AccountWorkspaces:
                         logger.info(f"Workspace group {group_name} already found, ignoring")
                 else:
                     logger.info(f"Found new group {group_name}")
-                    assert group_name is not None
+                    if not group_name:
+                        continue
                     all_workspaces_groups[group_name] = full_workspace_group
         return all_workspaces_groups
 
@@ -134,7 +136,8 @@ class AccountWorkspaces:
     def _get_account_groups(self) -> dict[str | None, list[ComplexValue] | None]:
         acc_groups = {}
         for acc_grp_id in self._ac.groups.list(attributes="id"):
-            assert acc_grp_id.id is not None
+            if not acc_grp_id.id:
+                continue
             full_account_group = self._ac.groups.get(acc_grp_id.id)
             acc_groups[full_account_group.display_name] = full_account_group.members
         return acc_groups
