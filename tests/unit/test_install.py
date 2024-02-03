@@ -623,7 +623,8 @@ def test_install_edit_policy_not_present(ws, mock_installation, any_prompt):
         timedelta(seconds=1),
     )
     ws.cluster_policies.get.side_effect = NotFound()
-    workspace_installation.create_jobs()
+    with pytest.raises(NotFound):
+        workspace_installation.create_jobs()
 
 
 def test_save_config_with_custom_policy(ws, mock_installation):

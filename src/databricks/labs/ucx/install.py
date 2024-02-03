@@ -543,8 +543,9 @@ class WorkspaceInstallation:
         try:
             policy_definition = self._ws.cluster_policies.get(policy_id=self.config.policy_id).definition
         except NotFound:
-            logger.error(f"UCX Policy {self.config.policy_id} not found, please reinstall UCX")
-            return
+            msg = f"UCX Policy {self.config.policy_id} not found, please reinstall UCX"
+            logger.error(msg)
+            raise NotFound(msg)
 
         self._ws.cluster_policies.edit(
             policy_id=self.config.policy_id,
