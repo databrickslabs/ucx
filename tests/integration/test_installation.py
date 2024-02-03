@@ -12,6 +12,7 @@ from databricks.labs.blueprint.tui import MockPrompts
 from databricks.labs.blueprint.wheels import WheelsV2
 from databricks.sdk.errors import InvalidParameterValue, NotFound, Unknown
 from databricks.sdk.retries import retried
+from databricks.sdk.service import compute
 from databricks.sdk.service.iam import PermissionLevel
 
 from databricks.labs.ucx.config import WorkspaceConfig
@@ -115,9 +116,11 @@ def test_job_cluster_policy(ws, new_installation):
 
     assert cluster_policy.name == f"Unity Catalog Migration ({install.config.inventory_database})"
 
-    assert policy_definition["spark_version"]["value"] == "14.3.x-scala2.12"
-    assert policy_definition["node_type_id"]["value"] == "Standard_F4s"
-    assert policy_definition["azure_attributes.availability"]["value"] == "ON_DEMAND_AZURE"
+    assert policy_definition["spark_version"]["value"] == ws.clusters.select_spark_version(latest=True)
+    assert policy_definition["node_type_id"]["value"] == ws.clusters.select_node_type(local_disk=True)
+    assert (
+        policy_definition["azure_attributes.availability"]["value"] == compute.AzureAvailability.ON_DEMAND_AZURE.value
+    )
 
 
 @pytest.mark.skip

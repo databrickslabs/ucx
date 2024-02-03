@@ -960,9 +960,6 @@ class WorkspaceInstallation:
         if not self.validate_step(step):
             self.run_workflow(step)
 
-    def create_policies(self):
-        self._ws.cluster_policies.delete(policy_id="22")
-
 
 if __name__ == "__main__":
     logger = get_logger(__file__)
