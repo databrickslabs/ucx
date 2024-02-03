@@ -1,4 +1,5 @@
 import json
+import random
 from datetime import timedelta
 from unittest.mock import MagicMock, create_autospec
 
@@ -91,6 +92,14 @@ def ws():
     ws.clusters.select_node_type = lambda local_disk: "Standard_F4s"
 
     return ws
+
+
+def mock_get_status(*args, **kwargs):
+    random_return_value = random.choice(["true", "false"])
+    if args[0] == 'enableProjectTypeInWorkspace':
+        return {"enableProjectTypeInWorkspace": random_return_value}
+    elif args[0] == 'enableWorkspaceFilesystem':
+        return {"enableWorkspaceFilesystem": random_return_value}
 
 
 def created_job(ws: MagicMock, name: str):
@@ -1045,3 +1054,27 @@ def test_repair_run_result_state(ws, caplog, mock_installation_with_jobs, any_pr
 
     workspace_installation.repair_run("assessment")
     assert "Please try after sometime" in caplog.text
+
+
+def test_enable_files_in_repos(ws, mock_installation, any_prompt, mocker):
+    sql_backend = MockBackend(
+        fails_on_first={'CREATE TABLE': '[UNRESOLVED_COLUMN.WITH_SUGGESTION] A column, variable is incorrect'}
+    )
+    wheels = create_autospec(WheelsV2)
+
+    ws.workspace_conf.get_status = mocker.patch(
+        "databricks.sdk.service.settings.WorkspaceConfAPI.get_status", side_effect=mock_get_status
+    )
+
+    workspace_installation = WorkspaceInstallation(
+        WorkspaceConfig(inventory_database='ucx'),
+        mock_installation,
+        sql_backend,
+        wheels,
+        ws,
+        any_prompt,
+        timedelta(seconds=1),
+    )
+
+    workspace_installation.enable_files_in_repos()
+    assert True
