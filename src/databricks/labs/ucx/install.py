@@ -962,6 +962,21 @@ class WorkspaceInstallation:
         if not self.validate_step(step):
             self.run_workflow(step)
 
+    def enable_files_in_repos(self):
+        # check if "enableProjectTypeInWorkspace" and "enableWorkspaceFilesystem" are set to false
+        project_type = self._ws.workspace_conf.get_status("enableProjectTypeInWorkspace")
+        workspace_file_system = self._ws.workspace_conf.get_status("enableWorkspaceFilesystem")
+
+        logger.debug("Checking Files In Repos configuration")
+
+        if project_type["enableProjectTypeInWorkspace"] == "false":
+            logger.debug("enableProjectTypeInWorkspace is False, enabling the config")
+            self._ws.workspace_conf.set_status("enableProjectTypeInWorkspace")
+
+        if workspace_file_system["enableWorkspaceFilesystem"] == "false":
+            logger.debug("enableWorkspaceFilesystem is False, enabling the config")
+            self._ws.workspace_conf.set_status("enableWorkspaceFileSystem")
+
 
 if __name__ == "__main__":
     logger = get_logger(__file__)
