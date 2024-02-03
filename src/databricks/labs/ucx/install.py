@@ -276,12 +276,7 @@ class WorkspaceInstaller:
         }
         if conf:
             for key, value in conf.items():
-                if key.startswith("spark.hadoop.javax.jdo.option") or key.startswith("sql.hive.metastore"):
-                    policy_definition[f"spark_conf.{key}"] = {"type": "fixed", "value": value}
-                elif self._ws.config.is_aws and key.startswith("spark.databricks.hive.metastore.glueCatalog.enabled"):
-                    policy_definition[f"spark_conf.{key}"] = {"type": "fixed", "value": value}
-                else:
-                    continue
+                policy_definition[f"spark_conf.{key}"] = {"type": "fixed", "value": value}
         if self._ws.config.is_aws:
             policy_definition["aws_attributes.availability"] = {
                 "type": "fixed",
@@ -310,7 +305,7 @@ class WorkspaceInstaller:
             logger.info(f"Instance Profile is Set to {instance_profile}")
         for key in cluster_policy.keys():
             if (
-                key.startswith("spark_conf.sql.hive.metastore")
+                key.startswith("spark_conf.spark.sql.hive.metastore")
                 or key.startswith("spark_conf.spark.hadoop.javax.jdo.option")
                 or key.startswith("spark_conf.spark.databricks.hive.metastore")
                 or key.startswith("spark_conf.spark.hadoop.hive.metastore.glue")
@@ -326,7 +321,7 @@ class WorkspaceInstaller:
                 yield policy
                 continue
             for key in def_json.keys():
-                if key.startswith("spark_config.spark.sql.hive.metastore"):
+                if key.startswith("spark_conf.spark.sql.hive.metastore"):
                     yield policy
                     break
 
@@ -545,7 +540,12 @@ class WorkspaceInstallation:
     def create_jobs(self):
         logger.debug(f"Creating jobs from tasks in {main.__name__}")
         remote_wheel = self._upload_wheel()
-        policy_definition = self._ws.cluster_policies.get(policy_id=self.config.policy_id).definition
+        try:
+            policy_definition = self._ws.cluster_policies.get(policy_id=self.config.policy_id).definition
+        except NotFound:
+            logger.error(f"UCX Policy {self.config.policy_id} not found, please reinstall UCX")
+            return
+
         self._ws.cluster_policies.edit(
             policy_id=self.config.policy_id,
             name=f"Unity Catalog Migration ({self.config.inventory_database})",
@@ -959,6 +959,9 @@ class WorkspaceInstallation:
     def validate_and_run(self, step: str):
         if not self.validate_step(step):
             self.run_workflow(step)
+
+    def create_policies(self):
+        self._ws.cluster_policies.delete(policy_id="22")
 
 
 if __name__ == "__main__":

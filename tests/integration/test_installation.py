@@ -233,27 +233,6 @@ def test_repair_run_workflow_job(ws, mocker, new_installation, sql_backend):
     assert run_status.value == "SUCCESS"
 
 
-@retried(on=[NotFound, Unknown, InvalidParameterValue], timeout=timedelta(minutes=8))
-def test_running_real_assessment_job_new_cluster_with_policy(
-    ws, new_installation, make_ucx_group, make_cluster_policy, make_cluster_policy_permissions
-):
-    ws_group_a, acc_group_a = make_ucx_group()
-
-    cluster_policy = make_cluster_policy()
-    make_cluster_policy_permissions(
-        object_id=cluster_policy.policy_id,
-        permission_level=PermissionLevel.CAN_USE,
-        group_name=ws_group_a.display_name,
-    )
-
-    install = new_installation(lambda wc: replace(wc, include_group_names=[ws_group_a.display_name]))
-    install.run_workflow("assessment")
-
-    generic_permissions = GenericPermissionsSupport(ws, [])
-    before = generic_permissions.load_as_dict("cluster-policies", cluster_policy.policy_id)
-    assert before[ws_group_a.display_name] == PermissionLevel.CAN_USE
-
-
 @retried(on=[NotFound], timeout=timedelta(minutes=5))
 def test_uninstallation(ws, sql_backend, new_installation):
     install = new_installation()

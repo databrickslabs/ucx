@@ -86,7 +86,10 @@ def ws():
     ws.query_visualizations.create.return_value = Visualization(id="abc")
     ws.dashboard_widgets.create.return_value = Widget(id="abc")
     ws.clusters.list.return_value = mock_clusters()
-    ws.cluster_policies.list = lambda: []
+    ws.cluster_policies.create.return_value = CreatePolicyResponse(policy_id="foo")
+    ws.clusters.select_spark_version = lambda latest: "14.2.x-scala2.12"
+    ws.clusters.select_node_type = lambda local_disk: "Standard_F4s"
+
     return ws
 
 
@@ -380,10 +383,6 @@ def test_save_config(ws, mock_installation):
     ws.warehouses.list = lambda **_: [
         EndpointInfo(name="abc", id="abc", warehouse_type=EndpointInfoWarehouseType.PRO, state=State.RUNNING)
     ]
-    ws.cluster_policies.list = lambda: []
-    ws.cluster_policies.create.return_value = CreatePolicyResponse(policy_id="foo")
-    ws.clusters.select_spark_version = lambda latest: "14.2.x-scala2.12"
-    ws.clusters.select_node_type = lambda local_disk: "Standard_F4s"
     ws.workspace.download = not_found
 
     prompts = MockPrompts(
@@ -421,9 +420,7 @@ def test_save_config_strip_group_names(ws, mock_installation):
             r".*": "",
         }
     )
-    ws.cluster_policies.create.return_value = CreatePolicyResponse(policy_id="foo")
-    ws.clusters.select_spark_version = lambda latest: "14.2.x-scala2.12"
-    ws.clusters.select_node_type = lambda local_disk: "Standard_F4s"
+
     install = WorkspaceInstaller(prompts, mock_installation, ws)
     install.configure()
 
@@ -445,68 +442,149 @@ def test_save_config_strip_group_names(ws, mock_installation):
 
 
 def test_cluster_policy_definition_azure_hms(ws, mock_installation):
-    install = WorkspaceInstaller(MockPrompts({r".*": ""}), mock_installation, ws)
     ws.config.is_aws = False
     ws.config.is_azure = True
     ws.config.is_gcp = False
-    ws.clusters.select_spark_version = lambda latest: "14.2.x-scala2.12"
-    ws.clusters.select_node_type = lambda local_disk: "Standard_F4s"
-    conf = {
-        "spark.hadoop.javax.jdo.option.ConnectionURL": "url",
-        "spark.hadoop.javax.jdo.option.ConnectionUserName": "user1",
-        "spark.hadoop.javax.jdo.option.ConnectionPassword": "pwd",
-        "spark.hadoop.javax.jdo.option.ConnectionDriverName": "SQLServerDriver",
-        "sql.hive.metastore.version": "0.13",
-        "sql.hive.metastore.jars": "jar1",
+    policy_definition = {
+        "spark_conf.spark.hadoop.javax.jdo.option.ConnectionURL": {"value": "url"},
+        "spark_conf.spark.hadoop.javax.jdo.option.ConnectionUserName": {"value": "user1"},
+        "spark_conf.spark.hadoop.javax.jdo.option.ConnectionPassword": {"value": "pwd"},
+        "spark_conf.spark.hadoop.javax.jdo.option.ConnectionDriverName": {"value": "SQLServerDriver"},
+        "spark_conf.spark.sql.hive.metastore.version": {"value": "0.13"},
+        "spark_conf.spark.sql.hive.metastore.jars": {"value": "jar1"},
+        "aws_attributes.instance_profile_arn": {"value": "role_arn_1"},
     }
-    instance_profile = "role_arn_1"
-    policy_definition = install._cluster_policy_definition(conf, instance_profile)
-    policy_definition_dict = json.loads(policy_definition)
-    assert policy_definition_dict["spark_conf.spark.hadoop.javax.jdo.option.ConnectionURL"]["value"] == "url"
-    assert policy_definition_dict["spark_conf.spark.hadoop.javax.jdo.option.ConnectionUserName"]["value"] == "user1"
-    assert policy_definition_dict["spark_conf.spark.hadoop.javax.jdo.option.ConnectionPassword"]["value"] == "pwd"
-    assert (
-        policy_definition_dict["spark_conf.spark.hadoop.javax.jdo.option.ConnectionDriverName"]["value"]
-        == "SQLServerDriver"
+
+    ws.cluster_policies.list.return_value = [
+        Policy(
+            policy_id="id1",
+            name="foo",
+            definition=json.dumps(policy_definition),
+            description="Custom cluster policy for Unity Catalog Migration (UCX)",
+        )
+    ]
+    prompts = MockPrompts(
+        {
+            r".*PRO or SERVERLESS SQL warehouse.*": "1",
+            r"Choose how to map the workspace groups.*": "2",  # specify names
+            r".*workspace group names.*": "g1, g2, g99",
+            r".*We have identified one or more cluster.*": "Yes",
+            r".*Choose a cluster policy.*": "0",
+            r".*": "",
+        }
     )
-    assert policy_definition_dict["spark_conf.sql.hive.metastore.version"]["value"] == "0.13"
-    assert policy_definition_dict["spark_conf.sql.hive.metastore.jars"]["value"] == "jar1"
-    assert policy_definition_dict["azure_attributes.availability"]["value"] == "ON_DEMAND_AZURE"
-    assert policy_definition_dict["spark_version"]["value"] == "14.2.x-scala2.12"
-    assert policy_definition_dict["node_type_id"]["value"] == "Standard_F4s"
+    install = WorkspaceInstaller(prompts, mock_installation, ws)
+    install.configure()
+    policy_definition_actual = {
+        "spark_version": {"type": "fixed", "value": "14.2.x-scala2.12"},
+        "node_type_id": {"type": "fixed", "value": "Standard_F4s"},
+        "spark_conf.spark.hadoop.javax.jdo.option.ConnectionURL": {"type": "fixed", "value": "url"},
+        "spark_conf.spark.hadoop.javax.jdo.option.ConnectionUserName": {"type": "fixed", "value": "user1"},
+        "spark_conf.spark.hadoop.javax.jdo.option.ConnectionPassword": {"type": "fixed", "value": "pwd"},
+        "spark_conf.spark.hadoop.javax.jdo.option.ConnectionDriverName": {"type": "fixed", "value": "SQLServerDriver"},
+        "spark_conf.spark.sql.hive.metastore.version": {"type": "fixed", "value": "0.13"},
+        "spark_conf.spark.sql.hive.metastore.jars": {"type": "fixed", "value": "jar1"},
+        "azure_attributes.availability": {"type": "fixed", "value": "ON_DEMAND_AZURE"},
+    }
+    ws.cluster_policies.create.assert_called_with(
+        name="Unity Catalog Migration (ucx)",
+        definition=json.dumps(policy_definition_actual),
+        description="Custom cluster policy for Unity Catalog Migration (UCX)",
+    )
 
 
-def test_cluster_policy_definition_aws_glue(ws):
-    install = WorkspaceInstaller(MockPrompts({r".*": ""}), mock_installation, ws)
+def test_cluster_policy_definition_aws_glue(ws, mock_installation):
     ws.config.is_aws = True
     ws.config.is_azure = False
     ws.config.is_gcp = False
-    ws.clusters.select_spark_version = lambda latest: "14.2.x-scala2.12"
-    ws.clusters.select_node_type = lambda local_disk: "Standard_F4s"
-    conf = {"spark.databricks.hive.metastore.glueCatalog.enabled": "True"}
-    instance_profile = "role_arn_1"
-    policy_definition = install._cluster_policy_definition(conf, instance_profile)
-    policy_definition_dict = json.loads(policy_definition)
-    assert policy_definition_dict["spark_conf.spark.databricks.hive.metastore.glueCatalog.enabled"]["value"] == "True"
-    assert policy_definition_dict["aws_attributes.availability"]["value"] == "ON_DEMAND"
-    assert policy_definition_dict["spark_version"]["value"] == "14.2.x-scala2.12"
-    assert policy_definition_dict["node_type_id"]["value"] == "Standard_F4s"
-    assert policy_definition_dict["aws_attributes.instance_profile_arn"]["value"] == "role_arn_1"
+    policy_definition = {
+        "spark_conf.spark.databricks.hive.metastore.glueCatalog.enabled": {"type": "fixed", "value": "true"},
+        "aws_attributes.instance_profile_arn": {"value": "role_arn_1"},
+    }
+
+    ws.cluster_policies.list.return_value = [
+        Policy(
+            policy_id="id1",
+            name="foo",
+            definition=json.dumps(policy_definition),
+            description="Custom cluster policy for Unity Catalog Migration (UCX)",
+        )
+    ]
+    prompts = MockPrompts(
+        {
+            r".*PRO or SERVERLESS SQL warehouse.*": "1",
+            r"Choose how to map the workspace groups.*": "2",  # specify names
+            r".*workspace group names.*": "g1, g2, g99",
+            r".*We have identified one or more cluster.*": "Yes",
+            r".*Choose a cluster policy.*": "0",
+            r".*": "",
+        }
+    )
+    install = WorkspaceInstaller(prompts, mock_installation, ws)
+    install.configure()
+    policy_definition_actual = {
+        "spark_version": {"type": "fixed", "value": "14.2.x-scala2.12"},
+        "node_type_id": {"type": "fixed", "value": "Standard_F4s"},
+        "spark_conf.spark.databricks.hive.metastore.glueCatalog.enabled": {"type": "fixed", "value": "true"},
+        "aws_attributes.availability": {"type": "fixed", "value": "ON_DEMAND"},
+        "aws_attributes.instance_profile_arn": {"type": "fixed", "value": "role_arn_1"},
+    }
+    ws.cluster_policies.create.assert_called_with(
+        name="Unity Catalog Migration (ucx)",
+        definition=json.dumps(policy_definition_actual),
+        description="Custom cluster policy for Unity Catalog Migration (UCX)",
+    )
 
 
-def test_cluster_policy_definition_gcp(ws):
-    install = WorkspaceInstaller(MockPrompts({r".*": ""}), mock_installation, ws)
+def test_cluster_policy_definition_gcp(ws, mock_installation):
     ws.config.is_aws = False
     ws.config.is_azure = False
     ws.config.is_gcp = True
-    ws.clusters.select_spark_version = lambda latest: "14.2.x-scala2.12"
-    ws.clusters.select_node_type = lambda local_disk: "Standard_F4s"
+    policy_definition = {
+        "spark_conf.spark.hadoop.javax.jdo.option.ConnectionURL": {"value": "url"},
+        "spark_conf.spark.hadoop.javax.jdo.option.ConnectionUserName": {"value": "user1"},
+        "spark_conf.spark.hadoop.javax.jdo.option.ConnectionPassword": {"value": "pwd"},
+        "spark_conf.spark.hadoop.javax.jdo.option.ConnectionDriverName": {"value": "SQLServerDriver"},
+        "spark_conf.spark.sql.hive.metastore.version": {"value": "0.13"},
+        "spark_conf.spark.sql.hive.metastore.jars": {"value": "jar1"},
+    }
 
-    policy_definition = install._cluster_policy_definition(None, "")
-    policy_definition_dict = json.loads(policy_definition)
-    assert policy_definition_dict["gcp_attributes.availability"]["value"] == "ON_DEMAND_GCP"
-    assert policy_definition_dict["spark_version"]["value"] == "14.2.x-scala2.12"
-    assert policy_definition_dict["node_type_id"]["value"] == "Standard_F4s"
+    ws.cluster_policies.list.return_value = [
+        Policy(
+            policy_id="id1",
+            name="foo",
+            definition=json.dumps(policy_definition),
+            description="Custom cluster policy for Unity Catalog Migration (UCX)",
+        )
+    ]
+    prompts = MockPrompts(
+        {
+            r".*PRO or SERVERLESS SQL warehouse.*": "1",
+            r"Choose how to map the workspace groups.*": "2",  # specify names
+            r".*workspace group names.*": "g1, g2, g99",
+            r".*We have identified one or more cluster.*": "Yes",
+            r".*Choose a cluster policy.*": "0",
+            r".*": "",
+        }
+    )
+    install = WorkspaceInstaller(prompts, mock_installation, ws)
+    install.configure()
+    policy_definition_actual = {
+        "spark_version": {"type": "fixed", "value": "14.2.x-scala2.12"},
+        "node_type_id": {"type": "fixed", "value": "Standard_F4s"},
+        "spark_conf.spark.hadoop.javax.jdo.option.ConnectionURL": {"type": "fixed", "value": "url"},
+        "spark_conf.spark.hadoop.javax.jdo.option.ConnectionUserName": {"type": "fixed", "value": "user1"},
+        "spark_conf.spark.hadoop.javax.jdo.option.ConnectionPassword": {"type": "fixed", "value": "pwd"},
+        "spark_conf.spark.hadoop.javax.jdo.option.ConnectionDriverName": {"type": "fixed", "value": "SQLServerDriver"},
+        "spark_conf.spark.sql.hive.metastore.version": {"type": "fixed", "value": "0.13"},
+        "spark_conf.spark.sql.hive.metastore.jars": {"type": "fixed", "value": "jar1"},
+        "gcp_attributes.availability": {"type": "fixed", "value": "ON_DEMAND_GCP"},
+    }
+    ws.cluster_policies.create.assert_called_with(
+        name="Unity Catalog Migration (ucx)",
+        definition=json.dumps(policy_definition_actual),
+        description="Custom cluster policy for Unity Catalog Migration (UCX)",
+    )
 
 
 def test_save_config_with_custom_policy(ws, mock_installation):
@@ -529,9 +607,6 @@ def test_save_config_with_custom_policy(ws, mock_installation):
             definition=policy_def.decode("utf-8"),
         )
     ]
-    ws.cluster_policies.create.return_value = CreatePolicyResponse(policy_id="foo")
-    ws.clusters.select_spark_version = lambda latest: "14.2.x-scala2.12"
-    ws.clusters.select_node_type = lambda local_disk: "Standard_F4s"
 
     prompts = MockPrompts(
         {
@@ -582,10 +657,6 @@ def test_save_config_with_glue(ws, mock_installation):
             definition=policy_def.decode("utf-8"),
         )
     ]
-    ws.cluster_policies.create.return_value = CreatePolicyResponse(policy_id="foo")
-    ws.clusters.select_spark_version = lambda latest: "14.2.x-scala2.12"
-    ws.clusters.select_node_type = lambda local_disk: "Standard_F4s"
-
     prompts = MockPrompts(
         {
             r".*PRO or SERVERLESS SQL warehouse.*": "1",
