@@ -25,14 +25,21 @@ Total number of identified storage locations based on scanning Hive Metastore ta
 # Assessment Widgets
 Assessment widgets query tables in the $inventory database and summarize or detail out findings.
 
-The second row of the report starts with "Readiness" and "Assessment Summary"
-<img width="1235" alt="image" src="https://github.com/databrickslabs/ucx/assets/1122251/c68194c4-4b09-4c8d-b61f-ebf57b7106c7">
+The second row of the report starts with "Readiness", "Assessment Summary", "Table counts by storage" and "Table counts by schema and format"
+
+<img width="1512" alt="image" src="https://github.com/databrickslabs/ucx/assets/106815134/41904d8a-c746-4191-be08-2e9e2090935d">
 
 ## Readiness
 This is a rough summary of the workspace readiness to run Unity Catalog governed workloads. Each line item is the percent of compatible items divided by the total items in the class.
 
 ## Assessment Summary
 This is a summary count, per finding type of all of the findings identified during the assessment workflow. The assessment summary will help identify areas that need focus (e.g. Tables on DBFS or Clusters that need DBR upgrades)
+
+## Table counts by storage
+This is a summary count of Hive Metastore tables, per storage type (DBFS Root, DBFS Mount, Cloud Storage (referred as External)). This also gives a summary count of tables using storage types which are unsupported (such as WASB or ADL in Azure) in Unity Catalog. Count of tables created using Databricks Demo Datasets are also identified here
+
+## Table counts by schema and format
+This is a summary count by Hive Metastore (HMS) table formats (Delta and Non Delta) for each HMS schema    
 
 The third row continues with "Database Summary"
 <img width="1220" alt="image" src="https://github.com/databrickslabs/ucx/assets/1122251/28742e33-d3e3-4eb8-832f-1edd34999fa2">
