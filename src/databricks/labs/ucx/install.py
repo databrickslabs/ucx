@@ -542,10 +542,10 @@ class WorkspaceInstallation:
         remote_wheel = self._upload_wheel()
         try:
             policy_definition = self._ws.cluster_policies.get(policy_id=self.config.policy_id).definition
-        except NotFound:
+        except NotFound as e:
             msg = f"UCX Policy {self.config.policy_id} not found, please reinstall UCX"
             logger.error(msg)
-            raise NotFound(msg)
+            raise NotFound(msg) from e
 
         self._ws.cluster_policies.edit(
             policy_id=self.config.policy_id,
