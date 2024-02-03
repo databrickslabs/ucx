@@ -86,7 +86,6 @@ def ws():
     ws.query_visualizations.create.return_value = Visualization(id="abc")
     ws.dashboard_widgets.create.return_value = Widget(id="abc")
     ws.clusters.list.return_value = mock_clusters()
-    ws.cluster_policies.get.return_value = Policy(policy_id="foo")
     ws.cluster_policies.create.return_value = CreatePolicyResponse(policy_id="foo")
     ws.clusters.select_spark_version = lambda latest: "14.2.x-scala2.12"
     ws.clusters.select_node_type = lambda local_disk: "Standard_F4s"
@@ -601,6 +600,7 @@ def test_install_edit_policy_with_library(ws, mock_installation, any_prompt):
         timedelta(seconds=1),
     )
     wheels.upload_to_wsfs.return_value = "path1"
+    ws.cluster_policies.get.return_value = Policy(policy_id="foo")
     workspace_installation.create_jobs()
     ws.cluster_policies.edit.assert_called_with(
         name="Unity Catalog Migration (ucx)",
@@ -622,7 +622,7 @@ def test_install_edit_policy_not_present(ws, mock_installation, any_prompt):
         any_prompt,
         timedelta(seconds=1),
     )
-
+    ws.cluster_policies.get.side_effect = NotFound()
     workspace_installation.create_jobs()
 
 
