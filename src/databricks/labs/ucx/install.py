@@ -368,6 +368,7 @@ class WorkspaceInstallation:
 
     def run(self):
         logger.info(f"Installing UCX v{PRODUCT_INFO.version()}")
+        self._enable_files_in_repos()
         Threads.strict(
             "installing components",
             [
@@ -962,7 +963,7 @@ class WorkspaceInstallation:
         if not self.validate_step(step):
             self.run_workflow(step)
 
-    def enable_files_in_repos(self):
+    def _enable_files_in_repos(self):
         # check if "enableProjectTypeInWorkspace" and "enableWorkspaceFilesystem" are set to false
         project_type = self._ws.workspace_conf.get_status("enableProjectTypeInWorkspace")
         workspace_file_system = self._ws.workspace_conf.get_status("enableWorkspaceFilesystem")

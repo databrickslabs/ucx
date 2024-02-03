@@ -1076,5 +1076,5 @@ def test_enable_files_in_repos(ws, mock_installation, any_prompt, mocker):
         timedelta(seconds=1),
     )
 
-    workspace_installation.enable_files_in_repos()
+    workspace_installation._enable_files_in_repos()
     assert True
