@@ -16,7 +16,7 @@ from databricks.sdk.errors import (
     PermissionDenied,
     Unknown,
 )
-from databricks.sdk.service import iam, jobs, sql
+from databricks.sdk.service import compute, iam, jobs, sql
 from databricks.sdk.service.compute import CreatePolicyResponse, Policy, State
 from databricks.sdk.service.jobs import BaseRun, RunResultState, RunState
 from databricks.sdk.service.sql import (
@@ -86,6 +86,7 @@ def ws():
     ws.query_visualizations.create.return_value = Visualization(id="abc")
     ws.dashboard_widgets.create.return_value = Widget(id="abc")
     ws.clusters.list.return_value = mock_clusters()
+    ws.cluster_policies.get.return_value = Policy(policy_id="foo")
     ws.cluster_policies.create.return_value = CreatePolicyResponse(policy_id="foo")
     ws.clusters.select_spark_version = lambda latest: "14.2.x-scala2.12"
     ws.clusters.select_node_type = lambda local_disk: "Standard_F4s"
@@ -585,6 +586,44 @@ def test_cluster_policy_definition_gcp(ws, mock_installation):
         definition=json.dumps(policy_definition_actual),
         description="Custom cluster policy for Unity Catalog Migration (UCX)",
     )
+
+
+def test_install_edit_policy_with_library(ws, mock_installation, any_prompt):
+    sql_backend = MockBackend()
+    wheels = create_autospec(WheelsV2)
+    workspace_installation = WorkspaceInstallation(
+        WorkspaceConfig(inventory_database='ucx', override_clusters={"main": 'one', "tacl": 'two'}, policy_id="foo"),
+        mock_installation,
+        sql_backend,
+        wheels,
+        ws,
+        any_prompt,
+        timedelta(seconds=1),
+    )
+    wheels.upload_to_wsfs.return_value = "path1"
+    workspace_installation.create_jobs()
+    ws.cluster_policies.edit.assert_called_with(
+        name="Unity Catalog Migration (ucx)",
+        policy_id="foo",
+        definition=None,
+        libraries=[compute.Library(whl="dbfs:path1")],
+    )
+
+
+def test_install_edit_policy_not_present(ws, mock_installation, any_prompt):
+    sql_backend = MockBackend()
+    wheels = create_autospec(WheelsV2)
+    workspace_installation = WorkspaceInstallation(
+        WorkspaceConfig(inventory_database='ucx', override_clusters={"main": 'one', "tacl": 'two'}, policy_id="foo1"),
+        mock_installation,
+        sql_backend,
+        wheels,
+        ws,
+        any_prompt,
+        timedelta(seconds=1),
+    )
+
+    workspace_installation.create_jobs()
 
 
 def test_save_config_with_custom_policy(ws, mock_installation):
