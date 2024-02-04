@@ -269,31 +269,31 @@ class WorkspaceInstaller:
             webbrowser.open(ws_file_url)
         return config
 
+    def _policy_config(self, value: str):
+        return {"type": "fixed", "value": value}
+
     def _cluster_policy_definition(self, conf: dict, instance_profile: str | None) -> str:
         policy_definition = {
-            "spark_version": {"type": "fixed", "value": self._ws.clusters.select_spark_version(latest=True)},
-            "node_type_id": {"type": "fixed", "value": self._ws.clusters.select_node_type(local_disk=True)},
+            "spark_version": self._policy_config(self._ws.clusters.select_spark_version(latest=True)),
+            "node_type_id": self._policy_config(self._ws.clusters.select_node_type(local_disk=True)),
         }
         if conf:
             for key, value in conf.items():
-                policy_definition[f"spark_conf.{key}"] = {"type": "fixed", "value": value}
+                policy_definition[f"spark_conf.{key}"] = self._policy_config(value)
         if self._ws.config.is_aws:
-            policy_definition["aws_attributes.availability"] = {
-                "type": "fixed",
-                "value": compute.AwsAvailability.ON_DEMAND.value,
-            }
+            policy_definition["aws_attributes.availability"] = self._policy_config(
+                compute.AwsAvailability.ON_DEMAND.value
+            )
             if instance_profile:
-                policy_definition["aws_attributes.instance_profile_arn"] = {"type": "fixed", "value": instance_profile}
+                policy_definition["aws_attributes.instance_profile_arn"] = self._policy_config(instance_profile)
         elif self._ws.config.is_azure:
-            policy_definition["azure_attributes.availability"] = {
-                "type": "fixed",
-                "value": compute.AzureAvailability.ON_DEMAND_AZURE.value,
-            }
+            policy_definition["azure_attributes.availability"] = self._policy_config(
+                compute.AzureAvailability.ON_DEMAND_AZURE.value
+            )
         else:
-            policy_definition["gcp_attributes.availability"] = {
-                "type": "fixed",
-                "value": compute.GcpAvailability.ON_DEMAND_GCP.value,
-            }
+            policy_definition["gcp_attributes.availability"] = self._policy_config(
+                compute.GcpAvailability.ON_DEMAND_GCP.value
+            )
         return json.dumps(policy_definition)
 
     @staticmethod
