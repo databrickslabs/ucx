@@ -39,8 +39,9 @@ logger = logging.getLogger(__name__)
 def new_installation(ws, sql_backend, env_or_skip, inventory_schema, make_random):
     cleanup = []
 
-    def factory(config_transform: Callable[[WorkspaceConfig], WorkspaceConfig] | None = None,
-                single_user_install: bool = True):
+    def factory(
+        config_transform: Callable[[WorkspaceConfig], WorkspaceConfig] | None = None, single_user_install: bool = True
+    ):
         prefix = make_random(4)
         renamed_group_prefix = f"rename-{prefix}-"
         prompts = MockPrompts(

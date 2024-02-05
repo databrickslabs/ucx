@@ -390,7 +390,6 @@ class WorkspaceInstallation:
         )
         dash.create_dashboards()
 
-
     def run_workflow(self, step: str):
         job_id = int(self._state.jobs[step])
         logger.debug(f"starting {step} job: {self._ws.config.host}#job/{job_id}")
