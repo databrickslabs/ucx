@@ -61,14 +61,21 @@ class AzureServicePrincipalMigration:
 
         storage_credentials = self._ws.storage_credentials.list(max_results=0)
         for storage_credential in storage_credentials:
+            # only add service principal's application_id, ignore managed identity based storage_credential
             if storage_credential.azure_service_principal:
                 storage_credential_app_ids.add(storage_credential.azure_service_principal.application_id)
+        logger.info(f"Found {len(storage_credential_app_ids)} distinct service principals already used in UC storage credentials")
         return storage_credential_app_ids
 
 
-    def _check_sp_in_storage_credentials(self, sp_list, sc_set):
+    def _check_sp_in_storage_credentials(self, sp_list, sc_set) -> list[StoragePermissionMapping]:
         # if sp is already used, take it off from the sp_list
-        return list()
+        filtered_sp_list = []
+        for service_principal in sp_list:
+            if service_principal.client_id not in sc_set:
+                filtered_sp_list.append(service_principal)
+
+        return filtered_sp_list
 
 
     def _fetch_client_secret(self, sp_list: list[StoragePermissionMapping]) -> list[ServicePrincipalMigrationInfo]:
