@@ -55,7 +55,7 @@ class AzureServicePrincipalMigration:
         return cls(installation, ws, azure_resource_permissions, azure_sp_crawler, customized_csv, replace_with_ac)
 
 
-    def _list_storage_credentials(self) -> set(str):
+    def _list_storage_credentials(self) -> set[str]:
         # list existed storage credentials that is using service principal, capture the service principal's application_id
         storage_credential_app_ids = set()
 
