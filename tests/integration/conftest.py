@@ -6,12 +6,14 @@ from functools import partial
 
 import databricks.sdk.core
 import pytest
+from databricks.labs.blueprint.installation import Installation
 from databricks.sdk import AccountClient, WorkspaceClient
 from databricks.sdk.core import Config
 from databricks.sdk.errors import NotFound
 from databricks.sdk.retries import retried
 from databricks.sdk.service.catalog import FunctionInfo, TableInfo
 
+from databricks.labs.ucx.account import WorkspaceInfo
 from databricks.labs.ucx.framework.crawlers import SqlBackend
 from databricks.labs.ucx.hive_metastore import TablesCrawler
 from databricks.labs.ucx.hive_metastore.mapping import Rule, TableMapping
@@ -161,11 +163,13 @@ class StaticUdfsCrawler(UdfsCrawler):
 
 
 class StaticTableMapping(TableMapping):
-    def __init__(
-        self, ws: WorkspaceClient, backend: SqlBackend, folder: str | None = None, rules: list[Rule] | None = None
-    ):
+    def __init__(self, ws: WorkspaceClient, sql_backend: SqlBackend, rules: list[Rule]):
+        installation = Installation(ws, 'ucx')
+        super().__init__(installation, ws, sql_backend)
         self._rules = rules
-        super().__init__(ws, backend, folder)
 
     def load(self):
         return self._rules
+
+    def save(self, tables: TablesCrawler, workspace_info: WorkspaceInfo) -> str:
+        raise RuntimeWarning("not available")

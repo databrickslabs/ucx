@@ -1,9 +1,9 @@
-import io
-import json
+from unittest.mock import create_autospec
 
-import yaml
 from databricks.labs.blueprint.entrypoint import find_project_root
+from databricks.labs.blueprint.installation import MockInstallation
 from databricks.labs.blueprint.installer import InstallState
+from databricks.labs.blueprint.tui import Prompts
 from databricks.sdk.service import iam
 from databricks.sdk.service.sql import (
     Dashboard,
@@ -13,7 +13,6 @@ from databricks.sdk.service.sql import (
     Widget,
 )
 
-from databricks.labs.ucx.config import WorkspaceConfig
 from databricks.labs.ucx.framework.dashboards import DashboardFromFiles
 from databricks.labs.ucx.install import WorkspaceInstaller
 
@@ -26,54 +25,42 @@ def test_dashboard(mocker):
     install_folder = "/users/not_a_real_user"
     queries_folder = f"{install_folder}/queries"
 
-    def download_mock(path):
-        if path == f"{queries_folder}/state.json":
-            return io.StringIO(
-                json.dumps(
-                    {
-                        "jobs.sql:query_id": "91e51760-7653-4769-bc32-1595ce1892af",
-                        "all_tables.sql:query_id": "4000e54c-4c51-45b3-b009-a4dd9a3b5599",
-                        "assessment_azure_05_0_azure_service_principals.sql:query_id": "_",
+    installation = MockInstallation(
+        {
+            'state.json': {
+                "version": 1,
+                "resources": {
+                    "queries": {
+                        "jobs.sql": "91e51760-7653-4769-bc32-1595ce1892af",
+                        "all_tables.sql": "4000e54c-4c51-45b3-b009-a4dd9a3b5599",
+                        "assessment_azure_05_0_azure_service_principals.sql": "_",
                     }
-                )
-            )
+                },
+            },
+            'config.yml': {
+                'version': 2,
+                'inventory_database': 'a',
+            },
+        }
+    )
 
-        if path == f"{install_folder}/state.json":
-            return io.StringIO(
-                json.dumps(
-                    {
-                        "$version": 1,
-                        "resources": {
-                            "queries": {
-                                "jobs.sql": "91e51760-7653-4769-bc32-1595ce1892af",
-                                "all_tables.sql": "4000e54c-4c51-45b3-b009-a4dd9a3b5599",
-                                "assessment_azure_05_0_azure_service_principals.sql": "_",
-                            }
-                        },
-                    }
-                )
-            )
-
-        config_bytes = yaml.dump(WorkspaceConfig(inventory_database="a").as_dict()).encode("utf8")
-        return io.BytesIO(config_bytes)
-
-    ws.workspace.download = download_mock
     ws.data_sources.list = lambda: [DataSource(id="bcd", warehouse_id="000000")]
     ws.dashboards.create.return_value = Dashboard(id="abc")
     ws.queries.create.return_value = Query(id="abc")
     ws.query_visualizations.create.return_value = Visualization(id="abc")
     ws.dashboard_widgets.create.return_value = Widget(id="abc")
     ws.warehouses.list.return_value = []
-    installer = WorkspaceInstaller(ws)
+    prompts = create_autospec(Prompts)
+    WorkspaceInstaller(prompts, installation, ws)
     local_query_files = find_project_root(__file__) / "src/databricks/labs/ucx/queries"
     dash = DashboardFromFiles(
         ws,
-        InstallState(ws, install_folder),
+        InstallState(None, None, installation=installation),
         local_folder=local_query_files,
         remote_folder=queries_folder,
         name_prefix="Assessment",
         warehouse_id="000000",
-        query_text_callback=installer.current_config.replace_inventory_variable,
+        query_text_callback=lambda x: x,
     )
     dashboards = dash.create_dashboards()
     assert dashboards is not None

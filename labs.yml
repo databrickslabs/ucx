@@ -22,8 +22,8 @@ commands:
   - name: installations
     description: Show installations by different users on the same workspace
     table_template: |-
-      User\tDatabase\tWarehouse
-      {{range .}}{{.user_name}}\t{{.database}}\t{{.warehouse_id}}
+      Path\tDatabase\tWarehouse
+      {{range .}}{{.path}}\t{{.database}}\t{{.warehouse_id}}
       {{end}}
 
   - name: skip
@@ -114,6 +114,14 @@ commands:
   - name: save-aws-iam-profiles
     description: | 
       Identifies all Instance Profiles and map their access to S3 buckets.
+      Requires a working setup of AWS CLI.
+    flags:
+      - name: aws-profile
+        description: AWS Profile to use for authentication
+
+  - name: save-uc-compatible-roles
+    description: | 
+      Scan all the AWS roles that are set for UC access and produce a mapping to the S3 resources.
       Requires a working setup of AWS CLI.
     flags:
       - name: aws-profile
