@@ -316,6 +316,7 @@ def migrate_azure_service_principals(w: WorkspaceClient):
         return
 
     service_principal_migration.execute_migration()
+    logger.info("Storage credentials created. Please check azure_service_principal_migration_result.csv for results ")
     return
 
 

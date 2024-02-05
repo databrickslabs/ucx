@@ -5,6 +5,7 @@ from dataclasses import dataclass
 from databricks.labs.blueprint.installation import Installation
 from databricks.sdk import WorkspaceClient
 from databricks.sdk.errors import Unauthenticated, PermissionDenied, ResourceDoesNotExist, InternalError
+from databricks.sdk.service.catalog import AzureServicePrincipal, Privilege, StorageCredentialInfo, ValidationResult
 
 from databricks.labs.ucx.assessment.azure import AzureResourcePermissions, AzureResources, \
     StoragePermissionMapping, AzureServicePrincipalCrawler
@@ -30,10 +31,25 @@ class ServicePrincipalMigrationInfo(StoragePermissionMapping):
                    client_secret=client_secret)
 
 
+@dataclass
+class StorageCredentialValidationResult(StorageCredentialInfo, ValidationResult):
+    @classmethod
+    def from_storage_credential_validation(cls, storage_credential: StorageCredentialInfo, validation: ValidationResult):
+        return cls(name=storage_credential.name,
+                   azure_service_principal=storage_credential.azure_service_principal,
+                   created_by=storage_credential.created_by,
+                   read_only=storage_credential.read_only,
+                   message=validation.message,
+                   operation=validation.operation,
+                   result=validation.result
+                   )
+
+
 class AzureServicePrincipalMigration:
 
     def __init__(self, installation: Installation, ws: WorkspaceClient, azure_resource_permissions: AzureResourcePermissions,
                  azure_sp_crawler: AzureServicePrincipalCrawler):
+        self._output_file = "azure_service_principal_migration_result.csv"
         self._final_sp_list = None
         self._installation = installation
         self._ws = ws
@@ -162,23 +178,41 @@ class AzureServicePrincipalMigration:
         return self._save_action_plan(sp_list_with_secret)
 
 
-    def _create_sc_with_client_secret(self, sp: ServicePrincipalMigrationInfo):
-        #self._ws.storage_credentials.create()
-        storage_credential=""
-        self._validate_sc(storage_credential)
-        return
+    def _create_sc_with_client_secret(self, sp: ServicePrincipalMigrationInfo) -> list(StorageCredentialValidationResult):
+        # prepare the storage credential properties
+        name = sp.principal
+        azure_service_principal = AzureServicePrincipal(directory_id=sp.directory_id,
+                                                        application_id=sp.client_id,
+                                                        client_secret=sp.client_secret)
+        comment = f"Created by UCX during migration to UC using Azure Service Principal: {sp.principal}"
+        read_only = False
+        if sp.privilege == Privilege.READ_FILES:
+            read_only = True
+        # create the storage credential
+        storage_credential = self._ws.storage_credentials.create(name=name,
+                                            azure_service_principal=azure_service_principal,
+                                            comment=comment,
+                                            read_only=read_only)
+
+        validation_result = self._validate_sc(storage_credential, sp.prefix)
+        yield validation_result
 
 
-    def _validate_sc(self, storage_credential):
-        return
+    def _validate_sc(self, storage_credential, location) -> StorageCredentialValidationResult:
+        validation = self._ws.storage_credentials.validate(storage_credential_name=storage_credential.name,
+                                                           url=location)
+        return StorageCredentialValidationResult.from_storage_credential_validation(storage_credential,
+                                                                                    validation)
 
-    def execute_migration(self):
+
+    def execute_migration(self) -> str | None:
         """
         Execute the action plan after user confirmed
         :return:
         """
+        execution_result = []
         for sp in self._final_sp_list:
-            self._create_sc_with_client_secret(sp)
-        return
+            execution_result.append(self._create_sc_with_client_secret(sp))
+        return self._installation.save(execution_result, filename=self._output_file)
 
 
