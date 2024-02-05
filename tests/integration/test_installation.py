@@ -61,7 +61,7 @@ def new_installation(ws, sql_backend, env_or_skip, inventory_schema, make_random
         if single_user_install:
             workspace_start_path = f"/Users/{ws.current_user.me().user_name}/.{prefix}"
         else:
-            workspace_start_path = f"/.{prefix}"
+            workspace_start_path = f"/Applications/.{prefix}"
         default_cluster_id = env_or_skip("TEST_DEFAULT_CLUSTER_ID")
         tacl_cluster_id = env_or_skip("TEST_LEGACY_TABLE_ACL_CLUSTER_ID")
         Threads.strict(
