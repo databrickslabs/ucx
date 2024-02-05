@@ -275,26 +275,24 @@ class WorkspaceInstaller:
 
     def _cluster_policy_definition(self, conf: dict, instance_profile: str | None) -> str:
         policy_definition = {
-            "spark_version": WorkspaceInstaller._policy_config(self._ws.clusters.select_spark_version(latest=True)),
-            "node_type_id": WorkspaceInstaller._policy_config(self._ws.clusters.select_node_type(local_disk=True)),
+            "spark_version": self._policy_config(self._ws.clusters.select_spark_version(latest=True)),
+            "node_type_id": self._policy_config(self._ws.clusters.select_node_type(local_disk=True)),
         }
         if conf:
             for key, value in conf.items():
-                policy_definition[f"spark_conf.{key}"] = WorkspaceInstaller._policy_config(value)
+                policy_definition[f"spark_conf.{key}"] = self._policy_config(value)
         if self._ws.config.is_aws:
-            policy_definition["aws_attributes.availability"] = WorkspaceInstaller._policy_config(
+            policy_definition["aws_attributes.availability"] = self._policy_config(
                 compute.AwsAvailability.ON_DEMAND.value
             )
             if instance_profile:
-                policy_definition["aws_attributes.instance_profile_arn"] = WorkspaceInstaller._policy_config(
-                    instance_profile
-                )
+                policy_definition["aws_attributes.instance_profile_arn"] = self._policy_config(instance_profile)
         elif self._ws.config.is_azure:
-            policy_definition["azure_attributes.availability"] = WorkspaceInstaller._policy_config(
+            policy_definition["azure_attributes.availability"] = self._policy_config(
                 compute.AzureAvailability.ON_DEMAND_AZURE.value
             )
         else:
-            policy_definition["gcp_attributes.availability"] = WorkspaceInstaller._policy_config(
+            policy_definition["gcp_attributes.availability"] = self._policy_config(
                 compute.GcpAvailability.ON_DEMAND_GCP.value
             )
         return json.dumps(policy_definition)
