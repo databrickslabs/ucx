@@ -39,7 +39,8 @@ logger = logging.getLogger(__name__)
 def new_installation(ws, sql_backend, env_or_skip, inventory_schema, make_random):
     cleanup = []
 
-    def factory(config_transform: Callable[[WorkspaceConfig], WorkspaceConfig] | None = None):
+    def factory(config_transform: Callable[[WorkspaceConfig], WorkspaceConfig] | None = None,
+                single_user_install: bool = True):
         prefix = make_random(4)
         renamed_group_prefix = f"rename-{prefix}-"
         prompts = MockPrompts(
@@ -56,6 +57,10 @@ def new_installation(ws, sql_backend, env_or_skip, inventory_schema, make_random
             }
         )
         workspace_start_path = f"/Users/{ws.current_user.me().user_name}/.{prefix}"
+        if single_user_install:
+            workspace_start_path = f"/Users/{ws.current_user.me().user_name}/.{prefix}"
+        else:
+            workspace_start_path = f"/.{prefix}"
         default_cluster_id = env_or_skip("TEST_DEFAULT_CLUSTER_ID")
         tacl_cluster_id = env_or_skip("TEST_LEGACY_TABLE_ACL_CLUSTER_ID")
         Threads.strict(
@@ -73,6 +78,8 @@ def new_installation(ws, sql_backend, env_or_skip, inventory_schema, make_random
         workspace_config.workspace_start_path = workspace_start_path
         if config_transform:
             workspace_config = config_transform(workspace_config)
+
+        installation = Installation(ws, prefix, install_folder=workspace_start_path)
         installation.save(workspace_config)
 
         # TODO: see if we want to move building wheel as a context manager for yield factory,
