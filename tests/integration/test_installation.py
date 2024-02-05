@@ -154,6 +154,35 @@ def test_running_real_migrate_groups_job(
     assert found[f"{install.config.renamed_group_prefix}{ws_group_a.display_name}"] == PermissionLevel.CAN_USE
 
 
+@retried(on=[NotFound, Unknown, InvalidParameterValue], timeout=timedelta(minutes=5))
+def test_running_real_validate_groups_permissions_job(
+    ws, sql_backend, new_installation, make_group, make_cluster_policy, make_cluster_policy_permissions
+):
+    ws_group_a = make_group()
+
+    cluster_policy = make_cluster_policy()
+    make_cluster_policy_permissions(
+        object_id=cluster_policy.policy_id,
+        permission_level=PermissionLevel.CAN_USE,
+        group_name=ws_group_a.display_name,
+    )
+
+    generic_permissions = GenericPermissionsSupport(
+        ws,
+        [
+            Listing(ws.cluster_policies.list, "policy_id", "cluster-policies"),
+        ],
+    )
+
+    install = new_installation(lambda wc: replace(wc, include_group_names=[ws_group_a.display_name]))
+    inventory_database = install.config.inventory_database
+    permission_manager = PermissionManager(sql_backend, inventory_database, [generic_permissions])
+    permission_manager.inventorize_permissions()
+
+    # assert the job does not throw any exception
+    install.run_workflow("validate-groups-permissions")
+
+
 @retried(on=[NotFound, InvalidParameterValue], timeout=timedelta(minutes=5))
 def test_running_real_remove_backup_groups_job(ws, sql_backend, new_installation, make_ucx_group):
     ws_group_a, acc_group_a = make_ucx_group()
