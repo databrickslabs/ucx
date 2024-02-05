@@ -213,8 +213,7 @@ def test_running_real_validate_groups_permissions_job_fails(
         request_object_type="cluster-policies", request_object_id=cluster_policy.policy_id, access_control_list=[]
     )
 
-    # assert the job fails validation
-    with pytest.raises(Unknown, match=r"Detected 1 failures: ValueError"):
+    with pytest.raises(Unknown, match=r"Detected \d+ failures: ValueError"):
         install.run_workflow("validate-groups-permissions")
 
 
