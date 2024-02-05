@@ -95,6 +95,39 @@ class AzureServicePrincipalMigration:
         return filtered_sp_list
 
 
+    def _read_databricks_secret(self, scope: str, key: str, application_id: str) -> str | None:
+        try:
+            secret_response = self._ws.secrets.get_secret(scope, key)
+        except Unauthenticated:
+            logger.error(f"User is unauthenticated to fetch Databricks secret value for service principal to storage credential migration.")
+            raise
+        except PermissionDenied:
+            logger.error(f"User does not have permission to Databricks secret value for service principal to storage credential migration.")
+            raise
+        except ResourceDoesNotExist:
+            logger.info(f"Secret {scope}.{key} does not exists. "
+                        f"Cannot fetch the service principal client_secret for {application_id}. "
+                        f"Will not reuse this client_secret")
+            return None
+        except InternalError:
+            logger.info(f"InternalError while reading secret {scope}.{key}. "
+                        f"Cannot fetch the service principal client_secret for {application_id}. "
+                        f"Will not reuse this client_secret")
+            print(f"{application_id} is not migrated due to InternalError while fetching the client_secret from Databricks secret."
+                  f"You may rerun the migration command later to retry this service principal")
+            return None
+
+        # decode the bytes string from GetSecretResponse to utf-8 string
+        # TODO: handle different encoding if we have feedback from the customer
+        try:
+            return base64.b64decode(secret_response.value).decode("utf-8")
+        except UnicodeDecodeError:
+            logger.info(f"Secret {scope}.{key} has Base64 bytes that cannot be decoded to utf-8 string . "
+                        f"Cannot fetch the service principal client_secret for {application_id}. "
+                        f"Will not reuse this client_secret")
+            return None
+
+
     def _fetch_client_secret(self, sp_list: list[StoragePermissionMapping]) -> list[ServicePrincipalMigrationInfo]:
         # check AzureServicePrincipalInfo from AzureServicePrincipalCrawler, if AzureServicePrincipalInfo
         # has secret_scope and secret_key not empty, fetch the client_secret and put it to the client_secret field
@@ -111,38 +144,9 @@ class AzureServicePrincipalMigration:
                 continue
             if azure_sp_info.secret_key is None:
                 continue
-
-            try:
-                secret_response = self._ws.secrets.get_secret(azure_sp_info.secret_scope, azure_sp_info.secret_key)
-            except Unauthenticated:
-                logger.info(f"User is unauthenticated to fetch secret value. Cannot fetch the service principal "
-                            f"client_secret for {azure_sp_info.application_id}. Will not reuse this client_secret")
-                continue
-            except PermissionDenied:
-                logger.info(f"User does not have permission to read secret value for {azure_sp_info.secret_scope}.{azure_sp_info.secret_key}. "
-                            f"Cannot fetch the service principal client_secret for {azure_sp_info.application_id}. "
-                            f"Will not reuse this client_secret")
-                continue
-            except ResourceDoesNotExist:
-                logger.info(f"Secret {azure_sp_info.secret_scope}.{azure_sp_info.secret_key} does not exists. "
-                            f"Cannot fetch the service principal client_secret for {azure_sp_info.application_id}. "
-                            f"Will not reuse this client_secret")
-                continue
-            except InternalError:
-                logger.info(f"InternalError while reading secret {azure_sp_info.secret_scope}.{azure_sp_info.secret_key}. "
-                            f"Cannot fetch the service principal client_secret for {azure_sp_info.application_id}. "
-                            f"Will not reuse this client_secret")
-                continue
-
-            # decode the bytes string from GetSecretResponse to utf-8 string
-            # TODO: handle different encoding if we have feedback from the customer
-            try:
-                secret_value = base64.b64decode(secret_response.value).decode("utf-8")
+            secret_value = self._read_databricks_secret(azure_sp_info.secret_scope, azure_sp_info.secret_key, azure_sp_info.application_id)
+            if secret_value:
                 azure_sp_info_with_client_secret.update(azure_sp_info.application_id, secret_value)
-            except UnicodeDecodeError:
-                logger.info(f"Secret {azure_sp_info.secret_scope}.{azure_sp_info.secret_key} has Base64 bytes that cannot be decoded to utf-8 string . "
-                            f"Cannot fetch the service principal client_secret for {azure_sp_info.application_id}. "
-                            f"Will not reuse this client_secret")
 
         # update the list of ServicePrincipalMigrationInfo if client_secret is found
         for sp in sp_list:
