@@ -32,12 +32,11 @@ class AWSPolicyAction:
 
 
 @dataclass
-class AWSInstanceProfileAction:
-    instance_profile_arn: str
+class AWSRoleAction:
+    role_arn: str
     resource_type: str
     privilege: str
     resource_path: str
-    iam_role_arn: str | None = None
 
 
 @dataclass
@@ -72,6 +71,10 @@ class AWSResources:
     S3_ACTIONS: typing.ClassVar[set[str]] = {"s3:PutObject", "s3:GetObject", "s3:DeleteObject", "s3:PutObjectAcl"}
     S3_READONLY: typing.ClassVar[str] = "s3:GetObject"
     S3_REGEX: typing.ClassVar[str] = r"arn:aws:s3:::([a-zA-Z0-9+=,.@_-]*)\/\*$"
+    UC_MASTER_ROLES_ARN: typing.ClassVar[list[str]] = [
+        "arn:aws:iam::414351767826:role/unity-catalog-prod-UCMasterRole-14S5ZJVKOTYTL",
+        "arn:aws:iam::707343435239:role/unity-catalog-dev-UCMasterRole-G3MMN8SP21FO",
+    ]
 
     def __init__(self, profile: str, command_runner: Callable[[str], tuple[int, str, str]] = run_command):
         self._profile = profile
@@ -104,11 +107,55 @@ class AWSResources:
             attached_policies.append(policy.get("PolicyArn"))
         return attached_policies
 
+    def list_all_uc_roles(self):
+        roles = self._run_json_command(f"iam list-roles --profile {self._profile}")
+        uc_roles = []
+        roles = roles.get("Roles")
+        if not roles:
+            logger.warning("list-roles couldn't find any roles")
+            return uc_roles
+        for role in roles:
+            policy_document = role.get("AssumeRolePolicyDocument")
+            if not policy_document:
+                continue
+            for statement in policy_document["Statement"]:
+                effect = statement.get("Effect")
+                action = statement.get("Action")
+                principal = statement.get("Principal")
+                if not (effect and action and principal):
+                    continue
+                if effect != "Allow":
+                    continue
+                if action != "sts:AssumeRole":
+                    continue
+                principal = principal.get("AWS")
+                if not principal:
+                    continue
+                if isinstance(principal, list):
+                    is_uc_principal = False
+                    for single_principal in principal:
+                        if single_principal in self.UC_MASTER_ROLES_ARN:
+                            is_uc_principal = True
+                            continue
+                    if not is_uc_principal:
+                        continue
+                elif principal not in self.UC_MASTER_ROLES_ARN:
+                    continue
+                uc_roles.append(
+                    AWSRole(
+                        role_id=role.get("RoleId"),
+                        role_name=role.get("RoleName"),
+                        arn=role.get("Arn"),
+                        path=role.get("Path"),
+                    )
+                )
+
+        return uc_roles
+
     def get_role_policy(self, role_name, policy_name: str | None = None, attached_policy_arn: str | None = None):
         if policy_name:
             get_policy = (
-                f"iam get-role-policy --profile {self._profile} --role-name {role_name} "
-                f"--policy-name {policy_name} --no-paginate"
+                f"iam get-role-policy --profile {self._profile} --role-name {role_name} " f"--policy-name {policy_name}"
             )
         elif attached_policy_arn:
             get_attached_policy = f"iam get-policy --profile {self._profile} --policy-arn {attached_policy_arn}"
@@ -118,7 +165,7 @@ class AWSResources:
             policy_version = attached_policy["Policy"]["DefaultVersionId"]
             get_policy = (
                 f"iam get-policy-version --profile {self._profile} --policy-arn {attached_policy_arn} "
-                f"--version-id {policy_version} --no-paginate"
+                f"--version-id {policy_version}"
             )
         else:
             logger.error("Failed to retrieve role. No role name or attached role ARN specified.")
@@ -161,7 +208,7 @@ class AWSResources:
 
     def _run_json_command(self, command: str):
         aws_cmd = shutil.which("aws")
-        code, output, error = self._command_runner(f"{aws_cmd} {command} --output json --no-paginate")
+        code, output, error = self._command_runner(f"{aws_cmd} {command} --output json")
         if code != 0:
             logger.error(error)
             return None
@@ -182,6 +229,13 @@ class AWSResourcePermissions:
             raise ResourceWarning("AWS CLI is not configured properly.")
         return cls(installation, ws, aws)
 
+    def save_uc_compatible_roles(self):
+        uc_role_access = list(self._get_role_access())
+        if len(uc_role_access) == 0:
+            logger.warning("No Mapping Was Generated.")
+            return None
+        return self._installation.save(uc_role_access, filename='uc_roles_access.csv')
+
     def _get_instance_profiles(self) -> Iterable[AWSInstanceProfile]:
         instance_profiles = self._ws.instance_profiles.list()
         result_instance_profiles = []
@@ -196,38 +250,44 @@ class AWSResourcePermissions:
         instance_profiles = list(self._get_instance_profiles())
         tasks = []
         for instance_profile in instance_profiles:
-            tasks.append(partial(self._get_instance_profile_access_task, instance_profile))
+            tasks.append(
+                partial(self._get_role_access_task, instance_profile.instance_profile_arn, instance_profile.role_name)
+            )
         # Aggregating the outputs from all the tasks
         return sum(Threads.strict("Scanning Instance Profiles", tasks), [])
 
-    def _get_instance_profile_access_task(self, instance_profile: AWSInstanceProfile):
+    def _get_role_access(self):
+        roles = list(self._aws_resources.list_all_uc_roles())
+        tasks = []
+        for role in roles:
+            tasks.append(partial(self._get_role_access_task, role.arn, role.role_name))
+        # Aggregating the outputs from all the tasks
+        return sum(Threads.strict("Scanning Roles", tasks), [])
+
+    def _get_role_access_task(self, arn: str, role_name: str):
         policy_actions = []
-        policies = list(self._aws_resources.list_role_policies(instance_profile.role_name))
+        policies = list(self._aws_resources.list_role_policies(role_name))
         for policy in policies:
-            actions = self._aws_resources.get_role_policy(instance_profile.role_name, policy_name=policy)
+            actions = self._aws_resources.get_role_policy(role_name, policy_name=policy)
             for action in actions:
                 policy_actions.append(
-                    AWSInstanceProfileAction(
-                        instance_profile.instance_profile_arn,
+                    AWSRoleAction(
+                        arn,
                         action.resource_type,
                         action.privilege,
                         action.resource_path,
-                        instance_profile.iam_role_arn,
                     )
                 )
-        attached_policies = self._aws_resources.list_attached_policies_in_role(instance_profile.role_name)
+        attached_policies = self._aws_resources.list_attached_policies_in_role(role_name)
         for attached_policy in attached_policies:
-            actions = list(
-                self._aws_resources.get_role_policy(instance_profile.role_name, attached_policy_arn=attached_policy)
-            )
+            actions = list(self._aws_resources.get_role_policy(role_name, attached_policy_arn=attached_policy))
             for action in actions:
                 policy_actions.append(
-                    AWSInstanceProfileAction(
-                        instance_profile.instance_profile_arn,
+                    AWSRoleAction(
+                        arn,
                         action.resource_type,
                         action.privilege,
                         action.resource_path,
-                        instance_profile.iam_role_arn,
                     )
                 )
         return policy_actions
