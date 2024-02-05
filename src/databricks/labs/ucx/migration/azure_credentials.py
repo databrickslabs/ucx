@@ -26,6 +26,7 @@ class ServicePrincipalMigrationInfo(StoragePermissionMapping):
                    client_id=storage_permission_mapping.client_id,
                    principal=storage_permission_mapping.principal,
                    privilege=storage_permission_mapping.privilege,
+                   directory_id=storage_permission_mapping.directory_id,
                    client_secret=client_secret)
 
 
@@ -161,8 +162,8 @@ class AzureServicePrincipalMigration:
         return self._save_action_plan(sp_list_with_secret)
 
 
-    def _create_sc_with_client_secret(self, sp):
-
+    def _create_sc_with_client_secret(self, sp: ServicePrincipalMigrationInfo):
+        #self._ws.storage_credentials.create()
         storage_credential=""
         self._validate_sc(storage_credential)
         return

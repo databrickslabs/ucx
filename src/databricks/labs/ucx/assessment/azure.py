@@ -170,3 +170,4 @@ class AzureServicePrincipalCrawler(CrawlerBase[AzureServicePrincipalInfo], JobsM
                 )
             )
         return set_service_principals
+
