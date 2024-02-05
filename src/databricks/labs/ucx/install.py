@@ -957,18 +957,6 @@ class WorkspaceInstallation:
         if not self.validate_step(step):
             self.run_workflow(step)
 
-    def check_installation_conflicts(self, inventory_database) -> bool:
-        logger.info("Checking current installations....")
-        installation_manager = InstallationManager(self._ws)
-        logger.info("Fetching installations...")
-        all_users = [_.as_summary() for _ in installation_manager.user_installations()]
-
-        for user in all_users:
-            if inventory_database == user['database']:
-                return True
-
-        return False
-
 
 if __name__ == "__main__":
     logger = get_logger(__file__)
