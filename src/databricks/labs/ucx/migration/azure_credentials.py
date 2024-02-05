@@ -3,6 +3,7 @@ import logging
 from dataclasses import dataclass
 
 from databricks.labs.blueprint.installation import Installation
+from databricks.labs.blueprint.tui import Prompts
 from databricks.sdk import WorkspaceClient
 from databricks.sdk.errors import Unauthenticated, PermissionDenied, ResourceDoesNotExist, InternalError
 from databricks.sdk.service.catalog import AzureServicePrincipal, Privilege, StorageCredentialInfo, ValidationResult
@@ -154,35 +155,32 @@ class AzureServicePrincipalMigration:
                 yield ServicePrincipalMigrationInfo.from_storage_permission_mapping(sp, azure_sp_info_with_client_secret[sp.client_id])
 
 
-    def _save_action_plan(self, sp_list_with_secret) -> str | None:
-        # save action plan to a file for customer to review.
-        # client_secret need to be removed
-        sp_list_wo_secret = []
+    def _print_action_plan(self, sp_list_with_secret):
+        # print action plan to console for customer to review.
         for sp in sp_list_with_secret:
-            sp_list_wo_secret.append(StoragePermissionMapping(sp.prefix, sp.client_id, sp.principal, sp.privilege))
-
-        return self._installation.save(sp_list_wo_secret, filename=self._action_plan)
+            print(f"Service Principal name: {sp.principal}, application_id: {sp.client_id}, privilege {sp.privilege} on location {sp.prefix}")
 
 
-    def generate_migration_list(self):
+    def _generate_migration_list(self):
         """
         Create the list of SP that need to be migrated, output an action plan as a csv file for users to confirm
         :return:
         """
         # load sp list from azure_storage_account_info.csv
-        loaded_sp_list = self._azure_resource_permissions.load_spn_permission()
+        sp_list = self._azure_resource_permissions.load()
         # list existed storage credentials
         sc_set = self._list_storage_credentials()
         # check if the sp is already used in UC storage credential
-        filtered_sp_list = self._check_sp_in_storage_credentials(loaded_sp_list, sc_set)
+        filtered_sp_list = self._check_sp_in_storage_credentials(sp_list, sc_set)
         # fetch sp client_secret if any
         sp_list_with_secret = self._fetch_client_secret(filtered_sp_list)
         self._final_sp_list = sp_list_with_secret
         # output the action plan for customer to confirm
-        return self._save_action_plan(sp_list_with_secret)
+        self._print_action_plan(sp_list_with_secret)
+        return
 
 
-    def _create_sc_with_client_secret(self, sp: ServicePrincipalMigrationInfo) -> list(StorageCredentialValidationResult):
+    def _create_storage_credential(self, sp: ServicePrincipalMigrationInfo) -> list(StorageCredentialValidationResult):
         # prepare the storage credential properties
         name = sp.principal
         azure_service_principal = AzureServicePrincipal(directory_id=sp.directory_id,
@@ -198,25 +196,42 @@ class AzureServicePrincipalMigration:
                                             comment=comment,
                                             read_only=read_only)
 
-        validation_result = self._validate_sc(storage_credential, sp.prefix)
+        validation_result = self._validate_storage_credential(storage_credential, sp.prefix)
         yield validation_result
 
 
-    def _validate_sc(self, storage_credential, location) -> StorageCredentialValidationResult:
+    def _validate_storage_credential(self, storage_credential, location) -> StorageCredentialValidationResult:
         validation = self._ws.storage_credentials.validate(storage_credential_name=storage_credential.name,
                                                            url=location)
         return StorageCredentialValidationResult.from_storage_credential_validation(storage_credential,
                                                                                     validation)
 
 
-    def execute_migration(self) -> str | None:
-        """
-        Execute the action plan after user confirmed
-        :return:
-        """
+    def execute_migration(self, prompts: Prompts):
+        if not self._w.config.is_azure:
+            logger.error("Workspace is not on azure, please run this command on azure databricks workspaces.")
+            return
+
+        csv_confirmed = prompts.confirm(f"Have you reviewed the azure_storage_account_info.csv "
+                                        f"and confirm listed service principals are allowed to be checked for migration?")
+        if csv_confirmed is not True:
+            return
+
+        self._generate_migration_list()
+
+        plan_confirmed = prompts.confirm(f"Above Azure Service Principals will be migrated to UC storage credentials, please review and confirm.")
+        if plan_confirmed is not True:
+            return
+
         execution_result = []
         for sp in self._final_sp_list:
-            execution_result.append(self._create_sc_with_client_secret(sp))
-        return self._installation.save(execution_result, filename=self._output_file)
+            execution_result.append(self._create_storage_credential(sp))
+
+        results_file = self._installation.save(execution_result, filename=self._output_file)
+        logger.info("Completed migration from Azure Service Principal migrated to UC Storage credentials")
+        print(f"Completed migration from Azure Service Principal migrated to UC Storage credentials. "
+              f"Please check {results_file} for validation results")
+        return
+
 
 

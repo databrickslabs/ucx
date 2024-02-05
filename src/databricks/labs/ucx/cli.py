@@ -297,26 +297,8 @@ def migrate_azure_service_principals(w: WorkspaceClient):
     """
     logger.info("Running migrate_azure_service_principals command")
     prompts = Prompts()
-    if not w.config.is_azure:
-        logger.error("Workspace is not on azure, please run this command on azure databricks workspaces.")
-        return
-
-    csv_confirmed = prompts.confirm(f"Have you reviewed the azure_storage_account_info.csv "
-                                    f"and confirm listed service principals are allowed to be checked for migration?")
-    if csv_confirmed is not True:
-        return
-
     service_principal_migration = AzureServicePrincipalMigration.for_cli(w)
-    action_plan_file = service_principal_migration.generate_migration_list()
-    logger.info("Azure Service Principals subject for migration are checked")
-
-    migration_list_confirmed = prompts.confirm(f"Service Principals subject to be migrated to UC storage credentials "
-                                               f"are listed in {action_plan_file}. Please confirm to execute the migration.")
-    if migration_list_confirmed is not True:
-        return
-
-    service_principal_migration.execute_migration()
-    logger.info("Storage credentials created. Please check azure_service_principal_migration_result.csv for results ")
+    service_principal_migration.execute_migration(prompts)
     return
 
 
