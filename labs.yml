@@ -103,16 +103,12 @@ commands:
       - name: subscription-id
         description: Subscription to scan storage account in
 
-
   - name: validate-groups-membership
     description: Validate the groups to see if the groups at account level and workspace level have different membership
     table_template: |-
       Workspace Group Name\tMembers Count\tAccount Group Name\tMembers Count
       {{range .}}{{.wf_group_name}}\t{{.wf_group_members_count}}\t{{.acc_group_name}}\t{{.acc_group_members_count}}
       {{end}}
-
-  - name: validate-groups-permissions
-    description: Validate that all the crawled permissions are applied correctly to the destination groups
 
   - name: save-aws-iam-profiles
     description: | 

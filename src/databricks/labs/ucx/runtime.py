@@ -310,6 +310,20 @@ def apply_permissions_to_account_groups(cfg: WorkspaceConfig, ws: WorkspaceClien
     permission_manager.apply_group_permissions(migration_state)
 
 
+@task("validate-groups-permissions")
+def validate_groups_permissions(cfg: WorkspaceConfig, ws: WorkspaceClient, sql_backend: SqlBackend):
+    """Validate that all the crawled permissions are applied correctly to the destination groups."""
+    logger.info("Running validation of permissions applied to destination groups.")
+    permission_manager = PermissionManager.factory(
+        ws,
+        sql_backend,
+        cfg.inventory_database,
+        num_threads=cfg.num_threads,
+        workspace_start_path=cfg.workspace_start_path,
+    )
+    permission_manager.verify_group_permissions()
+
+
 @task("remove-workspace-local-backup-groups", depends_on=[apply_permissions_to_account_groups])
 def delete_backup_groups(cfg: WorkspaceConfig, ws: WorkspaceClient, sql_backend: SqlBackend):
     """Last step of the group migration process. Removes all workspace-level backup groups, along with their
