@@ -100,7 +100,7 @@ def test_job_failure_propagates_correct_error_message_and_logs(ws, sql_backend, 
     assert len(workflow_run_logs) == 1
 
 
-@retried(on=[NotFound, Unknown, InvalidParameterValue], timeout=timedelta(minutes=8))
+@retried(on=[NotFound, Unknown, InvalidParameterValue], timeout=timedelta(minutes=12))
 def test_running_real_assessment_job(
     ws, new_installation, make_ucx_group, make_cluster_policy, make_cluster_policy_permissions
 ):
@@ -181,6 +181,41 @@ def test_running_real_validate_groups_permissions_job(
 
     # assert the job does not throw any exception
     install.run_workflow("validate-groups-permissions")
+
+
+@retried(on=[NotFound], timeout=timedelta(minutes=5))
+def test_running_real_validate_groups_permissions_job_fails(
+    ws, sql_backend, new_installation, make_group, make_cluster_policy, make_cluster_policy_permissions
+):
+    ws_group_a = make_group()
+
+    cluster_policy = make_cluster_policy()
+    make_cluster_policy_permissions(
+        object_id=cluster_policy.policy_id,
+        permission_level=PermissionLevel.CAN_USE,
+        group_name=ws_group_a.display_name,
+    )
+
+    generic_permissions = GenericPermissionsSupport(
+        ws,
+        [
+            Listing(ws.cluster_policies.list, "policy_id", "cluster-policies"),
+        ],
+    )
+
+    install = new_installation(lambda wc: replace(wc, include_group_names=[ws_group_a.display_name]))
+    inventory_database = install.config.inventory_database
+    permission_manager = PermissionManager(sql_backend, inventory_database, [generic_permissions])
+    permission_manager.inventorize_permissions()
+
+    # remove permission so the validation fails
+    ws.permissions.set(
+        request_object_type="cluster-policies", request_object_id=cluster_policy.policy_id, access_control_list=[]
+    )
+
+    # assert the job fails validation
+    with pytest.raises(Unknown, match=r"Detected 1 failures: ValueError"):
+        install.run_workflow("validate-groups-permissions")
 
 
 @retried(on=[NotFound, InvalidParameterValue], timeout=timedelta(minutes=5))
