@@ -11,7 +11,10 @@ from functools import lru_cache, partial
 from databricks.labs.blueprint.installation import Installation
 from databricks.labs.blueprint.parallel import Threads
 from databricks.sdk import WorkspaceClient
-from databricks.sdk.service.catalog import Privilege
+from databricks.sdk.service.catalog import Privilege, StorageCredentialInfo
+
+from databricks.labs.ucx.framework.crawlers import StatementExecutionBackend
+from databricks.labs.ucx.hive_metastore import ExternalLocations
 
 logger = logging.getLogger(__name__)
 
@@ -301,3 +304,20 @@ class AWSResourcePermissions:
             logger.warning("No Mapping Was Generated.")
             return None
         return self._installation.save(instance_profile_access, filename='aws_instance_profile_info.csv')
+
+
+class AWSUCResources:
+    def __init__(self, ws: WorkspaceClient, backend: StatementExecutionBackend, aws_resources: AWSResources,
+                 schema: str):
+        self._ws = ws
+        self._backend = backend
+        self._aws_resources = AWSResources
+        self._schema = schema
+
+    def _get_storage_credentials(self) -> Iterable[StorageCredentialInfo]:
+        return self._ws.storage_credentials.list()
+
+    def _identify_missing_credentials(self):
+        storage_credentials = self._get_storage_credentials()
+        external_locations = ExternalLocations(self._ws, self._backend, self._schema)
+
