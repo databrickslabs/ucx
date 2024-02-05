@@ -132,12 +132,14 @@ def test_save_spn_permissions_valid_storage_accounts(caplog, mocker, az_token):
                 'prefix': 'abfss://container3@sto2.dfs.core.windows.net/',
                 'principal': 'disNameuser3',
                 'privilege': 'WRITE_FILES',
+                'directory_id': '0000-0000',
             },
             {
                 'client_id': 'appIduser3',
                 'prefix': 'abfss://container3@sto2.dfs.core.windows.net/',
                 'principal': 'disNameuser3',
                 'privilege': 'WRITE_FILES',
+                'directory_id': '0000-0000',
             },
         ],
     )
