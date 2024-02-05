@@ -104,8 +104,11 @@ class AzureResourcePermissions:
                     storage_accounts.append(storage_acct)
         return storage_accounts
 
-    def load_spn_permission(self, customized_csv: str) -> list[StoragePermissionMapping]:
+    def load_spn_permission(self) -> list[StoragePermissionMapping]:
         """
         Load StoragePermissionMapping info from azure_storage_account_info.csv
+        :return:
         """
-        return self._installation.load(list[StoragePermissionMapping], self._filename)
+        storage_account_infos = self._installation.load(list[StoragePermissionMapping], self._filename)
+
+        return storage_account_infos
