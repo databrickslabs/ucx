@@ -1,6 +1,5 @@
-from unittest.mock import Mock, create_autospec
+from unittest.mock import Mock
 
-from databricks.sdk import WorkspaceClient
 from databricks.sdk.service.compute import DbfsStorageInfo, InitScriptInfo
 from databricks.sdk.service.pipelines import (
     PipelineCluster,
@@ -12,6 +11,7 @@ from databricks.labs.ucx.assessment.azure import AzureServicePrincipalCrawler
 from databricks.labs.ucx.assessment.pipelines import PipelineInfo, PipelinesCrawler
 
 from ..framework.mocks import MockBackend
+from . import workspace_client_mock
 
 
 def test_pipeline_assessment_with_config(mocker):
@@ -27,7 +27,7 @@ def test_pipeline_assessment_with_config(mocker):
         )
     ]
 
-    ws = create_autospec(WorkspaceClient)
+    ws = workspace_client_mock(clusters="job-source-cluster.json")
     config_dict = {
         "spark.hadoop.fs.azure.account.auth.type.abcde.dfs.core.windows.net": "SAS",
         "spark.hadoop.fs.azure.sas.token.provider.type.abcde.dfs."
@@ -57,7 +57,7 @@ def test_pipeline_assessment_with_config(mocker):
             label='default',
             node_type_id='Standard_F4s',
             num_workers=1,
-            policy_id="test_id",
+            policy_id="single-user-with-spn",
             spark_conf={"spark.databricks.delta.preview.enabled": "true"},
             spark_env_vars=None,
             ssh_public_keys=None,
@@ -65,7 +65,7 @@ def test_pipeline_assessment_with_config(mocker):
     ]
     ws.pipelines.get().spec.configuration = config_dict
     ws.pipelines.get().spec.clusters = pipeline_cluster
-    ws.cluster_policies.get().definition = (
+    ws.cluster_policies.get(policy_id="single-user-with-spn").definition = (
         '{\n  "spark_conf.fs.azure.account.auth.type": {\n    '
         '"type": "fixed",\n    "value": "OAuth",\n   '
         ' "hidden": true\n  },\n  "spark_conf.fs.azure.account.oauth.provider.type": {\n   '
@@ -80,7 +80,7 @@ def test_pipeline_assessment_with_config(mocker):
         '"value": "https://login.microsoftonline.com/1234ededed/oauth2/token",\n    '
         '"hidden": true\n  }\n}'
     )
-    ws.cluster_policies.get().policy_family_definition_overrides = (
+    ws.cluster_policies.get(policy_id="single-user-with-spn").policy_family_definition_overrides = (
         '{\n  "spark_conf.fs.azure.account.auth.type": {\n    '
         '"type": "fixed",\n    "value": "OAuth",\n   '
         ' "hidden": true\n  },\n  "spark_conf.fs.azure.account.oauth.provider.type": {\n   '
@@ -98,7 +98,8 @@ def test_pipeline_assessment_with_config(mocker):
     ws.workspace.export().content = "JXNoCmVjaG8gIj0="
     ws.dbfs.read().data = "JXNoCmVjaG8gIj0="
 
-    crawler = PipelinesCrawler(ws, MockBackend(), "ucx")._assess_pipelines(sample_pipelines)
+    ws.pipelines.list_pipelines.return_value = sample_pipelines
+    crawler = PipelinesCrawler(ws, MockBackend(), "ucx").snapshot()
     result_set = list(crawler)
 
     assert len(result_set) == 1
@@ -117,7 +118,7 @@ def test_pipeline_assessment_without_config(mocker):
             state=PipelineState.IDLE,
         )
     ]
-    ws = create_autospec(WorkspaceClient)
+    ws = workspace_client_mock(clusters="job-source-cluster.json")
     config_dict = {}
     pipeline_cluster = [
         PipelineCluster(
@@ -143,7 +144,8 @@ def test_pipeline_assessment_without_config(mocker):
     ]
     ws.pipelines.get().spec.configuration = config_dict
     ws.pipelines.get().spec.clusters = pipeline_cluster
-    crawler = PipelinesCrawler(ws, MockBackend(), "ucx")._assess_pipelines(sample_pipelines)
+    ws.pipelines.list_pipelines.return_value = sample_pipelines
+    crawler = PipelinesCrawler(ws, MockBackend(), "ucx").snapshot()
     result_set = list(crawler)
 
     assert len(result_set) == 1
@@ -160,7 +162,7 @@ def test_pipeline_snapshot_with_config():
             failures="",
         )
     ]
-    mock_ws = create_autospec(WorkspaceClient)
+    mock_ws = workspace_client_mock(clusters="job-source-cluster.json")
     crawler = PipelinesCrawler(mock_ws, MockBackend(), "ucx")
     crawler._try_fetch = Mock(return_value=[])
     crawler._crawl = Mock(return_value=sample_pipelines)
@@ -181,11 +183,11 @@ def test_pipeline_list_with_no_config():
             failures="",
         )
     ]
-    mock_ws = create_autospec(WorkspaceClient)
+    mock_ws = workspace_client_mock(clusters="no-spark-conf.json")
     mock_ws.pipelines.list_pipelines.return_value = sample_pipelines
     config_dict = {"spark.hadoop.fs.azure1.account.oauth2.client.id.abcde.dfs.core.windows.net": "wewewerty"}
     mock_ws.pipelines.get().spec.configuration = config_dict
-    crawler = AzureServicePrincipalCrawler(mock_ws, MockBackend(), "ucx")._list_all_pipeline_with_spn_in_spark_conf()
+    crawler = AzureServicePrincipalCrawler(mock_ws, MockBackend(), "ucx").snapshot()
 
     assert len(crawler) == 0
 
@@ -203,7 +205,7 @@ def test_pipeline_without_owners_should_have_empty_creator_name():
         )
     ]
 
-    ws = create_autospec(WorkspaceClient)
+    ws = workspace_client_mock(clusters="no-spark-conf.json")
     ws.pipelines.list_pipelines.return_value = sample_pipelines
     pipeline_cluster = [
         PipelineCluster(
@@ -257,7 +259,7 @@ def test_pipeline_assessment_with_no_cluster_config(mocker):
         )
     ]
 
-    ws = create_autospec(WorkspaceClient)
+    ws = workspace_client_mock(clusters="no-spark-conf.json")
     config_dict = {
         "spark.hadoop.fs.azure.account.auth.type.abcde.dfs.core.windows.net": "SAS",
         "spark.hadoop.fs.azure.sas.token.provider.type.abcde.dfs."
@@ -267,8 +269,8 @@ def test_pipeline_assessment_with_no_cluster_config(mocker):
     pipeline_cluster = []
     ws.pipelines.get().spec.configuration = config_dict
     ws.pipelines.get().spec.clusters = pipeline_cluster
-
-    crawler = PipelinesCrawler(ws, MockBackend(), "ucx")._assess_pipelines(sample_pipelines)
+    ws.pipelines.list_pipelines.return_value = sample_pipelines
+    crawler = PipelinesCrawler(ws, MockBackend(), "ucx").snapshot()
     result_set = list(crawler)
 
     assert len(result_set) == 1
