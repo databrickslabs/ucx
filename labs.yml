@@ -118,3 +118,11 @@ commands:
     flags:
       - name: aws-profile
         description: AWS Profile to use for authentication
+
+  - name: save-uc-compatible-roles
+    description: | 
+      Scan all the AWS roles that are set for UC access and produce a mapping to the S3 resources.
+      Requires a working setup of AWS CLI.
+    flags:
+      - name: aws-profile
+        description: AWS Profile to use for authentication

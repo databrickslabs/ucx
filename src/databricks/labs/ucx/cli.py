@@ -273,5 +273,33 @@ def save_aws_iam_profiles(w: WorkspaceClient, aws_profile: str | None = None):
     return None
 
 
+@ucx.command
+def save_uc_compatible_roles(w: WorkspaceClient, *, aws_profile: str | None = None):
+    """extracts all the iam roles with trust relationships to the UC master role.
+     Map these roles to the S3 buckets they have access to.
+    Requires a working setup of AWS CLI.
+    https://aws.amazon.com/cli/
+    The command saves a CSV to the UCX installation folder with the mapping.
+
+    The user has to be authenticated with AWS and the have the permissions to browse the resources and iam services.
+    More information can be found here:
+    https://docs.aws.amazon.com/IAM/latest/UserGuide/access_permissions-required.html
+    """
+    if not shutil.which("aws"):
+        logger.error("Couldn't find AWS CLI in path.Please obtain and install the CLI from https://aws.amazon.com/cli/")
+        return None
+    if not aws_profile:
+        aws_profile = os.getenv("AWS_DEFAULT_PROFILE")
+    if not aws_profile:
+        logger.error(
+            "AWS Profile is not specified. Use the environment variable [AWS_DEFAULT_PROFILE] "
+            "or use the '--aws-profile=[profile-name]' parameter."
+        )
+        return None
+    aws_permissions = AWSResourcePermissions.for_cli(w, aws_profile)
+    aws_permissions.save_uc_compatible_roles()
+    return None
+
+
 if __name__ == "__main__":
     ucx()
