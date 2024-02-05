@@ -180,7 +180,7 @@ class AzureServicePrincipalMigration:
         return
 
 
-    def _create_storage_credential(self, sp: ServicePrincipalMigrationInfo) -> list(StorageCredentialValidationResult):
+    def _create_storage_credential(self, sp: ServicePrincipalMigrationInfo) -> list[StorageCredentialValidationResult]:
         # prepare the storage credential properties
         name = sp.principal
         azure_service_principal = AzureServicePrincipal(directory_id=sp.directory_id,
