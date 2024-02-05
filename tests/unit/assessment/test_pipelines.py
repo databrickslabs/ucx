@@ -1,11 +1,6 @@
 from unittest.mock import Mock
 
-from databricks.sdk.service.compute import DbfsStorageInfo, InitScriptInfo
-from databricks.sdk.service.pipelines import (
-    PipelineCluster,
-    PipelineState,
-    PipelineStateInfo,
-)
+from databricks.sdk.service.pipelines import PipelineState, PipelineStateInfo
 
 from databricks.labs.ucx.assessment.azure import AzureServicePrincipalCrawler
 from databricks.labs.ucx.assessment.pipelines import PipelineInfo, PipelinesCrawler
@@ -14,7 +9,7 @@ from ..framework.mocks import MockBackend
 from . import workspace_client_mock
 
 
-def test_pipeline_assessment_with_config(mocker):
+def test_pipeline_assessment_with_config(mock_pipeline_cluster):
     sample_pipelines = [
         PipelineStateInfo(
             cluster_id=None,
@@ -34,37 +29,8 @@ def test_pipeline_assessment_with_config(mocker):
         "core.windows.net": "org.apache.hadoop.fs.azurebfs.sas.FixedSASTokenProvider",
         "spark.hadoop.fs.azure.sas.fixed.token.abcde.dfs.core.windows.net": "{{secrets/abcde_access/sasFixedToken}}",
     }
-    pipeline_cluster = [
-        PipelineCluster(
-            apply_policy_default_values=None,
-            autoscale=None,
-            aws_attributes=None,
-            azure_attributes=None,
-            cluster_log_conf=None,
-            custom_tags={'cluster_type': 'default'},
-            driver_instance_pool_id=None,
-            driver_node_type_id=None,
-            gcp_attributes=None,
-            init_scripts=[
-                InitScriptInfo(
-                    dbfs=DbfsStorageInfo(destination="dbfs:/users/test@test.com/init_scripts/test.sh"),
-                    s3=None,
-                    volumes=None,
-                    workspace=None,
-                )
-            ],
-            instance_pool_id=None,
-            label='default',
-            node_type_id='Standard_F4s',
-            num_workers=1,
-            policy_id="single-user-with-spn",
-            spark_conf={"spark.databricks.delta.preview.enabled": "true"},
-            spark_env_vars=None,
-            ssh_public_keys=None,
-        )
-    ]
     ws.pipelines.get().spec.configuration = config_dict
-    ws.pipelines.get().spec.clusters = pipeline_cluster
+    ws.pipelines.get().spec.clusters = mock_pipeline_cluster
     ws.cluster_policies.get(policy_id="single-user-with-spn").definition = (
         '{\n  "spark_conf.fs.azure.account.auth.type": {\n    '
         '"type": "fixed",\n    "value": "OAuth",\n   '
@@ -106,7 +72,7 @@ def test_pipeline_assessment_with_config(mocker):
     assert result_set[0].success == 0
 
 
-def test_pipeline_assessment_without_config(mocker):
+def test_pipeline_assessment_without_config(mock_pipeline_cluster_with_no_config):
     sample_pipelines = [
         PipelineStateInfo(
             cluster_id=None,
@@ -120,30 +86,8 @@ def test_pipeline_assessment_without_config(mocker):
     ]
     ws = workspace_client_mock(clusters="job-source-cluster.json")
     config_dict = {}
-    pipeline_cluster = [
-        PipelineCluster(
-            apply_policy_default_values=None,
-            autoscale=None,
-            aws_attributes=None,
-            azure_attributes=None,
-            cluster_log_conf=None,
-            custom_tags={'cluster_type': 'default'},
-            driver_instance_pool_id=None,
-            driver_node_type_id=None,
-            gcp_attributes=None,
-            init_scripts=[],
-            instance_pool_id=None,
-            label='default',
-            node_type_id='Standard_F4s',
-            num_workers=1,
-            policy_id=None,
-            spark_conf=None,
-            spark_env_vars=None,
-            ssh_public_keys=None,
-        )
-    ]
     ws.pipelines.get().spec.configuration = config_dict
-    ws.pipelines.get().spec.clusters = pipeline_cluster
+    ws.pipelines.get().spec.clusters = mock_pipeline_cluster_with_no_config
     ws.pipelines.list_pipelines.return_value = sample_pipelines
     crawler = PipelinesCrawler(ws, MockBackend(), "ucx").snapshot()
     result_set = list(crawler)
@@ -192,7 +136,7 @@ def test_pipeline_list_with_no_config():
     assert len(crawler) == 0
 
 
-def test_pipeline_without_owners_should_have_empty_creator_name():
+def test_pipeline_without_owners_should_have_empty_creator_name(mock_pipeline_cluster_with_no_config):
     sample_pipelines = [
         PipelineStateInfo(
             cluster_id=None,
@@ -207,30 +151,8 @@ def test_pipeline_without_owners_should_have_empty_creator_name():
 
     ws = workspace_client_mock(clusters="no-spark-conf.json")
     ws.pipelines.list_pipelines.return_value = sample_pipelines
-    pipeline_cluster = [
-        PipelineCluster(
-            apply_policy_default_values=None,
-            autoscale=None,
-            aws_attributes=None,
-            azure_attributes=None,
-            cluster_log_conf=None,
-            custom_tags={'cluster_type': 'default'},
-            driver_instance_pool_id=None,
-            driver_node_type_id=None,
-            gcp_attributes=None,
-            init_scripts=[],
-            instance_pool_id=None,
-            label='default',
-            node_type_id='Standard_F4s',
-            num_workers=1,
-            policy_id=None,
-            spark_conf=None,
-            spark_env_vars=None,
-            ssh_public_keys=None,
-        )
-    ]
     ws.pipelines.get().spec.configuration = {}
-    ws.pipelines.get().spec.clusters = pipeline_cluster
+    ws.pipelines.get().spec.clusters = mock_pipeline_cluster_with_no_config
     mockbackend = MockBackend()
     PipelinesCrawler(ws, mockbackend, "ucx").snapshot()
     result = mockbackend.rows_written_for("hive_metastore.ucx.pipelines", "append")
