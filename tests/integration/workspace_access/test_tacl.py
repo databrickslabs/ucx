@@ -55,6 +55,7 @@ def test_hms2hms_owner_permissions(sql_backend, inventory_schema, make_schema, m
 
     schema_a = make_schema()
     schema_b = make_schema()
+    schema_c = make_schema()
     table_a = make_table(schema_name=schema_a.name)
     table_b = make_table(schema_name=schema_b.name)
     table_c = make_table(schema_name=schema_b.name, external=True)
@@ -63,7 +64,7 @@ def test_hms2hms_owner_permissions(sql_backend, inventory_schema, make_schema, m
     sql_backend.execute(f"ALTER SCHEMA {schema_a.name} OWNER TO `{first.name_in_workspace}`")
     sql_backend.execute(f"GRANT ALL PRIVILEGES ON SCHEMA {schema_b.name} TO `{second.name_in_workspace}`")
     sql_backend.execute(
-        f"GRANT USAGE, SELECT, MODIFY, CREATE, READ_METADATA, CREATE_NAMED_FUNCTION ON SCHEMA default TO "
+        f"GRANT USAGE, SELECT, MODIFY, CREATE, READ_METADATA, CREATE_NAMED_FUNCTION ON SCHEMA {schema_c.name} TO "
         f"`{third.name_in_workspace}`"
     )
     sql_backend.execute(f"GRANT SELECT ON TABLE {table_a.full_name} TO `{first.name_in_workspace}`")
