@@ -60,7 +60,7 @@ class AzureServicePrincipalMigration:
 
 
     @classmethod
-    def for_cli(cls, ws: WorkspaceClient, customized_csv: str, replace_with_ac: bool, product='ucx'):
+    def for_cli(cls, ws: WorkspaceClient, product='ucx'):
         installation = Installation.current(ws, product)
         config = installation.load(WorkspaceConfig)
         sql_backend = StatementExecutionBackend(ws, config.warehouse_id)
@@ -70,7 +70,7 @@ class AzureServicePrincipalMigration:
         azure_resource_permissions = AzureResourcePermissions(installation, ws, azurerm, locations)
         azure_sp_crawler = AzureServicePrincipalCrawler(ws, sql_backend, config.inventory_database)
 
-        return cls(installation, ws, azure_resource_permissions, azure_sp_crawler, customized_csv, replace_with_ac)
+        return cls(installation, ws, azure_resource_permissions, azure_sp_crawler)
 
 
     def _list_storage_credentials(self) -> set[str]:
