@@ -31,36 +31,6 @@ def test_pipeline_assessment_with_config(mock_pipeline_cluster):
     }
     ws.pipelines.get().spec.configuration = config_dict
     ws.pipelines.get().spec.clusters = mock_pipeline_cluster
-    ws.cluster_policies.get(policy_id="single-user-with-spn").definition = (
-        '{\n  "spark_conf.fs.azure.account.auth.type": {\n    '
-        '"type": "fixed",\n    "value": "OAuth",\n   '
-        ' "hidden": true\n  },\n  "spark_conf.fs.azure.account.oauth.provider.type": {\n   '
-        ' "type": "fixed",\n    "value": '
-        '"org.apache.hadoop.fs.azurebfs.oauth2.ClientCredsTokenProvider",\n    '
-        '"hidden": true\n  },\n  "spark_conf.fs.azure.account.oauth2.client.id": {\n    '
-        '"type": "fixed",\n    "value": "fsfsfsfsffsfsf",\n    "hidden": true\n  },\n  '
-        '"spark_conf.fs.azure.account.oauth2.client.secret": {\n    "type": "fixed",\n    '
-        '"value": "gfgfgfgfggfggfgfdds",\n    "hidden": true\n  },\n  '
-        '"spark_conf.fs.azure.account.oauth2.client.endpoint": {\n    '
-        '"type": "fixed",\n    '
-        '"value": "https://login.microsoftonline.com/1234ededed/oauth2/token",\n    '
-        '"hidden": true\n  }\n}'
-    )
-    ws.cluster_policies.get(policy_id="single-user-with-spn").policy_family_definition_overrides = (
-        '{\n  "spark_conf.fs.azure.account.auth.type": {\n    '
-        '"type": "fixed",\n    "value": "OAuth",\n   '
-        ' "hidden": true\n  },\n  "spark_conf.fs.azure.account.oauth.provider.type": {\n   '
-        ' "type": "fixed",\n    "value": '
-        '"org.apache.hadoop.fs.azurebfs.oauth2.ClientCredsTokenProvider",\n    '
-        '"hidden": true\n  },\n  "spark_conf.fs.azure.account.oauth2.client.id": {\n    '
-        '"type": "fixed",\n    "value": "fsfsfsfsffsfsf",\n    "hidden": true\n  },\n  '
-        '"spark_conf.fs.azure.account.oauth2.client.secret": {\n    "type": "fixed",\n    '
-        '"value": "gfgfgfgfggfggfgfdds",\n    "hidden": true\n  },\n  '
-        '"spark_conf.fs.azure.account.oauth2.client.endpoint": {\n    '
-        '"type": "fixed",\n    '
-        '"value": "https://login.microsoftonline.com/1234ededed/oauth2/token",\n    '
-        '"hidden": true\n  }\n}'
-    )
     ws.workspace.export().content = "JXNoCmVjaG8gIj0="
     ws.dbfs.read().data = "JXNoCmVjaG8gIj0="
 
