@@ -5,11 +5,27 @@ from dataclasses import dataclass
 from databricks.labs.blueprint.installation import Installation
 from databricks.labs.blueprint.tui import Prompts
 from databricks.sdk import WorkspaceClient
-from databricks.sdk.errors import Unauthenticated, PermissionDenied, ResourceDoesNotExist, InternalError
-from databricks.sdk.service.catalog import AzureServicePrincipal, Privilege, StorageCredentialInfo, ValidationResult
+from databricks.sdk.errors import (
+    InternalError,
+    PermissionDenied,
+    ResourceDoesNotExist,
+    Unauthenticated,
+)
+from databricks.sdk.service.catalog import (
+    AzureServicePrincipal,
+    Privilege,
+    StorageCredentialInfo,
+    ValidateStorageCredentialResponse,
+    ValidationResult,
+    ValidationResultOperation,
+)
 
-from databricks.labs.ucx.assessment.azure import AzureResourcePermissions, AzureResources, \
-    StoragePermissionMapping, AzureServicePrincipalCrawler
+from databricks.labs.ucx.assessment.azure import (
+    AzureResourcePermissions,
+    AzureResources,
+    AzureServicePrincipalCrawler,
+    StoragePermissionMapping,
+)
 from databricks.labs.ucx.config import WorkspaceConfig
 from databricks.labs.ucx.framework.crawlers import StatementExecutionBackend
 from databricks.labs.ucx.hive_metastore.locations import ExternalLocations
@@ -24,40 +40,55 @@ class ServicePrincipalMigrationInfo(StoragePermissionMapping):
 
     @classmethod
     def from_storage_permission_mapping(cls, storage_permission_mapping: StoragePermissionMapping, client_secret: str):
-        return cls(prefix=storage_permission_mapping.prefix,
-                   client_id=storage_permission_mapping.client_id,
-                   principal=storage_permission_mapping.principal,
-                   privilege=storage_permission_mapping.privilege,
-                   directory_id=storage_permission_mapping.directory_id,
-                   client_secret=client_secret)
+        return cls(
+            prefix=storage_permission_mapping.prefix,
+            client_id=storage_permission_mapping.client_id,
+            principal=storage_permission_mapping.principal,
+            privilege=storage_permission_mapping.privilege,
+            directory_id=storage_permission_mapping.directory_id,
+            client_secret=client_secret,
+        )
 
 
 @dataclass
-class StorageCredentialValidationResult(StorageCredentialInfo, ValidationResult):
+class StorageCredentialValidationResult:
+    name: str
+    azure_service_principal: AzureServicePrincipal
+    created_by: str
+    read_only: bool
+    message: str
+    operation: ValidationResultOperation
+    results: list[ValidationResult]
+
     @classmethod
-    def from_storage_credential_validation(cls, storage_credential: StorageCredentialInfo, validation: ValidationResult):
-        return cls(name=storage_credential.name,
-                   azure_service_principal=storage_credential.azure_service_principal,
-                   created_by=storage_credential.created_by,
-                   read_only=storage_credential.read_only,
-                   message=validation.message,
-                   operation=validation.operation,
-                   result=validation.result
-                   )
+    def from_storage_credential_validation(
+        cls, storage_credential: StorageCredentialInfo, validation: ValidateStorageCredentialResponse
+    ):
+        return cls(
+            name=storage_credential.name,
+            azure_service_principal=storage_credential.azure_service_principal,
+            created_by=storage_credential.created_by,
+            read_only=storage_credential.read_only,
+            results=validation.results,
+        )
 
 
 class AzureServicePrincipalMigration:
 
-    def __init__(self, installation: Installation, ws: WorkspaceClient, azure_resource_permissions: AzureResourcePermissions,
-                 azure_sp_crawler: AzureServicePrincipalCrawler):
+    def __init__(
+        self,
+        installation: Installation,
+        ws: WorkspaceClient,
+        azure_resource_permissions: AzureResourcePermissions,
+        azure_sp_crawler: AzureServicePrincipalCrawler,
+    ):
         self._output_file = "azure_service_principal_migration_result.csv"
-        self._final_sp_list = None
+        self._final_sp_list: list[ServicePrincipalMigrationInfo] = []
         self._installation = installation
         self._ws = ws
         self._azure_resource_permissions = azure_resource_permissions
         self._azure_sp_crawler = azure_sp_crawler
         self._action_plan = 'service_principals_for_storage_credentials.csv'
-
 
     @classmethod
     def for_cli(cls, ws: WorkspaceClient, product='ucx'):
@@ -72,7 +103,6 @@ class AzureServicePrincipalMigration:
 
         return cls(installation, ws, azure_resource_permissions, azure_sp_crawler)
 
-
     def _list_storage_credentials(self) -> set[str]:
         # list existed storage credentials that is using service principal, capture the service principal's application_id
         storage_credential_app_ids = set()
@@ -82,9 +112,10 @@ class AzureServicePrincipalMigration:
             # only add service principal's application_id, ignore managed identity based storage_credential
             if storage_credential.azure_service_principal:
                 storage_credential_app_ids.add(storage_credential.azure_service_principal.application_id)
-        logger.info(f"Found {len(storage_credential_app_ids)} distinct service principals already used in UC storage credentials")
+        logger.info(
+            f"Found {len(storage_credential_app_ids)} distinct service principals already used in UC storage credentials"
+        )
         return storage_credential_app_ids
-
 
     def _check_sp_in_storage_credentials(self, sp_list, sc_set) -> list[StoragePermissionMapping]:
         # if sp is already used, take it off from the sp_list
@@ -95,27 +126,36 @@ class AzureServicePrincipalMigration:
 
         return filtered_sp_list
 
-
     def _read_databricks_secret(self, scope: str, key: str, application_id: str) -> str | None:
         try:
             secret_response = self._ws.secrets.get_secret(scope, key)
         except Unauthenticated:
-            logger.error(f"User is unauthenticated to fetch Databricks secret value for service principal to storage credential migration.")
+            logger.error(
+                "User is unauthenticated to fetch Databricks secret value for service principal to storage credential migration."
+            )
             raise
         except PermissionDenied:
-            logger.error(f"User does not have permission to Databricks secret value for service principal to storage credential migration.")
+            logger.error(
+                "User does not have permission to Databricks secret value for service principal to storage credential migration."
+            )
             raise
         except ResourceDoesNotExist:
-            logger.info(f"Secret {scope}.{key} does not exists. "
-                        f"Cannot fetch the service principal client_secret for {application_id}. "
-                        f"Will not reuse this client_secret")
+            logger.info(
+                f"Secret {scope}.{key} does not exists. "
+                f"Cannot fetch the service principal client_secret for {application_id}. "
+                f"Will not reuse this client_secret"
+            )
             return None
         except InternalError:
-            logger.info(f"InternalError while reading secret {scope}.{key}. "
-                        f"Cannot fetch the service principal client_secret for {application_id}. "
-                        f"Will not reuse this client_secret")
-            print(f"{application_id} is not migrated due to InternalError while fetching the client_secret from Databricks secret."
-                  f"You may rerun the migration command later to retry this service principal")
+            logger.info(
+                f"InternalError while reading secret {scope}.{key}. "
+                f"Cannot fetch the service principal client_secret for {application_id}. "
+                f"Will not reuse this client_secret"
+            )
+            print(
+                f"{application_id} is not migrated due to InternalError while fetching the client_secret from Databricks secret."
+                f"You may rerun the migration command later to retry this service principal"
+            )
             return None
 
         # decode the bytes string from GetSecretResponse to utf-8 string
@@ -123,11 +163,12 @@ class AzureServicePrincipalMigration:
         try:
             return base64.b64decode(secret_response.value).decode("utf-8")
         except UnicodeDecodeError:
-            logger.info(f"Secret {scope}.{key} has Base64 bytes that cannot be decoded to utf-8 string . "
-                        f"Cannot fetch the service principal client_secret for {application_id}. "
-                        f"Will not reuse this client_secret")
+            logger.info(
+                f"Secret {scope}.{key} has Base64 bytes that cannot be decoded to utf-8 string . "
+                f"Cannot fetch the service principal client_secret for {application_id}. "
+                f"Will not reuse this client_secret"
+            )
             return None
-
 
     def _fetch_client_secret(self, sp_list: list[StoragePermissionMapping]) -> list[ServicePrincipalMigrationInfo]:
         # check AzureServicePrincipalInfo from AzureServicePrincipalCrawler, if AzureServicePrincipalInfo
@@ -137,7 +178,7 @@ class AzureServicePrincipalMigration:
         # they won't have any client_secret, we will process managed identity in the future.
 
         # fetch client_secrets of crawled service principal, if any
-        azure_sp_info_with_client_secret = {}
+        azure_sp_info_with_client_secret: dict[str, str] = {}
         azure_sp_infos = self._azure_sp_crawler.snapshot()
 
         for azure_sp_info in azure_sp_infos:
@@ -145,21 +186,29 @@ class AzureServicePrincipalMigration:
                 continue
             if azure_sp_info.secret_key is None:
                 continue
-            secret_value = self._read_databricks_secret(azure_sp_info.secret_scope, azure_sp_info.secret_key, azure_sp_info.application_id)
+            secret_value = self._read_databricks_secret(
+                azure_sp_info.secret_scope, azure_sp_info.secret_key, azure_sp_info.application_id
+            )
             if secret_value:
-                azure_sp_info_with_client_secret.update(azure_sp_info.application_id, secret_value)
+                azure_sp_info_with_client_secret[azure_sp_info.application_id] = secret_value
 
         # update the list of ServicePrincipalMigrationInfo if client_secret is found
+        sp_list_with_secret = []
         for sp in sp_list:
             if sp.client_id in azure_sp_info_with_client_secret:
-                yield ServicePrincipalMigrationInfo.from_storage_permission_mapping(sp, azure_sp_info_with_client_secret[sp.client_id])
-
+                sp_list_with_secret.append(
+                    ServicePrincipalMigrationInfo.from_storage_permission_mapping(
+                        sp, azure_sp_info_with_client_secret[sp.client_id]
+                    )
+                )
+        return sp_list_with_secret
 
     def _print_action_plan(self, sp_list_with_secret):
         # print action plan to console for customer to review.
         for sp in sp_list_with_secret:
-            print(f"Service Principal name: {sp.principal}, application_id: {sp.client_id}, privilege {sp.privilege} on location {sp.prefix}")
-
+            print(
+                f"Service Principal name: {sp.principal}, application_id: {sp.client_id}, privilege {sp.privilege} on location {sp.prefix}"
+            )
 
     def _generate_migration_list(self):
         """
@@ -179,47 +228,47 @@ class AzureServicePrincipalMigration:
         self._print_action_plan(sp_list_with_secret)
         return
 
-
-    def _create_storage_credential(self, sp: ServicePrincipalMigrationInfo) -> list[StorageCredentialValidationResult]:
+    def _create_storage_credential(self, sp: ServicePrincipalMigrationInfo):
         # prepare the storage credential properties
         name = sp.principal
-        azure_service_principal = AzureServicePrincipal(directory_id=sp.directory_id,
-                                                        application_id=sp.client_id,
-                                                        client_secret=sp.client_secret)
+        azure_service_principal = AzureServicePrincipal(
+            directory_id=sp.directory_id, application_id=sp.client_id, client_secret=sp.client_secret
+        )
         comment = f"Created by UCX during migration to UC using Azure Service Principal: {sp.principal}"
         read_only = False
         if sp.privilege == Privilege.READ_FILES:
             read_only = True
         # create the storage credential
-        storage_credential = self._ws.storage_credentials.create(name=name,
-                                            azure_service_principal=azure_service_principal,
-                                            comment=comment,
-                                            read_only=read_only)
+        storage_credential = self._ws.storage_credentials.create(
+            name=name, azure_service_principal=azure_service_principal, comment=comment, read_only=read_only
+        )
 
         validation_result = self._validate_storage_credential(storage_credential, sp.prefix)
         yield validation_result
 
-
     def _validate_storage_credential(self, storage_credential, location) -> StorageCredentialValidationResult:
-        validation = self._ws.storage_credentials.validate(storage_credential_name=storage_credential.name,
-                                                           url=location)
-        return StorageCredentialValidationResult.from_storage_credential_validation(storage_credential,
-                                                                                    validation)
-
+        validation = self._ws.storage_credentials.validate(
+            storage_credential_name=storage_credential.name, url=location
+        )
+        return StorageCredentialValidationResult.from_storage_credential_validation(storage_credential, validation)
 
     def execute_migration(self, prompts: Prompts):
-        if not self._w.config.is_azure:
+        if not self._ws.config.is_azure:
             logger.error("Workspace is not on azure, please run this command on azure databricks workspaces.")
             return
 
-        csv_confirmed = prompts.confirm(f"Have you reviewed the azure_storage_account_info.csv "
-                                        f"and confirm listed service principals are allowed to be checked for migration?")
+        csv_confirmed = prompts.confirm(
+            "Have you reviewed the azure_storage_account_info.csv "
+            "and confirm listed service principals are allowed to be checked for migration?"
+        )
         if csv_confirmed is not True:
             return
 
         self._generate_migration_list()
 
-        plan_confirmed = prompts.confirm(f"Above Azure Service Principals will be migrated to UC storage credentials, please review and confirm.")
+        plan_confirmed = prompts.confirm(
+            "Above Azure Service Principals will be migrated to UC storage credentials, please review and confirm."
+        )
         if plan_confirmed is not True:
             return
 
@@ -229,9 +278,8 @@ class AzureServicePrincipalMigration:
 
         results_file = self._installation.save(execution_result, filename=self._output_file)
         logger.info("Completed migration from Azure Service Principal migrated to UC Storage credentials")
-        print(f"Completed migration from Azure Service Principal migrated to UC Storage credentials. "
-              f"Please check {results_file} for validation results")
+        print(
+            f"Completed migration from Azure Service Principal migrated to UC Storage credentials. "
+            f"Please check {results_file} for validation results"
+        )
         return
-
-
-
