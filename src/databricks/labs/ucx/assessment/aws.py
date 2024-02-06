@@ -219,6 +219,8 @@ class AWSResources:
 
 
 class AWSResourcePermissions:
+    UCRolesFileName: typing.ClassVar[str] = "uc_roles_access.csv"
+
     def __init__(self, installation: Installation, ws: WorkspaceClient, aws_resources: AWSResources):
         self._installation = installation
         self._aws_resources = aws_resources
@@ -237,7 +239,14 @@ class AWSResourcePermissions:
         if len(uc_role_access) == 0:
             logger.warning("No Mapping Was Generated.")
             return None
-        return self._installation.save(uc_role_access, filename='uc_roles_access.csv')
+        return self._installation.save(uc_role_access, filename=self.UCRolesFileName)
+
+    def get_uc_compatible_roles(self):
+        role_actions = self._installation.load(list[AWSRoleAction], filename=self.UCRolesFileName)
+        if not role_actions:
+            self.save_uc_compatible_roles()
+            role_actions = self._installation.load(list[AWSRoleAction], filename=self.UCRolesFileName)
+        return role_actions
 
     def save_ucx_compatible_roles(self):
         pass
@@ -314,10 +323,19 @@ class AWSUCResources:
         self._aws_resources = AWSResources
         self._schema = schema
 
+    @classmethod
+    def for_cli(cls, ws: WorkspaceClient, aws_profile, product='ucx'):
+        installation = Installation.current(ws, product)
+        aws = AWSResources(aws_profile)
+        if not aws.validate_connection():
+            raise ResourceWarning("AWS CLI is not configured properly.")
+        return cls(installation, ws, aws)
+
     def _get_storage_credentials(self) -> Iterable[StorageCredentialInfo]:
         return self._ws.storage_credentials.list()
 
     def _identify_missing_credentials(self):
         storage_credentials = self._get_storage_credentials()
-        external_locations = ExternalLocations(self._ws, self._backend, self._schema)
+        external_locations = ExternalLocations(self._ws, self._backend, self._schema).snapshot()
+
 
