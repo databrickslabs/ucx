@@ -55,18 +55,12 @@ class PipelinesCrawler(CrawlerBase[PipelineInfo], CheckClusterMixin):
                 logger.info("Pipeline cluster details are empty")
             else:
                 for cluster in pipeline_cluster:
-                    if not cluster.spark_conf:
-                        logger.info("spark configuration is not present in Pipeline cluster")
-                    else:
+                    if cluster.spark_conf:
                         failures.extend(self.check_spark_conf(cluster.spark_conf, "pipeline cluster"))
                     # Checking if cluster config is present in cluster policies
-                    if not cluster.policy_id:
-                        logger.info("policy id is not present in Pipeline cluster")
-                    else:
+                    if cluster.policy_id:
                         failures.extend(self._check_cluster_policy(cluster.policy_id, "pipeline cluster"))
-                    if not cluster.init_scripts:
-                        logger.info("init scripts are not present in Pipeline cluster")
-                    else:
+                    if cluster.init_scripts:
                         failures.extend(self._check_cluster_init_script(cluster.init_scripts, "pipeline cluster"))
 
             pipeline_info.failures = json.dumps(failures)
