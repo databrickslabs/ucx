@@ -9,7 +9,7 @@ from ..framework.mocks import MockBackend
 from . import workspace_client_mock
 
 
-def test_pipeline_assessment_with_config(mock_pipeline_cluster):
+def test_pipeline_assessment_with_config():
     sample_pipelines = [
         PipelineStateInfo(
             cluster_id=None,
@@ -30,7 +30,6 @@ def test_pipeline_assessment_with_config(mock_pipeline_cluster):
         "spark.hadoop.fs.azure.sas.fixed.token.abcde.dfs.core.windows.net": "{{secrets/abcde_access/sasFixedToken}}",
     }
     ws.pipelines.get().spec.configuration = config_dict
-    ws.pipelines.get().spec.clusters = mock_pipeline_cluster
     ws.workspace.export().content = "JXNoCmVjaG8gIj0="
     ws.dbfs.read().data = "JXNoCmVjaG8gIj0="
 
@@ -42,7 +41,7 @@ def test_pipeline_assessment_with_config(mock_pipeline_cluster):
     assert result_set[0].success == 0
 
 
-def test_pipeline_assessment_without_config(mock_pipeline_cluster_with_no_config):
+def test_pipeline_assessment_without_config():
     sample_pipelines = [
         PipelineStateInfo(
             cluster_id=None,
@@ -57,7 +56,8 @@ def test_pipeline_assessment_without_config(mock_pipeline_cluster_with_no_config
     ws = workspace_client_mock(clusters="job-source-cluster.json")
     config_dict = {}
     ws.pipelines.get().spec.configuration = config_dict
-    ws.pipelines.get().spec.clusters = mock_pipeline_cluster_with_no_config
+    ws.workspace.export().content = "JXNoCmVjaG8gIj0="
+    ws.dbfs.read().data = "JXNoCmVjaG8gIj0="
     ws.pipelines.list_pipelines.return_value = sample_pipelines
     crawler = PipelinesCrawler(ws, MockBackend(), "ucx").snapshot()
     result_set = list(crawler)
@@ -106,7 +106,7 @@ def test_pipeline_list_with_no_config():
     assert len(crawler) == 0
 
 
-def test_pipeline_without_owners_should_have_empty_creator_name(mock_pipeline_cluster_with_no_config):
+def test_pipeline_without_owners_should_have_empty_creator_name():
     sample_pipelines = [
         PipelineStateInfo(
             cluster_id=None,
@@ -122,7 +122,8 @@ def test_pipeline_without_owners_should_have_empty_creator_name(mock_pipeline_cl
     ws = workspace_client_mock(clusters="no-spark-conf.json")
     ws.pipelines.list_pipelines.return_value = sample_pipelines
     ws.pipelines.get().spec.configuration = {}
-    ws.pipelines.get().spec.clusters = mock_pipeline_cluster_with_no_config
+    ws.workspace.export().content = "JXNoCmVjaG8gIj0="
+    ws.dbfs.read().data = "JXNoCmVjaG8gIj0="
     mockbackend = MockBackend()
     PipelinesCrawler(ws, mockbackend, "ucx").snapshot()
     result = mockbackend.rows_written_for("hive_metastore.ucx.pipelines", "append")
@@ -138,7 +139,7 @@ def test_pipeline_without_owners_should_have_empty_creator_name(mock_pipeline_cl
     ]
 
 
-def test_pipeline_assessment_with_no_cluster_config(mocker):
+def test_pipeline_assessment_with_no_cluster_config():
     sample_pipelines = [
         PipelineStateInfo(
             cluster_id=None,

@@ -51,9 +51,7 @@ class PipelinesCrawler(CrawlerBase[PipelineInfo], CheckClusterMixin):
             if pipeline_config:
                 failures.extend(self.check_spark_conf(pipeline_config, "pipeline"))
             pipeline_cluster = pipeline_response.spec.clusters
-            if not pipeline_cluster:
-                logger.info("Pipeline cluster details are empty")
-            else:
+            if pipeline_cluster:
                 for cluster in pipeline_cluster:
                     if cluster.spark_conf:
                         failures.extend(self.check_spark_conf(cluster.spark_conf, "pipeline cluster"))

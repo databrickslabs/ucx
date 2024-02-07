@@ -4,6 +4,7 @@ from unittest.mock import create_autospec
 
 from databricks.sdk import WorkspaceClient
 from databricks.sdk.service.compute import ClusterDetails, Policy
+from databricks.sdk.service.pipelines import PipelineCluster
 
 __dir = pathlib.Path(__file__).parent
 
@@ -24,8 +25,9 @@ def _cluster_policy(policy_id: str):
     return Policy(description=definition, policy_family_definition_overrides=overrides)
 
 
-def workspace_client_mock(clusters="no-spark-conf.json"):
+def workspace_client_mock(clusters="no-spark-conf.json", pipeline_cluster="pipeline_cluster.json"):
     ws = create_autospec(WorkspaceClient)
     ws.clusters.list.return_value = _load_list(ClusterDetails, f"../assessment/clusters/{clusters}")
     ws.cluster_policies.get = _cluster_policy
+    ws.pipelines.get().spec.clusters = _load_list(PipelineCluster, f"clusters/{pipeline_cluster}")
     return ws
