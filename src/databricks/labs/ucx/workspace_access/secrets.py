@@ -1,5 +1,6 @@
 import json
 import logging
+from collections.abc import Callable, Iterable
 from datetime import timedelta
 from functools import partial
 
@@ -7,6 +8,7 @@ from databricks.labs.blueprint.limiter import rate_limited
 from databricks.sdk import WorkspaceClient
 from databricks.sdk.retries import retried
 from databricks.sdk.service import workspace
+from databricks.sdk.service.workspace import AclItem
 
 from databricks.labs.ucx.workspace_access.base import AclSupport, Permissions
 from databricks.labs.ucx.workspace_access.groups import MigrationState
@@ -58,7 +60,7 @@ class SecretScopesSupport(AclSupport):
 
         def apply_acls():
             for acl in new_acls:
-                self._rate_limited_put_acl(item.object_id, acl.principal, acl.permission)
+                self._applier_task(item.object_id, acl.principal, acl.permission)
             return True
 
         return partial(apply_acls)
@@ -78,21 +80,42 @@ class SecretScopesSupport(AclSupport):
     def _reapply_on_failure(self, scope_name: str, group_name: str, expected_permission: workspace.AclPermission):
         # in-flight check for the applied permissions
         # the api might be inconsistent, therefore we need to check that the permissions were applied
-        applied_permission = self.secret_scope_permission(scope_name, group_name)
-        if applied_permission != expected_permission:
-            # try to apply again if the permissions are not equal: sometimes the list_acls api is inconsistent
+        try:
+            self._verify(scope_name, group_name, expected_permission)
+        except ValueError:
             logger.info(f"Applying permissions again {expected_permission} to {group_name} for {scope_name}")
             self._ws.secrets.put_acl(scope_name, group_name, expected_permission)
-            msg = (
-                f"Applied permission {applied_permission} is not equal to expected "
-                f"permission {expected_permission} for {scope_name} and {group_name}!"
-            )
-            raise ValueError(msg)
-        logger.info(f"Permissions matched for {scope_name}, {group_name} and {expected_permission}!")
+            raise
         return True
 
     @rate_limited(max_requests=1100, burst_period_seconds=60)
-    def _rate_limited_put_acl(self, object_id: str, principal: str, permission: workspace.AclPermission):
+    def _verify(self, scope_name: str, group_name: str, expected_permission: workspace.AclPermission):
+        # in-flight check for the applied permissions
+        # the api might be inconsistent, therefore we need to check that the permissions were applied
+        applied_permission = self.secret_scope_permission(scope_name, group_name)
+        if applied_permission != expected_permission:
+            msg = (
+                f"Couldn't find permission for scope {scope_name} and group {group_name}\n"
+                f"acl to be applied={expected_permission}\n"
+                f"acl found in the object={applied_permission}\n"
+            )
+            raise ValueError(msg)
+        return True
+
+    def get_verify_task(self, item: Permissions) -> Callable[[], bool]:
+        acls = [workspace.AclItem.from_dict(acl) for acl in json.loads(item.raw)]
+
+        def _verify_acls(scope_name: str, acls: Iterable[AclItem]):
+            for acl in acls:
+                assert acl.permission is not None
+                assert acl.principal is not None
+                self._verify(scope_name, acl.principal, acl.permission)
+            return True
+
+        return partial(_verify_acls, item.object_id, acls)
+
+    @rate_limited(max_requests=1100, burst_period_seconds=60)
+    def _applier_task(self, object_id: str, principal: str, permission: workspace.AclPermission):
         self._ws.secrets.put_acl(object_id, principal, permission)
         retry_on_value_error = retried(on=[ValueError], timeout=self._verify_timeout)
         retried_check = retry_on_value_error(self._reapply_on_failure)

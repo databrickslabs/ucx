@@ -12,10 +12,13 @@ from databricks.labs.blueprint.tui import MockPrompts
 from databricks.labs.blueprint.wheels import WheelsV2
 from databricks.sdk.errors import InvalidParameterValue, NotFound, Unknown
 from databricks.sdk.retries import retried
+from databricks.sdk.service import sql
 from databricks.sdk.service import compute
 from databricks.sdk.service.iam import PermissionLevel
 
 from databricks.labs.ucx.config import WorkspaceConfig
+from databricks.labs.ucx.install import PRODUCT_INFO, WorkspaceInstallation
+from databricks.labs.ucx.workspace_access import redash
 from databricks.labs.ucx.install import (
     PRODUCT_INFO,
     WorkspaceInstallation,
@@ -27,6 +30,7 @@ from databricks.labs.ucx.workspace_access.generic import (
 )
 from databricks.labs.ucx.workspace_access.groups import GroupManager
 from databricks.labs.ucx.workspace_access.manager import PermissionManager
+from databricks.labs.ucx.workspace_access.redash import RedashPermissionsSupport
 
 logger = logging.getLogger(__name__)
 
@@ -109,6 +113,7 @@ def test_job_failure_propagates_correct_error_message_and_logs(ws, sql_backend, 
     assert len(workflow_run_logs) == 1
 
 
+@retried(on=[NotFound, Unknown, InvalidParameterValue], timeout=timedelta(minutes=18))
 def test_job_cluster_policy(ws, new_installation):
     install = new_installation(lambda wc: replace(wc, override_clusters=None))
     cluster_policy = ws.cluster_policies.get(policy_id=install.config.policy_id)
@@ -196,6 +201,66 @@ def test_running_real_migrate_groups_job(
     found = generic_permissions.load_as_dict("cluster-policies", cluster_policy.policy_id)
     assert found[acc_group_a.display_name] == PermissionLevel.CAN_USE
     assert found[f"{install.config.renamed_group_prefix}{ws_group_a.display_name}"] == PermissionLevel.CAN_USE
+
+
+@retried(on=[NotFound, Unknown, InvalidParameterValue], timeout=timedelta(minutes=5))
+def test_running_real_validate_groups_permissions_job(
+    ws, sql_backend, new_installation, make_group, make_query, make_query_permissions
+):
+    ws_group_a = make_group()
+
+    query = make_query()
+    make_query_permissions(
+        object_id=query.id,
+        permission_level=sql.PermissionLevel.CAN_EDIT,
+        group_name=ws_group_a.display_name,
+    )
+
+    redash_permissions = RedashPermissionsSupport(
+        ws,
+        [redash.Listing(ws.queries.list, sql.ObjectTypePlural.QUERIES)],
+    )
+
+    install = new_installation(lambda wc: replace(wc, include_group_names=[ws_group_a.display_name]))
+    permission_manager = PermissionManager(sql_backend, install.config.inventory_database, [redash_permissions])
+    permission_manager.inventorize_permissions()
+
+    # assert the job does not throw any exception
+    install.run_workflow("validate-groups-permissions")
+
+
+@retried(on=[NotFound], timeout=timedelta(minutes=5))
+def test_running_real_validate_groups_permissions_job_fails(
+    ws, sql_backend, new_installation, make_group, make_cluster_policy, make_cluster_policy_permissions
+):
+    ws_group_a = make_group()
+
+    cluster_policy = make_cluster_policy()
+    make_cluster_policy_permissions(
+        object_id=cluster_policy.policy_id,
+        permission_level=PermissionLevel.CAN_USE,
+        group_name=ws_group_a.display_name,
+    )
+
+    generic_permissions = GenericPermissionsSupport(
+        ws,
+        [
+            Listing(ws.cluster_policies.list, "policy_id", "cluster-policies"),
+        ],
+    )
+
+    install = new_installation(lambda wc: replace(wc, include_group_names=[ws_group_a.display_name]))
+    inventory_database = install.config.inventory_database
+    permission_manager = PermissionManager(sql_backend, inventory_database, [generic_permissions])
+    permission_manager.inventorize_permissions()
+
+    # remove permission so the validation fails
+    ws.permissions.set(
+        request_object_type="cluster-policies", request_object_id=cluster_policy.policy_id, access_control_list=[]
+    )
+
+    with pytest.raises(Unknown, match=r"Detected \d+ failures: ValueError"):
+        install.run_workflow("validate-groups-permissions")
 
 
 @retried(on=[NotFound, InvalidParameterValue], timeout=timedelta(minutes=5))

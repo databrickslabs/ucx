@@ -1,8 +1,9 @@
 import json
 from datetime import timedelta
-from unittest.mock import MagicMock, Mock
+from unittest.mock import MagicMock, Mock, create_autospec
 
 import pytest
+from databricks.sdk import WorkspaceClient
 from databricks.sdk.core import DatabricksError
 from databricks.sdk.errors import InternalError, NotFound, PermissionDenied
 from databricks.sdk.service import sql
@@ -215,26 +216,13 @@ def test_apply_permissions_not_applied(migration_state):
     task()
     assert ws.dbsql_permissions.set.call_count == 1
 
-    expected_acl = [
-        sql.AccessControl(
-            group_name="test",
-            permission_level=sql.PermissionLevel.CAN_MANAGE,
-        ),
-        sql.AccessControl(
-            group_name="db-temp-test",
-            permission_level=sql.PermissionLevel.CAN_MANAGE,
-        ),
-    ]
-    assert sup._safe_get_dbsql_permissions(object_type=sql.ObjectTypePlural.ALERTS, object_id="test") is None
-    assert not sup._inflight_check(object_type=sql.ObjectTypePlural.ALERTS, object_id="test", acl=expected_acl)
-
 
 def test_apply_permissions_no_relevant_items(migration_state):
     ws = MagicMock()
     sup = RedashPermissionsSupport(ws=ws, listings=[])
     item = Permissions(
         object_id="test",
-        object_type="alerts",
+        object_type=sql.ObjectTypePlural.ALERTS.value,
         raw=json.dumps(
             sql.GetResponse(
                 object_type=sql.ObjectType.ALERT,
@@ -278,7 +266,7 @@ def test_apply_permissions_no_valid_groups():
     sup = RedashPermissionsSupport(ws=ws, listings=[])
     item = Permissions(
         object_id="test",
-        object_type="alerts",
+        object_type=sql.ObjectTypePlural.ALERTS.value,
         raw=json.dumps(
             sql.GetResponse(
                 object_type=sql.ObjectType.ALERT,
@@ -617,3 +605,149 @@ def test_load_as_dict_no_permission_level():
     policy_permissions = redash_permissions.load_as_dict(sql.ObjectTypePlural.QUERIES, query_id)
 
     assert len(policy_permissions) == 0
+
+
+def test_verify_task_should_return_true_if_permissions_applied():
+    ws = create_autospec(WorkspaceClient)
+    ws.dbsql_permissions.get.return_value = sql.GetResponse(
+        object_type=sql.ObjectType.ALERT,
+        object_id="test",
+        access_control_list=[
+            sql.AccessControl(
+                group_name="test",
+                permission_level=sql.PermissionLevel.CAN_EDIT,
+            )
+        ],
+    )
+
+    sup = RedashPermissionsSupport(ws=ws, listings=[])
+    item = Permissions(
+        object_id="test",
+        object_type=sql.ObjectTypePlural.ALERTS.value,
+        raw=json.dumps(
+            sql.GetResponse(
+                object_type=sql.ObjectType.ALERT,
+                object_id="test",
+                access_control_list=[
+                    sql.AccessControl(
+                        group_name="test",
+                        permission_level=sql.PermissionLevel.CAN_EDIT,
+                    )
+                ],
+            ).as_dict()
+        ),
+    )
+    task = sup.get_verify_task(item)
+    result = task()
+
+    assert result
+
+
+def test_verify_task_should_return_false_if_permissions_not_found():
+    ws = create_autospec(WorkspaceClient)
+    ws.dbsql_permissions.get.side_effect = NotFound(...)
+
+    sup = RedashPermissionsSupport(ws=ws, listings=[])
+    item = Permissions(
+        object_id="test",
+        object_type=sql.ObjectTypePlural.ALERTS.value,
+        raw=json.dumps(
+            sql.GetResponse(
+                object_type=sql.ObjectType.ALERT,
+                object_id="test",
+                access_control_list=[
+                    sql.AccessControl(
+                        group_name="test",
+                        permission_level=sql.PermissionLevel.CAN_EDIT,
+                    )
+                ],
+            ).as_dict()
+        ),
+    )
+    task = sup.get_verify_task(item)
+    result = task()
+
+    assert not result
+
+
+def test_verify_task_should_fail_if_permissions_not_matching():
+    ws = create_autospec(WorkspaceClient)
+    ws.dbsql_permissions.get.return_value = sql.GetResponse(
+        object_type=sql.ObjectType.ALERT,
+        object_id="test",
+        access_control_list=[
+            sql.AccessControl(
+                group_name="test",
+                permission_level=sql.PermissionLevel.CAN_MANAGE,
+            )
+        ],
+    )
+
+    sup = RedashPermissionsSupport(ws=ws, listings=[])
+    item = Permissions(
+        object_id="test",
+        object_type=sql.ObjectTypePlural.ALERTS.value,
+        raw=json.dumps(
+            sql.GetResponse(
+                object_type=sql.ObjectType.ALERT,
+                object_id="test",
+                access_control_list=[
+                    sql.AccessControl(
+                        group_name="test",
+                        permission_level=sql.PermissionLevel.CAN_EDIT,
+                    )
+                ],
+            ).as_dict()
+        ),
+    )
+    task = sup.get_verify_task(item)
+
+    with pytest.raises(ValueError):
+        task()
+
+
+def test_verify_task_should_fail_if_acl_empty():
+    ws = create_autospec(WorkspaceClient)
+
+    sup = RedashPermissionsSupport(ws=ws, listings=[])
+    item = Permissions(
+        object_id="test",
+        object_type=sql.ObjectTypePlural.ALERTS.value,
+        raw=json.dumps(
+            sql.GetResponse(object_type=sql.ObjectType.ALERT, object_id="test", access_control_list=[]).as_dict()
+        ),
+    )
+
+    with pytest.raises(ValueError):
+        sup.get_verify_task(item)
+
+
+def test_verify_task_should_fail_if_acl_missing():
+    ws = create_autospec(WorkspaceClient)
+    ws.dbsql_permissions.get.return_value = sql.GetResponse(
+        object_type=sql.ObjectType.ALERT,
+        object_id="test",
+        access_control_list=None,
+    )
+
+    sup = RedashPermissionsSupport(ws=ws, listings=[])
+    item = Permissions(
+        object_id="test",
+        object_type=sql.ObjectTypePlural.ALERTS.value,
+        raw=json.dumps(
+            sql.GetResponse(
+                object_type=sql.ObjectType.ALERT,
+                object_id="test",
+                access_control_list=[
+                    sql.AccessControl(
+                        group_name="test",
+                        permission_level=sql.PermissionLevel.CAN_EDIT,
+                    )
+                ],
+            ).as_dict()
+        ),
+    )
+    task = sup.get_verify_task(item)
+
+    with pytest.raises(AssertionError):
+        task()

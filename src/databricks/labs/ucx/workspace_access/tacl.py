@@ -3,7 +3,10 @@ import dataclasses
 import functools
 import json
 from collections.abc import Callable, Iterator
+from datetime import timedelta
 from functools import partial
+
+from databricks.sdk.retries import retried
 
 from databricks.labs.ucx.framework.crawlers import SqlBackend
 from databricks.labs.ucx.hive_metastore import GrantsCrawler
@@ -13,9 +16,15 @@ from databricks.labs.ucx.workspace_access.groups import MigrationState
 
 
 class TableAclSupport(AclSupport):
-    def __init__(self, grants_crawler: GrantsCrawler, sql_backend: SqlBackend):
+    def __init__(
+        self,
+        grants_crawler: GrantsCrawler,
+        sql_backend: SqlBackend,
+        verify_timeout: timedelta | None = timedelta(minutes=1),
+    ):
         self._grants_crawler = grants_crawler
         self._sql_backend = sql_backend
+        self._verify_timeout = verify_timeout
 
     def get_crawler_tasks(self) -> Iterator[Callable[..., Permissions | None]]:
         # Table ACL permissions (grant/revoke and ownership) are not atomic. When granting the permissions,
@@ -97,4 +106,33 @@ class TableAclSupport(AclSupport):
         """
         for sql in grant.hive_grant_sql():
             self._sql_backend.execute(sql)
-        return True
+
+        object_type, object_id = grant.this_type_and_key()
+        retry_on_value_error = retried(on=[ValueError], timeout=self._verify_timeout)
+        retried_check = retry_on_value_error(self._verify)
+        return retried_check(object_type, object_id, grant)
+
+    def _verify(self, object_type: str, object_id: str, acl: Grant) -> bool:
+        grant_dict = dataclasses.asdict(acl)
+        del grant_dict["action_type"]
+        del grant_dict["principal"]
+        grants_on_object = self._grants_crawler._grants(**grant_dict)
+
+        if grants_on_object:
+            action_types_for_current_principal = [
+                grant.action_type for grant in grants_on_object if grant.principal == acl.principal
+            ]
+            acl_action_types = acl.action_type.split(", ")
+            if all(action_type in action_types_for_current_principal for action_type in acl_action_types):
+                return True
+            msg = (
+                f"Couldn't find permission for object type {object_type}, id {object_id} and principal {acl.principal}\n"
+                f"acl to be applied={acl_action_types}\n"
+                f"acl found in the object={action_types_for_current_principal}\n"
+            )
+            raise ValueError(msg)
+        return False
+
+    def get_verify_task(self, item: Permissions) -> Callable[[], bool]:
+        grant = Grant(**json.loads(item.raw))
+        return partial(self._verify, item.object_type, item.object_id, grant)
