@@ -44,6 +44,7 @@ def get_az_api_mapping(*args, **kwargs):
 
 def workspace_client_mock(clusters="no-spark-conf.json",
                           pipelines="single-pipeline.json",
+                          pipeline_spec="empty-pipeline-spec.json",
                           jobs="single-job.json",
                           warehouse_config="single-config.json",
                           secret_exists=True):
@@ -53,6 +54,7 @@ def workspace_client_mock(clusters="no-spark-conf.json",
     ws.cluster_policies.get = _cluster_policy
     ws.pipelines.list_pipelines.return_value = (
         _load_list(PipelineStateInfo, f"../assessment/pipelines/{pipelines}"))
+    ws.pipelines.get().spec.configuration = (_load_fixture(f"../assessment/pipelines/{pipeline_spec}"))
     ws.jobs.list.return_value = (
         _load_list(BaseJob, f"../assessment/jobs/{jobs}"))
     ws.warehouses.get_workspace_warehouse_config().data_access_config = (
