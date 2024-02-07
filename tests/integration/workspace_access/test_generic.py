@@ -1,9 +1,12 @@
+import json
 from datetime import timedelta
 
 from databricks.sdk.errors import BadRequest, NotFound
 from databricks.sdk.retries import retried
+from databricks.sdk.service import iam
 from databricks.sdk.service.iam import PermissionLevel
 
+from databricks.labs.ucx.workspace_access.base import Permissions
 from databricks.labs.ucx.workspace_access.generic import (
     GenericPermissionsSupport,
     Listing,
@@ -366,3 +369,45 @@ def test_tokens(ws, make_group, make_authorization_permissions):
 
     after = generic_permissions.load_as_dict("authorization", "tokens")
     assert after[group_b.display_name] == PermissionLevel.CAN_USE
+
+
+@retried(on=[BadRequest], timeout=timedelta(minutes=3))
+def test_verify_permissions(ws, make_group, make_job, make_job_permissions):
+    group_a = make_group()
+    job = make_job()
+    make_job_permissions(
+        object_id=job.job_id,
+        permission_level=PermissionLevel.CAN_MANAGE,
+        group_name=group_a.display_name,
+    )
+
+    generic_permissions = GenericPermissionsSupport(
+        ws,
+        [
+            Listing(ws.jobs.list, "job_id", "jobs"),
+        ],
+    )
+
+    item = Permissions(
+        object_id=job.job_id,
+        object_type="jobs",
+        raw=json.dumps(
+            iam.ObjectPermissions(
+                object_id=job.job_id,
+                object_type="jobs",
+                access_control_list=[
+                    iam.AccessControlResponse(
+                        group_name=group_a.display_name,
+                        all_permissions=[
+                            iam.Permission(inherited=False, permission_level=iam.PermissionLevel.CAN_MANAGE)
+                        ],
+                    )
+                ],
+            ).as_dict()
+        ),
+    )
+
+    task = generic_permissions.get_verify_task(item)
+    result = task()
+
+    assert result

@@ -1,8 +1,11 @@
 import json
 
+import pytest
+
 from databricks.labs.ucx.hive_metastore import GrantsCrawler, TablesCrawler
 from databricks.labs.ucx.hive_metastore.grants import Grant
 from databricks.labs.ucx.hive_metastore.udfs import UdfsCrawler
+from databricks.labs.ucx.mixins.sql import Row
 from databricks.labs.ucx.workspace_access.base import Permissions
 from databricks.labs.ucx.workspace_access.groups import MigratedGroup, MigrationState
 from databricks.labs.ucx.workspace_access.tacl import TableAclSupport
@@ -232,9 +235,30 @@ def test_tacl_crawler_multiple_permissions():
     ) == Grant(**json.loads(permissions.raw))
 
 
-def test_tacl_applier(mocker):
-    sql_backend = MockBackend()
-    table_acl_support = TableAclSupport(mocker.Mock(), sql_backend)
+def make_row(data, columns):
+    row = Row(data)
+    row.__columns__ = columns
+    return row
+
+
+SHOW_COLS = ["principal", "action_type", "object_type", "ignored"]
+
+
+def test_tacl_applier():
+    sql_backend = MockBackend(
+        rows={
+            "SELECT \\* FROM hive_metastore.test.grants": [
+                ("abc", "SELECT", "catalog_a", "database_b", "table_c", None, None, False, False)
+            ],
+            "SHOW GRANTS ON TABLE catalog_a.database_b.table_c": [
+                make_row(("account-abc", "SELECT", "TABLE", "table_c"), SHOW_COLS),
+            ],
+        }
+    )
+    tables_crawler = TablesCrawler(sql_backend, "test")
+    udf_crawler = UdfsCrawler(sql_backend, "test")
+    grants_crawler = GrantsCrawler(tables_crawler, udf_crawler)
+    table_acl_support = TableAclSupport(grants_crawler, sql_backend)
 
     permissions = Permissions(
         object_type="TABLE",
@@ -263,14 +287,73 @@ def test_tacl_applier(mocker):
     ]
     migration_state = MigrationState(grp)
     task = table_acl_support.get_apply_task(permissions, migration_state)
-    task()
+    validation_res = task()
 
-    assert ["GRANT SELECT ON TABLE catalog_a.database_b.table_c TO `account-abc`"] == sql_backend.queries
+    assert [
+        "GRANT SELECT ON TABLE catalog_a.database_b.table_c TO `account-abc`",
+        'SHOW GRANTS ON TABLE catalog_a.database_b.table_c',
+    ] == sql_backend.queries
+    assert validation_res
+
+
+def test_tacl_applier_not_applied():
+    sql_backend = MockBackend(rows={"SELECT \\* FROM hive_metastore.test.grants": []})
+    tables_crawler = TablesCrawler(sql_backend, "test")
+    udf_crawler = UdfsCrawler(sql_backend, "test")
+    grants_crawler = GrantsCrawler(tables_crawler, udf_crawler)
+    table_acl_support = TableAclSupport(grants_crawler, sql_backend)
+
+    permissions = Permissions(
+        object_type="TABLE",
+        object_id="catalog_a.database_b.table_c",
+        raw=json.dumps(
+            {
+                "principal": "abc",
+                "action_type": "SELECT",
+                "catalog": "catalog_a",
+                "database": "database_b",
+                "table": "table_c",
+            }
+        ),
+    )
+    grp = [
+        MigratedGroup(
+            id_in_workspace=None,
+            name_in_workspace="abc",
+            name_in_account="account-abc",
+            temporary_name="tmp-backup-abc",
+            members=None,
+            entitlements=None,
+            external_id=None,
+            roles=None,
+        )
+    ]
+    migration_state = MigrationState(grp)
+    task = table_acl_support.get_apply_task(permissions, migration_state)
+    validation_res = task()
+
+    assert [
+        "GRANT SELECT ON TABLE catalog_a.database_b.table_c TO `account-abc`",
+        'SHOW GRANTS ON TABLE catalog_a.database_b.table_c',
+    ] == sql_backend.queries
+    assert not validation_res
 
 
 def test_tacl_udf_applier(mocker):
-    sql_backend = MockBackend()
-    table_acl_support = TableAclSupport(mocker.Mock(), sql_backend)
+    sql_backend = MockBackend(
+        rows={
+            "SELECT \\* FROM hive_metastore.test.grants": [
+                ("abc", "SELECT", "catalog_a", "database_b", "table_c", None, None, False, False)
+            ],
+            "SHOW GRANTS ON FUNCTION catalog_a.database_b.function_c": [
+                make_row(("account-abc", "SELECT", "FUNCTION", "function_c"), SHOW_COLS),
+            ],
+        }
+    )
+    tables_crawler = TablesCrawler(sql_backend, "test")
+    udf_crawler = UdfsCrawler(sql_backend, "test")
+    grants_crawler = GrantsCrawler(tables_crawler, udf_crawler)
+    table_acl_support = TableAclSupport(grants_crawler, sql_backend)
 
     permissions = Permissions(
         object_type="FUNCTION",
@@ -299,14 +382,31 @@ def test_tacl_udf_applier(mocker):
     ]
     migration_state = MigrationState(grp)
     task = table_acl_support.get_apply_task(permissions, migration_state)
-    task()
+    validation_res = task()
 
-    assert ["GRANT SELECT ON FUNCTION catalog_a.database_b.function_c TO `account-abc`"] == sql_backend.queries
+    assert [
+        "GRANT SELECT ON FUNCTION catalog_a.database_b.function_c TO `account-abc`",
+        "SHOW GRANTS ON FUNCTION catalog_a.database_b.function_c",
+    ] == sql_backend.queries
+    assert validation_res
 
 
 def test_tacl_applier_multiple_actions(mocker):
-    sql_backend = MockBackend()
-    table_acl_support = TableAclSupport(mocker.Mock(), sql_backend)
+    sql_backend = MockBackend(
+        rows={
+            "SELECT \\* FROM hive_metastore.test.grants": [
+                ("abc", "SELECT", "catalog_a", "database_b", "table_c", None, None, False, False)
+            ],
+            "SHOW GRANTS ON TABLE catalog_a.database_b.table_c": [
+                make_row(("account-abc", "SELECT", "TABLE", "table_c"), SHOW_COLS),
+                make_row(("account-abc", "MODIFY", "TABLE", "table_c"), SHOW_COLS),
+            ],
+        }
+    )
+    tables_crawler = TablesCrawler(sql_backend, "test")
+    udf_crawler = UdfsCrawler(sql_backend, "test")
+    grants_crawler = GrantsCrawler(tables_crawler, udf_crawler)
+    table_acl_support = TableAclSupport(grants_crawler, sql_backend)
 
     permissions = Permissions(
         object_type="TABLE",
@@ -335,9 +435,13 @@ def test_tacl_applier_multiple_actions(mocker):
     ]
     migration_state = MigrationState(grp)
     task = table_acl_support.get_apply_task(permissions, migration_state)
-    task()
+    validation_res = task()
 
-    assert ["GRANT SELECT, MODIFY ON TABLE catalog_a.database_b.table_c TO `account-abc`"] == sql_backend.queries
+    assert [
+        "GRANT SELECT, MODIFY ON TABLE catalog_a.database_b.table_c TO `account-abc`",
+        "SHOW GRANTS ON TABLE catalog_a.database_b.table_c",
+    ] == sql_backend.queries
+    assert validation_res
 
 
 def test_tacl_applier_no_target_principal(mocker):
@@ -374,3 +478,93 @@ def test_tacl_applier_no_target_principal(mocker):
     assert task is None
 
     assert [] == sql_backend.queries
+
+
+def test_verify_task_should_return_true_if_permissions_applied():
+    sql_backend = MockBackend(
+        rows={
+            "SHOW GRANTS ON TABLE catalog_a.database_b.table_c": [
+                make_row(("abc", "SELECT", "TABLE", "table_c"), SHOW_COLS),
+            ],
+        }
+    )
+    tables_crawler = TablesCrawler(sql_backend, "test")
+    udf_crawler = UdfsCrawler(sql_backend, "test")
+    grants_crawler = GrantsCrawler(tables_crawler, udf_crawler)
+    table_acl_support = TableAclSupport(grants_crawler, sql_backend)
+
+    item = Permissions(
+        object_type="TABLE",
+        object_id="catalog_a.database_b.table_c",
+        raw=json.dumps(
+            {
+                "principal": "abc",
+                "action_type": "SELECT",
+                "catalog": "catalog_a",
+                "database": "database_b",
+                "table": "table_c",
+            }
+        ),
+    )
+
+    task = table_acl_support.get_verify_task(item)
+    result = task()
+    assert result
+
+
+def test_verify_task_should_fail_if_permissions_not_applied():
+    sql_backend = MockBackend(
+        rows={
+            "SHOW GRANTS ON TABLE catalog_a.database_b.table_c": [
+                make_row(("abc", "MODIFY", "TABLE", "table_c"), SHOW_COLS),
+            ],
+        }
+    )
+    tables_crawler = TablesCrawler(sql_backend, "test")
+    udf_crawler = UdfsCrawler(sql_backend, "test")
+    grants_crawler = GrantsCrawler(tables_crawler, udf_crawler)
+    table_acl_support = TableAclSupport(grants_crawler, sql_backend)
+
+    item = Permissions(
+        object_type="TABLE",
+        object_id="catalog_a.database_b.table_c",
+        raw=json.dumps(
+            {
+                "principal": "abc",
+                "action_type": "SELECT",
+                "catalog": "catalog_a",
+                "database": "database_b",
+                "table": "table_c",
+            }
+        ),
+    )
+
+    task = table_acl_support.get_verify_task(item)
+    with pytest.raises(ValueError):
+        task()
+
+
+def test_verify_task_should_return_false_if_not_grants_present():
+    sql_backend = MockBackend()
+    tables_crawler = TablesCrawler(sql_backend, "test")
+    udf_crawler = UdfsCrawler(sql_backend, "test")
+    grants_crawler = GrantsCrawler(tables_crawler, udf_crawler)
+    table_acl_support = TableAclSupport(grants_crawler, sql_backend)
+
+    item = Permissions(
+        object_type="TABLE",
+        object_id="catalog_a.database_b.table_c",
+        raw=json.dumps(
+            {
+                "principal": "abc",
+                "action_type": "SELECT",
+                "catalog": "catalog_a",
+                "database": "database_b",
+                "table": "table_c",
+            }
+        ),
+    )
+
+    task = table_acl_support.get_verify_task(item)
+    result = task()
+    assert not result

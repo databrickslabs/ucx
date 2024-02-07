@@ -119,7 +119,8 @@ class GenericPermissionsSupport(AclSupport):
                 )
         return results
 
-    def _inflight_check(self, object_type: str, object_id: str, acl: list[iam.AccessControlRequest]):
+    @rate_limited(max_requests=100)
+    def _verify(self, object_type: str, object_id: str, acl: list[iam.AccessControlRequest]):
         # in-flight check for the applied permissions
         # the api might be inconsistent, therefore we need to check that the permissions were applied
         remote_permission = self._safe_get_permissions(object_type, object_id)
@@ -127,12 +128,22 @@ class GenericPermissionsSupport(AclSupport):
             remote_permission_as_request = self._response_to_request(remote_permission.access_control_list)
             if all(elem in remote_permission_as_request for elem in acl):
                 return True
-            msg = f"""Couldn't apply appropriate permission for object type {object_type} with id {object_id}
-                acl to be applied={acl}
-                acl found in the object={remote_permission_as_request}
-                """
+            msg = (
+                f"Couldn't find permission for object type {object_type} with id {object_id}\n"
+                f"acl to be applied={acl}\n"
+                f"acl found in the object={remote_permission_as_request}\n"
+            )
             raise ValueError(msg)
         return False
+
+    def get_verify_task(self, item: Permissions) -> Callable[[], bool]:
+        acl = iam.ObjectPermissions.from_dict(json.loads(item.raw))
+        if not acl.access_control_list:
+            raise ValueError(
+                f"Access control list not present for object type " f"{item.object_type} and object id {item.object_id}"
+            )
+        permissions_as_request = self._response_to_request(acl.access_control_list)
+        return partial(self._verify, item.object_type, item.object_id, permissions_as_request)
 
     @rate_limited(max_requests=30)
     def _applier_task(self, object_type: str, object_id: str, acl: list[iam.AccessControlRequest]):
@@ -145,7 +156,7 @@ class GenericPermissionsSupport(AclSupport):
         update_retried_check(object_type, object_id, acl)
 
         retry_on_value_error = retried(on=[*retryable_exceptions, ValueError], timeout=self._verify_timeout)
-        retried_check = retry_on_value_error(self._inflight_check)
+        retried_check = retry_on_value_error(self._verify)
         return retried_check(object_type, object_id, acl)
 
     @rate_limited(max_requests=100)

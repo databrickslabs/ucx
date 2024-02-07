@@ -223,3 +223,123 @@ def test_factory(mocker):
             "DATABASE",
         }
     ) == sorted(appliers.keys())
+
+
+def test_manager_verify(mocker):
+    b = MockBackend(
+        rows={
+            "SELECT object_id": [
+                permissions_row(
+                    "test",
+                    "clusters",
+                    json.dumps(
+                        iam.ObjectPermissions(
+                            object_id="test",
+                            object_type="clusters",
+                            access_control_list=[
+                                iam.AccessControlResponse(
+                                    group_name="test",
+                                    all_permissions=[
+                                        iam.Permission(inherited=False, permission_level=iam.PermissionLevel.CAN_USE)
+                                    ],
+                                )
+                            ],
+                        ).as_dict()
+                    ),
+                ),
+            ],
+            "SELECT COUNT": [
+                make_row([12], ["cnt"]),
+            ],
+        }
+    )
+
+    # has to be set, as it's going to be appended through multiple threads
+    items = set()
+    mock_verifier = mocker.Mock()
+    mock_verifier.object_types = lambda: {"clusters"}
+    # this emulates a real verifier and call to an API
+    mock_verifier.get_verify_task = lambda item: lambda: items.add(f"{item.object_id} {item.object_id}")
+
+    pm = PermissionManager(b, "test_database", [mock_verifier])
+    result = pm.verify_group_permissions()
+
+    assert result
+    assert {"test test"} == items
+
+
+def test_manager_verify_not_supported_type(mocker):
+    b = MockBackend(
+        rows={
+            "SELECT object_id": [
+                permissions_row(
+                    "test",
+                    "clusters",
+                    json.dumps(
+                        iam.ObjectPermissions(
+                            object_id="test",
+                            object_type="clusters",
+                            access_control_list=[
+                                iam.AccessControlResponse(
+                                    group_name="test",
+                                    all_permissions=[
+                                        iam.Permission(inherited=False, permission_level=iam.PermissionLevel.CAN_USE)
+                                    ],
+                                )
+                            ],
+                        ).as_dict()
+                    ),
+                ),
+            ],
+            "SELECT COUNT": [
+                make_row([12], ["cnt"]),
+            ],
+        }
+    )
+
+    mock_verifier = mocker.Mock()
+    mock_verifier.object_types = lambda: {"not_supported"}
+    pm = PermissionManager(b, "test_database", [mock_verifier])
+
+    with pytest.raises(ValueError):
+        pm.verify_group_permissions()
+
+
+def test_manager_verify_no_tasks(mocker):
+    b = MockBackend(
+        rows={
+            "SELECT object_id": [
+                permissions_row(
+                    "test",
+                    "clusters",
+                    json.dumps(
+                        iam.ObjectPermissions(
+                            object_id="test",
+                            object_type="clusters",
+                            access_control_list=[
+                                iam.AccessControlResponse(
+                                    group_name="test",
+                                    all_permissions=[
+                                        iam.Permission(inherited=False, permission_level=iam.PermissionLevel.CAN_USE)
+                                    ],
+                                )
+                            ],
+                        ).as_dict()
+                    ),
+                ),
+            ],
+            "SELECT COUNT": [
+                make_row([12], ["cnt"]),
+            ],
+        }
+    )
+
+    mock_verifier = mocker.Mock()
+    mock_verifier.object_types = lambda: {"clusters"}
+    # this emulates a real verifier and call to an API
+    mock_verifier.get_verify_task = lambda item: None
+
+    pm = PermissionManager(b, "test_database", [mock_verifier])
+    result = pm.verify_group_permissions()
+
+    assert result
