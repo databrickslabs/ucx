@@ -3,7 +3,12 @@ import pathlib
 from unittest.mock import create_autospec
 
 from databricks.sdk import WorkspaceClient
+from databricks.sdk.errors import NotFound
 from databricks.sdk.service.compute import ClusterDetails, Policy
+from databricks.sdk.service.jobs import BaseJob
+from databricks.sdk.service.pipelines import PipelineStateInfo
+from databricks.sdk.service.sql import EndpointConfPair
+from databricks.sdk.service.workspace import GetSecretResponse
 
 __dir = pathlib.Path(__file__).parent
 
@@ -23,9 +28,27 @@ def _cluster_policy(policy_id: str):
     overrides = json.dumps(fixture["policy_family_definition_overrides"])
     return Policy(description=definition, policy_family_definition_overrides=overrides)
 
+def _mock_get_secret(secret_scope, secret_key):
+    msg = f"Secret Scope {secret_scope} does not exist!"
+    raise NotFound(msg)
 
-def workspace_client_mock(clusters="no-spark-conf.json"):
+def workspace_client_mock(clusters="no-spark-conf.json",
+                          pipelines="single-pipeline.json",
+                          jobs="single-job.json",
+                          warehouse_config="single-config.json",
+                          secret_exists=True):
     ws = create_autospec(WorkspaceClient)
-    ws.clusters.list.return_value = _load_list(ClusterDetails, f"../assessment/clusters/{clusters}")
+    ws.clusters.list.return_value = (
+        _load_list(ClusterDetails, f"../assessment/clusters/{clusters}"))
     ws.cluster_policies.get = _cluster_policy
+    ws.pipelines.list_pipelines.return_value = (
+        _load_list(PipelineStateInfo, f"../assessment/pipelines/{pipelines}"))
+    ws.jobs.list.return_value = (
+        _load_list(BaseJob, f"../assessment/jobs/{jobs}"))
+    ws.warehouses.get_workspace_warehouse_config().data_access_config = (
+        _load_list(EndpointConfPair, f"../assessment/warehouses/{warehouse_config}"))
+    if secret_exists:
+        ws.secrets.get_secret.return_value = GetSecretResponse(key="username", value="SGVsbG8sIFdvcmxkIQ==")
+    else:
+        ws.secrets.get_secret = _mock_get_secret
     return ws

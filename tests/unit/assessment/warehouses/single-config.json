@@ -1,0 +1,6 @@
+[
+  {
+    "key": "spark.hadoop.fs.azure.account.auth.type.storage_acct1.dfs.core.windows.net",
+    "value": "OAuth"
+  }
+]
