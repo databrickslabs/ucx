@@ -240,7 +240,7 @@ def test_save_spn_permissions_valid_storage_accounts(caplog, mocker, az_token):
     )
 
 
-def test_azure_spn_info_without_secret(mocker):
+def test_azure_spn_info_without_secret():
     ws = workspace_client_mock(clusters="single-cluster-spn-config.json")
     sample_spns = [{"application_id": "test123456789", "secret_scope": "", "secret_key": ""}]
     AzureServicePrincipalCrawler(ws, MockBackend(), "ucx")._list_all_cluster_with_spn_in_spark_conf()
@@ -408,7 +408,7 @@ def test_azure_service_principal_info_null_applid_crawl():
     assert len(spn_crawler) == 0
 
 
-def test_azure_spn_info_with_secret(mocker):
+def test_azure_spn_info_with_secret():
     ws = workspace_client_mock(clusters="single-cluster-spn.json", secret_exists=True)
     sample_spns = [{"application_id": "test123456780", "secret_scope": "abcff", "secret_key": "sp_app_client_id"}]
     crawler = AzureServicePrincipalCrawler(ws, MockBackend(), "ucx")._assess_service_principals(sample_spns)
@@ -418,7 +418,7 @@ def test_azure_spn_info_with_secret(mocker):
     assert result_set[0].application_id == "test123456780"
 
 
-def test_spn_with_spark_config_snapshot_try_fetch(mocker):
+def test_spn_with_spark_config_snapshot_try_fetch():
     sample_spns = [
         {
             "application_id": "test123456780",
@@ -438,7 +438,7 @@ def test_spn_with_spark_config_snapshot_try_fetch(mocker):
     assert len(result_set) == 1
 
 
-def test_spn_with_spark_config_snapshot(mocker):
+def test_spn_with_spark_config_snapshot():
     sample_spns = [{"application_id": "test123456780", "secret_scope": "abcff", "secret_key": "sp_app_client_id"}]
     mock_ws = Mock()
     crawler = AzureServicePrincipalCrawler(mock_ws, MockBackend(), "ucx")
@@ -491,7 +491,7 @@ def test_list_all_clusters_spn_in_spark_conf_with_tenant():
     assert result_set[0].get("tenant_id") == "dummy_tenant_id"
 
 
-def test_azure_service_principal_info_policy_conf(mocker):
+def test_azure_service_principal_info_policy_conf():
     ws = workspace_client_mock(clusters="single-cluster-spn.json",
                                jobs="single-spn-with-policy.json",
                                pipelines="single-pipeline.json",
@@ -502,7 +502,7 @@ def test_azure_service_principal_info_policy_conf(mocker):
     assert len(spn_crawler) == 4
 
 
-def test_azure_service_principal_info_dedupe(mocker):
+def test_azure_service_principal_info_dedupe():
     ws = workspace_client_mock(clusters="single-cluster-spn.json",
                                jobs="single-spn-with-policy.json",
                                pipelines="single-pipeline.json",
@@ -524,14 +524,14 @@ def test_list_all_pipeline_with_conf_spn_in_spark_conf():
     assert result_set[0].get("application_id") == "pipeline_dummy_application_id"
 
 
-def test_list_all_pipeline_wo_conf_spn_in_spark_conf(mocker):
+def test_list_all_pipeline_wo_conf_spn_in_spark_conf():
     ws = workspace_client_mock(pipelines="single-pipeline.json")
     result_set = AzureServicePrincipalCrawler(ws, MockBackend(), "ucx")._list_all_pipeline_with_spn_in_spark_conf()
 
     assert len(result_set) == 0
 
 
-def test_list_all_pipeline_with_conf_spn_tenant(mocker):
+def test_list_all_pipeline_with_conf_spn_tenant():
     ws = workspace_client_mock(pipelines="single-pipeline.json")
     config_dict = {
         "spark.hadoop.fs.azure.account.oauth2.client.id.newstorageacct.dfs.core.windows.net": ""
@@ -549,7 +549,7 @@ def test_list_all_pipeline_with_conf_spn_tenant(mocker):
     assert result_set[0].get("application_id") == "pipeline_dummy_application_id"
 
 
-def test_list_all_pipeline_with_conf_spn_secret(mocker):
+def test_list_all_pipeline_with_conf_spn_secret():
     ws = workspace_client_mock(pipelines="single-pipeline.json",
                                pipeline_spec="pipeline-spec.json",
                                secret_exists=True)
@@ -559,7 +559,7 @@ def test_list_all_pipeline_with_conf_spn_secret(mocker):
     assert result_set[0].get("storage_account") == "newstorageacct"
 
 
-def test_azure_service_principal_info_policy_family(mocker):
+def test_azure_service_principal_info_policy_family():
     ws = workspace_client_mock(clusters="single-cluster-spn-with-policy-overrides.json")
     spn_crawler = AzureServicePrincipalCrawler(ws, MockBackend(), "ucx")._crawl()
 
@@ -568,7 +568,7 @@ def test_azure_service_principal_info_policy_family(mocker):
     assert spn_crawler[0].tenant_id == "dummy_tenant_id"
 
 
-def test_list_all_pipeline_with_conf_spn_secret_unavlbl(mocker):
+def test_list_all_pipeline_with_conf_spn_secret_unavlbl():
     ws = workspace_client_mock(pipelines="single-pipeline.json", secret_exists=False)
     crawler = AzureServicePrincipalCrawler(ws, MockBackend(), "ucx")
     result_set = crawler._list_all_pipeline_with_spn_in_spark_conf()
@@ -576,26 +576,19 @@ def test_list_all_pipeline_with_conf_spn_secret_unavlbl(mocker):
     assert len(result_set) == 0
 
 
-def test_list_all_pipeline_with_conf_spn_secret_avlb(mocker):
-    ws = workspace_client_mock(pipelines="single-pipeline.json", secret_exists=True)
-    config_dict = {
-        "spark.hadoop.fs.azure.account.oauth2.client.id.newstorageacct.dfs.core.windows"
-        ".net": "{{secrets/reallyreallyasecret/sasFixedToken}}",
-        "spark.hadoop.fs.azure.account.oauth2.client."
-        "endpoint.newstorageacct.dfs.core.windows.net": "https://"
-                                                        "login.microsoftonline.com/directory_12345/oauth2/token",
-        "spark.hadoop.fs.azure.sas.fixed.token.abcde.dfs.core.windows.net": "{{secrets/abcde_access/sasFixedToken}}",
-    }
-    ws.pipelines.get().spec.configuration = config_dict
+def test_list_all_pipeline_with_conf_spn_secret_avlb():
+    ws = workspace_client_mock(pipelines="single-pipeline.json",
+                               pipeline_spec="pipeline-spec.json",
+                               secret_exists=True)
     result_set = AzureServicePrincipalCrawler(ws, MockBackend(), "ucx")._list_all_pipeline_with_spn_in_spark_conf()
 
     assert len(result_set) > 0
-    assert result_set[0].get("application_id") == "Hello, World!"
+    assert result_set[0].get("application_id") == "pipeline_dummy_application_id"
     assert result_set[0].get("tenant_id") == "directory_12345"
     assert result_set[0].get("storage_account") == "newstorageacct"
 
 
-def test_azure_spn_info_with_secret_unavailable(mocker):
+def test_azure_spn_info_with_secret_unavailable():
     ws = workspace_client_mock(secret_exists=False)
     spark_conf = {
         "spark.hadoop.fs.azure.account."
