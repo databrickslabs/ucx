@@ -62,7 +62,6 @@ class PipelinesCrawler(CrawlerBase[PipelineInfo], CheckClusterMixin):
                         failures.extend(self._check_cluster_init_script(cluster.init_scripts, "pipeline cluster"))
 
             pipeline_info.failures = json.dumps(failures)
-            print(pipeline_info)
             if len(failures) > 0:
                 pipeline_info.success = 0
             yield pipeline_info
