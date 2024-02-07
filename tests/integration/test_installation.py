@@ -12,18 +12,16 @@ from databricks.labs.blueprint.tui import MockPrompts
 from databricks.labs.blueprint.wheels import WheelsV2
 from databricks.sdk.errors import InvalidParameterValue, NotFound, Unknown
 from databricks.sdk.retries import retried
-from databricks.sdk.service import sql
-from databricks.sdk.service import compute
+from databricks.sdk.service import compute, sql
 from databricks.sdk.service.iam import PermissionLevel
 
 from databricks.labs.ucx.config import WorkspaceConfig
-from databricks.labs.ucx.install import PRODUCT_INFO, WorkspaceInstallation
-from databricks.labs.ucx.workspace_access import redash
 from databricks.labs.ucx.install import (
     PRODUCT_INFO,
     WorkspaceInstallation,
     WorkspaceInstaller,
 )
+from databricks.labs.ucx.workspace_access import redash
 from databricks.labs.ucx.workspace_access.generic import (
     GenericPermissionsSupport,
     Listing,
