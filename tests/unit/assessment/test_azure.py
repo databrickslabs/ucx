@@ -20,7 +20,6 @@ from databricks.sdk.service.jobs import (
     Task,
 )
 from databricks.sdk.service.sql import EndpointConfPair
-from databricks.sdk.service.workspace import GetSecretResponse
 
 from databricks.labs.ucx.assessment.azure import (
     AzureResource,
@@ -34,7 +33,10 @@ from databricks.labs.ucx.hive_metastore import ExternalLocations
 
 from ..framework.mocks import MockBackend
 
-from . import workspace_client_mock
+from . import (
+    workspace_client_mock,
+    get_az_api_mapping,
+)
 
 
 @pytest.fixture
@@ -43,164 +45,6 @@ def az_token(mocker):
     str_token = base64.b64encode(token).decode("utf-8").replace("=", "")
     tok = Token(access_token=f"header.{str_token}.sig")
     mocker.patch("databricks.sdk.oauth.Refreshable.token", return_value=tok)
-
-
-def get_az_api_mapping(*args, **kwargs):
-    mapping = {
-        "/v1.0/directoryObjects/user1": {"appId": "appIduser1", "displayName": "disNameuser1", "id": "Iduser1"},
-        "/v1.0/directoryObjects/user2": {"appId": "appIduser2", "displayName": "disNameuser2", "id": "Iduser2"},
-        "/v1.0/directoryObjects/user3": {"appId": "appIduser3", "displayName": "disNameuser3", "id": "Iduser3"},
-        "/subscriptions": {
-            "value": [
-                {"displayName": "sub1", "subscriptionId": "001", "tenantId": "bar1"},
-                {"displayName": "sub2", "subscriptionId": "002", "tenantId": "bar"},
-                {"displayName": "sub3", "subscriptionId": "003", "tenantId": "bar3"},
-            ]
-        },
-        "/subscriptions/002/providers/Microsoft.Storage/storageAccounts": {
-            "value": [
-                {
-                    "name": "sto1",
-                },
-                {"name": "sto2", "id": "subscriptions/002/resourceGroups/rg1/storageAccounts/sto2"},
-                {"name": "sto3", "id": "subscriptions/002/resourceGroups/rg1/storageAccounts/sto3"},
-            ]
-        },
-        "subscriptions/002/resourceGroups/rg1/storageAccounts/sto2/blobServices/default/containers": {
-            "value": [
-                {
-                    "name": "container1",
-                    "id": "subscriptions/002/resourceGroups/rg1/storageAccounts/sto2/containers/container1",
-                },
-                {
-                    "name": "container2",
-                    "id": "subscriptions/002/resourceGroups/rg1/storageAccounts/sto2/containers/container2",
-                },
-                {
-                    "name": "container3",
-                    "id": "subscriptions/002/resourceGroups/rg1/storageAccounts/sto2/containers/container3",
-                },
-                {
-                    "name": "container4",
-                },
-            ]
-        },
-        "subscriptions/002/resourceGroups/rg1/storageAccounts/sto1/providers/Microsoft.Authorization/roleAssignments": {
-            "value": [
-                {
-                    "properties": {
-                        "principalId": "user1",
-                        "principalType": "User",
-                        "roleDefinitionId": "id001",
-                        "scope": "subscriptions/002/resourceGroups/rg1/storageAccounts/sto1",
-                    },
-                    "id": "rol1",
-                },
-            ]
-        },
-        "subscriptions/002/resourceGroups/rg1/storageAccounts/sto2/providers/Microsoft.Authorization/roleAssignments": {
-            "value": [
-                {
-                    "properties": {
-                        "principalId": "user2",
-                        "principalType": "ServicePrincipal",
-                        "roleDefinitionId": "id001",
-                        "scope": "subscriptions/002/resourceGroups/rg1/storageAccounts/sto2",
-                    },
-                    "id": "rol1",
-                },
-            ]
-        },
-        "id001": {
-            "id": "role1",
-            "properties": {
-                "roleName": "Contributor",
-            },
-        },
-        "subscriptions/002/resourceGroups/rg1/storageAccounts/sto3/providers/Microsoft.Authorization/roleAssignments": {
-            "value": [
-                {
-                    "properties": {
-                        "principalId": "user3",
-                        "principalType": "ServicePrincipal",
-                        "roleDefinitionId": "id002",
-                        "scope": "subscriptions/002/resourceGroups/rg1/storageAccounts/sto3",
-                    },
-                    "id": "rol1",
-                },
-                {
-                    "properties": {
-                        "principalId": "user3",
-                        "principalType": "ServicePrincipal",
-                        "roleDefinitionId": "id002",
-                        "scope": "subscriptions/002/resourceGroups/rg1/storageAccounts/sto3",
-                    },
-                    "id": "rol2",
-                },
-            ]
-        },
-        "id002": {
-            "id": "role2",
-            "properties": {
-                "roleName": "Storage Blob Data Owner",
-            },
-        },
-        "subscriptions/002/resourceGroups/rg1/storageAccounts/sto2/containers/container1/providers/"
-        "Microsoft.Authorization/roleAssignments": {
-            "value": [
-                {
-                    "properties": {
-                        "principalId": "user2",
-                        "principalType": "ServicePrincipal",
-                        "roleDefinitionId": "id001",
-                        "scope": "subscriptions/002/resourceGroups/rg1/storageAccounts/sto2/containers/container1",
-                    },
-                    "id": "rol1",
-                },
-            ]
-        },
-        "subscriptions/002/resourceGroups/rg1/storageAccounts/sto2/containers/container2/providers/"
-        "Microsoft.Authorization/roleAssignments": {
-            "value": [
-                {
-                    "properties": {
-                        "principalId": "user1",
-                        "principalType": "User",
-                        "roleDefinitionId": "id001",
-                        "scope": "this",
-                    },
-                    "id": "rol1",
-                },
-            ]
-        },
-        "subscriptions/002/resourceGroups/rg1/storageAccounts/sto2/containers/container3/providers/"
-        "Microsoft.Authorization/roleAssignments": {
-            "value": [
-                {
-                    "properties": {
-                        "principalId": "user3",
-                        "principalType": "ServicePrincipal",
-                        "roleDefinitionId": "id002",
-                        "scope": "subscriptions/002/resourceGroups/rg1/storageAccounts/sto2/containers/container3",
-                    },
-                    "id": "rol1",
-                },
-                {
-                    "properties": {
-                        "principalId": "user3",
-                        "principalType": "ServicePrincipal",
-                        "roleDefinitionId": "id002",
-                        "scope": "subscriptions/002/resourceGroups/rg1/storageAccounts/sto2",
-                    },
-                    "id": "rol2",
-                },
-            ]
-        },
-    }
-    if args[1] in mapping:
-        return mapping[args[1]]
-    else:
-        return {}
 
 
 def test_subscriptions_no_subscription(mocker, az_token):
@@ -963,13 +807,13 @@ def test_azure_spn_info_with_secret(mocker):
             autoscale=AutoScale(min_workers=1, max_workers=6),
             spark_conf={
                 "spark.hadoop.fs.azure.account.oauth2.client.id.abcde.dfs.core.windows.net": "{{secrets/abcff"
-                "/sp_app_client_id}}",
+                                                                                             "/sp_app_client_id}}",
                 "spark.hadoop.fs.azure.account.oauth2.client.endpoint.abcde.dfs.core.windows.net": "https://login"
-                ".microsoftonline"
-                ".com/dedededede"
-                "/token",
+                                                                                                   ".microsoftonline"
+                                                                                                   ".com/dedededede"
+                                                                                                   "/token",
                 "spark.hadoop.fs.azure.account.oauth2.client.secret.abcde.dfs.core.windows.net": "{{secrets/abcff"
-                "/sp_secret}}",
+                                                                                                 "/sp_secret}}",
             },
             spark_context_id=5134472582179565315,
             spark_env_vars=None,
@@ -1086,9 +930,9 @@ def test_list_all_pipeline_with_conf_spn_in_spark_conf():
     ws = workspace_client_mock(pipelines="single-pipeline.json")
     config_dict = {
         "spark.hadoop.fs.azure.account.oauth2.client.id.newstorageacct.dfs.core.windows.net": ""
-        "pipeline_dummy_application_id",
+                                                                                              "pipeline_dummy_application_id",
         "spark.hadoop.fs.azure.account.oauth2.client.endpoint.newstorageacct.dfs.core.windows.net": ""
-        "https://login.microsoftonline.com/directory_12345/oauth2/token",
+                                                                                                    "https://login.microsoftonline.com/directory_12345/oauth2/token",
         "spark.hadoop.fs.azure.sas.fixed.token.abcde.dfs.core.windows.net": "{{secrets/abcde_access/sasFixedToken}}",
     }
     ws.pipelines.get().spec.configuration = config_dict
@@ -1108,13 +952,13 @@ def test_list_all_pipeline_wo_conf_spn_in_spark_conf(mocker):
     assert len(result_set) == 0
 
 
-def test_list_all_pipeline_with_conf_spn_tenat(mocker):
+def test_list_all_pipeline_with_conf_spn_tenant(mocker):
     ws = workspace_client_mock(pipelines="single-pipeline.json")
     config_dict = {
         "spark.hadoop.fs.azure.account.oauth2.client.id.newstorageacct.dfs.core.windows.net": ""
-        "pipeline_dummy_application_id",
+                                                                                              "pipeline_dummy_application_id",
         "spark.hadoop.fs.azure1.account.oauth2.client.endpoint.newstorageacct.dfs.core.windows.net": ""
-        "https://login.microsoftonline.com/directory_12345/oauth2/token",
+                                                                                                     "https://login.microsoftonline.com/directory_12345/oauth2/token",
         "spark.hadoop.fs.azure.sas.fixed.token.abcde.dfs.core.windows.net": "{{secrets/abcde_access/sasFixedToken}}",
     }
     ws.pipelines.get().spec.configuration = config_dict
@@ -1133,7 +977,7 @@ def test_list_all_pipeline_with_conf_spn_secret(mocker):
         ".net": "{{secrets/abcde_access/sasFixedToken}}",
         "spark.hadoop.fs.azure1.account.oauth2.client."
         "endpoint.newstorageacct.dfs.core.windows.net": "https://"
-        "login.microsoftonline.com/directory_12345/oauth2/token",
+                                                        "login.microsoftonline.com/directory_12345/oauth2/token",
         "spark.hadoop.fs.azure.sas.fixed.token.abcde.dfs.core.windows.net": "{{secrets/abcde_access/sasFixedToken}}",
     }
     ws.pipelines.get().spec.configuration = config_dict
@@ -1276,7 +1120,7 @@ def test_list_all_pipeline_with_conf_spn_secret_avlb(mocker):
         ".net": "{{secrets/reallyreallyasecret/sasFixedToken}}",
         "spark.hadoop.fs.azure.account.oauth2.client."
         "endpoint.newstorageacct.dfs.core.windows.net": "https://"
-        "login.microsoftonline.com/directory_12345/oauth2/token",
+                                                        "login.microsoftonline.com/directory_12345/oauth2/token",
         "spark.hadoop.fs.azure.sas.fixed.token.abcde.dfs.core.windows.net": "{{secrets/abcde_access/sasFixedToken}}",
     }
     ws.pipelines.get().spec.configuration = config_dict
@@ -1295,7 +1139,7 @@ def test_azure_spn_info_with_secret_unavailable(mocker):
         "oauth2.client.id.abcde.dfs.core.windows.net": "{{secrets/abcff/sp_app_client_id}}",
         "spark.hadoop.fs.azure.account."
         "oauth2.client.endpoint.abcde.dfs.core.windows.net": "https://login.microsoftonline.com/dedededede"
-        "/token",
+                                                             "/token",
         "spark.hadoop.fs.azure.account."
         "oauth2.client.secret.abcde.dfs.core.windows.net": "{{secrets/abcff/sp_secret}}",
     }

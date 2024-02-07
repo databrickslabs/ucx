@@ -28,9 +28,19 @@ def _cluster_policy(policy_id: str):
     overrides = json.dumps(fixture["policy_family_definition_overrides"])
     return Policy(description=definition, policy_family_definition_overrides=overrides)
 
+
 def _mock_get_secret(secret_scope, secret_key):
     msg = f"Secret Scope {secret_scope} does not exist!"
     raise NotFound(msg)
+
+
+def get_az_api_mapping(*args, **kwargs):
+    mapping = _load_fixture("../assessment/azure/mappings.json")[0]
+    if args[1] in mapping:
+        return mapping[args[1]]
+    else:
+        return {}
+
 
 def workspace_client_mock(clusters="no-spark-conf.json",
                           pipelines="single-pipeline.json",
