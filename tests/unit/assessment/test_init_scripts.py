@@ -1,7 +1,7 @@
 import base64
 
-from databricks.sdk.service.compute import GlobalInitScriptDetails
 from databricks.sdk.errors import InvalidParameterValue
+from databricks.sdk.service.compute import GlobalInitScriptDetails
 
 from databricks.labs.ucx.assessment.init_scripts import (
     GlobalInitScriptCrawler,
