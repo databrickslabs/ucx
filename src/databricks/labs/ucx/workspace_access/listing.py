@@ -78,8 +78,8 @@ class WorkspaceListing:
         logger.info(f"Recursive WorkspaceFS listing started at {self.start_time}")
         try:
             root_object = self._ws.workspace.get_status(start_path)
-        except ResourceDoesNotExist as err:
-            logger.warning(f"get status failed for {start_path}: {err}")
+        except ResourceDoesNotExist:
+            logger.warning(f"removed on the backend {start_path}")
             return self.results
         self.results.append(root_object)
 
