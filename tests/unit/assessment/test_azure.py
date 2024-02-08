@@ -6,20 +6,6 @@ import pytest
 from databricks.labs.blueprint.installation import MockInstallation
 from databricks.sdk import WorkspaceClient
 from databricks.sdk.oauth import Token
-from databricks.sdk.service.compute import (
-    AutoScale,
-    ClusterDetails,
-    ClusterSource,
-    ClusterSpec,
-)
-from databricks.sdk.service.jobs import (
-    BaseJob,
-    JobCluster,
-    JobSettings,
-    NotebookTask,
-    Task,
-)
-from databricks.sdk.service.sql import EndpointConfPair
 
 from databricks.labs.ucx.assessment.azure import (
     AzureResource,
@@ -28,15 +14,12 @@ from databricks.labs.ucx.assessment.azure import (
     AzureServicePrincipalCrawler,
     Principal,
 )
-from databricks.labs.ucx.assessment.pipelines import PipelineInfo
 from databricks.labs.ucx.hive_metastore import ExternalLocations
-
-from ..framework.mocks import MockBackend
-
 from . import (
     workspace_client_mock,
     get_az_api_mapping,
 )
+from ..framework.mocks import MockBackend
 
 
 @pytest.fixture
