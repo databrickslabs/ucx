@@ -1176,11 +1176,7 @@ def test_latest_job_status_list(ws, any_prompt):
     config = WorkspaceConfig(inventory_database='ucx')
     timeout = timedelta(seconds=1)
     mock_installation = MockInstallation(
-        {
-            'state.json': {
-                'resources': {'jobs': {"job1": "1", "job2": "2", "job3": "3"}}
-            }
-        }
+        {'state.json': {'resources': {'jobs': {"job1": "1", "job2": "2", "job3": "3"}}}}
     )
     workspace_installation = WorkspaceInstallation(
         config, mock_installation, sql_backend, wheels, ws, any_prompt, timeout
