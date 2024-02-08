@@ -147,10 +147,7 @@ class TableError:
 @dataclass
 class MigrationCount:
     database: str
-    managed_tables: int = 0
-    external_tables: int = 0
-    views: int = 0
-
+    what_count: dict[str, int]
 
 class TablesCrawler(CrawlerBase):
     def __init__(self, backend: SqlBackend, schema):

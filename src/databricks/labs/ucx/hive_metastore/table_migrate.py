@@ -153,23 +153,14 @@ class TablesMigrate:
 
         migration_list = []
         for cur_database, tables in table_by_database.items():
-            external_tables = 0
-            managed_tables = 0
-            views = 0
+            what_count: dict[str, int]={}
             for current_table in tables:
                 if current_table.upgraded_to is not None:
-                    if current_table.kind == "VIEW":
-                        views += 1
-                        continue
-                    if current_table.object_type == "EXTERNAL":
-                        external_tables += 1
-                        continue
-                    if current_table.object_type == "MANAGED":
-                        managed_tables += 1
-                        continue
+                    count = what_count.get(current_table.what, 0)
+                    what_count[current_table.what] = count+1
             migration_list.append(
                 MigrationCount(
-                    database=cur_database, managed_tables=managed_tables, external_tables=external_tables, views=views
+                    database=cur_database, what_count=what_count
                 )
             )
         return migration_list
@@ -189,16 +180,22 @@ class TablesMigrate:
             logger.info("No migrated tables were found.")
             return False
         print("The following is the count of migrated tables and views found in scope:")
-        print("Database                      | External Tables  | Managed Table    | Views            |")
+        table_header="Database                      |"
+        for what in list(What):
+            table_header += f" {what.name:<16} |"
+        print(table_header)
         print("=" * 88)
         for count in migrated_count:
-            print(f"{count.database:<30}| {count.external_tables:16} | {count.managed_tables:16} | {count.views:16} |")
+            table_row=f"{count.database:<30}|"
+            for what in list(What):
+                table_row += f" {count.what_count.get(what.name,0):16} |"
+            print(table_row)
         print("=" * 88)
         print("Migrated External Tables and Views (targets) will be deleted")
         if delete_managed:
-            print("Migrated Manged Tables (targets) will be deleted")
+            print("Migrated DBFS Root Tables will be deleted")
         else:
-            print("Migrated Manged Tables (targets) will be left intact.")
+            print("Migrated DBFS Root Tables will be left intact.")
             print("To revert and delete Migrated Tables, add --delete_managed true flag to the command.")
         return True
 
