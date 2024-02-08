@@ -5,6 +5,7 @@ from collections.abc import Iterable
 from dataclasses import dataclass
 
 from databricks.sdk import WorkspaceClient
+from databricks.sdk.errors import InvalidParameterValue
 
 from databricks.labs.ucx.assessment.crawlers import (
     _AZURE_SP_CONF_FAILURE_MSG,
@@ -62,7 +63,11 @@ class GlobalInitScriptCrawler(CrawlerBase[GlobalInitScriptInfo], CheckInitScript
                 failures="[]",
             )
             failures = []
-            script = self._ws.global_init_scripts.get(gis.script_id)
+            try:
+                script = self._ws.global_init_scripts.get(gis.script_id)
+            except InvalidParameterValue as err:
+                logger.warning(f"Failed to get init script {gis.script_id}: {err}")
+                continue
             global_init_script = base64.b64decode(script.script).decode("utf-8")
             if not global_init_script:
                 continue

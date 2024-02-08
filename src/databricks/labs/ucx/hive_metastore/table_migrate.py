@@ -379,7 +379,11 @@ class TableMove:
             return False
 
     def _reapply_grants(self, from_table_name, to_table_name, *, target_view: bool = False):
-        grants = self._ws.grants.get(SecurableType.TABLE, from_table_name)
+        try:
+            grants = self._ws.grants.get(SecurableType.TABLE, from_table_name)
+        except TypeError as err:
+            logger.warning(f"Cannot get grants from table {from_table_name}: {err}")
+            return
         if grants.privilege_assignments is not None:
             logger.info(f"Applying grants on table {to_table_name}")
             grants_changes = []
