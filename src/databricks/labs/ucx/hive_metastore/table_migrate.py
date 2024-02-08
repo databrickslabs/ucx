@@ -153,16 +153,12 @@ class TablesMigrate:
 
         migration_list = []
         for cur_database, tables in table_by_database.items():
-            what_count: dict[str, int]={}
+            what_count: dict[What, int] = {}
             for current_table in tables:
                 if current_table.upgraded_to is not None:
                     count = what_count.get(current_table.what, 0)
-                    what_count[current_table.what] = count+1
-            migration_list.append(
-                MigrationCount(
-                    database=cur_database, what_count=what_count
-                )
-            )
+                    what_count[current_table.what] = count + 1
+            migration_list.append(MigrationCount(database=cur_database, what_count=what_count))
         return migration_list
 
     def is_upgraded(self, schema: str, table: str) -> bool:
@@ -180,15 +176,15 @@ class TablesMigrate:
             logger.info("No migrated tables were found.")
             return False
         print("The following is the count of migrated tables and views found in scope:")
-        table_header="Database                      |"
+        table_header = "Database                      |"
         for what in list(What):
             table_header += f" {what.name:<16} |"
         print(table_header)
         print("=" * 88)
         for count in migrated_count:
-            table_row=f"{count.database:<30}|"
+            table_row = f"{count.database:<30}|"
             for what in list(What):
-                table_row += f" {count.what_count.get(what.name,0):16} |"
+                table_row += f" {count.what_count.get(what,0):16} |"
             print(table_row)
         print("=" * 88)
         print("Migrated External Tables and Views (targets) will be deleted")

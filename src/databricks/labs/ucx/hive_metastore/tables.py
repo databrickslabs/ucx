@@ -147,7 +147,8 @@ class TableError:
 @dataclass
 class MigrationCount:
     database: str
-    what_count: dict[str, int]
+    what_count: dict[What, int]
+
 
 class TablesCrawler(CrawlerBase):
     def __init__(self, backend: SqlBackend, schema):
