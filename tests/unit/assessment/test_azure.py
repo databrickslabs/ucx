@@ -15,11 +15,9 @@ from databricks.labs.ucx.assessment.azure import (
     Principal,
 )
 from databricks.labs.ucx.hive_metastore import ExternalLocations
-from . import (
-    workspace_client_mock,
-    get_az_api_mapping,
-)
+
 from ..framework.mocks import MockBackend
+from . import get_az_api_mapping, workspace_client_mock
 
 
 @pytest.fixture
@@ -235,21 +233,25 @@ def test_azure_spn_info_without_secret():
 
 
 def test_azure_service_principal_info_crawl():
-    ws = workspace_client_mock(clusters="assortment-spn.json",
-                               pipelines="single-pipeline-with-spn.json",
-                               jobs="assortment-spn.json",
-                               warehouse_config="spn-config.json",
-                               secret_exists=True)
+    ws = workspace_client_mock(
+        clusters="assortment-spn.json",
+        pipelines="single-pipeline-with-spn.json",
+        jobs="assortment-spn.json",
+        warehouse_config="spn-config.json",
+        secret_exists=True,
+    )
     spn_crawler = AzureServicePrincipalCrawler(ws, MockBackend(), "ucx")._crawl()
 
     assert len(spn_crawler) == 5
 
 
 def test_azure_service_principal_info_spark_conf_crawl():
-    ws = workspace_client_mock(clusters="no-spark-conf.json",
-                               pipelines="single-pipeline.json",
-                               jobs="assortment-spn.json",
-                               warehouse_config="spn-config.json")
+    ws = workspace_client_mock(
+        clusters="no-spark-conf.json",
+        pipelines="single-pipeline.json",
+        jobs="assortment-spn.json",
+        warehouse_config="spn-config.json",
+    )
 
     spn_crawler = AzureServicePrincipalCrawler(ws, MockBackend(), "ucx")._crawl()
 
@@ -257,10 +259,12 @@ def test_azure_service_principal_info_spark_conf_crawl():
 
 
 def test_azure_service_principal_info_no_spark_conf_crawl():
-    ws = workspace_client_mock(clusters="no-spark-conf.json",
-                               pipelines="single-pipeline.json",
-                               jobs="single-job.json",
-                               warehouse_config="single-config.json", )
+    ws = workspace_client_mock(
+        clusters="no-spark-conf.json",
+        pipelines="single-pipeline.json",
+        jobs="single-job.json",
+        warehouse_config="single-config.json",
+    )
 
     spn_crawler = AzureServicePrincipalCrawler(ws, MockBackend(), "ucx")._crawl()
 
@@ -275,9 +279,9 @@ def test_azure_service_principal_info_policy_family_conf_crawl(mocker):
 
 
 def test_azure_service_principal_info_null_applid_crawl():
-    ws = workspace_client_mock(clusters="single-cluster-spn-with-policy.json",
-                               pipelines="single-pipeline.json",
-                               jobs="single-job.json")
+    ws = workspace_client_mock(
+        clusters="single-cluster-spn-with-policy.json", pipelines="single-pipeline.json", jobs="single-job.json"
+    )
     spn_crawler = AzureServicePrincipalCrawler(ws, MockBackend(), "ucx")._crawl()
     assert len(spn_crawler) == 0
 
@@ -357,8 +361,7 @@ def test_list_all_wh_config_with_spn_and_secret():
 
 
 def test_list_all_clusters_spn_in_spark_conf_with_tenant():
-    ws = workspace_client_mock(clusters="single-cluster-spn.json",
-                               secret_exists=True)
+    ws = workspace_client_mock(clusters="single-cluster-spn.json", secret_exists=True)
     result_set = AzureServicePrincipalCrawler(ws, MockBackend(), "ucx")._list_all_cluster_with_spn_in_spark_conf()
 
     assert len(result_set) == 1
@@ -366,22 +369,26 @@ def test_list_all_clusters_spn_in_spark_conf_with_tenant():
 
 
 def test_azure_service_principal_info_policy_conf():
-    ws = workspace_client_mock(clusters="single-cluster-spn.json",
-                               jobs="single-spn-with-policy.json",
-                               pipelines="single-pipeline-with-spn.json",
-                               warehouse_config="spn-config.json",
-                               secret_exists=True)
+    ws = workspace_client_mock(
+        clusters="single-cluster-spn.json",
+        jobs="single-spn-with-policy.json",
+        pipelines="single-pipeline-with-spn.json",
+        warehouse_config="spn-config.json",
+        secret_exists=True,
+    )
     spn_crawler = AzureServicePrincipalCrawler(ws, MockBackend(), "ucx")._crawl()
 
     assert len(spn_crawler) == 4
 
 
 def test_azure_service_principal_info_dedupe():
-    ws = workspace_client_mock(clusters="single-cluster-dupe-spn.json",
-                               jobs="single-spn-with-policy.json",
-                               pipelines="single-pipeline-with-spn.json",
-                               warehouse_config="dupe-spn-config.json",
-                               secret_exists=True)
+    ws = workspace_client_mock(
+        clusters="single-cluster-dupe-spn.json",
+        jobs="single-spn-with-policy.json",
+        pipelines="single-pipeline-with-spn.json",
+        warehouse_config="dupe-spn-config.json",
+        secret_exists=True,
+    )
     spn_crawler = AzureServicePrincipalCrawler(ws, MockBackend(), "ucx")._crawl()
 
     assert len(spn_crawler) == 2
@@ -414,8 +421,7 @@ def test_list_all_pipeline_with_conf_spn_tenant():
 
 
 def test_list_all_pipeline_with_conf_spn_secret():
-    ws = workspace_client_mock(pipelines="single-pipeline-with-spn.json",
-                               secret_exists=True)
+    ws = workspace_client_mock(pipelines="single-pipeline-with-spn.json", secret_exists=True)
     result_set = AzureServicePrincipalCrawler(ws, MockBackend(), "ucx")._list_all_pipeline_with_spn_in_spark_conf()
 
     assert len(result_set) == 1
@@ -440,8 +446,7 @@ def test_list_all_pipeline_with_conf_spn_secret_unavlbl():
 
 
 def test_list_all_pipeline_with_conf_spn_secret_avlb():
-    ws = workspace_client_mock(pipelines="single-pipeline-with-spn.json",
-                               secret_exists=True)
+    ws = workspace_client_mock(pipelines="single-pipeline-with-spn.json", secret_exists=True)
     result_set = AzureServicePrincipalCrawler(ws, MockBackend(), "ucx")._list_all_pipeline_with_spn_in_spark_conf()
 
     assert len(result_set) > 0
@@ -457,7 +462,7 @@ def test_azure_spn_info_with_secret_unavailable():
         "oauth2.client.id.abcde.dfs.core.windows.net": "{{secrets/abcff/sp_app_client_id}}",
         "spark.hadoop.fs.azure.account."
         "oauth2.client.endpoint.abcde.dfs.core.windows.net": "https://login.microsoftonline.com/dedededede"
-                                                             "/token",
+        "/token",
         "spark.hadoop.fs.azure.account."
         "oauth2.client.secret.abcde.dfs.core.windows.net": "{{secrets/abcff/sp_secret}}",
     }
