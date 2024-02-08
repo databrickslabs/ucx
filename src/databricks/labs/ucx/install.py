@@ -784,8 +784,8 @@ class WorkspaceInstallation:
     def _check_policy_has_instance_pool(self, policy_id):
         try:
             policy = self._ws.cluster_policies.get(policy_id=policy_id)
-        except InvalidParameterValue as e:
-            logger.warning(f"skipping {policy_id}: {e}")
+        except NotFound:
+            logger.warning(f"removed on the backend {policy_id}")
             return False
         def_json = json.loads(policy.definition)
         instance_pool = def_json.get("instance_pool_id")
