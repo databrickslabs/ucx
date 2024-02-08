@@ -385,7 +385,7 @@ def test_list_all_clusters_spn_in_spark_conf_with_tenant():
 def test_azure_service_principal_info_policy_conf():
     ws = workspace_client_mock(clusters="single-cluster-spn.json",
                                jobs="single-spn-with-policy.json",
-                               pipelines="single-pipeline.json",
+                               pipelines="single-pipeline-with-spn.json",
                                warehouse_config="spn-config.json",
                                secret_exists=True)
     spn_crawler = AzureServicePrincipalCrawler(ws, MockBackend(), "ucx")._crawl()
@@ -394,10 +394,10 @@ def test_azure_service_principal_info_policy_conf():
 
 
 def test_azure_service_principal_info_dedupe():
-    ws = workspace_client_mock(clusters="single-cluster-spn.json",
+    ws = workspace_client_mock(clusters="single-cluster-dupe-spn.json",
                                jobs="single-spn-with-policy.json",
-                               pipelines="single-pipeline.json",
-                               warehouse_config="spn-config.json",
+                               pipelines="single-pipeline-with-spn.json",
+                               warehouse_config="dupe-spn-config.json",
                                secret_exists=True)
     spn_crawler = AzureServicePrincipalCrawler(ws, MockBackend(), "ucx")._crawl()
 

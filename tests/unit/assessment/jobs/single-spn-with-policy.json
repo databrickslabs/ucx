@@ -10,12 +10,7 @@
           "new_cluster": {
             "node_type_id": "Standard_DS3_v2",
             "num_workers": 2,
-            "policy_id": "single-job-with-spn",
-            "spark_conf": {
-              "spark.hadoop.fs.azure.account.oauth2.client.id.abcde.dfs.core.windows.net": "1234567890",
-              "spark.databricks.delta.formatCheck.enabled": "false",
-              "fs.azure.account.oauth2.client.endpoint.dummy.dfs.core.windows.net": "https://login.microsoftonline.com/dummy-123tenant-123/oauth2/token"
-            }
+            "policy_id": "single-job-with-spn"
           }
         }
       ],
