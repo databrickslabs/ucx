@@ -29,6 +29,10 @@ class AclSupport:
         """This method returns a Callable, that applies permissions to a destination group, based on
         the group migration state. The callable is required not to have any shared mutable state."""
 
+    def get_verify_task(self, item: Permissions) -> Callable[[], bool] | None:
+        """This method returns a Callable that verifies that all the crawled permissions are applied correctly to the
+        destination group."""
+
     @abstractmethod
     def object_types(self) -> set[str]:
         """This method returns a set of strings, that represent object types that are applicable by this instance."""

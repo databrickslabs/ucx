@@ -1,3 +1,4 @@
+# pylint: disable=duplicate-code
 import dataclasses
 import json
 import logging
@@ -141,7 +142,8 @@ class RedashPermissionsSupport(AclSupport):
             )
         return None
 
-    def _inflight_check(self, object_type: sql.ObjectTypePlural, object_id: str, acl: list[sql.AccessControl]):
+    @rate_limited(max_requests=100)
+    def _verify(self, object_type: sql.ObjectTypePlural, object_id: str, acl: list[sql.AccessControl]):
         # in-flight check for the applied permissions
         # the api might be inconsistent, therefore we need to check that the permissions were applied
         remote_permission = self._safe_get_dbsql_permissions(object_type, object_id)
@@ -149,13 +151,21 @@ class RedashPermissionsSupport(AclSupport):
             assert remote_permission.access_control_list is not None
             if all(elem in remote_permission.access_control_list for elem in acl):
                 return True
-            msg = f"""
-            Couldn't apply appropriate permission for object type {object_type} with id {object_id}
-            acl to be applied={acl}
-            acl found in the object={remote_permission}
-            """
+            msg = (
+                f"Couldn't find permission for object type {object_type} with id {object_id}\n"
+                f"acl to be applied={acl}\n"
+                f"acl found in the object={remote_permission}\n"
+            )
             raise ValueError(msg)
         return False
+
+    def get_verify_task(self, item: Permissions) -> Callable[[], bool]:
+        acl = sql.GetResponse.from_dict(json.loads(item.raw))
+        if not acl.access_control_list:
+            raise ValueError(
+                f"Access control list not present for object type " f"{item.object_type} and object id {item.object_id}"
+            )
+        return partial(self._verify, sql.ObjectTypePlural(item.object_type), item.object_id, acl.access_control_list)
 
     @rate_limited(max_requests=30)
     def _applier_task(self, object_type: sql.ObjectTypePlural, object_id: str, acl: list[sql.AccessControl]):
@@ -169,7 +179,7 @@ class RedashPermissionsSupport(AclSupport):
         set_retried_check(object_type, object_id, acl)
 
         retry_on_value_error = retried(on=[InternalError, ValueError], timeout=self._verify_timeout)
-        retried_check = retry_on_value_error(self._inflight_check)
+        retried_check = retry_on_value_error(self._verify)
         return retried_check(object_type, object_id, acl)
 
     def _prepare_new_acl(
