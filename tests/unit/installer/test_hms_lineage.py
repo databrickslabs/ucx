@@ -2,11 +2,11 @@ from unittest.mock import create_autospec
 
 from databricks.labs.blueprint.tui import MockPrompts
 from databricks.sdk import WorkspaceClient
+from databricks.sdk.errors import InvalidParameterValue
 from databricks.sdk.service.compute import (
     GlobalInitScriptDetails,
     GlobalInitScriptDetailsWithContent,
 )
-from databricks.sdk.errors import InvalidParameterValue
 
 from databricks.labs.ucx.installer.hms_lineage import HiveMetastoreLineageEnabler
 
