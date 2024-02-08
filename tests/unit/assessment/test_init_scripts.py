@@ -1,6 +1,6 @@
 import base64
 
-from databricks.sdk.errors import InvalidParameterValue
+from databricks.sdk.errors import ResourceDoesNotExist
 from databricks.sdk.service.compute import GlobalInitScriptDetails
 
 from databricks.labs.ucx.assessment.init_scripts import (
@@ -119,11 +119,11 @@ def test_missing_global_init_script(mocker, caplog):
             updated_by="2123l@eee.com",
         )
     ]
-    mock_ws.global_init_scripts.get.side_effect = InvalidParameterValue("NO_SCRIPT")
+    mock_ws.global_init_scripts.get.side_effect = ResourceDoesNotExist("RESOURCE_DOES_NOT_EXIST")
     mockbackend = MockBackend()
     crawler = GlobalInitScriptCrawler(mock_ws, mockbackend, schema="ucx")
     result = crawler.snapshot()
     result = mockbackend.rows_written_for("hive_metastore.ucx.global_init_scripts", "append")
 
     assert len(result) == 0
-    assert "Failed to get init script 222: NO_SCRIPT" in caplog.messages
+    assert "removed on the backend 222" in caplog.messages
