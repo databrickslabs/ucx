@@ -1101,7 +1101,6 @@ def test_latest_job_status_states(ws, mock_installation_with_jobs, any_prompt, s
     workspace_installation = WorkspaceInstallation(
         config, mock_installation_with_jobs, sql_backend, wheels, ws, any_prompt, timeout
     )
-    workspace_installation._state.jobs = {"assessment": "123"}
     ws.jobs.list_runs.return_value = base
     status = workspace_installation.latest_job_status()
     assert len(status) == 1
@@ -1114,6 +1113,7 @@ def test_latest_job_status_states(ws, mock_installation_with_jobs, any_prompt, s
     [
         (1704114000000, "1 hour ago"),  # 2024-01-01 13:00:00
         (1704117600000, "less than 1 second ago"),  # 2024-01-01 14:00:00
+        (1704116990000, "10 minutes 10 seconds ago"),  # 2024-01-01 13:49:50
         (None, "<never run>"),
     ],
 )
@@ -1138,7 +1138,6 @@ def test_latest_job_status_success_with_time(
     workspace_installation = WorkspaceInstallation(
         config, mock_installation_with_jobs, sql_backend, wheels, ws, any_prompt, timeout
     )
-    workspace_installation._state.jobs = {"assessment": "123"}
     ws.jobs.list_runs.return_value = base
     faked_now = datetime(2024, 1, 1, 14, 0, 0)
     mock_datetime.now.return_value = faked_now
@@ -1146,7 +1145,7 @@ def test_latest_job_status_success_with_time(
     assert status[0]["started"] == expected
 
 
-def test_latest_job_status_list(ws, mock_installation_with_jobs, any_prompt):
+def test_latest_job_status_list(ws, any_prompt):
     runs = [
         [
             BaseRun(
@@ -1176,10 +1175,16 @@ def test_latest_job_status_list(ws, mock_installation_with_jobs, any_prompt):
     wheels = create_autospec(WheelsV2)
     config = WorkspaceConfig(inventory_database='ucx')
     timeout = timedelta(seconds=1)
-    workspace_installation = WorkspaceInstallation(
-        config, mock_installation_with_jobs, sql_backend, wheels, ws, any_prompt, timeout
+    mock_installation = MockInstallation(
+        {
+            'state.json': {
+                'resources': {'jobs': {"job1": "1", "job2": "2", "job3": "3"}}
+            }
+        }
     )
-    workspace_installation._state.jobs = {"job1": "1", "job2": "2", "job3": "3"}
+    workspace_installation = WorkspaceInstallation(
+        config, mock_installation, sql_backend, wheels, ws, any_prompt, timeout
+    )
     ws.jobs.list_runs.side_effect = iter(runs)
     status = workspace_installation.latest_job_status()
     assert len(status) == 3
@@ -1199,7 +1204,6 @@ def test_latest_job_status_no_job_run(ws, mock_installation_with_jobs, any_promp
     workspace_installation = WorkspaceInstallation(
         config, mock_installation_with_jobs, sql_backend, wheels, ws, any_prompt, timeout
     )
-    workspace_installation._state.jobs = {"assessment": "123"}
     ws.jobs.list_runs.return_value = ""
     status = workspace_installation.latest_job_status()
     assert len(status) == 1
@@ -1214,7 +1218,6 @@ def test_latest_job_status_exception(ws, mock_installation_with_jobs, any_prompt
     workspace_installation = WorkspaceInstallation(
         config, mock_installation_with_jobs, sql_backend, wheels, ws, any_prompt, timeout
     )
-    workspace_installation._state.jobs = {"assessment": "123"}
     ws.jobs.list_runs.side_effect = InvalidParameterValue("Workflow does not exists")
     status = workspace_installation.latest_job_status()
     assert len(status) == 0
