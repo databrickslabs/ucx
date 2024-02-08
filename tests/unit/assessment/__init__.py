@@ -25,9 +25,14 @@ def _cluster_policy(policy_id: str):
     return Policy(description=definition, policy_family_definition_overrides=overrides)
 
 
+def _pipeline_cluster(pipeline_id: str):
+    pipeline_response = _load_list(GetPipelineResponse, f"clusters/{pipeline_id}.json")[0]
+    return pipeline_response
+
+
 def workspace_client_mock(clusters="no-spark-conf.json"):
     ws = create_autospec(WorkspaceClient)
     ws.clusters.list.return_value = _load_list(ClusterDetails, f"../assessment/clusters/{clusters}")
     ws.cluster_policies.get = _cluster_policy
-    ws.pipelines.get.return_value = _load_list(GetPipelineResponse, "clusters/pipeline_cluster.json")[0]
+    ws.pipelines.get = _pipeline_cluster
     return ws

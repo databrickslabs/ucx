@@ -16,20 +16,13 @@ def test_pipeline_assessment_with_config():
             creator_user_name="abcde.defgh@databricks.com",
             latest_updates=None,
             name="New DLT Pipeline",
-            pipeline_id="0112eae7-9d11-4b40-a2b8-6c83cb3c7407",
+            pipeline_id="pipeline_id_with_conf",
             run_as_user_name="abcde.defgh@databricks.com",
             state=PipelineState.IDLE,
         )
     ]
 
     ws = workspace_client_mock(clusters="job-source-cluster.json")
-    config_dict = {
-        "spark.hadoop.fs.azure.account.auth.type.abcde.dfs.core.windows.net": "SAS",
-        "spark.hadoop.fs.azure.sas.token.provider.type.abcde.dfs."
-        "core.windows.net": "org.apache.hadoop.fs.azurebfs.sas.FixedSASTokenProvider",
-        "spark.hadoop.fs.azure.sas.fixed.token.abcde.dfs.core.windows.net": "{{secrets/abcde_access/sasFixedToken}}",
-    }
-    ws.pipelines.get().spec.configuration = config_dict
     ws.workspace.export().content = "JXNoCmVjaG8gIj0="
     ws.dbfs.read().data = "JXNoCmVjaG8gIj0="
 
@@ -48,14 +41,12 @@ def test_pipeline_assessment_without_config():
             creator_user_name="abcde.defgh@databricks.com",
             latest_updates=None,
             name="New DLT Pipeline",
-            pipeline_id="0112eae7-9d11-4b40-a2b8-6c83cb3c7497",
+            pipeline_id="pipeline_id_without_conf",
             run_as_user_name="abcde.defgh@databricks.com",
             state=PipelineState.IDLE,
         )
     ]
     ws = workspace_client_mock(clusters="job-source-cluster.json")
-    config_dict = {}
-    ws.pipelines.get().spec.configuration = config_dict
     ws.workspace.export().content = "JXNoCmVjaG8gIj0="
     ws.dbfs.read().data = "JXNoCmVjaG8gIj0="
     ws.pipelines.list_pipelines.return_value = sample_pipelines
@@ -92,15 +83,13 @@ def test_pipeline_list_with_no_config():
         PipelineInfo(
             creator_name="abcde.defgh@databricks.com",
             pipeline_name="New DLT Pipeline",
-            pipeline_id="0112eae7-9d11-4b40-a2b8-6c83cb3c7497",
+            pipeline_id="pipeline_id_without_conf",
             success=1,
             failures="",
         )
     ]
     mock_ws = workspace_client_mock(clusters="no-spark-conf.json")
     mock_ws.pipelines.list_pipelines.return_value = sample_pipelines
-    config_dict = {"spark.hadoop.fs.azure1.account.oauth2.client.id.abcde.dfs.core.windows.net": "wewewerty"}
-    mock_ws.pipelines.get().spec.configuration = config_dict
     crawler = AzureServicePrincipalCrawler(mock_ws, MockBackend(), "ucx").snapshot()
 
     assert len(crawler) == 0
@@ -113,7 +102,7 @@ def test_pipeline_without_owners_should_have_empty_creator_name():
             creator_user_name=None,
             latest_updates=None,
             name="New DLT Pipeline",
-            pipeline_id="0112eae7-9d11-4b40-a2b8-6c83cb3c7407",
+            pipeline_id="pipeline_id_without_conf",
             run_as_user_name="abcde.defgh@databricks.com",
             state=PipelineState.IDLE,
         )
@@ -121,7 +110,6 @@ def test_pipeline_without_owners_should_have_empty_creator_name():
 
     ws = workspace_client_mock(clusters="no-spark-conf.json")
     ws.pipelines.list_pipelines.return_value = sample_pipelines
-    ws.pipelines.get().spec.configuration = {}
     ws.workspace.export().content = "JXNoCmVjaG8gIj0="
     ws.dbfs.read().data = "JXNoCmVjaG8gIj0="
     mockbackend = MockBackend()
@@ -130,7 +118,7 @@ def test_pipeline_without_owners_should_have_empty_creator_name():
 
     assert result == [
         PipelineInfo(
-            pipeline_id="0112eae7-9d11-4b40-a2b8-6c83cb3c7407",
+            pipeline_id="pipeline_id_without_conf",
             pipeline_name="New DLT Pipeline",
             creator_name=None,
             success=1,
@@ -146,22 +134,15 @@ def test_pipeline_assessment_with_no_cluster_config():
             creator_user_name="abcde.defgh@databricks.com",
             latest_updates=None,
             name="New DLT Pipeline",
-            pipeline_id="0112eae7-9d11-4b40-a2b8-6c83cb3c7407",
+            pipeline_id="pipeline_id_with_conf",
             run_as_user_name="abcde.defgh@databricks.com",
             state=PipelineState.IDLE,
         )
     ]
 
     ws = workspace_client_mock(clusters="no-spark-conf.json")
-    config_dict = {
-        "spark.hadoop.fs.azure.account.auth.type.abcde.dfs.core.windows.net": "SAS",
-        "spark.hadoop.fs.azure.sas.token.provider.type.abcde.dfs."
-        "core.windows.net": "org.apache.hadoop.fs.azurebfs.sas.FixedSASTokenProvider",
-        "spark.hadoop.fs.azure.sas.fixed.token.abcde.dfs.core.windows.net": "{{secrets/abcde_access/sasFixedToken}}",
-    }
-    pipeline_cluster = []
-    ws.pipelines.get().spec.configuration = config_dict
-    ws.pipelines.get().spec.clusters = pipeline_cluster
+    ws.workspace.export().content = "JXNoCmVjaG8gIj0="
+    ws.dbfs.read().data = "JXNoCmVjaG8gIj0="
     ws.pipelines.list_pipelines.return_value = sample_pipelines
     crawler = PipelinesCrawler(ws, MockBackend(), "ucx").snapshot()
     result_set = list(crawler)

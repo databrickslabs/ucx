@@ -1,0 +1,13 @@
+[
+  {
+    "creator_user_name": "abcde.defgh@databricks.com",
+    "name": "New DLT Pipeline",
+    "pipeline_id": "pipeline_id_with_conf",
+    "run_as_user_name": "abcde.defgh@databricks.com",
+    "spec": {
+      "clusters": [],
+      "configuration": {
+    }
+    }
+  }
+  ]
