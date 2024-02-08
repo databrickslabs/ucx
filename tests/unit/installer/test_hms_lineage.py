@@ -6,6 +6,7 @@ from databricks.sdk.service.compute import (
     GlobalInitScriptDetails,
     GlobalInitScriptDetailsWithContent,
 )
+from databricks.sdk.errors import InvalidParameterValue
 
 from databricks.labs.ucx.installer.hms_lineage import HiveMetastoreLineageEnabler
 
@@ -127,3 +128,26 @@ def test_disabled_and_then_enabled(caplog):
     hmle.apply(MockPrompts({r'HMS lineage collection init script is disabled.*': 'yes'}))
 
     ws.global_init_scripts.update.assert_called_once()
+
+
+def test_get_script_fails_missing_script(caplog):
+    ws = create_autospec(WorkspaceClient)
+    ginit_scripts = [
+        GlobalInitScriptDetails(
+            created_at=1695045723722,
+            created_by="test@abc.com",
+            enabled=True,
+            name="test123",
+            position=0,
+            script_id="12345",
+            updated_at=1695046359612,
+            updated_by="test@abc.com",
+        )
+    ]
+    ws.global_init_scripts.list.return_value = ginit_scripts
+    ws.global_init_scripts.get.side_effect = InvalidParameterValue("INVALID_PARAMETER_VALUE")
+
+    with caplog.at_level('WARN'):
+        hmle = HiveMetastoreLineageEnabler(ws)
+        hmle.apply(MockPrompts({r'No HMS lineage collection init script exists.*': 'yes'}))
+        assert "Failed to get init script 12345: INVALID_PARAMETER_VALUE" in caplog.messages
