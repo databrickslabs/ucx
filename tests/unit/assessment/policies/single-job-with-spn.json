@@ -1,0 +1,30 @@
+{
+  "definition": {
+    "spark_conf.fs.azure.account.auth.type": {
+      "type": "fixed",
+      "value": "OAuth",
+      "hidden": "true"
+    },
+    "spark_conf.fs.azure.account.oauth.provider.type": {
+      "type": "fixed",
+      "value": "org.apache.hadoop.fs.azurebfs.oauth2.ClientCredsTokenProvider",
+      "hidden": "true"
+    },
+    "spark_conf.fs.azure.account.oauth2.client.id": {
+      "type": "fixed",
+      "value": "dummyclientidfromprofile",
+      "hidden": "true"
+    },
+    "spark_conf.fs.azure.account.oauth2.client.secret": {
+      "type": "fixed",
+      "value": "gfgfgfgfggfggfgfdds",
+      "hidden": "true"
+    },
+    "spark_conf.fs.azure.account.oauth2.client.endpoint": {
+      "type": "fixed",
+      "value": "https://login.microsoftonline.com/1234ededed/oauth2/token",
+      "hidden": "true"
+    }
+  },
+  "policy_family_definition_overrides": {}
+}

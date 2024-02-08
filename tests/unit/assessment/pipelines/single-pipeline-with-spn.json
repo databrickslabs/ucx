@@ -1,0 +1,9 @@
+[
+  {
+    "creator_name": "abcde.defgh@databricks.com",
+    "failures": "",
+    "pipeline_id": "spec-with-spn",
+    "pipeline_name": "New DLT Pipeline",
+    "success": 1
+  }
+]
