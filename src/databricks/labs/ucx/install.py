@@ -914,7 +914,7 @@ class WorkspaceInstallation:
         logger.info("Deleting cluster policy")
         try:
             self._ws.cluster_policies.delete(policy_id=self.config.policy_id)
-        except InvalidParameterValue:
+        except NotFound:
             logger.error("UCX Policy already deleted")
 
     def _remove_jobs(self):
