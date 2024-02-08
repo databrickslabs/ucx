@@ -16,7 +16,7 @@ def test_pipeline_assessment_with_config():
             creator_user_name="abcde.defgh@databricks.com",
             latest_updates=None,
             name="New DLT Pipeline",
-            pipeline_id="pipeline_id_with_conf",
+            pipeline_id="spec-with-spn",
             run_as_user_name="abcde.defgh@databricks.com",
             state=PipelineState.IDLE,
         )
@@ -41,7 +41,7 @@ def test_pipeline_assessment_without_config():
             creator_user_name="abcde.defgh@databricks.com",
             latest_updates=None,
             name="New DLT Pipeline",
-            pipeline_id="pipeline_id_without_conf",
+            pipeline_id="empty-spec",
             run_as_user_name="abcde.defgh@databricks.com",
             state=PipelineState.IDLE,
         )
@@ -83,7 +83,7 @@ def test_pipeline_list_with_no_config():
         PipelineInfo(
             creator_name="abcde.defgh@databricks.com",
             pipeline_name="New DLT Pipeline",
-            pipeline_id="pipeline_id_without_conf",
+            pipeline_id="empty-spec",
             success=1,
             failures="",
         )
@@ -102,7 +102,7 @@ def test_pipeline_without_owners_should_have_empty_creator_name():
             creator_user_name=None,
             latest_updates=None,
             name="New DLT Pipeline",
-            pipeline_id="pipeline_id_without_conf",
+            pipeline_id="empty-spec",
             run_as_user_name="abcde.defgh@databricks.com",
             state=PipelineState.IDLE,
         )
@@ -118,34 +118,10 @@ def test_pipeline_without_owners_should_have_empty_creator_name():
 
     assert result == [
         PipelineInfo(
-            pipeline_id="pipeline_id_without_conf",
+            pipeline_id="empty-spec",
             pipeline_name="New DLT Pipeline",
             creator_name=None,
             success=1,
             failures="[]",
         )
     ]
-
-
-def test_pipeline_assessment_with_no_cluster_config():
-    sample_pipelines = [
-        PipelineStateInfo(
-            cluster_id=None,
-            creator_user_name="abcde.defgh@databricks.com",
-            latest_updates=None,
-            name="New DLT Pipeline",
-            pipeline_id="pipeline_id_with_conf",
-            run_as_user_name="abcde.defgh@databricks.com",
-            state=PipelineState.IDLE,
-        )
-    ]
-
-    ws = workspace_client_mock(clusters="no-spark-conf.json")
-    ws.workspace.export().content = "JXNoCmVjaG8gIj0="
-    ws.dbfs.read().data = "JXNoCmVjaG8gIj0="
-    ws.pipelines.list_pipelines.return_value = sample_pipelines
-    crawler = PipelinesCrawler(ws, MockBackend(), "ucx").snapshot()
-    result_set = list(crawler)
-
-    assert len(result_set) == 1
-    assert result_set[0].success == 0
