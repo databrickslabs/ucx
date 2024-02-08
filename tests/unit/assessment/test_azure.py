@@ -253,8 +253,7 @@ def test_azure_spn_info_without_secret():
 
 def test_azure_service_principal_info_crawl():
     ws = workspace_client_mock(clusters="assortment-spn.json",
-                               pipelines="single-pipeline.json",
-                               pipeline_spec="pipeline-spec.json",
+                               pipelines="single-pipeline-with-spn.json",
                                jobs="assortment-spn.json",
                                warehouse_config="spn-config.json",
                                secret_exists=True)
@@ -406,8 +405,7 @@ def test_azure_service_principal_info_dedupe():
 
 
 def test_list_all_pipeline_with_conf_spn_in_spark_conf():
-    ws = workspace_client_mock(pipelines="single-pipeline.json",
-                               pipeline_spec="pipeline-spec.json",)
+    ws = workspace_client_mock(pipelines="single-pipeline-with-spn.json")
     result_set = AzureServicePrincipalCrawler(ws, MockBackend(), "ucx")._list_all_pipeline_with_spn_in_spark_conf()
 
     assert len(result_set) == 1
@@ -424,16 +422,7 @@ def test_list_all_pipeline_wo_conf_spn_in_spark_conf():
 
 
 def test_list_all_pipeline_with_conf_spn_tenant():
-    ws = workspace_client_mock(pipelines="single-pipeline.json")
-    config_dict = {
-        "spark.hadoop.fs.azure.account.oauth2.client.id.newstorageacct.dfs.core.windows.net": ""
-                                                                                              "pipeline_dummy_application_id",
-        "spark.hadoop.fs.azure1.account.oauth2.client.endpoint.newstorageacct.dfs.core.windows.net": ""
-                                                                                                     "https://login.microsoftonline.com/directory_12345/oauth2/token",
-        "spark.hadoop.fs.azure.sas.fixed.token.abcde.dfs.core.windows.net": "{{secrets/abcde_access/sasFixedToken}}",
-    }
-    ws.pipelines.get().spec.configuration = config_dict
-
+    ws = workspace_client_mock(pipelines="single-pipeline-with-spn.json")
     result_set = AzureServicePrincipalCrawler(ws, MockBackend(), "ucx")._list_all_pipeline_with_spn_in_spark_conf()
 
     assert len(result_set) == 1
@@ -442,8 +431,7 @@ def test_list_all_pipeline_with_conf_spn_tenant():
 
 
 def test_list_all_pipeline_with_conf_spn_secret():
-    ws = workspace_client_mock(pipelines="single-pipeline.json",
-                               pipeline_spec="pipeline-spec.json",
+    ws = workspace_client_mock(pipelines="single-pipeline-with-spn.json",
                                secret_exists=True)
     result_set = AzureServicePrincipalCrawler(ws, MockBackend(), "ucx")._list_all_pipeline_with_spn_in_spark_conf()
 
@@ -469,8 +457,7 @@ def test_list_all_pipeline_with_conf_spn_secret_unavlbl():
 
 
 def test_list_all_pipeline_with_conf_spn_secret_avlb():
-    ws = workspace_client_mock(pipelines="single-pipeline.json",
-                               pipeline_spec="pipeline-spec.json",
+    ws = workspace_client_mock(pipelines="single-pipeline-with-spn.json",
                                secret_exists=True)
     result_set = AzureServicePrincipalCrawler(ws, MockBackend(), "ucx")._list_all_pipeline_with_spn_in_spark_conf()
 

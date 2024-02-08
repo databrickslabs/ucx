@@ -6,7 +6,7 @@ from databricks.sdk import WorkspaceClient
 from databricks.sdk.errors import NotFound
 from databricks.sdk.service.compute import ClusterDetails, Policy
 from databricks.sdk.service.jobs import BaseJob
-from databricks.sdk.service.pipelines import PipelineStateInfo
+from databricks.sdk.service.pipelines import PipelineStateInfo, GetPipelineResponse
 from databricks.sdk.service.sql import EndpointConfPair
 from databricks.sdk.service.workspace import GetSecretResponse
 
@@ -29,7 +29,11 @@ def _cluster_policy(policy_id: str):
     return Policy(description=definition, policy_family_definition_overrides=overrides)
 
 
-def _mock_get_secret(secret_scope, secret_key):
+def _pipeline(pipeline_id: str):
+    fixture = _load_fixture(f"pipelines/{pipeline_id}.json")
+    return GetPipelineResponse.from_dict(fixture)
+
+def _secret_not_found(secret_scope, secret_key):
     msg = f"Secret Scope {secret_scope} does not exist!"
     raise NotFound(msg)
 
@@ -54,7 +58,7 @@ def workspace_client_mock(clusters="no-spark-conf.json",
     ws.cluster_policies.get = _cluster_policy
     ws.pipelines.list_pipelines.return_value = (
         _load_list(PipelineStateInfo, f"../assessment/pipelines/{pipelines}"))
-    ws.pipelines.get().spec.configuration = (_load_fixture(f"../assessment/pipelines/{pipeline_spec}"))
+    ws.pipelines.get = _pipeline
     ws.jobs.list.return_value = (
         _load_list(BaseJob, f"../assessment/jobs/{jobs}"))
     ws.warehouses.get_workspace_warehouse_config().data_access_config = (
@@ -62,5 +66,5 @@ def workspace_client_mock(clusters="no-spark-conf.json",
     if secret_exists:
         ws.secrets.get_secret.return_value = GetSecretResponse(key="username", value="SGVsbG8sIFdvcmxkIQ==")
     else:
-        ws.secrets.get_secret = _mock_get_secret
+        ws.secrets.get_secret = _secret_not_found
     return ws
