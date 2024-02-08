@@ -1,0 +1,42 @@
+[
+  {
+    "key": "spark.hadoop.fs.azure.account.auth.type.storage_acct1.dfs.core.windows.net",
+    "value": "OAuth"
+  },
+  {
+    "key": "spark.hadoop.fs.azure.account.oauth.provider.type.storage_acct1.dfs.core.windows.net",
+    "value": "org.apache.hadoop.fs.azurebfs.oauth2.ClientCredsTokenProvider"
+  },
+  {
+    "key": "spark.hadoop.fs.azure.account.oauth2.client.id.storage_acct2.dfs.core.windows.net",
+    "value": "dummy_application_id"
+  },
+  {
+    "key": "spark.hadoop.fs.azure.account.oauth2.client.secret.storage_acct1.dfs.core.windows.net",
+    "value": "dfddsaaaaddwwdds"
+  },
+  {
+    "key": "spark.hadoop.fs.azure.account.oauth2.client.endpoint.storage_acct2.dfs.core.windows.net",
+    "value": "https://login.microsoftonline.com/dummy_tenant_id/oauth2/token"
+  },
+  {
+    "key": "spark.hadoop.fs.azure.account.auth.type.storage_acct2.dfs.core.windows.net",
+    "value": "OAuth"
+  },
+  {
+    "key": "spark.hadoop.fs.azure.account.oauth.provider.type.storage_acct2.dfs.core.windows.net",
+    "value": "org.apache.hadoop.fs.azurebfs.oauth2.ClientCredsTokenProvider"
+  },
+  {
+    "key": "spark.hadoop.fs.azure.account.oauth2.client.id.storage_acct1.dfs.core.windows.net",
+    "value": "dummy_application_id_2"
+  },
+  {
+    "key": "spark.hadoop.fs.azure.account.oauth2.client.secret.storage_acct2.dfs.core.windows.net",
+    "value": "dfddsaaaaddwwdds"
+  },
+  {
+    "key": "spark.hadoop.fs.azure.account.oauth2.client.endpoint.storage_acct1.dfs.core.windows.net",
+    "value": "https://login.microsoftonline.com/dummy_tenant_id_2/oauth2/token"
+  }
+]

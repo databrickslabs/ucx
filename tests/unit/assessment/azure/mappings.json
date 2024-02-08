@@ -1,0 +1,180 @@
+[
+  {
+    "/v1.0/directoryObjects/user1": {
+      "appId": "appIduser1",
+      "displayName": "disNameuser1",
+      "id": "Iduser1"
+    },
+    "/v1.0/directoryObjects/user2": {
+      "appId": "appIduser2",
+      "displayName": "disNameuser2",
+      "id": "Iduser2"
+    },
+    "/v1.0/directoryObjects/user3": {
+      "appId": "appIduser3",
+      "displayName": "disNameuser3",
+      "id": "Iduser3"
+    },
+    "/subscriptions": {
+      "value": [
+        {
+          "displayName": "sub1",
+          "subscriptionId": "001",
+          "tenantId": "bar1"
+        },
+        {
+          "displayName": "sub2",
+          "subscriptionId": "002",
+          "tenantId": "bar"
+        },
+        {
+          "displayName": "sub3",
+          "subscriptionId": "003",
+          "tenantId": "bar3"
+        }
+      ]
+    },
+    "/subscriptions/002/providers/Microsoft.Storage/storageAccounts": {
+      "value": [
+        {
+          "name": "sto1"
+        },
+        {
+          "name": "sto2",
+          "id": "subscriptions/002/resourceGroups/rg1/storageAccounts/sto2"
+        },
+        {
+          "name": "sto3",
+          "id": "subscriptions/002/resourceGroups/rg1/storageAccounts/sto3"
+        }
+      ]
+    },
+    "subscriptions/002/resourceGroups/rg1/storageAccounts/sto2/blobServices/default/containers": {
+      "value": [
+        {
+          "name": "container1",
+          "id": "subscriptions/002/resourceGroups/rg1/storageAccounts/sto2/containers/container1"
+        },
+        {
+          "name": "container2",
+          "id": "subscriptions/002/resourceGroups/rg1/storageAccounts/sto2/containers/container2"
+        },
+        {
+          "name": "container3",
+          "id": "subscriptions/002/resourceGroups/rg1/storageAccounts/sto2/containers/container3"
+        },
+        {
+          "name": "container4"
+        }
+      ]
+    },
+    "subscriptions/002/resourceGroups/rg1/storageAccounts/sto1/providers/Microsoft.Authorization/roleAssignments": {
+      "value": [
+        {
+          "properties": {
+            "principalId": "user1",
+            "principalType": "User",
+            "roleDefinitionId": "id001",
+            "scope": "subscriptions/002/resourceGroups/rg1/storageAccounts/sto1"
+          },
+          "id": "rol1"
+        }
+      ]
+    },
+    "subscriptions/002/resourceGroups/rg1/storageAccounts/sto2/providers/Microsoft.Authorization/roleAssignments": {
+      "value": [
+        {
+          "properties": {
+            "principalId": "user2",
+            "principalType": "ServicePrincipal",
+            "roleDefinitionId": "id001",
+            "scope": "subscriptions/002/resourceGroups/rg1/storageAccounts/sto2"
+          },
+          "id": "rol1"
+        }
+      ]
+    },
+    "id001": {
+      "id": "role1",
+      "properties": {
+        "roleName": "Contributor"
+      }
+    },
+    "subscriptions/002/resourceGroups/rg1/storageAccounts/sto3/providers/Microsoft.Authorization/roleAssignments": {
+      "value": [
+        {
+          "properties": {
+            "principalId": "user3",
+            "principalType": "ServicePrincipal",
+            "roleDefinitionId": "id002",
+            "scope": "subscriptions/002/resourceGroups/rg1/storageAccounts/sto3"
+          },
+          "id": "rol1"
+        },
+        {
+          "properties": {
+            "principalId": "user3",
+            "principalType": "ServicePrincipal",
+            "roleDefinitionId": "id002",
+            "scope": "subscriptions/002/resourceGroups/rg1/storageAccounts/sto3"
+          },
+          "id": "rol2"
+        }
+      ]
+    },
+    "id002": {
+      "id": "role2",
+      "properties": {
+        "roleName": "Storage Blob Data Owner"
+      }
+    },
+    "subscriptions/002/resourceGroups/rg1/storageAccounts/sto2/containers/container1/providers/Microsoft.Authorization/roleAssignments": {
+      "value": [
+        {
+          "properties": {
+            "principalId": "user2",
+            "principalType": "ServicePrincipal",
+            "roleDefinitionId": "id001",
+            "scope": "subscriptions/002/resourceGroups/rg1/storageAccounts/sto2/containers/container1"
+          },
+          "id": "rol1"
+        }
+      ]
+    },
+    "subscriptions/002/resourceGroups/rg1/storageAccounts/sto2/containers/container2/providers/Microsoft.Authorization/roleAssignments": {
+      "value": [
+        {
+          "properties": {
+            "principalId": "user1",
+            "principalType": "User",
+            "roleDefinitionId": "id001",
+            "scope": "this"
+          },
+          "id": "rol1"
+        }
+      ]
+    },
+    "subscriptions/002/resourceGroups/rg1/storageAccounts/sto2/containers/container3/providers/Microsoft.Authorization/roleAssignments": {
+      "value": [
+        {
+          "properties": {
+            "principalId": "user3",
+            "principalType": "ServicePrincipal",
+            "roleDefinitionId": "id002",
+            "scope": "subscriptions/002/resourceGroups/rg1/storageAccounts/sto2/containers/container3"
+          },
+          "id": "rol1"
+        },
+        {
+          "properties": {
+            "principalId": "user3",
+            "principalType": "ServicePrincipal",
+            "roleDefinitionId": "id002",
+            "scope": "subscriptions/002/resourceGroups/rg1/storageAccounts/sto2"
+          },
+          "id": "rol2"
+        }
+      ]
+    }
+  }
+]
