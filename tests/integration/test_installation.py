@@ -1,4 +1,5 @@
 import functools
+import json
 import logging
 from collections.abc import Callable
 from dataclasses import replace
@@ -11,11 +12,15 @@ from databricks.labs.blueprint.tui import MockPrompts
 from databricks.labs.blueprint.wheels import WheelsV2
 from databricks.sdk.errors import InvalidParameterValue, NotFound, Unknown
 from databricks.sdk.retries import retried
-from databricks.sdk.service import sql
+from databricks.sdk.service import compute, sql
 from databricks.sdk.service.iam import PermissionLevel
 
 from databricks.labs.ucx.config import WorkspaceConfig
-from databricks.labs.ucx.install import PRODUCT_INFO, WorkspaceInstallation
+from databricks.labs.ucx.install import (
+    PRODUCT_INFO,
+    WorkspaceInstallation,
+    WorkspaceInstaller,
+)
 from databricks.labs.ucx.workspace_access import redash
 from databricks.labs.ucx.workspace_access.generic import (
     GenericPermissionsSupport,
@@ -29,20 +34,25 @@ logger = logging.getLogger(__name__)
 
 
 @pytest.fixture
-def new_installation(ws, sql_backend, env_or_skip, inventory_schema, make_random):
+def new_installation(ws, sql_backend, env_or_skip, inventory_schema, make_random, make_cluster_policy):
     cleanup = []
-
-    prompts = MockPrompts(
-        {
-            r'Open job overview in your browser.*': 'no',
-            r'Do you want to uninstall ucx.*': 'yes',
-            r'Do you want to delete the inventory database.*': 'yes',
-        }
-    )
 
     def factory(config_transform: Callable[[WorkspaceConfig], WorkspaceConfig] | None = None):
         prefix = make_random(4)
         renamed_group_prefix = f"rename-{prefix}-"
+        prompts = MockPrompts(
+            {
+                r'Open job overview in your browser.*': 'no',
+                r'Do you want to uninstall ucx.*': 'yes',
+                r'Do you want to delete the inventory database.*': 'yes',
+                r".*PRO or SERVERLESS SQL warehouse.*": "1",
+                r"Choose how to map the workspace groups.*": "1",
+                r".*connect to the external metastore?.*": "yes",
+                r".*Inventory Database.*": inventory_schema,
+                r".*Backup prefix*": renamed_group_prefix,
+                r".*": "",
+            }
+        )
         workspace_start_path = f"/Users/{ws.current_user.me().user_name}/.{prefix}"
         default_cluster_id = env_or_skip("TEST_DEFAULT_CLUSTER_ID")
         tacl_cluster_id = env_or_skip("TEST_LEGACY_TABLE_ACL_CLUSTER_ID")
@@ -53,16 +63,14 @@ def new_installation(ws, sql_backend, env_or_skip, inventory_schema, make_random
                 functools.partial(ws.clusters.ensure_cluster_is_running, tacl_cluster_id),
             ],
         )
-        workspace_config = WorkspaceConfig(
-            inventory_database=inventory_schema,
-            log_level="DEBUG",
-            renamed_group_prefix=renamed_group_prefix,
-            workspace_start_path=workspace_start_path,
-            override_clusters={"main": default_cluster_id, "tacl": tacl_cluster_id},
-        )
+        installation = Installation(ws, prefix)
+        installer = WorkspaceInstaller(prompts, installation, ws)
+        workspace_config = installer.configure()
+        overrides = {"main": default_cluster_id, "tacl": tacl_cluster_id}
+        workspace_config.override_clusters = overrides
+        workspace_config.workspace_start_path = workspace_start_path
         if config_transform:
             workspace_config = config_transform(workspace_config)
-        installation = Installation(ws, prefix)
         installation.save(workspace_config)
 
         # TODO: see if we want to move building wheel as a context manager for yield factory,
@@ -104,6 +112,42 @@ def test_job_failure_propagates_correct_error_message_and_logs(ws, sql_backend, 
 
 
 @retried(on=[NotFound, Unknown, InvalidParameterValue], timeout=timedelta(minutes=18))
+def test_job_cluster_policy(ws, new_installation):
+    install = new_installation(lambda wc: replace(wc, override_clusters=None))
+    cluster_policy = ws.cluster_policies.get(policy_id=install.config.policy_id)
+    policy_definition = json.loads(cluster_policy.definition)
+
+    assert cluster_policy.name == f"Unity Catalog Migration ({install.config.inventory_database})"
+
+    assert policy_definition["spark_version"]["value"] == ws.clusters.select_spark_version(latest=True)
+    assert policy_definition["node_type_id"]["value"] == ws.clusters.select_node_type(local_disk=True)
+    assert (
+        policy_definition["azure_attributes.availability"]["value"] == compute.AzureAvailability.ON_DEMAND_AZURE.value
+    )
+
+
+@pytest.mark.skip
+@retried(on=[NotFound, TimeoutError], timeout=timedelta(minutes=15))
+def test_new_job_cluster_with_policy_assessment(
+    ws, new_installation, make_ucx_group, make_cluster_policy, make_cluster_policy_permissions
+):
+    ws_group_a, acc_group_a = make_ucx_group()
+    cluster_policy = make_cluster_policy()
+    make_cluster_policy_permissions(
+        object_id=cluster_policy.policy_id,
+        permission_level=PermissionLevel.CAN_USE,
+        group_name=ws_group_a.display_name,
+    )
+    install = new_installation(
+        lambda wc: replace(wc, override_clusters=None, include_group_names=[ws_group_a.display_name])
+    )
+    install.run_workflow("assessment")
+    generic_permissions = GenericPermissionsSupport(ws, [])
+    before = generic_permissions.load_as_dict("cluster-policies", cluster_policy.policy_id)
+    assert before[ws_group_a.display_name] == PermissionLevel.CAN_USE
+
+
+@retried(on=[NotFound, Unknown, InvalidParameterValue], timeout=timedelta(minutes=20))
 def test_running_real_assessment_job(
     ws, new_installation, make_ucx_group, make_cluster_policy, make_cluster_policy_permissions
 ):
