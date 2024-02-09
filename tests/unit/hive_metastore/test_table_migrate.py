@@ -373,11 +373,11 @@ def test_revert_report(capsys):
     captured = capsys.readouterr()
     assert "test_schema1|1|0|1|0|1|0|0|" in captured.out.replace(" ", "")
     assert "test_schema2|1|0|0|0|0|0|0|" in captured.out.replace(" ", "")
-    assert "Migrated DBFS Root Tables will be deleted" in captured.out
+    assert "- Migrated DBFS Root Tables will be deleted" in captured.out
 
     table_migrate.print_revert_report(delete_managed=False)
     captured = capsys.readouterr()
-    assert "Migrated DBFS Root Tables will be left intact" in captured.out
+    assert "- Migrated DBFS Root Tables will be left intact" in captured.out
 
 
 def test_empty_revert_report(capsys):

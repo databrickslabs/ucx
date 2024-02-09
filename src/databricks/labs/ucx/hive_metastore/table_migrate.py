@@ -176,23 +176,36 @@ class TablesMigrate:
             logger.info("No migrated tables were found.")
             return False
         print("The following is the count of migrated tables and views found in scope:")
-        table_header = "Database                      |"
+        table_header = "Database            |"
+        headers = 1
         for what in list(What):
-            table_header += f" {what.name:<16} |"
+            headers = max(headers, len(what.name.split("_")))
+            table_header += f" {what.name.split('_')[0]:<10} |"
         print(table_header)
-        print("=" * 88)
-        for count in migrated_count:
-            table_row = f"{count.database:<30}|"
+        # Split the header so _ separated what names are splitted into multiple lines
+        for header in range(1, headers):
+            table_sub_header = "                    |"
             for what in list(What):
-                table_row += f" {count.what_count.get(what,0):16} |"
+                if len(what.name.split("_")) - 1 < header:
+                    table_sub_header += f"{' '*12}|"
+                    continue
+                table_sub_header += f" {what.name.split('_')[header]:<10} |"
+            print(table_sub_header)
+        separator = "=" * (22 + 13 * len(What))
+        print(separator)
+        for count in migrated_count:
+            table_row = f"{count.database:<20}|"
+            for what in list(What):
+                table_row += f" {count.what_count.get(what, 0):10} |"
             print(table_row)
-        print("=" * 88)
-        print("Migrated External Tables and Views (targets) will be deleted")
+        print(separator)
+        print("The following actions will be performed")
+        print("- Migrated External Tables and Views (targets) will be deleted")
         if delete_managed:
-            print("Migrated DBFS Root Tables will be deleted")
+            print("- Migrated DBFS Root Tables will be deleted")
         else:
-            print("Migrated DBFS Root Tables will be left intact.")
-            print("To revert and delete Migrated Tables, add --delete_managed true flag to the command.")
+            print("- Migrated DBFS Root Tables will be left intact")
+            print("To revert and delete Migrated Tables, add --delete_managed true flag to the command")
         return True
 
 
