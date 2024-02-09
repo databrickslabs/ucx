@@ -3,7 +3,7 @@ import logging
 from datetime import timedelta
 
 from databricks.sdk import WorkspaceClient
-from databricks.sdk.errors.mapping import NotFound
+from databricks.sdk.errors.platform import NotFound
 from databricks.sdk.retries import retried
 from databricks.sdk.service import workspace
 from databricks.sdk.service.workspace import AclPermission
