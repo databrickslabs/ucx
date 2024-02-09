@@ -94,7 +94,7 @@ def test_migrate_tables_with_cache_should_not_create_table(
     table_mapping = StaticTableMapping(ws, sql_backend, rules=rules)
     table_migrate = TablesMigrate(table_crawler, ws, sql_backend, table_mapping)
 
-    # FIXME: flaky: databricks.sdk.errors.mapping.NotFound: Catalog 'ucx_cjazg' does not exist.
+    # FIXME: flaky: databricks.sdk.errors.platform.NotFound: Catalog 'ucx_cjazg' does not exist.
     table_migrate.migrate_tables()
 
     target_tables = list(sql_backend.fetch(f"SHOW TABLES IN {dst_schema.full_name}"))

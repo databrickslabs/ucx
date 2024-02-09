@@ -12,7 +12,7 @@ from databricks.labs.blueprint.limiter import rate_limited
 from databricks.labs.blueprint.parallel import ManyError, Threads
 from databricks.labs.blueprint.tui import Prompts
 from databricks.sdk import WorkspaceClient
-from databricks.sdk.errors.mapping import (
+from databricks.sdk.errors.platform import (
     BadRequest,
     DeadlineExceeded,
     InternalError,
