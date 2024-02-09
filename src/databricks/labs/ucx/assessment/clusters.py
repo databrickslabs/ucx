@@ -9,8 +9,9 @@ from databricks.sdk.errors import NotFound
 from databricks.sdk.service.compute import (
     ClusterDetails,
     ClusterSource,
+    DataSecurityMode,
     InitScriptInfo,
-    Policy, DataSecurityMode,
+    Policy,
 )
 
 from databricks.labs.ucx.assessment.crawlers import (
@@ -101,9 +102,11 @@ class CheckClusterMixin(CheckInitScriptMixin):
     def check_cluster_failures(self, cluster: ClusterDetails, source: str) -> list[str]:
         failures: list[str] = []
 
-        unsupported_cluster_types = [DataSecurityMode.LEGACY_PASSTHROUGH,
-                DataSecurityMode.LEGACY_SINGLE_USER,
-                DataSecurityMode.LEGACY_TABLE_ACL]
+        unsupported_cluster_types = [
+            DataSecurityMode.LEGACY_PASSTHROUGH,
+            DataSecurityMode.LEGACY_SINGLE_USER,
+            DataSecurityMode.LEGACY_TABLE_ACL,
+        ]
         support_status = spark_version_compatibility(cluster.spark_version)
         if support_status != "supported":
             failures.append(f"not supported DBR: {cluster.spark_version}")

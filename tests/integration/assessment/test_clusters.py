@@ -33,9 +33,8 @@ def test_cluster_crawler_no_isolation(ws, make_cluster, inventory_schema, sql_ba
     for cluster in clusters:
         if cluster.success != 0:
             continue
-        if cluster.cluster_id == created_cluster_2.cluster_id :
+        if cluster.cluster_id == created_cluster_2.cluster_id:
             results.append(cluster)
 
     assert len(results) >= 1
     assert results[0].failures == '["No isolation shared clusters not supported in UC"]'
-
