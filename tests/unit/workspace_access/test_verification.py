@@ -2,11 +2,14 @@ from unittest.mock import create_autospec
 
 import pytest
 from databricks.sdk import WorkspaceClient
-from databricks.sdk.errors import PermissionDenied
+from databricks.sdk.errors import NotFound, PermissionDenied, ResourceDoesNotExist
 from databricks.sdk.service.catalog import MetastoreAssignment
 
+from databricks.labs.ucx.workspace_access.groups import MigratedGroup, MigrationState
+from databricks.labs.ucx.workspace_access.secrets import SecretScopesSupport
 from databricks.labs.ucx.workspace_access.verification import (
     MetastoreNotFoundError,
+    VerificationManager,
     VerifyHasMetastore,
 )
 
@@ -50,3 +53,29 @@ def test_permission_denied_error():
     verify_metastore_obj = VerifyHasMetastore(ws)
 
     assert not verify_metastore_obj.verify_metastore()
+
+
+def test_fail_get_permissions_missing_object(caplog):
+    ws = create_autospec(WorkspaceClient)
+    ws.permissions.get.side_effect = ResourceDoesNotExist("RESOURCE_DOES_NOT_EXIST")
+    ws.groups.get.side_effect = NotFound("GROUP_MISSING")
+    secret_scopes = SecretScopesSupport(ws)
+    manager = VerificationManager(ws, secret_scopes)
+
+    state = MigrationState(
+        [
+            MigratedGroup(
+                id_in_workspace="wid1",
+                name_in_workspace="test",
+                name_in_account="test",
+                temporary_name="db-temp-test",
+                members=None,
+                entitlements=None,
+                external_id="eid1",
+                roles=None,
+            )
+        ]
+    )
+    manager.verify_applied_permissions("ot1", "oid1", state, "backup")
+    manager.verify_roles_and_entitlements(state, "backup")
+    assert caplog.messages == ['removed on backend: ot1.oid1', 'removed on backend: wid1']

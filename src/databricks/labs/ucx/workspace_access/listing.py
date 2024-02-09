@@ -5,7 +5,7 @@ from concurrent.futures import FIRST_COMPLETED, ThreadPoolExecutor, wait
 from itertools import groupby
 
 from databricks.sdk import WorkspaceClient
-from databricks.sdk.errors import InternalError, NotFound
+from databricks.sdk.errors import InternalError, NotFound, ResourceDoesNotExist
 from databricks.sdk.retries import retried
 from databricks.sdk.service.workspace import ObjectInfo, ObjectType
 
@@ -76,7 +76,11 @@ class WorkspaceListing:
     def walk(self, start_path="/"):
         self.start_time = dt.datetime.now()
         logger.info(f"Recursive WorkspaceFS listing started at {self.start_time}")
-        root_object = self._ws.workspace.get_status(start_path)
+        try:
+            root_object = self._ws.workspace.get_status(start_path)
+        except ResourceDoesNotExist:
+            logger.warning(f"removed on the backend {start_path}")
+            return self.results
         self.results.append(root_object)
 
         with ThreadPoolExecutor(self._num_threads) as executor:

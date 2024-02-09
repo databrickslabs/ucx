@@ -1045,3 +1045,19 @@ def test_repair_run_result_state(ws, caplog, mock_installation_with_jobs, any_pr
 
     workspace_installation.repair_run("assessment")
     assert "Please try after sometime" in caplog.text
+
+
+def test_check_policy_has_instance_pool(ws, mock_installation, any_prompt, caplog):
+    ws.cluster_policies.get = MagicMock()
+    ws.cluster_policies.get.side_effect = NotFound("NO_POLICY")
+
+    sql_backend = MockBackend()
+    wheels = create_autospec(WheelsV2)
+    config = WorkspaceConfig(inventory_database='ucx')
+    timeout = timedelta(seconds=1)
+    workspace_installation = WorkspaceInstallation(
+        config, mock_installation_with_jobs, sql_backend, wheels, ws, any_prompt, timeout
+    )
+    res = workspace_installation._check_policy_has_instance_pool(1)
+    assert not res
+    assert "removed on the backend 1" in caplog.messages
