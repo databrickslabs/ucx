@@ -242,11 +242,12 @@ class WorkspaceInstaller:
                 cluster_policy = json.loads(self._prompts.choice_from_dict("Choose a cluster policy", cluster_policies))
                 instance_profile, spark_conf_dict = self._get_ext_hms_conf_from_policy(cluster_policy)
 
-        if self._prompts.confirm("Do you want to follow a policy to create clusters?"):
-            cluster_policies_list = {f"{_.name} ({_.policy_id})": _.policy_id for _ in self._ws.cluster_policies.list()}
-            custom_cluster_policy_id = self._prompts.choice_from_dict("Choose a cluster policy", cluster_policies_list)
-        else:
-            custom_cluster_policy_id = None
+        logger.info("Creating UCX cluster policy.")
+        policy_id = self._ws.cluster_policies.create(
+            name=f"Unity Catalog Migration ({inventory_database})",
+            definition=self._cluster_policy_definition(conf=spark_conf_dict, instance_profile=instance_profile),
+            description="Custom cluster policy for Unity Catalog Migration (UCX)",
+        ).policy_id
 
         config = WorkspaceConfig(
             inventory_database=inventory_database,
@@ -261,12 +262,40 @@ class WorkspaceInstaller:
             num_threads=num_threads,
             instance_profile=instance_profile,
             spark_conf=spark_conf_dict,
-            custom_cluster_policy_id=custom_cluster_policy_id,
+            policy_id=policy_id,
         )
         ws_file_url = self._installation.save(config)
         if self._prompts.confirm("Open config file in the browser and continue installing?"):
             webbrowser.open(ws_file_url)
         return config
+
+    @staticmethod
+    def _policy_config(value: str):
+        return {"type": "fixed", "value": value}
+
+    def _cluster_policy_definition(self, conf: dict, instance_profile: str | None) -> str:
+        policy_definition = {
+            "spark_version": self._policy_config(self._ws.clusters.select_spark_version(latest=True)),
+            "node_type_id": self._policy_config(self._ws.clusters.select_node_type(local_disk=True)),
+        }
+        if conf:
+            for key, value in conf.items():
+                policy_definition[f"spark_conf.{key}"] = self._policy_config(value)
+        if self._ws.config.is_aws:
+            policy_definition["aws_attributes.availability"] = self._policy_config(
+                compute.AwsAvailability.ON_DEMAND.value
+            )
+            if instance_profile:
+                policy_definition["aws_attributes.instance_profile_arn"] = self._policy_config(instance_profile)
+        elif self._ws.config.is_azure:
+            policy_definition["azure_attributes.availability"] = self._policy_config(
+                compute.AzureAvailability.ON_DEMAND_AZURE.value
+            )
+        else:
+            policy_definition["gcp_attributes.availability"] = self._policy_config(
+                compute.GcpAvailability.ON_DEMAND_GCP.value
+            )
+        return json.dumps(policy_definition)
 
     @staticmethod
     def _get_ext_hms_conf_from_policy(cluster_policy):
@@ -277,7 +306,7 @@ class WorkspaceInstaller:
             logger.info(f"Instance Profile is Set to {instance_profile}")
         for key in cluster_policy.keys():
             if (
-                key.startswith("spark_conf.sql.hive.metastore")
+                key.startswith("spark_conf.spark.sql.hive.metastore")
                 or key.startswith("spark_conf.spark.hadoop.javax.jdo.option")
                 or key.startswith("spark_conf.spark.databricks.hive.metastore")
                 or key.startswith("spark_conf.spark.hadoop.hive.metastore.glue")
@@ -293,7 +322,7 @@ class WorkspaceInstaller:
                 yield policy
                 continue
             for key in def_json.keys():
-                if key.startswith("spark_config.spark.sql.hive.metastore"):
+                if key.startswith("spark_conf.spark.sql.hive.metastore"):
                     yield policy
                     break
 
@@ -512,13 +541,26 @@ class WorkspaceInstallation:
     def create_jobs(self):
         logger.debug(f"Creating jobs from tasks in {main.__name__}")
         remote_wheel = self._upload_wheel()
+        try:
+            policy_definition = self._ws.cluster_policies.get(policy_id=self.config.policy_id).definition
+        except NotFound as e:
+            msg = f"UCX Policy {self.config.policy_id} not found, please reinstall UCX"
+            logger.error(msg)
+            raise NotFound(msg) from e
+
+        self._ws.cluster_policies.edit(
+            policy_id=self.config.policy_id,
+            name=f"Unity Catalog Migration ({self.config.inventory_database})",
+            definition=policy_definition,
+            libraries=[compute.Library(whl=f"dbfs:{remote_wheel}")],
+        )
         desired_steps = {t.workflow for t in _TASKS.values() if t.cloud_compatible(self._ws.config)}
         wheel_runner = None
 
         if self._config.override_clusters:
             wheel_runner = self._upload_wheel_runner(remote_wheel)
         for step_name in desired_steps:
-            settings = self._job_settings(step_name, remote_wheel)
+            settings = self._job_settings(step_name)
             if self._config.override_clusters:
                 settings = self._apply_cluster_overrides(settings, self._config.override_clusters, wheel_runner)
             self._deploy_workflow(step_name, settings)
@@ -618,7 +660,7 @@ class WorkspaceInstallation:
         ).encode("utf8")
         self._installation.upload('DEBUG.py', content)
 
-    def _job_settings(self, step_name: str, remote_wheel: str):
+    def _job_settings(self, step_name: str):
         email_notifications = None
         if not self._config.override_clusters and "@" in self._my_username:
             # set email notifications only if we're running the real
@@ -637,7 +679,7 @@ class WorkspaceInstallation:
             "tags": {"version": f"v{version}"},
             "job_clusters": self._job_clusters({t.job_cluster for t in tasks}),
             "email_notifications": email_notifications,
-            "tasks": [self._job_task(task, remote_wheel) for task in tasks],
+            "tasks": [self._job_task(task) for task in tasks],
         }
 
     def _upload_wheel_runner(self, remote_wheel: str):
@@ -661,7 +703,7 @@ class WorkspaceInstallation:
                 job_task.notebook_task = jobs.NotebookTask(notebook_path=wheel_runner, base_parameters=params)
         return settings
 
-    def _job_task(self, task: Task, remote_wheel: str) -> jobs.Task:
+    def _job_task(self, task: Task) -> jobs.Task:
         jobs_task = jobs.Task(
             task_key=task.name,
             job_cluster_key=task.job_cluster,
@@ -674,7 +716,7 @@ class WorkspaceInstallation:
             return retried_job_dashboard_task(jobs_task, task)
         if task.notebook:
             return self._job_notebook_task(jobs_task, task)
-        return self._job_wheel_task(jobs_task, task, remote_wheel)
+        return self._job_wheel_task(jobs_task, task)
 
     def _job_dashboard_task(self, jobs_task: jobs.Task, task: Task) -> jobs.Task:
         assert task.dashboard is not None
@@ -706,11 +748,10 @@ class WorkspaceInstallation:
             ),
         )
 
-    def _job_wheel_task(self, jobs_task: jobs.Task, task: Task, remote_wheel: str) -> jobs.Task:
+    def _job_wheel_task(self, jobs_task: jobs.Task, task: Task) -> jobs.Task:
         return replace(
             jobs_task,
             # TODO: check when we can install wheels from WSFS properly
-            libraries=[compute.Library(whl=f"dbfs:{remote_wheel}")],
             python_wheel_task=jobs.PythonWheelTask(
                 package_name="databricks_labs_ucx",
                 entry_point="runtime",  # [project.entry-points.databricks] in pyproject.toml
@@ -726,21 +767,13 @@ class WorkspaceInstallation:
         }
         if self._config.spark_conf is not None:
             spark_conf = spark_conf | self._config.spark_conf
-        spec = self._cluster_node_type(
-            compute.ClusterSpec(
-                spark_version=self._ws.clusters.select_spark_version(latest=True),
-                data_security_mode=compute.DataSecurityMode.LEGACY_SINGLE_USER,
-                spark_conf=spark_conf,
-                custom_tags={"ResourceClass": "SingleNode"},
-                num_workers=0,
-            )
+        spec = compute.ClusterSpec(
+            data_security_mode=compute.DataSecurityMode.LEGACY_SINGLE_USER,
+            spark_conf=spark_conf,
+            custom_tags={"ResourceClass": "SingleNode"},
+            num_workers=0,
+            policy_id=self.config.policy_id,
         )
-        if self._config.custom_cluster_policy_id is not None:
-            spec = replace(spec, policy_id=self._config.custom_cluster_policy_id)
-        if self._ws.config.is_aws and spec.aws_attributes is not None:
-            # TODO: we might not need spec.aws_attributes, if we have a cluster policy
-            aws_attributes = replace(spec.aws_attributes, instance_profile_arn=self._config.instance_profile)
-            spec = replace(spec, aws_attributes=aws_attributes)
         if "main" in names:
             clusters.append(
                 jobs.JobCluster(
@@ -762,37 +795,6 @@ class WorkspaceInstallation:
                 )
             )
         return clusters
-
-    def _cluster_node_type(self, spec: compute.ClusterSpec) -> compute.ClusterSpec:
-        cfg = self._config
-        valid_node_type = False
-        if cfg.custom_cluster_policy_id is not None:
-            if self._check_policy_has_instance_pool(cfg.custom_cluster_policy_id):
-                valid_node_type = True
-        if not valid_node_type:
-            if cfg.instance_pool_id is not None:
-                return replace(spec, instance_pool_id=cfg.instance_pool_id)
-            spec = replace(spec, node_type_id=self._ws.clusters.select_node_type(local_disk=True))
-        if self._ws.config.is_aws:
-            return replace(spec, aws_attributes=compute.AwsAttributes(availability=compute.AwsAvailability.ON_DEMAND))
-        if self._ws.config.is_azure:
-            return replace(
-                spec, azure_attributes=compute.AzureAttributes(availability=compute.AzureAvailability.ON_DEMAND_AZURE)
-            )
-        return replace(spec, gcp_attributes=compute.GcpAttributes(availability=compute.GcpAvailability.ON_DEMAND_GCP))
-
-    def _check_policy_has_instance_pool(self, policy_id):
-        policy = self._ws.cluster_policies.get(policy_id=policy_id)
-        def_json = json.loads(policy.definition)
-        instance_pool = def_json.get("instance_pool_id")
-        if instance_pool is not None:
-            return True
-        return False
-
-    def _instance_profiles(self):
-        return {"No Instance Profile": None} | {
-            profile.instance_profile_arn: profile.instance_profile_arn for profile in self._ws.instance_profiles.list()
-        }
 
     @staticmethod
     def _readable_timedelta(epoch):
@@ -895,6 +897,7 @@ class WorkspaceInstallation:
         self._remove_database()
         self._remove_jobs()
         self._remove_warehouse()
+        self._remove_policies()
         self._installation.remove()
         logger.info("UnInstalling UCX complete")
 
@@ -906,6 +909,13 @@ class WorkspaceInstallation:
         logger.info(f"Deleting inventory database {self._config.inventory_database}")
         deployer = SchemaDeployer(self._sql_backend, self._config.inventory_database, Any)
         deployer.delete_schema()
+
+    def _remove_policies(self):
+        logger.info("Deleting cluster policy")
+        try:
+            self._ws.cluster_policies.delete(policy_id=self.config.policy_id)
+        except NotFound:
+            logger.error("UCX Policy already deleted")
 
     def _remove_jobs(self):
         logger.info("Deleting jobs")

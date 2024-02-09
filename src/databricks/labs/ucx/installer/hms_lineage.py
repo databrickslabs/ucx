@@ -4,6 +4,7 @@ import time
 
 from databricks.labs.blueprint.tui import Prompts
 from databricks.sdk import WorkspaceClient
+from databricks.sdk.errors import InvalidParameterValue
 from databricks.sdk.service.compute import GlobalInitScriptDetailsWithContent
 
 global_init_script = """if [[ $DB_IS_DRIVER = "TRUE" ]]; then
@@ -48,7 +49,11 @@ class HiveMetastoreLineageEnabler:
         for script in self._ws.global_init_scripts.list():
             if not script.script_id:
                 continue
-            script_content = self._ws.global_init_scripts.get(script_id=script.script_id)
+            try:
+                script_content = self._ws.global_init_scripts.get(script_id=script.script_id)
+            except InvalidParameterValue as err:
+                logger.warning(f"Failed to get init script {script.script_id}: {err}")
+                continue
             if not script_content:
                 continue
             content = script_content.script

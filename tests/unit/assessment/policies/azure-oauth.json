@@ -27,7 +27,7 @@
     }
   },
   "policy_family_definition_overrides": {
-        "spark_conf.fs.azure.account.auth.type": {
+    "spark_conf.fs.azure.account.auth.type": {
       "type": "fixed",
       "value": "OAuth",
       "hidden": true

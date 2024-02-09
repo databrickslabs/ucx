@@ -1,5 +1,6 @@
 import base64
 
+from databricks.sdk.errors import ResourceDoesNotExist
 from databricks.sdk.service.compute import GlobalInitScriptDetails
 
 from databricks.labs.ucx.assessment.init_scripts import (
@@ -102,3 +103,27 @@ def test_init_script_without_config_should_have_empty_creator_name(mocker):
             script_id="222", script_name="newscript", enabled=False, created_by=None, success=1, failures="[]"
         ),
     ]
+
+
+def test_missing_global_init_script(mocker, caplog):
+    mock_ws = mocker.Mock()
+    mock_ws.global_init_scripts.list.return_value = [
+        GlobalInitScriptDetails(
+            created_at=111,
+            created_by=None,
+            enabled=False,
+            name="newscript",
+            position=4,
+            script_id="222",
+            updated_at=111,
+            updated_by="2123l@eee.com",
+        )
+    ]
+    mock_ws.global_init_scripts.get.side_effect = ResourceDoesNotExist("RESOURCE_DOES_NOT_EXIST")
+    mockbackend = MockBackend()
+    crawler = GlobalInitScriptCrawler(mock_ws, mockbackend, schema="ucx")
+    result = crawler.snapshot()
+    result = mockbackend.rows_written_for("hive_metastore.ucx.global_init_scripts", "append")
+
+    assert len(result) == 0
+    assert "removed on the backend 222" in caplog.messages

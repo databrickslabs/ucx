@@ -1,7 +1,9 @@
+import json
 import logging
 from collections import defaultdict
 
 from databricks.labs.ucx.hive_metastore import GrantsCrawler
+from databricks.labs.ucx.workspace_access.base import Permissions
 from databricks.labs.ucx.workspace_access.groups import MigratedGroup
 from databricks.labs.ucx.workspace_access.tacl import TableAclSupport
 
@@ -53,6 +55,7 @@ def test_hms2hms_owner_permissions(sql_backend, inventory_schema, make_schema, m
 
     schema_a = make_schema()
     schema_b = make_schema()
+    schema_c = make_schema()
     table_a = make_table(schema_name=schema_a.name)
     table_b = make_table(schema_name=schema_b.name)
     table_c = make_table(schema_name=schema_b.name, external=True)
@@ -61,7 +64,7 @@ def test_hms2hms_owner_permissions(sql_backend, inventory_schema, make_schema, m
     sql_backend.execute(f"ALTER SCHEMA {schema_a.name} OWNER TO `{first.name_in_workspace}`")
     sql_backend.execute(f"GRANT ALL PRIVILEGES ON SCHEMA {schema_b.name} TO `{second.name_in_workspace}`")
     sql_backend.execute(
-        f"GRANT USAGE, SELECT, MODIFY, CREATE, READ_METADATA, CREATE_NAMED_FUNCTION ON SCHEMA default TO "
+        f"GRANT USAGE, SELECT, MODIFY, CREATE, READ_METADATA, CREATE_NAMED_FUNCTION ON SCHEMA {schema_c.name} TO "
         f"`{third.name_in_workspace}`"
     )
     sql_backend.execute(f"GRANT SELECT ON TABLE {table_a.full_name} TO `{first.name_in_workspace}`")
@@ -160,3 +163,33 @@ def test_permission_for_udfs(sql_backend, inventory_schema, make_schema, make_ud
     for grant in grants._grants(catalog=schema.catalog_name, database=schema.name, udf=udf_b.name):
         actual_udf_b_grants[grant.principal].add(grant.action_type)
     assert {"READ_METADATA"} == actual_udf_b_grants[group.name_in_account]
+
+
+def test_verify_permission_for_udfs(sql_backend, inventory_schema, make_schema, make_udf, make_group):
+    group = make_group()
+    schema = make_schema()
+
+    sql_backend.execute(f"GRANT SELECT ON SCHEMA {schema.name} TO `{group.display_name}`")
+
+    item = Permissions(
+        object_type="DATABASE",
+        object_id=schema.full_name,
+        raw=json.dumps(
+            {
+                "principal": group.display_name,
+                "action_type": "SELECT",
+                "catalog": schema.catalog_name,
+                "database": schema.name,
+            }
+        ),
+    )
+
+    tables = StaticTablesCrawler(sql_backend, inventory_schema, [])
+    udfs = StaticUdfsCrawler(sql_backend, inventory_schema, [])
+    grants = GrantsCrawler(tables, udfs)
+
+    tacl_support = TableAclSupport(grants, sql_backend)
+    task = tacl_support.get_verify_task(item)
+    result = task()
+
+    assert result

@@ -2,7 +2,7 @@ import logging
 from typing import Literal
 
 from databricks.sdk import WorkspaceClient
-from databricks.sdk.errors import PermissionDenied
+from databricks.sdk.errors import NotFound, PermissionDenied, ResourceDoesNotExist
 
 from databricks.labs.ucx.workspace_access.groups import MigrationState
 from databricks.labs.ucx.workspace_access.secrets import SecretScopesSupport
@@ -33,7 +33,11 @@ class VerificationManager:
         target: Literal["backup", "account"],
     ):
         base_attr = "temporary_name" if target == "backup" else "name_in_account"
-        op = self._ws.permissions.get(object_type, object_id)
+        try:
+            op = self._ws.permissions.get(object_type, object_id)
+        except ResourceDoesNotExist:
+            logger.warning(f"removed on backend: {object_type}.{object_id}")
+            return
         for info in migration_state.groups:
             if not op.access_control_list:
                 continue
@@ -78,8 +82,16 @@ class VerificationManager:
             comparison_base = getattr(el, "id_in_workspace" if target == "backup" else "id_in_workspace")
             comparison_target = getattr(el, target_attr)
 
-            base_group_info = self._ws.groups.get(comparison_base)
-            target_group_info = self._ws.groups.get(comparison_target)
+            try:
+                base_group_info = self._ws.groups.get(comparison_base)
+            except NotFound:
+                logger.warning(f"removed on backend: {comparison_base}")
+                continue
+            try:
+                target_group_info = self._ws.groups.get(comparison_target)
+            except NotFound:
+                logger.warning(f"removed on backend: {comparison_target}")
+                continue
 
             assert base_group_info.roles == target_group_info.roles
             assert base_group_info.entitlements == target_group_info.entitlements

@@ -204,6 +204,36 @@ def test_alias_tables_not_found_view_unknown_error(caplog):
     assert len([rec.message for rec in caplog.records if "unknown error" in rec.message]) == 1
 
 
+def test_move_tables_get_grants_fails_because_table_removed(caplog):
+    client = create_autospec(WorkspaceClient)
+
+    client.tables.list.return_value = [
+        TableInfo(
+            catalog_name="SrcC",
+            schema_name="SrcS",
+            name="table1",
+            full_name="SrcC.SrcS.table1",
+            table_type=TableType.EXTERNAL,
+        ),
+    ]
+
+    rows = {
+        "SHOW CREATE TABLE SrcC.SrcS.table1": [
+            ["CREATE TABLE SrcC.SrcS.table1 (name string)"],
+        ]
+    }
+
+    client.grants.get.side_effect = NotFound('TABLE_DOES_NOT_EXIST')
+    client.schemas.get.side_effect = [SchemaInfo(), SchemaInfo()]
+    client.tables.get.side_effect = [NotFound(), NotFound(), NotFound(), NotFound()]
+    client.grants.update = MagicMock()
+    backend = MockBackend(rows=rows)
+    tm = TableMove(client, backend)
+    tm.move_tables("SrcC", "SrcS", "table1", "TgtC", "TgtS", False)
+
+    assert "removed on the backend SrcC.SrcS.table1" in caplog.messages
+
+
 def test_move_all_tables_and_drop_source():
     client = create_autospec(WorkspaceClient)
 

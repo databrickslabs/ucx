@@ -103,7 +103,6 @@ commands:
       - name: subscription-id
         description: Subscription to scan storage account in
 
-
   - name: validate-groups-membership
     description: Validate the groups to see if the groups at account level and workspace level have different membership
     table_template: |-

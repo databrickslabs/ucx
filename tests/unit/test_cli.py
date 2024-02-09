@@ -276,7 +276,8 @@ def test_validate_groups_membership(ws):
     ws.groups.list.assert_called()
 
 
-def test_save_aws_iam_profiles_no_profile(ws, caplog):
+def test_save_aws_iam_profiles_no_profile(ws, caplog, mocker):
+    mocker.patch("shutil.which", return_value="/path/aws")
     save_aws_iam_profiles(ws)
     assert any({"AWS Profile is not specified." in message for message in caplog.messages})
 
@@ -301,7 +302,8 @@ def test_save_aws_iam_profiles_no_cli(ws, mocker, caplog):
     assert any({"Couldn't find AWS" in message for message in caplog.messages})
 
 
-def test_save_uc_roles_no_profile(ws, caplog):
+def test_save_uc_roles_no_profile(ws, caplog, mocker):
+    mocker.patch("shutil.which", return_value="/path/aws")
     save_uc_compatible_roles(ws)
     assert any({"AWS Profile is not specified." in message for message in caplog.messages})
 

@@ -1,7 +1,7 @@
 import datetime as dt
 from unittest.mock import MagicMock, Mock, patch
 
-from databricks.sdk.errors import InternalError
+from databricks.sdk.errors import InternalError, ResourceDoesNotExist
 from databricks.sdk.service.workspace import ObjectInfo, ObjectType
 
 from databricks.labs.ucx.workspace_access import generic, listing
@@ -80,6 +80,20 @@ def test_walk_with_an_empty_folder_should_return_it():
 
     assert len(listing_instance.results) == 1
     assert listing_instance.results == [rootobj]
+
+
+def test_walk_with_resource_missing(caplog):
+    file = ObjectInfo(path="/rootPath/file1", object_type=ObjectType.FILE)
+
+    client = Mock()
+    client.workspace.list.return_value = [file]
+    client.workspace.get_status.side_effect = ResourceDoesNotExist("RESOURCE_DOES_NOT_EXIST")
+
+    listing_instance = listing.WorkspaceListing(client, 1)
+    listing_instance.walk("/rootPath")
+
+    assert len(listing_instance.results) == 0
+    assert "removed on the backend /rootPath" in caplog.messages
 
 
 def test_walk_with_two_files_should_return_rootpath_and_two_files():

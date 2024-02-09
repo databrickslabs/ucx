@@ -91,7 +91,7 @@ class PermissionManager(CrawlerBase[Permissions]):
         self._save(items)
         logger.info(f"Saved {len(items)} to {self._full_name}")
 
-    def apply_group_permissions(self, migration_state: MigrationState):
+    def apply_group_permissions(self, migration_state: MigrationState) -> bool:
         # list shall be sorted prior to using group by
         if len(migration_state) == 0:
             logger.info("No valid groups selected, nothing to do.")
@@ -138,6 +138,34 @@ class PermissionManager(CrawlerBase[Permissions]):
             logger.error(f"Detected {len(errors)} while applying permissions")
             raise ManyError(errors)
         logger.info("Permissions were applied")
+        return True
+
+    def verify_group_permissions(self) -> bool:
+        items = sorted(self.load_all(), key=lambda i: i.object_type)
+        logger.info(f"Total permissions found: {len(items)}")
+        verifier_tasks: list[Callable[..., bool]] = []
+        appliers = self._appliers()
+
+        for object_type, items_subset in groupby(items, key=lambda i: i.object_type):
+            if object_type not in appliers:
+                msg = f"Could not find support for {object_type}. Please check the inventory table."
+                raise ValueError(msg)
+
+            relevant_support = appliers[object_type]
+            tasks_for_support: list[Callable[..., bool]] = []
+            for item in items_subset:
+                task = relevant_support.get_verify_task(item)
+                if not task:
+                    continue
+                tasks_for_support.append(task)
+
+            logger.info(f"Total tasks for {object_type}: {len(tasks_for_support)}")
+            verifier_tasks.extend(tasks_for_support)
+
+        logger.info(f"Starting to verify permissions. Total tasks: {len(verifier_tasks)}")
+        Threads.strict("verify group permissions", verifier_tasks)
+        logger.info("All permissions validated successfully. No issues found.")
+
         return True
 
     def _appliers(self) -> dict[str, AclSupport]:

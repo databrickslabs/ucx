@@ -1,5 +1,6 @@
 import json
 import logging
+from collections.abc import Callable
 from datetime import timedelta
 from functools import partial
 
@@ -94,7 +95,8 @@ class ScimSupport(AclSupport):
             raw=json.dumps([e.as_dict() for e in getattr(group, property_name)]),
         )
 
-    def _inflight_check(self, group_id: str, value: list[iam.ComplexValue], property_name: str):
+    @rate_limited(max_requests=255, burst_period_seconds=60)
+    def _verify(self, group_id: str, value: list[iam.ComplexValue], property_name: str):
         # in-flight check for the applied permissions
         # the api might be inconsistent, therefore we need to check that the permissions were applied
         group = self._safe_get_group(group_id)
@@ -105,12 +107,17 @@ class ScimSupport(AclSupport):
             if property_name == "entitlements" and group.entitlements:
                 if all(elem in group.entitlements for elem in value):
                     return True
-            msg = f"""Couldn't apply appropriate role for group {group_id}
-                            acl to be applied={[e.as_dict() for e in value]}
-                            acl found in the object={group.as_dict()}
-                            """
+            msg = (
+                f"Couldn't find role for group {group_id}\n"
+                f"acl to be applied={[e.as_dict() for e in value]}\n"
+                f"acl found in the object={group.as_dict()}\n"
+            )
             raise ValueError(msg)
         return False
+
+    def get_verify_task(self, item: Permissions) -> Callable[[], bool]:
+        value = [iam.ComplexValue.from_dict(e) for e in json.loads(item.raw)]
+        return partial(self._verify, item.object_id, value, item.object_type)
 
     @rate_limited(max_requests=10, burst_period_seconds=60)
     def _applier_task(self, group_id: str, value: list[iam.ComplexValue], property_name: str):
@@ -126,7 +133,7 @@ class ScimSupport(AclSupport):
         patch_retried_check(group_id, operations, schemas)
 
         retry_on_value_error = retried(on=[*retryable_errors, ValueError], timeout=self._verify_timeout)
-        retried_check = retry_on_value_error(self._inflight_check)
+        retried_check = retry_on_value_error(self._verify)
         return retried_check(group_id, value, property_name)
 
     def _safe_patch_group(

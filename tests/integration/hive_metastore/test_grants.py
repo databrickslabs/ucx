@@ -18,15 +18,16 @@ def test_all_grants_in_databases(sql_backend, inventory_schema, make_schema, mak
     group_b = make_group()
     schema_a = make_schema()
     schema_b = make_schema()
+    schema_c = make_schema()
     empty_schema = make_schema()
     table_a = make_table(schema_name=schema_a.name)
     table_b = make_table(schema_name=schema_b.name)
     view_c = make_table(schema_name=schema_a.name, view=True, ctas="SELECT id FROM range(10)")
     view_d = make_table(schema_name=schema_a.name, view=True, ctas="SELECT id FROM range(10)")
-    table_e = make_table(schema_name="default")
+    table_e = make_table(schema_name=schema_c.name)
 
-    sql_backend.execute(f"GRANT USAGE ON SCHEMA default TO `{group_a.display_name}`")
-    sql_backend.execute(f"GRANT USAGE ON SCHEMA default TO `{group_b.display_name}`")
+    sql_backend.execute(f"GRANT USAGE ON SCHEMA {schema_c.name} TO `{group_a.display_name}`")
+    sql_backend.execute(f"GRANT USAGE ON SCHEMA {schema_c.name} TO `{group_b.display_name}`")
     sql_backend.execute(f"GRANT MODIFY ON TABLE {table_e.full_name} TO `{group_b.display_name}`")
     sql_backend.execute(f"GRANT SELECT ON TABLE {table_a.full_name} TO `{group_a.display_name}`")
     sql_backend.execute(f"GRANT SELECT ON TABLE {table_b.full_name} TO `{group_b.display_name}`")
@@ -46,8 +47,8 @@ def test_all_grants_in_databases(sql_backend, inventory_schema, make_schema, mak
         all_grants[f"{grant.principal}.{grant.object_key}"] = grant.action_type
 
     assert len(all_grants) >= 8, "must have at least three grants"
-    assert all_grants[f"{group_a.display_name}.hive_metastore.default"] == "USAGE"
-    assert all_grants[f"{group_b.display_name}.hive_metastore.default"] == "USAGE"
+    assert all_grants[f"{group_a.display_name}.hive_metastore.{schema_c.name}"] == "USAGE"
+    assert all_grants[f"{group_b.display_name}.hive_metastore.{schema_c.name}"] == "USAGE"
     assert all_grants[f"{group_a.display_name}.{table_a.full_name}"] == "SELECT"
     assert all_grants[f"{group_b.display_name}.{table_b.full_name}"] == "SELECT"
     assert all_grants[f"{group_b.display_name}.{schema_b.full_name}"] == "MODIFY"
