@@ -1,5 +1,19 @@
 # Version changelog
 
+## 0.12.0
+
+* Added CLI Command `databricks labs ucx save-uc-compatible-roles` ([#863](https://github.com/databrickslabs/ucx/pull/863)).
+* Added dashboard widget with table count by storage and format ([#852](https://github.com/databrickslabs/ucx/pull/852)).
+* Added verification of group permissions ([#841](https://github.com/databrickslabs/ucx/pull/841)).
+* Checking pipeline cluster config and cluster policy in 'crawl_pipelines' task ([#864](https://github.com/databrickslabs/ucx/pull/864)).
+* Created cluster policy (ucx-policy) to be used by all UCX compute. This may require customers to reinstall UCX. ([#853](https://github.com/databrickslabs/ucx/pull/853)).
+* Skip scanning objects that were removed on platform side since the last scan time, so that integration tests are less flaky ([#922](https://github.com/databrickslabs/ucx/pull/922)).
+* Updated assessment documentation ([#873](https://github.com/databrickslabs/ucx/pull/873)).
+
+Dependency updates:
+
+ * Updated databricks-sdk requirement from ~=0.18.0 to ~=0.19.0 ([#930](https://github.com/databrickslabs/ucx/pull/930)).
+
 ## 0.11.1
 
 * Added "what" property for migration to scope down table migrations ([#856](https://github.com/databrickslabs/ucx/pull/856)).
