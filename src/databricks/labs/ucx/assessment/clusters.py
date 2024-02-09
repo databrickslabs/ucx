@@ -10,7 +10,7 @@ from databricks.sdk.service.compute import (
     ClusterDetails,
     ClusterSource,
     InitScriptInfo,
-    Policy,
+    Policy, DataSecurityMode,
 )
 
 from databricks.labs.ucx.assessment.crawlers import (
@@ -101,6 +101,9 @@ class CheckClusterMixin(CheckInitScriptMixin):
     def check_cluster_failures(self, cluster: ClusterDetails, source: str) -> list[str]:
         failures: list[str] = []
 
+        unsupported_cluster_types = [DataSecurityMode.LEGACY_PASSTHROUGH,
+                DataSecurityMode.LEGACY_SINGLE_USER,
+                DataSecurityMode.LEGACY_TABLE_ACL]
         support_status = spark_version_compatibility(cluster.spark_version)
         if support_status != "supported":
             failures.append(f"not supported DBR: {cluster.spark_version}")
@@ -111,6 +114,10 @@ class CheckClusterMixin(CheckInitScriptMixin):
             failures.extend(self._check_cluster_policy(cluster.policy_id, source))
         if cluster.init_scripts is not None:
             failures.extend(self._check_cluster_init_script(cluster.init_scripts, source))
+        if cluster.data_security_mode == DataSecurityMode.NONE:
+            failures.append("No isolation shared clusters not supported in UC")
+        if cluster.data_security_mode in unsupported_cluster_types:
+            failures.append(f"cluster type not supported : {cluster.data_security_mode.value}")
 
         return failures
 

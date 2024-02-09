@@ -265,3 +265,4 @@ def test_try_fetch():
     assert result_set[0].cluster_id == "000"
     assert result_set[0].success == 1
     assert result_set[0].failures == "123"
+
