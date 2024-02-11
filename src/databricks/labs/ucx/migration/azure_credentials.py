@@ -1,5 +1,6 @@
 import base64
 import logging
+from collections import namedtuple
 from dataclasses import dataclass
 
 from databricks.labs.blueprint.installation import Installation
@@ -33,21 +34,8 @@ from databricks.labs.ucx.hive_metastore.locations import ExternalLocations
 logger = logging.getLogger(__name__)
 
 
-@dataclass
-class ServicePrincipalMigrationInfo(StoragePermissionMapping):
-    # Service Principal's client_secret stored in Databricks secret
-    client_secret: str
-
-    @classmethod
-    def from_storage_permission_mapping(cls, storage_permission_mapping: StoragePermissionMapping, client_secret: str):
-        return cls(
-            prefix=storage_permission_mapping.prefix,
-            client_id=storage_permission_mapping.client_id,
-            principal=storage_permission_mapping.principal,
-            privilege=storage_permission_mapping.privilege,
-            directory_id=storage_permission_mapping.directory_id,
-            client_secret=client_secret,
-        )
+# A namedtuple to host service_principal and its client_secret info
+ServicePrincipalMigrationInfo = namedtuple("ServicePrincipalMigrationInfo", "service_principal client_secret")
 
 
 @dataclass
@@ -189,17 +177,18 @@ class AzureServicePrincipalMigration:
         for sp in sp_list:
             if sp.client_id in azure_sp_info_with_client_secret:
                 sp_list_with_secret.append(
-                    ServicePrincipalMigrationInfo.from_storage_permission_mapping(
-                        sp, azure_sp_info_with_client_secret[sp.client_id]
-                    )
+                    ServicePrincipalMigrationInfo(service_principal=sp, client_secret=azure_sp_info_with_client_secret[sp.client_id])
                 )
         return sp_list_with_secret
 
-    def _print_action_plan(self, sp_list_with_secret):
+    def _print_action_plan(self, sp_list_with_secret: list[ServicePrincipalMigrationInfo]):
         # print action plan to console for customer to review.
         for sp in sp_list_with_secret:
             print(
-                f"Service Principal name: {sp.principal}, application_id: {sp.client_id}, privilege {sp.privilege} on location {sp.prefix}"
+                f"Service Principal name: {sp.service_principal.principal}, "
+                f"application_id: {sp.service_principal.client_id}, "
+                f"privilege {sp.service_principal.privilege} "
+                f"on location {sp.service_principal.prefix}"
             )
 
     def _generate_migration_list(self):
@@ -220,22 +209,24 @@ class AzureServicePrincipalMigration:
         self._print_action_plan(sp_list_with_secret)
         return
 
-    def _create_storage_credential(self, sp: ServicePrincipalMigrationInfo):
+    def _create_storage_credential(self, sp_migration: ServicePrincipalMigrationInfo):
         # prepare the storage credential properties
-        name = sp.principal
+        name = sp_migration.service_principal.principal
         azure_service_principal = AzureServicePrincipal(
-            directory_id=sp.directory_id, application_id=sp.client_id, client_secret=sp.client_secret
+            directory_id=sp_migration.service_principal.directory_id,
+            application_id=sp_migration.service_principal.client_id,
+            client_secret=sp_migration.client_secret
         )
-        comment = f"Created by UCX during migration to UC using Azure Service Principal: {sp.principal}"
+        comment = f"Created by UCX during migration to UC using Azure Service Principal: {sp_migration.service_principal.principal}"
         read_only = False
-        if sp.privilege == Privilege.READ_FILES:
+        if sp_migration.service_principal.privilege == Privilege.READ_FILES:
             read_only = True
         # create the storage credential
         storage_credential = self._ws.storage_credentials.create(
             name=name, azure_service_principal=azure_service_principal, comment=comment, read_only=read_only
         )
 
-        validation_result = self._validate_storage_credential(storage_credential, sp.prefix)
+        validation_result = self._validate_storage_credential(storage_credential, sp_migration.service_principal.prefix)
         yield validation_result
 
     def _validate_storage_credential(self, storage_credential, location) -> StorageCredentialValidationResult:
