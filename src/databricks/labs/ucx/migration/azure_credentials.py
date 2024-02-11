@@ -109,16 +109,6 @@ class AzureServicePrincipalMigration:
     def _read_databricks_secret(self, scope: str, key: str, application_id: str) -> str | None:
         try:
             secret_response = self._ws.secrets.get_secret(scope, key)
-        except Unauthenticated:
-            logger.error(
-                "User is unauthenticated to fetch Databricks secret value for service principal to storage credential migration."
-            )
-            raise
-        except PermissionDenied:
-            logger.error(
-                "User does not have permission to Databricks secret value for service principal to storage credential migration."
-            )
-            raise
         except ResourceDoesNotExist:
             logger.info(
                 f"Secret {scope}.{key} does not exists. "
