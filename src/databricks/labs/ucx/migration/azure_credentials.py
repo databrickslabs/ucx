@@ -117,14 +117,6 @@ class AzureServicePrincipalMigration:
         )
         return storage_credential_app_ids
 
-    def _check_sp_in_storage_credentials(self, sp_list, sc_set) -> list[StoragePermissionMapping]:
-        # if sp is already used, take it off from the sp_list
-        filtered_sp_list = []
-        for service_principal in sp_list:
-            if service_principal.client_id not in sc_set:
-                filtered_sp_list.append(service_principal)
-
-        return filtered_sp_list
 
     def _read_databricks_secret(self, scope: str, key: str, application_id: str) -> str | None:
         try:
@@ -220,7 +212,7 @@ class AzureServicePrincipalMigration:
         # list existed storage credentials
         sc_set = self._list_storage_credentials()
         # check if the sp is already used in UC storage credential
-        filtered_sp_list = self._check_sp_in_storage_credentials(sp_list, sc_set)
+        filtered_sp_list = [sp for sp in sp_list if sp not in sc_set]
         # fetch sp client_secret if any
         sp_list_with_secret = self._fetch_client_secret(filtered_sp_list)
         self._final_sp_list = sp_list_with_secret
