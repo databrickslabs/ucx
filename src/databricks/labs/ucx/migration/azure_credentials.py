@@ -79,7 +79,18 @@ class AzureServicePrincipalMigration:
         self._action_plan = 'service_principals_for_storage_credentials.csv'
 
     @classmethod
-    def for_cli(cls, ws: WorkspaceClient, product='ucx'):
+    def for_cli(cls, ws: WorkspaceClient, prompts: Prompts, product='ucx'):
+        if not ws.config.is_azure:
+            logger.error("Workspace is not on azure, please run this command on azure databricks workspaces.")
+            return
+
+        csv_confirmed = prompts.confirm(
+            "Have you reviewed the azure_storage_account_info.csv "
+            "and confirm listed service principals are allowed to be checked for migration?"
+        )
+        if csv_confirmed is not True:
+            return
+
         installation = Installation.current(ws, product)
         config = installation.load(WorkspaceConfig)
         sql_backend = StatementExecutionBackend(ws, config.warehouse_id)
@@ -226,16 +237,6 @@ class AzureServicePrincipalMigration:
         return StorageCredentialValidationResult.from_storage_credential_validation(storage_credential, validation)
 
     def execute_migration(self, prompts: Prompts):
-        if not self._ws.config.is_azure:
-            logger.error("Workspace is not on azure, please run this command on azure databricks workspaces.")
-            return
-
-        csv_confirmed = prompts.confirm(
-            "Have you reviewed the azure_storage_account_info.csv "
-            "and confirm listed service principals are allowed to be checked for migration?"
-        )
-        if csv_confirmed is not True:
-            return
 
         self._generate_migration_list()
 

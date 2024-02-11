@@ -299,7 +299,7 @@ def migrate_azure_service_principals(w: WorkspaceClient):
     """
     logger.info("Running migrate_azure_service_principals command")
     prompts = Prompts()
-    service_principal_migration = AzureServicePrincipalMigration.for_cli(w)
+    service_principal_migration = AzureServicePrincipalMigration.for_cli(w, prompts)
     service_principal_migration.execute_migration(prompts)
     return
 
