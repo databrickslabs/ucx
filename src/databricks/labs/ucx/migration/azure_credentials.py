@@ -217,7 +217,7 @@ class AzureServicePrincipalMigration:
         )
 
         validation_result = self._validate_storage_credential(storage_credential, sp_migration.service_principal.prefix)
-        yield validation_result
+        return validation_result
 
     def _validate_storage_credential(self, storage_credential, location) -> StorageCredentialValidationResult:
         validation = self._ws.storage_credentials.validate(
