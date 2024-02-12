@@ -8,9 +8,7 @@ from databricks.labs.blueprint.tui import Prompts
 from databricks.sdk import WorkspaceClient
 from databricks.sdk.errors import (
     InternalError,
-    PermissionDenied,
-    ResourceDoesNotExist,
-    Unauthenticated,
+    ResourceDoesNotExist
 )
 from databricks.sdk.service.catalog import (
     AzureServicePrincipal,
@@ -18,7 +16,6 @@ from databricks.sdk.service.catalog import (
     StorageCredentialInfo,
     ValidateStorageCredentialResponse,
     ValidationResult,
-    ValidationResultOperation,
 )
 
 from databricks.labs.ucx.assessment.azure import (
@@ -44,8 +41,6 @@ class StorageCredentialValidationResult:
     azure_service_principal: AzureServicePrincipal
     created_by: str
     read_only: bool
-    message: str
-    operation: ValidationResultOperation
     results: list[ValidationResult]
 
     @classmethod
@@ -57,7 +52,7 @@ class StorageCredentialValidationResult:
             azure_service_principal=storage_credential.azure_service_principal,
             created_by=storage_credential.created_by,
             read_only=storage_credential.read_only,
-            results=validation.results,
+            results=validation.results
         )
 
 
@@ -219,7 +214,9 @@ class AzureServicePrincipalMigration:
         )
         comment = f"Created by UCX during migration to UC using Azure Service Principal: {sp_migration.service_principal.principal}"
         read_only = False
-        if sp_migration.service_principal.privilege == Privilege.READ_FILES:
+        p = Privilege.READ_FILES
+        sp = sp_migration.service_principal.privilege
+        if sp_migration.service_principal.privilege == Privilege.READ_FILES.value:
             read_only = True
         # create the storage credential
         storage_credential = self._ws.storage_credentials.create(

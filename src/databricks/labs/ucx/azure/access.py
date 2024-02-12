@@ -109,6 +109,6 @@ class AzureResourcePermissions:
         Load StoragePermissionMapping info from azure_storage_account_info.csv
         :return:
         """
-        storage_account_infos = self._installation.load(list[StoragePermissionMapping], self._filename)
+        storage_account_infos = self._installation.load(list[StoragePermissionMapping], filename=self._filename)
 
         return storage_account_infos
