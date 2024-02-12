@@ -72,6 +72,20 @@ def _get_key_from_config(matching_key: str, config: dict) -> dict:
     return matched
 
 
+def _get_tenant_id_from_config(tenant_key: str, config: dict) -> str | None:
+    matching_key = [key for key in config.keys() if re.search(tenant_key, key)]
+    if len(matching_key) == 0 or matching_key[0] is None:
+        return None
+    matched = matching_key[0]
+    if re.search("spark_conf", matched):
+        client_endpoint_list = config.get(matched, {}).get("value", "").split("/")
+    else:
+        client_endpoint_list = config.get(matched, "").split("/")
+    if len(client_endpoint_list) == _CLIENT_ENDPOINT_LENGTH:
+        return client_endpoint_list[3]
+    return None
+
+
 class AzureServicePrincipalCrawler(CrawlerBase[AzureServicePrincipalInfo], JobsMixin):
     def __init__(self, ws: WorkspaceClient, sbe: SqlBackend, schema):
         super().__init__(sbe, "hive_metastore", schema, "azure_service_principals", AzureServicePrincipalInfo)
@@ -184,7 +198,7 @@ class AzureServicePrincipalCrawler(CrawlerBase[AzureServicePrincipalInfo], JobsM
                     tenant_key = "fs.azure.account.oauth2.client.endpoint." + storage_account
                 else:
                     tenant_key = "fs.azure.account.oauth2.client.endpoint"
-                tenant_id = self._get_azure_spn_tenant_id(config, tenant_key)
+                tenant_id = _get_tenant_id_from_config(tenant_key, config)
 
                 spn_list.append(
                     {
@@ -196,20 +210,6 @@ class AzureServicePrincipalCrawler(CrawlerBase[AzureServicePrincipalInfo], JobsM
                     }
                 )
         return spn_list
-
-    def _get_azure_spn_tenant_id(self, config: dict, tenant_key: str) -> str | None:
-        matching_key = [key for key in config.keys() if re.search(tenant_key, key)]
-        if len(matching_key) > 0:
-            matched = matching_key[0]
-            if not matched:
-                return None
-            if re.search("spark_conf", matched):
-                client_endpoint_list = config.get(matched, {}).get("value", "").split("/")
-            else:
-                client_endpoint_list = config.get(matched, "").split("/")
-            if len(client_endpoint_list) == _CLIENT_ENDPOINT_LENGTH:
-                return client_endpoint_list[3]
-        return None
 
     def _get_secret_if_exists(self, secret_string) -> str | None:
         if len(secret_string) == _SECRET_LIST_LENGTH:
