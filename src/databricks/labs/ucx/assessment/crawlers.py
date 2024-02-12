@@ -18,20 +18,20 @@ _AZURE_SP_CONF = [
 ]
 _SECRET_PATTERN = r"{{(secrets.*?)}}"
 _STORAGE_ACCOUNT_EXTRACT_PATTERN = r"(?:id|endpoint)(.*?)dfs"
-_AZURE_SP_CONF_FAILURE_MSG = "Uses azure service principal credentials config in"
+AZURE_SP_CONF_FAILURE_MSG = "Uses azure service principal credentials config in"
 _SECRET_LIST_LENGTH = 3
 _CLIENT_ENDPOINT_LENGTH = 6
 _INIT_SCRIPT_DBFS_PATH = 2
 
 
-def _azure_sp_conf_in_init_scripts(init_script_data: str) -> bool:
+def azure_sp_conf_in_init_scripts(init_script_data: str) -> bool:
     for conf in _AZURE_SP_CONF:
         if re.search(conf, init_script_data):
             return True
     return False
 
 
-def _azure_sp_conf_present_check(config: dict) -> bool:
+def azure_sp_conf_present_check(config: dict) -> bool:
     for key in config.keys():
         for conf in _AZURE_SP_CONF:
             if re.search(conf, key):

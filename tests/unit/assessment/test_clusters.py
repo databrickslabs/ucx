@@ -12,7 +12,7 @@ from databricks.sdk.service.compute import (
     WorkspaceStorageInfo,
 )
 
-from databricks.labs.ucx.assessment.azure import AzureServicePrincipalCrawler
+from databricks.labs.ucx.assessment.azure import AzureServicePrincipalCrawler, generate_service_principals
 from databricks.labs.ucx.assessment.clusters import ClusterInfo, ClustersCrawler
 
 from ..framework.mocks import MockBackend
@@ -72,13 +72,13 @@ def test_cluster_assessment_with_spn_cluster_policy_not_found(mocker):
             spark_version="9.3.x-cpu-ml-scala2.12",
             cluster_id="0810-225833-atlanta69",
             cluster_name="Tech Summit FY24 Cluster-1",
-            policy_id="bdqwbdqiwd1111",
+            policy_id="single-user-with-spn",
         )
     ]
-    ws = mocker.Mock()
+    ws = workspace_client_mock()
     ws.clusters.list.return_value = sample_clusters
     ws.cluster_policies.get.side_effect = NotFound("NO_POLICY")
-    crawler = AzureServicePrincipalCrawler(ws, MockBackend(), "ucx")._list_all_cluster_with_spn_in_spark_conf()
+    crawler = AzureServicePrincipalCrawler(ws, MockBackend(), "ucx").snapshot()
     assert len(crawler) == 1
 
 
@@ -100,7 +100,7 @@ def test_cluster_assessment_with_spn_cluster_policy_exception(mocker):
     ws.cluster_policies.get.side_effect = InternalError(...)
 
     with pytest.raises(DatabricksError):
-        AzureServicePrincipalCrawler(ws, MockBackend(), "ucx")._list_all_cluster_with_spn_in_spark_conf()
+        AzureServicePrincipalCrawler(ws, MockBackend(), "ucx").snapshot()
 
 
 def test_azure_spn_info_without_matching_spark_conf(mocker):
@@ -117,11 +117,10 @@ def test_azure_spn_info_without_matching_spark_conf(mocker):
         )
     ]
     sample_spns = [{}]
-    ws = mocker.Mock()
+    ws = workspace_client_mock()
     ws.clusters.list.return_value = sample_clusters
-    ws.cluster_policies.get().policy_family_definition_overrides = None
-    AzureServicePrincipalCrawler(ws, MockBackend(), "ucx")._list_all_cluster_with_spn_in_spark_conf()
-    crawler = AzureServicePrincipalCrawler(ws, MockBackend(), "ucx")._assess_service_principals(sample_spns)
+    AzureServicePrincipalCrawler(ws, MockBackend(), "ucx").snapshot()
+    crawler = generate_service_principals(sample_spns)
     result_set = list(crawler)
 
     assert len(result_set) == 1
@@ -141,11 +140,10 @@ def test_azure_spn_info_without_spark_conf(mocker):
         )
     ]
     sample_spns = [{}]
-    ws = mocker.Mock()
+    ws = workspace_client_mock()
     ws.clusters.list.return_value = sample_clusters
-    ws.cluster_policies.get().policy_family_definition_overrides = None
-    AzureServicePrincipalCrawler(ws, MockBackend(), "ucx")._list_all_cluster_with_spn_in_spark_conf()
-    crawler = AzureServicePrincipalCrawler(ws, MockBackend(), "ucx")._assess_service_principals(sample_spns)
+    AzureServicePrincipalCrawler(ws, MockBackend(), "ucx").snapshot()
+    crawler = generate_service_principals(sample_spns)
     result_set = list(crawler)
 
     assert len(result_set) == 1
