@@ -6,10 +6,7 @@ from dataclasses import dataclass
 from databricks.labs.blueprint.installation import Installation
 from databricks.labs.blueprint.tui import Prompts
 from databricks.sdk import WorkspaceClient
-from databricks.sdk.errors import (
-    InternalError,
-    ResourceDoesNotExist
-)
+from databricks.sdk.errors import InternalError, ResourceDoesNotExist
 from databricks.sdk.service.catalog import (
     AzureServicePrincipal,
     Privilege,
@@ -48,11 +45,11 @@ class StorageCredentialValidationResult:
         cls, storage_credential: StorageCredentialInfo, validation: ValidateStorageCredentialResponse
     ):
         return cls(
-            name=storage_credential.name,
-            azure_service_principal=storage_credential.azure_service_principal,
-            created_by=storage_credential.created_by,
-            read_only=storage_credential.read_only,
-            results=validation.results
+            name=storage_credential.name or "",
+            azure_service_principal=storage_credential.azure_service_principal or AzureServicePrincipal("", "", ""),
+            created_by=storage_credential.created_by or "",
+            read_only=storage_credential.read_only or False,
+            results=validation.results or [],
         )
 
 
@@ -76,14 +73,14 @@ class AzureServicePrincipalMigration:
     def for_cli(cls, ws: WorkspaceClient, prompts: Prompts, product='ucx'):
         if not ws.config.is_azure:
             logger.error("Workspace is not on azure, please run this command on azure databricks workspaces.")
-            return
+            return None
 
         csv_confirmed = prompts.confirm(
             "Have you reviewed the azure_storage_account_info.csv "
             "and confirm listed service principals are allowed to be checked for migration?"
         )
         if csv_confirmed is not True:
-            return
+            return None
 
         installation = Installation.current(ws, product)
         config = installation.load(WorkspaceConfig)
@@ -110,7 +107,6 @@ class AzureServicePrincipalMigration:
         )
         return storage_credential_app_ids
 
-
     def _read_databricks_secret(self, scope: str, key: str, application_id: str) -> str | None:
         try:
             secret_response = self._ws.secrets.get_secret(scope, key)
@@ -136,6 +132,8 @@ class AzureServicePrincipalMigration:
         # decode the bytes string from GetSecretResponse to utf-8 string
         # TODO: handle different encoding if we have feedback from the customer
         try:
+            if secret_response.value is None:
+                return None
             return base64.b64decode(secret_response.value).decode("utf-8")
         except UnicodeDecodeError:
             logger.info(
@@ -172,7 +170,9 @@ class AzureServicePrincipalMigration:
         for sp in sp_list:
             if sp.client_id in azure_sp_info_with_client_secret:
                 sp_list_with_secret.append(
-                    ServicePrincipalMigrationInfo(service_principal=sp, client_secret=azure_sp_info_with_client_secret[sp.client_id])
+                    ServicePrincipalMigrationInfo(
+                        service_principal=sp, client_secret=azure_sp_info_with_client_secret[sp.client_id]
+                    )
                 )
         return sp_list_with_secret
 
@@ -189,7 +189,6 @@ class AzureServicePrincipalMigration:
     def _generate_migration_list(self):
         """
         Create the list of SP that need to be migrated, output an action plan as a csv file for users to confirm
-        :return:
         """
         # load sp list from azure_storage_account_info.csv
         sp_list = self._azure_resource_permissions.load()
@@ -202,7 +201,6 @@ class AzureServicePrincipalMigration:
         self._final_sp_list = sp_list_with_secret
         # output the action plan for customer to confirm
         self._print_action_plan(sp_list_with_secret)
-        return
 
     def _create_storage_credential(self, sp_migration: ServicePrincipalMigrationInfo):
         # prepare the storage credential properties
@@ -210,12 +208,10 @@ class AzureServicePrincipalMigration:
         azure_service_principal = AzureServicePrincipal(
             directory_id=sp_migration.service_principal.directory_id,
             application_id=sp_migration.service_principal.client_id,
-            client_secret=sp_migration.client_secret
+            client_secret=sp_migration.client_secret,
         )
         comment = f"Created by UCX during migration to UC using Azure Service Principal: {sp_migration.service_principal.principal}"
         read_only = False
-        p = Privilege.READ_FILES
-        sp = sp_migration.service_principal.privilege
         if sp_migration.service_principal.privilege == Privilege.READ_FILES.value:
             read_only = True
         # create the storage credential

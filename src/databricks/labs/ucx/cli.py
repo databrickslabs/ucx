@@ -301,7 +301,6 @@ def migrate_azure_service_principals(w: WorkspaceClient):
     prompts = Prompts()
     service_principal_migration = AzureServicePrincipalMigration.for_cli(w, prompts)
     service_principal_migration.execute_migration(prompts)
-    return
 
 
 if __name__ == "__main__":
