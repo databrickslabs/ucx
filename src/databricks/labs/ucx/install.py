@@ -102,6 +102,7 @@ dbutils.library.restartPython()
 
 import logging
 from pathlib import Path
+from databricks.labs.blueprint.installation import Installation
 from databricks.labs.blueprint.logger import install_logger
 from databricks.labs.ucx.__about__ import __version__
 from databricks.labs.ucx.config import WorkspaceConfig
@@ -110,7 +111,7 @@ from databricks.sdk import WorkspaceClient
 install_logger()
 logging.getLogger("databricks").setLevel("DEBUG")
 
-cfg = WorkspaceConfig.from_file(Path("/Workspace{config_file}"))
+cfg = Installation.load_local(WorkspaceConfig, Path("/Workspace{config_file}"))
 ws = WorkspaceClient()
 
 print(__version__)
@@ -798,7 +799,7 @@ class WorkspaceInstallation:
 
     @staticmethod
     def _readable_timedelta(epoch):
-        when = datetime.fromtimestamp(epoch)
+        when = datetime.utcfromtimestamp(epoch)
         duration = datetime.now() - when
         data = {}
         data["days"], remaining = divmod(duration.total_seconds(), 86_400)
@@ -807,7 +808,8 @@ class WorkspaceInstallation:
 
         time_parts = ((name, round(value)) for name, value in data.items())
         time_parts = [f"{value} {name[:-1] if value == 1 else name}" for name, value in time_parts if value > 0]
-        time_parts.append("ago")
+        if len(time_parts) > 0:
+            time_parts.append("ago")
         if time_parts:
             return " ".join(time_parts)
         return "less than 1 second ago"
@@ -815,32 +817,31 @@ class WorkspaceInstallation:
     def latest_job_status(self) -> list[dict]:
         latest_status = []
         for step, job_id in self._state.jobs.items():
+            job_state = None
+            start_time = None
             try:
-                step_status = self._step_status(job_id, step)
-                latest_status.append(step_status)
+                job_runs = list(self._ws.jobs.list_runs(job_id=int(job_id), limit=1))
             except InvalidParameterValue as e:
                 logger.warning(f"skipping {step}: {e}")
                 continue
+            if job_runs:
+                state = job_runs[0].state
+                if state and state.result_state:
+                    job_state = state.result_state.name
+                elif state and state.life_cycle_state:
+                    job_state = state.life_cycle_state.name
+                if job_runs[0].start_time:
+                    start_time = job_runs[0].start_time / 1000
+            latest_status.append(
+                {
+                    "step": step,
+                    "state": "UNKNOWN" if not (job_runs and job_state) else job_state,
+                    "started": (
+                        "<never run>" if not (job_runs and start_time) else self._readable_timedelta(start_time)
+                    ),
+                }
+            )
         return latest_status
-
-    def _step_status(self, job_id, step):
-        job_state = None
-        start_time = None
-        job_runs = list(self._ws.jobs.list_runs(job_id=int(job_id), limit=1))
-        if job_runs:
-            state = job_runs[0].state
-            job_state = None
-            if state and state.result_state:
-                job_state = state.result_state.name
-            elif state and state.life_cycle_state:
-                job_state = state.life_cycle_state.name
-            if job_runs[0].start_time:
-                start_time = job_runs[0].start_time / 1000
-        return {
-            "step": step,
-            "state": "UNKNOWN" if not (job_runs and job_state) else job_state,
-            "started": "<never run>" if not job_runs else self._readable_timedelta(start_time),
-        }
 
     def _get_result_state(self, job_id):
         job_runs = list(self._ws.jobs.list_runs(job_id=job_id, limit=1))
