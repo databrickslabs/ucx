@@ -163,9 +163,9 @@ class AzureServicePrincipalMigration:
         azure_sp_infos = self._azure_sp_crawler.snapshot()
 
         for azure_sp_info in azure_sp_infos:
-            if azure_sp_info.secret_scope is None:
+            if not azure_sp_info.secret_scope:
                 continue
-            if azure_sp_info.secret_key is None:
+            if not azure_sp_info.secret_key:
                 continue
             secret_value = self._read_databricks_secret(
                 azure_sp_info.secret_scope, azure_sp_info.secret_key, azure_sp_info.application_id
