@@ -13,8 +13,7 @@ from databricks.sdk.service.catalog import (
     AzureManagedIdentity,
     AzureServicePrincipal,
     StorageCredentialInfo,
-    ValidateStorageCredentialResponse,
-    ValidationResult
+    ValidateStorageCredentialResponse
 )
 from databricks.sdk.service.workspace import GetSecretResponse
 
