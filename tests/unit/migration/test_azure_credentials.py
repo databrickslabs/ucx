@@ -16,12 +16,34 @@ from databricks.sdk.service.catalog import (
 )
 from databricks.sdk.service.workspace import GetSecretResponse
 
+from databricks.labs.blueprint.tui import MockPrompts
 from databricks.labs.ucx.assessment.azure import StoragePermissionMapping, \
     AzureServicePrincipalCrawler, AzureServicePrincipalInfo
 from databricks.labs.ucx.migration.azure_credentials import (
     AzureServicePrincipalMigration, ServicePrincipalMigrationInfo,
 )
 from tests.unit.framework.mocks import MockBackend
+from tests.unit.test_cli import ws
+
+
+def test_for_cli_not_azure():
+    w = create_autospec(WorkspaceClient)
+    w.config.is_azure.return_value = False
+    assert AzureServicePrincipalMigration.for_cli(w, MagicMock()) is None
+
+
+def test_for_cli_not_prompts():
+    w = create_autospec(WorkspaceClient)
+    w.config.is_azure.return_value = True
+    prompts = MockPrompts({"Have you reviewed the azure_storage_account_info.csv *": "No"})
+    assert AzureServicePrincipalMigration.for_cli(w, prompts) is None
+
+
+def test_for_cli(ws):
+    ws.config.is_azure.return_value = True
+    prompts = MockPrompts({"Have you reviewed the azure_storage_account_info.csv *": "Yes"})
+
+    assert isinstance(AzureServicePrincipalMigration.for_cli(ws, prompts), AzureServicePrincipalMigration)
 
 
 def test_list_storage_credentials():
