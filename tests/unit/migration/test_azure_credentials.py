@@ -1,12 +1,20 @@
+import logging
+import pytest
+
 from unittest.mock import MagicMock, create_autospec
 
 from databricks.sdk import WorkspaceClient
+from databricks.sdk.errors import (
+    InternalError,
+    ResourceDoesNotExist
+)
 from databricks.sdk.service.catalog import (
     AwsIamRole,
     AzureManagedIdentity,
     AzureServicePrincipal,
     StorageCredentialInfo,
 )
+from databricks.sdk.service.workspace import GetSecretResponse
 
 from databricks.labs.ucx.assessment.azure import StoragePermissionMapping
 from databricks.labs.ucx.migration.azure_credentials import (
@@ -41,53 +49,29 @@ def test_list_storage_credentials():
     assert expected == sp_migration._list_storage_credentials()
 
 
-def test_sp_in_storage_credentials():
-    storage_credentials_app_ids = {"no_match_id_1", "client_id_1", "client_id_2"}
+@pytest.mark.parametrize("secret_bytes_value, expected_return",
+                         [(GetSecretResponse(value="aGVsbG8gd29ybGQ="), "hello world"),
+                          (GetSecretResponse(value="T2zhLCBNdW5kbyE="), None)
+                          ])
+def test_read_secret_value_decode(secret_bytes_value, expected_return):
+    w = create_autospec(WorkspaceClient)
+    w.secrets.get_secret.return_value = secret_bytes_value
 
-    sp_no_match1 = StoragePermissionMapping(
-        prefix="prefix3",
-        client_id="client_id_3",
-        principal="principal_3",
-        privilege="READ_FILES",
-        directory_id="directory_id_3",
-    )
-    sp_match1 = StoragePermissionMapping(
-        prefix="prefix1",
-        client_id="client_id_1",
-        principal="principal_1",
-        privilege="WRITE_FILES",
-        directory_id="directory_id_1",
-    )
-    sp_match2 = StoragePermissionMapping(
-        prefix="prefix2",
-        client_id="client_id_2",
-        principal="principal_2",
-        privilege="WRITE_FILES",
-        directory_id="directory_id_2",
-    )
-    service_principals = [sp_no_match1, sp_match1, sp_match2]
-
-    sp_migration = AzureServicePrincipalMigration(MagicMock(), MagicMock(), MagicMock(), MagicMock())
-
-    filtered_sp_list = sp_migration._check_sp_in_storage_credentials(service_principals, storage_credentials_app_ids)
-
-    assert filtered_sp_list == [sp_no_match1]
+    sp_migration = AzureServicePrincipalMigration(MagicMock(), w, MagicMock(), MagicMock())
+    assert sp_migration._read_databricks_secret("test_scope","test_key", "000") == expected_return
 
 
-def test_sp_with_empty_storage_credentials():
-    storage_credentials_app_ids = {}
+@pytest.mark.parametrize("exception, expected_log, expected_return",
+                         [(ResourceDoesNotExist(), "Will not reuse this client_secret", None),
+                          (InternalError(), "Will not reuse this client_secret", None)
+                          ])
+def test_read_secret_read_exception(caplog, exception, expected_log, expected_return):
+    caplog.set_level(logging.INFO)
+    w = create_autospec(WorkspaceClient)
+    w.secrets.get_secret.side_effect = exception
 
-    sp_no_match1 = StoragePermissionMapping(
-        prefix="prefix3",
-        client_id="client_id_3",
-        principal="principal_3",
-        privilege="READ_FILES",
-        directory_id="directory_id_3",
-    )
-    service_principals = [sp_no_match1]
+    sp_migration = AzureServicePrincipalMigration(MagicMock(), w, MagicMock(), MagicMock())
+    secret_value = sp_migration._read_databricks_secret("test_scope","test_key", "000")
 
-    sp_migration = AzureServicePrincipalMigration(MagicMock(), MagicMock(), MagicMock(), MagicMock())
-
-    filtered_sp_list = sp_migration._check_sp_in_storage_credentials(service_principals, storage_credentials_app_ids)
-
-    assert filtered_sp_list == [sp_no_match1]
+    assert expected_log in caplog.text
+    assert secret_value == expected_return
