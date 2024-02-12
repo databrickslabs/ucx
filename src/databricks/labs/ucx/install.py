@@ -102,6 +102,7 @@ dbutils.library.restartPython()
 
 import logging
 from pathlib import Path
+from databricks.labs.blueprint.installation import Installation
 from databricks.labs.blueprint.logger import install_logger
 from databricks.labs.ucx.__about__ import __version__
 from databricks.labs.ucx.config import WorkspaceConfig
@@ -110,7 +111,7 @@ from databricks.sdk import WorkspaceClient
 install_logger()
 logging.getLogger("databricks").setLevel("DEBUG")
 
-cfg = WorkspaceConfig.from_file(Path("/Workspace{config_file}"))
+cfg = Installation.load_local(WorkspaceConfig, Path("/Workspace{config_file}"))
 ws = WorkspaceClient()
 
 print(__version__)
