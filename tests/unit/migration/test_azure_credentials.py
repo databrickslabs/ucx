@@ -1,7 +1,7 @@
 import logging
 import pytest
 
-from unittest.mock import MagicMock, create_autospec, Mock
+from unittest.mock import MagicMock, create_autospec, Mock, patch
 
 from databricks.sdk import WorkspaceClient
 from databricks.sdk.errors import (
@@ -139,5 +139,28 @@ def test_print_action_plan(capsys):
     assert expected_print == capsys.readouterr().out
 
 
+def test_generate_migration_list(capsys, mocker, ws):
+    ws.config.is_azure.return_value = True
+    ws.secrets.get_secret.return_value = GetSecretResponse(value="aGVsbG8gd29ybGQ=")
+    ws.storage_credentials.list.return_value = [
+        StorageCredentialInfo(
+            azure_service_principal=AzureServicePrincipal(
+                application_id="app_secret1",
+                directory_id="directory_id_1",
+                client_secret="hello world",
+            )
+        )
+    ]
 
+    prompts = MockPrompts({"Have you reviewed the azure_storage_account_info.csv *": "Yes"})
+
+    mocker.patch("databricks.labs.ucx.assessment.azure.AzureResourcePermissions.load", return_value = [StoragePermissionMapping(prefix="prefix1",client_id="app_secret1",principal="principal_1",privilege="WRITE_FILES",directory_id="directory_id_1"),
+                              StoragePermissionMapping(prefix="prefix2",client_id="app_secret2",principal="principal_2",privilege="READ_FILES",directory_id="directory_id_1")])
+    mocker.patch("databricks.labs.ucx.assessment.azure.AzureServicePrincipalCrawler.snapshot", return_value=[AzureServicePrincipalInfo("app_secret1", "test_scope", "test_key", "tenant_id_1", "storage1"),
+                                                                                                             AzureServicePrincipalInfo("app_secret2", "test_scope", "test_key", "tenant_id_1", "storage1")])
+
+    sp_migration = AzureServicePrincipalMigration.for_cli(ws, prompts)
+    sp_migration._generate_migration_list()
+
+    assert "app_secret2" in capsys.readouterr().out
 

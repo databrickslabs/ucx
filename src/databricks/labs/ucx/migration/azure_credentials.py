@@ -76,7 +76,6 @@ class AzureServicePrincipalMigration:
         self._ws = ws
         self._azure_resource_permissions = azure_resource_permissions
         self._azure_sp_crawler = azure_sp_crawler
-        self._action_plan = 'service_principals_for_storage_credentials.csv'
 
     @classmethod
     def for_cli(cls, ws: WorkspaceClient, prompts: Prompts, product='ucx'):
@@ -202,7 +201,7 @@ class AzureServicePrincipalMigration:
         # list existed storage credentials
         sc_set = self._list_storage_credentials()
         # check if the sp is already used in UC storage credential
-        filtered_sp_list = [sp for sp in sp_list if sp not in sc_set]
+        filtered_sp_list = [sp for sp in sp_list if sp.client_id not in sc_set]
         # fetch sp client_secret if any
         sp_list_with_secret = self._fetch_client_secret(filtered_sp_list)
         self._final_sp_list = sp_list_with_secret
