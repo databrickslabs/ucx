@@ -12,7 +12,8 @@ from databricks.labs.ucx.assessment.azure import (
     AzureResourcePermissions,
     AzureResources,
     AzureServicePrincipalCrawler,
-    Principal, generate_service_principals,
+    Principal,
+    generate_service_principals,
 )
 from databricks.labs.ucx.hive_metastore import ExternalLocations
 
@@ -287,7 +288,6 @@ def test_azure_service_principal_info_null_applidsnapshot():
 
 
 def test_azure_spn_info_with_secret():
-    ws = workspace_client_mock(clusters="single-cluster-spn.json", secret_exists=True)
     sample_spns = [{"application_id": "test123456780", "secret_scope": "abcff", "secret_key": "sp_app_client_id"}]
     crawler = generate_service_principals(sample_spns)
     result_set = list(crawler)

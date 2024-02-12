@@ -12,7 +12,10 @@ from databricks.sdk.service.compute import (
     WorkspaceStorageInfo,
 )
 
-from databricks.labs.ucx.assessment.azure import AzureServicePrincipalCrawler, generate_service_principals
+from databricks.labs.ucx.assessment.azure import (
+    AzureServicePrincipalCrawler,
+    generate_service_principals,
+)
 from databricks.labs.ucx.assessment.clusters import ClusterInfo, ClustersCrawler
 
 from ..framework.mocks import MockBackend

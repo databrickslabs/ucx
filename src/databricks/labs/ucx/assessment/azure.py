@@ -22,7 +22,8 @@ from databricks.labs.ucx.assessment.crawlers import (
     _SECRET_PATTERN,
     _STORAGE_ACCOUNT_EXTRACT_PATTERN,
     azure_sp_conf_present_check,
-    logger, )
+    logger,
+)
 from databricks.labs.ucx.assessment.jobs import JobsMixin
 from databricks.labs.ucx.config import WorkspaceConfig
 from databricks.labs.ucx.framework.crawlers import (
@@ -50,26 +51,13 @@ class AzureServicePrincipalInfo:
 def generate_service_principals(service_principals: list[dict]):
     for spn in service_principals:
         spn_info = AzureServicePrincipalInfo(
-            application_id=spn.get("application_id"),
-            secret_scope=spn.get("secret_scope"),
-            secret_key=spn.get("secret_key"),
-            tenant_id=spn.get("tenant_id"),
-            storage_account=spn.get("storage_account"),
+            application_id=spn["application_id"],
+            secret_scope=spn["secret_scope"],
+            secret_key=spn["secret_key"],
+            tenant_id=spn["tenant_id"],
+            storage_account=spn["storage_account"],
         )
         yield spn_info
-
-
-def _get_key_from_config(matching_key: str, config: dict) -> dict:
-    matched = {}
-    matched_key = [key for key in config.keys() if re.search(matching_key, key)]
-    if len(matched_key) == 0:
-        return matched
-    for key in matched_key:
-        if re.search("spark_conf", key):
-            matched[key] = config.get(key, {}).get("value", "")
-        else:
-            matched[key] = config.get(key, "")
-    return matched
 
 
 def _get_tenant_id_from_config(tenant_key: str, config: dict) -> str | None:
@@ -113,7 +101,9 @@ class AzureServicePrincipalCrawler(CrawlerBase[AzureServicePrincipalInfo], JobsM
 
         # list all relevant service principals in pipelines
         for pipeline in self._ws.pipelines.list_pipelines():
+            assert pipeline.pipeline_id is not None
             pipeline_info = self._ws.pipelines.get(pipeline.pipeline_id)
+            assert pipeline_info.spec is not None
             pipeline_config = pipeline_info.spec.configuration
             if pipeline_config:
                 if not azure_sp_conf_present_check(pipeline_config):
@@ -162,7 +152,8 @@ class AzureServicePrincipalCrawler(CrawlerBase[AzureServicePrincipalInfo], JobsM
             return azure_spn_list
         if azure_sp_conf_present_check(json.loads(policy.policy_family_definition_overrides)):
             azure_spn_list.extend(
-                self._get_azure_spn_from_config(json.loads(policy.policy_family_definition_overrides)))
+                self._get_azure_spn_from_config(json.loads(policy.policy_family_definition_overrides))
+            )
 
         return azure_spn_list
 
@@ -175,17 +166,19 @@ class AzureServicePrincipalCrawler(CrawlerBase[AzureServicePrincipalInfo], JobsM
 
     def _get_azure_spn_from_config(self, config: dict) -> list:
         spn_list = []
-        spn_application_id, secret_scope, secret_key, tenant_id, storage_account = "", "", "", "",""
+        spn_application_id, secret_scope, secret_key, tenant_id, storage_account = None, "", "", None, ""
         matching_key_list = [key for key in config.keys() if "fs.azure.account.oauth2.client.id" in key]
         if len(matching_key_list) > 0:
             for key in matching_key_list:
-                storage_account_match = re.search(_STORAGE_ACCOUNT_EXTRACT_PATTERN, key)
+                # retrieve application id of spn
                 if re.search("spark_conf", key):
                     spn_application_id = config.get(key, {}).get("value")
                 else:
-                    spn_application_id = config.get(key)
+                    spn_application_id = config[key]
                 if not spn_application_id:
                     continue
+
+                # retrieve secret scopes if used
                 secret_matched = re.search(_SECRET_PATTERN, spn_application_id)
                 if secret_matched is not None:
                     secret_string = secret_matched.group(1).split("/")
@@ -193,13 +186,18 @@ class AzureServicePrincipalCrawler(CrawlerBase[AzureServicePrincipalInfo], JobsM
                     if not spn_application_id:
                         continue
                     secret_scope, secret_key = secret_string[1], secret_string[2]
+                spn_application_id = "" if spn_application_id is None else spn_application_id
+
+                # retrieve storage account configured with this spn
+                storage_account_match = re.search(_STORAGE_ACCOUNT_EXTRACT_PATTERN, key)
                 if storage_account_match:
                     storage_account = storage_account_match.group(1).strip(".")
                     tenant_key = "fs.azure.account.oauth2.client.endpoint." + storage_account
                 else:
                     tenant_key = "fs.azure.account.oauth2.client.endpoint"
+                # retrieve tenant id of spn
                 tenant_id = _get_tenant_id_from_config(tenant_key, config)
-
+                tenant_id = "" if tenant_id is None else tenant_id
                 spn_list.append(
                     {
                         "application_id": spn_application_id,
@@ -390,7 +388,7 @@ class AzureResources:
         return self._principals[principal_id]
 
     def role_assignments(
-            self, resource_id: str, *, principal_types: list[str] | None = None
+        self, resource_id: str, *, principal_types: list[str] | None = None
     ) -> Iterable[AzureRoleAssignment]:
         """See https://learn.microsoft.com/en-us/rest/api/authorization/role-assignments/list-for-resource"""
         if not principal_types:
@@ -509,7 +507,7 @@ class AzureResourcePermissions:
             if location.location.startswith("abfss://"):
                 start = location.location.index("@")
                 end = location.location.index(".dfs.core.windows.net")
-                storage_acct = location.location[start + 1: end]
+                storage_acct = location.location[start + 1 : end]
                 if storage_acct not in storage_accounts:
                     storage_accounts.append(storage_acct)
         return storage_accounts
