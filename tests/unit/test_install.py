@@ -1,6 +1,6 @@
 import json
-from datetime import timedelta
-from unittest.mock import MagicMock, create_autospec
+from datetime import datetime, timedelta
+from unittest.mock import MagicMock, create_autospec, patch
 
 import pytest
 from databricks.labs.blueprint.installation import Installation, MockInstallation
@@ -18,7 +18,12 @@ from databricks.sdk.errors import (
 )
 from databricks.sdk.service import compute, iam, jobs, sql
 from databricks.sdk.service.compute import CreatePolicyResponse, Policy, State
-from databricks.sdk.service.jobs import BaseRun, RunResultState, RunState
+from databricks.sdk.service.jobs import (
+    BaseRun,
+    RunLifeCycleState,
+    RunResultState,
+    RunState,
+)
 from databricks.sdk.service.sql import (
     Dashboard,
     DataSource,
@@ -1045,3 +1050,171 @@ def test_repair_run_result_state(ws, caplog, mock_installation_with_jobs, any_pr
 
     workspace_installation.repair_run("assessment")
     assert "Please try after sometime" in caplog.text
+
+
+@pytest.mark.parametrize(
+    "state,expected",
+    [
+        (
+            RunState(
+                result_state=None,
+                life_cycle_state=RunLifeCycleState.RUNNING,
+            ),
+            "RUNNING",
+        ),
+        (
+            RunState(
+                result_state=RunResultState.SUCCESS,
+                life_cycle_state=RunLifeCycleState.TERMINATED,
+            ),
+            "SUCCESS",
+        ),
+        (
+            RunState(
+                result_state=RunResultState.FAILED,
+                life_cycle_state=RunLifeCycleState.TERMINATED,
+            ),
+            "FAILED",
+        ),
+        (
+            RunState(
+                result_state=None,
+                life_cycle_state=None,
+            ),
+            "UNKNOWN",
+        ),
+    ],
+)
+def test_latest_job_status_states(ws, mock_installation_with_jobs, any_prompt, state, expected):
+    base = [
+        BaseRun(
+            job_id=123,
+            run_name="assessment",
+            state=state,
+            start_time=1704114000000,
+        )
+    ]
+    sql_backend = MockBackend()
+    wheels = create_autospec(WheelsV2)
+    config = WorkspaceConfig(inventory_database='ucx')
+    timeout = timedelta(seconds=1)
+    workspace_installation = WorkspaceInstallation(
+        config, mock_installation_with_jobs, sql_backend, wheels, ws, any_prompt, timeout
+    )
+    workspace_installation._state.jobs = {"assessment": "123"}
+    ws.jobs.list_runs.return_value = base
+    status = workspace_installation.latest_job_status()
+    assert len(status) == 1
+    assert status[0]["state"] == expected
+
+
+@patch(f"{databricks.labs.ucx.install.__name__}.datetime", wraps=datetime)
+@pytest.mark.parametrize(
+    "start_time,expected",
+    [
+        (1704114000000, "1 hour ago"),  # 2024-01-01 13:00:00
+        (1704117600000, "less than 1 second ago"),  # 2024-01-01 14:00:00
+        (None, "<never run>"),
+    ],
+)
+def test_latest_job_status_success_with_time(
+    mock_datetime, ws, mock_installation_with_jobs, any_prompt, start_time, expected
+):
+    base = [
+        BaseRun(
+            job_id=123,
+            run_name="assessment",
+            state=RunState(
+                result_state=RunResultState.SUCCESS,
+                life_cycle_state=RunLifeCycleState.TERMINATED,
+            ),
+            start_time=start_time,
+        )
+    ]
+    sql_backend = MockBackend()
+    wheels = create_autospec(WheelsV2)
+    config = WorkspaceConfig(inventory_database='ucx')
+    timeout = timedelta(seconds=1)
+    workspace_installation = WorkspaceInstallation(
+        config, mock_installation_with_jobs, sql_backend, wheels, ws, any_prompt, timeout
+    )
+    workspace_installation._state.jobs = {"assessment": "123"}
+    ws.jobs.list_runs.return_value = base
+    faked_now = datetime(2024, 1, 1, 14, 0, 0)
+    mock_datetime.now.return_value = faked_now
+    status = workspace_installation.latest_job_status()
+    assert status[0]["started"] == expected
+
+
+def test_latest_job_status_list(ws, mock_installation_with_jobs, any_prompt):
+    runs = [
+        [
+            BaseRun(
+                job_id=1,
+                run_name="job1",
+                state=RunState(
+                    result_state=None,
+                    life_cycle_state=RunLifeCycleState.RUNNING,
+                ),
+                start_time=1705577671907,
+            )
+        ],
+        [
+            BaseRun(
+                job_id=2,
+                run_name="job2",
+                state=RunState(
+                    result_state=RunResultState.SUCCESS,
+                    life_cycle_state=RunLifeCycleState.TERMINATED,
+                ),
+                start_time=1705577671907,
+            )
+        ],
+        [],  # the last job has no runs
+    ]
+    sql_backend = MockBackend()
+    wheels = create_autospec(WheelsV2)
+    config = WorkspaceConfig(inventory_database='ucx')
+    timeout = timedelta(seconds=1)
+    workspace_installation = WorkspaceInstallation(
+        config, mock_installation_with_jobs, sql_backend, wheels, ws, any_prompt, timeout
+    )
+    workspace_installation._state.jobs = {"job1": "1", "job2": "2", "job3": "3"}
+    ws.jobs.list_runs.side_effect = iter(runs)
+    status = workspace_installation.latest_job_status()
+    assert len(status) == 3
+    assert status[0]["step"] == "job1"
+    assert status[0]["state"] == "RUNNING"
+    assert status[1]["step"] == "job2"
+    assert status[1]["state"] == "SUCCESS"
+    assert status[2]["step"] == "job3"
+    assert status[2]["state"] == "UNKNOWN"
+
+
+def test_latest_job_status_no_job_run(ws, mock_installation_with_jobs, any_prompt):
+    sql_backend = MockBackend()
+    wheels = create_autospec(WheelsV2)
+    config = WorkspaceConfig(inventory_database='ucx')
+    timeout = timedelta(seconds=1)
+    workspace_installation = WorkspaceInstallation(
+        config, mock_installation_with_jobs, sql_backend, wheels, ws, any_prompt, timeout
+    )
+    workspace_installation._state.jobs = {"assessment": "123"}
+    ws.jobs.list_runs.return_value = ""
+    status = workspace_installation.latest_job_status()
+    assert len(status) == 1
+    assert status[0]["step"] == "assessment"
+
+
+def test_latest_job_status_exception(ws, mock_installation_with_jobs, any_prompt):
+    sql_backend = MockBackend()
+    wheels = create_autospec(WheelsV2)
+    config = WorkspaceConfig(inventory_database='ucx')
+    timeout = timedelta(seconds=1)
+    workspace_installation = WorkspaceInstallation(
+        config, mock_installation_with_jobs, sql_backend, wheels, ws, any_prompt, timeout
+    )
+    workspace_installation._state.jobs = {"assessment": "123"}
+    ws.jobs.list_runs.side_effect = InvalidParameterValue("Workflow does not exists")
+    status = workspace_installation.latest_job_status()
+    assert len(status) == 0
