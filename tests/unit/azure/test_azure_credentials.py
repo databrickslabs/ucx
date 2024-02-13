@@ -8,6 +8,7 @@ import yaml
 from databricks.labs.blueprint.tui import MockPrompts
 from databricks.sdk import WorkspaceClient
 from databricks.sdk.errors import InternalError, NotFound, ResourceDoesNotExist
+from databricks.sdk.errors.platform import InvalidParameterValue
 from databricks.sdk.service import sql
 from databricks.sdk.service.catalog import (
     AwsIamRole,
@@ -51,6 +52,13 @@ def ws():
             "prefix": "prefix3",
             "client_id": "app_secret3",
             "principal": "principal_write",
+            "privilege": "WRITE_FILES",
+            "directory_id": "directory_id_2",
+        },
+        {
+            "prefix": "overlap_with_external_location",
+            "client_id": "app_secret4",
+            "principal": "principal_overlap",
             "privilege": "WRITE_FILES",
             "directory_id": "directory_id_2",
         },
@@ -135,6 +143,42 @@ def test_list_storage_credentials(ws):
     sp_migration._list_storage_credentials()
 
     assert expected == sp_migration._list_storage_credentials()
+
+
+def test_list_storage_credentials_for_integration_test(ws):
+    ws.storage_credentials.list.return_value = [
+        StorageCredentialInfo(aws_iam_role=AwsIamRole(role_arn="arn:aws:iam::123456789012:role/example-role-name")),
+        StorageCredentialInfo(
+            azure_managed_identity=AzureManagedIdentity(
+                access_connector_id="/subscriptions/.../providers/Microsoft.Databricks/..."
+            )
+        ),
+        StorageCredentialInfo(
+            name="spn_for_integration_test",
+            azure_service_principal=AzureServicePrincipal(
+                application_id="b6420590-5e1c-4426-8950-a94cbe9b6115",
+                directory_id="62e43d7d-df53-4c64-86ed-c2c1a3ac60c3",
+                client_secret="secret",
+            ),
+        ),
+    ]
+
+    # test storage credential: spn_for_integration_test is picked up
+    # in integration test, we only pick up the existing storage credential created in integration test and ignore the others
+    sp_migration = AzureServicePrincipalMigration(
+        MagicMock(), ws, MagicMock(), MagicMock(), integration_test_flag="spn_for_integration_test"
+    )
+    expected = {"b6420590-5e1c-4426-8950-a94cbe9b6115"}
+    sp_migration._list_storage_credentials()
+    assert expected == sp_migration._list_storage_credentials()
+
+    # test storage credential is not picked up
+    # if integration test does not create storage credential, we use dummy integration_test_flag to filter out other existing storage credentials
+    sp_migration = AzureServicePrincipalMigration(
+        MagicMock(), ws, MagicMock(), MagicMock(), integration_test_flag="other_spn"
+    )
+    sp_migration._list_storage_credentials()
+    assert {""} == sp_migration._list_storage_credentials()
 
 
 @pytest.mark.parametrize(
@@ -306,12 +350,10 @@ def test_execute_migration_no_confirmation(mocker, ws):
         }
     )
 
-    mocker.patch(
-        "databricks.labs.ucx.migration.azure_credentials.AzureServicePrincipalMigration._generate_migration_list"
-    )
+    mocker.patch("databricks.labs.ucx.azure.azure_credentials.AzureServicePrincipalMigration._generate_migration_list")
 
     with patch(
-        "databricks.labs.ucx.migration.azure_credentials.AzureServicePrincipalMigration._create_storage_credential"
+        "databricks.labs.ucx.azure.azure_credentials.AzureServicePrincipalMigration._create_storage_credential"
     ) as c:
         sp_migration = AzureServicePrincipalMigration.for_cli(ws, prompts)
         sp_migration.execute_migration(prompts)
@@ -325,6 +367,8 @@ def side_effect_create_storage_credential(name, azure_service_principal, comment
 
 
 def side_effect_validate_storage_credential(storage_credential_name, url):
+    if "overlap" in storage_credential_name:
+        raise InvalidParameterValue
     if "read" in storage_credential_name:
         response = {
             "is_dir": True,
@@ -351,7 +395,7 @@ def side_effect_validate_storage_credential(storage_credential_name, url):
         return ValidateStorageCredentialResponse.from_dict(response)
 
 
-def test_execute_migration(capsys, mocker, ws):
+def test_execute_migration(caplog, capsys, mocker, ws):
     ws.config.is_azure = True
     ws.secrets.get_secret.return_value = GetSecretResponse(value="aGVsbG8gd29ybGQ=")
     ws.storage_credentials.list.return_value = [
@@ -379,10 +423,14 @@ def test_execute_migration(capsys, mocker, ws):
             AzureServicePrincipalInfo("app_secret1", "test_scope", "test_key", "tenant_id_1", "storage1"),
             AzureServicePrincipalInfo("app_secret2", "test_scope", "test_key", "tenant_id_1", "storage1"),
             AzureServicePrincipalInfo("app_secret3", "test_scope", "test_key", "tenant_id_2", "storage1"),
+            AzureServicePrincipalInfo("app_secret4", "test_scope", "test_key", "tenant_id_2", "storage1"),
         ],
     )
 
     sp_migration = AzureServicePrincipalMigration.for_cli(ws, prompts)
     sp_migration.execute_migration(prompts)
 
+    # assert migration is complete
     assert "Completed migration" in capsys.readouterr().out
+    # assert the validation exception is caught when prefix overlaps with existing external location
+    assert "Skip the validation" in caplog.text

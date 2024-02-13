@@ -275,9 +275,6 @@ class AzureServicePrincipalMigration:
         for sp in self._final_sp_list:
             execution_result.append(self._create_storage_credential(sp))
 
-        if self._integration_test_flag:
-            print(execution_result)
-
         results_file = self._installation.save(execution_result, filename=self._output_file)
         logger.info("Completed migration from Azure Service Principal migrated to UC Storage credentials")
         print(
