@@ -15,9 +15,9 @@ from databricks.sdk.service.compute import (
 )
 
 from databricks.labs.ucx.assessment.crawlers import (
-    INIT_SCRIPT_DBFS_PATH,
     AZURE_SP_CONF_FAILURE_MSG,
     INCOMPATIBLE_SPARK_CONFIG_KEYS,
+    INIT_SCRIPT_DBFS_PATH,
     azure_sp_conf_present_check,
     spark_version_compatibility,
 )
