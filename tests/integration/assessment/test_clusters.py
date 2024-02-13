@@ -2,6 +2,7 @@ from datetime import timedelta
 
 from databricks.sdk.errors import NotFound
 from databricks.sdk.retries import retried
+from databricks.sdk.service.compute import DataSecurityMode
 
 from databricks.labs.ucx.assessment.clusters import ClustersCrawler
 
@@ -22,3 +23,16 @@ def test_cluster_crawler(ws, make_cluster, inventory_schema, sql_backend):
 
     assert len(results) >= 1
     assert results[0].cluster_id == created_cluster.cluster_id
+
+
+def test_cluster_crawler_no_isolation(ws, make_cluster, inventory_schema, sql_backend):
+    created_cluster = make_cluster(data_security_mode=DataSecurityMode.NONE, num_workers=1)
+    cluster_crawler = ClustersCrawler(ws=ws, sbe=sql_backend, schema=inventory_schema)
+    clusters = cluster_crawler.snapshot()
+    results = []
+    for cluster in clusters:
+        if cluster.cluster_id == created_cluster.cluster_id:
+            results.append(cluster)
+
+    assert len(results) == 1
+    assert results[0].failures == '["No isolation shared clusters not supported in UC"]'
