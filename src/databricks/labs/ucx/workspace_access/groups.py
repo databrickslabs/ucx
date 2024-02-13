@@ -374,7 +374,20 @@ class GroupManager(CrawlerBase[MigratedGroup]):
             raise ManyError(errors)
 
     def get_migration_state(self) -> MigrationState:
-        return MigrationState(self.snapshot())
+        state = MigrationState(self.snapshot())
+        if not self._include_group_names:
+            return state
+
+        new_state = []
+        for migrated_group in state.groups:
+            if migrated_group.name_in_workspace in self._include_group_names:
+                new_state.append(migrated_group)
+            else:
+                logger.warning(
+                    f"Group {migrated_group.name_in_workspace} defined in configuration does not exist on the groups table. "
+                    "Consider re-running the assessment to add this group to the state"
+                )
+        return MigrationState(new_state)
 
     def delete_original_workspace_groups(self):
         tasks = []
