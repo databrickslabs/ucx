@@ -39,14 +39,6 @@ def _secret_not_found(secret_scope, secret_key):
     raise NotFound(msg)
 
 
-def get_az_api_mapping(*args, **kwargs):
-    mapping = _load_fixture("../assessment/azure/mappings.json")[0]
-    if args[1] in mapping:
-        return mapping[args[1]]
-    else:
-        return {}
-
-
 def workspace_client_mock(
     clusters="no-spark-conf.json",
     pipelines="single-pipeline.json",
