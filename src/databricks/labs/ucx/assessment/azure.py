@@ -51,27 +51,13 @@ class AzureServicePrincipalInfo:
 def generate_service_principals(service_principals: list[dict]):
     for spn in service_principals:
         spn_info = AzureServicePrincipalInfo(
-            application_id=spn["application_id"],
-            secret_scope=spn["secret_scope"],
-            secret_key=spn["secret_key"],
-            tenant_id=spn["tenant_id"],
-            storage_account=spn["storage_account"],
+            application_id=spn.get("application_id"),
+            secret_scope=spn.get("secret_scope"),
+            secret_key=spn.get("secret_key"),
+            tenant_id=spn.get("tenant_id"),
+            storage_account=spn.get("storage_account"),
         )
         yield spn_info
-
-
-def _get_tenant_id_from_config(tenant_key: str, config: dict) -> str | None:
-    matching_key = [key for key in config.keys() if re.search(tenant_key, key)]
-    if len(matching_key) == 0 or matching_key[0] is None:
-        return None
-    matched = matching_key[0]
-    if re.search("spark_conf", matched):
-        client_endpoint_list = config.get(matched, {}).get("value", "").split("/")
-    else:
-        client_endpoint_list = config.get(matched, "").split("/")
-    if len(client_endpoint_list) == _CLIENT_ENDPOINT_LENGTH:
-        return client_endpoint_list[3]
-    return None
 
 
 class AzureServicePrincipalCrawler(CrawlerBase[AzureServicePrincipalInfo], JobsMixin):
@@ -166,27 +152,14 @@ class AzureServicePrincipalCrawler(CrawlerBase[AzureServicePrincipalInfo], JobsM
 
     def _get_azure_spn_from_config(self, config: dict) -> list:
         spn_list = []
-        spn_application_id, secret_scope, secret_key, tenant_id, storage_account = None, "", "", None, ""
+        spn_application_id, secret_scope, secret_key, tenant_id, storage_account = None, "", "", "", ""
         matching_key_list = [key for key in config.keys() if "fs.azure.account.oauth2.client.id" in key]
         if len(matching_key_list) > 0:
             for key in matching_key_list:
                 # retrieve application id of spn
-                if re.search("spark_conf", key):
-                    spn_application_id = config.get(key, {}).get("value")
-                else:
-                    spn_application_id = config[key]
-                if not spn_application_id:
+                spn_application_id, secret_scope, secret_key = self._get_key_from_config(key, config)
+                if spn_application_id is None:
                     continue
-
-                # retrieve secret scopes if used
-                secret_matched = re.search(_SECRET_PATTERN, spn_application_id)
-                if secret_matched is not None:
-                    secret_string = secret_matched.group(1).split("/")
-                    spn_application_id = self._get_secret_if_exists(secret_string)
-                    if not spn_application_id:
-                        continue
-                    secret_scope, secret_key = secret_string[1], secret_string[2]
-                spn_application_id = "" if spn_application_id is None else spn_application_id
 
                 # retrieve storage account configured with this spn
                 storage_account_match = re.search(_STORAGE_ACCOUNT_EXTRACT_PATTERN, key)
@@ -195,9 +168,17 @@ class AzureServicePrincipalCrawler(CrawlerBase[AzureServicePrincipalInfo], JobsM
                     tenant_key = "fs.azure.account.oauth2.client.endpoint." + storage_account
                 else:
                     tenant_key = "fs.azure.account.oauth2.client.endpoint"
+
                 # retrieve tenant id of spn
-                tenant_id = _get_tenant_id_from_config(tenant_key, config)
-                tenant_id = "" if tenant_id is None else tenant_id
+                matching_key = [key for key in config.keys() if re.search(tenant_key, key)]
+                if len(matching_key) == 0 or matching_key[0] is None:
+                    tenant_id = ""
+                else:
+                    client_endpoint_list = self._get_key_from_config(matching_key[0], config)[0].split("/")
+                    if len(client_endpoint_list) == _CLIENT_ENDPOINT_LENGTH:
+                        tenant_id = client_endpoint_list[3]
+
+                # add output to spn list
                 spn_list.append(
                     {
                         "application_id": spn_application_id,
@@ -208,6 +189,20 @@ class AzureServicePrincipalCrawler(CrawlerBase[AzureServicePrincipalInfo], JobsM
                     }
                 )
         return spn_list
+
+    def _get_key_from_config(self, key: str, config: dict) -> tuple[str, str, str]:
+        if re.search("spark_conf", key):
+            value = config.get(key, {}).get("value", "")
+        else:
+            value = config.get(key, "")
+        # retrieve from secret scope if used
+        secret_matched = re.search(_SECRET_PATTERN, value)
+        if secret_matched is None:
+            return value, "", ""
+        secret_string = secret_matched.group(1).split("/")
+        value = self._get_secret_if_exists(secret_string)
+        secret_scope, secret_key = secret_string[1], secret_string[2]
+        return value, secret_scope, secret_key
 
     def _get_secret_if_exists(self, secret_string) -> str | None:
         if len(secret_string) == _SECRET_LIST_LENGTH:
