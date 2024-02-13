@@ -12,16 +12,15 @@ from databricks.sdk.errors import NotFound
 
 from databricks.labs.ucx.account import AccountWorkspaces, WorkspaceInfo
 from databricks.labs.ucx.assessment.aws import AWSResourcePermissions
+
 from databricks.labs.ucx.azure.access import AzureResourcePermissions
+from databricks.labs.ucx.azure.azure_credentials import AzureServicePrincipalMigration
 from databricks.labs.ucx.config import WorkspaceConfig
 from databricks.labs.ucx.framework.crawlers import StatementExecutionBackend
 from databricks.labs.ucx.hive_metastore import ExternalLocations, TablesCrawler
 from databricks.labs.ucx.hive_metastore.mapping import TableMapping
 from databricks.labs.ucx.hive_metastore.table_migrate import TableMove, TablesMigrate
 from databricks.labs.ucx.install import WorkspaceInstallation
-from databricks.labs.ucx.azure.azure_credentials import (
-    AzureServicePrincipalMigration,
-)
 from databricks.labs.ucx.workspace_access.groups import GroupManager
 
 ucx = App(__file__)
