@@ -102,6 +102,10 @@ class AzureServicePrincipalCrawler(CrawlerBase[AzureServicePrincipalInfo], JobsM
         return self._get_azure_spn_from_config(warehouse_config_dict)
 
     def _get_azure_spn_from_cluster_config(self, cluster_config):
+        """Detect azure service principals from a Databricks cluster config
+        This checks the Spark conf of the cluster config, and any spark conf in the cluster policy
+        As well as cluster policy family override
+        """
         azure_spn_list = []
 
         if cluster_config.spark_conf is not None:
@@ -137,6 +141,10 @@ class AzureServicePrincipalCrawler(CrawlerBase[AzureServicePrincipalInfo], JobsM
             return None
 
     def _get_azure_spn_from_config(self, config: dict) -> list:
+        """Detect azure service principals from a dictionary of spark configs
+        This checks for the existence of an application id by matching fs.azure.account.oauth2.client.id
+        For each application id identified, retrieve the relevant storage account, and corresponding tenant id
+        """
         spn_list = []
         spn_application_id, secret_scope, secret_key, tenant_id, storage_account = None, "", "", "", ""
         matching_spn_app_id_keys = [key for key in config.keys() if "fs.azure.account.oauth2.client.id" in key]
@@ -177,6 +185,10 @@ class AzureServicePrincipalCrawler(CrawlerBase[AzureServicePrincipalInfo], JobsM
         return spn_list
 
     def _get_key_from_config(self, key: str, config: dict) -> tuple[str, str, str]:
+        """Get a config based on its key, with some special handling:
+        If the key is prefixed with spark_conf, i.e. this is in a cluster policy, the actual value is nested
+        If the value is of format {{secret_scope/secret}}, we extract that as well
+        """
         if re.search("spark_conf", key):
             value = config.get(key, {}).get("value", "")
         else:
@@ -186,19 +198,19 @@ class AzureServicePrincipalCrawler(CrawlerBase[AzureServicePrincipalInfo], JobsM
         if secret_matched is None:
             return value, "", ""
         secret_string = secret_matched.group(1).split("/")
-        value = self._get_secret_if_exists(secret_string)
+        if len(secret_string) != SECRET_LIST_LENGTH:
+            return value, "", ""
         secret_scope, secret_key = secret_string[1], secret_string[2]
+        value = self._get_secret_if_exists(secret_scope, secret_key)
         return value, secret_scope, secret_key
 
-    def _get_secret_if_exists(self, secret_string) -> str | None:
-        if len(secret_string) == SECRET_LIST_LENGTH:
-            secret_scope, secret_key = secret_string[1], secret_string[2]
-            try:
-                # Return the decoded secret value in string format
-                secret = self._ws.secrets.get_secret(secret_scope, secret_key)
-                assert secret.value is not None
-                return base64.b64decode(secret.value).decode("utf-8")
-            except NotFound:
-                logger.warning(f'removed on the backend: {"/".join(secret_string)}')
-                return None
-        return None
+    def _get_secret_if_exists(self, secret_scope, secret_key) -> str | None:
+        """Get the secret value given a secret scope & secret key. Log a warning if secret does not exist"""
+        try:
+            # Return the decoded secret value in string format
+            secret = self._ws.secrets.get_secret(secret_scope, secret_key)
+            assert secret.value is not None
+            return base64.b64decode(secret.value).decode("utf-8")
+        except NotFound:
+            logger.warning(f'removed on the backend: {secret_scope}"/"{secret_key}')
+            return None
