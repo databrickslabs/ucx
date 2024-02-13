@@ -379,13 +379,14 @@ class GroupManager(CrawlerBase[MigratedGroup]):
             return state
 
         new_state = []
-        for migrated_group in state.groups:
-            if migrated_group.name_in_workspace in self._include_group_names:
-                new_state.append(migrated_group)
+        group_name_with_state = {migrated_group.name_in_workspace: migrated_group for migrated_group in state.groups}
+        for group_name in self._include_group_names:
+            if group_name in group_name_with_state:
+                new_state.append(group_name_with_state[group_name])
             else:
                 logger.warning(
-                    f"Group {migrated_group.name_in_workspace} defined in configuration does not exist on the groups table. "
-                    "Consider re-running the assessment to add this group to the state"
+                    f"Group {group_name} defined in configuration does not exist on the groups table. "
+                    "Consider checking if the group exist in the workspace or re-running the assessment."
                 )
         return MigrationState(new_state)
 
