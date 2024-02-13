@@ -9,10 +9,10 @@ from databricks.sdk.errors import NotFound
 from databricks.sdk.service.compute import ClusterSource, Policy
 
 from databricks.labs.ucx.assessment.crawlers import (
-    _CLIENT_ENDPOINT_LENGTH,
-    _SECRET_LIST_LENGTH,
-    _SECRET_PATTERN,
-    _STORAGE_ACCOUNT_EXTRACT_PATTERN,
+    CLIENT_ENDPOINT_LENGTH,
+    SECRET_LIST_LENGTH,
+    SECRET_PATTERN,
+    STORAGE_ACCOUNT_EXTRACT_PATTERN,
     azure_sp_conf_present_check,
     logger,
 )
@@ -148,7 +148,7 @@ class AzureServicePrincipalCrawler(CrawlerBase[AzureServicePrincipalInfo], JobsM
                     continue
 
                 # retrieve storage account configured with this spn
-                storage_account_matched = re.search(_STORAGE_ACCOUNT_EXTRACT_PATTERN, spn_app_id_key)
+                storage_account_matched = re.search(STORAGE_ACCOUNT_EXTRACT_PATTERN, spn_app_id_key)
                 if storage_account_matched:
                     storage_account = storage_account_matched.group(1).strip(".")
                     tenant_key = "fs.azure.account.oauth2.client.endpoint." + storage_account
@@ -161,7 +161,7 @@ class AzureServicePrincipalCrawler(CrawlerBase[AzureServicePrincipalInfo], JobsM
                     tenant_id = ""
                 else:
                     client_endpoint_list = self._get_key_from_config(matching_tenant_keys[0], config)[0].split("/")
-                    if len(client_endpoint_list) == _CLIENT_ENDPOINT_LENGTH:
+                    if len(client_endpoint_list) == CLIENT_ENDPOINT_LENGTH:
                         tenant_id = client_endpoint_list[3]
 
                 # add output to spn list
@@ -182,7 +182,7 @@ class AzureServicePrincipalCrawler(CrawlerBase[AzureServicePrincipalInfo], JobsM
         else:
             value = config.get(key, "")
         # retrieve from secret scope if used
-        secret_matched = re.search(_SECRET_PATTERN, value)
+        secret_matched = re.search(SECRET_PATTERN, value)
         if secret_matched is None:
             return value, "", ""
         secret_string = secret_matched.group(1).split("/")
@@ -191,7 +191,7 @@ class AzureServicePrincipalCrawler(CrawlerBase[AzureServicePrincipalInfo], JobsM
         return value, secret_scope, secret_key
 
     def _get_secret_if_exists(self, secret_string) -> str | None:
-        if len(secret_string) == _SECRET_LIST_LENGTH:
+        if len(secret_string) == SECRET_LIST_LENGTH:
             secret_scope, secret_key = secret_string[1], secret_string[2]
             try:
                 # Return the decoded secret value in string format

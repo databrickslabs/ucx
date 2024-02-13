@@ -14,7 +14,7 @@ from databricks.sdk.service.compute import (
 )
 
 from databricks.labs.ucx.assessment.crawlers import (
-    _INIT_SCRIPT_DBFS_PATH,
+    INIT_SCRIPT_DBFS_PATH,
     AZURE_SP_CONF_FAILURE_MSG,
     INCOMPATIBLE_SPARK_CONFIG_KEYS,
     azure_sp_conf_present_check,
@@ -59,7 +59,7 @@ class CheckClusterMixin(CheckInitScriptMixin):
 
     def _get_init_script_data(self, init_script_info: InitScriptInfo) -> str | None:
         if init_script_info.dbfs is not None and init_script_info.dbfs.destination is not None:
-            if len(init_script_info.dbfs.destination.split(":")) == _INIT_SCRIPT_DBFS_PATH:
+            if len(init_script_info.dbfs.destination.split(":")) == INIT_SCRIPT_DBFS_PATH:
                 file_api_format_destination = init_script_info.dbfs.destination.split(":")[1]
                 if file_api_format_destination:
                     try:
