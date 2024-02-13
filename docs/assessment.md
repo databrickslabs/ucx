@@ -128,6 +128,14 @@ A spark config option was found in a cluster compute definition that is incompat
 Passthrough security model is not supported by Unity Catalog. Passthrough mode relied upon file based authorization which is incompatible with Fine Grained Access Controls supported by Unity Catalog.
 Recommend mapping your Passthrough security model to a External Location/Volume/Table/View based security model compatible with Unity Catalog.
 
+### AF116 - No isolation shared clusters not supported in UC
+Unity Catalog data cannot be accessed from No Isolation clusters, they should not be used.
+
+### AF117 - cluster type not supported
+Only Assigned and Shared access mode are supported in UC.
+You must change your cluster configuration to match UC compliant access modes.
+
+
 ### AF201 - Inplace Sync
 Short description: We found that the table or database can be SYNC'd without moving data because the data is stored directly on cloud storage specified via a mount or a cloud storage URL (not DBFS).
 How: Run the SYNC command on the table or schema.  If the tables (or source database) is 'managed' first set this spark setting in your session or in the interactive cluster configuration: `spark.databricks.sync.command.enableManagedTable=true`
