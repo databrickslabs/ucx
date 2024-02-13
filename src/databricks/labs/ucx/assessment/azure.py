@@ -37,15 +37,15 @@ from databricks.labs.ucx.hive_metastore.locations import ExternalLocations
 @dataclass
 class AzureServicePrincipalInfo:
     # fs.azure.account.oauth2.client.id
-    application_id: str
+    application_id: str | None
     # fs.azure.account.oauth2.client.secret: {{secrets/${local.secret_scope}/${local.secret_key}}}
-    secret_scope: str
+    secret_scope: str | None
     # fs.azure.account.oauth2.client.secret: {{secrets/${local.secret_scope}/${local.secret_key}}}
-    secret_key: str
+    secret_key: str | None
     # fs.azure.account.oauth2.client.endpoint: "https://login.microsoftonline.com/${local.tenant_id}/oauth2/token"
-    tenant_id: str
+    tenant_id: str | None
     # Azure Storage account to which the SP has been given access
-    storage_account: str
+    storage_account: str | None
 
 
 def generate_service_principals(service_principals: list[dict]):
