@@ -1,6 +1,9 @@
 from unittest.mock import Mock
 
-from databricks.labs.ucx.assessment.azure import AzureServicePrincipalCrawler
+from databricks.labs.ucx.assessment.azure import (
+    AzureServicePrincipalCrawler,
+    generate_service_principals,
+)
 
 from ..framework.mocks import MockBackend
 from . import workspace_client_mock
@@ -129,9 +132,9 @@ def test_list_all_wh_config_with_spn_no_secret():
     result_set = AzureServicePrincipalCrawler(ws, MockBackend(), "ucx").snapshot()
 
     assert len(result_set) == 2
-    assert result_set[0].get("application_id") == "dummy_application_id"
-    assert result_set[0].get("tenant_id") == "dummy_tenant_id"
-    assert result_set[0].get("storage_account") == "storage_acct2"
+    assert any(_ for _ in result_set if _.application_id == "dummy_application_id")
+    assert any(_ for _ in result_set if _.tenant_id == "dummy_tenant_id")
+    assert any(_ for _ in result_set if _.storage_account == "storage_acct2")
 
 
 def test_list_all_wh_config_with_spn_and_secret():
@@ -139,8 +142,8 @@ def test_list_all_wh_config_with_spn_and_secret():
     result_set = AzureServicePrincipalCrawler(ws, MockBackend(), "ucx").snapshot()
 
     assert len(result_set) == 2
-    assert result_set[0].get("tenant_id") == "dummy_tenant_id"
-    assert result_set[0].get("storage_account") == "abcde"
+    assert any(_ for _ in result_set if _.tenant_id == "dummy_tenant_id")
+    assert any(_ for _ in result_set if _.storage_account == "abcde")
 
 
 def test_list_all_clusters_spn_in_spark_conf_with_tenant():
