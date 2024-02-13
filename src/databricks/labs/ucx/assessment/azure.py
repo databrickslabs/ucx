@@ -139,28 +139,28 @@ class AzureServicePrincipalCrawler(CrawlerBase[AzureServicePrincipalInfo], JobsM
     def _get_azure_spn_from_config(self, config: dict) -> list:
         spn_list = []
         spn_application_id, secret_scope, secret_key, tenant_id, storage_account = None, "", "", "", ""
-        matching_key_list = [key for key in config.keys() if "fs.azure.account.oauth2.client.id" in key]
-        if len(matching_key_list) > 0:
-            for key in matching_key_list:
+        matching_spn_app_id_keys = [key for key in config.keys() if "fs.azure.account.oauth2.client.id" in key]
+        if len(matching_spn_app_id_keys) > 0:
+            for spn_app_id_key in matching_spn_app_id_keys:
                 # retrieve application id of spn
-                spn_application_id, secret_scope, secret_key = self._get_key_from_config(key, config)
+                spn_application_id, secret_scope, secret_key = self._get_key_from_config(spn_app_id_key, config)
                 if spn_application_id is None:
                     continue
 
                 # retrieve storage account configured with this spn
-                storage_account_match = re.search(_STORAGE_ACCOUNT_EXTRACT_PATTERN, key)
-                if storage_account_match:
-                    storage_account = storage_account_match.group(1).strip(".")
+                storage_account_matched = re.search(_STORAGE_ACCOUNT_EXTRACT_PATTERN, spn_app_id_key)
+                if storage_account_matched:
+                    storage_account = storage_account_matched.group(1).strip(".")
                     tenant_key = "fs.azure.account.oauth2.client.endpoint." + storage_account
                 else:
                     tenant_key = "fs.azure.account.oauth2.client.endpoint"
 
                 # retrieve tenant id of spn
-                matching_key = [key for key in config.keys() if re.search(tenant_key, key)]
-                if len(matching_key) == 0 or matching_key[0] is None:
+                matching_tenant_keys = [key for key in config.keys() if re.search(tenant_key, key)]
+                if len(matching_tenant_keys) == 0 or matching_tenant_keys[0] is None:
                     tenant_id = ""
                 else:
-                    client_endpoint_list = self._get_key_from_config(matching_key[0], config)[0].split("/")
+                    client_endpoint_list = self._get_key_from_config(matching_tenant_keys[0], config)[0].split("/")
                     if len(client_endpoint_list) == _CLIENT_ENDPOINT_LENGTH:
                         tenant_id = client_endpoint_list[3]
 
