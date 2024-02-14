@@ -374,21 +374,7 @@ class GroupManager(CrawlerBase[MigratedGroup]):
             raise ManyError(errors)
 
     def get_migration_state(self) -> MigrationState:
-        state = MigrationState(self.snapshot())
-        if not self._include_group_names:
-            return state
-
-        new_state = []
-        group_name_with_state = {migrated_group.name_in_workspace: migrated_group for migrated_group in state.groups}
-        for group_name in self._include_group_names:
-            if group_name in group_name_with_state:
-                new_state.append(group_name_with_state[group_name])
-            else:
-                logger.warning(
-                    f"Group {group_name} defined in configuration does not exist on the groups table. "
-                    "Consider checking if the group exist in the workspace or re-running the assessment."
-                )
-        return MigrationState(new_state)
+        return MigrationState(self.snapshot())
 
     def delete_original_workspace_groups(self):
         tasks = []
@@ -408,8 +394,24 @@ class GroupManager(CrawlerBase[MigratedGroup]):
             raise ManyError(errors)
 
     def _fetcher(self) -> Iterable[MigratedGroup]:
+        state = []
         for row in self._backend.fetch(f"SELECT * FROM {self._full_name}"):
-            yield MigratedGroup(*row)
+            state.append(MigratedGroup(*row))
+
+        if not self._include_group_names:
+            return state
+
+        new_state = []
+        group_name_with_state = {migrated_group.name_in_workspace: migrated_group for migrated_group in state}
+        for group_name in self._include_group_names:
+            if group_name in group_name_with_state:
+                new_state.append(group_name_with_state[group_name])
+            else:
+                logger.warning(
+                    f"Group {group_name} defined in configuration does not exist on the groups table. "
+                    "Consider checking if the group exist in the workspace or re-running the assessment."
+                )
+        return new_state
 
     def _crawler(self) -> Iterable[MigratedGroup]:
         workspace_groups_in_workspace = self._workspace_groups_in_workspace()
