@@ -370,28 +370,10 @@ def side_effect_validate_storage_credential(storage_credential_name, url):
     if "overlap" in storage_credential_name:
         raise InvalidParameterValue
     if "read" in storage_credential_name:
-        response = {
-            "is_dir": True,
-            "results": [
-                {
-                    "message": "",
-                    "operation": ["DELETE", "LIST", "READ", "WRITE"],
-                    "result": ["SKIP", "PASS", "PASS", "SKIP"],
-                }
-            ],
-        }
+        response = {"isDir": True, "results": [{"message": "", "operation": "WRITE", "result": "SKIP"}]}
         return ValidateStorageCredentialResponse.from_dict(response)
     else:
-        response = {
-            "is_dir": True,
-            "results": [
-                {
-                    "message": "",
-                    "operation": ["DELETE", "LIST", "READ", "WRITE"],
-                    "result": ["PASS", "PASS", "PASS", "PASS"],
-                }
-            ],
-        }
+        response = {"isDir": True, "results": [{"message": "", "operation": "WRITE", "result": "PASS"}]}
         return ValidateStorageCredentialResponse.from_dict(response)
 
 
@@ -428,9 +410,15 @@ def test_execute_migration(caplog, capsys, mocker, ws):
     )
 
     sp_migration = AzureServicePrincipalMigration.for_cli(ws, prompts)
+    sp_migration._installation.save = MagicMock()
     sp_migration.execute_migration(prompts)
 
     # assert migration is complete
     assert "Completed migration" in capsys.readouterr().out
     # assert the validation exception is caught when prefix overlaps with existing external location
     assert "Skip the validation" in caplog.text
+    # assert validation results
+    save_args = sp_migration._installation.save.call_args.args[0]
+    assert any("The validation is skipped" in arg.results[0].message for arg in save_args)
+    assert any("PASS" in arg.results[0].result.value for arg in save_args)
+    assert any("SKIP" in arg.results[0].result.value for arg in save_args)
