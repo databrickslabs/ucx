@@ -5,11 +5,9 @@ from unittest.mock import MagicMock
 import pytest
 from databricks.labs.blueprint.tui import MockPrompts
 
-from databricks.labs.ucx.assessment.azure import (
-    AzureServicePrincipalInfo,
-    StoragePermissionMapping,
-)
+from databricks.labs.ucx.assessment.azure import AzureServicePrincipalInfo
 from databricks.labs.ucx.assessment.crawlers import _SECRET_PATTERN
+from databricks.labs.ucx.azure.access import StoragePermissionMapping
 from databricks.labs.ucx.azure.azure_credentials import AzureServicePrincipalMigration
 
 

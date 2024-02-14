@@ -22,8 +22,8 @@ from databricks.sdk.service.workspace import GetSecretResponse
 from databricks.labs.ucx.assessment.azure import (
     AzureServicePrincipalCrawler,
     AzureServicePrincipalInfo,
-    StoragePermissionMapping,
 )
+from databricks.labs.ucx.azure.access import StoragePermissionMapping
 from databricks.labs.ucx.azure.azure_credentials import (
     AzureServicePrincipalMigration,
     ServicePrincipalMigrationInfo,

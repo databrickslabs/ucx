@@ -16,12 +16,12 @@ from databricks.sdk.service.catalog import (
     ValidationResult,
 )
 
-from databricks.labs.ucx.assessment.azure import (
+from databricks.labs.ucx.assessment.azure import AzureServicePrincipalCrawler
+from databricks.labs.ucx.azure.access import (
     AzureResourcePermissions,
-    AzureResources,
-    AzureServicePrincipalCrawler,
     StoragePermissionMapping,
 )
+from databricks.labs.ucx.azure.resources import AzureResources
 from databricks.labs.ucx.config import WorkspaceConfig
 from databricks.labs.ucx.framework.crawlers import StatementExecutionBackend
 from databricks.labs.ucx.hive_metastore.locations import ExternalLocations

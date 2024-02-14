@@ -65,7 +65,7 @@ class AzureResourcePermissions:
                         client_id=role_assignment.principal.client_id,
                         principal=role_assignment.principal.display_name,
                         privilege=privilege,
-                        directory_id = role_assignment.principal.directory_id
+                        directory_id=role_assignment.principal.directory_id,
                     )
                 )
         return out
