@@ -1,6 +1,6 @@
 import base64
 import re
-from unittest.mock import MagicMock
+from unittest.mock import MagicMock, patch
 
 import pytest
 from databricks.labs.blueprint.tui import MockPrompts
@@ -8,7 +8,7 @@ from databricks.labs.blueprint.tui import MockPrompts
 from databricks.labs.ucx.assessment.azure import AzureServicePrincipalInfo
 from databricks.labs.ucx.assessment.crawlers import _SECRET_PATTERN
 from databricks.labs.ucx.azure.access import StoragePermissionMapping
-from databricks.labs.ucx.azure.azure_credentials import AzureServicePrincipalMigration
+from databricks.labs.ucx.azure.azure_credentials import ServicePrincipalMigration
 
 
 @pytest.fixture
@@ -75,15 +75,15 @@ def prepare_spn_migration_test(ws, debug_env, make_random):
 
 @pytest.fixture
 def execute_migration(ws):
-    def inner(variables: dict, integration_test_flag: str) -> AzureServicePrincipalMigration:
-        spn_migration = AzureServicePrincipalMigration(
+    def inner(variables: dict, integration_test_flag: str) -> ServicePrincipalMigration:
+        spn_migration = ServicePrincipalMigration(
             variables["installation"],
             ws,
             variables["azure_resource_permissions"],
             variables["azure_sp_crawler"],
             integration_test_flag=integration_test_flag,
         )
-        spn_migration.execute_migration(
+        spn_migration.run(
             MockPrompts({"Above Azure Service Principals will be migrated to UC storage credentials *": "Yes"})
         )
         return spn_migration
@@ -92,7 +92,7 @@ def execute_migration(ws):
 
 
 def test_spn_migration_existed_storage_credential(
-    ws, execute_migration, make_storage_credential_from_spn, prepare_spn_migration_test
+    execute_migration, make_storage_credential_from_spn, prepare_spn_migration_test
 ):
     variables = prepare_spn_migration_test(read_only=False)
 
@@ -104,11 +104,11 @@ def test_spn_migration_existed_storage_credential(
         directory_id=variables["directory_id"],
     )
 
-    # test that the spn migration will be skipped due to above storage credential is existed
-    spn_migration = execute_migration(variables, integration_test_flag=variables["storage_credential_name"])
-
-    # because storage_credential is existing, no spn should be migrated
-    assert not spn_migration._final_sp_list
+    with patch("databricks.labs.ucx.azure.azure_credentials.ServicePrincipalMigration._create_storage_credential") as create_storage_credential:
+        # test that the spn migration will be skipped due to above storage credential is existed
+        execute_migration(variables, integration_test_flag=variables["storage_credential_name"])
+        # because storage_credential is existing, no spn should be migrated
+        create_storage_credential.assert_not_called()
 
 
 @pytest.mark.parametrize("read_only", [False, True])
@@ -118,8 +118,9 @@ def test_spn_migration(ws, execute_migration, prepare_spn_migration_test, read_o
     try:
         spn_migration = execute_migration(variables, integration_test_flag="lets_migrate_the_spn")
 
-        assert spn_migration._final_sp_list[0].service_principal.principal == variables["storage_credential_name"]
-        assert ws.storage_credentials.get(variables["storage_credential_name"]).read_only is read_only
+        storage_credential = ws.storage_credentials.get(variables["storage_credential_name"])
+        assert storage_credential is not None
+        assert storage_credential.read_only is read_only
 
         validation_result = spn_migration._installation.save.call_args.args[0][0]
         if read_only:

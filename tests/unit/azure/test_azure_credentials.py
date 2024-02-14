@@ -25,7 +25,7 @@ from databricks.labs.ucx.assessment.azure import (
 )
 from databricks.labs.ucx.azure.access import StoragePermissionMapping
 from databricks.labs.ucx.azure.azure_credentials import (
-    AzureServicePrincipalMigration,
+    ServicePrincipalMigration,
     ServicePrincipalMigrationInfo,
 )
 from tests.unit.framework.mocks import MockBackend
@@ -103,21 +103,21 @@ def ws():
 
 def test_for_cli_not_azure(caplog, ws):
     ws.config.is_azure = False
-    assert AzureServicePrincipalMigration.for_cli(ws, MagicMock()) is None
+    assert ServicePrincipalMigration.for_cli(ws, MagicMock()) is None
     assert "Workspace is not on azure, please run this command on azure databricks workspaces." in caplog.text
 
 
 def test_for_cli_not_prompts(ws):
     ws.config.is_azure = True
     prompts = MockPrompts({"Have you reviewed the azure_storage_account_info.csv *": "No"})
-    assert AzureServicePrincipalMigration.for_cli(ws, prompts) is None
+    assert ServicePrincipalMigration.for_cli(ws, prompts) is None
 
 
 def test_for_cli(ws):
     ws.config.is_azure = True
     prompts = MockPrompts({"Have you reviewed the azure_storage_account_info.csv *": "Yes"})
 
-    assert isinstance(AzureServicePrincipalMigration.for_cli(ws, prompts), AzureServicePrincipalMigration)
+    assert isinstance(ServicePrincipalMigration.for_cli(ws, prompts), ServicePrincipalMigration)
 
 
 def test_list_storage_credentials(ws):
@@ -137,7 +137,7 @@ def test_list_storage_credentials(ws):
         ),
     ]
 
-    sp_migration = AzureServicePrincipalMigration(MagicMock(), ws, MagicMock(), MagicMock())
+    sp_migration = ServicePrincipalMigration(MagicMock(), ws, MagicMock(), MagicMock())
 
     expected = {"b6420590-5e1c-4426-8950-a94cbe9b6115"}
     sp_migration._list_storage_credentials()
@@ -165,7 +165,7 @@ def test_list_storage_credentials_for_integration_test(ws):
 
     # test storage credential: spn_for_integration_test is picked up
     # in integration test, we only pick up the existing storage credential created in integration test and ignore the others
-    sp_migration = AzureServicePrincipalMigration(
+    sp_migration = ServicePrincipalMigration(
         MagicMock(), ws, MagicMock(), MagicMock(), integration_test_flag="spn_for_integration_test"
     )
     expected = {"b6420590-5e1c-4426-8950-a94cbe9b6115"}
@@ -174,11 +174,11 @@ def test_list_storage_credentials_for_integration_test(ws):
 
     # test storage credential is not picked up
     # if integration test does not create storage credential, we use dummy integration_test_flag to filter out other existing storage credentials
-    sp_migration = AzureServicePrincipalMigration(
+    sp_migration = ServicePrincipalMigration(
         MagicMock(), ws, MagicMock(), MagicMock(), integration_test_flag="other_spn"
     )
     sp_migration._list_storage_credentials()
-    assert {""} == sp_migration._list_storage_credentials()
+    assert {} == sp_migration._list_storage_credentials()
 
 
 @pytest.mark.parametrize(
@@ -192,7 +192,7 @@ def test_list_storage_credentials_for_integration_test(ws):
 def test_read_secret_value_decode(ws, secret_bytes_value, expected_return):
     ws.secrets.get_secret.return_value = secret_bytes_value
 
-    sp_migration = AzureServicePrincipalMigration(MagicMock(), ws, MagicMock(), MagicMock())
+    sp_migration = ServicePrincipalMigration(MagicMock(), ws, MagicMock(), MagicMock())
     assert sp_migration._read_databricks_secret("test_scope", "test_key", "000") == expected_return
 
 
@@ -207,7 +207,7 @@ def test_read_secret_read_exception(caplog, ws, exception, expected_log, expecte
     caplog.set_level(logging.INFO)
     ws.secrets.get_secret.side_effect = exception
 
-    sp_migration = AzureServicePrincipalMigration(MagicMock(), ws, MagicMock(), MagicMock())
+    sp_migration = ServicePrincipalMigration(MagicMock(), ws, MagicMock(), MagicMock())
     secret_value = sp_migration._read_databricks_secret("test_scope", "test_key", "000")
 
     assert expected_log in caplog.text
@@ -281,13 +281,14 @@ def test_fetch_client_secret(ws):
         ),
     ]
 
-    sp_migration = AzureServicePrincipalMigration(MagicMock(), ws, MagicMock(), sp_crawler)
+    sp_migration = ServicePrincipalMigration(MagicMock(), ws, MagicMock(), sp_crawler)
     filtered_sp_list = sp_migration._fetch_client_secret(sp_to_be_checked)
 
     assert filtered_sp_list == expected_sp_list
 
 
-def test_print_action_plan(capsys):
+def test_print_action_plan(caplog):
+    caplog.set_level(logging.INFO)
     sp_list_with_secret = [
         ServicePrincipalMigrationInfo(
             StoragePermissionMapping(
@@ -300,19 +301,20 @@ def test_print_action_plan(capsys):
             "hello world",
         )
     ]
-    sp_migration = AzureServicePrincipalMigration(MagicMock(), MagicMock(), MagicMock(), MagicMock())
+    sp_migration = ServicePrincipalMigration(MagicMock(), MagicMock(), MagicMock(), MagicMock())
     sp_migration._print_action_plan(sp_list_with_secret)
 
     expected_print = (
         "Service Principal name: principal_1, "
         "application_id: app_secret1, "
         "privilege WRITE_FILES "
-        "on location prefix1\n"
+        "on location prefix1"
     )
-    assert expected_print == capsys.readouterr().out
+    assert expected_print in caplog.text
 
 
-def test_generate_migration_list(capsys, mocker, ws):
+def test_generate_migration_list(caplog, mocker, ws):
+    caplog.set_level(logging.INFO)
     ws.config.is_azure = True
     ws.secrets.get_secret.return_value = GetSecretResponse(value="aGVsbG8gd29ybGQ=")
     ws.storage_credentials.list.return_value = [
@@ -335,10 +337,11 @@ def test_generate_migration_list(capsys, mocker, ws):
         ],
     )
 
-    sp_migration = AzureServicePrincipalMigration.for_cli(ws, prompts)
+    sp_migration = ServicePrincipalMigration.for_cli(ws, prompts)
     sp_migration._generate_migration_list()
 
-    assert "app_secret2" in capsys.readouterr().out
+    assert "app_secret2" in caplog.text
+    assert "app_secret1" not in caplog.text
 
 
 def test_execute_migration_no_confirmation(mocker, ws):
@@ -350,13 +353,13 @@ def test_execute_migration_no_confirmation(mocker, ws):
         }
     )
 
-    mocker.patch("databricks.labs.ucx.azure.azure_credentials.AzureServicePrincipalMigration._generate_migration_list")
+    mocker.patch("databricks.labs.ucx.azure.azure_credentials.ServicePrincipalMigration._generate_migration_list")
 
     with patch(
-        "databricks.labs.ucx.azure.azure_credentials.AzureServicePrincipalMigration._create_storage_credential"
+        "databricks.labs.ucx.azure.azure_credentials.ServicePrincipalMigration._create_storage_credential"
     ) as c:
-        sp_migration = AzureServicePrincipalMigration.for_cli(ws, prompts)
-        sp_migration.execute_migration(prompts)
+        sp_migration = ServicePrincipalMigration.for_cli(ws, prompts)
+        sp_migration.run(prompts)
         c.assert_not_called()
 
 
@@ -409,9 +412,9 @@ def test_execute_migration(caplog, capsys, mocker, ws):
         ],
     )
 
-    sp_migration = AzureServicePrincipalMigration.for_cli(ws, prompts)
+    sp_migration = ServicePrincipalMigration.for_cli(ws, prompts)
     sp_migration._installation.save = MagicMock()
-    sp_migration.execute_migration(prompts)
+    sp_migration.run(prompts)
 
     # assert migration is complete
     assert "Completed migration" in capsys.readouterr().out

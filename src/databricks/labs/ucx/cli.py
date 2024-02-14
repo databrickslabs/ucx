@@ -13,7 +13,7 @@ from databricks.sdk.errors import NotFound
 from databricks.labs.ucx.account import AccountWorkspaces, WorkspaceInfo
 from databricks.labs.ucx.assessment.aws import AWSResourcePermissions
 from databricks.labs.ucx.azure.access import AzureResourcePermissions
-from databricks.labs.ucx.azure.azure_credentials import AzureServicePrincipalMigration
+from databricks.labs.ucx.azure.azure_credentials import ServicePrincipalMigration
 from databricks.labs.ucx.config import WorkspaceConfig
 from databricks.labs.ucx.framework.crawlers import StatementExecutionBackend
 from databricks.labs.ucx.hive_metastore import ExternalLocations, TablesCrawler
@@ -297,8 +297,8 @@ def migrate_azure_service_principals(w: WorkspaceClient):
     """
     logger.info("Running migrate_azure_service_principals command")
     prompts = Prompts()
-    service_principal_migration = AzureServicePrincipalMigration.for_cli(w, prompts)
-    service_principal_migration.execute_migration(prompts)
+    service_principal_migration = ServicePrincipalMigration.for_cli(w, prompts)
+    service_principal_migration.run(prompts)
 
 
 if __name__ == "__main__":

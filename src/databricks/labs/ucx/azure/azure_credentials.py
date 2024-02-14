@@ -54,7 +54,7 @@ class StorageCredentialValidationResult:
         )
 
 
-class AzureServicePrincipalMigration:
+class ServicePrincipalMigration:
 
     def __init__(
         self,
@@ -65,7 +65,6 @@ class AzureServicePrincipalMigration:
         integration_test_flag="",
     ):
         self._output_file = "azure_service_principal_migration_result.csv"
-        self._final_sp_list: list[ServicePrincipalMigrationInfo] = []
         self._installation = installation
         self._ws = ws
         self._azure_resource_permissions = azure_resource_permissions
@@ -111,7 +110,7 @@ class AzureServicePrincipalMigration:
                     # return the storage credential created during integration test
                     return {storage_credential.azure_service_principal.application_id}
             # return no storage credential if there is none created during integration test
-            return {""}
+            return {}
 
         for storage_credential in storage_credentials:
             # only add service principal's application_id, ignore managed identity based storage_credential
@@ -186,17 +185,17 @@ class AzureServicePrincipalMigration:
                 )
         return sp_list_with_secret
 
-    def _print_action_plan(self, sp_list_with_secret: list[ServicePrincipalMigrationInfo]):
+    def _print_action_plan(self, sp_list: list[ServicePrincipalMigrationInfo]):
         # print action plan to console for customer to review.
-        for sp in sp_list_with_secret:
-            print(
+        for sp in sp_list:
+            logger.info(
                 f"Service Principal name: {sp.service_principal.principal}, "
                 f"application_id: {sp.service_principal.client_id}, "
                 f"privilege {sp.service_principal.privilege} "
                 f"on location {sp.service_principal.prefix}"
             )
 
-    def _generate_migration_list(self):
+    def _generate_migration_list(self) -> list[ServicePrincipalMigrationInfo]:
         """
         Create the list of SP that need to be migrated, output an action plan as a csv file for users to confirm
         """
@@ -208,9 +207,9 @@ class AzureServicePrincipalMigration:
         filtered_sp_list = [sp for sp in sp_list if sp.client_id not in sc_set]
         # fetch sp client_secret if any
         sp_list_with_secret = self._fetch_client_secret(filtered_sp_list)
-        self._final_sp_list = sp_list_with_secret
         # output the action plan for customer to confirm
         self._print_action_plan(sp_list_with_secret)
+        return sp_list_with_secret
 
     def _create_storage_credential(self, sp_migration: ServicePrincipalMigrationInfo):
         # prepare the storage credential properties
@@ -260,9 +259,9 @@ class AzureServicePrincipalMigration:
                 ),
             )
 
-    def execute_migration(self, prompts: Prompts):
+    def run(self, prompts: Prompts):
 
-        self._generate_migration_list()
+        sp_list_with_secret = self._generate_migration_list()
 
         plan_confirmed = prompts.confirm(
             "Above Azure Service Principals will be migrated to UC storage credentials, please review and confirm."
@@ -271,7 +270,7 @@ class AzureServicePrincipalMigration:
             return
 
         execution_result = []
-        for sp in self._final_sp_list:
+        for sp in sp_list_with_secret:
             execution_result.append(self._create_storage_credential(sp))
 
         results_file = self._installation.save(execution_result, filename=self._output_file)
