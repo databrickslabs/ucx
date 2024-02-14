@@ -23,6 +23,7 @@ def test_sync_workspace_info(mocker):
     ]
 
     ws = create_autospec(WorkspaceClient)
+    acc_client.get_workspace_client.return_value = ws
 
     def workspace_client(host, product, **kwargs) -> WorkspaceClient:
         assert host in ("https://abc.cloud.databricks.com", "https://def.cloud.databricks.com")
@@ -84,8 +85,6 @@ def test_create_acc_groups_should_create_acc_group_if_no_group_found_in_account(
     def workspace_client(**kwargs) -> WorkspaceClient:
         return ws
 
-    account_workspaces = AccountWorkspaces(acc_client, workspace_client)
-
     group = Group(
         id="12",
         display_name="de",
@@ -94,8 +93,10 @@ def test_create_acc_groups_should_create_acc_group_if_no_group_found_in_account(
 
     ws.groups.list.return_value = [group]
     ws.groups.get.return_value = group
+    acc_client.get_workspace_client.return_value = ws
     acc_client.groups.create.return_value = group
 
+    account_workspaces = AccountWorkspaces(acc_client, workspace_client)
     account_workspaces.create_account_level_groups(MockPrompts({}))
 
     acc_client.groups.create.assert_called_with(
@@ -163,6 +164,7 @@ def test_create_acc_groups_should_create_acc_group_with_appropriate_members(mock
 
     ws.groups.list.return_value = [group]
     ws.groups.get.return_value = group
+    acc_client.get_workspace_client.return_value = ws
     acc_client.groups.create.return_value = group
 
     account_workspaces.create_account_level_groups(MockPrompts({}))
@@ -243,7 +245,7 @@ def test_create_acc_groups_should_not_create_group_if_exists_in_account(mocker):
 
     ws.groups.list.return_value = [group]
     ws.groups.get.return_value = group
-
+    acc_client.get_workspace_client.return_value = ws
     account_workspaces = AccountWorkspaces(acc_client, workspace_client)
     account_workspaces.create_account_level_groups(MockPrompts({}))
 
@@ -268,6 +270,12 @@ def test_create_acc_groups_should_create_groups_accross_workspaces(mocker):
         else:
             return ws2
 
+    def get_workspace_client(workspace, **kwargs) -> WorkspaceClient:
+        if workspace.workspace_id == 123:
+            return ws1
+        else:
+            return ws2
+
     group = Group(id="12", display_name="de", members=[])
     group2 = Group(id="12", display_name="security_grp", members=[])
 
@@ -276,6 +284,8 @@ def test_create_acc_groups_should_create_groups_accross_workspaces(mocker):
 
     ws2.groups.list.return_value = [group2]
     ws2.groups.get.return_value = group2
+
+    acc_client.get_workspace_client.side_effect = get_workspace_client
 
     account_workspaces = AccountWorkspaces(acc_client, workspace_client)
     account_workspaces.create_account_level_groups(MockPrompts({}))
@@ -302,6 +312,12 @@ def test_create_acc_groups_should_filter_groups_accross_workspaces(mocker):
         else:
             return ws2
 
+    def get_workspace_client(workspace, **kwargs) -> WorkspaceClient:
+        if workspace.workspace_id == 123:
+            return ws1
+        else:
+            return ws2
+
     group = Group(
         id="12",
         display_name="de",
@@ -314,6 +330,7 @@ def test_create_acc_groups_should_filter_groups_accross_workspaces(mocker):
     ws2.groups.list.return_value = [group]
     ws2.groups.get.return_value = group
     acc_client.groups.create.return_value = group
+    acc_client.get_workspace_client.side_effect = get_workspace_client
 
     account_workspaces = AccountWorkspaces(acc_client, workspace_client)
     account_workspaces.create_account_level_groups(MockPrompts({}))
@@ -350,6 +367,12 @@ def test_create_acc_groups_should_create_acc_group_if_exist_in_other_workspaces_
         else:
             return ws2
 
+    def get_workspace_client(workspace, **kwargs) -> WorkspaceClient:
+        if workspace.workspace_id == 123:
+            return ws1
+        else:
+            return ws2
+
     group = Group(
         id="12",
         display_name="de",
@@ -366,6 +389,7 @@ def test_create_acc_groups_should_create_acc_group_if_exist_in_other_workspaces_
 
     ws2.groups.list.return_value = [group_2]
     ws2.groups.get.return_value = group_2
+    acc_client.get_workspace_client.side_effect = get_workspace_client
 
     account_workspaces = AccountWorkspaces(acc_client, workspace_client)
     account_workspaces.create_account_level_groups(

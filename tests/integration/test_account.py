@@ -20,4 +20,3 @@ def test_create_account_level_groups(make_ucx_group, make_group, make_user, acc)
             results.append(grp)
 
     assert len(results) == 1
-

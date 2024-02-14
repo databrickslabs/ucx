@@ -9,8 +9,6 @@ from databricks.sdk.errors import NotFound
 from databricks.sdk.service.iam import ComplexValue, Group, Patch, PatchOp, PatchSchema
 from databricks.sdk.service.provisioning import Workspace
 
-from databricks.labs.ucx.__about__ import __version__
-
 logger = logging.getLogger(__name__)
 
 
@@ -75,7 +73,7 @@ class AccountWorkspaces:
 
             acc_group = self._ac.groups.create(display_name=group_name)
 
-            if not acc_group.id:
+            if not valid_group.members or not acc_group.id:
                 continue
             if len(valid_group.members) > 0:
                 self._add_members_to_acc_group(self._ac, acc_group.id, group_name, valid_group)
@@ -139,7 +137,7 @@ class AccountWorkspaces:
         return all_workspaces_groups
 
     def _is_group_out_of_scope(self, group: Group) -> bool:
-        if group.display_name in ["users", "admins", "account users"]:
+        if group.display_name in {"users", "admins", "account users"}:
             logger.debug(f"Group {group.display_name} is a system group, ignoring")
             return True
         meta = group.meta
