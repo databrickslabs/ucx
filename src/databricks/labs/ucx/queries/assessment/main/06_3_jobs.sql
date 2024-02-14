@@ -1,5 +1,5 @@
 -- viz type=table, name=Jobs, columns=failure,job_id,job_name,creator
--- widget title=Incompatible jobs, row=7, col=3, size_x=3, size_y=8
+-- widget title=Incompatible jobs, row=6, col=3, size_x=3, size_y=8
 SELECT
     EXPLODE(FROM_JSON(failures, 'array<string>')) AS failure,
     job_id,

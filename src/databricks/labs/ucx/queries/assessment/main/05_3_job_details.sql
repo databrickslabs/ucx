@@ -1,5 +1,5 @@
 -- viz type=table, name=Job Details, search_by=job_name, columns=job_id,job_name,success,failures,creator
--- widget title=Job Details, row=6, col=0, size_x=6, size_y=8
+-- widget title=Job Details, row=5, col=3, size_x=3, size_y=8
 SELECT
     job_id,
     job_name,
