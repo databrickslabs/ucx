@@ -316,13 +316,6 @@ class AWSResourcePermissions:
                 )
         return policy_actions
 
-    def save_instance_profile_permissions(self) -> str | None:
-        instance_profile_access = list(self._get_instance_profiles_access())
-        if len(instance_profile_access) == 0:
-            logger.warning("No Mapping Was Generated.")
-            return None
-        return self._installation.save(instance_profile_access, filename=self.InstanceProfilesFileName)
-
     def _identify_missing_paths(self):
         external_locations = ExternalLocations(self._ws, self._backend, self._schema).snapshot()
         compatible_roles = self.get_uc_compatible_roles()
@@ -338,6 +331,25 @@ class AWSResourcePermissions:
                 continue
             missing_paths.add(external_location.location)
         return missing_paths
+
+    def get_role_creation_cli(self, *, single_role=True):
+        missing_paths = self._identify_missing_paths()
+        if single_role:
+
+
+    def save_instance_profile_permissions(self) -> str | None:
+        instance_profile_access = list(self._get_instance_profiles_access())
+        if len(instance_profile_access) == 0:
+            logger.warning("No Mapping Was Generated.")
+            return None
+        return self._installation.save(instance_profile_access, filename=self.InstanceProfilesFileName)
+
+
+
+
+
+
+
 
 
 
