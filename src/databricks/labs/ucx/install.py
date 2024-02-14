@@ -266,7 +266,7 @@ class WorkspaceInstaller:
             policy_id=policy_id,
         )
         self._installation.save(config)
-        ws_file_url = self._installation.workspace_link("config.yml")
+        ws_file_url = self._installation.workspace_link(config.__file__)
         if self._prompts.confirm(f"Open config file in the browser and continue installing? {ws_file_url}"):
             webbrowser.open(ws_file_url)
         return config
