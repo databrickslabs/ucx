@@ -265,8 +265,8 @@ class WorkspaceInstaller:
             spark_conf=spark_conf_dict,
             policy_id=policy_id,
         )
-        ws_file = self._installation.save(config)
-        ws_file_url = self._installation.workspace_link(ws_file.replace(self._installation.install_folder(), ""))
+        self._installation.save(config)
+        ws_file_url = self._installation.workspace_link("config.yml")
         if self._prompts.confirm(f"Open config file in the browser and continue installing? {ws_file_url}"):
             webbrowser.open(ws_file_url)
         return config
