@@ -182,9 +182,7 @@ class AzureServicePrincipalMigration:
         for sp in sp_list:
             if sp.client_id in azure_sp_info_with_client_secret:
                 sp_list_with_secret.append(
-                    ServicePrincipalMigrationInfo(
-                        sp, azure_sp_info_with_client_secret[sp.client_id]
-                    )
+                    ServicePrincipalMigrationInfo(sp, azure_sp_info_with_client_secret[sp.client_id])
                 )
         return sp_list_with_secret
 
@@ -231,10 +229,14 @@ class AzureServicePrincipalMigration:
             name=name, azure_service_principal=azure_service_principal, comment=comment, read_only=read_only
         )
 
-        validation_result = self._validate_storage_credential(storage_credential, sp_migration.service_principal.prefix, read_only)
+        validation_result = self._validate_storage_credential(
+            storage_credential, sp_migration.service_principal.prefix, read_only
+        )
         return validation_result
 
-    def _validate_storage_credential(self, storage_credential, location: str, read_only: bool) -> StorageCredentialValidationResult:
+    def _validate_storage_credential(
+        self, storage_credential, location: str, read_only: bool
+    ) -> StorageCredentialValidationResult:
         # storage_credential validation creates a temp UC external location, which cannot overlap with
         # existing UC external locations. So add a sub folder to the validation location just in case
         try:

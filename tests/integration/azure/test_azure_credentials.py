@@ -9,9 +9,7 @@ from databricks.labs.ucx.assessment.azure import (
     AzureServicePrincipalInfo,
     StoragePermissionMapping,
 )
-from databricks.labs.ucx.assessment.crawlers import (
-    _SECRET_PATTERN,
-)
+from databricks.labs.ucx.assessment.crawlers import _SECRET_PATTERN
 from databricks.labs.ucx.azure.azure_credentials import AzureServicePrincipalMigration
 
 
@@ -23,10 +21,13 @@ def prepare_spn_migration_test(ws, debug_env, make_random):
         application_id = spark_conf.get("fs.azure.account.oauth2.client.id")
 
         secret_matched = re.search(_SECRET_PATTERN, spark_conf.get("fs.azure.account.oauth2.client.secret"))
-        secret_scope, secret_key = (
-            secret_matched.group(1).split("/")[1],
-            secret_matched.group(1).split("/")[2],
-        )
+        if secret_matched:
+            secret_scope, secret_key = (
+                secret_matched.group(1).split("/")[1],
+                secret_matched.group(1).split("/")[2],
+            )
+        assert secret_scope is not None
+        assert secret_key is not None
 
         secret_response = ws.secrets.get_secret(secret_scope, secret_key)
         client_secret = base64.b64decode(secret_response.value).decode("utf-8")
@@ -128,21 +129,15 @@ def test_spn_migration(ws, execute_migration, prepare_spn_migration_test, read_o
             # In real life, the READ validation for read only storage credential may fail if there is no file,
             # but that is fine, as the storage credential is created, and we just cannot validate it until it's really used.
             assert not any(
-                (res.operation is not None)
-                and ("WRITE" in res.operation.value)
-                for res in validation_result.results
+                (res.operation is not None) and ("WRITE" in res.operation.value) for res in validation_result.results
             )
         else:
             assert any(
-                (res.operation is not None)
-                and ("WRITE" in res.operation.value)
-                and ("PASS" in res.result.value)
+                (res.operation is not None) and ("WRITE" in res.operation.value) and ("PASS" in res.result.value)
                 for res in validation_result.results
             )
             assert any(
-                (res.operation is not None)
-                and ("DELETE" in res.operation.value)
-                and ("PASS" in res.result.value)
+                (res.operation is not None) and ("DELETE" in res.operation.value) and ("PASS" in res.result.value)
                 for res in validation_result.results
             )
     finally:
