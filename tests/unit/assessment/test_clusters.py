@@ -13,10 +13,7 @@ from databricks.sdk.service.compute import (
     WorkspaceStorageInfo,
 )
 
-from databricks.labs.ucx.assessment.azure import (
-    AzureServicePrincipalCrawler,
-    generate_service_principals,
-)
+from databricks.labs.ucx.assessment.azure import AzureServicePrincipalCrawler
 from databricks.labs.ucx.assessment.clusters import ClusterInfo, ClustersCrawler
 
 from ..framework.mocks import MockBackend
@@ -105,53 +102,6 @@ def test_cluster_assessment_with_spn_cluster_policy_exception(mocker):
 
     with pytest.raises(DatabricksError):
         AzureServicePrincipalCrawler(ws, MockBackend(), "ucx").snapshot()
-
-
-def test_azure_spn_info_without_matching_spark_conf(mocker):
-    sample_clusters = [
-        ClusterDetails(
-            autoscale=AutoScale(min_workers=1, max_workers=6),
-            cluster_source=ClusterSource.UI,
-            spark_conf={"spark.databricks.delta.preview.enabled": "true"},
-            spark_context_id=5134472582179565315,
-            spark_env_vars=None,
-            spark_version="9.3.x-cpu-ml-scala2.12",
-            cluster_id="0810-225833-atlanta69",
-            cluster_name="Tech Summit FY24 Cluster-1",
-        )
-    ]
-    sample_spns = [{}]
-    ws = workspace_client_mock()
-    ws.clusters.list.return_value = sample_clusters
-    AzureServicePrincipalCrawler(ws, MockBackend(), "ucx").snapshot()
-    crawler = generate_service_principals(sample_spns)
-    result_set = list(crawler)
-
-    assert len(result_set) == 1
-    assert result_set[0].application_id is None
-
-
-def test_azure_spn_info_without_spark_conf(mocker):
-    sample_clusters = [
-        ClusterDetails(
-            autoscale=AutoScale(min_workers=1, max_workers=6),
-            cluster_source=ClusterSource.UI,
-            spark_context_id=5134472582179565315,
-            spark_env_vars=None,
-            spark_version="9.3.x-cpu-ml-scala2.12",
-            cluster_id="0810-225833-atlanta69",
-            cluster_name="Tech Summit FY24 Cluster-1",
-        )
-    ]
-    sample_spns = [{}]
-    ws = workspace_client_mock()
-    ws.clusters.list.return_value = sample_clusters
-    AzureServicePrincipalCrawler(ws, MockBackend(), "ucx").snapshot()
-    crawler = generate_service_principals(sample_spns)
-    result_set = list(crawler)
-
-    assert len(result_set) == 1
-    assert result_set[0].application_id is None
 
 
 def test_cluster_init_script(mocker):

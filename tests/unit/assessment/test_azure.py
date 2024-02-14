@@ -1,23 +1,9 @@
 from unittest.mock import Mock
 
-from databricks.labs.ucx.assessment.azure import (
-    AzureServicePrincipalCrawler,
-    generate_service_principals,
-)
+from databricks.labs.ucx.assessment.azure import AzureServicePrincipalCrawler
 
 from ..framework.mocks import MockBackend
 from . import workspace_client_mock
-
-
-def test_azure_spn_info_without_secret():
-    ws = workspace_client_mock(clusters="single-cluster-spn.json")
-    sample_spns = [{"application_id": "test123456789", "secret_scope": "", "secret_key": ""}]
-    AzureServicePrincipalCrawler(ws, MockBackend(), "ucx").snapshot()
-    crawler = generate_service_principals(sample_spns)
-    result_set = list(crawler)
-
-    assert len(result_set) == 1
-    assert result_set[0].application_id == "test123456789"
 
 
 def test_azure_service_principal_info_crawl():
@@ -72,15 +58,6 @@ def test_azure_service_principal_info_null_applid_crawl():
     )
     spn_crawler = AzureServicePrincipalCrawler(ws, MockBackend(), "ucx").snapshot()
     assert len(spn_crawler) == 0
-
-
-def test_azure_spn_info_with_secret():
-    sample_spns = [{"application_id": "test123456780", "secret_scope": "abcff", "secret_key": "sp_app_client_id"}]
-    crawler = generate_service_principals(sample_spns)
-    result_set = list(crawler)
-
-    assert len(result_set) == 1
-    assert result_set[0].application_id == "test123456780"
 
 
 def test_spn_with_spark_config_snapshot_try_fetch():

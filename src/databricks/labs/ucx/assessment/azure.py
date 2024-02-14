@@ -20,30 +20,18 @@ from databricks.labs.ucx.assessment.jobs import JobsMixin
 from databricks.labs.ucx.framework.crawlers import CrawlerBase, SqlBackend
 
 
-@dataclass
+@dataclass(frozen=True)
 class AzureServicePrincipalInfo:
     # fs.azure.account.oauth2.client.id
-    application_id: str | None
+    application_id: str
     # fs.azure.account.oauth2.client.secret: {{secrets/${local.secret_scope}/${local.secret_key}}}
-    secret_scope: str | None
+    secret_scope: str | None = None
     # fs.azure.account.oauth2.client.secret: {{secrets/${local.secret_scope}/${local.secret_key}}}
-    secret_key: str | None
+    secret_key: str | None = None
     # fs.azure.account.oauth2.client.endpoint: "https://login.microsoftonline.com/${local.tenant_id}/oauth2/token"
-    tenant_id: str | None
+    tenant_id: str | None = None
     # Azure Storage account to which the SP has been given access
-    storage_account: str | None
-
-
-def generate_service_principals(service_principals: list[dict]):
-    for spn in service_principals:
-        spn_info = AzureServicePrincipalInfo(
-            application_id=spn.get("application_id"),
-            secret_scope=spn.get("secret_scope"),
-            secret_key=spn.get("secret_key"),
-            tenant_id=spn.get("tenant_id"),
-            storage_account=spn.get("storage_account"),
-        )
-        yield spn_info
+    storage_account: str | None = None
 
 
 class AzureServicePrincipalCrawler(CrawlerBase[AzureServicePrincipalInfo], JobsMixin):
@@ -59,9 +47,18 @@ class AzureServicePrincipalCrawler(CrawlerBase[AzureServicePrincipalInfo], JobsM
             yield AzureServicePrincipalInfo(*row)
 
     def _crawl(self) -> Iterable[AzureServicePrincipalInfo]:
-        all_relevant_service_principals = self._get_relevant_service_principals()
-        deduped_service_principals = [dict(t) for t in {tuple(d.items()) for d in all_relevant_service_principals}]
-        return list(generate_service_principals(deduped_service_principals))
+        service_principals = set[AzureServicePrincipalInfo]()
+        for spn in self._get_relevant_service_principals():
+            service_principals.add(
+                AzureServicePrincipalInfo(
+                    application_id=spn.get("application_id"),
+                    secret_scope=spn.get("secret_scope"),
+                    secret_key=spn.get("secret_key"),
+                    tenant_id=spn.get("tenant_id"),
+                    storage_account=spn.get("storage_account"),
+                )
+            )
+        return list(service_principals)
 
     def _get_relevant_service_principals(self) -> list:
         relevant_service_principals = []
