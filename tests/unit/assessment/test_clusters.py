@@ -7,6 +7,7 @@ from databricks.sdk.service.compute import (
     AutoScale,
     ClusterDetails,
     ClusterSource,
+    DataSecurityMode,
     DbfsStorageInfo,
     InitScriptInfo,
     WorkspaceStorageInfo,
@@ -265,3 +266,37 @@ def test_try_fetch():
     assert result_set[0].cluster_id == "000"
     assert result_set[0].success == 1
     assert result_set[0].failures == "123"
+
+
+def test_no_isolation_clusters():
+    sample_clusters = [
+        ClusterDetails(
+            cluster_name="No isolation shared",
+            spark_version="12.3.x-cpu-ml-scala2.12",
+            data_security_mode=DataSecurityMode.NONE,
+        )
+    ]
+    ws = workspace_client_mock()
+    mockBackend = MagicMock()
+    ws.clusters.list.return_value = sample_clusters
+    crawler = ClustersCrawler(ws, mockBackend, "ucx")
+    result_set = list(crawler.snapshot())
+    assert len(result_set) == 1
+    assert result_set[0].failures == '["No isolation shared clusters not supported in UC"]'
+
+
+def test_unsupported_clusters():
+    sample_clusters = [
+        ClusterDetails(
+            cluster_name="Passthrough cluster",
+            spark_version="12.3.x-cpu-ml-scala2.12",
+            data_security_mode=DataSecurityMode.LEGACY_PASSTHROUGH,
+        )
+    ]
+    ws = workspace_client_mock()
+    mockBackend = MagicMock()
+    ws.clusters.list.return_value = sample_clusters
+    crawler = ClustersCrawler(ws, mockBackend, "ucx")
+    result_set = list(crawler.snapshot())
+    assert len(result_set) == 1
+    assert result_set[0].failures == '["cluster type not supported : LEGACY_PASSTHROUGH"]'
