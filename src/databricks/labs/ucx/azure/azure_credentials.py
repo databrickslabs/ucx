@@ -136,10 +136,7 @@ class AzureServicePrincipalMigration:
             logger.info(
                 f"InternalError while reading secret {scope}.{key}. "
                 f"Cannot fetch the service principal client_secret for {application_id}. "
-                f"Will not reuse this client_secret"
-            )
-            print(
-                f"{application_id} is not migrated due to InternalError while fetching the client_secret from Databricks secret."
+                f"Will not reuse this client_secret. "
                 f"You may rerun the migration command later to retry this service principal"
             )
             return None
@@ -186,7 +183,7 @@ class AzureServicePrincipalMigration:
             if sp.client_id in azure_sp_info_with_client_secret:
                 sp_list_with_secret.append(
                     ServicePrincipalMigrationInfo(
-                        service_principal=sp, client_secret=azure_sp_info_with_client_secret[sp.client_id]
+                        sp, azure_sp_info_with_client_secret[sp.client_id]
                     )
                 )
         return sp_list_with_secret
