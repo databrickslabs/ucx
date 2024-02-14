@@ -102,8 +102,9 @@ def create_account_groups(a: AccountClient):
     account
     """
     logger.info(f"Account ID: {a.config.account_id}")
+    prompts = Prompts()
     workspaces = AccountWorkspaces(a)
-    workspaces.create_account_level_groups()
+    workspaces.create_account_level_groups(prompts)
 
 
 @ucx.command

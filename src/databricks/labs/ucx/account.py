@@ -38,13 +38,7 @@ class AccountWorkspaces:
         return "aws"
 
     def client_for(self, workspace: Workspace) -> WorkspaceClient:
-        config = self._ac.config.as_dict()
-        if "databricks_cli_path" in config:
-            del config["databricks_cli_path"]
-        cloud = self._get_cloud()
-        # copy current config and swap with a host relevant to a workspace
-        config["host"] = f"https://{workspace.deployment_name}.{self._tlds[cloud]}"
-        return self._new_workspace_client(**config, product="ucx", product_version=__version__)
+        return self._ac.get_workspace_client(workspace)
 
     def workspace_clients(self) -> list[WorkspaceClient]:
         """
@@ -70,9 +64,9 @@ class AccountWorkspaces:
             for installation in Installation.existing(ws, "ucx"):
                 installation.save(workspaces, filename=self.SYNC_FILE_NAME)
 
-    def create_account_level_groups(self):
+    def create_account_level_groups(self, prompts: Prompts):
         acc_groups = self._get_account_groups()
-        all_valid_workspace_groups = self._get_valid_workspaces_groups()
+        all_valid_workspace_groups = self._get_valid_workspaces_groups(prompts)
 
         for group_name, valid_group in all_valid_workspace_groups.items():
             if group_name in acc_groups:
@@ -81,15 +75,18 @@ class AccountWorkspaces:
 
             acc_group = self._ac.groups.create(display_name=group_name)
 
-            if len(acc_group.members) > 0:
-                self._add_members_to_acc_group(acc_group.id, group_name, valid_group)
-
+            if not acc_group.id:
+                continue
+            if len(valid_group.members) > 0:
+                self._add_members_to_acc_group(self._ac, acc_group.id, group_name, valid_group)
             logger.info(f"Group {group_name} created in the account")
 
-    def _add_members_to_acc_group(self, acc_group_id: str, group_name: str, valid_group: Group):
+    def _add_members_to_acc_group(
+        self, acc_client: AccountClient, acc_group_id: str, group_name: str, valid_group: Group
+    ):
         for chunk in self._chunks(valid_group.members, 20):
-            logger.debug(f"Adding 20 members to acc group {group_name}")
-            self._ac.groups.patch(
+            logger.debug(f"Adding {len(chunk)} members to acc group {group_name}")
+            acc_client.groups.patch(
                 acc_group_id,
                 operations=[Patch(op=PatchOp.ADD, path="members", value=[x.as_dict() for x in chunk])],
                 schemas=[PatchSchema.URN_IETF_PARAMS_SCIM_API_MESSAGES_2_0_PATCH_OP],
@@ -100,11 +97,13 @@ class AccountWorkspaces:
         for i in range(0, len(lst), n):
             yield lst[i : i + n]
 
-    def _get_valid_workspaces_groups(self) -> dict[str, Group]:
+    def _get_valid_workspaces_groups(self, prompts: Prompts) -> dict[str, Group]:
         all_workspaces_groups: dict[str, Group] = {}
 
         for workspace in self._workspaces():
             client = self.client_for(workspace)
+            logger.info(f"Crawling groups in workspace {client.config.host}")
+
             ws_group_ids = client.groups.list(attributes="id")
             for group_id in ws_group_ids:
                 if not group_id.id:
@@ -113,18 +112,21 @@ class AccountWorkspaces:
                 full_workspace_group = client.groups.get(group_id.id)
                 group_name = full_workspace_group.display_name
 
+                if self._is_group_out_of_scope(full_workspace_group):
+                    continue
+
                 if group_name in all_workspaces_groups:
                     if self._has_same_members(all_workspaces_groups[group_name], full_workspace_group):
                         logger.info(f"Workspace group {group_name} already found, ignoring")
                         continue
 
-                    logger.warning(
+                    if prompts.confirm(
                         f"Group {group_name} does not have the same amount of members "
-                        f"in workspace {client.config.host}, it will be created with account "
-                        f"name {workspace.workspace_name}_{group_name}"
-                    )
-                    all_workspaces_groups[f"{workspace.workspace_name}_{group_name}"] = full_workspace_group
-                    continue
+                        f"in workspace {client.config.host} than previous workspaces which contains the same group name,"
+                        f"it will be created at the account with name : {workspace.workspace_name}_{group_name}"
+                    ):
+                        all_workspaces_groups[f"{workspace.workspace_name}_{group_name}"] = full_workspace_group
+                        continue
 
                 if not group_name:
                     continue
@@ -132,7 +134,21 @@ class AccountWorkspaces:
                 logger.info(f"Found new group {group_name}")
                 all_workspaces_groups[group_name] = full_workspace_group
 
+            logger.info(f"Found a total of {len(all_workspaces_groups)} groups to migrate to the account")
+
         return all_workspaces_groups
+
+    def _is_group_out_of_scope(self, group: Group) -> bool:
+        if group.display_name in ["users", "admins", "account users"]:
+            logger.debug(f"Group {group.display_name} is a system group, ignoring")
+            return True
+        meta = group.meta
+        if not meta:
+            return False
+        if meta.resource_type != "WorkspaceGroup":
+            logger.debug(f"Group {group.display_name} is an account group, ignoring")
+            return True
+        return False
 
     def _has_same_members(self, group_1: Group, group_2: Group) -> bool:
         ws_members_set_1 = set([m.display for m in group_1.members] if group_1.members else [])
@@ -140,12 +156,16 @@ class AccountWorkspaces:
         return not bool((ws_members_set_1 - ws_members_set_2).union(ws_members_set_2 - ws_members_set_1))
 
     def _get_account_groups(self) -> dict[str | None, list[ComplexValue] | None]:
+        logger.debug("Listing groups in account")
         acc_groups = {}
         for acc_grp_id in self._ac.groups.list(attributes="id"):
             if not acc_grp_id.id:
                 continue
             full_account_group = self._ac.groups.get(acc_grp_id.id)
+            logger.debug(f"Found account group {acc_grp_id.display_name}")
             acc_groups[full_account_group.display_name] = full_account_group.members
+
+        logger.info(f"{len(acc_groups)} account groups found")
         return acc_groups
 
 
