@@ -234,15 +234,15 @@ class AzureServicePrincipalMigration:
             name=name, azure_service_principal=azure_service_principal, comment=comment, read_only=read_only
         )
 
-        validation_result = self._validate_storage_credential(storage_credential, sp_migration.service_principal.prefix)
+        validation_result = self._validate_storage_credential(storage_credential, sp_migration.service_principal.prefix, read_only)
         return validation_result
 
-    def _validate_storage_credential(self, storage_credential, location: str) -> StorageCredentialValidationResult:
+    def _validate_storage_credential(self, storage_credential, location: str, read_only: bool) -> StorageCredentialValidationResult:
         # storage_credential validation creates a temp UC external location, which cannot overlap with
         # existing UC external locations. So add a sub folder to the validation location just in case
         try:
             validation = self._ws.storage_credentials.validate(
-                storage_credential_name=storage_credential.name, url=location
+                storage_credential_name=storage_credential.name, url=location, read_only=read_only
             )
             return StorageCredentialValidationResult.from_storage_credential_validation(storage_credential, validation)
         except InvalidParameterValue:
