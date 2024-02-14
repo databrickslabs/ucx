@@ -366,11 +366,11 @@ def side_effect_create_storage_credential(name, azure_service_principal, comment
     )
 
 
-def side_effect_validate_storage_credential(storage_credential_name, url):
+def side_effect_validate_storage_credential(storage_credential_name, url, read_only):
     if "overlap" in storage_credential_name:
         raise InvalidParameterValue
     if "read" in storage_credential_name:
-        response = {"isDir": True, "results": [{"message": "", "operation": "WRITE", "result": "SKIP"}]}
+        response = {"isDir": True, "results": [{"message": "", "operation": "READ", "result": "PASS"}]}
         return ValidateStorageCredentialResponse.from_dict(response)
     else:
         response = {"isDir": True, "results": [{"message": "", "operation": "WRITE", "result": "PASS"}]}
@@ -420,5 +420,11 @@ def test_execute_migration(caplog, capsys, mocker, ws):
     # assert validation results
     save_args = sp_migration._installation.save.call_args.args[0]
     assert any("The validation is skipped" in arg.results[0].message for arg in save_args)
-    assert any("PASS" in arg.results[0].result.value for arg in save_args)
-    assert any("SKIP" in arg.results[0].result.value for arg in save_args)
+    assert any(("READ" in arg.results[0].operation.value)
+        and ("PASS" in arg.results[0].result.value)
+        for arg in save_args
+    )
+    assert any(("WRITE" in arg.results[0].operation.value)
+        and ("PASS" in arg.results[0].result.value)
+        for arg in save_args
+        )

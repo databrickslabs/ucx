@@ -18,8 +18,7 @@ from databricks.labs.ucx.azure.azure_credentials import AzureServicePrincipalMig
 @pytest.fixture
 def prepare_spn_migration_test(ws, debug_env, make_random):
     def inner(read_only=False) -> dict:
-        # cluster_conf = ws.clusters.get(cluster_id=debug_env["TEST_DEFAULT_CLUSTER_ID"])
-        spark_conf = ws.clusters.get(cluster_id="0214-064652-su15myvb").spark_conf
+        spark_conf = ws.clusters.get(cluster_id=debug_env["TEST_LEGACY_SPN_CLUSTER_ID"]).spark_conf
 
         application_id = spark_conf.get("fs.azure.account.oauth2.client.id")
 
@@ -35,8 +34,6 @@ def prepare_spn_migration_test(ws, debug_env, make_random):
         end_point = spark_conf.get("fs.azure.account.oauth2.client.endpoint")
         directory_id = end_point.split("/")[3]
 
-        # application_id = "9cbd8a1a-8169-4ff8-a929-f1e9572c090c"
-        # directory_id = "9f37a392-f0ae-4280-9796-f1864a10effc"
         name = f"testinfra_storageaccess_{make_random(4).lower()}"
 
         azure_resource_permissions = MagicMock()
@@ -109,7 +106,7 @@ def test_spn_migration_existed_storage_credential(
     )
 
     # test that the spn migration will be skipped due to above storage credential is existed
-    spn_migration = execute_migration(variables=variables, integration_test_flag=variables["storage_credential_name"])
+    spn_migration = execute_migration(variables, integration_test_flag=variables["storage_credential_name"])
 
     # because storage_credential is existing, no spn should be migrated
     assert not spn_migration._final_sp_list
@@ -120,7 +117,7 @@ def test_spn_migration(ws, execute_migration, prepare_spn_migration_test, read_o
     variables = prepare_spn_migration_test(read_only)
 
     try:
-        spn_migration = execute_migration(variables=variables, integration_test_flag="lets_migrate_the_spn")
+        spn_migration = execute_migration(variables, integration_test_flag="lets_migrate_the_spn")
 
         assert spn_migration._final_sp_list[0].service_principal.principal == variables["storage_credential_name"]
         assert ws.storage_credentials.get(variables["storage_credential_name"]).read_only is read_only
