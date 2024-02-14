@@ -7,6 +7,7 @@ import typing
 from collections.abc import Callable, Iterable
 from dataclasses import dataclass
 from functools import lru_cache, partial
+from pathlib import PurePath
 
 from databricks.labs.blueprint.installation import Installation
 from databricks.labs.blueprint.parallel import Threads
@@ -220,11 +221,15 @@ class AWSResources:
 
 class AWSResourcePermissions:
     UCRolesFileName: typing.ClassVar[str] = "uc_roles_access.csv"
+    InstanceProfilesFileName: typing.ClassVar[str] =  "aws_instance_profile_info.csv"
 
-    def __init__(self, installation: Installation, ws: WorkspaceClient, aws_resources: AWSResources):
+    def __init__(self, installation: Installation, ws: WorkspaceClient, backend: StatementExecutionBackend,
+                 aws_resources: AWSResources, schema: str):
         self._installation = installation
         self._aws_resources = aws_resources
+        self._backend = backend
         self._ws = ws
+        self._schema = schema
 
     @classmethod
     def for_cli(cls, ws: WorkspaceClient, aws_profile, product='ucx'):
@@ -248,8 +253,12 @@ class AWSResourcePermissions:
             role_actions = self._installation.load(list[AWSRoleAction], filename=self.UCRolesFileName)
         return role_actions
 
-    def save_ucx_compatible_roles(self):
-        pass
+    def get_uc_missing_roles(self, default_role_arn):
+        missing_paths = self._identify_missing_paths()
+        role_actions = []
+        for path in missing_paths:
+            role_actions.append(AWSRoleAction(default_role_arn,"s3","Privilege.WRITE_FILES.value",path))
+        return role_actions
 
     def _get_instance_profiles(self) -> Iterable[AWSInstanceProfile]:
         instance_profiles = self._ws.instance_profiles.list()
@@ -312,30 +321,31 @@ class AWSResourcePermissions:
         if len(instance_profile_access) == 0:
             logger.warning("No Mapping Was Generated.")
             return None
-        return self._installation.save(instance_profile_access, filename='aws_instance_profile_info.csv')
+        return self._installation.save(instance_profile_access, filename=self.InstanceProfilesFileName)
 
-
-class AWSUCResources:
-    def __init__(self, ws: WorkspaceClient, backend: StatementExecutionBackend, aws_resources: AWSResources,
-                 schema: str):
-        self._ws = ws
-        self._backend = backend
-        self._aws_resources = AWSResources
-        self._schema = schema
-
-    @classmethod
-    def for_cli(cls, ws: WorkspaceClient, aws_profile, product='ucx'):
-        installation = Installation.current(ws, product)
-        aws = AWSResources(aws_profile)
-        if not aws.validate_connection():
-            raise ResourceWarning("AWS CLI is not configured properly.")
-        return cls(installation, ws, aws)
-
-    def _get_storage_credentials(self) -> Iterable[StorageCredentialInfo]:
-        return self._ws.storage_credentials.list()
-
-    def _identify_missing_credentials(self):
-        storage_credentials = self._get_storage_credentials()
+    def _identify_missing_paths(self):
         external_locations = ExternalLocations(self._ws, self._backend, self._schema).snapshot()
+        compatible_roles = self.get_uc_compatible_roles()
+        missing_paths = set()
+        for external_location in external_locations:
+            path = PurePath(external_location.location)
+            matching_role = False
+            for role in compatible_roles:
+                if path.match(role.resource_path):
+                    matching_role = True
+                    continue
+            if matching_role:
+                continue
+            missing_paths.add(external_location.location)
+        return missing_paths
+
+
+
+
+
+
+
+
+
 
 
