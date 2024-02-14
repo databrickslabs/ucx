@@ -1217,3 +1217,21 @@ def test_latest_job_status_exception(ws, mock_installation_with_jobs, any_prompt
     ws.jobs.list_runs.side_effect = InvalidParameterValue("Workflow does not exists")
     status = workspace_installation.latest_job_status()
     assert len(status) == 0
+
+
+def test_open_config(ws, mocker, mock_installation):
+    webbrowser_open = mocker.patch("webbrowser.open")
+    prompts = MockPrompts(
+        {
+            r".*PRO or SERVERLESS SQL warehouse.*": "1",
+            r"Choose how to map the workspace groups.*": "2",
+            r".*workspace group names.*": "g1, g2, g99",
+            r"Open config file in.*": "yes",
+            r".*": "",
+        }
+    )
+
+    install = WorkspaceInstaller(prompts, mock_installation, ws)
+    install.configure()
+
+    webbrowser_open.assert_called_with('https://localhost/#workspace~/mock/config.yml')
