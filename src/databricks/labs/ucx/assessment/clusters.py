@@ -15,10 +15,10 @@ from databricks.sdk.service.compute import (
 )
 
 from databricks.labs.ucx.assessment.crawlers import (
-    _AZURE_SP_CONF_FAILURE_MSG,
-    _INIT_SCRIPT_DBFS_PATH,
+    AZURE_SP_CONF_FAILURE_MSG,
     INCOMPATIBLE_SPARK_CONFIG_KEYS,
-    _azure_sp_conf_present_check,
+    INIT_SCRIPT_DBFS_PATH,
+    azure_sp_conf_present_check,
     spark_version_compatibility,
 )
 from databricks.labs.ucx.assessment.init_scripts import CheckInitScriptMixin
@@ -51,16 +51,16 @@ class CheckClusterMixin(CheckInitScriptMixin):
         policy = self._safe_get_cluster_policy(policy_id)
         if policy:
             if policy.definition:
-                if _azure_sp_conf_present_check(json.loads(policy.definition)):
-                    failures.append(f"{_AZURE_SP_CONF_FAILURE_MSG} {source}.")
+                if azure_sp_conf_present_check(json.loads(policy.definition)):
+                    failures.append(f"{AZURE_SP_CONF_FAILURE_MSG} {source}.")
             if policy.policy_family_definition_overrides:
-                if _azure_sp_conf_present_check(json.loads(policy.policy_family_definition_overrides)):
-                    failures.append(f"{_AZURE_SP_CONF_FAILURE_MSG} {source}.")
+                if azure_sp_conf_present_check(json.loads(policy.policy_family_definition_overrides)):
+                    failures.append(f"{AZURE_SP_CONF_FAILURE_MSG} {source}.")
         return failures
 
     def _get_init_script_data(self, init_script_info: InitScriptInfo) -> str | None:
         if init_script_info.dbfs is not None and init_script_info.dbfs.destination is not None:
-            if len(init_script_info.dbfs.destination.split(":")) == _INIT_SCRIPT_DBFS_PATH:
+            if len(init_script_info.dbfs.destination.split(":")) == INIT_SCRIPT_DBFS_PATH:
                 file_api_format_destination = init_script_info.dbfs.destination.split(":")[1]
                 if file_api_format_destination:
                     try:
@@ -95,8 +95,8 @@ class CheckClusterMixin(CheckInitScriptMixin):
             if "dbfs:/mnt" in value or "/dbfs/mnt" in value:
                 failures.append(f"using DBFS mount in configuration: {value}")
         # Checking if Azure cluster config is present in spark config
-        if _azure_sp_conf_present_check(conf):
-            failures.append(f"{_AZURE_SP_CONF_FAILURE_MSG} {source}.")
+        if azure_sp_conf_present_check(conf):
+            failures.append(f"{AZURE_SP_CONF_FAILURE_MSG} {source}.")
         return failures
 
     def check_cluster_failures(self, cluster: ClusterDetails, source: str) -> list[str]:

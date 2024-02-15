@@ -8,8 +8,8 @@ from databricks.sdk import WorkspaceClient
 from databricks.sdk.errors import ResourceDoesNotExist
 
 from databricks.labs.ucx.assessment.crawlers import (
-    _AZURE_SP_CONF_FAILURE_MSG,
-    _azure_sp_conf_in_init_scripts,
+    AZURE_SP_CONF_FAILURE_MSG,
+    azure_sp_conf_in_init_scripts,
 )
 from databricks.labs.ucx.framework.crawlers import CrawlerBase, SqlBackend
 
@@ -33,8 +33,8 @@ class CheckInitScriptMixin:
         failures: list[str] = []
         if not init_script_data:
             return failures
-        if _azure_sp_conf_in_init_scripts(init_script_data):
-            failures.append(f"{_AZURE_SP_CONF_FAILURE_MSG} {source}.")
+        if azure_sp_conf_in_init_scripts(init_script_data):
+            failures.append(f"{AZURE_SP_CONF_FAILURE_MSG} {source}.")
         return failures
 
 
