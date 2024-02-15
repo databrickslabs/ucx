@@ -45,9 +45,20 @@ class StorageCredentialValidationResult:
     def from_storage_credential_validation(
         cls, storage_credential: StorageCredentialInfo, validation: ValidateStorageCredentialResponse
     ):
+        if storage_credential.azure_service_principal:
+            # Guard rail to explicitly remove the client_secret, just in case the azure_service_principal
+            # in StorageCredentialInfo returned by WorkspaceClient.storage_credentials.create exposes the
+            # client_secret due to potential bugs in the future.
+            service_principal = AzureServicePrincipal(storage_credential.azure_service_principal.directory_id,
+                                                      storage_credential.azure_service_principal.application_id,
+                                                      ""
+            )
+        else:
+            service_principal = AzureServicePrincipal("", "", "")
+
         return cls(
             name=storage_credential.name or "",
-            azure_service_principal=storage_credential.azure_service_principal or AzureServicePrincipal("", "", ""),
+            azure_service_principal=service_principal,
             created_by=storage_credential.created_by or "",
             read_only=storage_credential.read_only or False,
             results=validation.results or [],
