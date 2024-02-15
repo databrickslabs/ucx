@@ -73,8 +73,8 @@ For questions, troubleshooting or bug fixes, please see your Databricks account 
 #### Install Databricks CLI on macOS
 ![macos_install_databricks](docs/macos_1_databrickslabsmac_installdatabricks.gif)
 
-#### Install Databricks CLI via curl on Windows
-![winos_install_databricks](docs/winos_1_databrickslabsmac_installdatabricks.gif)
+#### Install Databricks CLI on Windows
+![windows_install_databricks.png](docs/windows_install_databricks.png)
 
 ### Download & Install
 
