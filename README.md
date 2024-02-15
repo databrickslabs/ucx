@@ -1,4 +1,4 @@
-# ![UCX by Databricks Labs](docs/logo-no-background.png)
+![UCX by Databricks Labs](docs/logo-no-background.png)
 
 Your best companion for upgrading to Unity Catalog. It helps you to upgrade all Databricks workspace assets:
 Legacy Table ACLs, Entitlements, AWS instance profiles, Clusters, Cluster policies, Instance Pools, Databricks SQL warehouses, Delta Live Tables, Jobs, MLflow experiments, MLflow registry, SQL Dashboards & Queries, SQL Alerts, Token and Password usage permissions that are set on the workspace level, Secret scopes, Notebooks, Directories, Repos, Files.
@@ -7,6 +7,28 @@ Legacy Table ACLs, Entitlements, AWS instance profiles, Clusters, Cluster polici
 
 See [contributing instructions](CONTRIBUTING.md) to help improve this project.
 
+<!-- TOC -->
+  * [Introduction](#introduction)
+  * [Installation](#installation)
+    * [Prerequisites](#prerequisites)
+      * [Install Databricks CLI on macOS](#install-databricks-cli-on-macos)
+      * [Install Databricks CLI via curl on Windows](#install-databricks-cli-via-curl-on-windows)
+    * [Download & Install](#download--install)
+      * [Install UCX](#install-ucx)
+      * [Upgrade UCX](#upgrade-ucx)
+      * [Uninstall UCX](#uninstall-ucx)
+  * [Using UCX](#using-ucx)
+    * [Executing assessment job](#executing-assessment-job)
+    * [Understanding assessment report](#understanding-assessment-report)
+    * [Scanning for legacy credentials and mapping access](#scanning-for-legacy-credentials-and-mapping-access)
+      * [AWS](#aws)
+      * [Azure](#azure)
+    * [Producing table mapping](#producing-table-mapping)
+    * [Synchronising UCX configurations](#synchronising-ucx-configurations)
+    * [Validating group membership](#validating-group-membership)
+  * [Star History](#star-history)
+  * [Project Support](#project-support)
+<!-- TOC -->
 
 ## Introduction
 UCX will guide you, the Databricks customer, through the process of upgrading your account, groups, workspaces, jobs etc. to Unity Catalog.
@@ -44,10 +66,11 @@ For questions, troubleshooting or bug fixes, please see your Databricks account 
     - A PRO or Serverless SQL Warehouse
     - The Assessment workflow will create a legacy "No Isolation Shared" and a legacy "Table ACL" jobs clusters needed to inventory Hive Metastore Table ACLS
     - If your Databricks Workspace relies on an external Hive Metastore (such as AWS Glue), make sure to read the [External HMS Document](docs/external_hms_glue.md).
-4. [[AWS]](https://docs.databricks.com/en/administration-guide/users-groups/best-practices.html) [[Azure]](https://learn.microsoft.com/en-us/azure/databricks/administration-guide/users-groups/best-practices)] [[GCP]](https://docs.gcp.databricks.com/administration-guide/users-groups/best-practices.html) Account level Identity Setup
-5. [[AWS]](https://docs.databricks.com/en/data-governance/unity-catalog/create-metastore.html) [[Azure]](https://learn.microsoft.com/en-us/azure/databricks/data-governance/unity-catalog/create-metastore) [[GCP]](https://docs.gcp.databricks.com/data-governance/unity-catalog/create-metastore.html) Unity Catalog Metastore Created (per region)
+4. A number of commands also require Databricks account administrator access permissions, e.g. `sync-workspace-info`
+5. [[AWS]](https://docs.databricks.com/en/administration-guide/users-groups/best-practices.html) [[Azure]](https://learn.microsoft.com/en-us/azure/databricks/administration-guide/users-groups/best-practices)] [[GCP]](https://docs.gcp.databricks.com/administration-guide/users-groups/best-practices.html) Account level Identity Setup
+6. [[AWS]](https://docs.databricks.com/en/data-governance/unity-catalog/create-metastore.html) [[Azure]](https://learn.microsoft.com/en-us/azure/databricks/data-governance/unity-catalog/create-metastore) [[GCP]](https://docs.gcp.databricks.com/data-governance/unity-catalog/create-metastore.html) Unity Catalog Metastore Created (per region)
 
-#### Installing Databricks CLI on macOS
+#### Install Databricks CLI on macOS
 ![macos_install_databricks](docs/macos_1_databrickslabsmac_installdatabricks.gif)
 
 #### Install Databricks CLI via curl on Windows
@@ -107,25 +130,70 @@ Databricks CLI will confirm a few options:
 
 ![macos_uninstall_ucx](docs/macos_4_databrickslabsmac_uninstallucx.gif)
 
-### Using UCX
+## Using UCX
 
 After installation, a number of UCX workflows will be available in the workspace. `<installation_path>/README` contains further instructions and explanations of these workflows.
 UCX also provides a number of command line utilities accessible via `databricks labs ucx`.
 
-#### Understanding assessment report
+### Executing assessment job
+The assessment workflow can be triggered using the Databricks UI, or via the command line
+```commandline
+databricks labs ucx ensure-assessment-run
+```
+![ucx_assessment_workflow](docs/ucx_assessment_workflow.png)
+
+### Understanding assessment report
 
 After UCX assessment workflow is executed, the assessment dashboard will be populated with findings and common recommendations.
 [This guide](docs/assessment.md) talks about them in more details.
 
-#### Synchronising workspace info
-Use to upload workspace config to all workspaces in the account where UCX is installed. UCX will prompt you to select an account profile that has been defined in `~/.databrickscfg`
+### Scanning for legacy credentials and mapping access
+#### AWS
+Use to identify all instance profiles in the workspace, and map their access to S3 buckets. 
+This requires `awscli` to be installed and configured.
+
+```commandline
+databricks labs ucx save-aws-iam-profiles
+```
+
+#### Azure
+Use to identify all storage account used by tables, identify the relevant Azure service principals and their permissions on each storage account.
+This requires `azure-cli` to be installed and configured. 
+
+```commandline
+databricks labs ucx save-azure-storage-accounts
+```
+
+### Producing table mapping
+Use to create a table mapping CSV file, which provides the target mapping for all `hive_metastore` tables identified by the assessment workflow.
+This file can be reviewed offline and later will be used for table migration.
+
+```commandline
+databricks labs ucx table-mapping 
+```
+
+### Synchronising UCX configurations
+Use to upload the current UCX workspace config to all workspaces in the account where UCX is installed. 
+This requires account administrator permissions. UCX will prompt you to select an account profile that has been defined in `~/.databrickscfg`
 
 ```commandline
 databricks labs ucx sync-workspace-info
 ```
 
-#### Saving AWS instance profiles
-Use to identify all instance profiles in the workspace, and map their access to S3 buckets. This requires `awscli` to be installed and configured.
+Workspace admins can manually upload the current ucx workspace config to specific target workspaces. 
+*This option should only be used when an account admin is not available to execute `sync-workspace-info`*. 
+UCX will ask to confirm the current workspace name, and the ID & name of the target workspaces
+
+```commandline
+databricks labs ucx manual-workspace-info
+```
+
+### Validating group membership
+Use to validate workspace-level & account-level groups to identify any discrepancies in membership after migration.
+
+```commandline
+databricks labs ucx validate-groups-membership
+```
 
 ## Star History
 
