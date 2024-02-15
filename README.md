@@ -154,7 +154,7 @@ Also captures the IAM roles which has UC arn listed, and map their access to S3 
 This requires `awscli` to be installed and configured.
 
 ```commandline
-databricks labs ucx principal_prefix_access --aws-profile test-profile
+databricks labs ucx principal-prefix-access --aws-profile test-profile
 ```
 
 #### Azure
@@ -162,7 +162,7 @@ Use to identify all storage account used by tables, identify the relevant Azure 
 This requires `azure-cli` to be installed and configured. 
 
 ```commandline
-databricks labs ucx principal_prefix_access --subscription-id test-subscription-id
+databricks labs ucx principal-prefix-access --subscription-id test-subscription-id
 ```
 
 ### Producing table mapping
