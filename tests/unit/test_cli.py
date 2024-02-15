@@ -246,11 +246,12 @@ def test_save_storage_and_principal_azure_no_subscription_id(ws, caplog):
     assert "Please enter subscription id to scan storage account in." in caplog.messages
 
 
-def test_save_storage_and_principal_azure(ws, caplog):
+def test_save_storage_and_principal_azure(ws, caplog, mocker):
     ws.config.auth_type = "azure_cli"
     ws.config.is_azure = True
+    azure_resource = mocker.patch("databricks.labs.ucx.azure.access.AzureResourcePermissions.save_spn_permissions")
     save_storage_and_principal(ws, "test")
-    assert "Generating azure storage accounts and service principal permission info" in caplog.messages
+    azure_resource.assert_called_once()
 
 
 def test_validate_groups_membership(ws):
@@ -287,3 +288,24 @@ def test_save_storage_and_principal_aws_no_cli(ws, mocker, caplog):
     ws.config.is_aws = True
     save_storage_and_principal(ws, aws_profile="profile")
     assert any({"Couldn't find AWS" in message for message in caplog.messages})
+
+
+def test_save_storage_and_principal_aws(ws, mocker, caplog):
+    mocker.patch("shutil.which", return_value=True)
+    ws.config.is_azure = False
+    ws.config.is_aws = True
+    aws_resource = mocker.patch("databricks.labs.ucx.assessment.aws.AWSResourcePermissions.for_cli")
+    save_storage_and_principal(ws, aws_profile="profile")
+    aws_resource.assert_called_once()
+
+
+def test_save_storage_and_principal_gcp(ws, caplog):
+    ws.config.is_azure = False
+    ws.config.is_aws = False
+    ws.config.is_gcp = True
+
+    save_storage_and_principal(
+        ws,
+    )
+
+    assert "This cmd is only supported for azure and aws workspaces" in caplog.messages
