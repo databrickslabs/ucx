@@ -55,9 +55,7 @@ class AzureServicePrincipalCrawler(CrawlerBase[AzureServicePrincipalInfo], JobsM
         # list all relevant service principals in clusters
         for cluster_config in self._ws.clusters.list():
             if cluster_config.cluster_source != ClusterSource.JOB:
-                set_service_principals.update(
-                    self._get_azure_spn_from_cluster_config(cluster_config)
-                )
+                set_service_principals.update(self._get_azure_spn_from_cluster_config(cluster_config))
 
         # list all relevant service principals in pipelines
         for pipeline in self._ws.pipelines.list_pipelines():
@@ -74,9 +72,7 @@ class AzureServicePrincipalCrawler(CrawlerBase[AzureServicePrincipalInfo], JobsM
         all_jobs = list(self._ws.jobs.list(expand_tasks=True))
         all_clusters_by_id = {c.cluster_id: c for c in self._ws.clusters.list()}
         for _job, cluster_config in self._get_cluster_configs_from_all_jobs(all_jobs, all_clusters_by_id):
-            set_service_principals.update(
-                self._get_azure_spn_from_cluster_config(cluster_config)
-            )
+            set_service_principals.update(self._get_azure_spn_from_cluster_config(cluster_config))
 
         # list all relevant service principals in sql spark conf
         set_service_principals.update(self._list_all_spn_in_sql_warehouses_spark_conf())
@@ -100,9 +96,7 @@ class AzureServicePrincipalCrawler(CrawlerBase[AzureServicePrincipalInfo], JobsM
 
         if cluster_config.spark_conf is not None:
             if azure_sp_conf_present_check(cluster_config.spark_conf):
-                set_service_principals.update(
-                    self._get_azure_spn_from_config(cluster_config.spark_conf)
-                )
+                set_service_principals.update(self._get_azure_spn_from_config(cluster_config.spark_conf))
 
         if cluster_config.policy_id is None:
             return set_service_principals
@@ -114,9 +108,7 @@ class AzureServicePrincipalCrawler(CrawlerBase[AzureServicePrincipalInfo], JobsM
 
         if policy.definition is not None:
             if azure_sp_conf_present_check(json.loads(policy.definition)):
-                set_service_principals.update(
-                    self._get_azure_spn_from_config(json.loads(policy.definition))
-                )
+                set_service_principals.update(self._get_azure_spn_from_config(json.loads(policy.definition)))
 
         if policy.policy_family_definition_overrides is None:
             return set_service_principals
