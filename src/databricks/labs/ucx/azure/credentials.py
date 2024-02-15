@@ -272,7 +272,11 @@ class ServicePrincipalMigration:
         return sp_list_with_secret
 
 
-    def run(self, prompts: Prompts):
+    def save(self, migration_results: list[StorageCredentialValidationResult]) -> str:
+        return self._installation.save(migration_results, filename=self._output_file)
+
+
+    def run(self, prompts: Prompts) -> list[StorageCredentialValidationResult]:
 
         sp_list_with_secret = self._generate_migration_list()
 
@@ -280,17 +284,17 @@ class ServicePrincipalMigration:
             "Above Azure Service Principals will be migrated to UC storage credentials, please review and confirm."
         )
         if plan_confirmed is not True:
-            return
+            return []
 
         execution_result = []
         for sp in sp_list_with_secret:
             storage_credential = self._storage_credential_manager.create_storage_credential(sp)
             execution_result.append(self._storage_credential_manager.validate_storage_credential(storage_credential, sp))
 
-        results_file = self._installation.save(execution_result, filename=self._output_file)
+        results_file = self.save(execution_result)
         logger.info("Completed migration from Azure Service Principal migrated to UC Storage credentials")
         print(
             f"Completed migration from Azure Service Principal migrated to UC Storage credentials. "
             f"Please check {results_file} for validation results"
         )
-        return
+        return execution_result

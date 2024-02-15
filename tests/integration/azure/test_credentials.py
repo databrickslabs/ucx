@@ -1,20 +1,24 @@
 import base64
 import logging
 import re
-from unittest.mock import MagicMock, patch
 
 import pytest
+from databricks.labs.blueprint.installation import Installation
 from databricks.labs.blueprint.tui import MockPrompts
 
 from databricks.labs.ucx.assessment.azure import AzureServicePrincipalInfo
 from databricks.labs.ucx.assessment.crawlers import _SECRET_PATTERN
 from databricks.labs.ucx.azure.access import StoragePermissionMapping
 from databricks.labs.ucx.azure.credentials import ServicePrincipalMigration
-from tests.integration.conftest import StaticStorageCredentialManager
+from databricks.labs.ucx.azure.resources import AzureResources
+from databricks.labs.ucx.hive_metastore import ExternalLocations
+from tests.integration.conftest import StaticStorageCredentialManager, \
+    StaticAzureResourcePermissions, StaticAzureServicePrincipalCrawler, \
+    StaticServicePrincipalMigration
 
 
 @pytest.fixture
-def prepare_spn_migration_test(ws, debug_env, make_random):
+def prepare_spn_migration_test(ws, debug_env, make_random, sql_backend):
     def inner(read_only=False) -> dict:
         spark_conf = ws.clusters.get(debug_env["TEST_LEGACY_SPN_CLUSTER_ID"]).spark_conf
 
@@ -35,10 +39,15 @@ def prepare_spn_migration_test(ws, debug_env, make_random):
         end_point = spark_conf.get("fs.azure.account.oauth2.client.endpoint")
         directory_id = end_point.split("/")[3]
 
-        name = f"testinfra_storageaccess_{make_random(4).lower()}"
+        random = make_random(6).lower()
+        name = f"testinfra_storageaccess_{random}"
 
-        azure_resource_permissions = MagicMock()
-        azure_resource_permissions.load.return_value = [
+
+        installation = Installation(ws, 'ucx')
+        azurerm = AzureResources(ws)
+        locations = ExternalLocations(ws, sql_backend, "dont_need_a_schema")
+
+        azure_resource_permissions = StaticAzureResourcePermissions(installation, ws, azurerm, locations, [
             StoragePermissionMapping(
                 prefix="abfss://things@labsazurethings.dfs.core.windows.net/avoid_ext_loc_overlap",
                 client_id=application_id,
@@ -46,10 +55,9 @@ def prepare_spn_migration_test(ws, debug_env, make_random):
                 privilege="READ_FILES" if read_only else "WRITE_FILES",
                 directory_id=directory_id,
             )
-        ]
+        ])
 
-        azure_sp_crawler = MagicMock()
-        azure_sp_crawler.snapshot.return_value = [
+        azure_sp_crawler = StaticAzureServicePrincipalCrawler(ws, sql_backend, "dont_need_a_schema", [
             AzureServicePrincipalInfo(
                 application_id=application_id,
                 secret_scope=secret_scope,
@@ -57,10 +65,7 @@ def prepare_spn_migration_test(ws, debug_env, make_random):
                 tenant_id="test",
                 storage_account="test",
             )
-        ]
-
-        installation = MagicMock()
-        installation.save.return_value = "azure_service_principal_migration_result.csv"
+        ])
 
         return {
             "storage_credential_name": name,
@@ -78,17 +83,16 @@ def prepare_spn_migration_test(ws, debug_env, make_random):
 @pytest.fixture
 def execute_migration(ws):
     def inner(variables: dict, credentials: list[str]) -> ServicePrincipalMigration:
-        spn_migration = ServicePrincipalMigration(
+        spn_migration = StaticServicePrincipalMigration(
             variables["installation"],
             ws,
             variables["azure_resource_permissions"],
             variables["azure_sp_crawler"],
             StaticStorageCredentialManager(ws, credentials)
         )
-        spn_migration.run(
+        return spn_migration.run(
             MockPrompts({"Above Azure Service Principals will be migrated to UC storage credentials *": "Yes"})
         )
-        return spn_migration
 
     return inner
 
@@ -108,18 +112,10 @@ def test_spn_migration_existed_storage_credential(
     )
 
     # test that the spn migration will be skipped due to above storage credential is existed
-    execute_migration(variables, [variables["storage_credential_name"]])
+    migration_result = execute_migration(variables, [variables["storage_credential_name"]])
 
-    # assert no action plan is logged since no spn migrated
-    patterns = [
-        "Service Principal name:",
-        "application_id:",
-        "privilege",
-        "on location"
-    ]
-    for record in caplog.records:
-        if all(pattern in record.message for pattern in patterns):
-            assert False, "Migration action plan should not be logged when no service principal will be migrated"
+    # assert no spn migrated since migration_result will be empty
+    assert not migration_result
 
 
 @pytest.mark.parametrize("read_only", [False, True])
@@ -127,28 +123,26 @@ def test_spn_migration(ws, execute_migration, prepare_spn_migration_test, read_o
     variables = prepare_spn_migration_test(read_only)
 
     try:
-        spn_migration = execute_migration(variables, ["lets_migrate_the_spn"])
+        migration_results = execute_migration(variables, ["lets_migrate_the_spn"])
 
         storage_credential = ws.storage_credentials.get(variables["storage_credential_name"])
         assert storage_credential is not None
         assert storage_credential.read_only is read_only
 
-        validation_result = spn_migration._installation.save.call_args.args[0][0]
-        if read_only:
-            # We only assert that write validation are not performed for read only storage credential here.
-            # In real life, the READ validation for read only storage credential may fail if there is no file,
-            # but that is fine, as the storage credential is created, and we just cannot validate it until it's really used.
-            assert not any(
-                (res.operation is not None) and ("WRITE" in res.operation.value) for res in validation_result.results
-            )
-        else:
-            assert any(
-                (res.operation is not None) and ("WRITE" in res.operation.value) and ("PASS" in res.result.value)
-                for res in validation_result.results
-            )
-            assert any(
-                (res.operation is not None) and ("DELETE" in res.operation.value) and ("PASS" in res.result.value)
-                for res in validation_result.results
-            )
+        for res in migration_results[0].results:
+            if res.operation is None:
+                #TODO: file a ticket to SDK team, PATH_EXISTS and HIERARCHICAL_NAMESPACE_ENABLED
+                # should be added to the validation operations. They are None right now.
+                # Once it's fixed, the None check here can be removed
+                continue
+            if read_only:
+                if res.operation.value in ("WRITE", "DELETE"):
+                    # We only assert that write validation are not performed for read only storage credential here.
+                    # In real life, the READ validation for read only storage credential may fail if there is no file,
+                    # but that is fine, as the storage credential is created, and we just cannot validate it until it's really used.
+                    assert False, "WRITE operation should not be checked for read-only storage credential"
+            if not read_only:
+                if res.result.value == "FAIL":
+                    assert False, f"{res.operation.value} operation is failed while validating storage credential"
     finally:
         ws.storage_credentials.delete(name=variables["storage_credential_name"], force=True)
