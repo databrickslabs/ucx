@@ -16,11 +16,7 @@ AZURE_SP_CONF = [
     "fs.azure.account.oauth2.client.secret",
     "fs.azure.account.oauth2.client.endpoint",
 ]
-SECRET_PATTERN = r"{{(secrets.*?)}}"
-STORAGE_ACCOUNT_EXTRACT_PATTERN = r"(?:id|endpoint)(.*?)dfs"
 AZURE_SP_CONF_FAILURE_MSG = "Uses azure service principal credentials config in"
-SECRET_LIST_LENGTH = 3
-CLIENT_ENDPOINT_LENGTH = 6
 INIT_SCRIPT_DBFS_PATH = 2
 
 
