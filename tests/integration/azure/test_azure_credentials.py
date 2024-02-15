@@ -11,10 +11,13 @@ from databricks.labs.ucx.azure.access import StoragePermissionMapping
 from databricks.labs.ucx.azure.azure_credentials import ServicePrincipalMigration
 
 
+
+
+
 @pytest.fixture
 def prepare_spn_migration_test(ws, debug_env, make_random):
     def inner(read_only=False) -> dict:
-        spark_conf = ws.clusters.get(cluster_id=debug_env["TEST_LEGACY_SPN_CLUSTER_ID"]).spark_conf
+        spark_conf = ws.clusters.get(debug_env["TEST_LEGACY_SPN_CLUSTER_ID"]).spark_conf
 
         application_id = spark_conf.get("fs.azure.account.oauth2.client.id")
 

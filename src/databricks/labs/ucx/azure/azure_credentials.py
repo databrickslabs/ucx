@@ -29,8 +29,11 @@ from databricks.labs.ucx.hive_metastore.locations import ExternalLocations
 logger = logging.getLogger(__name__)
 
 
-# A namedtuple to host service_principal and its client_secret info
-ServicePrincipalMigrationInfo = namedtuple("ServicePrincipalMigrationInfo", "service_principal client_secret")
+# A dataclass to host service_principal info and its client_secret info
+@dataclass
+class ServicePrincipalMigrationInfo:
+    permission_mapping: StoragePermissionMapping
+    client_secret: str
 
 
 @dataclass
@@ -200,10 +203,10 @@ class ServicePrincipalMigration:
         # print action plan to console for customer to review.
         for sp in sp_list:
             logger.info(
-                f"Service Principal name: {sp.service_principal.principal}, "
-                f"application_id: {sp.service_principal.client_id}, "
-                f"privilege {sp.service_principal.privilege} "
-                f"on location {sp.service_principal.prefix}"
+                f"Service Principal name: {sp.permission_mapping.principal}, "
+                f"application_id: {sp.permission_mapping.client_id}, "
+                f"privilege {sp.permission_mapping.privilege} "
+                f"on location {sp.permission_mapping.prefix}"
             )
 
     def _generate_migration_list(self) -> list[ServicePrincipalMigrationInfo]:
@@ -224,15 +227,15 @@ class ServicePrincipalMigration:
 
     def _create_storage_credential(self, sp_migration: ServicePrincipalMigrationInfo):
         # prepare the storage credential properties
-        name = sp_migration.service_principal.principal
+        name = sp_migration.permission_mapping.principal
         azure_service_principal = AzureServicePrincipal(
-            directory_id=sp_migration.service_principal.directory_id,
-            application_id=sp_migration.service_principal.client_id,
+            directory_id=sp_migration.permission_mapping.directory_id,
+            application_id=sp_migration.permission_mapping.client_id,
             client_secret=sp_migration.client_secret,
         )
-        comment = f"Created by UCX during migration to UC using Azure Service Principal: {sp_migration.service_principal.principal}"
+        comment = f"Created by UCX during migration to UC using Azure Service Principal: {sp_migration.permission_mapping.principal}"
         read_only = False
-        if sp_migration.service_principal.privilege == Privilege.READ_FILES.value:
+        if sp_migration.permission_mapping.privilege == Privilege.READ_FILES.value:
             read_only = True
         # create the storage credential
         storage_credential = self._ws.storage_credentials.create(
@@ -240,7 +243,7 @@ class ServicePrincipalMigration:
         )
 
         validation_result = self._validate_storage_credential(
-            storage_credential, sp_migration.service_principal.prefix, read_only
+            storage_credential, sp_migration.permission_mapping.prefix, read_only
         )
         return validation_result
 
