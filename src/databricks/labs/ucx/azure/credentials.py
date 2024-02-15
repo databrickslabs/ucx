@@ -1,6 +1,5 @@
 import base64
 import logging
-from collections import namedtuple
 from dataclasses import dataclass
 
 from databricks.labs.blueprint.installation import Installation
