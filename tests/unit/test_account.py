@@ -89,9 +89,14 @@ def test_create_acc_groups_should_create_acc_group_if_no_group_found_in_account(
         id="12",
         display_name="de",
         members=[ComplexValue(display="test-user-1", value="20"), ComplexValue(display="test-user-2", value="21")],
+        meta=ResourceMeta("WorkspaceGroup"),
+    )
+    group_2 = Group(
+        display_name="no_id",
+        members=[ComplexValue(display="test-user-1", value="20"), ComplexValue(display="test-user-2", value="21")],
     )
 
-    ws.groups.list.return_value = [group]
+    ws.groups.list.return_value = [group, group_2]
     ws.groups.get.return_value = group
     acc_client.get_workspace_client.return_value = ws
     acc_client.groups.create.return_value = group
@@ -288,7 +293,8 @@ def test_create_acc_groups_should_not_create_group_if_exists_in_account():
         display_name="de",
         members=[ComplexValue(display="test-user-1", value="20"), ComplexValue(display="test-user-2", value="21")],
     )
-    acc_client.groups.list.return_value = [group]
+    group_2 = Group(display_name="de_invalid")
+    acc_client.groups.list.return_value = [group, group_2]
     acc_client.groups.get.return_value = group
     acc_client.workspaces.list.return_value = [
         Workspace(workspace_name="foo", workspace_id=123, workspace_status_message="Running", deployment_name="abc")
