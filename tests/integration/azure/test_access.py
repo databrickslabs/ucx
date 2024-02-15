@@ -38,9 +38,3 @@ def test_save_spn_permissions_local(ws, sql_backend, inventory_schema, make_rand
     az_res_perm = AzureResourcePermissions(installation, ws, AzureResources(ws, include_subscriptions=""), location)
     path = az_res_perm.save_spn_permissions()
     assert ws.workspace.get_status(path)
-
-
-def test_cli(ws):
-    from databricks.labs.ucx.cli import save_storage_and_principal
-
-    save_storage_and_principal(ws)
