@@ -92,7 +92,7 @@ This will start an interactive installer with a number of configuration question
 - Create a new or select an existing SQL warehouse to run assessment dashboards on. The existing warehouse must be Pro or Serverless.
 - Configurations for workspace local groups migration:
   - Provide a backup prefix. This is used to rename workspace local groups after they have been migrated. Defaults to `db-temp-`
-  - Select a workspace local groups migration strategy. UCX offers matching by name or external ID, using a prefix/suffix, or using regex.
+  - Select a workspace local groups migration strategy. UCX offers matching by name or external ID, using a prefix/suffix, or using regex. See [this](docs/group_name_conflict.md) for more details
   - Provide a specific list of workspace local groups (or all groups) to be migrated.
 - Select a Python log level, e.g. `DEBUG`, `INFO`. Defaults to `INFO`
 - Provide the level of parallelism, which limit the number of concurrent operation as UCX scans the workspace. Defaults to 8.
@@ -172,16 +172,17 @@ This file can be reviewed offline and later will be used for table migration.
 databricks labs ucx table-mapping 
 ```
 
-### Synchronising UCX configurations
-Use to upload the current UCX workspace config to all workspaces in the account where UCX is installed. 
-This requires account administrator permissions. UCX will prompt you to select an account profile that has been defined in `~/.databrickscfg`
+### Managing cross-workspace installation
+When installing UCX across multiple workspaces, users needs to keep UCX configurations in sync. The below commands address that.
+
+**Recommended:** An account administrator executes `sync-workspace-info` to upload the current UCX workspace configurations to all workspaces in the account where UCX is installed. 
+UCX will prompt you to select an account profile that has been defined in `~/.databrickscfg`.
 
 ```commandline
 databricks labs ucx sync-workspace-info
 ```
 
-Workspace admins can manually upload the current ucx workspace config to specific target workspaces. 
-*This option should only be used when an account admin is not available to execute `sync-workspace-info`*. 
+**Not recommended:** If an account admin is not available to execute `sync-workspace-info`, workspace admins can manually upload the current ucx workspace config to specific target workspaces.
 UCX will ask to confirm the current workspace name, and the ID & name of the target workspaces
 
 ```commandline
