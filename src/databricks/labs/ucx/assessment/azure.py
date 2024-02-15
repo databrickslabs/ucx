@@ -47,26 +47,17 @@ class AzureServicePrincipalCrawler(CrawlerBase[AzureServicePrincipalInfo], JobsM
             yield AzureServicePrincipalInfo(*row)
 
     def _crawl(self) -> Iterable[AzureServicePrincipalInfo]:
-        service_principals = set[AzureServicePrincipalInfo]()
-        for spn in self._get_relevant_service_principals():
-            service_principals.add(
-                AzureServicePrincipalInfo(
-                    application_id=spn.get("application_id"),
-                    secret_scope=spn.get("secret_scope"),
-                    secret_key=spn.get("secret_key"),
-                    tenant_id=spn.get("tenant_id"),
-                    storage_account=spn.get("storage_account"),
-                )
-            )
-        return list(service_principals)
+        return self._get_relevant_service_principals()
 
-    def _get_relevant_service_principals(self) -> list:
-        relevant_service_principals = []
+    def _get_relevant_service_principals(self) -> list[AzureServicePrincipalInfo]:
+        set_service_principals = set[AzureServicePrincipalInfo]()
 
         # list all relevant service principals in clusters
         for cluster_config in self._ws.clusters.list():
             if cluster_config.cluster_source != ClusterSource.JOB:
-                relevant_service_principals.extend(self._get_azure_spn_from_cluster_config(cluster_config))
+                set_service_principals.update(
+                    self._get_azure_spn_from_cluster_config(cluster_config)
+                )
 
         # list all relevant service principals in pipelines
         for pipeline in self._ws.pipelines.list_pipelines():
@@ -77,58 +68,64 @@ class AzureServicePrincipalCrawler(CrawlerBase[AzureServicePrincipalInfo], JobsM
             if pipeline_config:
                 if not azure_sp_conf_present_check(pipeline_config):
                     continue
-                relevant_service_principals.extend(self._get_azure_spn_from_config(pipeline_config))
+                set_service_principals.update(self._get_azure_spn_from_config(pipeline_config))
 
         # list all relevant service principals in jobs
         all_jobs = list(self._ws.jobs.list(expand_tasks=True))
         all_clusters_by_id = {c.cluster_id: c for c in self._ws.clusters.list()}
         for _job, cluster_config in self._get_cluster_configs_from_all_jobs(all_jobs, all_clusters_by_id):
-            relevant_service_principals.extend(self._get_azure_spn_from_cluster_config(cluster_config))
+            set_service_principals.update(
+                self._get_azure_spn_from_cluster_config(cluster_config)
+            )
 
         # list all relevant service principals in sql spark conf
-        relevant_service_principals.extend(self._list_all_spn_in_sql_warehouses_spark_conf())
-        return relevant_service_principals
+        set_service_principals.update(self._list_all_spn_in_sql_warehouses_spark_conf())
+        return list(set_service_principals)
 
-    def _list_all_spn_in_sql_warehouses_spark_conf(self) -> list:
+    def _list_all_spn_in_sql_warehouses_spark_conf(self) -> set[AzureServicePrincipalInfo]:
         warehouse_config_list = self._ws.warehouses.get_workspace_warehouse_config().data_access_config
         if warehouse_config_list is None or len(warehouse_config_list) == 0:
-            return []
+            return set[AzureServicePrincipalInfo]()
         warehouse_config_dict = {config.key: config.value for config in warehouse_config_list}
         if not azure_sp_conf_present_check(warehouse_config_dict):
-            return []
+            return set[AzureServicePrincipalInfo]()
         return self._get_azure_spn_from_config(warehouse_config_dict)
 
-    def _get_azure_spn_from_cluster_config(self, cluster_config):
+    def _get_azure_spn_from_cluster_config(self, cluster_config) -> set[AzureServicePrincipalInfo]:
         """Detect azure service principals from a Databricks cluster config
         This checks the Spark conf of the cluster config, and any spark conf in the cluster policy
         As well as cluster policy family override
         """
-        azure_spn_list = []
+        set_service_principals = set[AzureServicePrincipalInfo]()
 
         if cluster_config.spark_conf is not None:
             if azure_sp_conf_present_check(cluster_config.spark_conf):
-                azure_spn_list.extend(self._get_azure_spn_from_config(cluster_config.spark_conf))
+                set_service_principals.update(
+                    self._get_azure_spn_from_config(cluster_config.spark_conf)
+                )
 
         if cluster_config.policy_id is None:
-            return azure_spn_list
+            return set_service_principals
 
         policy = self._safe_get_cluster_policy(cluster_config.policy_id)
 
         if policy is None:
-            return azure_spn_list
+            return set_service_principals
 
         if policy.definition is not None:
             if azure_sp_conf_present_check(json.loads(policy.definition)):
-                azure_spn_list.extend(self._get_azure_spn_from_config(json.loads(policy.definition)))
+                set_service_principals.update(
+                    self._get_azure_spn_from_config(json.loads(policy.definition))
+                )
 
         if policy.policy_family_definition_overrides is None:
-            return azure_spn_list
+            return set_service_principals
         if azure_sp_conf_present_check(json.loads(policy.policy_family_definition_overrides)):
-            azure_spn_list.extend(
+            set_service_principals.update(
                 self._get_azure_spn_from_config(json.loads(policy.policy_family_definition_overrides))
             )
 
-        return azure_spn_list
+        return set_service_principals
 
     def _safe_get_cluster_policy(self, policy_id: str) -> Policy | None:
         try:
@@ -137,49 +134,48 @@ class AzureServicePrincipalCrawler(CrawlerBase[AzureServicePrincipalInfo], JobsM
             logger.warning(f"The cluster policy was deleted: {policy_id}")
             return None
 
-    def _get_azure_spn_from_config(self, config: dict) -> list:
+    def _get_azure_spn_from_config(self, config: dict) -> set[AzureServicePrincipalInfo]:
         """Detect azure service principals from a dictionary of spark configs
         This checks for the existence of an application id by matching fs.azure.account.oauth2.client.id
         For each application id identified, retrieve the relevant storage account, and corresponding tenant id
         """
-        spn_list = []
+        set_service_principals = set[AzureServicePrincipalInfo]()
         spn_application_id, secret_scope, secret_key, tenant_id, storage_account = None, "", "", "", ""
         matching_spn_app_id_keys = [key for key in config.keys() if "fs.azure.account.oauth2.client.id" in key]
-        if len(matching_spn_app_id_keys) > 0:
-            for spn_app_id_key in matching_spn_app_id_keys:
-                # retrieve application id of spn
-                spn_application_id, secret_scope, secret_key = self._get_key_from_config(spn_app_id_key, config)
-                if spn_application_id is None:
-                    continue
+        for spn_app_id_key in matching_spn_app_id_keys:
+            # retrieve application id of spn
+            spn_application_id, secret_scope, secret_key = self._get_key_from_config(spn_app_id_key, config)
+            if spn_application_id is None:
+                continue
 
-                # retrieve storage account configured with this spn
-                storage_account_matched = re.search(STORAGE_ACCOUNT_EXTRACT_PATTERN, spn_app_id_key)
-                if storage_account_matched:
-                    storage_account = storage_account_matched.group(1).strip(".")
-                    tenant_key = "fs.azure.account.oauth2.client.endpoint." + storage_account
-                else:
-                    tenant_key = "fs.azure.account.oauth2.client.endpoint"
+            # retrieve storage account configured with this spn
+            storage_account_matched = re.search(STORAGE_ACCOUNT_EXTRACT_PATTERN, spn_app_id_key)
+            if storage_account_matched:
+                storage_account = storage_account_matched.group(1).strip(".")
+                tenant_key = "fs.azure.account.oauth2.client.endpoint." + storage_account
+            else:
+                tenant_key = "fs.azure.account.oauth2.client.endpoint"
 
-                # retrieve tenant id of spn
-                matching_tenant_keys = [key for key in config.keys() if re.search(tenant_key, key)]
-                if len(matching_tenant_keys) == 0 or matching_tenant_keys[0] is None:
-                    tenant_id = ""
-                else:
-                    client_endpoint_list = self._get_key_from_config(matching_tenant_keys[0], config)[0].split("/")
-                    if len(client_endpoint_list) == CLIENT_ENDPOINT_LENGTH:
-                        tenant_id = client_endpoint_list[3]
+            # retrieve tenant id of spn
+            matching_tenant_keys = [key for key in config.keys() if re.search(tenant_key, key)]
+            if len(matching_tenant_keys) == 0 or matching_tenant_keys[0] is None:
+                tenant_id = ""
+            else:
+                client_endpoint_list = self._get_key_from_config(matching_tenant_keys[0], config)[0].split("/")
+                if len(client_endpoint_list) == CLIENT_ENDPOINT_LENGTH:
+                    tenant_id = client_endpoint_list[3]
 
-                # add output to spn list
-                spn_list.append(
-                    {
-                        "application_id": spn_application_id,
-                        "secret_scope": secret_scope,
-                        "secret_key": secret_key,
-                        "tenant_id": tenant_id,
-                        "storage_account": storage_account,
-                    }
+            # add output to the set - this automatically dedupe
+            set_service_principals.add(
+                AzureServicePrincipalInfo(
+                    application_id=spn_application_id,
+                    secret_scope=secret_scope,
+                    secret_key=secret_key,
+                    tenant_id=tenant_id,
+                    storage_account=storage_account,
                 )
-        return spn_list
+            )
+        return set_service_principals
 
     def _get_key_from_config(self, key: str, config: dict) -> tuple[str, str, str]:
         """Get a config based on its key, with some special handling:
@@ -209,5 +205,5 @@ class AzureServicePrincipalCrawler(CrawlerBase[AzureServicePrincipalInfo], JobsM
             assert secret.value is not None
             return base64.b64decode(secret.value).decode("utf-8")
         except NotFound:
-            logger.warning(f'removed on the backend: {secret_scope}"/"{secret_key}')
+            logger.warning(f'removed on the backend: {secret_scope}{secret_key}')
             return None

@@ -231,4 +231,4 @@ def test_azure_spn_info_with_secret_unavailable():
     }
     crawler = AzureServicePrincipalCrawler(ws, MockBackend(), "ucx")._get_azure_spn_from_config(spark_conf)
 
-    assert crawler == []
+    assert crawler == set()
