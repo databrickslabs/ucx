@@ -228,76 +228,46 @@ def alias(
 
 
 @ucx.command
-def save_azure_storage_accounts(w: WorkspaceClient, subscription_id: str):
-    """identifies all azure storage account used by external tables
-    identifies all spn which has storage blob reader, blob contributor, blob owner access
-    saves the data in ucx database."""
-    if not w.config.is_azure:
-        logger.error("Workspace is not on azure, please run this command on azure databricks workspaces.")
-        return
-    if w.config.auth_type != "azure_cli":
-        logger.error("In order to obtain AAD token, Please run azure cli to authenticate.")
-        return
-    if subscription_id == "":
-        logger.error("Please enter subscription id to scan storage account in.")
-        return
-    azure_resource_permissions = AzureResourcePermissions.for_cli(w)
-    logger.info("Generating azure storage accounts and service principal permission info")
-    azure_resource_permissions.save_spn_permissions()
-
-
-@ucx.command
-def save_aws_iam_profiles(w: WorkspaceClient, aws_profile: str | None = None):
-    """identifies all Instance Profiles and map their access to S3 buckets.
-    Requires a working setup of AWS CLI.
-    https://aws.amazon.com/cli/
-    The command saves a CSV to the UCX installation folder with the mapping.
-
-    The user has to be authenticated with AWS and the have the permissions to browse the resources and iam services.
-    More information can be found here:
-    https://docs.aws.amazon.com/IAM/latest/UserGuide/access_permissions-required.html
-    """
-    if not shutil.which("aws"):
-        logger.error("Couldn't find AWS CLI in path.Please obtain and install the CLI from https://aws.amazon.com/cli/")
-        return None
-    if not aws_profile:
-        aws_profile = os.getenv("AWS_DEFAULT_PROFILE")
-    if not aws_profile:
-        logger.error(
-            "AWS Profile is not specified. Use the environment variable [AWS_DEFAULT_PROFILE] "
-            "or use the '--aws-profile=[profile-name]' parameter."
-        )
-        return None
-    aws_permissions = AWSResourcePermissions.for_cli(w, aws_profile)
-    aws_permissions.save_instance_profile_permissions()
-    return None
-
-
-@ucx.command
-def save_uc_compatible_roles(w: WorkspaceClient, *, aws_profile: str | None = None):
-    """extracts all the iam roles with trust relationships to the UC master role.
-     Map these roles to the S3 buckets they have access to.
-    Requires a working setup of AWS CLI.
-    https://aws.amazon.com/cli/
-    The command saves a CSV to the UCX installation folder with the mapping.
-
-    The user has to be authenticated with AWS and the have the permissions to browse the resources and iam services.
-    More information can be found here:
-    https://docs.aws.amazon.com/IAM/latest/UserGuide/access_permissions-required.html
-    """
-    if not shutil.which("aws"):
-        logger.error("Couldn't find AWS CLI in path.Please obtain and install the CLI from https://aws.amazon.com/cli/")
-        return None
-    if not aws_profile:
-        aws_profile = os.getenv("AWS_DEFAULT_PROFILE")
-    if not aws_profile:
-        logger.error(
-            "AWS Profile is not specified. Use the environment variable [AWS_DEFAULT_PROFILE] "
-            "or use the '--aws-profile=[profile-name]' parameter."
-        )
-        return None
-    aws_permissions = AWSResourcePermissions.for_cli(w, aws_profile)
-    aws_permissions.save_uc_compatible_roles()
+def principal_prefix_access(w: WorkspaceClient, subscription_id: str | None = None, aws_profile: str | None = None):
+    """For azure cloud, identifies all storage account used by tables in the workspace, identify spn and its
+    permission on each storage accounts. For aws, identifies all the Instance Profiles configured in the workspace and
+    its access to all the S3 buckets, along with AWS roles that are set with UC access and its access to S3 buckets.
+    The output is stored in the workspace install folder.
+    Pass suscription_id for azure and aws_profile for aws."""
+    print("testing")
+    if w.config.is_azure:
+        if w.config.auth_type != "azure-cli":
+            logger.error("In order to obtain AAD token, Please run azure cli to authenticate.")
+            return None
+        if subscription_id == "":
+            logger.error("Please enter subscription id to scan storage account in.")
+            return None
+        azure_resource_permissions = AzureResourcePermissions.for_cli(w)
+        logger.info("Generating azure storage accounts and service principal permission info")
+        path = azure_resource_permissions.save_spn_permissions()
+        if path:
+            logger.info(f"storage and spn info saved under {path}")
+    elif w.config.is_aws:
+        if not shutil.which("aws"):
+            logger.error("Couldn't find AWS CLI in path. Please install the CLI from https://aws.amazon.com/cli/")
+            return None
+        if not aws_profile:
+            aws_profile = os.getenv("AWS_DEFAULT_PROFILE")
+        if not aws_profile:
+            logger.error(
+                "AWS Profile is not specified. Use the environment variable [AWS_DEFAULT_PROFILE] "
+                "or use the '--aws-profile=[profile-name]' parameter."
+            )
+            return None
+        logger.info("Generating instance profile and bucket permission info")
+        aws_permissions = AWSResourcePermissions.for_cli(w, aws_profile)
+        instance_role_path = aws_permissions.save_instance_profile_permissions()
+        logger.info(f"Instance profile and bucket info saved {instance_role_path}")
+        logger.info("Generating UC roles and bucket permission info")
+        uc_role_path = aws_permissions.save_uc_compatible_roles()
+        logger.info(f"UC roles and bucket info saved {uc_role_path}")
+    else:
+        logger.error("This cmd is only supported for azure and aws workspaces")
     return None
 
 

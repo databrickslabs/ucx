@@ -97,11 +97,16 @@ commands:
       - name: to-schema
         description: target schema to migrate tables to
 
-  - name: save-azure-storage-accounts
-    description: Identifies all storage account used by tables, identify spn and its permission on each storage accounts
+  - name: principal-prefix-access
+    description: For azure cloud, identifies all storage account used by tables in the workspace, identify spn and its 
+      permission on each storage accounts. For aws, identifies all the Instance Profiles configured in the workspace and 
+      its access to all the S3 buckets, along with AWS roles that are set with UC access and its access to S3 buckets. 
+      The output is stored in the workspace install folder.
     flags:
       - name: subscription-id
         description: Subscription to scan storage account in
+      - name: aws-profile
+        description: AWS Profile to use for authentication
 
   - name: validate-groups-membership
     description: Validate the groups to see if the groups at account level and workspace level have different membership
@@ -109,19 +114,3 @@ commands:
       Workspace Group Name\tMembers Count\tAccount Group Name\tMembers Count
       {{range .}}{{.wf_group_name}}\t{{.wf_group_members_count}}\t{{.acc_group_name}}\t{{.acc_group_members_count}}
       {{end}}
-
-  - name: save-aws-iam-profiles
-    description: | 
-      Identifies all Instance Profiles and map their access to S3 buckets.
-      Requires a working setup of AWS CLI.
-    flags:
-      - name: aws-profile
-        description: AWS Profile to use for authentication
-
-  - name: save-uc-compatible-roles
-    description: | 
-      Scan all the AWS roles that are set for UC access and produce a mapping to the S3 resources.
-      Requires a working setup of AWS CLI.
-    flags:
-      - name: aws-profile
-        description: AWS Profile to use for authentication
