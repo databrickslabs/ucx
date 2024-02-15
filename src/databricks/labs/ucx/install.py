@@ -266,6 +266,7 @@ class WorkspaceInstaller:
             is_terraform_used=is_terraform_used,
             include_databases=self._select_databases(),
         )
+        self._installation = Installation(self._ws, PRODUCT_INFO.product_name(), install_folder=self._install_location)
         self._installation.save(config)
         ws_file_url = self._installation.workspace_link(config.__file__)
         if self._prompts.confirm(f"Open config file in the browser and continue installing? {ws_file_url}"):
