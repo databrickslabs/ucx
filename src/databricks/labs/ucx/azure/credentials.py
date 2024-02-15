@@ -84,17 +84,17 @@ class StorageCredentialManager:
         logger.info(f"Found {len(application_ids)} distinct service principals already used in UC storage credentials")
         return application_ids
 
-    def create_storage_credential(self, sp_migration: ServicePrincipalMigrationInfo) -> StorageCredentialInfo:
+    def create_storage_credential(self, sp: ServicePrincipalMigrationInfo) -> StorageCredentialInfo:
         # prepare the storage credential properties
-        name = sp_migration.permission_mapping.principal
+        name = sp.permission_mapping.principal
         service_principal = AzureServicePrincipal(
-            directory_id=sp_migration.permission_mapping.directory_id,
-            application_id=sp_migration.permission_mapping.client_id,
-            client_secret=sp_migration.client_secret,
+            directory_id=sp.permission_mapping.directory_id,
+            application_id=sp.permission_mapping.client_id,
+            client_secret=sp.client_secret,
         )
-        comment = f"Created by UCX during migration to UC using Azure Service Principal: {sp_migration.permission_mapping.principal}"
+        comment = f"Created by UCX during migration to UC using Azure Service Principal: {sp.permission_mapping.principal}"
         read_only = False
-        if sp_migration.permission_mapping.privilege == Privilege.READ_FILES.value:
+        if sp.permission_mapping.privilege == Privilege.READ_FILES.value:
             read_only = True
         # create the storage credential
         return self._ws.storage_credentials.create(
