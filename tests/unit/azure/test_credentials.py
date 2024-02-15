@@ -24,7 +24,7 @@ from databricks.labs.ucx.assessment.azure import (
     AzureServicePrincipalInfo,
 )
 from databricks.labs.ucx.azure.access import StoragePermissionMapping
-from databricks.labs.ucx.azure.azure_credentials import (
+from databricks.labs.ucx.azure.credentials import (
     ServicePrincipalMigration,
     ServicePrincipalMigrationInfo,
 )

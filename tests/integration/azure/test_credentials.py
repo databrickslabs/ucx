@@ -1,4 +1,5 @@
 import base64
+import logging
 import re
 from unittest.mock import MagicMock, patch
 
@@ -8,10 +9,8 @@ from databricks.labs.blueprint.tui import MockPrompts
 from databricks.labs.ucx.assessment.azure import AzureServicePrincipalInfo
 from databricks.labs.ucx.assessment.crawlers import _SECRET_PATTERN
 from databricks.labs.ucx.azure.access import StoragePermissionMapping
-from databricks.labs.ucx.azure.azure_credentials import ServicePrincipalMigration
-
-
-
+from databricks.labs.ucx.azure.credentials import ServicePrincipalMigration
+from tests.integration.conftest import StaticStorageCredentialManager
 
 
 @pytest.fixture
@@ -78,13 +77,13 @@ def prepare_spn_migration_test(ws, debug_env, make_random):
 
 @pytest.fixture
 def execute_migration(ws):
-    def inner(variables: dict, integration_test_flag: str) -> ServicePrincipalMigration:
+    def inner(variables: dict, credentials: list[str]) -> ServicePrincipalMigration:
         spn_migration = ServicePrincipalMigration(
             variables["installation"],
             ws,
             variables["azure_resource_permissions"],
             variables["azure_sp_crawler"],
-            integration_test_flag=integration_test_flag,
+            StaticStorageCredentialManager(ws, credentials)
         )
         spn_migration.run(
             MockPrompts({"Above Azure Service Principals will be migrated to UC storage credentials *": "Yes"})
@@ -95,8 +94,9 @@ def execute_migration(ws):
 
 
 def test_spn_migration_existed_storage_credential(
-    execute_migration, make_storage_credential_from_spn, prepare_spn_migration_test
+        caplog, execute_migration, make_storage_credential_from_spn, prepare_spn_migration_test
 ):
+    caplog.set_level(logging.INFO)
     variables = prepare_spn_migration_test(read_only=False)
 
     # create a storage credential for this test
@@ -107,11 +107,19 @@ def test_spn_migration_existed_storage_credential(
         directory_id=variables["directory_id"],
     )
 
-    with patch("databricks.labs.ucx.azure.azure_credentials.ServicePrincipalMigration._create_storage_credential") as create_storage_credential:
-        # test that the spn migration will be skipped due to above storage credential is existed
-        execute_migration(variables, integration_test_flag=variables["storage_credential_name"])
-        # because storage_credential is existing, no spn should be migrated
-        create_storage_credential.assert_not_called()
+    # test that the spn migration will be skipped due to above storage credential is existed
+    execute_migration(variables, [variables["storage_credential_name"]])
+
+    # assert no action plan is logged since no spn migrated
+    patterns = [
+        "Service Principal name:",
+        "application_id:",
+        "privilege",
+        "on location"
+    ]
+    for record in caplog.records:
+        if all(pattern in record.message for pattern in patterns):
+            assert False, "Migration action plan should not be logged when no service principal will be migrated"
 
 
 @pytest.mark.parametrize("read_only", [False, True])
@@ -119,7 +127,7 @@ def test_spn_migration(ws, execute_migration, prepare_spn_migration_test, read_o
     variables = prepare_spn_migration_test(read_only)
 
     try:
-        spn_migration = execute_migration(variables, integration_test_flag="lets_migrate_the_spn")
+        spn_migration = execute_migration(variables, ["lets_migrate_the_spn"])
 
         storage_credential = ws.storage_credentials.get(variables["storage_credential_name"])
         assert storage_credential is not None

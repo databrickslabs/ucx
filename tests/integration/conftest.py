@@ -10,6 +10,7 @@ from databricks.sdk.service.catalog import FunctionInfo, TableInfo
 
 from databricks.labs.ucx.__about__ import __version__
 from databricks.labs.ucx.account import WorkspaceInfo
+from databricks.labs.ucx.azure.credentials import StorageCredentialManager
 from databricks.labs.ucx.framework.crawlers import SqlBackend
 from databricks.labs.ucx.hive_metastore import TablesCrawler
 from databricks.labs.ucx.hive_metastore.mapping import Rule, TableMapping
@@ -154,3 +155,27 @@ class StaticTableMapping(TableMapping):
 
     def save(self, tables: TablesCrawler, workspace_info: WorkspaceInfo) -> str:
         raise RuntimeWarning("not available")
+
+
+class StaticStorageCredentialManager(StorageCredentialManager):
+    # During integration test, we only want to list storage_credentials that are created during the test.
+    # So we provide a credential name list so the test can ignore credentials that are not in the list.
+    def __init__(self, ws: WorkspaceClient, credential_names=[]):
+        super().__init__(ws)
+        self._credential_names = credential_names
+
+    def list_storage_credentials(self) -> set[str]:
+        application_ids = set()
+
+        storage_credentials = self._ws.storage_credentials.list(max_results=0)
+
+        for storage_credential in storage_credentials:
+            if not storage_credential.azure_service_principal:
+                continue
+            if storage_credential.name in self._credential_names:
+                application_ids.add(storage_credential.azure_service_principal.application_id)
+
+        logger.info(
+            f"Found {len(application_ids)} distinct service principals already used in storage credentials during integration test"
+        )
+        return application_ids

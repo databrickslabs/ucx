@@ -68,6 +68,75 @@ class StorageCredentialValidationResult:
         )
 
 
+class StorageCredentialManager:
+    def __init__(self, ws: WorkspaceClient):
+        self._ws = ws
+
+    def list_storage_credentials(self) -> set[str]:
+        # list existed storage credentials that is using service principal, capture the service principal's application_id
+        application_ids = set()
+
+        storage_credentials = self._ws.storage_credentials.list(max_results=0)
+
+        for storage_credential in storage_credentials:
+            # only add service principal's application_id, ignore managed identity based storage_credential
+            if storage_credential.azure_service_principal:
+                application_ids.add(storage_credential.azure_service_principal.application_id)
+
+        logger.info(
+            f"Found {len(application_ids)} distinct service principals already used in UC storage credentials"
+        )
+        return application_ids
+
+
+    def create_storage_credential(self, sp_migration: ServicePrincipalMigrationInfo) -> StorageCredentialInfo:
+        # prepare the storage credential properties
+        name = sp_migration.permission_mapping.principal
+        azure_service_principal = AzureServicePrincipal(
+            directory_id=sp_migration.permission_mapping.directory_id,
+            application_id=sp_migration.permission_mapping.client_id,
+            client_secret=sp_migration.client_secret,
+        )
+        comment = f"Created by UCX during migration to UC using Azure Service Principal: {sp_migration.permission_mapping.principal}"
+        read_only = False
+        if sp_migration.permission_mapping.privilege == Privilege.READ_FILES.value:
+            read_only = True
+        # create the storage credential
+        return self._ws.storage_credentials.create(
+            name, azure_service_principal=azure_service_principal, comment=comment, read_only=read_only
+        )
+
+
+    def validate_storage_credential(
+            self, storage_credential, sp_migration: ServicePrincipalMigrationInfo
+    ) -> StorageCredentialValidationResult:
+        read_only = False
+        if sp_migration.permission_mapping.privilege == Privilege.READ_FILES.value:
+            read_only = True
+        # storage_credential validation creates a temp UC external location, which cannot overlap with
+        # existing UC external locations. So add a sub folder to the validation location just in case
+        try:
+            validation = self._ws.storage_credentials.validate(
+                storage_credential_name=storage_credential.name, url=sp_migration.permission_mapping.prefix, read_only=read_only
+            )
+            return StorageCredentialValidationResult.from_storage_credential_validation(storage_credential, validation)
+        except InvalidParameterValue:
+            logger.warning(
+                "There is an existing external location overlaps with the prefix that is mapped to the service principal and used for validating the migrated storage credential. Skip the validation"
+            )
+            return StorageCredentialValidationResult.from_storage_credential_validation(
+                storage_credential,
+                ValidateStorageCredentialResponse(
+                    is_dir=None,
+                    results=[
+                        ValidationResult(
+                            message="The validation is skipped because an existing external location overlaps with the location used for validation."
+                        )
+                    ],
+                ),
+            )
+
+
 class ServicePrincipalMigration:
 
     def __init__(
@@ -76,14 +145,14 @@ class ServicePrincipalMigration:
         ws: WorkspaceClient,
         azure_resource_permissions: AzureResourcePermissions,
         azure_sp_crawler: AzureServicePrincipalCrawler,
-        integration_test_flag="",
+        storage_credential_manager: StorageCredentialManager
     ):
         self._output_file = "azure_service_principal_migration_result.csv"
         self._installation = installation
         self._ws = ws
         self._azure_resource_permissions = azure_resource_permissions
         self._azure_sp_crawler = azure_sp_crawler
-        self._integration_test_flag = integration_test_flag
+        self._storage_credential_manager = storage_credential_manager
 
     @classmethod
     def for_cli(cls, ws: WorkspaceClient, prompts: Prompts, product='ucx'):
@@ -107,33 +176,10 @@ class ServicePrincipalMigration:
         azure_resource_permissions = AzureResourcePermissions(installation, ws, azurerm, locations)
         azure_sp_crawler = AzureServicePrincipalCrawler(ws, sql_backend, config.inventory_database)
 
-        return cls(installation, ws, azure_resource_permissions, azure_sp_crawler)
+        storage_credential_manager = StorageCredentialManager(ws)
 
-    def _list_storage_credentials(self) -> set[str]:
-        # list existed storage credentials that is using service principal, capture the service principal's application_id
-        storage_credential_app_ids = set()
+        return cls(installation, ws, azure_resource_permissions, azure_sp_crawler, storage_credential_manager)
 
-        storage_credentials = self._ws.storage_credentials.list(max_results=0)
-
-        # if we are doing integration test
-        if self._integration_test_flag:
-            for storage_credential in storage_credentials:
-                if not storage_credential.azure_service_principal:
-                    continue
-                if self._integration_test_flag == storage_credential.name:
-                    # return the storage credential created during integration test
-                    return {storage_credential.azure_service_principal.application_id}
-            # return no storage credential if there is none created during integration test
-            return {}
-
-        for storage_credential in storage_credentials:
-            # only add service principal's application_id, ignore managed identity based storage_credential
-            if storage_credential.azure_service_principal:
-                storage_credential_app_ids.add(storage_credential.azure_service_principal.application_id)
-        logger.info(
-            f"Found {len(storage_credential_app_ids)} distinct service principals already used in UC storage credentials"
-        )
-        return storage_credential_app_ids
 
     def _read_databricks_secret(self, scope: str, key: str, application_id: str) -> str | None:
         try:
@@ -216,7 +262,7 @@ class ServicePrincipalMigration:
         # load sp list from azure_storage_account_info.csv
         sp_list = self._azure_resource_permissions.load()
         # list existed storage credentials
-        sc_set = self._list_storage_credentials()
+        sc_set = self._storage_credential_manager.list_storage_credentials()
         # check if the sp is already used in UC storage credential
         filtered_sp_list = [sp for sp in sp_list if sp.client_id not in sc_set]
         # fetch sp client_secret if any
@@ -225,53 +271,6 @@ class ServicePrincipalMigration:
         self._print_action_plan(sp_list_with_secret)
         return sp_list_with_secret
 
-    def _create_storage_credential(self, sp_migration: ServicePrincipalMigrationInfo):
-        # prepare the storage credential properties
-        name = sp_migration.permission_mapping.principal
-        azure_service_principal = AzureServicePrincipal(
-            directory_id=sp_migration.permission_mapping.directory_id,
-            application_id=sp_migration.permission_mapping.client_id,
-            client_secret=sp_migration.client_secret,
-        )
-        comment = f"Created by UCX during migration to UC using Azure Service Principal: {sp_migration.permission_mapping.principal}"
-        read_only = False
-        if sp_migration.permission_mapping.privilege == Privilege.READ_FILES.value:
-            read_only = True
-        # create the storage credential
-        storage_credential = self._ws.storage_credentials.create(
-            name=name, azure_service_principal=azure_service_principal, comment=comment, read_only=read_only
-        )
-
-        validation_result = self._validate_storage_credential(
-            storage_credential, sp_migration.permission_mapping.prefix, read_only
-        )
-        return validation_result
-
-    def _validate_storage_credential(
-        self, storage_credential, location: str, read_only: bool
-    ) -> StorageCredentialValidationResult:
-        # storage_credential validation creates a temp UC external location, which cannot overlap with
-        # existing UC external locations. So add a sub folder to the validation location just in case
-        try:
-            validation = self._ws.storage_credentials.validate(
-                storage_credential_name=storage_credential.name, url=location, read_only=read_only
-            )
-            return StorageCredentialValidationResult.from_storage_credential_validation(storage_credential, validation)
-        except InvalidParameterValue:
-            logger.warning(
-                "There is an existing external location overlaps with the prefix that is mapped to the service principal and used for validating the migrated storage credential. Skip the validation"
-            )
-            return StorageCredentialValidationResult.from_storage_credential_validation(
-                storage_credential,
-                ValidateStorageCredentialResponse(
-                    is_dir=None,
-                    results=[
-                        ValidationResult(
-                            message="The validation is skipped because an existing external location overlaps with the location used for validation."
-                        )
-                    ],
-                ),
-            )
 
     def run(self, prompts: Prompts):
 
@@ -285,7 +284,8 @@ class ServicePrincipalMigration:
 
         execution_result = []
         for sp in sp_list_with_secret:
-            execution_result.append(self._create_storage_credential(sp))
+            storage_credential = self._storage_credential_manager.create_storage_credential(sp)
+            execution_result.append(self._storage_credential_manager.validate_storage_credential(storage_credential, sp))
 
         results_file = self._installation.save(execution_result, filename=self._output_file)
         logger.info("Completed migration from Azure Service Principal migrated to UC Storage credentials")
