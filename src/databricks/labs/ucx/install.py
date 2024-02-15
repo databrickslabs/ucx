@@ -12,7 +12,7 @@ from pathlib import Path
 from typing import Any
 
 from databricks.labs.blueprint.entrypoint import get_logger
-from databricks.labs.blueprint.installation import Installation
+from databricks.labs.blueprint.installation import Installation, NotInstalled
 from databricks.labs.blueprint.installer import InstallState
 from databricks.labs.blueprint.parallel import ManyError, Threads
 from databricks.labs.blueprint.tui import Prompts
@@ -187,6 +187,7 @@ class WorkspaceInstaller:
         wheel_builder_factory: Callable[[], WheelsV2] | None = None,
     ):
         logger.info(f"Installing UCX v{PRODUCT_INFO.version()}")
+        self._get_existing_database_names()
         config = self.configure()
         if not sql_backend_factory:
             sql_backend_factory = self._new_sql_backend
@@ -266,7 +267,6 @@ class WorkspaceInstaller:
             is_terraform_used=is_terraform_used,
             include_databases=self._select_databases(),
         )
-        self._installation = Installation(self._ws, PRODUCT_INFO.product_name(), install_folder=self._install_location)
         self._installation.save(config)
         ws_file_url = self._installation.workspace_link(config.__file__)
         if self._prompts.confirm(f"Open config file in the browser and continue installing? {ws_file_url}"):
