@@ -7,7 +7,7 @@ from databricks.labs.blueprint.tui import MockPrompts
 from databricks.sdk import AccountClient, WorkspaceClient
 from databricks.sdk.config import Config
 from databricks.sdk.service import iam
-from databricks.sdk.service.iam import ComplexValue, Group, User
+from databricks.sdk.service.iam import ComplexValue, Group, ResourceMeta, User
 from databricks.sdk.service.provisioning import Workspace
 
 from databricks.labs.ucx.account import AccountWorkspaces, WorkspaceInfo
@@ -72,7 +72,7 @@ def test_manual_workspace_info(mocker):
     ws.workspace.upload.assert_called()
 
 
-def test_create_acc_groups_should_create_acc_group_if_no_group_found_in_account(mocker):
+def test_create_acc_groups_should_create_acc_group_if_no_group_found_in_account():
     acc_client = create_autospec(AccountClient)
     acc_client.config = Config(host="https://accounts.cloud.databricks.com", account_id="123", token="123")
 
@@ -115,7 +115,63 @@ def test_create_acc_groups_should_create_acc_group_if_no_group_found_in_account(
     )
 
 
-def test_create_acc_groups_should_create_acc_group_with_appropriate_members(mocker):
+def test_create_acc_groups_should_filter_system_groups():
+    acc_client = create_autospec(AccountClient)
+    acc_client.config = Config(host="https://accounts.cloud.databricks.com", account_id="123", token="123")
+
+    acc_client.workspaces.list.return_value = [
+        Workspace(workspace_name="foo", workspace_id=123, workspace_status_message="Running", deployment_name="abc")
+    ]
+
+    ws = create_autospec(WorkspaceClient)
+
+    def workspace_client(**kwargs) -> WorkspaceClient:
+        return ws
+
+    group = Group(
+        id="12",
+        display_name="admins",
+        members=[],
+    )
+
+    ws.groups.list.return_value = [group]
+    ws.groups.get.return_value = group
+    acc_client.get_workspace_client.return_value = ws
+    acc_client.groups.create.return_value = group
+
+    account_workspaces = AccountWorkspaces(acc_client, workspace_client)
+    account_workspaces.create_account_level_groups(MockPrompts({}))
+
+    acc_client.groups.create.assert_not_called()
+
+
+def test_create_acc_groups_should_filter_account_groups_in_workspace():
+    acc_client = create_autospec(AccountClient)
+    acc_client.config = Config(host="https://accounts.cloud.databricks.com", account_id="123", token="123")
+
+    acc_client.workspaces.list.return_value = [
+        Workspace(workspace_name="foo", workspace_id=123, workspace_status_message="Running", deployment_name="abc")
+    ]
+
+    ws = create_autospec(WorkspaceClient)
+
+    def workspace_client(**kwargs) -> WorkspaceClient:
+        return ws
+
+    group = Group(id="12", display_name="test_account", meta=ResourceMeta("Account"))
+
+    ws.groups.list.return_value = [group]
+    ws.groups.get.return_value = group
+    acc_client.get_workspace_client.return_value = ws
+    acc_client.groups.create.return_value = group
+
+    account_workspaces = AccountWorkspaces(acc_client, workspace_client)
+    account_workspaces.create_account_level_groups(MockPrompts({}))
+
+    acc_client.groups.create.assert_not_called()
+
+
+def test_create_acc_groups_should_create_acc_group_with_appropriate_members():
     acc_client = create_autospec(AccountClient)
     acc_client.config = Config(host="https://accounts.cloud.databricks.com", account_id="123", token="123")
 
@@ -223,7 +279,7 @@ def test_create_acc_groups_should_create_acc_group_with_appropriate_members(mock
     )
 
 
-def test_create_acc_groups_should_not_create_group_if_exists_in_account(mocker):
+def test_create_acc_groups_should_not_create_group_if_exists_in_account():
     acc_client = create_autospec(AccountClient)
     acc_client.config = Config(host="https://accounts.cloud.databricks.com", account_id="123", token="123")
 
@@ -252,7 +308,7 @@ def test_create_acc_groups_should_not_create_group_if_exists_in_account(mocker):
     acc_client.groups.create.assert_not_called()
 
 
-def test_create_acc_groups_should_create_groups_accross_workspaces(mocker):
+def test_create_acc_groups_should_create_groups_accross_workspaces():
     acc_client = create_autospec(AccountClient)
     acc_client.config = Config(host="https://accounts.cloud.databricks.com", account_id="123", token="123")
 
@@ -294,7 +350,7 @@ def test_create_acc_groups_should_create_groups_accross_workspaces(mocker):
     acc_client.groups.create.assert_any_call(display_name="security_grp")
 
 
-def test_create_acc_groups_should_filter_groups_accross_workspaces(mocker):
+def test_create_acc_groups_should_filter_groups_accross_workspaces():
     acc_client = create_autospec(AccountClient)
     acc_client.config = Config(host="https://accounts.cloud.databricks.com", account_id="123", token="123")
 
@@ -349,7 +405,7 @@ def test_create_acc_groups_should_filter_groups_accross_workspaces(mocker):
     )
 
 
-def test_create_acc_groups_should_create_acc_group_if_exist_in_other_workspaces_but_not_same_members(mocker):
+def test_create_acc_groups_should_create_acc_group_if_exist_in_other_workspaces_but_not_same_members():
     acc_client = create_autospec(AccountClient)
     acc_client.config = Config(host="https://accounts.cloud.databricks.com", account_id="123", token="123")
 
