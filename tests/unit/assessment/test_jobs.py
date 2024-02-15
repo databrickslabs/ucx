@@ -18,6 +18,7 @@ from databricks.labs.ucx.assessment.azure import AzureServicePrincipalCrawler
 from databricks.labs.ucx.assessment.jobs import JobInfo, JobsCrawler
 
 from ..framework.mocks import MockBackend
+from . import workspace_client_mock
 
 
 def test_job_assessment():
@@ -323,11 +324,10 @@ def test_jobs_assessment_with_spn_cluster_no_job_tasks(mocker):
         )
     ]
 
-    ws = mocker.Mock()
-    ws.clusters.list.return_value = []
+    ws = workspace_client_mock()
     ws.jobs.list.return_value = sample_jobs
 
-    jobs = AzureServicePrincipalCrawler(ws, MockBackend(), "ucx")._list_all_jobs_with_spn_in_spark_conf()
+    jobs = AzureServicePrincipalCrawler(ws, MockBackend(), "ucx").snapshot()
     assert len(jobs) == 0
 
 
@@ -341,11 +341,10 @@ def test_jobs_assessment_with_spn_cluster_no_job_settings(mocker):
         )
     ]
 
-    ws = mocker.Mock()
-    ws.clusters.list.return_value = []
+    ws = workspace_client_mock()
     ws.jobs.list.return_value = sample_jobs
 
-    jobs = AzureServicePrincipalCrawler(ws, MockBackend(), "ucx")._list_all_jobs_with_spn_in_spark_conf()
+    jobs = AzureServicePrincipalCrawler(ws, MockBackend(), "ucx").snapshot()
     assert len(jobs) == 0
 
 
@@ -384,9 +383,11 @@ def test_jobs_assessment_with_spn_cluster_policy_not_found(mocker):
     ]
     ws = mocker.Mock()
     ws.clusters.list.return_value = []
+    ws.pipelines.list_pipelines.return_value = []
     ws.jobs.list.return_value = sample_jobs
+    ws.warehouses.get_workspace_warehouse_config.return_value.data_access_config = None
     ws.cluster_policies.get.side_effect = NotFound("NO_POLICY")
-    crawler = AzureServicePrincipalCrawler(ws, MockBackend(), "ucx")._list_all_jobs_with_spn_in_spark_conf()
+    crawler = AzureServicePrincipalCrawler(ws, MockBackend(), "ucx").snapshot()
     assert len(crawler) == 1
 
 
@@ -426,11 +427,12 @@ def test_jobs_assessment_with_spn_cluster_policy_exception(mocker):
 
     ws = mocker.Mock()
     ws.clusters.list.return_value = []
+    ws.pipelines.list_pipelines.return_value = []
     ws.jobs.list.return_value = sample_jobs
     ws.cluster_policies.get.side_effect = InternalError(...)
 
     with pytest.raises(DatabricksError):
-        AzureServicePrincipalCrawler(ws, MockBackend(), "ucx")._list_all_jobs_with_spn_in_spark_conf()
+        AzureServicePrincipalCrawler(ws, MockBackend(), "ucx").snapshot()
 
 
 def test_job_cluster_init_script():

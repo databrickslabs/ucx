@@ -92,7 +92,7 @@ These are Global Init Scripts that are incompatible with Unity Catalog compute. 
 # Assessment Finding Index
 This section will help explain UCX Assessment findings and provide a recommended action.
 The assessment finding index is grouped by:
-- The 100 serieds findings are Databricks Runtime and compute configuration findings
+- The 100 series findings are Databricks Runtime and compute configuration findings.
 - The 200 series findings are centered around data related observations.
 
 ### AF101 - not supported DBR: ##.#.x-scala2.12

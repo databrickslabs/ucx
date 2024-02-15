@@ -9,31 +9,31 @@ INCOMPATIBLE_SPARK_CONFIG_KEYS = [
     "spark.databricks.hive.metastore.glueCatalog.enabled",
 ]
 
-_AZURE_SP_CONF = [
+AZURE_SP_CONF = [
     "fs.azure.account.auth.type",
     "fs.azure.account.oauth.provider.type",
     "fs.azure.account.oauth2.client.id",
     "fs.azure.account.oauth2.client.secret",
     "fs.azure.account.oauth2.client.endpoint",
 ]
-_SECRET_PATTERN = r"{{(secrets.*?)}}"
-_STORAGE_ACCOUNT_EXTRACT_PATTERN = r"(?:id|endpoint)(.*?)dfs"
-_AZURE_SP_CONF_FAILURE_MSG = "Uses azure service principal credentials config in"
-_SECRET_LIST_LENGTH = 3
-_CLIENT_ENDPOINT_LENGTH = 6
-_INIT_SCRIPT_DBFS_PATH = 2
+SECRET_PATTERN = r"{{(secrets.*?)}}"
+STORAGE_ACCOUNT_EXTRACT_PATTERN = r"(?:id|endpoint)(.*?)dfs"
+AZURE_SP_CONF_FAILURE_MSG = "Uses azure service principal credentials config in"
+SECRET_LIST_LENGTH = 3
+CLIENT_ENDPOINT_LENGTH = 6
+INIT_SCRIPT_DBFS_PATH = 2
 
 
-def _azure_sp_conf_in_init_scripts(init_script_data: str) -> bool:
-    for conf in _AZURE_SP_CONF:
+def azure_sp_conf_in_init_scripts(init_script_data: str) -> bool:
+    for conf in AZURE_SP_CONF:
         if re.search(conf, init_script_data):
             return True
     return False
 
 
-def _azure_sp_conf_present_check(config: dict) -> bool:
+def azure_sp_conf_present_check(config: dict) -> bool:
     for key in config.keys():
-        for conf in _AZURE_SP_CONF:
+        for conf in AZURE_SP_CONF:
             if re.search(conf, key):
                 return True
     return False
