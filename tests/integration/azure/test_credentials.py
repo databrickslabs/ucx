@@ -1,5 +1,4 @@
 import base64
-import logging
 import re
 from dataclasses import dataclass
 
@@ -10,13 +9,15 @@ from databricks.labs.blueprint.tui import MockPrompts
 from databricks.labs.ucx.assessment.azure import AzureServicePrincipalInfo
 from databricks.labs.ucx.assessment.crawlers import _SECRET_PATTERN
 from databricks.labs.ucx.azure.access import StoragePermissionMapping
-from databricks.labs.ucx.azure.credentials import ServicePrincipalMigration, \
-    StorageCredentialValidationResult
+from databricks.labs.ucx.azure.credentials import StorageCredentialValidationResult
 from databricks.labs.ucx.azure.resources import AzureResources
 from databricks.labs.ucx.hive_metastore import ExternalLocations
-from tests.integration.conftest import StaticStorageCredentialManager, \
-    StaticAzureResourcePermissions, StaticAzureServicePrincipalCrawler, \
-    StaticServicePrincipalMigration
+from tests.integration.conftest import (
+    StaticAzureResourcePermissions,
+    StaticAzureServicePrincipalCrawler,
+    StaticServicePrincipalMigration,
+    StaticStorageCredentialManager,
+)
 
 
 @dataclass
@@ -57,38 +58,47 @@ def extract_test_info(ws, debug_env, make_random):
 
 
 @pytest.fixture
-def run_migration(ws, sql_backend) -> ServicePrincipalMigration:
-    def inner(test_info: MigrationTestInfo, credentials: list[str], read_only=False) -> list[StorageCredentialValidationResult]:
+def run_migration(ws, sql_backend):
+    def inner(
+        test_info: MigrationTestInfo, credentials: list[str], read_only=False
+    ) -> list[StorageCredentialValidationResult]:
         installation = Installation(ws, 'ucx')
         azurerm = AzureResources(ws)
         locations = ExternalLocations(ws, sql_backend, "dont_need_a_schema")
 
-        azure_resource_permissions = StaticAzureResourcePermissions(installation, ws, azurerm, locations, [
-            StoragePermissionMapping(
-                prefix="abfss://things@labsazurethings.dfs.core.windows.net/avoid_ext_loc_overlap",
-                client_id=test_info.application_id,
-                principal=test_info.credential_name,
-                privilege="READ_FILES" if read_only else "WRITE_FILES",
-                directory_id=test_info.directory_id
-            )
-        ])
-
-        azure_sp_crawler = StaticAzureServicePrincipalCrawler(ws, sql_backend, "dont_need_a_schema", [
-            AzureServicePrincipalInfo(
-                application_id=test_info.application_id,
-                secret_scope=test_info.secret_scope,
-                secret_key=test_info.secret_key,
-                tenant_id="test",
-                storage_account="test",
-            )
-        ])
-
-        spn_migration = StaticServicePrincipalMigration(
+        resource_permissions = StaticAzureResourcePermissions(
             installation,
             ws,
-            azure_resource_permissions,
-            azure_sp_crawler,
-            StaticStorageCredentialManager(ws, credentials)
+            azurerm,
+            locations,
+            [
+                StoragePermissionMapping(
+                    prefix="abfss://things@labsazurethings.dfs.core.windows.net/avoid_ext_loc_overlap",
+                    client_id=test_info.application_id,
+                    principal=test_info.credential_name,
+                    privilege="READ_FILES" if read_only else "WRITE_FILES",
+                    directory_id=test_info.directory_id,
+                )
+            ],
+        )
+
+        sp_crawler = StaticAzureServicePrincipalCrawler(
+            ws,
+            sql_backend,
+            "dont_need_a_schema",
+            [
+                AzureServicePrincipalInfo(
+                    application_id=test_info.application_id,
+                    secret_scope=test_info.secret_scope,
+                    secret_key=test_info.secret_key,
+                    tenant_id="test",
+                    storage_account="test",
+                )
+            ],
+        )
+
+        spn_migration = StaticServicePrincipalMigration(
+            installation, ws, resource_permissions, sp_crawler, StaticStorageCredentialManager(ws, credentials)
         )
         return spn_migration.run(
             MockPrompts({"Above Azure Service Principals will be migrated to UC storage credentials *": "Yes"})
@@ -97,15 +107,13 @@ def run_migration(ws, sql_backend) -> ServicePrincipalMigration:
     return inner
 
 
-def test_spn_migration_existed_storage_credential(
-        extract_test_info, make_storage_credential_from_spn, run_migration
-):
+def test_spn_migration_existed_storage_credential(extract_test_info, make_storage_credential_from_spn, run_migration):
     # create a storage credential for this test
     make_storage_credential_from_spn(
         name=extract_test_info.credential_name,
         application_id=extract_test_info.application_id,
         client_secret=extract_test_info.client_secret,
-        directory_id=extract_test_info.directory_id
+        directory_id=extract_test_info.directory_id,
     )
 
     # test that the spn migration will be skipped due to above storage credential is existed
@@ -127,7 +135,7 @@ def test_spn_migration(ws, extract_test_info, run_migration, read_only):
         # assert the storage credential validation results
         for res in migration_results[0].results:
             if res.operation is None:
-                #TODO: file a ticket to SDK team, PATH_EXISTS and HIERARCHICAL_NAMESPACE_ENABLED
+                # TODO: file a ticket to SDK team, PATH_EXISTS and HIERARCHICAL_NAMESPACE_ENABLED
                 # should be added to the validation operations. They are None right now.
                 # Once it's fixed, the None check here can be removed
                 continue

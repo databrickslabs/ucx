@@ -10,14 +10,22 @@ from databricks.sdk.service.catalog import FunctionInfo, TableInfo
 
 from databricks.labs.ucx.__about__ import __version__
 from databricks.labs.ucx.account import WorkspaceInfo
-from databricks.labs.ucx.assessment.azure import AzureServicePrincipalCrawler, \
-    AzureServicePrincipalInfo
-from databricks.labs.ucx.azure.access import AzureResourcePermissions, StoragePermissionMapping
-from databricks.labs.ucx.azure.credentials import StorageCredentialManager, \
-    ServicePrincipalMigration, StorageCredentialValidationResult
+from databricks.labs.ucx.assessment.azure import (
+    AzureServicePrincipalCrawler,
+    AzureServicePrincipalInfo,
+)
+from databricks.labs.ucx.azure.access import (
+    AzureResourcePermissions,
+    StoragePermissionMapping,
+)
+from databricks.labs.ucx.azure.credentials import (
+    ServicePrincipalMigration,
+    StorageCredentialManager,
+    StorageCredentialValidationResult,
+)
 from databricks.labs.ucx.azure.resources import AzureResources
 from databricks.labs.ucx.framework.crawlers import SqlBackend
-from databricks.labs.ucx.hive_metastore import TablesCrawler, ExternalLocations
+from databricks.labs.ucx.hive_metastore import ExternalLocations, TablesCrawler
 from databricks.labs.ucx.hive_metastore.mapping import Rule, TableMapping
 from databricks.labs.ucx.hive_metastore.tables import Table
 from databricks.labs.ucx.hive_metastore.udfs import Udf, UdfsCrawler
@@ -164,12 +172,12 @@ class StaticTableMapping(TableMapping):
 
 class StaticServicePrincipalMigration(ServicePrincipalMigration):
     def __init__(
-            self,
-            installation: Installation,
-            ws: WorkspaceClient,
-            azure_resource_permissions: AzureResourcePermissions,
-            azure_sp_crawler: AzureServicePrincipalCrawler,
-            storage_credential_manager: StorageCredentialManager
+        self,
+        installation: Installation,
+        ws: WorkspaceClient,
+        azure_resource_permissions: AzureResourcePermissions,
+        azure_sp_crawler: AzureServicePrincipalCrawler,
+        storage_credential_manager: StorageCredentialManager,
     ):
         super().__init__(installation, ws, azure_resource_permissions, azure_sp_crawler, storage_credential_manager)
 
@@ -209,8 +217,16 @@ class StaticAzureServicePrincipalCrawler(AzureServicePrincipalCrawler):
     def snapshot(self) -> list[AzureServicePrincipalInfo]:
         return self.spn_infos
 
+
 class StaticAzureResourcePermissions(AzureResourcePermissions):
-    def __init__(self, installation: Installation, ws: WorkspaceClient, azurerm: AzureResources, lc: ExternalLocations, permission_mappings: list[StoragePermissionMapping]):
+    def __init__(
+        self,
+        installation: Installation,
+        ws: WorkspaceClient,
+        azurerm: AzureResources,
+        lc: ExternalLocations,
+        permission_mappings: list[StoragePermissionMapping],
+    ):
         super().__init__(installation, ws, azurerm, lc)
         self._permission_mappings = permission_mappings
 

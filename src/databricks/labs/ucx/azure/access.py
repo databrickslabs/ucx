@@ -105,7 +105,5 @@ class AzureResourcePermissions:
         return storage_accounts
 
     def load(self) -> list[StoragePermissionMapping]:
-        """
-        Load StoragePermissionMapping info from azure_storage_account_info.csv
-        """
+        """Load StoragePermissionMapping info from azure_storage_account_info.csv"""
         return self._installation.load(list[StoragePermissionMapping], filename=self._filename)

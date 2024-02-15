@@ -355,9 +355,7 @@ def test_execute_migration_no_confirmation(mocker, ws):
 
     mocker.patch("databricks.labs.ucx.azure.azure_credentials.ServicePrincipalMigration._generate_migration_list")
 
-    with patch(
-        "databricks.labs.ucx.azure.azure_credentials.ServicePrincipalMigration._create_storage_credential"
-    ) as c:
+    with patch("databricks.labs.ucx.azure.azure_credentials.ServicePrincipalMigration._create_storage_credential") as c:
         sp_migration = ServicePrincipalMigration.for_cli(ws, prompts)
         sp_migration.run(prompts)
         c.assert_not_called()
