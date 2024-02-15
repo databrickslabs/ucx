@@ -33,17 +33,17 @@ For questions, troubleshooting or bug fixes, please see your Databricks account 
 ### Prerequisites
 1. Get trained on UC [[free instructor-led training 2x week]](https://customer-academy.databricks.com/learn/course/1683/data-governance-with-unity-catalog?generated_by=302876&hash=4eab6668f83636ba44d109880002b293e8dda6dd) [[full training schedule]](https://files.training.databricks.com/static/ilt-sessions/half-day-workshops/index.html)
 2. You will need a desktop computer, running Windows, macOS, or Linux; This computer is used to install the UCX toolkit onto the Databricks workspace, the computer will also need:
-  -  Network access to your Databricks Workspace
-  -  Network access to the Internet to retrieve additional Python packages (e.g. PyYAML, databricks-sdk,...) and access GitHub.com
-  -  Python 3.10 or later - [Windows instructions](https://www.python.org/downloads/)
-  -  Databricks CLI with a workspace [configuration profile](https://docs.databricks.com/en/dev-tools/auth.html#databricks-client-unified-authentication) for workspace - [instructions](https://docs.databricks.com/en/dev-tools/cli/install.html)
-  -  Your Windows computer will need a shell environment (GitBash or ([WSL](https://learn.microsoft.com/en-us/windows/wsl/about))
+    -  Network access to your Databricks Workspace
+    -  Network access to the Internet to retrieve additional Python packages (e.g. PyYAML, databricks-sdk,...) and access https://github.com
+    -  Python 3.10 or later - [Windows instructions](https://www.python.org/downloads/)
+    -  Databricks CLI with a workspace [configuration profile](https://docs.databricks.com/en/dev-tools/auth.html#databricks-client-unified-authentication) for workspace - [instructions](https://docs.databricks.com/en/dev-tools/cli/install.html)
+    -  Your Windows computer will need a shell environment (GitBash or ([WSL](https://learn.microsoft.com/en-us/windows/wsl/about))
 3. Within the Databricks Workspace you will need:
-  - Workspace administrator access permissions
-  - The ability for the installer to upload Python Wheel files to DBFS and Workspace FileSystem
-  - A PRO or Serverless SQL Warehouse
-  - The Assessment workflow will create a legacy "No Isolation Shared" and a legacy "Table ACL" jobs clusters needed to inventory Hive Metastore Table ACLS
-  - If your Databricks Workspace relies on an external Hive Metastore (such as AWS Glue), make sure to read the [External HMS Document](docs/external_hms_glue.md).
+    - Workspace administrator access permissions
+    - The ability for the installer to upload Python Wheel files to DBFS and Workspace FileSystem
+    - A PRO or Serverless SQL Warehouse
+    - The Assessment workflow will create a legacy "No Isolation Shared" and a legacy "Table ACL" jobs clusters needed to inventory Hive Metastore Table ACLS
+    - If your Databricks Workspace relies on an external Hive Metastore (such as AWS Glue), make sure to read the [External HMS Document](docs/external_hms_glue.md).
 4. [[AWS]](https://docs.databricks.com/en/administration-guide/users-groups/best-practices.html) [[Azure]](https://learn.microsoft.com/en-us/azure/databricks/administration-guide/users-groups/best-practices)] [[GCP]](https://docs.gcp.databricks.com/administration-guide/users-groups/best-practices.html) Account level Identity Setup
 5. [[AWS]](https://docs.databricks.com/en/data-governance/unity-catalog/create-metastore.html) [[Azure]](https://learn.microsoft.com/en-us/azure/databricks/data-governance/unity-catalog/create-metastore) [[GCP]](https://docs.gcp.databricks.com/data-governance/unity-catalog/create-metastore.html) Unity Catalog Metastore Created (per region)
 
