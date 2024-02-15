@@ -228,14 +228,15 @@ def alias(
 
 
 @ucx.command
-def save_storage_and_principal(w: WorkspaceClient, subscription_id: str | None = None, aws_profile: str | None = None):
+def principal_prefix_access(w: WorkspaceClient, subscription_id: str | None = None, aws_profile: str | None = None):
     """For azure cloud, identifies all storage account used by tables in the workspace, identify spn and its
     permission on each storage accounts. For aws, identifies all the Instance Profiles configured in the workspace and
     its access to all the S3 buckets, along with AWS roles that are set with UC access and its access to S3 buckets.
     The output is stored in the workspace install folder.
     Pass suscription_id for azure and aws_profile for aws."""
+    print("testing")
     if w.config.is_azure:
-        if w.config.auth_type != "azure_cli":
+        if w.config.auth_type != "azure-cli":
             logger.error("In order to obtain AAD token, Please run azure cli to authenticate.")
             return None
         if subscription_id == "":
@@ -248,7 +249,7 @@ def save_storage_and_principal(w: WorkspaceClient, subscription_id: str | None =
             logger.info(f"storage and spn info saved under {path}")
     elif w.config.is_aws:
         if not shutil.which("aws"):
-            logger.error("Couldn't find AWS CLI in path.Please install the CLI from https://aws.amazon.com/cli/")
+            logger.error("Couldn't find AWS CLI in path. Please install the CLI from https://aws.amazon.com/cli/")
             return None
         if not aws_profile:
             aws_profile = os.getenv("AWS_DEFAULT_PROFILE")

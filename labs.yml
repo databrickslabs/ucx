@@ -97,12 +97,11 @@ commands:
       - name: to-schema
         description: target schema to migrate tables to
 
-  - name: save-storage-and-principal
+  - name: principal-prefix-access
     description: For azure cloud, identifies all storage account used by tables in the workspace, identify spn and its 
       permission on each storage accounts. For aws, identifies all the Instance Profiles configured in the workspace and 
       its access to all the S3 buckets, along with AWS roles that are set with UC access and its access to S3 buckets. 
       The output is stored in the workspace install folder.
-
     flags:
       - name: subscription-id
         description: Subscription to scan storage account in

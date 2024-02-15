@@ -150,10 +150,11 @@ After UCX assessment workflow is executed, the assessment dashboard will be popu
 ### Scanning for legacy credentials and mapping access
 #### AWS
 Use to identify all instance profiles in the workspace, and map their access to S3 buckets. 
+Also captures the IAM roles which has UC arn listed, and map their access to S3 buckets 
 This requires `awscli` to be installed and configured.
 
 ```commandline
-databricks labs ucx save-aws-iam-profiles
+databricks labs ucx principal_prefix_access --aws-profile test-profile
 ```
 
 #### Azure
@@ -161,7 +162,7 @@ Use to identify all storage account used by tables, identify the relevant Azure 
 This requires `azure-cli` to be installed and configured. 
 
 ```commandline
-databricks labs ucx save-azure-storage-accounts
+databricks labs ucx principal_prefix_access --subscription-id test-subscription-id
 ```
 
 ### Producing table mapping
