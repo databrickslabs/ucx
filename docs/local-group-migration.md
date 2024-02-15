@@ -26,10 +26,10 @@ We implement `workspace_access.AclSupport` for each supported resource type.
 
 ## Logical objects and relevant APIs
 
-
 ### Group level properties (uses SCIM API)
 
-- [x] Entitlements (One of `workspace-access`, `databricks-sql-access`, `allow-cluster-create`, `allow-instance-pool-create`)
+- [x] Entitlements (One
+  of `workspace-access`, `databricks-sql-access`, `allow-cluster-create`, `allow-instance-pool-create`)
 - [x] Roles (AWS only)
 
 These are workspace-level properties that are not associated with any specific resource.
@@ -57,7 +57,6 @@ Additional info:
 - get method: `ws.permissions.get(object_id, object_type)`
 - put method: `ws.permissions.update(object_id, object_type)`
 - get response object type: `databricks.sdk.service.iam.ObjectPermissions`
-
 
 ### Workflows (uses Permissions API)
 
@@ -88,7 +87,6 @@ Additional info:
 - get method: `ws.permissions.get(object_id, object_type)`
 - put method: `ws.permissions.update(object_id, object_type)`
 - get response object type: `databricks.sdk.service.iam.ObjectPermissions`
-
 
 ### SQL (uses SQL Permissions API)
 
@@ -141,9 +139,9 @@ Additional info:
 
 #### Known issues
 
-- Folder names with forward-slash (`/`) in directory name will be skipped by the inventory. Databricks UI no longer 
-allows creating folders with a forward slash. See [this issue](https://github.com/databrickslabs/ucx/issues/230) for 
-more details.
+- Folder names with forward-slash (`/`) in directory name will be skipped by the inventory. Databricks UI no longer
+  allows creating folders with a forward slash. See [this issue](https://github.com/databrickslabs/ucx/issues/230) for
+  more details.
 
 ### Secrets (uses Secrets API)
 
@@ -158,7 +156,6 @@ Additional info:
 - get method: `ws.secrets.list_acls(scope_name)`
 - put method: `ws.secrets.put_acl`
 
-
 ## AclSupport and serialization logic
 
 Crawlers are expected to return a list of callable functions that will be later used to get the permissions.
@@ -168,7 +165,8 @@ method.
 
 ## Applier and deserialization logic
 
-Appliers are expected to accept a list of `workspace_access.Permissions` and generate a list of callables that will apply the
+Appliers are expected to accept a list of `workspace_access.Permissions` and generate a list of callables that will
+apply the
 given permissions.
 Each applier should implement a deserialization method that will convert the raw payload into a typed one.
 Each permission item should have a crawler type associated with it, so that the applier can use the correct
@@ -183,6 +181,7 @@ We do this inside the `applier`, by returning a `noop` callable if the object is
 ## Crawling the permissions
 
 To crawl the permissions, we use the following logic:
+
 1. Go through the list of all crawlers.
 2. Get the list of all objects of the given type.
 3. For each object, generate a callable that will return a `workspace_access.Permissions`.
@@ -202,10 +201,12 @@ To apply the permissions, we use the following logic:
 
 ## Troubleshooting
 
-Below are some useful code snippets that can be useful for troubleshooting. 
-Make sure to install [databricks-sdk](https://docs.databricks.com/en/dev-tools/sdk-python.html) on the cluster to run it.
+Below are some useful code snippets that can be useful for troubleshooting.
+Make sure to install [databricks-sdk](https://docs.databricks.com/en/dev-tools/sdk-python.html) on the cluster to run
+it.
 
 1. Find workspace-local groups that are eligible for migration to the account:
+
 ```
 from databricks.sdk import WorkspaceClient
 from databricks.sdk.service import iam
@@ -239,7 +240,7 @@ print(f"Found {len(group_names)} groups to migrate")
 2. Recover workspace-local groups from backup groups from within a debug notebook:
 
 ```python
-from databricks.labs.ucx.workspace_access.groups import  GroupManager
+from databricks.labs.ucx.workspace_access.groups import GroupManager
 from databricks.labs.ucx.config import GroupsConfig
 
 group_manager = GroupManager(ws, GroupsConfig(auto=True))

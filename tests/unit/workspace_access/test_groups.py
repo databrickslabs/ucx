@@ -1031,3 +1031,32 @@ def test_validate_acc_group_removed_after_listing():
         backend, wsclient, inventory_database="inv", workspace_group_regex=r"\(([1-9]+)\)", account_group_regex="[1-9]+"
     ).validate_group_membership()
     assert grp_membership == []
+
+
+def test_migration_state_with_filtered_group():
+    backend = MockBackend(
+        rows={
+            "SELECT": [
+                ("", "de", "de", "test-group-de", "", "", "", ""),
+                ("", "ds", "ds", "test-group-ds", "", "", "", ""),
+            ]
+        }
+    )
+    wsclient = MagicMock()
+    grp_membership = GroupManager(
+        backend, wsclient, inventory_database="inv", include_group_names=["ds", "irrelevant_group"]
+    ).get_migration_state()
+
+    assert len(grp_membership.groups) == 1
+    assert grp_membership.groups == [
+        MigratedGroup(
+            id_in_workspace='',
+            name_in_workspace='ds',
+            name_in_account='ds',
+            temporary_name='test-group-ds',
+            members='',
+            entitlements='',
+            external_id='',
+            roles='',
+        )
+    ]
