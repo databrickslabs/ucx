@@ -170,9 +170,9 @@ def test_get_role_policy():
     def command_call(cmd: str):
         if "iam get-role-policy" in cmd:
             return 0, get_role_policy_return, ""
-        elif "iam get-policy " in cmd:
+        if "iam get-policy " in cmd:
             return 0, get_policy_return, ""
-        elif "iam get-policy-version" in cmd:
+        if "iam get-policy-version" in cmd:
             return 0, get_policy_version_return, ""
         return -1, "", "Error"
 
@@ -498,7 +498,7 @@ def test_get_uc_roles_missing_keys():
     }
     """
 
-    def command_call(cmd: str):
+    def command_call(_):
         return 0, list_roles_return, ""
 
     aws = AWSResources("Fake_Profile", command_call)
@@ -712,7 +712,7 @@ def test_role_mismatched(caplog):
 
 
 def test_get_role_policy_missing_role(caplog):
-    def command_call(cmd: str):
+    def command_call(_):
         return 0, "", ""
 
     aws = AWSResources("Fake_Profile", command_call)
@@ -748,7 +748,7 @@ def test_uc_roles_empty_mapping(caplog):
 
 
 def test_command(caplog):
-    return_code, output, error = run_command("echo success")
+    return_code, _, _ = run_command("echo success")
     assert return_code == 0
     with pytest.raises(FileNotFoundError) as exception:
         run_command("no_way_this_command_would_work")

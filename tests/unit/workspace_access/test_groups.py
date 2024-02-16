@@ -39,7 +39,7 @@ def test_snapshot_with_group_created_in_account_console_should_be_considered():
     account_admins_group = Group(id="1234", external_id="1234", display_name="de")
     ws.groups.get.return_value = group
     ws.api_client.do.return_value = {
-        "Resources": [g.as_dict() for g in [account_admins_group]],
+        "Resources": [account_admins_group.as_dict()],
     }
     group_manager = GroupManager(backend, ws, inventory_database="inv")
     res = group_manager.snapshot()
@@ -75,10 +75,10 @@ def test_snapshot_with_group_not_created_in_account_console_should_be_filtered()
     wsclient.groups.list.return_value = [group]
     account_admins_group = Group(id="1234", display_name="ds")
     wsclient.api_client.do.return_value = {
-        "Resources": [g.as_dict() for g in [account_admins_group]],
+        "Resources": [account_admins_group.as_dict()],
     }
     res = GroupManager(backend, wsclient, inventory_database="inv").snapshot()
-    assert res == []
+    assert not res
 
 
 def test_snapshot_with_group_already_migrated_should_be_filtered():
@@ -98,10 +98,10 @@ def test_snapshot_with_group_already_migrated_should_be_filtered():
     wsclient.groups.list.return_value = [group]
     account_admins_group = Group(id="1234", display_name="de")
     wsclient.api_client.do.return_value = {
-        "Resources": [g.as_dict() for g in [account_admins_group]],
+        "Resources": [account_admins_group.as_dict()],
     }
     res = GroupManager(backend, wsclient, inventory_database="inv").snapshot()
-    assert res == []
+    assert not res
 
 
 def test_snapshot_should_filter_account_system_groups():
@@ -121,10 +121,10 @@ def test_snapshot_should_filter_account_system_groups():
     wsclient.groups.list.return_value = [group]
     account_admins_group = Group(id="1234", display_name="account users")
     wsclient.api_client.do.return_value = {
-        "Resources": [g.as_dict() for g in [account_admins_group]],
+        "Resources": [account_admins_group.as_dict()],
     }
     res = GroupManager(backend, wsclient, inventory_database="inv").snapshot()
-    assert res == []
+    assert not res
 
 
 def test_snapshot_should_filter_workspace_system_groups():
@@ -897,7 +897,7 @@ def test_validate_group_diff_membership_no_members():
         members=None,
     )
 
-    def do_api_side_effect(*args, **kwargs):
+    def do_api_side_effect(*args, **_):
         if args[0] == "GET":
             if args[1] == "/api/2.0/account/scim/v2/Groups":
                 return {"Resources": [g.as_dict() for g in [account_admins_group]]}
@@ -911,7 +911,7 @@ def test_validate_group_diff_membership_no_members():
     grp_membership = GroupManager(
         backend, wsclient, inventory_database="inv", workspace_group_regex=r"\(([1-9]+)\)", account_group_regex="[1-9]+"
     ).validate_group_membership()
-    assert grp_membership == []
+    assert not grp_membership
 
 
 def test_validate_group_diff_membership_no_account_group_found():

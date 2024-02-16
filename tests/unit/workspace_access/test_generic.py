@@ -199,7 +199,7 @@ def test_passwords_tokens_crawler(migration_state):
     assert len(tasks) == 2
     auth_items = [task() for task in tasks]
     for item in auth_items:
-        assert item.object_id in ["tokens", "passwords"]
+        assert item.object_id in {"tokens", "passwords"}
         assert item.object_type == "authorization"
         applier = sup.get_apply_task(item, migration_state)
         applier()
@@ -256,7 +256,7 @@ def test_experiment_listing():
     assert len(results) == 2
     for res in results:
         assert res.request_type == "experiments"
-        assert res.object_id in ["test", "test2"]
+        assert res.object_id in {"test", "test2"}
 
 
 def test_response_to_request_mapping():
@@ -729,7 +729,7 @@ def test_eligibles_assets_with_owner_should_be_accepted():
                     ),
                 ],
             )
-        elif object_type == "pipelines":
+        if object_type == "pipelines":
             return ObjectPermissions(
                 object_id=object_id,
                 object_type=object_type,
@@ -742,6 +742,7 @@ def test_eligibles_assets_with_owner_should_be_accepted():
                     ),
                 ],
             )
+        return None
 
     ws.permissions.get.side_effect = perms
 
@@ -777,7 +778,7 @@ def test_eligibles_assets_without_owner_should_be_ignored():
                     )
                 ],
             )
-        elif object_type == "pipelines":
+        if object_type == "pipelines":
             return ObjectPermissions(
                 object_id=object_id,
                 object_type=object_type,
@@ -787,7 +788,7 @@ def test_eligibles_assets_without_owner_should_be_ignored():
                     )
                 ],
             )
-        elif object_type == "jobs":
+        if object_type == "jobs":
             return ObjectPermissions(
                 object_id=object_id,
                 object_type=object_type,
@@ -797,6 +798,7 @@ def test_eligibles_assets_without_owner_should_be_ignored():
                     ),
                 ],
             )
+        return None
 
     ws.permissions.get.side_effect = perms
 

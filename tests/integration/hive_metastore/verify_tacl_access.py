@@ -2,16 +2,18 @@
 import sys
 
 from databricks.sdk.service.compute import ResultType
+from databricks.sdk import WorkspaceClient
+from databricks.sdk.service.compute import Language
 
 
 def main():
-    from databricks.sdk import WorkspaceClient
+
 
     table_name = sys.argv[1]
 
     # labs-aws-simple-spn is a config profile that has SPN
     # with USER access to a workspace and TACL cluster configured
-    from databricks.sdk.service.compute import Language
+
 
     w = WorkspaceClient(profile="labs-aws-simple-spn")
 

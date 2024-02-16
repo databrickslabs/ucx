@@ -131,7 +131,7 @@ def test_job_cluster_policy(ws, new_installation):
 def test_new_job_cluster_with_policy_assessment(
     ws, new_installation, make_ucx_group, make_cluster_policy, make_cluster_policy_permissions
 ):
-    ws_group_a, acc_group_a = make_ucx_group()
+    ws_group_a, _ = make_ucx_group()
     cluster_policy = make_cluster_policy()
     make_cluster_policy_permissions(
         object_id=cluster_policy.policy_id,
@@ -151,7 +151,7 @@ def test_new_job_cluster_with_policy_assessment(
 def test_running_real_assessment_job(
     ws, new_installation, make_ucx_group, make_cluster_policy, make_cluster_policy_permissions
 ):
-    ws_group_a, acc_group_a = make_ucx_group()
+    ws_group_a, _ = make_ucx_group()
 
     cluster_policy = make_cluster_policy()
     make_cluster_policy_permissions(
@@ -263,7 +263,7 @@ def test_running_real_validate_groups_permissions_job_fails(
 
 @retried(on=[NotFound, InvalidParameterValue], timeout=timedelta(minutes=5))
 def test_running_real_remove_backup_groups_job(ws, sql_backend, new_installation, make_ucx_group):
-    ws_group_a, acc_group_a = make_ucx_group()
+    ws_group_a, _ = make_ucx_group()
 
     install = new_installation(lambda wc: replace(wc, include_group_names=[ws_group_a.display_name]))
     cfg = install.config

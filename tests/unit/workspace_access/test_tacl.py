@@ -30,8 +30,8 @@ def test_tacl_crawler():
     first_task = next(crawler_tasks)
     x = first_task()
 
-    assert "TABLE" == x.object_type
-    assert "catalog_a.database_b.table_c" == x.object_id
+    assert x.object_type == "TABLE"
+    assert x.object_id == "catalog_a.database_b.table_c"
 
 
 def test_tacl_udf_crawler():
@@ -51,8 +51,8 @@ def test_tacl_udf_crawler():
     first_task = next(crawler_tasks)
     x = first_task()
 
-    assert "FUNCTION" == x.object_type
-    assert "catalog_a.database_b.function_c" == x.object_id
+    assert x.object_type == "FUNCTION"
+    assert x.object_id == "catalog_a.database_b.function_c"
 
 
 def test_tacl_crawler_multiple_permissions():
@@ -92,8 +92,8 @@ def test_tacl_crawler_multiple_permissions():
 
     permissions = next(crawler_tasks)()
 
-    assert "TABLE" == permissions.object_type
-    assert "catalog_a.database_b.table_c" == permissions.object_id
+    assert permissions.object_type == "TABLE"
+    assert permissions.object_id == "catalog_a.database_b.table_c"
     assert Grant(
         principal="foo@example.com",
         action_type="MODIFY, OWN, SELECT",
@@ -108,8 +108,8 @@ def test_tacl_crawler_multiple_permissions():
 
     permissions = next(crawler_tasks)()
 
-    assert "TABLE" == permissions.object_type
-    assert "catalog_a.database_b.table_d" == permissions.object_id
+    assert permissions.object_type == "TABLE"
+    assert permissions.object_id == "catalog_a.database_b.table_d"
     assert Grant(
         principal="foo@example.com",
         action_type="SELECT",
@@ -124,8 +124,8 @@ def test_tacl_crawler_multiple_permissions():
 
     permissions = next(crawler_tasks)()
 
-    assert "TABLE" == permissions.object_type
-    assert "catalog_a.database_b.table_c" == permissions.object_id
+    assert permissions.object_type == "TABLE"
+    assert permissions.object_id == "catalog_a.database_b.table_c"
     assert Grant(
         principal="foo2@example.com",
         action_type="SELECT",
@@ -140,8 +140,8 @@ def test_tacl_crawler_multiple_permissions():
 
     permissions = next(crawler_tasks)()
 
-    assert "VIEW" == permissions.object_type
-    assert "catalog_a.database_b.view_c" == permissions.object_id
+    assert permissions.object_type == "VIEW"
+    assert permissions.object_id == "catalog_a.database_b.view_c"
     assert Grant(
         principal="foo3@example.com",
         action_type="SELECT",
@@ -156,8 +156,8 @@ def test_tacl_crawler_multiple_permissions():
 
     permissions = next(crawler_tasks)()
 
-    assert "DATABASE" == permissions.object_type
-    assert "catalog_a.database_b" == permissions.object_id
+    assert permissions.object_type == "DATABASE"
+    assert permissions.object_id == "catalog_a.database_b"
     assert Grant(
         principal="foo3@example.com",
         action_type="SELECT",
@@ -172,8 +172,8 @@ def test_tacl_crawler_multiple_permissions():
 
     permissions = next(crawler_tasks)()
 
-    assert "CATALOG" == permissions.object_type
-    assert "catalog_a" == permissions.object_id
+    assert permissions.object_type == "CATALOG"
+    assert permissions.object_id == "catalog_a"
     assert Grant(
         principal="foo3@example.com",
         action_type="SELECT",
@@ -188,7 +188,7 @@ def test_tacl_crawler_multiple_permissions():
 
     permissions = next(crawler_tasks)()
 
-    assert "ANY FILE" == permissions.object_type
+    assert permissions.object_type == "ANY FILE"
     assert permissions.object_id == ""
     assert Grant(
         principal="foo3@example.com",
@@ -204,7 +204,7 @@ def test_tacl_crawler_multiple_permissions():
 
     permissions = next(crawler_tasks)()
 
-    assert "ANONYMOUS FUNCTION" == permissions.object_type
+    assert permissions.object_type == "ANONYMOUS FUNCTION"
     assert permissions.object_id == ""
     assert Grant(
         principal="foo3@example.com",
@@ -220,8 +220,8 @@ def test_tacl_crawler_multiple_permissions():
 
     permissions = next(crawler_tasks)()
 
-    assert "FUNCTION" == permissions.object_type
-    assert "catalog_a.database_b.function_c" == permissions.object_id
+    assert permissions.object_type == "FUNCTION"
+    assert permissions.object_id == "catalog_a.database_b.function_c"
     assert Grant(
         principal="foo3@example.com",
         action_type="SELECT",
@@ -477,7 +477,7 @@ def test_tacl_applier_no_target_principal(mocker):
     task = table_acl_support.get_apply_task(permissions, migration_state)
     assert task is None
 
-    assert [] == sql_backend.queries
+    assert not sql_backend.queries
 
 
 def test_verify_task_should_return_true_if_permissions_applied():

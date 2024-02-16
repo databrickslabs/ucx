@@ -34,7 +34,7 @@ def _pipeline(pipeline_id: str):
     return GetPipelineResponse.from_dict(fixture)
 
 
-def _secret_not_found(secret_scope, secret_key):
+def _secret_not_found(secret_scope, _):
     msg = f"Secret Scope {secret_scope} does not exist!"
     raise NotFound(msg)
 
@@ -42,7 +42,6 @@ def _secret_not_found(secret_scope, secret_key):
 def workspace_client_mock(
     clusters="no-spark-conf.json",
     pipelines="single-pipeline.json",
-    pipeline_spec="empty-pipeline-spec.json",
     jobs="single-job.json",
     warehouse_config="single-config.json",
     secret_exists=True,
