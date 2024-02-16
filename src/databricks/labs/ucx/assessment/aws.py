@@ -12,6 +12,7 @@ from pathlib import PurePath
 from databricks.labs.blueprint.installation import Installation
 from databricks.labs.blueprint.parallel import Threads
 from databricks.sdk import WorkspaceClient
+from databricks.sdk.errors import ResourceDoesNotExist
 from databricks.sdk.service.catalog import Privilege, StorageCredentialInfo
 
 from databricks.labs.ucx.framework.crawlers import StatementExecutionBackend
@@ -351,22 +352,24 @@ class AWSResourcePermissions:
     InstanceProfilesFileName: typing.ClassVar[str] = "aws_instance_profile_info.csv"
 
     def __init__(self, installation: Installation, ws: WorkspaceClient, backend: StatementExecutionBackend,
-                 aws_resources: AWSResources, schema: str, aws_account_id=None):
+                 aws_resources: AWSResources, schema: str, aws_account_id=None, kms_key=None):
         self._installation = installation
         self._aws_resources = aws_resources
         self._backend = backend
         self._ws = ws
         self._schema = schema
         self._aws_account_id = aws_account_id
+        self._kms_key = kms_key
 
     @classmethod
-    def for_cli(cls, ws: WorkspaceClient, backend, aws_profile, schema, product='ucx'):
+    def for_cli(cls, ws: WorkspaceClient, backend, aws_profile, schema, kms_key=None, product='ucx'):
         installation = Installation.current(ws, product)
         aws = AWSResources(aws_profile)
         caller_identity = aws.validate_connection()
         if not caller_identity:
             raise ResourceWarning("AWS CLI is not configured properly.")
-        return cls(installation, ws, backend, aws, schema=schema, aws_account_id=json.loads(caller_identity).get("Account"))
+        return cls(installation, ws, backend, aws,
+                   schema=schema, aws_account_id=caller_identity.get("Account"), kms_key=kms_key)
 
     def save_uc_compatible_roles(self):
         uc_role_access = list(self._get_role_access())
@@ -376,8 +379,9 @@ class AWSResourcePermissions:
         return self._installation.save(uc_role_access, filename=self.UCRolesFileName)
 
     def get_uc_compatible_roles(self):
-        role_actions = self._installation.load(list[AWSRoleAction], filename=self.UCRolesFileName)
-        if not role_actions:
+        try:
+            role_actions = self._installation.load(list[AWSRoleAction], filename=self.UCRolesFileName)
+        except ResourceDoesNotExist:
             self.save_uc_compatible_roles()
             role_actions = self._installation.load(list[AWSRoleAction], filename=self.UCRolesFileName)
         return role_actions
@@ -392,7 +396,7 @@ class AWSResourcePermissions:
     def create_uc_roles_cli(self, *, single_role=True, single_role_name=None):
         missing_paths = self._identify_missing_paths()
         if single_role:
-            self._aws_resources.add_uc_role(single_role_name, missing_paths)
+            self._aws_resources.add_uc_role(single_role_name, missing_paths, self._aws_account_id, self._kms_key)
 
     def _get_instance_profiles(self) -> Iterable[AWSInstanceProfile]:
         instance_profiles = self._ws.instance_profiles.list()
