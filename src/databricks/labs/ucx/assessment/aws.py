@@ -80,6 +80,7 @@ class AWSResources:
     S3_ACTIONS: typing.ClassVar[set[str]] = {"s3:PutObject", "s3:GetObject", "s3:DeleteObject", "s3:PutObjectAcl"}
     S3_READONLY: typing.ClassVar[str] = "s3:GetObject"
     S3_REGEX: typing.ClassVar[str] = r"arn:aws:s3:::([a-zA-Z0-9+=,.@_-]*)\/\*$"
+    S3_
     UC_MASTER_ROLES_ARN: typing.ClassVar[list[str]] = [
         "arn:aws:iam::414351767826:role/unity-catalog-prod-UCMasterRole-14S5ZJVKOTYTL",
         "arn:aws:iam::707343435239:role/unity-catalog-dev-UCMasterRole-G3MMN8SP21FO",
@@ -397,6 +398,9 @@ class AWSResourcePermissions:
         missing_paths = self._identify_missing_paths()
         if single_role:
             self._aws_resources.add_uc_role(single_role_name, missing_paths, self._aws_account_id, self._kms_key)
+        else:
+            for missing_path in missing_paths:
+                self._aws_resources.add_uc_role(single_role_name, {missing_path}, self._aws_account_id, self._kms_key)
 
     def _get_instance_profiles(self) -> Iterable[AWSInstanceProfile]:
         instance_profiles = self._ws.instance_profiles.list()
