@@ -71,6 +71,10 @@ def run_command(command):
         return process.returncode, output.decode("utf-8"), error.decode("utf-8")
 
 
+def esc_json_for_cli(json: str) -> str:
+    return json.replace('"', '\\"').replace('\n', '\\n')
+
+
 class AWSResources:
     S3_ACTIONS: typing.ClassVar[set[str]] = {"s3:PutObject", "s3:GetObject", "s3:DeleteObject", "s3:PutObjectAcl"}
     S3_READONLY: typing.ClassVar[str] = "s3:GetObject"
@@ -79,6 +83,25 @@ class AWSResources:
         "arn:aws:iam::414351767826:role/unity-catalog-prod-UCMasterRole-14S5ZJVKOTYTL",
         "arn:aws:iam::707343435239:role/unity-catalog-dev-UCMasterRole-G3MMN8SP21FO",
     ]
+    AWS_ROLE_TRUST_DOC: typing.ClassVar[str] = """
+{
+    "Version": "2012-10-17",
+    "Statement": [
+        {
+            "Effect": "Allow",
+            "Principal": {
+                "AWS": "arn:aws:iam::414351767826:role/unity-catalog-prod-UCMasterRole-14S5ZJVKOTYTL"
+            },
+            "Action": "sts:AssumeRole",
+            "Condition": {
+                "StringEquals": {
+                    "sts:ExternalId": "0000"
+                }
+            }
+        }
+    ]
+}
+    """
 
     def __init__(self, profile: str, command_runner: Callable[[str], tuple[int, str, str]] = run_command):
         self._profile = profile
@@ -335,6 +358,7 @@ class AWSResourcePermissions:
     def get_role_creation_cli(self, *, single_role=True):
         missing_paths = self._identify_missing_paths()
         if single_role:
+
 
 
     def save_instance_profile_permissions(self) -> str | None:
