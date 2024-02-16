@@ -240,14 +240,14 @@ class ServicePrincipalMigration:
                 sp_list_with_secret.append(ServicePrincipalMigrationInfo(sp, sp_info_with_client_secret[sp.client_id]))
         return sp_list_with_secret
 
-    def _print_action_plan(self, sp_list: list[ServicePrincipalMigrationInfo]):
+    def _print_action_plan(self, sp_list: list[StoragePermissionMapping]):
         # print action plan to console for customer to review.
         for sp in sp_list:
             logger.info(
-                f"Service Principal name: {sp.permission_mapping.principal}, "
-                f"application_id: {sp.permission_mapping.client_id}, "
-                f"privilege {sp.permission_mapping.privilege} "
-                f"on location {sp.permission_mapping.prefix}"
+                f"Service Principal name: {sp.principal}, "
+                f"application_id: {sp.client_id}, "
+                f"privilege {sp.privilege} "
+                f"on location {sp.prefix}"
             )
 
     def _generate_migration_list(self) -> list[ServicePrincipalMigrationInfo]:
@@ -262,8 +262,12 @@ class ServicePrincipalMigration:
         filtered_sp_list = [sp for sp in sp_list if sp.client_id not in sc_set]
         # fetch sp client_secret if any
         sp_list_with_secret = self._fetch_client_secret(filtered_sp_list)
+
         # output the action plan for customer to confirm
-        self._print_action_plan(sp_list_with_secret)
+        # but first make a copy of the list and strip out the client_secret
+        sp_candidates = [sp.permission_mapping for sp in sp_list_with_secret]
+        self._print_action_plan(sp_candidates)
+
         return sp_list_with_secret
 
     def save(self, migration_results: list[StorageCredentialValidationResult]) -> str:
