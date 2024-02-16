@@ -101,7 +101,7 @@ def run_migration(ws, sql_backend):
 def test_spn_migration_existed_storage_credential(extract_test_info, make_storage_credential_from_spn, run_migration):
     # create a storage credential for this test
     make_storage_credential_from_spn(
-        name=extract_test_info.credential_name,
+        credential_name=extract_test_info.credential_name,
         application_id=extract_test_info.application_id,
         client_secret=extract_test_info.client_secret,
         directory_id=extract_test_info.directory_id,
