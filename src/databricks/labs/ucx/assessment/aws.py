@@ -103,6 +103,102 @@ class AWSResources:
 }
     """
 
+    AWS_POLICY_KMS: typing.ClassVar[str] = """
+{
+  "Version": "2012-10-17",
+  "Statement": [
+      {
+          "Action": [
+              "s3:GetObject",
+              "s3:PutObject",
+              "s3:DeleteObject",
+              "s3:ListBucket",
+              "s3:GetBucketLocation"
+          ],
+          "Resource": [
+              "arn:aws:s3:::<BUCKET>/*",
+              "arn:aws:s3:::<BUCKET>"
+          ],
+          "Effect": "Allow"
+      },
+      {
+          "Action": [
+              "kms:Decrypt",
+              "kms:Encrypt",
+              "kms:GenerateDataKey*"
+          ],
+          "Resource": [
+              "arn:aws:kms:<KMS-KEY>"
+          ],
+          "Effect": "Allow"
+      },
+      {
+          "Action": [
+              "sts:AssumeRole"
+          ],
+          "Resource": [
+              "arn:aws:iam::<AWS-ACCOUNT-ID>:role/<AWS-IAM-ROLE-NAME>"
+          ],
+          "Effect": "Allow"
+      }
+    ]
+}    
+    """
+
+    AWS_POLICY_NO_KMS: typing.ClassVar[str] = """
+    {
+      "Version": "2012-10-17",
+      "Statement": [
+          {
+              "Action": [
+                  "s3:GetObject",
+                  "s3:PutObject",
+                  "s3:DeleteObject",
+                  "s3:ListBucket",
+                  "s3:GetBucketLocation"
+              ],
+              "Resource": [
+                  "arn:aws:s3:::<BUCKET>/*",
+                  "arn:aws:s3:::<BUCKET>"
+              ],
+              "Effect": "Allow"
+          },
+          {
+              "Action": [
+                  "sts:AssumeRole"
+              ],
+              "Resource": [
+                  "arn:aws:iam::<AWS-ACCOUNT-ID>:role/<AWS-IAM-ROLE-NAME>"
+              ],
+              "Effect": "Allow"
+          }
+        ]
+    }    
+        """
+
+    SELF_ASSUME_ROLE_POLICY: typing.ClassVar[str]:"""
+{
+  "Version": "2012-10-17",
+  "Statement": [
+    {
+      "Effect": "Allow",
+      "Principal": {
+        "AWS": [
+          "arn:aws:iam::414351767826:role/unity-catalog-prod-UCMasterRole-14S5ZJVKOTYTL",
+          "arn:aws:iam::<YOUR-AWS-ACCOUNT-ID>:role/<THIS-ROLE-NAME>"
+        ]
+      },
+      "Action": "sts:AssumeRole",
+      "Condition": {
+        "StringEquals": {
+          "sts:ExternalId": "<STORAGE-CREDENTIAL-EXTERNAL-ID>"
+        }
+      }
+    }
+  ]
+}    
+    """
+
     def __init__(self, profile: str, command_runner: Callable[[str], tuple[int, str, str]] = run_command):
         self._profile = profile
         self._command_runner = command_runner
@@ -233,6 +329,17 @@ class AWSResources:
                     policy_actions.append(AWSPolicyAction("s3", privilege, f"s3a://{match.group(1)}"))
         return policy_actions
 
+    def add_uc_role(self, role_name, s3_prefixes: set[str], account_id:str, kms_key = None):
+        assume_role_json = esc_json_for_cli(self.AWS_ROLE_TRUST_DOC)
+        add_role = self._run_json_command(f"iam create-role --role-name {role_name} --assume-role-policy-document {assume_role_json}")
+        if not add_role:
+            return False
+        add_policy = self._run_json_command(f"")
+        if not add_policy:
+            return False
+
+
+
     def _run_json_command(self, command: str):
         aws_cmd = shutil.which("aws")
         code, output, error = self._command_runner(f"{aws_cmd} {command} --output json")
@@ -282,6 +389,12 @@ class AWSResourcePermissions:
         for path in missing_paths:
             role_actions.append(AWSRoleAction(default_role_arn,"s3","Privilege.WRITE_FILES.value",path))
         return role_actions
+
+    def create_uc_roles_cli(self, *, single_role=True, single_role_name=None):
+        missing_paths = self._identify_missing_paths()
+        if single_role:
+            self._aws_resources.add_uc_role(single_role_name, missing_paths)
+
 
     def _get_instance_profiles(self) -> Iterable[AWSInstanceProfile]:
         instance_profiles = self._ws.instance_profiles.list()
@@ -354,12 +467,6 @@ class AWSResourcePermissions:
                 continue
             missing_paths.add(external_location.location)
         return missing_paths
-
-    def get_role_creation_cli(self, *, single_role=True):
-        missing_paths = self._identify_missing_paths()
-        if single_role:
-
-
 
     def save_instance_profile_permissions(self) -> str | None:
         instance_profile_access = list(self._get_instance_profiles_access())
