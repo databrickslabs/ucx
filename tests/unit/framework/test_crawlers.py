@@ -50,7 +50,7 @@ def test_invalid():
 
 def test_full_name():
     cb = CrawlerBase(MockBackend(), "a", "b", "c", Bar)
-    assert "a.b.c" == cb._full_name
+    assert cb._full_name == "a.b.c"
 
 
 def test_snapshot_appends_to_existing_table():
@@ -268,7 +268,7 @@ def test_save_table_with_not_null_constraint_violated(mocker):
 def test_raise_spark_sql_exceptions(msg, t):
     err = RuntimeBackend._api_error_from_message(msg)
     # here we compare the type, so that pytest assert rewrite kick in
-    assert type(err) == t
+    assert type(err) == t # pytest: disable=unidiomatic-typecheck
 
 
 def test_execute(mocker):

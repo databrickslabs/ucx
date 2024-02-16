@@ -528,7 +528,6 @@ def test_skipping_rules_target_exists():
     errors = {}
     rows = {}
     backend = MockBackend(fails_on_first=errors, rows=rows)
-    client.tables.get.side_effect = NotFound()
     client.catalogs.list.return_value = []
     client.schemas.list.return_value = []
     client.tables.list.return_value = []
@@ -554,7 +553,6 @@ def test_is_target_exists():
     rows = {}
     backend = MockBackend(fails_on_first=errors, rows=rows)
     client = create_autospec(WorkspaceClient)
-    client.tables.get.side_effect = NotFound()
     client.catalogs.list.return_value = []
     client.schemas.list.return_value = []
     client.tables.list.return_value = []

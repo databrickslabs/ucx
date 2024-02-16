@@ -96,15 +96,15 @@ def ws():
     return workspace_client
 
 
-def created_job(ws, name):
-    for call in ws.jobs.method_calls:
+def created_job(workspace_client, name):
+    for call in workspace_client.jobs.method_calls:
         if call.kwargs['name'] == name:
             return call.kwargs
     raise AssertionError(f'call not found: {name}')
 
 
-def created_job_tasks(ws: MagicMock, name: str) -> dict[str, jobs.Task]:
-    call = created_job(ws, name)
+def created_job_tasks(workspace_client: MagicMock, name: str) -> dict[str, jobs.Task]:
+    call = created_job(workspace_client, name)
     return {_.task_key: _ for _ in call['tasks']}
 
 

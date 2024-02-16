@@ -305,6 +305,7 @@ def test_move_all_tables_and_drop_source():
         not_to_migrate = ["TgtC.TgtS.table3", "TgtC.TgtS.view3"]
         if full_name in not_to_migrate:
             return TableInfo()
+        return None
 
     rows = {
         "SHOW CREATE TABLE SrcC.SrcS.table1": [
@@ -407,6 +408,7 @@ def test_alias_all_tables():
         not_to_migrate = ["TgtC.TgtS.table3", "TgtC.TgtS.view3"]
         if full_name in not_to_migrate:
             return TableInfo()
+        return None
 
     client.grants.get.side_effect = lambda _, full_name: grants_mapping[full_name]
     client.schemas.get.side_effect = [SchemaInfo(), SchemaInfo()]
@@ -418,8 +420,8 @@ def test_alias_all_tables():
     assert [
         'CREATE VIEW TgtC.TgtS.table1 AS SELECT * FROM SrcC.SrcS.table1',
         'CREATE VIEW TgtC.TgtS.table2 AS SELECT * FROM SrcC.SrcS.table2',
-        'CREATE VIEW TgtC.TgtS.view1 AS SELECT * FROM SrcC.SrcS.another_table1 WHERE ' 'field1=value',
-        'CREATE VIEW TgtC.TgtS.view2 AS SELECT * FROM SrcC.SrcS.another_table2 WHERE ' 'field2=value',
+        'CREATE VIEW TgtC.TgtS.view1 AS SELECT * FROM SrcC.SrcS.another_table1 WHERE field1=value',
+        'CREATE VIEW TgtC.TgtS.view2 AS SELECT * FROM SrcC.SrcS.another_table2 WHERE field2=value',
     ] == sorted(backend.queries)
 
 

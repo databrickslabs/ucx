@@ -33,7 +33,7 @@ def test_storage_accounts(mocker, az_token):
     assert len(storage_accounts) == 2
     for storage_account in storage_accounts:
         assert storage_account.resource_group == "rg1"
-        assert storage_account.storage_account in ["sto2", "sto3"]
+        assert storage_account.storage_account in {"sto2", "sto3"}
         assert storage_account.container is None
         assert storage_account.subscription_id == "002"
 
@@ -48,7 +48,7 @@ def test_containers(mocker, az_token):
     for container in containers:
         assert container.resource_group == "rg1"
         assert container.storage_account == "sto2"
-        assert container.container in ["container1", "container2", "container3"]
+        assert container.container in {"container1", "container2", "container3"}
         assert container.subscription_id == "002"
 
 
