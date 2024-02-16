@@ -80,7 +80,7 @@ class AWSResources:
     S3_ACTIONS: typing.ClassVar[set[str]] = {"s3:PutObject", "s3:GetObject", "s3:DeleteObject", "s3:PutObjectAcl"}
     S3_READONLY: typing.ClassVar[str] = "s3:GetObject"
     S3_REGEX: typing.ClassVar[str] = r"arn:aws:s3:::([a-zA-Z0-9+=,.@_-]*)\/\*$"
-    S3_
+    S3_PREFIX: typing.ClassVar[str] = "arn:aws:s3:::"
     UC_MASTER_ROLES_ARN: typing.ClassVar[list[str]] = [
         "arn:aws:iam::414351767826:role/unity-catalog-prod-UCMasterRole-14S5ZJVKOTYTL",
         "arn:aws:iam::707343435239:role/unity-catalog-dev-UCMasterRole-G3MMN8SP21FO",
@@ -117,9 +117,7 @@ class AWSResources:
               "s3:ListBucket",
               "s3:GetBucketLocation"
           ],
-          "Resource": [
-              <BUCKETS>
-          ],
+          "Resource": <BUCKETS>,
           "Effect": "Allow"
       },
       {
@@ -158,9 +156,7 @@ class AWSResources:
                   "s3:ListBucket",
                   "s3:GetBucketLocation"
               ],
-              "Resource": [
-                  <BUCKETS>
-              ],
+              "Resource": <BUCKETS>,
               "Effect": "Allow"
           },
           {
@@ -185,7 +181,7 @@ class AWSResources:
       "Principal": {
         "AWS": [
           "arn:aws:iam::414351767826:role/unity-catalog-prod-UCMasterRole-14S5ZJVKOTYTL",
-          "arn:aws:iam::<YOUR-AWS-ACCOUNT-ID>:role/<THIS-ROLE-NAME>"
+          "arn:aws:iam::<AWS-ACCOUNT-ID>:role/<AWS-IAM-ROLE-NAME>"
         ]
       },
       "Action": "sts:AssumeRole",
@@ -329,13 +325,23 @@ class AWSResources:
                     policy_actions.append(AWSPolicyAction("s3", privilege, f"s3a://{match.group(1)}"))
         return policy_actions
 
-    def add_uc_role(self, role_name, s3_prefixes: set[str], account_id: str, kms_key=None):
+    def add_uc_role(self, role_name, policy_name, s3_prefixes: set[str], account_id: str, kms_key=None):
         assume_role_json = esc_json_for_cli(self.AWS_ROLE_TRUST_DOC)
         add_role = self._run_json_command(
             f"iam create-role --role-name {role_name} --assume-role-policy-document {assume_role_json}")
         if not add_role:
             return False
-        add_policy = self._run_json_command(f"")
+        if kms_key:
+            policy_document = self.AWS_POLICY_KMS
+        else:
+            policy_document = self.AWS_POLICY_NO_KMS
+        s3_prefixes_enriched = {self.S3_PREFIX+s3_prefix for s3_prefix in s3_prefixes}
+        policy_document = policy_document.replace("<BUCKET>",json.dumps(s3_prefixes_enriched))
+        policy_document = policy_document.replace("<AWS-ACCOUNT-ID>",account_id)
+        policy_document = policy_document.replace("<AWS-IAM-ROLE-NAME>", role_name)
+        policy_document_json = esc_json_for_cli(policy_document)
+        add_policy = self._run_json_command(
+            f"iam put-role-policy --role-name {role_name} --policy-name {policy_name} --policy-document {policy_document_json}")
         if not add_policy:
             return False
 
