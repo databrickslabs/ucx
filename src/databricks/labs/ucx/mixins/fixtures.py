@@ -1079,19 +1079,19 @@ def make_query(ws, make_table, make_random):
 @pytest.fixture
 def make_storage_credential_from_spn(ws):
     def create(
-        *, name: str, application_id: str, client_secret: str, directory_id: str, read_only=False
+        *, credential_name: str, application_id: str, client_secret: str, directory_id: str, read_only=False
     ) -> StorageCredentialInfo:
         azure_service_principal = AzureServicePrincipal(
-            directory_id=directory_id,
-            application_id=application_id,
-            client_secret=client_secret,
+            directory_id,
+            application_id,
+            client_secret,
         )
         storage_credential = ws.storage_credentials.create(
-            name=name, azure_service_principal=azure_service_principal, read_only=read_only
+            credential_name, azure_service_principal=azure_service_principal, read_only=read_only
         )
         return storage_credential
 
     def remove(storage_credential: StorageCredentialInfo):
-        ws.storage_credentials.delete(name=storage_credential.name, force=True)
+        ws.storage_credentials.delete(storage_credential.name, force=True)
 
     yield from factory("storage_credential_from_spn", create, remove)
