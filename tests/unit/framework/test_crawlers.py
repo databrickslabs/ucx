@@ -89,7 +89,7 @@ def test_snapshot_wrong_error():
         cb._snapshot(fetcher=fetcher, loader=lambda: [Foo(first="first", second=True)])
 
 
-def test_statement_execution_backend_execute_happy(mocker):
+def test_statement_execution_backend_execute_happy():
     ws = create_autospec(WorkspaceClient)
     ws.statement_execution.execute_statement.return_value = sql.ExecuteStatementResponse(
         status=sql.StatementStatus(state=sql.StatementState.SUCCEEDED)

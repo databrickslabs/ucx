@@ -50,15 +50,15 @@ def ws():
             raise NotFound(path)
         return io.StringIO(state[path])
 
-    ws = create_autospec(WorkspaceClient)
-    ws.config.host = 'https://localhost'
-    ws.current_user.me().user_name = "foo"
-    ws.workspace.download = download
-    ws.statement_execution.execute_statement.return_value = sql.ExecuteStatementResponse(
+    workspace_client = create_autospec(WorkspaceClient)
+    workspace_client.config.host = 'https://localhost'
+    workspace_client.current_user.me().user_name = "foo"
+    workspace_client.workspace.download = download
+    workspace_client.statement_execution.execute_statement.return_value = sql.ExecuteStatementResponse(
         status=sql.StatementStatus(state=sql.StatementState.SUCCEEDED),
         manifest=sql.ResultManifest(schema=sql.ResultSchema()),
     )
-    return ws
+    return workspace_client
 
 
 def test_workflow(ws, caplog):

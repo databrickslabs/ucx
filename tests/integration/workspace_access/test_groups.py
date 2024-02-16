@@ -41,7 +41,7 @@ def test_prepare_environment(ws, make_ucx_group, sql_backend, inventory_schema):
 
 @retried(on=[NotFound], timeout=timedelta(minutes=2))
 def test_prepare_environment_no_groups_selected(ws, make_ucx_group, sql_backend, inventory_schema):
-    ws_group, acc_group = make_ucx_group()
+    ws_group, _ = make_ucx_group()
 
     group_manager = GroupManager(sql_backend, ws, inventory_schema)
     group_migration_state = group_manager.snapshot()
@@ -53,7 +53,7 @@ def test_prepare_environment_no_groups_selected(ws, make_ucx_group, sql_backend,
 @retried(on=[NotFound], timeout=timedelta(minutes=2))
 def test_rename_groups(ws, make_ucx_group, sql_backend, inventory_schema):
     # FIXME - test_rename_groups - TimeoutError: Timed out after 0:01:00
-    ws_group, acc_group = make_ucx_group()
+    ws_group, _ = make_ucx_group()
 
     group_manager = GroupManager(sql_backend, ws, inventory_schema, [ws_group.display_name], "ucx-temp-")
     group_manager.rename_groups()
@@ -65,7 +65,7 @@ def test_rename_groups(ws, make_ucx_group, sql_backend, inventory_schema):
 def test_reflect_account_groups_on_workspace_recovers_when_group_already_exists(
     ws, make_ucx_group, sql_backend, inventory_schema
 ):
-    ws_group, acc_group = make_ucx_group()
+    ws_group, _ = make_ucx_group()
 
     group_manager = GroupManager(sql_backend, ws, inventory_schema, [ws_group.display_name], "ucx-temp-")
     group_manager.reflect_account_groups_on_workspace()
@@ -96,7 +96,7 @@ def test_reflect_account_groups_on_workspace(ws, make_ucx_group, sql_backend, in
 def test_delete_ws_groups_should_delete_renamed_and_reflected_groups_only(
     ws, make_ucx_group, sql_backend, inventory_schema
 ):
-    ws_group, acc_group = make_ucx_group()
+    ws_group, _ = make_ucx_group()
 
     group_manager = GroupManager(sql_backend, ws, inventory_schema, [ws_group.display_name], "ucx-temp-")
     group_manager.rename_groups()
@@ -109,7 +109,7 @@ def test_delete_ws_groups_should_delete_renamed_and_reflected_groups_only(
 
 @retried(on=[NotFound], timeout=timedelta(minutes=2))
 def test_delete_ws_groups_should_not_delete_current_ws_groups(ws, make_ucx_group, sql_backend, inventory_schema):
-    ws_group, acc_group = make_ucx_group()
+    ws_group, _ = make_ucx_group()
 
     group_manager = GroupManager(sql_backend, ws, inventory_schema, [ws_group.display_name], "ucx-temp-")
     group_manager.delete_original_workspace_groups()
@@ -119,7 +119,7 @@ def test_delete_ws_groups_should_not_delete_current_ws_groups(ws, make_ucx_group
 
 @retried(on=[NotFound], timeout=timedelta(minutes=2))
 def test_delete_ws_groups_should_not_delete_non_reflected_acc_groups(ws, make_ucx_group, sql_backend, inventory_schema):
-    ws_group, acc_group = make_ucx_group()
+    ws_group, _ = make_ucx_group()
     group_manager = GroupManager(sql_backend, ws, inventory_schema, [ws_group.display_name], "ucx-temp-")
     group_manager.rename_groups()
     group_manager.delete_original_workspace_groups()
@@ -315,7 +315,7 @@ def test_replace_workspace_groups_with_account_groups(
     @retried(on=[AssertionError], timeout=timedelta(seconds=30))
     def assert_table_has_two_permissions():
         dummy_grants = list(permission_manager.load_all_for("TABLE", dummy_table.full_name, Grant))
-        assert 2 == len(dummy_grants)
+        assert len(dummy_grants) == 2
 
     assert_table_has_two_permissions()
 

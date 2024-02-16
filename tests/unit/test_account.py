@@ -23,8 +23,8 @@ def test_sync_workspace_info(mocker):
 
     ws = create_autospec(WorkspaceClient)
 
-    def workspace_client(host, product, **kwargs) -> WorkspaceClient:
-        assert host in ("https://abc.cloud.databricks.com", "https://def.cloud.databricks.com")
+    def workspace_client(host, product, **_) -> WorkspaceClient:
+        assert host in {"https://abc.cloud.databricks.com", "https://def.cloud.databricks.com"}
         assert product == "ucx"
         return ws
 
@@ -46,7 +46,7 @@ def test_current_workspace_name(mocker):
         requests_get.return_value = response
         installation = Installation(ws, 'ucx')
         wir = WorkspaceInfo(installation, ws)
-        assert "some" == wir.current()
+        assert wir.current() == "some"
 
 
 def test_manual_workspace_info(mocker):
