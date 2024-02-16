@@ -1,5 +1,17 @@
 # Version changelog
 
+## 0.13.0
+
+* Added CLI Command `databricks labs ucx principal-prefix-access` ([#949](https://github.com/databrickslabs/ucx/pull/949)).
+* Added a widget with all jobs to track migration progress ([#940](https://github.com/databrickslabs/ucx/pull/940)).
+* Added legacy cluster types to the assessment result ([#932](https://github.com/databrickslabs/ucx/pull/932)).
+* Cleanup of install documentation ([#951](https://github.com/databrickslabs/ucx/pull/951), [#947](https://github.com/databrickslabs/ucx/pull/947)).
+* Fixed `WorkspaceConfig` initialization for `DEBUG` notebook ([#934](https://github.com/databrickslabs/ucx/pull/934)).
+* Fixed installer not opening config file during the installation ([#945](https://github.com/databrickslabs/ucx/pull/945)).
+* Fixed groups in config file not considered for group migration job ([#943](https://github.com/databrickslabs/ucx/pull/943)).
+* Fixed bug where `tenant_id` inside secret scope is not detected ([#942](https://github.com/databrickslabs/ucx/pull/942)).
+
+
 ## 0.12.0
 
 * Added CLI Command `databricks labs ucx save-uc-compatible-roles` ([#863](https://github.com/databrickslabs/ucx/pull/863)).
