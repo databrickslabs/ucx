@@ -134,10 +134,10 @@ def test_snapshot_should_filter_workspace_system_groups():
     wsclient.groups.list.return_value = [group]
     acc_group = Group(id="1234", display_name="de")
     wsclient.api_client.do.return_value = {
-        "Resources": [g.as_dict() for g in [acc_group]],
+        "Resources": [acc_group.as_dict()],
     }
     res = GroupManager(backend, wsclient, inventory_database="inv").snapshot()
-    assert res == []
+    assert not res
 
 
 def test_snapshot_should_consider_groups_defined_in_conf():
@@ -149,7 +149,7 @@ def test_snapshot_should_consider_groups_defined_in_conf():
     acc_group_1 = Group(id="11", display_name="de", external_id="1234")
     acc_group_2 = Group(id="12", display_name="ds", external_id="1235")
     wsclient.api_client.do.return_value = {
-        "Resources": [g.as_dict() for g in [acc_group_1, acc_group_2]],
+        "Resources": [g.as_dict() for g in (acc_group_1, acc_group_2)],
     }
 
     wsclient.groups.list.return_value = [group1, group2]
@@ -177,10 +177,10 @@ def test_snapshot_should_filter_system_groups_defined_in_conf():
     wsclient.groups.list.return_value = [group1]
     acc_group_1 = Group(id="11", display_name="de")
     wsclient.api_client.do.return_value = {
-        "Resources": [g.as_dict() for g in [acc_group_1]],
+        "Resources": [g.as_dict() for g in (acc_group_1,)],
     }
     res = GroupManager(backend, wsclient, inventory_database="inv", include_group_names=["admins"]).snapshot()
-    assert res == []
+    assert not res
 
 
 def test_snapshot_should_filter_groups_defined_in_conf_not_present_in_workspace():
@@ -190,10 +190,10 @@ def test_snapshot_should_filter_groups_defined_in_conf_not_present_in_workspace(
     wsclient.groups.list.return_value = [group1]
     acc_group_1 = Group(id="11", display_name="de")
     wsclient.api_client.do.return_value = {
-        "Resources": [g.as_dict() for g in [acc_group_1]],
+        "Resources": [g.as_dict() for g in (acc_group_1,)],
     }
     res = GroupManager(backend, wsclient, inventory_database="inv", include_group_names=["de"]).snapshot()
-    assert res == []
+    assert not res
 
 
 def test_snapshot_should_filter_groups_defined_in_conf_not_present_in_account():
@@ -203,10 +203,10 @@ def test_snapshot_should_filter_groups_defined_in_conf_not_present_in_account():
     wsclient.groups.list.return_value = [group1]
     acc_group_1 = Group(id="11", display_name="ds")
     wsclient.api_client.do.return_value = {
-        "Resources": [g.as_dict() for g in [acc_group_1]],
+        "Resources": [g.as_dict() for g in (acc_group_1,)],
     }
     res = GroupManager(backend, wsclient, inventory_database="inv", include_group_names=["de"]).snapshot()
-    assert res == []
+    assert not res
 
 
 def test_snapshot_should_rename_groups_defined_in_conf():
@@ -220,7 +220,7 @@ def test_snapshot_should_rename_groups_defined_in_conf():
     account_admins_group_1 = Group(id="11", display_name="de", external_id="1234")
     account_admins_group_2 = Group(id="12", display_name="ds", external_id="1235")
     wsclient.api_client.do.return_value = {
-        "Resources": [g.as_dict() for g in [account_admins_group_1, account_admins_group_2]],
+        "Resources": [g.as_dict() for g in (account_admins_group_1, account_admins_group_2)],
     }
 
     wsclient.groups.list.return_value = [group1, group2]
@@ -262,7 +262,7 @@ def test_rename_groups_should_patch_eligible_groups():
     wsclient.groups.get.return_value = group1
     account_admins_group_1 = Group(id="11", display_name="de")
     wsclient.api_client.do.return_value = {
-        "Resources": [g.as_dict() for g in [account_admins_group_1]],
+        "Resources": [g.as_dict() for g in (account_admins_group_1,)],
     }
     GroupManager(backend, wsclient, inventory_database="inv", renamed_group_prefix="test-group-").rename_groups()
     wsclient.groups.patch.assert_called_with(
@@ -278,7 +278,7 @@ def test_rename_groups_should_filter_account_groups_in_workspace():
     wsclient.groups.list.return_value = [group1]
     account_group1 = Group(id="11", display_name="de")
     wsclient.api_client.do.return_value = {
-        "Resources": [g.as_dict() for g in [account_group1]],
+        "Resources": [g.as_dict() for g in (account_group1,)],
     }
     GroupManager(backend, wsclient, inventory_database="inv").rename_groups()
     wsclient.groups.patch.assert_not_called()
@@ -304,7 +304,7 @@ def test_rename_groups_should_fail_if_error_is_thrown():
     wsclient.groups.get.return_value = group1
     account_admins_group_1 = Group(id="11", display_name="de")
     wsclient.api_client.do.return_value = {
-        "Resources": [g.as_dict() for g in [account_admins_group_1]],
+        "Resources": [g.as_dict() for g in (account_admins_group_1,)],
     }
     wsclient.groups.patch.side_effect = RuntimeError("Something bad")
     gm = GroupManager(backend, wsclient, inventory_database="inv", renamed_group_prefix="test-group-")
@@ -318,7 +318,7 @@ def test_reflect_account_groups_on_workspace_should_be_called_for_eligible_group
     wsclient = MagicMock()
     account_group = Group(id="1", display_name="de")
     wsclient.api_client.do.return_value = {
-        "Resources": [g.as_dict() for g in [account_group]],
+        "Resources": [g.as_dict() for g in (account_group,)],
     }
 
     group1 = Group(id="1", display_name="test-dfd-de", meta=ResourceMeta(resource_type="WorkspaceGroup"))
@@ -339,7 +339,7 @@ def test_reflect_account_groups_on_workspace_should_filter_account_groups_in_wor
     wsclient.groups.get.return_value = group1
     account_group1 = Group(id="11", display_name="de")
     wsclient.api_client.do.return_value = {
-        "Resources": [g.as_dict() for g in [account_group1]],
+        "Resources": [g.as_dict() for g in (account_group1,)],
     }
     GroupManager(backend, wsclient, inventory_database="inv").reflect_account_groups_on_workspace()
 
@@ -355,7 +355,7 @@ def test_reflect_account_groups_on_workspace_should_filter_account_groups_not_in
     wsclient.groups.get.return_value = group1
     account_group1 = Group(id="11", display_name="ds")
     wsclient.api_client.do.return_value = {
-        "Resources": [g.as_dict() for g in [account_group1]],
+        "Resources": [g.as_dict() for g in (account_group1,)],
     }
     GroupManager(backend, wsclient, inventory_database="inv").reflect_account_groups_on_workspace()
 
@@ -368,11 +368,10 @@ def test_reflect_account_should_fail_if_error_is_thrown():
     wsclient = MagicMock()
     account_group = Group(id="1", display_name="de")
 
-    def do_side_effect(*args, **kwargs):
+    def do_side_effect(*args, **_):
         if args[0] == "GET":
-            return {"Resources": [g.as_dict() for g in [account_group]]}
-        else:
-            raise RuntimeError()
+            return {"Resources": [g.as_dict() for g in (account_group,)]}
+        raise RuntimeError()
 
     wsclient.api_client.do.side_effect = do_side_effect
 
@@ -389,16 +388,17 @@ def test_reflect_account_should_not_fail_if_group_not_in_the_account_anymore():
     wsclient = MagicMock()
     account_group1 = Group(id="11", display_name="de")
 
-    def reflect_account_side_effect(method, *args, **kwargs):
+    def reflect_account_side_effect(method, *_):
         if method == "GET":
             return {
-                "Resources": [g.as_dict() for g in [account_group1]],
+                "Resources": [g.as_dict() for g in (account_group1,)],
             }
         if method == "PUT":
             raise ResourceDoesNotExist(
                 "The group has been removed from the Databricks account after getting the group "
                 "and before reflecting it to the workspace."
             )
+        return None
 
     wsclient.api_client.do.side_effect = reflect_account_side_effect
     GroupManager(backend, wsclient, inventory_database="inv").reflect_account_groups_on_workspace()
@@ -533,13 +533,14 @@ def test_list_workspace_groups():
         entitlements=[ComplexValue(value="allow-cluster-create"), ComplexValue(value="allow-instance-pool-create")],
     )
 
-    def my_side_effect(group_id, **kwargs):
+    def my_side_effect(group_id, **_):
         if group_id == "1":
             return full_group1
-        elif group_id == "2":
+        if group_id == "2":
             return full_group2
-        elif group_id == "3":
+        if group_id == "3":
             return full_group3
+        raise NotImplementedError
 
     wsclient.groups.get.side_effect = my_side_effect
 
@@ -581,7 +582,7 @@ def test_snapshot_with_group_matched_by_suffix():
     wsclient.groups.get.return_value = group
     account_admins_group = Group(id="1234", external_id="1234", display_name="de_sx")
     wsclient.api_client.do.return_value = {
-        "Resources": [g.as_dict() for g in [account_admins_group]],
+        "Resources": [g.as_dict() for g in (account_admins_group,)],
     }
     res = GroupManager(
         backend, wsclient, inventory_database="inv", workspace_group_regex="$", workspace_group_replace="_sx"
@@ -620,7 +621,7 @@ def test_snapshot_with_group_matched_by_prefix():
     wsclient.groups.get.return_value = group
     account_admins_group = Group(id="1234", external_id="1234", display_name="px_de")
     wsclient.api_client.do.return_value = {
-        "Resources": [g.as_dict() for g in [account_admins_group]],
+        "Resources": [g.as_dict() for g in (account_admins_group,)],
     }
     res = GroupManager(
         backend, wsclient, inventory_database="inv", workspace_group_regex="^", workspace_group_replace="px_"
@@ -659,7 +660,7 @@ def test_snapshot_with_group_matched_by_subset():
     wsclient.groups.get.return_value = group
     account_admins_group = Group(id="1234", external_id="1234", display_name="px_1234")
     wsclient.api_client.do.return_value = {
-        "Resources": [g.as_dict() for g in [account_admins_group]],
+        "Resources": [g.as_dict() for g in (account_admins_group,)],
     }
     res = GroupManager(
         backend, wsclient, inventory_database="inv", workspace_group_regex=r"\(([1-9]+)\)", account_group_regex="[1-9]+"
@@ -698,7 +699,7 @@ def test_snapshot_with_group_matched_by_external_id():
     wsclient.groups.get.return_value = group
     account_admins_group = Group(id="1234", external_id="1234", display_name="xxxx")
     wsclient.api_client.do.return_value = {
-        "Resources": [g.as_dict() for g in [account_admins_group]],
+        "Resources": [g.as_dict() for g in (account_admins_group,)],
     }
     res = GroupManager(backend, wsclient, inventory_database="inv", external_id_match=True).snapshot()
     assert res == [
@@ -742,8 +743,8 @@ def test_configure_prefix():
         )
     )
     cg.run()
-    assert "^" == cg.workspace_group_regex
-    assert "test" == cg.workspace_group_replace
+    assert cg.workspace_group_regex == "^"
+    assert cg.workspace_group_replace == "test"
 
 
 def test_configure_suffix():
@@ -758,8 +759,8 @@ def test_configure_suffix():
         )
     )
     cg.run()
-    assert "$" == cg.workspace_group_regex
-    assert "test" == cg.workspace_group_replace
+    assert cg.workspace_group_regex == "$"
+    assert cg.workspace_group_replace == "test"
 
 
 def test_configure_external_id():
@@ -789,8 +790,8 @@ def test_configure_substitute():
         )
     )
     cg.run()
-    assert "biz" == cg.workspace_group_regex
-    assert "business" == cg.workspace_group_replace
+    assert cg.workspace_group_regex == "biz"
+    assert cg.workspace_group_replace == "business"
 
 
 def test_configure_match():
@@ -806,8 +807,8 @@ def test_configure_match():
         )
     )
     cg.run()
-    assert r"\[(#+)\]" == cg.workspace_group_regex
-    assert r"\((#+)\)" == cg.account_group_regex
+    assert cg.workspace_group_regex == r"\[(#+)\]"
+    assert cg.account_group_regex == r"\((#+)\)"
 
 
 def test_state():
@@ -851,14 +852,12 @@ def test_validate_group_diff_membership():
         members=[ComplexValue(display="test-user-3", value="3")],
     )
 
-    def do_api_side_effect(*args, **kwargs):
+    def do_api_side_effect(*args, **_):
         if args[0] == "GET":
             if args[1] == "/api/2.0/account/scim/v2/Groups":
-                return {"Resources": [g.as_dict() for g in [account_admins_group]]}
-            else:
-                return account_admins_group.as_dict()
-        else:
-            raise RuntimeError()
+                return {"Resources": [g.as_dict() for g in (account_admins_group,)]}
+            return account_admins_group.as_dict()
+        raise RuntimeError()
 
     wsclient.api_client.do.side_effect = do_api_side_effect
     wsclient.groups.get.side_effect = lambda group_id: group if group_id == "1" else account_admins_group
@@ -900,11 +899,9 @@ def test_validate_group_diff_membership_no_members():
     def do_api_side_effect(*args, **_):
         if args[0] == "GET":
             if args[1] == "/api/2.0/account/scim/v2/Groups":
-                return {"Resources": [g.as_dict() for g in [account_admins_group]]}
-            else:
-                return account_admins_group.as_dict()
-        else:
-            raise RuntimeError()
+                return {"Resources": [g.as_dict() for g in (account_admins_group,)]}
+            return account_admins_group.as_dict()
+        raise RuntimeError()
 
     wsclient.api_client.do.side_effect = do_api_side_effect
     wsclient.groups.get.side_effect = lambda group_id: group if group_id == "1" else account_admins_group
@@ -936,21 +933,19 @@ def test_validate_group_diff_membership_no_account_group_found():
         members=None,
     )
 
-    def do_api_side_effect(*args, **kwargs):
+    def do_api_side_effect(*args, **_):
         if args[0] == "GET":
             if args[1] == "/api/2.0/account/scim/v2/Groups":
-                return {"Resources": [g.as_dict() for g in [account_admins_group]]}
-            else:
-                return account_admins_group.as_dict()
-        else:
-            raise RuntimeError()
+                return {"Resources": [g.as_dict() for g in (account_admins_group,)]}
+            return account_admins_group.as_dict()
+        raise RuntimeError()
 
     wsclient.api_client.do.side_effect = do_api_side_effect
     wsclient.groups.get.side_effect = lambda group_id: group if group_id == "1" else None
     grp_membership = GroupManager(
         backend, wsclient, inventory_database="inv", workspace_group_regex=r"\(([1-9]+)\)", account_group_regex="[1-9]+"
     ).validate_group_membership()
-    assert grp_membership == []
+    assert not grp_membership
 
 
 def test_validate_group_same_membership():
@@ -977,20 +972,18 @@ def test_validate_group_same_membership():
         members=[ComplexValue(display="test-user-1", value="01"), ComplexValue(display="test-user-2", value="02")],
     )
 
-    def do_api_side_effect(*args, **kwargs):
+    def do_api_side_effect(*args, **_):
         if args[0] == "GET":
             if args[1] == "/api/2.0/account/scim/v2/Groups":
-                return {"Resources": [g.as_dict() for g in [account_admins_group]]}
-            else:
-                return account_admins_group.as_dict()
-        else:
-            raise RuntimeError()
+                return {"Resources": [g.as_dict() for g in (account_admins_group,)]}
+            return account_admins_group.as_dict()
+        raise RuntimeError()
 
     wsclient.api_client.do.side_effect = do_api_side_effect
     grp_membership = GroupManager(
         backend, wsclient, inventory_database="inv", workspace_group_regex=r"\(([1-9]+)\)", account_group_regex="[1-9]+"
     ).validate_group_membership()
-    assert grp_membership == []
+    assert not grp_membership
 
 
 def test_validate_acc_group_removed_after_listing():
@@ -1017,20 +1010,18 @@ def test_validate_acc_group_removed_after_listing():
         members=[ComplexValue(display="test-user-1", value="01"), ComplexValue(display="test-user-2", value="02")],
     )
 
-    def do_api_side_effect(*args, **kwargs):
+    def do_api_side_effect(*args, **_):
         if args[0] == "GET":
             if args[1] == "/api/2.0/account/scim/v2/Groups":
-                return {"Resources": [g.as_dict() for g in [account_admins_group]]}
-            else:
-                raise NotFound()
-        else:
-            raise RuntimeError()
+                return {"Resources": [g.as_dict() for g in (account_admins_group,)]}
+            raise NotFound()
+        raise RuntimeError()
 
     wsclient.api_client.do.side_effect = do_api_side_effect
     grp_membership = GroupManager(
         backend, wsclient, inventory_database="inv", workspace_group_regex=r"\(([1-9]+)\)", account_group_regex="[1-9]+"
     ).validate_group_membership()
-    assert grp_membership == []
+    assert not grp_membership
 
 
 def test_migration_state_with_filtered_group():

@@ -19,7 +19,7 @@ from databricks.labs.ucx.hive_metastore import TablesCrawler
 from databricks.labs.ucx.hive_metastore.mapping import Rule, TableMapping
 from databricks.labs.ucx.hive_metastore.tables import Table
 from databricks.labs.ucx.hive_metastore.udfs import Udf, UdfsCrawler
-# pylint: disable-next=unused-wildcard-import
+# pylint: disable-next=unused-wildcard-import,wildcard-import
 from databricks.labs.ucx.mixins.fixtures import *  # noqa: F403
 from databricks.labs.ucx.workspace_access.groups import MigratedGroup
 
@@ -37,12 +37,12 @@ def debug_env_name():
     return "ucws"
 
 
-def get_workspace_membership(ws, resource_type: str = "WorkspaceGroup"):
+def get_workspace_membership(workspace_client, res_type: str = "WorkspaceGroup"):
     membership = collections.defaultdict(set)
-    for g in ws.groups.list(attributes="id,displayName,meta,members"):
-        if g.display_name in ["users", "admins", "account users"]:
+    for g in workspace_client.groups.list(attributes="id,displayName,meta,members"):
+        if g.display_name in {"users", "admins", "account users"}:
             continue
-        if g.meta.resource_type != resource_type:
+        if g.meta.resource_type != res_type:
             continue
         if g.members is None:
             continue
@@ -54,10 +54,9 @@ def get_workspace_membership(ws, resource_type: str = "WorkspaceGroup"):
 def account_host(self: databricks.sdk.core.Config) -> str:
     if self.is_azure:
         return "https://accounts.azuredatabricks.net"
-    elif self.is_gcp:
+    if self.is_gcp:
         return "https://accounts.gcp.databricks.com/"
-    else:
-        return "https://accounts.cloud.databricks.com"
+    return "https://accounts.cloud.databricks.com"
 
 
 @pytest.fixture(scope="session")  # type: ignore[no-redef]
