@@ -13,8 +13,8 @@ from databricks.labs.ucx.azure.credentials import StorageCredentialValidationRes
 from databricks.labs.ucx.azure.resources import AzureResources
 from databricks.labs.ucx.hive_metastore import ExternalLocations
 from tests.integration.conftest import (
-    StaticAzureResourcePermissions,
-    StaticAzureServicePrincipalCrawler,
+    StaticResourcePermissions,
+    StaticServicePrincipalCrawler,
     StaticServicePrincipalMigration,
     StaticStorageCredentialManager,
 )
@@ -66,36 +66,27 @@ def run_migration(ws, sql_backend):
         azurerm = AzureResources(ws)
         locations = ExternalLocations(ws, sql_backend, "dont_need_a_schema")
 
-        resource_permissions = StaticAzureResourcePermissions(
-            installation,
-            ws,
-            azurerm,
-            locations,
-            [
-                StoragePermissionMapping(
-                    prefix="abfss://things@labsazurethings.dfs.core.windows.net/avoid_ext_loc_overlap",
-                    client_id=test_info.application_id,
-                    principal=test_info.credential_name,
-                    privilege="READ_FILES" if read_only else "WRITE_FILES",
-                    directory_id=test_info.directory_id,
-                )
-            ],
-        )
+        permission_mappings = [
+            StoragePermissionMapping(
+                prefix="abfss://things@labsazurethings.dfs.core.windows.net/avoid_ext_loc_overlap",
+                client_id=test_info.application_id,
+                principal=test_info.credential_name,
+                privilege="READ_FILES" if read_only else "WRITE_FILES",
+                directory_id=test_info.directory_id,
+            )
+        ]
+        resource_permissions = StaticResourcePermissions(permission_mappings, installation, ws, azurerm, locations)
 
-        sp_crawler = StaticAzureServicePrincipalCrawler(
-            ws,
-            sql_backend,
-            "dont_need_a_schema",
-            [
-                AzureServicePrincipalInfo(
-                    application_id=test_info.application_id,
-                    secret_scope=test_info.secret_scope,
-                    secret_key=test_info.secret_key,
-                    tenant_id="test",
-                    storage_account="test",
-                )
-            ],
-        )
+        sp_infos = [
+            AzureServicePrincipalInfo(
+                application_id=test_info.application_id,
+                secret_scope=test_info.secret_scope,
+                secret_key=test_info.secret_key,
+                tenant_id="test",
+                storage_account="test",
+            )
+        ]
+        sp_crawler = StaticServicePrincipalCrawler(sp_infos, ws, sql_backend, "dont_need_a_schema")
 
         spn_migration = StaticServicePrincipalMigration(
             installation, ws, resource_permissions, sp_crawler, StaticStorageCredentialManager(ws, credentials)

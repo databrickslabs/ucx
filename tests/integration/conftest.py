@@ -23,9 +23,8 @@ from databricks.labs.ucx.azure.credentials import (
     StorageCredentialManager,
     StorageCredentialValidationResult,
 )
-from databricks.labs.ucx.azure.resources import AzureResources
 from databricks.labs.ucx.framework.crawlers import SqlBackend
-from databricks.labs.ucx.hive_metastore import ExternalLocations, TablesCrawler
+from databricks.labs.ucx.hive_metastore import TablesCrawler
 from databricks.labs.ucx.hive_metastore.mapping import Rule, TableMapping
 from databricks.labs.ucx.hive_metastore.tables import Table
 from databricks.labs.ucx.hive_metastore.udfs import Udf, UdfsCrawler
@@ -209,25 +208,18 @@ class StaticStorageCredentialManager(StorageCredentialManager):
         return application_ids
 
 
-class StaticAzureServicePrincipalCrawler(AzureServicePrincipalCrawler):
-    def __init__(self, ws: WorkspaceClient, sbe: SqlBackend, schema: str, spn_infos: list[AzureServicePrincipalInfo]):
-        super().__init__(ws, sbe, schema)
-        self.spn_infos = spn_infos
+class StaticServicePrincipalCrawler(AzureServicePrincipalCrawler):
+    def __init__(self, spn_infos: list[AzureServicePrincipalInfo], *args):
+        super().__init__(*args)
+        self._spn_infos = spn_infos
 
     def snapshot(self) -> list[AzureServicePrincipalInfo]:
-        return self.spn_infos
+        return self._spn_infos
 
 
-class StaticAzureResourcePermissions(AzureResourcePermissions):
-    def __init__(
-        self,
-        installation: Installation,
-        ws: WorkspaceClient,
-        azurerm: AzureResources,
-        lc: ExternalLocations,
-        permission_mappings: list[StoragePermissionMapping],
-    ):
-        super().__init__(installation, ws, azurerm, lc)
+class StaticResourcePermissions(AzureResourcePermissions):
+    def __init__(self, permission_mappings: list[StoragePermissionMapping], *args):
+        super().__init__(*args)
         self._permission_mappings = permission_mappings
 
     def load(self) -> list[StoragePermissionMapping]:

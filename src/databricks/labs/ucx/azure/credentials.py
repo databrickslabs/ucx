@@ -92,7 +92,9 @@ class StorageCredentialManager:
             application_id=sp.permission_mapping.client_id,
             client_secret=sp.client_secret,
         )
-        comment = f"Created by UCX during migration to UC using Azure Service Principal: {sp.permission_mapping.principal}"
+        comment = (
+            f"Created by UCX during migration to UC using Azure Service Principal: {sp.permission_mapping.principal}"
+        )
         read_only = False
         if sp.permission_mapping.privilege == Privilege.READ_FILES.value:
             read_only = True
@@ -102,17 +104,17 @@ class StorageCredentialManager:
         )
 
     def validate_storage_credential(
-        self, storage_credential, sp_migration: ServicePrincipalMigrationInfo
+        self, storage_credential: StorageCredentialInfo, sp: ServicePrincipalMigrationInfo
     ) -> StorageCredentialValidationResult:
         read_only = False
-        if sp_migration.permission_mapping.privilege == Privilege.READ_FILES.value:
+        if sp.permission_mapping.privilege == Privilege.READ_FILES.value:
             read_only = True
         # storage_credential validation creates a temp UC external location, which cannot overlap with
         # existing UC external locations. So add a sub folder to the validation location just in case
         try:
             validation = self._ws.storage_credentials.validate(
                 storage_credential_name=storage_credential.name,
-                url=sp_migration.permission_mapping.prefix,
+                url=sp.permission_mapping.prefix,
                 read_only=read_only,
             )
             return StorageCredentialValidationResult.from_storage_credential_validation(storage_credential, validation)
@@ -284,10 +286,13 @@ class ServicePrincipalMigration:
                 self._storage_credential_manager.validate_storage_credential(storage_credential, sp)
             )
 
-        results_file = self.save(execution_result)
-        logger.info("Completed migration from Azure Service Principal migrated to UC Storage credentials")
-        print(
-            f"Completed migration from Azure Service Principal migrated to UC Storage credentials. "
-            f"Please check {results_file} for validation results"
-        )
+        if execution_result:
+            results_file = self.save(execution_result)
+            logger.info("Completed migration from Azure Service Principal migrated to UC Storage credentials")
+            print(
+                f"Completed migration from Azure Service Principal migrated to UC Storage credentials. "
+                f"Please check {results_file} for validation results"
+            )
+        else:
+            logger.info("No Azure Service Principal migrated to UC Storage credentials")
         return execution_result

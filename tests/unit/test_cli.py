@@ -313,8 +313,8 @@ def test_migrate_azure_service_principals(ws):
     with (
         patch("databricks.labs.blueprint.tui.Prompts.confirm", return_value=True),
         patch("databricks.labs.blueprint.installation.Installation.load"),
-        patch("databricks.labs.blueprint.installation.Installation.save") as s,
+        patch("databricks.labs.blueprint.installation.Installation.save"),
     ):
         migrate_azure_service_principals(ws)
-        s.assert_called_once()
+        ws.storage_credentials.list.assert_called()
 
