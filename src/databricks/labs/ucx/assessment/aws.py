@@ -176,7 +176,7 @@ class AWSResources:
     }    
         """
 
-    SELF_ASSUME_ROLE_POLICY: typing.ClassVar[str]:"""
+    SELF_ASSUME_ROLE_POLICY: typing.ClassVar[str]="""
 {
   "Version": "2012-10-17",
   "Statement": [
