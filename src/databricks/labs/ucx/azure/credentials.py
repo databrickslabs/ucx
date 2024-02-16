@@ -115,7 +115,9 @@ class StorageCredentialManager:
                 url=sp.permission_mapping.prefix,
                 read_only=read_only,
             )
-            return StorageCredentialValidationResult.from_validation(storage_credential, validation, sp.permission_mapping.prefix)
+            return StorageCredentialValidationResult.from_validation(
+                storage_credential, validation, sp.permission_mapping.prefix
+            )
         except InvalidParameterValue:
             logger.warning(
                 "There is an existing external location overlaps with the prefix that is mapped to the service principal and used for validating the migrated storage credential. Skip the validation"
@@ -130,7 +132,7 @@ class StorageCredentialManager:
                         )
                     ],
                 ),
-                sp.permission_mapping.prefix
+                sp.permission_mapping.prefix,
             )
 
 
