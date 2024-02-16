@@ -38,31 +38,29 @@ class ServicePrincipalMigrationInfo:
 @dataclass
 class StorageCredentialValidationResult:
     name: str | None = None
-    azure_service_principal: AzureServicePrincipal | None = None
+    application_id: str | None = None
+    directory_id: str | None = None
     created_by: str | None = None
     read_only: bool | None = None
+    validated_on: str | None = None
     results: list[ValidationResult] | None = None
 
     @classmethod
-    def from_storage_credential_validation(
-        cls, storage_credential: StorageCredentialInfo, validation: ValidateStorageCredentialResponse
+    def from_validation(
+        cls, storage_credential: StorageCredentialInfo, validation: ValidateStorageCredentialResponse, prefix: str
     ):
         if storage_credential.azure_service_principal:
-            # Guard rail to explicitly remove the client_secret, just in case the azure_service_principal
-            # in StorageCredentialInfo returned by WorkspaceClient.storage_credentials.create exposes the
-            # client_secret due to potential bugs in the future.
-            service_principal = AzureServicePrincipal(
-                storage_credential.azure_service_principal.directory_id,
-                storage_credential.azure_service_principal.application_id,
-                "",
-            )
+            application_id = storage_credential.azure_service_principal.application_id
+            directory_id = storage_credential.azure_service_principal.directory_id
 
         return cls(
-            name=storage_credential.name,
-            azure_service_principal=service_principal,
-            created_by=storage_credential.created_by,
-            read_only=storage_credential.read_only,
-            results=validation.results,
+            storage_credential.name,
+            application_id,
+            directory_id,
+            storage_credential.created_by,
+            storage_credential.read_only,
+            prefix,
+            validation.results,
         )
 
 
@@ -117,12 +115,12 @@ class StorageCredentialManager:
                 url=sp.permission_mapping.prefix,
                 read_only=read_only,
             )
-            return StorageCredentialValidationResult.from_storage_credential_validation(storage_credential, validation)
+            return StorageCredentialValidationResult.from_validation(storage_credential, validation, sp.permission_mapping.prefix)
         except InvalidParameterValue:
             logger.warning(
                 "There is an existing external location overlaps with the prefix that is mapped to the service principal and used for validating the migrated storage credential. Skip the validation"
             )
-            return StorageCredentialValidationResult.from_storage_credential_validation(
+            return StorageCredentialValidationResult.from_validation(
                 storage_credential,
                 ValidateStorageCredentialResponse(
                     is_dir=None,
@@ -132,6 +130,7 @@ class StorageCredentialManager:
                         )
                     ],
                 ),
+                sp.permission_mapping.prefix
             )
 
 
