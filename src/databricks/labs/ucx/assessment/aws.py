@@ -237,55 +237,38 @@ class AWSResources:
 
     def add_uc_role_policy(self, role_name, policy_name, s3_prefixes: set[str], account_id: str, kms_key=None):
         s3_prefixes_enriched = sorted([self.S3_PREFIX + s3_prefix for s3_prefix in s3_prefixes])
+        statement = [
+            {
+                "Action": [
+                    "s3:GetObject",
+                    "s3:PutObject",
+                    "s3:DeleteObject",
+                    "s3:ListBucket",
+                    "s3:GetBucketLocation",
+                ],
+                "Resource": s3_prefixes_enriched,
+                "Effect": "Allow",
+            },
+            {
+                "Action": ["sts:AssumeRole"],
+                "Resource": [f"arn:aws:iam::{account_id}:role/{role_name}"],
+                "Effect": "Allow",
+            },
+        ]
         if kms_key:
-            policy_document = {
-                "Version": "2012-10-17",
-                "Statement": [
-                    {
-                        "Action": [
-                            "s3:GetObject",
-                            "s3:PutObject",
-                            "s3:DeleteObject",
-                            "s3:ListBucket",
-                            "s3:GetBucketLocation",
-                        ],
-                        "Resource": s3_prefixes_enriched,
-                        "Effect": "Allow",
-                    },
-                    {
-                        "Action": ["kms:Decrypt", "kms:Encrypt", "kms:GenerateDataKey*"],
-                        "Resource": [f"arn:aws:kms:{kms_key}"],
-                        "Effect": "Allow",
-                    },
-                    {
-                        "Action": ["sts:AssumeRole"],
-                        "Resource": [f"arn:aws:iam::{account_id}:role/{role_name}"],
-                        "Effect": "Allow",
-                    },
-                ],
-            }
-        else:
-            policy_document = {
-                "Version": "2012-10-17",
-                "Statement": [
-                    {
-                        "Action": [
-                            "s3:GetObject",
-                            "s3:PutObject",
-                            "s3:DeleteObject",
-                            "s3:ListBucket",
-                            "s3:GetBucketLocation",
-                        ],
-                        "Resource": s3_prefixes_enriched,
-                        "Effect": "Allow",
-                    },
-                    {
-                        "Action": ["sts:AssumeRole"],
-                        "Resource": [f"arn:aws:iam::{account_id}:role/{role_name}"],
-                        "Effect": "Allow",
-                    },
-                ],
-            }
+            statement.insert(
+                1,
+                {
+                    "Action": ["kms:Decrypt", "kms:Encrypt", "kms:GenerateDataKey*"],
+                    "Resource": [f"arn:aws:kms:{kms_key}"],
+                    "Effect": "Allow",
+                },
+            )
+        policy_document = {
+            "Version": "2012-10-17",
+            "Statement": statement,
+        }
+
         policy_document_json = self._get_json_for_cli(policy_document)
         if not self._run_command(
             f"iam put-role-policy --role-name {role_name} --policy-name {policy_name} --policy-document {policy_document_json}"
@@ -372,7 +355,7 @@ class AWSResourcePermissions:
         missing_paths = self._identify_missing_paths()
         role_actions = []
         for path in missing_paths:
-            role_actions.append(AWSRoleAction(default_role_arn, "s3", "Privilege.WRITE_FILES.value", path))
+            role_actions.append(AWSRoleAction(default_role_arn, "s3", Privilege.WRITE_FILES.value, path))
         return role_actions
 
     def create_uc_roles_cli(self, *, single_role=True, role_name="UC_ROLE", policy_name="UC_POLICY"):
