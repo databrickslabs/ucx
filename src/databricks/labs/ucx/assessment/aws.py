@@ -13,7 +13,7 @@ from databricks.labs.blueprint.installation import Installation
 from databricks.labs.blueprint.parallel import Threads
 from databricks.sdk import WorkspaceClient
 from databricks.sdk.errors import ResourceDoesNotExist
-from databricks.sdk.service.catalog import Privilege, StorageCredentialInfo
+from databricks.sdk.service.catalog import Privilege
 
 from databricks.labs.ucx.framework.crawlers import StatementExecutionBackend
 from databricks.labs.ucx.hive_metastore import ExternalLocations
@@ -73,7 +73,7 @@ def run_command(command):
 
 
 def esc_json_for_cli(json: str) -> str:
-    return json.replace('"', '\\"').replace('\n', '\\n')
+    return json.replace('\n', '').replace(" ", "")
 
 
 class AWSResources:
@@ -85,7 +85,9 @@ class AWSResources:
         "arn:aws:iam::414351767826:role/unity-catalog-prod-UCMasterRole-14S5ZJVKOTYTL",
         "arn:aws:iam::707343435239:role/unity-catalog-dev-UCMasterRole-G3MMN8SP21FO",
     ]
-    AWS_ROLE_TRUST_DOC: typing.ClassVar[str] = """
+    AWS_ROLE_TRUST_DOC: typing.ClassVar[
+        str
+    ] = """
 {
     "Version": "2012-10-17",
     "Statement": [
@@ -105,7 +107,9 @@ class AWSResources:
 }
     """
 
-    AWS_POLICY_KMS: typing.ClassVar[str] = """
+    AWS_POLICY_KMS: typing.ClassVar[
+        str
+    ] = """
 {
   "Version": "2012-10-17",
   "Statement": [
@@ -144,7 +148,9 @@ class AWSResources:
 }    
     """
 
-    AWS_POLICY_NO_KMS: typing.ClassVar[str] = """
+    AWS_POLICY_NO_KMS: typing.ClassVar[
+        str
+    ] = """
 {
       "Version": "2012-10-17",
       "Statement": [
@@ -172,7 +178,9 @@ class AWSResources:
     }    
         """
 
-    SELF_ASSUME_ROLE_POLICY: typing.ClassVar[str] = """
+    SELF_ASSUME_ROLE_POLICY: typing.ClassVar[
+        str
+    ] = """
 {
   "Version": "2012-10-17",
   "Statement": [
@@ -328,22 +336,27 @@ class AWSResources:
     def add_uc_role(self, role_name, policy_name, s3_prefixes: set[str], account_id: str, kms_key=None):
         assume_role_json = esc_json_for_cli(self.AWS_ROLE_TRUST_DOC)
         add_role = self._run_json_command(
-            f"iam create-role --role-name {role_name} --assume-role-policy-document {assume_role_json}")
+            f"iam create-role --role-name {role_name} --assume-role-policy-document {assume_role_json}"
+        )
         if not add_role:
             return False
         if kms_key:
             policy_document = self.AWS_POLICY_KMS
         else:
             policy_document = self.AWS_POLICY_NO_KMS
-        s3_prefixes_enriched = {self.S3_PREFIX+s3_prefix for s3_prefix in s3_prefixes}
-        policy_document = policy_document.replace("<BUCKET>",json.dumps(s3_prefixes_enriched))
-        policy_document = policy_document.replace("<AWS-ACCOUNT-ID>",account_id)
+        s3_prefixes_enriched = [self.S3_PREFIX + s3_prefix for s3_prefix in s3_prefixes]
+        policy_document = policy_document.replace("<BUCKETS>", json.dumps(s3_prefixes_enriched))
+        policy_document = policy_document.replace("<AWS-ACCOUNT-ID>", account_id)
         policy_document = policy_document.replace("<AWS-IAM-ROLE-NAME>", role_name)
         policy_document_json = esc_json_for_cli(policy_document)
         add_policy = self._run_json_command(
-            f"iam put-role-policy --role-name {role_name} --policy-name {policy_name} --policy-document {policy_document_json}")
-        if not add_policy:
+            f"iam put-role-policy --role-name {role_name} --policy-name {policy_name} --policy-document {policy_document_json}"
+        )
+        if add_policy is None:
             return False
+        # TODO: Create Credential and update policy
+        #  https://docs.databricks.com/en/connect/unity-catalog/storage-credentials.html step 3
+        return True
 
     def _run_json_command(self, command: str):
         aws_cmd = shutil.which("aws")
@@ -358,8 +371,16 @@ class AWSResourcePermissions:
     UCRolesFileName: typing.ClassVar[str] = "uc_roles_access.csv"
     InstanceProfilesFileName: typing.ClassVar[str] = "aws_instance_profile_info.csv"
 
-    def __init__(self, installation: Installation, ws: WorkspaceClient, backend: StatementExecutionBackend,
-                 aws_resources: AWSResources, schema: str, aws_account_id=None, kms_key=None):
+    def __init__(
+        self,
+        installation: Installation,
+        ws: WorkspaceClient,
+        backend: StatementExecutionBackend,
+        aws_resources: AWSResources,
+        schema: str,
+        aws_account_id=None,
+        kms_key=None,
+    ):
         self._installation = installation
         self._aws_resources = aws_resources
         self._backend = backend
@@ -375,8 +396,15 @@ class AWSResourcePermissions:
         caller_identity = aws.validate_connection()
         if not caller_identity:
             raise ResourceWarning("AWS CLI is not configured properly.")
-        return cls(installation, ws, backend, aws,
-                   schema=schema, aws_account_id=caller_identity.get("Account"), kms_key=kms_key)
+        return cls(
+            installation,
+            ws,
+            backend,
+            aws,
+            schema=schema,
+            aws_account_id=caller_identity.get("Account"),
+            kms_key=kms_key,
+        )
 
     def save_uc_compatible_roles(self):
         uc_role_access = list(self._get_role_access())
@@ -486,5 +514,3 @@ class AWSResourcePermissions:
             logger.warning("No Mapping Was Generated.")
             return None
         return self._installation.save(instance_profile_access, filename=self.InstanceProfilesFileName)
-
-
