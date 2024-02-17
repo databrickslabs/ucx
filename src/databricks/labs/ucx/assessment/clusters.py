@@ -10,8 +10,10 @@ from databricks.sdk.service.compute import (
     ClusterDetails,
     ClusterSource,
     DataSecurityMode,
+    DbfsStorageInfo,
     InitScriptInfo,
     Policy,
+    WorkspaceStorageInfo,
 )
 
 from databricks.labs.ucx.assessment.crawlers import (
@@ -59,25 +61,22 @@ class CheckClusterMixin(CheckInitScriptMixin):
         return failures
 
     def _get_init_script_data(self, init_script_info: InitScriptInfo) -> str | None:
-        if init_script_info.dbfs is not None and init_script_info.dbfs.destination is not None:
-            if len(init_script_info.dbfs.destination.split(":")) == INIT_SCRIPT_DBFS_PATH:
-                file_api_format_destination = init_script_info.dbfs.destination.split(":")[1]
-                if file_api_format_destination:
-                    try:
-                        data = self._ws.dbfs.read(file_api_format_destination).data
-                        if data is not None:
-                            return base64.b64decode(data).decode("utf-8")
-                    except NotFound:
+        try:
+            match init_script_info:
+                case InitScriptInfo(dbfs=DbfsStorageInfo(destination)):
+                    split = destination.split(":")
+                    if len(split) != INIT_SCRIPT_DBFS_PATH:
                         return None
-        if init_script_info.workspace is not None and init_script_info.workspace.destination is not None:
-            workspace_file_destination = init_script_info.workspace.destination
-            try:
-                data = self._ws.workspace.export(workspace_file_destination).content
-                if data is not None:
-                    return base64.b64decode(data).decode("utf-8")
-            except NotFound:
-                return None
-        return None
+                    data = self._ws.dbfs.read(split[1]).data
+                    if data is not None:
+                        return base64.b64decode(data).decode("utf-8")
+                case InitScriptInfo(workspace=WorkspaceStorageInfo(workspace_file_destination)):
+                    data = self._ws.workspace.export(workspace_file_destination).content
+                    if data is not None:
+                        return base64.b64decode(data).decode("utf-8")
+            return None
+        except NotFound:
+            return None
 
     def _check_cluster_init_script(self, init_scripts: list[InitScriptInfo], source: str) -> list[str]:
         failures: list[str] = []

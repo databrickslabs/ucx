@@ -24,7 +24,7 @@ class JobInfo:
 
 class JobsMixin:
     @staticmethod
-    def _get_cluster_configs_from_all_jobs(all_jobs, all_clusters_by_id):
+    def _get_cluster_configs_from_all_jobs(all_jobs, all_clusters_by_id):  # pylint: disable=too-complex
         for j in all_jobs:
             if j.settings is None:
                 continue

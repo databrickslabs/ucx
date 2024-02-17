@@ -185,37 +185,47 @@ class AzureResources:
             principal_types = ["ServicePrincipal"]
         result = self._get_resource(f"{resource_id}/providers/Microsoft.Authorization/roleAssignments", "2022-04-01")
         for role_assignment in result.get("value", []):
-            assignment_properties = role_assignment.get("properties", {})
-            principal_type = assignment_properties.get("principalType")
-            if not principal_type:
+            assignment = self._role_assignment(role_assignment, resource_id, principal_types)
+            if not assignment:
                 continue
-            if principal_type not in principal_types:
-                continue
-            principal_id = assignment_properties.get("principalId")
-            if not principal_id:
-                continue
-            role_definition_id = assignment_properties.get("roleDefinitionId")
-            if not role_definition_id:
-                continue
-            scope = assignment_properties.get("scope")
-            if not scope:
-                continue
-            if role_definition_id not in self._role_definitions:
-                role_definition = self._get_resource(role_definition_id, "2022-04-01")
-                definition_properties = role_definition.get("properties", {})
-                role_name: str = definition_properties.get("roleName")
-                if not role_name:
-                    continue
-                self._role_definitions[role_definition_id] = role_name
-            principal = self._get_principal(principal_id)
-            if not principal:
-                continue
-            role_name = self._role_definitions[role_definition_id]
-            if scope == "/":
-                scope = resource_id
-            yield AzureRoleAssignment(
-                resource=AzureResource(resource_id),
-                scope=AzureResource(scope),
-                principal=principal,
-                role_name=role_name,
-            )
+            yield assignment
+
+    def _role_assignment(
+        self, role_assignment: dict, resource_id: str, principal_types: list[str]
+    ) -> AzureRoleAssignment | None:
+        assignment_properties = role_assignment.get("properties", {})
+        principal_type = assignment_properties.get("principalType")
+        if not principal_type:
+            return None
+        if principal_type not in principal_types:
+            return None
+        principal_id = assignment_properties.get("principalId")
+        if not principal_id:
+            return None
+        role_definition_id = assignment_properties.get("roleDefinitionId")
+        if not role_definition_id:
+            return None
+        scope = assignment_properties.get("scope")
+        if not scope:
+            return None
+        role_name = self._role_name(role_definition_id)
+        if not role_name:
+            return None
+        principal = self._get_principal(principal_id)
+        if not principal:
+            return None
+        if scope == "/":
+            scope = resource_id
+        return AzureRoleAssignment(
+            resource=AzureResource(resource_id), scope=AzureResource(scope), principal=principal, role_name=role_name
+        )
+
+    def _role_name(self, role_definition_id) -> str | None:
+        if role_definition_id not in self._role_definitions:
+            role_definition = self._get_resource(role_definition_id, "2022-04-01")
+            definition_properties = role_definition.get("properties", {})
+            role_name: str = definition_properties.get("roleName")
+            if not role_name:
+                return None
+            self._role_definitions[role_definition_id] = role_name
+        return self._role_definitions.get(role_definition_id)

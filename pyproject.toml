@@ -217,19 +217,21 @@ limit-inference-results = 100
 # usually to register additional checkers.
 load-plugins = [
     "pylint_pytest",
-    "pylint.extensions.check_elif",
     "pylint.extensions.bad_builtin",
-    "pylint.extensions.docparams",
-    "pylint.extensions.for_any_all",
-    "pylint.extensions.set_membership",
-    "pylint.extensions.code_style",
-    "pylint.extensions.overlapping_exceptions",
-    "pylint.extensions.typing",
-    "pylint.extensions.redefined_variable_type",
-    "pylint.extensions.comparison_placement",
     "pylint.extensions.broad_try_clause",
+    "pylint.extensions.check_elif",
+    "pylint.extensions.code_style",
+    "pylint.extensions.comparison_placement",
+    "pylint.extensions.consider_refactoring_into_while_condition",
     "pylint.extensions.dict_init_mutate",
-    "pylint.extensions.consider_refactoring_into_while_condition"
+    "pylint.extensions.docparams",
+    "pylint.extensions.dunder",
+    "pylint.extensions.for_any_all",
+    "pylint.extensions.mccabe",
+    "pylint.extensions.overlapping_exceptions",
+    "pylint.extensions.redefined_variable_type",
+    "pylint.extensions.set_membership",
+    "pylint.extensions.typing",
 ]
 
 # Pickle collected data for later comparisons.

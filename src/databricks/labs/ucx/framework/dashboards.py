@@ -169,7 +169,7 @@ class DashboardFromFiles:
         parent = f"folders/{object_info.object_id}"
         return parent
 
-    def _store_query_state(self, queries_per_dashboard: dict[str, list[SimpleQuery]]):
+    def _store_query_state(self, queries_per_dashboard: dict[str, list[SimpleQuery]]):  # pylint: disable=too-complex
         query_refs = set()
         dashboard_refs = queries_per_dashboard.keys()
         for queries in queries_per_dashboard.values():
