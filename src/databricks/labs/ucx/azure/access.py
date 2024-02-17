@@ -33,11 +33,11 @@ class AzureResourcePermissions:
         }
 
     @classmethod
-    def for_cli(cls, ws: WorkspaceClient, product='ucx'):
+    def for_cli(cls, ws: WorkspaceClient, product='ucx', include_subscriptions=None):
         installation = Installation.current(ws, product)
         config = installation.load(WorkspaceConfig)
         sql_backend = StatementExecutionBackend(ws, config.warehouse_id)
-        azurerm = AzureResources(ws)
+        azurerm = AzureResources(ws, include_subscriptions=include_subscriptions)
         locations = ExternalLocations(ws, sql_backend, config.inventory_database)
         return cls(installation, ws, azurerm, locations)
 

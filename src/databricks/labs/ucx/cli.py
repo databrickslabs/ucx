@@ -234,23 +234,12 @@ def principal_prefix_access(w: WorkspaceClient, subscription_id: str | None = No
     its access to all the S3 buckets, along with AWS roles that are set with UC access and its access to S3 buckets.
     The output is stored in the workspace install folder.
     Pass suscription_id for azure and aws_profile for aws."""
-    print("testing")
     if w.config.is_azure:
-        if w.config.auth_type != "azure-cli":
-            logger.error("In order to obtain AAD token, Please run azure cli to authenticate.")
-            return None
-        if subscription_id == "":
+        if not subscription_id:
             logger.error("Please enter subscription id to scan storage account in.")
             return None
-        azure_resource_permissions = AzureResourcePermissions.for_cli(w)
-        logger.info("Generating azure storage accounts and service principal permission info")
-        path = azure_resource_permissions.save_spn_permissions()
-        if path:
-            logger.info(f"storage and spn info saved under {path}")
-    elif w.config.is_aws:
-        if not shutil.which("aws"):
-            logger.error("Couldn't find AWS CLI in path. Please install the CLI from https://aws.amazon.com/cli/")
-            return None
+        return _azure_principal_prefix_access(w, subscription_id)
+    if w.config.is_aws:
         if not aws_profile:
             aws_profile = os.getenv("AWS_DEFAULT_PROFILE")
         if not aws_profile:
@@ -259,19 +248,35 @@ def principal_prefix_access(w: WorkspaceClient, subscription_id: str | None = No
                 "or use the '--aws-profile=[profile-name]' parameter."
             )
             return None
-        logger.info("Generating instance profile and bucket permission info")
-        installation = Installation.current(w, 'ucx')
-        config = installation.load(WorkspaceConfig)
-        sql_backend = StatementExecutionBackend(w, config.warehouse_id)
-        aws_permissions = AWSResourcePermissions.for_cli(w, sql_backend, aws_profile, config.inventory_database)
-        instance_role_path = aws_permissions.save_instance_profile_permissions()
-        logger.info(f"Instance profile and bucket info saved {instance_role_path}")
-        logger.info("Generating UC roles and bucket permission info")
-        uc_role_path = aws_permissions.save_uc_compatible_roles()
-        logger.info(f"UC roles and bucket info saved {uc_role_path}")
-    else:
-        logger.error("This cmd is only supported for azure and aws workspaces")
+        return _aws_principal_prefix_access(w, aws_profile)
+    logger.error("This cmd is only supported for azure and aws workspaces")
     return None
+
+
+def _azure_principal_prefix_access(w: WorkspaceClient, subscription_id: str):
+    if w.config.auth_type != "azure-cli":
+        logger.error("In order to obtain AAD token, Please run azure cli to authenticate.")
+        return
+    include_subscriptions = [subscription_id] if subscription_id else None
+    azure_resource_permissions = AzureResourcePermissions.for_cli(w, include_subscriptions=include_subscriptions)
+    logger.info("Generating azure storage accounts and service principal permission info")
+    path = azure_resource_permissions.save_spn_permissions()
+    if path:
+        logger.info(f"storage and spn info saved under {path}")
+    return
+
+
+def _aws_principal_prefix_access(w: WorkspaceClient, aws_profile: str):
+    if not shutil.which("aws"):
+        logger.error("Couldn't find AWS CLI in path. Please install the CLI from https://aws.amazon.com/cli/")
+        return
+    logger.info("Generating instance profile and bucket permission info")
+    aws_permissions = AWSResourcePermissions.for_cli(w, aws_profile)
+    instance_role_path = aws_permissions.save_instance_profile_permissions()
+    logger.info(f"Instance profile and bucket info saved {instance_role_path}")
+    logger.info("Generating UC roles and bucket permission info")
+    uc_role_path = aws_permissions.save_uc_compatible_roles()
+    logger.info(f"UC roles and bucket info saved {uc_role_path}")
 
 
 if __name__ == "__main__":

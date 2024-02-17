@@ -289,7 +289,7 @@ class WorkspaceInstaller:
             )
             if instance_profile:
                 policy_definition["aws_attributes.instance_profile_arn"] = self._policy_config(instance_profile)
-        elif self._ws.config.is_azure:
+        elif self._ws.config.is_azure:  # pylint: disable=confusing-consecutive-elif
             policy_definition["azure_attributes.availability"] = self._policy_config(
                 compute.AzureAvailability.ON_DEMAND_AZURE.value
             )
