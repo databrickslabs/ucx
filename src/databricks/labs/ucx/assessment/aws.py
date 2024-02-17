@@ -227,6 +227,8 @@ class AWSResources:
                 }
             ],
         }
+        # the AssumeRole condition will be modified with the external ID captured from the UC credential.
+        # https://docs.databricks.com/en/connect/unity-catalog/storage-credentials.html
         assume_role_json = self._get_json_for_cli(aws_role_trust_doc)
         add_role = self._run_json_command(
             f"iam create-role --role-name {role_name} --assume-role-policy-document {assume_role_json}"
@@ -256,13 +258,12 @@ class AWSResources:
             },
         ]
         if kms_key:
-            statement.insert(
-                1,
+            statement.append(
                 {
                     "Action": ["kms:Decrypt", "kms:Encrypt", "kms:GenerateDataKey*"],
                     "Resource": [f"arn:aws:kms:{kms_key}"],
                     "Effect": "Allow",
-                },
+                }
             )
         policy_document = {
             "Version": "2012-10-17",
