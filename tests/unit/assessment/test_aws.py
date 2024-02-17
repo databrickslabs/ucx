@@ -1,5 +1,5 @@
 import logging
-from unittest.mock import create_autospec
+from unittest.mock import MagicMock, call, create_autospec
 
 import pytest
 from databricks.labs.blueprint.installation import MockInstallation
@@ -13,6 +13,7 @@ from databricks.labs.ucx.assessment.aws import (
     AWSResourcePermissions,
     AWSResources,
     AWSRole,
+    AWSRoleAction,
     run_command,
 )
 from tests.unit.framework.mocks import MockBackend
@@ -818,6 +819,45 @@ def test_create_uc_role_single():
     ws = create_autospec(WorkspaceClient)
     aws = create_autospec(AWSResources)
     installation = MockInstallation()
-    aws_resource_permissions = AWSResourcePermissions(installation, ws, MockBackend(), aws, "ucx")
+    installation.load = MagicMock()
+    installation.load.return_value = [
+        AWSRoleAction("arn:aws:iam::12345:role/uc-role1", "s3", "WRITE_FILES", "s3://BUCKETX/*")
+    ]
+    rows = {
+        "external_locations": [["s3://BUCKET1/FOLDER1", 1], ["s3://BUCKET2/FOLDER2", 1], ["s3://BUCKETX/FOLDERX", 1]]
+    }
+    errors = {}
+    backend = MockBackend(rows=rows, fails_on_first=errors)
+    aws_resource_permissions = AWSResourcePermissions(installation, ws, backend, aws, "ucx")
     aws_resource_permissions.create_uc_roles_cli()
+    assert (
+        aws.add_uc_role.assert_called_with(
+            'UC_ROLE', 'UC_POLICY', {'BUCKET1/FOLDER1', 'BUCKET2/FOLDER2'}, account_id=None, kms_key=None
+        )
+        is None
+    )
 
+
+def test_create_uc_role_multiple():
+    ws = create_autospec(WorkspaceClient)
+    aws = create_autospec(AWSResources)
+    installation = MockInstallation()
+    installation.load = MagicMock()
+    installation.load.return_value = [
+        AWSRoleAction("arn:aws:iam::12345:role/uc-role1", "s3", "WRITE_FILES", "s3://BUCKETX/*")
+    ]
+    rows = {
+        "external_locations": [["s3://BUCKET1/FOLDER1", 1], ["s3://BUCKET2/FOLDER2", 1], ["s3://BUCKETX/FOLDERX", 1]]
+    }
+    errors = {}
+    backend = MockBackend(rows=rows, fails_on_first=errors)
+    aws_resource_permissions = AWSResourcePermissions(installation, ws, backend, aws, "ucx")
+    aws_resource_permissions.create_uc_roles_cli(single_role=False)
+    assert (
+        call('UC_ROLE-1', 'UC_POLICY-1', {'BUCKET1/FOLDER1'}, account_id=None, kms_key=None)
+        in aws.add_uc_role.call_args_list
+    )
+    assert (
+        call('UC_ROLE-2', 'UC_POLICY-2', {'BUCKET2/FOLDER2'}, account_id=None, kms_key=None)
+        in aws.add_uc_role.call_args_list
+    )
