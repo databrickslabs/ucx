@@ -72,10 +72,6 @@ def run_command(command):
         return process.returncode, output.decode("utf-8"), error.decode("utf-8")
 
 
-def esc_json_for_cli(input_json: str) -> str:
-    return input_json.replace('\n', '').replace(" ", "")
-
-
 class AWSResources:
     S3_ACTIONS: typing.ClassVar[set[str]] = {"s3:PutObject", "s3:GetObject", "s3:DeleteObject", "s3:PutObjectAcl"}
     S3_READONLY: typing.ClassVar[str] = "s3:GetObject"
@@ -86,123 +82,6 @@ class AWSResources:
         "arn:aws:iam::414351767826:role/unity-catalog-prod-UCMasterRole-14S5ZJVKOTYTL",
         "arn:aws:iam::707343435239:role/unity-catalog-dev-UCMasterRole-G3MMN8SP21FO",
     ]
-    AWS_ROLE_TRUST_DOC: typing.ClassVar[
-        str
-    ] = """
-{
-    "Version": "2012-10-17",
-    "Statement": [
-        {
-            "Effect": "Allow",
-            "Principal": {
-                "AWS": "arn:aws:iam::414351767826:role/unity-catalog-prod-UCMasterRole-14S5ZJVKOTYTL"
-            },
-            "Action": "sts:AssumeRole",
-            "Condition": {
-                "StringEquals": {
-                    "sts:ExternalId": "0000"
-                }
-            }
-        }
-    ]
-}
-    """
-
-    AWS_POLICY_KMS: typing.ClassVar[
-        str
-    ] = """
-{
-  "Version": "2012-10-17",
-  "Statement": [
-      {
-          "Action": [
-              "s3:GetObject",
-              "s3:PutObject",
-              "s3:DeleteObject",
-              "s3:ListBucket",
-              "s3:GetBucketLocation"
-          ],
-          "Resource": <BUCKETS>,
-          "Effect": "Allow"
-      },
-      {
-          "Action": [
-              "kms:Decrypt",
-              "kms:Encrypt",
-              "kms:GenerateDataKey*"
-          ],
-          "Resource": [
-              "arn:aws:kms:<KMS-KEY>"
-          ],
-          "Effect": "Allow"
-      },
-      {
-          "Action": [
-              "sts:AssumeRole"
-          ],
-          "Resource": [
-              "arn:aws:iam::<AWS-ACCOUNT-ID>:role/<AWS-IAM-ROLE-NAME>"
-          ],
-          "Effect": "Allow"
-      }
-    ]
-}    
-    """
-
-    AWS_POLICY_NO_KMS: typing.ClassVar[
-        str
-    ] = """
-{
-      "Version": "2012-10-17",
-      "Statement": [
-          {
-              "Action": [
-                  "s3:GetObject",
-                  "s3:PutObject",
-                  "s3:DeleteObject",
-                  "s3:ListBucket",
-                  "s3:GetBucketLocation"
-              ],
-              "Resource": <BUCKETS>,
-              "Effect": "Allow"
-          },
-          {
-              "Action": [
-                  "sts:AssumeRole"
-              ],
-              "Resource": [
-                  "arn:aws:iam::<AWS-ACCOUNT-ID>:role/<AWS-IAM-ROLE-NAME>"
-              ],
-              "Effect": "Allow"
-          }
-        ]
-    }    
-        """
-
-    SELF_ASSUME_ROLE_POLICY: typing.ClassVar[
-        str
-    ] = """
-{
-  "Version": "2012-10-17",
-  "Statement": [
-    {
-      "Effect": "Allow",
-      "Principal": {
-        "AWS": [
-          "arn:aws:iam::414351767826:role/unity-catalog-prod-UCMasterRole-14S5ZJVKOTYTL",
-          "arn:aws:iam::<AWS-ACCOUNT-ID>:role/<AWS-IAM-ROLE-NAME>"
-        ]
-      },
-      "Action": "sts:AssumeRole",
-      "Condition": {
-        "StringEquals": {
-          "sts:ExternalId": "<STORAGE-CREDENTIAL-EXTERNAL-ID>"
-        }
-      }
-    }
-  ]
-}    
-    """
 
     def __init__(self, profile: str, command_runner: Callable[[str], tuple[int, str, str]] = run_command):
         self._profile = profile
@@ -335,23 +214,128 @@ class AWSResources:
         return policy_actions
 
     def add_uc_role(self, role_name, policy_name, s3_prefixes: set[str], account_id: str, kms_key=None):
-        assume_role_json = esc_json_for_cli(self.AWS_ROLE_TRUST_DOC)
+        aws_role_trust_doc: dict = {
+            "Version": "2012-10-17",
+            "Statement": [
+                {
+                    "Effect": "Allow",
+                    "Principal": {
+                        "AWS": "arn:aws:iam::414351767826:role/unity-catalog-prod-UCMasterRole-14S5ZJVKOTYTL"
+                    },
+                    "Action": "sts:AssumeRole",
+                    "Condition": {"StringEquals": {"sts:ExternalId": "0000"}},
+                }
+            ],
+        }
+        aws_policy_kms: dict = {
+            "Version": "2012-10-17",
+            "Statement": [
+                {
+                    "Action": [
+                        "s3:GetObject",
+                        "s3:PutObject",
+                        "s3:DeleteObject",
+                        "s3:ListBucket",
+                        "s3:GetBucketLocation",
+                    ],
+                    "Resource": "",
+                    "Effect": "Allow",
+                },
+                {
+                    "Action": ["kms:Decrypt", "kms:Encrypt", "kms:GenerateDataKey*"],
+                    "Resource": ["arn:aws:kms:<KMS-KEY>"],
+                    "Effect": "Allow",
+                },
+                {
+                    "Action": ["sts:AssumeRole"],
+                    "Resource": ["arn:aws:iam::<AWS-ACCOUNT-ID>:role/<AWS-IAM-ROLE-NAME>"],
+                    "Effect": "Allow",
+                },
+            ],
+        }
+
+        aws_policy_no_kms: dict = {
+            "Version": "2012-10-17",
+            "Statement": [
+                {
+                    "Action": [
+                        "s3:GetObject",
+                        "s3:PutObject",
+                        "s3:DeleteObject",
+                        "s3:ListBucket",
+                        "s3:GetBucketLocation",
+                    ],
+                    "Resource": "",
+                    "Effect": "Allow",
+                },
+                {
+                    "Action": ["sts:AssumeRole"],
+                    "Resource": ["arn:aws:iam::<AWS-ACCOUNT-ID>:role/<AWS-IAM-ROLE-NAME>"],
+                    "Effect": "Allow",
+                },
+            ],
+        }
+        assume_role_json = self._get_json_for_cli(aws_role_trust_doc)
         add_role = self._run_json_command(
             f"iam create-role --role-name {role_name} --assume-role-policy-document {assume_role_json}"
         )
         if not add_role:
             return False
         if kms_key:
-            policy_document = self.AWS_POLICY_KMS
+            policy_document = aws_policy_kms
         else:
-            policy_document = self.AWS_POLICY_NO_KMS
+            policy_document = aws_policy_no_kms
         s3_prefixes_enriched = sorted([self.S3_PREFIX + s3_prefix for s3_prefix in s3_prefixes])
-        policy_document = policy_document.replace("<BUCKETS>", json.dumps(s3_prefixes_enriched))
-        policy_document = policy_document.replace("<AWS-ACCOUNT-ID>", account_id)
-        policy_document = policy_document.replace("<AWS-IAM-ROLE-NAME>", role_name)
         if kms_key:
-            policy_document = policy_document.replace("<KMS-KEY>", kms_key)
-        policy_document_json = esc_json_for_cli(policy_document)
+            policy_document = {
+                "Version": "2012-10-17",
+                "Statement": [
+                    {
+                        "Action": [
+                            "s3:GetObject",
+                            "s3:PutObject",
+                            "s3:DeleteObject",
+                            "s3:ListBucket",
+                            "s3:GetBucketLocation",
+                        ],
+                        "Resource": s3_prefixes_enriched,
+                        "Effect": "Allow",
+                    },
+                    {
+                        "Action": ["kms:Decrypt", "kms:Encrypt", "kms:GenerateDataKey*"],
+                        "Resource": [f"arn:aws:kms:{kms_key}"],
+                        "Effect": "Allow",
+                    },
+                    {
+                        "Action": ["sts:AssumeRole"],
+                        "Resource": [f"arn:aws:iam::{account_id}:role/{role_name}"],
+                        "Effect": "Allow",
+                    },
+                ],
+            }
+        else:
+            policy_document = {
+                "Version": "2012-10-17",
+                "Statement": [
+                    {
+                        "Action": [
+                            "s3:GetObject",
+                            "s3:PutObject",
+                            "s3:DeleteObject",
+                            "s3:ListBucket",
+                            "s3:GetBucketLocation",
+                        ],
+                        "Resource": s3_prefixes_enriched,
+                        "Effect": "Allow",
+                    },
+                    {
+                        "Action": ["sts:AssumeRole"],
+                        "Resource": [f"arn:aws:iam::{account_id}:role/{role_name}"],
+                        "Effect": "Allow",
+                    },
+                ],
+            }
+        policy_document_json = self._get_json_for_cli(policy_document)
         if not self._run_command(
             f"iam put-role-policy --role-name {role_name} --policy-name {policy_name} --policy-document {policy_document_json}"
         ):
@@ -375,6 +359,10 @@ class AWSResources:
             logger.error(error)
             return False
         return True
+
+    @staticmethod
+    def _get_json_for_cli(input_json: dict) -> str:
+        return json.dumps(input_json).replace('\n', '').replace(" ", "")
 
 
 class AWSResourcePermissions:
