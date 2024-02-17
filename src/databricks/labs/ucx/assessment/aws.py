@@ -351,12 +351,6 @@ class AWSResourcePermissions:
             role_actions = self._installation.load(list[AWSRoleAction], filename=self.UC_ROLES_FILE_NAMES)
         return role_actions
 
-    def get_uc_missing_roles(self, default_role_arn):
-        missing_paths = self._identify_missing_paths()
-        role_actions = []
-        for path in missing_paths:
-            role_actions.append(AWSRoleAction(default_role_arn, "s3", Privilege.WRITE_FILES.value, path))
-        return role_actions
 
     def create_uc_roles_cli(self, *, single_role=True, role_name="UC_ROLE", policy_name="UC_POLICY"):
         missing_paths = self._identify_missing_paths()
