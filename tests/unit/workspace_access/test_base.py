@@ -2,10 +2,10 @@ from collections.abc import Callable, Iterable
 from functools import partial
 
 from databricks.labs.ucx.workspace_access.base import AclSupport, Permissions
-from databricks.labs.ucx.workspace_access.groups import MigratedGroup, MigrationState
+from databricks.labs.ucx.workspace_access.groups import MigrationState
 
 
-def test_applier():
+def test_applier(migration_state):
     class SampleApplier(AclSupport):
         def __init__(self):
             self.called = False
@@ -40,20 +40,6 @@ def test_applier():
 
     applier = SampleApplier()
     positive_item = Permissions(object_id="test", object_type="test", raw="test")
-    migration_state = MigrationState(
-        [
-            MigratedGroup(
-                id_in_workspace='123',
-                name_in_workspace="test",
-                name_in_account="test",
-                temporary_name="db-temp-test",
-                members=None,
-                entitlements=None,
-                external_id=None,
-                roles=None,
-            )
-        ]
-    )
 
     task = applier.get_apply_task(positive_item, migration_state)
     task()
