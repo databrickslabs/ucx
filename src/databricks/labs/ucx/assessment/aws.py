@@ -81,6 +81,7 @@ class AWSResources:
     S3_READONLY: typing.ClassVar[str] = "s3:GetObject"
     S3_REGEX: typing.ClassVar[str] = r"arn:aws:s3:::([a-zA-Z0-9+=,.@_-]*)\/\*$"
     S3_PREFIX: typing.ClassVar[str] = "arn:aws:s3:::"
+    S3_PATH_REGEX: typing.ClassVar[str] = "((s3:\/\/)|(s3a:\/\/))(.*)"
     UC_MASTER_ROLES_ARN: typing.ClassVar[list[str]] = [
         "arn:aws:iam::414351767826:role/unity-catalog-prod-UCMasterRole-14S5ZJVKOTYTL",
         "arn:aws:iam::707343435239:role/unity-catalog-dev-UCMasterRole-G3MMN8SP21FO",
@@ -349,10 +350,9 @@ class AWSResources:
         policy_document = policy_document.replace("<AWS-ACCOUNT-ID>", account_id)
         policy_document = policy_document.replace("<AWS-IAM-ROLE-NAME>", role_name)
         policy_document_json = esc_json_for_cli(policy_document)
-        add_policy = self._run_json_command(
+        if not self._run_command(
             f"iam put-role-policy --role-name {role_name} --policy-name {policy_name} --policy-document {policy_document_json}"
-        )
-        if add_policy is None:
+        ):
             return False
         # TODO: Create Credential and update policy
         #  https://docs.databricks.com/en/connect/unity-catalog/storage-credentials.html step 3
@@ -365,6 +365,14 @@ class AWSResources:
             logger.error(error)
             return None
         return json.loads(output)
+
+    def _run_command(self, command: str):
+        aws_cmd = shutil.which("aws")
+        code, output, error = self._command_runner(f"{aws_cmd} {command} --output json")
+        if code != 0:
+            logger.error(error)
+            return False
+        return True
 
 
 class AWSResourcePermissions:
@@ -430,6 +438,9 @@ class AWSResourcePermissions:
 
     def create_uc_roles_cli(self, *, single_role=True, single_role_name=None):
         missing_paths = self._identify_missing_paths()
+        s3_prefixes = set()
+        for missing_path in missing_paths:
+            match = missing_path
         if single_role:
             self._aws_resources.add_uc_role(single_role_name, missing_paths, self._aws_account_id, self._kms_key)
         else:
