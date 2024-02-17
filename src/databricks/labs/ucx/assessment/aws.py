@@ -378,8 +378,8 @@ class AWSResources:
 
 
 class AWSResourcePermissions:
-    UCRolesFileName: typing.ClassVar[str] = "uc_roles_access.csv"
-    InstanceProfilesFileName: typing.ClassVar[str] = "aws_instance_profile_info.csv"
+    UC_ROLES_FILE_NAMES: typing.ClassVar[str] = "uc_roles_access.csv"
+    INSTANCE_PROFILES_FILE_NAMES: typing.ClassVar[str] = "aws_instance_profile_info.csv"
 
     def __init__(
         self,
@@ -421,14 +421,14 @@ class AWSResourcePermissions:
         if len(uc_role_access) == 0:
             logger.warning("No Mapping Was Generated.")
             return None
-        return self._installation.save(uc_role_access, filename=self.UCRolesFileName)
+        return self._installation.save(uc_role_access, filename=self.UC_ROLES_FILE_NAMES)
 
     def get_uc_compatible_roles(self):
         try:
-            role_actions = self._installation.load(list[AWSRoleAction], filename=self.UCRolesFileName)
+            role_actions = self._installation.load(list[AWSRoleAction], filename=self.UC_ROLES_FILE_NAMES)
         except ResourceDoesNotExist:
             self.save_uc_compatible_roles()
-            role_actions = self._installation.load(list[AWSRoleAction], filename=self.UCRolesFileName)
+            role_actions = self._installation.load(list[AWSRoleAction], filename=self.UC_ROLES_FILE_NAMES)
         return role_actions
 
     def get_uc_missing_roles(self, default_role_arn):
@@ -538,4 +538,4 @@ class AWSResourcePermissions:
         if len(instance_profile_access) == 0:
             logger.warning("No Mapping Was Generated.")
             return None
-        return self._installation.save(instance_profile_access, filename=self.InstanceProfilesFileName)
+        return self._installation.save(instance_profile_access, filename=self.INSTANCE_PROFILES_FILE_NAMES)
