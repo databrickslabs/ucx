@@ -48,7 +48,7 @@ def test_permission_for_files_anonymous_func(sql_backend, inventory_schema, make
     assert anonymous_function_actual[old.display_name] == anonymous_function_actual[new.display_name]
 
 
-def test_hms2hms_owner_permissions(sql_backend, inventory_schema, make_schema, make_table, make_group_pair):
+def test_hms2hms_owner_permissions(sql_backend, inventory_schema, make_schema, make_table, make_group_pair): # pylint: disable=too-many-locals
     first = make_group_pair()
     second = make_group_pair()
     third = make_group_pair()

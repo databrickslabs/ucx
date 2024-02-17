@@ -26,7 +26,7 @@ def test_move_tables_no_from_schema(ws, sql_backend, make_random, make_catalog, 
 
 
 @retried(on=[NotFound], timeout=timedelta(minutes=2))
-def test_move_tables(ws, sql_backend, make_catalog, make_schema, make_table, make_acc_group):
+def test_move_tables(ws, sql_backend, make_catalog, make_schema, make_table, make_acc_group): # pylint: disable=too-many-locals
     tm = TableMove(ws, sql_backend)
     group_a = make_acc_group()
     group_b = make_acc_group()
@@ -139,7 +139,7 @@ def test_move_views(ws, sql_backend, make_catalog, make_schema, make_table, make
 
 
 @retried(on=[NotFound], timeout=timedelta(minutes=2))
-def test_alias_tables(ws, sql_backend, make_catalog, make_schema, make_table, make_acc_group):
+def test_alias_tables(ws, sql_backend, make_catalog, make_schema, make_table, make_acc_group):# pylint: disable=too-many-locals
     tm = TableMove(ws, sql_backend)
     group_a = make_acc_group()
     group_b = make_acc_group()

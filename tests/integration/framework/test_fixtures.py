@@ -5,13 +5,14 @@ from _pytest.outcomes import Failed, Skipped
 from databricks.labs.blueprint.commands import CommandExecutor
 from databricks.sdk.service.workspace import AclPermission
 
+# pylint: disable-next=unused-wildcard-import,wildcard-import
 from databricks.labs.ucx.mixins.fixtures import *  # noqa: F403
 
 logger = logging.getLogger(__name__)
 
 
 @pytest.fixture  # type: ignore[no-redef]
-def debug_env_name():
+def debug_env_name(): # pylint: disable=function-redefined
     return "ucws"
 
 
