@@ -16,7 +16,35 @@ from databricks.labs.ucx.hive_metastore.mapping import (
     TableToMigrate,
 )
 from databricks.labs.ucx.hive_metastore.tables import Table, TablesCrawler
-from tests.unit.framework.mocks import MockBackend
+
+from ..framework.mocks import MockBackend
+
+MANAGED_DELTA_TABLE = Table(
+    object_type="MANAGED",
+    table_format="DELTA",
+    catalog="hive_metastore",
+    database="test_schema1",
+    name="test_table2",
+)
+
+VIEW = Table(
+    object_type="VIEW",
+    table_format="VIEW",
+    catalog="hive_metastore",
+    database="test_schema1",
+    name="test_view1",
+    view_text="SELECT * FROM SOMETHING",
+    upgraded_to="cat1.schema1.dest_view1",
+)
+
+EXTERNAL_DELTA_TABLE = Table(
+    object_type="EXTERNAL",
+    table_format="DELTA",
+    catalog="hive_metastore",
+    database="test_schema1",
+    name="test_table1",
+    upgraded_to="cat1.schema1.dest1",
+)
 
 
 def test_current_tables_empty_fails():
@@ -234,30 +262,9 @@ def test_skip_tables_marked_for_skipping_or_upgraded():
     ]
 
     test_tables = [
-        Table(
-            object_type="EXTERNAL",
-            table_format="DELTA",
-            catalog="hive_metastore",
-            database="test_schema1",
-            name="test_table1",
-            upgraded_to="cat1.schema1.dest1",
-        ),
-        Table(
-            object_type="VIEW",
-            table_format="VIEW",
-            catalog="hive_metastore",
-            database="test_schema1",
-            name="test_view1",
-            view_text="SELECT * FROM SOMETHING",
-            upgraded_to="cat1.schema1.dest_view1",
-        ),
-        Table(
-            object_type="MANAGED",
-            table_format="DELTA",
-            catalog="hive_metastore",
-            database="test_schema1",
-            name="test_table2",
-        ),
+        EXTERNAL_DELTA_TABLE,
+        VIEW,
+        MANAGED_DELTA_TABLE,
         Table(
             object_type="EXTERNAL",
             table_format="DELTA",

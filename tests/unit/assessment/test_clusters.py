@@ -8,9 +8,6 @@ from databricks.sdk.service.compute import (
     ClusterDetails,
     ClusterSource,
     DataSecurityMode,
-    DbfsStorageInfo,
-    InitScriptInfo,
-    WorkspaceStorageInfo,
 )
 
 from databricks.labs.ucx.assessment.azure import AzureServicePrincipalCrawler
@@ -104,60 +101,9 @@ def test_cluster_assessment_with_spn_cluster_policy_exception(mocker):
         AzureServicePrincipalCrawler(ws, MockBackend(), "ucx").snapshot()
 
 
-def test_cluster_init_script(mocker):
-    sample_clusters = [
-        ClusterDetails(
-            autoscale=AutoScale(min_workers=1, max_workers=6),
-            cluster_source=ClusterSource.UI,
-            spark_context_id=5134472582179565315,
-            spark_env_vars=None,
-            spark_version="12.3.x-cpu-ml-scala2.12",
-            cluster_id="0810-225833-atlanta69",
-            cluster_name="Tech Summit FY24 Cluster-1",
-            init_scripts=[
-                InitScriptInfo(
-                    dbfs=DbfsStorageInfo(destination="dbfs:/users/test@test.com/init_scripts/test.sh"),
-                    s3=None,
-                    volumes=None,
-                    workspace=None,
-                ),
-                InitScriptInfo(
-                    dbfs=None,
-                    s3=None,
-                    volumes=None,
-                    workspace=WorkspaceStorageInfo(
-                        destination="/Users/dipankar.kushari@databricks.com/init_script_1.sh"
-                    ),
-                ),
-            ],
-        )
-    ]
-    ws = mocker.Mock()
-    ws.clusters.list.return_value = sample_clusters
+def test_cluster_init_script():
+    ws = workspace_client_mock(clusters='single-cluster-init-scripts.json')
     ws.dbfs.read().data = "JXNoCmVjaG8gIj0="
-    ws.workspace.export().content = (
-        "IyEvYmluL2Jhc2gKCiMgU2V0IGEg"
-        "Y3VzdG9tIFNwYXJrIGNvbmZpZ3VyYXRpb24KZWNobyAic3Bhc"
-        "msuZXhlY3V0b3IubWVtb3J5IDRnIiA+PiAvZGF0YWJyaWNrcy9"
-        "zcGFyay9jb25mL3NwYXJrLWRlZmF1bHRzLmNvbmYKZWNobyAic3Bhc"
-        "msuZHJpdmVyLm1lbW9yeSAyZyIgPj4gL2RhdGFicmlja3Mvc3BhcmsvY2"
-        "9uZi9zcGFyay1kZWZhdWx0cy5jb25mCmVjaG8gInNwYXJrLmhhZG9vcC5mcy"
-        "5henVyZS5hY2NvdW50LmF1dGgudHlwZS5hYmNkZS5kZnMuY29yZS53aW5kb3d"
-        "zLm5ldCBPQXV0aCIgPj4gL2RhdGFicmlja3Mvc3BhcmsvY29uZi9zcGFyay1kZWZ"
-        "hdWx0cy5jb25mCmVjaG8gInNwYXJrLmhhZG9vcC5mcy5henVyZS5hY2NvdW50Lm9"
-        "hdXRoLnByb3ZpZGVyLnR5cGUuYWJjZGUuZGZzLmNvcmUud2luZG93cy5uZXQgb3JnLmF"
-        "wYWNoZS5oYWRvb3AuZnMuYXp1cmViZnMub2F1dGgyLkNsaWVudENyZWRzVG9rZW5Qcm92"
-        "aWRlciIgPj4gL2RhdGFicmlja3Mvc3BhcmsvY29uZi9zcGFyay1kZWZhdWx0cy5jb25mC"
-        "mVjaG8gInNwYXJrLmhhZG9vcC5mcy5henVyZS5hY2NvdW50Lm9hdXRoMi5jbGllbnQuaWQ"
-        "uYWJjZGUuZGZzLmNvcmUud2luZG93cy5uZXQgZHVtbXlfYXBwbGljYXRpb25faWQiID4+IC"
-        "9kYXRhYnJpY2tzL3NwYXJrL2NvbmYvc3BhcmstZGVmYXVsdHMuY29uZgplY2hvICJzcGFya"
-        "y5oYWRvb3AuZnMuYXp1cmUuYWNjb3VudC5vYXV0aDIuY2xpZW50LnNlY3JldC5hYmNkZS5kZnMu"
-        "Y29yZS53aW5kb3dzLm5ldCBkZGRkZGRkZGRkZGRkZGRkZGRkIiA+PiAvZGF0YWJyaWNrcy9zcGFy"
-        "ay9jb25mL3NwYXJrLWRlZmF1bHRzLmNvbmYKZWNobyAic3BhcmsuaGFkb29wLmZzLmF6dXJlLmFj"
-        "Y291bnQub2F1dGgyLmNsaWVudC5lbmRwb2ludC5hYmNkZS5kZnMuY29yZS53aW5kb3dzLm5ldCBod"
-        "HRwczovL2xvZ2luLm1pY3Jvc29mdG9ubGluZS5jb20vZHVtbXlfdGVuYW50X2lkL29hdXRoMi90b2t"
-        "lbiIgPj4gL2RhdGFicmlja3Mvc3BhcmsvY29uZi9zcGFyay1kZWZhdWx0cy5jb25mCg=="
-    )
     init_crawler = ClustersCrawler(ws, MockBackend(), "ucx").snapshot()
     assert len(init_crawler) == 1
 

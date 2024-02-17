@@ -13,7 +13,9 @@ logger = logging.getLogger(__name__)
 
 
 @retried(on=[NotFound, TimeoutError], timeout=timedelta(minutes=15))
-def test_all_grants_in_databases(sql_backend, inventory_schema, make_schema, make_table, make_group): # pylint: disable=too-many-locals
+def test_all_grants_in_databases(
+    sql_backend, inventory_schema, make_schema, make_table, make_group
+):  # pylint: disable=too-many-locals
     group_a = make_group()
     group_b = make_group()
     schema_a = make_schema()

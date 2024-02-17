@@ -17,7 +17,13 @@ from databricks.sdk.errors import (
     Unknown,
 )
 from databricks.sdk.service import compute, iam, jobs, sql
-from databricks.sdk.service.compute import ClusterDetails, DataSecurityMode, CreatePolicyResponse, Policy, State
+from databricks.sdk.service.compute import (
+    ClusterDetails,
+    CreatePolicyResponse,
+    DataSecurityMode,
+    Policy,
+    State,
+)
 from databricks.sdk.service.jobs import (
     BaseRun,
     RunLifeCycleState,
@@ -73,7 +79,9 @@ def mock_clusters():
 def ws():
     workspace_client = create_autospec(WorkspaceClient)
 
-    workspace_client.current_user.me = lambda: iam.User(user_name="me@example.com", groups=[iam.ComplexValue(display="admins")])
+    workspace_client.current_user.me = lambda: iam.User(
+        user_name="me@example.com", groups=[iam.ComplexValue(display="admins")]
+    )
     workspace_client.config.host = "https://foo"
     workspace_client.config.is_aws = True
     workspace_client.config.is_azure = False
@@ -1173,12 +1181,8 @@ def test_latest_job_status_list(ws, any_prompt):
     wheels = create_autospec(WheelsV2)
     config = WorkspaceConfig(inventory_database='ucx')
     timeout = timedelta(seconds=1)
-    mi = MockInstallation(
-        {'state.json': {'resources': {'jobs': {"job1": "1", "job2": "2", "job3": "3"}}}}
-    )
-    workspace_installation = WorkspaceInstallation(
-        config, mi, sql_backend, wheels, ws, any_prompt, timeout
-    )
+    mi = MockInstallation({'state.json': {'resources': {'jobs': {"job1": "1", "job2": "2", "job3": "3"}}}})
+    workspace_installation = WorkspaceInstallation(config, mi, sql_backend, wheels, ws, any_prompt, timeout)
     ws.jobs.list_runs.side_effect = iter(runs)
     status = workspace_installation.latest_job_status()
     assert len(status) == 3

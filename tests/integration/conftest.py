@@ -4,24 +4,25 @@ import logging
 from datetime import timedelta
 from functools import partial
 
-import pytest
 import databricks.sdk.core
+import pytest  # pylint: disable=wrong-import-order
 from databricks.labs.blueprint.installation import Installation
 from databricks.sdk import AccountClient, WorkspaceClient
 from databricks.sdk.errors import NotFound
 from databricks.sdk.retries import retried
 from databricks.sdk.service.catalog import FunctionInfo, TableInfo
 
+from databricks.labs.ucx.__about__ import __version__
 from databricks.labs.ucx.account import WorkspaceInfo
 from databricks.labs.ucx.framework.crawlers import SqlBackend
 from databricks.labs.ucx.hive_metastore import TablesCrawler
 from databricks.labs.ucx.hive_metastore.mapping import Rule, TableMapping
 from databricks.labs.ucx.hive_metastore.tables import Table
 from databricks.labs.ucx.hive_metastore.udfs import Udf, UdfsCrawler
+
 # pylint: disable-next=unused-wildcard-import,wildcard-import
 from databricks.labs.ucx.mixins.fixtures import *  # noqa: F403
 from databricks.labs.ucx.workspace_access.groups import MigratedGroup
-from databricks.labs.ucx.__about__ import __version__
 
 logging.getLogger("tests").setLevel("DEBUG")
 logging.getLogger("databricks.labs.ucx").setLevel("DEBUG")
@@ -33,7 +34,7 @@ long_retry_on_not_found = functools.partial(retry_on_not_found, timeout=timedelt
 
 
 @pytest.fixture  # type: ignore[no-redef]
-def debug_env_name(): # pylint: disable=function-redefined
+def debug_env_name():  # pylint: disable=function-redefined
     return "ucws"
 
 
@@ -60,12 +61,12 @@ def account_host(self: databricks.sdk.core.Config) -> str:
 
 
 @pytest.fixture(scope="session")  # type: ignore[no-redef]
-def product_info(): # pylint: disable=function-redefined
+def product_info():  # pylint: disable=function-redefined
     return "ucx", __version__
 
 
 @pytest.fixture  # type: ignore[no-redef]
-def acc(ws) -> AccountClient: # pylint: disable=function-redefined
+def acc(ws) -> AccountClient:  # pylint: disable=function-redefined
     return AccountClient(host=ws.config.environment.deployment_url('accounts'))
 
 

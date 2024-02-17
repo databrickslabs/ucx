@@ -6,7 +6,7 @@ from databricks.labs.ucx.hive_metastore.locations import Mount
 
 @pytest.mark.skip(reason="Needs to have mountpoints already created ")
 def test_mount_listing(ws, inventory_schema, wsfs_wheel, sql_fetch_all):
-    commands = CommandExecutor(ws.clusters, ws.command_execution, lambda : ws.config.cluster_id)
+    commands = CommandExecutor(ws.clusters, ws.command_execution, lambda: ws.config.cluster_id)
     commands.install_notebook_library(f"/Workspace{wsfs_wheel}")
 
     commands.run(

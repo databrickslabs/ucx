@@ -1,3 +1,4 @@
+import base64
 import json
 import pathlib
 from unittest.mock import create_autospec
@@ -8,9 +9,19 @@ from databricks.sdk.service.compute import ClusterDetails, Policy
 from databricks.sdk.service.jobs import BaseJob
 from databricks.sdk.service.pipelines import GetPipelineResponse, PipelineStateInfo
 from databricks.sdk.service.sql import EndpointConfPair
-from databricks.sdk.service.workspace import GetSecretResponse
+from databricks.sdk.service.workspace import ExportResponse, GetSecretResponse
 
 __dir = pathlib.Path(__file__).parent
+
+
+def _base64(filename: str):
+    with (__dir / filename).open("rb") as f:
+        return base64.b64encode(f.read())
+
+
+def _workspace_export(filename: str):
+    res = _base64(f'workspace/{filename}')
+    return ExportResponse(content=res.decode('utf8'))
 
 
 def _load_fixture(filename: str):
@@ -55,6 +66,7 @@ def workspace_client_mock(
     ws.warehouses.get_workspace_warehouse_config().data_access_config = _load_list(
         EndpointConfPair, f"../assessment/warehouses/{warehouse_config}"
     )
+    ws.workspace.export = _workspace_export
     if secret_exists:
         ws.secrets.get_secret.return_value = GetSecretResponse(key="username", value="SGVsbG8sIFdvcmxkIQ==")
     else:

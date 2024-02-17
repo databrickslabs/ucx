@@ -43,7 +43,7 @@ def test_applier():
     migration_state = MigrationState(
         [
             MigratedGroup(
-                id_in_workspace=None,
+                id_in_workspace='123',
                 name_in_workspace="test",
                 name_in_account="test",
                 temporary_name="db-temp-test",

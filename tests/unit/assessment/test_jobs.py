@@ -499,38 +499,10 @@ def test_job_cluster_init_script():
         ),
     ]
 
-    sample_clusters = [
-        ClusterDetails(
-            init_scripts=[
-                InitScriptInfo(
-                    dbfs=DbfsStorageInfo(destination="dbfs:/users/test@test.com/init_scripts/test.sh"),
-                    s3=None,
-                    volumes=None,
-                    workspace=None,
-                ),
-                InitScriptInfo(
-                    dbfs=None,
-                    s3=None,
-                    volumes=None,
-                    workspace=WorkspaceStorageInfo(
-                        destination="/Users/dipankar.kushari@databricks.com/init_script_1.sh"
-                    ),
-                ),
-            ],
-            autoscale=AutoScale(min_workers=1, max_workers=6),
-            spark_context_id=5134472582179566666,
-            spark_env_vars=None,
-            spark_version="13.3.x-cpu-ml-scala2.12",
-            cluster_id="0807-225846-avon493",
-            cluster_source=ClusterSource.JOB,
-        )
-    ]
-    ws = create_autospec(WorkspaceClient)
-    ws.workspace.export().content = "JXNoCmVjaG8gIj0="
+    ws = workspace_client_mock(clusters='single-cluster-init-scripts.json')
+    ws.jobs.list.return_value = sample_jobs
     ws.dbfs.read().data = "JXNoCmVjaG8gIj0="
-    result_set = JobsCrawler(ws, MockBackend(), "ucx")._assess_jobs(
-        sample_jobs, {c.cluster_id: c for c in sample_clusters}
-    )
+    result_set = JobsCrawler(ws, MockBackend(), "ucx").snapshot()
     assert len(result_set) == 3
 
 

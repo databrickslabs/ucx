@@ -231,6 +231,15 @@ def get_table_migrate(backend: SqlBackend) -> TablesMigrate:
         ]
     )
 
+    simple_view = Table(
+        object_type="VIEW",
+        table_format="VIEW",
+        catalog="hive_metastore",
+        database="test_schema1",
+        name="test_view1",
+        view_text="SELECT * FROM SOMETHING ELSE",
+        upgraded_to="cat1.schema1.dest_view1",
+    )
     test_tables = [
         Table(
             object_type="EXTERNAL",
@@ -241,15 +250,7 @@ def get_table_migrate(backend: SqlBackend) -> TablesMigrate:
             location="s3://some_location/table",
             upgraded_to="cat1.schema1.dest1",
         ),
-        Table(
-            object_type="VIEW",
-            table_format="VIEW",
-            catalog="hive_metastore",
-            database="test_schema1",
-            name="test_view1",
-            view_text="SELECT * FROM SOMETHING",
-            upgraded_to="cat1.schema1.dest_view1",
-        ),
+        simple_view,
         Table(
             object_type="MANAGED",
             table_format="DELTA",
