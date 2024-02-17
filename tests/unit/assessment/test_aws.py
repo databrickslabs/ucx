@@ -4,6 +4,7 @@ from unittest.mock import MagicMock, call, create_autospec
 import pytest
 from databricks.labs.blueprint.installation import MockInstallation
 from databricks.sdk import WorkspaceClient
+from databricks.sdk.errors import ResourceDoesNotExist
 from databricks.sdk.service import iam
 from databricks.sdk.service.compute import InstanceProfile
 
@@ -860,4 +861,109 @@ def test_create_uc_role_multiple():
     assert (
         call('UC_ROLE-2', 'UC_POLICY-2', {'BUCKET2/FOLDER2'}, account_id=None, kms_key=None)
         in aws.add_uc_role.call_args_list
+    )
+
+
+def test_get_uc_compatible_roles():
+    ws = create_autospec(WorkspaceClient)
+    ws.current_user.me = lambda: iam.User(user_name="me@example.com", groups=[iam.ComplexValue(display="admins")])
+
+    aws = create_autospec(AWSResources)
+    aws.get_role_policy.side_effect = [
+        [
+            AWSPolicyAction(
+                resource_type="s3",
+                privilege="READ_FILES",
+                resource_path="s3://bucket1",
+            ),
+            AWSPolicyAction(
+                resource_type="s3",
+                privilege="READ_FILES",
+                resource_path="s3://bucket2",
+            ),
+            AWSPolicyAction(
+                resource_type="s3",
+                privilege="READ_FILES",
+                resource_path="s3://bucket3",
+            ),
+        ],
+        [],
+        [],
+        [
+            AWSPolicyAction(
+                resource_type="s3",
+                privilege="WRITE_FILES",
+                resource_path="s3://bucketA",
+            ),
+            AWSPolicyAction(
+                resource_type="s3",
+                privilege="WRITE_FILES",
+                resource_path="s3://bucketB",
+            ),
+            AWSPolicyAction(
+                resource_type="s3",
+                privilege="WRITE_FILES",
+                resource_path="s3://bucketC",
+            ),
+        ],
+        [],
+        [],
+    ]
+    aws.list_role_policies.return_value = ["Policy1", "Policy2", "Policy3"]
+    aws.list_attached_policies_in_role.return_value = [
+        "arn:aws:iam::aws:policy/Policy1",
+        "arn:aws:iam::aws:policy/Policy2",
+    ]
+    aws.list_all_uc_roles.return_value = [
+        AWSRole(path='/', role_name='uc-role1', role_id='12345', arn='arn:aws:iam::12345:role/uc-role1')
+    ]
+
+    installation = MockInstallation()
+    aws_resource_permissions = AWSResourcePermissions(installation, ws, MockBackend(), aws, "ucx")
+    installation.load = MagicMock()
+    installation.load.side_effect = [
+        ResourceDoesNotExist(),
+        [AWSRoleAction("arn:aws:iam::12345:role/uc-role1", "s3", "WRITE_FILES", "s3://BUCKETX/*")],
+    ]
+    aws_resource_permissions.get_uc_compatible_roles()
+    installation.assert_file_written(
+        'uc_roles_access.csv',
+        [
+            {
+                'privilege': 'READ_FILES',
+                'resource_path': 's3://bucket1',
+                'resource_type': 's3',
+                'role_arn': 'arn:aws:iam::12345:role/uc-role1',
+            },
+            {
+                'privilege': 'READ_FILES',
+                'resource_path': 's3://bucket2',
+                'resource_type': 's3',
+                'role_arn': 'arn:aws:iam::12345:role/uc-role1',
+            },
+            {
+                'privilege': 'READ_FILES',
+                'resource_path': 's3://bucket3',
+                'resource_type': 's3',
+                'role_arn': 'arn:aws:iam::12345:role/uc-role1',
+            },
+            {
+                'privilege': 'WRITE_FILES',
+                'resource_path': 's3://bucketA',
+                'resource_type': 's3',
+                'role_arn': 'arn:aws:iam::12345:role/uc-role1',
+            },
+            {
+                'privilege': 'WRITE_FILES',
+                'resource_path': 's3://bucketB',
+                'resource_type': 's3',
+                'role_arn': 'arn:aws:iam::12345:role/uc-role1',
+            },
+            {
+                'privilege': 'WRITE_FILES',
+                'resource_path': 's3://bucketC',
+                'resource_type': 's3',
+                'role_arn': 'arn:aws:iam::12345:role/uc-role1',
+            },
+        ],
     )
