@@ -12,6 +12,8 @@ from databricks.labs.ucx.workspace_access.secrets import (
     SecretScopesSupport,
 )
 
+# pylint: disable=protected-access
+
 
 def test_secret_scopes_crawler():
     ws = MagicMock()

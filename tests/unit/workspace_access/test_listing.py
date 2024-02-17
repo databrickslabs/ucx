@@ -7,16 +7,6 @@ from databricks.sdk.service.workspace import ObjectInfo, ObjectType
 from databricks.labs.ucx.workspace_access import generic, listing
 
 
-def test_logging_calls():
-    ws = MagicMock()
-    workspace_listing = listing.WorkspaceListing(ws=ws, num_threads=1)
-    workspace_listing.start_time = dt.datetime.now()
-    workspace_listing._counter = 9
-    # with patch.object(logger, "table") as mock_info:
-    #     workspace_listing._progress_report(None)
-    #     mock_info.assert_called_once()
-
-
 def test_workspace_listing():
     listing_instance = [
         generic.WorkspaceObjectInfo(object_type="NOTEBOOK", object_id=1, path="", language="PYTHON"),

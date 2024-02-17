@@ -1,5 +1,3 @@
-from unittest.mock import Mock
-
 from databricks.labs.ucx.assessment.azure import AzureServicePrincipalCrawler
 
 from ..framework.mocks import MockBackend
@@ -58,43 +56,6 @@ def test_azure_service_principal_info_null_applid_crawl():
     )
     spn_crawler = AzureServicePrincipalCrawler(ws, MockBackend(), "ucx").snapshot()
     assert len(spn_crawler) == 0
-
-
-def test_spn_with_spark_config_snapshot_try_fetch():
-    sample_spns = [
-        {
-            "application_id": "test123456780",
-            "secret_scope": "abcff",
-            "secret_key": "sp_app_client_id",
-            "tenant_id": "dummy",
-            "storage_account": "SA_Dummy",
-        }
-    ]
-    mock_ws = Mock()
-    crawler = AzureServicePrincipalCrawler(mock_ws, MockBackend(), "ucx")
-    crawler._fetch = Mock(return_value=sample_spns)
-    crawler._crawl = Mock(return_value=sample_spns)
-
-    result_set = crawler.snapshot()
-
-    assert len(result_set) == 1
-
-
-def test_spn_with_spark_config_snapshot():
-    sample_spns = [{"application_id": "test123456780", "secret_scope": "abcff", "secret_key": "sp_app_client_id"}]
-    mock_ws = Mock()
-    crawler = AzureServicePrincipalCrawler(mock_ws, MockBackend(), "ucx")
-    crawler._try_fetch = Mock(return_value=sample_spns)
-    crawler._crawl = Mock(return_value=sample_spns)
-
-    result_set = crawler.snapshot()
-
-    assert len(result_set) == 1
-    assert result_set[0] == {
-        "application_id": "test123456780",
-        "secret_scope": "abcff",
-        "secret_key": "sp_app_client_id",
-    }
 
 
 def test_list_all_cluster_with_spn_in_spark_conf_with_secret():

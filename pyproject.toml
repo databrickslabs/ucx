@@ -536,7 +536,40 @@ confidence = ["HIGH", "CONTROL_FLOW", "INFERENCE", "INFERENCE_FAILURE", "UNDEFIN
 # --enable=similarities". If you want to run only the classes checker, but have
 # no Warning level messages displayed, use "--disable=all --enable=classes
 # --disable=W".
-disable = ["raw-checker-failed", "bad-inline-option", "locally-disabled", "file-ignored", "suppressed-message", "deprecated-pragma", "use-implicit-booleaness-not-comparison-to-string", "use-implicit-booleaness-not-comparison-to-zero", "consider-using-augmented-assign", "prefer-typing-namedtuple", "attribute-defined-outside-init", "invalid-name", "missing-module-docstring", "missing-class-docstring", "missing-function-docstring", "protected-access", "too-few-public-methods", "line-too-long", "too-many-lines", "trailing-whitespace", "missing-final-newline", "trailing-newlines", "bad-indentation", "unnecessary-semicolon", "multiple-statements", "superfluous-parens", "mixed-line-endings", "unexpected-line-ending-format", "fixme", "consider-using-assignment-expr", "logging-fstring-interpolation", "consider-using-any-or-all"]
+disable = [
+    "raw-checker-failed",
+    "bad-inline-option",
+    "locally-disabled",
+    "file-ignored",
+    "suppressed-message",
+    "deprecated-pragma",
+    "use-implicit-booleaness-not-comparison-to-string",
+    "use-implicit-booleaness-not-comparison-to-zero",
+    "consider-using-augmented-assign",
+    "prefer-typing-namedtuple",
+    "attribute-defined-outside-init",
+    "invalid-name",
+    "missing-module-docstring",
+    "missing-class-docstring",
+    "missing-function-docstring",
+#    "protected-access",
+    "too-few-public-methods",
+    "line-too-long",
+    "too-many-lines",
+    "trailing-whitespace",
+    "missing-final-newline",
+    "trailing-newlines",
+    "bad-indentation",
+    "unnecessary-semicolon",
+    "multiple-statements",
+    "superfluous-parens",
+    "mixed-line-endings",
+    "unexpected-line-ending-format",
+    "fixme",
+    "consider-using-assignment-expr",
+    "logging-fstring-interpolation",
+    "consider-using-any-or-all"
+]
 
 # Enable the message, report, category or checker with the given id(s). You can
 # either give multiple identifier separated by comma (,) or put this option

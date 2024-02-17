@@ -580,5 +580,5 @@ def test_is_target_exists():
     src_table = Table(
         catalog="hive_metastore", database="schema1", name="dest1", object_type="MANAGED", table_format="DELTA"
     )
-    assert not table_mapping._exists_in_uc(src_table, "cat1.schema1.dest1")
-    assert table_mapping._exists_in_uc(src_table, "cat1.schema2.dest2")
+    assert not table_mapping.exists_in_uc(src_table, "cat1.schema1.dest1")
+    assert table_mapping.exists_in_uc(src_table, "cat1.schema2.dest2")

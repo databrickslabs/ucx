@@ -16,6 +16,8 @@ from databricks.labs.ucx.workspace_access.redash import (
     RedashPermissionsSupport,
 )
 
+# pylint: disable=protected-access
+
 
 def test_crawlers():
     ws = MagicMock()

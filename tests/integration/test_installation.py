@@ -1,12 +1,14 @@
 import functools
 import json
 import logging
+import os.path
 from collections.abc import Callable
 from dataclasses import replace
 from datetime import timedelta
 
 import pytest
 from databricks.labs.blueprint.installation import Installation
+from databricks.labs.blueprint.installer import InstallState
 from databricks.labs.blueprint.parallel import Threads
 from databricks.labs.blueprint.tui import MockPrompts
 from databricks.labs.blueprint.wheels import WheelsV2
@@ -291,10 +293,13 @@ def test_repair_run_workflow_job(ws, mocker, new_installation, sql_backend):
     sql_backend.execute(f"CREATE SCHEMA IF NOT EXISTS {install.config.inventory_database}")
 
     install.repair_run("099-destroy-schema")
-    workflow_job_id = install._state.jobs["099-destroy-schema"]
+
+    installation = Installation(ws, product=os.path.basename(install.folder), install_folder=install.folder)
+    state = InstallState.from_installation(installation)
+    workflow_job_id = state.jobs["099-destroy-schema"]
     run_status = None
     while run_status is None:
-        job_runs = list(install._ws.jobs.list_runs(job_id=workflow_job_id, limit=1))
+        job_runs = list(ws.jobs.list_runs(job_id=workflow_job_id, limit=1))
         run_status = job_runs[0].state.result_state
     assert run_status.value == "SUCCESS"
 
@@ -302,7 +307,9 @@ def test_repair_run_workflow_job(ws, mocker, new_installation, sql_backend):
 @retried(on=[NotFound], timeout=timedelta(minutes=5))
 def test_uninstallation(ws, sql_backend, new_installation):
     install = new_installation()
-    assessment_job_id = install._state.jobs["assessment"]
+    installation = Installation(ws, product=os.path.basename(install.folder), install_folder=install.folder)
+    state = InstallState.from_installation(installation)
+    assessment_job_id = state.jobs["assessment"]
     install.uninstall()
     with pytest.raises(NotFound):
         ws.workspace.get_status(install.folder)

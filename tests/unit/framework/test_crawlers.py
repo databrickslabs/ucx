@@ -23,6 +23,8 @@ from databricks.labs.ucx.framework.crawlers import (
 
 from ..framework.mocks import MockBackend
 
+# pylint: disable=protected-access
+
 
 @dataclass
 class Foo:
@@ -50,7 +52,7 @@ def test_invalid():
 
 def test_full_name():
     cb = CrawlerBase(MockBackend(), "a", "b", "c", Bar)
-    assert cb._full_name == "a.b.c"
+    assert cb.full_name == "a.b.c"
 
 
 def test_snapshot_appends_to_existing_table():

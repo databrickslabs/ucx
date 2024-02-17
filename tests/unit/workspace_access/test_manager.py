@@ -19,7 +19,7 @@ def b():
 def test_inventory_table_manager_init(b):
     pi = PermissionManager(b, "test_database", [])
 
-    assert pi._full_name == "hive_metastore.test_database.permissions"
+    assert pi.full_name == "hive_metastore.test_database.permissions"
 
 
 def test_cleanup(b):
@@ -191,7 +191,7 @@ def test_factory(mocker):
     ws.groups.list.return_value = []
     sql_backend = MockBackend()
     permission_manager = PermissionManager.factory(ws, sql_backend, "test")
-    appliers = permission_manager._appliers()
+    appliers = permission_manager.object_type_support()
 
     assert sorted(
         {

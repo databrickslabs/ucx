@@ -238,7 +238,7 @@ class CrawlerBase(Generic[Result]):
         self._klass = klass
 
     @property
-    def _full_name(self) -> str:
+    def full_name(self) -> str:
         """
         Generates the full name of the table.
 
@@ -298,21 +298,21 @@ class CrawlerBase(Generic[Result]):
         Returns:
         list[any]: A list of data records, either fetched or loaded.
         """
-        logger.debug(f"[{self._full_name}] fetching {self._table} inventory")
+        logger.debug(f"[{self.full_name}] fetching {self._table} inventory")
         try:
             cached_results = list(fetcher())
             if len(cached_results) > 0:
                 return cached_results
         except NotFound:
             pass
-        logger.debug(f"[{self._full_name}] crawling new batch for {self._table}")
+        logger.debug(f"[{self.full_name}] crawling new batch for {self._table}")
         loaded_records = list(loader())
         self._append_records(loaded_records)
         return loaded_records
 
     def _append_records(self, items: Sequence[Result]):
-        logger.debug(f"[{self._full_name}] found {len(items)} new records for {self._table}")
-        self._backend.save_table(self._full_name, items, self._klass, mode="append")
+        logger.debug(f"[{self.full_name}] found {len(items)} new records for {self._table}")
+        self._backend.save_table(self.full_name, items, self._klass, mode="append")
 
 
 class SchemaDeployer:

@@ -45,7 +45,7 @@ def test_task_logger(tmp_path):
     app_logger = logging.getLogger("databricks.labs.ucx.foo")
     databricks_logger = logging.getLogger("databricks.sdk.core")
     with TaskLogger(tmp_path, "assessment", "123", "crawl-tables", "234") as task_logger:
-        app_logger.info(f"log file is {task_logger._log_file}")
+        app_logger.info(f"log file is {task_logger.log_file}")
         databricks_logger.debug("something from sdk")
     contents = _log_contents(tmp_path)
     assert len(contents) == 2

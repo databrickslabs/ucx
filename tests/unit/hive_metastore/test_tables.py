@@ -106,11 +106,6 @@ def test_uc_sql(table, target, query):
         assert table.sql_migrate_external(target) == query
 
 
-def test_tables_crawler_inventory_table():
-    tc = TablesCrawler(MockBackend(), "default")
-    assert tc._table == "tables"
-
-
 def test_tables_crawler_parse_tp():
     tc = TablesCrawler(MockBackend(), "default")
     tp1 = tc._parse_table_props(
@@ -132,7 +127,7 @@ def test_tables_returning_error_when_describing():
     }
     backend = MockBackend(fails_on_first=errors, rows=rows)
     tc = TablesCrawler(backend, "default")
-    results = tc._crawl()
+    results = tc.snapshot()
     assert len(results) == 1
 
 

@@ -308,7 +308,7 @@ def test_grants_returning_error_when_showing_grants():
     udf = UdfsCrawler(backend, "default")
     crawler = GrantsCrawler(tc, udf)
 
-    results = crawler._crawl()
+    results = crawler.snapshot()
     assert results == [
         Grant(
             principal="principal1",
@@ -344,7 +344,7 @@ def test_grants_returning_error_when_describing():
     udf = UdfsCrawler(backend, "default")
     crawler = GrantsCrawler(tc, udf)
 
-    results = crawler._crawl()
+    results = crawler.snapshot()
     assert results == [
         Grant(
             principal="principal1",
@@ -381,7 +381,7 @@ def test_udf_grants_returning_error_when_showing_grants():
     udf = UdfsCrawler(backend, "default")
     crawler = GrantsCrawler(tc, udf)
 
-    results = crawler._crawl()
+    results = crawler.snapshot()
     assert results == [
         Grant(
             principal="principal1",
@@ -417,7 +417,7 @@ def test_udf_grants_returning_error_when_describing():
     udf = UdfsCrawler(backend, "default")
     crawler = GrantsCrawler(tc, udf)
 
-    results = crawler._crawl()
+    results = crawler.snapshot()
     assert results == [
         Grant(
             principal="principal1",

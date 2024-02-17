@@ -12,6 +12,8 @@ from databricks.labs.ucx.workspace_access.base import Permissions
 from databricks.labs.ucx.workspace_access.groups import MigratedGroup, MigrationState
 from databricks.labs.ucx.workspace_access.scim import ScimSupport
 
+# pylint: disable=protected-access
+
 
 def test_applier_task_should_return_true_if_roles_are_properly_applied():
     ws = MagicMock()

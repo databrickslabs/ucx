@@ -395,7 +395,7 @@ class GroupManager(CrawlerBase[MigratedGroup]):
 
     def _fetcher(self) -> Iterable[MigratedGroup]:
         state = []
-        for row in self._backend.fetch(f"SELECT * FROM {self._full_name}"):
+        for row in self._backend.fetch(f"SELECT * FROM {self.full_name}"):
             state.append(MigratedGroup(*row))
 
         if not self._include_group_names:

@@ -156,7 +156,7 @@ class GrantsCrawler(CrawlerBase[Grant]):
         return self._snapshot(partial(self._try_load), partial(self._crawl))
 
     def _try_load(self):
-        for row in self._fetch(f"SELECT * FROM {escape_sql_identifier(self._full_name)}"):
+        for row in self._fetch(f"SELECT * FROM {escape_sql_identifier(self.full_name)}"):
             yield Grant(*row)
 
     def _crawl(self) -> Iterable[Grant]:
@@ -185,19 +185,19 @@ class GrantsCrawler(CrawlerBase[Grant]):
         list[Grant]: A list of Grant objects representing the grants found in hive_metastore.
         """
         catalog = "hive_metastore"
-        tasks = [partial(self._grants, catalog=catalog)]
+        tasks = [partial(self.grants, catalog=catalog)]
         # Scanning ANY FILE and ANONYMOUS FUNCTION grants
-        tasks.append(partial(self._grants, catalog=catalog, any_file=True))
-        tasks.append(partial(self._grants, catalog=catalog, anonymous_function=True))
+        tasks.append(partial(self.grants, catalog=catalog, any_file=True))
+        tasks.append(partial(self.grants, catalog=catalog, anonymous_function=True))
         # scan all databases, even empty ones
         for row in self._fetch(f"SHOW DATABASES FROM {escape_sql_identifier(catalog)}"):
-            tasks.append(partial(self._grants, catalog=catalog, database=row.databaseName))
+            tasks.append(partial(self.grants, catalog=catalog, database=row.databaseName))
         for table in self._tc.snapshot():
-            fn = partial(self._grants, catalog=catalog, database=table.database)
+            fn = partial(self.grants, catalog=catalog, database=table.database)
             # views are recognized as tables
             tasks.append(partial(fn, table=table.name))
         for udf in self._udf.snapshot():
-            fn = partial(self._grants, catalog=catalog, database=udf.database)
+            fn = partial(self.grants, catalog=catalog, database=udf.database)
             tasks.append(partial(fn, udf=udf.name))
         catalog_grants, errors = Threads.gather(f"listing grants for {catalog}", tasks)
         if len(errors) > 0:
@@ -207,17 +207,17 @@ class GrantsCrawler(CrawlerBase[Grant]):
     def for_table_info(self, table: TableInfo):
         # TODO: it does not work yet for views
         principal_permissions = defaultdict(set)
-        for grant in self._grants(catalog=table.catalog_name, database=table.schema_name, table=table.name):
+        for grant in self.grants(catalog=table.catalog_name, database=table.schema_name, table=table.name):
             principal_permissions[grant.principal].add(grant.action_type)
         return principal_permissions
 
     def for_schema_info(self, schema: SchemaInfo):
         principal_permissions = defaultdict(set)
-        for grant in self._grants(catalog=schema.catalog_name, database=schema.name):
+        for grant in self.grants(catalog=schema.catalog_name, database=schema.name):
             principal_permissions[grant.principal].add(grant.action_type)
         return principal_permissions
 
-    def _grants(
+    def grants(
         self,
         *,
         catalog: str | None = None,
