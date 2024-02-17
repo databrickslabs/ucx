@@ -855,17 +855,7 @@ def debug_env(monkeypatch, debug_env_name) -> MutableMapping[str, str]:
     with conf_file.open("r") as f:
         conf = json.load(f)
         if debug_env_name not in conf:
-            sys.stderr.write(
-                f"""{debug_env_name} not found in ~/.databricks/debug-env.json
-
-            this usually means that you have to add the following fixture to
-            conftest.py file in the relevant directory:
-
-            @pytest.fixture
-            def debug_env_name():
-                return 'ENV_NAME' # where ENV_NAME is one of: {", ".join(conf.keys())}
-            """
-            )
+            sys.stderr.write(f"""{debug_env_name} not found in ~/.databricks/debug-env.json""")
             msg = f"{debug_env_name} not found in ~/.databricks/debug-env.json"
             raise KeyError(msg)
         for k, v in conf[debug_env_name].items():
