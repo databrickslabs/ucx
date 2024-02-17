@@ -351,7 +351,6 @@ class AWSResourcePermissions:
             role_actions = self._installation.load(list[AWSRoleAction], filename=self.UC_ROLES_FILE_NAMES)
         return role_actions
 
-
     def create_uc_roles_cli(self, *, single_role=True, role_name="UC_ROLE", policy_name="UC_POLICY"):
         missing_paths = self._identify_missing_paths()
         s3_prefixes = set()
