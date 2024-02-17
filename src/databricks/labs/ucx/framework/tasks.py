@@ -53,7 +53,7 @@ class Task:
         return True
 
 
-def _remove_extra_indentation(doc: str) -> str:
+def remove_extra_indentation(doc: str) -> str:
     lines = doc.splitlines()
     stripped = []
     for line in lines:
@@ -108,7 +108,7 @@ def task(
             task_id=len(_TASKS),
             workflow=workflow,
             name=func.__name__,
-            doc=_remove_extra_indentation(func.__doc__),
+            doc=remove_extra_indentation(func.__doc__),
             fn=func,
             depends_on=deps,
             job_cluster=job_cluster,

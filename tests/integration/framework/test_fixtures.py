@@ -1,7 +1,6 @@
 import logging
 
 import pytest
-from _pytest.outcomes import Failed, Skipped
 from databricks.labs.blueprint.commands import CommandExecutor
 from databricks.sdk.service.workspace import AclPermission
 
@@ -90,7 +89,7 @@ def test_sql_backend_works(ws, wsfs_wheel):
 
 
 def test_env_or_skip(env_or_skip):
-    with pytest.raises((Skipped, Failed)):
+    with pytest.raises((pytest.Skipped, pytest.Failed)):
         env_or_skip("NO_ENV_VAR_HERE")
 
 

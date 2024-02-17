@@ -7,12 +7,12 @@ from databricks.sdk import WorkspaceClient
 from databricks.labs.ucx.framework.tasks import (
     Task,
     TaskLogger,
-    _remove_extra_indentation,
+    remove_extra_indentation,
 )
 
 
 def test_replace_pydoc():
-    doc = _remove_extra_indentation(
+    doc = remove_extra_indentation(
         """Test1
         Test2
     Test3"""

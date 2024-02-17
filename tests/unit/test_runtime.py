@@ -6,7 +6,10 @@ from databricks.sdk import WorkspaceClient
 from databricks.sdk.config import Config
 
 from databricks.labs.ucx.config import WorkspaceConfig
-from databricks.labs.ucx.framework.tasks import _TASKS, Task
+from databricks.labs.ucx.framework.tasks import (  # pylint: disable=import-private-name
+    _TASKS,
+    Task,
+)
 from databricks.labs.ucx.runtime import assess_azure_service_principals
 
 from .framework.mocks import MockBackend

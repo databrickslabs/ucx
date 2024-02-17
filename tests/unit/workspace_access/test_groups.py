@@ -2,7 +2,6 @@ import json
 from unittest.mock import MagicMock, create_autospec
 
 import pytest
-from _pytest.outcomes import fail
 from databricks.labs.blueprint.parallel import ManyError
 from databricks.labs.blueprint.tui import MockPrompts
 from databricks.sdk import WorkspaceClient
@@ -464,10 +463,7 @@ def test_delete_original_workspace_groups_should_not_fail_if_target_group_doesnt
     wsclient.groups.delete.side_effect = DatabricksError(message="None Group with id 100 not found")
     gm = GroupManager(backend, wsclient, inventory_database="inv")
 
-    try:
-        gm.delete_original_workspace_groups()
-    except DatabricksError:
-        fail("delete_original_workspace_groups() raised DatabricksError unexpectedly!")
+    gm.delete_original_workspace_groups()
 
 
 def test_delete_original_workspace_groups_should_fail_if_delete_does_not_work():
