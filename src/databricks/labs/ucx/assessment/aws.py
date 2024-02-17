@@ -227,64 +227,12 @@ class AWSResources:
                 }
             ],
         }
-        aws_policy_kms: dict = {
-            "Version": "2012-10-17",
-            "Statement": [
-                {
-                    "Action": [
-                        "s3:GetObject",
-                        "s3:PutObject",
-                        "s3:DeleteObject",
-                        "s3:ListBucket",
-                        "s3:GetBucketLocation",
-                    ],
-                    "Resource": "",
-                    "Effect": "Allow",
-                },
-                {
-                    "Action": ["kms:Decrypt", "kms:Encrypt", "kms:GenerateDataKey*"],
-                    "Resource": ["arn:aws:kms:<KMS-KEY>"],
-                    "Effect": "Allow",
-                },
-                {
-                    "Action": ["sts:AssumeRole"],
-                    "Resource": ["arn:aws:iam::<AWS-ACCOUNT-ID>:role/<AWS-IAM-ROLE-NAME>"],
-                    "Effect": "Allow",
-                },
-            ],
-        }
-
-        aws_policy_no_kms: dict = {
-            "Version": "2012-10-17",
-            "Statement": [
-                {
-                    "Action": [
-                        "s3:GetObject",
-                        "s3:PutObject",
-                        "s3:DeleteObject",
-                        "s3:ListBucket",
-                        "s3:GetBucketLocation",
-                    ],
-                    "Resource": "",
-                    "Effect": "Allow",
-                },
-                {
-                    "Action": ["sts:AssumeRole"],
-                    "Resource": ["arn:aws:iam::<AWS-ACCOUNT-ID>:role/<AWS-IAM-ROLE-NAME>"],
-                    "Effect": "Allow",
-                },
-            ],
-        }
         assume_role_json = self._get_json_for_cli(aws_role_trust_doc)
         add_role = self._run_json_command(
             f"iam create-role --role-name {role_name} --assume-role-policy-document {assume_role_json}"
         )
         if not add_role:
             return False
-        if kms_key:
-            policy_document = aws_policy_kms
-        else:
-            policy_document = aws_policy_no_kms
         s3_prefixes_enriched = sorted([self.S3_PREFIX + s3_prefix for s3_prefix in s3_prefixes])
         if kms_key:
             policy_document = {
