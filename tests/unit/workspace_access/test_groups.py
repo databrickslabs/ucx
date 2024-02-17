@@ -388,7 +388,7 @@ def test_reflect_account_should_not_fail_if_group_not_in_the_account_anymore():
     wsclient = MagicMock()
     account_group1 = Group(id="11", display_name="de")
 
-    def reflect_account_side_effect(method, *_):
+    def reflect_account_side_effect(method, *_, **__):
         if method == "GET":
             return {
                 "Resources": [g.as_dict() for g in (account_group1,)],

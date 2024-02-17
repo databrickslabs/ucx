@@ -25,10 +25,10 @@
         }
       },
       {
-            "workspace": {
-                "destination": "/Users/user@databricks.com/.ucx/startup.sh"
-            }
+        "workspace": {
+          "destination": "init.sh"
         }
+      }
     ]
   }
 ]

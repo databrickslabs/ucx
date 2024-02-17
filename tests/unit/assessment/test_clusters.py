@@ -111,7 +111,6 @@ def test_cluster_init_script():
 def test_cluster_init_script_check_dbfs():
     ws = workspace_client_mock(clusters="dbfs-init-scripts.json")
     ws.dbfs.read().data = "JXNoCmVjaG8gIj0="
-    ws.workspace.export().content = "JXNoCmVjaG8gIj0="
     init_crawler = ClustersCrawler(ws, MockBackend(), "ucx").snapshot()
     assert len(init_crawler) == 1
 
