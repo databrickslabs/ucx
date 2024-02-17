@@ -72,8 +72,8 @@ def run_command(command):
         return process.returncode, output.decode("utf-8"), error.decode("utf-8")
 
 
-def esc_json_for_cli(json: str) -> str:
-    return json.replace('\n', '').replace(" ", "")
+def esc_json_for_cli(input_json: str) -> str:
+    return input_json.replace('\n', '').replace(" ", "")
 
 
 class AWSResources:
@@ -81,7 +81,7 @@ class AWSResources:
     S3_READONLY: typing.ClassVar[str] = "s3:GetObject"
     S3_REGEX: typing.ClassVar[str] = r"arn:aws:s3:::([a-zA-Z0-9+=,.@_-]*)\/\*$"
     S3_PREFIX: typing.ClassVar[str] = "arn:aws:s3:::"
-    S3_PATH_REGEX: typing.ClassVar[str] = "((s3:\/\/)|(s3a:\/\/))(.*)"
+    S3_PATH_REGEX: typing.ClassVar[str] = r"((s3:\/\/)|(s3a:\/\/))(.*)"
     UC_MASTER_ROLES_ARN: typing.ClassVar[list[str]] = [
         "arn:aws:iam::414351767826:role/unity-catalog-prod-UCMasterRole-14S5ZJVKOTYTL",
         "arn:aws:iam::707343435239:role/unity-catalog-dev-UCMasterRole-G3MMN8SP21FO",
@@ -345,10 +345,12 @@ class AWSResources:
             policy_document = self.AWS_POLICY_KMS
         else:
             policy_document = self.AWS_POLICY_NO_KMS
-        s3_prefixes_enriched = [self.S3_PREFIX + s3_prefix for s3_prefix in s3_prefixes]
+        s3_prefixes_enriched = sorted([self.S3_PREFIX + s3_prefix for s3_prefix in s3_prefixes])
         policy_document = policy_document.replace("<BUCKETS>", json.dumps(s3_prefixes_enriched))
         policy_document = policy_document.replace("<AWS-ACCOUNT-ID>", account_id)
         policy_document = policy_document.replace("<AWS-IAM-ROLE-NAME>", role_name)
+        if kms_key:
+            policy_document = policy_document.replace("<KMS-KEY>", kms_key)
         policy_document_json = esc_json_for_cli(policy_document)
         if not self._run_command(
             f"iam put-role-policy --role-name {role_name} --policy-name {policy_name} --policy-document {policy_document_json}"
@@ -368,7 +370,7 @@ class AWSResources:
 
     def _run_command(self, command: str):
         aws_cmd = shutil.which("aws")
-        code, output, error = self._command_runner(f"{aws_cmd} {command} --output json")
+        code, _, error = self._command_runner(f"{aws_cmd} {command} --output json")
         if code != 0:
             logger.error(error)
             return False
@@ -448,7 +450,13 @@ class AWSResourcePermissions:
         else:
             role_id = 1
             for s3_prefix in s3_prefixes:
-                self._aws_resources.add_uc_role(f"{role_name}-{role_id}", f"{policy_name}-{role_id}", {s3_prefix}, self._aws_account_id, self._kms_key)
+                self._aws_resources.add_uc_role(
+                    f"{role_name}-{role_id}",
+                    f"{policy_name}-{role_id}",
+                    {s3_prefix},
+                    self._aws_account_id,
+                    self._kms_key,
+                )
 
     def _get_instance_profiles(self) -> Iterable[AWSInstanceProfile]:
         instance_profiles = self._ws.instance_profiles.list()

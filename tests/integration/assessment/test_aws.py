@@ -26,4 +26,3 @@ def test_create_uc_role(env_or_skip, make_random):
     aws.add_uc_role(role_name, policy_name, s3_prefixes, account_id)
     uc_roles = aws.list_all_uc_roles()
     assert role_name in [role.role_name for role in uc_roles]
-

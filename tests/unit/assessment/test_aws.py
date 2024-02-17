@@ -15,6 +15,7 @@ from databricks.labs.ucx.assessment.aws import (
     AWSRole,
     run_command,
 )
+from tests.unit.framework.mocks import MockBackend
 
 logger = logging.getLogger(__name__)
 
@@ -557,7 +558,7 @@ def test_save_instance_profile_permissions():
     ]
 
     installation = MockInstallation()
-    aws_resource_permissions = AWSResourcePermissions(installation, ws, aws)
+    aws_resource_permissions = AWSResourcePermissions(installation, ws, MockBackend(), aws, "ucx")
     aws_resource_permissions.save_instance_profile_permissions()
 
     installation.assert_file_written(
@@ -658,7 +659,7 @@ def test_save_uc_compatible_roles():
     ]
 
     installation = MockInstallation()
-    aws_resource_permissions = AWSResourcePermissions(installation, ws, aws)
+    aws_resource_permissions = AWSResourcePermissions(installation, ws, MockBackend(), aws, "ucx")
     aws_resource_permissions.save_uc_compatible_roles()
     installation.assert_file_written(
         'uc_roles_access.csv',
@@ -727,7 +728,7 @@ def test_instance_profiles_empty_mapping(caplog):
     ws.current_user.me = lambda: iam.User(user_name="me@example.com", groups=[iam.ComplexValue(display="admins")])
     aws = create_autospec(AWSResources)
     installation = MockInstallation()
-    aws_resource_permissions = AWSResourcePermissions(installation, ws, aws)
+    aws_resource_permissions = AWSResourcePermissions(installation, ws, MockBackend(), aws, "ucx")
     aws_resource_permissions.save_instance_profile_permissions()
     assert 'No Mapping Was Generated.' in caplog.messages
 
@@ -740,7 +741,7 @@ def test_uc_roles_empty_mapping(caplog):
     ws.current_user.me = lambda: iam.User(user_name="me@example.com", groups=[iam.ComplexValue(display="admins")])
     aws = create_autospec(AWSResources)
     installation = MockInstallation()
-    aws_resource_permissions = AWSResourcePermissions(installation, ws, aws)
+    aws_resource_permissions = AWSResourcePermissions(installation, ws, MockBackend(), aws, "ucx")
     aws_resource_permissions.save_uc_compatible_roles()
     assert 'No Mapping Was Generated.' in caplog.messages
 
@@ -751,3 +752,72 @@ def test_command(caplog):
     with pytest.raises(FileNotFoundError) as exception:
         run_command("no_way_this_command_would_work")
         print(exception)
+
+
+def test_create_uc_role_no_kms(mocker):
+    command_calls = []
+    mocker.patch("shutil.which", return_value="/path/aws")
+
+    def command_call(cmd: str):
+        command_calls.append(cmd)
+        return 0, '{"VALID":"JSON"}', ""
+
+    aws = AWSResources("Fake_Profile", command_call)
+    s3_prefixes = {"BUCKET1/FOLDER1", "BUCKET1/FOLDER1/*", "BUCKET2/FOLDER2", "BUCKET2/FOLDER2/*"}
+    aws.add_uc_role("test_role", "test_policy", s3_prefixes, "1234")
+    assert (
+        '/path/aws iam create-role --role-name test_role '
+        '--assume-role-policy-document '
+        '{"Version":"2012-10-17","Statement":[{"Effect":"Allow","Principal":'
+        '{"AWS":"arn:aws:iam::414351767826:role/unity-catalog-prod-UCMasterRole-14S5ZJVKOTYTL"}'
+        ',"Action":"sts:AssumeRole","Condition":{"StringEquals":{"sts:ExternalId":"0000"}}}]} --output json'
+    ) in command_calls
+    assert (
+        '/path/aws iam put-role-policy --role-name test_role '
+        '--policy-name test_policy --policy-document '
+        '{"Version":"2012-10-17","Statement":[{"Action":["s3:GetObject","s3:PutObject","s3:DeleteObject",'
+        '"s3:ListBucket","s3:GetBucketLocation"],"Resource":["arn:aws:s3:::BUCKET1/FOLDER1",'
+        '"arn:aws:s3:::BUCKET1/FOLDER1/*","arn:aws:s3:::BUCKET2/FOLDER2","arn:aws:s3:::BUCKET2/FOLDER2/*"],'
+        '"Effect":"Allow"},{"Action":["sts:AssumeRole"],"Resource":["arn:aws:iam::1234:role/test_role"],'
+        '"Effect":"Allow"}]} --output json'
+    ) in command_calls
+
+
+def test_create_uc_role_kms(mocker):
+    command_calls = []
+    mocker.patch("shutil.which", return_value="/path/aws")
+
+    def command_call(cmd: str):
+        command_calls.append(cmd)
+        return 0, '{"VALID":"JSON"}', ""
+
+    aws = AWSResources("Fake_Profile", command_call)
+    s3_prefixes = {"BUCKET1/FOLDER1", "BUCKET1/FOLDER1/*", "BUCKET2/FOLDER2", "BUCKET2/FOLDER2/*"}
+    aws.add_uc_role("test_role", "test_policy", s3_prefixes, "1234", "KMSKEY")
+    assert (
+        '/path/aws iam create-role --role-name test_role '
+        '--assume-role-policy-document '
+        '{"Version":"2012-10-17","Statement":[{"Effect":"Allow","Principal":'
+        '{"AWS":"arn:aws:iam::414351767826:role/unity-catalog-prod-UCMasterRole-14S5ZJVKOTYTL"}'
+        ',"Action":"sts:AssumeRole","Condition":{"StringEquals":{"sts:ExternalId":"0000"}}}]} --output json'
+    ) in command_calls
+    assert (
+        '/path/aws iam put-role-policy --role-name test_role '
+        '--policy-name test_policy '
+        '--policy-document {"Version":"2012-10-17","Statement":[{"Action":["s3:GetObject","s3:PutObject",'
+        '"s3:DeleteObject","s3:ListBucket","s3:GetBucketLocation"],"Resource":["arn:aws:s3:::BUCKET1/FOLDER1",'
+        '"arn:aws:s3:::BUCKET1/FOLDER1/*","arn:aws:s3:::BUCKET2/FOLDER2","arn:aws:s3:::BUCKET2/FOLDER2/*"],'
+        '"Effect":"Allow"},{"Action":["kms:Decrypt","kms:Encrypt","kms:GenerateDataKey*"],'
+        '"Resource":["arn:aws:kms:KMSKEY"],'
+        '"Effect":"Allow"},{"Action":["sts:AssumeRole"],"Resource":["arn:aws:iam::1234:role/test_role"],'
+        '"Effect":"Allow"}]} --output json'
+    ) in command_calls
+
+
+def test_create_uc_role_single():
+    ws = create_autospec(WorkspaceClient)
+    aws = create_autospec(AWSResources)
+    installation = MockInstallation()
+    aws_resource_permissions = AWSResourcePermissions(installation, ws, MockBackend(), aws, "ucx")
+    aws_resource_permissions.create_uc_roles_cli()
+
