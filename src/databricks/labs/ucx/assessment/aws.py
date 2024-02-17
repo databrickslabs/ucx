@@ -436,16 +436,19 @@ class AWSResourcePermissions:
             role_actions.append(AWSRoleAction(default_role_arn, "s3", "Privilege.WRITE_FILES.value", path))
         return role_actions
 
-    def create_uc_roles_cli(self, *, single_role=True, single_role_name=None):
+    def create_uc_roles_cli(self, *, single_role=True, role_name="UC_ROLE", policy_name="UC_POLICY"):
         missing_paths = self._identify_missing_paths()
         s3_prefixes = set()
         for missing_path in missing_paths:
-            match = missing_path
+            match = re.match(self._aws_resources.S3_PATH_REGEX, missing_path)
+            if match:
+                s3_prefixes.add(match.group(2))
         if single_role:
-            self._aws_resources.add_uc_role(single_role_name, missing_paths, self._aws_account_id, self._kms_key)
+            self._aws_resources.add_uc_role(role_name, policy_name, s3_prefixes, self._aws_account_id, self._kms_key)
         else:
-            for missing_path in missing_paths:
-                self._aws_resources.add_uc_role(single_role_name, {missing_path}, self._aws_account_id, self._kms_key)
+            role_id = 1
+            for s3_prefix in s3_prefixes:
+                self._aws_resources.add_uc_role(f"{role_name}-{role_id}", f"{policy_name}-{role_id}", {s3_prefix}, self._aws_account_id, self._kms_key)
 
     def _get_instance_profiles(self) -> Iterable[AWSInstanceProfile]:
         instance_profiles = self._ws.instance_profiles.list()
