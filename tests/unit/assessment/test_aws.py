@@ -756,7 +756,26 @@ def test_command(caplog):
         print(exception)
 
 
-def test_create_uc_role_no_kms(mocker):
+def test_create_uc_role(mocker):
+    command_calls = []
+    mocker.patch("shutil.which", return_value="/path/aws")
+
+    def command_call(cmd: str):
+        command_calls.append(cmd)
+        return 0, '{"VALID":"JSON"}', ""
+
+    aws = AWSResources("Fake_Profile", command_call)
+    aws.add_uc_role("test_role")
+    assert (
+        '/path/aws iam create-role --role-name test_role '
+        '--assume-role-policy-document '
+        '{"Version":"2012-10-17","Statement":[{"Effect":"Allow","Principal":'
+        '{"AWS":"arn:aws:iam::414351767826:role/unity-catalog-prod-UCMasterRole-14S5ZJVKOTYTL"}'
+        ',"Action":"sts:AssumeRole","Condition":{"StringEquals":{"sts:ExternalId":"0000"}}}]} --output json'
+    ) in command_calls
+
+
+def test_create_uc_role_policy_no_kms(mocker):
     command_calls = []
     mocker.patch("shutil.which", return_value="/path/aws")
 
@@ -766,14 +785,7 @@ def test_create_uc_role_no_kms(mocker):
 
     aws = AWSResources("Fake_Profile", command_call)
     s3_prefixes = {"BUCKET1/FOLDER1", "BUCKET1/FOLDER1/*", "BUCKET2/FOLDER2", "BUCKET2/FOLDER2/*"}
-    aws.add_uc_role("test_role", "test_policy", s3_prefixes, "1234")
-    assert (
-        '/path/aws iam create-role --role-name test_role '
-        '--assume-role-policy-document '
-        '{"Version":"2012-10-17","Statement":[{"Effect":"Allow","Principal":'
-        '{"AWS":"arn:aws:iam::414351767826:role/unity-catalog-prod-UCMasterRole-14S5ZJVKOTYTL"}'
-        ',"Action":"sts:AssumeRole","Condition":{"StringEquals":{"sts:ExternalId":"0000"}}}]} --output json'
-    ) in command_calls
+    aws.add_uc_role_policy("test_role", "test_policy", s3_prefixes, "1234")
     assert (
         '/path/aws iam put-role-policy --role-name test_role '
         '--policy-name test_policy --policy-document '
@@ -795,14 +807,7 @@ def test_create_uc_role_kms(mocker):
 
     aws = AWSResources("Fake_Profile", command_call)
     s3_prefixes = {"BUCKET1/FOLDER1", "BUCKET1/FOLDER1/*", "BUCKET2/FOLDER2", "BUCKET2/FOLDER2/*"}
-    aws.add_uc_role("test_role", "test_policy", s3_prefixes, "1234", "KMSKEY")
-    assert (
-        '/path/aws iam create-role --role-name test_role '
-        '--assume-role-policy-document '
-        '{"Version":"2012-10-17","Statement":[{"Effect":"Allow","Principal":'
-        '{"AWS":"arn:aws:iam::414351767826:role/unity-catalog-prod-UCMasterRole-14S5ZJVKOTYTL"}'
-        ',"Action":"sts:AssumeRole","Condition":{"StringEquals":{"sts:ExternalId":"0000"}}}]} --output json'
-    ) in command_calls
+    aws.add_uc_role_policy("test_role", "test_policy", s3_prefixes, "1234", "KMSKEY")
     assert (
         '/path/aws iam put-role-policy --role-name test_role '
         '--policy-name test_policy '
@@ -831,8 +836,9 @@ def test_create_uc_role_single():
     backend = MockBackend(rows=rows, fails_on_first=errors)
     aws_resource_permissions = AWSResourcePermissions(installation, ws, backend, aws, "ucx")
     aws_resource_permissions.create_uc_roles_cli()
+    assert aws.add_uc_role.assert_called_with('UC_ROLE') is None
     assert (
-        aws.add_uc_role.assert_called_with(
+        aws.add_uc_role_policy.assert_called_with(
             'UC_ROLE', 'UC_POLICY', {'BUCKET1/FOLDER1', 'BUCKET2/FOLDER2'}, account_id=None, kms_key=None
         )
         is None
@@ -854,13 +860,15 @@ def test_create_uc_role_multiple():
     backend = MockBackend(rows=rows, fails_on_first=errors)
     aws_resource_permissions = AWSResourcePermissions(installation, ws, backend, aws, "ucx")
     aws_resource_permissions.create_uc_roles_cli(single_role=False)
+    assert call('UC_ROLE-1') in aws.add_uc_role.call_args_list
+    assert call('UC_ROLE-2') in aws.add_uc_role.call_args_list
     assert (
         call('UC_ROLE-1', 'UC_POLICY-1', {'BUCKET1/FOLDER1'}, account_id=None, kms_key=None)
-        in aws.add_uc_role.call_args_list
+        in aws.add_uc_role_policy.call_args_list
     )
     assert (
         call('UC_ROLE-2', 'UC_POLICY-2', {'BUCKET2/FOLDER2'}, account_id=None, kms_key=None)
-        in aws.add_uc_role.call_args_list
+        in aws.add_uc_role_policy.call_args_list
     )
 
 

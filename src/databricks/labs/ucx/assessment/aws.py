@@ -213,7 +213,7 @@ class AWSResources:
                     policy_actions.append(AWSPolicyAction("s3", privilege, f"s3a://{match.group(1)}"))
         return policy_actions
 
-    def add_uc_role(self, role_name, policy_name, s3_prefixes: set[str], account_id: str, kms_key=None):
+    def add_uc_role(self, role_name):
         aws_role_trust_doc: dict = {
             "Version": "2012-10-17",
             "Statement": [
@@ -233,6 +233,9 @@ class AWSResources:
         )
         if not add_role:
             return False
+        return True
+
+    def add_uc_role_policy(self, role_name, policy_name, s3_prefixes: set[str], account_id: str, kms_key=None):
         s3_prefixes_enriched = sorted([self.S3_PREFIX + s3_prefix for s3_prefix in s3_prefixes])
         if kms_key:
             policy_document = {
@@ -288,8 +291,6 @@ class AWSResources:
             f"iam put-role-policy --role-name {role_name} --policy-name {policy_name} --policy-document {policy_document_json}"
         ):
             return False
-        # TODO: Create Credential and update policy
-        #  https://docs.databricks.com/en/connect/unity-catalog/storage-credentials.html step 3
         return True
 
     def _run_json_command(self, command: str):
@@ -382,19 +383,21 @@ class AWSResourcePermissions:
             if match:
                 s3_prefixes.add(match.group(4))
         if single_role:
-            self._aws_resources.add_uc_role(
-                role_name, policy_name, s3_prefixes, account_id=self._aws_account_id, kms_key=self._kms_key
-            )
+            if self._aws_resources.add_uc_role(role_name):
+                self._aws_resources.add_uc_role_policy(
+                    role_name, policy_name, s3_prefixes, account_id=self._aws_account_id, kms_key=self._kms_key
+                )
         else:
             role_id = 1
             for s3_prefix in sorted(list(s3_prefixes)):
-                self._aws_resources.add_uc_role(
-                    f"{role_name}-{role_id}",
-                    f"{policy_name}-{role_id}",
-                    {s3_prefix},
-                    account_id=self._aws_account_id,
-                    kms_key=self._kms_key,
-                )
+                if self._aws_resources.add_uc_role(f"{role_name}-{role_id}"):
+                    self._aws_resources.add_uc_role_policy(
+                        f"{role_name}-{role_id}",
+                        f"{policy_name}-{role_id}",
+                        {s3_prefix},
+                        account_id=self._aws_account_id,
+                        kms_key=self._kms_key,
+                    )
                 role_id += 1
 
     def _get_instance_profiles(self) -> Iterable[AWSInstanceProfile]:
