@@ -13,7 +13,7 @@ from databricks.labs.ucx.assessment.jobs import JobsMixin
 from databricks.labs.ucx.framework.crawlers import CrawlerBase, SqlBackend
 
 SECRET_PATTERN = r"{{secrets\/(.*)\/(.*)}}"
-TENANT_PATTERN = r"https:\/\/login.microsoftonline.com\/(.*)\/oauth2\/token"
+TENANT_PATTERN = r"https:\/\/login\.(?:partner\.)?microsoftonline\.(?:com|us|cn)\/(.*)\/oauth2\/token"
 STORAGE_ACCOUNT_EXTRACT_PATTERN = r"(?:id|endpoint)(.*?)dfs"
 
 
@@ -132,7 +132,7 @@ class AzureServicePrincipalCrawler(CrawlerBase[AzureServicePrincipalInfo], JobsM
         matching_spn_app_id_keys = [key for key in config.keys() if "fs.azure.account.oauth2.client.id" in key]
         for spn_app_id_key in matching_spn_app_id_keys:
             # retrieve application id of spn
-            spn_application_id = self._get_key_from_config(spn_app_id_key, config)
+            spn_application_id = self._get_value_from_config_key(config, spn_app_id_key)
             if spn_application_id is None:
                 continue
 
@@ -153,26 +153,13 @@ class AzureServicePrincipalCrawler(CrawlerBase[AzureServicePrincipalInfo], JobsM
             if len(matching_secret_keys) == 0 or matching_secret_keys[0] is None:
                 secret_scope, secret_key = None, None
             else:
-                client_secret = self._get_key_from_config(matching_secret_keys[0], config, False)
-                if client_secret is not None:
-                    secret_matched = re.findall(SECRET_PATTERN, client_secret)
-                    if len(secret_matched) == 0:
-                        logger.warning('Secret in config stored in plaintext.')
-                    else:
-                        secret_scope, secret_key = secret_matched[0][0], secret_matched[0][1]
-
+                secret_scope, secret_key = self._get_client_secret(config, matching_secret_keys[0])
             # retrieve tenant id of spn
             matching_tenant_keys = [key for key in config.keys() if re.search(tenant_key, key)]
             if len(matching_tenant_keys) == 0 or matching_tenant_keys[0] is None:
                 tenant_id = None
             else:
-                tenant_value = self._get_key_from_config(matching_tenant_keys[0], config)
-                if tenant_value is not None:
-                    tenant_matched = re.findall(TENANT_PATTERN, tenant_value)
-                    if len(tenant_matched) == 0:
-                        logger.warning('Tenant id configuration is not in correct format')
-                    else:
-                        tenant_id = tenant_matched[0]
+                tenant_id = self._get_tenant_id(config, matching_tenant_keys[0])
 
             # add output to the set - this automatically dedupe
             set_service_principals.add(
@@ -186,8 +173,8 @@ class AzureServicePrincipalCrawler(CrawlerBase[AzureServicePrincipalInfo], JobsM
             )
         return set_service_principals
 
-    def _get_key_from_config(self, key: str, config: dict, get_secret: bool = True) -> str | None:
-        """Get a config based on its key, with some special handling:
+    def _get_value_from_config_key(self, config: dict, key: str, get_secret: bool = True) -> str | None:
+        """Get a config value based on its key, with some special handling:
         If the key is prefixed with spark_conf, i.e. this is in a cluster policy, the actual value is nested
         If the value is of format {{secret_scope/secret}}, we extract that as well
         """
@@ -214,3 +201,23 @@ class AzureServicePrincipalCrawler(CrawlerBase[AzureServicePrincipalInfo], JobsM
         except NotFound:
             logger.warning(f'removed on the backend: {secret_scope}{secret_key}')
             return None
+
+    def _get_client_secret(self, config: dict, secret_key: str) -> tuple[str | None, str | None]:
+        client_secret = self._get_value_from_config_key(config, secret_key, False)
+        if client_secret is None:
+            return None, None
+        secret_matched = re.findall(SECRET_PATTERN, client_secret)
+        if len(secret_matched) == 0:
+            logger.warning('Secret in config stored in plaintext.')
+            return None, None
+        return secret_matched[0][0], secret_matched[0][1]
+
+    def _get_tenant_id(self, config: dict, tenant_key: str) -> str | None:
+        tenant_value = self._get_value_from_config_key(config, tenant_key)
+        if tenant_value is None:
+            return None
+        tenant_matched = re.findall(TENANT_PATTERN, tenant_value)
+        if len(tenant_matched) == 0:
+            logger.warning('Tenant id configuration is not in correct format')
+            return None
+        return tenant_matched[0]
