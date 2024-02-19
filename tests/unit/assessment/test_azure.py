@@ -7,7 +7,7 @@ from . import workspace_client_mock
 def test_azure_service_principal_info_crawl():
     ws = workspace_client_mock(
         cluster_ids=['azure-spn-secret', 'simplest-autoscale'],
-        pipelines="single-pipeline-with-spn.json",
+        pipeline_ids=['spec-with-spn'],
         jobs="assortment-spn.json",
         warehouse_config="spn-config.json",
         secret_exists=True,
@@ -96,8 +96,8 @@ def test_list_all_clusters_spn_in_spark_conf_with_tenant():
 def test_azure_service_principal_info_policy_conf():
     ws = workspace_client_mock(
         cluster_ids=['policy-single-user-with-spn', 'policy-azure-oauth'],
+        pipeline_ids=['spec-with-spn'],
         jobs="single-spn-with-policy.json",
-        pipelines="single-pipeline-with-spn.json",
         warehouse_config="spn-config.json",
         secret_exists=True,
     )
@@ -109,8 +109,8 @@ def test_azure_service_principal_info_policy_conf():
 def test_azure_service_principal_info_dedupe():
     ws = workspace_client_mock(
         cluster_ids=['policy-single-user-with-spn'],
+        pipeline_ids=['spec-with-spn'],
         jobs="single-spn-with-policy.json",
-        pipelines="single-pipeline-with-spn.json",
         warehouse_config="dupe-spn-config.json",
         secret_exists=True,
     )
@@ -120,7 +120,7 @@ def test_azure_service_principal_info_dedupe():
 
 
 def test_list_all_pipeline_with_conf_spn_in_spark_conf():
-    ws = workspace_client_mock(cluster_ids=['simplest-autoscale'], pipelines="single-pipeline-with-spn.json")
+    ws = workspace_client_mock(cluster_ids=['simplest-autoscale'], pipeline_ids=['spec-with-spn'])
     result_set = AzureServicePrincipalCrawler(ws, MockBackend(), "ucx").snapshot()
 
     assert len(result_set) == 1
@@ -137,7 +137,7 @@ def test_list_all_pipeline_wo_conf_spn_in_spark_conf():
 
 
 def test_list_all_pipeline_with_conf_spn_tenant():
-    ws = workspace_client_mock(cluster_ids=['simplest-autoscale'], pipelines="single-pipeline-with-spn.json")
+    ws = workspace_client_mock(cluster_ids=['simplest-autoscale'], pipeline_ids=['spec-with-spn'])
     result_set = AzureServicePrincipalCrawler(ws, MockBackend(), "ucx").snapshot()
 
     assert len(result_set) == 1
@@ -146,7 +146,7 @@ def test_list_all_pipeline_with_conf_spn_tenant():
 
 
 def test_list_all_pipeline_with_conf_spn_secret():
-    ws = workspace_client_mock(cluster_ids=['simplest-autoscale'], pipelines="single-pipeline-with-spn.json", secret_exists=True)
+    ws = workspace_client_mock(cluster_ids=['simplest-autoscale'], pipeline_ids=['spec-with-spn'],secret_exists=True)
     result_set = AzureServicePrincipalCrawler(ws, MockBackend(), "ucx").snapshot()
 
     assert len(result_set) == 1
@@ -171,7 +171,7 @@ def test_list_all_pipeline_with_conf_spn_secret_unavlbl():
 
 
 def test_list_all_pipeline_with_conf_spn_secret_avlb():
-    ws = workspace_client_mock(cluster_ids=['simplest-autoscale'], pipelines="single-pipeline-with-spn.json", secret_exists=True)
+    ws = workspace_client_mock(cluster_ids=['simplest-autoscale'], pipeline_ids=['spec-with-spn'],secret_exists=True)
     result_set = AzureServicePrincipalCrawler(ws, MockBackend(), "ucx").snapshot()
 
     assert len(result_set) > 0
