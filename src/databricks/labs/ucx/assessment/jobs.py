@@ -29,21 +29,21 @@ class JobsMixin:
             if j.settings is None:
                 continue
             if j.settings.job_clusters is not None:
-                for jc in j.settings.job_clusters:
-                    if jc.new_cluster is None:
+                for job_cluster in j.settings.job_clusters:
+                    if job_cluster.new_cluster is None:
                         continue
-                    yield j, jc.new_cluster
+                    yield j, job_cluster.new_cluster
             if j.settings.tasks is None:
                 continue
-            for t in j.settings.tasks:
-                if t.existing_cluster_id is not None:
-                    interactive_cluster = all_clusters_by_id.get(t.existing_cluster_id, None)
+            for task in j.settings.tasks:
+                if task.existing_cluster_id is not None:
+                    interactive_cluster = all_clusters_by_id.get(task.existing_cluster_id, None)
                     if interactive_cluster is None:
                         continue
                     yield j, interactive_cluster
 
-                elif t.new_cluster is not None:
-                    yield j, t.new_cluster
+                elif task.new_cluster is not None:
+                    yield j, task.new_cluster
 
 
 class JobsCrawler(CrawlerBase[JobInfo], JobsMixin, CheckClusterMixin):

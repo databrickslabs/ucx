@@ -21,18 +21,18 @@ class ConfigureClusterOverrides:
         """User may override standard job clusters with interactive clusters"""
         logger.info("Configuring cluster overrides from existing clusters")
 
-        def is_classic(c) -> bool:
+        def is_classic(cluster_info) -> bool:
             return (
-                c.state == compute.State.RUNNING
-                and c.spark_version >= MINIMUM_SPARK_VERSION
-                and c.data_security_mode == compute.DataSecurityMode.NONE
+                    cluster_info.state == compute.State.RUNNING
+                    and cluster_info.spark_version >= MINIMUM_SPARK_VERSION
+                    and cluster_info.data_security_mode == compute.DataSecurityMode.NONE
             )
 
-        def is_tacl(c) -> bool:
+        def is_tacl(cluster_info) -> bool:
             return (
-                c.state == compute.State.RUNNING
-                and c.spark_version >= MINIMUM_SPARK_VERSION
-                and c.data_security_mode == compute.DataSecurityMode.LEGACY_TABLE_ACL
+                    cluster_info.state == compute.State.RUNNING
+                    and cluster_info.spark_version >= MINIMUM_SPARK_VERSION
+                    and cluster_info.data_security_mode == compute.DataSecurityMode.LEGACY_TABLE_ACL
             )
 
         def build_and_prompt(prompt, clusters):
@@ -44,11 +44,11 @@ class ConfigureClusterOverrides:
         # build list of valid active clusters
         classic_clusters = []
         tacl_clusters = []
-        for c in self._ws.clusters.list(can_use_client="NOTEBOOK"):
-            if is_classic(c):
-                classic_clusters.append(c)
-            if is_tacl(c):
-                tacl_clusters.append(c)
+        for cluster in self._ws.clusters.list(can_use_client="NOTEBOOK"):
+            if is_classic(cluster):
+                classic_clusters.append(cluster)
+            if is_tacl(cluster):
+                tacl_clusters.append(cluster)
 
         preamble = """
         We detected an install issue and

@@ -15,8 +15,8 @@ def test_move_tables_no_from_schema(ws, sql_backend, make_random, make_catalog, 
     from_catalog = make_catalog()
     from_schema = make_random(4)
     to_catalog = make_catalog()
-    tm = TableMove(ws, sql_backend)
-    tm.move_tables(from_catalog.name, from_schema, "*", to_catalog.name, from_schema, False)
+    table_move = TableMove(ws, sql_backend)
+    table_move.move_tables(from_catalog.name, from_schema, "*", to_catalog.name, from_schema, False)
     rec_results = [
         rec.message
         for rec in caplog.records
@@ -29,7 +29,7 @@ def test_move_tables_no_from_schema(ws, sql_backend, make_random, make_catalog, 
 def test_move_tables(
     ws, sql_backend, make_catalog, make_schema, make_table, make_acc_group
 ):  # pylint: disable=too-many-locals
-    tm = TableMove(ws, sql_backend)
+    table_move = TableMove(ws, sql_backend)
     group_a = make_acc_group()
     group_b = make_acc_group()
     from_catalog = make_catalog()
@@ -52,7 +52,7 @@ def test_move_tables(
     sql_backend.execute(f"GRANT SELECT ON VIEW {from_view_1.full_name} TO `{group_b.display_name}`")
     sql_backend.execute(f"GRANT SELECT ON TABLE {to_table_3.full_name} TO `{group_a.display_name}`")
 
-    tm.move_tables(from_catalog.name, from_schema.name, "*", to_catalog.name, to_schema.name, False)
+    table_move.move_tables(from_catalog.name, from_schema.name, "*", to_catalog.name, to_schema.name, False)
 
     to_tables = ws.tables.list(catalog_name=to_catalog.name, schema_name=to_schema.name)
     table_1_grant = ws.grants.get(

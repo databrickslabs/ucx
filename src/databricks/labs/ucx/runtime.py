@@ -358,6 +358,5 @@ def main(*argv):
 
 if __name__ == "__main__":
     if "DATABRICKS_RUNTIME_VERSION" not in os.environ:
-        msg = "Only intended to run in Databricks Runtime"
-        raise SystemExit(msg)
+        raise SystemExit("Only intended to run in Databricks Runtime")
     main(*sys.argv)

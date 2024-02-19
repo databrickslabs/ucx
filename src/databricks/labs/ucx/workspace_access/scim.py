@@ -58,12 +58,12 @@ class ScimSupport(AclSupport):
         if not self._is_item_relevant(item, migration_state):
             return None
         value = [iam.ComplexValue.from_dict(e) for e in json.loads(item.raw)]
-        for mg in migration_state.groups:
-            if mg.id_in_workspace != item.object_id:
+        for migrated_group in migration_state.groups:
+            if migrated_group.id_in_workspace != item.object_id:
                 continue
-            target_group = self._snapshot.get(mg.name_in_account)
+            target_group = self._snapshot.get(migrated_group.name_in_account)
             if not target_group:
-                msg = f"target group for {mg.name_in_workspace} ({mg.id_in_workspace}) not found: {mg.name_in_account}"
+                msg = f"target group for {migrated_group.name_in_workspace} ({migrated_group.id_in_workspace}) not found: {migrated_group.name_in_account}"
                 raise ValueError(msg)
             return partial(self._applier_task, target_group.id, value, item.object_type)
         return None

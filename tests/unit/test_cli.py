@@ -117,19 +117,19 @@ def test_skip_no_schema(ws, caplog):
 
 def test_sync_workspace_info():
     with (
-        patch("databricks.labs.ucx.account.AccountWorkspaces.sync_workspace_info", return_value=None) as s,
+        patch("databricks.labs.ucx.account.AccountWorkspaces.sync_workspace_info", return_value=None) as swi,
         patch("databricks.labs.ucx.account.AccountWorkspaces.__init__", return_value=None),
     ):
         # TODO: rewrite with mocks, not patches
         a = create_autospec(AccountClient)
         sync_workspace_info(a)
-        s.assert_called_once()
+        swi.assert_called_once()
 
 
 def test_manual_workspace_info(ws):
-    with patch("databricks.labs.ucx.account.WorkspaceInfo.manual_workspace_info", return_value=None) as m:
+    with patch("databricks.labs.ucx.account.WorkspaceInfo.manual_workspace_info", return_value=None) as mwi:
         manual_workspace_info(ws)
-        m.assert_called_once()
+        mwi.assert_called_once()
 
 
 def test_create_table_mapping(ws):

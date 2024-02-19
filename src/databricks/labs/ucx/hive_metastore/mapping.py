@@ -96,13 +96,13 @@ class TableMapping:
             self._sql_backend.execute(
                 f"ALTER TABLE {escape_sql_identifier(schema)}.{escape_sql_identifier(table)} SET TBLPROPERTIES('{self.UCX_SKIP_PROPERTY}' = true)"
             )
-        except NotFound as nf:
-            if "[TABLE_OR_VIEW_NOT_FOUND]" in str(nf) or "[DELTA_TABLE_NOT_FOUND]" in str(nf):
+        except NotFound as err:
+            if "[TABLE_OR_VIEW_NOT_FOUND]" in str(err) or "[DELTA_TABLE_NOT_FOUND]" in str(err):
                 logger.error(f"Failed to apply skip marker for Table {schema}.{table}. Table not found.")
             else:
-                logger.error(f"Failed to apply skip marker for Table {schema}.{table}: {nf!s}", exc_info=True)
-        except BadRequest as br:
-            logger.error(f"Failed to apply skip marker for Table {schema}.{table}: {br!s}", exc_info=True)
+                logger.error(f"Failed to apply skip marker for Table {schema}.{table}: {err!s}", exc_info=True)
+        except BadRequest as err:
+            logger.error(f"Failed to apply skip marker for Table {schema}.{table}: {err!s}", exc_info=True)
 
     def skip_schema(self, schema: str):
         # Marks a schema to be skipped in the migration process by applying a table property
@@ -110,13 +110,13 @@ class TableMapping:
             self._sql_backend.execute(
                 f"ALTER SCHEMA {escape_sql_identifier(schema)} SET DBPROPERTIES('{self.UCX_SKIP_PROPERTY}' = true)"
             )
-        except NotFound as nf:
-            if "[SCHEMA_NOT_FOUND]" in str(nf):
+        except NotFound as err:
+            if "[SCHEMA_NOT_FOUND]" in str(err):
                 logger.error(f"Failed to apply skip marker for Schema {schema}. Schema not found.")
             else:
-                logger.error(nf)
-        except BadRequest as br:
-            logger.error(br)
+                logger.error(err)
+        except BadRequest as err:
+            logger.error(err)
 
     def get_tables_to_migrate(self, tables_crawler: TablesCrawler):
         rules = self.load()

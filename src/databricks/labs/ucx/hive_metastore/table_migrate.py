@@ -25,15 +25,15 @@ logger = logging.getLogger(__name__)
 class TablesMigrate:
     def __init__(
         self,
-        tc: TablesCrawler,
+        tables_crawler: TablesCrawler,
         ws: WorkspaceClient,
         backend: SqlBackend,
-        tm: TableMapping,
+        table_mapping: TableMapping,
     ):
-        self._tc = tc
+        self._tc = tables_crawler
         self._backend = backend
         self._ws = ws
-        self._tm = tm
+        self._tm = table_mapping
         self._seen_tables: dict[str, str] = {}
 
     @classmethod

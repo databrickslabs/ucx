@@ -22,9 +22,9 @@ class AccountWorkspaces:
 
     SYNC_FILE_NAME: ClassVar[str] = "workspaces.json"
 
-    def __init__(self, ac: AccountClient, new_workspace_client=WorkspaceClient):
+    def __init__(self, account_client: AccountClient, new_workspace_client=WorkspaceClient):
         self._new_workspace_client = new_workspace_client
-        self._ac = ac
+        self._ac = account_client
 
     def _workspaces(self):
         return self._ac.workspaces.list()
