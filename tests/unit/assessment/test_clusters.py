@@ -95,7 +95,7 @@ def test_cluster_without_owner_should_have_empty_creator_name():
     result = mockbackend.rows_written_for("hive_metastore.ucx.clusters", "append")
     assert result == [
         ClusterInfo(
-            cluster_id="0915-190044-3dqy6751",
+            cluster_id="simplest-autoscale",
             cluster_name="Tech Summit FY24 Cluster-2",
             creator=None,
             success=1,

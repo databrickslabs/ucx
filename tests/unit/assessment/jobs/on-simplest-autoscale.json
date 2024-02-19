@@ -1,0 +1,17 @@
+{
+  "created_time": 1694536604319,
+  "creator_user_name": "anonymous@databricks.com",
+  "job_id": 123,
+  "settings": {
+    "name": "On Simplest Autoscale",
+    "tasks": [
+      {
+        "task_key": "Ingest",
+        "existing_cluster_id": "simplest-autoscale",
+        "notebook_task": {
+          "notebook_path": "/Users/foo.bar@databricks.com/Customers/Example/Test/Load"
+        }
+      }
+    ]
+  }
+}

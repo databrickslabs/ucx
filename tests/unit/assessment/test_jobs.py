@@ -22,83 +22,9 @@ from . import workspace_client_mock
 
 
 def test_job_assessment():
-    sample_jobs = [
-        BaseJob(
-            created_time=1694536604319,
-            creator_user_name="anonymous@databricks.com",
-            job_id=536591785949415,
-            settings=JobSettings(
-                compute=None,
-                continuous=None,
-                tasks=[
-                    Task(
-                        task_key="Ingest",
-                        existing_cluster_id="0807-225846-motto493",
-                        notebook_task=NotebookTask(
-                            notebook_path="/Users/foo.bar@databricks.com/Customers/Example/Test/Load"
-                        ),
-                        timeout_seconds=0,
-                    )
-                ],
-                timeout_seconds=0,
-            ),
-        ),
-        BaseJob(
-            created_time=1694536604321,
-            creator_user_name="anonymous@databricks.com",
-            job_id=536591785949416,
-            settings=JobSettings(
-                compute=None,
-                continuous=None,
-                tasks=[
-                    Task(
-                        task_key="Ingest",
-                        existing_cluster_id="0810-225833-atlanta69",
-                        notebook_task=NotebookTask(
-                            notebook_path="/Users/foo.bar@databricks.com/Customers/Example/Test/Load"
-                        ),
-                        timeout_seconds=0,
-                    )
-                ],
-                timeout_seconds=0,
-            ),
-        ),
-    ]
-
-    sample_clusters = [
-        ClusterDetails(
-            autoscale=AutoScale(min_workers=1, max_workers=6),
-            spark_conf={"spark.databricks.delta.preview.enabled": "true"},
-            creator_user_name="anonymous@databricks.com",
-            spark_context_id=5134472582179565315,
-            spark_env_vars=None,
-            spark_version="13.3.x-cpu-ml-scala2.12",
-            cluster_id="0807-225846-motto493",
-            cluster_source=ClusterSource.UI,
-        ),
-        ClusterDetails(
-            autoscale=AutoScale(min_workers=1, max_workers=6),
-            spark_conf={"spark.databricks.delta.preview.enabled": "true"},
-            creator_user_name="anonymous@databricks.com",
-            spark_context_id=5134472582179565315,
-            spark_env_vars=None,
-            spark_version="9.3.x-cpu-ml-scala2.12",
-            cluster_id="0810-225833-atlanta69",
-            cluster_source=ClusterSource.UI,
-        ),
-        ClusterDetails(
-            autoscale=AutoScale(min_workers=1, max_workers=6),
-            spark_conf={"spark.databricks.delta.preview.enabled": "true"},
-            spark_context_id=5134472582179566666,
-            spark_env_vars=None,
-            spark_version="13.3.x-cpu-ml-scala2.12",
-            cluster_id="0810-229933-chicago12",
-            cluster_source=ClusterSource.JOB,
-        ),
-    ]
-    result_set = JobsCrawler(Mock(), MockBackend(), "ucx")._assess_jobs(
-        sample_jobs, {c.cluster_id: c for c in sample_clusters}
-    )
+    ws = workspace_client_mock(job_ids=['on-simplest-autoscale', 'on-outdated-autoscale'], cluster_ids=['simplest-autoscale', 'outdated-autoscale'])
+    sql_backend = MockBackend()
+    result_set = JobsCrawler(ws, sql_backend, "ucx").snapshot()
     assert len(result_set) == 2
     assert result_set[0].success == 1
     assert result_set[1].success == 0
