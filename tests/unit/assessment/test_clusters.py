@@ -129,9 +129,9 @@ def test_cluster_with_job_source():
 
 def test_try_fetch():
     ws = workspace_client_mock(cluster_ids=['simplest-autoscale'])
-    mockBackend = MagicMock()
-    mockBackend.fetch.return_value = [("000", 1, "123")]
-    crawler = ClustersCrawler(ws, mockBackend, "ucx")
+    mock_backend = MagicMock()
+    mock_backend.fetch.return_value = [("000", 1, "123")]
+    crawler = ClustersCrawler(ws, mock_backend, "ucx")
     result_set = list(crawler.snapshot())
 
     assert len(result_set) == 1

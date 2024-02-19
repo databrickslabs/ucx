@@ -28,10 +28,10 @@ def test_tacl_crawler():
 
     crawler_tasks = table_acl_support.get_crawler_tasks()
     first_task = next(crawler_tasks)
-    x = first_task()
+    obj = first_task()
 
-    assert x.object_type == "TABLE"
-    assert x.object_id == "catalog_a.database_b.table_c"
+    assert obj.object_type == "TABLE"
+    assert obj.object_id == "catalog_a.database_b.table_c"
 
 
 def test_tacl_udf_crawler():
@@ -49,10 +49,10 @@ def test_tacl_udf_crawler():
 
     crawler_tasks = table_acl_support.get_crawler_tasks()
     first_task = next(crawler_tasks)
-    x = first_task()
+    obj = first_task()
 
-    assert x.object_type == "FUNCTION"
-    assert x.object_id == "catalog_a.database_b.function_c"
+    assert obj.object_type == "FUNCTION"
+    assert obj.object_id == "catalog_a.database_b.function_c"
 
 
 def test_tacl_crawler_multiple_permissions():

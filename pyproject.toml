@@ -322,10 +322,19 @@ function-naming-style = "snake_case"
 
 # Regular expression matching correct function names. Overrides function-naming-
 # style. If left empty, function names will be checked with the set naming style.
-function-rgx = "[a-z_][a-z0-9_]{2,30}$"
+function-rgx = "[a-z_][a-z0-9_]{2,}$"
 
 # Good variable names which should always be accepted, separated by a comma.
-good-names = ["i", "j", "k", "ex", "Run", "_"]
+good-names = [
+    "f",            # use for file handles
+    "i", "j", "k",  # use for loops
+    "df",           # use for pyspark.sql.DataFrame
+    "ex", "e",      # use for exceptions
+    "fn", "cb",     # use for callbacks
+    "_",            # use for ignores
+    "a",            # use for databricks.sdk.AccountClient
+    "w", "ws"       # use for databricks.sdk.WorkspaceClient
+]
 
 # Good variable names regexes, separated by a comma. If names match any regex,
 # they will always be accepted
@@ -537,22 +546,12 @@ confidence = ["HIGH", "CONTROL_FLOW", "INFERENCE", "INFERENCE_FAILURE", "UNDEFIN
 # no Warning level messages displayed, use "--disable=all --enable=classes
 # --disable=W".
 disable = [
-    "raw-checker-failed",
-    "bad-inline-option",
-    "locally-disabled",
-    "file-ignored",
-    "suppressed-message",
-    "deprecated-pragma",
-    "use-implicit-booleaness-not-comparison-to-string",
-    "use-implicit-booleaness-not-comparison-to-zero",
     "consider-using-augmented-assign",
     "prefer-typing-namedtuple",
     "attribute-defined-outside-init",
-    "invalid-name",
     "missing-module-docstring",
     "missing-class-docstring",
     "missing-function-docstring",
-#    "protected-access", # TODO: enable back
     "too-few-public-methods",
     "line-too-long",
     "too-many-lines",

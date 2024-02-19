@@ -17,7 +17,7 @@ def test_runtime_backend_incorrect_schema_and_table_handled(ws, wsfs_wheel, make
     commands = CommandExecutor(ws.clusters, ws.command_execution, lambda: ws.config.cluster_id)
 
     commands.install_notebook_library(f"/Workspace{wsfs_wheel}")
-    query_response_incorrect_schema_execute = commands.run(
+    incorrect_schema_execute = commands.run(
         f"""
         from databricks.labs.ucx.framework.crawlers import RuntimeBackend
         from databricks.sdk.errors import NotFound
@@ -29,9 +29,9 @@ def test_runtime_backend_incorrect_schema_and_table_handled(ws, wsfs_wheel, make
             return "PASSED"
         """
     )
-    assert query_response_incorrect_schema_execute == "PASSED"
+    assert incorrect_schema_execute == "PASSED"
 
-    query_response_incorrect_table_execute = commands.run(
+    incorrect_table_execute = commands.run(
         f"""
         from databricks.labs.ucx.framework.crawlers import RuntimeBackend
         from databricks.sdk.errors import NotFound
@@ -43,9 +43,9 @@ def test_runtime_backend_incorrect_schema_and_table_handled(ws, wsfs_wheel, make
             return "PASSED"
         """
     )
-    assert query_response_incorrect_table_execute == "PASSED"
+    assert incorrect_table_execute == "PASSED"
 
-    query_response_incorrect_schema_fetch = commands.run(
+    incorrect_schema_fetch = commands.run(
         f"""
         from databricks.labs.ucx.framework.crawlers import RuntimeBackend
         from databricks.sdk.errors import NotFound
@@ -57,9 +57,9 @@ def test_runtime_backend_incorrect_schema_and_table_handled(ws, wsfs_wheel, make
             return "PASSED"
         """
     )
-    assert query_response_incorrect_schema_fetch == "PASSED"
+    assert incorrect_schema_fetch == "PASSED"
 
-    query_response_incorrect_table_fetch = commands.run(
+    incorrect_table_fetch = commands.run(
         f"""
         from databricks.labs.ucx.framework.crawlers import RuntimeBackend
         from databricks.sdk.errors import NotFound
@@ -71,14 +71,14 @@ def test_runtime_backend_incorrect_schema_and_table_handled(ws, wsfs_wheel, make
             return "PASSED"
         """
     )
-    assert query_response_incorrect_table_fetch == "PASSED"
+    assert incorrect_table_fetch == "PASSED"
 
 
 def test_runtime_backend_incorrect_syntax_handled(ws, wsfs_wheel):
     commands = CommandExecutor(ws.clusters, ws.command_execution, lambda: ws.config.cluster_id)
 
     commands.install_notebook_library(f"/Workspace{wsfs_wheel}")
-    query_response_incorrect_syntax_execute = commands.run(
+    incorrect_syntax_execute = commands.run(
         """
         from databricks.labs.ucx.framework.crawlers import RuntimeBackend
         from databricks.sdk.errors import BadRequest
@@ -90,9 +90,9 @@ def test_runtime_backend_incorrect_syntax_handled(ws, wsfs_wheel):
             return "PASSED"
         """
     )
-    assert query_response_incorrect_syntax_execute == "PASSED"
+    assert incorrect_syntax_execute == "PASSED"
 
-    query_response_incorrect_syntax_fetch = commands.run(
+    incorrect_syntax_fetch = commands.run(
         """
         from databricks.labs.ucx.framework.crawlers import RuntimeBackend
         from databricks.sdk.errors import BadRequest
@@ -104,14 +104,14 @@ def test_runtime_backend_incorrect_syntax_handled(ws, wsfs_wheel):
             return "PASSED"
         """
     )
-    assert query_response_incorrect_syntax_fetch == "PASSED"
+    assert incorrect_syntax_fetch == "PASSED"
 
 
 def test_runtime_backend_permission_denied_handled(ws, wsfs_wheel):
     commands = CommandExecutor(ws.clusters, ws.command_execution, lambda: ws.config.cluster_id)
 
     commands.install_notebook_library(f"/Workspace{wsfs_wheel}")
-    query_response_permission_denied_execute = commands.run(
+    permission_denied_execute = commands.run(
         """
         from databricks.labs.ucx.framework.crawlers import RuntimeBackend
         from databricks.sdk.errors import PermissionDenied
@@ -124,9 +124,9 @@ def test_runtime_backend_permission_denied_handled(ws, wsfs_wheel):
             return "PASSED"
         """
     )
-    assert query_response_permission_denied_execute == "PASSED"
+    assert permission_denied_execute == "PASSED"
 
-    query_response_permission_denied_fetch = commands.run(
+    permission_denied_fetch = commands.run(
         """
         from databricks.labs.ucx.framework.crawlers import RuntimeBackend
         from databricks.sdk.errors import PermissionDenied
@@ -139,7 +139,7 @@ def test_runtime_backend_permission_denied_handled(ws, wsfs_wheel):
             return "PASSED"
         """
     )
-    assert query_response_permission_denied_fetch == "PASSED"
+    assert permission_denied_fetch == "PASSED"
 
 
 def test_runtime_backend_unknown_error_handled(ws, wsfs_wheel):

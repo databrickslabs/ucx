@@ -31,14 +31,14 @@ def test_workspace_listing():
 
 
 # Helper to compare an unordered list of objects
-def compare(s, t):
-    t = list(t)  # make a mutable copy
+def compare(i, j):
+    j = list(j)  # make a mutable copy
     try:
-        for elem in s:
-            t.remove(elem)
+        for elem in i:
+            j.remove(elem)
     except ValueError:
         return False
-    return not t
+    return not j
 
 
 def test_list_and_analyze_should_separate_folders_and_other_objects():

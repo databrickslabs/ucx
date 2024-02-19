@@ -224,8 +224,8 @@ def test_snapshot_should_rename_groups_defined_in_conf():
 
     wsclient.groups.list.return_value = [group1, group2]
     wsclient.groups.get.side_effect = [group1, group2]
-    gm = GroupManager(backend, wsclient, inventory_database="inv", renamed_group_prefix="test-group-")
-    res = gm.snapshot()
+    group_manager = GroupManager(backend, wsclient, inventory_database="inv", renamed_group_prefix="test-group-")
+    res = group_manager.snapshot()
 
     assert res == [
         MigratedGroup(
@@ -306,9 +306,9 @@ def test_rename_groups_should_fail_if_error_is_thrown():
         "Resources": [g.as_dict() for g in (account_admins_group_1,)],
     }
     wsclient.groups.patch.side_effect = RuntimeError("Something bad")
-    gm = GroupManager(backend, wsclient, inventory_database="inv", renamed_group_prefix="test-group-")
+    group_manager = GroupManager(backend, wsclient, inventory_database="inv", renamed_group_prefix="test-group-")
     with pytest.raises(ManyError) as e:
-        gm.rename_groups()
+        group_manager.rename_groups()
     assert e.value.args[0] == "Detected 1 failures: RuntimeError: Something bad"
 
 
@@ -376,10 +376,10 @@ def test_reflect_account_should_fail_if_error_is_thrown():
 
     group1 = Group(id="1", display_name="test-dfd-de", meta=ResourceMeta(resource_type="WorkspaceGroup"))
     wsclient.groups.list.return_value = [group1]
-    gm = GroupManager(backend, wsclient, inventory_database="inv")
+    group_manager = GroupManager(backend, wsclient, inventory_database="inv")
 
     with pytest.raises(ManyError):
-        gm.reflect_account_groups_on_workspace()
+        group_manager.reflect_account_groups_on_workspace()
 
 
 def test_reflect_account_should_not_fail_if_group_not_in_the_account_anymore():
@@ -461,9 +461,9 @@ def test_delete_original_workspace_groups_should_not_fail_if_target_group_doesnt
     wsclient.groups.list.return_value = [temp_group, reflected_group]
 
     wsclient.groups.delete.side_effect = DatabricksError(message="None Group with id 100 not found")
-    gm = GroupManager(backend, wsclient, inventory_database="inv")
+    group_manager = GroupManager(backend, wsclient, inventory_database="inv")
 
-    gm.delete_original_workspace_groups()
+    group_manager.delete_original_workspace_groups()
 
 
 def test_delete_original_workspace_groups_should_fail_if_delete_does_not_work():
@@ -478,10 +478,10 @@ def test_delete_original_workspace_groups_should_fail_if_delete_does_not_work():
     wsclient.groups.get.return_value = temp_group
 
     wsclient.groups.delete.side_effect = RuntimeError("Something bad")
-    gm = GroupManager(backend, wsclient, inventory_database="inv")
+    group_manager = GroupManager(backend, wsclient, inventory_database="inv")
 
     with pytest.raises(ManyError):
-        gm.delete_original_workspace_groups()
+        group_manager.delete_original_workspace_groups()
 
 
 def test_list_workspace_groups():
@@ -547,8 +547,8 @@ def test_list_workspace_groups():
         ]
     }
 
-    gm = GroupManager(backend, wsclient, inventory_database="inv")
-    result = gm.snapshot()
+    group_manager = GroupManager(backend, wsclient, inventory_database="inv")
+    result = group_manager.snapshot()
 
     assert len(result) == 3
     assert result[0].name_in_workspace == "group_1"
@@ -714,7 +714,7 @@ def test_snapshot_with_group_matched_by_external_id():
 
 
 def test_configure_include_groups():
-    cg = ConfigureGroups(
+    configure_groups = ConfigureGroups(
         MockPrompts(
             {
                 "Backup prefix": "",
@@ -723,12 +723,12 @@ def test_configure_include_groups():
             }
         )
     )
-    cg.run()
-    assert ["foo", "bar", "baz"] == cg.include_group_names
+    configure_groups.run()
+    assert ["foo", "bar", "baz"] == configure_groups.include_group_names
 
 
 def test_configure_prefix():
-    cg = ConfigureGroups(
+    configure_groups = ConfigureGroups(
         MockPrompts(
             {
                 "Backup prefix": "",
@@ -738,13 +738,13 @@ def test_configure_prefix():
             }
         )
     )
-    cg.run()
-    assert cg.workspace_group_regex == "^"
-    assert cg.workspace_group_replace == "test"
+    configure_groups.run()
+    assert configure_groups.workspace_group_regex == "^"
+    assert configure_groups.workspace_group_replace == "test"
 
 
 def test_configure_suffix():
-    cg = ConfigureGroups(
+    configure_groups = ConfigureGroups(
         MockPrompts(
             {
                 "Backup prefix": "",
@@ -754,13 +754,13 @@ def test_configure_suffix():
             }
         )
     )
-    cg.run()
-    assert cg.workspace_group_regex == "$"
-    assert cg.workspace_group_replace == "test"
+    configure_groups.run()
+    assert configure_groups.workspace_group_regex == "$"
+    assert configure_groups.workspace_group_replace == "test"
 
 
 def test_configure_external_id():
-    cg = ConfigureGroups(
+    configure_groups = ConfigureGroups(
         MockPrompts(
             {
                 "Backup prefix": "",
@@ -769,12 +769,12 @@ def test_configure_external_id():
             }
         )
     )
-    cg.run()
-    assert cg.group_match_by_external_id
+    configure_groups.run()
+    assert configure_groups.group_match_by_external_id
 
 
 def test_configure_substitute():
-    cg = ConfigureGroups(
+    configure_groups = ConfigureGroups(
         MockPrompts(
             {
                 "Backup prefix": "",
@@ -785,13 +785,13 @@ def test_configure_substitute():
             }
         )
     )
-    cg.run()
-    assert cg.workspace_group_regex == "biz"
-    assert cg.workspace_group_replace == "business"
+    configure_groups.run()
+    assert configure_groups.workspace_group_regex == "biz"
+    assert configure_groups.workspace_group_replace == "business"
 
 
 def test_configure_match():
-    cg = ConfigureGroups(
+    configure_groups = ConfigureGroups(
         MockPrompts(
             {
                 "Backup prefix": "",
@@ -802,9 +802,9 @@ def test_configure_match():
             }
         )
     )
-    cg.run()
-    assert cg.workspace_group_regex == r"\[(#+)\]"
-    assert cg.account_group_regex == r"\((#+)\)"
+    configure_groups.run()
+    assert configure_groups.workspace_group_regex == r"\[(#+)\]"
+    assert configure_groups.account_group_regex == r"\((#+)\)"
 
 
 def test_state():

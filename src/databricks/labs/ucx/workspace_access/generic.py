@@ -199,18 +199,18 @@ class GenericPermissionsSupport(AclSupport):
         acl: list[iam.AccessControlRequest] = []
         if not loaded.access_control_list:
             return acl
-        for v in loaded.access_control_list:
-            if not v.all_permissions:
+        for access_control in loaded.access_control_list:
+            if not access_control.all_permissions:
                 continue
-            for permission in v.all_permissions:
+            for permission in access_control.all_permissions:
                 if permission.inherited:
                     continue
                 acl.append(
                     iam.AccessControlRequest(
                         permission_level=permission.permission_level,
-                        service_principal_name=v.service_principal_name,
-                        group_name=v.group_name,
-                        user_name=v.user_name,
+                        service_principal_name=access_control.service_principal_name,
+                        group_name=access_control.group_name,
+                        user_name=access_control.user_name,
                     )
                 )
         # sort to return deterministic results
@@ -284,15 +284,15 @@ class GenericPermissionsSupport(AclSupport):
                 continue
             if not _item.all_permissions:
                 continue
-            for p in _item.all_permissions:
-                if p.inherited:
+            for permission in _item.all_permissions:
+                if permission.inherited:
                     continue
                 acl_requests.append(
                     iam.AccessControlRequest(
                         group_name=new_group_name,
                         service_principal_name=_item.service_principal_name,
                         user_name=_item.user_name,
-                        permission_level=p.permission_level,
+                        permission_level=permission.permission_level,
                     )
                 )
         return acl_requests
@@ -378,15 +378,15 @@ class WorkspaceListing(Listing, CrawlerBase[WorkspaceObjectInfo]):
 def models_listing(ws: WorkspaceClient, num_threads: int):
     def inner() -> Iterator[ml.ModelDatabricks]:
         tasks = []
-        for m in ws.model_registry.list_models():
-            tasks.append(partial(ws.model_registry.get_model, name=m.name))
+        for model in ws.model_registry.list_models():
+            tasks.append(partial(ws.model_registry.get_model, name=model.name))
         models, errors = Threads.gather("listing model ids", tasks, num_threads)
         if len(errors) > 0:
             raise ManyError(errors)
-        for model in models:
-            if not model.registered_model_databricks:
+        for model_response in models:
+            if not model_response.registered_model_databricks:
                 continue
-            yield model.registered_model_databricks
+            yield model_response.registered_model_databricks
 
     return inner
 

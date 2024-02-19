@@ -231,8 +231,8 @@ def test_group_matching_names_with_diff_users(
         account_group_regex=r"\[([0-9a-zA-Z]*)\]",
     )
 
-    t = group_manager.validate_group_membership()
-    assert len(t) > 0
+    membership = group_manager.validate_group_membership()
+    assert len(membership) > 0
 
 
 @retried(on=[NotFound], timeout=timedelta(minutes=2))
@@ -261,8 +261,8 @@ def test_group_matching_names_with_same_users(
         account_group_regex=r"\[([0-9a-zA-Z]*)\]",
     )
 
-    t = group_manager.validate_group_membership()
-    assert len(t) == 0
+    membership = group_manager.validate_group_membership()
+    assert len(membership) == 0
 
 
 # average runtime is 100 seconds

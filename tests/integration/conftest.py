@@ -40,15 +40,15 @@ def debug_env_name():  # pylint: disable=function-redefined
 
 def get_workspace_membership(workspace_client, res_type: str = "WorkspaceGroup"):
     membership = collections.defaultdict(set)
-    for g in workspace_client.groups.list(attributes="id,displayName,meta,members"):
-        if g.display_name in {"users", "admins", "account users"}:
+    for group in workspace_client.groups.list(attributes="id,displayName,meta,members"):
+        if group.display_name in {"users", "admins", "account users"}:
             continue
-        if g.meta.resource_type != res_type:
+        if group.meta.resource_type != res_type:
             continue
-        if g.members is None:
+        if group.members is None:
             continue
-        for m in g.members:
-            membership[g.display_name].add(m.display)
+        for member in group.members:
+            membership[group.display_name].add(member.display)
     return membership
 
 

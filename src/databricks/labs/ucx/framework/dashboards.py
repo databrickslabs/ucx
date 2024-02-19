@@ -19,6 +19,8 @@ from databricks.sdk.service.sql import (
 
 logger = logging.getLogger(__name__)
 
+# pylint: disable=invalid-name
+
 
 @dataclass
 class SimpleQuery:

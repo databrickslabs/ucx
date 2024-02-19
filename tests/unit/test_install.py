@@ -1181,8 +1181,8 @@ def test_latest_job_status_list(ws, any_prompt):
     wheels = create_autospec(WheelsV2)
     config = WorkspaceConfig(inventory_database='ucx')
     timeout = timedelta(seconds=1)
-    mi = MockInstallation({'state.json': {'resources': {'jobs': {"job1": "1", "job2": "2", "job3": "3"}}}})
-    workspace_installation = WorkspaceInstallation(config, mi, sql_backend, wheels, ws, any_prompt, timeout)
+    mock_install = MockInstallation({'state.json': {'resources': {'jobs': {"job1": "1", "job2": "2", "job3": "3"}}}})
+    workspace_installation = WorkspaceInstallation(config, mock_install, sql_backend, wheels, ws, any_prompt, timeout)
     ws.jobs.list_runs.side_effect = iter(runs)
     status = workspace_installation.latest_job_status()
     assert len(status) == 3

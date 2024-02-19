@@ -548,10 +548,10 @@ class WorkspaceInstallation:
         remote_wheel = self._upload_wheel()
         try:
             policy_definition = self._ws.cluster_policies.get(policy_id=self.config.policy_id).definition
-        except NotFound as e:
+        except NotFound as err:
             msg = f"UCX Policy {self.config.policy_id} not found, please reinstall UCX"
             logger.error(msg)
-            raise NotFound(msg) from e
+            raise NotFound(msg) from err
 
         self._ws.cluster_policies.edit(
             policy_id=self.config.policy_id,
@@ -612,7 +612,7 @@ class WorkspaceInstallation:
 
     def _create_readme(self) -> str:
         debug_notebook_link = self._installation.workspace_markdown_link('debug notebook', 'DEBUG.py')
-        md = [
+        markdown = [
             "# UCX - The Unity Catalog Migration Assistant",
             f'To troubleshoot, see {debug_notebook_link}.\n',
             "Here are the URLs and descriptions of workflows that trigger various stages of migration.",
@@ -632,19 +632,19 @@ class WorkspaceInstallation:
                 dashboard_url = f"{self._ws.config.host}/sql/dashboards/{self._state.dashboards[dash]}"
                 dashboard_link += f"  - [{first} ({second}) dashboard]({dashboard_url})\n"
             job_link = f"[{self._name(step_name)}]({self._ws.config.host}#job/{job_id})"
-            md.append("---\n\n")
-            md.append(f"## {job_link}\n\n")
-            md.append(f"{dashboard_link}")
-            md.append("\nThe workflow consists of the following separate tasks:\n\n")
-            for t in self._sorted_tasks():
-                if t.workflow != step_name:
+            markdown.append("---\n\n")
+            markdown.append(f"## {job_link}\n\n")
+            markdown.append(f"{dashboard_link}")
+            markdown.append("\nThe workflow consists of the following separate tasks:\n\n")
+            for task in self._sorted_tasks():
+                if task.workflow != step_name:
                     continue
-                doc = self._config.replace_inventory_variable(t.doc)
-                md.append(f"### `{t.name}`\n\n")
-                md.append(f"{doc}\n")
-                md.append("\n\n")
+                doc = self._config.replace_inventory_variable(task.doc)
+                markdown.append(f"### `{task.name}`\n\n")
+                markdown.append(f"{doc}\n")
+                markdown.append("\n\n")
         preamble = ["# Databricks notebook source", "# MAGIC %md"]
-        intro = "\n".join(preamble + [f"# MAGIC {line}" for line in md])
+        intro = "\n".join(preamble + [f"# MAGIC {line}" for line in markdown])
         self._installation.upload('README.py', intro.encode('utf8'))
         readme_url = self._installation.workspace_link('README')
         if self._prompts and self._prompts.confirm(f"Open job overview in your browser? {readme_url}"):
@@ -689,8 +689,8 @@ class WorkspaceInstallation:
 
     def _upload_wheel_runner(self, remote_wheel: str):
         # TODO: we have to be doing this workaround until ES-897453 is solved in the platform
-        py = TEST_RUNNER_NOTEBOOK.format(remote_wheel=remote_wheel, config_file=self._config_file).encode("utf8")
-        return self._installation.upload(f"wheels/wheel-test-runner-{PRODUCT_INFO.version()}.py", py)
+        code = TEST_RUNNER_NOTEBOOK.format(remote_wheel=remote_wheel, config_file=self._config_file).encode("utf8")
+        return self._installation.upload(f"wheels/wheel-test-runner-{PRODUCT_INFO.version()}.py", code)
 
     @staticmethod
     def _apply_cluster_overrides(settings: dict[str, Any], overrides: dict[str, str], wheel_runner: str) -> dict:

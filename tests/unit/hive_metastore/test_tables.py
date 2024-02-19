@@ -122,8 +122,8 @@ def test_tables_returning_error_when_describing():
         ],
     }
     backend = MockBackend(fails_on_first=errors, rows=rows)
-    tc = TablesCrawler(backend, "default")
-    results = tc.snapshot()
+    tables_crawler = TablesCrawler(backend, "default")
+    results = tables_crawler.snapshot()
     assert len(results) == 1
     first = results[0]
     assert first.upgraded_to == 'fake_cat.fake_ext.fake_delta'

@@ -7,7 +7,7 @@ from databricks.sdk import WorkspaceClient
 from databricks.sdk.errors import InvalidParameterValue
 from databricks.sdk.service.compute import GlobalInitScriptDetailsWithContent
 
-global_init_script = """if [[ $DB_IS_DRIVER = "TRUE" ]]; then
+GLOBAL_INIT_SCRIPT = """if [[ $DB_IS_DRIVER = "TRUE" ]]; then
   driver_conf=${DB_HOME}/driver/conf/spark-branch.conf
   if [ ! -e $driver_conf ] ; then
     touch $driver_conf
@@ -65,7 +65,7 @@ class HiveMetastoreLineageEnabler:
 
     @staticmethod
     def _get_init_script_content():
-        return base64.b64encode(global_init_script.encode()).decode()
+        return base64.b64encode(GLOBAL_INIT_SCRIPT.encode()).decode()
 
     def _add_global_init_script(self) -> str:
         content = self._get_init_script_content()

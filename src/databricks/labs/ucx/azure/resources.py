@@ -31,9 +31,9 @@ class AzureResource:
         i = 0
         while i < len(split):
             k = split[i]
-            v = split[i + 1]
+            value = split[i + 1]
             i += 2
-            self._pairs[k] = v
+            self._pairs[k] = value
 
     @property
     def subscription_id(self):

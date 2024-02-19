@@ -30,6 +30,6 @@ def test_udfs_returning_error_when_describing():
         ],
     }
     backend = MockBackend(fails_on_first=errors, rows=rows)
-    fc = UdfsCrawler(backend, "default")
-    results = fc.snapshot()
+    udf_crawler = UdfsCrawler(backend, "default")
+    results = udf_crawler.snapshot()
     assert len(results) == 0

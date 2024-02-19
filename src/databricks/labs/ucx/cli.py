@@ -170,10 +170,10 @@ def revert_migrated_tables(w: WorkspaceClient, schema: str, table: str, *, delet
         question = "You haven't specified a schema or a table. All migrated tables will be reverted. Continue?"
         if not prompts.confirm(question, max_attempts=2):
             return
-    tm = TablesMigrate.for_cli(w)
-    revert = tm.print_revert_report(delete_managed=delete_managed)
+    tables_migrate = TablesMigrate.for_cli(w)
+    revert = tables_migrate.print_revert_report(delete_managed=delete_managed)
     if revert and prompts.confirm("Would you like to continue?", max_attempts=2):
-        tm.revert_migrated_tables(schema, table, delete_managed=delete_managed)
+        tables_migrate.revert_migrated_tables(schema, table, delete_managed=delete_managed)
 
 
 @ucx.command
