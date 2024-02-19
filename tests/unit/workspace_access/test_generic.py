@@ -1,6 +1,6 @@
 import json
 from datetime import timedelta
-from unittest.mock import MagicMock, Mock, create_autospec, patch
+from unittest.mock import MagicMock, Mock, create_autospec
 
 import pytest
 from databricks.labs.blueprint.parallel import ManyError
@@ -19,7 +19,6 @@ from databricks.sdk.service.jobs import BaseJob
 from databricks.sdk.service.pipelines import PipelineStateInfo
 from databricks.sdk.service.workspace import Language, ObjectInfo, ObjectType
 
-from databricks.labs.ucx.mixins.sql import Row
 from databricks.labs.ucx.workspace_access.generic import (
     GenericPermissionsSupport,
     Listing,
@@ -30,7 +29,10 @@ from databricks.labs.ucx.workspace_access.generic import (
     models_listing,
     tokens_and_passwords,
 )
+from databricks.labs.ucx.workspace_access.groups import MigrationState
 from tests.unit.framework.mocks import MockBackend
+
+# pylint: disable=protected-access
 
 
 def test_crawler():
@@ -120,19 +122,18 @@ def test_apply(migration_state):
 
 def test_relevance():
     sup = GenericPermissionsSupport(ws=MagicMock(), listings=[])  # no listings since only apply is tested
-    result = sup._is_item_relevant(
-        item=Permissions(object_id="passwords", object_type="passwords", raw="some-stuff"),
-        migration_state=MagicMock(),
-    )
-    assert result is True
+    item = Permissions(object_id="passwords", object_type="passwords", raw="{}")
+    migration_state = create_autospec(MigrationState)
+    task = sup.get_apply_task(item, migration_state)
+    assert task is not None
 
 
 def test_safe_get_permissions_when_error_non_retriable():
     ws = MagicMock()
     ws.permissions.get.side_effect = NotFound(...)
     sup = GenericPermissionsSupport(ws=ws, listings=[])
-    result = sup._safe_get_permissions("clusters", "test")
-    assert result is None
+    result = sup.load_as_dict("clusters", "test")
+    assert not result
 
     # TODO uncomment after ES-892977 is fixed. The code now is retried.
     # ws.permissions.get.side_effect = DatabricksError(error_code="SOMETHING_UNEXPECTED")
@@ -145,7 +146,7 @@ def test_safe_get_permissions_when_error_retriable():
     ws.permissions.get.side_effect = Aborted(...)
     sup = GenericPermissionsSupport(ws=ws, listings=[])
     with pytest.raises(DatabricksError) as e:
-        sup._safe_get_permissions("clusters", "test")
+        sup.load_as_dict("clusters", "test")
     assert e.type == Aborted
 
 
@@ -199,7 +200,7 @@ def test_passwords_tokens_crawler(migration_state):
     assert len(tasks) == 2
     auth_items = [task() for task in tasks]
     for item in auth_items:
-        assert item.object_id in ["tokens", "passwords"]
+        assert item.object_id in {"tokens", "passwords"}
         assert item.object_type == "authorization"
         applier = sup.get_apply_task(item, migration_state)
         applier()
@@ -256,7 +257,7 @@ def test_experiment_listing():
     assert len(results) == 2
     for res in results:
         assert res.request_type == "experiments"
-        assert res.object_id in ["test", "test2"]
+        assert res.object_id in {"test", "test2"}
 
 
 def test_response_to_request_mapping():
@@ -607,107 +608,22 @@ def test_load_as_dict_no_permission_level():
     assert len(policy_permissions) == 0
 
 
-def test_workspaceobject_try_fetch():
-    columns = ["object_type", "object_id", "path", "language"]
-    row1 = Row(("NOTEBOOK", 123, "/rootobj/notebook1", "PYTHON"))
-    row1.__columns__ = columns
-    row2 = Row(("DIRECTORY", 456, "/rootobj/folder1", ""))
-    row2.__columns__ = columns
-    sample_objects = iter(
-        [
-            row1,
-            row2,
-        ]
-    )
-    ws = Mock()
-    crawler = WorkspaceListing(ws, MockBackend(), "ucx")
-    crawler._fetch = Mock(return_value=sample_objects)
-    result_set = list(crawler._try_fetch())
-
-    assert len(result_set) == 2
-    assert result_set[0] == WorkspaceObjectInfo("/rootobj/notebook1", "NOTEBOOK", 123, "PYTHON")
-
-
 def test_workspaceobject_crawl():
     sample_objects = [
         ObjectInfo(
             object_type=ObjectType.NOTEBOOK,
-            path="/rootobj/notebook1",
+            path="/notebook1",
             language=Language.PYTHON,
-            created_at=0,
-            modified_at=0,
             object_id=123,
-            size=0,
-        ),
-        ObjectInfo(
-            object_type=ObjectType.DIRECTORY,
-            path="/rootobj/folder1",
-            created_at=0,
-            modified_at=0,
-            object_id=456,
-            size=0,
         ),
     ]
     ws = Mock()
-    with patch("databricks.labs.ucx.workspace_access.listing.WorkspaceListing.walk", return_value=sample_objects):
-        crawler = WorkspaceListing(ws, MockBackend(), "ucx")._crawl()
-        result_set = list(crawler)
+    ws.workspace.list.return_value = sample_objects
+    crawler = WorkspaceListing(ws, MockBackend(), "ucx").snapshot()
+    result_set = list(crawler)
 
     assert len(result_set) == 2
-    assert result_set[0] == WorkspaceObjectInfo("/rootobj/notebook1", "NOTEBOOK", "123", "PYTHON")
-
-
-def test_workspaceobject_withexperiment_crawl():
-    sample_objects = [
-        ObjectInfo(
-            object_type=ObjectType.NOTEBOOK,
-            path="/rootobj/notebook1",
-            language=Language.PYTHON,
-            created_at=0,
-            modified_at=0,
-            object_id=123,
-            size=0,
-        ),
-        ObjectInfo(
-            path="/rootobj/experiment1",
-            created_at=0,
-            modified_at=0,
-            object_id=456,
-        ),
-    ]
-    ws = Mock()
-    with patch("databricks.labs.ucx.workspace_access.listing.WorkspaceListing.walk", return_value=sample_objects):
-        crawler = WorkspaceListing(ws, MockBackend(), "ucx")._crawl()
-        result_set = list(crawler)
-
-    assert len(result_set) == 1
-    assert result_set[0] == WorkspaceObjectInfo("/rootobj/notebook1", "NOTEBOOK", "123", "PYTHON")
-
-
-def test_workspace_snapshot():
-    sample_objects = [
-        WorkspaceObjectInfo(
-            object_type="NOTEBOOK",
-            object_id="123",
-            path="/rootobj/notebook1",
-            language="PYTHON",
-        ),
-        WorkspaceObjectInfo(
-            object_type="DIRECTORY",
-            object_id="456",
-            path="/rootobj/folder1",
-            language="",
-        ),
-    ]
-    mock_ws = Mock()
-    crawler = WorkspaceListing(mock_ws, MockBackend(), "ucx")
-    crawler._try_fetch = Mock(return_value=[])
-    crawler._crawl = Mock(return_value=sample_objects)
-
-    result_set = crawler.snapshot()
-
-    assert len(result_set) == 2
-    assert result_set[0] == WorkspaceObjectInfo("/rootobj/notebook1", "NOTEBOOK", "123", "PYTHON")
+    assert result_set[1] == WorkspaceObjectInfo("/notebook1", "NOTEBOOK", "123", "PYTHON")
 
 
 def test_eligibles_assets_with_owner_should_be_accepted():
@@ -729,7 +645,7 @@ def test_eligibles_assets_with_owner_should_be_accepted():
                     ),
                 ],
             )
-        elif object_type == "pipelines":
+        if object_type == "pipelines":
             return ObjectPermissions(
                 object_id=object_id,
                 object_type=object_type,
@@ -742,6 +658,7 @@ def test_eligibles_assets_with_owner_should_be_accepted():
                     ),
                 ],
             )
+        return None
 
     ws.permissions.get.side_effect = perms
 
@@ -777,7 +694,7 @@ def test_eligibles_assets_without_owner_should_be_ignored():
                     )
                 ],
             )
-        elif object_type == "pipelines":
+        if object_type == "pipelines":
             return ObjectPermissions(
                 object_id=object_id,
                 object_type=object_type,
@@ -787,7 +704,7 @@ def test_eligibles_assets_without_owner_should_be_ignored():
                     )
                 ],
             )
-        elif object_type == "jobs":
+        if object_type == "jobs":
             return ObjectPermissions(
                 object_id=object_id,
                 object_type=object_type,
@@ -797,6 +714,7 @@ def test_eligibles_assets_without_owner_should_be_ignored():
                     ),
                 ],
             )
+        return None
 
     ws.permissions.get.side_effect = perms
 

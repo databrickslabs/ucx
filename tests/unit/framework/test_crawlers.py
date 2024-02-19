@@ -23,6 +23,8 @@ from databricks.labs.ucx.framework.crawlers import (
 
 from ..framework.mocks import MockBackend
 
+# pylint: disable=protected-access
+
 
 @dataclass
 class Foo:
@@ -50,7 +52,7 @@ def test_invalid():
 
 def test_full_name():
     cb = CrawlerBase(MockBackend(), "a", "b", "c", Bar)
-    assert "a.b.c" == cb._full_name
+    assert cb.full_name == "a.b.c"
 
 
 def test_snapshot_appends_to_existing_table():
@@ -89,7 +91,7 @@ def test_snapshot_wrong_error():
         cb._snapshot(fetcher=fetcher, loader=lambda: [Foo(first="first", second=True)])
 
 
-def test_statement_execution_backend_execute_happy(mocker):
+def test_statement_execution_backend_execute_happy():
     ws = create_autospec(WorkspaceClient)
     ws.statement_execution.execute_statement.return_value = sql.ExecuteStatementResponse(
         status=sql.StatementStatus(state=sql.StatementState.SUCCEEDED)
@@ -268,7 +270,7 @@ def test_save_table_with_not_null_constraint_violated(mocker):
 def test_raise_spark_sql_exceptions(msg, t):
     err = RuntimeBackend._api_error_from_message(msg)
     # here we compare the type, so that pytest assert rewrite kick in
-    assert type(err) == t
+    assert type(err) == t  # pylint: disable=unidiomatic-typecheck
 
 
 def test_execute(mocker):

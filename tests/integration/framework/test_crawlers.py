@@ -5,7 +5,7 @@ from databricks.labs.ucx.hive_metastore.grants import Grant
 
 
 def test_deploys_database(sql_backend, inventory_schema):
-    from databricks.labs import ucx
+    from databricks.labs import ucx  # pylint: disable=import-outside-toplevel
 
     deployer = SchemaDeployer(sql_backend, inventory_schema, ucx)
     deployer.deploy_schema()

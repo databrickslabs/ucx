@@ -289,7 +289,7 @@ class WorkspaceInstaller:
             )
             if instance_profile:
                 policy_definition["aws_attributes.instance_profile_arn"] = self._policy_config(instance_profile)
-        elif self._ws.config.is_azure:
+        elif self._ws.config.is_azure:  # pylint: disable=confusing-consecutive-elif
             policy_definition["azure_attributes.availability"] = self._policy_config(
                 compute.AzureAvailability.ON_DEMAND_AZURE.value
             )
@@ -422,33 +422,36 @@ class WorkspaceInstallation:
         except OperationFailed as err:
             # currently we don't have any good message from API, so we have to work around it.
             job_run = self._ws.jobs.get_run(job_run_waiter.run_id)
-            errors: list[DatabricksError] = []
-            timeouts: list[DeadlineExceeded] = []
-            assert job_run.tasks is not None
-            for run_task in job_run.tasks:
-                if not run_task.state:
-                    continue
-                if run_task.state.result_state == jobs.RunResultState.TIMEDOUT:
-                    msg = f"{run_task.task_key}: The run was stopped after reaching the timeout"
-                    timeouts.append(DeadlineExceeded(msg))
-                    continue
-                if run_task.state.result_state != jobs.RunResultState.FAILED:
-                    continue
-                assert run_task.run_id is not None
-                run_output = self._ws.jobs.get_run_output(run_task.run_id)
-                if logger.isEnabledFor(logging.DEBUG):
-                    if run_output and run_output.error_trace:
-                        sys.stderr.write(run_output.error_trace)
-                if run_output and run_output.error:
-                    errors.append(self._infer_task_exception(f"{run_task.task_key}: {run_output.error}"))
-            assert job_run.state is not None
-            assert job_run.state.state_message is not None
-            if len(errors) == 1:
-                raise errors[0] from err
-            all_errors = errors + timeouts
-            if len(all_errors) == 0:
-                raise Unknown(job_run.state.state_message) from err
-            raise ManyError(all_errors) from err
+            raise self._infer_nested_error(job_run) from err
+
+    def _infer_nested_error(self, job_run) -> Exception:
+        errors: list[DatabricksError] = []
+        timeouts: list[DeadlineExceeded] = []
+        assert job_run.tasks is not None
+        for run_task in job_run.tasks:
+            if not run_task.state:
+                continue
+            if run_task.state.result_state == jobs.RunResultState.TIMEDOUT:
+                msg = f"{run_task.task_key}: The run was stopped after reaching the timeout"
+                timeouts.append(DeadlineExceeded(msg))
+                continue
+            if run_task.state.result_state != jobs.RunResultState.FAILED:
+                continue
+            assert run_task.run_id is not None
+            run_output = self._ws.jobs.get_run_output(run_task.run_id)
+            if logger.isEnabledFor(logging.DEBUG):
+                if run_output and run_output.error_trace:
+                    sys.stderr.write(run_output.error_trace)
+            if run_output and run_output.error:
+                errors.append(self._infer_task_exception(f"{run_task.task_key}: {run_output.error}"))
+        assert job_run.state is not None
+        assert job_run.state.state_message is not None
+        if len(errors) == 1:
+            return errors[0]
+        all_errors = errors + timeouts
+        if len(all_errors) == 0:
+            return Unknown(job_run.state.state_message)
+        return ManyError(all_errors)
 
     @staticmethod
     def _infer_task_exception(haystack: str) -> DatabricksError:

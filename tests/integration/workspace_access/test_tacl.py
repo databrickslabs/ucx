@@ -30,7 +30,7 @@ def test_permission_for_files_anonymous_func(sql_backend, inventory_schema, make
     apply_tasks(tacl_support, [MigratedGroup.partial_info(old, new)])
 
     any_file_actual = {}
-    for any_file_grant in grants._grants(any_file=True):
+    for any_file_grant in grants.grants(any_file=True):
         any_file_actual[any_file_grant.principal] = any_file_grant.action_type
 
     # both old and new group have permissions
@@ -39,7 +39,7 @@ def test_permission_for_files_anonymous_func(sql_backend, inventory_schema, make
     assert any_file_actual[old.display_name] == any_file_actual[new.display_name]
 
     anonymous_function_actual = {}
-    for ano_func_grant in grants._grants(anonymous_function=True):
+    for ano_func_grant in grants.grants(anonymous_function=True):
         anonymous_function_actual[ano_func_grant.principal] = ano_func_grant.action_type
 
     assert old.display_name in anonymous_function_actual
@@ -48,7 +48,9 @@ def test_permission_for_files_anonymous_func(sql_backend, inventory_schema, make
     assert anonymous_function_actual[old.display_name] == anonymous_function_actual[new.display_name]
 
 
-def test_hms2hms_owner_permissions(sql_backend, inventory_schema, make_schema, make_table, make_group_pair):
+def test_hms2hms_owner_permissions(
+    sql_backend, inventory_schema, make_schema, make_table, make_group_pair
+):  # pylint: disable=too-many-locals
     first = make_group_pair()
     second = make_group_pair()
     third = make_group_pair()
@@ -155,12 +157,12 @@ def test_permission_for_udfs(sql_backend, inventory_schema, make_schema, make_ud
     apply_tasks(tacl_support, [group])
 
     actual_udf_a_grants = defaultdict(set)
-    for grant in grants._grants(catalog=schema.catalog_name, database=schema.name, udf=udf_a.name):
+    for grant in grants.grants(catalog=schema.catalog_name, database=schema.name, udf=udf_a.name):
         actual_udf_a_grants[grant.principal].add(grant.action_type)
     assert {"SELECT", "OWN"} == actual_udf_a_grants[group.name_in_account]
 
     actual_udf_b_grants = defaultdict(set)
-    for grant in grants._grants(catalog=schema.catalog_name, database=schema.name, udf=udf_b.name):
+    for grant in grants.grants(catalog=schema.catalog_name, database=schema.name, udf=udf_b.name):
         actual_udf_b_grants[grant.principal].add(grant.action_type)
     assert {"READ_METADATA"} == actual_udf_b_grants[group.name_in_account]
 

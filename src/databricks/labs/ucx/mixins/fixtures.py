@@ -38,7 +38,7 @@ from databricks.sdk.service.workspace import ImportFormat
 from databricks.labs.ucx.framework.crawlers import StatementExecutionBackend
 
 # this file will get to databricks-labs-pytester project and be maintained/refactored there
-# pylint: disable=redefined-outer-name,too-many-try-statements,import-outside-toplevel,unnecessary-lambda
+# pylint: disable=redefined-outer-name,too-many-try-statements,import-outside-toplevel,unnecessary-lambda,too-complex
 
 logger = logging.getLogger(__name__)
 
@@ -320,9 +320,9 @@ def _redash_permissions_mapping():
 
 class _PermissionsChange:
     def __init__(self, object_id: str, before: list[iam.AccessControlRequest], after: list[iam.AccessControlRequest]):
-        self._object_id = object_id
-        self._before = before
-        self._after = after
+        self.object_id = object_id
+        self.before = before
+        self.after = after
 
     @staticmethod
     def _principal(acr: iam.AccessControlRequest) -> str:
@@ -336,14 +336,14 @@ class _PermissionsChange:
         return ", ".join(f"{self._principal(_)} {_.permission_level.value}" for _ in acl)
 
     def __repr__(self):
-        return f"{self._object_id} [{self._list(self._before)}] -> [{self._list(self._after)}]"
+        return f"{self.object_id} [{self._list(self.before)}] -> [{self._list(self.after)}]"
 
 
 class _RedashPermissionsChange:
     def __init__(self, object_id: str, before: list[sql.AccessControl], after: list[sql.AccessControl]):
-        self._object_id = object_id
-        self._before = before
-        self._after = after
+        self.object_id = object_id
+        self.before = before
+        self.after = after
 
     @staticmethod
     def _principal(acr: sql.AccessControl) -> str:
@@ -355,7 +355,7 @@ class _RedashPermissionsChange:
         return ", ".join(f"{self._principal(_)} {_.permission_level.value}" for _ in acl)
 
     def __repr__(self):
-        return f"{self._object_id} [{self._list(self._before)}] -> [{self._list(self._after)}]"
+        return f"{self.object_id} [{self._list(self.before)}] -> [{self._list(self.after)}]"
 
 
 def _make_permissions_factory(name, resource_type, levels, id_retriever):
@@ -429,7 +429,7 @@ def _make_permissions_factory(name, resource_type, levels, id_retriever):
             return _PermissionsChange(object_id, initial, access_control_list)
 
         def remove(change: _PermissionsChange):
-            ws.permissions.set(resource_type, change._object_id, access_control_list=change._before)
+            ws.permissions.set(resource_type, change.object_id, access_control_list=change.before)
 
         yield from factory(f"{name} permissions", create, remove)
 
@@ -496,7 +496,7 @@ def _make_redash_permissions_factory(name, resource_type, levels, id_retriever):
 
         def remove(change: _RedashPermissionsChange):
             ws.dbsql_permissions.set(
-                sql.ObjectTypePlural(resource_type), change._object_id, access_control_list=change._before
+                sql.ObjectTypePlural(resource_type), change.object_id, access_control_list=change.before
             )
 
         yield from factory(f"{name} permissions", create, remove)
@@ -855,17 +855,7 @@ def debug_env(monkeypatch, debug_env_name) -> MutableMapping[str, str]:
     with conf_file.open("r") as f:
         conf = json.load(f)
         if debug_env_name not in conf:
-            sys.stderr.write(
-                f"""{debug_env_name} not found in ~/.databricks/debug-env.json
-
-            this usually means that you have to add the following fixture to
-            conftest.py file in the relevant directory:
-
-            @pytest.fixture
-            def debug_env_name():
-                return 'ENV_NAME' # where ENV_NAME is one of: {", ".join(conf.keys())}
-            """
-            )
+            sys.stderr.write(f"""{debug_env_name} not found in ~/.databricks/debug-env.json""")
             msg = f"{debug_env_name} not found in ~/.databricks/debug-env.json"
             raise KeyError(msg)
         for k, v in conf[debug_env_name].items():

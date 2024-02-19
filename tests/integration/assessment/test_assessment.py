@@ -46,4 +46,4 @@ def test_workspace_object_crawler(ws, make_notebook, inventory_schema, sql_backe
     workspace_objects = {_.path: _ for _ in workspace_listing.snapshot()}
 
     assert notebook in workspace_objects
-    assert "NOTEBOOK" == workspace_objects[notebook].object_type
+    assert workspace_objects[notebook].object_type == "NOTEBOOK"

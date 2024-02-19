@@ -17,7 +17,13 @@ from databricks.sdk.errors import (
     Unknown,
 )
 from databricks.sdk.service import compute, iam, jobs, sql
-from databricks.sdk.service.compute import CreatePolicyResponse, Policy, State
+from databricks.sdk.service.compute import (
+    ClusterDetails,
+    CreatePolicyResponse,
+    DataSecurityMode,
+    Policy,
+    State,
+)
 from databricks.sdk.service.jobs import (
     BaseRun,
     RunLifeCycleState,
@@ -44,8 +50,6 @@ from ..unit.framework.mocks import MockBackend
 
 
 def mock_clusters():
-    from databricks.sdk.service.compute import ClusterDetails, DataSecurityMode, State
-
     return [
         ClusterDetails(
             spark_version="13.3.x-dbrxxx",
@@ -73,40 +77,42 @@ def mock_clusters():
 
 @pytest.fixture
 def ws():
-    ws = create_autospec(WorkspaceClient)
+    workspace_client = create_autospec(WorkspaceClient)
 
-    ws.current_user.me = lambda: iam.User(user_name="me@example.com", groups=[iam.ComplexValue(display="admins")])
-    ws.config.host = "https://foo"
-    ws.config.is_aws = True
-    ws.config.is_azure = False
-    ws.config.is_gcp = False
-    ws.workspace.get_status = lambda _: ObjectInfo(object_id=123)
-    ws.data_sources.list = lambda: [DataSource(id="bcd", warehouse_id="abc")]
-    ws.warehouses.list = lambda **_: [
+    workspace_client.current_user.me = lambda: iam.User(
+        user_name="me@example.com", groups=[iam.ComplexValue(display="admins")]
+    )
+    workspace_client.config.host = "https://foo"
+    workspace_client.config.is_aws = True
+    workspace_client.config.is_azure = False
+    workspace_client.config.is_gcp = False
+    workspace_client.workspace.get_status = lambda _: ObjectInfo(object_id=123)
+    workspace_client.data_sources.list = lambda: [DataSource(id="bcd", warehouse_id="abc")]
+    workspace_client.warehouses.list = lambda **_: [
         EndpointInfo(name="abc", id="abc", warehouse_type=EndpointInfoWarehouseType.PRO, state=State.RUNNING)
     ]
-    ws.dashboards.create.return_value = Dashboard(id="abc")
-    ws.jobs.create.return_value = jobs.CreateResponse(job_id=123)
-    ws.queries.create.return_value = Query(id="abc")
-    ws.query_visualizations.create.return_value = Visualization(id="abc")
-    ws.dashboard_widgets.create.return_value = Widget(id="abc")
-    ws.clusters.list.return_value = mock_clusters()
-    ws.cluster_policies.create.return_value = CreatePolicyResponse(policy_id="foo")
-    ws.clusters.select_spark_version = lambda latest: "14.2.x-scala2.12"
-    ws.clusters.select_node_type = lambda local_disk: "Standard_F4s"
+    workspace_client.dashboards.create.return_value = Dashboard(id="abc")
+    workspace_client.jobs.create.return_value = jobs.CreateResponse(job_id=123)
+    workspace_client.queries.create.return_value = Query(id="abc")
+    workspace_client.query_visualizations.create.return_value = Visualization(id="abc")
+    workspace_client.dashboard_widgets.create.return_value = Widget(id="abc")
+    workspace_client.clusters.list.return_value = mock_clusters()
+    workspace_client.cluster_policies.create.return_value = CreatePolicyResponse(policy_id="foo")
+    workspace_client.clusters.select_spark_version = lambda latest: "14.2.x-scala2.12"
+    workspace_client.clusters.select_node_type = lambda local_disk: "Standard_F4s"
 
-    return ws
+    return workspace_client
 
 
-def created_job(ws: MagicMock, name: str):
-    for call in ws.jobs.method_calls:
+def created_job(workspace_client, name):
+    for call in workspace_client.jobs.method_calls:
         if call.kwargs['name'] == name:
             return call.kwargs
     raise AssertionError(f'call not found: {name}')
 
 
-def created_job_tasks(ws: MagicMock, name: str) -> dict[str, jobs.Task]:
-    call = created_job(ws, name)
+def created_job_tasks(workspace_client: MagicMock, name: str) -> dict[str, jobs.Task]:
+    call = created_job(workspace_client, name)
     return {_.task_key: _ for _ in call['tasks']}
 
 
@@ -164,8 +170,8 @@ def test_install_cluster_override_jobs(ws, mock_installation, any_prompt):
     workspace_installation.create_jobs()
 
     tasks = created_job_tasks(ws, '[MOCK] assessment')
-    assert 'one' == tasks['assess_jobs'].existing_cluster_id
-    assert 'two' == tasks['crawl_grants'].existing_cluster_id
+    assert tasks['assess_jobs'].existing_cluster_id == 'one'
+    assert tasks['crawl_grants'].existing_cluster_id == 'two'
 
 
 def test_write_protected_dbfs(ws, tmp_path, mock_installation):
@@ -196,8 +202,8 @@ def test_write_protected_dbfs(ws, tmp_path, mock_installation):
     workspace_installation.create_jobs()
 
     tasks = created_job_tasks(ws, '[MOCK] assessment')
-    assert "2222-999999-nosecuri" == tasks['assess_jobs'].existing_cluster_id
-    assert '3333-999999-legacytc' == tasks['crawl_grants'].existing_cluster_id
+    assert tasks['assess_jobs'].existing_cluster_id == "2222-999999-nosecuri"
+    assert tasks['crawl_grants'].existing_cluster_id == '3333-999999-legacytc'
 
     mock_installation.assert_file_written(
         'config.yml',
@@ -238,7 +244,7 @@ def test_writeable_dbfs(ws, tmp_path, mock_installation, any_prompt):
 
 def test_run_workflow_creates_proper_failure(ws, mocker, any_prompt, mock_installation_with_jobs):
     def run_now(job_id):
-        assert 123 == job_id
+        assert job_id == 123
 
         def result():
             raise OperationFailed(...)
@@ -274,14 +280,14 @@ def test_run_workflow_creates_proper_failure(ws, mocker, any_prompt, mock_instal
     with pytest.raises(Unknown) as failure:
         installer.run_workflow("assessment")
 
-    assert "stuff: does not compute" == str(failure.value)
+    assert str(failure.value) == "stuff: does not compute"
 
 
 def test_run_workflow_creates_failure_from_mapping(
     ws, mocker, mock_installation, any_prompt, mock_installation_with_jobs
 ):
     def run_now(job_id):
-        assert 123 == job_id
+        assert job_id == 123
 
         def result():
             raise OperationFailed(...)
@@ -324,7 +330,7 @@ def test_run_workflow_creates_failure_from_mapping(
 
 def test_run_workflow_creates_failure_many_error(ws, mocker, any_prompt, mock_installation_with_jobs):
     def run_now(job_id):
-        assert 123 == job_id
+        assert job_id == 123
 
         def result():
             raise OperationFailed(...)
@@ -1175,12 +1181,8 @@ def test_latest_job_status_list(ws, any_prompt):
     wheels = create_autospec(WheelsV2)
     config = WorkspaceConfig(inventory_database='ucx')
     timeout = timedelta(seconds=1)
-    mock_installation = MockInstallation(
-        {'state.json': {'resources': {'jobs': {"job1": "1", "job2": "2", "job3": "3"}}}}
-    )
-    workspace_installation = WorkspaceInstallation(
-        config, mock_installation, sql_backend, wheels, ws, any_prompt, timeout
-    )
+    mi = MockInstallation({'state.json': {'resources': {'jobs': {"job1": "1", "job2": "2", "job3": "3"}}}})
+    workspace_installation = WorkspaceInstallation(config, mi, sql_backend, wheels, ws, any_prompt, timeout)
     ws.jobs.list_runs.side_effect = iter(runs)
     status = workspace_installation.latest_job_status()
     assert len(status) == 3

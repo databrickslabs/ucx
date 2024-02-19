@@ -12,6 +12,8 @@ from databricks.labs.ucx.workspace_access.base import Permissions
 from databricks.labs.ucx.workspace_access.groups import MigratedGroup, MigrationState
 from databricks.labs.ucx.workspace_access.scim import ScimSupport
 
+# pylint: disable=protected-access
+
 
 def test_applier_task_should_return_true_if_roles_are_properly_applied():
     ws = MagicMock()
@@ -84,9 +86,7 @@ def test_safe_patch_group_when_error_non_retriable():
     ws = MagicMock()
     ws.groups.patch.side_effect = PermissionDenied(...)
     sup = ScimSupport(ws=ws, verify_timeout=timedelta(seconds=1))
-    operations = [
-        iam.Patch(op=iam.PatchOp.ADD, path="roles", value=[e.as_dict() for e in [iam.ComplexValue(value="role1")]])
-    ]
+    operations = [iam.Patch(op=iam.PatchOp.ADD, path="roles", value=[iam.ComplexValue(value="role1").as_dict()])]
     schemas = [iam.PatchSchema.URN_IETF_PARAMS_SCIM_API_MESSAGES_2_0_PATCH_OP]
     result = sup._safe_patch_group(group_id="1", operations=operations, schemas=schemas)
     assert result is None
@@ -96,9 +96,7 @@ def test_safe_patch_group_when_error_retriable():
     ws = MagicMock()
     ws.groups.patch.side_effect = InternalError(...)
     sup = ScimSupport(ws=ws, verify_timeout=timedelta(seconds=1))
-    operations = [
-        iam.Patch(op=iam.PatchOp.ADD, path="roles", value=[e.as_dict() for e in [iam.ComplexValue(value="role1")]])
-    ]
+    operations = [iam.Patch(op=iam.PatchOp.ADD, path="roles", value=[iam.ComplexValue(value="role1").as_dict()])]
     schemas = [iam.PatchSchema.URN_IETF_PARAMS_SCIM_API_MESSAGES_2_0_PATCH_OP]
     with pytest.raises(DatabricksError) as e:
         sup._safe_patch_group(group_id="1", operations=operations, schemas=schemas)

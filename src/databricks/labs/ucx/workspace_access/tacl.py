@@ -116,7 +116,7 @@ class TableAclSupport(AclSupport):
         grant_dict = dataclasses.asdict(acl)
         del grant_dict["action_type"]
         del grant_dict["principal"]
-        grants_on_object = self._grants_crawler._grants(**grant_dict)
+        grants_on_object = self._grants_crawler.grants(**grant_dict)
 
         if grants_on_object:
             action_types_for_current_principal = [

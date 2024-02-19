@@ -10,13 +10,37 @@ from databricks.sdk.service.catalog import TableInfo
 
 from databricks.labs.ucx.account import WorkspaceInfo
 from databricks.labs.ucx.framework.crawlers import SqlBackend
-from databricks.labs.ucx.hive_metastore.mapping import (
-    Rule,
-    TableMapping,
-    TableToMigrate,
-)
+from databricks.labs.ucx.hive_metastore.mapping import Rule, TableMapping
 from databricks.labs.ucx.hive_metastore.tables import Table, TablesCrawler
-from tests.unit.framework.mocks import MockBackend
+
+from ..framework.mocks import MockBackend
+
+MANAGED_DELTA_TABLE = Table(
+    object_type="MANAGED",
+    table_format="DELTA",
+    catalog="hive_metastore",
+    database="test_schema1",
+    name="test_table2",
+)
+
+VIEW = Table(
+    object_type="VIEW",
+    table_format="VIEW",
+    catalog="hive_metastore",
+    database="test_schema1",
+    name="test_view1",
+    view_text="SELECT * FROM SOMETHING",
+    upgraded_to="cat1.schema1.dest_view1",
+)
+
+EXTERNAL_DELTA_TABLE = Table(
+    object_type="EXTERNAL",
+    table_format="DELTA",
+    catalog="hive_metastore",
+    database="test_schema1",
+    name="test_table1",
+    upgraded_to="cat1.schema1.dest1",
+)
 
 
 def test_current_tables_empty_fails():
@@ -234,30 +258,9 @@ def test_skip_tables_marked_for_skipping_or_upgraded():
     ]
 
     test_tables = [
-        Table(
-            object_type="EXTERNAL",
-            table_format="DELTA",
-            catalog="hive_metastore",
-            database="test_schema1",
-            name="test_table1",
-            upgraded_to="cat1.schema1.dest1",
-        ),
-        Table(
-            object_type="VIEW",
-            table_format="VIEW",
-            catalog="hive_metastore",
-            database="test_schema1",
-            name="test_view1",
-            view_text="SELECT * FROM SOMETHING",
-            upgraded_to="cat1.schema1.dest_view1",
-        ),
-        Table(
-            object_type="MANAGED",
-            table_format="DELTA",
-            catalog="hive_metastore",
-            database="test_schema1",
-            name="test_table2",
-        ),
+        EXTERNAL_DELTA_TABLE,
+        VIEW,
+        MANAGED_DELTA_TABLE,
         Table(
             object_type="EXTERNAL",
             table_format="DELTA",
@@ -315,17 +318,32 @@ def test_table_with_no_target_reverted():
     client = create_autospec(WorkspaceClient)
     client.tables.get.side_effect = NotFound()
 
-    installation = Installation(client, "ucx")
-    table_mapping = TableMapping(installation, client, backend)
-    table_to_migrate = Table(
-        object_type="EXTERNAL",
-        table_format="DELTA",
-        catalog="hive_metastore",
-        database="schema1",
-        name="table1",
+    installation = MockInstallation(
+        {
+            'mapping.csv': [
+                {
+                    'workspace_name': "fake_ws",
+                    "catalog_name": 'cat1',
+                    'src_schema': 'schema1',
+                    'dst_schema': 'schema1',
+                    'src_table': 'table1',
+                    'dst_table': 'table1',
+                }
+            ]
+        }
     )
-    rule = Rule("fake_ws", "cat1", "schema1", "schema1", "table1", "table1")
-    assert table_mapping._get_table_in_scope_task(TableToMigrate(table_to_migrate, rule))
+    table_mapping = TableMapping(installation, client, backend)
+    tables_crawler = create_autospec(TablesCrawler)
+    tables_crawler.snapshot.return_value = [
+        Table(
+            object_type="EXTERNAL",
+            table_format="DELTA",
+            catalog="hive_metastore",
+            database="schema1",
+            name="table1",
+        ),
+    ]
+    table_mapping.get_tables_to_migrate(tables_crawler)
     assert "ALTER TABLE hive_metastore.schema1.table1 UNSET TBLPROPERTIES IF EXISTS('upgraded_to');" in backend.queries
 
 
@@ -528,7 +546,6 @@ def test_skipping_rules_target_exists():
     errors = {}
     rows = {}
     backend = MockBackend(fails_on_first=errors, rows=rows)
-    client.tables.get.side_effect = NotFound()
     client.catalogs.list.return_value = []
     client.schemas.list.return_value = []
     client.tables.list.return_value = []
@@ -554,7 +571,6 @@ def test_is_target_exists():
     rows = {}
     backend = MockBackend(fails_on_first=errors, rows=rows)
     client = create_autospec(WorkspaceClient)
-    client.tables.get.side_effect = NotFound()
     client.catalogs.list.return_value = []
     client.schemas.list.return_value = []
     client.tables.list.return_value = []
@@ -575,5 +591,5 @@ def test_is_target_exists():
     src_table = Table(
         catalog="hive_metastore", database="schema1", name="dest1", object_type="MANAGED", table_format="DELTA"
     )
-    assert not table_mapping._exists_in_uc(src_table, "cat1.schema1.dest1")
-    assert table_mapping._exists_in_uc(src_table, "cat1.schema2.dest2")
+    assert not table_mapping.exists_in_uc(src_table, "cat1.schema1.dest1")
+    assert table_mapping.exists_in_uc(src_table, "cat1.schema2.dest2")

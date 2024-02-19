@@ -159,7 +159,7 @@ class TableMapping:
         table = table_to_migrate.src
         rule = table_to_migrate.rule
 
-        if self._exists_in_uc(table, rule.as_uc_table_key):
+        if self.exists_in_uc(table, rule.as_uc_table_key):
             logger.info(f"The intended target for {table.key}, {rule.as_uc_table_key}, already exists.")
             return None
         result = self._sql_backend.fetch(
@@ -171,7 +171,7 @@ class TableMapping:
                 return None
             if value["key"] == "upgraded_to":
                 logger.info(f"{table.key} is set as upgraded to {value['value']}")
-                if self._exists_in_uc(table, value["value"]):
+                if self.exists_in_uc(table, value["value"]):
                     logger.info(
                         f"The table {table.key} was previously upgraded to {value['value']}. "
                         f"To revert the table and allow it to be upgraded again use the CLI command:"
@@ -183,7 +183,7 @@ class TableMapping:
 
         return table_to_migrate
 
-    def _exists_in_uc(self, src_table: Table, target_key: str):
+    def exists_in_uc(self, src_table: Table, target_key: str):
         # Attempts to get the target table info from UC returns True if it exists.
         try:
             table_info = self._ws.tables.get(target_key)

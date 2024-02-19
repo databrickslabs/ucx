@@ -20,8 +20,6 @@ logger = logging.getLogger(__name__)
 @retried(on=[NotFound], timeout=timedelta(minutes=3))
 def test_permissions_for_redash(
     ws,
-    sql_backend,
-    inventory_schema,
     make_ucx_group,
     make_group,
     make_user,

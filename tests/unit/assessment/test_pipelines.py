@@ -1,5 +1,3 @@
-from unittest.mock import Mock
-
 from databricks.sdk.service.pipelines import PipelineState, PipelineStateInfo
 
 from databricks.labs.ucx.assessment.azure import AzureServicePrincipalCrawler
@@ -23,7 +21,6 @@ def test_pipeline_assessment_with_config():
     ]
 
     ws = workspace_client_mock(clusters="job-source-cluster.json")
-    ws.workspace.export().content = "JXNoCmVjaG8gIj0="
     ws.dbfs.read().data = "JXNoCmVjaG8gIj0="
 
     ws.pipelines.list_pipelines.return_value = sample_pipelines
@@ -47,7 +44,6 @@ def test_pipeline_assessment_without_config():
         )
     ]
     ws = workspace_client_mock(clusters="job-source-cluster.json")
-    ws.workspace.export().content = "JXNoCmVjaG8gIj0="
     ws.dbfs.read().data = "JXNoCmVjaG8gIj0="
     ws.pipelines.list_pipelines.return_value = sample_pipelines
     crawler = PipelinesCrawler(ws, MockBackend(), "ucx").snapshot()
@@ -58,20 +54,8 @@ def test_pipeline_assessment_without_config():
 
 
 def test_pipeline_snapshot_with_config():
-    sample_pipelines = [
-        PipelineInfo(
-            creator_name="abcde.defgh@databricks.com",
-            pipeline_name="New DLT Pipeline",
-            pipeline_id="0112eae7-9d11-4b40-a2b8-6c83cb3c7497",
-            success=1,
-            failures="",
-        )
-    ]
-    mock_ws = workspace_client_mock(clusters="job-source-cluster.json")
+    mock_ws = workspace_client_mock()
     crawler = PipelinesCrawler(mock_ws, MockBackend(), "ucx")
-    crawler._try_fetch = Mock(return_value=[])
-    crawler._crawl = Mock(return_value=sample_pipelines)
-
     result_set = crawler.snapshot()
 
     assert len(result_set) == 1
@@ -110,7 +94,6 @@ def test_pipeline_without_owners_should_have_empty_creator_name():
 
     ws = workspace_client_mock(clusters="no-spark-conf.json")
     ws.pipelines.list_pipelines.return_value = sample_pipelines
-    ws.workspace.export().content = "JXNoCmVjaG8gIj0="
     ws.dbfs.read().data = "JXNoCmVjaG8gIj0="
     mockbackend = MockBackend()
     PipelinesCrawler(ws, mockbackend, "ucx").snapshot()

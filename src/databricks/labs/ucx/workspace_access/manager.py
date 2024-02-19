@@ -89,7 +89,7 @@ class PermissionManager(CrawlerBase[Permissions]):
             raise ManyError(errors)
         logger.info(f"Total crawled permissions: {len(items)}")
         self._save(items)
-        logger.info(f"Saved {len(items)} to {self._full_name}")
+        logger.info(f"Saved {len(items)} to {self.full_name}")
 
     def apply_group_permissions(self, migration_state: MigrationState) -> bool:
         # list shall be sorted prior to using group by
@@ -107,7 +107,7 @@ class PermissionManager(CrawlerBase[Permissions]):
             support: list(items_subset) for support, items_subset in groupby(items, key=lambda i: i.object_type)
         }
 
-        appliers = self._appliers()
+        appliers = self.object_type_support()
 
         # we first check that all supports are valid.
         for object_type in supports_to_items:
@@ -144,7 +144,7 @@ class PermissionManager(CrawlerBase[Permissions]):
         items = sorted(self.load_all(), key=lambda i: i.object_type)
         logger.info(f"Total permissions found: {len(items)}")
         verifier_tasks: list[Callable[..., bool]] = []
-        appliers = self._appliers()
+        appliers = self.object_type_support()
 
         for object_type, items_subset in groupby(items, key=lambda i: i.object_type):
             if object_type not in appliers:
@@ -168,7 +168,7 @@ class PermissionManager(CrawlerBase[Permissions]):
 
         return True
 
-    def _appliers(self) -> dict[str, AclSupport]:
+    def object_type_support(self) -> dict[str, AclSupport]:
         appliers: dict[str, AclSupport] = {}
         for support in self._acl_support:
             for object_type in support.object_types():
@@ -179,8 +179,8 @@ class PermissionManager(CrawlerBase[Permissions]):
         return appliers
 
     def cleanup(self):
-        logger.info(f"Cleaning up inventory table {self._full_name}")
-        self._exec(f"DROP TABLE IF EXISTS {self._full_name}")
+        logger.info(f"Cleaning up inventory table {self.full_name}")
+        self._exec(f"DROP TABLE IF EXISTS {self.full_name}")
         logger.info("Inventory table cleanup complete")
 
     def _save(self, items: Sequence[Permissions]):
@@ -189,16 +189,16 @@ class PermissionManager(CrawlerBase[Permissions]):
         logger.info("Successfully saved the items to inventory table")
 
     def load_all(self) -> list[Permissions]:
-        logger.info(f"Loading inventory table {self._full_name}")
-        if list(self._fetch(f"SELECT COUNT(*) as cnt FROM {self._full_name}"))[0][0] == 0:  # noqa: RUF015
+        logger.info(f"Loading inventory table {self.full_name}")
+        if list(self._fetch(f"SELECT COUNT(*) as cnt FROM {self.full_name}"))[0][0] == 0:  # noqa: RUF015
             msg = (
-                f"table {self._full_name} is empty for fetching permission info. "
+                f"table {self.full_name} is empty for fetching permission info. "
                 f"Please ensure assessment job is run successfully and permissions populated"
             )
             raise RuntimeError(msg)
         return [
             Permissions(object_id, object_type, raw)
-            for object_id, object_type, raw in self._fetch(f"SELECT object_id, object_type, raw FROM {self._full_name}")
+            for object_id, object_type, raw in self._fetch(f"SELECT object_id, object_type, raw FROM {self.full_name}")
         ]
 
     def load_all_for(self, object_type: str, object_id: str, klass: Dataclass) -> Iterable[DataclassInstance]:

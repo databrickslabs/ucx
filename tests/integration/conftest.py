@@ -5,20 +5,22 @@ from datetime import timedelta
 from functools import partial
 
 import databricks.sdk.core
-import pytest
+import pytest  # pylint: disable=wrong-import-order
 from databricks.labs.blueprint.installation import Installation
 from databricks.sdk import AccountClient, WorkspaceClient
-from databricks.sdk.core import Config
 from databricks.sdk.errors import NotFound
 from databricks.sdk.retries import retried
 from databricks.sdk.service.catalog import FunctionInfo, TableInfo
 
+from databricks.labs.ucx.__about__ import __version__
 from databricks.labs.ucx.account import WorkspaceInfo
 from databricks.labs.ucx.framework.crawlers import SqlBackend
 from databricks.labs.ucx.hive_metastore import TablesCrawler
 from databricks.labs.ucx.hive_metastore.mapping import Rule, TableMapping
 from databricks.labs.ucx.hive_metastore.tables import Table
 from databricks.labs.ucx.hive_metastore.udfs import Udf, UdfsCrawler
+
+# pylint: disable-next=unused-wildcard-import,wildcard-import
 from databricks.labs.ucx.mixins.fixtures import *  # noqa: F403
 from databricks.labs.ucx.workspace_access.groups import MigratedGroup
 
@@ -32,16 +34,16 @@ long_retry_on_not_found = functools.partial(retry_on_not_found, timeout=timedelt
 
 
 @pytest.fixture  # type: ignore[no-redef]
-def debug_env_name():
+def debug_env_name():  # pylint: disable=function-redefined
     return "ucws"
 
 
-def get_workspace_membership(ws, resource_type: str = "WorkspaceGroup"):
+def get_workspace_membership(workspace_client, res_type: str = "WorkspaceGroup"):
     membership = collections.defaultdict(set)
-    for g in ws.groups.list(attributes="id,displayName,meta,members"):
-        if g.display_name in ["users", "admins", "account users"]:
+    for g in workspace_client.groups.list(attributes="id,displayName,meta,members"):
+        if g.display_name in {"users", "admins", "account users"}:
             continue
-        if g.meta.resource_type != resource_type:
+        if g.meta.resource_type != res_type:
             continue
         if g.members is None:
             continue
@@ -53,33 +55,19 @@ def get_workspace_membership(ws, resource_type: str = "WorkspaceGroup"):
 def account_host(self: databricks.sdk.core.Config) -> str:
     if self.is_azure:
         return "https://accounts.azuredatabricks.net"
-    elif self.is_gcp:
+    if self.is_gcp:
         return "https://accounts.gcp.databricks.com/"
-    else:
-        return "https://accounts.cloud.databricks.com"
+    return "https://accounts.cloud.databricks.com"
 
 
 @pytest.fixture(scope="session")  # type: ignore[no-redef]
-def product_info():
-    from databricks.labs.ucx.__about__ import __version__
-
+def product_info():  # pylint: disable=function-redefined
     return "ucx", __version__
 
 
 @pytest.fixture  # type: ignore[no-redef]
-def acc(ws) -> AccountClient:
-    # TODO: https://github.com/databricks/databricks-sdk-py/pull/390
-    def account_host(cfg: Config) -> str:
-        if cfg.is_azure:
-            return "https://accounts.azuredatabricks.net"
-        elif cfg.is_gcp:
-            return "https://accounts.gcp.databricks.com/"
-        else:
-            return "https://accounts.cloud.databricks.com"
-
-    # Use variables from Unified Auth
-    # See https://databricks-sdk-py.readthedocs.io/en/latest/authentication.html
-    return AccountClient(host=account_host(ws.config))
+def acc(ws) -> AccountClient:  # pylint: disable=function-redefined
+    return AccountClient(host=ws.config.environment.deployment_url('accounts'))
 
 
 @pytest.fixture
@@ -120,8 +108,8 @@ def make_group_pair(make_random, make_group):
 
 
 class StaticTablesCrawler(TablesCrawler):
-    def __init__(self, sql_backend: SqlBackend, schema: str, tables: list[TableInfo]):
-        super().__init__(sql_backend, schema)
+    def __init__(self, sb: SqlBackend, schema: str, tables: list[TableInfo]):
+        super().__init__(sb, schema)
         self._tables = [
             Table(
                 catalog=_.catalog_name,
@@ -140,8 +128,8 @@ class StaticTablesCrawler(TablesCrawler):
 
 
 class StaticUdfsCrawler(UdfsCrawler):
-    def __init__(self, sql_backend: SqlBackend, schema: str, udfs: list[FunctionInfo]):
-        super().__init__(sql_backend, schema)
+    def __init__(self, sb: SqlBackend, schema: str, udfs: list[FunctionInfo]):
+        super().__init__(sb, schema)
         self._udfs = [
             Udf(
                 catalog=_.catalog_name,
@@ -163,9 +151,9 @@ class StaticUdfsCrawler(UdfsCrawler):
 
 
 class StaticTableMapping(TableMapping):
-    def __init__(self, ws: WorkspaceClient, sql_backend: SqlBackend, rules: list[Rule]):
-        installation = Installation(ws, 'ucx')
-        super().__init__(installation, ws, sql_backend)
+    def __init__(self, workspace_client: WorkspaceClient, sb: SqlBackend, rules: list[Rule]):
+        installation = Installation(workspace_client, 'ucx')
+        super().__init__(installation, workspace_client, sb)
         self._rules = rules
 
     def load(self):

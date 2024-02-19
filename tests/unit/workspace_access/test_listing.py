@@ -7,16 +7,6 @@ from databricks.sdk.service.workspace import ObjectInfo, ObjectType
 from databricks.labs.ucx.workspace_access import generic, listing
 
 
-def test_logging_calls():
-    ws = MagicMock()
-    workspace_listing = listing.WorkspaceListing(ws=ws, num_threads=1)
-    workspace_listing.start_time = dt.datetime.now()
-    workspace_listing._counter = 9
-    # with patch.object(logger, "table") as mock_info:
-    #     workspace_listing._progress_report(None)
-    #     mock_info.assert_called_once()
-
-
 def test_workspace_listing():
     listing_instance = [
         generic.WorkspaceObjectInfo(object_type="NOTEBOOK", object_id=1, path="", language="PYTHON"),
@@ -31,13 +21,13 @@ def test_workspace_listing():
         results = generic.WorkspaceListing(ws=MagicMock(), sql_backend=MagicMock(), inventory_database=MagicMock())
         assert len(list(results)) == 4
         for res in results:
-            assert res.request_type in [
+            assert res.request_type in {
                 "notebooks",
                 "directories",
                 "repos",
                 "files",
-            ]
-            assert int(res.object_id) in [1, 2, 4, 5]
+            }
+            assert int(res.object_id) in {1, 2, 4, 5}
 
 
 # Helper to compare an unordered list of objects
@@ -118,11 +108,12 @@ def test_walk_with_nested_folders_should_return_nested_objects():
     nested_folder = ObjectInfo(path="/rootPath/nested_folder", object_type=ObjectType.DIRECTORY)
     nested_notebook = ObjectInfo(path="/rootPath/nested_folder/notebook", object_type=ObjectType.NOTEBOOK)
 
-    def my_side_effect(path, **kwargs):
+    def my_side_effect(path, **_):
         if path == "/rootPath":
             return [file, nested_folder]
-        elif path == "/rootPath/nested_folder":
+        if path == "/rootPath/nested_folder":
             return [nested_notebook]
+        return None
 
     client = Mock()
     client.workspace.list.side_effect = my_side_effect
@@ -147,13 +138,14 @@ def test_walk_with_three_level_nested_folders_returns_three_levels():
         path="/rootPath/nested_folder/second_nested_folder/notebook2", object_type=ObjectType.NOTEBOOK
     )
 
-    def my_side_effect(path, **kwargs):
+    def my_side_effect(path, **_):
         if path == "/rootPath":
             return [file, nested_folder]
-        elif path == "/rootPath/nested_folder":
+        if path == "/rootPath/nested_folder":
             return [nested_notebook, second_nested_folder]
-        elif path == "/rootPath/nested_folder/second_nested_folder":
+        if path == "/rootPath/nested_folder/second_nested_folder":
             return [second_nested_notebook]
+        return None
 
     client = Mock()
     client.workspace.list.side_effect = my_side_effect
@@ -175,13 +167,14 @@ def test_walk_should_retry_on_backend_exceptions_and_log_them():
     second_folder = ObjectInfo(path="/rootPath/nested_folder_2", object_type=ObjectType.DIRECTORY)
     second_folder_notebook = ObjectInfo(path="/rootPath/nested_folder_2/notebook2", object_type=ObjectType.NOTEBOOK)
 
-    def my_side_effect(path, **kwargs):
+    def my_side_effect(path, **_):
         if path == "/rootPath":
             return [file, first_folder, second_folder]
-        elif path == "/rootPath/nested_folder":
+        if path == "/rootPath/nested_folder":
             raise InternalError(message="Backend dead")
-        elif path == "/rootPath/nested_folder_2":
+        if path == "/rootPath/nested_folder_2":
             return [second_folder_notebook]
+        return None
 
     client = Mock()
     client.workspace.list.side_effect = my_side_effect

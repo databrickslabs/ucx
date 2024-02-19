@@ -43,6 +43,7 @@ path = "src/databricks/labs/ucx/__about__.py"
 [tool.hatch.envs.default]
 dependencies = [
     "pylint",
+    "pylint-pytest==2.0.0a0",
     "coverage[toml]>=6.5",
     "pytest",
     "pytest-xdist",
@@ -70,12 +71,13 @@ fmt         = ["isort .",
                "black .",
                "ruff  . --fix",
                "mypy .",
-               "pylint --output-format=colorized -j 0 src"]
+               "pylint --output-format=colorized -j 0 src tests"]
 verify      = ["black --check .",
                "isort . --check-only",
                "ruff .",
                "mypy .",
-               "pylint --output-format=colorized -j 0 src"]
+               "pylint --output-format=colorized -j 0 src tests"]
+lint         = ["pylint --output-format=colorized -j 0 src tests"]
 
 [tool.isort]
 skip_glob = ["notebooks/*.py"]
@@ -213,7 +215,26 @@ limit-inference-results = 100
 
 # List of plugins (as comma separated values of python module names) to load,
 # usually to register additional checkers.
-load-plugins = ["pylint.extensions.check_elif", "pylint.extensions.bad_builtin", "pylint.extensions.docparams", "pylint.extensions.for_any_all", "pylint.extensions.set_membership", "pylint.extensions.code_style", "pylint.extensions.overlapping_exceptions", "pylint.extensions.typing", "pylint.extensions.redefined_variable_type", "pylint.extensions.comparison_placement", "pylint.extensions.broad_try_clause", "pylint.extensions.dict_init_mutate", "pylint.extensions.consider_refactoring_into_while_condition"]
+load-plugins = [
+    "pylint_pytest",
+    "pylint.extensions.bad_builtin",
+    "pylint.extensions.broad_try_clause",
+    "pylint.extensions.check_elif",
+    "pylint.extensions.code_style",
+    "pylint.extensions.confusing_elif",
+    "pylint.extensions.comparison_placement",
+    "pylint.extensions.consider_refactoring_into_while_condition",
+    "pylint.extensions.dict_init_mutate",
+    "pylint.extensions.docparams",
+    "pylint.extensions.dunder",
+    "pylint.extensions.for_any_all",
+    "pylint.extensions.mccabe",
+    "pylint.extensions.overlapping_exceptions",
+    "pylint.extensions.private_import",
+    "pylint.extensions.redefined_variable_type",
+    "pylint.extensions.set_membership",
+    "pylint.extensions.typing",
+]
 
 # Pickle collected data for later comparisons.
 persistent = true
@@ -515,7 +536,40 @@ confidence = ["HIGH", "CONTROL_FLOW", "INFERENCE", "INFERENCE_FAILURE", "UNDEFIN
 # --enable=similarities". If you want to run only the classes checker, but have
 # no Warning level messages displayed, use "--disable=all --enable=classes
 # --disable=W".
-disable = ["raw-checker-failed", "bad-inline-option", "locally-disabled", "file-ignored", "suppressed-message", "deprecated-pragma", "use-implicit-booleaness-not-comparison-to-string", "use-implicit-booleaness-not-comparison-to-zero", "consider-using-augmented-assign", "prefer-typing-namedtuple", "attribute-defined-outside-init", "invalid-name", "missing-module-docstring", "missing-class-docstring", "missing-function-docstring", "protected-access", "too-few-public-methods", "line-too-long", "too-many-lines", "trailing-whitespace", "missing-final-newline", "trailing-newlines", "bad-indentation", "unnecessary-semicolon", "multiple-statements", "superfluous-parens", "mixed-line-endings", "unexpected-line-ending-format", "fixme", "consider-using-assignment-expr", "logging-fstring-interpolation", "consider-using-any-or-all"]
+disable = [
+    "raw-checker-failed",
+    "bad-inline-option",
+    "locally-disabled",
+    "file-ignored",
+    "suppressed-message",
+    "deprecated-pragma",
+    "use-implicit-booleaness-not-comparison-to-string",
+    "use-implicit-booleaness-not-comparison-to-zero",
+    "consider-using-augmented-assign",
+    "prefer-typing-namedtuple",
+    "attribute-defined-outside-init",
+    "invalid-name",
+    "missing-module-docstring",
+    "missing-class-docstring",
+    "missing-function-docstring",
+    "protected-access", # TODO: enable back
+    "too-few-public-methods",
+    "line-too-long",
+    "too-many-lines",
+    "trailing-whitespace",
+    "missing-final-newline",
+    "trailing-newlines",
+    "bad-indentation",
+    "unnecessary-semicolon",
+    "multiple-statements",
+    "superfluous-parens",
+    "mixed-line-endings",
+    "unexpected-line-ending-format",
+    "fixme",
+    "consider-using-assignment-expr",
+    "logging-fstring-interpolation",
+    "consider-using-any-or-all"
+]
 
 # Enable the message, report, category or checker with the given id(s). You can
 # either give multiple identifier separated by comma (,) or put this option

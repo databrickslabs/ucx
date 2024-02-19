@@ -1,17 +1,17 @@
 import logging
 
 import pytest
-from _pytest.outcomes import Failed, Skipped
 from databricks.labs.blueprint.commands import CommandExecutor
 from databricks.sdk.service.workspace import AclPermission
 
+# pylint: disable-next=unused-wildcard-import,wildcard-import
 from databricks.labs.ucx.mixins.fixtures import *  # noqa: F403
 
 logger = logging.getLogger(__name__)
 
 
 @pytest.fixture  # type: ignore[no-redef]
-def debug_env_name():
+def debug_env_name():  # pylint: disable=function-redefined
     return "ucws"
 
 
@@ -89,7 +89,7 @@ def test_sql_backend_works(ws, wsfs_wheel):
 
 
 def test_env_or_skip(env_or_skip):
-    with pytest.raises((Skipped, Failed)):
+    with pytest.raises((pytest.Skipped, pytest.Failed)):
         env_or_skip("NO_ENV_VAR_HERE")
 
 

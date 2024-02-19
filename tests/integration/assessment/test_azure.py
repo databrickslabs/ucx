@@ -2,7 +2,6 @@ from datetime import timedelta
 
 from databricks.sdk.errors import NotFound
 from databricks.sdk.retries import retried
-from databricks.sdk.service import compute, jobs
 
 from databricks.labs.ucx.assessment.azure import AzureServicePrincipalCrawler
 
@@ -47,24 +46,6 @@ def test_spn_crawler_deleted_cluster_policy(
     make_notebook,
 ):
     cluster_policy_id = make_cluster_policy().policy_id
-    make_job(
-        name=f"sdk-{make_random(4)}",
-        tasks=[
-            jobs.Task(
-                task_key=make_random(4),
-                description=make_random(4),
-                new_cluster=compute.ClusterSpec(
-                    num_workers=1,
-                    node_type_id=ws.clusters.select_node_type(local_disk=True),
-                    spark_version=ws.clusters.select_spark_version(latest=True),
-                    spark_conf=_SPARK_CONF,
-                    policy_id=cluster_policy_id,
-                ),
-                notebook_task=jobs.NotebookTask(notebook_path=make_notebook()),
-                timeout_seconds=0,
-            )
-        ],
-    )
     make_cluster(single_node=True, spark_conf=_SPARK_CONF, policy_id=cluster_policy_id)
     ws.cluster_policies.delete(policy_id=cluster_policy_id)
     spn_crawler = AzureServicePrincipalCrawler(ws, sql_backend, inventory_schema)

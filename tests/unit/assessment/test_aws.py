@@ -31,13 +31,13 @@ def test_aws_validate():
     }
     """
 
-    def successful_call(cmd: str):
+    def successful_call(_):
         return 0, successful_return, ""
 
     aws = AWSResources("Fake_Profile", successful_call)
     assert aws.validate_connection()
 
-    def failed_call(cmd: str):
+    def failed_call(_):
         return -1, "", "Can't connect"
 
     aws = AWSResources("Fake_Profile", failed_call)
@@ -57,7 +57,7 @@ def test_list_role_policies():
 
     """
 
-    def command_call(cmd: str):
+    def command_call(_):
         return 0, command_return, ""
 
     aws = AWSResources("Fake_Profile", command_call)
@@ -83,7 +83,7 @@ def test_list_attached_policies_in_role():
 
     """
 
-    def command_call(cmd: str):
+    def command_call(_):
         return 0, command_return, ""
 
     aws = AWSResources("Fake_Profile", command_call)
@@ -170,12 +170,11 @@ def test_get_role_policy():
     def command_call(cmd: str):
         if "iam get-role-policy" in cmd:
             return 0, get_role_policy_return, ""
-        elif "iam get-policy " in cmd:
+        if "iam get-policy " in cmd:
             return 0, get_policy_return, ""
-        elif "iam get-policy-version" in cmd:
+        if "iam get-policy-version" in cmd:
             return 0, get_policy_version_return, ""
-        else:
-            return -1, "", "Error"
+        return -1, "", "Error"
 
     aws = AWSResources("Fake_Profile", command_call)
     role_policy = aws.get_role_policy("fake_role", policy_name="fake_policy")
@@ -326,7 +325,7 @@ def test_get_uc_roles():
     }
     """
 
-    def command_call(cmd: str):
+    def command_call(_):
         return 0, list_roles_return, ""
 
     aws = AWSResources("Fake_Profile", command_call)
@@ -499,7 +498,7 @@ def test_get_uc_roles_missing_keys():
     }
     """
 
-    def command_call(cmd: str):
+    def command_call(_):
         return 0, list_roles_return, ""
 
     aws = AWSResources("Fake_Profile", command_call)
@@ -713,7 +712,7 @@ def test_role_mismatched(caplog):
 
 
 def test_get_role_policy_missing_role(caplog):
-    def command_call(cmd: str):
+    def command_call(_):
         return 0, "", ""
 
     aws = AWSResources("Fake_Profile", command_call)
@@ -749,7 +748,7 @@ def test_uc_roles_empty_mapping(caplog):
 
 
 def test_command(caplog):
-    return_code, output, error = run_command("echo success")
+    return_code, _, _ = run_command("echo success")
     assert return_code == 0
     with pytest.raises(FileNotFoundError) as exception:
         run_command("no_way_this_command_would_work")

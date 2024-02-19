@@ -50,15 +50,15 @@ def ws():
             raise NotFound(path)
         return io.StringIO(state[path])
 
-    ws = create_autospec(WorkspaceClient)
-    ws.config.host = 'https://localhost'
-    ws.current_user.me().user_name = "foo"
-    ws.workspace.download = download
-    ws.statement_execution.execute_statement.return_value = sql.ExecuteStatementResponse(
+    workspace_client = create_autospec(WorkspaceClient)
+    workspace_client.config.host = 'https://localhost'
+    workspace_client.current_user.me().user_name = "foo"
+    workspace_client.workspace.download = download
+    workspace_client.statement_execution.execute_statement.return_value = sql.ExecuteStatementResponse(
         status=sql.StatementStatus(state=sql.StatementState.SUCCEEDED),
         manifest=sql.ResultManifest(schema=sql.ResultSchema()),
     )
-    return ws
+    return workspace_client
 
 
 def test_workflow(ws, caplog):
@@ -234,14 +234,14 @@ def test_save_storage_and_principal_azure_no_azure_cli(ws, caplog):
     ws.config.is_azure = True
     principal_prefix_access(ws, "")
 
-    assert 'In order to obtain AAD token, Please run azure cli to authenticate.' in caplog.messages
+    assert 'Please enter subscription id to scan storage account in.' in caplog.messages
 
 
 def test_save_storage_and_principal_azure_no_subscription_id(ws, caplog):
     ws.config.auth_type = "azure-cli"
     ws.config.is_azure = True
 
-    principal_prefix_access(ws, "")
+    principal_prefix_access(ws)
 
     assert "Please enter subscription id to scan storage account in." in caplog.messages
 

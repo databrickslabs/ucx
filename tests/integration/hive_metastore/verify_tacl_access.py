@@ -1,17 +1,16 @@
 #!/usr/bin/env python
 import sys
 
-from databricks.sdk.service.compute import ResultType
+from databricks.sdk import WorkspaceClient
+from databricks.sdk.service.compute import Language, ResultType
 
 
 def main():
-    from databricks.sdk import WorkspaceClient
 
     table_name = sys.argv[1]
 
     # labs-aws-simple-spn is a config profile that has SPN
     # with USER access to a workspace and TACL cluster configured
-    from databricks.sdk.service.compute import Language
 
     w = WorkspaceClient(profile="labs-aws-simple-spn")
 
@@ -31,7 +30,4 @@ def main():
 
 
 if __name__ == "__main__":
-    try:
-        main()
-    except Exception as e:
-        print(e)
+    main()

@@ -55,7 +55,7 @@ class UdfsCrawler(CrawlerBase):
 
     def _try_load(self) -> Iterable[Udf]:
         """Tries to load udf information from the database or throws TABLE_OR_VIEW_NOT_FOUND error"""
-        for row in self._fetch(f"SELECT * FROM {escape_sql_identifier(self._full_name)}"):
+        for row in self._fetch(f"SELECT * FROM {escape_sql_identifier(self.full_name)}"):
             yield Udf(*row)
 
     def _crawl(self) -> Iterable[Udf]:

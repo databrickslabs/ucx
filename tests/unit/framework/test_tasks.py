@@ -7,12 +7,12 @@ from databricks.sdk import WorkspaceClient
 from databricks.labs.ucx.framework.tasks import (
     Task,
     TaskLogger,
-    _remove_extra_indentation,
+    remove_extra_indentation,
 )
 
 
 def test_replace_pydoc():
-    doc = _remove_extra_indentation(
+    doc = remove_extra_indentation(
         """Test1
         Test2
     Test3"""
@@ -45,10 +45,10 @@ def test_task_logger(tmp_path):
     app_logger = logging.getLogger("databricks.labs.ucx.foo")
     databricks_logger = logging.getLogger("databricks.sdk.core")
     with TaskLogger(tmp_path, "assessment", "123", "crawl-tables", "234") as task_logger:
-        app_logger.info(f"log file is {task_logger._log_file}")
+        app_logger.info(f"log file is {task_logger.log_file}")
         databricks_logger.debug("something from sdk")
     contents = _log_contents(tmp_path)
-    assert 2 == len(contents)
+    assert len(contents) == 2
     assert "log file is" in contents["logs/assessment/run-234/crawl-tables.log"]
     assert "something from sdk" in contents["logs/assessment/run-234/crawl-tables.log"]
     assert "[run #234](/#job/123/run/234)" in contents["logs/assessment/run-234/README.md"]
@@ -59,7 +59,7 @@ def test_task_failure(tmp_path):
         with TaskLogger(tmp_path, "assessment", "123", "crawl-tables", "234"):
             raise ValueError("some value not found")
     contents = _log_contents(tmp_path)
-    assert 2 == len(contents)
+    assert len(contents) == 2
     # CLI debug info present
     assert "databricks workspace export" in contents["logs/assessment/run-234/crawl-tables.log"]
     # log file name present
