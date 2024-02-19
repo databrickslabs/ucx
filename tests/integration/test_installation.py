@@ -40,10 +40,15 @@ def new_installation(ws, sql_backend, env_or_skip, inventory_schema, make_random
     cleanup = []
 
     def factory(
-        config_transform: Callable[[WorkspaceConfig], WorkspaceConfig] | None = None, single_user_install: bool = True
+        config_transform: Callable[[WorkspaceConfig], WorkspaceConfig] | None = None, single_user_install: bool = False
     ):
         prefix = make_random(4)
         renamed_group_prefix = f"rename-{prefix}-"
+        if single_user_install:
+            single_user_prompt_response = "yes"
+        else:
+            single_user_prompt_response = "no"
+
         prompts = MockPrompts(
             {
                 r'Open job overview in your browser.*': 'no',
@@ -54,6 +59,7 @@ def new_installation(ws, sql_backend, env_or_skip, inventory_schema, make_random
                 r".*connect to the external metastore?.*": "yes",
                 r".*Inventory Database.*": inventory_schema,
                 r".*Backup prefix*": renamed_group_prefix,
+                r"Do you want to install for a single user?": single_user_prompt_response,
                 r".*": "",
             }
         )
@@ -71,7 +77,7 @@ def new_installation(ws, sql_backend, env_or_skip, inventory_schema, make_random
                 functools.partial(ws.clusters.ensure_cluster_is_running, tacl_cluster_id),
             ],
         )
-        installation = Installation(ws, prefix)
+        installation = Installation(ws, prefix, install_folder=ucx_install_path)
         installer = WorkspaceInstaller(prompts, installation, ws)
         workspace_config = installer.configure()
         overrides = {"main": default_cluster_id, "tacl": tacl_cluster_id}
@@ -80,7 +86,6 @@ def new_installation(ws, sql_backend, env_or_skip, inventory_schema, make_random
         if config_transform:
             workspace_config = config_transform(workspace_config)
 
-        installation = Installation(ws, prefix, install_folder=ucx_install_path)
         installation.save(workspace_config)
 
         # TODO: see if we want to move building wheel as a context manager for yield factory,
@@ -338,7 +343,24 @@ def test_single_user_installation(new_installation):
     install_single_user.uninstall()
 
 
-@retried(on=[NotFound], timeout=timedelta(minutes=5))
-def test_workspace_root_installation(new_installation):
+def test_workspace_root_installation(ws, new_installation):
     install_workspace_root = new_installation(single_user_install=False)
     install_workspace_root.uninstall()
+
+
+@retried(on=[NotFound], timeout=timedelta(minutes=5))
+def test_workspace_root_installation_on_existing_root_install(ws, new_installation):
+    existing_installation = Installation(ws, "ucx", install_folder='/Applications/ucx')
+    ws_config = ws.config
+    existing_installation.save(ws_config)
+    reinstall_workspace_root = new_installation(single_user_install=False)
+    reinstall_workspace_root.uninstall()
+
+
+@retried(on=[NotFound], timeout=timedelta(minutes=5))
+def test_single_user_installation_on_existing_root_install(ws, new_installation):
+    existing_installation = Installation(ws, "ucx", install_folder='/Applications/ucx')
+    ws_config = ws.config
+    existing_installation.save(ws_config)
+    reinstall_single_user = new_installation(single_user_install=True)
+    reinstall_single_user.uninstall()
