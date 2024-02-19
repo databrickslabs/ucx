@@ -4,6 +4,8 @@ import json
 import pytest
 from databricks.sdk.oauth import Token
 
+pytest.register_assert_rewrite('databricks.labs.blueprint.installation')
+
 
 @pytest.fixture
 def az_token(mocker):
