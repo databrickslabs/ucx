@@ -141,7 +141,7 @@ def test_cluster_with_multiple_failures():
 
 
 def test_cluster_with_job_source():
-    ws = workspace_client_mock(clusters="job-source-cluster.json")
+    ws = workspace_client_mock(cluster_ids=['job-cluster', 'policy-azure-oauth'])
     crawler = ClustersCrawler(ws, MockBackend(), "ucx")
     result_set = list(crawler.snapshot())
 

@@ -20,7 +20,7 @@ def test_pipeline_assessment_with_config():
         )
     ]
 
-    ws = workspace_client_mock(clusters="job-source-cluster.json")
+    ws = workspace_client_mock(cluster_ids=['job-cluster', 'policy-azure-oauth'])
     ws.dbfs.read().data = "JXNoCmVjaG8gIj0="
 
     ws.pipelines.list_pipelines.return_value = sample_pipelines
@@ -43,7 +43,7 @@ def test_pipeline_assessment_without_config():
             state=PipelineState.IDLE,
         )
     ]
-    ws = workspace_client_mock(clusters="job-source-cluster.json")
+    ws = workspace_client_mock(cluster_ids=['job-cluster'])
     ws.dbfs.read().data = "JXNoCmVjaG8gIj0="
     ws.pipelines.list_pipelines.return_value = sample_pipelines
     crawler = PipelinesCrawler(ws, MockBackend(), "ucx").snapshot()
