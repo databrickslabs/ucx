@@ -1,4 +1,3 @@
-import base64
 import json
 import re
 from collections.abc import Iterable
@@ -8,16 +7,12 @@ from databricks.sdk import WorkspaceClient
 from databricks.sdk.errors import NotFound
 from databricks.sdk.service.compute import ClusterSource, Policy
 
-from databricks.labs.ucx.assessment.crawlers import (
-    CLIENT_ENDPOINT_LENGTH,
-    SECRET_LIST_LENGTH,
-    SECRET_PATTERN,
-    STORAGE_ACCOUNT_EXTRACT_PATTERN,
-    azure_sp_conf_present_check,
-    logger,
-)
+from databricks.labs.ucx.assessment.crawlers import azure_sp_conf_present_check, logger
 from databricks.labs.ucx.assessment.jobs import JobsMixin
+from databricks.labs.ucx.assessment.secrets import SecretsMixin
 from databricks.labs.ucx.framework.crawlers import CrawlerBase, SqlBackend
+
+_STORAGE_ACCOUNT_PATTERN = r"(?:id|endpoint)(.*?)dfs"
 
 
 @dataclass(frozen=True)
@@ -34,7 +29,7 @@ class AzureServicePrincipalInfo:
     storage_account: str | None = None
 
 
-class AzureServicePrincipalCrawler(CrawlerBase[AzureServicePrincipalInfo], JobsMixin):
+class AzureServicePrincipalCrawler(CrawlerBase[AzureServicePrincipalInfo], JobsMixin, SecretsMixin):
     def __init__(self, ws: WorkspaceClient, sbe: SqlBackend, schema):
         super().__init__(sbe, "hive_metastore", schema, "azure_service_principals", AzureServicePrincipalInfo)
         self._ws = ws
@@ -129,33 +124,40 @@ class AzureServicePrincipalCrawler(CrawlerBase[AzureServicePrincipalInfo], JobsM
     def _get_azure_spn_from_config(self, config: dict) -> set[AzureServicePrincipalInfo]:
         """Detect azure service principals from a dictionary of spark configs
         This checks for the existence of an application id by matching fs.azure.account.oauth2.client.id
-        For each application id identified, retrieve the relevant storage account, and corresponding tenant id
+        For each application id identified, retrieve the relevant storage account, client secret and tenant id
         """
         set_service_principals = set[AzureServicePrincipalInfo]()
-        spn_application_id, secret_scope, secret_key, tenant_id, storage_account = None, "", "", "", ""
         matching_spn_app_id_keys = [key for key in config.keys() if "fs.azure.account.oauth2.client.id" in key]
         for spn_app_id_key in matching_spn_app_id_keys:
             # retrieve application id of spn
-            spn_application_id, secret_scope, secret_key = self._get_key_from_config(spn_app_id_key, config)
+            spn_application_id = self._get_value_from_config_key(config, spn_app_id_key)
             if spn_application_id is None:
                 continue
 
+            storage_account, secret_scope, secret_key, tenant_id = None, None, None, None
+            tenant_key = "fs.azure.account.oauth2.client.endpoint"
+            client_secret_key = "fs.azure.account.oauth2.client.secret"
+
             # retrieve storage account configured with this spn
-            storage_account_matched = re.search(STORAGE_ACCOUNT_EXTRACT_PATTERN, spn_app_id_key)
+            storage_account_matched = re.search(_STORAGE_ACCOUNT_PATTERN, spn_app_id_key)
             if storage_account_matched:
                 storage_account = storage_account_matched.group(1).strip(".")
-                tenant_key = "fs.azure.account.oauth2.client.endpoint." + storage_account
-            else:
-                tenant_key = "fs.azure.account.oauth2.client.endpoint"
+                # adjust the key to lookup for tenant id & secret id
+                tenant_key = f"{tenant_key}.{storage_account}"
+                client_secret_key = f"{client_secret_key}.{storage_account}"
 
-            # retrieve tenant id of spn
-            matching_tenant_keys = [key for key in config.keys() if re.search(tenant_key, key)]
-            if len(matching_tenant_keys) == 0 or matching_tenant_keys[0] is None:
-                tenant_id = ""
+            # retrieve client secret of spn
+            matching_secret_keys = [key for key in config.keys() if client_secret_key in key]
+            if len(matching_secret_keys) == 0 or matching_secret_keys[0] is None:
+                secret_scope, secret_key = None, None
             else:
-                client_endpoint_list = self._get_key_from_config(matching_tenant_keys[0], config)[0].split("/")
-                if len(client_endpoint_list) == CLIENT_ENDPOINT_LENGTH:
-                    tenant_id = client_endpoint_list[3]
+                secret_scope, secret_key = self._get_client_secret(config, matching_secret_keys[0])
+            # retrieve tenant id of spn
+            matching_tenant_keys = [key for key in config.keys() if tenant_key in key]
+            if len(matching_tenant_keys) == 0 or matching_tenant_keys[0] is None:
+                tenant_id = None
+            else:
+                tenant_id = self._get_tenant_id(config, matching_tenant_keys[0])
 
             # add output to the set - this automatically dedupe
             set_service_principals.add(
@@ -168,34 +170,3 @@ class AzureServicePrincipalCrawler(CrawlerBase[AzureServicePrincipalInfo], JobsM
                 )
             )
         return set_service_principals
-
-    def _get_key_from_config(self, key: str, config: dict) -> tuple[str, str, str]:
-        """Get a config based on its key, with some special handling:
-        If the key is prefixed with spark_conf, i.e. this is in a cluster policy, the actual value is nested
-        If the value is of format {{secret_scope/secret}}, we extract that as well
-        """
-        if re.search("spark_conf", key):
-            value = config.get(key, {}).get("value", "")
-        else:
-            value = config.get(key, "")
-        # retrieve from secret scope if used
-        secret_matched = re.search(SECRET_PATTERN, value)
-        if secret_matched is None:
-            return value, "", ""
-        secret_string = secret_matched.group(1).split("/")
-        if len(secret_string) != SECRET_LIST_LENGTH:
-            return value, "", ""
-        secret_scope, secret_key = secret_string[1], secret_string[2]
-        value = self._get_secret_if_exists(secret_scope, secret_key)
-        return value, secret_scope, secret_key
-
-    def _get_secret_if_exists(self, secret_scope, secret_key) -> str | None:
-        """Get the secret value given a secret scope & secret key. Log a warning if secret does not exist"""
-        try:
-            # Return the decoded secret value in string format
-            secret = self._ws.secrets.get_secret(secret_scope, secret_key)
-            assert secret.value is not None
-            return base64.b64decode(secret.value).decode("utf-8")
-        except NotFound:
-            logger.warning(f'removed on the backend: {secret_scope}{secret_key}')
-            return None
