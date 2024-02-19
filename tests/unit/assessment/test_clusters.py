@@ -36,16 +36,16 @@ def test_cluster_assessment_cluster_policy_no_spark_conf():
 
 
 def test_cluster_assessment_cluster_policy_not_found(caplog):
-    ws = workspace_client_mock(clusters="assortment-conf.json")
+    ws = workspace_client_mock(cluster_ids=['policy-azure-oauth'])
     ws.cluster_policies.get = MagicMock()
     ws.cluster_policies.get.side_effect = NotFound("NO_POLICY")
     crawler = ClustersCrawler(ws, MockBackend(), "ucx")
     list(crawler.snapshot())
-    assert "The cluster policy was deleted: single-user-with-spn" in caplog.messages
+    assert "The cluster policy was deleted: azure-oauth" in caplog.messages
 
 
 def test_cluster_assessment_cluster_policy_exception():
-    ws = workspace_client_mock(clusters="assortment-conf.json")
+    ws = workspace_client_mock(cluster_ids=['policy-azure-oauth'])
     ws.cluster_policies.get = MagicMock()
     ws.cluster_policies.get.side_effect = InternalError(...)
     crawler = ClustersCrawler(ws, MockBackend(), "ucx")
@@ -107,7 +107,7 @@ def test_cluster_init_script():
 
 
 def test_cluster_init_script_check_dbfs():
-    ws = workspace_client_mock(clusters="dbfs-init-scripts.json")
+    ws = workspace_client_mock(cluster_ids=['init-scripts-dbfs'])
     ws.dbfs.read().data = "JXNoCmVjaG8gIj0="
     init_crawler = ClustersCrawler(ws, MockBackend(), "ucx").snapshot()
     assert len(init_crawler) == 1
@@ -150,7 +150,7 @@ def test_cluster_with_job_source():
 
 
 def test_try_fetch():
-    ws = workspace_client_mock(clusters="assortment-conf.json")
+    ws = workspace_client_mock(cluster_ids=[])
     mockBackend = MagicMock()
     mockBackend.fetch.return_value = [("000", 1, "123")]
     crawler = ClustersCrawler(ws, mockBackend, "ucx")
