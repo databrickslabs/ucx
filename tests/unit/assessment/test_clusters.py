@@ -18,7 +18,7 @@ from . import workspace_client_mock
 
 
 def test_cluster_assessment():
-    ws = workspace_client_mock(cluster_ids=['policy-single-user-with-spn', 'policy-azure-oauth'], pipeline_ids=['empty-spec'])
+    ws = workspace_client_mock(cluster_ids=['policy-single-user-with-spn', 'policy-azure-oauth'], )
     crawler = ClustersCrawler(ws, MockBackend(), "ucx")
     result_set = list(crawler.snapshot())
 
@@ -28,7 +28,7 @@ def test_cluster_assessment():
 
 
 def test_cluster_assessment_cluster_policy_not_found(caplog):
-    ws = workspace_client_mock(cluster_ids=['policy-azure-oauth'], pipeline_ids=['empty-spec'])
+    ws = workspace_client_mock(cluster_ids=['policy-azure-oauth'], )
     ws.cluster_policies.get = MagicMock()
     ws.cluster_policies.get.side_effect = NotFound("NO_POLICY")
     crawler = ClustersCrawler(ws, MockBackend(), "ucx")
@@ -37,7 +37,7 @@ def test_cluster_assessment_cluster_policy_not_found(caplog):
 
 
 def test_cluster_assessment_cluster_policy_exception():
-    ws = workspace_client_mock(cluster_ids=['policy-azure-oauth'], pipeline_ids=['empty-spec'])
+    ws = workspace_client_mock(cluster_ids=['policy-azure-oauth'], )
     ws.cluster_policies.get = MagicMock()
     ws.cluster_policies.get.side_effect = InternalError(...)
     crawler = ClustersCrawler(ws, MockBackend(), "ucx")
@@ -47,7 +47,7 @@ def test_cluster_assessment_cluster_policy_exception():
 
 
 def test_cluster_assessment_with_spn_cluster_policy_not_found():
-    ws = workspace_client_mock(cluster_ids=['policy-azure-oauth'], pipeline_ids=['empty-spec'])
+    ws = workspace_client_mock(cluster_ids=['policy-azure-oauth'], )
     ws.cluster_policies.get.side_effect = NotFound("NO_POLICY")
     crawler = AzureServicePrincipalCrawler(ws, MockBackend(), "ucx").snapshot()
     assert len(crawler) == 1
@@ -75,21 +75,21 @@ def test_cluster_assessment_with_spn_cluster_policy_exception(mocker):
 
 
 def test_cluster_init_script():
-    ws = workspace_client_mock(pipeline_ids=['empty-spec'], cluster_ids=['init-scripts-dbfs'])
+    ws = workspace_client_mock(cluster_ids=['init-scripts-dbfs'])
     ws.dbfs.read().data = "JXNoCmVjaG8gIj0="
     init_crawler = ClustersCrawler(ws, MockBackend(), "ucx").snapshot()
     assert len(init_crawler) == 1
 
 
 def test_cluster_init_script_check_dbfs():
-    ws = workspace_client_mock(pipeline_ids=['empty-spec'],cluster_ids=['init-scripts-dbfs'])
+    ws = workspace_client_mock(cluster_ids=['init-scripts-dbfs'])
     ws.dbfs.read().data = "JXNoCmVjaG8gIj0="
     init_crawler = ClustersCrawler(ws, MockBackend(), "ucx").snapshot()
     assert len(init_crawler) == 1
 
 
 def test_cluster_without_owner_should_have_empty_creator_name():
-    ws = workspace_client_mock(pipeline_ids=['empty-spec'],cluster_ids=['simplest-autoscale'])
+    ws = workspace_client_mock(cluster_ids=['simplest-autoscale'])
     mockbackend = MockBackend()
     ClustersCrawler(ws, mockbackend, "ucx").snapshot()
     result = mockbackend.rows_written_for("hive_metastore.ucx.clusters", "append")
@@ -105,7 +105,7 @@ def test_cluster_without_owner_should_have_empty_creator_name():
 
 
 def test_cluster_with_multiple_failures():
-    ws = workspace_client_mock(pipeline_ids=['empty-spec'],cluster_ids=['passthrough'])
+    ws = workspace_client_mock(cluster_ids=['passthrough'])
     crawler = ClustersCrawler(ws, MockBackend(), "ucx")
     result_set = list(crawler.snapshot())
     assert len(result_set) == 1
@@ -116,7 +116,7 @@ def test_cluster_with_multiple_failures():
 
 
 def test_cluster_with_job_source():
-    ws = workspace_client_mock(pipeline_ids=['empty-spec'],cluster_ids=['job-cluster', 'policy-azure-oauth'])
+    ws = workspace_client_mock(cluster_ids=['job-cluster', 'policy-azure-oauth'])
     crawler = ClustersCrawler(ws, MockBackend(), "ucx")
     result_set = list(crawler.snapshot())
 
@@ -125,7 +125,7 @@ def test_cluster_with_job_source():
 
 
 def test_try_fetch():
-    ws = workspace_client_mock(pipeline_ids=['empty-spec'],cluster_ids=['simplest-autoscale'])
+    ws = workspace_client_mock(cluster_ids=['simplest-autoscale'])
     mockBackend = MagicMock()
     mockBackend.fetch.return_value = [("000", 1, "123")]
     crawler = ClustersCrawler(ws, mockBackend, "ucx")
@@ -138,7 +138,7 @@ def test_try_fetch():
 
 
 def test_no_isolation_clusters():
-    ws = workspace_client_mock(pipeline_ids=['empty-spec'],cluster_ids=['no-isolation'])
+    ws = workspace_client_mock(cluster_ids=['no-isolation'])
     sql_backend = MagicMock()
     crawler = ClustersCrawler(ws, sql_backend, "ucx")
     result_set = list(crawler.snapshot())
@@ -147,7 +147,7 @@ def test_no_isolation_clusters():
 
 
 def test_unsupported_clusters():
-    ws = workspace_client_mock(pipeline_ids=['empty-spec'],cluster_ids=['legacy-passthrough'])
+    ws = workspace_client_mock(cluster_ids=['legacy-passthrough'])
     sql_backend = MagicMock()
     crawler = ClustersCrawler(ws, sql_backend, "ucx")
     result_set = list(crawler.snapshot())
