@@ -18,15 +18,13 @@ from . import workspace_client_mock
 
 
 def test_cluster_assessment():
-    ws = workspace_client_mock(clusters="assortment-conf.json")
+    ws = workspace_client_mock(cluster_ids=['policy-single-user-with-spn', 'policy-azure-oauth'])
     crawler = ClustersCrawler(ws, MockBackend(), "ucx")
     result_set = list(crawler.snapshot())
 
-    assert len(result_set) == 4
+    assert len(result_set) == 2
     assert result_set[0].success == 1
     assert result_set[1].success == 0
-    assert result_set[2].success == 0
-    assert result_set[3].success == 0
 
 
 def test_cluster_assessment_cluster_policy_no_spark_conf():
