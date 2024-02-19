@@ -122,7 +122,7 @@ def test_apply(migration_state):
 
 def test_relevance():
     sup = GenericPermissionsSupport(ws=MagicMock(), listings=[])  # no listings since only apply is tested
-    item = Permissions(object_id="passwords", object_type="passwords", raw="some-stuff")
+    item = Permissions(object_id="passwords", object_type="passwords", raw="{}")
     migration_state = create_autospec(MigrationState)
     task = sup.get_apply_task(item, migration_state)
     assert task is not None
