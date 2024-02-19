@@ -31,35 +31,9 @@ def test_job_assessment():
 
 
 def test_job_assessment_no_job_tasks():
-    sample_jobs = [
-        BaseJob(
-            created_time=1694536604319,
-            creator_user_name="anonymous@databricks.com",
-            job_id=536591785949415,
-            settings=JobSettings(
-                compute=None,
-                continuous=None,
-                tasks=None,
-                timeout_seconds=0,
-            ),
-        ),
-    ]
-
-    sample_clusters = [
-        ClusterDetails(
-            autoscale=AutoScale(min_workers=1, max_workers=6),
-            spark_conf={"spark.databricks.delta.preview.enabled": "true"},
-            spark_context_id=5134472582179566666,
-            spark_env_vars=None,
-            spark_version="13.3.x-cpu-ml-scala2.12",
-            cluster_id="0810-229933-chicago99",
-            cluster_source=ClusterSource.JOB,
-        ),
-    ]
-    ws = Mock()
-    result_set = JobsCrawler(ws, MockBackend(), "ucx")._assess_jobs(
-        sample_jobs, {c.cluster_id: c for c in sample_clusters}
-    )
+    ws = workspace_client_mock(job_ids=['no-tasks'])
+    sql_backend = MockBackend()
+    result_set = JobsCrawler(ws, sql_backend, "ucx").snapshot()
     assert len(result_set) == 1
     assert result_set[0].success == 1
 

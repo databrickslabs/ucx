@@ -96,7 +96,7 @@ def test_cluster_without_owner_should_have_empty_creator_name():
     assert result == [
         ClusterInfo(
             cluster_id="simplest-autoscale",
-            cluster_name="Tech Summit FY24 Cluster-2",
+            cluster_name="Simplest Shared Autoscale",
             creator=None,
             success=1,
             failures='[]',
