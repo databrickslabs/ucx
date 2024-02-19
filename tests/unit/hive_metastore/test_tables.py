@@ -114,9 +114,11 @@ def test_tables_returning_error_when_describing():
         "DESCRIBE TABLE EXTENDED hive_metastore.database.table2": [
             ("Catalog", "catalog", ""),
             ("Type", "delta", ""),
-            ("Table Properties",
-             "[delta.minReaderVersion=1,delta.minWriterVersion=2,upgraded_to=fake_cat.fake_ext.fake_delta]",
-             ""),
+            (
+                "Table Properties",
+                "[delta.minReaderVersion=1,delta.minWriterVersion=2,upgraded_to=fake_cat.fake_ext.fake_delta]",
+                "",
+            ),
         ],
     }
     backend = MockBackend(fails_on_first=errors, rows=rows)
