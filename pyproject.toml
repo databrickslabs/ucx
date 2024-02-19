@@ -552,7 +552,7 @@ disable = [
     "missing-module-docstring",
     "missing-class-docstring",
     "missing-function-docstring",
-#    "protected-access",
+    "protected-access", # TODO: enable back
     "too-few-public-methods",
     "line-too-long",
     "too-many-lines",

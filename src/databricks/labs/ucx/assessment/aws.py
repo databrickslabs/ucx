@@ -138,15 +138,7 @@ class AWSResources:
                 principal = principal.get("AWS")
                 if not principal:
                     continue
-                if isinstance(principal, list):
-                    is_uc_principal = False
-                    for single_principal in principal:
-                        if single_principal in self.UC_MASTER_ROLES_ARN:
-                            is_uc_principal = True
-                            continue
-                    if not is_uc_principal:
-                        continue
-                elif principal not in self.UC_MASTER_ROLES_ARN:
+                if not self._is_uc_principal(principal):
                     continue
                 uc_roles.append(
                     AWSRole(
@@ -158,6 +150,14 @@ class AWSResources:
                 )
 
         return uc_roles
+
+    def _is_uc_principal(self, principal):
+        if isinstance(principal, list):
+            for single_principal in principal:
+                if single_principal in self.UC_MASTER_ROLES_ARN:
+                    return True
+            return False
+        return principal in self.UC_MASTER_ROLES_ARN
 
     def get_role_policy(self, role_name, policy_name: str | None = None, attached_policy_arn: str | None = None):
         if policy_name:
@@ -184,28 +184,22 @@ class AWSResources:
             actions = policy["PolicyDocument"].get("Statement", [])
         else:
             actions = policy["PolicyVersion"]["Document"].get("Statement", [])
+        return self._policy_actions(actions)
+
+    def _policy_actions(self, actions):
         policy_actions = []
         for action in actions:
             if action.get("Effect", "Deny") != "Allow":
                 continue
             actions = action["Action"]
-            s3_action = []
-            if isinstance(actions, list):
-                for single_action in actions:
-                    if single_action in self.S3_ACTIONS:
-                        s3_action.append(single_action)
-                        continue
-            elif actions in self.S3_ACTIONS:
-                s3_action = [actions]
-
-            if not s3_action or self.S3_READONLY not in s3_action:
+            s3_actions = self._s3_actions(actions)
+            if not s3_actions or self.S3_READONLY not in s3_actions:
                 continue
             privilege = Privilege.WRITE_FILES.value
             for s3_action_type in self.S3_ACTIONS:
-                if s3_action_type not in s3_action:
+                if s3_action_type not in s3_actions:
                     privilege = Privilege.READ_FILES.value
                     continue
-
             for resource in action.get("Resource", []):
                 match = re.match(self.S3_REGEX, resource)
                 if match:
@@ -213,8 +207,19 @@ class AWSResources:
                     policy_actions.append(AWSPolicyAction("s3", privilege, f"s3a://{match.group(1)}"))
         return policy_actions
 
+    def _s3_actions(self, actions):
+        s3_actions = []
+        if isinstance(actions, list):
+            for single_action in actions:
+                if single_action in self.S3_ACTIONS:
+                    s3_actions.append(single_action)
+                    continue
+        elif actions in self.S3_ACTIONS:
+            s3_actions = [actions]
+        return s3_actions
+
     def add_uc_role(self, role_name):
-        aws_role_trust_doc: dict = {
+        aws_role_trust_doc = {
             "Version": "2012-10-17",
             "Statement": [
                 {

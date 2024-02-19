@@ -271,7 +271,10 @@ def _aws_principal_prefix_access(w: WorkspaceClient, aws_profile: str):
         logger.error("Couldn't find AWS CLI in path. Please install the CLI from https://aws.amazon.com/cli/")
         return
     logger.info("Generating instance profile and bucket permission info")
-    aws_permissions = AWSResourcePermissions.for_cli(w, aws_profile)
+    installation = Installation.current(w, 'ucx')
+    config = installation.load(WorkspaceConfig)
+    sql_backend = StatementExecutionBackend(w, config.warehouse_id)
+    aws_permissions = AWSResourcePermissions.for_cli(w, sql_backend, aws_profile, config.inventory_database)
     instance_role_path = aws_permissions.save_instance_profile_permissions()
     logger.info(f"Instance profile and bucket info saved {instance_role_path}")
     logger.info("Generating UC roles and bucket permission info")
