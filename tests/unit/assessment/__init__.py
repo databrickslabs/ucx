@@ -38,7 +38,13 @@ _FOLDERS = {
 def _load_list(cls: type, filename: str, ids=None):
     if not ids:  # TODO: remove
         return [cls.from_dict(_) for _ in _load_fixture(filename)]  # type: ignore[attr-defined]
-    return [cls.from_dict(_load_fixture(f'{_FOLDERS[cls]}/{_}.json')) for _ in ids]  # type: ignore[attr-defined]
+    return _id_list(cls, ids)
+
+
+def _id_list(cls: type, ids=None):
+    if not ids:
+        return []
+    return [cls.from_dict(_load_fixture(f'{_FOLDERS[cls]}/{_}.json')) for _ in ids] # type: ignore[attr-defined]
 
 
 def _cluster_policy(policy_id: str):
@@ -59,15 +65,14 @@ def _secret_not_found(secret_scope, _):
 
 
 def workspace_client_mock(
-    clusters="no-spark-conf.json",
-    cluster_ids=[],
+    cluster_ids: list[str] | None = None,
     pipelines="single-pipeline.json",
     jobs="single-job.json",
     warehouse_config="single-config.json",
     secret_exists=True,
 ):
     ws = create_autospec(WorkspaceClient)
-    ws.clusters.list.return_value = _load_list(ClusterDetails, f"../assessment/clusters/{clusters}", cluster_ids)
+    ws.clusters.list.return_value = _id_list(ClusterDetails, cluster_ids)
     ws.cluster_policies.get = _cluster_policy
     ws.pipelines.list_pipelines.return_value = _load_list(PipelineStateInfo, f"../assessment/pipelines/{pipelines}")
     ws.pipelines.get = _pipeline
