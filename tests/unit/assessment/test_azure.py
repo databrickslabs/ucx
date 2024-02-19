@@ -153,7 +153,7 @@ def test_list_all_pipeline_with_conf_spn_secret():
 
 
 def test_azure_service_principal_info_policy_family():
-    ws = workspace_client_mock(clusters="single-cluster-spn-with-policy-overrides.json")
+    ws = workspace_client_mock(cluster_ids=['policy-spn-in-policy-overrides'])
     spn_crawler = AzureServicePrincipalCrawler(ws, MockBackend(), "ucx").snapshot()
 
     assert len(spn_crawler) == 1

@@ -1,0 +1,12 @@
+{
+  "autoscale": {
+    "max_workers": 6,
+    "min_workers": 1
+  },
+  "cluster_source": "ClusterSource.UI",
+  "spark_context_id": 5134472582179565315,
+  "spark_version": "9.3.x-cpu-ml-scala2.12",
+  "cluster_id": "0810-225833-atlanta69",
+  "cluster_name": "Tech Summit FY24 Cluster-1",
+  "policy_id": "spn-in-policy-overrides"
+}
