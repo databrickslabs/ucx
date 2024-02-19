@@ -252,7 +252,7 @@ class TablesCrawler(CrawlerBase):
                     "upgraded_to", None
                 ),
                 storage_properties=self._parse_table_props(describe.get("Storage Properties", "").lower()),  # type: ignore[arg-type]
-                is_partitioned="#Partition Information" in describe
+                is_partitioned="#Partition Information" in describe,
             )
         except Exception as e:  # pylint: disable=broad-exception-caught
             # TODO: https://github.com/databrickslabs/ucx/issues/406
