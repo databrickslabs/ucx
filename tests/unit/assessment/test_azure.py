@@ -52,7 +52,7 @@ def test_azure_service_principal_info_policy_family_conf_crawl(mocker):
 
 def test_azure_service_principal_info_null_applid_crawl():
     ws = workspace_client_mock(
-        clusters="single-cluster-spn-with-policy.json", pipelines="single-pipeline.json", jobs="single-job.json"
+        cluster_ids=['policy-single-user-with-empty-appid-spn'], pipelines="single-pipeline.json", jobs="single-job.json"
     )
     spn_crawler = AzureServicePrincipalCrawler(ws, MockBackend(), "ucx").snapshot()
     assert len(spn_crawler) == 0
