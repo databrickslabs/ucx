@@ -10,7 +10,7 @@ def test_permissions_save_and_load(ws, sql_backend, inventory_schema, env_or_ski
         Permissions(object_id="efg", object_type="fgh", raw="ghi"),
     ]
 
-    pi._save(saved)
+    pi._save(saved)  # pylint: disable=protected-access
     loaded = pi.load_all()
 
     assert saved == loaded

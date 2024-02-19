@@ -189,19 +189,9 @@ def test_list_all_pipeline_with_conf_spn_secret_avlb():
 
 
 def test_azure_spn_info_with_secret_unavailable():
-    ws = workspace_client_mock(cluster_ids=['simplest-autoscale'], pipeline_ids=['empty-spec'], secret_exists=False)
-    spark_conf = {
-        "spark.hadoop.fs.azure.account."
-        "oauth2.client.id.abcde.dfs.core.windows.net": "{{secrets/abcff/sp_app_client_id}}",
-        "spark.hadoop.fs.azure.account."
-        "oauth2.client.endpoint.abcde.dfs.core.windows.net": "https://login.microsoftonline.com/dedededede"
-        "/token",
-        "spark.hadoop.fs.azure.account."
-        "oauth2.client.secret.abcde.dfs.core.windows.net": "{{secrets/abcff/sp_secret}}",
-    }
-    crawler = AzureServicePrincipalCrawler(ws, MockBackend(), "ucx")._get_azure_spn_from_config(spark_conf)
-
-    assert crawler == set()
+    ws = workspace_client_mock(cluster_ids=['azure-spn-secret'], secret_exists=False)
+    result = AzureServicePrincipalCrawler(ws, MockBackend(), "ucx").snapshot()
+    assert len(result) == 0
 
 
 def test_jobs_assessment_with_spn_cluster_policy_not_found():

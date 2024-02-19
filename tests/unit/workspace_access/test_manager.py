@@ -33,7 +33,7 @@ def test_cleanup(b):
 def test_save(b):
     pi = PermissionManager(b, "test_database", [])
 
-    pi._save([Permissions("object1", "clusters", "test acl")])
+    pi._save([Permissions("object1", "clusters", "test acl")])  # pylint: disable=protected-access
 
     assert [Permissions(object_id="object1", object_type="clusters", raw="test acl")] == b.rows_written_for(
         "hive_metastore.test_database.permissions", "append"

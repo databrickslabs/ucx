@@ -53,6 +53,9 @@ class MigratedGroup:
             external_id=workspace.external_id,
         )
 
+    def decode_members(self):
+        return [iam.ComplexValue.from_dict(_) for _ in json.loads(self.members)]
+
 
 class MigrationState:
     """Holds migration state of workspace-to-account groups"""
@@ -450,6 +453,14 @@ class GroupManager(CrawlerBase[MigratedGroup]):
         else:
             logger.info("There are groups with different membership between account and workspace")
         return mismatch_group
+
+    def has_workspace_group(self, name):
+        groups = self._workspace_groups_in_workspace()
+        return name in groups
+
+    def has_account_group(self, name):
+        groups = self._account_groups_in_workspace()
+        return name in groups
 
     def _workspace_groups_in_workspace(self) -> dict[str, Group]:
         attributes = "id,displayName,meta,externalId,members,roles,entitlements"

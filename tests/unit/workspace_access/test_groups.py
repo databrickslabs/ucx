@@ -539,24 +539,24 @@ def test_list_workspace_groups():
         raise NotImplementedError
 
     wsclient.groups.get.side_effect = my_side_effect
+    wsclient.api_client.do.return_value = {
+        'Resources': [
+            {'displayName': 'group_1'},
+            {'displayName': 'group_2'},
+            {'displayName': 'group_3'},
+        ]
+    }
 
-    # Test when attributes do not contain "members"
     gm = GroupManager(backend, wsclient, inventory_database="inv")
-    result = gm._list_workspace_groups("WorkspaceGroup", "id,displayName,meta")
-    assert len(result) == 3
-    assert result[0].display_name == "group_1"
-    assert result[0].members is None
-    wsclient.groups.get.assert_not_called()
+    result = gm.snapshot()
 
-    # Test when attributes contain "members"
-    result = gm._list_workspace_groups("WorkspaceGroup", "id,displayName,meta,members")
     assert len(result) == 3
-    assert result[0].display_name == "group_1"
-    assert result[0].members == [
+    assert result[0].name_in_workspace == "group_1"
+    assert result[0].decode_members() == [
         ComplexValue(display="test-user-1", value="20"),
         ComplexValue(display="test-user-2", value="21"),
     ]
-    wsclient.groups.get.assert_called()
+    assert wsclient.groups.get.call_count == 3
 
 
 def test_snapshot_with_group_matched_by_suffix():

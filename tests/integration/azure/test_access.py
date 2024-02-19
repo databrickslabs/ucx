@@ -22,9 +22,11 @@ def test_azure_storage_accounts(ws, sql_backend, inventory_schema, make_random):
     location = ExternalLocations(ws, sql_backend, inventory_schema)
     installation = Installation(ws, make_random)
     az_res_perm = AzureResourcePermissions(installation, ws, AzureResources(ws), location)
-    accounts = list(az_res_perm._get_storage_accounts())
-    assert len(accounts) == 1
-    assert accounts[0] == "labsazurethings"
+    az_res_perm.save_spn_permissions()
+
+    mapping = az_res_perm.load()
+    assert len(mapping) == 1
+    assert mapping[0].prefix == "labsazurethings"
 
 
 @pytest.mark.skip
