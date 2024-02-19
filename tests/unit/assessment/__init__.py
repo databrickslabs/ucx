@@ -30,6 +30,7 @@ def _load_fixture(filename: str):
 
 
 _FOLDERS = {
+    BaseJob: '../assessment/jobs',
     ClusterDetails: '../assessment/clusters',
     PipelineStateInfo: '../assessment/pipelines',
 }
@@ -67,7 +68,7 @@ def _secret_not_found(secret_scope, _):
 def workspace_client_mock(
     cluster_ids: list[str] | None = None,
     pipeline_ids: list[str] | None = None,
-    jobs="single-job.json",
+    job_ids: list[str] | None = None,
     warehouse_config="single-config.json",
     secret_exists=True,
 ):
@@ -76,7 +77,7 @@ def workspace_client_mock(
     ws.cluster_policies.get = _cluster_policy
     ws.pipelines.list_pipelines.return_value = _id_list(PipelineStateInfo, pipeline_ids)
     ws.pipelines.get = _pipeline
-    ws.jobs.list.return_value = _load_list(BaseJob, f"../assessment/jobs/{jobs}")
+    ws.jobs.list.return_value = _id_list(BaseJob, job_ids)
     ws.warehouses.get_workspace_warehouse_config().data_access_config = _load_list(
         EndpointConfPair, f"../assessment/warehouses/{warehouse_config}"
     )

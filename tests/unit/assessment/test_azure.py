@@ -8,7 +8,7 @@ def test_azure_service_principal_info_crawl():
     ws = workspace_client_mock(
         cluster_ids=['azure-spn-secret', 'simplest-autoscale'],
         pipeline_ids=['spec-with-spn'],
-        jobs="assortment-spn.json",
+        job_ids=['some-spn'],
         warehouse_config="spn-config.json",
         secret_exists=True,
     )
@@ -21,7 +21,7 @@ def test_azure_service_principal_info_spark_conf_crawl():
     ws = workspace_client_mock(
         cluster_ids=['simplest-autoscale'],
         pipeline_ids=['empty-spec'],
-        jobs="assortment-spn.json",
+        job_ids=['some-spn'],
         warehouse_config="spn-config.json",
     )
 
@@ -34,7 +34,7 @@ def test_azure_service_principal_info_no_spark_conf_crawl():
     ws = workspace_client_mock(
         cluster_ids=['simplest-autoscale'],
         pipeline_ids=['empty-spec'],
-        jobs="single-job.json",
+        job_ids=['single-job'],
         warehouse_config="single-config.json",
     )
 
@@ -53,7 +53,8 @@ def test_azure_service_principal_info_policy_family_conf_crawl():
 def test_azure_service_principal_info_null_applid_crawl():
     ws = workspace_client_mock(
         cluster_ids=['policy-single-user-with-empty-appid-spn'],
-        pipeline_ids=['empty-spec'], jobs="single-job.json"
+        pipeline_ids=['empty-spec'],
+        job_ids=['single-job'],
     )
     spn_crawler = AzureServicePrincipalCrawler(ws, MockBackend(), "ucx").snapshot()
     assert len(spn_crawler) == 0
@@ -97,7 +98,7 @@ def test_azure_service_principal_info_policy_conf():
     ws = workspace_client_mock(
         cluster_ids=['policy-single-user-with-spn', 'policy-azure-oauth'],
         pipeline_ids=['spec-with-spn'],
-        jobs="single-spn-with-policy.json",
+        job_ids=['policy-single-job-with-spn'],
         warehouse_config="spn-config.json",
         secret_exists=True,
     )
@@ -110,7 +111,7 @@ def test_azure_service_principal_info_dedupe():
     ws = workspace_client_mock(
         cluster_ids=['policy-single-user-with-spn'],
         pipeline_ids=['spec-with-spn'],
-        jobs="single-spn-with-policy.json",
+        job_ids=['policy-single-job-with-spn'],
         warehouse_config="dupe-spn-config.json",
         secret_exists=True,
     )
