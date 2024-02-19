@@ -66,6 +66,7 @@ def _secret_not_found(secret_scope, _):
 
 def workspace_client_mock(
     cluster_ids: list[str] | None = None,
+    pipeline_ids: list[str] | None = None,
     pipelines="single-pipeline.json",
     jobs="single-job.json",
     warehouse_config="single-config.json",
@@ -74,7 +75,7 @@ def workspace_client_mock(
     ws = create_autospec(WorkspaceClient)
     ws.clusters.list.return_value = _id_list(ClusterDetails, cluster_ids)
     ws.cluster_policies.get = _cluster_policy
-    ws.pipelines.list_pipelines.return_value = _load_list(PipelineStateInfo, f"../assessment/pipelines/{pipelines}")
+    ws.pipelines.list_pipelines.return_value = _load_list(PipelineStateInfo, f"../assessment/pipelines/{pipelines}", pipeline_ids)
     ws.pipelines.get = _pipeline
     ws.jobs.list.return_value = _load_list(BaseJob, f"../assessment/jobs/{jobs}")
     ws.warehouses.get_workspace_warehouse_config().data_access_config = _load_list(

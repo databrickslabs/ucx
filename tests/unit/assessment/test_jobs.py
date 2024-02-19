@@ -324,7 +324,7 @@ def test_jobs_assessment_with_spn_cluster_no_job_tasks(mocker):
         )
     ]
 
-    ws = workspace_client_mock(cluster_ids=['policy-single-user-with-spn'])
+    ws = workspace_client_mock(pipeline_ids=['empty-spec'],cluster_ids=['policy-single-user-with-spn'])
     ws.jobs.list.return_value = sample_jobs
 
     jobs = AzureServicePrincipalCrawler(ws, MockBackend(), "ucx").snapshot()
@@ -341,7 +341,7 @@ def test_jobs_assessment_with_spn_cluster_no_job_settings(mocker):
         )
     ]
 
-    ws = workspace_client_mock(cluster_ids=['policy-single-user-with-spn'])
+    ws = workspace_client_mock(pipeline_ids=['empty-spec'],cluster_ids=['policy-single-user-with-spn'])
     ws.jobs.list.return_value = sample_jobs
 
     jobs = AzureServicePrincipalCrawler(ws, MockBackend(), "ucx").snapshot()
@@ -499,7 +499,7 @@ def test_job_cluster_init_script():
         ),
     ]
 
-    ws = workspace_client_mock(cluster_ids=['init-scripts-dbfs'])
+    ws = workspace_client_mock(pipeline_ids=['empty-spec'],cluster_ids=['init-scripts-dbfs'])
     ws.jobs.list.return_value = sample_jobs
     ws.dbfs.read().data = "JXNoCmVjaG8gIj0="
     result_set = JobsCrawler(ws, MockBackend(), "ucx").snapshot()
