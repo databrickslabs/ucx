@@ -75,7 +75,7 @@ def test_cluster_assessment_with_spn_cluster_policy_exception(mocker):
 
 
 def test_cluster_init_script():
-    ws = workspace_client_mock(clusters='single-cluster-init-scripts.json')
+    ws = workspace_client_mock(cluster_ids=['init-scripts-dbfs'])
     ws.dbfs.read().data = "JXNoCmVjaG8gIj0="
     init_crawler = ClustersCrawler(ws, MockBackend(), "ucx").snapshot()
     assert len(init_crawler) == 1

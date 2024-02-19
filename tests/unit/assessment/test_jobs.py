@@ -499,7 +499,7 @@ def test_job_cluster_init_script():
         ),
     ]
 
-    ws = workspace_client_mock(clusters='single-cluster-init-scripts.json')
+    ws = workspace_client_mock(cluster_ids=['init-scripts-dbfs'])
     ws.jobs.list.return_value = sample_jobs
     ws.dbfs.read().data = "JXNoCmVjaG8gIj0="
     result_set = JobsCrawler(ws, MockBackend(), "ucx").snapshot()
