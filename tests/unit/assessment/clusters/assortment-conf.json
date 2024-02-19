@@ -1,64 +1,64 @@
- [
-   {
+[
+  {
     "autoscale": {
       "max_workers": 6,
       "min_workers": 1
     },
-    "creator_user_name":"fake@fake.org",
+    "creator_user_name": "fake@fake.org",
     "cluster_id": "0123-190044-11111111",
     "cluster_name": "Single User Cluster Name",
     "policy_id": "single-user-with-spn",
     "spark_version": "13.3.x-cpu-ml-scala2.12",
-    "spark_conf" : {
-        "spark.databricks.delta.preview.enabled": "true"
+    "spark_conf": {
+      "spark.databricks.delta.preview.enabled": "true"
     },
-    "spark_context_id":"5134472582179565315"
+    "spark_context_id": "5134472582179565315"
   },
-    {
+  {
     "autoscale": {
       "max_workers": 6,
       "min_workers": 1
     },
-    "creator_user_name":"fake@fake.org",
+    "creator_user_name": "fake@fake.org",
     "cluster_id": "0123-190044-1122334444",
     "cluster_name": "Single User Cluster Name",
     "policy_id": "single-user-with-spn",
     "spark_version": "13.3.x-cpu-ml-scala2.12",
-    "spark_conf" : {
+    "spark_conf": {
       "spark.hadoop.fs.azure.account.oauth2.client.id.abcde.dfs.core.windows.net": "{{secrets/abcff/sp_app_client_id}}",
       "spark.hadoop.fs.azure.account.oauth2.client.endpoint.abcde.dfs.core.windows.net": "https://login.microsoftonline.com/dedededede/token",
       "spark.hadoop.fs.azure.account.oauth2.client.secret.abcde.dfs.core.windows.net": "{{secrets/abcff/sp_secret}}"
-},
-    "spark_context_id":"5134472582179565315"
+    },
+    "spark_context_id": "5134472582179565315"
   },
-    {
+  {
     "autoscale": {
       "max_workers": 6,
       "min_workers": 1
     },
-    "creator_user_name":"fake@fake.org",
+    "creator_user_name": "fake@fake.org",
     "cluster_id": "0123-190044-1122334422",
     "cluster_name": "Single User Cluster Name",
     "policy_id": "single-user-with-spn",
     "spark_version": "9.3.x-cpu-ml-scala2.12",
-    "spark_conf" : {
-        "spark.databricks.delta.preview.enabled": "true"
+    "spark_conf": {
+      "spark.databricks.delta.preview.enabled": "true"
     },
-    "spark_context_id":"5134472582179565315"
+    "spark_context_id": "5134472582179565315"
   },
-    {
+  {
     "autoscale": {
       "max_workers": 6,
       "min_workers": 1
     },
-    "creator_user_name":"fake@fake.org",
+    "creator_user_name": "fake@fake.org",
     "cluster_id": "0123-190044-1122334411",
     "cluster_name": "Single User Cluster Name",
     "policy_id": "azure-oauth",
     "spark_version": "13.3.x-cpu-ml-scala2.12",
-    "spark_conf" : {
-        "spark.databricks.delta.preview.enabled": "true"
+    "spark_conf": {
+      "spark.databricks.delta.preview.enabled": "true"
     },
-    "spark_context_id":"5134472582179565315"
+    "spark_context_id": "5134472582179565315"
   }
 ]

@@ -6,7 +6,7 @@ from . import workspace_client_mock
 
 def test_azure_service_principal_info_crawl():
     ws = workspace_client_mock(
-        clusters="assortment-spn.json",
+        cluster_ids=['azure-spn-secret', 'simplest-autoscale'],
         pipelines="single-pipeline-with-spn.json",
         jobs="assortment-spn.json",
         warehouse_config="spn-config.json",
