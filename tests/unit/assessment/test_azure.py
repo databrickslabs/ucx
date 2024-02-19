@@ -59,7 +59,7 @@ def test_azure_service_principal_info_null_applid_crawl():
 
 
 def test_list_all_cluster_with_spn_in_spark_conf_with_secret():
-    ws = workspace_client_mock(clusters="single-cluster-spn.json")
+    ws = workspace_client_mock(cluster_ids=['azure-spn-secret'])
     result_set = AzureServicePrincipalCrawler(ws, MockBackend(), "ucx").snapshot()
 
     assert len(result_set) == 1
@@ -85,16 +85,16 @@ def test_list_all_wh_config_with_spn_and_secret():
 
 
 def test_list_all_clusters_spn_in_spark_conf_with_tenant():
-    ws = workspace_client_mock(clusters="single-cluster-spn.json", secret_exists=True)
+    ws = workspace_client_mock(cluster_ids=['azure-spn-secret'], secret_exists=True)
     result_set = AzureServicePrincipalCrawler(ws, MockBackend(), "ucx").snapshot()
 
     assert len(result_set) == 1
-    assert result_set[0].tenant_id == "dummy_tenant_id"
+    assert result_set[0].tenant_id == "dedededede"
 
 
 def test_azure_service_principal_info_policy_conf():
     ws = workspace_client_mock(
-        clusters="single-cluster-spn.json",
+        cluster_ids=['policy-single-user-with-spn', 'policy-azure-oauth'],
         jobs="single-spn-with-policy.json",
         pipelines="single-pipeline-with-spn.json",
         warehouse_config="spn-config.json",
