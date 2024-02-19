@@ -549,7 +549,7 @@ class GroupManager(CrawlerBase[MigratedGroup]):
             return iam.Group.from_dict(raw)  # type: ignore[arg-type]
         except NotFound:
             # the given group has been removed from the account after getting the group and before running this method
-            logger.warning("Group with ID: %s does not exist anymore in the Databricks account.", group_id)
+            logger.warning(f"Group with ID {group_id} does not exist anymore in the Databricks account.")
             return None
 
     def _list_account_groups(self, scim_attributes: str) -> list[iam.Group]:
@@ -591,7 +591,7 @@ class GroupManager(CrawlerBase[MigratedGroup]):
             return True
         except NotFound:
             # the given group has been removed from the account after getting the group and before running this method
-            logger.warning("Group with ID: %s does not exist anymore in the Databricks account.", account_group_id)
+            logger.warning(f"Group with ID {account_group_id} does not exist anymore in the Databricks account.")
             return True
 
     def _get_strategy(
