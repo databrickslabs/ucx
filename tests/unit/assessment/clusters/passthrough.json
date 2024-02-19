@@ -1,0 +1,13 @@
+{
+  "autoscale": {
+    "max_workers": 6,
+    "min_workers": 1
+  },
+  "cluster_id": "0915-190044-3dqy6751",
+  "cluster_name": "Tech Summit FY24 Cluster-2",
+  "policy_id": "single-user-with-spn",
+  "spark_version": "9.3.x-cpu-ml-scala2.12",
+  "spark_conf" : {
+      "spark.databricks.passthrough.enabled": "True"
+  }
+}

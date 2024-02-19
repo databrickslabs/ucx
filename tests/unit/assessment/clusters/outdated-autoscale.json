@@ -1,0 +1,9 @@
+{
+  "autoscale": {
+    "max_workers": 6,
+    "min_workers": 1
+  },
+  "cluster_id": "outdated-autoscale",
+  "cluster_name": "Outdated Shared Autoscale",
+  "spark_version": "9.3.x-cpu-ml-scala2.12"
+}

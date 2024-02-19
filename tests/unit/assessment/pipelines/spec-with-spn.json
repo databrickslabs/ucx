@@ -1,41 +1,48 @@
 {
+  "creator_user_name": "abcde.defgh@databricks.com",
+  "name": "New DLT Pipeline",
+  "pipeline_id":"spec-with-spn",
+  "run_as_user_name": "abcde.defgh@databricks.com",
+  "state":  "IDLE",
   "spec": {
-    "clusters": [{
-          "autoscale": {
-            "max_workers": 6,
-            "min_workers": 1
-          },
-          "custom_tags": {
-            "cluster_type": "default"
-          },
-          "label": "default",
-          "init_scripts": [
-            {
-              "dbfs": {
-                "destination": "dbfs:/users/test@test.com/init_scripts/test.sh"
-              }
-            }
-          ],
-          "node_type_id": "Standard_F4s",
-          "num_workers": 1,
-          "policy_id": "single-user-with-spn",
-          "spark_conf": {
-            "spark.databricks.delta.preview.enabled": "true"
-          }
+    "clusters": [
+      {
+        "autoscale": {
+          "max_workers": 6,
+          "min_workers": 1
         },
-        {
-          "autoscale": {
-            "max_workers": 6,
-            "min_workers": 1
-          },
-          "custom_tags": {
-            "cluster_type": "default"
-          },
-          "label": "default",
-          "init_scripts": [],
-          "node_type_id": "Standard_F4s",
-          "num_workers": 1
-        }],
+        "custom_tags": {
+          "cluster_type": "default"
+        },
+        "label": "default",
+        "init_scripts": [
+          {
+            "dbfs": {
+              "destination": "dbfs:/users/test@test.com/init_scripts/test.sh"
+            }
+          }
+        ],
+        "node_type_id": "Standard_F4s",
+        "num_workers": 1,
+        "policy_id": "single-user-with-spn",
+        "spark_conf": {
+          "spark.databricks.delta.preview.enabled": "true"
+        }
+      },
+      {
+        "autoscale": {
+          "max_workers": 6,
+          "min_workers": 1
+        },
+        "custom_tags": {
+          "cluster_type": "default"
+        },
+        "label": "default",
+        "init_scripts": [],
+        "node_type_id": "Standard_F4s",
+        "num_workers": 1
+      }
+    ],
     "configuration": {
       "spark.hadoop.fs.azure.account.oauth2.client.id.newstorageacct.dfs.core.windows.net": "pipeline_dummy_application_id",
       "spark.hadoop.fs.azure.account.oauth2.client.endpoint.newstorageacct.dfs.core.windows.net": "https://login.microsoftonline.com/directory_12345/oauth2/token",
