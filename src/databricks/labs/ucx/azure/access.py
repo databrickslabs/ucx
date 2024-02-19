@@ -80,6 +80,9 @@ class AzureResourcePermissions:
             return None
         return self._installation.save(storage_account_infos, filename=self._filename)
 
+    def load(self):
+        return self._installation.save(list[StoragePermissionMapping], filename=self._filename)
+
     def _get_storage_accounts(self) -> list[str]:
         external_locations = self._locations.snapshot()
         storage_accounts = []

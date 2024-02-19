@@ -454,6 +454,14 @@ class GroupManager(CrawlerBase[MigratedGroup]):
             logger.info("There are groups with different membership between account and workspace")
         return mismatch_group
 
+    def has_workspace_group(self, name):
+        groups = self._workspace_groups_in_workspace()
+        return name in groups
+
+    def has_account_group(self, name):
+        groups = self._account_groups_in_workspace()
+        return name in groups
+
     def _workspace_groups_in_workspace(self) -> dict[str, Group]:
         attributes = "id,displayName,meta,externalId,members,roles,entitlements"
         groups = {}

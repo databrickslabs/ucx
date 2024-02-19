@@ -128,14 +128,11 @@ def test_delete_ws_groups_should_not_delete_non_reflected_acc_groups(ws, make_uc
 
 
 def validate_migrate_groups(group_manager: GroupManager, ws_group: Group, to_group: Group):
-    workspace_groups = group_manager._workspace_groups_in_workspace()
-    assert ws_group.display_name in workspace_groups
+    assert group_manager.has_workspace_group(ws_group.display_name), f'missing workspace group: {ws_group.display_name}'
     group_manager.rename_groups()
-    workspace_groups = group_manager._workspace_groups_in_workspace()
-    assert f"ucx-temp-{ws_group.display_name}" in workspace_groups
+    assert group_manager.has_workspace_group(f"ucx-temp-{ws_group.display_name}"), 'missing temp group'
     group_manager.reflect_account_groups_on_workspace()
-    account_workspace_groups = group_manager._account_groups_in_workspace()
-    assert to_group.display_name in account_workspace_groups
+    assert group_manager.has_account_group(to_group.display_name), f'missing account group: {to_group.display_name}'
 
 
 @retried(on=[NotFound], timeout=timedelta(minutes=2))
