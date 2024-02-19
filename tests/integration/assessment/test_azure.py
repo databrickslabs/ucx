@@ -19,7 +19,7 @@ from .test_assessment import (
 def test_spn_crawler(ws, inventory_schema, make_job, make_pipeline, sql_backend):
     make_job(spark_conf=_SPARK_CONF)
     make_pipeline(configuration=_PIPELINE_CONF)
-    spn_crawler = AzureServicePrincipalCrawler(ws=ws, sbe=sql_backend, schema=inventory_schema)
+    spn_crawler = AzureServicePrincipalCrawler(ws, sql_backend, inventory_schema)
     results = spn_crawler.snapshot()
 
     assert any(_ for _ in results if _.tenant_id == _TEST_TENANT_ID)
@@ -31,7 +31,7 @@ def test_spn_crawler_no_config(ws, inventory_schema, make_job, make_pipeline, sq
     make_job()
     make_pipeline()
     make_cluster(single_node=True)
-    spn_crawler = AzureServicePrincipalCrawler(ws=ws, sbe=sql_backend, schema=inventory_schema)
+    spn_crawler = AzureServicePrincipalCrawler(ws, sql_backend, inventory_schema)
     spn_crawler.snapshot()
 
 
@@ -67,7 +67,7 @@ def test_spn_crawler_deleted_cluster_policy(
     )
     make_cluster(single_node=True, spark_conf=_SPARK_CONF, policy_id=cluster_policy_id)
     ws.cluster_policies.delete(policy_id=cluster_policy_id)
-    spn_crawler = AzureServicePrincipalCrawler(ws=ws, sbe=sql_backend, schema=inventory_schema)
+    spn_crawler = AzureServicePrincipalCrawler(ws, sql_backend, inventory_schema)
     results = spn_crawler.snapshot()
 
     assert any(_ for _ in results if _.tenant_id == _TEST_TENANT_ID)
@@ -78,7 +78,7 @@ def test_spn_crawler_deleted_cluster_policy(
 def test_spn_crawler_with_pipeline_unavailable_secret(ws, inventory_schema, make_job, make_pipeline, sql_backend):
     make_job(spark_conf=_SPARK_CONF)
     make_pipeline(configuration=_PIPELINE_CONF_WITH_SECRET)
-    spn_crawler = AzureServicePrincipalCrawler(ws=ws, sbe=sql_backend, schema=inventory_schema)
+    spn_crawler = AzureServicePrincipalCrawler(ws, sql_backend, inventory_schema)
     results = spn_crawler.snapshot()
 
     assert any(_ for _ in results if _.tenant_id == _TEST_TENANT_ID)
@@ -93,11 +93,11 @@ def test_spn_crawler_with_available_secrets(
     client_id_secret_key = "spn_client_id"
     client_secret_secret_key = "spn_client_secret"
     tenant_id_secret_key = "spn_tenant_id"
-    ws.secrets.put_secret(scope=secret_scope, key=client_id_secret_key, string_value="New_Application_Id")
-    ws.secrets.put_secret(scope=secret_scope, key=client_secret_secret_key, string_value="secret")
+    ws.secrets.put_secret(secret_scope, client_id_secret_key, string_value="New_Application_Id")
+    ws.secrets.put_secret(secret_scope, client_secret_secret_key, string_value="secret")
     ws.secrets.put_secret(
-        scope=secret_scope,
-        key=tenant_id_secret_key,
+        secret_scope,
+        tenant_id_secret_key,
         string_value=f"https://login.microsoftonline.com/{_TEST_TENANT_ID}/oauth2/token",
     )
     _pipeline_conf_with_avlbl_secret = {
@@ -107,7 +107,7 @@ def test_spn_crawler_with_available_secrets(
     }
     make_job()
     make_pipeline(configuration=_pipeline_conf_with_avlbl_secret)
-    spn_crawler = AzureServicePrincipalCrawler(ws=ws, sbe=sql_backend, schema=inventory_schema)
+    spn_crawler = AzureServicePrincipalCrawler(ws, sql_backend, inventory_schema)
     results = spn_crawler.snapshot()
 
     assert any(_ for _ in results if _.secret_scope == secret_scope)
