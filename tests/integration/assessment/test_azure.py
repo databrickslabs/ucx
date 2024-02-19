@@ -81,13 +81,13 @@ def test_spn_crawler_with_available_secrets(
         tenant_id_secret_key,
         string_value=f"https://login.microsoftonline.com/{_TEST_TENANT_ID}/oauth2/token",
     )
-    _pipeline_conf_with_avlbl_secret = {
+    conf_secret_available = {
         "fs.azure.account.oauth2.client.id.SA1.dfs.core.windows.net": f"{{{{secrets/{secret_scope}/{client_id_secret_key}}}}}",
         "fs.azure.account.oauth2.client.secret.SA1.dfs.core.windows.net": f"{{{{secrets/{secret_scope}/{client_secret_secret_key}}}}}",
         "fs.azure.account.oauth2.client.endpoint.SA1.dfs.core.windows.net": f"{{{{secrets/{secret_scope}/{tenant_id_secret_key}}}}}",
     }
     make_job()
-    make_pipeline(configuration=_pipeline_conf_with_avlbl_secret)
+    make_pipeline(configuration=conf_secret_available)
     spn_crawler = AzureServicePrincipalCrawler(ws, sql_backend, inventory_schema)
     results = spn_crawler.snapshot()
 

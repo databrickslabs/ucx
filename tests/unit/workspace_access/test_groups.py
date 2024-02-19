@@ -547,8 +547,8 @@ def test_list_workspace_groups():
         ]
     }
 
-    gm = GroupManager(backend, wsclient, inventory_database="inv")
-    result = gm.snapshot()
+    group_manager = GroupManager(backend, wsclient, inventory_database="inv")
+    result = group_manager.snapshot()
 
     assert len(result) == 3
     assert result[0].name_in_workspace == "group_1"
