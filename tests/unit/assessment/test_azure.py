@@ -107,7 +107,7 @@ def test_azure_service_principal_info_policy_conf():
 
 def test_azure_service_principal_info_dedupe():
     ws = workspace_client_mock(
-        clusters="single-cluster-dupe-spn.json",
+        cluster_ids=['policy-single-user-with-spn'],
         jobs="single-spn-with-policy.json",
         pipelines="single-pipeline-with-spn.json",
         warehouse_config="dupe-spn-config.json",
