@@ -53,6 +53,9 @@ class MigratedGroup:
             external_id=workspace.external_id,
         )
 
+    def decode_members(self):
+        return [iam.ComplexValue.from_dict(_) for _ in json.loads(self.members)]
+
 
 class MigrationState:
     """Holds migration state of workspace-to-account groups"""
