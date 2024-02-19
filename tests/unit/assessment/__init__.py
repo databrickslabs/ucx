@@ -15,8 +15,11 @@ __dir = pathlib.Path(__file__).parent
 
 
 def _base64(filename: str):
-    with (__dir / filename).open("rb") as f:
-        return base64.b64encode(f.read())
+    try:
+        with (__dir / filename).open("rb") as f:
+            return base64.b64encode(f.read())
+    except FileNotFoundError as err:
+        raise NotFound(filename) from err
 
 
 def _workspace_export(filename: str):
@@ -25,8 +28,11 @@ def _workspace_export(filename: str):
 
 
 def _load_fixture(filename: str):
-    with (__dir / filename).open("r") as f:
-        return json.load(f)
+    try:
+        with (__dir / filename).open("r") as f:
+            return json.load(f)
+    except FileNotFoundError as err:
+        raise NotFound(filename) from err
 
 
 _FOLDERS = {
@@ -45,7 +51,7 @@ def _load_list(cls: type, filename: str, ids=None):
 def _id_list(cls: type, ids=None):
     if not ids:
         return []
-    return [cls.from_dict(_load_fixture(f'{_FOLDERS[cls]}/{_}.json')) for _ in ids] # type: ignore[attr-defined]
+    return [cls.from_dict(_load_fixture(f'{_FOLDERS[cls]}/{_}.json')) for _ in ids]  # type: ignore[attr-defined]
 
 
 def _cluster_policy(policy_id: str):

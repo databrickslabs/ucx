@@ -1,5 +1,3 @@
-from databricks.sdk.service.pipelines import PipelineState, PipelineStateInfo
-
 from databricks.labs.ucx.assessment.azure import AzureServicePrincipalCrawler
 from databricks.labs.ucx.assessment.pipelines import PipelineInfo, PipelinesCrawler
 

@@ -3,12 +3,7 @@ from unittest.mock import MagicMock
 
 import pytest
 from databricks.sdk.errors import DatabricksError, InternalError, NotFound
-from databricks.sdk.service.compute import (
-    AutoScale,
-    ClusterDetails,
-    ClusterSource,
-    DataSecurityMode,
-)
+from databricks.sdk.service.compute import AutoScale, ClusterDetails, ClusterSource
 
 from databricks.labs.ucx.assessment.azure import AzureServicePrincipalCrawler
 from databricks.labs.ucx.assessment.clusters import ClusterInfo, ClustersCrawler
@@ -18,7 +13,9 @@ from . import workspace_client_mock
 
 
 def test_cluster_assessment():
-    ws = workspace_client_mock(cluster_ids=['policy-single-user-with-spn', 'policy-azure-oauth'], )
+    ws = workspace_client_mock(
+        cluster_ids=['policy-single-user-with-spn', 'policy-azure-oauth'],
+    )
     crawler = ClustersCrawler(ws, MockBackend(), "ucx")
     result_set = list(crawler.snapshot())
 
@@ -28,7 +25,9 @@ def test_cluster_assessment():
 
 
 def test_cluster_assessment_cluster_policy_not_found(caplog):
-    ws = workspace_client_mock(cluster_ids=['policy-azure-oauth'], )
+    ws = workspace_client_mock(
+        cluster_ids=['policy-azure-oauth'],
+    )
     ws.cluster_policies.get = MagicMock()
     ws.cluster_policies.get.side_effect = NotFound("NO_POLICY")
     crawler = ClustersCrawler(ws, MockBackend(), "ucx")
@@ -37,7 +36,9 @@ def test_cluster_assessment_cluster_policy_not_found(caplog):
 
 
 def test_cluster_assessment_cluster_policy_exception():
-    ws = workspace_client_mock(cluster_ids=['policy-azure-oauth'], )
+    ws = workspace_client_mock(
+        cluster_ids=['policy-azure-oauth'],
+    )
     ws.cluster_policies.get = MagicMock()
     ws.cluster_policies.get.side_effect = InternalError(...)
     crawler = ClustersCrawler(ws, MockBackend(), "ucx")
@@ -47,7 +48,9 @@ def test_cluster_assessment_cluster_policy_exception():
 
 
 def test_cluster_assessment_with_spn_cluster_policy_not_found():
-    ws = workspace_client_mock(cluster_ids=['policy-azure-oauth'], )
+    ws = workspace_client_mock(
+        cluster_ids=['policy-azure-oauth'],
+    )
     ws.cluster_policies.get.side_effect = NotFound("NO_POLICY")
     crawler = AzureServicePrincipalCrawler(ws, MockBackend(), "ucx").snapshot()
     assert len(crawler) == 1
