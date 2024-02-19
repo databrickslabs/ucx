@@ -54,8 +54,8 @@ def test_pipeline_assessment_without_config():
 
 
 def test_pipeline_snapshot_with_config():
-    mock_ws = workspace_client_mock()
-    crawler = PipelinesCrawler(mock_ws, MockBackend(), "ucx")
+    ws = workspace_client_mock(cluster_ids=['policy-single-user-with-spn'])
+    crawler = PipelinesCrawler(ws, MockBackend(), "ucx")
     result_set = crawler.snapshot()
 
     assert len(result_set) == 1
@@ -72,7 +72,7 @@ def test_pipeline_list_with_no_config():
             failures="",
         )
     ]
-    mock_ws = workspace_client_mock(clusters="no-spark-conf.json")
+    mock_ws = workspace_client_mock(cluster_ids=['simplest-autoscale'])
     mock_ws.pipelines.list_pipelines.return_value = sample_pipelines
     crawler = AzureServicePrincipalCrawler(mock_ws, MockBackend(), "ucx").snapshot()
 
@@ -92,7 +92,7 @@ def test_pipeline_without_owners_should_have_empty_creator_name():
         )
     ]
 
-    ws = workspace_client_mock(clusters="no-spark-conf.json")
+    ws = workspace_client_mock(cluster_ids=['simplest-autoscale'])
     ws.pipelines.list_pipelines.return_value = sample_pipelines
     ws.dbfs.read().data = "JXNoCmVjaG8gIj0="
     mockbackend = MockBackend()

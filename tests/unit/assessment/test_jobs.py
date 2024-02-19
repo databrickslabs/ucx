@@ -324,7 +324,7 @@ def test_jobs_assessment_with_spn_cluster_no_job_tasks(mocker):
         )
     ]
 
-    ws = workspace_client_mock()
+    ws = workspace_client_mock(cluster_ids=['policy-single-user-with-spn'])
     ws.jobs.list.return_value = sample_jobs
 
     jobs = AzureServicePrincipalCrawler(ws, MockBackend(), "ucx").snapshot()
@@ -341,7 +341,7 @@ def test_jobs_assessment_with_spn_cluster_no_job_settings(mocker):
         )
     ]
 
-    ws = workspace_client_mock()
+    ws = workspace_client_mock(cluster_ids=['policy-single-user-with-spn'])
     ws.jobs.list.return_value = sample_jobs
 
     jobs = AzureServicePrincipalCrawler(ws, MockBackend(), "ucx").snapshot()

@@ -1,0 +1,5 @@
+{
+  "cluster_name": "Passthrough cluster",
+  "spark_version": "12.3.x-cpu-ml-scala2.12",
+  "data_security_mode": "LEGACY_PASSTHROUGH"
+}
