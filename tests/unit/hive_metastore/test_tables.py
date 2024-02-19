@@ -106,29 +106,25 @@ def test_uc_sql(table, target, query):
         assert table.sql_migrate_external(target) == query
 
 
-def test_tables_crawler_parse_tp():
-    tc = TablesCrawler(MockBackend(), "default")
-    tp1 = tc._parse_table_props(
-        "[delta.minReaderVersion=1,delta.minWriterVersion=2,upgraded_to=fake_cat.fake_ext.fake_delta]"
-    )
-    tp2 = tc._parse_table_props("[delta.minReaderVersion=1,delta.minWriterVersion=2]")
-    assert len(tp1) == 3
-    assert tp1.get("upgraded_to") == "fake_cat.fake_ext.fake_delta"
-    assert len(tp2) == 2
-    assert tp2.get("upgraded_to") is None
-
-
 def test_tables_returning_error_when_describing():
     errors = {"DESCRIBE TABLE EXTENDED hive_metastore.database.table1": "error"}
     rows = {
         "SHOW DATABASES": [("database",)],
         "SHOW TABLES FROM hive_metastore.database": [("", "table1", ""), ("", "table2", "")],
-        "DESCRIBE TABLE EXTENDED hive_metastore.database.table2": [("Catalog", "catalog", ""), ("Type", "delta", "")],
+        "DESCRIBE TABLE EXTENDED hive_metastore.database.table2": [
+            ("Catalog", "catalog", ""),
+            ("Type", "delta", ""),
+            ("Table Properties",
+             "[delta.minReaderVersion=1,delta.minWriterVersion=2,upgraded_to=fake_cat.fake_ext.fake_delta]",
+             ""),
+        ],
     }
     backend = MockBackend(fails_on_first=errors, rows=rows)
     tc = TablesCrawler(backend, "default")
     results = tc.snapshot()
     assert len(results) == 1
+    first = results[0]
+    assert first.upgraded_to == 'fake_cat.fake_ext.fake_delta'
 
 
 @pytest.mark.parametrize(
