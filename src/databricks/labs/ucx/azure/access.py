@@ -20,7 +20,13 @@ class StoragePermissionMapping:
 
 
 class AzureResourcePermissions:
-    def __init__(self, installation: Installation, ws: WorkspaceClient, azurerm: AzureResources, external_locations: ExternalLocations):
+    def __init__(
+        self,
+        installation: Installation,
+        ws: WorkspaceClient,
+        azurerm: AzureResources,
+        external_locations: ExternalLocations,
+    ):
         self._filename = 'azure_storage_account_info.csv'
         self._installation = installation
         self._locations = external_locations

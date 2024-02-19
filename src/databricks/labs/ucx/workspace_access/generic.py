@@ -383,10 +383,10 @@ def models_listing(ws: WorkspaceClient, num_threads: int):
         models, errors = Threads.gather("listing model ids", tasks, num_threads)
         if len(errors) > 0:
             raise ManyError(errors)
-        for model in models:
-            if not model.registered_model_databricks:
+        for model_response in models:
+            if not model_response.registered_model_databricks:
                 continue
-            yield model.registered_model_databricks
+            yield model_response.registered_model_databricks
 
     return inner
 

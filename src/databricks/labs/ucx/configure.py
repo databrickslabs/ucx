@@ -23,16 +23,16 @@ class ConfigureClusterOverrides:
 
         def is_classic(cluster_info) -> bool:
             return (
-                    cluster_info.state == compute.State.RUNNING
-                    and cluster_info.spark_version >= MINIMUM_SPARK_VERSION
-                    and cluster_info.data_security_mode == compute.DataSecurityMode.NONE
+                cluster_info.state == compute.State.RUNNING
+                and cluster_info.spark_version >= MINIMUM_SPARK_VERSION
+                and cluster_info.data_security_mode == compute.DataSecurityMode.NONE
             )
 
         def is_tacl(cluster_info) -> bool:
             return (
-                    cluster_info.state == compute.State.RUNNING
-                    and cluster_info.spark_version >= MINIMUM_SPARK_VERSION
-                    and cluster_info.data_security_mode == compute.DataSecurityMode.LEGACY_TABLE_ACL
+                cluster_info.state == compute.State.RUNNING
+                and cluster_info.spark_version >= MINIMUM_SPARK_VERSION
+                and cluster_info.data_security_mode == compute.DataSecurityMode.LEGACY_TABLE_ACL
             )
 
         def build_and_prompt(prompt, clusters):

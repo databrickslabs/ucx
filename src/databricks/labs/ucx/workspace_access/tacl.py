@@ -119,9 +119,7 @@ class TableAclSupport(AclSupport):
         grants_on_object = self._grants_crawler.grants(**grant_dict)
 
         if grants_on_object:
-            on_current_principal = [
-                grant.action_type for grant in grants_on_object if grant.principal == acl.principal
-            ]
+            on_current_principal = [grant.action_type for grant in grants_on_object if grant.principal == acl.principal]
             acl_action_types = acl.action_type.split(", ")
             if all(action_type in on_current_principal for action_type in acl_action_types):
                 return True

@@ -204,7 +204,9 @@ class MatchByExternalIdStrategy(GroupMigrationStrategy):
                     external_id=account_group.external_id,
                     members=json.dumps([gg.as_dict() for gg in group.members]) if group.members else None,
                     roles=json.dumps([gg.as_dict() for gg in group.roles]) if group.roles else None,
-                    entitlements=json.dumps([gg.as_dict() for gg in group.entitlements]) if group.entitlements else None,
+                    entitlements=(
+                        json.dumps([gg.as_dict() for gg in group.entitlements]) if group.entitlements else None
+                    ),
                 )
             else:
                 logger.info(f"Couldn't find a matching account group for {group.display_name} group with external_id")
@@ -234,7 +236,9 @@ class RegexSubStrategy(GroupMigrationStrategy):
         workspace_groups = self.get_filtered_groups()
         for group in workspace_groups.values():
             temporary_name = f"{self.renamed_groups_prefix}{group.display_name}"
-            name_in_account = self._safe_sub(group.display_name, self.workspace_group_regex, self.workspace_group_replace)
+            name_in_account = self._safe_sub(
+                group.display_name, self.workspace_group_regex, self.workspace_group_replace
+            )
             yield MigratedGroup(
                 id_in_workspace=group.id,
                 name_in_workspace=group.display_name,
@@ -346,7 +350,9 @@ class GroupManager(CrawlerBase[MigratedGroup]):
                 logger.info(f"Skipping {migrated_group.name_in_workspace}: already renamed")
                 continue
             logger.info(f"Renaming: {migrated_group.name_in_workspace} -> {migrated_group.temporary_name}")
-            tasks.append(functools.partial(self._rename_group, migrated_group.id_in_workspace, migrated_group.temporary_name))
+            tasks.append(
+                functools.partial(self._rename_group, migrated_group.id_in_workspace, migrated_group.temporary_name)
+            )
         _, errors = Threads.gather("rename groups in the workspace", tasks)
         if len(errors) > 0:
             raise ManyError(errors)
@@ -390,7 +396,11 @@ class GroupManager(CrawlerBase[MigratedGroup]):
             if migrated_group.name_in_account not in account_groups_in_workspace:
                 logger.info(f"Skipping {migrated_group.name_in_account}: not reflected in workspace")
                 continue
-            tasks.append(functools.partial(self._delete_workspace_group, migrated_group.id_in_workspace, migrated_group.temporary_name))
+            tasks.append(
+                functools.partial(
+                    self._delete_workspace_group, migrated_group.id_in_workspace, migrated_group.temporary_name
+                )
+            )
         _, errors = Threads.gather("removing original workspace groups", tasks)
         if len(errors) > 0:
             logger.error(f"During account-to-workspace reflection got {len(errors)} errors. See debug logs")

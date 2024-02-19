@@ -74,7 +74,7 @@ class JobsCrawler(CrawlerBase[JobInfo], JobsMixin, CheckClusterMixin):
         return list(job_details.values())
 
     @staticmethod
-    def _prepare(all_jobs):
+    def _prepare(all_jobs) -> tuple[dict[int, set[str]], dict[int, JobInfo]]:
         job_assessment: dict[int, set[str]] = {}
         job_details: dict[int, JobInfo] = {}
         for job in all_jobs:
