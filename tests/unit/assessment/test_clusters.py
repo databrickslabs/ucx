@@ -130,7 +130,7 @@ def test_cluster_without_owner_should_have_empty_creator_name():
 
 
 def test_cluster_with_multiple_failures():
-    ws = workspace_client_mock(clusters="multiple-failures-conf.json")
+    ws = workspace_client_mock(cluster_ids=['passthrough'])
     crawler = ClustersCrawler(ws, MockBackend(), "ucx")
     result_set = list(crawler.snapshot())
     assert len(result_set) == 1
