@@ -7,7 +7,6 @@ from databricks.labs.blueprint.installation import Installation
 from databricks.labs.blueprint.tui import MockPrompts
 
 from databricks.labs.ucx.assessment.azure import AzureServicePrincipalInfo
-from databricks.labs.ucx.assessment.crawlers import SECRET_PATTERN
 from databricks.labs.ucx.azure.access import StoragePermissionMapping
 from databricks.labs.ucx.azure.credentials import StorageCredentialValidationResult
 from databricks.labs.ucx.azure.resources import AzureResources
@@ -42,12 +41,9 @@ def extract_test_info(ws, debug_env, make_random):
     end_point = spark_conf.get("fs.azure.account.oauth2.client.endpoint")
     directory_id = end_point.split("/")[3]
 
-    secret_matched = re.search(SECRET_PATTERN, spark_conf.get("fs.azure.account.oauth2.client.secret"))
-    if secret_matched:
-        secret_scope, secret_key = (
-            secret_matched.group(1).split("/")[1],
-            secret_matched.group(1).split("/")[2],
-        )
+    secret_matched = re.findall(r"{{secrets\/(.*)\/(.*)}}", spark_conf.get("fs.azure.account.oauth2.client.secret"))
+    secret_scope = secret_matched[0][0]
+    secret_key = secret_matched[0][1]
     assert secret_scope is not None
     assert secret_key is not None
 
