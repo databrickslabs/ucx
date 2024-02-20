@@ -1,8 +1,7 @@
-import csv
 import io
 import json
 import subprocess
-from unittest.mock import create_autospec, patch, MagicMock
+from unittest.mock import create_autospec, patch
 
 import pytest
 import yaml
@@ -45,7 +44,7 @@ def ws():
             }
         ),
         '/Users/foo/.ucx/state.json': json.dumps({'resources': {'jobs': {'assessment': '123'}}}),
-        "/Users/foo/.ucx/azure_storage_account_info.csv": "prefix,client_id,principal,privilege,directory_id\ntest,test,test,test,test"
+        "/Users/foo/.ucx/azure_storage_account_info.csv": "prefix,client_id,principal,privilege,directory_id\ntest,test,test,test,test",
     }
 
     def download(path: str) -> io.StringIO | io.BytesIO:
@@ -318,4 +317,3 @@ def test_migrate_azure_service_principals(ws):
     with patch("databricks.labs.blueprint.tui.Prompts.confirm", return_value=True):
         migrate_azure_service_principals(ws)
         ws.storage_credentials.list.assert_called()
-
