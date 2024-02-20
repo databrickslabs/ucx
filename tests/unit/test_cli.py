@@ -1,7 +1,8 @@
+import csv
 import io
 import json
 import subprocess
-from unittest.mock import create_autospec, patch
+from unittest.mock import create_autospec, patch, MagicMock
 
 import pytest
 import yaml
@@ -44,11 +45,14 @@ def ws():
             }
         ),
         '/Users/foo/.ucx/state.json': json.dumps({'resources': {'jobs': {'assessment': '123'}}}),
+        "/Users/foo/.ucx/azure_storage_account_info.csv": "prefix,client_id,principal,privilege,directory_id\ntest,test,test,test,test"
     }
 
-    def download(path: str) -> io.StringIO:
+    def download(path: str) -> io.StringIO | io.BytesIO:
         if path not in state:
             raise NotFound(path)
+        if ".csv" in path:
+            return io.BytesIO(state[path].encode('utf-8'))
         return io.StringIO(state[path])
 
     workspace_client = create_autospec(WorkspaceClient)
@@ -310,11 +314,8 @@ def test_save_storage_and_principal_gcp(ws, caplog):
 
 def test_migrate_azure_service_principals(ws):
     ws.config.is_azure = True
-    with (
-        patch("databricks.labs.blueprint.tui.Prompts.confirm", return_value=True),
-        patch("databricks.labs.blueprint.installation.Installation.load"),
-        patch("databricks.labs.blueprint.installation.Installation.save"),
-    ):
+    ws.workspace.upload.return_value = "test"
+    with patch("databricks.labs.blueprint.tui.Prompts.confirm", return_value=True):
         migrate_azure_service_principals(ws)
         ws.storage_credentials.list.assert_called()
 
