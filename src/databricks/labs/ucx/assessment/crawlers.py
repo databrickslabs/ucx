@@ -18,6 +18,7 @@ AZURE_SP_CONF = [
 ]
 AZURE_SP_CONF_FAILURE_MSG = "Uses azure service principal credentials config in"
 INIT_SCRIPT_DBFS_PATH = 2
+INIT_SCRIPT_LOCAL_PATH = 2
 
 
 def azure_sp_conf_in_init_scripts(init_script_data: str) -> bool:

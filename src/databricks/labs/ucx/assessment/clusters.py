@@ -14,6 +14,9 @@ from databricks.sdk.service.compute import (
     InitScriptInfo,
     Policy,
     WorkspaceStorageInfo,
+    S3StorageInfo,
+    LocalFileInfo,
+
 )
 
 from databricks.labs.ucx.assessment.crawlers import (
@@ -22,6 +25,7 @@ from databricks.labs.ucx.assessment.crawlers import (
     INIT_SCRIPT_DBFS_PATH,
     azure_sp_conf_present_check,
     spark_version_compatibility,
+    INIT_SCRIPT_LOCAL_PATH,
 )
 from databricks.labs.ucx.assessment.init_scripts import CheckInitScriptMixin
 from databricks.labs.ucx.framework.crawlers import CrawlerBase, SqlBackend
@@ -74,6 +78,15 @@ class CheckClusterMixin(CheckInitScriptMixin):
                     data = self._ws.workspace.export(workspace_file_destination).content
                     if data is not None:
                         return base64.b64decode(data).decode("utf-8")
+                case InitScriptInfo(file=LocalFileInfo(destination)):
+                    split = destination.split(":")
+                    if len(split) != INIT_SCRIPT_LOCAL_PATH:
+                        return None
+                    with open(destination, "r") as file:
+                        data = file.read()
+                    if data is not None:
+                        return base64.b64decode(data).decode("utf-8")
+
             return None
         except NotFound:
             return None
