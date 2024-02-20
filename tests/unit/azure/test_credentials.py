@@ -8,7 +8,7 @@ import yaml
 from databricks.labs.blueprint.installation import MockInstallation
 from databricks.labs.blueprint.tui import MockPrompts
 from databricks.sdk import WorkspaceClient
-from databricks.sdk.errors import InternalError, NotFound, ResourceDoesNotExist
+from databricks.sdk.errors import NotFound, ResourceDoesNotExist
 from databricks.sdk.errors.platform import InvalidParameterValue
 from databricks.sdk.service.catalog import (
     AwsIamRole,
@@ -272,11 +272,7 @@ def test_for_cli(ws):
 
 @pytest.mark.parametrize(
     "secret_bytes_value, num_migrated",
-    [
-        (GetSecretResponse(value="aGVsbG8gd29ybGQ="), 1),
-        (GetSecretResponse(value="T2zhLCBNdW5kbyE="), 0),
-        (GetSecretResponse(value=None), 0),
-    ],
+    [(GetSecretResponse(value="aGVsbG8gd29ybGQ="), 1), (GetSecretResponse(value="T2zhLCBNdW5kbyE="), 0)],
 )
 def test_read_secret_value_decode(ws, sp_migration, secret_bytes_value, num_migrated):
     ws.secrets.get_secret.return_value = secret_bytes_value
@@ -285,21 +281,21 @@ def test_read_secret_value_decode(ws, sp_migration, secret_bytes_value, num_migr
     assert len(sp_migration.run(prompts)) == num_migrated
 
 
-@pytest.mark.parametrize(
-    "exception, log_pattern, num_migrated",
-    [
-        (ResourceDoesNotExist(), r"Secret.* does not exists", 0),
-        (InternalError(), r"InternalError while reading secret .*", 0),
-    ],
-)
-def test_read_secret_read_exception(caplog, ws, sp_migration, exception, log_pattern, num_migrated):
+def test_read_secret_value_none(ws, sp_migration):
+    ws.secrets.get_secret.return_value = GetSecretResponse(value=None)
+    prompts = MockPrompts({"Above Azure Service Principals will be migrated to UC storage credentials*": "Yes"})
+    with pytest.raises(AssertionError):
+        sp_migration.run(prompts)
+
+
+def test_read_secret_read_exception(caplog, ws, sp_migration):
     caplog.set_level(logging.INFO)
-    ws.secrets.get_secret.side_effect = exception
+    ws.secrets.get_secret.side_effect = ResourceDoesNotExist()
 
     prompts = MockPrompts({"Above Azure Service Principals will be migrated to UC storage credentials*": "Yes"})
 
-    assert len(sp_migration.run(prompts)) == num_migrated
-    assert re.search(log_pattern, caplog.text)
+    assert len(sp_migration.run(prompts)) == 0
+    assert re.search(r"removed on the backend: .*", caplog.text)
 
 
 def test_print_action_plan(caplog, ws, sp_migration):

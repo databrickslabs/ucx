@@ -1,11 +1,9 @@
-import base64
 import logging
 from dataclasses import dataclass
 
 from databricks.labs.blueprint.installation import Installation
 from databricks.labs.blueprint.tui import Prompts
 from databricks.sdk import WorkspaceClient
-from databricks.sdk.errors import InternalError, ResourceDoesNotExist
 from databricks.sdk.errors.platform import InvalidParameterValue
 from databricks.sdk.service.catalog import (
     AzureServicePrincipal,
@@ -16,6 +14,7 @@ from databricks.sdk.service.catalog import (
 )
 
 from databricks.labs.ucx.assessment.azure import AzureServicePrincipalCrawler
+from databricks.labs.ucx.assessment.secrets import SecretsMixin
 from databricks.labs.ucx.azure.access import (
     AzureResourcePermissions,
     StoragePermissionMapping,
@@ -136,7 +135,7 @@ class StorageCredentialManager:
             )
 
 
-class ServicePrincipalMigration:
+class ServicePrincipalMigration(SecretsMixin):
 
     def __init__(
         self,
@@ -179,39 +178,6 @@ class ServicePrincipalMigration:
 
         return cls(installation, ws, resource_permissions, sp_crawler, storage_credential_manager)
 
-    def _read_databricks_secret(self, scope: str, key: str, application_id: str) -> str | None:
-        try:
-            secret_response = self._ws.secrets.get_secret(scope, key)
-        except ResourceDoesNotExist:
-            logger.info(
-                f"Secret {scope}.{key} does not exists. "
-                f"Cannot fetch the service principal client_secret for {application_id}. "
-                f"Will not reuse this client_secret"
-            )
-            return None
-        except InternalError:
-            logger.info(
-                f"InternalError while reading secret {scope}.{key}. "
-                f"Cannot fetch the service principal client_secret for {application_id}. "
-                f"Will not reuse this client_secret. "
-                f"You may rerun the migration command later to retry this service principal"
-            )
-            return None
-
-        # decode the bytes string from GetSecretResponse to utf-8 string
-        # TODO: handle different encoding if we have feedback from the customer
-        try:
-            if secret_response.value is None:
-                return None
-            return base64.b64decode(secret_response.value).decode("utf-8")
-        except UnicodeDecodeError:
-            logger.info(
-                f"Secret {scope}.{key} has Base64 bytes that cannot be decoded to utf-8 string . "
-                f"Cannot fetch the service principal client_secret for {application_id}. "
-                f"Will not reuse this client_secret"
-            )
-            return None
-
     def _fetch_client_secret(self, sp_list: list[StoragePermissionMapping]) -> list[ServicePrincipalMigrationInfo]:
         # check AzureServicePrincipalInfo from AzureServicePrincipalCrawler, if AzureServicePrincipalInfo
         # has secret_scope and secret_key not empty, fetch the client_secret and put it to the client_secret field
@@ -228,11 +194,16 @@ class ServicePrincipalMigration:
                 continue
             if not sp_info.secret_key:
                 continue
-            secret_value = self._read_databricks_secret(
-                sp_info.secret_scope, sp_info.secret_key, sp_info.application_id
-            )
+
+            secret_value = self._get_secret_if_exists(sp_info.secret_scope, sp_info.secret_key)
+
             if secret_value:
                 sp_info_with_client_secret[sp_info.application_id] = secret_value
+            else:
+                logger.info(
+                    f"Cannot fetch the service principal client_secret for {sp_info.application_id}. "
+                    f"This service principal will be skipped for migration"
+                )
 
         # update the list of ServicePrincipalMigrationInfo if client_secret is found
         sp_list_with_secret = []
