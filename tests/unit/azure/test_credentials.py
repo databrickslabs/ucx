@@ -55,11 +55,11 @@ def ws():
             raise NotFound(path)
         return io.StringIO(state[path])
 
-    ws = create_autospec(WorkspaceClient)
-    ws.config.host = 'https://localhost'
-    ws.current_user.me().user_name = "foo"
-    ws.workspace.download = download
-    return ws
+    ws_mock = create_autospec(WorkspaceClient)
+    ws_mock.config.host = 'https://localhost'
+    ws_mock.current_user.me().user_name = "foo"
+    ws_mock.workspace.download = download
+    return ws_mock
 
 
 def side_effect_create_storage_credential(name, azure_service_principal, comment, read_only):
@@ -68,15 +68,14 @@ def side_effect_create_storage_credential(name, azure_service_principal, comment
     )
 
 
-def side_effect_validate_storage_credential(storage_credential_name, url, read_only):
+def side_effect_validate_storage_credential(storage_credential_name, url, read_only):  # pylint: disable=unused-argument
     if "overlap" in storage_credential_name:
         raise InvalidParameterValue
     if read_only:
         response = {"isDir": True, "results": [{"message": "", "operation": "READ", "result": "PASS"}]}
         return ValidateStorageCredentialResponse.from_dict(response)
-    else:
-        response = {"isDir": True, "results": [{"message": "", "operation": "WRITE", "result": "PASS"}]}
-        return ValidateStorageCredentialResponse.from_dict(response)
+    response = {"isDir": True, "results": [{"message": "", "operation": "WRITE", "result": "PASS"}]}
+    return ValidateStorageCredentialResponse.from_dict(response)
 
 
 @pytest.fixture
@@ -225,8 +224,8 @@ def test_validate_storage_credentials(credential_manager):
 def sp_migration(ws, credential_manager):
     ws.secrets.get_secret.return_value = GetSecretResponse(value="aGVsbG8gd29ybGQ=")
 
-    rp = create_autospec(AzureResourcePermissions)
-    rp.load.return_value = [
+    arp = create_autospec(AzureResourcePermissions)
+    arp.load.return_value = [
         StoragePermissionMapping(
             prefix="prefix1",
             client_id="app_secret1",
@@ -265,7 +264,7 @@ def sp_migration(ws, credential_manager):
         AzureServicePrincipalInfo("app_secret4", "", "", "tenant_id_2", "storage1"),
     ]
 
-    return ServicePrincipalMigration(MockInstallation(), ws, rp, sp_crawler, credential_manager)
+    return ServicePrincipalMigration(MockInstallation(), ws, arp, sp_crawler, credential_manager)
 
 
 def test_for_cli_not_azure(caplog, ws):
@@ -329,7 +328,7 @@ def test_print_action_plan(caplog, ws, sp_migration):
 
     sp_migration.run(prompts)
 
-    log_pattern = r"Service Principal name: .*" "application_id: .*" "privilege .*" "on location .*"
+    log_pattern = r"Service Principal name: .* application_id: .* privilege .* on location .*"
     for msg in caplog.messages:
         if re.search(log_pattern, msg):
             assert True

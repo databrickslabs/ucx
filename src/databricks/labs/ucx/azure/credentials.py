@@ -238,7 +238,9 @@ class ServicePrincipalMigration:
         sp_list_with_secret = []
         for spn in sp_list:
             if spn.client_id in sp_info_with_client_secret:
-                sp_list_with_secret.append(ServicePrincipalMigrationInfo(spn, sp_info_with_client_secret[spn.client_id]))
+                sp_list_with_secret.append(
+                    ServicePrincipalMigrationInfo(spn, sp_info_with_client_secret[spn.client_id])
+                )
         return sp_list_with_secret
 
     def _print_action_plan(self, sp_list: list[StoragePermissionMapping]):
