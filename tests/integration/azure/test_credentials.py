@@ -64,22 +64,22 @@ def run_migration(ws, sql_backend):
 
         permission_mappings = [
             StoragePermissionMapping(
-                prefix="abfss://things@labsazurethings.dfs.core.windows.net/avoid_ext_loc_overlap",
-                client_id=test_info.application_id,
-                principal=test_info.credential_name,
-                privilege="READ_FILES" if read_only else "WRITE_FILES",
-                directory_id=test_info.directory_id,
+                "abfss://things@labsazurethings.dfs.core.windows.net/avoid_ext_loc_overlap",
+                test_info.application_id,
+                test_info.credential_name,
+                "READ_FILES" if read_only else "WRITE_FILES",
+                test_info.directory_id,
             )
         ]
         resource_permissions = StaticResourcePermissions(permission_mappings, installation, ws, azurerm, locations)
 
         sp_infos = [
             AzureServicePrincipalInfo(
-                application_id=test_info.application_id,
-                secret_scope=test_info.secret_scope,
-                secret_key=test_info.secret_key,
-                tenant_id="test",
-                storage_account="test",
+                test_info.application_id,
+                test_info.secret_scope,
+                test_info.secret_key,
+                "test",
+                "test",
             )
         ]
         sp_crawler = StaticServicePrincipalCrawler(sp_infos, ws, sql_backend, "dont_need_a_schema")

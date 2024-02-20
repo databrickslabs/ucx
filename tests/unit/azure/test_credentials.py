@@ -69,24 +69,18 @@ def side_effect_validate_storage_credential(storage_credential_name, url, read_o
 @pytest.fixture
 def credential_manager(ws):
     ws.storage_credentials.list.return_value = [
-        StorageCredentialInfo(aws_iam_role=AwsIamRole(role_arn="arn:aws:iam::123456789012:role/example-role-name")),
+        StorageCredentialInfo(aws_iam_role=AwsIamRole("arn:aws:iam::123456789012:role/example-role-name")),
         StorageCredentialInfo(
             azure_managed_identity=AzureManagedIdentity("/subscriptions/.../providers/Microsoft.Databricks/...")
         ),
         StorageCredentialInfo(
             azure_service_principal=AzureServicePrincipal(
-                application_id="b6420590-5e1c-4426-8950-a94cbe9b6115",
-                directory_id="62e43d7d-df53-4c64-86ed-c2c1a3ac60c3",
-                client_secret="secret",
+                "62e43d7d-df53-4c64-86ed-c2c1a3ac60c3",
+                "b6420590-5e1c-4426-8950-a94cbe9b6115",
+                "secret",
             )
         ),
-        StorageCredentialInfo(
-            azure_service_principal=AzureServicePrincipal(
-                application_id="app_secret2",
-                directory_id="directory_id_1",
-                client_secret="secret",
-            )
-        ),
+        StorageCredentialInfo(azure_service_principal=AzureServicePrincipal("directory_id_1", "app_secret2", "secret")),
     ]
 
     ws.storage_credentials.create.side_effect = side_effect_create_storage_credential
@@ -102,21 +96,21 @@ def test_list_storage_credentials(credential_manager):
 def test_create_storage_credentials(credential_manager):
     sp_1 = ServicePrincipalMigrationInfo(
         StoragePermissionMapping(
-            prefix="prefix1",
-            client_id="app_secret1",
-            principal="principal_write",
-            privilege="WRITE_FILES",
-            directory_id="directory_id_1",
+            "prefix1",
+            "app_secret1",
+            "principal_write",
+            "WRITE_FILES",
+            "directory_id_1",
         ),
         "test",
     )
     sp_2 = ServicePrincipalMigrationInfo(
         StoragePermissionMapping(
-            prefix="prefix2",
-            client_id="app_secret2",
-            principal="principal_read",
-            privilege="READ_FILES",
-            directory_id="directory_id_1",
+            "prefix2",
+            "app_secret2",
+            "principal_read",
+            "READ_FILES",
+            "directory_id_1",
         ),
         "test",
     )
@@ -133,11 +127,11 @@ def test_create_storage_credentials(credential_manager):
 def test_validate_storage_credentials(credential_manager):
     sp_1 = ServicePrincipalMigrationInfo(
         StoragePermissionMapping(
-            prefix="prefix1",
-            client_id="app_secret1",
-            principal="principal_1",
-            privilege="WRITE_FILES",
-            directory_id="directory_id_1",
+            "prefix1",
+            "app_secret1",
+            "principal_1",
+            "WRITE_FILES",
+            "directory_id_1",
         ),
         "test",
     )
@@ -151,11 +145,11 @@ def test_validate_storage_credentials(credential_manager):
 
     sp_2 = ServicePrincipalMigrationInfo(
         StoragePermissionMapping(
-            prefix="prefix2",
-            client_id="app_secret2",
-            principal="principal_read",
-            privilege="READ_FILES",
-            directory_id="directory_id_1",
+            "prefix2",
+            "app_secret2",
+            "principal_read",
+            "READ_FILES",
+            "directory_id_1",
         ),
         "test",
     )
@@ -169,11 +163,11 @@ def test_validate_storage_credentials(credential_manager):
 
     sp_3 = ServicePrincipalMigrationInfo(
         StoragePermissionMapping(
-            prefix="overlap_with_external_location",
-            client_id="app_secret4",
-            principal="principal_overlap",
-            privilege="WRITE_FILES",
-            directory_id="directory_id_2",
+            "overlap_with_external_location",
+            "app_secret4",
+            "principal_overlap",
+            "WRITE_FILES",
+            "directory_id_2",
         ),
         "test",
     )
@@ -215,32 +209,32 @@ def sp_migration(ws, credential_manager):
     arp = create_autospec(AzureResourcePermissions)
     arp.load.return_value = [
         StoragePermissionMapping(
-            prefix="prefix1",
-            client_id="app_secret1",
-            principal="principal_1",
-            privilege="WRITE_FILES",
-            directory_id="directory_id_1",
+            "prefix1",
+            "app_secret1",
+            "principal_1",
+            "WRITE_FILES",
+            "directory_id_1",
         ),
         StoragePermissionMapping(
-            prefix="prefix2",
-            client_id="app_secret2",
-            principal="principal_read",
-            privilege="READ_FILES",
-            directory_id="directory_id_1",
+            "prefix2",
+            "app_secret2",
+            "principal_read",
+            "READ_FILES",
+            "directory_id_1",
         ),
         StoragePermissionMapping(
-            prefix="prefix3",
-            client_id="app_secret3",
-            principal="principal_write",
-            privilege="WRITE_FILES",
-            directory_id="directory_id_2",
+            "prefix3",
+            "app_secret3",
+            "principal_write",
+            "WRITE_FILES",
+            "directory_id_2",
         ),
         StoragePermissionMapping(
-            prefix="overlap_with_external_location",
-            client_id="app_secret4",
-            principal="principal_overlap",
-            privilege="WRITE_FILES",
-            directory_id="directory_id_2",
+            "overlap_with_external_location",
+            "app_secret4",
+            "principal_overlap",
+            "WRITE_FILES",
+            "directory_id_2",
         ),
     ]
 
