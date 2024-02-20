@@ -79,10 +79,10 @@ class CheckClusterMixin(CheckInitScriptMixin):
                     if data is not None:
                         return base64.b64decode(data).decode("utf-8")
                 case InitScriptInfo(file=LocalFileInfo(destination)):
-                    split = destination.split(":")
+                    split = destination.split(":/")
                     if len(split) != INIT_SCRIPT_LOCAL_PATH:
                         return None
-                    with open(destination, "r") as file:
+                    with open(split[1], "r") as file:
                         data = file.read()
                     if data is not None:
                         return base64.b64decode(data).decode("utf-8")
