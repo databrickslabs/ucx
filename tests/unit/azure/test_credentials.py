@@ -90,7 +90,7 @@ def credential_manager(ws):
 
 
 def test_list_storage_credentials(credential_manager):
-    assert {"b6420590-5e1c-4426-8950-a94cbe9b6115", "app_secret2"} == credential_manager.list_storage_credentials()
+    assert credential_manager.list_storage_credentials() == {"b6420590-5e1c-4426-8950-a94cbe9b6115", "app_secret2"}
 
 
 def test_create_storage_credentials(credential_manager):
