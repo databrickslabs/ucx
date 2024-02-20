@@ -1077,7 +1077,7 @@ def make_query(ws, make_table, make_random):
 
 
 @pytest.fixture
-def make_storage_credential_from_spn(ws):
+def make_storage_credential_spn(ws):
     def create(
         *, credential_name: str, application_id: str, client_secret: str, directory_id: str, read_only=False
     ) -> StorageCredentialInfo:

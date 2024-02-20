@@ -36,19 +36,7 @@ from databricks.labs.ucx.azure.credentials import (
 
 @pytest.fixture
 def ws():
-    state = {
-        "/Users/foo/.ucx/config.yml": yaml.dump(
-            {
-                'version': 2,
-                'inventory_database': 'ucx',
-                'warehouse_id': 'test',
-                'connect': {
-                    'host': 'foo',
-                    'token': 'bar',
-                },
-            }
-        ),
-    }
+    state = {"/Users/foo/.ucx/config.yml": yaml.dump({'version': 2, 'inventory_database': 'ucx'})}
 
     def download(path: str) -> io.StringIO:
         if path not in state:

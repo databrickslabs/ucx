@@ -56,7 +56,7 @@ def extract_test_info(ws, debug_env, make_random):
 @pytest.fixture
 def run_migration(ws, sql_backend):
     def inner(
-        test_info: MigrationTestInfo, credentials: list[str], read_only=False
+        test_info: MigrationTestInfo, credentials: set[str], read_only=False
     ) -> list[StorageCredentialValidationResult]:
         installation = Installation(ws, 'ucx')
         azurerm = AzureResources(ws)
@@ -94,9 +94,9 @@ def run_migration(ws, sql_backend):
     return inner
 
 
-def test_spn_migration_existed_storage_credential(extract_test_info, make_storage_credential_from_spn, run_migration):
+def test_spn_migration_existed_storage_credential(extract_test_info, make_storage_credential_spn, run_migration):
     # create a storage credential for this test
-    make_storage_credential_from_spn(
+    make_storage_credential_spn(
         credential_name=extract_test_info.credential_name,
         application_id=extract_test_info.application_id,
         client_secret=extract_test_info.client_secret,
@@ -104,7 +104,7 @@ def test_spn_migration_existed_storage_credential(extract_test_info, make_storag
     )
 
     # test that the spn migration will be skipped due to above storage credential is existed
-    migration_result = run_migration(extract_test_info, [extract_test_info.credential_name])
+    migration_result = run_migration(extract_test_info, {extract_test_info.credential_name})
 
     # assert no spn migrated since migration_result will be empty
     assert not migration_result
@@ -113,27 +113,28 @@ def test_spn_migration_existed_storage_credential(extract_test_info, make_storag
 @pytest.mark.parametrize("read_only", [False, True])
 def test_spn_migration(ws, extract_test_info, run_migration, read_only):
     try:
-        migration_results = run_migration(extract_test_info, ["lets_migrate_the_spn"], read_only)
+        migration_results = run_migration(extract_test_info, {"lets_migrate_the_spn"}, read_only)
 
         storage_credential = ws.storage_credentials.get(extract_test_info.credential_name)
-        assert storage_credential is not None
-        assert storage_credential.read_only is read_only
-
-        # assert the storage credential validation results
-        for res in migration_results[0].results:
-            if res.operation is None:
-                # TODO: file a ticket to SDK team, PATH_EXISTS and HIERARCHICAL_NAMESPACE_ENABLED
-                # should be added to the validation operations. They are None right now.
-                # Once it's fixed, the None check here can be removed
-                continue
-            if read_only:
-                if res.operation.value in ("WRITE", "DELETE"):
-                    # We only assert that write validation are not performed for read only storage credential here.
-                    # In real life, the READ validation for read only storage credential may fail if there is no file,
-                    # but that is fine, as the storage credential is created, and we just cannot validate it until it's really used.
-                    assert False, "WRITE operation should not be checked for read-only storage credential"
-            if not read_only:
-                if res.result.value == "FAIL":
-                    assert False, f"{res.operation.value} operation is failed while validating storage credential"
     finally:
         ws.storage_credentials.delete(extract_test_info.credential_name, force=True)
+
+    assert storage_credential is not None
+    assert storage_credential.read_only is read_only
+
+    # assert the storage credential validation results
+    for res in migration_results[0].results:
+        if res.operation is None:
+            # TODO: file a ticket to SDK team, PATH_EXISTS and HIERARCHICAL_NAMESPACE_ENABLED
+            # should be added to the validation operations. They are None right now.
+            # Once it's fixed, the None check here can be removed
+            continue
+        if read_only:
+            if res.operation.value in {"WRITE", "DELETE"}:
+                # We only assert that write validation are not performed for read only storage credential here.
+                # In real life, the READ validation for read only storage credential may fail if there is no file,
+                # but that is fine, as the storage credential is created, and we just cannot validate it until it's really used.
+                assert False, "WRITE operation should not be checked for read-only storage credential"
+        if not read_only:
+            if res.result.value == "FAIL":
+                assert False, f"{res.operation.value} operation is failed while validating storage credential"

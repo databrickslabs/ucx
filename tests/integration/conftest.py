@@ -170,16 +170,6 @@ class StaticTableMapping(TableMapping):
 
 
 class StaticServicePrincipalMigration(ServicePrincipalMigration):
-    def __init__(
-        self,
-        installation: Installation,
-        ws: WorkspaceClient,
-        azure_resource_permissions: AzureResourcePermissions,
-        azure_sp_crawler: AzureServicePrincipalCrawler,
-        storage_credential_manager: StorageCredentialManager,
-    ):
-        super().__init__(installation, ws, azure_resource_permissions, azure_sp_crawler, storage_credential_manager)
-
     def save(self, migration_results: list[StorageCredentialValidationResult]) -> str:
         return "azure_service_principal_migration_result.csv"
 
@@ -187,8 +177,8 @@ class StaticServicePrincipalMigration(ServicePrincipalMigration):
 class StaticStorageCredentialManager(StorageCredentialManager):
     # During integration test, we only want to list storage_credentials that are created during the test.
     # So we provide a credential name list so the test can ignore credentials that are not in the list.
-    def __init__(self, ws: WorkspaceClient, credential_names=[]):
-        super().__init__(ws)
+    def __init__(self, ws_client: WorkspaceClient, credential_names: set[str]):
+        super().__init__(ws_client)
         self._credential_names = credential_names
 
     def list_storage_credentials(self) -> set[str]:
