@@ -82,19 +82,19 @@ class StorageCredentialManager:
         logger.info(f"Found {len(application_ids)} distinct service principals already used in UC storage credentials")
         return application_ids
 
-    def create_storage_credential(self, sp: ServicePrincipalMigrationInfo) -> StorageCredentialInfo:
+    def create_storage_credential(self, spn: ServicePrincipalMigrationInfo) -> StorageCredentialInfo:
         # prepare the storage credential properties
-        name = sp.permission_mapping.principal
+        name = spn.permission_mapping.principal
         service_principal = AzureServicePrincipal(
-            directory_id=sp.permission_mapping.directory_id,
-            application_id=sp.permission_mapping.client_id,
-            client_secret=sp.client_secret,
+            spn.permission_mapping.directory_id,
+            spn.permission_mapping.client_id,
+            spn.client_secret,
         )
         comment = (
-            f"Created by UCX during migration to UC using Azure Service Principal: {sp.permission_mapping.principal}"
+            f"Created by UCX during migration to UC using Azure Service Principal: {spn.permission_mapping.principal}"
         )
         read_only = False
-        if sp.permission_mapping.privilege == Privilege.READ_FILES.value:
+        if spn.permission_mapping.privilege == Privilege.READ_FILES.value:
             read_only = True
         # create the storage credential
         return self._ws.storage_credentials.create(
@@ -102,21 +102,21 @@ class StorageCredentialManager:
         )
 
     def validate_storage_credential(
-        self, storage_credential: StorageCredentialInfo, sp: ServicePrincipalMigrationInfo
+        self, storage_credential: StorageCredentialInfo, spn: ServicePrincipalMigrationInfo
     ) -> StorageCredentialValidationResult:
         read_only = False
-        if sp.permission_mapping.privilege == Privilege.READ_FILES.value:
+        if spn.permission_mapping.privilege == Privilege.READ_FILES.value:
             read_only = True
         # storage_credential validation creates a temp UC external location, which cannot overlap with
         # existing UC external locations. So add a sub folder to the validation location just in case
         try:
             validation = self._ws.storage_credentials.validate(
                 storage_credential_name=storage_credential.name,
-                url=sp.permission_mapping.prefix,
+                url=spn.permission_mapping.prefix,
                 read_only=read_only,
             )
             return StorageCredentialValidationResult.from_validation(
-                storage_credential, validation, sp.permission_mapping.prefix
+                storage_credential, validation, spn.permission_mapping.prefix
             )
         except InvalidParameterValue:
             logger.warning(
@@ -132,7 +132,7 @@ class StorageCredentialManager:
                         )
                     ],
                 ),
-                sp.permission_mapping.prefix,
+                spn.permission_mapping.prefix,
             )
 
 
@@ -236,19 +236,19 @@ class ServicePrincipalMigration:
 
         # update the list of ServicePrincipalMigrationInfo if client_secret is found
         sp_list_with_secret = []
-        for sp in sp_list:
-            if sp.client_id in sp_info_with_client_secret:
-                sp_list_with_secret.append(ServicePrincipalMigrationInfo(sp, sp_info_with_client_secret[sp.client_id]))
+        for spn in sp_list:
+            if spn.client_id in sp_info_with_client_secret:
+                sp_list_with_secret.append(ServicePrincipalMigrationInfo(spn, sp_info_with_client_secret[spn.client_id]))
         return sp_list_with_secret
 
     def _print_action_plan(self, sp_list: list[StoragePermissionMapping]):
         # print action plan to console for customer to review.
-        for sp in sp_list:
+        for spn in sp_list:
             logger.info(
-                f"Service Principal name: {sp.principal}, "
-                f"application_id: {sp.client_id}, "
-                f"privilege {sp.privilege} "
-                f"on location {sp.prefix}"
+                f"Service Principal name: {spn.principal}, "
+                f"application_id: {spn.client_id}, "
+                f"privilege {spn.privilege} "
+                f"on location {spn.prefix}"
             )
 
     def _generate_migration_list(self) -> list[ServicePrincipalMigrationInfo]:
@@ -285,10 +285,10 @@ class ServicePrincipalMigration:
             return []
 
         execution_result = []
-        for sp in sp_list_with_secret:
-            storage_credential = self._storage_credential_manager.create_storage_credential(sp)
+        for spn in sp_list_with_secret:
+            storage_credential = self._storage_credential_manager.create_storage_credential(spn)
             execution_result.append(
-                self._storage_credential_manager.validate_storage_credential(storage_credential, sp)
+                self._storage_credential_manager.validate_storage_credential(storage_credential, spn)
             )
 
         if execution_result:
