@@ -265,6 +265,7 @@ def test_for_cli_not_prompts(ws):
 
 def test_for_cli(ws):
     ws.config.is_azure = True
+    ws.config.auth_type = "azure-cli"
     prompts = MockPrompts({"Have you reviewed the azure_storage_account_info.csv *": "Yes"})
 
     assert isinstance(ServicePrincipalMigration.for_cli(ws, prompts), ServicePrincipalMigration)
