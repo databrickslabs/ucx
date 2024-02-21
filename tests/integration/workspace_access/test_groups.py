@@ -176,8 +176,8 @@ def test_group_name_change(ws, sql_backend, inventory_schema, make_ucx_group, ma
 
 @retried(on=[NotFound], timeout=timedelta(minutes=2))
 @pytest.mark.parametrize("same_users", [True, False])
-def test_group_matching_names_with_multiple_users(
-    ws, sql_backend, inventory_schema, make_random, make_user, make_group, make_acc_group, same_users: bool
+def test_group_matching_names(
+    ws, sql_backend, inventory_schema, make_random, make_user, make_group, make_acc_group, same_user
 ):
     rand_elem = make_random(4)
     workspace_group_name = f"test_group_{rand_elem}"
@@ -185,7 +185,7 @@ def test_group_matching_names_with_multiple_users(
     user1 = make_user()
     members1 = [user1.id]
     members2 = [user1.id]
-    if not same_users:
+    if not same_user:
         user2 = make_user()
         members2 = [user2.id]
     ws_group = make_group(display_name=workspace_group_name, members=members1, entitlements=["allow-cluster-create"])
@@ -201,11 +201,12 @@ def test_group_matching_names_with_multiple_users(
         [ws_group.display_name],
         "ucx-temp-",
         r"([0-9a-zA-Z]*)$",
+        None,
         r"\[([0-9a-zA-Z]*)\]",
     )
 
     membership = group_manager.validate_group_membership()
-    if same_users:
+    if same_user:
         assert len(membership) == 0
     else:
         assert len(membership) > 0
