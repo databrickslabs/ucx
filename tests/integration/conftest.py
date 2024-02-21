@@ -29,9 +29,6 @@ logging.getLogger("databricks.labs.ucx").setLevel("DEBUG")
 
 logger = logging.getLogger(__name__)
 
-retry_on_not_found = functools.partial(retried, on=[NotFound], timeout=timedelta(minutes=5))
-long_retry_on_not_found = functools.partial(retry_on_not_found, timeout=timedelta(minutes=15))
-
 
 @pytest.fixture  # type: ignore[no-redef]
 def debug_env_name():  # pylint: disable=function-redefined

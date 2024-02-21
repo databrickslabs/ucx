@@ -13,7 +13,6 @@ from . import apply_tasks
 logger = logging.getLogger(__name__)
 
 
-# @retried(on=[AssertionError], timeout=timedelta(minutes=3))
 def test_permission_for_files_anonymous_func(sql_backend, inventory_schema, make_group):
     old = make_group()
     new = make_group()
