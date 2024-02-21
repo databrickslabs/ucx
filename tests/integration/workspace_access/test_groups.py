@@ -175,7 +175,7 @@ def test_group_name_change(ws, sql_backend, inventory_schema, make_ucx_group, ma
 
 
 @retried(on=[NotFound], timeout=timedelta(minutes=2))
-@pytest.mark.parametrize("same_users", [True, False])
+@pytest.mark.parametrize("same_user", [True, False])
 def test_group_matching_names(
     ws, sql_backend, inventory_schema, make_random, make_user, make_group, make_acc_group, same_user
 ):
