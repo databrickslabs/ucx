@@ -25,7 +25,7 @@ class SecretsMixin:
             logger.warning(f'removed on the backend: {secret_scope}/{secret_key}')
             return None
         except UnicodeDecodeError:
-            logger.info(f"Secret {secret_scope}/{secret_key} has Base64 bytes that cannot be decoded to utf-8 string.")
+            logger.warning(f"Secret {secret_scope}/{secret_key} has Base64 bytes that cannot be decoded to utf-8 string.")
             return None
 
     def _get_value_from_config_key(self, config: dict, key: str, get_secret: bool = True) -> str | None:

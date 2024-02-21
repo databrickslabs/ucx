@@ -67,7 +67,7 @@ class StorageCredentialManager:
     def __init__(self, ws: WorkspaceClient):
         self._ws = ws
 
-    def list_storage_credentials(self) -> set[str]:
+    def list(self) -> set[str]:
         # list existed storage credentials that is using service principal, capture the service principal's application_id
         application_ids = set()
 
@@ -81,7 +81,7 @@ class StorageCredentialManager:
         logger.info(f"Found {len(application_ids)} distinct service principals already used in UC storage credentials")
         return application_ids
 
-    def create_storage_credential(self, spn: ServicePrincipalMigrationInfo) -> StorageCredentialInfo:
+    def create_with_client_secret(self, spn: ServicePrincipalMigrationInfo) -> StorageCredentialInfo:
         # prepare the storage credential properties
         name = spn.permission_mapping.principal
         service_principal = AzureServicePrincipal(
@@ -142,14 +142,14 @@ class ServicePrincipalMigration(SecretsMixin):
         installation: Installation,
         ws: WorkspaceClient,
         resource_permissions: AzureResourcePermissions,
-        sp_crawler: AzureServicePrincipalCrawler,
+        service_principal_crawler: AzureServicePrincipalCrawler,
         storage_credential_manager: StorageCredentialManager,
     ):
         self._output_file = "azure_service_principal_migration_result.csv"
         self._installation = installation
         self._ws = ws
         self._resource_permissions = resource_permissions
-        self._sp_crawler = sp_crawler
+        self._sp_crawler = service_principal_crawler
         self._storage_credential_manager = storage_credential_manager
 
     @classmethod
@@ -231,7 +231,7 @@ class ServicePrincipalMigration(SecretsMixin):
         # load sp list from azure_storage_account_info.csv
         sp_list = self._resource_permissions.load()
         # list existed storage credentials
-        sc_set = self._storage_credential_manager.list_storage_credentials()
+        sc_set = self._storage_credential_manager.list()
         # check if the sp is already used in UC storage credential
         filtered_sp_list = [sp for sp in sp_list if sp.client_id not in sc_set]
         # fetch sp client_secret if any
@@ -259,7 +259,7 @@ class ServicePrincipalMigration(SecretsMixin):
 
         execution_result = []
         for spn in sp_list_with_secret:
-            storage_credential = self._storage_credential_manager.create_storage_credential(spn)
+            storage_credential = self._storage_credential_manager.create_with_client_secret(spn)
             execution_result.append(
                 self._storage_credential_manager.validate_storage_credential(storage_credential, spn)
             )

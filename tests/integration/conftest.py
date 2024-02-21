@@ -181,7 +181,7 @@ class StaticStorageCredentialManager(StorageCredentialManager):
         super().__init__(ws_client)
         self._credential_names = credential_names
 
-    def list_storage_credentials(self) -> set[str]:
+    def list(self) -> set[str]:
         application_ids = set()
 
         storage_credentials = self._ws.storage_credentials.list(max_results=0)

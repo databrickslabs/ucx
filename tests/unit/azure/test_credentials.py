@@ -101,7 +101,7 @@ def credential_manager(ws):
 
 
 def test_list_storage_credentials(credential_manager):
-    assert credential_manager.list_storage_credentials() == {"b6420590-5e1c-4426-8950-a94cbe9b6115", "app_secret2"}
+    assert credential_manager.list() == {"b6420590-5e1c-4426-8950-a94cbe9b6115", "app_secret2"}
 
 
 def test_create_storage_credentials(credential_manager):
@@ -126,11 +126,11 @@ def test_create_storage_credentials(credential_manager):
         "test",
     )
 
-    storage_credential = credential_manager.create_storage_credential(sp_1)
+    storage_credential = credential_manager.create_with_client_secret(sp_1)
     assert sp_1.permission_mapping.principal == storage_credential.name
     assert storage_credential.read_only is False
 
-    storage_credential = credential_manager.create_storage_credential(sp_2)
+    storage_credential = credential_manager.create_with_client_secret(sp_2)
     assert sp_2.permission_mapping.principal == storage_credential.name
     assert storage_credential.read_only is True
 
