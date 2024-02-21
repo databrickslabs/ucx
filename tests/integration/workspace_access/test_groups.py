@@ -50,6 +50,12 @@ def test_prepare_environment_no_groups_selected(ws, make_ucx_group, sql_backend,
     assert ws_group.display_name in names
 
 
+# group rename is eventually consistent
+@retried(on=[AssertionError], timeout=timedelta(minutes=1))
+def check_group_renamed(ws, ws_group):
+    assert ws.groups.get(ws_group.id).display_name == "ucx-temp-" + ws_group.display_name
+
+
 @retried(on=[NotFound], timeout=timedelta(minutes=2))
 def test_rename_groups(ws, make_ucx_group, sql_backend, inventory_schema):
     # FIXME - test_rename_groups - TimeoutError: Timed out after 0:01:00
@@ -58,7 +64,7 @@ def test_rename_groups(ws, make_ucx_group, sql_backend, inventory_schema):
     group_manager = GroupManager(sql_backend, ws, inventory_schema, [ws_group.display_name], "ucx-temp-")
     group_manager.rename_groups()
 
-    assert ws.groups.get(ws_group.id).display_name == "ucx-temp-" + ws_group.display_name
+    check_group_renamed(ws, ws_group)
 
 
 @retried(on=[NotFound], timeout=timedelta(minutes=2))
@@ -87,9 +93,8 @@ def test_reflect_account_groups_on_workspace(ws, make_ucx_group, sql_backend, in
     assert not reflected_group.roles  # Cannot create roles currently
     assert not reflected_group.entitlements  # Entitlements aren't reflected there
 
-    assert (
-        ws.groups.get(ws_group.id).display_name == "ucx-temp-" + ws_group.display_name
-    )  # At this time previous ws level groups aren't deleted
+    check_group_renamed(ws, ws_group)
+    # At this time previous ws level groups aren't deleted
 
 
 @retried(on=[NotFound], timeout=timedelta(minutes=2))
@@ -124,7 +129,7 @@ def test_delete_ws_groups_should_not_delete_non_reflected_acc_groups(ws, make_uc
     group_manager.rename_groups()
     group_manager.delete_original_workspace_groups()
 
-    assert ws.groups.get(ws_group.id).display_name == "ucx-temp-" + ws_group.display_name
+    check_group_renamed(ws, ws_group)
 
 
 def validate_migrate_groups(group_manager: GroupManager, ws_group: Group, to_group: Group):
