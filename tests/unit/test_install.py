@@ -653,10 +653,12 @@ def test_install_edit_policy_with_library(ws, mock_installation, any_prompt):
         timedelta(seconds=1),
     )
     wheels.upload_to_wsfs.return_value = "path1"
-    ws.cluster_policies.get.return_value = Policy(policy_id="foo")
+    ws.cluster_policies.get.return_value = Policy(
+        policy_id="foo", name="Unity Catalog Migration (ucx) (me@example.com)"
+    )
     workspace_installation.create_jobs()
     ws.cluster_policies.edit.assert_called_with(
-        name="Unity Catalog Migration (ucx)",
+        name="Unity Catalog Migration (ucx) (me@example.com)",
         policy_id="foo",
         definition=None,
         libraries=[compute.Library(whl="dbfs:path1")],
