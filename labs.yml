@@ -108,6 +108,10 @@ commands:
       - name: aws-profile
         description: AWS Profile to use for authentication
 
+  - name: create-master-principal
+    description: For azure cloud, creates a service principal and gives STORAGE BLOB READER access on all the storage account 
+      used by tables in the workspace and stores the spn info in the UCX cluster policy.
+
   - name: validate-groups-membership
     description: Validate the groups to see if the groups at account level and workspace level have different membership
     table_template: |-
