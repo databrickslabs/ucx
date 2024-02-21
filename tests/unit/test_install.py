@@ -158,7 +158,7 @@ def test_install_cluster_override_jobs(ws, mock_installation, any_prompt):
     sql_backend = MockBackend()
     wheels = create_autospec(WheelsV2)
     workspace_installation = WorkspaceInstallation(
-        WorkspaceConfig(inventory_database='ucx', override_clusters={"main": 'one', "tacl": 'two'}),
+        WorkspaceConfig(inventory_database='ucx', override_clusters={"main": 'one', "tacl": 'two'}, policy_id='123'),
         mock_installation,
         sql_backend,
         wheels,
@@ -190,7 +190,7 @@ def test_write_protected_dbfs(ws, tmp_path, mock_installation):
     )
 
     workspace_installation = WorkspaceInstallation(
-        WorkspaceConfig(inventory_database='ucx'),
+        WorkspaceConfig(inventory_database='ucx', policy_id='123'),
         mock_installation,
         sql_backend,
         wheels,
@@ -214,6 +214,7 @@ def test_write_protected_dbfs(ws, tmp_path, mock_installation):
             'log_level': 'INFO',
             'num_threads': 10,
             'override_clusters': {'main': '2222-999999-nosecuri', 'tacl': '3333-999999-legacytc'},
+            'policy_id': '123',
             'renamed_group_prefix': 'ucx-renamed-',
             'workspace_start_path': '/',
         },
@@ -225,7 +226,7 @@ def test_writeable_dbfs(ws, tmp_path, mock_installation, any_prompt):
     sql_backend = MockBackend()
     wheels = create_autospec(WheelsV2)
     workspace_installation = WorkspaceInstallation(
-        WorkspaceConfig(inventory_database='ucx'),
+        WorkspaceConfig(inventory_database='ucx', policy_id='123'),
         mock_installation,
         sql_backend,
         wheels,
@@ -452,6 +453,47 @@ def test_save_config_strip_group_names(ws, mock_installation):
     )
 
 
+def test_cluster_policy_definition_present_reuse(ws, mock_installation):
+    ws.config.is_aws = False
+    ws.config.is_azure = True
+    ws.config.is_gcp = False
+    ws.cluster_policies.list.return_value = [
+        Policy(
+            policy_id="foo1",
+            name="Unity Catalog Migration (ucx) (me@example.com)",
+            definition=json.dumps({}),
+            description="Custom cluster policy for Unity Catalog Migration (UCX)",
+        )
+    ]
+    prompts = MockPrompts(
+        {
+            r".*PRO or SERVERLESS SQL warehouse.*": "1",
+            r"Choose how to map the workspace groups.*": "2",  # specify names
+            r".*workspace group names.*": "g1, g2, g99",
+            r".*We have identified one or more cluster.*": "No",
+            r".*Choose a cluster policy.*": "0",
+            r".*": "",
+        }
+    )
+    install = WorkspaceInstaller(prompts, mock_installation, ws)
+    install.configure()
+    mock_installation.assert_file_written(
+        'config.yml',
+        {
+            'version': 2,
+            'default_catalog': 'ucx_default',
+            'include_group_names': ['g1', 'g2', 'g99'],
+            'inventory_database': 'ucx',
+            'log_level': 'INFO',
+            'num_threads': 8,
+            'policy_id': 'foo1',
+            'renamed_group_prefix': 'db-temp-',
+            'warehouse_id': 'abc',
+            'workspace_start_path': '/',
+        },
+    )
+
+
 def test_cluster_policy_definition_azure_hms(ws, mock_installation):
     ws.config.is_aws = False
     ws.config.is_azure = True
@@ -498,7 +540,7 @@ def test_cluster_policy_definition_azure_hms(ws, mock_installation):
         "azure_attributes.availability": {"type": "fixed", "value": "ON_DEMAND_AZURE"},
     }
     ws.cluster_policies.create.assert_called_with(
-        name="Unity Catalog Migration (ucx)",
+        name="Unity Catalog Migration (ucx) (me@example.com)",
         definition=json.dumps(policy_definition_actual),
         description="Custom cluster policy for Unity Catalog Migration (UCX)",
     )
@@ -541,7 +583,7 @@ def test_cluster_policy_definition_aws_glue(ws, mock_installation):
         "aws_attributes.instance_profile_arn": {"type": "fixed", "value": "role_arn_1"},
     }
     ws.cluster_policies.create.assert_called_with(
-        name="Unity Catalog Migration (ucx)",
+        name="Unity Catalog Migration (ucx) (me@example.com)",
         definition=json.dumps(policy_definition_actual),
         description="Custom cluster policy for Unity Catalog Migration (UCX)",
     )
@@ -592,7 +634,7 @@ def test_cluster_policy_definition_gcp(ws, mock_installation):
         "gcp_attributes.availability": {"type": "fixed", "value": "ON_DEMAND_GCP"},
     }
     ws.cluster_policies.create.assert_called_with(
-        name="Unity Catalog Migration (ucx)",
+        name="Unity Catalog Migration (ucx) (me@example.com)",
         definition=json.dumps(policy_definition_actual),
         description="Custom cluster policy for Unity Catalog Migration (UCX)",
     )
@@ -621,7 +663,7 @@ def test_install_edit_policy_with_library(ws, mock_installation, any_prompt):
     )
 
 
-def test_install_edit_policy_not_present(ws, mock_installation, any_prompt):
+def test_install_edit_policy_not_found(ws, mock_installation, any_prompt):
     sql_backend = MockBackend()
     wheels = create_autospec(WheelsV2)
     workspace_installation = WorkspaceInstallation(
@@ -635,6 +677,22 @@ def test_install_edit_policy_not_present(ws, mock_installation, any_prompt):
     )
     ws.cluster_policies.get.side_effect = NotFound()
     with pytest.raises(NotFound):
+        workspace_installation.create_jobs()
+
+
+def test_install_edit_policy_not_present(ws, mock_installation, any_prompt):
+    sql_backend = MockBackend()
+    wheels = create_autospec(WheelsV2)
+    workspace_installation = WorkspaceInstallation(
+        WorkspaceConfig(inventory_database='ucx', override_clusters={"main": 'one', "tacl": 'two'}),
+        mock_installation,
+        sql_backend,
+        wheels,
+        ws,
+        any_prompt,
+        timedelta(seconds=1),
+    )
+    with pytest.raises(InvalidParameterValue):
         workspace_installation.create_jobs()
 
 
@@ -750,7 +808,7 @@ def test_main_with_existing_conf_does_not_recreate_config(ws, mocker, mock_insta
         }
     )
     workspace_installation = WorkspaceInstallation(
-        WorkspaceConfig(inventory_database="..."),
+        WorkspaceConfig(inventory_database="...", policy_id='123'),
         mock_installation,
         sql_backend,
         create_autospec(WheelsV2),
