@@ -62,7 +62,7 @@ def test_permissions_for_redash(
 # the old name for some time. Therefore, we need to allow at least 10 mins in the timeout for checking the permissions
 # after group rename.
 @skip  # skipping as it takes 5-10 mins to execute
-@retried(on=[NotFound], timeout=timedelta(minutes=13))
+@retried(on=[NotFound], timeout=timedelta(minutes=5))
 def test_permissions_for_redash_after_group_is_renamed(
     ws,
     sql_backend,

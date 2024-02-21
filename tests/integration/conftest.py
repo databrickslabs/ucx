@@ -1,15 +1,11 @@
 import collections
-import functools
 import logging
-from datetime import timedelta
 from functools import partial
 
 import databricks.sdk.core
 import pytest  # pylint: disable=wrong-import-order
 from databricks.labs.blueprint.installation import Installation
 from databricks.sdk import AccountClient, WorkspaceClient
-from databricks.sdk.errors import NotFound
-from databricks.sdk.retries import retried
 from databricks.sdk.service.catalog import FunctionInfo, TableInfo
 
 from databricks.labs.ucx.__about__ import __version__
@@ -28,9 +24,6 @@ logging.getLogger("tests").setLevel("DEBUG")
 logging.getLogger("databricks.labs.ucx").setLevel("DEBUG")
 
 logger = logging.getLogger(__name__)
-
-retry_on_not_found = functools.partial(retried, on=[NotFound], timeout=timedelta(minutes=5))
-long_retry_on_not_found = functools.partial(retry_on_not_found, timeout=timedelta(minutes=15))
 
 
 @pytest.fixture  # type: ignore[no-redef]
