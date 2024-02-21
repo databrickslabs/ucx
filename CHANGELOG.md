@@ -1,5 +1,10 @@
 # Version changelog
 
+## 0.13.2
+
+* Fixed `Unknown: org.apache.hadoop.hive.ql.metadata.HiveException: NoSuchObjectException` in `crawl_grants` task by ignoring the database that is not found ([#967](https://github.com/databrickslabs/ucx/pull/967)).
+
+
 ## 0.13.1
 
 * Added secret detection logic to Azure service principal crawler ([#950](https://github.com/databrickslabs/ucx/pull/950)).
