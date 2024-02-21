@@ -16,6 +16,9 @@ from databricks.sdk.service.catalog import (
     AzureServicePrincipal,
     StorageCredentialInfo,
     ValidateStorageCredentialResponse,
+    ValidationResult,
+    ValidationResultOperation,
+    ValidationResultResult,
 )
 from databricks.sdk.service.workspace import GetSecretResponse
 
@@ -71,10 +74,14 @@ def side_effect_validate_storage_credential(storage_credential_name, url, read_o
     if "overlap" in storage_credential_name:
         raise InvalidParameterValue
     if read_only:
-        response = {"isDir": True, "results": [{"message": "", "operation": "READ", "result": "PASS"}]}
-        return ValidateStorageCredentialResponse.from_dict(response)
-    response = {"isDir": True, "results": [{"message": "", "operation": "WRITE", "result": "PASS"}]}
-    return ValidateStorageCredentialResponse.from_dict(response)
+        return ValidateStorageCredentialResponse(
+            is_dir=True,
+            results=[ValidationResult(operation=ValidationResultOperation.READ, result=ValidationResultResult.PASS)],
+        )
+    return ValidateStorageCredentialResponse(
+        is_dir=True,
+        results=[ValidationResult(operation=ValidationResultOperation.WRITE, result=ValidationResultResult.PASS)],
+    )
 
 
 @pytest.fixture
