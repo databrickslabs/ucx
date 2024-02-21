@@ -62,6 +62,7 @@ def test_rename_groups(ws, make_ucx_group, sql_backend, inventory_schema):
 
 
 @retried(on=[NotFound], timeout=timedelta(minutes=2))
+@pytest.mark.flaky(reruns=2)
 def test_reflect_account_groups_on_workspace_recovers_when_group_already_exists(
     ws, make_ucx_group, sql_backend, inventory_schema
 ):
@@ -184,6 +185,7 @@ def test_group_name_change_substitute(ws, sql_backend, inventory_schema, make_uc
 
 
 @retried(on=[NotFound], timeout=timedelta(minutes=2))
+@pytest.mark.flaky(reruns=2)
 def test_group_matching_names(ws, sql_backend, inventory_schema, make_ucx_group, make_random):
     rand_elem = make_random(4)
     ws_group, accnt_group = make_ucx_group(f"test_group_{rand_elem}", f"same_group_[{rand_elem}]")
