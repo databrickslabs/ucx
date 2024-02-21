@@ -243,22 +243,7 @@ class WorkspaceInstaller:
                 cluster_policy = json.loads(self._prompts.choice_from_dict("Choose a cluster policy", cluster_policies))
                 instance_profile, spark_conf_dict = self._get_ext_hms_conf_from_policy(cluster_policy)
 
-        policy_name = f"Unity Catalog Migration ({inventory_database}) ({self._ws.current_user.me().user_name})"
-        policies = self._ws.cluster_policies.list()
-        policy_id = None
-        for policy in policies:
-            if policy.name == policy_name:
-                policy_id = policy.policy_id
-                logger.info(f"Cluster policy {policy_name} already present, reusing the same.")
-                break
-        if not policy_id:
-            logger.info("Creating UCX cluster policy.")
-            policy_id = self._ws.cluster_policies.create(
-                name=policy_name,
-                definition=self._cluster_policy_definition(conf=spark_conf_dict, instance_profile=instance_profile),
-                description="Custom cluster policy for Unity Catalog Migration (UCX)",
-            ).policy_id
-
+        policy_id = self._create_cluster_policy(inventory_database, spark_conf_dict, instance_profile)
         config = WorkspaceConfig(
             inventory_database=inventory_database,
             workspace_group_regex=configure_groups.workspace_group_regex,
@@ -283,6 +268,26 @@ class WorkspaceInstaller:
     @staticmethod
     def _policy_config(value: str):
         return {"type": "fixed", "value": value}
+
+    def _create_cluster_policy(
+        self, inventory_database: str, spark_conf: dict, instance_profile: str | None
+    ) -> str | None:
+        policy_name = f"Unity Catalog Migration ({inventory_database}) ({self._ws.current_user.me().user_name})"
+        policies = self._ws.cluster_policies.list()
+        policy_id = None
+        for policy in policies:
+            if policy.name == policy_name:
+                policy_id = policy.policy_id
+                logger.info(f"Cluster policy {policy_name} already present, reusing the same.")
+                break
+        if not policy_id:
+            logger.info("Creating UCX cluster policy.")
+            policy_id = self._ws.cluster_policies.create(
+                name=policy_name,
+                definition=self._cluster_policy_definition(conf=spark_conf, instance_profile=instance_profile),
+                description="Custom cluster policy for Unity Catalog Migration (UCX)",
+            ).policy_id
+        return policy_id
 
     def _cluster_policy_definition(self, conf: dict, instance_profile: str | None) -> str:
         policy_definition = {
@@ -552,9 +557,7 @@ class WorkspaceInstallation:
                 self._installation.save(self._config)
             return self._wheels.upload_to_wsfs()
 
-    def create_jobs(self):
-        logger.debug(f"Creating jobs from tasks in {main.__name__}")
-        remote_wheel = self._upload_wheel()
+    def _upload_cluster_policy(self, remote_wheel: str):
         try:
             if self.config.policy_id is None:
                 msg = "Cluster policy not present, please uninstall and reinstall ucx completely."
@@ -564,13 +567,18 @@ class WorkspaceInstallation:
             msg = f"UCX Policy {self.config.policy_id} not found, please reinstall UCX"
             logger.error(msg)
             raise NotFound(msg) from err
+        if policy.name is not None:
+            self._ws.cluster_policies.edit(
+                policy_id=self.config.policy_id,
+                name=policy.name,
+                definition=policy.definition,
+                libraries=[compute.Library(whl=f"dbfs:{remote_wheel}")],
+            )
 
-        self._ws.cluster_policies.edit(
-            policy_id=self.config.policy_id,
-            name=policy.name,
-            definition=policy.definition,
-            libraries=[compute.Library(whl=f"dbfs:{remote_wheel}")],
-        )
+    def create_jobs(self):
+        logger.debug(f"Creating jobs from tasks in {main.__name__}")
+        remote_wheel = self._upload_wheel()
+        self._upload_cluster_policy(remote_wheel)
         desired_steps = {t.workflow for t in _TASKS.values() if t.cloud_compatible(self._ws.config)}
         wheel_runner = None
 
