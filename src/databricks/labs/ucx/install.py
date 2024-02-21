@@ -559,7 +559,7 @@ class WorkspaceInstallation:
             if self.config.policy_id is None:
                 msg = "Cluster policy not present, please uninstall and reinstall ucx completely."
                 raise InvalidParameterValue(msg)
-            policy_definition = self._ws.cluster_policies.get(policy_id=self.config.policy_id).definition
+            policy = self._ws.cluster_policies.get(policy_id=self.config.policy_id)
         except NotFound as err:
             msg = f"UCX Policy {self.config.policy_id} not found, please reinstall UCX"
             logger.error(msg)
@@ -567,8 +567,8 @@ class WorkspaceInstallation:
 
         self._ws.cluster_policies.edit(
             policy_id=self.config.policy_id,
-            name=f"Unity Catalog Migration ({self.config.inventory_database})",
-            definition=policy_definition,
+            name=policy.name,
+            definition=policy.definition,
             libraries=[compute.Library(whl=f"dbfs:{remote_wheel}")],
         )
         desired_steps = {t.workflow for t in _TASKS.values() if t.cloud_compatible(self._ws.config)}
