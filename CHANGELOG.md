@@ -1,5 +1,21 @@
 # Version changelog
 
+## 0.13.1
+
+* Added secret detection logic to Azure service principal crawler ([#950](https://github.com/databrickslabs/ucx/pull/950)).
+* Create storage credentials based on instance profiles and existing roles ([#869](https://github.com/databrickslabs/ucx/pull/869)).
+* Enforced `protected-access` pylint rule ([#956](https://github.com/databrickslabs/ucx/pull/956)).
+* Enforced `pylint` on unit and integration test code ([#953](https://github.com/databrickslabs/ucx/pull/953)).
+* Enforcing `invalid-name` pylint rule ([#957](https://github.com/databrickslabs/ucx/pull/957)).
+* Fixed AzureResourcePermissions.load to call Installation.load ([#962](https://github.com/databrickslabs/ucx/pull/962)).
+* Fixed installer script to reuse an existing UCX Cluster policy if present ([#964](https://github.com/databrickslabs/ucx/pull/964)).
+* More `pylint` tuning ([#958](https://github.com/databrickslabs/ucx/pull/958)).
+* Refactor `workspace_client_mock` to have combine fixtures stored in separate JSON files ([#955](https://github.com/databrickslabs/ucx/pull/955)).
+
+Dependency updates:
+
+ * Updated databricks-sdk requirement from ~=0.19.0 to ~=0.20.0 ([#961](https://github.com/databrickslabs/ucx/pull/961)).
+
 ## 0.13.0
 
 * Added CLI Command `databricks labs ucx principal-prefix-access` ([#949](https://github.com/databrickslabs/ucx/pull/949)).
