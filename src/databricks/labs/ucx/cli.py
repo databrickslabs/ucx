@@ -12,6 +12,7 @@ from databricks.sdk.errors import NotFound
 
 from databricks.labs.ucx.account import AccountWorkspaces, WorkspaceInfo
 from databricks.labs.ucx.assessment.aws import AWSResourcePermissions
+from databricks.labs.ucx.aws.credentials import InstanceProfileMigration
 from databricks.labs.ucx.azure.access import AzureResourcePermissions
 from databricks.labs.ucx.config import WorkspaceConfig
 from databricks.labs.ucx.framework.crawlers import StatementExecutionBackend
@@ -280,6 +281,30 @@ def _aws_principal_prefix_access(w: WorkspaceClient, aws_profile: str):
     logger.info("Generating UC roles and bucket permission info")
     uc_role_path = aws_permissions.save_uc_compatible_roles()
     logger.info(f"UC roles and bucket info saved {uc_role_path}")
+
+
+def _aws_migration(w: WorkspaceClient, aws_profile: str):
+    logger.info("Migrating instance profiles to UC storage credentials")
+    prompts = Prompts()
+    instance_profile_migration = InstanceProfileMigration.for_cli(w, aws_profile, prompts)
+    instance_profile_migration.run(prompts)
+
+
+@ucx.command
+def migrate_credentials(w: WorkspaceClient, aws_profile: str | None = None):
+    """lorem ipsum"""
+    if w.config.is_aws:
+        if not aws_profile:
+            aws_profile = os.getenv("AWS_DEFAULT_PROFILE")
+        if not aws_profile:
+            logger.error(
+                "AWS Profile is not specified. Use the environment variable [AWS_DEFAULT_PROFILE] "
+                "or use the '--aws-profile=[profile-name]' parameter."
+            )
+            return None
+        return _aws_migration(w, aws_profile)
+    logger.error("This cmd is only supported for azure and aws workspaces")
+    return None
 
 
 if __name__ == "__main__":

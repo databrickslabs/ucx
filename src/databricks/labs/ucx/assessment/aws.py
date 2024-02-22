@@ -277,7 +277,8 @@ class AWSResources:
 
         policy_document_json = self._get_json_for_cli(policy_document)
         if not self._run_command(
-            f"iam put-role-policy --role-name {role_name} --policy-name {policy_name} --policy-document {policy_document_json}"
+            f"iam put-role-policy --role-name {role_name} "
+            f"--policy-name {policy_name} --policy-document {policy_document_json}"
         ):
             return False
         return True
@@ -324,6 +325,7 @@ class AWSResourcePermissions:
         self._schema = schema
         self._aws_account_id = aws_account_id
         self._kms_key = kms_key
+        self._filename = self.INSTANCE_PROFILES_FILE_NAMES
 
     @classmethod
     def for_cli(cls, ws: WorkspaceClient, backend, aws_profile, schema, kms_key=None, product='ucx'):
@@ -337,9 +339,9 @@ class AWSResourcePermissions:
             ws,
             backend,
             aws,
-            schema=schema,
-            aws_account_id=caller_identity.get("Account"),
-            kms_key=kms_key,
+            schema,
+            caller_identity.get("Account"),
+            kms_key,
         )
 
     def save_uc_compatible_roles(self):
@@ -367,7 +369,7 @@ class AWSResourcePermissions:
         if single_role:
             if self._aws_resources.add_uc_role(role_name):
                 self._aws_resources.add_uc_role_policy(
-                    role_name, policy_name, s3_prefixes, account_id=self._aws_account_id, kms_key=self._kms_key
+                    role_name, policy_name, s3_prefixes, self._aws_account_id, self._kms_key
                 )
         else:
             role_id = 1
@@ -377,8 +379,8 @@ class AWSResourcePermissions:
                         f"{role_name}-{role_id}",
                         f"{policy_name}-{role_id}",
                         {s3_prefix},
-                        account_id=self._aws_account_id,
-                        kms_key=self._kms_key,
+                        self._aws_account_id,
+                        self._kms_key,
                     )
                 role_id += 1
 
@@ -453,6 +455,9 @@ class AWSResourcePermissions:
                 continue
             missing_paths.add(external_location.location)
         return missing_paths
+
+    def load(self):
+        return self._installation.load(list[AWSInstanceProfile], filename=self._filename)
 
     def save_instance_profile_permissions(self) -> str | None:
         instance_profile_access = list(self._get_instance_profiles_access())
