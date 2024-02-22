@@ -261,7 +261,7 @@ class ServicePrincipalMigration(SecretsMixin):
         if execution_result:
             results_file = self.save(execution_result)
             logger.info(
-                f"Completed migration from Azure Service Principal migrated to UC Storage credentials"
+                f"Completed migration from Azure Service Principal to UC Storage credentials"
                 f"Please check {results_file} for validation results"
             )
         else:
