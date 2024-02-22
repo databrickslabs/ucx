@@ -9,8 +9,7 @@ from databricks.sdk.service.catalog import (
     AzureServicePrincipal,
     Privilege,
     StorageCredentialInfo,
-    ValidateStorageCredentialResponse,
-    ValidationResult,
+    ValidationResultResult,
 )
 
 from databricks.labs.ucx.assessment.azure import AzureServicePrincipalCrawler
@@ -39,27 +38,18 @@ class StorageCredentialValidationResult:
     name: str | None = None
     application_id: str | None = None
     directory_id: str | None = None
-    created_by: str | None = None
     read_only: bool | None = None
     validated_on: str | None = None
-    results: list[ValidationResult] | None = None
+    failures: list[str] | None = None
 
     @classmethod
-    def from_validation(
-        cls, storage_credential: StorageCredentialInfo, validation: ValidateStorageCredentialResponse, prefix: str
-    ):
+    def from_validation(cls, storage_credential: StorageCredentialInfo, failures: list[str] | None, prefix: str):
         if storage_credential.azure_service_principal:
             application_id = storage_credential.azure_service_principal.application_id
             directory_id = storage_credential.azure_service_principal.directory_id
 
         return cls(
-            storage_credential.name,
-            application_id,
-            directory_id,
-            storage_credential.created_by,
-            storage_credential.read_only,
-            prefix,
-            validation.results,
+            storage_credential.name, application_id, directory_id, storage_credential.read_only, prefix, failures
         )
 
 
@@ -106,33 +96,40 @@ class StorageCredentialManager:
         read_only = False
         if spn.permission_mapping.privilege == Privilege.READ_FILES.value:
             read_only = True
-        # storage_credential validation creates a temp UC external location, which cannot overlap with
-        # existing UC external locations. So add a sub folder to the validation location just in case
+
         try:
             validation = self._ws.storage_credentials.validate(
                 storage_credential_name=storage_credential.name,
                 url=spn.permission_mapping.prefix,
                 read_only=read_only,
             )
-            return StorageCredentialValidationResult.from_validation(
-                storage_credential, validation, spn.permission_mapping.prefix
-            )
         except InvalidParameterValue:
             logger.warning(
-                "There is an existing external location overlaps with the prefix that is mapped to the service principal and used for validating the migrated storage credential. Skip the validation"
+                "There is an existing external location overlaps with the prefix that is mapped to "
+                "the service principal and used for validating the migrated storage credential. Skip the validation"
             )
             return StorageCredentialValidationResult.from_validation(
                 storage_credential,
-                ValidateStorageCredentialResponse(
-                    is_dir=None,
-                    results=[
-                        ValidationResult(
-                            message="The validation is skipped because an existing external location overlaps with the location used for validation."
-                        )
-                    ],
-                ),
+                [
+                    "The validation is skipped because an existing external location overlaps with the location used for validation."
+                ],
                 spn.permission_mapping.prefix,
             )
+
+        if not validation.results:
+            return StorageCredentialValidationResult.from_validation(
+                storage_credential, ["Validation returned none results."], spn.permission_mapping.prefix
+            )
+
+        failures = []
+        for result in validation.results:
+            if result.operation is None:
+                continue
+            if result.result == ValidationResultResult.FAIL:
+                failures.append(f"{result.operation.value} validation failed with message: {result.message}")
+        return StorageCredentialValidationResult.from_validation(
+            storage_credential, None if not failures else failures, spn.permission_mapping.prefix
+        )
 
 
 class ServicePrincipalMigration(SecretsMixin):

@@ -73,6 +73,18 @@ def side_effect_create_storage_credential(name, azure_service_principal, comment
 def side_effect_validate_storage_credential(storage_credential_name, url, read_only):  # pylint: disable=unused-argument
     if "overlap" in storage_credential_name:
         raise InvalidParameterValue
+    if "none" in storage_credential_name:
+        return ValidateStorageCredentialResponse()
+    if "fail" in storage_credential_name:
+        return ValidateStorageCredentialResponse(
+            is_dir=True,
+            results=[
+                ValidationResult(
+                    operation=ValidationResultOperation.LIST, result=ValidationResultResult.FAIL, message="fail"
+                ),
+                ValidationResult(operation=None, result=ValidationResultResult.FAIL, message="fail"),
+            ],
+        )
     if read_only:
         return ValidateStorageCredentialResponse(
             is_dir=True,
@@ -143,22 +155,15 @@ def test_create_storage_credentials(credential_manager):
 
 
 def test_validate_storage_credentials(credential_manager):
-    service_principal = ServicePrincipalMigrationInfo(
-        StoragePermissionMapping(
-            "prefix1",
-            "app_secret1",
-            "principal_1",
-            "WRITE_FILES",
-            "directory_id_1",
-        ),
-        "test",
-    )
+    service_principal = MagicMock()
+    service_principal.permission_mapping.privilege = "WRITE_FILES"
+
     storage_credential = StorageCredentialInfo(
-        name=service_principal.permission_mapping.principal,
+        name="principal_1",
         azure_service_principal=AzureServicePrincipal(
-            service_principal.permission_mapping.directory_id,
-            service_principal.permission_mapping.client_id,
-            service_principal.client_secret,
+            "directory_id_1",
+            "client_id",
+            "test",
         ),
         read_only=False,
     )
@@ -167,28 +172,19 @@ def test_validate_storage_credentials(credential_manager):
     validation = credential_manager.validate_storage_credential(storage_credential, service_principal)
     assert validation.read_only is False
     assert validation.name == storage_credential.name
-    for result in validation.results:
-        if result.operation.value == "WRITE":
-            assert result.result.value == "PASS"
+    assert not validation.failures
 
 
 def test_validate_read_only_storage_credentials(credential_manager):
-    service_principal = ServicePrincipalMigrationInfo(
-        StoragePermissionMapping(
-            "prefix2",
-            "app_secret2",
-            "principal_read",
-            "READ_FILES",
-            "directory_id_1",
-        ),
-        "test",
-    )
+    service_principal = MagicMock()
+    service_principal.permission_mapping.privilege = "READ_FILES"
+
     storage_credential = StorageCredentialInfo(
-        name=service_principal.permission_mapping.principal,
+        name="principal_read",
         azure_service_principal=AzureServicePrincipal(
-            service_principal.permission_mapping.directory_id,
-            service_principal.permission_mapping.client_id,
-            service_principal.client_secret,
+            "directory_id_1",
+            "client_id",
+            "test",
         ),
         read_only=True,
     )
@@ -197,38 +193,60 @@ def test_validate_read_only_storage_credentials(credential_manager):
     validation = credential_manager.validate_storage_credential(storage_credential, service_principal)
     assert validation.read_only is True
     assert validation.name == storage_credential.name
-    for result in validation.results:
-        if result.operation.value == "READ":
-            assert result.result.value == "PASS"
+    assert not validation.failures
 
 
 def test_validate_storage_credentials_overlap_location(credential_manager):
-    service_principal = ServicePrincipalMigrationInfo(
-        StoragePermissionMapping(
-            "overlap_with_external_location",
-            "app_secret4",
-            "principal_overlap",
-            "WRITE_FILES",
-            "directory_id_2",
-        ),
-        "test",
-    )
+    service_principal = MagicMock()
+    service_principal.permission_mapping.privilege = "WRITE_FILES"
+
     storage_credential = StorageCredentialInfo(
-        name=service_principal.permission_mapping.principal,
+        name="overlap",
         azure_service_principal=AzureServicePrincipal(
-            service_principal.permission_mapping.directory_id,
-            service_principal.permission_mapping.client_id,
-            service_principal.client_secret,
+            "directory_id_2",
+            "client_id",
+            "test",
         ),
     )
 
     # prefix used for validation overlaps with existing external location will raise InvalidParameterValue
-    # assert the exception is handled
+    # assert InvalidParameterValue is handled
     validation = credential_manager.validate_storage_credential(storage_credential, service_principal)
-    assert (
-        validation.results[0].message
-        == "The validation is skipped because an existing external location overlaps with the location used for validation."
+    assert validation.failures == [
+        "The validation is skipped because an existing external location overlaps with the location used for validation."
+    ]
+
+
+def test_validate_storage_credentials_non_response(credential_manager):
+    service_principal = MagicMock()
+    service_principal.permission_mapping.privilege = "WRITE_FILES"
+
+    storage_credential = StorageCredentialInfo(
+        name="none",
+        azure_service_principal=AzureServicePrincipal(
+            "directory_id_2",
+            "client_id",
+            "test",
+        ),
     )
+    validation = credential_manager.validate_storage_credential(storage_credential, service_principal)
+    assert validation.failures == ["Validation returned none results."]
+
+
+def test_validate_storage_credentials_failed_operation(credential_manager):
+    service_principal = MagicMock()
+    service_principal.permission_mapping.privilege = "WRITE_FILES"
+
+    storage_credential = StorageCredentialInfo(
+        name="fail",
+        azure_service_principal=AzureServicePrincipal(
+            "directory_id_2",
+            "client_id",
+            "test",
+        ),
+    )
+    validation = credential_manager.validate_storage_credential(storage_credential, service_principal)
+    assert validation.failures == ["LIST validation failed with message: fail"]
 
 
 @pytest.fixture

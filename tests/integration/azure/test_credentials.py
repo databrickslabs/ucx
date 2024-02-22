@@ -122,19 +122,12 @@ def test_spn_migration(ws, extract_test_info, run_migration, read_only):
     assert storage_credential is not None
     assert storage_credential.read_only is read_only
 
-    # assert the storage credential validation results
-    for res in migration_results[0].results:
-        if res.operation is None:
-            # TODO: file a ticket to SDK team, PATH_EXISTS and HIERARCHICAL_NAMESPACE_ENABLED
-            # should be added to the validation operations. They are None right now.
-            # Once it's fixed, the None check here can be removed
-            continue
-        if read_only:
-            if res.operation.value in {"WRITE", "DELETE"}:
-                # We only assert that write validation are not performed for read only storage credential here.
-                # In real life, the READ validation for read only storage credential may fail if there is no file,
-                # but that is fine, as the storage credential is created, and we just cannot validate it until it's really used.
-                assert False, "WRITE operation should not be checked for read-only storage credential"
-        if not read_only:
-            if res.result.value == "FAIL":
-                assert False, f"{res.operation.value} operation is failed while validating storage credential"
+    if read_only:
+        failures = migration_results[0].failures
+        # in this test LIST should fail as validation path does not exist
+        assert failures
+        match = re.match(r"LIST validation failed with message: .*The specified path does not exist", failures[0])
+        assert match is not None, "LIST validation should fail"
+    else:
+        # all validation should pass
+        assert not migration_results[0].failures
