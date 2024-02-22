@@ -169,7 +169,7 @@ def test_validate_storage_credentials(credential_manager):
     )
 
     # validate normal storage credential
-    validation = credential_manager.validate_storage_credential(storage_credential, service_principal)
+    validation = credential_manager.validate(storage_credential, service_principal)
     assert validation.read_only is False
     assert validation.name == storage_credential.name
     assert not validation.failures
@@ -190,7 +190,7 @@ def test_validate_read_only_storage_credentials(credential_manager):
     )
 
     # validate read-only storage credential
-    validation = credential_manager.validate_storage_credential(storage_credential, service_principal)
+    validation = credential_manager.validate(storage_credential, service_principal)
     assert validation.read_only is True
     assert validation.name == storage_credential.name
     assert not validation.failures
@@ -211,7 +211,7 @@ def test_validate_storage_credentials_overlap_location(credential_manager):
 
     # prefix used for validation overlaps with existing external location will raise InvalidParameterValue
     # assert InvalidParameterValue is handled
-    validation = credential_manager.validate_storage_credential(storage_credential, service_principal)
+    validation = credential_manager.validate(storage_credential, service_principal)
     assert validation.failures == [
         "The validation is skipped because an existing external location overlaps with the location used for validation."
     ]
@@ -229,7 +229,7 @@ def test_validate_storage_credentials_non_response(credential_manager):
             "test",
         ),
     )
-    validation = credential_manager.validate_storage_credential(storage_credential, service_principal)
+    validation = credential_manager.validate(storage_credential, service_principal)
     assert validation.failures == ["Validation returned none results."]
 
 
@@ -245,7 +245,7 @@ def test_validate_storage_credentials_failed_operation(credential_manager):
             "test",
         ),
     )
-    validation = credential_manager.validate_storage_credential(storage_credential, service_principal)
+    validation = credential_manager.validate(storage_credential, service_principal)
     assert validation.failures == ["LIST validation failed with message: fail"]
 
 

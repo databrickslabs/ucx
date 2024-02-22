@@ -82,36 +82,35 @@ class StorageCredentialManager:
         comment = (
             f"Created by UCX during migration to UC using Azure Service Principal: {spn.permission_mapping.principal}"
         )
-        read_only = False
-        if spn.permission_mapping.privilege == Privilege.READ_FILES.value:
-            read_only = True
+
         # create the storage credential
         return self._ws.storage_credentials.create(
-            name, azure_service_principal=service_principal, comment=comment, read_only=read_only
+            name,
+            azure_service_principal=service_principal,
+            comment=comment,
+            read_only=spn.permission_mapping.privilege == Privilege.READ_FILES.value,
         )
 
-    def validate_storage_credential(
+    def validate(
         self, storage_credential: StorageCredentialInfo, spn: ServicePrincipalMigrationInfo
     ) -> StorageCredentialValidationResult:
-        read_only = False
-        if spn.permission_mapping.privilege == Privilege.READ_FILES.value:
-            read_only = True
-
         try:
             validation = self._ws.storage_credentials.validate(
                 storage_credential_name=storage_credential.name,
                 url=spn.permission_mapping.prefix,
-                read_only=read_only,
+                read_only=spn.permission_mapping.privilege == Privilege.READ_FILES.value,
             )
         except InvalidParameterValue:
             logger.warning(
                 "There is an existing external location overlaps with the prefix that is mapped to "
-                "the service principal and used for validating the migrated storage credential. Skip the validation"
+                "the service principal and used for validating the migrated storage credential. "
+                "Skip the validation"
             )
             return StorageCredentialValidationResult.from_validation(
                 storage_credential,
                 [
-                    "The validation is skipped because an existing external location overlaps with the location used for validation."
+                    "The validation is skipped because an existing external location overlaps "
+                    "with the location used for validation."
                 ],
                 spn.permission_mapping.prefix,
             )
@@ -257,15 +256,12 @@ class ServicePrincipalMigration(SecretsMixin):
         execution_result = []
         for spn in sp_list_with_secret:
             storage_credential = self._storage_credential_manager.create_with_client_secret(spn)
-            execution_result.append(
-                self._storage_credential_manager.validate_storage_credential(storage_credential, spn)
-            )
+            execution_result.append(self._storage_credential_manager.validate(storage_credential, spn))
 
         if execution_result:
             results_file = self.save(execution_result)
-            logger.info("Completed migration from Azure Service Principal migrated to UC Storage credentials")
-            print(
-                f"Completed migration from Azure Service Principal migrated to UC Storage credentials. "
+            logger.info(
+                f"Completed migration from Azure Service Principal migrated to UC Storage credentials"
                 f"Please check {results_file} for validation results"
             )
         else:
