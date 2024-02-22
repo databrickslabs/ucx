@@ -15,7 +15,6 @@ from databricks.sdk.service.catalog import (
     AzureServicePrincipal,
     StorageCredentialInfo,
 )
-from databricks.sdk.service.workspace import GetSecretResponse
 
 from databricks.labs.ucx.assessment.aws import (
     AWSInstanceProfile,
@@ -159,7 +158,6 @@ def test_print_action_plan(caplog, ws, instance_profile_migration):
 
 
 def test_run_without_confirmation(ws, instance_profile_migration):
-    ws.secrets.get_secret.return_value = GetSecretResponse(value="aGVsbG8gd29ybGQ=")
     prompts = MockPrompts(
         {
             "Above Instance Profiles will be migrated to UC storage credentials*": "No",
