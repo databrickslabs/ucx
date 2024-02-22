@@ -149,11 +149,7 @@ class ServicePrincipalMigration(SecretsMixin):
         self._storage_credential_manager = storage_credential_manager
 
     @classmethod
-    def for_cli(cls, ws: WorkspaceClient, prompts: Prompts, product='ucx'):
-        if not ws.config.is_azure:
-            logger.error("Workspace is not on azure, please run this command on azure databricks workspaces.")
-            raise SystemExit()
-
+    def for_cli(cls, ws: WorkspaceClient, installation: Installation, prompts: Prompts):
         msg = (
             "Have you reviewed the azure_storage_account_info.csv "
             "and confirm listed service principals are allowed to be checked for migration?"
@@ -161,7 +157,6 @@ class ServicePrincipalMigration(SecretsMixin):
         if not prompts.confirm(msg):
             raise SystemExit()
 
-        installation = Installation.current(ws, product)
         config = installation.load(WorkspaceConfig)
         sql_backend = StatementExecutionBackend(ws, config.warehouse_id)
         azurerm = AzureResources(ws)

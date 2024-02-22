@@ -1,14 +1,12 @@
-import io
 import logging
 import re
 from unittest.mock import MagicMock, create_autospec
 
 import pytest
-import yaml
 from databricks.labs.blueprint.installation import MockInstallation
 from databricks.labs.blueprint.tui import MockPrompts
 from databricks.sdk import WorkspaceClient
-from databricks.sdk.errors import NotFound, ResourceDoesNotExist
+from databricks.sdk.errors import ResourceDoesNotExist
 from databricks.sdk.errors.platform import InvalidParameterValue
 from databricks.sdk.service.catalog import (
     AwsIamRole,
@@ -35,33 +33,59 @@ from databricks.labs.ucx.azure.credentials import (
     ServicePrincipalMigrationInfo,
     StorageCredentialManager,
 )
+from databricks.labs.ucx.azure.resources import AzureResources
+from databricks.labs.ucx.hive_metastore import ExternalLocations
 
 
 @pytest.fixture
 def ws():
-    state = {
-        "/Users/foo/.ucx/config.yml": yaml.dump(
-            {
+    return create_autospec(WorkspaceClient)
+
+
+@pytest.fixture
+def installation():
+    return MockInstallation(
+        {
+            "config.yml": {
                 'version': 2,
                 'inventory_database': 'ucx',
                 'connect': {
                     'host': 'foo',
                     'token': 'bar',
                 },
-            }
-        )
-    }
-
-    def download(path: str) -> io.StringIO:
-        if path not in state:
-            raise NotFound(path)
-        return io.StringIO(state[path])
-
-    ws_mock = create_autospec(WorkspaceClient)
-    ws_mock.config.host = 'https://localhost'
-    ws_mock.current_user.me().user_name = "foo"
-    ws_mock.workspace.download = download
-    return ws_mock
+            },
+            "azure_storage_account_info.csv": [
+                {
+                    'prefix': 'prefix1',
+                    'client_id': 'app_secret1',
+                    'principal': 'principal_1',
+                    'privilege': 'WRITE_FILES',
+                    'directory_id': 'directory_id_1',
+                },
+                {
+                    'prefix': 'prefix2',
+                    'client_id': 'app_secret2',
+                    'principal': 'principal_read',
+                    'privilege': 'READ_FILES',
+                    'directory_id': 'directory_id_1',
+                },
+                {
+                    'prefix': 'prefix3',
+                    'client_id': 'app_secret3',
+                    'principal': 'principal_write',
+                    'privilege': 'WRITE_FILES',
+                    'directory_id': 'directory_id_2',
+                },
+                {
+                    'prefix': 'overlap_with_external_location',
+                    'client_id': 'app_secret4',
+                    'principal': 'principal_overlap',
+                    'privilege': 'WRITE_FILES',
+                    'directory_id': 'directory_id_2',
+                },
+            ],
+        }
+    )
 
 
 def side_effect_create_storage_credential(name, azure_service_principal, comment, read_only):
@@ -250,40 +274,12 @@ def test_validate_storage_credentials_failed_operation(credential_manager):
 
 
 @pytest.fixture
-def sp_migration(ws, credential_manager):
+def sp_migration(ws, installation, credential_manager):
     ws.secrets.get_secret.return_value = GetSecretResponse(value="aGVsbG8gd29ybGQ=")
 
-    arp = create_autospec(AzureResourcePermissions)
-    arp.load.return_value = [
-        StoragePermissionMapping(
-            "prefix1",
-            "app_secret1",
-            "principal_1",
-            "WRITE_FILES",
-            "directory_id_1",
-        ),
-        StoragePermissionMapping(
-            "prefix2",
-            "app_secret2",
-            "principal_read",
-            "READ_FILES",
-            "directory_id_1",
-        ),
-        StoragePermissionMapping(
-            "prefix3",
-            "app_secret3",
-            "principal_write",
-            "WRITE_FILES",
-            "directory_id_2",
-        ),
-        StoragePermissionMapping(
-            "overlap_with_external_location",
-            "app_secret4",
-            "principal_overlap",
-            "WRITE_FILES",
-            "directory_id_2",
-        ),
-    ]
+    arp = AzureResourcePermissions(
+        installation, ws, create_autospec(AzureResources), create_autospec(ExternalLocations)
+    )
 
     sp_crawler = create_autospec(AzureServicePrincipalCrawler)
     sp_crawler.snapshot.return_value = [
@@ -293,29 +289,22 @@ def sp_migration(ws, credential_manager):
         AzureServicePrincipalInfo("app_secret4", "", "", "tenant_id_2", "storage1"),
     ]
 
-    return ServicePrincipalMigration(MockInstallation(), ws, arp, sp_crawler, credential_manager)
+    return ServicePrincipalMigration(installation, ws, arp, sp_crawler, credential_manager)
 
 
-def test_for_cli_not_azure(caplog, ws):
-    ws.config.is_azure = False
-    with pytest.raises(SystemExit):
-        ServicePrincipalMigration.for_cli(ws, MagicMock())
-    assert "Workspace is not on azure, please run this command on azure databricks workspaces." in caplog.text
-
-
-def test_for_cli_not_prompts(ws):
+def test_for_cli_not_prompts(ws, installation):
     ws.config.is_azure = True
     prompts = MockPrompts({"Have you reviewed the azure_storage_account_info.csv *": "No"})
     with pytest.raises(SystemExit):
-        ServicePrincipalMigration.for_cli(ws, prompts)
+        ServicePrincipalMigration.for_cli(ws, installation, prompts)
 
 
-def test_for_cli(ws):
+def test_for_cli(ws, installation):
     ws.config.is_azure = True
     ws.config.auth_type = "azure-cli"
     prompts = MockPrompts({"Have you reviewed the azure_storage_account_info.csv *": "Yes"})
 
-    assert isinstance(ServicePrincipalMigration.for_cli(ws, prompts), ServicePrincipalMigration)
+    assert isinstance(ServicePrincipalMigration.for_cli(ws, installation, prompts), ServicePrincipalMigration)
 
 
 @pytest.mark.parametrize(
@@ -373,12 +362,18 @@ def test_run_without_confirmation(ws, sp_migration):
     assert sp_migration.run(prompts) == []
 
 
-def test_run(ws, sp_migration):
+def test_run(ws, installation, sp_migration):
     prompts = MockPrompts({"Above Azure Service Principals will be migrated to UC storage credentials*": "Yes"})
 
-    results = sp_migration.run(prompts)
-    for result in results:
-        if result.name != "principal_1":
-            assert (
-                False
-            ), "Service principal with no client_secret in databricks secret or already be used in storage credential should not be migrated"
+    sp_migration.run(prompts)
+    installation.assert_file_written(
+        "azure_service_principal_migration_result.csv",
+        [
+            {
+                'application_id': 'app_secret1',
+                'directory_id': 'directory_id_1',
+                'name': 'principal_1',
+                'validated_on': 'prefix1',
+            }
+        ],
+    )
