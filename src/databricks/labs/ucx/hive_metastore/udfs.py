@@ -4,6 +4,7 @@ from dataclasses import dataclass
 from functools import partial
 
 from databricks.labs.blueprint.parallel import Threads
+from databricks.sdk.errors import Unknown
 
 from databricks.labs.ucx.framework.crawlers import CrawlerBase, SqlBackend
 from databricks.labs.ucx.framework.utils import escape_sql_identifier
@@ -66,13 +67,16 @@ class UdfsCrawler(CrawlerBase):
         # "target schema <database> is not in the current catalog"
         self._exec(f"USE CATALOG {escape_sql_identifier(catalog)};")
         for (database,) in self._all_databases():
-            logger.debug(f"[{catalog}.{database}] listing udfs")
-            for (udf,) in self._fetch(
-                f"SHOW USER FUNCTIONS FROM {escape_sql_identifier(catalog)}.{escape_sql_identifier(database)};"
-            ):
-                if udf.startswith(f"{catalog}.{database}"):
-                    udf_name = udf[udf.rfind(".") + 1 :]  # remove catalog and database info from the name
-                    tasks.append(partial(self._describe, catalog, database, udf_name))
+            try:
+                logger.debug(f"[{catalog}.{database}] listing udfs")
+                for (udf,) in self._fetch(
+                    f"SHOW USER FUNCTIONS FROM {escape_sql_identifier(catalog)}.{escape_sql_identifier(database)};"
+                ):
+                    if udf.startswith(f"{catalog}.{database}"):
+                        udf_name = udf[udf.rfind(".") + 1 :]  # remove catalog and database info from the name
+                        tasks.append(partial(self._describe, catalog, database, udf_name))
+            except Unknown as err:
+                logger.error(f"Problem with {database}: {err}")
         catalog_tables, errors = Threads.gather(f"listing udfs in {catalog}", tasks)
         if len(errors) > 0:
             logger.error(f"Detected {len(errors)} while scanning udfs in {catalog}")

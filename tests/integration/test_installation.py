@@ -113,13 +113,14 @@ def test_job_failure_propagates_correct_error_message_and_logs(ws, sql_backend, 
     assert len(workflow_run_logs) == 1
 
 
-@retried(on=[NotFound, Unknown, InvalidParameterValue], timeout=timedelta(minutes=18))
+@retried(on=[NotFound, Unknown, InvalidParameterValue], timeout=timedelta(minutes=3))
 def test_job_cluster_policy(ws, new_installation):
     install = new_installation(lambda wc: replace(wc, override_clusters=None))
+    user_name = ws.current_user.me().user_name
     cluster_policy = ws.cluster_policies.get(policy_id=install.config.policy_id)
     policy_definition = json.loads(cluster_policy.definition)
 
-    assert cluster_policy.name == f"Unity Catalog Migration ({install.config.inventory_database})"
+    assert cluster_policy.name == f"Unity Catalog Migration ({install.config.inventory_database}) ({user_name})"
 
     assert policy_definition["spark_version"]["value"] == ws.clusters.select_spark_version(latest=True)
     assert policy_definition["node_type_id"]["value"] == ws.clusters.select_node_type(local_disk=True)
@@ -129,7 +130,7 @@ def test_job_cluster_policy(ws, new_installation):
 
 
 @pytest.mark.skip
-@retried(on=[NotFound, TimeoutError], timeout=timedelta(minutes=15))
+@retried(on=[NotFound, TimeoutError], timeout=timedelta(minutes=5))
 def test_new_job_cluster_with_policy_assessment(
     ws, new_installation, make_ucx_group, make_cluster_policy, make_cluster_policy_permissions
 ):
@@ -149,7 +150,7 @@ def test_new_job_cluster_with_policy_assessment(
     assert before[ws_group_a.display_name] == PermissionLevel.CAN_USE
 
 
-@retried(on=[NotFound, Unknown, InvalidParameterValue], timeout=timedelta(minutes=20))
+@retried(on=[NotFound, Unknown, InvalidParameterValue], timeout=timedelta(minutes=10))
 def test_running_real_assessment_job(
     ws, new_installation, make_ucx_group, make_cluster_policy, make_cluster_policy_permissions
 ):
