@@ -860,14 +860,8 @@ def test_create_uc_role_multiple():
     aws_resource_permissions.create_uc_roles_cli(single_role=False)
     assert call('UC_ROLE-1') in aws.add_uc_role.call_args_list
     assert call('UC_ROLE-2') in aws.add_uc_role.call_args_list
-    assert (
-        call('UC_ROLE-1', 'UC_POLICY-1', {'BUCKET1/FOLDER1'}, None, None)
-        in aws.add_uc_role_policy.call_args_list
-    )
-    assert (
-        call('UC_ROLE-2', 'UC_POLICY-2', {'BUCKET2/FOLDER2'}, None, None)
-        in aws.add_uc_role_policy.call_args_list
-    )
+    assert call('UC_ROLE-1', 'UC_POLICY-1', {'BUCKET1/FOLDER1'}, None, None) in aws.add_uc_role_policy.call_args_list
+    assert call('UC_ROLE-2', 'UC_POLICY-2', {'BUCKET2/FOLDER2'}, None, None) in aws.add_uc_role_policy.call_args_list
 
 
 def test_get_uc_compatible_roles():

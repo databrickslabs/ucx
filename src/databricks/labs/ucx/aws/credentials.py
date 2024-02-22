@@ -63,6 +63,7 @@ class StorageCredentialManager:
             aws_iam_role=AwsIamRole(iam.iam_role_arn),
             comment=f"Created by UCX during migration to UC using AWS instance profile: {iam.role_name}",
         )
+        return StorageCredentialValidationResult.from_validation(storage_credential, None)
 
 
 class InstanceProfileMigration:
