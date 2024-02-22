@@ -325,6 +325,14 @@ def test_save_storage_and_principal_gcp(ws, caplog):
     assert "This cmd is only supported for azure and aws workspaces" in caplog.messages
 
 
+def test_migrate_aws_instance_profiles(ws, mocker):
+    mocker.patch("shutil.which", return_value=True)
+    ws.config.is_azure = True
+    with patch("databricks.labs.blueprint.tui.Prompts.confirm", return_value=True):
+        migrate_credentials(ws, aws_profile="profile")
+        ws.storage_credentials.list.assert_called()
+
+
 def test_migrate_credentials_azure(ws):
     ws.config.is_azure = True
     ws.workspace.upload.return_value = "test"

@@ -342,5 +342,29 @@ def migrate_credentials(w: WorkspaceClient, aws_profile: str | None = None):
         logger.error("migrate_credentials is not yet supported in GCP")
 
 
+def _aws_migration(w: WorkspaceClient, aws_profile: str):
+    logger.info("Migrating instance profiles to UC storage credentials")
+    prompts = Prompts()
+    instance_profile_migration = InstanceProfileMigration.for_cli(w, aws_profile, prompts)
+    instance_profile_migration.run(prompts)
+
+
+@ucx.command
+def migrate_credentials(w: WorkspaceClient, aws_profile: str | None = None):
+    """lorem ipsum"""
+    if w.config.is_aws:
+        if not aws_profile:
+            aws_profile = os.getenv("AWS_DEFAULT_PROFILE")
+        if not aws_profile:
+            logger.error(
+                "AWS Profile is not specified. Use the environment variable [AWS_DEFAULT_PROFILE] "
+                "or use the '--aws-profile=[profile-name]' parameter."
+            )
+            return None
+        return _aws_migration(w, aws_profile)
+    logger.error("This cmd is only supported for azure and aws workspaces")
+    return None
+
+
 if __name__ == "__main__":
     ucx()
