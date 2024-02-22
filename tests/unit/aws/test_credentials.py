@@ -99,16 +99,19 @@ def test_create_storage_credentials(credential_manager):
 
 @pytest.fixture
 def instance_profile_migration(ws, credential_manager):
-    arp = create_autospec(AWSResourcePermissions)
-    arp.load.return_value = [
-        AWSInstanceProfile(
-            iam_role_arn=f"arn:aws:iam::123456789012:role/prefix{i}",
-            instance_profile_arn=f"arn:aws:iam::123456789012:instance-profile/prefix{i}",
-        )
-        for i in range(10)
-    ]
+    def generate_instance_profiles(num_instance_profiles: int):
+        arp = create_autospec(AWSResourcePermissions)
+        arp.load.return_value = [
+            AWSInstanceProfile(
+                iam_role_arn=f"arn:aws:iam::123456789012:role/prefix{i}",
+                instance_profile_arn=f"arn:aws:iam::123456789012:instance-profile/prefix{i}",
+            )
+            for i in range(num_instance_profiles)
+        ]
 
-    return InstanceProfileMigration(MockInstallation(), ws, arp, credential_manager)
+        return InstanceProfileMigration(MockInstallation(), ws, arp, credential_manager)
+
+    return generate_instance_profiles
 
 
 def test_for_cli_not_aws(caplog, ws):
@@ -147,7 +150,7 @@ def test_print_action_plan(caplog, ws, instance_profile_migration):
 
     prompts = MockPrompts({"Above Instance Profiles will be migrated to UC storage credentials*": "Yes"})
 
-    instance_profile_migration.run(prompts)
+    instance_profile_migration(10).run(prompts)
 
     log_pattern = r"IAM Role name: .* IAM Role ARN: .*"
     for msg in caplog.messages:
@@ -164,11 +167,12 @@ def test_run_without_confirmation(ws, instance_profile_migration):
         }
     )
 
-    assert instance_profile_migration.run(prompts) == []
+    assert instance_profile_migration(10).run(prompts) == []
 
 
-def test_run(ws, instance_profile_migration):
+@pytest.mark.parametrize("num_instance_profiles", [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10])
+def test_run(ws, instance_profile_migration, num_instance_profiles: int):
     prompts = MockPrompts({"Above Instance Profiles will be migrated to UC storage credentials*": "Yes"})
-
-    results = instance_profile_migration.run(prompts)
-    assert len(results) == 10
+    migration = instance_profile_migration(num_instance_profiles)
+    results = migration.run(prompts)
+    assert len(results) == num_instance_profiles

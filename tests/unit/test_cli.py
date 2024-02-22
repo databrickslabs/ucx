@@ -317,3 +317,11 @@ def test_migrate_aws_instance_profiles(ws, mocker):
     with patch("databricks.labs.blueprint.tui.Prompts.confirm", return_value=True):
         migrate_credentials(ws, aws_profile="profile")
         ws.storage_credentials.list.assert_called()
+
+
+def test_migrate_aws_instance_profiles_no_profile(ws, caplog, mocker):
+    mocker.patch("shutil.which", return_value="/path/aws")
+    ws.config.is_azure = False
+    ws.config.is_aws = True
+    migrate_credentials(ws)
+    assert any({"AWS Profile is not specified." in message for message in caplog.messages})
