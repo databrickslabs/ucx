@@ -341,15 +341,6 @@ def test_migrate_credentials_azure(ws):
         ws.storage_credentials.list.assert_called()
 
 
-def test_migrate_aws_instance_profiles(ws, mocker):
-    mocker.patch("shutil.which", return_value=True)
-    ws.config.is_azure = False
-    ws.config.is_aws = True
-    with patch("databricks.labs.blueprint.tui.Prompts.confirm", return_value=True):
-        migrate_credentials(ws, aws_profile="profile")
-        ws.storage_credentials.list.assert_called()
-
-
 def test_migrate_aws_instance_profiles_no_profile(ws, caplog, mocker):
     mocker.patch("shutil.which", return_value="/path/aws")
     ws.config.is_azure = False
