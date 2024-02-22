@@ -30,11 +30,11 @@ class MigrationTestInfo:
 
 
 @pytest.fixture
-def extract_test_info(ws, debug_env, make_random):
+def extract_test_info(ws, env_or_skip, make_random):
     random = make_random(6).lower()
     credential_name = f"testinfra_storageaccess_{random}"
 
-    spark_conf = ws.clusters.get(debug_env["TEST_LEGACY_SPN_CLUSTER_ID"]).spark_conf
+    spark_conf = ws.clusters.get(env_or_skip("TEST_LEGACY_SPN_CLUSTER_ID")).spark_conf
 
     application_id = spark_conf.get("fs.azure.account.oauth2.client.id")
 
@@ -54,11 +54,11 @@ def extract_test_info(ws, debug_env, make_random):
 
 
 @pytest.fixture
-def run_migration(ws, sql_backend):
+def run_migration(ws, sql_backend, make_random):
     def inner(
         test_info: MigrationTestInfo, credentials: set[str], read_only=False
     ) -> list[StorageCredentialValidationResult]:
-        installation = Installation(ws, 'ucx')
+        installation = Installation(ws, make_random(4))
         azurerm = AzureResources(ws)
         locations = ExternalLocations(ws, sql_backend, "dont_need_a_schema")
 
@@ -114,7 +114,6 @@ def test_spn_migration_existed_storage_credential(extract_test_info, make_storag
 def test_spn_migration(ws, extract_test_info, run_migration, read_only):
     try:
         migration_results = run_migration(extract_test_info, {"lets_migrate_the_spn"}, read_only)
-
         storage_credential = ws.storage_credentials.get(extract_test_info.credential_name)
     finally:
         ws.storage_credentials.delete(extract_test_info.credential_name, force=True)
