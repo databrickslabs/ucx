@@ -861,11 +861,11 @@ def test_create_uc_role_multiple():
     assert call('UC_ROLE-1') in aws.add_uc_role.call_args_list
     assert call('UC_ROLE-2') in aws.add_uc_role.call_args_list
     assert (
-        call('UC_ROLE-1', 'UC_POLICY-1', {'BUCKET1/FOLDER1'}, account_id=None, kms_key=None)
+        call('UC_ROLE-1', 'UC_POLICY-1', {'BUCKET1/FOLDER1'}, None, None)
         in aws.add_uc_role_policy.call_args_list
     )
     assert (
-        call('UC_ROLE-2', 'UC_POLICY-2', {'BUCKET2/FOLDER2'}, account_id=None, kms_key=None)
+        call('UC_ROLE-2', 'UC_POLICY-2', {'BUCKET2/FOLDER2'}, None, None)
         in aws.add_uc_role_policy.call_args_list
     )
 

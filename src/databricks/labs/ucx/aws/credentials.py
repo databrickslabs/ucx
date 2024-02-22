@@ -39,7 +39,7 @@ class StorageCredentialManager:
 
     def list(self) -> set[str]:
         # list existed storage credentials that is using iam roles, capturing the arns
-        role_arns = set()
+        iam_roles = set()
 
         storage_credentials = self._ws.storage_credentials.list(max_results=0)
 
@@ -49,25 +49,20 @@ class StorageCredentialManager:
             if not storage_credential.aws_iam_role:
                 continue
 
-            role_arns.add(storage_credential.aws_iam_role.role_arn)
+            iam_roles.add(storage_credential.aws_iam_role.role_arn)
 
-        logger.info(f"Found {len(role_arns)} distinct IAM roles already used in UC storage credentials")
-        return role_arns
+        logger.info(f"Found {len(iam_roles)} distinct IAM roles already used in UC storage credentials")
+        return iam_roles
 
     def create(self, iam: AWSInstanceProfile) -> StorageCredentialValidationResult:
         if iam.iam_role_arn is None:
             logger.warning("IAM role ARN is None, skipping.")
             return StorageCredentialValidationResult.from_validation(StorageCredentialInfo(), "IAM role ARN is None.")
-        try:
-            storage_credential = self._ws.storage_credentials.create(
-                iam.role_name,
-                aws_iam_role=AwsIamRole(iam.iam_role_arn),
-                comment=f"Created by UCX during migration to UC using AWS instance profile: {iam.role_name}",
-            )
-            return StorageCredentialValidationResult.from_validation(storage_credential, None)
-        except Exception as e:
-            logger.warning("There is an error while creating the storage credential. ")
-            return StorageCredentialValidationResult.from_validation(StorageCredentialInfo(), str(e))
+        storage_credential = self._ws.storage_credentials.create(
+            iam.role_name,
+            aws_iam_role=AwsIamRole(iam.iam_role_arn),
+            comment=f"Created by UCX during migration to UC using AWS instance profile: {iam.role_name}",
+        )
 
 
 class InstanceProfileMigration:
