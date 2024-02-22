@@ -35,6 +35,7 @@ class WorkspaceConfig:  # pylint: disable=too-many-instance-attributes
 
     override_clusters: dict[str, str] | None = None
     policy_id: str | None = None
+    global_spn_id: str | None = None
 
     def replace_inventory_variable(self, text: str) -> str:
         return text.replace("$inventory", f"hive_metastore.{self.inventory_database}")

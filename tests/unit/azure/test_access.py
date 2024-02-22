@@ -22,9 +22,9 @@ def test_save_spn_permissions_no_external_table(caplog):
     backend = MockBackend(rows=rows)
     location = ExternalLocations(w, backend, "ucx")
     installation = MockInstallation()
-    azure_resource_permission = AzureResourcePermissions(
-        installation, w, AzureResources(w, include_subscriptions="002"), location
-    )
+    azure_resources = create_autospec(AzureResources)
+    azure_resource_permission = AzureResourcePermissions(installation, w, azure_resources, location)
+    azure_resources.storage_accounts.return_value = []
     azure_resource_permission.save_spn_permissions()
     msg = "There are no external table present with azure storage account. Please check if assessment job is run"
     assert [rec.message for rec in caplog.records if msg in rec.message]
@@ -36,9 +36,9 @@ def test_save_spn_permissions_no_azure_storage_account():
     backend = MockBackend(rows=rows)
     location = ExternalLocations(w, backend, "ucx")
     installation = MockInstallation()
-    azure_resource_permission = AzureResourcePermissions(
-        installation, w, AzureResources(w, include_subscriptions="002"), location
-    )
+    azure_resources = create_autospec(AzureResources)
+    azure_resource_permission = AzureResourcePermissions(installation, w, azure_resources, location)
+    azure_resources.storage_accounts.return_value = []
     assert not azure_resource_permission.save_spn_permissions()
 
 

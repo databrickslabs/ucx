@@ -8,9 +8,12 @@ from databricks.sdk.core import (
     Config,
     credentials_provider,
 )
-from databricks.sdk.errors import NotFound
+from databricks.sdk.errors import NotFound, PermissionDenied
 
 from databricks.labs.ucx.assessment.crawlers import logger
+
+# https://learn.microsoft.com/en-us/azure/role-based-access-control/built-in-roles
+_AZURE_BLOB_READER_ROLE_DEFINITION_ID = "2a2b9908-6ea1-4ae2-8e65-a410df84e7d1"
 
 
 @dataclass
@@ -70,6 +73,7 @@ class Principal:
     client_id: str
     display_name: str
     object_id: str
+    secret: str | None = None
 
 
 @dataclass
@@ -116,19 +120,56 @@ class AzureResources:
         return _credentials
 
     def _get_subscriptions(self) -> Iterable[AzureSubscription]:
-        for subscription in self._get_resource("/subscriptions", api_version="2022-12-01").get("value", []):
+        for subscription in self._resource_action("/subscriptions", "2022-12-01", "GET").get("value", []):
             yield AzureSubscription(
                 name=subscription["displayName"],
                 subscription_id=subscription["subscriptionId"],
                 tenant_id=subscription["tenantId"],
             )
 
-    def _tenant_id(self):
+    def create_service_principal(self) -> Principal:
+        try:
+            path = "/v1.0/servicePrincipals"
+            service_principal_info: dict[str, str] = self._graph.do("POST", path)  # type: ignore[assignment]
+            app_id = service_principal_info["appId"]
+            path = f"/v1.0/servicePrincipals(appId='{app_id}')/addPassword"
+            secret_info: dict[str, str] = self._graph.do("POST", path)  # type: ignore[assignment]
+            return Principal(
+                app_id, service_principal_info["displayName"], service_principal_info["id"], secret_info["secretText"]
+            )
+        except PermissionDenied:
+            msg = (
+                "Permission denied. Please run this cmd under the identity of a user who has"
+                " create service principal permission."
+            )
+            logger.error(msg)
+            raise PermissionDenied(msg) from None
+
+    def apply_storage_permission(self, principal_id: str, resource_id: str):
+        try:
+            path = f"/{resource_id}/providers/Microsoft.Authorization/roleAssignments/{_AZURE_BLOB_READER_ROLE_DEFINITION_ID}?api-version=2022-04-01"
+            body = {
+                "properties": {
+                    "roleDefinitionId": f"/{resource_id}/providers/Microsoft.Authorization/roleDefinitions/{_AZURE_BLOB_READER_ROLE_DEFINITION_ID}",
+                    "principalId": principal_id,
+                    "principalType": "ServicePrincipal",
+                }
+            }
+            self._resource_action(path, "2023-01-01", "PUT", body)
+        except PermissionDenied:
+            msg = (
+                "Permission denied. Please run this cmd under the identity of a user who has "
+                "create service principal permission."
+            )
+            logger.error(msg)
+            raise PermissionDenied(msg) from None
+
+    def tenant_id(self):
         token = self._token_source.token()
         return token.jwt_claims().get("tid")
 
     def subscriptions(self):
-        tenant_id = self._tenant_id()
+        tenant_id = self.tenant_id()
         for subscription in self._get_subscriptions():
             if subscription.tenant_id != tenant_id:
                 continue
@@ -136,23 +177,25 @@ class AzureResources:
                 continue
             yield subscription
 
-    def _get_resource(self, path: str, api_version: str):
+    def _resource_action(self, path: str, api_version: str, action: str, body=None):
         headers = {"Accept": "application/json"}
         query = {"api-version": api_version}
-        return self._resource_manager.do("GET", path, query=query, headers=headers)
+        return self._resource_manager.do(action, path, query, headers, body)
 
     def storage_accounts(self) -> Iterable[AzureResource]:
         for subscription in self.subscriptions():
             logger.info(f"Checking in subscription {subscription.name} for storage accounts")
             path = f"/subscriptions/{subscription.subscription_id}/providers/Microsoft.Storage/storageAccounts"
-            for storage in self._get_resource(path, "2023-01-01").get("value", []):
+            for storage in self._resource_action(path, "2022-04-01", "GET").get("value", []):
                 resource_id = storage.get("id")
                 if not resource_id:
                     continue
                 yield AzureResource(resource_id)
 
     def containers(self, storage: AzureResource):
-        for raw in self._get_resource(f"{storage}/blobServices/default/containers", "2023-01-01").get("value", []):
+        for raw in self._resource_action(f"{storage}/blobServices/default/containers", "2023-01-01", "GET").get(
+            "value", []
+        ):
             resource_id = raw.get("id")
             if not resource_id:
                 continue
@@ -183,7 +226,9 @@ class AzureResources:
         """See https://learn.microsoft.com/en-us/rest/api/authorization/role-assignments/list-for-resource"""
         if not principal_types:
             principal_types = ["ServicePrincipal"]
-        result = self._get_resource(f"{resource_id}/providers/Microsoft.Authorization/roleAssignments", "2022-04-01")
+        result = self._resource_action(
+            f"{resource_id}/providers/Microsoft.Authorization/roleAssignments", "2022-04-01", "GET"
+        )
         for role_assignment in result.get("value", []):
             assignment = self._role_assignment(role_assignment, resource_id, principal_types)
             if not assignment:
@@ -222,7 +267,7 @@ class AzureResources:
 
     def _role_name(self, role_definition_id) -> str | None:
         if role_definition_id not in self._role_definitions:
-            role_definition = self._get_resource(role_definition_id, "2022-04-01")
+            role_definition = self._resource_action(role_definition_id, "2022-04-01", "GET")
             definition_properties = role_definition.get("properties", {})
             role_name: str = definition_properties.get("roleName")
             if not role_name:

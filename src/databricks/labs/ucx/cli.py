@@ -282,5 +282,20 @@ def _aws_principal_prefix_access(w: WorkspaceClient, aws_profile: str):
     logger.info(f"UC roles and bucket info saved {uc_role_path}")
 
 
+@ucx.command
+def create_master_principal(w: WorkspaceClient):
+    """For azure cloud, creates a service principal and gives STORAGE BLOB READER access on all the storage account
+    used by tables in the workspace and stores the spn info in the UCX cluster policy."""
+    if not w.config.is_azure:
+        logger.error("This command is only supported on azure workspaces.")
+        return
+    if w.config.auth_type != "azure-cli":
+        logger.error("In order to obtain AAD token, Please run azure cli to authenticate.")
+        return
+    azure_resource_permissions = AzureResourcePermissions.for_cli(w)
+    azure_resource_permissions.create_global_spn()
+    return
+
+
 if __name__ == "__main__":
     ucx()

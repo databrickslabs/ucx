@@ -11,6 +11,7 @@ from databricks.sdk.service import iam, sql
 
 from databricks.labs.ucx.cli import (
     alias,
+    create_master_principal,
     create_table_mapping,
     ensure_assessment_run,
     installations,
@@ -305,3 +306,23 @@ def test_save_storage_and_principal_gcp(ws, caplog):
     ws.config.is_gcp = True
     principal_prefix_access(ws)
     assert "This cmd is only supported for azure and aws workspaces" in caplog.messages
+
+
+def test_create_master_principal_not_azure(ws):
+    ws.config.is_azure = False
+    create_master_principal(ws)
+    ws.workspace.get_status.assert_not_called()
+
+
+def test_create_master_principal_no_azure_cli(ws):
+    ws.config.auth_type = "azure_clis"
+    ws.config.is_azure = True
+    create_master_principal(ws)
+    ws.workspace.get_status.assert_not_called()
+
+
+def test_create_master_principal(ws):
+    ws.config.auth_type = "azure-cli"
+    ws.config.is_azure = True
+    create_master_principal(ws)
+    ws.workspace.get_status.assert_called()
