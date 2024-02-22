@@ -143,7 +143,7 @@ def test_create_storage_credentials(credential_manager):
 
 
 def test_validate_storage_credentials(credential_manager):
-    sp_1 = ServicePrincipalMigrationInfo(
+    service_principal = ServicePrincipalMigrationInfo(
         StoragePermissionMapping(
             "prefix1",
             "app_secret1",
@@ -153,15 +153,27 @@ def test_validate_storage_credentials(credential_manager):
         ),
         "test",
     )
-    sc_1 = StorageCredentialInfo(
-        name=sp_1.permission_mapping.principal,
+    storage_credential = StorageCredentialInfo(
+        name=service_principal.permission_mapping.principal,
         azure_service_principal=AzureServicePrincipal(
-            sp_1.permission_mapping.directory_id, sp_1.permission_mapping.client_id, sp_1.client_secret
+            service_principal.permission_mapping.directory_id,
+            service_principal.permission_mapping.client_id,
+            service_principal.client_secret,
         ),
         read_only=False,
     )
 
-    sp_2 = ServicePrincipalMigrationInfo(
+    # validate normal storage credential
+    validation = credential_manager.validate_storage_credential(storage_credential, service_principal)
+    assert validation.read_only is False
+    assert validation.name == storage_credential.name
+    for result in validation.results:
+        if result.operation.value == "WRITE":
+            assert result.result.value == "PASS"
+
+
+def test_validate_read_only_storage_credentials(credential_manager):
+    service_principal = ServicePrincipalMigrationInfo(
         StoragePermissionMapping(
             "prefix2",
             "app_secret2",
@@ -171,15 +183,27 @@ def test_validate_storage_credentials(credential_manager):
         ),
         "test",
     )
-    sc_2 = StorageCredentialInfo(
-        name=sp_2.permission_mapping.principal,
+    storage_credential = StorageCredentialInfo(
+        name=service_principal.permission_mapping.principal,
         azure_service_principal=AzureServicePrincipal(
-            sp_2.permission_mapping.directory_id, sp_2.permission_mapping.client_id, sp_2.client_secret
+            service_principal.permission_mapping.directory_id,
+            service_principal.permission_mapping.client_id,
+            service_principal.client_secret,
         ),
         read_only=True,
     )
 
-    sp_3 = ServicePrincipalMigrationInfo(
+    # validate read-only storage credential
+    validation = credential_manager.validate_storage_credential(storage_credential, service_principal)
+    assert validation.read_only is True
+    assert validation.name == storage_credential.name
+    for result in validation.results:
+        if result.operation.value == "READ":
+            assert result.result.value == "PASS"
+
+
+def test_validate_storage_credentials_overlap_location(credential_manager):
+    service_principal = ServicePrincipalMigrationInfo(
         StoragePermissionMapping(
             "overlap_with_external_location",
             "app_secret4",
@@ -189,31 +213,18 @@ def test_validate_storage_credentials(credential_manager):
         ),
         "test",
     )
-    sc_3 = StorageCredentialInfo(
-        name=sp_3.permission_mapping.principal,
+    storage_credential = StorageCredentialInfo(
+        name=service_principal.permission_mapping.principal,
         azure_service_principal=AzureServicePrincipal(
-            sp_3.permission_mapping.directory_id, sp_3.permission_mapping.client_id, sp_3.client_secret
+            service_principal.permission_mapping.directory_id,
+            service_principal.permission_mapping.client_id,
+            service_principal.client_secret,
         ),
     )
 
-    # validate normal storage credential
-    validation = credential_manager.validate_storage_credential(sc_1, sp_1)
-    assert validation.read_only is False
-    assert validation.name == sp_1.permission_mapping.principal
-    for result in validation.results:
-        if result.operation.value == "WRITE":
-            assert result.result.value == "PASS"
-
-    # validate read-only storage credential
-    validation = credential_manager.validate_storage_credential(sc_2, sp_2)
-    assert validation.read_only is True
-    assert validation.name == sp_2.permission_mapping.principal
-    for result in validation.results:
-        if result.operation.value == "READ":
-            assert result.result.value == "PASS"
-
-    # prefix used for validation overlaps with existing external location
-    validation = credential_manager.validate_storage_credential(sc_3, sp_3)
+    # prefix used for validation overlaps with existing external location will raise InvalidParameterValue
+    # assert the exception is handled
+    validation = credential_manager.validate_storage_credential(storage_credential, service_principal)
     assert (
         validation.results[0].message
         == "The validation is skipped because an existing external location overlaps with the location used for validation."
