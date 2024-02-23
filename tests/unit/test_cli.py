@@ -15,6 +15,7 @@ from databricks.labs.ucx.cli import (
     ensure_assessment_run,
     installations,
     manual_workspace_info,
+    migrate_credentials,
     move,
     open_remote_config,
     principal_prefix_access,
@@ -43,11 +44,14 @@ def ws():
             }
         ),
         '/Users/foo/.ucx/state.json': json.dumps({'resources': {'jobs': {'assessment': '123'}}}),
+        "/Users/foo/.ucx/azure_storage_account_info.csv": "prefix,client_id,principal,privilege,directory_id\ntest,test,test,test,test",
     }
 
-    def download(path: str) -> io.StringIO:
+    def download(path: str) -> io.StringIO | io.BytesIO:
         if path not in state:
             raise NotFound(path)
+        if ".csv" in path:
+            return io.BytesIO(state[path].encode('utf-8'))
         return io.StringIO(state[path])
 
     workspace_client = create_autospec(WorkspaceClient)
@@ -305,3 +309,11 @@ def test_save_storage_and_principal_gcp(ws, caplog):
     ws.config.is_gcp = True
     principal_prefix_access(ws)
     assert "This cmd is only supported for azure and aws workspaces" in caplog.messages
+
+
+def test_migrate_credentials_azure(ws):
+    ws.config.is_azure = True
+    ws.workspace.upload.return_value = "test"
+    with patch("databricks.labs.blueprint.tui.Prompts.confirm", return_value=True):
+        migrate_credentials(ws)
+        ws.storage_credentials.list.assert_called()
