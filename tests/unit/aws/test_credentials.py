@@ -1,59 +1,44 @@
-import io
 import logging
 import re
 from unittest.mock import MagicMock, create_autospec
 
 import pytest
-import yaml
 from databricks.labs.blueprint.installation import MockInstallation
 from databricks.labs.blueprint.tui import MockPrompts
 from databricks.sdk import WorkspaceClient
-from databricks.sdk.errors import NotFound
 from databricks.sdk.service.catalog import (
     AwsIamRole,
     AzureManagedIdentity,
     AzureServicePrincipal,
+    Privilege,
     StorageCredentialInfo,
 )
 
 from databricks.labs.ucx.assessment.aws import (
-    AWSInstanceProfile,
     AWSResourcePermissions,
+    AWSRoleAction,
 )
 from databricks.labs.ucx.aws.credentials import (
     InstanceProfileMigration,
-    StorageCredentialManager,
+    AWSStorageCredentialManager,
 )
+from tests.unit import DEFAULT_CONFIG
+from tests.unit.azure.test_credentials import side_effect_validate_storage_credential
+
+
+@pytest.fixture
+def installation():
+    return MockInstallation(
+        DEFAULT_CONFIG
+    )
 
 
 @pytest.fixture
 def ws():
-    state = {
-        "/Users/foo/.ucx/config.yml": yaml.dump(
-            {
-                'version': 2,
-                'inventory_database': 'ucx',
-                'connect': {
-                    'host': 'foo',
-                    'token': 'bar',
-                },
-            }
-        )
-    }
-
-    def download(path: str) -> io.StringIO:
-        if path not in state:
-            raise NotFound(path)
-        return io.StringIO(state[path])
-
-    ws_mock = create_autospec(WorkspaceClient)
-    ws_mock.config.host = 'https://localhost'
-    ws_mock.current_user.me().user_name = "foo"
-    ws_mock.workspace.download = download
-    return ws_mock
+    return create_autospec(WorkspaceClient)
 
 
-def side_effect_create_storage_credential(name, aws_iam_role, comment):
+def side_effect_create_aws_storage_credential(name, aws_iam_role, comment):
     return StorageCredentialInfo(name=name, aws_iam_role=aws_iam_role, comment=comment)
 
 
@@ -68,9 +53,10 @@ def credential_manager(ws):
         StorageCredentialInfo(azure_service_principal=AzureServicePrincipal("directory_id_1", "app_secret2", "secret")),
     ]
 
-    ws.storage_credentials.create.side_effect = side_effect_create_storage_credential
+    ws.storage_credentials.create.side_effect = side_effect_create_aws_storage_credential
+    ws.storage_credentials.validate.side_effect = side_effect_validate_storage_credential
 
-    return StorageCredentialManager(ws)
+    return AWSStorageCredentialManager(ws)
 
 
 def test_list_storage_credentials(credential_manager):
@@ -81,13 +67,17 @@ def test_list_storage_credentials(credential_manager):
 
 
 def test_create_storage_credentials(credential_manager):
-    first_iam = AWSInstanceProfile(
-        iam_role_arn="arn:aws:iam::123456789012:role/example-role-name",
-        instance_profile_arn="arn:aws:iam::123456789012:instance-profile/example-role-name",
+    first_iam = AWSRoleAction(
+        role_arn="arn:aws:iam::123456789012:role/example-role-name",
+        resource_type="s3",
+        privilege=Privilege.WRITE_FILES.value,
+        resource_path="s3://example-bucket",
     )
-    second_iam = AWSInstanceProfile(
-        iam_role_arn="arn:aws:iam::123456789012:role/another-role-name",
-        instance_profile_arn="arn:aws:iam::123456789012:instance-profile/another-role-name",
+    second_iam = AWSRoleAction(
+        role_arn="arn:aws:iam::123456789012:role/another-role-name",
+        resource_type="s3",
+        privilege=Privilege.READ_FILES.value,
+        resource_path="s3://example-bucket",
     )
 
     storage_credential = credential_manager.create(first_iam)
@@ -98,51 +88,53 @@ def test_create_storage_credentials(credential_manager):
 
 
 @pytest.fixture
-def instance_profile_migration(ws, credential_manager):
+def instance_profile_migration(ws, installation, credential_manager):
     def generate_instance_profiles(num_instance_profiles: int):
         arp = create_autospec(AWSResourcePermissions)
-        arp.load.return_value = [
-            AWSInstanceProfile(
-                iam_role_arn=f"arn:aws:iam::123456789012:role/prefix{i}",
-                instance_profile_arn=f"arn:aws:iam::123456789012:instance-profile/prefix{i}",
+        arp.load_uc_compatible_roles.return_value = [
+            AWSRoleAction(
+                role_arn=f"arn:aws:iam::123456789012:role/prefix{i}",
+                resource_type="s3",
+                privilege=Privilege.WRITE_FILES.value,
+                resource_path=f"s3://example-bucket-{i}",
             )
             for i in range(num_instance_profiles)
         ]
 
-        return InstanceProfileMigration(MockInstallation(), ws, arp, credential_manager)
+        return InstanceProfileMigration(installation, ws, arp, credential_manager)
 
     return generate_instance_profiles
 
 
-def test_for_cli_not_aws(caplog, ws):
+def test_for_cli_not_aws(caplog, ws, installation):
     ws.config.is_aws = False
     with pytest.raises(SystemExit):
-        InstanceProfileMigration.for_cli(ws, "", MagicMock())
+        InstanceProfileMigration.for_cli(ws, installation, "", MagicMock())
     assert "Workspace is not on AWS, please run this command on a Databricks on AWS workspaces." in caplog.text
 
 
-def test_for_cli_not_prompts(ws):
+def test_for_cli_not_prompts(ws, installation):
     ws.config.is_aws = True
     prompts = MockPrompts(
         {
-            "Have you reviewed the aws_instance_profile_info.csv "
+            f"Have you reviewed the {AWSResourcePermissions.UC_ROLES_FILE_NAMES} "
             "and confirm listed instance profiles to be migrated migration*": "No"
         }
     )
     with pytest.raises(SystemExit):
-        InstanceProfileMigration.for_cli(ws, "", prompts)
+        InstanceProfileMigration.for_cli(ws, installation, "", prompts)
 
 
-def test_for_cli(ws):
+def test_for_cli(ws, installation):
     ws.config.is_aws = True
     prompts = MockPrompts(
         {
-            "Have you reviewed the aws_instance_profile_info.csv "
+            f"Have you reviewed the {AWSResourcePermissions.UC_ROLES_FILE_NAMES} "
             "and confirm listed instance profiles to be migrated migration*": "Yes"
         }
     )
 
-    assert isinstance(InstanceProfileMigration.for_cli(ws, "", prompts), InstanceProfileMigration)
+    assert isinstance(InstanceProfileMigration.for_cli(ws, installation, "", prompts), InstanceProfileMigration)
 
 
 def test_print_action_plan(caplog, ws, instance_profile_migration):
@@ -152,7 +144,7 @@ def test_print_action_plan(caplog, ws, instance_profile_migration):
 
     instance_profile_migration(10).run(prompts)
 
-    log_pattern = r"IAM Role name: .* IAM Role ARN: .*"
+    log_pattern = r"IAM Role ARN: .* privilege .*"
     for msg in caplog.messages:
         if re.search(log_pattern, msg):
             assert True
@@ -176,3 +168,37 @@ def test_run(ws, instance_profile_migration, num_instance_profiles: int):
     migration = instance_profile_migration(num_instance_profiles)
     results = migration.run(prompts)
     assert len(results) == num_instance_profiles
+
+
+def test_validate_read_only_storage_credentials(credential_manager):
+    role_action = AWSRoleAction("arn:aws:iam::123456789012:role/client_id", "s3", "READ_FILES", "s3://prefix")
+
+    # validate read-only storage credential
+    validation = credential_manager.validate(role_action)
+    assert validation.read_only is True
+    assert validation.name == role_action.role_name
+    assert not validation.failures
+
+
+def test_validate_storage_credentials_overlap_location(credential_manager):
+    role_action = AWSRoleAction("arn:aws:iam::123456789012:role/overlap", "s3", "READ_FILES", "s3://prefix")
+
+    # prefix used for validation overlaps with existing external location will raise InvalidParameterValue
+    # assert InvalidParameterValue is handled
+    validation = credential_manager.validate(role_action)
+    assert validation.failures == ["The validation is skipped because "
+                                   "an existing external location overlaps with the location used for validation."]
+
+
+def test_validate_storage_credentials_non_response(credential_manager):
+    permission_mapping = AWSRoleAction("arn:aws:iam::123456789012:role/none", "s3", "READ_FILES", "s3://prefix")
+
+    validation = credential_manager.validate(permission_mapping)
+    assert validation.failures == ["Validation returned no results."]
+
+
+def test_validate_storage_credentials_failed_operation(credential_manager):
+    permission_mapping = AWSRoleAction("arn:aws:iam::123456789012:role/fail", "s3", "READ_FILES", "s3://prefix")
+
+    validation = credential_manager.validate(permission_mapping)
+    assert validation.failures == ["LIST validation failed with message: fail"]

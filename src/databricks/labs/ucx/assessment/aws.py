@@ -43,11 +43,16 @@ class AWSRoleAction:
     privilege: str
     resource_path: str
 
+    @property
+    def role_name(self):
+        role_match = re.match(AWSInstanceProfile.ROLE_NAME_REGEX, self.role_arn)
+        return role_match.group(1)
+
 
 @dataclass
 class AWSInstanceProfile:
     instance_profile_arn: str
-    iam_role_arn: str | None = None
+    iam_role_arn: str
 
     ROLE_NAME_REGEX = r"arn:aws:iam::[0-9]+:(?:instance-profile|role)\/([a-zA-Z0-9+=,.@_-]*)$"
 
@@ -344,21 +349,6 @@ class AWSResourcePermissions:
             kms_key,
         )
 
-    def save_uc_compatible_roles(self):
-        uc_role_access = list(self._get_role_access())
-        if len(uc_role_access) == 0:
-            logger.warning("No Mapping Was Generated.")
-            return None
-        return self._installation.save(uc_role_access, filename=self.UC_ROLES_FILE_NAMES)
-
-    def get_uc_compatible_roles(self):
-        try:
-            role_actions = self._installation.load(list[AWSRoleAction], filename=self.UC_ROLES_FILE_NAMES)
-        except ResourceDoesNotExist:
-            self.save_uc_compatible_roles()
-            role_actions = self._installation.load(list[AWSRoleAction], filename=self.UC_ROLES_FILE_NAMES)
-        return role_actions
-
     def create_uc_roles_cli(self, *, single_role=True, role_name="UC_ROLE", policy_name="UC_POLICY"):
         missing_paths = self._identify_missing_paths()
         s3_prefixes = set()
@@ -384,10 +374,36 @@ class AWSResourcePermissions:
                     )
                 role_id += 1
 
+    def save_uc_compatible_roles(self):
+        uc_role_access = list(self._get_role_access())
+        if len(uc_role_access) == 0:
+            logger.warning("No Mapping Was Generated.")
+            return None
+        return self._installation.save(uc_role_access, filename=self.UC_ROLES_FILE_NAMES)
+
+    def load_uc_compatible_roles(self):
+        try:
+            role_actions = self._installation.load(list[AWSRoleAction], filename=self.UC_ROLES_FILE_NAMES)
+        except ResourceDoesNotExist:
+            self.save_uc_compatible_roles()
+            role_actions = self._installation.load(list[AWSRoleAction], filename=self.UC_ROLES_FILE_NAMES)
+        return role_actions
+
+    def save_instance_profile_permissions(self) -> str | None:
+        instance_profile_access = list(self._get_instance_profiles_access())
+        if len(instance_profile_access) == 0:
+            logger.warning("No Mapping Was Generated.")
+            return None
+        return self._installation.save(instance_profile_access, filename=self.INSTANCE_PROFILES_FILE_NAMES)
+
     def _get_instance_profiles(self) -> Iterable[AWSInstanceProfile]:
         instance_profiles = self._ws.instance_profiles.list()
         result_instance_profiles = []
         for instance_profile in instance_profiles:
+            if not instance_profile.iam_role_arn:
+                instance_profile.iam_role_arn = instance_profile.instance_profile_arn.replace(
+                    "instance-profile", "role"
+                )
             result_instance_profiles.append(
                 AWSInstanceProfile(instance_profile.instance_profile_arn, instance_profile.iam_role_arn)
             )
@@ -442,7 +458,7 @@ class AWSResourcePermissions:
 
     def _identify_missing_paths(self):
         external_locations = ExternalLocations(self._ws, self._backend, self._schema).snapshot()
-        compatible_roles = self.get_uc_compatible_roles()
+        compatible_roles = self.load_uc_compatible_roles()
         missing_paths = set()
         for external_location in external_locations:
             path = PurePath(external_location.location)
@@ -455,13 +471,3 @@ class AWSResourcePermissions:
                 continue
             missing_paths.add(external_location.location)
         return missing_paths
-
-    def load(self):
-        return self._installation.load(list[AWSInstanceProfile], filename=self._filename)
-
-    def save_instance_profile_permissions(self) -> str | None:
-        instance_profile_access = list(self._get_instance_profiles_access())
-        if len(instance_profile_access) == 0:
-            logger.warning("No Mapping Was Generated.")
-            return None
-        return self._installation.save(instance_profile_access, filename=self.INSTANCE_PROFILES_FILE_NAMES)

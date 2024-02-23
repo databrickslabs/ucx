@@ -925,7 +925,7 @@ def test_get_uc_compatible_roles():
         ResourceDoesNotExist(),
         [AWSRoleAction("arn:aws:iam::12345:role/uc-role1", "s3", "WRITE_FILES", "s3://BUCKETX/*")],
     ]
-    aws_resource_permissions.get_uc_compatible_roles()
+    aws_resource_permissions.load_uc_compatible_roles()
     installation.assert_file_written(
         'uc_roles_access.csv',
         [
