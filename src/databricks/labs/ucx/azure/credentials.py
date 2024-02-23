@@ -66,9 +66,13 @@ class StorageCredentialManager:
         if include_names:
             # we only check UC storage credentials listed in include_names
             for storage_credential in storage_credentials:
+                if not storage_credential.azure_service_principal:
+                    continue
                 if storage_credential.name in include_names:
                     application_ids.add(storage_credential.azure_service_principal.application_id)
-            logger.info(f"Found {len(application_ids)} distinct service principals already used in UC storage credentials listed in include_names")
+            logger.info(
+                f"Found {len(application_ids)} distinct service principals already used in UC storage credentials listed in include_names"
+            )
             return application_ids
 
         for storage_credential in storage_credentials:

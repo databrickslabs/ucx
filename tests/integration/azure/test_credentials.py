@@ -3,20 +3,19 @@ import re
 from dataclasses import dataclass
 
 import pytest
-from databricks.labs.blueprint.installation import Installation
+from databricks.labs.blueprint.installation import MockInstallation
 from databricks.labs.blueprint.tui import MockPrompts
 
 from databricks.labs.ucx.assessment.azure import AzureServicePrincipalInfo
-from databricks.labs.ucx.azure.access import StoragePermissionMapping
-from databricks.labs.ucx.azure.credentials import StorageCredentialValidationResult, \
-    StorageCredentialManager
+from databricks.labs.ucx.azure.access import AzureResourcePermissions
+from databricks.labs.ucx.azure.credentials import (
+    ServicePrincipalMigration,
+    StorageCredentialManager,
+    StorageCredentialValidationResult,
+)
 from databricks.labs.ucx.azure.resources import AzureResources
 from databricks.labs.ucx.hive_metastore import ExternalLocations
-from tests.integration.conftest import (
-    StaticResourcePermissions,
-    StaticServicePrincipalCrawler,
-    StaticServicePrincipalMigration
-)
+from tests.integration.conftest import StaticServicePrincipalCrawler
 
 
 @dataclass
@@ -54,24 +53,27 @@ def extract_test_info(ws, env_or_skip, make_random):
 
 
 @pytest.fixture
-def run_migration(ws, sql_backend, make_random):
+def run_migration(ws, sql_backend):
     def inner(
         test_info: MigrationTestInfo, credentials: set[str], read_only=False
     ) -> list[StorageCredentialValidationResult]:
-        installation = Installation(ws, make_random(4))
         azurerm = AzureResources(ws)
         locations = ExternalLocations(ws, sql_backend, "dont_need_a_schema")
 
-        permission_mappings = [
-            StoragePermissionMapping(
-                "abfss://things@labsazurethings.dfs.core.windows.net/avoid_ext_loc_overlap",
-                test_info.application_id,
-                test_info.credential_name,
-                "READ_FILES" if read_only else "WRITE_FILES",
-                test_info.directory_id,
-            )
-        ]
-        resource_permissions = StaticResourcePermissions(permission_mappings, installation, ws, azurerm, locations)
+        installation = MockInstallation(
+            {
+                "azure_storage_account_info.csv": [
+                    {
+                        'prefix': 'abfss://things@labsazurethings.dfs.core.windows.net/avoid_ext_loc_overlap',
+                        'client_id': test_info.application_id,
+                        'principal': test_info.credential_name,
+                        'privilege': "READ_FILES" if read_only else "WRITE_FILES",
+                        'directory_id': test_info.directory_id,
+                    },
+                ]
+            }
+        )
+        resource_permissions = AzureResourcePermissions(installation, ws, azurerm, locations)
 
         sp_infos = [
             AzureServicePrincipalInfo(
@@ -84,12 +86,12 @@ def run_migration(ws, sql_backend, make_random):
         ]
         sp_crawler = StaticServicePrincipalCrawler(sp_infos, ws, sql_backend, "dont_need_a_schema")
 
-        spn_migration = StaticServicePrincipalMigration(
+        spn_migration = ServicePrincipalMigration(
             installation, ws, resource_permissions, sp_crawler, StorageCredentialManager(ws)
         )
         return spn_migration.run(
             MockPrompts({"Above Azure Service Principals will be migrated to UC storage credentials *": "Yes"}),
-            credentials
+            credentials,
         )
 
     return inner

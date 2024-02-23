@@ -128,12 +128,12 @@ def credential_manager(ws):
             azure_managed_identity=AzureManagedIdentity("/subscriptions/.../providers/Microsoft.Databricks/...")
         ),
         StorageCredentialInfo(
-            name = "included_test",
+            name="included_test",
             azure_service_principal=AzureServicePrincipal(
                 "62e43d7d-df53-4c64-86ed-c2c1a3ac60c3",
                 "b6420590-5e1c-4426-8950-a94cbe9b6115",
                 "secret",
-            )
+            ),
         ),
         StorageCredentialInfo(azure_service_principal=AzureServicePrincipal("directory_id_1", "app_secret2", "secret")),
     ]
@@ -146,6 +146,7 @@ def credential_manager(ws):
 
 def test_list_storage_credentials(credential_manager):
     assert credential_manager.list() == {"b6420590-5e1c-4426-8950-a94cbe9b6115", "app_secret2"}
+
 
 def test_list_included_storage_credentials(credential_manager):
     include_names = {"included_test"}

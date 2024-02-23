@@ -14,15 +14,6 @@ from databricks.labs.ucx.assessment.azure import (
     AzureServicePrincipalCrawler,
     AzureServicePrincipalInfo,
 )
-from databricks.labs.ucx.azure.access import (
-    AzureResourcePermissions,
-    StoragePermissionMapping,
-)
-from databricks.labs.ucx.azure.credentials import (
-    ServicePrincipalMigration,
-    StorageCredentialManager,
-    StorageCredentialValidationResult,
-)
 from databricks.labs.ucx.framework.crawlers import SqlBackend
 from databricks.labs.ucx.hive_metastore import TablesCrawler
 from databricks.labs.ucx.hive_metastore.mapping import Rule, TableMapping
@@ -169,11 +160,6 @@ class StaticTableMapping(TableMapping):
         raise RuntimeWarning("not available")
 
 
-class StaticServicePrincipalMigration(ServicePrincipalMigration):
-    def save(self, migration_results: list[StorageCredentialValidationResult]) -> str:
-        return "azure_service_principal_migration_result.csv"
-
-
 class StaticServicePrincipalCrawler(AzureServicePrincipalCrawler):
     def __init__(self, spn_infos: list[AzureServicePrincipalInfo], *args):
         super().__init__(*args)
@@ -181,12 +167,3 @@ class StaticServicePrincipalCrawler(AzureServicePrincipalCrawler):
 
     def snapshot(self) -> list[AzureServicePrincipalInfo]:
         return self._spn_infos
-
-
-class StaticResourcePermissions(AzureResourcePermissions):
-    def __init__(self, permission_mappings: list[StoragePermissionMapping], *args):
-        super().__init__(*args)
-        self._permission_mappings = permission_mappings
-
-    def load(self) -> list[StoragePermissionMapping]:
-        return self._permission_mappings
