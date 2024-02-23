@@ -90,7 +90,7 @@ class AWSStorageCredentialManager:
                 role_action.role_arn,
                 role_action.resource_path,
                 role_action.privilege == Privilege.READ_FILES.value,
-                ["Validation returned no results."]
+                ["Validation returned no results."],
             )
 
         failures = []
@@ -104,7 +104,7 @@ class AWSStorageCredentialManager:
             role_action.role_arn,
             role_action.resource_path,
             role_action.privilege == Privilege.READ_FILES.value,
-            None if not failures else failures
+            None if not failures else failures,
         )
 
 

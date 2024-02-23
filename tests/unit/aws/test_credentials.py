@@ -14,13 +14,10 @@ from databricks.sdk.service.catalog import (
     StorageCredentialInfo,
 )
 
-from databricks.labs.ucx.assessment.aws import (
-    AWSResourcePermissions,
-    AWSRoleAction,
-)
+from databricks.labs.ucx.assessment.aws import AWSResourcePermissions, AWSRoleAction
 from databricks.labs.ucx.aws.credentials import (
-    InstanceProfileMigration,
     AWSStorageCredentialManager,
+    InstanceProfileMigration,
 )
 from tests.unit import DEFAULT_CONFIG
 from tests.unit.azure.test_credentials import side_effect_validate_storage_credential
@@ -28,9 +25,7 @@ from tests.unit.azure.test_credentials import side_effect_validate_storage_crede
 
 @pytest.fixture
 def installation():
-    return MockInstallation(
-        DEFAULT_CONFIG
-    )
+    return MockInstallation(DEFAULT_CONFIG)
 
 
 @pytest.fixture
@@ -186,8 +181,10 @@ def test_validate_storage_credentials_overlap_location(credential_manager):
     # prefix used for validation overlaps with existing external location will raise InvalidParameterValue
     # assert InvalidParameterValue is handled
     validation = credential_manager.validate(role_action)
-    assert validation.failures == ["The validation is skipped because "
-                                   "an existing external location overlaps with the location used for validation."]
+    assert validation.failures == [
+        "The validation is skipped because "
+        "an existing external location overlaps with the location used for validation."
+    ]
 
 
 def test_validate_storage_credentials_non_response(credential_manager):
