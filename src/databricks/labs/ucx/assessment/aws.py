@@ -377,7 +377,7 @@ class AWSResourcePermissions:
     def save_uc_compatible_roles(self):
         uc_role_access = list(self._get_role_access())
         if len(uc_role_access) == 0:
-            logger.warning("No Mapping Was Generated.")
+            logger.warning("No mapping was generated.")
             return None
         return self._installation.save(uc_role_access, filename=self.UC_ROLES_FILE_NAMES)
 
@@ -392,7 +392,7 @@ class AWSResourcePermissions:
     def save_instance_profile_permissions(self) -> str | None:
         instance_profile_access = list(self._get_instance_profiles_access())
         if len(instance_profile_access) == 0:
-            logger.warning("No Mapping Was Generated.")
+            logger.warning("No mapping was generated.")
             return None
         return self._installation.save(instance_profile_access, filename=self.INSTANCE_PROFILES_FILE_NAMES)
 

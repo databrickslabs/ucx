@@ -18,7 +18,7 @@ WITH table_stats AS (
         WHEN STARTSWITH(location, "adl") THEN 1
         ELSE 0
     END AS is_unsupported,
-    IF(format = "DELTA", 1, 0) AS is_delta
+    IF(table_format = "DELTA", 1, 0) AS is_delta
    FROM $inventory.tables
 ), database_stats AS (
   SELECT `database`,

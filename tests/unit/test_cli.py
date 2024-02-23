@@ -11,6 +11,7 @@ from databricks.sdk.service import iam, sql
 
 from databricks.labs.ucx.cli import (
     alias,
+    create_account_groups,
     create_table_mapping,
     ensure_assessment_run,
     installations,
@@ -44,8 +45,10 @@ def ws():
             }
         ),
         '/Users/foo/.ucx/state.json': json.dumps({'resources': {'jobs': {'assessment': '123'}}}),
-        "/Users/foo/.ucx/uc_roles_access.csv.csv": "role_arn,resource_type,privilege,resource_path\ntest,test,test,test",
-        "/Users/foo/.ucx/azure_storage_account_info.csv": "prefix,client_id,principal,privilege,directory_id\ntest,test,test,test,test",
+        "/Users/foo/.ucx/uc_roles_access.csv": "role_arn,resource_type,privilege,resource_path\n"
+        "arn:aws:iam::123456789012:role/role_name,s3,READ_FILES,s3://labsawsbucket/",
+        "/Users/foo/.ucx/azure_storage_account_info.csv": "prefix,client_id,principal,privilege,directory_id\n"
+        "test,test,test,test,test",
     }
 
     def download(path: str) -> io.StringIO | io.BytesIO:
@@ -129,6 +132,16 @@ def test_sync_workspace_info():
         a = create_autospec(AccountClient)
         sync_workspace_info(a)
         swi.assert_called_once()
+
+
+def test_create_account_groups():
+    a = create_autospec(AccountClient)
+    with (
+        patch("databricks.sdk.WorkspaceClient.__init__", return_value=None),
+        patch("databricks.sdk.WorkspaceClient.get_workspace_id", return_value=None),
+    ):
+        create_account_groups(a)
+        a.groups.list.assert_called_with(attributes="id")
 
 
 def test_manual_workspace_info(ws):
@@ -322,7 +335,8 @@ def test_migrate_credentials_azure(ws):
 
 def test_migrate_aws_instance_profiles(ws, mocker):
     mocker.patch("shutil.which", return_value=True)
-    ws.config.is_azure = True
+    ws.config.is_azure = False
+    ws.config.is_aws = True
     with patch("databricks.labs.blueprint.tui.Prompts.confirm", return_value=True):
         migrate_credentials(ws, aws_profile="profile")
         ws.storage_credentials.list.assert_called()

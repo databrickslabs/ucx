@@ -731,7 +731,7 @@ def test_instance_profiles_empty_mapping(caplog):
     installation = MockInstallation()
     aws_resource_permissions = AWSResourcePermissions(installation, ws, MockBackend(), aws, "ucx")
     aws_resource_permissions.save_instance_profile_permissions()
-    assert 'No Mapping Was Generated.' in caplog.messages
+    assert 'No mapping was generated.' in caplog.messages
 
 
 def test_uc_roles_empty_mapping(caplog):
@@ -744,7 +744,7 @@ def test_uc_roles_empty_mapping(caplog):
     installation = MockInstallation()
     aws_resource_permissions = AWSResourcePermissions(installation, ws, MockBackend(), aws, "ucx")
     aws_resource_permissions.save_uc_compatible_roles()
-    assert 'No Mapping Was Generated.' in caplog.messages
+    assert 'No mapping was generated.' in caplog.messages
 
 
 def test_command(caplog):

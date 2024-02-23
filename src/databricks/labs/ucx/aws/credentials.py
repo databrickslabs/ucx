@@ -36,7 +36,7 @@ class AWSStorageCredentialManager:
     def __init__(self, ws: WorkspaceClient):
         self._ws = ws
 
-    def list(self) -> set[str]:
+    def list(self, include_names: set[str] | None = None) -> set[str]:
         # list existed storage credentials that is using iam roles, capturing the arns
         iam_roles = set()
 
@@ -46,6 +46,10 @@ class AWSStorageCredentialManager:
 
             # only add storage credentials with iam roles
             if not storage_credential.aws_iam_role:
+                continue
+
+            # if include_names is not None, only add the storage credentials that are in the include_names set
+            if include_names is not None and storage_credential.name not in include_names:
                 continue
 
             iam_roles.add(storage_credential.aws_iam_role.role_arn)
@@ -154,14 +158,14 @@ class InstanceProfileMigration:
                 f"IAM Role ARN: {iam.role_arn} : " f"privilege {iam.privilege} " f"on location {iam.resource_path}"
             )
 
-    def _generate_migration_list(self) -> list[AWSRoleAction]:
+    def _generate_migration_list(self, include_names: set[str] | None = None) -> list[AWSRoleAction]:
         """
         Create the list of IAM roles that need to be migrated, output an action plan as a csv file for users to confirm
         """
         # load instance profile list from aws_instance_profile_info.csv
         iam_list = self._resource_permissions.load_uc_compatible_roles()
         # list existing storage credentials
-        sc_set = self._storage_credential_manager.list()
+        sc_set = self._storage_credential_manager.list(include_names)
         # check if the iam is already used in UC storage credential
         filtered_iam_list = [iam for iam in iam_list if iam.role_arn not in sc_set]
 
@@ -173,9 +177,11 @@ class InstanceProfileMigration:
     def save(self, migration_results: list[AWSStorageCredentialValidationResult]) -> str:
         return self._installation.save(migration_results, filename=self._output_file)
 
-    def run(self, prompts: Prompts) -> list[AWSStorageCredentialValidationResult]:
+    def run(
+        self, prompts: Prompts, include_names: set[str] | None = None
+    ) -> list[AWSStorageCredentialValidationResult]:
 
-        iam_list = self._generate_migration_list()
+        iam_list = self._generate_migration_list(include_names)
 
         plan_confirmed = prompts.confirm(
             "Above Instance Profiles will be migrated to UC storage credentials, please review and confirm."

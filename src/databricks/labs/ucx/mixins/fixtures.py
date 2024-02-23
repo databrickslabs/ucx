@@ -18,7 +18,9 @@ from databricks.sdk.core import DatabricksError
 from databricks.sdk.errors import NotFound, ResourceConflict
 from databricks.sdk.retries import retried
 from databricks.sdk.service import compute, iam, jobs, pipelines, sql, workspace
+from databricks.sdk.service._internal import Wait
 from databricks.sdk.service.catalog import (
+    AwsIamRole,
     AzureServicePrincipal,
     CatalogInfo,
     DataSourceFormat,
@@ -27,6 +29,12 @@ from databricks.sdk.service.catalog import (
     StorageCredentialInfo,
     TableInfo,
     TableType,
+)
+from databricks.sdk.service.serving import (
+    EndpointCoreConfigInput,
+    ServedModelInput,
+    ServedModelInputWorkloadSize,
+    ServingEndpointDetailed,
 )
 from databricks.sdk.service.sql import (
     CreateWarehouseRequestWarehouseType,
@@ -274,6 +282,12 @@ def _permissions_mapping():
             "serving_endpoint",
             "serving-endpoints",
             [PermissionLevel.CAN_VIEW, PermissionLevel.CAN_MANAGE],
+            _simple,
+        ),
+        (
+            "feature_table",
+            "feature-tables",
+            [PermissionLevel.CAN_VIEW_METADATA, PermissionLevel.CAN_EDIT_METADATA, PermissionLevel.CAN_MANAGE],
             _simple,
         ),
     ]
@@ -1077,21 +1091,75 @@ def make_query(ws, make_table, make_random):
 
 
 @pytest.fixture
-def make_storage_credential_spn(ws):
+def make_storage_credential(ws):
     def create(
-        *, credential_name: str, application_id: str, client_secret: str, directory_id: str, read_only=False
+        *,
+        credential_name: str,
+        aws_iam_role_arn: str | None = None,
+        application_id: str | None = None,
+        client_secret: str | None = None,
+        directory_id: str | None = None,
+        read_only=False,
     ) -> StorageCredentialInfo:
-        azure_service_principal = AzureServicePrincipal(
-            directory_id,
-            application_id,
-            client_secret,
-        )
-        storage_credential = ws.storage_credentials.create(
-            credential_name, azure_service_principal=azure_service_principal, read_only=read_only
-        )
-        return storage_credential
+        if application_id is not None and client_secret is not None and directory_id is not None:
+            azure_service_principal = AzureServicePrincipal(
+                directory_id,
+                application_id,
+                client_secret,
+            )
+            return ws.storage_credentials.create(
+                credential_name, azure_service_principal=azure_service_principal, read_only=read_only
+            )
+        if aws_iam_role_arn is not None:
+            aws_iam_role = AwsIamRole(aws_iam_role_arn)
+            return ws.storage_credentials.create(credential_name, aws_iam_role=aws_iam_role, read_only=read_only)
+        return StorageCredentialInfo()
 
     def remove(storage_credential: StorageCredentialInfo):
         ws.storage_credentials.delete(storage_credential.name, force=True)
 
-    yield from factory("storage_credential_from_spn", create, remove)
+    yield from factory("storage_credential", create, remove)
+
+
+@pytest.fixture
+def make_serving_endpoint(ws, make_random, make_model):
+    def create() -> Wait[ServingEndpointDetailed]:
+        endpoint_name = make_random(4)
+        model = make_model()
+        endpoint = ws.serving_endpoints.create(
+            endpoint_name,
+            EndpointCoreConfigInput(
+                served_models=[
+                    ServedModelInput(model.name, "1", ServedModelInputWorkloadSize.SMALL, scale_to_zero_enabled=True)
+                ]
+            ),
+        )
+        return endpoint
+
+    def remove(endpoint_name: str):
+        try:
+            ws.serving_endpoints.delete(endpoint_name)
+        except RuntimeError as e:
+            logger.info(f"Can't remove endpoint {e}")
+
+    yield from factory("Serving endpoint", create, remove)
+
+
+@pytest.fixture
+def make_feature_table(ws, make_random):
+    def create():
+        feature_table_name = make_random(6) + "." + make_random(6)
+        table = ws.api_client.do(
+            "POST",
+            "/api/2.0/feature-store/feature-tables/create",
+            body={"name": feature_table_name, "primary_keys": [{"name": "pk", "data_type": "string"}]},
+        )
+        return table['feature_table']
+
+    def remove(table: dict):
+        try:
+            ws.api_client.do("DELETE", "/api/2.0/feature-store/feature-tables/delete", body={"name": table["name"]})
+        except RuntimeError as e:
+            logger.info(f"Can't remove feature table {e}")
+
+    yield from factory("Feature table", create, remove)

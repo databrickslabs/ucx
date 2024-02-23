@@ -70,8 +70,12 @@ class Principal:
     client_id: str
     display_name: str
     object_id: str
+    # service principal will have type: "Application"
+    # managed identity will have type: "ManagedIdentity"
+    type: str
     # Need this directory_id/tenant_id when create UC storage credentials using service principal
-    directory_id: str
+    # it will be None if type is managed identity
+    directory_id: str | None = None
 
 
 @dataclass
@@ -173,13 +177,17 @@ class AzureResources:
         client_id = raw.get("appId")
         display_name = raw.get("displayName")
         object_id = raw.get("id")
+        principal_type = raw.get("servicePrincipalType")
         # Need this directory_id/tenant_id when create UC storage credentials using service principal
         directory_id = raw.get("appOwnerOrganizationId")
         assert client_id is not None
         assert display_name is not None
         assert object_id is not None
-        assert directory_id is not None
-        self._principals[principal_id] = Principal(client_id, display_name, object_id, directory_id)
+        assert principal_type is not None
+        if principal_type == "Application":
+            # service principal must have directory_id
+            assert directory_id is not None
+        self._principals[principal_id] = Principal(client_id, display_name, object_id, principal_type, directory_id)
         return self._principals[principal_id]
 
     def role_assignments(

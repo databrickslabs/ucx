@@ -456,6 +456,7 @@ class GroupManager(CrawlerBase[MigratedGroup]):
                     "wf_group_members_count": len(ws_members_set),
                     "acc_group_name": ws_group.name_in_account,
                     "acc_group_members_count": len(acc_members_set),
+                    "group_members_difference": len(ws_members_set) - len(acc_members_set),
                 }
             )
         if not mismatch_group:
