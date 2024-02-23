@@ -37,6 +37,8 @@ from databricks.labs.ucx.azure.resources import AzureResources
 from databricks.labs.ucx.hive_metastore import ExternalLocations
 from tests.unit import DEFAULT_CONFIG
 
+from tests.unit import DEFAULT_CONFIG
+
 
 @pytest.fixture
 def ws():
@@ -46,8 +48,7 @@ def ws():
 @pytest.fixture
 def installation():
     return MockInstallation(
-        DEFAULT_CONFIG
-        | {
+        DEFAULT_CONFIG | {
             "azure_storage_account_info.csv": [
                 {
                     'prefix': 'prefix1',
