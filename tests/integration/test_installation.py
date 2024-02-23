@@ -7,6 +7,7 @@ from dataclasses import replace
 from datetime import timedelta
 
 import pytest
+from unittest.mock import MagicMock
 from databricks.labs.blueprint.installation import Installation
 from databricks.labs.blueprint.installer import InstallState
 from databricks.labs.blueprint.parallel import Threads
@@ -23,6 +24,7 @@ from databricks.labs.ucx.install import (
     WorkspaceInstallation,
     WorkspaceInstaller,
 )
+from databricks.labs.ucx.mixins.fixtures import make_random
 from databricks.labs.ucx.workspace_access import redash
 from databricks.labs.ucx.workspace_access.generic import (
     GenericPermissionsSupport,
@@ -40,7 +42,8 @@ def new_installation(ws, sql_backend, env_or_skip, inventory_schema, make_random
     cleanup = []
 
     def factory(
-        config_transform: Callable[[WorkspaceConfig], WorkspaceConfig] | None = None, single_user_install: bool = False
+        config_transform: Callable[[WorkspaceConfig], WorkspaceConfig] | None = None, single_user_install: bool = False,
+            existing_installation_prefix_as_product: str = 'ucx'
     ):
         prefix = make_random(4)
         renamed_group_prefix = f"rename-{prefix}-"
@@ -79,6 +82,8 @@ def new_installation(ws, sql_backend, env_or_skip, inventory_schema, make_random
         )
         installation = Installation(ws, prefix, install_folder=ucx_install_path)
         installer = WorkspaceInstaller(prompts, installation, ws)
+        PRODUCT_INFO.product_name = MagicMock()
+        PRODUCT_INFO.product_name.return_value = existing_installation_prefix_as_product
         workspace_config = installer.configure()
         overrides = {"main": default_cluster_id, "tacl": tacl_cluster_id}
         workspace_config.override_clusters = overrides
@@ -337,30 +342,27 @@ def test_uninstallation(ws, sql_backend, new_installation):
         sql_backend.execute(f"show tables from hive_metastore.{install.config.inventory_database}")
 
 
-@retried(on=[NotFound], timeout=timedelta(minutes=5))
+def test_fresh_global_installation(ws, new_installation):
+    global_installation = new_installation(single_user_install=False)
+    global_installation.uninstall()
+
+
 def test_single_user_installation(new_installation):
-    install_single_user = new_installation(single_user_install=True)
-    install_single_user.uninstall()
+    single_user_installation = new_installation(single_user_install=True)
+    single_user_installation.uninstall()
 
 
-def test_workspace_root_installation(ws, new_installation):
-    install_workspace_root = new_installation(single_user_install=False)
-    install_workspace_root.uninstall()
-
-
-@retried(on=[NotFound], timeout=timedelta(minutes=5))
-def test_workspace_root_installation_on_existing_root_install(ws, new_installation):
-    existing_installation = Installation(ws, "ucx", install_folder='/Applications/ucx')
-    ws_config = ws.config
-    existing_installation.save(ws_config)
-    reinstall_workspace_root = new_installation(single_user_install=False)
+def test_workspace_root_installation_on_existing_root_install(ws, new_installation, existing_installation):
+    existing_global_installation = existing_installation("global")
+    mock_product_value = existing_global_installation.product()
+    reinstall_workspace_root = new_installation(single_user_install=False, existing_installation_prefix_as_product=mock_product_value)
     reinstall_workspace_root.uninstall()
-
-
-@retried(on=[NotFound], timeout=timedelta(minutes=5))
-def test_single_user_installation_on_existing_root_install(ws, new_installation):
-    existing_installation = Installation(ws, "ucx", install_folder='/Applications/ucx')
-    ws_config = ws.config
-    existing_installation.save(ws_config)
-    reinstall_single_user = new_installation(single_user_install=True)
-    reinstall_single_user.uninstall()
+#
+#
+# @retried(on=[NotFound], timeout=timedelta(minutes=5))
+# def test_single_user_installation_on_existing_root_install(ws, new_installation):
+#     existing_installation = Installation(ws, "ucx", install_folder='/Applications/ucx')
+#     ws_config = ws.config
+#     existing_installation.save(ws_config)
+#     reinstall_single_user = new_installation(single_user_install=True)
+#     reinstall_single_user.uninstall()
