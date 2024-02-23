@@ -7,7 +7,12 @@ from databricks.sdk.errors import NotFound
 from databricks.sdk.service.catalog import Privilege
 
 from databricks.labs.ucx.assessment.crawlers import logger
-from databricks.labs.ucx.azure.resources import AzureResource, AzureResources, Principal
+from databricks.labs.ucx.azure.resources import (
+    AzureAPIClient,
+    AzureResource,
+    AzureResources,
+    Principal,
+)
 from databricks.labs.ucx.config import WorkspaceConfig
 from databricks.labs.ucx.framework.crawlers import StatementExecutionBackend
 from databricks.labs.ucx.hive_metastore.locations import ExternalLocations
@@ -45,7 +50,8 @@ class AzureResourcePermissions:
         installation = Installation.current(ws, product)
         config = installation.load(WorkspaceConfig)
         sql_backend = StatementExecutionBackend(ws, config.warehouse_id)
-        azurerm = AzureResources(ws, include_subscriptions=include_subscriptions)
+        api_client = AzureAPIClient(ws)
+        azurerm = AzureResources(include_subscriptions=include_subscriptions, api_client=api_client)
         locations = ExternalLocations(ws, sql_backend, config.inventory_database)
         return cls(installation, ws, azurerm, locations)
 

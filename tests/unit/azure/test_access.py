@@ -5,6 +5,7 @@ from databricks.sdk import WorkspaceClient
 
 from databricks.labs.ucx.azure.access import AzureResourcePermissions
 from databricks.labs.ucx.azure.resources import (
+    AzureAPIClient,
     AzureResource,
     AzureResources,
     AzureRoleAssignment,
@@ -22,7 +23,8 @@ def test_save_spn_permissions_no_external_table(caplog):
     backend = MockBackend(rows=rows)
     location = ExternalLocations(w, backend, "ucx")
     installation = MockInstallation()
-    azure_resources = create_autospec(AzureResources)
+    api_client = AzureAPIClient(w)
+    azure_resources = create_autospec(AzureResources(api_client=api_client))
     azure_resource_permission = AzureResourcePermissions(installation, w, azure_resources, location)
     azure_resources.storage_accounts.return_value = []
     azure_resource_permission.save_spn_permissions()
@@ -36,7 +38,8 @@ def test_save_spn_permissions_no_azure_storage_account():
     backend = MockBackend(rows=rows)
     location = ExternalLocations(w, backend, "ucx")
     installation = MockInstallation()
-    azure_resources = create_autospec(AzureResources)
+    api_client = AzureAPIClient(w)
+    azure_resources = create_autospec(AzureResources(api_client=api_client))
     azure_resource_permission = AzureResourcePermissions(installation, w, azure_resources, location)
     azure_resources.storage_accounts.return_value = []
     assert not azure_resource_permission.save_spn_permissions()
@@ -106,11 +109,11 @@ def test_save_spn_permissions_no_valid_storage_accounts(caplog, mocker, az_token
     backend = MockBackend(rows=rows)
     location = ExternalLocations(w, backend, "ucx")
     installation = MockInstallation()
+    api_client = AzureAPIClient(w)
     azure_resource_permission = AzureResourcePermissions(
-        installation, w, AzureResources(w, include_subscriptions="002"), location
+        installation, w, AzureResources(include_subscriptions="002", api_client=api_client), location
     )
-    azure_resource_permission.save_spn_permissions()
-    assert [rec.message for rec in caplog.records if "No storage account found in current tenant" in rec.message]
+    assert not azure_resource_permission.save_spn_permissions()
 
 
 def test_save_spn_permissions_valid_storage_accounts(caplog, mocker, az_token):
@@ -120,8 +123,9 @@ def test_save_spn_permissions_valid_storage_accounts(caplog, mocker, az_token):
     backend = MockBackend(rows=rows)
     location = ExternalLocations(w, backend, "ucx")
     installation = MockInstallation()
+    api_client = AzureAPIClient(w)
     azure_resource_permission = AzureResourcePermissions(
-        installation, w, AzureResources(w, include_subscriptions="002"), location
+        installation, w, AzureResources(include_subscriptions="002", api_client=api_client), location
     )
     azure_resource_permission.save_spn_permissions()
     installation.assert_file_written(
