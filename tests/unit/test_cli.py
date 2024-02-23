@@ -319,7 +319,7 @@ def test_migrate_credentials_azure(ws):
         migrate_credentials(ws)
         ws.storage_credentials.list.assert_called()
 
-
+        
 def test_migrate_aws_instance_profiles(ws, mocker):
     mocker.patch("shutil.which", return_value=True)
     ws.config.is_azure = True
