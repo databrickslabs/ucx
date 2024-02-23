@@ -114,3 +114,6 @@ commands:
       Workspace Group Name\tMembers Count\tAccount Group Name\tMembers Count
       {{range .}}{{.wf_group_name}}\t{{.wf_group_members_count}}\t{{.acc_group_name}}\t{{.acc_group_members_count}}
       {{end}}
+
+  - name: migrate_credentials
+    description: Migrate credentials for storage access to UC storage credential

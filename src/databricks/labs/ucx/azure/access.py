@@ -17,6 +17,8 @@ class StoragePermissionMapping:
     client_id: str
     principal: str
     privilege: str
+    # Need this directory_id/tenant_id when create UC storage credentials using service principal
+    directory_id: str
 
 
 class AzureResourcePermissions:
@@ -63,6 +65,7 @@ class AzureResourcePermissions:
                         client_id=role_assignment.principal.client_id,
                         principal=role_assignment.principal.display_name,
                         privilege=privilege,
+                        directory_id=role_assignment.principal.directory_id,
                     )
                 )
         return out

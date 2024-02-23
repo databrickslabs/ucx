@@ -45,6 +45,7 @@ def ws():
         ),
         '/Users/foo/.ucx/state.json': json.dumps({'resources': {'jobs': {'assessment': '123'}}}),
         "/Users/foo/.ucx/aws_instance_profile_info.csv": "instance_profile_arn,iam_role_arn,ROLE_NAME_REGEX\ntest,test,test",
+        "/Users/foo/.ucx/azure_storage_account_info.csv": "prefix,client_id,principal,privilege,directory_id\ntest,test,test,test,test",
     }
 
     def download(path: str) -> io.StringIO | io.BytesIO:
@@ -309,6 +310,14 @@ def test_save_storage_and_principal_gcp(ws, caplog):
     ws.config.is_gcp = True
     principal_prefix_access(ws)
     assert "This cmd is only supported for azure and aws workspaces" in caplog.messages
+
+
+def test_migrate_credentials_azure(ws):
+    ws.config.is_azure = True
+    ws.workspace.upload.return_value = "test"
+    with patch("databricks.labs.blueprint.tui.Prompts.confirm", return_value=True):
+        migrate_credentials(ws)
+        ws.storage_credentials.list.assert_called()
 
 
 def test_migrate_aws_instance_profiles(ws, mocker):
