@@ -104,6 +104,7 @@ def test_create_service_principal(mocker, az_token):
     assert global_spn.client_id == "appIduser1"
     assert global_spn.object_id == "Iduser1"
     assert global_spn.display_name == "disNameuser1"
+    assert global_spn.directory_id == "dir1"
     assert global_spn.secret == "mypwd"
 
 

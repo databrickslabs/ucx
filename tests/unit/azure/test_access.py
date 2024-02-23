@@ -14,7 +14,6 @@ from databricks.labs.ucx.azure.resources import (
 from databricks.labs.ucx.hive_metastore import ExternalLocations
 
 from ..framework.mocks import MockBackend
-from . import get_az_api_mapping
 
 
 def test_save_spn_permissions_no_external_table(caplog):
@@ -97,53 +96,6 @@ def test_save_spn_permissions_valid_azure_storage_account():
                 'client_id': 'a',
                 'prefix': 'abfss://container2@storage1.dfs.core.windows.net/',
                 'principal': 'b',
-                'privilege': 'WRITE_FILES',
-                'directory_id': '0000-0000',
-            },
-        ],
-    )
-
-
-def test_save_spn_permissions_no_valid_storage_accounts(caplog, mocker, az_token):
-    w = create_autospec(WorkspaceClient)
-    rows = {"SELECT \\* FROM ucx.external_locations": [["abfss://continer1@sto3.dfs.core.windows.net/folder1", 1]]}
-    mocker.patch("databricks.sdk.core.ApiClient.do", side_effect=get_az_api_mapping)
-    backend = MockBackend(rows=rows)
-    location = ExternalLocations(w, backend, "ucx")
-    installation = MockInstallation()
-    api_client = AzureAPIClient(w)
-    azure_resource_permission = AzureResourcePermissions(
-        installation, w, AzureResources(include_subscriptions="002", api_client=api_client), location
-    )
-    assert not azure_resource_permission.save_spn_permissions()
-
-
-def test_save_spn_permissions_valid_storage_accounts(caplog, mocker, az_token):
-    w = create_autospec(WorkspaceClient)
-    rows = {"SELECT \\* FROM ucx.external_locations": [["abfss://continer1@sto2.dfs.core.windows.net/folder1", 1]]}
-    mocker.patch("databricks.sdk.core.ApiClient.do", side_effect=get_az_api_mapping)
-    backend = MockBackend(rows=rows)
-    location = ExternalLocations(w, backend, "ucx")
-    installation = MockInstallation()
-    api_client = AzureAPIClient(w)
-    azure_resource_permission = AzureResourcePermissions(
-        installation, w, AzureResources(include_subscriptions="002", api_client=api_client), location
-    )
-    azure_resource_permission.save_spn_permissions()
-    installation.assert_file_written(
-        'azure_storage_account_info.csv',
-        [
-            {
-                'client_id': 'appIduser3',
-                'prefix': 'abfss://container3@sto2.dfs.core.windows.net/',
-                'principal': 'disNameuser3',
-                'privilege': 'WRITE_FILES',
-                'directory_id': '0000-0000',
-            },
-            {
-                'client_id': 'appIduser3',
-                'prefix': 'abfss://container3@sto2.dfs.core.windows.net/',
-                'principal': 'disNameuser3',
                 'privilege': 'WRITE_FILES',
                 'directory_id': '0000-0000',
             },

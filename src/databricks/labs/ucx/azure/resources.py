@@ -165,12 +165,11 @@ class AzureResources:
         try:
             path = "/v1.0/servicePrincipals"
             service_principal_info: dict[str, str] = self._api_client.put(path, "azure_graph")  # type: ignore[assignment]
-            app_id = service_principal_info["appId"]
-            path = f"/v1.0/servicePrincipals(appId='{app_id}')/addPassword"
+            client_id = service_principal_info.get("appId")
+            assert client_id is not None
+            path = f"/v1.0/servicePrincipals(appId='{client_id}')/addPassword"
             secret_info: dict[str, str] = self._api_client.put(path, "azure_graph")  # type: ignore[assignment]
-            return Principal(
-                app_id, service_principal_info["displayName"], service_principal_info["id"], secret_info["secretText"]
-            )
+
         except PermissionDenied:
             msg = (
                 "Permission denied. Please run this cmd under the identity of a user who has"
@@ -178,6 +177,16 @@ class AzureResources:
             )
             logger.error(msg)
             raise PermissionDenied(msg) from None
+        secret = secret_info.get("secretText")
+        display_name = service_principal_info.get("displayName")
+        object_id = service_principal_info.get("id")
+        directory_id = service_principal_info.get("appOwnerOrganizationId")
+        assert client_id is not None
+        assert display_name is not None
+        assert object_id is not None
+        assert directory_id is not None
+        assert secret is not None
+        return Principal(client_id, display_name, object_id, directory_id, secret)
 
     def apply_storage_permission(self, principal_id: str, resource_id: str):
         try:

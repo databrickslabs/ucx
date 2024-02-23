@@ -18,7 +18,7 @@ from databricks.labs.ucx.azure.access import (
     AzureResourcePermissions,
     StoragePermissionMapping,
 )
-from databricks.labs.ucx.azure.resources import AzureResources
+from databricks.labs.ucx.azure.resources import AzureAPIClient, AzureResources
 from databricks.labs.ucx.config import WorkspaceConfig
 from databricks.labs.ucx.framework.crawlers import StatementExecutionBackend
 from databricks.labs.ucx.hive_metastore.locations import ExternalLocations
@@ -167,7 +167,7 @@ class ServicePrincipalMigration(SecretsMixin):
 
         config = installation.load(WorkspaceConfig)
         sql_backend = StatementExecutionBackend(ws, config.warehouse_id)
-        azurerm = AzureResources(ws)
+        azurerm = AzureResources(api_client=AzureAPIClient(ws))
         locations = ExternalLocations(ws, sql_backend, config.inventory_database)
 
         resource_permissions = AzureResourcePermissions(installation, ws, azurerm, locations)
