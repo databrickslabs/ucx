@@ -19,10 +19,12 @@ from databricks.sdk.errors import NotFound, ResourceConflict
 from databricks.sdk.retries import retried
 from databricks.sdk.service import compute, iam, jobs, pipelines, sql, workspace
 from databricks.sdk.service.catalog import (
+    AzureServicePrincipal,
     CatalogInfo,
     DataSourceFormat,
     FunctionInfo,
     SchemaInfo,
+    StorageCredentialInfo,
     TableInfo,
     TableType,
 )
@@ -1072,3 +1074,24 @@ def make_query(ws, make_table, make_random):
             logger.info(f"Can't drop query {e}")
 
     yield from factory("query", create, remove)
+
+
+@pytest.fixture
+def make_storage_credential_spn(ws):
+    def create(
+        *, credential_name: str, application_id: str, client_secret: str, directory_id: str, read_only=False
+    ) -> StorageCredentialInfo:
+        azure_service_principal = AzureServicePrincipal(
+            directory_id,
+            application_id,
+            client_secret,
+        )
+        storage_credential = ws.storage_credentials.create(
+            credential_name, azure_service_principal=azure_service_principal, read_only=read_only
+        )
+        return storage_credential
+
+    def remove(storage_credential: StorageCredentialInfo):
+        ws.storage_credentials.delete(storage_credential.name, force=True)
+
+    yield from factory("storage_credential_from_spn", create, remove)

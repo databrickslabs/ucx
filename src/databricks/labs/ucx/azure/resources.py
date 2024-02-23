@@ -73,6 +73,8 @@ class Principal:
     client_id: str
     display_name: str
     object_id: str
+    # Need this directory_id/tenant_id when create UC storage credentials using service principal
+    directory_id: str
     secret: str | None = None
 
 
@@ -242,10 +244,13 @@ class AzureResources:
         client_id = raw.get("appId")
         display_name = raw.get("displayName")
         object_id = raw.get("id")
+        # Need this directory_id/tenant_id when create UC storage credentials using service principal
+        directory_id = raw.get("appOwnerOrganizationId")
         assert client_id is not None
         assert display_name is not None
         assert object_id is not None
-        self._principals[principal_id] = Principal(client_id, display_name, object_id)
+        assert directory_id is not None
+        self._principals[principal_id] = Principal(client_id, display_name, object_id, directory_id)
         return self._principals[principal_id]
 
     def role_assignments(
