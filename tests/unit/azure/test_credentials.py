@@ -1,6 +1,6 @@
 import logging
 import re
-from unittest.mock import MagicMock, create_autospec
+from unittest.mock import create_autospec
 
 import pytest
 from databricks.labs.blueprint.installation import MockInstallation
@@ -185,97 +185,49 @@ def test_create_storage_credentials(credential_manager):
 
 
 def test_validate_storage_credentials(credential_manager):
-    service_principal = MagicMock()
-    service_principal.permission_mapping.privilege = "WRITE_FILES"
-
-    storage_credential = StorageCredentialInfo(
-        name="principal_1",
-        azure_service_principal=AzureServicePrincipal(
-            "directory_id_1",
-            "client_id",
-            "test",
-        ),
-        read_only=False,
-    )
+    permission_mapping = StoragePermissionMapping("prefix", "client_id", "principal_1", "WRITE_FILES", "directory_id")
 
     # validate normal storage credential
-    validation = credential_manager.validate(storage_credential, service_principal)
+    validation = credential_manager.validate(permission_mapping)
     assert validation.read_only is False
-    assert validation.name == storage_credential.name
+    assert validation.name == permission_mapping.principal
     assert not validation.failures
 
 
 def test_validate_read_only_storage_credentials(credential_manager):
-    service_principal = MagicMock()
-    service_principal.permission_mapping.privilege = "READ_FILES"
-
-    storage_credential = StorageCredentialInfo(
-        name="principal_read",
-        azure_service_principal=AzureServicePrincipal(
-            "directory_id_1",
-            "client_id",
-            "test",
-        ),
-        read_only=True,
+    permission_mapping = StoragePermissionMapping(
+        "prefix", "client_id", "principal_read", "READ_FILES", "directory_id_1"
     )
 
     # validate read-only storage credential
-    validation = credential_manager.validate(storage_credential, service_principal)
+    validation = credential_manager.validate(permission_mapping)
     assert validation.read_only is True
-    assert validation.name == storage_credential.name
+    assert validation.name == permission_mapping.principal
     assert not validation.failures
 
 
 def test_validate_storage_credentials_overlap_location(credential_manager):
-    service_principal = MagicMock()
-    service_principal.permission_mapping.privilege = "WRITE_FILES"
-
-    storage_credential = StorageCredentialInfo(
-        name="overlap",
-        azure_service_principal=AzureServicePrincipal(
-            "directory_id_2",
-            "client_id",
-            "test",
-        ),
-    )
+    permission_mapping = StoragePermissionMapping("prefix", "client_id", "overlap", "WRITE_FILES", "directory_id_2")
 
     # prefix used for validation overlaps with existing external location will raise InvalidParameterValue
     # assert InvalidParameterValue is handled
-    validation = credential_manager.validate(storage_credential, service_principal)
+    validation = credential_manager.validate(permission_mapping)
     assert validation.failures == [
         "The validation is skipped because an existing external location overlaps with the location used for validation."
     ]
 
 
 def test_validate_storage_credentials_non_response(credential_manager):
-    service_principal = MagicMock()
-    service_principal.permission_mapping.privilege = "WRITE_FILES"
+    permission_mapping = StoragePermissionMapping("prefix", "client_id", "none", "WRITE_FILES", "directory_id")
 
-    storage_credential = StorageCredentialInfo(
-        name="none",
-        azure_service_principal=AzureServicePrincipal(
-            "directory_id_2",
-            "client_id",
-            "test",
-        ),
-    )
-    validation = credential_manager.validate(storage_credential, service_principal)
+    validation = credential_manager.validate(permission_mapping)
     assert validation.failures == ["Validation returned none results."]
 
 
 def test_validate_storage_credentials_failed_operation(credential_manager):
-    service_principal = MagicMock()
-    service_principal.permission_mapping.privilege = "WRITE_FILES"
+    permission_mapping = StoragePermissionMapping("prefix", "client_id", "fail", "WRITE_FILES", "directory_id_2")
 
-    storage_credential = StorageCredentialInfo(
-        name="fail",
-        azure_service_principal=AzureServicePrincipal(
-            "directory_id_2",
-            "client_id",
-            "test",
-        ),
-    )
-    validation = credential_manager.validate(storage_credential, service_principal)
+    validation = credential_manager.validate(permission_mapping)
     assert validation.failures == ["LIST validation failed with message: fail"]
 
 

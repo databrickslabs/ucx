@@ -35,21 +35,22 @@ class ServicePrincipalMigrationInfo:
 
 @dataclass
 class StorageCredentialValidationResult:
-    name: str | None = None
-    application_id: str | None = None
-    directory_id: str | None = None
-    read_only: bool | None = None
-    validated_on: str | None = None
+    name: str
+    application_id: str
+    directory_id: str
+    read_only: bool
+    validated_on: str
     failures: list[str] | None = None
 
     @classmethod
-    def from_validation(cls, storage_credential: StorageCredentialInfo, failures: list[str] | None, prefix: str):
-        if storage_credential.azure_service_principal:
-            application_id = storage_credential.azure_service_principal.application_id
-            directory_id = storage_credential.azure_service_principal.directory_id
-
+    def from_validation(cls, permission_mapping: StoragePermissionMapping, failures: list[str] | None):
         return cls(
-            storage_credential.name, application_id, directory_id, storage_credential.read_only, prefix, failures
+            permission_mapping.principal,
+            permission_mapping.client_id,
+            permission_mapping.directory_id,
+            permission_mapping.privilege == Privilege.READ_FILES.value,
+            permission_mapping.prefix,
+            failures,
         )
 
 
@@ -103,14 +104,12 @@ class StorageCredentialManager:
             read_only=spn.permission_mapping.privilege == Privilege.READ_FILES.value,
         )
 
-    def validate(
-        self, storage_credential: StorageCredentialInfo, spn: ServicePrincipalMigrationInfo
-    ) -> StorageCredentialValidationResult:
+    def validate(self, permission_mapping: StoragePermissionMapping) -> StorageCredentialValidationResult:
         try:
             validation = self._ws.storage_credentials.validate(
-                storage_credential_name=storage_credential.name,
-                url=spn.permission_mapping.prefix,
-                read_only=spn.permission_mapping.privilege == Privilege.READ_FILES.value,
+                storage_credential_name=permission_mapping.principal,
+                url=permission_mapping.prefix,
+                read_only=permission_mapping.privilege == Privilege.READ_FILES.value,
             )
         except InvalidParameterValue:
             logger.warning(
@@ -119,17 +118,16 @@ class StorageCredentialManager:
                 "Skip the validation"
             )
             return StorageCredentialValidationResult.from_validation(
-                storage_credential,
+                permission_mapping,
                 [
                     "The validation is skipped because an existing external location overlaps "
                     "with the location used for validation."
                 ],
-                spn.permission_mapping.prefix,
             )
 
         if not validation.results:
             return StorageCredentialValidationResult.from_validation(
-                storage_credential, ["Validation returned none results."], spn.permission_mapping.prefix
+                permission_mapping, ["Validation returned none results."]
             )
 
         failures = []
@@ -138,9 +136,7 @@ class StorageCredentialManager:
                 continue
             if result.result == ValidationResultResult.FAIL:
                 failures.append(f"{result.operation.value} validation failed with message: {result.message}")
-        return StorageCredentialValidationResult.from_validation(
-            storage_credential, None if not failures else failures, spn.permission_mapping.prefix
-        )
+        return StorageCredentialValidationResult.from_validation(permission_mapping, None if not failures else failures)
 
 
 class ServicePrincipalMigration(SecretsMixin):
@@ -262,8 +258,8 @@ class ServicePrincipalMigration(SecretsMixin):
 
         execution_result = []
         for spn in sp_list_with_secret:
-            storage_credential = self._storage_credential_manager.create_with_client_secret(spn)
-            execution_result.append(self._storage_credential_manager.validate(storage_credential, spn))
+            self._storage_credential_manager.create_with_client_secret(spn)
+            execution_result.append(self._storage_credential_manager.validate(spn.permission_mapping))
 
         if execution_result:
             results_file = self.save(execution_result)
