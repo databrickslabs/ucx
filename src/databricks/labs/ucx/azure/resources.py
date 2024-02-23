@@ -150,7 +150,8 @@ class AzureResources:
             path = f"/{resource_id}/providers/Microsoft.Authorization/roleAssignments/{_AZURE_BLOB_READER_ROLE_DEFINITION_ID}?api-version=2022-04-01"
             body = {
                 "properties": {
-                    "roleDefinitionId": f"/{resource_id}/providers/Microsoft.Authorization/roleDefinitions/{_AZURE_BLOB_READER_ROLE_DEFINITION_ID}",
+                    "roleDefinitionId": f"/{resource_id}/providers/Microsoft.Authorization/roleDefinitions/"
+                    f"{_AZURE_BLOB_READER_ROLE_DEFINITION_ID}",
                     "principalId": principal_id,
                     "principalType": "ServicePrincipal",
                 }
@@ -177,10 +178,12 @@ class AzureResources:
                 continue
             yield subscription
 
-    def _resource_action(self, path: str, api_version: str, action: str, body=None):
+    def _resource_action(self, path: str, api_version: str, action: str, body: dict | None = None):
         headers = {"Accept": "application/json"}
         query = {"api-version": api_version}
-        return self._resource_manager.do(action, path, query, headers, body)
+        if action == "PUT" and body is not None:
+            return self._resource_manager.do(action, path, query, headers, body)
+        return self._resource_manager.do(action, path, query, headers)
 
     def storage_accounts(self) -> Iterable[AzureResource]:
         for subscription in self.subscriptions():

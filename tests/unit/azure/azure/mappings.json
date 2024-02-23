@@ -175,6 +175,14 @@
           "id": "rol2"
         }
       ]
+    },
+    "/v1.0/servicePrincipals": {
+      "appId": "appIduser1",
+      "displayName": "disNameuser1",
+      "id": "Iduser1"
+    },
+    "/v1.0/servicePrincipals(appId='appIduser1')/addPassword": {
+      "secretText": "mypwd"
     }
   }
 ]
