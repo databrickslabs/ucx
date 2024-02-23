@@ -44,7 +44,7 @@ def ws():
             }
         ),
         '/Users/foo/.ucx/state.json': json.dumps({'resources': {'jobs': {'assessment': '123'}}}),
-        "/Users/foo/.ucx/aws_instance_profile_info.csv": "instance_profile_arn,iam_role_arn,ROLE_NAME_REGEX\ntest,test,test",
+        "/Users/foo/.ucx/uc_roles_access.csv.csv": "role_arn,resource_type,privilege,resource_path\ntest,test,test,test",
         "/Users/foo/.ucx/azure_storage_account_info.csv": "prefix,client_id,principal,privilege,directory_id\ntest,test,test,test,test",
     }
 
