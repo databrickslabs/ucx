@@ -57,11 +57,19 @@ class StorageCredentialManager:
     def __init__(self, ws: WorkspaceClient):
         self._ws = ws
 
-    def list(self) -> set[str]:
+    def list(self, include_names: set[str] | None = None) -> set[str]:
         # list existed storage credentials that is using service principal, capture the service principal's application_id
         application_ids = set()
 
         storage_credentials = self._ws.storage_credentials.list(max_results=0)
+
+        if include_names:
+            # we only check UC storage credentials listed in include_names
+            for storage_credential in storage_credentials:
+                if storage_credential.name in include_names:
+                    application_ids.add(storage_credential.azure_service_principal.application_id)
+            logger.info(f"Found {len(application_ids)} distinct service principals already used in UC storage credentials listed in include_names")
+            return application_ids
 
         for storage_credential in storage_credentials:
             # only add service principal's application_id, ignore managed identity based storage_credential
@@ -215,14 +223,14 @@ class ServicePrincipalMigration(SecretsMixin):
                 f"on location {spn.prefix}"
             )
 
-    def _generate_migration_list(self) -> list[ServicePrincipalMigrationInfo]:
+    def _generate_migration_list(self, include_names: set[str] | None = None) -> list[ServicePrincipalMigrationInfo]:
         """
         Create the list of SP that need to be migrated, output an action plan as a csv file for users to confirm
         """
         # load sp list from azure_storage_account_info.csv
         sp_list = self._resource_permissions.load()
         # list existed storage credentials
-        sc_set = self._storage_credential_manager.list()
+        sc_set = self._storage_credential_manager.list(include_names)
         # check if the sp is already used in UC storage credential
         filtered_sp_list = [sp for sp in sp_list if sp.client_id not in sc_set]
         # fetch sp client_secret if any
@@ -238,9 +246,9 @@ class ServicePrincipalMigration(SecretsMixin):
     def save(self, migration_results: list[StorageCredentialValidationResult]) -> str:
         return self._installation.save(migration_results, filename=self._output_file)
 
-    def run(self, prompts: Prompts) -> list[StorageCredentialValidationResult]:
+    def run(self, prompts: Prompts, include_names: set[str] | None = None) -> list[StorageCredentialValidationResult]:
 
-        sp_list_with_secret = self._generate_migration_list()
+        sp_list_with_secret = self._generate_migration_list(include_names)
 
         plan_confirmed = prompts.confirm(
             "Above Azure Service Principals will be migrated to UC storage credentials, please review and confirm."

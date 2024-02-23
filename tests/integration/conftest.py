@@ -174,30 +174,6 @@ class StaticServicePrincipalMigration(ServicePrincipalMigration):
         return "azure_service_principal_migration_result.csv"
 
 
-class StaticStorageCredentialManager(StorageCredentialManager):
-    # During integration test, we only want to list storage_credentials that are created during the test.
-    # So we provide a credential name list so the test can ignore credentials that are not in the list.
-    def __init__(self, ws_client: WorkspaceClient, credential_names: set[str]):
-        super().__init__(ws_client)
-        self._credential_names = credential_names
-
-    def list(self) -> set[str]:
-        application_ids = set()
-
-        storage_credentials = self._ws.storage_credentials.list(max_results=0)
-
-        for storage_credential in storage_credentials:
-            if not storage_credential.azure_service_principal:
-                continue
-            if storage_credential.name in self._credential_names:
-                application_ids.add(storage_credential.azure_service_principal.application_id)
-
-        logger.info(
-            f"Found {len(application_ids)} distinct service principals already used in storage credentials during integration test"
-        )
-        return application_ids
-
-
 class StaticServicePrincipalCrawler(AzureServicePrincipalCrawler):
     def __init__(self, spn_infos: list[AzureServicePrincipalInfo], *args):
         super().__init__(*args)

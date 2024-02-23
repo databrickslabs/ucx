@@ -8,14 +8,14 @@ from databricks.labs.blueprint.tui import MockPrompts
 
 from databricks.labs.ucx.assessment.azure import AzureServicePrincipalInfo
 from databricks.labs.ucx.azure.access import StoragePermissionMapping
-from databricks.labs.ucx.azure.credentials import StorageCredentialValidationResult
+from databricks.labs.ucx.azure.credentials import StorageCredentialValidationResult, \
+    StorageCredentialManager
 from databricks.labs.ucx.azure.resources import AzureResources
 from databricks.labs.ucx.hive_metastore import ExternalLocations
 from tests.integration.conftest import (
     StaticResourcePermissions,
     StaticServicePrincipalCrawler,
-    StaticServicePrincipalMigration,
-    StaticStorageCredentialManager,
+    StaticServicePrincipalMigration
 )
 
 
@@ -85,10 +85,11 @@ def run_migration(ws, sql_backend, make_random):
         sp_crawler = StaticServicePrincipalCrawler(sp_infos, ws, sql_backend, "dont_need_a_schema")
 
         spn_migration = StaticServicePrincipalMigration(
-            installation, ws, resource_permissions, sp_crawler, StaticStorageCredentialManager(ws, credentials)
+            installation, ws, resource_permissions, sp_crawler, StorageCredentialManager(ws)
         )
         return spn_migration.run(
-            MockPrompts({"Above Azure Service Principals will be migrated to UC storage credentials *": "Yes"})
+            MockPrompts({"Above Azure Service Principals will be migrated to UC storage credentials *": "Yes"}),
+            credentials
         )
 
     return inner
