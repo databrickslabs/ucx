@@ -132,10 +132,33 @@ def test_apply_storage_permission(mocker, az_token):
     api_client.put.assert_called_with(path, "azure_graph", body)
 
 
-def test_apply_storage_permission_no_access(mocker, az_token):
+def test_apply_storage_permission_no_access(az_token):
     api_client = azure_api_client()
     api_client.put.side_effect = PermissionDenied()
     azure_resource = AzureResources(api_client=api_client)
-    mocker.patch("databricks.sdk.core.ApiClient.do", side_effect=PermissionDenied())
     with pytest.raises(PermissionDenied):
         azure_resource.apply_storage_permission("test", "resourceid1")
+
+
+def test_azure_client_api_put_graph(mocker, az_token):
+    mocker.patch("databricks.sdk.core.ApiClient.do", side_effect=get_az_api_mapping)
+    w = create_autospec(WorkspaceClient)
+    api_client = AzureAPIClient(w)
+    result = api_client.put("/v1.0/servicePrincipals", "azure_graph", {"foo": "bar"})
+    assert result.get("appId") == "appIduser1"
+
+
+def test_azure_client_api_get_azure(mocker, az_token):
+    mocker.patch("databricks.sdk.core.ApiClient.do", side_effect=get_az_api_mapping)
+    w = create_autospec(WorkspaceClient)
+    api_client = AzureAPIClient(w)
+    subscriptions = api_client.get("/subscriptions", "azure_mgmt", {"foo": "bar"})
+    assert len(subscriptions) == 1
+
+
+def test_azure_client_api_get_graph(mocker, az_token):
+    mocker.patch("databricks.sdk.core.ApiClient.do", side_effect=get_az_api_mapping)
+    w = create_autospec(WorkspaceClient)
+    api_client = AzureAPIClient(w)
+    principal = api_client.get("/v1.0/directoryObjects/user1", "azure_graph")
+    assert principal.get("appId") == "appIduser1"

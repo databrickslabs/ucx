@@ -127,16 +127,11 @@ class AzureAPIClient:
             return self._graph.do("GET", path)
         return None
 
-    def put(self, path: str, host: str, body: dict | None = None, api_version: str | None = None):
+    def put(self, path: str, host: str, body: dict | None = None):
         headers = {"Accept": "application/json"}
-        query = {}
-        if api_version is not None:
-            query = {"api-version": api_version}
         if body is not None:
-            if host == "azure_mgmt":
-                return self._resource_manager.do("POST", path, query, headers, body)
             if host == "azure_graph":
-                return self._graph.do("POST", path, body)
+                return self._graph.do("POST", path, headers=headers, body=body)
         return None
 
     @property
