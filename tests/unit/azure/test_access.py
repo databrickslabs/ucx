@@ -178,7 +178,6 @@ def test_create_global_spn(mocker):
     call_1 = call(
         WorkspaceConfig(
             inventory_database='ucx',
-            override_clusters={"main": 'one', "tacl": 'two'},
             policy_id="foo1",
             global_spn_id="appIduser1",
         )
