@@ -113,9 +113,7 @@ def test_create_global_spn_no_policy():
     w = create_autospec(WorkspaceClient)
     location = ExternalLocations(w, MockBackend, "ucx")
     installation = create_autospec(Installation)
-    installation.load.return_value = WorkspaceConfig(
-        inventory_database='ucx', override_clusters={"main": 'one', "tacl": 'two'}
-    )
+    installation.load.return_value = WorkspaceConfig(inventory_database='ucx')
     azure_resources = create_autospec(AzureResources(api_client=AzureAPIClient(w)))
     azure_resource_permission = AzureResourcePermissions(installation, w, azure_resources, location)
     assert not azure_resource_permission.create_global_spn()
@@ -127,7 +125,6 @@ def test_create_global_spn_spn_present():
     installation = create_autospec(Installation)
     installation.load.return_value = WorkspaceConfig(
         inventory_database='ucx',
-        override_clusters={"main": 'one', "tacl": 'two'},
         policy_id="foo1",
         global_spn_id="123",
     )
@@ -142,9 +139,7 @@ def test_create_global_spn_no_storage():
     backend = MockBackend(rows=rows)
     location = ExternalLocations(w, backend, "ucx")
     installation = create_autospec(Installation)
-    installation.load.return_value = WorkspaceConfig(
-        inventory_database='ucx', override_clusters={"main": 'one', "tacl": 'two'}, policy_id="foo1"
-    )
+    installation.load.return_value = WorkspaceConfig(inventory_database='ucx')
     azure_resources = create_autospec(AzureResources(api_client=AzureAPIClient(w)))
     azure_resource_permission = AzureResourcePermissions(installation, w, azure_resources, location)
     assert not azure_resource_permission.create_global_spn()
@@ -157,9 +152,7 @@ def test_create_global_spn_cluster_policy_not_found(mocker):
     backend = MockBackend(rows=rows)
     location = ExternalLocations(w, backend, "ucx")
     installation = create_autospec(Installation)
-    installation.load.return_value = WorkspaceConfig(
-        inventory_database='ucx', override_clusters={"main": 'one', "tacl": 'two'}, policy_id="foo1"
-    )
+    installation.load.return_value = WorkspaceConfig(inventory_database='ucx', policy_id="foo1")
     api_client = azure_api_client(mocker)
     azure_resources = AzureResources(include_subscriptions="002", api_client=api_client)
     azure_resource_permission = AzureResourcePermissions(installation, w, azure_resources, location)
@@ -177,9 +170,7 @@ def test_create_global_spn(mocker):
     backend = MockBackend(rows=rows)
     location = ExternalLocations(w, backend, "ucx")
     installation = create_autospec(Installation)
-    installation.load.return_value = WorkspaceConfig(
-        inventory_database='ucx', override_clusters={"main": 'one', "tacl": 'two'}, policy_id="foo1"
-    )
+    installation.load.return_value = WorkspaceConfig(inventory_database='ucx', policy_id="foo1")
     api_client = azure_api_client(mocker)
     azure_resources = AzureResources(include_subscriptions="002", api_client=api_client)
     azure_resource_permission = AzureResourcePermissions(installation, w, azure_resources, location)
