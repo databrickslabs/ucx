@@ -1,7 +1,11 @@
-from unittest.mock import create_autospec
+import json
+from unittest.mock import call, create_autospec
 
-from databricks.labs.blueprint.installation import MockInstallation
+import pytest
+from databricks.labs.blueprint.installation import Installation, MockInstallation
 from databricks.sdk import WorkspaceClient
+from databricks.sdk.errors import NotFound
+from databricks.sdk.service.compute import Policy
 
 from databricks.labs.ucx.azure.access import AzureResourcePermissions
 from databricks.labs.ucx.azure.resources import (
@@ -11,9 +15,11 @@ from databricks.labs.ucx.azure.resources import (
     AzureRoleAssignment,
     Principal,
 )
+from databricks.labs.ucx.config import WorkspaceConfig
 from databricks.labs.ucx.hive_metastore import ExternalLocations
 
 from ..framework.mocks import MockBackend
+from . import azure_api_client
 
 
 def test_save_spn_permissions_no_external_table(caplog):
@@ -100,4 +106,124 @@ def test_save_spn_permissions_valid_azure_storage_account():
                 'directory_id': '0000-0000',
             },
         ],
+    )
+
+
+def test_create_global_spn_no_policy():
+    w = create_autospec(WorkspaceClient)
+    location = ExternalLocations(w, MockBackend, "ucx")
+    installation = create_autospec(Installation)
+    installation.load.return_value = WorkspaceConfig(
+        inventory_database='ucx', override_clusters={"main": 'one', "tacl": 'two'}
+    )
+    azure_resources = create_autospec(AzureResources(api_client=AzureAPIClient(w)))
+    azure_resource_permission = AzureResourcePermissions(installation, w, azure_resources, location)
+    assert not azure_resource_permission.create_global_spn()
+
+
+def test_create_global_spn_spn_present():
+    w = create_autospec(WorkspaceClient)
+    location = ExternalLocations(w, MockBackend, "ucx")
+    installation = create_autospec(Installation)
+    installation.load.return_value = WorkspaceConfig(
+        inventory_database='ucx',
+        override_clusters={"main": 'one', "tacl": 'two'},
+        policy_id="foo1",
+        global_spn_id="123",
+    )
+    azure_resources = create_autospec(AzureResources(api_client=AzureAPIClient(w)))
+    azure_resource_permission = AzureResourcePermissions(installation, w, azure_resources, location)
+    assert not azure_resource_permission.create_global_spn()
+
+
+def test_create_global_spn_no_storage():
+    w = create_autospec(WorkspaceClient)
+    rows = {"SELECT \\* FROM ucx.external_locations": [["s3://bucket1/folder1", "0"]]}
+    backend = MockBackend(rows=rows)
+    location = ExternalLocations(w, backend, "ucx")
+    installation = create_autospec(Installation)
+    installation.load.return_value = WorkspaceConfig(
+        inventory_database='ucx', override_clusters={"main": 'one', "tacl": 'two'}, policy_id="foo1"
+    )
+    azure_resources = create_autospec(AzureResources(api_client=AzureAPIClient(w)))
+    azure_resource_permission = AzureResourcePermissions(installation, w, azure_resources, location)
+    assert not azure_resource_permission.create_global_spn()
+
+
+def test_create_global_spn_cluster_policy_not_found(mocker):
+    w = create_autospec(WorkspaceClient)
+    w.cluster_policies.get.side_effect = NotFound()
+    rows = {"SELECT \\* FROM ucx.external_locations": [["abfss://container1@sto2.dfs.core.windows.net/folder1", "1"]]}
+    backend = MockBackend(rows=rows)
+    location = ExternalLocations(w, backend, "ucx")
+    installation = create_autospec(Installation)
+    installation.load.return_value = WorkspaceConfig(
+        inventory_database='ucx', override_clusters={"main": 'one', "tacl": 'two'}, policy_id="foo1"
+    )
+    api_client = azure_api_client(mocker)
+    azure_resources = AzureResources(include_subscriptions="002", api_client=api_client)
+    azure_resource_permission = AzureResourcePermissions(installation, w, azure_resources, location)
+    with pytest.raises(NotFound):
+        azure_resource_permission.create_global_spn()
+
+
+def test_create_global_spn(mocker):
+    w = create_autospec(WorkspaceClient)
+    cluster_policy = Policy(
+        policy_id="foo", name="Unity Catalog Migration (ucx) (me@example.com)", definition=json.dumps({"foo": "bar"})
+    )
+    w.cluster_policies.get.return_value = cluster_policy
+    rows = {"SELECT \\* FROM ucx.external_locations": [["abfss://container1@sto2.dfs.core.windows.net/folder1", "1"]]}
+    backend = MockBackend(rows=rows)
+    location = ExternalLocations(w, backend, "ucx")
+    installation = create_autospec(Installation)
+    installation.load.return_value = WorkspaceConfig(
+        inventory_database='ucx', override_clusters={"main": 'one', "tacl": 'two'}, policy_id="foo1"
+    )
+    api_client = azure_api_client(mocker)
+    azure_resources = AzureResources(include_subscriptions="002", api_client=api_client)
+    azure_resource_permission = AzureResourcePermissions(installation, w, azure_resources, location)
+    azure_resource_permission.create_global_spn()
+    call_1 = call(
+        WorkspaceConfig(
+            inventory_database='ucx',
+            override_clusters={"main": 'one', "tacl": 'two'},
+            policy_id="foo1",
+            global_spn_id="appIduser1",
+        )
+    )
+    call_2 = call(cluster_policy.as_dict(), filename='policy-backup.json')
+    installation.save.assert_has_calls([call_1, call_2])
+    path = "/subscriptions/002/resourceGroups/rg1/storageAccounts/sto2/providers/Microsoft.Authorization/roleAssignments/2a2b9908-6ea1-4ae2-8e65-a410df84e7d1?api-version=2022-04-01"
+    body = {
+        'properties': {
+            'principalId': 'appIduser1',
+            'principalType': 'ServicePrincipal',
+            'roleDefinitionId': '/subscriptions/002/resourceGroups/rg1/storageAccounts/sto2/providers/Microsoft.Authorization/roleDefinitions/2a2b9908-6ea1-4ae2-8e65-a410df84e7d1',
+        }
+    }
+
+    api_client.put.assert_called_with(path, "azure_graph", body)
+    definition = {
+        "foo": "bar",
+        "spark_conf.fs.azure.account.oauth2.client.id.sto2.dfs.core.windows.net": {
+            "type": "fixed",
+            "value": "appIduser1",
+        },
+        "spark_conf.fs.azure.account.oauth.provider.type.sto2.dfs.core.windows.net": {
+            "type": "fixed",
+            "value": "org.apache.hadoop.fs.azurebfs.oauth2.ClientCredsTokenProvider",
+        },
+        "spark_conf.fs.azure.account.oauth2.client.endpoint.sto2.dfs.core.windows.net": {
+            "type": "fixed",
+            "value": "https://login.microsoftonline.com/bar/oauth2/token",
+        },
+        "spark_conf.fs.azure.account.auth.type.sto2.dfs.core.windows.net": {"type": "fixed", "value": "OAuth"},
+        "spark_conf.fs.azure.account.oauth2.client.secret.sto2.dfs.core.windows.net": {
+            "type": "fixed",
+            "value": "mypwd",
+        },
+    }
+    w.cluster_policies.edit.assert_called_with(
+        'foo1', 'Unity Catalog Migration (ucx) (me@example.com)', definition=json.dumps(definition)
     )

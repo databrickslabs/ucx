@@ -128,6 +128,7 @@ class AzureResourcePermissions:
         self, policy_id: str, storage_accounts: list[AzureResource], global_principal: Principal
     ):
         try:
+            policy_definition = ""
             cluster_policy = self._ws.cluster_policies.get(policy_id)
             self._installation.save(cluster_policy.as_dict(), filename="policy-backup.json")
             if cluster_policy.definition is not None:
@@ -149,7 +150,7 @@ class AzureResourcePermissions:
             )
             return
         if config.global_spn_id is not None:
-            logger.info("Global service principal already created for this workspace.")
+            logger.error("Global service principal already created for this workspace.")
             return
         used_storage_accounts = self._get_storage_accounts()
         if len(used_storage_accounts) == 0:
