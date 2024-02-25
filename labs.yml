@@ -111,6 +111,9 @@ commands:
   - name: create-master-principal
     description: For azure cloud, creates a service principal and gives STORAGE BLOB READER access on all the storage account 
       used by tables in the workspace and stores the spn info in the UCX cluster policy.
+    flags:
+      - name: subscription-id
+        description: Subscription to scan storage account in
 
   - name: validate-groups-membership
     description: Validate the groups to see if the groups at account level and workspace level have different membership

@@ -104,25 +104,27 @@ def test_create_service_principal_no_access(mocker):
 def test_apply_storage_permission(mocker):
     api_client = azure_api_client(mocker)
     azure_resource = AzureResources(api_client=api_client)
-    azure_resource.apply_storage_permission("test", "resourceid1")
-    path = "/resourceid1/providers/Microsoft.Authorization/roleAssignments/2a2b9908-6ea1-4ae2-8e65-a410df84e7d1?api-version=2022-04-01"
+    azure_storage = AzureResource("subscriptions/002/resourceGroups/rg1/storageAccounts/sto2")
+    azure_resource.apply_storage_permission("test", azure_storage, "STORAGE_BLOB_READER")
+    path = "subscriptions/002/resourceGroups/rg1/storageAccounts/sto2/providers/Microsoft.Authorization/roleAssignments/e97fa67e-cf3a-49f4-987b-2fc8a3be88a1"
     body = {
         'properties': {
             'principalId': 'test',
             'principalType': 'ServicePrincipal',
-            'roleDefinitionId': '/resourceid1/providers/Microsoft.Authorization/roleDefinitions/2a2b9908-6ea1-4ae2-8e65-a410df84e7d1',
+            'roleDefinitionId': '/subscriptions/002/providers/Microsoft.Authorization/roleDefinitions/2a2b9908-6ea1-4ae2-8e65-a410df84e7d1',
         }
     }
 
-    api_client.put.assert_called_with(path, "azure_graph", body)
+    api_client.put.assert_called_with(path, "azure_mgmt", body)
 
 
 def test_apply_storage_permission_no_access(mocker):
     api_client = azure_api_client(mocker)
     api_client.put.side_effect = PermissionDenied()
+    azure_storage = AzureResource("subscriptions/002/resourceGroups/rg1/storageAccounts/sto2")
     azure_resource = AzureResources(api_client=api_client)
     with pytest.raises(PermissionDenied):
-        azure_resource.apply_storage_permission("test", "resourceid1")
+        azure_resource.apply_storage_permission("test", azure_storage, "STORAGE_BLOB_READER")
 
 
 def test_azure_client_api_put_graph(mocker):
@@ -131,6 +133,14 @@ def test_azure_client_api_put_graph(mocker):
     api_client = AzureAPIClient(w)
     result = api_client.put("/v1.0/servicePrincipals", "azure_graph", {"foo": "bar"})
     assert result.get("appId") == "appIduser1"
+
+
+def test_azure_client_api_put_mgmt(mocker):
+    mocker.patch("databricks.sdk.core.ApiClient.do", side_effect=get_az_api_mapping)
+    w = create_autospec(WorkspaceClient)
+    api_client = AzureAPIClient(w)
+    result = api_client.put("id001", "azure_mgmt", {"foo": "bar"})
+    assert result.get("id") == "role1"
 
 
 def test_azure_client_api_get_azure(mocker):

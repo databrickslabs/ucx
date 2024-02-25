@@ -8,12 +8,17 @@ from databricks.sdk.core import (
     Config,
     credentials_provider,
 )
-from databricks.sdk.errors import NotFound, PermissionDenied
+from databricks.sdk.errors import NotFound, PermissionDenied, BadRequest
 
 from databricks.labs.ucx.assessment.crawlers import logger
 
 # https://learn.microsoft.com/en-us/azure/role-based-access-control/built-in-roles
-_AZURE_BLOB_READER_ROLE_DEFINITION_ID = "2a2b9908-6ea1-4ae2-8e65-a410df84e7d1"
+_ROLES = {
+    "STORAGE_BLOB_READER": {
+        "name": "e97fa67e-cf3a-49f4-987b-2fc8a3be88a1",
+        "id": "2a2b9908-6ea1-4ae2-8e65-a410df84e7d1",
+    }
+}
 
 
 @dataclass
@@ -128,11 +133,16 @@ class AzureAPIClient:
         return None
 
     def put(self, path: str, host: str, body: dict | None = None):
-        headers = {"Accept": "application/json"}
-        if body is not None:
-            if host == "azure_graph":
+        headers = {"Content-Type": "application/json"}
+        if host == "azure_mgmt":
+            assert body is not None
+            query = {"api-version": "2022-04-01"}
+            return self._resource_manager.do("PUT", path, headers=headers, body=body, query=query)
+        if host == "azure_graph":
+            if body is not None:
                 return self._graph.do("POST", path, headers=headers, body=body)
-        return None
+            return self._graph.do("POST", path, headers=headers)
+        raise ValueError()
 
     @property
     def token(self):
@@ -158,12 +168,19 @@ class AzureResources:
 
     def create_service_principal(self) -> Principal:
         try:
-            path = "/v1.0/servicePrincipals"
-            service_principal_info: dict[str, str] = self._api_client.put(path, "azure_graph")  # type: ignore[assignment]
+            application_info: dict[str, str] = self._api_client.put(
+                "/v1.0/applications", "azure_graph", {"displayName": "UCXServicePrincipal"}
+            )
+            app_id = application_info.get("appId")
+            assert app_id is not None
+            service_principal_info: dict[str, str] = self._api_client.put(
+                "/v1.0/servicePrincipals", "azure_graph", {"appId": app_id}
+            )
             client_id = service_principal_info.get("appId")
             assert client_id is not None
-            path = f"/v1.0/servicePrincipals(appId='{client_id}')/addPassword"
-            secret_info: dict[str, str] = self._api_client.put(path, "azure_graph")  # type: ignore[assignment]
+            secret_info: dict[str, str] = self._api_client.put(
+                f"/v1.0/servicePrincipals(appId='{client_id}')/addPassword", "azure_graph"
+            )
 
         except PermissionDenied:
             msg = (
@@ -183,18 +200,20 @@ class AzureResources:
         assert secret is not None
         return Principal(client_id, display_name, object_id, directory_id, secret)
 
-    def apply_storage_permission(self, principal_id: str, resource_id: str):
+    def apply_storage_permission(self, principal_id: str, resource: AzureResource, role: str):
         try:
-            path = f"/{resource_id}/providers/Microsoft.Authorization/roleAssignments/{_AZURE_BLOB_READER_ROLE_DEFINITION_ID}?api-version=2022-04-01"
+            role_name = _ROLES[role]["name"]
+            role_id = _ROLES[role]["id"]
+            path = f"{str(resource)}/providers/Microsoft.Authorization/roleAssignments/{role_name}"
             body = {
                 "properties": {
-                    "roleDefinitionId": f"/{resource_id}/providers/Microsoft.Authorization/roleDefinitions/"
-                    f"{_AZURE_BLOB_READER_ROLE_DEFINITION_ID}",
+                    "roleDefinitionId": f"/subscriptions/{resource.subscription_id}/providers/Microsoft.Authorization/roleDefinitions/"
+                    f"{role_id}",
                     "principalId": principal_id,
                     "principalType": "ServicePrincipal",
                 }
             }
-            self._api_client.put(path, "azure_graph", body)
+            self._api_client.put(path, "azure_mgmt", body)
         except PermissionDenied:
             msg = (
                 "Permission denied. Please run this cmd under the identity of a user who has "
@@ -202,6 +221,9 @@ class AzureResources:
             )
             logger.error(msg)
             raise PermissionDenied(msg) from None
+        except BadRequest:
+            pass
+
 
     def tenant_id(self):
         token = self._api_client.token
@@ -220,7 +242,7 @@ class AzureResources:
         for subscription in self.subscriptions():
             logger.info(f"Checking in subscription {subscription.name} for storage accounts")
             path = f"/subscriptions/{subscription.subscription_id}/providers/Microsoft.Storage/storageAccounts"
-            for storage in self._api_client.get(path, "azure_mgmt", "2022-04-01").get("value", []):
+            for storage in self._api_client.get(path, "azure_mgmt", "2023-01-01").get("value", []):
                 resource_id = storage.get("id")
                 if not resource_id:
                     continue
@@ -245,6 +267,7 @@ class AzureResources:
             # don't load principals from external directories twice
             self._principals[principal_id] = None
             return self._principals[principal_id]
+
         client_id = raw.get("appId")
         display_name = raw.get("displayName")
         object_id = raw.get("id")

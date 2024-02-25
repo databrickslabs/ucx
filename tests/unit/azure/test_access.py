@@ -184,16 +184,16 @@ def test_create_global_spn(mocker):
     )
     call_2 = call(cluster_policy.as_dict(), filename='policy-backup.json')
     installation.save.assert_has_calls([call_1, call_2])
-    path = "/subscriptions/002/resourceGroups/rg1/storageAccounts/sto2/providers/Microsoft.Authorization/roleAssignments/2a2b9908-6ea1-4ae2-8e65-a410df84e7d1?api-version=2022-04-01"
+    path = "subscriptions/002/resourceGroups/rg1/storageAccounts/sto2/providers/Microsoft.Authorization/roleAssignments/e97fa67e-cf3a-49f4-987b-2fc8a3be88a1"
     body = {
         'properties': {
-            'principalId': 'appIduser1',
+            'principalId': 'Iduser1',
             'principalType': 'ServicePrincipal',
-            'roleDefinitionId': '/subscriptions/002/resourceGroups/rg1/storageAccounts/sto2/providers/Microsoft.Authorization/roleDefinitions/2a2b9908-6ea1-4ae2-8e65-a410df84e7d1',
+            'roleDefinitionId': '/subscriptions/002/providers/Microsoft.Authorization/roleDefinitions/2a2b9908-6ea1-4ae2-8e65-a410df84e7d1',
         }
     }
 
-    api_client.put.assert_called_with(path, "azure_graph", body)
+    api_client.put.assert_called_with(path, "azure_mgmt", body)
     definition = {
         "foo": "bar",
         "spark_conf.fs.azure.account.oauth2.client.id.sto2.dfs.core.windows.net": {

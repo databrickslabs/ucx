@@ -186,6 +186,15 @@
     },
     "/v1.0/servicePrincipals(appId='appIduser1')/addPassword": {
       "secretText": "mypwd"
+    },
+    "/resourceid1/providers/Microsoft.Authorization/roleAssignments/2a2b9908-6ea1-4ae2-8e65-a410df84e7d1?api-version=2022-04-01": {
+      "foo": "bar"
+    },
+    "/subscriptions/002/resourceGroups/rg1/storageAccounts/sto2/providers/Microsoft.Authorization/roleAssignments/2a2b9908-6ea1-4ae2-8e65-a410df84e7d1?api-version=2022-04-01": {
+      "foo": "bar"
+    },
+    "/v1.0/applications": {
+      "appId": "appIduser1"
     }
   }
 ]
