@@ -8,7 +8,7 @@ from databricks.sdk.core import (
     Config,
     credentials_provider,
 )
-from databricks.sdk.errors import BadRequest, NotFound, PermissionDenied
+from databricks.sdk.errors import NotFound, PermissionDenied
 
 from databricks.labs.ucx.assessment.crawlers import logger
 
@@ -221,8 +221,6 @@ class AzureResources:
             )
             logger.error(msg)
             raise PermissionDenied(msg) from None
-        except BadRequest:
-            pass
 
     def tenant_id(self):
         token = self._api_client.token
