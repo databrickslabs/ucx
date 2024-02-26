@@ -310,7 +310,7 @@ def apply_permissions_to_account_groups(cfg: WorkspaceConfig, ws: WorkspaceClien
     permission_manager.apply_group_permissions(migration_state)
 
 
-@task("validate-groups-permissions")
+@task("validate-groups-permissions", job_cluster="tacl")
 def validate_groups_permissions(cfg: WorkspaceConfig, ws: WorkspaceClient, sql_backend: SqlBackend):
     """Validate that all the crawled permissions are applied correctly to the destination groups."""
     logger.info("Running validation of permissions applied to destination groups.")
