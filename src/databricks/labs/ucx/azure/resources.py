@@ -90,23 +90,17 @@ class AzureRoleAssignment:
     principal: Principal
     role_name: str
 
-
+#rm_host = ws.config.arm_environment.resource_manager_endpoint
+#"https://graph.microsoft.com"
 class AzureAPIClient:
-    def __init__(self, ws: WorkspaceClient):
-        rm_host = ws.config.arm_environment.resource_manager_endpoint
-        self._resource_manager = ApiClient(
+    def __init__(self, ws: WorkspaceClient, host_endpoint: str, service_endpoint: str):
+        self._api_client = ApiClient(
             Config(
-                host=rm_host,
-                credentials_provider=self._provider_for(ws.config.arm_environment.service_management_endpoint),
+                host=host_endpoint,
+                credentials_provider=self._provider_for(service_endpoint),
             )
         )
-        self._graph = ApiClient(
-            Config(
-                host="https://graph.microsoft.com",
-                credentials_provider=self._provider_for("https://graph.microsoft.com"),
-            )
-        )
-        self._token_source = AzureCliTokenSource(rm_host)
+        self._token_source = AzureCliTokenSource(host_endpoint)
 
     def _provider_for(self, endpoint: str):
         @credentials_provider("azure-cli", ["host"])
@@ -121,28 +115,19 @@ class AzureAPIClient:
 
         return _credentials
 
-    def get(self, path: str, host: str, api_version: str | None = None):
+    def get(self, path: str, api_version: str | None = None):
         headers = {"Accept": "application/json"}
         query = {}
         if api_version is not None:
             query = {"api-version": api_version}
-        if host == "azure_mgmt":
-            return self._resource_manager.do("GET", path, query, headers)
-        if host == "azure_graph":
-            return self._graph.do("GET", path)
-        return None
+        return self._api_client.do("GET", path, query, headers)
 
-    def put(self, path: str, host: str, body: dict | None = None):
+    def put(self, path: str, body: dict | None = None, api_version: str | None = None):
         headers = {"Content-Type": "application/json"}
-        if host == "azure_mgmt":
-            assert body is not None
-            query = {"api-version": "2022-04-01"}
-            return self._resource_manager.do("PUT", path, headers=headers, body=body, query=query)
-        if host == "azure_graph":
-            if body is not None:
-                return self._graph.do("POST", path, headers=headers, body=body)
-            return self._graph.do("POST", path, headers=headers)
-        raise ValueError()
+        query={}
+        if api_version is not None:
+            query = {"api-version": api_version}
+        return self._api_client.do("PUT", path, query, headers, body)
 
     @property
     def token(self):
@@ -150,16 +135,17 @@ class AzureAPIClient:
 
 
 class AzureResources:
-    def __init__(self, *, include_subscriptions=None, api_client: AzureAPIClient):
+    def __init__(self, *, include_subscriptions=None, azure_mgmt: AzureAPIClient, azure_graph: AzureAPIClient):
         if not include_subscriptions:
             include_subscriptions = []
-        self._api_client = api_client
+        self._azure_mgmt = azure_mgmt
+        self._azure_graph = azure_graph
         self._include_subscriptions = include_subscriptions
         self._role_definitions = {}  # type: dict[str, str]
         self._principals: dict[str, Principal | None] = {}
 
     def _get_subscriptions(self) -> Iterable[AzureSubscription]:
-        for subscription in self._api_client.get("/subscriptions", "azure_mgmt", "2022-12-01").get("value", []):
+        for subscription in self._azure_mgmt.get("/subscriptions", "2022-12-01").get("value", []):
             yield AzureSubscription(
                 name=subscription["displayName"],
                 subscription_id=subscription["subscriptionId"],
@@ -168,18 +154,18 @@ class AzureResources:
 
     def create_service_principal(self) -> Principal:
         try:
-            application_info: dict[str, str] = self._api_client.put(
-                "/v1.0/applications", "azure_graph", {"displayName": "UCXServicePrincipal"}
+            application_info: dict[str, str] = self._azure_graph.put(
+                "/v1.0/applications", {"displayName": "UCXServicePrincipal"}
             )
             app_id = application_info.get("appId")
             assert app_id is not None
-            service_principal_info: dict[str, str] = self._api_client.put(
-                "/v1.0/servicePrincipals", "azure_graph", {"appId": app_id}
+            service_principal_info: dict[str, str] = self._azure_graph.put(
+                "/v1.0/servicePrincipals", {"appId": app_id}
             )
             client_id = service_principal_info.get("appId")
             assert client_id is not None
-            secret_info: dict[str, str] = self._api_client.put(
-                f"/v1.0/servicePrincipals(appId='{client_id}')/addPassword", "azure_graph"
+            secret_info: dict[str, str] = self._azure_graph.put(
+                f"/v1.0/servicePrincipals(appId='{client_id}')/addPassword"
             )
 
         except PermissionDenied:
@@ -213,7 +199,7 @@ class AzureResources:
                     "principalType": "ServicePrincipal",
                 }
             }
-            self._api_client.put(path, "azure_mgmt", body)
+            self._azure_mgmt.put(path, body)
         except PermissionDenied:
             msg = (
                 "Permission denied. Please run this cmd under the identity of a user who has "
@@ -223,7 +209,7 @@ class AzureResources:
             raise PermissionDenied(msg) from None
 
     def tenant_id(self):
-        token = self._api_client.token
+        token = self._azure_mgmt.token
         return token.jwt_claims().get("tid")
 
     def subscriptions(self):
@@ -239,14 +225,14 @@ class AzureResources:
         for subscription in self.subscriptions():
             logger.info(f"Checking in subscription {subscription.name} for storage accounts")
             path = f"/subscriptions/{subscription.subscription_id}/providers/Microsoft.Storage/storageAccounts"
-            for storage in self._api_client.get(path, "azure_mgmt", "2023-01-01").get("value", []):
+            for storage in self._azure_mgmt.get(path, "2023-01-01").get("value", []):
                 resource_id = storage.get("id")
                 if not resource_id:
                     continue
                 yield AzureResource(resource_id)
 
     def containers(self, storage: AzureResource):
-        for raw in self._api_client.get(f"{storage}/blobServices/default/containers", "azure_mgmt", "2023-01-01").get(
+        for raw in self._azure_mgmt.get(f"{storage}/blobServices/default/containers", "2023-01-01").get(
             "value", []
         ):
             resource_id = raw.get("id")
@@ -259,7 +245,7 @@ class AzureResources:
             return self._principals[principal_id]
         try:
             path = f"/v1.0/directoryObjects/{principal_id}"
-            raw: dict[str, str] = self._api_client.get(path, "azure_graph")  # type: ignore[assignment]
+            raw: dict[str, str] = self._azure_graph.get(path)  # type: ignore[assignment]
         except NotFound:
             # don't load principals from external directories twice
             self._principals[principal_id] = None
@@ -273,7 +259,9 @@ class AzureResources:
         assert client_id is not None
         assert display_name is not None
         assert object_id is not None
-        assert directory_id is not None
+        #assert directory_id is not None
+        if directory_id is None:
+            print(display_name)
         self._principals[principal_id] = Principal(client_id, display_name, object_id, directory_id)
         return self._principals[principal_id]
 
@@ -283,8 +271,8 @@ class AzureResources:
         """See https://learn.microsoft.com/en-us/rest/api/authorization/role-assignments/list-for-resource"""
         if not principal_types:
             principal_types = ["ServicePrincipal"]
-        result = self._api_client.get(
-            f"{resource_id}/providers/Microsoft.Authorization/roleAssignments", "azure_mgmt", "2022-04-01"
+        result = self._azure_mgmt.get(
+            f"{resource_id}/providers/Microsoft.Authorization/roleAssignments", "2022-04-01"
         )
         for role_assignment in result.get("value", []):
             assignment = self._role_assignment(role_assignment, resource_id, principal_types)
@@ -324,7 +312,7 @@ class AzureResources:
 
     def _role_name(self, role_definition_id) -> str | None:
         if role_definition_id not in self._role_definitions:
-            role_definition = self._api_client.get(role_definition_id, "azure_mgmt", "2022-04-01")
+            role_definition = self._azure_mgmt.get(role_definition_id, "2022-04-01")
             definition_properties = role_definition.get("properties", {})
             role_name: str = definition_properties.get("roleName")
             if not role_name:

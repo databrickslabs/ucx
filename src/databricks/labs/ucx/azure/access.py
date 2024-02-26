@@ -130,7 +130,7 @@ class AzureResourcePermissions:
         try:
             policy_definition = ""
             cluster_policy = self._ws.cluster_policies.get(policy_id)
-            #self._installation.save(cluster_policy.as_dict(), filename="policy-backup.json")
+            self._installation.save(cluster_policy, filename="policy-backup.json")
             if cluster_policy.definition is not None:
                 policy_definition = self._update_cluster_policy_definition(
                     cluster_policy.definition, storage_accounts, global_principal
@@ -167,7 +167,7 @@ class AzureResourcePermissions:
         logger.info(f"Created service principal of client_id {global_principal.client_id}")
         logger.info("Applying permission on storage accounts")
         for storage in used_storage_accounts:
-            self._azurerm.apply_storage_permission(global_principal.object_id, storage, "STORAGE_BLOB_READER")
+#            self._azurerm.apply_storage_permission(global_principal.object_id, storage, "STORAGE_BLOB_READER")
             logger.debug(
                 f"Storage Data Blob Reader permission applied for spn {global_principal.client_id} "
                 f"to storage account {storage.storage_account}"
