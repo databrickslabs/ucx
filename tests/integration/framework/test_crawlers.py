@@ -143,6 +143,7 @@ def test_runtime_backend_permission_denied_handled(ws, wsfs_wheel):
 
 
 def test_runtime_backend_unknown_error_handled(ws, env_or_skip, wsfs_wheel):
+    """We test this on the default cluster, i.e. without UC enabled. The command will throw an unknown error"""
     commands = CommandExecutor(ws.clusters, ws.command_execution, lambda: env_or_skip("TEST_DEFAULT_CLUSTER_ID"))
 
     commands.install_notebook_library(f"/Workspace{wsfs_wheel}")

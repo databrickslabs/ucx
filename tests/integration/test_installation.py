@@ -128,6 +128,10 @@ def test_job_cluster_policy(ws, new_installation):
         assert (
             policy_definition["azure_attributes.availability"]["value"] == compute.AzureAvailability.ON_DEMAND_AZURE.value
         )
+    if ws.config.is_aws:
+        assert (
+            policy_definition["aws_attributes.availability"]["value"] == compute.AwsAvailability.ON_DEMAND.value
+        )
 
 
 @pytest.mark.skip
