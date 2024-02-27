@@ -16,6 +16,7 @@ from databricks.labs.blueprint.installation import Installation
 from databricks.labs.blueprint.installer import InstallState
 from databricks.labs.blueprint.parallel import ManyError, Threads
 from databricks.labs.blueprint.tui import Prompts
+from databricks.labs.blueprint.upgrades import Upgrades
 from databricks.labs.blueprint.wheels import ProductInfo, WheelsV2, find_project_root
 from databricks.sdk import WorkspaceClient
 from databricks.sdk.errors import (  # pylint: disable=redefined-builtin
@@ -194,7 +195,10 @@ class WorkspaceInstaller:
 
     def configure(self) -> WorkspaceConfig:
         try:
-            return self._installation.load(WorkspaceConfig)
+            config = self._installation.load(WorkspaceConfig)
+            upgrades = Upgrades(PRODUCT_INFO, self._installation)
+            upgrades.apply(self._ws)
+            return config
         except NotFound as err:
             logger.debug(f"Cannot find previous installation: {err}")
         logger.info("Please answer a couple of questions to configure Unity Catalog migration")
@@ -370,7 +374,7 @@ class WorkspaceInstallation:
 
     @classmethod
     def current(cls, ws: WorkspaceClient):
-        installation = Installation.current(ws, PRODUCT_INFO.product_name())
+        installation = PRODUCT_INFO.current_installation(ws)
         config = installation.load(WorkspaceConfig)
         sql_backend = StatementExecutionBackend(ws, config.warehouse_id)
         wheels = WheelsV2(installation, PRODUCT_INFO)
