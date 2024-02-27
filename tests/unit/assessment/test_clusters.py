@@ -1,5 +1,5 @@
 import json
-from unittest.mock import MagicMock
+from unittest.mock import MagicMock, mock_open, patch
 
 import pytest
 from databricks.sdk.errors import DatabricksError, InternalError, NotFound
@@ -82,6 +82,13 @@ def test_cluster_init_script():
     ws.dbfs.read().data = "JXNoCmVjaG8gIj0="
     init_crawler = ClustersCrawler(ws, MockBackend(), "ucx").snapshot()
     assert len(init_crawler) == 1
+
+
+def test_cluster_file_init_script():
+    ws = workspace_client_mock(cluster_ids=['init-scripts-file'])
+    with patch("builtins.open", mock_open(read_data="data")):
+        init_crawler = ClustersCrawler(ws, MockBackend(), "ucx").snapshot()
+        assert len(init_crawler) == 1
 
 
 def test_cluster_init_script_check_dbfs():

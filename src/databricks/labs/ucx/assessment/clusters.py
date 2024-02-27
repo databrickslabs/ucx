@@ -84,8 +84,7 @@ class CheckClusterMixin(CheckInitScriptMixin):
                         return None
                     with open(split[1], "r") as file:
                         data = file.read()
-                    if data is not None:
-                        return base64.b64decode(data).decode("utf-8")
+                    return data
 
             return None
         except NotFound:
