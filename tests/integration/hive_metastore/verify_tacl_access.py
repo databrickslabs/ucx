@@ -6,7 +6,6 @@ from databricks.sdk.service.compute import Language, ResultType
 
 
 def main():
-
     table_name = sys.argv[1]
 
     # labs-aws-simple-spn is a config profile that has SPN
