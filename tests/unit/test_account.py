@@ -2,6 +2,7 @@ import io
 import json
 from unittest.mock import create_autospec, patch
 
+import pytest
 from databricks.labs.blueprint.installation import Installation, MockInstallation
 from databricks.labs.blueprint.tui import MockPrompts
 from databricks.sdk import AccountClient, WorkspaceClient
@@ -102,7 +103,7 @@ def test_create_acc_groups_should_create_acc_group_if_no_group_found_in_account(
     acc_client.groups.create.return_value = group
 
     account_workspaces = AccountWorkspaces(acc_client, workspace_client)
-    account_workspaces.create_account_level_groups(MockPrompts({}), [123])
+    account_workspaces.create_account_level_groups(MockPrompts({}), [123, 46])
 
     acc_client.groups.create.assert_called_with(
         display_name="de",
@@ -118,6 +119,27 @@ def test_create_acc_groups_should_create_acc_group_if_no_group_found_in_account(
         ],
         schemas=[iam.PatchSchema.URN_IETF_PARAMS_SCIM_API_MESSAGES_2_0_PATCH_OP],
     )
+
+
+def test_create_acc_groups_should_throw_exception():
+    acc_client = create_autospec(AccountClient)
+    acc_client.config = Config(host="https://accounts.cloud.databricks.com", account_id="123", token="123")
+
+    acc_client.workspaces.list.return_value = []
+
+    ws = create_autospec(WorkspaceClient)
+
+    def workspace_client() -> WorkspaceClient:
+        return ws
+
+    group = Group(id="12", display_name="test_account", meta=ResourceMeta("Account"))
+
+    acc_client.get_workspace_client.return_value = ws
+    acc_client.groups.create.return_value = group
+
+    account_workspaces = AccountWorkspaces(acc_client, workspace_client)
+    with pytest.raises(ValueError):
+        account_workspaces.create_account_level_groups(MockPrompts({}), [123])
 
 
 def test_create_acc_groups_should_filter_system_groups():
@@ -145,7 +167,7 @@ def test_create_acc_groups_should_filter_system_groups():
     acc_client.groups.create.return_value = group
 
     account_workspaces = AccountWorkspaces(acc_client, workspace_client)
-    account_workspaces.create_account_level_groups(MockPrompts({}))
+    account_workspaces.create_account_level_groups(MockPrompts({}), [123])
 
     acc_client.groups.create.assert_not_called()
 
@@ -309,7 +331,7 @@ def test_create_acc_groups_should_not_create_group_if_exists_in_account():
     ws.groups.get.return_value = group
     acc_client.get_workspace_client.return_value = ws
     account_workspaces = AccountWorkspaces(acc_client, workspace_client)
-    account_workspaces.create_account_level_groups(MockPrompts({}))
+    account_workspaces.create_account_level_groups(MockPrompts({}), [123])
 
     acc_client.groups.create.assert_not_called()
 
