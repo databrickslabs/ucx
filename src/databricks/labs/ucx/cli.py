@@ -94,7 +94,7 @@ def sync_workspace_info(a: AccountClient):
 def create_account_groups(a: AccountClient, workspace_ids: list[int] | None = None):
     """
     Crawl all workspaces, and create account level groups if a WS local group is not present in the account.
-    The feature is not configurable, meaning that it fetches all workspaces groups and all account groups.
+    The can be configured for multiple workspace IDs or all workspaces configured in the account.
 
     The following scenarios are supported, if a group X:
     - Exist in workspaces A,B,C and it has same members in there, it will be created in the account
