@@ -80,7 +80,7 @@ class CheckClusterMixin(CheckInitScriptMixin):
                     split = destination.split(":/")
                     if len(split) != INIT_SCRIPT_LOCAL_PATH:
                         return None
-                    with open(split[1], "r") as file:
+                    with open(split[1], "r", encoding="utf-8") as file:
                         data = file.read()
                     return data
 
