@@ -37,7 +37,7 @@ class ServicePrincipalMigrationInfo:
 class StorageCredentialValidationResult:
     name: str
     application_id: str
-    directory_id: str
+    directory_id: str | None
     read_only: bool
     validated_on: str
     failures: list[str] | None = None
@@ -87,6 +87,7 @@ class StorageCredentialManager:
     def create_with_client_secret(self, spn: ServicePrincipalMigrationInfo) -> StorageCredentialInfo:
         # prepare the storage credential properties
         name = spn.permission_mapping.principal
+        assert spn.permission_mapping.directory_id is not None
         service_principal = AzureServicePrincipal(
             spn.permission_mapping.directory_id,
             spn.permission_mapping.client_id,
@@ -228,7 +229,9 @@ class ServicePrincipalMigration(SecretsMixin):
         Create the list of SP that need to be migrated, output an action plan as a csv file for users to confirm
         """
         # load sp list from azure_storage_account_info.csv
-        sp_list = self._resource_permissions.load()
+        permission_mappings = self._resource_permissions.load()
+        # For now we only migrate Service Principal and ignore Managed Identity
+        sp_list = [mapping for mapping in permission_mappings if mapping.type == "Application"]
         # list existed storage credentials
         sc_set = self._storage_credential_manager.list(include_names)
         # check if the sp is already used in UC storage credential
