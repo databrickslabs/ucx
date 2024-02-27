@@ -14,6 +14,11 @@
       }
     },
     {
+      "file": {
+        "destination": "file"
+      }
+    },
+    {
       "workspace": {
         "destination": "init.sh"
       }

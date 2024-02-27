@@ -12,20 +12,18 @@ from databricks.sdk.service.compute import (
     DataSecurityMode,
     DbfsStorageInfo,
     InitScriptInfo,
+    LocalFileInfo,
     Policy,
     WorkspaceStorageInfo,
-    S3StorageInfo,
-    LocalFileInfo,
-
 )
 
 from databricks.labs.ucx.assessment.crawlers import (
     AZURE_SP_CONF_FAILURE_MSG,
     INCOMPATIBLE_SPARK_CONFIG_KEYS,
     INIT_SCRIPT_DBFS_PATH,
+    INIT_SCRIPT_LOCAL_PATH,
     azure_sp_conf_present_check,
     spark_version_compatibility,
-    INIT_SCRIPT_LOCAL_PATH,
 )
 from databricks.labs.ucx.assessment.init_scripts import CheckInitScriptMixin
 from databricks.labs.ucx.framework.crawlers import CrawlerBase, SqlBackend
