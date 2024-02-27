@@ -26,6 +26,7 @@ See [contributing instructions](CONTRIBUTING.md) to help improve this project.
     * [Producing table mapping](#producing-table-mapping)
     * [Synchronising UCX configurations](#synchronising-ucx-configurations)
     * [Validating group membership](#validating-group-membership)
+    * [Creating account groups](#creating-account-groups)
   * [Star History](#star-history)
   * [Project Support](#project-support)
 <!-- TOC -->
@@ -195,6 +196,21 @@ Use to validate workspace-level & account-level groups to identify any discrepan
 
 ```commandline
 databricks labs ucx validate-groups-membership
+```
+
+### Creating account groups
+Crawl all workspaces configured in workspace_ids, then creates account level groups if a WS local group is not present 
+    in the account.
+If workspace_ids is not specified, it will create account groups for all workspaces configured in the account.
+
+The following scenarios are supported, if a group X:
+- Exist in workspaces A,B,C and it has same members in there, it will be created in the account
+- Exist in workspaces A,B but not in C, it will be created in the account
+- Exist in workspaces A,B,C. It has same members in A,B, but not in C. Then, X and C_X will be created in the
+account
+
+```commandline
+databricks labs ucx create-account-groups --workspace_ids <comma separated list of workspace id>
 ```
 
 ## Star History

@@ -93,13 +93,14 @@ def sync_workspace_info(a: AccountClient):
 @ucx.command(is_account=True)
 def create_account_groups(a: AccountClient, workspace_ids: list[int] | None = None):
     """
-    Crawl all workspaces, and create account level groups if a WS local group is not present in the account.
-    The can be configured for multiple workspace IDs or all workspaces configured in the account.
+    Crawl all workspaces configured in workspace_ids, then creates account level groups if a WS local group is not present
+    in the account.
+    If workspace_ids is not specified, it will create account groups for all workspaces configured in the account.
 
     The following scenarios are supported, if a group X:
     - Exist in workspaces A,B,C and it has same members in there, it will be created in the account
     - Exist in workspaces A,B but not in C, it will be created in the account
-    - Exist in workspaces A,B,C and it has same members in A,B, but not in C, then, X and C_X will be created in the
+    - Exist in workspaces A,B,C. It has same members in A,B, but not in C. Then, X and C_X will be created in the
     account
     """
     logger.info(f"Account ID: {a.config.account_id}")
