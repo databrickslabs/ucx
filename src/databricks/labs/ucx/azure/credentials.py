@@ -37,9 +37,9 @@ class ServicePrincipalMigrationInfo:
 class StorageCredentialValidationResult:
     name: str
     application_id: str
-    directory_id: str | None
     read_only: bool
     validated_on: str
+    directory_id: str | None = None
     failures: list[str] | None = None
 
     @classmethod
@@ -47,10 +47,10 @@ class StorageCredentialValidationResult:
         return cls(
             permission_mapping.principal,
             permission_mapping.client_id,
-            permission_mapping.directory_id,
             permission_mapping.privilege == Privilege.READ_FILES.value,
             permission_mapping.prefix,
-            failures,
+            permission_mapping.directory_id,
+            failures
         )
 
 
