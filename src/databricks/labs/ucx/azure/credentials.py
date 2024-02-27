@@ -50,7 +50,7 @@ class StorageCredentialValidationResult:
             permission_mapping.privilege == Privilege.READ_FILES.value,
             permission_mapping.prefix,
             permission_mapping.directory_id,
-            failures
+            failures,
         )
 
 
