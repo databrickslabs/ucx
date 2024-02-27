@@ -133,7 +133,7 @@ def test_sync_workspace_info():
 
 def test_create_account_groups():
     a = create_autospec(AccountClient)
-    with (patch("databricks.sdk.WorkspaceClient.get_workspace_id", return_value=None) as s,):
+    with patch("databricks.sdk.WorkspaceClient.get_workspace_id", return_value=None):
         create_account_groups(a)
         a.groups.list.assert_called_with(attributes="id")
 

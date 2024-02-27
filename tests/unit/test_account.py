@@ -82,7 +82,7 @@ def test_create_acc_groups_should_create_acc_group_if_no_group_found_in_account(
 
     ws = create_autospec(WorkspaceClient)
 
-    def workspace_client(**kwargs) -> WorkspaceClient:
+    def workspace_client() -> WorkspaceClient:
         return ws
 
     group = Group(
@@ -130,7 +130,7 @@ def test_create_acc_groups_should_filter_system_groups():
 
     ws = create_autospec(WorkspaceClient)
 
-    def workspace_client(**kwargs) -> WorkspaceClient:
+    def workspace_client() -> WorkspaceClient:
         return ws
 
     group = Group(
@@ -160,7 +160,7 @@ def test_create_acc_groups_should_filter_account_groups_in_workspace():
 
     ws = create_autospec(WorkspaceClient)
 
-    def workspace_client(**kwargs) -> WorkspaceClient:
+    def workspace_client() -> WorkspaceClient:
         return ws
 
     group = Group(id="12", display_name="test_account", meta=ResourceMeta("Account"))
@@ -186,7 +186,7 @@ def test_create_acc_groups_should_create_acc_group_with_appropriate_members():
 
     ws = create_autospec(WorkspaceClient)
 
-    def workspace_client(**kwargs) -> WorkspaceClient:
+    def workspace_client() -> WorkspaceClient:
         return ws
 
     account_workspaces = AccountWorkspaces(acc_client, workspace_client)
@@ -302,7 +302,7 @@ def test_create_acc_groups_should_not_create_group_if_exists_in_account():
 
     ws = create_autospec(WorkspaceClient)
 
-    def workspace_client(**kwargs) -> WorkspaceClient:
+    def workspace_client() -> WorkspaceClient:
         return ws
 
     ws.groups.list.return_value = [group]
@@ -326,17 +326,15 @@ def test_create_acc_groups_should_create_groups_accross_workspaces():
     ws1 = create_autospec(WorkspaceClient)
     ws2 = create_autospec(WorkspaceClient)
 
-    def workspace_client(host, product, **kwargs) -> WorkspaceClient:
+    def workspace_client(host) -> WorkspaceClient:
         if host == "https://abc.cloud.databricks.com":
             return ws1
-        else:
-            return ws2
+        return ws2
 
-    def get_workspace_client(workspace, **kwargs) -> WorkspaceClient:
+    def get_workspace_client(workspace) -> WorkspaceClient:
         if workspace.workspace_id == 123:
             return ws1
-        else:
-            return ws2
+        return ws2
 
     group = Group(id="12", display_name="de", members=[])
     group2 = Group(id="12", display_name="security_grp", members=[])
@@ -368,17 +366,15 @@ def test_create_acc_groups_should_filter_groups_accross_workspaces():
     ws1 = create_autospec(WorkspaceClient)
     ws2 = create_autospec(WorkspaceClient)
 
-    def workspace_client(host, product, **kwargs) -> WorkspaceClient:
+    def workspace_client(host) -> WorkspaceClient:
         if host == "https://abc.cloud.databricks.com":
             return ws1
-        else:
-            return ws2
+        return ws2
 
-    def get_workspace_client(workspace, **kwargs) -> WorkspaceClient:
+    def get_workspace_client(workspace) -> WorkspaceClient:
         if workspace.workspace_id == 123:
             return ws1
-        else:
-            return ws2
+        return ws2
 
     group = Group(
         id="12",
@@ -423,17 +419,15 @@ def test_create_acc_groups_should_create_acc_group_if_exist_in_other_workspaces_
     ws1 = create_autospec(WorkspaceClient)
     ws2 = create_autospec(WorkspaceClient)
 
-    def workspace_client(host, product, **kwargs) -> WorkspaceClient:
+    def workspace_client(host) -> WorkspaceClient:
         if host == "https://abc.cloud.databricks.com":
             return ws1
-        else:
-            return ws2
+        return ws2
 
-    def get_workspace_client(workspace, **kwargs) -> WorkspaceClient:
+    def get_workspace_client(workspace) -> WorkspaceClient:
         if workspace.workspace_id == 123:
             return ws1
-        else:
-            return ws2
+        return ws2
 
     group = Group(
         id="12",

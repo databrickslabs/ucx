@@ -97,7 +97,8 @@ class AccountWorkspaces:
         if not valid_workspace_ids:
             raise ValueError("No workspace ids provided in the configuration found in the account")
 
-        logger.info("Creating account groups for workspaces IDs : " + ','.join(str(x) for x in valid_workspace_ids))
+        workspace_ids_str = ','.join(str(x) for x in valid_workspace_ids)
+        logger.info(f"Creating account groups for workspaces IDs : {workspace_ids_str}")
         return valid_workspace_ids
 
     def _add_members_to_acc_group(
@@ -111,10 +112,10 @@ class AccountWorkspaces:
                 schemas=[PatchSchema.URN_IETF_PARAMS_SCIM_API_MESSAGES_2_0_PATCH_OP],
             )
 
-    def _chunks(self, lst, n):
+    def _chunks(self, lst, chunk_size):
         """Yield successive n-sized chunks from lst."""
-        for i in range(0, len(lst), n):
-            yield lst[i : i + n]
+        for i in range(0, len(lst), chunk_size):
+            yield lst[i : i + chunk_size]
 
     def _get_valid_workspaces_groups(self, prompts: Prompts, workspace_ids: list[int]) -> dict[str, Group]:
         all_workspaces_groups: dict[str, Group] = {}

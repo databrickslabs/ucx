@@ -11,7 +11,7 @@ def test_create_account_level_groups(make_ucx_group, make_group, make_user, acc,
 
     results = []
     for grp in acc.groups.list():
-        if grp.display_name in ["regular_group"]:
+        if grp.display_name in {"regular_group"}:
             results.append(grp)
             acc.groups.delete(grp.id)  # Avoids flakiness for future runs
 
