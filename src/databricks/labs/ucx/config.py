@@ -41,15 +41,11 @@ class WorkspaceConfig:  # pylint: disable=too-many-instance-attributes
 
     @classmethod
     def v1_migrate(cls, raw: dict) -> dict:
-        stored_version = raw.pop("version", None)
-        if stored_version == cls.__version__:
-            return raw
-        if stored_version == 1:
-            raw["include_group_names"] = (
-                raw.get("groups", {"selected": []})["selected"] if "selected" in raw["groups"] else None
-            )
-            raw["renamed_group_prefix"] = raw.get("groups", {"backup_group_prefix": "db-temp-"})["backup_group_prefix"]
-            raw.pop("groups", None)
-            return raw
-        msg = f"Unknown config version: {stored_version}"
-        raise ValueError(msg)
+        # See https://github.com/databrickslabs/ucx/blob/v0.5.0/src/databricks/labs/ucx/config.py#L16-L32
+        groups = raw.pop("groups", {})
+        selected_groups = groups.get("selected", [])
+        if selected_groups:
+            raw["include_group_names"] = selected_groups
+        raw["renamed_group_prefix"] = groups.get("backup_group_prefix", "db-temp-")
+        raw["version"] = 2
+        return raw
