@@ -102,7 +102,7 @@ def test_create_acc_groups_should_create_acc_group_if_no_group_found_in_account(
     acc_client.groups.create.return_value = group
 
     account_workspaces = AccountWorkspaces(acc_client, workspace_client)
-    account_workspaces.create_account_level_groups(MockPrompts({}))
+    account_workspaces.create_account_level_groups(MockPrompts({}), [123])
 
     acc_client.groups.create.assert_called_with(
         display_name="de",
@@ -228,7 +228,7 @@ def test_create_acc_groups_should_create_acc_group_with_appropriate_members():
     acc_client.get_workspace_client.return_value = ws
     acc_client.groups.create.return_value = group
 
-    account_workspaces.create_account_level_groups(MockPrompts({}))
+    account_workspaces.create_account_level_groups(MockPrompts({}), [123])
 
     acc_client.groups.create.assert_called_with(
         display_name="de",
@@ -350,7 +350,7 @@ def test_create_acc_groups_should_create_groups_accross_workspaces():
     acc_client.get_workspace_client.side_effect = get_workspace_client
 
     account_workspaces = AccountWorkspaces(acc_client, workspace_client)
-    account_workspaces.create_account_level_groups(MockPrompts({}))
+    account_workspaces.create_account_level_groups(MockPrompts({}), [123, 456])
 
     acc_client.groups.create.assert_any_call(display_name="de")
     acc_client.groups.create.assert_any_call(display_name="security_grp")
@@ -395,7 +395,7 @@ def test_create_acc_groups_should_filter_groups_accross_workspaces():
     acc_client.get_workspace_client.side_effect = get_workspace_client
 
     account_workspaces = AccountWorkspaces(acc_client, workspace_client)
-    account_workspaces.create_account_level_groups(MockPrompts({}))
+    account_workspaces.create_account_level_groups(MockPrompts({}), [123, 456])
 
     acc_client.groups.create.assert_called_once_with(display_name="de")
     acc_client.groups.patch.assert_called_once_with(
@@ -459,7 +459,8 @@ def test_create_acc_groups_should_create_acc_group_if_exist_in_other_workspaces_
             {
                 r'Group de does not have the same amount of members in workspace ': 'yes',
             }
-        )
+        ),
+        [123, 456],
     )
 
     acc_client.groups.create.assert_any_call(display_name="de")

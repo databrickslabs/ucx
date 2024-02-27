@@ -62,9 +62,10 @@ class AccountWorkspaces:
             for installation in Installation.existing(ws, "ucx"):
                 installation.save(workspaces, filename=self.SYNC_FILE_NAME)
 
-    def create_account_level_groups(self, prompts: Prompts):
+    def create_account_level_groups(self, prompts: Prompts, workspace_ids: list[int] | None = None):
         acc_groups = self._get_account_groups()
-        all_valid_workspace_groups = self._get_valid_workspaces_groups(prompts)
+        workspace_ids = self._get_valid_workspaces_ids(workspace_ids)
+        all_valid_workspace_groups = self._get_valid_workspaces_groups(prompts, workspace_ids)
 
         for group_name, valid_group in all_valid_workspace_groups.items():
             if group_name in acc_groups:
@@ -78,6 +79,26 @@ class AccountWorkspaces:
             if len(valid_group.members) > 0:
                 self._add_members_to_acc_group(self._ac, acc_group.id, group_name, valid_group)
             logger.info(f"Group {group_name} created in the account")
+
+    def _get_valid_workspaces_ids(self, workspace_ids: list[int] | None = None) -> list[int]:
+        if not workspace_ids:
+            logger.info("No workspace ids provided, using current workspace instead")
+            return [self._new_workspace_client().get_workspace_id()]
+
+        all_workspace_ids = [workspace.workspace_id for workspace in self._workspaces()]
+
+        valid_workspace_ids = []
+        for workspace_id in workspace_ids:
+            if workspace_id in all_workspace_ids:
+                valid_workspace_ids.append(workspace_id)
+            else:
+                logger.info(f"Workspace id {workspace_id} not found on the account")
+
+        if not valid_workspace_ids:
+            raise ValueError("No workspace ids provided in the configuration found in the account")
+
+        logger.info("Creating account groups for workspaces IDs : " + ','.join(str(x) for x in valid_workspace_ids))
+        return valid_workspace_ids
 
     def _add_members_to_acc_group(
         self, acc_client: AccountClient, acc_group_id: str, group_name: str, valid_group: Group
@@ -95,10 +116,12 @@ class AccountWorkspaces:
         for i in range(0, len(lst), n):
             yield lst[i : i + n]
 
-    def _get_valid_workspaces_groups(self, prompts: Prompts) -> dict[str, Group]:
+    def _get_valid_workspaces_groups(self, prompts: Prompts, workspace_ids: list[int]) -> dict[str, Group]:
         all_workspaces_groups: dict[str, Group] = {}
 
         for workspace in self._workspaces():
+            if workspace.workspace_id not in workspace_ids:
+                continue
             client = self.client_for(workspace)
             logger.info(f"Crawling groups in workspace {client.config.host}")
 

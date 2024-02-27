@@ -128,4 +128,9 @@ commands:
         
   - name: create-account-groups
     is_account_level: true
-    description: Creates account level groups for all groups in all workspaces.
+    description: |
+      Creates account level groups for all groups in workspaces provided in workspace_ids.
+      If workspace_ids is not provided, it will use all workspaces present in the account.
+    flags:
+      - name: workspace_ids
+        description: List of workspace IDs to create account groups from.

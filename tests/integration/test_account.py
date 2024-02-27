@@ -3,12 +3,11 @@ from databricks.labs.blueprint.tui import MockPrompts
 from databricks.labs.ucx.account import AccountWorkspaces
 
 
-def test_create_account_level_groups(make_ucx_group, make_group, make_user, acc):
-    # pytest.skip("Unskip when well be able to filter by workspace ID and group ID to avoid unintended side effects")
+def test_create_account_level_groups(make_ucx_group, make_group, make_user, acc, ws):
     make_ucx_group("test_ucx_migrate_invalid", "test_ucx_migrate_invalid")
 
     make_group(display_name="regular_group", members=[make_user().id])
-    AccountWorkspaces(acc).create_account_level_groups(MockPrompts({}))
+    AccountWorkspaces(acc).create_account_level_groups(MockPrompts({}), [ws.get_workspace_id()])
 
     results = []
     for grp in acc.groups.list():
