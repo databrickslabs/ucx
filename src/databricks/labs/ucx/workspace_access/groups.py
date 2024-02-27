@@ -53,6 +53,9 @@ class MigratedGroup:
             external_id=workspace.external_id,
         )
 
+    def decode_members(self):
+        return [iam.ComplexValue.from_dict(_) for _ in json.loads(self.members)]
+
 
 class MigrationState:
     """Holds migration state of workspace-to-account groups"""
@@ -63,16 +66,16 @@ class MigrationState:
         self.groups: list[MigratedGroup] = groups
 
     def get_target_principal(self, name: str) -> str | None:
-        mg = self._name_to_group.get(name)
-        if mg is None:
+        migrated_group = self._name_to_group.get(name)
+        if migrated_group is None:
             return None
-        return mg.name_in_account
+        return migrated_group.name_in_account
 
     def get_temp_principal(self, name: str) -> str | None:
-        mg = self._name_to_group.get(name)
-        if mg is None:
+        migrated_group = self._name_to_group.get(name)
+        if migrated_group is None:
             return None
-        return mg.temporary_name
+        return migrated_group.temporary_name
 
     def is_in_scope(self, name: str) -> bool:
         if name is None:
@@ -152,21 +155,21 @@ class MatchingNamesStrategy(GroupMigrationStrategy):
 
     def generate_migrated_groups(self):
         workspace_groups = self.get_filtered_groups()
-        for g in workspace_groups.values():
-            temporary_name = f"{self.renamed_groups_prefix}{g.display_name}"
-            account_group = self.account_groups_in_account.get(g.display_name)
+        for group in workspace_groups.values():
+            temporary_name = f"{self.renamed_groups_prefix}{group.display_name}"
+            account_group = self.account_groups_in_account.get(group.display_name)
             if not account_group:
-                logger.info(f"Couldn't find a matching account group for {g.display_name} group")
+                logger.info(f"Couldn't find a matching account group for {group.display_name} group")
                 continue
             yield MigratedGroup(
-                id_in_workspace=g.id,
-                name_in_workspace=g.display_name,
-                name_in_account=g.display_name,
+                id_in_workspace=group.id,
+                name_in_workspace=group.display_name,
+                name_in_account=group.display_name,
                 temporary_name=temporary_name,
                 external_id=account_group.external_id,
-                members=json.dumps([gg.as_dict() for gg in g.members]) if g.members else None,
-                roles=json.dumps([gg.as_dict() for gg in g.roles]) if g.roles else None,
-                entitlements=json.dumps([gg.as_dict() for gg in g.entitlements]) if g.entitlements else None,
+                members=json.dumps([gg.as_dict() for gg in group.members]) if group.members else None,
+                roles=json.dumps([gg.as_dict() for gg in group.roles]) if group.roles else None,
+                entitlements=json.dumps([gg.as_dict() for gg in group.entitlements]) if group.entitlements else None,
             )
 
 
@@ -189,22 +192,24 @@ class MatchByExternalIdStrategy(GroupMigrationStrategy):
     def generate_migrated_groups(self):
         workspace_groups = self.get_filtered_groups()
         account_groups_by_id = {group.external_id: group for group in self.account_groups_in_account.values()}
-        for g in workspace_groups.values():
-            temporary_name = f"{self.renamed_groups_prefix}{g.display_name}"
-            account_group = account_groups_by_id.get(g.external_id)
+        for group in workspace_groups.values():
+            temporary_name = f"{self.renamed_groups_prefix}{group.display_name}"
+            account_group = account_groups_by_id.get(group.external_id)
             if account_group:
                 yield MigratedGroup(
-                    id_in_workspace=g.id,
-                    name_in_workspace=g.display_name,
+                    id_in_workspace=group.id,
+                    name_in_workspace=group.display_name,
                     name_in_account=account_group.display_name,
                     temporary_name=temporary_name,
                     external_id=account_group.external_id,
-                    members=json.dumps([gg.as_dict() for gg in g.members]) if g.members else None,
-                    roles=json.dumps([gg.as_dict() for gg in g.roles]) if g.roles else None,
-                    entitlements=json.dumps([gg.as_dict() for gg in g.entitlements]) if g.entitlements else None,
+                    members=json.dumps([gg.as_dict() for gg in group.members]) if group.members else None,
+                    roles=json.dumps([gg.as_dict() for gg in group.roles]) if group.roles else None,
+                    entitlements=(
+                        json.dumps([gg.as_dict() for gg in group.entitlements]) if group.entitlements else None
+                    ),
                 )
             else:
-                logger.info(f"Couldn't find a matching account group for {g.display_name} group with external_id")
+                logger.info(f"Couldn't find a matching account group for {group.display_name} group with external_id")
 
 
 class RegexSubStrategy(GroupMigrationStrategy):
@@ -229,18 +234,20 @@ class RegexSubStrategy(GroupMigrationStrategy):
 
     def generate_migrated_groups(self):
         workspace_groups = self.get_filtered_groups()
-        for g in workspace_groups.values():
-            temporary_name = f"{self.renamed_groups_prefix}{g.display_name}"
-            name_in_account = self._safe_sub(g.display_name, self.workspace_group_regex, self.workspace_group_replace)
+        for group in workspace_groups.values():
+            temporary_name = f"{self.renamed_groups_prefix}{group.display_name}"
+            name_in_account = self._safe_sub(
+                group.display_name, self.workspace_group_regex, self.workspace_group_replace
+            )
             yield MigratedGroup(
-                id_in_workspace=g.id,
-                name_in_workspace=g.display_name,
+                id_in_workspace=group.id,
+                name_in_workspace=group.display_name,
                 name_in_account=name_in_account,
                 temporary_name=temporary_name,
                 external_id=self.account_groups_in_account[name_in_account].external_id,
-                members=json.dumps([gg.as_dict() for gg in g.members]) if g.members else None,
-                roles=json.dumps([gg.as_dict() for gg in g.roles]) if g.roles else None,
-                entitlements=json.dumps([gg.as_dict() for gg in g.entitlements]) if g.entitlements else None,
+                members=json.dumps([gg.as_dict() for gg in group.members]) if group.members else None,
+                roles=json.dumps([gg.as_dict() for gg in group.roles]) if group.roles else None,
+                entitlements=json.dumps([gg.as_dict() for gg in group.entitlements]) if group.entitlements else None,
             )
 
 
@@ -335,15 +342,17 @@ class GroupManager(CrawlerBase[MigratedGroup]):
         workspace_groups_in_workspace = self._workspace_groups_in_workspace()
         groups_to_migrate = self.get_migration_state().groups
 
-        for mg in groups_to_migrate:
-            if mg.name_in_account in account_groups_in_workspace:
-                logger.info(f"Skipping {mg.name_in_account}: already in workspace")
+        for migrated_group in groups_to_migrate:
+            if migrated_group.name_in_account in account_groups_in_workspace:
+                logger.info(f"Skipping {migrated_group.name_in_account}: already in workspace")
                 continue
-            if mg.temporary_name in workspace_groups_in_workspace:
-                logger.info(f"Skipping {mg.name_in_workspace}: already renamed")
+            if migrated_group.temporary_name in workspace_groups_in_workspace:
+                logger.info(f"Skipping {migrated_group.name_in_workspace}: already renamed")
                 continue
-            logger.info(f"Renaming: {mg.name_in_workspace} -> {mg.temporary_name}")
-            tasks.append(functools.partial(self._rename_group, mg.id_in_workspace, mg.temporary_name))
+            logger.info(f"Renaming: {migrated_group.name_in_workspace} -> {migrated_group.temporary_name}")
+            tasks.append(
+                functools.partial(self._rename_group, migrated_group.id_in_workspace, migrated_group.temporary_name)
+            )
         _, errors = Threads.gather("rename groups in the workspace", tasks)
         if len(errors) > 0:
             raise ManyError(errors)
@@ -360,14 +369,14 @@ class GroupManager(CrawlerBase[MigratedGroup]):
         account_groups_in_account = self._account_groups_in_account()
         account_groups_in_workspace = self._account_groups_in_workspace()
         groups_to_migrate = self.get_migration_state().groups
-        for mg in groups_to_migrate:
-            if mg.name_in_account in account_groups_in_workspace:
-                logger.info(f"Skipping {mg.name_in_account}: already in workspace")
+        for migrated_group in groups_to_migrate:
+            if migrated_group.name_in_account in account_groups_in_workspace:
+                logger.info(f"Skipping {migrated_group.name_in_account}: already in workspace")
                 continue
-            if mg.name_in_account not in account_groups_in_account:
-                logger.warning(f"Skipping {mg.name_in_account}: not in account")
+            if migrated_group.name_in_account not in account_groups_in_account:
+                logger.warning(f"Skipping {migrated_group.name_in_account}: not in account")
                 continue
-            group_id = account_groups_in_account[mg.name_in_account].id
+            group_id = account_groups_in_account[migrated_group.name_in_account].id
             tasks.append(functools.partial(self._reflect_account_group_to_workspace, group_id))
         _, errors = Threads.gather("reflect account groups on this workspace", tasks)
         if len(errors) > 0:
@@ -380,22 +389,42 @@ class GroupManager(CrawlerBase[MigratedGroup]):
         tasks = []
         workspace_groups_in_workspace = self._workspace_groups_in_workspace()
         account_groups_in_workspace = self._account_groups_in_workspace()
-        for mg in self.snapshot():
-            if mg.temporary_name not in workspace_groups_in_workspace:
-                logger.info(f"Skipping {mg.name_in_workspace}: no longer in workspace")
+        for migrated_group in self.snapshot():
+            if migrated_group.temporary_name not in workspace_groups_in_workspace:
+                logger.info(f"Skipping {migrated_group.name_in_workspace}: no longer in workspace")
                 continue
-            if mg.name_in_account not in account_groups_in_workspace:
-                logger.info(f"Skipping {mg.name_in_account}: not reflected in workspace")
+            if migrated_group.name_in_account not in account_groups_in_workspace:
+                logger.info(f"Skipping {migrated_group.name_in_account}: not reflected in workspace")
                 continue
-            tasks.append(functools.partial(self._delete_workspace_group, mg.id_in_workspace, mg.temporary_name))
+            tasks.append(
+                functools.partial(
+                    self._delete_workspace_group, migrated_group.id_in_workspace, migrated_group.temporary_name
+                )
+            )
         _, errors = Threads.gather("removing original workspace groups", tasks)
         if len(errors) > 0:
             logger.error(f"During account-to-workspace reflection got {len(errors)} errors. See debug logs")
             raise ManyError(errors)
 
     def _fetcher(self) -> Iterable[MigratedGroup]:
-        for row in self._backend.fetch(f"SELECT * FROM {self._full_name}"):
-            yield MigratedGroup(*row)
+        state = []
+        for row in self._backend.fetch(f"SELECT * FROM {self.full_name}"):
+            state.append(MigratedGroup(*row))
+
+        if not self._include_group_names:
+            return state
+
+        new_state = []
+        group_name_with_state = {migrated_group.name_in_workspace: migrated_group for migrated_group in state}
+        for group_name in self._include_group_names:
+            if group_name in group_name_with_state:
+                new_state.append(group_name_with_state[group_name])
+            else:
+                logger.warning(
+                    f"Group {group_name} defined in configuration does not exist on the groups table. "
+                    "Consider checking if the group exist in the workspace or re-running the assessment."
+                )
+        return new_state
 
     def _crawler(self) -> Iterable[MigratedGroup]:
         workspace_groups_in_workspace = self._workspace_groups_in_workspace()
@@ -435,29 +464,37 @@ class GroupManager(CrawlerBase[MigratedGroup]):
             logger.info("There are groups with different membership between account and workspace")
         return mismatch_group
 
+    def has_workspace_group(self, name):
+        groups = self._workspace_groups_in_workspace()
+        return name in groups
+
+    def has_account_group(self, name):
+        groups = self._account_groups_in_workspace()
+        return name in groups
+
     def _workspace_groups_in_workspace(self) -> dict[str, Group]:
         attributes = "id,displayName,meta,externalId,members,roles,entitlements"
         groups = {}
-        for g in self._list_workspace_groups("WorkspaceGroup", attributes):
-            if not g.display_name:
+        for group in self._list_workspace_groups("WorkspaceGroup", attributes):
+            if not group.display_name:
                 continue
-            groups[g.display_name] = g
+            groups[group.display_name] = group
         return groups
 
     def _account_groups_in_workspace(self) -> dict[str, Group]:
         groups = {}
-        for g in self._list_workspace_groups("Group", "id,displayName,externalId,meta"):
-            if not g.display_name:
+        for group in self._list_workspace_groups("Group", "id,displayName,externalId,meta"):
+            if not group.display_name:
                 continue
-            groups[g.display_name] = g
+            groups[group.display_name] = group
         return groups
 
     def _account_groups_in_account(self) -> dict[str, Group]:
         groups = {}
-        for g in self._list_account_groups("id,displayName,externalId"):
-            if not g.display_name:
+        for group in self._list_account_groups("id,displayName,externalId"):
+            if not group.display_name:
                 continue
-            groups[g.display_name] = g
+            groups[group.display_name] = group
         return groups
 
     def _is_group_out_of_scope(self, group: iam.Group, resource_type: str) -> bool:
@@ -481,18 +518,18 @@ class GroupManager(CrawlerBase[MigratedGroup]):
             attributes.remove("members")
             retry_on_internal_error = retried(on=[InternalError], timeout=self._verify_timeout)
             get_group = retry_on_internal_error(self._get_group)
-            for g in self._ws.groups.list(attributes=",".join(attributes)):
-                if self._is_group_out_of_scope(g, resource_type):
+            for group in self._ws.groups.list(attributes=",".join(attributes)):
+                if self._is_group_out_of_scope(group, resource_type):
                     continue
-                group_with_all_attributes = get_group(g.id)
+                group_with_all_attributes = get_group(group.id)
                 if not group_with_all_attributes:
                     continue
                 results.append(group_with_all_attributes)
         else:
-            for g in self._ws.groups.list(attributes=scim_attributes):
-                if self._is_group_out_of_scope(g, resource_type):
+            for group in self._ws.groups.list(attributes=scim_attributes):
+                if self._is_group_out_of_scope(group, resource_type):
                     continue
-                results.append(g)
+                results.append(group)
         logger.info(f"Found {len(results)} {resource_type}")
         return results
 
@@ -512,7 +549,7 @@ class GroupManager(CrawlerBase[MigratedGroup]):
             return iam.Group.from_dict(raw)  # type: ignore[arg-type]
         except NotFound:
             # the given group has been removed from the account after getting the group and before running this method
-            logger.warning("Group with ID: %s does not exist anymore in the Databricks account.", group_id)
+            logger.warning(f"Group with ID {group_id} does not exist anymore in the Databricks account.")
             return None
 
     def _list_account_groups(self, scim_attributes: str) -> list[iam.Group]:
@@ -521,11 +558,11 @@ class GroupManager(CrawlerBase[MigratedGroup]):
         logger.info(f"Listing account groups with {scim_attributes}...")
         account_groups = []
         raw = self._ws.api_client.do("GET", "/api/2.0/account/scim/v2/Groups", query={"attributes": scim_attributes})
-        for r in raw.get("Resources", []):  # type: ignore[union-attr]
-            g = iam.Group.from_dict(r)
-            if g.display_name in self._SYSTEM_GROUPS:
+        for resource in raw.get("Resources", []):  # type: ignore[union-attr]
+            group = iam.Group.from_dict(resource)
+            if group.display_name in self._SYSTEM_GROUPS:
                 continue
-            account_groups.append(g)
+            account_groups.append(group)
         logger.info(f"Found {len(account_groups)} account groups")
         sorted_groups: list[iam.Group] = sorted(account_groups, key=lambda _: _.display_name)  # type: ignore[arg-type,return-value]
         return sorted_groups
@@ -554,7 +591,7 @@ class GroupManager(CrawlerBase[MigratedGroup]):
             return True
         except NotFound:
             # the given group has been removed from the account after getting the group and before running this method
-            logger.warning("Group with ID: %s does not exist anymore in the Databricks account.", account_group_id)
+            logger.warning(f"Group with ID {account_group_id} does not exist anymore in the Databricks account.")
             return True
 
     def _get_strategy(

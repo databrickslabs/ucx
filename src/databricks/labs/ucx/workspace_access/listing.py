@@ -56,8 +56,8 @@ class WorkspaceListing:
         try:
             list_workspace = self._list_workspace(obj.path)
 
-            def is_dir(x: ObjectInfo) -> bool:
-                return x.object_type == ObjectType.DIRECTORY
+            def is_dir(obj: ObjectInfo) -> bool:
+                return obj.object_type == ObjectType.DIRECTORY
 
             grouped_iterator: Iterable[tuple[bool, Iterable[ObjectInfo]]] = groupby(list_workspace, key=is_dir)
             for is_directory, objects in grouped_iterator:

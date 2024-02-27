@@ -69,57 +69,63 @@ def test_list_mounts_should_return_a_deduped_list_of_mount_without_variable_volu
 
 
 def test_external_locations():
-    crawler = ExternalLocations(Mock(), MockBackend(), "test")
     row_factory = type("Row", (Row,), {"__columns__": ["location", "storage_properties"]})
-    sample_locations = [
-        row_factory(["s3://us-east-1-dev-account-staging-uc-ext-loc-bucket-1/Location/Table", ""]),
-        row_factory(["s3://us-east-1-dev-account-staging-uc-ext-loc-bucket-1/Location/Table2", ""]),
-        row_factory(["s3://us-east-1-dev-account-staging-uc-ext-loc-bucket-23/testloc/Table3", ""]),
-        row_factory(["s3://us-east-1-dev-account-staging-uc-ext-loc-bucket-23/anotherloc/Table4", ""]),
-        row_factory(["dbfs:/mnt/ucx/database1/table1", ""]),
-        row_factory(["dbfs:/mnt/ucx/database2/table2", ""]),
-        row_factory(["DatabricksRootmntDatabricksRoot", ""]),
-        row_factory(
-            [
-                "jdbc:databricks://",
-                "[personalAccessToken=*********(redacted), \
-        httpPath=/sql/1.0/warehouses/65b52fb5bd86a7be, host=dbc-test1-aa11.cloud.databricks.com, \
-        dbtable=samples.nyctaxi.trips]",
-            ]
-        ),
-        row_factory(
-            [
-                "jdbc:/MYSQL",
-                "[database=test_db, host=somemysql.us-east-1.rds.amazonaws.com, \
-            port=3306, dbtable=movies, user=*********(redacted), password=*********(redacted)]",
-            ]
-        ),
-        row_factory(
-            [
-                "jdbc:providerknown:/",
-                "[database=test_db, host=somedb.us-east-1.rds.amazonaws.com, \
-            port=1234, dbtable=sometable, user=*********(redacted), password=*********(redacted), \
-            provider=providerknown]",
-            ]
-        ),
-        row_factory(
-            [
-                "jdbc:providerknown:/",
-                "[database=test_db, host=somedb.us-east-1.rds.amazonaws.com, \
-            port=1234, dbtable=sometable2, user=*********(redacted), password=*********(redacted), \
-            provider=providerknown]",
-            ]
-        ),
-        row_factory(
-            [
-                "jdbc:providerunknown:/",
-                "[database=test_db, host=somedb.us-east-1.rds.amazonaws.com, \
-            port=1234, dbtable=sometable, user=*********(redacted), password=*********(redacted)]",
-            ]
-        ),
-    ]
-    sample_mounts = [Mount("/mnt/ucx", "s3://us-east-1-ucx-container")]
-    result_set = crawler._external_locations(sample_locations, sample_mounts)
+    sql_backend = MockBackend(
+        rows={
+            'SELECT location, storage_properties FROM test.tables WHERE location IS NOT NULL': [
+                row_factory(["s3://us-east-1-dev-account-staging-uc-ext-loc-bucket-1/Location/Table", ""]),
+                row_factory(["s3://us-east-1-dev-account-staging-uc-ext-loc-bucket-1/Location/Table2", ""]),
+                row_factory(["s3://us-east-1-dev-account-staging-uc-ext-loc-bucket-23/testloc/Table3", ""]),
+                row_factory(["s3://us-east-1-dev-account-staging-uc-ext-loc-bucket-23/anotherloc/Table4", ""]),
+                row_factory(["dbfs:/mnt/ucx/database1/table1", ""]),
+                row_factory(["dbfs:/mnt/ucx/database2/table2", ""]),
+                row_factory(["DatabricksRootmntDatabricksRoot", ""]),
+                row_factory(
+                    [
+                        "jdbc:databricks://",
+                        "[personalAccessToken=*********(redacted), \
+            httpPath=/sql/1.0/warehouses/65b52fb5bd86a7be, host=dbc-test1-aa11.cloud.databricks.com, \
+            dbtable=samples.nyctaxi.trips]",
+                    ]
+                ),
+                row_factory(
+                    [
+                        "jdbc:/MYSQL",
+                        "[database=test_db, host=somemysql.us-east-1.rds.amazonaws.com, \
+                port=3306, dbtable=movies, user=*********(redacted), password=*********(redacted)]",
+                    ]
+                ),
+                row_factory(
+                    [
+                        "jdbc:providerknown:/",
+                        "[database=test_db, host=somedb.us-east-1.rds.amazonaws.com, \
+                port=1234, dbtable=sometable, user=*********(redacted), password=*********(redacted), \
+                provider=providerknown]",
+                    ]
+                ),
+                row_factory(
+                    [
+                        "jdbc:providerknown:/",
+                        "[database=test_db, host=somedb.us-east-1.rds.amazonaws.com, \
+                port=1234, dbtable=sometable2, user=*********(redacted), password=*********(redacted), \
+                provider=providerknown]",
+                    ]
+                ),
+                row_factory(
+                    [
+                        "jdbc:providerunknown:/",
+                        "[database=test_db, host=somedb.us-east-1.rds.amazonaws.com, \
+                port=1234, dbtable=sometable, user=*********(redacted), password=*********(redacted)]",
+                    ]
+                ),
+            ],
+            r"SELECT \* FROM test.mounts": [
+                ("/mnt/ucx", "s3://us-east-1-ucx-container"),
+            ],
+        }
+    )
+    crawler = ExternalLocations(Mock(), sql_backend, "test")
+    result_set = crawler.snapshot()
     assert len(result_set) == 7
     assert result_set[0].location == "s3://us-east-1-dev-account-staging-uc-ext-loc-bucket-1/Location/"
     assert result_set[0].table_count == 2

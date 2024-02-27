@@ -1,18 +1,16 @@
-[
-  {
-    "created_time": 1694536604319,
-    "creator_user_name": "anonymous@databricks.com",
-    "job_id": 536591785949415,
-    "settings": {
-      "tasks": [
-        {
-          "task_key": "Ingest",
-          "existing_cluster_id": "0807-225846-motto493",
-          "notebook_task": {
-            "notebook_path": "/Users/foo.bar@databricks.com/Customers/Example/Test/Load"
-          }
+{
+  "created_time": 1694536604319,
+  "creator_user_name": "anonymous@databricks.com",
+  "job_id": 536591785949415,
+  "settings": {
+    "tasks": [
+      {
+        "task_key": "Ingest",
+        "existing_cluster_id": "0807-225846-motto493",
+        "notebook_task": {
+          "notebook_path": "/Users/foo.bar@databricks.com/Customers/Example/Test/Load"
         }
-      ]
-    }
+      }
+    ]
   }
-]
+}

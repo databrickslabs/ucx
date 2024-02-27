@@ -25,15 +25,15 @@ logger = logging.getLogger(__name__)
 class TablesMigrate:
     def __init__(
         self,
-        tc: TablesCrawler,
+        tables_crawler: TablesCrawler,
         ws: WorkspaceClient,
         backend: SqlBackend,
-        tm: TableMapping,
+        table_mapping: TableMapping,
     ):
-        self._tc = tc
+        self._tc = tables_crawler
         self._backend = backend
         self._ws = ws
-        self._tm = tm
+        self._tm = table_mapping
         self._seen_tables: dict[str, str] = {}
 
     @classmethod
@@ -153,25 +153,12 @@ class TablesMigrate:
 
         migration_list = []
         for cur_database, tables in table_by_database.items():
-            external_tables = 0
-            managed_tables = 0
-            views = 0
+            what_count: dict[What, int] = {}
             for current_table in tables:
                 if current_table.upgraded_to is not None:
-                    if current_table.kind == "VIEW":
-                        views += 1
-                        continue
-                    if current_table.object_type == "EXTERNAL":
-                        external_tables += 1
-                        continue
-                    if current_table.object_type == "MANAGED":
-                        managed_tables += 1
-                        continue
-            migration_list.append(
-                MigrationCount(
-                    database=cur_database, managed_tables=managed_tables, external_tables=external_tables, views=views
-                )
-            )
+                    count = what_count.get(current_table.what, 0)
+                    what_count[current_table.what] = count + 1
+            migration_list.append(MigrationCount(database=cur_database, what_count=what_count))
         return migration_list
 
     def is_upgraded(self, schema: str, table: str) -> bool:
@@ -189,17 +176,36 @@ class TablesMigrate:
             logger.info("No migrated tables were found.")
             return False
         print("The following is the count of migrated tables and views found in scope:")
-        print("Database                      | External Tables  | Managed Table    | Views            |")
-        print("=" * 88)
+        table_header = "Database            |"
+        headers = 1
+        for what in list(What):
+            headers = max(headers, len(what.name.split("_")))
+            table_header += f" {what.name.split('_')[0]:<10} |"
+        print(table_header)
+        # Split the header so _ separated what names are splitted into multiple lines
+        for header in range(1, headers):
+            table_sub_header = "                    |"
+            for what in list(What):
+                if len(what.name.split("_")) - 1 < header:
+                    table_sub_header += f"{' '*12}|"
+                    continue
+                table_sub_header += f" {what.name.split('_')[header]:<10} |"
+            print(table_sub_header)
+        separator = "=" * (22 + 13 * len(What))
+        print(separator)
         for count in migrated_count:
-            print(f"{count.database:<30}| {count.external_tables:16} | {count.managed_tables:16} | {count.views:16} |")
-        print("=" * 88)
-        print("Migrated External Tables and Views (targets) will be deleted")
+            table_row = f"{count.database:<20}|"
+            for what in list(What):
+                table_row += f" {count.what_count.get(what, 0):10} |"
+            print(table_row)
+        print(separator)
+        print("The following actions will be performed")
+        print("- Migrated External Tables and Views (targets) will be deleted")
         if delete_managed:
-            print("Migrated Manged Tables (targets) will be deleted")
+            print("- Migrated DBFS Root Tables will be deleted")
         else:
-            print("Migrated Manged Tables (targets) will be left intact.")
-            print("To revert and delete Migrated Tables, add --delete_managed true flag to the command.")
+            print("- Migrated DBFS Root Tables will be left intact")
+            print("To revert and delete Migrated Tables, add --delete_managed true flag to the command")
         return True
 
 

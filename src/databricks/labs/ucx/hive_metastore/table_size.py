@@ -53,7 +53,7 @@ class TableSizeCrawler(CrawlerBase):
 
     def _try_load(self) -> Iterable[TableSize]:
         """Tries to load table information from the database or throws TABLE_OR_VIEW_NOT_FOUND error"""
-        for row in self._fetch(f"SELECT * FROM {self._full_name}"):
+        for row in self._fetch(f"SELECT * FROM {self.full_name}"):
             yield TableSize(*row)
 
     def snapshot(self) -> list[TableSize]:
@@ -69,6 +69,7 @@ class TableSizeCrawler(CrawlerBase):
     def _safe_get_table_size(self, table_full_name: str) -> int | None:
         logger.debug(f"Evaluating {table_full_name} table size.")
         try:
+            # pylint: disable-next=protected-access
             return self._spark._jsparkSession.table(table_full_name).queryExecution().analyzed().stats().sizeInBytes()
         except Exception as e:  # pylint: disable=broad-exception-caught
             if "[TABLE_OR_VIEW_NOT_FOUND]" in str(e) or "[DELTA_TABLE_NOT_FOUND]" in str(e):

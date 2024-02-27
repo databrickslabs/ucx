@@ -12,30 +12,30 @@ from ..framework.mocks import MockBackend
 
 
 @pytest.fixture
-def b():
+def mock_backend():
     return MockBackend()
 
 
-def test_inventory_table_manager_init(b):
-    pi = PermissionManager(b, "test_database", [])
+def test_inventory_table_manager_init(mock_backend):
+    permission_manager = PermissionManager(mock_backend, "test_database", [])
 
-    assert pi._full_name == "hive_metastore.test_database.permissions"
-
-
-def test_cleanup(b):
-    pi = PermissionManager(b, "test_database", [])
-
-    pi.cleanup()
-
-    assert "DROP TABLE IF EXISTS hive_metastore.test_database.permissions" == b.queries[0]
+    assert permission_manager.full_name == "hive_metastore.test_database.permissions"
 
 
-def test_save(b):
-    pi = PermissionManager(b, "test_database", [])
+def test_cleanup(mock_backend):
+    permission_manager = PermissionManager(mock_backend, "test_database", [])
 
-    pi._save([Permissions("object1", "clusters", "test acl")])
+    permission_manager.cleanup()
 
-    assert [Permissions(object_id="object1", object_type="clusters", raw="test acl")] == b.rows_written_for(
+    assert mock_backend.queries[0] == "DROP TABLE IF EXISTS hive_metastore.test_database.permissions"
+
+
+def test_save(mock_backend):
+    permission_manager = PermissionManager(mock_backend, "test_database", [])
+
+    permission_manager._save([Permissions("object1", "clusters", "test acl")])  # pylint: disable=protected-access
+
+    assert [Permissions(object_id="object1", object_type="clusters", raw="test acl")] == mock_backend.rows_written_for(
         "hive_metastore.test_database.permissions", "append"
     )
 
@@ -53,7 +53,7 @@ def make_row(data, columns):
 
 
 def test_load_all():
-    b = MockBackend(
+    sql_backend = MockBackend(
         rows={
             "SELECT object_id": [
                 permissions_row("object1", "clusters", "test acl"),
@@ -63,14 +63,14 @@ def test_load_all():
             ],
         }
     )
-    pi = PermissionManager(b, "test_database", [])
+    permission_manager = PermissionManager(sql_backend, "test_database", [])
 
-    output = pi.load_all()
+    output = permission_manager.load_all()
     assert output[0] == Permissions("object1", "clusters", "test acl")
 
 
 def test_load_all_no_rows_present():
-    b = MockBackend(
+    sql_backend = MockBackend(
         rows={
             "SELECT object_id": [
                 permissions_row("object1", "clusters", "test acl"),
@@ -81,26 +81,26 @@ def test_load_all_no_rows_present():
         }
     )
 
-    pi = PermissionManager(b, "test_database", [])
+    permission_manager = PermissionManager(sql_backend, "test_database", [])
 
     with pytest.raises(RuntimeError):
-        pi.load_all()
+        permission_manager.load_all()
 
 
-def test_manager_inventorize(b, mocker):
+def test_manager_inventorize(mock_backend, mocker):
     some_crawler = mocker.Mock()
     some_crawler.get_crawler_tasks = lambda: [lambda: None, lambda: Permissions("a", "b", "c"), lambda: None]
-    pm = PermissionManager(b, "test_database", [some_crawler])
+    permission_manager = PermissionManager(mock_backend, "test_database", [some_crawler])
 
-    pm.inventorize_permissions()
+    permission_manager.inventorize_permissions()
 
-    assert [Permissions(object_id="a", object_type="b", raw="c")] == b.rows_written_for(
+    assert [Permissions(object_id="a", object_type="b", raw="c")] == mock_backend.rows_written_for(
         "hive_metastore.test_database.permissions", "append"
     )
 
 
 def test_manager_apply(mocker):
-    b = MockBackend(
+    sql_backend = MockBackend(
         rows={
             "SELECT object_id": [
                 permissions_row(
@@ -153,7 +153,7 @@ def test_manager_apply(mocker):
     # this emulates a real applier and call to an API
     mock_applier.get_apply_task = lambda item, _: lambda: applied_items.add(f"{item.object_id} {item.object_id}")
 
-    pm = PermissionManager(b, "test_database", [mock_applier])
+    permission_manager = PermissionManager(sql_backend, "test_database", [mock_applier])
     group_migration_state = MigrationState(
         [
             MigratedGroup(
@@ -169,29 +169,29 @@ def test_manager_apply(mocker):
         ]
     )
 
-    pm.apply_group_permissions(group_migration_state)
+    permission_manager.apply_group_permissions(group_migration_state)
 
     assert {"test2 test2", "test test"} == applied_items
 
 
 def test_unregistered_support():
-    b = MockBackend(
+    sql_backend = MockBackend(
         rows={
             "SELECT": [
                 permissions_row("test", "__unknown__", "{}"),
             ]
         }
     )
-    pm = PermissionManager(b, "test", [])
-    pm.apply_group_permissions(migration_state=MagicMock())
+    permission_manager = PermissionManager(sql_backend, "test", [])
+    permission_manager.apply_group_permissions(migration_state=MagicMock())
 
 
 def test_factory(mocker):
     ws = mocker.Mock()
     ws.groups.list.return_value = []
-    b = MockBackend()
-    permission_manager = PermissionManager.factory(ws, b, "test")
-    appliers = permission_manager._appliers()
+    sql_backend = MockBackend()
+    permission_manager = PermissionManager.factory(ws, sql_backend, "test")
+    appliers = permission_manager.object_type_support()
 
     assert sorted(
         {
@@ -226,7 +226,7 @@ def test_factory(mocker):
 
 
 def test_manager_verify(mocker):
-    b = MockBackend(
+    sql_backend = MockBackend(
         rows={
             "SELECT object_id": [
                 permissions_row(
@@ -261,15 +261,15 @@ def test_manager_verify(mocker):
     # this emulates a real verifier and call to an API
     mock_verifier.get_verify_task = lambda item: lambda: items.add(f"{item.object_id} {item.object_id}")
 
-    pm = PermissionManager(b, "test_database", [mock_verifier])
-    result = pm.verify_group_permissions()
+    permission_manager = PermissionManager(sql_backend, "test_database", [mock_verifier])
+    result = permission_manager.verify_group_permissions()
 
     assert result
     assert {"test test"} == items
 
 
 def test_manager_verify_not_supported_type(mocker):
-    b = MockBackend(
+    sql_backend = MockBackend(
         rows={
             "SELECT object_id": [
                 permissions_row(
@@ -299,14 +299,14 @@ def test_manager_verify_not_supported_type(mocker):
 
     mock_verifier = mocker.Mock()
     mock_verifier.object_types = lambda: {"not_supported"}
-    pm = PermissionManager(b, "test_database", [mock_verifier])
+    permission_manager = PermissionManager(sql_backend, "test_database", [mock_verifier])
 
     with pytest.raises(ValueError):
-        pm.verify_group_permissions()
+        permission_manager.verify_group_permissions()
 
 
 def test_manager_verify_no_tasks(mocker):
-    b = MockBackend(
+    sql_backend = MockBackend(
         rows={
             "SELECT object_id": [
                 permissions_row(
@@ -339,7 +339,7 @@ def test_manager_verify_no_tasks(mocker):
     # this emulates a real verifier and call to an API
     mock_verifier.get_verify_task = lambda item: None
 
-    pm = PermissionManager(b, "test_database", [mock_verifier])
-    result = pm.verify_group_permissions()
+    permission_manager = PermissionManager(sql_backend, "test_database", [mock_verifier])
+    result = permission_manager.verify_group_permissions()
 
     assert result

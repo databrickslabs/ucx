@@ -12,6 +12,8 @@ from databricks.labs.ucx.workspace_access.secrets import (
     SecretScopesSupport,
 )
 
+# pylint: disable=protected-access
+
 
 def test_secret_scopes_crawler():
     ws = MagicMock()
@@ -160,10 +162,8 @@ def test_secret_scopes_reapply_check_exception_type():
 
     sup = SecretScopesSupport(ws, timedelta(seconds=1))
     expected_permission = workspace.AclPermission.MANAGE
-    try:
+    with pytest.raises(TimeoutError):
         sup._applier_task("test", "db-temp-test", expected_permission)
-    except Exception as e:
-        assert isinstance(e, TimeoutError)
 
 
 def test_verify_task_should_return_true_if_permissions_applied():

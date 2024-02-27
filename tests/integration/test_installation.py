@@ -1,12 +1,14 @@
 import functools
 import json
 import logging
+import os.path
 from collections.abc import Callable
 from dataclasses import replace
 from datetime import timedelta
 
 import pytest
 from databricks.labs.blueprint.installation import Installation
+from databricks.labs.blueprint.installer import InstallState
 from databricks.labs.blueprint.parallel import Threads
 from databricks.labs.blueprint.tui import MockPrompts
 from databricks.labs.blueprint.wheels import WheelsV2
@@ -111,27 +113,32 @@ def test_job_failure_propagates_correct_error_message_and_logs(ws, sql_backend, 
     assert len(workflow_run_logs) == 1
 
 
-@retried(on=[NotFound, Unknown, InvalidParameterValue], timeout=timedelta(minutes=18))
+@retried(on=[NotFound, Unknown, InvalidParameterValue], timeout=timedelta(minutes=3))
 def test_job_cluster_policy(ws, new_installation):
     install = new_installation(lambda wc: replace(wc, override_clusters=None))
+    user_name = ws.current_user.me().user_name
     cluster_policy = ws.cluster_policies.get(policy_id=install.config.policy_id)
     policy_definition = json.loads(cluster_policy.definition)
 
-    assert cluster_policy.name == f"Unity Catalog Migration ({install.config.inventory_database})"
+    assert cluster_policy.name == f"Unity Catalog Migration ({install.config.inventory_database}) ({user_name})"
 
     assert policy_definition["spark_version"]["value"] == ws.clusters.select_spark_version(latest=True)
     assert policy_definition["node_type_id"]["value"] == ws.clusters.select_node_type(local_disk=True)
-    assert (
-        policy_definition["azure_attributes.availability"]["value"] == compute.AzureAvailability.ON_DEMAND_AZURE.value
-    )
+    if ws.config.is_azure:
+        assert (
+            policy_definition["azure_attributes.availability"]["value"]
+            == compute.AzureAvailability.ON_DEMAND_AZURE.value
+        )
+    if ws.config.is_aws:
+        assert policy_definition["aws_attributes.availability"]["value"] == compute.AwsAvailability.ON_DEMAND.value
 
 
 @pytest.mark.skip
-@retried(on=[NotFound, TimeoutError], timeout=timedelta(minutes=15))
+@retried(on=[NotFound, TimeoutError], timeout=timedelta(minutes=5))
 def test_new_job_cluster_with_policy_assessment(
     ws, new_installation, make_ucx_group, make_cluster_policy, make_cluster_policy_permissions
 ):
-    ws_group_a, acc_group_a = make_ucx_group()
+    ws_group_a, _ = make_ucx_group()
     cluster_policy = make_cluster_policy()
     make_cluster_policy_permissions(
         object_id=cluster_policy.policy_id,
@@ -147,11 +154,11 @@ def test_new_job_cluster_with_policy_assessment(
     assert before[ws_group_a.display_name] == PermissionLevel.CAN_USE
 
 
-@retried(on=[NotFound, Unknown, InvalidParameterValue], timeout=timedelta(minutes=20))
+@retried(on=[NotFound, Unknown, InvalidParameterValue], timeout=timedelta(minutes=10))
 def test_running_real_assessment_job(
     ws, new_installation, make_ucx_group, make_cluster_policy, make_cluster_policy_permissions
 ):
-    ws_group_a, acc_group_a = make_ucx_group()
+    ws_group_a, _ = make_ucx_group()
 
     cluster_policy = make_cluster_policy()
     make_cluster_policy_permissions(
@@ -263,7 +270,7 @@ def test_running_real_validate_groups_permissions_job_fails(
 
 @retried(on=[NotFound, InvalidParameterValue], timeout=timedelta(minutes=5))
 def test_running_real_remove_backup_groups_job(ws, sql_backend, new_installation, make_ucx_group):
-    ws_group_a, acc_group_a = make_ucx_group()
+    ws_group_a, _ = make_ucx_group()
 
     install = new_installation(lambda wc: replace(wc, include_group_names=[ws_group_a.display_name]))
     cfg = install.config
@@ -291,10 +298,13 @@ def test_repair_run_workflow_job(ws, mocker, new_installation, sql_backend):
     sql_backend.execute(f"CREATE SCHEMA IF NOT EXISTS {install.config.inventory_database}")
 
     install.repair_run("099-destroy-schema")
-    workflow_job_id = install._state.jobs["099-destroy-schema"]
+
+    installation = Installation(ws, product=os.path.basename(install.folder), install_folder=install.folder)
+    state = InstallState.from_installation(installation)
+    workflow_job_id = state.jobs["099-destroy-schema"]
     run_status = None
     while run_status is None:
-        job_runs = list(install._ws.jobs.list_runs(job_id=workflow_job_id, limit=1))
+        job_runs = list(ws.jobs.list_runs(job_id=workflow_job_id, limit=1))
         run_status = job_runs[0].state.result_state
     assert run_status.value == "SUCCESS"
 
@@ -302,7 +312,9 @@ def test_repair_run_workflow_job(ws, mocker, new_installation, sql_backend):
 @retried(on=[NotFound], timeout=timedelta(minutes=5))
 def test_uninstallation(ws, sql_backend, new_installation):
     install = new_installation()
-    assessment_job_id = install._state.jobs["assessment"]
+    installation = Installation(ws, product=os.path.basename(install.folder), install_folder=install.folder)
+    state = InstallState.from_installation(installation)
+    assessment_job_id = state.jobs["assessment"]
     install.uninstall()
     with pytest.raises(NotFound):
         ws.workspace.get_status(install.folder)

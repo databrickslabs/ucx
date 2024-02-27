@@ -116,19 +116,17 @@ class TableAclSupport(AclSupport):
         grant_dict = dataclasses.asdict(acl)
         del grant_dict["action_type"]
         del grant_dict["principal"]
-        grants_on_object = self._grants_crawler._grants(**grant_dict)
+        grants_on_object = self._grants_crawler.grants(**grant_dict)
 
         if grants_on_object:
-            action_types_for_current_principal = [
-                grant.action_type for grant in grants_on_object if grant.principal == acl.principal
-            ]
+            on_current_principal = [grant.action_type for grant in grants_on_object if grant.principal == acl.principal]
             acl_action_types = acl.action_type.split(", ")
-            if all(action_type in action_types_for_current_principal for action_type in acl_action_types):
+            if all(action_type in on_current_principal for action_type in acl_action_types):
                 return True
             msg = (
                 f"Couldn't find permission for object type {object_type}, id {object_id} and principal {acl.principal}\n"
                 f"acl to be applied={acl_action_types}\n"
-                f"acl found in the object={action_types_for_current_principal}\n"
+                f"acl found in the object={on_current_principal}\n"
             )
             raise ValueError(msg)
         return False

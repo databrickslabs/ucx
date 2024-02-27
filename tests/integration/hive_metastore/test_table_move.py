@@ -15,8 +15,8 @@ def test_move_tables_no_from_schema(ws, sql_backend, make_random, make_catalog, 
     from_catalog = make_catalog()
     from_schema = make_random(4)
     to_catalog = make_catalog()
-    tm = TableMove(ws, sql_backend)
-    tm.move_tables(from_catalog.name, from_schema, "*", to_catalog.name, from_schema, False)
+    table_move = TableMove(ws, sql_backend)
+    table_move.move_tables(from_catalog.name, from_schema, "*", to_catalog.name, from_schema, False)
     rec_results = [
         rec.message
         for rec in caplog.records
@@ -26,8 +26,10 @@ def test_move_tables_no_from_schema(ws, sql_backend, make_random, make_catalog, 
 
 
 @retried(on=[NotFound], timeout=timedelta(minutes=2))
-def test_move_tables(ws, sql_backend, make_catalog, make_schema, make_table, make_acc_group):
-    tm = TableMove(ws, sql_backend)
+def test_move_tables(
+    ws, sql_backend, make_catalog, make_schema, make_table, make_acc_group
+):  # pylint: disable=too-many-locals
+    table_move = TableMove(ws, sql_backend)
     group_a = make_acc_group()
     group_b = make_acc_group()
     from_catalog = make_catalog()
@@ -50,7 +52,7 @@ def test_move_tables(ws, sql_backend, make_catalog, make_schema, make_table, mak
     sql_backend.execute(f"GRANT SELECT ON VIEW {from_view_1.full_name} TO `{group_b.display_name}`")
     sql_backend.execute(f"GRANT SELECT ON TABLE {to_table_3.full_name} TO `{group_a.display_name}`")
 
-    tm.move_tables(from_catalog.name, from_schema.name, "*", to_catalog.name, to_schema.name, False)
+    table_move.move_tables(from_catalog.name, from_schema.name, "*", to_catalog.name, to_schema.name, False)
 
     to_tables = ws.tables.list(catalog_name=to_catalog.name, schema_name=to_schema.name)
     table_1_grant = ws.grants.get(
@@ -65,8 +67,8 @@ def test_move_tables(ws, sql_backend, make_catalog, make_schema, make_table, mak
     view_1_grant = ws.grants.get(
         securable_type=SecurableType.TABLE, full_name=f"{to_catalog.name}.{to_schema.name}.{from_view_1.name}"
     )
-    for t in to_tables:
-        assert t.name in [from_table_1.name, from_table_2.name, from_table_3.name, from_view_1.name]
+    for table in to_tables:
+        assert table.name in [from_table_1.name, from_table_2.name, from_table_3.name, from_view_1.name]
 
     expected_table_1_grant = [PrivilegeAssignment(group_a.display_name, [Privilege.SELECT])]
     expected_table_2_grant = [
@@ -83,7 +85,7 @@ def test_move_tables(ws, sql_backend, make_catalog, make_schema, make_table, mak
 
 @retried(on=[NotFound], timeout=timedelta(minutes=2))
 def test_move_tables_no_to_schema(ws, sql_backend, make_catalog, make_schema, make_table, make_random):
-    tm = TableMove(ws, sql_backend)
+    table_move = TableMove(ws, sql_backend)
     from_catalog = make_catalog()
     from_schema = make_schema(catalog_name=from_catalog.name)
     from_table_to_migrate = make_table(catalog_name=from_catalog.name, schema_name=from_schema.name)
@@ -92,21 +94,23 @@ def test_move_tables_no_to_schema(ws, sql_backend, make_catalog, make_schema, ma
     to_schema = make_random(4)
 
     # migrate first table
-    tm.move_tables(from_catalog.name, from_schema.name, from_table_to_migrate.name, to_catalog.name, to_schema, True)
+    table_move.move_tables(
+        from_catalog.name, from_schema.name, from_table_to_migrate.name, to_catalog.name, to_schema, True
+    )
 
     to_tables = ws.tables.list(catalog_name=to_catalog.name, schema_name=to_schema)
     from_tables = ws.tables.list(catalog_name=from_catalog.name, schema_name=from_schema.name)
 
-    for t in to_tables:
-        assert t.name == from_table_to_migrate.name
+    for table in to_tables:
+        assert table.name == from_table_to_migrate.name
 
-    for t in from_tables:
-        assert t.name == from_table_not_to_migrate.name
+    for table in from_tables:
+        assert table.name == from_table_not_to_migrate.name
 
 
 @retried(on=[NotFound], timeout=timedelta(minutes=2))
 def test_move_views(ws, sql_backend, make_catalog, make_schema, make_table, make_random):
-    tm = TableMove(ws, sql_backend)
+    table_move = TableMove(ws, sql_backend)
     from_catalog = make_catalog()
     from_schema = make_schema(catalog_name=from_catalog.name)
     from_table = make_table(catalog_name=from_catalog.name, schema_name=from_schema.name)
@@ -126,21 +130,25 @@ def test_move_views(ws, sql_backend, make_catalog, make_schema, make_table, make
     to_schema = make_random(4)
 
     # migrate first table
-    tm.move_tables(from_catalog.name, from_schema.name, from_view_to_migrate.name, to_catalog.name, to_schema, True)
+    table_move.move_tables(
+        from_catalog.name, from_schema.name, from_view_to_migrate.name, to_catalog.name, to_schema, True
+    )
 
     to_views = ws.tables.list(catalog_name=to_catalog.name, schema_name=to_schema)
     from_views = ws.tables.list(catalog_name=from_catalog.name, schema_name=from_schema.name)
 
-    for t in to_views:
-        assert t.name == from_view_to_migrate.name
+    for view in to_views:
+        assert view.name == from_view_to_migrate.name
 
-    for t in from_views:
-        assert t.name in [from_view_not_to_migrate.name, from_table.name]
+    for view in from_views:
+        assert view.name in [from_view_not_to_migrate.name, from_table.name]
 
 
 @retried(on=[NotFound], timeout=timedelta(minutes=2))
-def test_alias_tables(ws, sql_backend, make_catalog, make_schema, make_table, make_acc_group):
-    tm = TableMove(ws, sql_backend)
+def test_alias_tables(
+    ws, sql_backend, make_catalog, make_schema, make_table, make_acc_group
+):  # pylint: disable=too-many-locals
+    table_move = TableMove(ws, sql_backend)
     group_a = make_acc_group()
     group_b = make_acc_group()
     from_catalog = make_catalog()
@@ -163,7 +171,7 @@ def test_alias_tables(ws, sql_backend, make_catalog, make_schema, make_table, ma
     sql_backend.execute(f"GRANT SELECT ON VIEW {from_view_1.full_name} TO `{group_b.display_name}`")
     sql_backend.execute(f"GRANT SELECT ON TABLE {to_table_3.full_name} TO `{group_a.display_name}`")
 
-    tm.alias_tables(from_catalog.name, from_schema.name, "*", to_catalog.name, to_schema.name)
+    table_move.alias_tables(from_catalog.name, from_schema.name, "*", to_catalog.name, to_schema.name)
 
     to_tables = ws.tables.list(catalog_name=to_catalog.name, schema_name=to_schema.name)
     table_1_grant = ws.grants.get(
@@ -178,8 +186,8 @@ def test_alias_tables(ws, sql_backend, make_catalog, make_schema, make_table, ma
     view_1_grant = ws.grants.get(
         securable_type=SecurableType.TABLE, full_name=f"{to_catalog.name}.{to_schema.name}.{from_view_1.name}"
     )
-    for t in to_tables:
-        assert t.name in [from_table_1.name, from_table_2.name, from_table_3.name, from_view_1.name]
+    for table in to_tables:
+        assert table.name in [from_table_1.name, from_table_2.name, from_table_3.name, from_view_1.name]
 
     expected_table_1_grant = [PrivilegeAssignment(group_a.display_name, [Privilege.SELECT])]
     expected_table_2_grant = [PrivilegeAssignment(group_b.display_name, [Privilege.SELECT])]

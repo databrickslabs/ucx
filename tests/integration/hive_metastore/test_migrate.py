@@ -139,7 +139,9 @@ def test_migrate_external_table(ws, sql_backend, inventory_schema, make_catalog,
 
 
 @retried(on=[NotFound], timeout=timedelta(minutes=5))
-def test_revert_migrated_table(ws, sql_backend, inventory_schema, make_schema, make_table, make_catalog):
+def test_revert_migrated_table(
+    ws, sql_backend, inventory_schema, make_schema, make_table, make_catalog
+):  # pylint: disable=too-many-locals
     src_schema1 = make_schema(catalog_name="hive_metastore")
     src_schema2 = make_schema(catalog_name="hive_metastore")
     table_to_revert = make_table(schema_name=src_schema1.name)
@@ -251,7 +253,9 @@ def test_mapping_skips_tables_databases(ws, sql_backend, inventory_schema, make_
 
 
 @retried(on=[NotFound], timeout=timedelta(minutes=5))
-def test_mapping_reverts_table(ws, sql_backend, inventory_schema, make_schema, make_table, make_catalog):
+def test_mapping_reverts_table(
+    ws, sql_backend, inventory_schema, make_schema, make_table, make_catalog
+):  # pylint: disable=too-many-locals
     src_schema = make_schema(catalog_name="hive_metastore")
     table_to_revert = make_table(schema_name=src_schema.name)
     table_to_skip = make_table(schema_name=src_schema.name)

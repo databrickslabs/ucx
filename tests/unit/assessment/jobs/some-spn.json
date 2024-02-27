@@ -1,0 +1,28 @@
+{
+  "created_time": 1694536604319,
+  "creator_user_name": "anonymous@databricks.com",
+  "job_id": 536591785949416,
+  "settings": {
+    "job_clusters": [
+      {
+        "job_cluster_key": "rrrrrrrr",
+        "new_cluster": {
+          "node_type_id": "Standard_DS3_v2",
+          "num_workers": 2,
+          "spark_conf": {
+            "spark.hadoop.fs.azure.account.oauth2.client.id.abcde.dfs.core.windows.net": "1234567890",
+            "spark.databricks.delta.formatCheck.enabled": "false"
+          }
+        }
+      }
+    ],
+    "tasks": [
+      {
+        "task_key": "Ingest",
+        "notebook_task": {
+          "notebook_path": "/Users/foo.bar@databricks.com/Customers/Example/Test/Load"
+        }
+      }
+    ]
+  }
+}

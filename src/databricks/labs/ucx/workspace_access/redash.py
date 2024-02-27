@@ -104,12 +104,12 @@ class RedashPermissionsSupport(AclSupport):
         if not loaded.access_control_list:
             return acl
 
-        for v in loaded.access_control_list:
+        for access_control in loaded.access_control_list:
             acl.append(
                 sql.AccessControl(
-                    permission_level=v.permission_level,
-                    group_name=v.group_name,
-                    user_name=v.user_name,
+                    permission_level=access_control.permission_level,
+                    group_name=access_control.group_name,
+                    user_name=access_control.user_name,
                 )
             )
         # sort to return deterministic results

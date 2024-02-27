@@ -207,7 +207,7 @@ def test_warehouses(ws, make_group, make_warehouse, make_warehouse_permissions):
 
 
 @retried(on=[NotFound], timeout=timedelta(minutes=3))
-def test_models(ws, make_group, make_model, make_registered_model_permissions):
+def test_models(ws, make_group, make_model, make_registered_model_permissions):  # pylint: disable=invalid-name
     group_a = make_group()
     group_b = make_group()
     model = make_model()

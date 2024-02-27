@@ -16,6 +16,8 @@ from databricks.labs.ucx.workspace_access.redash import (
     RedashPermissionsSupport,
 )
 
+# pylint: disable=protected-access
+
 
 def test_crawlers():
     ws = MagicMock()
@@ -41,7 +43,7 @@ def test_crawlers():
 
     ws.dbsql_permissions.get.side_effect = [
         sql.GetResponse(object_type=ot, object_id="test", access_control_list=sample_acl)
-        for ot in [sql.ObjectType.ALERT, sql.ObjectType.QUERY, sql.ObjectType.DASHBOARD]
+        for ot in (sql.ObjectType.ALERT, sql.ObjectType.QUERY, sql.ObjectType.DASHBOARD)
     ]
 
     sup = RedashPermissionsSupport(
@@ -61,7 +63,7 @@ def test_crawlers():
     for task in tasks:
         item = task()
         assert item.object_id == "test"
-        assert item.object_type in ["alerts", "dashboards", "queries"]
+        assert item.object_type in {"alerts", "dashboards", "queries"}
         assert item.raw is not None
 
 

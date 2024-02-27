@@ -102,6 +102,7 @@ dbutils.library.restartPython()
 
 import logging
 from pathlib import Path
+from databricks.labs.blueprint.installation import Installation
 from databricks.labs.blueprint.logger import install_logger
 from databricks.labs.ucx.__about__ import __version__
 from databricks.labs.ucx.config import WorkspaceConfig
@@ -110,7 +111,7 @@ from databricks.sdk import WorkspaceClient
 install_logger()
 logging.getLogger("databricks").setLevel("DEBUG")
 
-cfg = WorkspaceConfig.from_file(Path("/Workspace{config_file}"))
+cfg = Installation.load_local(WorkspaceConfig, Path("/Workspace{config_file}"))
 ws = WorkspaceClient()
 
 print(__version__)
@@ -242,13 +243,7 @@ class WorkspaceInstaller:
                 cluster_policy = json.loads(self._prompts.choice_from_dict("Choose a cluster policy", cluster_policies))
                 instance_profile, spark_conf_dict = self._get_ext_hms_conf_from_policy(cluster_policy)
 
-        logger.info("Creating UCX cluster policy.")
-        policy_id = self._ws.cluster_policies.create(
-            name=f"Unity Catalog Migration ({inventory_database})",
-            definition=self._cluster_policy_definition(conf=spark_conf_dict, instance_profile=instance_profile),
-            description="Custom cluster policy for Unity Catalog Migration (UCX)",
-        ).policy_id
-
+        policy_id = self._create_cluster_policy(inventory_database, spark_conf_dict, instance_profile)
         config = WorkspaceConfig(
             inventory_database=inventory_database,
             workspace_group_regex=configure_groups.workspace_group_regex,
@@ -264,14 +259,35 @@ class WorkspaceInstaller:
             spark_conf=spark_conf_dict,
             policy_id=policy_id,
         )
-        ws_file_url = self._installation.save(config)
-        if self._prompts.confirm("Open config file in the browser and continue installing?"):
+        self._installation.save(config)
+        ws_file_url = self._installation.workspace_link(config.__file__)
+        if self._prompts.confirm(f"Open config file in the browser and continue installing? {ws_file_url}"):
             webbrowser.open(ws_file_url)
         return config
 
     @staticmethod
     def _policy_config(value: str):
         return {"type": "fixed", "value": value}
+
+    def _create_cluster_policy(
+        self, inventory_database: str, spark_conf: dict, instance_profile: str | None
+    ) -> str | None:
+        policy_name = f"Unity Catalog Migration ({inventory_database}) ({self._ws.current_user.me().user_name})"
+        policies = self._ws.cluster_policies.list()
+        policy_id = None
+        for policy in policies:
+            if policy.name == policy_name:
+                policy_id = policy.policy_id
+                logger.info(f"Cluster policy {policy_name} already present, reusing the same.")
+                break
+        if not policy_id:
+            logger.info("Creating UCX cluster policy.")
+            policy_id = self._ws.cluster_policies.create(
+                name=policy_name,
+                definition=self._cluster_policy_definition(conf=spark_conf, instance_profile=instance_profile),
+                description="Custom cluster policy for Unity Catalog Migration (UCX)",
+            ).policy_id
+        return policy_id
 
     def _cluster_policy_definition(self, conf: dict, instance_profile: str | None) -> str:
         policy_definition = {
@@ -287,7 +303,7 @@ class WorkspaceInstaller:
             )
             if instance_profile:
                 policy_definition["aws_attributes.instance_profile_arn"] = self._policy_config(instance_profile)
-        elif self._ws.config.is_azure:
+        elif self._ws.config.is_azure:  # pylint: disable=confusing-consecutive-elif
             policy_definition["azure_attributes.availability"] = self._policy_config(
                 compute.AzureAvailability.ON_DEMAND_AZURE.value
             )
@@ -420,33 +436,36 @@ class WorkspaceInstallation:
         except OperationFailed as err:
             # currently we don't have any good message from API, so we have to work around it.
             job_run = self._ws.jobs.get_run(job_run_waiter.run_id)
-            errors: list[DatabricksError] = []
-            timeouts: list[DeadlineExceeded] = []
-            assert job_run.tasks is not None
-            for run_task in job_run.tasks:
-                if not run_task.state:
-                    continue
-                if run_task.state.result_state == jobs.RunResultState.TIMEDOUT:
-                    msg = f"{run_task.task_key}: The run was stopped after reaching the timeout"
-                    timeouts.append(DeadlineExceeded(msg))
-                    continue
-                if run_task.state.result_state != jobs.RunResultState.FAILED:
-                    continue
-                assert run_task.run_id is not None
-                run_output = self._ws.jobs.get_run_output(run_task.run_id)
-                if logger.isEnabledFor(logging.DEBUG):
-                    if run_output and run_output.error_trace:
-                        sys.stderr.write(run_output.error_trace)
-                if run_output and run_output.error:
-                    errors.append(self._infer_task_exception(f"{run_task.task_key}: {run_output.error}"))
-            assert job_run.state is not None
-            assert job_run.state.state_message is not None
-            if len(errors) == 1:
-                raise errors[0] from err
-            all_errors = errors + timeouts
-            if len(all_errors) == 0:
-                raise Unknown(job_run.state.state_message) from err
-            raise ManyError(all_errors) from err
+            raise self._infer_nested_error(job_run) from err
+
+    def _infer_nested_error(self, job_run) -> Exception:
+        errors: list[DatabricksError] = []
+        timeouts: list[DeadlineExceeded] = []
+        assert job_run.tasks is not None
+        for run_task in job_run.tasks:
+            if not run_task.state:
+                continue
+            if run_task.state.result_state == jobs.RunResultState.TIMEDOUT:
+                msg = f"{run_task.task_key}: The run was stopped after reaching the timeout"
+                timeouts.append(DeadlineExceeded(msg))
+                continue
+            if run_task.state.result_state != jobs.RunResultState.FAILED:
+                continue
+            assert run_task.run_id is not None
+            run_output = self._ws.jobs.get_run_output(run_task.run_id)
+            if logger.isEnabledFor(logging.DEBUG):
+                if run_output and run_output.error_trace:
+                    sys.stderr.write(run_output.error_trace)
+            if run_output and run_output.error:
+                errors.append(self._infer_task_exception(f"{run_task.task_key}: {run_output.error}"))
+        assert job_run.state is not None
+        assert job_run.state.state_message is not None
+        if len(errors) == 1:
+            return errors[0]
+        all_errors = errors + timeouts
+        if len(all_errors) == 0:
+            return Unknown(job_run.state.state_message)
+        return ManyError(all_errors)
 
     @staticmethod
     def _infer_task_exception(haystack: str) -> DatabricksError:
@@ -538,22 +557,28 @@ class WorkspaceInstallation:
                 self._installation.save(self._config)
             return self._wheels.upload_to_wsfs()
 
+    def _upload_cluster_policy(self, remote_wheel: str):
+        try:
+            if self.config.policy_id is None:
+                msg = "Cluster policy not present, please uninstall and reinstall ucx completely."
+                raise InvalidParameterValue(msg)
+            policy = self._ws.cluster_policies.get(policy_id=self.config.policy_id)
+        except NotFound as err:
+            msg = f"UCX Policy {self.config.policy_id} not found, please reinstall UCX"
+            logger.error(msg)
+            raise NotFound(msg) from err
+        if policy.name is not None:
+            self._ws.cluster_policies.edit(
+                policy_id=self.config.policy_id,
+                name=policy.name,
+                definition=policy.definition,
+                libraries=[compute.Library(whl=f"dbfs:{remote_wheel}")],
+            )
+
     def create_jobs(self):
         logger.debug(f"Creating jobs from tasks in {main.__name__}")
         remote_wheel = self._upload_wheel()
-        try:
-            policy_definition = self._ws.cluster_policies.get(policy_id=self.config.policy_id).definition
-        except NotFound as e:
-            msg = f"UCX Policy {self.config.policy_id} not found, please reinstall UCX"
-            logger.error(msg)
-            raise NotFound(msg) from e
-
-        self._ws.cluster_policies.edit(
-            policy_id=self.config.policy_id,
-            name=f"Unity Catalog Migration ({self.config.inventory_database})",
-            definition=policy_definition,
-            libraries=[compute.Library(whl=f"dbfs:{remote_wheel}")],
-        )
+        self._upload_cluster_policy(remote_wheel)
         desired_steps = {t.workflow for t in _TASKS.values() if t.cloud_compatible(self._ws.config)}
         wheel_runner = None
 
@@ -607,7 +632,7 @@ class WorkspaceInstallation:
 
     def _create_readme(self) -> str:
         debug_notebook_link = self._installation.workspace_markdown_link('debug notebook', 'DEBUG.py')
-        md = [
+        markdown = [
             "# UCX - The Unity Catalog Migration Assistant",
             f'To troubleshoot, see {debug_notebook_link}.\n',
             "Here are the URLs and descriptions of workflows that trigger various stages of migration.",
@@ -627,19 +652,19 @@ class WorkspaceInstallation:
                 dashboard_url = f"{self._ws.config.host}/sql/dashboards/{self._state.dashboards[dash]}"
                 dashboard_link += f"  - [{first} ({second}) dashboard]({dashboard_url})\n"
             job_link = f"[{self._name(step_name)}]({self._ws.config.host}#job/{job_id})"
-            md.append("---\n\n")
-            md.append(f"## {job_link}\n\n")
-            md.append(f"{dashboard_link}")
-            md.append("\nThe workflow consists of the following separate tasks:\n\n")
-            for t in self._sorted_tasks():
-                if t.workflow != step_name:
+            markdown.append("---\n\n")
+            markdown.append(f"## {job_link}\n\n")
+            markdown.append(f"{dashboard_link}")
+            markdown.append("\nThe workflow consists of the following separate tasks:\n\n")
+            for task in self._sorted_tasks():
+                if task.workflow != step_name:
                     continue
-                doc = self._config.replace_inventory_variable(t.doc)
-                md.append(f"### `{t.name}`\n\n")
-                md.append(f"{doc}\n")
-                md.append("\n\n")
+                doc = self._config.replace_inventory_variable(task.doc)
+                markdown.append(f"### `{task.name}`\n\n")
+                markdown.append(f"{doc}\n")
+                markdown.append("\n\n")
         preamble = ["# Databricks notebook source", "# MAGIC %md"]
-        intro = "\n".join(preamble + [f"# MAGIC {line}" for line in md])
+        intro = "\n".join(preamble + [f"# MAGIC {line}" for line in markdown])
         self._installation.upload('README.py', intro.encode('utf8'))
         readme_url = self._installation.workspace_link('README')
         if self._prompts and self._prompts.confirm(f"Open job overview in your browser? {readme_url}"):
@@ -684,8 +709,8 @@ class WorkspaceInstallation:
 
     def _upload_wheel_runner(self, remote_wheel: str):
         # TODO: we have to be doing this workaround until ES-897453 is solved in the platform
-        py = TEST_RUNNER_NOTEBOOK.format(remote_wheel=remote_wheel, config_file=self._config_file).encode("utf8")
-        return self._installation.upload(f"wheels/wheel-test-runner-{PRODUCT_INFO.version()}.py", py)
+        code = TEST_RUNNER_NOTEBOOK.format(remote_wheel=remote_wheel, config_file=self._config_file).encode("utf8")
+        return self._installation.upload(f"wheels/wheel-test-runner-{PRODUCT_INFO.version()}.py", code)
 
     @staticmethod
     def _apply_cluster_overrides(settings: dict[str, Any], overrides: dict[str, str], wheel_runner: str) -> dict:
@@ -798,7 +823,7 @@ class WorkspaceInstallation:
 
     @staticmethod
     def _readable_timedelta(epoch):
-        when = datetime.fromtimestamp(epoch)
+        when = datetime.utcfromtimestamp(epoch)
         duration = datetime.now() - when
         data = {}
         data["days"], remaining = divmod(duration.total_seconds(), 86_400)
@@ -807,7 +832,8 @@ class WorkspaceInstallation:
 
         time_parts = ((name, round(value)) for name, value in data.items())
         time_parts = [f"{value} {name[:-1] if value == 1 else name}" for name, value in time_parts if value > 0]
-        time_parts.append("ago")
+        if len(time_parts) > 0:
+            time_parts.append("ago")
         if time_parts:
             return " ".join(time_parts)
         return "less than 1 second ago"
@@ -815,32 +841,31 @@ class WorkspaceInstallation:
     def latest_job_status(self) -> list[dict]:
         latest_status = []
         for step, job_id in self._state.jobs.items():
+            job_state = None
+            start_time = None
             try:
-                step_status = self._step_status(job_id, step)
-                latest_status.append(step_status)
+                job_runs = list(self._ws.jobs.list_runs(job_id=int(job_id), limit=1))
             except InvalidParameterValue as e:
                 logger.warning(f"skipping {step}: {e}")
                 continue
+            if job_runs:
+                state = job_runs[0].state
+                if state and state.result_state:
+                    job_state = state.result_state.name
+                elif state and state.life_cycle_state:
+                    job_state = state.life_cycle_state.name
+                if job_runs[0].start_time:
+                    start_time = job_runs[0].start_time / 1000
+            latest_status.append(
+                {
+                    "step": step,
+                    "state": "UNKNOWN" if not (job_runs and job_state) else job_state,
+                    "started": (
+                        "<never run>" if not (job_runs and start_time) else self._readable_timedelta(start_time)
+                    ),
+                }
+            )
         return latest_status
-
-    def _step_status(self, job_id, step):
-        job_state = None
-        start_time = None
-        job_runs = list(self._ws.jobs.list_runs(job_id=int(job_id), limit=1))
-        if job_runs:
-            state = job_runs[0].state
-            job_state = None
-            if state and state.result_state:
-                job_state = state.result_state.name
-            elif state and state.life_cycle_state:
-                job_state = state.life_cycle_state.name
-            if job_runs[0].start_time:
-                start_time = job_runs[0].start_time / 1000
-        return {
-            "step": step,
-            "state": "UNKNOWN" if not (job_runs and job_state) else job_state,
-            "started": "<never run>" if not job_runs else self._readable_timedelta(start_time),
-        }
 
     def _get_result_state(self, job_id):
         job_runs = list(self._ws.jobs.list_runs(job_id=job_id, limit=1))

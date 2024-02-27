@@ -1,5 +1,0 @@
-{
-  "spark.hadoop.fs.azure.account.oauth2.client.id.newstorageacct.dfs.core.windows.net": "pipeline_dummy_application_id",
-  "spark.hadoop.fs.azure.account.oauth2.client.endpoint.newstorageacct.dfs.core.windows.net": "https://login.microsoftonline.com/directory_12345/oauth2/token",
-  "spark.hadoop.fs.azure.sas.fixed.token.abcde.dfs.core.windows.net": "{{secrets/abcde_access/sasFixedToken}}"
-}

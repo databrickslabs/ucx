@@ -1,4 +1,6 @@
 {
+  "pipeline_id": "empty-spec",
+  "name": "New DLT Pipeline",
   "spec": {
     "clusters": [],
     "configuration": {

@@ -167,16 +167,16 @@ ROWS = {
 
 
 def test_crawler_no_data():
-    b = MockBackend()
-    table = TablesCrawler(b, "schema")
-    udf = UdfsCrawler(b, "schema")
+    sql_backend = MockBackend()
+    table = TablesCrawler(sql_backend, "schema")
+    udf = UdfsCrawler(sql_backend, "schema")
     crawler = GrantsCrawler(table, udf)
     grants = crawler.snapshot()
     assert len(grants) == 0
 
 
 def test_crawler_crawl():
-    b = MockBackend(
+    sql_backend = MockBackend(
         rows={
             "SHOW DATABASES": [
                 make_row(("database_one",), ["databaseName"]),
@@ -205,15 +205,15 @@ def test_crawler_crawl():
             ],
         }
     )
-    table = TablesCrawler(b, "schema")
-    udf = UdfsCrawler(b, "schema")
+    table = TablesCrawler(sql_backend, "schema")
+    udf = UdfsCrawler(sql_backend, "schema")
     crawler = GrantsCrawler(table, udf)
     grants = crawler.snapshot()
     assert len(grants) == 3
 
 
 def test_crawler_udf_crawl():
-    b = MockBackend(
+    sql_backend = MockBackend(
         rows={
             "SHOW DATABASES": [
                 make_row(("database_one",), ["databaseName"]),
@@ -237,8 +237,8 @@ def test_crawler_udf_crawl():
         }
     )
 
-    table = TablesCrawler(b, "schema")
-    udf = UdfsCrawler(b, "schema")
+    table = TablesCrawler(sql_backend, "schema")
+    udf = UdfsCrawler(sql_backend, "schema")
     crawler = GrantsCrawler(table, udf)
     grants = crawler.snapshot()
 
@@ -268,18 +268,18 @@ def test_crawler_udf_crawl():
 
 
 def test_crawler_snapshot_when_no_data():
-    b = MockBackend()
-    table = TablesCrawler(b, "schema")
-    udf = UdfsCrawler(b, "schema")
+    sql_backend = MockBackend()
+    table = TablesCrawler(sql_backend, "schema")
+    udf = UdfsCrawler(sql_backend, "schema")
     crawler = GrantsCrawler(table, udf)
     snapshot = crawler.snapshot()
     assert len(snapshot) == 0
 
 
 def test_crawler_snapshot_with_data():
-    b = MockBackend(rows=ROWS)
-    table = TablesCrawler(b, "schema")
-    udf = UdfsCrawler(b, "schema")
+    sql_backend = MockBackend(rows=ROWS)
+    table = TablesCrawler(sql_backend, "schema")
+    udf = UdfsCrawler(sql_backend, "schema")
     crawler = GrantsCrawler(table, udf)
     snapshot = crawler.snapshot()
     assert len(snapshot) == 3
@@ -304,11 +304,11 @@ def test_grants_returning_error_when_showing_grants():
     }
 
     backend = MockBackend(fails_on_first=errors, rows=rows)
-    tc = TablesCrawler(backend, "default")
+    table_crawler = TablesCrawler(backend, "default")
     udf = UdfsCrawler(backend, "default")
-    crawler = GrantsCrawler(tc, udf)
+    crawler = GrantsCrawler(table_crawler, udf)
 
-    results = crawler._crawl()
+    results = crawler.snapshot()
     assert results == [
         Grant(
             principal="principal1",
@@ -340,11 +340,11 @@ def test_grants_returning_error_when_describing():
     }
 
     backend = MockBackend(fails_on_first=errors, rows=rows)
-    tc = TablesCrawler(backend, "default")
+    table_crawler = TablesCrawler(backend, "default")
     udf = UdfsCrawler(backend, "default")
-    crawler = GrantsCrawler(tc, udf)
+    crawler = GrantsCrawler(table_crawler, udf)
 
-    results = crawler._crawl()
+    results = crawler.snapshot()
     assert results == [
         Grant(
             principal="principal1",
@@ -377,11 +377,11 @@ def test_udf_grants_returning_error_when_showing_grants():
     }
 
     backend = MockBackend(fails_on_first=errors, rows=rows)
-    tc = TablesCrawler(backend, "default")
+    table_crawler = TablesCrawler(backend, "default")
     udf = UdfsCrawler(backend, "default")
-    crawler = GrantsCrawler(tc, udf)
+    crawler = GrantsCrawler(table_crawler, udf)
 
-    results = crawler._crawl()
+    results = crawler.snapshot()
     assert results == [
         Grant(
             principal="principal1",
@@ -413,11 +413,11 @@ def test_udf_grants_returning_error_when_describing():
     }
 
     backend = MockBackend(fails_on_first=errors, rows=rows)
-    tc = TablesCrawler(backend, "default")
+    table_crawler = TablesCrawler(backend, "default")
     udf = UdfsCrawler(backend, "default")
-    crawler = GrantsCrawler(tc, udf)
+    crawler = GrantsCrawler(table_crawler, udf)
 
-    results = crawler._crawl()
+    results = crawler.snapshot()
     assert results == [
         Grant(
             principal="principal1",

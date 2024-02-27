@@ -34,8 +34,8 @@ def test_describe_all_tables_in_databases(ws, sql_backend, inventory_schema, mak
     tables = TablesCrawler(sql_backend, inventory_schema)
 
     all_tables = {}
-    for t in tables.snapshot():
-        all_tables[t.key] = t
+    for table in tables.snapshot():
+        all_tables[table.key] = table
 
     assert len(all_tables) >= 5
     assert all_tables[non_delta.full_name].table_format == "JSON"

@@ -24,26 +24,26 @@ class JobInfo:
 
 class JobsMixin:
     @staticmethod
-    def _get_cluster_configs_from_all_jobs(all_jobs, all_clusters_by_id):
+    def _get_cluster_configs_from_all_jobs(all_jobs, all_clusters_by_id):  # pylint: disable=too-complex
         for j in all_jobs:
             if j.settings is None:
                 continue
             if j.settings.job_clusters is not None:
-                for jc in j.settings.job_clusters:
-                    if jc.new_cluster is None:
+                for job_cluster in j.settings.job_clusters:
+                    if job_cluster.new_cluster is None:
                         continue
-                    yield j, jc.new_cluster
+                    yield j, job_cluster.new_cluster
             if j.settings.tasks is None:
                 continue
-            for t in j.settings.tasks:
-                if t.existing_cluster_id is not None:
-                    interactive_cluster = all_clusters_by_id.get(t.existing_cluster_id, None)
+            for task in j.settings.tasks:
+                if task.existing_cluster_id is not None:
+                    interactive_cluster = all_clusters_by_id.get(task.existing_cluster_id, None)
                     if interactive_cluster is None:
                         continue
                     yield j, interactive_cluster
 
-                elif t.new_cluster is not None:
-                    yield j, t.new_cluster
+                elif task.new_cluster is not None:
+                    yield j, task.new_cluster
 
 
 class JobsCrawler(CrawlerBase[JobInfo], JobsMixin, CheckClusterMixin):
@@ -57,6 +57,24 @@ class JobsCrawler(CrawlerBase[JobInfo], JobsMixin, CheckClusterMixin):
         return self._assess_jobs(all_jobs, all_clusters)
 
     def _assess_jobs(self, all_jobs: list[BaseJob], all_clusters_by_id) -> Iterable[JobInfo]:
+        job_assessment, job_details = self._prepare(all_jobs)
+        for job, cluster_config in self._get_cluster_configs_from_all_jobs(all_jobs, all_clusters_by_id):
+            job_id = job.job_id
+            if not job_id:
+                continue
+            cluster_details = ClusterDetails.from_dict(cluster_config.as_dict())
+            cluster_failures = self.check_cluster_failures(cluster_details, "Job cluster")
+            job_assessment[job_id].update(cluster_failures)
+
+        # TODO: next person looking at this - rewrite, as this code makes no sense
+        for job_key in job_details.keys():  # pylint: disable=consider-using-dict-items,consider-iterating-dictionary
+            job_details[job_key].failures = json.dumps(list(job_assessment[job_key]))
+            if len(job_assessment[job_key]) > 0:
+                job_details[job_key].success = 0
+        return list(job_details.values())
+
+    @staticmethod
+    def _prepare(all_jobs) -> tuple[dict[int, set[str]], dict[int, JobInfo]]:
         job_assessment: dict[int, set[str]] = {}
         job_details: dict[int, JobInfo] = {}
         for job in all_jobs:
@@ -82,21 +100,7 @@ class JobsCrawler(CrawlerBase[JobInfo], JobsMixin, CheckClusterMixin):
                 success=1,
                 failures="[]",
             )
-
-        for job, cluster_config in self._get_cluster_configs_from_all_jobs(all_jobs, all_clusters_by_id):
-            job_id = job.job_id
-            if not job_id:
-                continue
-            cluster_details = ClusterDetails.from_dict(cluster_config.as_dict())
-            cluster_failures = self.check_cluster_failures(cluster_details, "Job cluster")
-            job_assessment[job_id].update(cluster_failures)
-
-        # TODO: next person looking at this - rewrite, as this code makes no sense
-        for job_key in job_details.keys():  # pylint: disable=consider-using-dict-items,consider-iterating-dictionary
-            job_details[job_key].failures = json.dumps(list(job_assessment[job_key]))
-            if len(job_assessment[job_key]) > 0:
-                job_details[job_key].success = 0
-        return list(job_details.values())
+        return job_assessment, job_details
 
     def snapshot(self) -> Iterable[JobInfo]:
         return self._snapshot(self._try_fetch, self._crawl)

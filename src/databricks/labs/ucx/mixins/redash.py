@@ -37,15 +37,15 @@ class WidgetOptions:
         return body
 
     @classmethod
-    def from_dict(cls, d: dict[str, Any]) -> "WidgetOptions":
+    def from_dict(cls, data: dict[str, Any]) -> "WidgetOptions":
         return cls(
-            created_at=d.get("created_at", None),
-            description=d.get("description", None),
-            is_hidden=d.get("isHidden", None),
-            parameter_mappings=d.get("parameterMappings", None),
-            position=_from_dict(d, "position", WidgetPosition),
-            title=d.get("title", None),
-            updated_at=d.get("updated_at", None),
+            created_at=data.get("created_at", None),
+            description=data.get("description", None),
+            is_hidden=data.get("isHidden", None),
+            parameter_mappings=data.get("parameterMappings", None),
+            position=_from_dict(data, "position", WidgetPosition),
+            title=data.get("title", None),
+            updated_at=data.get("updated_at", None),
         )
 
 
@@ -94,13 +94,13 @@ class DashboardWidgetsAPI:
         res = self._api.do("POST", "/api/2.0/preview/sql/widgets", body=body)
         return Widget.from_dict(res)
 
-    def delete(self, id: str):
-        self._api.do("DELETE", f"/api/2.0/preview/sql/widgets/{id}")
+    def delete(self, widget_id: str):
+        self._api.do("DELETE", f"/api/2.0/preview/sql/widgets/{widget_id}")
 
     def update(
         self,
         dashboard_id: str,
-        id: str,
+        widget_id: str,
         *,
         options: WidgetOptions | None = None,
         text: str | None = None,
@@ -111,7 +111,7 @@ class DashboardWidgetsAPI:
 
         :param dashboard_id: str
           Dashboard ID returned by :method:dashboards/create.
-        :param id: str
+        :param widget_id: str
         :param options: :class:`WidgetOptions` (optional)
         :param text: str (optional)
           If this is a textbox widget, the application displays this text. This field is ignored if the widget
@@ -134,7 +134,7 @@ class DashboardWidgetsAPI:
             body["visualization_id"] = visualization_id
         if width is not None:
             body["width"] = width
-        res = self._api.do("POST", f"/api/2.0/preview/sql/widgets/{id}", body=body)
+        res = self._api.do("POST", f"/api/2.0/preview/sql/widgets/{widget_id}", body=body)
         return Widget.from_dict(res)
 
 
@@ -174,13 +174,13 @@ class QueryVisualizationsAPI:
         res = self._api.do("POST", "/api/2.0/preview/sql/visualizations", body=body)
         return Visualization.from_dict(res)
 
-    def delete(self, id: str):
+    def delete(self, widget_id: str):
         """Remove visualization.
 
-        :param id: str
+        :param widget_id: str
         """
 
         headers = {
             "Accept": "application/json",
         }
-        self._api.do("DELETE", f"/api/2.0/preview/sql/visualizations/{id}", headers=headers)
+        self._api.do("DELETE", f"/api/2.0/preview/sql/visualizations/{widget_id}", headers=headers)

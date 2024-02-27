@@ -41,7 +41,7 @@ def test_prepare_environment(ws, make_ucx_group, sql_backend, inventory_schema):
 
 @retried(on=[NotFound], timeout=timedelta(minutes=2))
 def test_prepare_environment_no_groups_selected(ws, make_ucx_group, sql_backend, inventory_schema):
-    ws_group, acc_group = make_ucx_group()
+    ws_group, _ = make_ucx_group()
 
     group_manager = GroupManager(sql_backend, ws, inventory_schema)
     group_migration_state = group_manager.snapshot()
@@ -50,22 +50,28 @@ def test_prepare_environment_no_groups_selected(ws, make_ucx_group, sql_backend,
     assert ws_group.display_name in names
 
 
+# group rename is eventually consistent
+@retried(on=[AssertionError], timeout=timedelta(minutes=1))
+def check_group_renamed(ws, ws_group):
+    assert ws.groups.get(ws_group.id).display_name == "ucx-temp-" + ws_group.display_name
+
+
 @retried(on=[NotFound], timeout=timedelta(minutes=2))
 def test_rename_groups(ws, make_ucx_group, sql_backend, inventory_schema):
     # FIXME - test_rename_groups - TimeoutError: Timed out after 0:01:00
-    ws_group, acc_group = make_ucx_group()
+    ws_group, _ = make_ucx_group()
 
     group_manager = GroupManager(sql_backend, ws, inventory_schema, [ws_group.display_name], "ucx-temp-")
     group_manager.rename_groups()
 
-    assert ws.groups.get(ws_group.id).display_name == "ucx-temp-" + ws_group.display_name
+    check_group_renamed(ws, ws_group)
 
 
 @retried(on=[NotFound], timeout=timedelta(minutes=2))
 def test_reflect_account_groups_on_workspace_recovers_when_group_already_exists(
     ws, make_ucx_group, sql_backend, inventory_schema
 ):
-    ws_group, acc_group = make_ucx_group()
+    ws_group, _ = make_ucx_group()
 
     group_manager = GroupManager(sql_backend, ws, inventory_schema, [ws_group.display_name], "ucx-temp-")
     group_manager.reflect_account_groups_on_workspace()
@@ -87,16 +93,15 @@ def test_reflect_account_groups_on_workspace(ws, make_ucx_group, sql_backend, in
     assert not reflected_group.roles  # Cannot create roles currently
     assert not reflected_group.entitlements  # Entitlements aren't reflected there
 
-    assert (
-        ws.groups.get(ws_group.id).display_name == "ucx-temp-" + ws_group.display_name
-    )  # At this time previous ws level groups aren't deleted
+    check_group_renamed(ws, ws_group)
+    # At this time previous ws level groups aren't deleted
 
 
 @retried(on=[NotFound], timeout=timedelta(minutes=2))
 def test_delete_ws_groups_should_delete_renamed_and_reflected_groups_only(
     ws, make_ucx_group, sql_backend, inventory_schema
 ):
-    ws_group, acc_group = make_ucx_group()
+    ws_group, _ = make_ucx_group()
 
     group_manager = GroupManager(sql_backend, ws, inventory_schema, [ws_group.display_name], "ucx-temp-")
     group_manager.rename_groups()
@@ -109,7 +114,7 @@ def test_delete_ws_groups_should_delete_renamed_and_reflected_groups_only(
 
 @retried(on=[NotFound], timeout=timedelta(minutes=2))
 def test_delete_ws_groups_should_not_delete_current_ws_groups(ws, make_ucx_group, sql_backend, inventory_schema):
-    ws_group, acc_group = make_ucx_group()
+    ws_group, _ = make_ucx_group()
 
     group_manager = GroupManager(sql_backend, ws, inventory_schema, [ws_group.display_name], "ucx-temp-")
     group_manager.delete_original_workspace_groups()
@@ -119,128 +124,65 @@ def test_delete_ws_groups_should_not_delete_current_ws_groups(ws, make_ucx_group
 
 @retried(on=[NotFound], timeout=timedelta(minutes=2))
 def test_delete_ws_groups_should_not_delete_non_reflected_acc_groups(ws, make_ucx_group, sql_backend, inventory_schema):
-    ws_group, acc_group = make_ucx_group()
+    ws_group, _ = make_ucx_group()
     group_manager = GroupManager(sql_backend, ws, inventory_schema, [ws_group.display_name], "ucx-temp-")
     group_manager.rename_groups()
     group_manager.delete_original_workspace_groups()
 
-    assert ws.groups.get(ws_group.id).display_name == "ucx-temp-" + ws_group.display_name
+    check_group_renamed(ws, ws_group)
 
 
 def validate_migrate_groups(group_manager: GroupManager, ws_group: Group, to_group: Group):
-    workspace_groups = group_manager._workspace_groups_in_workspace()
-    assert ws_group.display_name in workspace_groups
+    if not group_manager.has_workspace_group(ws_group.display_name):
+        raise NotFound(f'missing workspace group: {ws_group.display_name}')
     group_manager.rename_groups()
-    workspace_groups = group_manager._workspace_groups_in_workspace()
-    assert f"ucx-temp-{ws_group.display_name}" in workspace_groups
+    if not group_manager.has_workspace_group(f"ucx-temp-{ws_group.display_name}"):
+        raise NotFound('missing temp group')
     group_manager.reflect_account_groups_on_workspace()
-    account_workspace_groups = group_manager._account_groups_in_workspace()
-    assert to_group.display_name in account_workspace_groups
+    if not group_manager.has_account_group(to_group.display_name):
+        raise NotFound(f'missing account group: {to_group.display_name}')
 
 
 @retried(on=[NotFound], timeout=timedelta(minutes=2))
-def test_group_name_change_prefix(ws, sql_backend, inventory_schema, make_ucx_group, make_random):
-    ws_display_name = f"ucx_{make_random(4)}"
-    ws_group, accnt_group = make_ucx_group(
-        workspace_group_name=ws_display_name, account_group_name=f"SAMPLE_{ws_display_name}"
-    )
-    logger.info(
-        f"Attempting Mapping From Workspace Group {ws_group.display_name} to "
-        f"Account Group {accnt_group.display_name}"
-    )
-    group_manager = GroupManager(
-        sql_backend, ws, inventory_schema, [ws_group.display_name], "ucx-temp-", "^", "SAMPLE_"
-    )
-    validate_migrate_groups(group_manager, ws_group, accnt_group)
-
-
-@retried(on=[NotFound], timeout=timedelta(minutes=2))
-def test_group_name_change_suffix(ws, sql_backend, inventory_schema, make_ucx_group, make_random):
-    ws_display_name = f"ucx_{make_random(4)}"
-    ws_group, accnt_group = make_ucx_group(
-        workspace_group_name=ws_display_name, account_group_name=f"{ws_display_name}_SAMPLE"
-    )
-    logger.info(
-        f"Attempting Mapping From Workspace Group {ws_group.display_name} to "
-        f"Account Group {accnt_group.display_name}"
-    )
-    group_manager = GroupManager(
-        sql_backend, ws, inventory_schema, [ws_group.display_name], "ucx-temp-", "$", "_SAMPLE"
-    )
-    validate_migrate_groups(group_manager, ws_group, accnt_group)
-
-
-@retried(on=[NotFound], timeout=timedelta(minutes=2))
-def test_group_name_change_substitute(ws, sql_backend, inventory_schema, make_ucx_group, make_random):
-    random_elem = f"{make_random(4)}"
-    ws_display_name = f"ucx_engineering_{random_elem}"
-    acct_display_name = f"ucx_eng_{random_elem}"
-    ws_group, accnt_group = make_ucx_group(workspace_group_name=ws_display_name, account_group_name=acct_display_name)
-    logger.info(
-        f"Attempting Mapping From Workspace Group {ws_group.display_name} to "
-        f"Account Group {accnt_group.display_name}"
-    )
-    group_manager = GroupManager(
-        sql_backend, ws, inventory_schema, [ws_group.display_name], "ucx-temp-", "engineering", "eng"
-    )
-    validate_migrate_groups(group_manager, ws_group, accnt_group)
-
-
-@retried(on=[NotFound], timeout=timedelta(minutes=2))
-def test_group_matching_names(ws, sql_backend, inventory_schema, make_ucx_group, make_random):
-    rand_elem = make_random(4)
-    ws_group, accnt_group = make_ucx_group(f"test_group_{rand_elem}", f"same_group_[{rand_elem}]")
-    logger.info(
-        f"Attempting Mapping From Workspace Group {ws_group.display_name} to "
-        f"Account Group {accnt_group.display_name}"
-    )
+@pytest.mark.parametrize("strategy", ["prefix", "suffix", "substitute", "matching"])
+def test_group_name_change(ws, sql_backend, inventory_schema, make_ucx_group, make_random, strategy):
+    random_element = f"ucx{make_random(4)}"
+    ws_group, account_group = None, None
+    workspace_group_regex, workspace_group_replace, account_group_regex = None, None, None
+    match strategy:
+        case "prefix":
+            ws_group, account_group = make_ucx_group(random_element, f"SAMPLE_{random_element}")
+            workspace_group_regex, workspace_group_replace = "^", "SAMPLE_"
+        case "suffix":
+            ws_group, account_group = make_ucx_group(random_element, f"{random_element}_SAMPLE")
+            workspace_group_regex, workspace_group_replace = "$", "_SAMPLE"
+        case "substitute":
+            ws_group, account_group = make_ucx_group(f"ucx_engineering_{random_element}", f"ucx_eng_{random_element}")
+            workspace_group_regex, workspace_group_replace = "engineering", "eng"
+        case "matching":
+            ws_group, account_group = make_ucx_group(f"test_group_{random_element}", f"same_group_[{random_element}]")
+            workspace_group_regex, account_group_regex = r"([0-9a-zA-Z]*)$", r"\[([0-9a-zA-Z]*)\]"
     group_manager = GroupManager(
         sql_backend,
         ws,
         inventory_schema,
         [ws_group.display_name],
         "ucx-temp-",
-        workspace_group_regex=r"([0-9a-zA-Z]*)$",
-        account_group_regex=r"\[([0-9a-zA-Z]*)\]",
+        workspace_group_regex,
+        workspace_group_replace,
+        account_group_regex,
     )
-    validate_migrate_groups(group_manager, ws_group, accnt_group)
-
-
-@retried(on=[NotFound], timeout=timedelta(minutes=2))
-def test_group_matching_names_with_diff_users(
-    ws, sql_backend, inventory_schema, make_random, make_user, make_group, make_acc_group
-):
-    rand_elem = make_random(4)
-    workspace_group_name = f"test_group_{rand_elem}"
-    account_group_name = f"same_group_[{rand_elem}]"
-    user1 = make_user()
-    user2 = make_user()
-    members1 = [user1.id]
-    members2 = [user2.id]
-    ws_group = make_group(display_name=workspace_group_name, members=members1, entitlements=["allow-cluster-create"])
-    accnt_group = make_acc_group(display_name=account_group_name, members=members2)
-
     logger.info(
         f"Attempting Mapping From Workspace Group {ws_group.display_name} to "
-        f"Account Group {accnt_group.display_name}"
+        f"Account Group {account_group.display_name}"
     )
-    group_manager = GroupManager(
-        sql_backend,
-        ws,
-        inventory_schema,
-        [ws_group.display_name],
-        "ucx-temp-",
-        workspace_group_regex=r"([0-9a-zA-Z]*)$",
-        account_group_regex=r"\[([0-9a-zA-Z]*)\]",
-    )
-
-    t = group_manager.validate_group_membership()
-    assert len(t) > 0
+    validate_migrate_groups(group_manager, ws_group, account_group)
 
 
 @retried(on=[NotFound], timeout=timedelta(minutes=2))
-def test_group_matching_names_with_same_users(
-    ws, sql_backend, inventory_schema, make_random, make_user, make_group, make_acc_group
+@pytest.mark.parametrize("same_user", [True, False])
+def test_group_matching_names(
+    ws, sql_backend, inventory_schema, make_random, make_user, make_group, make_acc_group, same_user
 ):
     rand_elem = make_random(4)
     workspace_group_name = f"test_group_{rand_elem}"
@@ -248,6 +190,9 @@ def test_group_matching_names_with_same_users(
     user1 = make_user()
     members1 = [user1.id]
     members2 = [user1.id]
+    if not same_user:
+        user2 = make_user()
+        members2 = [user2.id]
     ws_group = make_group(display_name=workspace_group_name, members=members1, entitlements=["allow-cluster-create"])
     acc_group = make_acc_group(display_name=account_group_name, members=members2)
 
@@ -260,17 +205,21 @@ def test_group_matching_names_with_same_users(
         inventory_schema,
         [ws_group.display_name],
         "ucx-temp-",
-        workspace_group_regex=r"([0-9a-zA-Z]*)$",
-        account_group_regex=r"\[([0-9a-zA-Z]*)\]",
+        r"([0-9a-zA-Z]*)$",
+        None,
+        r"\[([0-9a-zA-Z]*)\]",
     )
 
-    t = group_manager.validate_group_membership()
-    assert len(t) == 0
+    membership = group_manager.validate_group_membership()
+    if same_user:
+        assert len(membership) == 0
+    else:
+        assert len(membership) > 0
 
 
 # average runtime is 100 seconds
 @retried(on=[NotFound], timeout=timedelta(minutes=3))
-def test_replace_workspace_groups_with_account_groups(
+def test_replace_workspace_groups_with_account_groups(  # pylint: disable=too-many-locals,too-many-statements
     ws,
     sql_backend,
     inventory_schema,
@@ -315,7 +264,7 @@ def test_replace_workspace_groups_with_account_groups(
     @retried(on=[AssertionError], timeout=timedelta(seconds=30))
     def assert_table_has_two_permissions():
         dummy_grants = list(permission_manager.load_all_for("TABLE", dummy_table.full_name, Grant))
-        assert 2 == len(dummy_grants)
+        assert len(dummy_grants) == 2
 
     assert_table_has_two_permissions()
 

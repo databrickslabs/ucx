@@ -9,15 +9,18 @@ from databricks.sdk.errors import NotFound
 from databricks.sdk.service.compute import (
     ClusterDetails,
     ClusterSource,
+    DataSecurityMode,
+    DbfsStorageInfo,
     InitScriptInfo,
     Policy,
+    WorkspaceStorageInfo,
 )
 
 from databricks.labs.ucx.assessment.crawlers import (
-    _AZURE_SP_CONF_FAILURE_MSG,
-    _INIT_SCRIPT_DBFS_PATH,
+    AZURE_SP_CONF_FAILURE_MSG,
     INCOMPATIBLE_SPARK_CONFIG_KEYS,
-    _azure_sp_conf_present_check,
+    INIT_SCRIPT_DBFS_PATH,
+    azure_sp_conf_present_check,
     spark_version_compatibility,
 )
 from databricks.labs.ucx.assessment.init_scripts import CheckInitScriptMixin
@@ -50,33 +53,30 @@ class CheckClusterMixin(CheckInitScriptMixin):
         policy = self._safe_get_cluster_policy(policy_id)
         if policy:
             if policy.definition:
-                if _azure_sp_conf_present_check(json.loads(policy.definition)):
-                    failures.append(f"{_AZURE_SP_CONF_FAILURE_MSG} {source}.")
+                if azure_sp_conf_present_check(json.loads(policy.definition)):
+                    failures.append(f"{AZURE_SP_CONF_FAILURE_MSG} {source}.")
             if policy.policy_family_definition_overrides:
-                if _azure_sp_conf_present_check(json.loads(policy.policy_family_definition_overrides)):
-                    failures.append(f"{_AZURE_SP_CONF_FAILURE_MSG} {source}.")
+                if azure_sp_conf_present_check(json.loads(policy.policy_family_definition_overrides)):
+                    failures.append(f"{AZURE_SP_CONF_FAILURE_MSG} {source}.")
         return failures
 
     def _get_init_script_data(self, init_script_info: InitScriptInfo) -> str | None:
-        if init_script_info.dbfs is not None and init_script_info.dbfs.destination is not None:
-            if len(init_script_info.dbfs.destination.split(":")) == _INIT_SCRIPT_DBFS_PATH:
-                file_api_format_destination = init_script_info.dbfs.destination.split(":")[1]
-                if file_api_format_destination:
-                    try:
-                        data = self._ws.dbfs.read(file_api_format_destination).data
-                        if data is not None:
-                            return base64.b64decode(data).decode("utf-8")
-                    except NotFound:
+        try:
+            match init_script_info:
+                case InitScriptInfo(dbfs=DbfsStorageInfo(destination)):
+                    split = destination.split(":")
+                    if len(split) != INIT_SCRIPT_DBFS_PATH:
                         return None
-        if init_script_info.workspace is not None and init_script_info.workspace.destination is not None:
-            workspace_file_destination = init_script_info.workspace.destination
-            try:
-                data = self._ws.workspace.export(workspace_file_destination).content
-                if data is not None:
-                    return base64.b64decode(data).decode("utf-8")
-            except NotFound:
-                return None
-        return None
+                    data = self._ws.dbfs.read(split[1]).data
+                    if data is not None:
+                        return base64.b64decode(data).decode("utf-8")
+                case InitScriptInfo(workspace=WorkspaceStorageInfo(workspace_file_destination)):
+                    data = self._ws.workspace.export(workspace_file_destination).content
+                    if data is not None:
+                        return base64.b64decode(data).decode("utf-8")
+            return None
+        except NotFound:
+            return None
 
     def _check_cluster_init_script(self, init_scripts: list[InitScriptInfo], source: str) -> list[str]:
         failures: list[str] = []
@@ -94,13 +94,18 @@ class CheckClusterMixin(CheckInitScriptMixin):
             if "dbfs:/mnt" in value or "/dbfs/mnt" in value:
                 failures.append(f"using DBFS mount in configuration: {value}")
         # Checking if Azure cluster config is present in spark config
-        if _azure_sp_conf_present_check(conf):
-            failures.append(f"{_AZURE_SP_CONF_FAILURE_MSG} {source}.")
+        if azure_sp_conf_present_check(conf):
+            failures.append(f"{AZURE_SP_CONF_FAILURE_MSG} {source}.")
         return failures
 
     def check_cluster_failures(self, cluster: ClusterDetails, source: str) -> list[str]:
         failures: list[str] = []
 
+        unsupported_cluster_types = [
+            DataSecurityMode.LEGACY_PASSTHROUGH,
+            DataSecurityMode.LEGACY_SINGLE_USER,
+            DataSecurityMode.LEGACY_TABLE_ACL,
+        ]
         support_status = spark_version_compatibility(cluster.spark_version)
         if support_status != "supported":
             failures.append(f"not supported DBR: {cluster.spark_version}")
@@ -111,6 +116,10 @@ class CheckClusterMixin(CheckInitScriptMixin):
             failures.extend(self._check_cluster_policy(cluster.policy_id, source))
         if cluster.init_scripts is not None:
             failures.extend(self._check_cluster_init_script(cluster.init_scripts, source))
+        if cluster.data_security_mode == DataSecurityMode.NONE:
+            failures.append("No isolation shared clusters not supported in UC")
+        if cluster.data_security_mode in unsupported_cluster_types:
+            failures.append(f"cluster type not supported : {cluster.data_security_mode.value}")
 
         return failures
 

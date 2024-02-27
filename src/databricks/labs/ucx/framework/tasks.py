@@ -53,7 +53,7 @@ class Task:
         return True
 
 
-def _remove_extra_indentation(doc: str) -> str:
+def remove_extra_indentation(doc: str) -> str:
     lines = doc.splitlines()
     stripped = []
     for line in lines:
@@ -108,7 +108,7 @@ def task(
             task_id=len(_TASKS),
             workflow=workflow,
             name=func.__name__,
-            doc=_remove_extra_indentation(func.__doc__),
+            doc=remove_extra_indentation(func.__doc__),
             fn=func,
             depends_on=deps,
             job_cluster=job_cluster,
@@ -139,11 +139,11 @@ class TaskLogger(contextlib.AbstractContextManager):
         self._databricks_logger = logging.getLogger("databricks")
         self._app_logger = logging.getLogger("databricks.labs.ucx")
         self._log_path = install_dir / "logs" / self._workflow / f"run-{self._workflow_run_id}"
-        self._log_file = self._log_path / f"{task_name}.log"
-        self._app_logger.info(f"UCX v{__version__} After job finishes, see debug logs at {self._log_file}")
+        self.log_file = self._log_path / f"{task_name}.log"
+        self._app_logger.info(f"UCX v{__version__} After job finishes, see debug logs at {self.log_file}")
 
     def __repr__(self):
-        return self._log_file.as_posix()
+        return self.log_file.as_posix()
 
     def __enter__(self):
         self._log_path.mkdir(parents=True, exist_ok=True)
@@ -158,7 +158,7 @@ class TaskLogger(contextlib.AbstractContextManager):
 
     def __exit__(self, _t, error, _tb):
         if error:
-            log_file_for_cli = str(self._log_file).removeprefix("/Workspace")
+            log_file_for_cli = str(self.log_file).removeprefix("/Workspace")
             cli_command = f"databricks workspace export /{log_file_for_cli}"
             self._app_logger.error(f"Execute `{cli_command}` locally to troubleshoot with more details. {error}")
             self._databricks_logger.debug("Task crash details", exc_info=error)
@@ -168,7 +168,7 @@ class TaskLogger(contextlib.AbstractContextManager):
     def _init_debug_logfile(self):
         log_format = "%(asctime)s %(levelname)s [%(name)s] {%(threadName)s} %(message)s"
         log_formatter = logging.Formatter(fmt=log_format, datefmt="%H:%M:%S")
-        self._file_handler = TimedRotatingFileHandler(self._log_file.as_posix(), when="M", interval=10)
+        self._file_handler = TimedRotatingFileHandler(self.log_file.as_posix(), when="M", interval=10)
         self._file_handler.setFormatter(log_formatter)
         self._file_handler.setLevel(logging.DEBUG)
 

@@ -49,7 +49,7 @@ class Table:
         "dbfs:/mnt",
     ]
 
-    DBFS_DATABRICKS_DATASETS_PREFIXES: typing.ClassVar[list[str]] = [
+    DBFS_DATABRICKS_DATASETS: typing.ClassVar[list[str]] = [
         "/dbfs/databricks-datasets",
         "dbfs:/databricks-datasets",
     ]
@@ -86,7 +86,7 @@ class Table:
                 for exception in self.DBFS_ROOT_PREFIX_EXCEPTIONS:
                     if self.location.startswith(exception):
                         return False
-                for db_datasets in self.DBFS_DATABRICKS_DATASETS_PREFIXES:
+                for db_datasets in self.DBFS_DATABRICKS_DATASETS:
                     if self.location.startswith(db_datasets):
                         return False
                 return True
@@ -102,7 +102,7 @@ class Table:
     def is_databricks_dataset(self) -> bool:
         if not self.location:
             return False
-        for db_datasets in self.DBFS_DATABRICKS_DATASETS_PREFIXES:
+        for db_datasets in self.DBFS_DATABRICKS_DATASETS:
             if self.location.startswith(db_datasets):
                 return True
         return False
@@ -147,9 +147,7 @@ class TableError:
 @dataclass
 class MigrationCount:
     database: str
-    managed_tables: int = 0
-    external_tables: int = 0
-    views: int = 0
+    what_count: dict[What, int]
 
 
 class TablesCrawler(CrawlerBase):
@@ -191,7 +189,7 @@ class TablesCrawler(CrawlerBase):
 
     def _try_load(self) -> Iterable[Table]:
         """Tries to load table information from the database or throws TABLE_OR_VIEW_NOT_FOUND error"""
-        for row in self._fetch(f"SELECT * FROM {escape_sql_identifier(self._full_name)}"):
+        for row in self._fetch(f"SELECT * FROM {escape_sql_identifier(self.full_name)}"):
             yield Table(*row)
 
     def _crawl(self) -> Iterable[Table]:

@@ -50,26 +50,30 @@ class ExternalLocations(CrawlerBase[ExternalLocation]):
                     and (self._prefix_size[0] < location.find(":/") < self._prefix_size[1])
                     and not location.startswith("jdbc")
                 ):
-                    dupe = False
-                    loc = 0
-                    while loc < len(external_locations) and not dupe:
-                        common = (
-                            os.path.commonpath(
-                                [external_locations[loc].location, os.path.dirname(location) + "/"]
-                            ).replace(":/", "://")
-                            + "/"
-                        )
-                        if common.count("/") > min_slash:
-                            table_count = external_locations[loc].table_count
-                            external_locations[loc] = ExternalLocation(common, table_count + 1)
-                            dupe = True
-                        loc += 1
-                    if not dupe:
-                        external_locations.append(ExternalLocation(os.path.dirname(location) + "/", 1))
+                    self._dbfs_locations(external_locations, location, min_slash)
                 if location.startswith("jdbc"):
                     self._add_jdbc_location(external_locations, location, table)
 
         return external_locations
+
+    @staticmethod
+    def _dbfs_locations(external_locations, location, min_slash):
+        dupe = False
+        loc = 0
+        while loc < len(external_locations) and not dupe:
+            common = (
+                os.path.commonpath([external_locations[loc].location, os.path.dirname(location) + "/"]).replace(
+                    ":/", "://"
+                )
+                + "/"
+            )
+            if common.count("/") > min_slash:
+                table_count = external_locations[loc].table_count
+                external_locations[loc] = ExternalLocation(common, table_count + 1)
+                dupe = True
+            loc += 1
+        if not dupe:
+            external_locations.append(ExternalLocation(os.path.dirname(location) + "/", 1))
 
     def _add_jdbc_location(self, external_locations, location, table):
         dupe = False

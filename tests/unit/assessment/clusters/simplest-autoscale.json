@@ -1,0 +1,10 @@
+{
+  "autoscale": {
+    "max_workers": 6,
+    "min_workers": 1
+  },
+  "cluster_id": "simplest-autoscale",
+  "cluster_name": "Simplest Shared Autoscale",
+  "policy_id": "single-user-with-spn",
+  "spark_version": "13.3.x-cpu-ml-scala2.12"
+}

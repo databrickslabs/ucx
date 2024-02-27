@@ -1,5 +1,55 @@
 # Version changelog
 
+## 0.13.2
+
+* Fixed `AnalysisException` in `crawl_tables` task by ignoring the database that is not found ([#970](https://github.com/databrickslabs/ucx/pull/970)).
+* Fixed `Unknown: org.apache.hadoop.hive.ql.metadata.HiveException: NoSuchObjectException` in `crawl_grants` task by ignoring the database that is not found ([#967](https://github.com/databrickslabs/ucx/pull/967)).
+* Fixed ruff config for ruff==2.0 ([#969](https://github.com/databrickslabs/ucx/pull/969)).
+* Made groups integration tests less flaky ([#965](https://github.com/databrickslabs/ucx/pull/965)).
+
+
+## 0.13.1
+
+* Added secret detection logic to Azure service principal crawler ([#950](https://github.com/databrickslabs/ucx/pull/950)).
+* Create storage credentials based on instance profiles and existing roles ([#869](https://github.com/databrickslabs/ucx/pull/869)).
+* Enforced `protected-access` pylint rule ([#956](https://github.com/databrickslabs/ucx/pull/956)).
+* Enforced `pylint` on unit and integration test code ([#953](https://github.com/databrickslabs/ucx/pull/953)).
+* Enforcing `invalid-name` pylint rule ([#957](https://github.com/databrickslabs/ucx/pull/957)).
+* Fixed AzureResourcePermissions.load to call Installation.load ([#962](https://github.com/databrickslabs/ucx/pull/962)).
+* Fixed installer script to reuse an existing UCX Cluster policy if present ([#964](https://github.com/databrickslabs/ucx/pull/964)).
+* More `pylint` tuning ([#958](https://github.com/databrickslabs/ucx/pull/958)).
+* Refactor `workspace_client_mock` to have combine fixtures stored in separate JSON files ([#955](https://github.com/databrickslabs/ucx/pull/955)).
+
+Dependency updates:
+
+ * Updated databricks-sdk requirement from ~=0.19.0 to ~=0.20.0 ([#961](https://github.com/databrickslabs/ucx/pull/961)).
+
+## 0.13.0
+
+* Added CLI Command `databricks labs ucx principal-prefix-access` ([#949](https://github.com/databrickslabs/ucx/pull/949)).
+* Added a widget with all jobs to track migration progress ([#940](https://github.com/databrickslabs/ucx/pull/940)).
+* Added legacy cluster types to the assessment result ([#932](https://github.com/databrickslabs/ucx/pull/932)).
+* Cleanup of install documentation ([#951](https://github.com/databrickslabs/ucx/pull/951), [#947](https://github.com/databrickslabs/ucx/pull/947)).
+* Fixed `WorkspaceConfig` initialization for `DEBUG` notebook ([#934](https://github.com/databrickslabs/ucx/pull/934)).
+* Fixed installer not opening config file during the installation ([#945](https://github.com/databrickslabs/ucx/pull/945)).
+* Fixed groups in config file not considered for group migration job ([#943](https://github.com/databrickslabs/ucx/pull/943)).
+* Fixed bug where `tenant_id` inside secret scope is not detected ([#942](https://github.com/databrickslabs/ucx/pull/942)).
+
+
+## 0.12.0
+
+* Added CLI Command `databricks labs ucx save-uc-compatible-roles` ([#863](https://github.com/databrickslabs/ucx/pull/863)).
+* Added dashboard widget with table count by storage and format ([#852](https://github.com/databrickslabs/ucx/pull/852)).
+* Added verification of group permissions ([#841](https://github.com/databrickslabs/ucx/pull/841)).
+* Checking pipeline cluster config and cluster policy in 'crawl_pipelines' task ([#864](https://github.com/databrickslabs/ucx/pull/864)).
+* Created cluster policy (ucx-policy) to be used by all UCX compute. This may require customers to reinstall UCX. ([#853](https://github.com/databrickslabs/ucx/pull/853)).
+* Skip scanning objects that were removed on platform side since the last scan time, so that integration tests are less flaky ([#922](https://github.com/databrickslabs/ucx/pull/922)).
+* Updated assessment documentation ([#873](https://github.com/databrickslabs/ucx/pull/873)).
+
+Dependency updates:
+
+ * Updated databricks-sdk requirement from ~=0.18.0 to ~=0.19.0 ([#930](https://github.com/databrickslabs/ucx/pull/930)).
+
 ## 0.11.1
 
 * Added "what" property for migration to scope down table migrations ([#856](https://github.com/databrickslabs/ucx/pull/856)).

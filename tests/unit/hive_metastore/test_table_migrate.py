@@ -12,12 +12,7 @@ from databricks.labs.ucx.hive_metastore.mapping import (
     TableToMigrate,
 )
 from databricks.labs.ucx.hive_metastore.table_migrate import TablesMigrate
-from databricks.labs.ucx.hive_metastore.tables import (
-    MigrationCount,
-    Table,
-    TablesCrawler,
-    What,
-)
+from databricks.labs.ucx.hive_metastore.tables import Table, TablesCrawler, What
 
 from ..framework.mocks import MockBackend
 
@@ -231,6 +226,15 @@ def get_table_migrate(backend: SqlBackend) -> TablesMigrate:
         ]
     )
 
+    simple_view = Table(
+        object_type="VIEW",
+        table_format="VIEW",
+        catalog="hive_metastore",
+        database="test_schema1",
+        name="test_view1",
+        view_text="SELECT * FROM SOMETHING ELSE",
+        upgraded_to="cat1.schema1.dest_view1",
+    )
     test_tables = [
         Table(
             object_type="EXTERNAL",
@@ -238,23 +242,17 @@ def get_table_migrate(backend: SqlBackend) -> TablesMigrate:
             catalog="hive_metastore",
             database="test_schema1",
             name="test_table1",
+            location="s3://some_location/table",
             upgraded_to="cat1.schema1.dest1",
         ),
-        Table(
-            object_type="VIEW",
-            table_format="VIEW",
-            catalog="hive_metastore",
-            database="test_schema1",
-            name="test_view1",
-            view_text="SELECT * FROM SOMETHING",
-            upgraded_to="cat1.schema1.dest_view1",
-        ),
+        simple_view,
         Table(
             object_type="MANAGED",
             table_format="DELTA",
             catalog="hive_metastore",
             database="test_schema1",
             name="test_table2",
+            location="dbfs:/dbfs_location/table",
             upgraded_to="cat1.schema1.dest2",
         ),
         Table(
@@ -263,6 +261,7 @@ def get_table_migrate(backend: SqlBackend) -> TablesMigrate:
             catalog="hive_metastore",
             database="test_schema2",
             name="test_table3",
+            location="s3://some_location/table",
             upgraded_to="cat1.schema2.dest3",
         ),
     ]
@@ -317,43 +316,20 @@ def test_revert_migrated_tables_including_managed():
     assert "DROP TABLE IF EXISTS cat1.schema1.dest2" in revert_with_managed_queries
 
 
-def test_get_table_list():
-    errors = {}
-    rows = {}
-    backend = MockBackend(fails_on_first=errors, rows=rows)
-    table_migrate = get_table_migrate(backend)
-    table_migrate._init_seen_tables()
-    assert len(table_migrate._get_tables_to_revert("test_schema1", "test_table1")) == 1
-    assert len(table_migrate._get_tables_to_revert("test_schema1")) == 3
-
-
 def test_no_migrated_tables():
     errors = {}
     rows = {}
     backend = MockBackend(fails_on_first=errors, rows=rows)
     table_crawler = create_autospec(TablesCrawler)
-    client = create_autospec(WorkspaceClient)
-    client.tables.list.side_effect = []
+    ws = create_autospec(WorkspaceClient)
     table_mapping = create_autospec(TableMapping)
     table_mapping.load.return_value = [
         Rule("workspace", "catalog_1", "db1", "db1", "managed", "managed"),
     ]
-    table_migrate = TablesMigrate(table_crawler, client, backend, table_mapping)
+    table_migrate = TablesMigrate(table_crawler, ws, backend, table_mapping)
     table_migrate.migrate_tables()
-    table_migrate._init_seen_tables = MagicMock()
-    assert len(table_migrate._get_tables_to_revert("test_schema1", "test_table1")) == 0
     table_migrate.revert_migrated_tables("test_schema1", "test_table1")
-    table_migrate._init_seen_tables.assert_called()
-
-
-def test_get_migrated_count():
-    errors = {}
-    rows = {}
-    backend = MockBackend(fails_on_first=errors, rows=rows)
-    table_migrate = get_table_migrate(backend)
-    migrated_count = table_migrate._get_revert_count()
-    assert MigrationCount("test_schema1", 1, 1, 1) in migrated_count
-    assert MigrationCount("test_schema2", 0, 1, 0) in migrated_count
+    ws.catalogs.list.assert_called()
 
 
 def test_revert_report(capsys):
@@ -363,13 +339,13 @@ def test_revert_report(capsys):
     table_migrate = get_table_migrate(backend)
     table_migrate.print_revert_report(delete_managed=True)
     captured = capsys.readouterr()
-    assert "test_schema1|1|1|1" in captured.out.replace(" ", "")
-    assert "test_schema2|1|0|0" in captured.out.replace(" ", "")
-    assert "Migrated Manged Tables (targets) will be deleted" in captured.out
+    assert "test_schema1|1|0|1|0|1|0|0|" in captured.out.replace(" ", "")
+    assert "test_schema2|1|0|0|0|0|0|0|" in captured.out.replace(" ", "")
+    assert "- Migrated DBFS Root Tables will be deleted" in captured.out
 
     table_migrate.print_revert_report(delete_managed=False)
     captured = capsys.readouterr()
-    assert "Migrated Manged Tables (targets) will be left intact" in captured.out
+    assert "- Migrated DBFS Root Tables will be left intact" in captured.out
 
 
 def test_empty_revert_report(capsys):

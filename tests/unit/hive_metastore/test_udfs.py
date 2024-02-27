@@ -19,11 +19,6 @@ def test_key():
     assert udf.key == "catalog.db.function"
 
 
-def test_udfs_crawler_inventory_table():
-    fc = UdfsCrawler(MockBackend(), "default")
-    assert fc._table == "udfs"
-
-
 def test_udfs_returning_error_when_describing():
     errors = {"DESCRIBE FUNCTION EXTENDED hive_metastore.database.function1": "error"}
     rows = {
@@ -35,6 +30,6 @@ def test_udfs_returning_error_when_describing():
         ],
     }
     backend = MockBackend(fails_on_first=errors, rows=rows)
-    fc = UdfsCrawler(backend, "default")
-    results = fc._crawl()
+    udf_crawler = UdfsCrawler(backend, "default")
+    results = udf_crawler.snapshot()
     assert len(results) == 0
