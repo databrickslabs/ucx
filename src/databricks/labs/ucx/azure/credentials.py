@@ -140,6 +140,7 @@ class StorageCredentialManager:
 
 
 class ServicePrincipalMigration(SecretsMixin):
+
     def __init__(
         self,
         installation: Installation,
@@ -246,6 +247,7 @@ class ServicePrincipalMigration(SecretsMixin):
         return self._installation.save(migration_results, filename=self._output_file)
 
     def run(self, prompts: Prompts, include_names: set[str] | None = None) -> list[StorageCredentialValidationResult]:
+
         sp_list_with_secret = self._generate_migration_list(include_names)
 
         plan_confirmed = prompts.confirm(
