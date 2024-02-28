@@ -31,7 +31,10 @@ def test_describe_all_tables_in_databases(ws, sql_backend, inventory_schema, mak
         f"view={view.full_name}"
     )
 
-    tables = TablesCrawler(sql_backend, inventory_schema)
+    schema_c = make_schema(catalog_name="hive_metastore")
+    make_table(schema_name=schema_c.name)
+
+    tables = TablesCrawler(sql_backend, inventory_schema, [schema_a.name, schema_b.name])
 
     all_tables = {}
     for table in tables.snapshot():

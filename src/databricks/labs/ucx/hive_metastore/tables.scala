@@ -1,3 +1,4 @@
+%scala
 // Databricks notebook source
 import java.util.concurrent.ConcurrentLinkedQueue
 import scala.collection.JavaConverters
@@ -72,20 +73,26 @@ def metadataForAllTables(databases: Seq[String], queue: ConcurrentLinkedQueue[Ta
   }).toList.toDF
 }
 
-def getInventoryDatabase(): String={
-  dbutils.widgets.text("config", "./config.yml")
-  val configFile = dbutils.widgets.get("config")
+def getConfig(): java.util.Map[String, Any] = {
+  val configFile = "/Workspace/Users/william.conti@databricks.com/config.yml"
   val fs = FileSystem.get(new java.net.URI("file:/Workspace"), sc.hadoopConfiguration)
   val file = fs.open(new Path(configFile))
   val configContents = org.apache.commons.io.IOUtils.toString(file, java.nio.charset.StandardCharsets.UTF_8)
-  val configObj = new Yaml().load(configContents).asInstanceOf[java.util.Map[String, Any]]
-  val inventoryDatabase = configObj.get("inventory_database").toString()
-  return inventoryDatabase
-
+  return new Yaml().load(configContents).asInstanceOf[java.util.Map[String, Any]]
 }
 
-val inventoryDatabase = getInventoryDatabase()
-var df = metadataForAllTables(spark.sharedState.externalCatalog.listDatabases().filter(_ != s"$inventoryDatabase"), failures)
+def getInventoryDatabase(configObj:java.util.Map[String, Any]): String ={
+  return configObj.get("inventory_database").toString()
+}
+
+def getDatabasesToFilter(configObj:java.util.Map[String, Any]): Array[String] ={
+  return configObj.get("include_databases").toString().split(",")
+}
+
+val config = getConfig()
+val inventoryDatabase = getInventoryDatabase(config)
+val databasesToFilter = getDatabasesToFilter(config)
+var df = metadataForAllTables(spark.sharedState.externalCatalog.listDatabases().filter(databasesToFilter.contains(_)), failures)
 var columnsToMapLower = Array("catalog","database","name","upgraded_to","storage_properties")
 columnsToMapLower.map(column => {
   df = df.withColumn(column, lower(col(column)))

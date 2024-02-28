@@ -220,3 +220,13 @@ def test_is_supported_for_sync(table, supported):
 )
 def test_table_what(table, what):
     assert table.what == what
+
+
+def test_tables_crawler_should_filter_by_database():
+    rows = {
+        "SHOW TABLES FROM hive_metastore.database": [("", "table1", ""), ("", "table2", "")],
+    }
+    backend = MockBackend(rows=rows)
+    tables_crawler = TablesCrawler(backend, "default", ["database"])
+    results = tables_crawler.snapshot()
+    assert len(results) == 2
