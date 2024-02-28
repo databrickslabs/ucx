@@ -29,8 +29,12 @@ from databricks.sdk.service.catalog import (
     TableInfo,
     TableType,
 )
-from databricks.sdk.service.serving import EndpointCoreConfigInput, ServingEndpointDetailed, ServedModelInput, \
-    ServedModelInputWorkloadSize
+from databricks.sdk.service.serving import (
+    EndpointCoreConfigInput,
+    ServedModelInput,
+    ServedModelInputWorkloadSize,
+    ServingEndpointDetailed,
+)
 from databricks.sdk.service.sql import (
     CreateWarehouseRequestWarehouseType,
     GetResponse,
@@ -1099,12 +1103,20 @@ def make_storage_credential_spn(ws):
 
     yield from factory("storage_credential_from_spn", create, remove)
 
+
 @pytest.fixture
 def make_serving_endpoint(ws, make_random, make_model):
     def create() -> Wait[ServingEndpointDetailed]:
         endpoint_name = make_random(4)
         model = make_model()
-        endpoint = ws.serving_endpoints.create(endpoint_name, EndpointCoreConfigInput(served_models=[ServedModelInput(model.name, "1", ServedModelInputWorkloadSize.SMALL, scale_to_zero_enabled=True)]))
+        endpoint = ws.serving_endpoints.create(
+            endpoint_name,
+            EndpointCoreConfigInput(
+                served_models=[
+                    ServedModelInput(model.name, "1", ServedModelInputWorkloadSize.SMALL, scale_to_zero_enabled=True)
+                ]
+            ),
+        )
         return endpoint
 
     def remove(endpoint_name: str):
