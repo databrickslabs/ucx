@@ -1,4 +1,3 @@
-%scala
 // Databricks notebook source
 import java.util.concurrent.ConcurrentLinkedQueue
 import scala.collection.JavaConverters
@@ -14,7 +13,6 @@ import org.apache.spark.sql.functions.{col,lower,upper}
 // must follow the same structure as databricks.labs.ucx.hive_metastore.tables.Table
 case class TableDetails(catalog: String, database: String, name: String, object_type: String,
                         table_format: String, location: String, view_text: String, upgraded_to: String, storage_properties: String)
-
 // recording error log in the database
 case class TableError(catalog: String, database: String, name: String, error: String)
 
@@ -86,8 +84,8 @@ def getInventoryDatabase(configObj:java.util.Map[String, Any]): String ={
   return configObj.get("inventory_database").toString()
 }
 
-def getDatabasesToFilter(configObj:java.util.Map[String, Any]): Array[String] ={
-  return configObj.get("include_databases").toString().split(",")
+def getDatabasesToFilter(configObj:java.util.Map[String, Any]): List[String] ={
+  return JavaConverters.asScalaBuffer(config.get("include_databases").asInstanceOf[java.util.ArrayList[String]]).toList
 }
 
 val config = getConfig()
