@@ -16,7 +16,7 @@ def test_create_account_level_groups(make_ucx_group, make_group, make_user, acc,
     for grp in acc.groups.list():
         if grp.display_name in {f"regular_group_{suffix}"}:
             results.append(grp)
-            try_delete_group(acc, grp.id) # Avoids flakiness for future runs
+            try_delete_group(acc, grp.id)  # Avoids flakiness for future runs
 
     assert len(results) == 1
 
