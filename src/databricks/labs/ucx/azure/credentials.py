@@ -85,9 +85,12 @@ class StorageCredentialManager:
         return application_ids
 
     def create_with_client_secret(self, spn: ServicePrincipalMigrationInfo) -> StorageCredentialInfo:
+        # this function should only be used to migrate service principal, fail the command here if
+        # it's misused to create storage credential with managed identity
+        assert spn.permission_mapping.directory_id is not None
+
         # prepare the storage credential properties
         name = spn.permission_mapping.principal
-        assert spn.permission_mapping.directory_id is not None
         service_principal = AzureServicePrincipal(
             spn.permission_mapping.directory_id,
             spn.permission_mapping.client_id,
