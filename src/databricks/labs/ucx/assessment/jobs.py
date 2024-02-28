@@ -68,7 +68,7 @@ class JobsCrawler(CrawlerBase[JobInfo], JobsMixin, CheckClusterMixin):
             if not job_id:
                 continue
             cluster_details = ClusterDetails.from_dict(cluster_config.as_dict())
-            cluster_failures = self.check_cluster_failures(cluster_details, "Job cluster")
+            cluster_failures = self._check_cluster_failures(cluster_details, "Job cluster")
             job_assessment[job_id].update(cluster_failures)
 
         # TODO: next person looking at this - rewrite, as this code makes no sense
@@ -161,31 +161,31 @@ class SubmitRunsCrawler(CrawlerBase[SubmitRunInfo], JobsMixin, CheckClusterMixin
             start_time_from=self.dt_to_ms(start),
             start_time_to=self.dt_to_ms(end),
         )
-        return self.assess_job_runs(submit_runs)
+        return self._assess_job_runs(submit_runs)
 
     def _try_fetch(self) -> Iterable[SubmitRunInfo]:
         for row in self._fetch(f"SELECT * FROM {self._schema}.{self._table}"):
             yield SubmitRunInfo(*row)
 
-    def check_spark_conf(self, conf: dict[str, str], source: str) -> list[str]:
+    def _check_spark_conf(self, conf: dict[str, str], source: str) -> list[str]:
         failures: list[str] = []
         for key in conf.keys():
             if any(pattern in key for pattern in self._FS_LEVEL_CONF_SETTING_PATTERNS):
                 failures.append(f"Potentially unsupported config property: {key}")
 
-        failures.extend(super().check_spark_conf(conf, source))
+        failures.extend(super()._check_spark_conf(conf, source))
         return failures
 
-    def check_cluster_failures(self, cluster: ClusterDetails, source: str) -> list[str]:
+    def _check_cluster_failures(self, cluster: ClusterDetails, source: str) -> list[str]:
         failures: list[str] = []
         if cluster.aws_attributes and cluster.aws_attributes.instance_profile_arn:
             failures.append(f"using instance profile: {cluster.aws_attributes.instance_profile_arn}")
 
-        failures.extend(super().check_cluster_failures(cluster, source))
+        failures.extend(super()._check_cluster_failures(cluster, source))
         return failures
 
     @staticmethod
-    def needs_compatibility_check(spec: compute.ClusterSpec) -> bool:
+    def _needs_compatibility_check(spec: compute.ClusterSpec) -> bool:
         """
         # we recognize a task as a potentially incompatible one if:
         # 1. cluster is not configured with data security mode
@@ -216,7 +216,7 @@ class SubmitRunsCrawler(CrawlerBase[SubmitRunInfo], JobsMixin, CheckClusterMixin
             hashable_items.append(json.dumps(self._flatten_task(task.as_dict())))
         return sha256(bytes("|".join(hashable_items).encode("utf-8"))).hexdigest()
 
-    def assess_job_runs(self, submit_runs: Iterable[BaseRun]) -> Iterable[SubmitRunInfo]:
+    def _assess_job_runs(self, submit_runs: Iterable[BaseRun]) -> Iterable[SubmitRunInfo]:
         """
         Assessment logic:
         1. For each submit run, we analyze all tasks inside this run.
@@ -236,19 +236,19 @@ class SubmitRunsCrawler(CrawlerBase[SubmitRunInfo], JobsMixin, CheckClusterMixin
                 all_tasks: list[RunTask] = submit_run.tasks
                 for task in sorted(all_tasks, key=lambda x: x.task_key if x.task_key is not None else ""):
 
-                    if not task.new_cluster or not self.needs_compatibility_check(task.new_cluster):
+                    if not task.new_cluster or not self._needs_compatibility_check(task.new_cluster):
                         continue
 
                     _task_key = task.task_key if task.task_key is not None else ""
                     if task.new_cluster:
                         _cluster_details = ClusterDetails.from_dict(task.new_cluster.as_dict())
-                        task_failures = self.check_cluster_failures(_cluster_details, _task_key)
+                        task_failures = self._check_cluster_failures(_cluster_details, _task_key)
                         failures_per_task[_task_key] = task_failures
 
             # v2.0 API, without tasks
             elif submit_run.cluster_spec:
                 _cluster_details = ClusterDetails.from_dict(submit_run.cluster_spec.as_dict())
-                task_failures = self.check_cluster_failures(_cluster_details, "root_task")
+                task_failures = self._check_cluster_failures(_cluster_details, "root_task")
                 failures_per_task["root_task"] = task_failures
 
             hashed_id = self._get_hash_from_run(submit_run)

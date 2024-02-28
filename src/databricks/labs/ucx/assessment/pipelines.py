@@ -49,12 +49,12 @@ class PipelinesCrawler(CrawlerBase[PipelineInfo], CheckClusterMixin):
             assert pipeline_response.spec is not None
             pipeline_config = pipeline_response.spec.configuration
             if pipeline_config:
-                failures.extend(self.check_spark_conf(pipeline_config, "pipeline"))
+                failures.extend(self._check_spark_conf(pipeline_config, "pipeline"))
             pipeline_cluster = pipeline_response.spec.clusters
             if pipeline_cluster:
                 for cluster in pipeline_cluster:
                     if cluster.spark_conf:
-                        failures.extend(self.check_spark_conf(cluster.spark_conf, "pipeline cluster"))
+                        failures.extend(self._check_spark_conf(cluster.spark_conf, "pipeline cluster"))
                     # Checking if cluster config is present in cluster policies
                     if cluster.policy_id:
                         failures.extend(self._check_cluster_policy(cluster.policy_id, "pipeline cluster"))
