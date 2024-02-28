@@ -74,7 +74,8 @@ def metadataForAllTables(databases: Seq[String], queue: ConcurrentLinkedQueue[Ta
 }
 
 def getConfig(): java.util.Map[String, Any] = {
-  val configFile = "/Workspace/Users/william.conti@databricks.com/config.yml"
+  dbutils.widgets.text("config", "./config.yml")
+  val configFile = dbutils.widgets.get("config")
   val fs = FileSystem.get(new java.net.URI("file:/Workspace"), sc.hadoopConfiguration)
   val file = fs.open(new Path(configFile))
   val configContents = org.apache.commons.io.IOUtils.toString(file, java.nio.charset.StandardCharsets.UTF_8)
