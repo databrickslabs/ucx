@@ -11,6 +11,7 @@ from databricks.sdk.service import iam, sql
 
 from databricks.labs.ucx.cli import (
     alias,
+    create_account_groups,
     create_table_mapping,
     ensure_assessment_run,
     installations,
@@ -128,6 +129,16 @@ def test_sync_workspace_info():
         a = create_autospec(AccountClient)
         sync_workspace_info(a)
         swi.assert_called_once()
+
+
+def test_create_account_groups():
+    a = create_autospec(AccountClient)
+    with (
+        patch("databricks.sdk.WorkspaceClient.__init__", return_value=None),
+        patch("databricks.sdk.WorkspaceClient.get_workspace_id", return_value=None),
+    ):
+        create_account_groups(a)
+        a.groups.list.assert_called_with(attributes="id")
 
 
 def test_manual_workspace_info(ws):
