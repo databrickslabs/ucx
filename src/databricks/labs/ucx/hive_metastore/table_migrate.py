@@ -72,7 +72,7 @@ class TablesMigrate:
         table_migrate_sql = src_table.sql_migrate_external(target_table_key)
         logger.debug(f"Migrating external table {src_table.key} to using SQL query: {table_migrate_sql}")
         self._backend.execute(table_migrate_sql)
-        self._backend.execute(src_table.sql_alter_from_ws(rule.as_uc_table_key, self._ws.get_workspace_id()))
+        self._backend.execute(src_table.sql_alter_from(rule.as_uc_table_key, self._ws.get_workspace_id()))
         return True
 
     def _migrate_dbfs_root_table(self, src_table: Table, rule: Rule):
@@ -81,8 +81,7 @@ class TablesMigrate:
         logger.debug(f"Migrating managed table {src_table.key} to using SQL query: {table_migrate_sql}")
         self._backend.execute(table_migrate_sql)
         self._backend.execute(src_table.sql_alter_to(rule.as_uc_table_key))
-        self._backend.execute(src_table.sql_alter_from(rule.as_uc_table_key))
-        self._backend.execute(src_table.sql_alter_from_ws(rule.as_uc_table_key, self._ws.get_workspace_id()))
+        self._backend.execute(src_table.sql_alter_from(rule.as_uc_table_key, self._ws.get_workspace_id()))
         return True
 
     def _migrate_view(self, src_table: Table, rule: Rule):
@@ -91,8 +90,7 @@ class TablesMigrate:
         logger.debug(f"Migrating view {src_table.key} to using SQL query: {table_migrate_sql}")
         self._backend.execute(table_migrate_sql)
         self._backend.execute(src_table.sql_alter_to(rule.as_uc_table_key))
-        self._backend.execute(src_table.sql_alter_from(rule.as_uc_table_key))
-        self._backend.execute(src_table.sql_alter_from_ws(rule.as_uc_table_key, self._ws.get_workspace_id()))
+        self._backend.execute(src_table.sql_alter_from(rule.as_uc_table_key, self._ws.get_workspace_id()))
         return True
 
     def _init_seen_tables(self):
