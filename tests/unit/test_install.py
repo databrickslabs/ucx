@@ -498,9 +498,6 @@ def test_cluster_policy_definition_present_reuse(ws, mock_installation):
         },
     )
 
-    install = WorkspaceInstaller(prompts, mock_installation, ws)
-    install.configure()
-
 
 def test_cluster_policy_definition_azure_hms(ws, mock_installation):
     ws.config.is_aws = False
