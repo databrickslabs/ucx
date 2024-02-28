@@ -142,7 +142,6 @@ def test_migrate_external_table(ws, sql_backend, inventory_schema, make_catalog,
     assert target_table_properties["upgraded_from_ws"] == str(ws.get_workspace_id())
 
 
-
 @retried(on=[NotFound], timeout=timedelta(minutes=5))
 def test_revert_migrated_table(
     ws, sql_backend, inventory_schema, make_schema, make_table, make_catalog

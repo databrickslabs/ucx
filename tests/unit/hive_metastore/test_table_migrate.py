@@ -56,11 +56,7 @@ def test_migrate_dbfs_root_tables_should_produce_proper_queries():
     ) in list(backend.queries)
     assert (
         "ALTER TABLE ucx_default.db1_dst.managed_dbfs "
-        "SET TBLPROPERTIES ('upgraded_from' = 'hive_metastore.db1_src.managed_dbfs');"
-    ) in list(backend.queries)
-    assert (
-        "ALTER TABLE ucx_default.db1_dst.managed_dbfs "
-        "SET TBLPROPERTIES ('upgraded_from_ws' = '12345');"
+        "SET TBLPROPERTIES ('upgraded_from' = 'hive_metastore.db1_src.managed_dbfs' , 'upgraded_from_ws' = '12345');"
     ) in list(backend.queries)
     assert "SYNC TABLE ucx_default.db1_dst.managed_other FROM hive_metastore.db1_src.managed_other;" in list(
         backend.queries
@@ -106,7 +102,7 @@ def test_migrate_external_tables_should_produce_proper_queries():
     assert (list(backend.queries)) == [
         "SYNC TABLE ucx_default.db1_dst.external_dst FROM hive_metastore.db1_src.external_src;",
         ("ALTER TABLE ucx_default.db1_dst.external_dst "
-        "SET TBLPROPERTIES ('upgraded_from_ws' = '12345');")
+        "SET TBLPROPERTIES ('upgraded_from' = 'hive_metastore.db1_src.external_src' , 'upgraded_from_ws' = '12345');")
     ]
 
 
@@ -186,11 +182,7 @@ def test_migrate_view_should_produce_proper_queries():
     ) in list(backend.queries)
     assert (
         "ALTER VIEW ucx_default.db1_dst.view_dst "
-        "SET TBLPROPERTIES ('upgraded_from' = 'hive_metastore.db1_src.view_src');"
-    ) in list(backend.queries)
-    assert (
-        "ALTER VIEW ucx_default.db1_dst.view_dst "
-        "SET TBLPROPERTIES ('upgraded_from_ws' = '12345');"
+        "SET TBLPROPERTIES ('upgraded_from' = 'hive_metastore.db1_src.view_src' , 'upgraded_from_ws' = '12345');"
     ) in list(backend.queries)
 
 
