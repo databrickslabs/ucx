@@ -27,7 +27,7 @@ def test_job_crawler(ws, make_job, inventory_schema, sql_backend):
 @retried(on=[NotFound], timeout=timedelta(minutes=5))
 def test_job_run_crawler(ws, make_job, inventory_schema, sql_backend):
     # new_job = make_job(spark_conf=_SPARK_CONF)
-    job_run_crawler = SubmitRunsCrawler(ws=ws, sbe=sql_backend, schema=inventory_schema)
+    job_run_crawler = SubmitRunsCrawler(ws=ws, sbe=sql_backend, schema=inventory_schema, num_days_history=30)
     job_runs = job_run_crawler.snapshot()
 
     assert len(job_runs) >= 1
