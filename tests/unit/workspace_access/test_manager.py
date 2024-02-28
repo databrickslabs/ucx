@@ -214,6 +214,7 @@ def test_factory(mocker):
             "secrets",
             "entitlements",
             "roles",
+            'serving-endpoints',
             "ANY FILE",
             "FUNCTION",
             "ANONYMOUS FUNCTION",

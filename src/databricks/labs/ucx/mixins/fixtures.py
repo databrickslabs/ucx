@@ -18,6 +18,7 @@ from databricks.sdk.core import DatabricksError
 from databricks.sdk.errors import NotFound, ResourceConflict
 from databricks.sdk.retries import retried
 from databricks.sdk.service import compute, iam, jobs, pipelines, sql, workspace
+from databricks.sdk.service._internal import Wait
 from databricks.sdk.service.catalog import (
     AzureServicePrincipal,
     CatalogInfo,
@@ -28,6 +29,8 @@ from databricks.sdk.service.catalog import (
     TableInfo,
     TableType,
 )
+from databricks.sdk.service.serving import EndpointCoreConfigInput, ServingEndpointDetailed, ServedModelInput, \
+    ServedModelInputWorkloadSize
 from databricks.sdk.service.sql import (
     CreateWarehouseRequestWarehouseType,
     GetResponse,
@@ -1095,3 +1098,19 @@ def make_storage_credential_spn(ws):
         ws.storage_credentials.delete(storage_credential.name, force=True)
 
     yield from factory("storage_credential_from_spn", create, remove)
+
+@pytest.fixture
+def make_serving_endpoint(ws, make_random, make_model):
+    def create() -> Wait[ServingEndpointDetailed]:
+        endpoint_name = make_random(4)
+        model = make_model()
+        endpoint = ws.serving_endpoints.create(endpoint_name, EndpointCoreConfigInput(served_models=[ServedModelInput(model.name, "1", ServedModelInputWorkloadSize.SMALL, scale_to_zero_enabled=True)]))
+        return endpoint
+
+    def remove(endpoint_name: str):
+        try:
+            ws.serving_endpoints.delete(endpoint_name)
+        except RuntimeError as e:
+            logger.info(f"Can't remove endpoint {e}")
+
+    yield from factory("Serving endpoint", create, remove)
