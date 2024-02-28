@@ -2,12 +2,27 @@ import json
 import logging
 from collections.abc import Iterable
 from dataclasses import dataclass
+from datetime import datetime, timedelta
+from hashlib import sha256
 
 from databricks.sdk import WorkspaceClient
+from databricks.sdk.service import compute
 from databricks.sdk.service.compute import ClusterDetails
-from databricks.sdk.service.jobs import BaseJob
+from databricks.sdk.service.jobs import (
+    BaseJob,
+    BaseRun,
+    DbtTask,
+    GitSource,
+    ListRunsRunType,
+    PythonWheelTask,
+    RunConditionTask,
+    RunTask,
+    SparkJarTask,
+    SqlTask,
+)
 
 from databricks.labs.ucx.assessment.clusters import CheckClusterMixin
+from databricks.labs.ucx.assessment.crawlers import spark_version_compatibility
 from databricks.labs.ucx.framework.crawlers import CrawlerBase, SqlBackend
 
 logger = logging.getLogger(__name__)
@@ -109,19 +124,241 @@ class JobsCrawler(CrawlerBase[JobInfo], JobsMixin, CheckClusterMixin):
         for row in self._fetch(f"SELECT * FROM {self._schema}.{self._table}"):
             yield JobInfo(*row)
 
-class JobsRunCrawler(CrawlerBase[JobInfo], JobsMixin):
-    def __init__(self, ws: WorkspaceClient, sbe: SqlBackend, schema):
-        super().__init__(sbe, "hive_metastore", schema, "jobs", JobInfo)
+
+@dataclass
+class SubmitRunInfo:
+    run_ids: str  # JSON-encoded list of run ids
+    hashed_id: str  # a pseudo id that combines all the hashable attributes of the run
+    failures: str = "[]"  # JSON-encoded list of failures
+
+
+class SubmitRunsCrawler(CrawlerBase[SubmitRunInfo], JobsMixin, CheckClusterMixin):
+    _FS_LEVEL_CONF_SETTING_PATTERNS = [
+        "fs.s3a",
+        "fs.s3n",
+        "fs.s3",
+        "fs.azure",
+        "fs.wasb",
+        "fs.abfs",
+        "fs.adl",
+    ]
+
+    def __init__(self, ws: WorkspaceClient, sbe: SqlBackend, schema: str, num_days_history: int):
+        super().__init__(sbe, "hive_metastore", schema, "submit_runs", SubmitRunInfo)
         self._ws = ws
+        self._num_days_history = num_days_history
 
-    def _crawl(self) -> Iterable[JobInfo]:
-        all_jobs = list(self._ws.jobs.list(expand_tasks=True))
-        all_clusters = {c.cluster_id: c for c in self._ws.clusters.list()}
-        return self._assess_jobs(all_jobs, all_clusters)
-
-    def snapshot(self) -> Iterable[JobInfo]:
+    def snapshot(self) -> Iterable[SubmitRunInfo]:
         return self._snapshot(self._try_fetch, self._crawl)
 
-    def _try_fetch(self) -> Iterable[JobInfo]:
+    @staticmethod
+    def dt_to_ms(dt: datetime):
+        epoch = datetime.utcfromtimestamp(0)
+        delta = dt - epoch
+        return int(delta.total_seconds() * 1000)
+
+    @staticmethod
+    def get_current_dttm() -> datetime:
+        return datetime.now()
+
+    def _crawl(self) -> Iterable[SubmitRunInfo]:
+        end = self.get_current_dttm()
+        start = end - timedelta(days=self._num_days_history)
+        submit_runs = self._ws.jobs.list_runs(
+            expand_tasks=True,
+            completed_only=True,
+            run_type=ListRunsRunType.SUBMIT_RUN,
+            start_time_from=self.dt_to_ms(start),
+            start_time_to=self.dt_to_ms(end),
+        )
+        return self.assess_job_runs(submit_runs)
+
+    def _try_fetch(self) -> Iterable[SubmitRunInfo]:
         for row in self._fetch(f"SELECT * FROM {self._schema}.{self._table}"):
-            yield JobInfo(*row)
+            yield SubmitRunInfo(*row)
+
+    @staticmethod
+    def retrieve_hash_values_from_sql_task(task: SqlTask) -> list[str]:
+        hash_values = []
+        if task.file is not None:
+            hash_values.append(task.file.path)
+        if task.alert is not None and task.alert.alert_id is not None:
+            hash_values.append(task.alert.alert_id)
+        if task.dashboard is not None and task.dashboard.dashboard_id is not None:
+            hash_values.append(task.dashboard.dashboard_id)
+        if task.query is not None and task.query.query_id is not None:
+            hash_values.append(task.query.query_id)
+        return [str(value) for value in hash_values if value is not None]
+
+    @staticmethod
+    def retrieve_hash_values_from_git_source(source: GitSource) -> list[str]:
+        hash_values = []
+        if source.git_url is not None:
+            hash_values.append(source.git_url)
+        return [str(value) for value in hash_values if value is not None]
+
+    @staticmethod
+    def retrieve_hash_values_from_dbt_task(dbt_task: DbtTask) -> list[str]:
+        hash_values = []
+        dbt_task.commands.sort()
+        if dbt_task.schema is not None:
+            hash_values.append(dbt_task.schema)
+        if dbt_task.catalog is not None:
+            hash_values.append(dbt_task.catalog)
+        if dbt_task.warehouse_id is not None:
+            hash_values.append(dbt_task.warehouse_id)
+        if dbt_task.project_directory is not None:
+            hash_values.append(dbt_task.project_directory)
+        hash_values.append(",".join(dbt_task.commands))
+        return [str(value) for value in hash_values if value is not None]
+
+    @staticmethod
+    def retrieve_hash_values_from_jar_task(spark_jar_task: SparkJarTask) -> list[str]:
+        hash_values = []
+        if spark_jar_task.jar_uri is not None:
+            hash_values.append(spark_jar_task.jar_uri)
+        if spark_jar_task.main_class_name is not None:
+            hash_values.append(spark_jar_task.main_class_name)
+        return [str(value) for value in hash_values if value is not None]
+
+    @staticmethod
+    def retrieve_hash_values_from_python_wheel_task(pw_task: PythonWheelTask) -> list[str]:
+        hash_values = []
+        if pw_task.package_name is not None:
+            hash_values.append(pw_task.package_name)
+        if pw_task.entry_point is not None:
+            hash_values.append(pw_task.entry_point)
+        return [str(value) for value in hash_values if value is not None]
+
+    @staticmethod
+    def retrieve_hash_values_from_condition_task(c_task: RunConditionTask) -> list[str]:
+        hash_values = [c_task.op.value, c_task.right, c_task.left]
+        if c_task.outcome is not None:
+            hash_values.append(c_task.outcome)
+        return [str(value) for value in hash_values if value is not None]
+
+    @staticmethod
+    def retrieve_hash_values_from_task(task: RunTask) -> list[str]:
+        """
+        Retrieve all hashable attributes and append to a list with None removed
+        - specifically ignore parameters as these change.
+        """
+        hash_values = []
+        if task.notebook_task is not None:
+            hash_values.append(task.notebook_task.notebook_path)
+        if task.spark_python_task is not None:
+            hash_values.append(task.spark_python_task.python_file)
+        if task.spark_submit_task is not None and task.spark_submit_task.parameters is not None:
+            hash_values.append('|'.join(task.spark_submit_task.parameters))
+        if task.spark_jar_task is not None:
+            hash_values.extend(SubmitRunsCrawler.retrieve_hash_values_from_jar_task(task.spark_jar_task))
+        if task.pipeline_task is not None and task.pipeline_task.pipeline_id is not None:
+            hash_values.append(task.pipeline_task.pipeline_id)
+        if task.python_wheel_task is not None:
+            hash_values.extend(SubmitRunsCrawler.retrieve_hash_values_from_python_wheel_task(task.python_wheel_task))
+        if task.sql_task is not None:
+            hash_values.extend(SubmitRunsCrawler.retrieve_hash_values_from_sql_task(task.sql_task))
+        if task.dbt_task is not None:
+            hash_values.extend(SubmitRunsCrawler.retrieve_hash_values_from_dbt_task(task.dbt_task))
+        if task.condition_task is not None:
+            hash_values.extend(SubmitRunsCrawler.retrieve_hash_values_from_condition_task(task.condition_task))
+        if task.run_job_task is not None and task.run_job_task.job_id is not None:
+            hash_values.append(str(task.run_job_task.job_id))
+        if task.git_source is not None:
+            hv = SubmitRunsCrawler.retrieve_hash_values_from_git_source(task.git_source)
+            hash_values.extend(hv)
+
+        return [str(value) for value in hash_values if value is not None]
+
+    def check_spark_conf(self, conf: dict[str, str], source: str) -> list[str]:
+        failures: list[str] = []
+        for key in conf.keys():
+            if any(pattern in key for pattern in self._FS_LEVEL_CONF_SETTING_PATTERNS):
+                failures.append(f"Potentially unsupported config property: {key}")
+
+        failures.extend(super().check_spark_conf(conf, source))
+        return failures
+
+    def check_cluster_failures(self, cluster: ClusterDetails, source: str) -> list[str]:
+        failures: list[str] = []
+        if cluster.aws_attributes and cluster.aws_attributes.instance_profile_arn:
+            failures.append(f"using instance profile: {cluster.aws_attributes.instance_profile_arn}")
+
+        failures.extend(super().check_cluster_failures(cluster, source))
+        return failures
+
+    @staticmethod
+    def needs_compatibility_check(spec: compute.ClusterSpec) -> bool:
+        """
+        # we recognize a task as a potentially incompatible one if:
+        # 1. cluster is not configured with data security mode
+        # 2. cluster's DBR version is greater than 11.3
+        """
+        if spec.data_security_mode is None:
+            compatability = spark_version_compatibility(spec.spark_version)
+            return compatability == "supported"
+
+        return False
+
+    @staticmethod
+    def get_hash_from_run(run: BaseRun) -> str:
+        hashable_items = []
+        all_tasks: list[RunTask] = run.tasks if run.tasks is not None else []
+        for task in sorted(all_tasks, key=lambda x: x.task_key if x.task_key is not None else ""):
+            hashable_items.extend(SubmitRunsCrawler.retrieve_hash_values_from_task(task))
+
+        if run.git_source:
+            hashable_items.extend(SubmitRunsCrawler.retrieve_hash_values_from_git_source(run.git_source))
+
+        return sha256(bytes("|".join(hashable_items).encode("utf-8"))).hexdigest()
+
+    def assess_job_runs(self, submit_runs: Iterable[BaseRun]) -> Iterable[SubmitRunInfo]:
+        """
+        Assessment logic:
+        1. For each submit run, we analyze all tasks inside this run.
+        2. Per each task, we calculate a unique hash based on the _retrieve_hash_values_from_task function
+        3. Then we coalesce all task hashes into a single hash for the submit run
+        4. Coalesce all runs under the same hash into a single pseudo-job
+        5. Return a list of pseudo-jobs with their assessment results
+        """
+        result: dict[str, SubmitRunInfo] = {}
+        runs_per_hash: dict[str, list[int | None]] = {}
+
+        for submit_run in submit_runs:
+            failures_per_task: dict[str, list[str]] = {}
+
+            # v2.1+ API, with tasks
+            if submit_run.tasks is not None:
+                all_tasks: list[RunTask] = submit_run.tasks
+                for task in sorted(all_tasks, key=lambda x: x.task_key if x.task_key is not None else ""):
+
+                    if not task.new_cluster or not self.needs_compatibility_check(task.new_cluster):
+                        continue
+
+                    _task_key = task.task_key if task.task_key is not None else ""
+                    if task.new_cluster:
+                        _cluster_details = ClusterDetails.from_dict(task.new_cluster.as_dict())
+                        task_failures = self.check_cluster_failures(_cluster_details, _task_key)
+                        failures_per_task[_task_key] = task_failures
+
+            # v2.0 API, without tasks
+            elif submit_run.cluster_spec:
+                _cluster_details = ClusterDetails.from_dict(submit_run.cluster_spec.as_dict())
+                task_failures = self.check_cluster_failures(_cluster_details, "root_task")
+                failures_per_task["root_task"] = task_failures
+
+            hashed_id = self.get_hash_from_run(submit_run)
+            if hashed_id in runs_per_hash:
+                runs_per_hash[hashed_id].append(submit_run.run_id)
+            else:
+                runs_per_hash[hashed_id] = [submit_run.run_id]
+
+            result[hashed_id] = SubmitRunInfo(
+                run_ids=json.dumps(runs_per_hash[hashed_id]),
+                hashed_id=hashed_id,
+                failures=json.dumps(
+                    [{"task_key": task_key, "failures": failures} for task_key, failures in failures_per_task.items()]
+                ),
+            )
+
+        return list(result.values())

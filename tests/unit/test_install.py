@@ -222,6 +222,24 @@ def test_write_protected_dbfs(ws, tmp_path, mock_installation):
 
 
 def test_writeable_dbfs(ws, tmp_path, mock_installation, any_prompt):
+    mock_installation.assert_file_written(
+        'config.yml',
+        {
+            'version': 2,
+            'default_catalog': 'ucx_default',
+            'inventory_database': 'ucx',
+            'log_level': 'INFO',
+            'num_threads': 10,
+            'override_clusters': {'main': '2222-999999-nosecuri', 'tacl': '3333-999999-legacytc'},
+            'policy_id': '123',
+            'renamed_group_prefix': 'ucx-renamed-',
+            'workspace_start_path': '/',
+            "num_days_submit_runs_history": 30,
+        },
+    )
+
+
+def test_writeable_dbfs(ws, tmp_path, mock_installation, any_prompt):
     """Ensure configure does not add cluster override for happy path of writable DBFS"""
     sql_backend = MockBackend()
     wheels = create_autospec(WheelsV2)
@@ -402,6 +420,7 @@ def test_save_config(ws, mock_installation):
             r".*PRO or SERVERLESS SQL warehouse.*": "1",
             r"Choose how to map the workspace groups.*": "2",
             r".*": "",
+            r".*days to analyze submitted runs.*": "1",
         }
     )
     install = WorkspaceInstaller(prompts, mock_installation, ws)
@@ -451,8 +470,35 @@ def test_save_config_strip_group_names(ws, mock_installation):
             'workspace_start_path': '/',
         },
     )
+    install = WorkspaceInstaller(prompts, mock_installation, ws)
+    install.configure()
+
+    mock_installation.assert_file_written(
+        'config.yml',
+        {
+            'version': 2,
+            'default_catalog': 'ucx_default',
+            'inventory_database': 'ucx',
+            'log_level': 'INFO',
+            'num_threads': 8,
+            'policy_id': 'foo',
+            'renamed_group_prefix': 'db-temp-',
+            'warehouse_id': 'abc',
+            'workspace_start_path': '/',
+            "num_days_submit_runs_history": 1,
+        },
+    )
 
 
+def test_save_config_strip_group_names(ws, mock_installation):
+    prompts = MockPrompts(
+        {
+            r".*PRO or SERVERLESS SQL warehouse.*": "1",
+            r"Choose how to map the workspace groups.*": "2",  # specify names
+            r".*workspace group names.*": "g1, g2, g99",
+            r".*": "",
+            r".*days to analyze submitted runs.*": "1",
+        }
 def test_cluster_policy_definition_present_reuse(ws, mock_installation):
     ws.config.is_aws = False
     ws.config.is_azure = True
@@ -493,6 +539,8 @@ def test_cluster_policy_definition_present_reuse(ws, mock_installation):
         },
     )
 
+    install = WorkspaceInstaller(prompts, mock_installation, ws)
+    install.configure()
 
 def test_cluster_policy_definition_azure_hms(ws, mock_installation):
     ws.config.is_aws = False
@@ -545,6 +593,22 @@ def test_cluster_policy_definition_azure_hms(ws, mock_installation):
         description="Custom cluster policy for Unity Catalog Migration (UCX)",
     )
 
+    mock_installation.assert_file_written(
+        'config.yml',
+        {
+            'version': 2,
+            'default_catalog': 'ucx_default',
+            'include_group_names': ['g1', 'g2', 'g99'],
+            'inventory_database': 'ucx',
+            'log_level': 'INFO',
+            'num_threads': 8,
+            'policy_id': 'foo',
+            'renamed_group_prefix': 'db-temp-',
+            'warehouse_id': 'abc',
+            'workspace_start_path': '/',
+            "num_days_submit_runs_history": 1,
+        },
+    )
 
 def test_cluster_policy_definition_aws_glue(ws, mock_installation):
     ws.config.is_aws = True

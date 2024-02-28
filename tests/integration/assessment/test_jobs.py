@@ -3,7 +3,7 @@ from datetime import timedelta
 from databricks.sdk.errors import NotFound
 from databricks.sdk.retries import retried
 
-from databricks.labs.ucx.assessment.jobs import JobsCrawler
+from databricks.labs.ucx.assessment.jobs import JobsCrawler, SubmitRunsCrawler
 
 from .test_assessment import _SPARK_CONF
 
@@ -22,3 +22,13 @@ def test_job_crawler(ws, make_job, inventory_schema, sql_backend):
 
     assert len(results) >= 1
     assert int(results[0].job_id) == new_job.job_id
+
+
+@retried(on=[NotFound], timeout=timedelta(minutes=5))
+def test_job_run_crawler(ws, make_job, inventory_schema, sql_backend):
+    # new_job = make_job(spark_conf=_SPARK_CONF)
+    job_run_crawler = SubmitRunsCrawler(ws=ws, sbe=sql_backend, schema=inventory_schema)
+    job_runs = job_run_crawler.snapshot()
+
+    assert len(job_runs) >= 1
+    # assert int(results[0].job_id) == new_job.job_id
