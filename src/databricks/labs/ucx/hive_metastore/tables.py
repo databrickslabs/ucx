@@ -54,7 +54,7 @@ class Table:
         "dbfs:/databricks-datasets",
     ]
 
-    UPGRADED_FROM_WS_PARAM: typing.ClassVar[str] = "upgraded_from_ws"
+    UPGRADED_FROM_WS_PARAM: typing.ClassVar[str] = "upgraded_from_workspace_id"
 
     @property
     def is_delta(self) -> bool:

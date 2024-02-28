@@ -7,6 +7,7 @@ from databricks.sdk.retries import retried
 
 from databricks.labs.ucx.hive_metastore.mapping import Rule
 from databricks.labs.ucx.hive_metastore.table_migrate import TablesMigrate
+from databricks.labs.ucx.hive_metastore.tables import Table
 
 from ..conftest import StaticTableMapping, StaticTablesCrawler
 
@@ -46,7 +47,7 @@ def test_migrate_managed_tables(ws, sql_backend, inventory_schema, make_catalog,
 
     target_table_properties = ws.tables.get(f"{dst_schema.full_name}.{src_managed_table.name}").properties
     assert target_table_properties["upgraded_from"] == src_managed_table.full_name
-    assert target_table_properties["upgraded_from_ws"] == str(ws.get_workspace_id())
+    assert target_table_properties[Table.UPGRADED_FROM_WS_PARAM] == str(ws.get_workspace_id())
 
 
 @retried(on=[NotFound], timeout=timedelta(minutes=5))
@@ -139,7 +140,7 @@ def test_migrate_external_table(ws, sql_backend, inventory_schema, make_catalog,
     assert len(target_tables) == 1
     target_table_properties = ws.tables.get(f"{dst_schema.full_name}.{src_external_table.name}").properties
     assert target_table_properties["upgraded_from"] == src_external_table.full_name
-    assert target_table_properties["upgraded_from_ws"] == str(ws.get_workspace_id())
+    assert target_table_properties[Table.UPGRADED_FROM_WS_PARAM] == str(ws.get_workspace_id())
 
 
 @retried(on=[NotFound], timeout=timedelta(minutes=5))
