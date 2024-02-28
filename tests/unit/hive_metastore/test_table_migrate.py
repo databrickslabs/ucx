@@ -101,8 +101,10 @@ def test_migrate_external_tables_should_produce_proper_queries():
 
     assert (list(backend.queries)) == [
         "SYNC TABLE ucx_default.db1_dst.external_dst FROM hive_metastore.db1_src.external_src;",
-        ("ALTER TABLE ucx_default.db1_dst.external_dst "
-        "SET TBLPROPERTIES ('upgraded_from' = 'hive_metastore.db1_src.external_src' , 'upgraded_from_ws' = '12345');")
+        (
+            "ALTER TABLE ucx_default.db1_dst.external_dst "
+            "SET TBLPROPERTIES ('upgraded_from' = 'hive_metastore.db1_src.external_src' , 'upgraded_from_ws' = '12345');"
+        ),
     ]
 
 
