@@ -54,6 +54,8 @@ class Table:
         "dbfs:/databricks-datasets",
     ]
 
+    UPGRADED_FROM_WS_PARAM: typing.ClassVar[str] = "upgraded_from_ws"
+
     @property
     def is_delta(self) -> bool:
         if self.table_format is None:
@@ -73,6 +75,9 @@ class Table:
 
     def sql_alter_from(self, target_table_key):
         return f"ALTER {self.kind} {target_table_key} SET TBLPROPERTIES ('upgraded_from' = '{self.key}');"
+
+    def sql_alter_from_ws(self, target_table_key, ws_id):
+        return f"ALTER {self.kind} {target_table_key} SET TBLPROPERTIES ('{self.UPGRADED_FROM_WS_PARAM}' = '{ws_id}');"
 
     def sql_unset_upgraded_to(self):
         return f"ALTER {self.kind} {self.key} UNSET TBLPROPERTIES IF EXISTS('upgraded_to');"
