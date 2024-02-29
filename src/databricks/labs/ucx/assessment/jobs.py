@@ -2,7 +2,7 @@ import json
 import logging
 from collections.abc import Iterable
 from dataclasses import dataclass
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from hashlib import sha256
 
 from databricks.sdk import WorkspaceClient
@@ -152,26 +152,25 @@ class SubmitRunsCrawler(CrawlerBase[SubmitRunInfo], JobsMixin, CheckClusterMixin
         return self._snapshot(self._try_fetch, self._crawl)
 
     @staticmethod
-    def dt_to_ms(date_time: datetime):
-        epoch = datetime.utcfromtimestamp(0)
-        delta = date_time - epoch
-        return int(delta.total_seconds() * 1000)
+    def _dt_to_ms(date_time: datetime):
+        return int(date_time.timestamp() * 1000)
 
     @staticmethod
-    def get_current_dttm() -> datetime:
-        return datetime.now()
+    def _get_current_dttm() -> datetime:
+        return datetime.now(timezone.utc)
 
     def _crawl(self) -> Iterable[SubmitRunInfo]:
-        end = self.get_current_dttm()
-        start = end - timedelta(days=self._num_days_history)
+        end = self._dt_to_ms(self._get_current_dttm())
+        start = self._dt_to_ms(self._get_current_dttm() - timedelta(days=self._num_days_history))
         submit_runs = self._ws.jobs.list_runs(
             expand_tasks=True,
             completed_only=True,
             run_type=ListRunsRunType.SUBMIT_RUN,
-            start_time_from=self.dt_to_ms(start),
-            start_time_to=self.dt_to_ms(end),
+            start_time_from=start,
+            start_time_to=end,
         )
-        return self._assess_job_runs(submit_runs)
+        all_clusters = {c.cluster_id: c for c in self._ws.clusters.list()}
+        return self._assess_job_runs(submit_runs, all_clusters)
 
     def _try_fetch(self) -> Iterable[SubmitRunInfo]:
         for row in self._fetch(f"SELECT * FROM {self._schema}.{self._table}"):
@@ -210,15 +209,15 @@ class SubmitRunsCrawler(CrawlerBase[SubmitRunInfo], JobsMixin, CheckClusterMixin
         hashable_items = []
         all_tasks: list[RunTask] = run.tasks if run.tasks is not None else []
         for task in sorted(all_tasks, key=lambda x: x.task_key if x.task_key is not None else ""):
-            hashable_items.extend(self._retrieve_hash_values_from_task(task))
+            hashable_items.extend(self._run_task_values(task))
 
         if run.git_source:
-            hashable_items.extend(self._retrieve_hash_values_from_git_source(run.git_source))
+            hashable_items.extend(self._git_source_values(run.git_source))
 
         return sha256(bytes("|".join(hashable_items).encode("utf-8"))).hexdigest()
 
-    @staticmethod
-    def _retrieve_hash_values_from_sql_task(task: SqlTask) -> list[str]:
+    @classmethod
+    def _sql_task_values(cls, task: SqlTask) -> list[str]:
         hash_values = []
         if task.file is not None:
             hash_values.append(task.file.path)
@@ -230,15 +229,15 @@ class SubmitRunsCrawler(CrawlerBase[SubmitRunInfo], JobsMixin, CheckClusterMixin
             hash_values.append(task.query.query_id)
         return [str(value) for value in hash_values if value is not None]
 
-    @staticmethod
-    def _retrieve_hash_values_from_git_source(source: GitSource) -> list[str]:
+    @classmethod
+    def _git_source_values(cls, source: GitSource) -> list[str]:
         hash_values = []
         if source.git_url is not None:
             hash_values.append(source.git_url)
         return [str(value) for value in hash_values if value is not None]
 
-    @staticmethod
-    def _retrieve_hash_values_from_dbt_task(dbt_task: DbtTask) -> list[str]:
+    @classmethod
+    def _dbt_task_values(cls, dbt_task: DbtTask) -> list[str]:
         hash_values = []
         if dbt_task.schema is not None:
             hash_values.append(dbt_task.schema)
@@ -251,22 +250,23 @@ class SubmitRunsCrawler(CrawlerBase[SubmitRunInfo], JobsMixin, CheckClusterMixin
         hash_values.append(",".join(sorted(dbt_task.commands)))
         return [str(value) for value in hash_values if value is not None]
 
-    @staticmethod
-    def _retrieve_hash_values_from_jar_task(spark_jar_task: SparkJarTask) -> list[str]:
+    @classmethod
+    def _jar_task_values(cls, spark_jar_task: SparkJarTask) -> list[str]:
         hash_values = [spark_jar_task.jar_uri, spark_jar_task.main_class_name]
         return [str(value) for value in hash_values if value is not None]
 
-    @staticmethod
-    def _retrieve_hash_values_from_python_wheel_task(pw_task: PythonWheelTask) -> list[str]:
+    @classmethod
+    def _python_wheel_task_values(cls, pw_task: PythonWheelTask) -> list[str]:
         hash_values = [pw_task.package_name, pw_task.entry_point]
         return [str(value) for value in hash_values if value is not None]
 
-    @staticmethod
-    def _retrieve_hash_values_from_condition_task(c_task: RunConditionTask) -> list[str]:
+    @classmethod
+    def _run_condition_task_values(cls, c_task: RunConditionTask) -> list[str]:
         hash_values = [c_task.op.value, c_task.right, c_task.left, c_task.outcome]
         return [str(value) for value in hash_values if value is not None]
 
-    def _retrieve_hash_values_from_task(self, task: RunTask) -> list[str]:
+    @classmethod
+    def _run_task_values(cls, task: RunTask) -> list[str]:
         """
         Retrieve all hashable attributes and append to a list with None removed
         - specifically ignore parameters as these change.
@@ -283,22 +283,18 @@ class SubmitRunsCrawler(CrawlerBase[SubmitRunInfo], JobsMixin, CheckClusterMixin
             task.run_job_task.job_id if task.run_job_task else None,
         ]
         hash_lists = [
-            self._retrieve_hash_values_from_jar_task(task.spark_jar_task) if task.spark_jar_task else None,
-            (
-                self._retrieve_hash_values_from_python_wheel_task(task.python_wheel_task)
-                if (task.python_wheel_task)
-                else None
-            ),
-            self._retrieve_hash_values_from_sql_task(task.sql_task) if task.sql_task else None,
-            self._retrieve_hash_values_from_dbt_task(task.dbt_task) if task.dbt_task else None,
-            self._retrieve_hash_values_from_condition_task(task.condition_task) if task.condition_task else None,
-            self._retrieve_hash_values_from_git_source(task.git_source) if task.git_source else None,
+            cls._jar_task_values(task.spark_jar_task) if task.spark_jar_task else None,
+            (cls._python_wheel_task_values(task.python_wheel_task) if (task.python_wheel_task) else None),
+            cls._sql_task_values(task.sql_task) if task.sql_task else None,
+            cls._dbt_task_values(task.dbt_task) if task.dbt_task else None,
+            cls._run_condition_task_values(task.condition_task) if task.condition_task else None,
+            cls._git_source_values(task.git_source) if task.git_source else None,
         ]
         # combining all the values from the lists where the list is not "None"
         hash_values_from_lists = sum([hash_list for hash_list in hash_lists if hash_list], [])
         return [str(value) for value in hash_values + hash_values_from_lists]
 
-    def _assess_job_runs(self, submit_runs: Iterable[BaseRun]) -> Iterable[SubmitRunInfo]:
+    def _assess_job_runs(self, submit_runs: Iterable[BaseRun], all_clusters_by_id) -> Iterable[SubmitRunInfo]:
         """
         Assessment logic:
         1. For each submit run, we analyze all tasks inside this run.
@@ -318,12 +314,13 @@ class SubmitRunsCrawler(CrawlerBase[SubmitRunInfo], JobsMixin, CheckClusterMixin
                 all_tasks: list[RunTask] = submit_run.tasks
                 for task in sorted(all_tasks, key=lambda x: x.task_key if x.task_key is not None else ""):
 
-                    if not task.new_cluster or not self._needs_compatibility_check(task.new_cluster):
-                        continue
-
                     _task_key = task.task_key if task.task_key is not None else ""
-                    if task.new_cluster:
+                    _cluster_details = None
+                    if task.new_cluster and self._needs_compatibility_check(task.new_cluster):
                         _cluster_details = ClusterDetails.from_dict(task.new_cluster.as_dict())
+                    if task.existing_cluster_id:
+                        _cluster_details = all_clusters_by_id.get(task.existing_cluster_id, None)
+                    if _cluster_details:
                         task_failures = self._check_cluster_failures(_cluster_details, _task_key)
                         failures_per_task[_task_key] = task_failures
 
