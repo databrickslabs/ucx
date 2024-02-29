@@ -24,7 +24,8 @@ def test_migrate_dbfs_root_tables_should_produce_proper_queries():
     rows = {}
     backend = MockBackend(fails_on_first=errors, rows=rows)
     table_crawler = TablesCrawler(backend, "inventory_database")
-    client = MagicMock()
+    client = create_autospec(WorkspaceClient)
+    client.get_workspace_id.return_value = "12345"
     table_mapping = create_autospec(TableMapping)
     table_mapping.get_tables_to_migrate.return_value = [
         TableToMigrate(
@@ -54,8 +55,8 @@ def test_migrate_dbfs_root_tables_should_produce_proper_queries():
         "SET TBLPROPERTIES ('upgraded_to' = 'ucx_default.db1_dst.managed_dbfs');"
     ) in list(backend.queries)
     assert (
-        "ALTER TABLE ucx_default.db1_dst.managed_dbfs "
-        "SET TBLPROPERTIES ('upgraded_from' = 'hive_metastore.db1_src.managed_dbfs');"
+        f"ALTER TABLE ucx_default.db1_dst.managed_dbfs "
+        f"SET TBLPROPERTIES ('upgraded_from' = 'hive_metastore.db1_src.managed_dbfs' , '{Table.UPGRADED_FROM_WS_PARAM}' = '12345');"
     ) in list(backend.queries)
     assert "SYNC TABLE ucx_default.db1_dst.managed_other FROM hive_metastore.db1_src.managed_other;" in list(
         backend.queries
@@ -86,7 +87,8 @@ def test_migrate_external_tables_should_produce_proper_queries():
     rows = {}
     backend = MockBackend(fails_on_first=errors, rows=rows)
     table_crawler = TablesCrawler(backend, "inventory_database")
-    client = MagicMock()
+    client = create_autospec(WorkspaceClient)
+    client.get_workspace_id.return_value = "12345"
     table_mapping = create_autospec(TableMapping)
     table_mapping.get_tables_to_migrate.return_value = [
         TableToMigrate(
@@ -98,7 +100,11 @@ def test_migrate_external_tables_should_produce_proper_queries():
     table_migrate.migrate_tables()
 
     assert (list(backend.queries)) == [
-        "SYNC TABLE ucx_default.db1_dst.external_dst FROM hive_metastore.db1_src.external_src;"
+        "SYNC TABLE ucx_default.db1_dst.external_dst FROM hive_metastore.db1_src.external_src;",
+        (
+            f"ALTER TABLE ucx_default.db1_dst.external_dst "
+            f"SET TBLPROPERTIES ('upgraded_from' = 'hive_metastore.db1_src.external_src' , '{Table.UPGRADED_FROM_WS_PARAM}' = '12345');"
+        ),
     ]
 
 
@@ -159,7 +165,8 @@ def test_migrate_view_should_produce_proper_queries():
     rows = {}
     backend = MockBackend(fails_on_first=errors, rows=rows)
     table_crawler = TablesCrawler(backend, "inventory_database")
-    client = MagicMock()
+    client = create_autospec(WorkspaceClient)
+    client.get_workspace_id.return_value = "12345"
     table_mapping = create_autospec(TableMapping)
     table_mapping.get_tables_to_migrate.return_value = [
         TableToMigrate(
@@ -176,8 +183,8 @@ def test_migrate_view_should_produce_proper_queries():
         "SET TBLPROPERTIES ('upgraded_to' = 'ucx_default.db1_dst.view_dst');"
     ) in list(backend.queries)
     assert (
-        "ALTER VIEW ucx_default.db1_dst.view_dst "
-        "SET TBLPROPERTIES ('upgraded_from' = 'hive_metastore.db1_src.view_src');"
+        f"ALTER VIEW ucx_default.db1_dst.view_dst "
+        f"SET TBLPROPERTIES ('upgraded_from' = 'hive_metastore.db1_src.view_src' , '{Table.UPGRADED_FROM_WS_PARAM}' = '12345');"
     ) in list(backend.queries)
 
 
