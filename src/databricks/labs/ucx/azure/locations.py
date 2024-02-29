@@ -1,8 +1,9 @@
 import logging
 from urllib.parse import urlparse
-from databricks.sdk import WorkspaceClient
 
 from databricks.labs.blueprint.installation import Installation
+from databricks.sdk import WorkspaceClient
+
 from databricks.labs.ucx.azure.access import AzureResourcePermissions
 from databricks.labs.ucx.azure.resources import AzureResources
 from databricks.labs.ucx.config import WorkspaceConfig
@@ -14,11 +15,11 @@ logger = logging.getLogger(__name__)
 
 class ExternalLocationsMigration:
     def __init__(
-            self,
-            ws: WorkspaceClient,
-            hms_locations: ExternalLocations,
-            resource_permissions: AzureResourcePermissions,
-            azurerm: AzureResources
+        self,
+        ws: WorkspaceClient,
+        hms_locations: ExternalLocations,
+        resource_permissions: AzureResourcePermissions,
+        azurerm: AzureResources,
     ):
         self._ws = ws
         self._hms_locations = hms_locations
@@ -29,11 +30,11 @@ class ExternalLocationsMigration:
     def for_cli(cls, ws: WorkspaceClient, installation: Installation):
         config = installation.load(WorkspaceConfig)
         sql_backend = StatementExecutionBackend(ws, config.warehouse_id)
-        locations = ExternalLocations(ws, sql_backend, config.inventory_database)
+        hms_locations = ExternalLocations(ws, sql_backend, config.inventory_database)
         azurerm = AzureResources(ws)
-        resource_permissions = AzureResourcePermissions(installation, ws, azurerm, locations)
+        resource_permissions = AzureResourcePermissions(installation, ws, azurerm, hms_locations)
 
-        return cls(installation, ws, locations, resource_permissions, azurerm)
+        return cls(ws, hms_locations, resource_permissions, azurerm)
 
     def _app_id_credential_name_mapping(self) -> tuple[dict[str, str], dict[str, str]]:
         # list all storage credentials.
@@ -44,25 +45,32 @@ class ExternalLocationsMigration:
         app_id_mapping_read = {}
         all_credentials = self._ws.storage_credentials.list(max_results=0)
         for credential in all_credentials:
+            # cannot have none credential name, it required for external location
+            if not credential.name:
+                continue
+            # if service principal based credential, use service principal's application_id directly
             if credential.azure_service_principal:
                 if not credential.read_only:
-                    app_id_mapping_write[credential.azure_service_principal.application_id]=credential.name
+                    app_id_mapping_write[credential.azure_service_principal.application_id] = credential.name
                     continue
                 if credential.read_only:
-                    app_id_mapping_read[credential.azure_service_principal.application_id]=credential.name
+                    app_id_mapping_read[credential.azure_service_principal.application_id] = credential.name
+            # if managed identity based credential, fetch the application_id of the managed identity
             if credential.azure_managed_identity:
-                application_id = self._azurerm.access_connector_identity_client_id(credential.azure_managed_identity.access_connector_id)
+                application_id = self._azurerm.managed_identity_client_id(
+                    credential.azure_managed_identity.access_connector_id
+                )
                 if not application_id:
                     continue
                 if not credential.read_only:
-                    app_id_mapping_write[application_id]=credential.name
+                    app_id_mapping_write[application_id] = credential.name
                     continue
                 if credential.read_only:
-                    app_id_mapping_read[application_id]=credential.name
+                    app_id_mapping_read[application_id] = credential.name
 
         return app_id_mapping_write, app_id_mapping_read
 
-    def _prefix_credential_name_mapping(self)-> tuple[dict[str, str], dict[str, str]]:
+    def _prefix_credential_name_mapping(self) -> tuple[dict[str, str], dict[str, str]]:
         # get managed identity/service principal's application id to storage credential name mapping
         # for all non read-only and read-only credentials
         app_id_mapping_write, app_id_mapping_read = self._app_id_credential_name_mapping()
@@ -78,7 +86,7 @@ class ExternalLocationsMigration:
                 prefix_mapping_read[permission_mapping.prefix] = app_id_mapping_read[permission_mapping.client_id]
         return prefix_mapping_write, prefix_mapping_read
 
-    def _create_location_name(self, location_url:str)-> str:
+    def _create_location_name(self, location_url: str) -> str:
         # generate the UC external location name
         container_name = location_url[8 : location_url.index("@")]
         res_name = (
@@ -89,7 +97,9 @@ class ExternalLocationsMigration:
         )
         return f"{container_name}_{res_name}"
 
-    def _create_external_location(self, location_url: str, prefix_mapping_write: dict[str, str], prefix_mapping_read: dict[str, str])-> str | None:
+    def _create_external_location(
+        self, location_url: str, prefix_mapping_write: dict[str, str], prefix_mapping_read: dict[str, str]
+    ) -> str | None:
         location_name = self._create_location_name(location_url)
 
         # get container url as the prefix
@@ -99,10 +109,7 @@ class ExternalLocationsMigration:
         # try to create external location with write privilege first
         if container_url in prefix_mapping_write:
             self._ws.external_locations.create(
-                location_name,
-                location_url,
-                prefix_mapping_write[container_url],
-                comment=f"Created by UCX"
+                location_name, location_url, prefix_mapping_write[container_url], comment="Created by UCX"
             )
             return location_url
         # if no matched write privilege credential, try to create read-only external location
@@ -111,8 +118,8 @@ class ExternalLocationsMigration:
                 location_name,
                 location_url,
                 prefix_mapping_read[container_url],
-                comment=f"Created by UCX",
-                read_only=True
+                comment="Created by UCX",
+                read_only=True,
             )
             return location_url
         # if no credential found
@@ -135,17 +142,16 @@ class ExternalLocationsMigration:
 
         leftover_loc = [loc for loc in missing_locs if loc not in migrated_locs]
         if leftover_loc:
-            logger.info("External locations below are not created in UC. You may check following cases and rerun this command:"
-                        "1. Please check the output of 'migrate_credentials' command for storage credentials migration failure."
-                        "2. If you use service principal in extra_config when create dbfs mount or use service principal "
-                        "in your code directly for storage access, UCX cannot automatically migrate them to storage credential."
-                        "Please manually create those storage credentials first.")
+            logger.info(
+                "External locations below are not created in UC. You may check following cases and rerun this command:"
+                "1. Please check the output of 'migrate_credentials' command for storage credentials migration failure."
+                "2. If you use service principal in extra_config when create dbfs mount or use service principal "
+                "in your code directly for storage access, UCX cannot automatically migrate them to storage credential."
+                "Please manually create those storage credentials first."
+            )
             for loc_url in leftover_loc:
                 logger.info(f"Not created external location: {loc_url}")
         else:
             logger.info("All UC external location are created.")
 
         return leftover_loc
-
-
-
