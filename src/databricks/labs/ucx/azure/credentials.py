@@ -257,6 +257,9 @@ class ServicePrincipalMigration(SecretsMixin):
     def save(self, migration_results: list[StorageCredentialValidationResult]) -> str:
         return self._installation.save(migration_results, filename=self._output_file)
 
+    def load(self):
+        return self._installation.load(list[StorageCredentialValidationResult], filename=self._output_file)
+
     def run(self, prompts: Prompts, include_names: set[str] | None = None) -> list[StorageCredentialValidationResult]:
 
         sp_list_with_secret = self._generate_migration_list(include_names)

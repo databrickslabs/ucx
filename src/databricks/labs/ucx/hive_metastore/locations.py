@@ -160,7 +160,7 @@ class ExternalLocations(CrawlerBase[ExternalLocation]):
             cnt += 1
         return tf_script
 
-    def _match_table_external_locations(self) -> tuple[list[list], list[ExternalLocation]]:
+    def match_table_external_locations(self) -> tuple[list[list], list[ExternalLocation]]:
         external_locations = list(self._ws.external_locations.list())
         location_path = [_.url.lower() for _ in external_locations]
         table_locations = self.snapshot()
@@ -178,7 +178,7 @@ class ExternalLocations(CrawlerBase[ExternalLocation]):
         return matching_locations, missing_locations
 
     def save_as_terraform_definitions_on_workspace(self, installation: Installation):
-        matching_locations, missing_locations = self._match_table_external_locations()
+        matching_locations, missing_locations = self.match_table_external_locations()
         if len(matching_locations) > 0:
             logger.info("following external locations are already configured.")
             logger.info("sharing details of # tables that can be migrated for each location")
