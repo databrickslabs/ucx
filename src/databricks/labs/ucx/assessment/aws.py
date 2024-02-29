@@ -282,6 +282,103 @@ class AWSResources:
             return False
         return True
 
+    def add_migration_role(self, role_name: str) -> str | None:
+        aws_role_trust_doc = {
+            "Version": "2012-10-17",
+            "Statement": [
+                {"Effect": "Allow", "Principal": {"Service": "ec2.amazonaws.com"}, "Action": "sts:AssumeRole"}
+            ],
+        }
+        assume_role_json = self._get_json_for_cli(aws_role_trust_doc)
+        role = self._run_json_command(
+            f"iam create-role --role-name {role_name} --assume-role-policy-document {assume_role_json}"
+        )
+        if not role:
+            return None
+
+        return role["Role"]['Arn']
+
+    def get_instance_profile(self, instance_profile_name: str) -> str | None:
+        instance_profile = self._run_json_command(
+            f"iam get-instance-profile --instance-profile-name {instance_profile_name}"
+        )
+
+        if not instance_profile:
+            return None
+
+        return instance_profile["InstanceProfile"]["Arn"]
+
+    def create_instance_profile(self, instance_profile_name: str) -> str | None:
+        instance_profile = self._run_json_command(
+            f"iam create-instance-profile --instance-profile-name {instance_profile_name}"
+        )
+
+        if not instance_profile:
+            return None
+
+        return instance_profile["InstanceProfile"]["Arn"]
+
+    def add_role_to_instance_profile(self, instance_profile_name: str, role_name: str):
+        # there can only be one role associated with iam instance profile
+        self._run_command(
+            f"iam add-role-to-instance-profile --instance-profile-name {instance_profile_name} --role-name {role_name}"
+        )
+
+    def add_or_update_migration_policy(
+        self, role_name: str, policy_name: str, s3_prefixes: set[str], account_id: str, kms_key=None
+    ):
+        s3_prefixes_strip = set()
+        for path in s3_prefixes:
+            match = re.match(AWSResources.S3_PATH_REGEX, path)
+            if match:
+                s3_prefixes_strip.add(match.group(4))
+
+        s3_prefixes_enriched = sorted([self.S3_PREFIX + s3_prefix for s3_prefix in s3_prefixes_strip])
+        statement = [
+            {
+                "Action": [
+                    "s3:GetObject",
+                    "s3:ListBucket",
+                    "s3:GetBucketLocation",
+                ],
+                "Resource": s3_prefixes_enriched,
+                "Effect": "Allow",
+            },
+            {
+                "Action": ["sts:AssumeRole"],
+                "Resource": [f"arn:aws:iam::{account_id}:role/{role_name}"],
+                "Effect": "Allow",
+            },
+        ]
+        if kms_key:
+            statement.append(
+                {
+                    "Action": ["kms:Decrypt", "kms:Encrypt", "kms:GenerateDataKey*"],
+                    "Resource": [f"arn:aws:kms:{kms_key}"],
+                    "Effect": "Allow",
+                }
+            )
+        policy_document = {
+            "Version": "2012-10-17",
+            "Statement": statement,
+        }
+
+        policy_document_json = self._get_json_for_cli(policy_document)
+        if not self._run_command(
+            f"iam put-role-policy "
+            f"--role-name {role_name} --policy-name {policy_name} --policy-document {policy_document_json}"
+        ):
+            return False
+        return True
+
+    def is_role_exists(self, role_name: str) -> bool:
+        result = self._run_json_command(f"iam list-roles --profile {self._profile}")
+        roles = result.get("Roles", [])
+        for role in roles:
+            if role["RoleName"] == role_name:
+                return True
+        return False
+
     def _run_json_command(self, command: str):
         aws_cmd = shutil.which("aws")
         code, output, error = self._command_runner(f"{aws_cmd} {command} --output json")
@@ -382,6 +479,9 @@ class AWSResourcePermissions:
                     )
                 role_id += 1
 
+    def is_role_exists(self, role_name: str) -> bool:
+        return self._aws_resources.is_role_exists(role_name)
+
     def _get_instance_profiles(self) -> Iterable[AWSInstanceProfile]:
         instance_profiles = self._ws.instance_profiles.list()
         result_instance_profiles = []
@@ -460,3 +560,41 @@ class AWSResourcePermissions:
             logger.warning("No Mapping Was Generated.")
             return None
         return self._installation.save(instance_profile_access, filename=self.INSTANCE_PROFILES_FILE_NAMES)
+
+    def add_or_update_migration_policy(self, role_name: str, policy_name: str, s3_prefixes: set[str]):
+        return self._aws_resources.add_or_update_migration_policy(
+            role_name, policy_name, s3_prefixes, self._aws_account_id, self._kms_key
+        )
+
+    def get_instance_profile(self, instance_profile_name: str) -> AWSInstanceProfile | None:
+        instance_profile_arn = self._aws_resources.get_instance_profile(instance_profile_name)
+
+        if not instance_profile_arn:
+            return None
+
+        return AWSInstanceProfile(instance_profile_arn)
+
+    def create_migration_instance_profile(
+        self, role_name: str, policy_name: str, s3_prefixes: set[str]
+    ) -> AWSInstanceProfile | None:
+        role_arn = self._aws_resources.add_migration_role(role_name)
+
+        if not role_arn:
+            return None
+
+        self._aws_resources.add_or_update_migration_policy(
+            role_name=role_name,
+            policy_name=policy_name,
+            s3_prefixes=s3_prefixes,
+            account_id=self._aws_account_id,
+            kms_key=self._kms_key,
+        )
+
+        instance_profile_name = role_name
+        instance_profile_arn = self._aws_resources.create_instance_profile(instance_profile_name)
+        if not instance_profile_arn:
+            return None
+
+        self._aws_resources.add_role_to_instance_profile(instance_profile_name, role_name)
+
+        return AWSInstanceProfile(instance_profile_arn, role_arn)

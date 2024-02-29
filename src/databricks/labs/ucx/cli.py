@@ -2,6 +2,7 @@ import json
 import os
 import shutil
 import webbrowser
+from collections.abc import Callable
 
 from databricks.labs.blueprint.cli import App
 from databricks.labs.blueprint.entrypoint import get_logger
@@ -9,9 +10,13 @@ from databricks.labs.blueprint.installation import Installation, SerdeError
 from databricks.labs.blueprint.tui import Prompts
 from databricks.sdk import AccountClient, WorkspaceClient
 from databricks.sdk.errors import NotFound
+from databricks.sdk.service.compute import Policy
 
 from databricks.labs.ucx.account import AccountWorkspaces, WorkspaceInfo
-from databricks.labs.ucx.assessment.aws import AWSResourcePermissions
+from databricks.labs.ucx.assessment.aws import (
+    AWSInstanceProfile,
+    AWSResourcePermissions,
+)
 from databricks.labs.ucx.azure.access import AzureResourcePermissions
 from databricks.labs.ucx.azure.credentials import ServicePrincipalMigration
 from databricks.labs.ucx.config import WorkspaceConfig
@@ -249,16 +254,39 @@ def alias(
 
 @ucx.command
 def principal_prefix_access(w: WorkspaceClient, subscription_id: str | None = None, aws_profile: str | None = None):
-    """For azure cloud, identifies all storage account used by tables in the workspace, identify spn and its
+    """For azure cloud, identifies all storage accounts used by tables in the workspace, identify spn and its
     permission on each storage accounts. For aws, identifies all the Instance Profiles configured in the workspace and
     its access to all the S3 buckets, along with AWS roles that are set with UC access and its access to S3 buckets.
     The output is stored in the workspace install folder.
-    Pass suscription_id for azure and aws_profile for aws."""
+    Pass subscription_id for azure and aws_profile for aws."""
+    return _execute_for_cloud(
+        w, _azure_principal_prefix_access, _aws_principal_prefix_access, subscription_id, aws_profile
+    )
+
+
+@ucx.command
+def setup_migration_principal(w: WorkspaceClient, subscription_id: str | None = None, aws_profile: str | None = None):
+    """Update UCX cluster policy with the instance profile that gives access to perform tables migration.
+    For azure cloud, it identifies all storage accounts used by tables in the workspace. For aws,
+    it identifies all s3 buckets used by the Instance Profiles configured in the workspace.
+    Pass subscription_id for azure and aws_profile for aws."""
+    return _execute_for_cloud(
+        w, _azure_setup_migration_principal, _aws_setup_migration_principal, subscription_id, aws_profile
+    )
+
+
+def _execute_for_cloud(
+    w: WorkspaceClient,
+    func_azure: Callable,
+    func_aws: Callable,
+    subscription_id: str | None = None,
+    aws_profile: str | None = None,
+):
     if w.config.is_azure:
         if not subscription_id:
-            logger.error("Please enter subscription id to scan storage account in.")
+            logger.error("Please enter subscription id to scan storage accounts in.")
             return None
-        return _azure_principal_prefix_access(w, subscription_id)
+        return func_azure(w, subscription_id)
     if w.config.is_aws:
         if not aws_profile:
             aws_profile = os.getenv("AWS_DEFAULT_PROFILE")
@@ -268,9 +296,110 @@ def principal_prefix_access(w: WorkspaceClient, subscription_id: str | None = No
                 "or use the '--aws-profile=[profile-name]' parameter."
             )
             return None
-        return _aws_principal_prefix_access(w, aws_profile)
+        return func_aws(w, aws_profile)
     logger.error("This cmd is only supported for azure and aws workspaces")
     return None
+
+
+def _azure_setup_migration_principal(w: WorkspaceClient, subscription_id: str):
+    # issue: https://github.com/databrickslabs/ucx/issues/881
+    raise NotImplementedError
+
+
+def _aws_setup_migration_principal(w: WorkspaceClient, aws_profile: str):
+    if not shutil.which("aws"):
+        logger.error("Couldn't find AWS CLI in path. Please install the CLI from https://aws.amazon.com/cli/")
+        return
+
+    installation = Installation.current(w, 'ucx')
+    config = installation.load(WorkspaceConfig)
+
+    if not config.policy_id:
+        msg = "Cluster policy not found in UCX config"
+        logger.error(msg)
+        return
+
+    sql_backend = StatementExecutionBackend(w, config.warehouse_id)
+    location_crawler = ExternalLocations(w, sql_backend, config.inventory_database)
+    external_locations = location_crawler.snapshot()
+    s3_paths = {loc.location for loc in external_locations}
+
+    if len(s3_paths) == 0:
+        logger.info("No S3 paths to migrate found")
+        return
+
+    aws_permissions = AWSResourcePermissions.for_cli(w, sql_backend, aws_profile, config.inventory_database)
+    cluster_policy = _get_cluster_policy(w, config.policy_id)
+    iam_role_name_in_cluster_policy = _get_iam_role_from_cluster_policy(str(cluster_policy.definition))
+
+    iam_policy_name = f"UCX_MIGRATION_POLICY_{config.inventory_database}"
+    prompts = Prompts()
+    if iam_role_name_in_cluster_policy and aws_permissions.is_role_exists(iam_role_name_in_cluster_policy):
+        if prompts.confirm(
+            f"We have identified existing UCX migration role \"{iam_role_name_in_cluster_policy}\" "
+            f"in cluster policy \"{cluster_policy.name}\". "
+            f"Do you want to update the role's migration policy?"
+        ):
+            aws_permissions.add_or_update_migration_policy(iam_role_name_in_cluster_policy, iam_policy_name, s3_paths)
+        return
+
+    iam_role_name = f"UCX_MIGRATION_ROLE_{config.inventory_database}"
+    if aws_permissions.is_role_exists(iam_role_name):
+        if not prompts.confirm(
+            f"We have identified existing UCX migration role \"{iam_role_name}\". "
+            f"Do you want to update the role's migration iam policy "
+            f"and add the role to UCX migration cluster policy \"{cluster_policy.name}\"?"
+        ):
+            return
+        aws_permissions.add_or_update_migration_policy(iam_role_name, iam_policy_name, s3_paths)
+        iam_instance_profile = aws_permissions.get_instance_profile(iam_role_name)
+    else:
+        if not prompts.confirm(
+            f"Do you want to create new migration role \"{iam_role_name}\" and "
+            f"add the role to UCX migration cluster policy \"{cluster_policy.name}\"?"
+        ):
+            return
+        iam_instance_profile = aws_permissions.create_migration_instance_profile(
+            iam_role_name, iam_policy_name, s3_paths
+        )
+
+    if iam_instance_profile:
+        _update_cluster_policy_with_aws_instance_profile(w, cluster_policy, iam_instance_profile)
+        logger.info(f"Cluster policy \"{cluster_policy.name}\" updated successfully")
+
+
+def _get_cluster_policy(w: WorkspaceClient, policy_id: str) -> Policy:
+    try:
+        return w.cluster_policies.get(policy_id=policy_id)
+    except NotFound as err:
+        msg = f"UCX Policy {policy_id} not found, please reinstall UCX"
+        logger.error(msg)
+        raise NotFound(msg) from err
+
+
+def _get_iam_role_from_cluster_policy(cluster_policy_definition: str) -> AWSInstanceProfile | None:
+    definition_dict = json.loads(cluster_policy_definition)
+    if definition_dict.get("aws_attributes.instance_profile_arn") is not None:
+        instance_profile_arn = definition_dict.get("aws_attributes.instance_profile_arn").get("value")
+        logger.info(f"Migration instance profile is set to {instance_profile_arn}")
+
+        return AWSInstanceProfile(instance_profile_arn).role_name
+
+    return None
+
+
+def _update_cluster_policy_with_aws_instance_profile(
+    w: WorkspaceClient, cluster_policy: Policy, iam_instance_profile: AWSInstanceProfile
+):
+    definition_dict = json.loads(str(cluster_policy.definition))
+    definition_dict["aws_attributes.instance_profile_arn"] = {
+        "type": "fixed",
+        "value": iam_instance_profile.instance_profile_arn,
+    }
+
+    w.cluster_policies.edit(
+        str(cluster_policy.policy_id), str(cluster_policy.name), definition=json.dumps(definition_dict)
+    )
 
 
 def _azure_principal_prefix_access(w: WorkspaceClient, subscription_id: str):
