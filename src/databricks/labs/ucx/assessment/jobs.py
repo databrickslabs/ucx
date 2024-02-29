@@ -1,4 +1,3 @@
-import collections
 import json
 import logging
 from collections.abc import Iterable
@@ -9,7 +8,18 @@ from hashlib import sha256
 from databricks.sdk import WorkspaceClient
 from databricks.sdk.service import compute
 from databricks.sdk.service.compute import ClusterDetails
-from databricks.sdk.service.jobs import BaseJob, BaseRun, ListRunsRunType, RunTask
+from databricks.sdk.service.jobs import (
+    BaseJob,
+    BaseRun,
+    DbtTask,
+    GitSource,
+    ListRunsRunType,
+    PythonWheelTask,
+    RunConditionTask,
+    RunTask,
+    SparkJarTask,
+    SqlTask,
+)
 
 from databricks.labs.ucx.assessment.clusters import CheckClusterMixin
 from databricks.labs.ucx.assessment.crawlers import spark_version_compatibility
@@ -196,25 +206,108 @@ class SubmitRunsCrawler(CrawlerBase[SubmitRunInfo], JobsMixin, CheckClusterMixin
             return compatibility == "supported"
         return False
 
-    def _flatten_task(self, task_dict):
-        flat_dict = {}
-        for key, value in task_dict.items():
-            if isinstance(value, (str, int, float)):
-                flat_dict[key] = value
-            # convert iterable
-            if isinstance(value, collections.abc.Iterable):
-                flat_dict[key] = tuple(list(value))
-            # recursion if nested
-            elif isinstance(value, dict):
-                flat_dict[key] = self._flatten_task(value)
-        return dict(sorted(flat_dict.items(), key=lambda item: item[0]))
-
     def _get_hash_from_run(self, run: BaseRun) -> str:
         hashable_items = []
         all_tasks: list[RunTask] = run.tasks if run.tasks is not None else []
-        for task in all_tasks:
-            hashable_items.append(json.dumps(self._flatten_task(task.as_dict())))
+        for task in sorted(all_tasks, key=lambda x: x.task_key if x.task_key is not None else ""):
+            hashable_items.extend(self._retrieve_hash_values_from_task(task))
+
+        if run.git_source:
+            hashable_items.extend(self._retrieve_hash_values_from_git_source(run.git_source))
+
         return sha256(bytes("|".join(hashable_items).encode("utf-8"))).hexdigest()
+
+    @staticmethod
+    def _retrieve_hash_values_from_sql_task(task: SqlTask) -> list[str]:
+        hash_values = []
+        if task.file is not None:
+            hash_values.append(task.file.path)
+        if task.alert is not None and task.alert.alert_id is not None:
+            hash_values.append(task.alert.alert_id)
+        if task.dashboard is not None and task.dashboard.dashboard_id is not None:
+            hash_values.append(task.dashboard.dashboard_id)
+        if task.query is not None and task.query.query_id is not None:
+            hash_values.append(task.query.query_id)
+        return [str(value) for value in hash_values if value is not None]
+
+    @staticmethod
+    def _retrieve_hash_values_from_git_source(source: GitSource) -> list[str]:
+        hash_values = []
+        if source.git_url is not None:
+            hash_values.append(source.git_url)
+        return [str(value) for value in hash_values if value is not None]
+
+    @staticmethod
+    def _retrieve_hash_values_from_dbt_task(dbt_task: DbtTask) -> list[str]:
+        hash_values = []
+        if dbt_task.schema is not None:
+            hash_values.append(dbt_task.schema)
+        if dbt_task.catalog is not None:
+            hash_values.append(dbt_task.catalog)
+        if dbt_task.warehouse_id is not None:
+            hash_values.append(dbt_task.warehouse_id)
+        if dbt_task.project_directory is not None:
+            hash_values.append(dbt_task.project_directory)
+        hash_values.append(",".join(sorted(dbt_task.commands)))
+        return [str(value) for value in hash_values if value is not None]
+
+    @staticmethod
+    def _retrieve_hash_values_from_jar_task(spark_jar_task: SparkJarTask) -> list[str]:
+        hash_values = []
+        if spark_jar_task.jar_uri is not None:
+            hash_values.append(spark_jar_task.jar_uri)
+        if spark_jar_task.main_class_name is not None:
+            hash_values.append(spark_jar_task.main_class_name)
+        return [str(value) for value in hash_values if value is not None]
+
+    @staticmethod
+    def _retrieve_hash_values_from_python_wheel_task(pw_task: PythonWheelTask) -> list[str]:
+        hash_values = []
+        if pw_task.package_name is not None:
+            hash_values.append(pw_task.package_name)
+        if pw_task.entry_point is not None:
+            hash_values.append(pw_task.entry_point)
+        return [str(value) for value in hash_values if value is not None]
+
+    @staticmethod
+    def _retrieve_hash_values_from_condition_task(c_task: RunConditionTask) -> list[str]:
+        hash_values = [c_task.op.value, c_task.right, c_task.left]
+        if c_task.outcome is not None:
+            hash_values.append(c_task.outcome)
+        return [str(value) for value in hash_values if value is not None]
+
+    @staticmethod
+    def _retrieve_hash_values_from_task(task: RunTask) -> list[str]:
+        """
+        Retrieve all hashable attributes and append to a list with None removed
+        - specifically ignore parameters as these change.
+        """
+        hash_values = []
+        if task.notebook_task is not None:
+            hash_values.append(task.notebook_task.notebook_path)
+        if task.spark_python_task is not None:
+            hash_values.append(task.spark_python_task.python_file)
+        if task.spark_submit_task is not None and task.spark_submit_task.parameters is not None:
+            hash_values.append('|'.join(task.spark_submit_task.parameters))
+        if task.spark_jar_task is not None:
+            hash_values.extend(SubmitRunsCrawler._retrieve_hash_values_from_jar_task(task.spark_jar_task))
+        if task.pipeline_task is not None and task.pipeline_task.pipeline_id is not None:
+            hash_values.append(task.pipeline_task.pipeline_id)
+        if task.python_wheel_task is not None:
+            hash_values.extend(SubmitRunsCrawler._retrieve_hash_values_from_python_wheel_task(task.python_wheel_task))
+        if task.sql_task is not None:
+            hash_values.extend(SubmitRunsCrawler._retrieve_hash_values_from_sql_task(task.sql_task))
+        if task.dbt_task is not None:
+            hash_values.extend(SubmitRunsCrawler._retrieve_hash_values_from_dbt_task(task.dbt_task))
+        if task.condition_task is not None:
+            hash_values.extend(SubmitRunsCrawler._retrieve_hash_values_from_condition_task(task.condition_task))
+        if task.run_job_task is not None and task.run_job_task.job_id is not None:
+            hash_values.append(str(task.run_job_task.job_id))
+        if task.git_source is not None:
+            git_hash_values = SubmitRunsCrawler._retrieve_hash_values_from_git_source(task.git_source)
+            hash_values.extend(git_hash_values)
+
+        return [str(value) for value in hash_values if value is not None]
 
     def _assess_job_runs(self, submit_runs: Iterable[BaseRun]) -> Iterable[SubmitRunInfo]:
         """
