@@ -45,7 +45,7 @@ def ws():
             }
         ),
         '/Users/foo/.ucx/state.json': json.dumps({'resources': {'jobs': {'assessment': '123'}}}),
-        "/Users/foo/.ucx/azure_storage_account_info.csv": "prefix,client_id,principal,privilege,directory_id\ntest,test,test,test,test",
+        "/Users/foo/.ucx/azure_storage_account_info.csv": "prefix,client_id,principal,privilege,type,directory_id\ntest,test,test,test,Application,test",
     }
 
     def download(path: str) -> io.StringIO | io.BytesIO:
