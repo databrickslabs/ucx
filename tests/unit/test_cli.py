@@ -249,7 +249,7 @@ def test_save_storage_and_principal_azure_no_azure_cli(ws, caplog):
     ws.config.is_azure = True
     principal_prefix_access(ws, "")
 
-    assert 'Please enter subscription id to scan storage account in.' in caplog.messages
+    assert 'Please enter subscription id to scan storage accounts in.' in caplog.messages
 
 
 def test_save_storage_and_principal_azure_no_subscription_id(ws, caplog):
@@ -258,7 +258,7 @@ def test_save_storage_and_principal_azure_no_subscription_id(ws, caplog):
 
     principal_prefix_access(ws)
 
-    assert "Please enter subscription id to scan storage account in." in caplog.messages
+    assert "Please enter subscription id to scan storage accounts in." in caplog.messages
 
 
 def test_save_storage_and_principal_azure(ws, caplog, mocker):
