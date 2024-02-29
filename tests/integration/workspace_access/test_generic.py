@@ -411,3 +411,31 @@ def test_verify_permissions(ws, make_group, make_job, make_job_permissions):
     result = task()
 
     assert result
+
+
+@retried(on=[NotFound], timeout=timedelta(minutes=3))
+def test_endpoints(
+    ws, make_group, make_serving_endpoint, make_serving_endpoint_permissions
+):  # pylint: disable=invalid-name
+    group_a = make_group()
+    group_b = make_group()
+    endpoint = make_serving_endpoint()
+    make_serving_endpoint_permissions(
+        object_id=endpoint.response.id,
+        permission_level=PermissionLevel.CAN_MANAGE,
+        group_name=group_a.display_name,
+    )
+
+    generic_permissions = GenericPermissionsSupport(ws, [Listing(ws.serving_endpoints.list, "id", "serving-endpoints")])
+    before = generic_permissions.load_as_dict("serving-endpoints", endpoint.response.id)
+    assert before[group_a.display_name] == PermissionLevel.CAN_MANAGE
+
+    apply_tasks(
+        generic_permissions,
+        [
+            MigratedGroup.partial_info(group_a, group_b),
+        ],
+    )
+
+    after = generic_permissions.load_as_dict("serving-endpoints", endpoint.response.id)
+    assert after[group_b.display_name] == PermissionLevel.CAN_MANAGE
