@@ -235,14 +235,18 @@ class AzureResources:
             self._role_definitions[role_definition_id] = role_name
         return self._role_definitions.get(role_definition_id)
 
-    def access_connector_identity_client_id(self, access_connector_id) -> str | None:
+    def managed_identity_client_id(self, access_connector_id) -> str | None:
+        # get te client_id/application_id of the managed identity used in the access connector
         identity = self._get_resource(access_connector_id, "2023-05-01").get("identity")
         if not identity:
             return None
         if identity.get("type") == "UserAssigned":
             return identity.get("userAssignedIdentities").get("clientId")
         if identity.get("type") == "SystemAssigned":
+            # SystemAssigned managed identity does not have client_id in get access connector response
+            # need to call graph api directoryObjects to fetch the client_id
             principal = self._get_principal(identity.get("principalId"))
             if not principal:
                 return None
             return principal.client_id
+        return None
