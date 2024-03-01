@@ -324,5 +324,14 @@ def migrate_credentials(w: WorkspaceClient):
         logger.error("migrate_credentials is not yet supported in GCP")
 
 
+@ucx.command
+def cluster_remap(w: WorkspaceClient, cluster_id):
+    """Re-mapping the cluster to UC"""
+    if not cluster_id:
+        raise KeyError("You did not specify --cluster_id")
+    print(cluster_id)
+    #Need to create function to re-map the cluster
+
+
 if __name__ == "__main__":
     ucx()
