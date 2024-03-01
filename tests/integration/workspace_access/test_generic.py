@@ -5,7 +5,7 @@ from databricks.sdk import WorkspaceClient
 from databricks.sdk.errors import BadRequest, NotFound
 from databricks.sdk.retries import retried
 from databricks.sdk.service import iam
-from databricks.sdk.service.iam import PermissionLevel
+from databricks.sdk.service.iam import AccessControlRequest, PermissionLevel
 
 from databricks.labs.ucx.workspace_access.base import Permissions
 from databricks.labs.ucx.workspace_access.generic import (
@@ -14,6 +14,7 @@ from databricks.labs.ucx.workspace_access.generic import (
     WorkspaceListing,
     experiments_listing,
     feature_store_listing,
+    feature_tables_root_page,
     models_listing,
     tokens_and_passwords,
 )
@@ -468,3 +469,61 @@ def test_feature_tables(ws: WorkspaceClient, make_feature_table, make_group, mak
 
     after = generic_permissions.load_as_dict("feature-tables", feature_table["id"])
     assert after[group_b.display_name] == PermissionLevel.CAN_EDIT_METADATA
+
+
+def test_feature_store_root_page(ws: WorkspaceClient, make_group):
+    group_a = make_group()
+    group_b = make_group()
+    ws.permissions.update(
+        "feature-tables",
+        "/root",
+        access_control_list=[
+            AccessControlRequest(group_name=group_a.display_name, permission_level=PermissionLevel.CAN_EDIT_METADATA)
+        ],
+    )
+
+    generic_permissions = GenericPermissionsSupport(
+        ws, [Listing(feature_tables_root_page, "object_id", "feature-tables")]
+    )
+    before = generic_permissions.load_as_dict("feature-tables", "/root")
+    assert before[group_a.display_name] == PermissionLevel.CAN_EDIT_METADATA
+
+    apply_tasks(
+        generic_permissions,
+        [
+            MigratedGroup.partial_info(group_a, group_b),
+        ],
+    )
+
+    after = generic_permissions.load_as_dict("feature-tables", "/root")
+    assert after[group_b.display_name] == PermissionLevel.CAN_EDIT_METADATA
+
+
+def test_models_root_page(ws: WorkspaceClient, make_group):
+    group_a = make_group()
+    group_b = make_group()
+    ws.permissions.update(
+        "registered-models",
+        "/root",
+        access_control_list=[
+            AccessControlRequest(
+                group_name=group_a.display_name, permission_level=PermissionLevel.CAN_MANAGE_PRODUCTION_VERSIONS
+            )
+        ],
+    )
+
+    generic_permissions = GenericPermissionsSupport(
+        ws, [Listing(feature_tables_root_page, "object_id", "registered-models")]
+    )
+    before = generic_permissions.load_as_dict("registered-models", "/root")
+    assert before[group_a.display_name] == PermissionLevel.CAN_MANAGE_PRODUCTION_VERSIONS
+
+    apply_tasks(
+        generic_permissions,
+        [
+            MigratedGroup.partial_info(group_a, group_b),
+        ],
+    )
+
+    after = generic_permissions.load_as_dict("registered-models", "/root")
+    assert after[group_b.display_name] == PermissionLevel.CAN_MANAGE_PRODUCTION_VERSIONS

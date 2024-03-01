@@ -54,8 +54,10 @@ class PermissionManager(CrawlerBase[Permissions]):
             generic.Listing(ws.serving_endpoints.list, "id", "serving-endpoints"),
             generic.Listing(generic.experiments_listing(ws), "experiment_id", "experiments"),
             generic.Listing(generic.models_listing(ws, num_threads), "id", "registered-models"),
+            generic.Listing(generic.models_root_page, "object_id", "registered-models"),
             generic.Listing(generic.tokens_and_passwords, "object_id", "authorization"),
             generic.Listing(generic.feature_store_listing(ws), "object_id", "feature-tables"),
+            generic.Listing(generic.feature_tables_root_page, "object_id", "feature-tables"),
             generic.WorkspaceListing(
                 ws,
                 sql_backend=sql_backend,

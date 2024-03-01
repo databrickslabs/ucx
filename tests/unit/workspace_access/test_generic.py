@@ -27,6 +27,7 @@ from databricks.labs.ucx.workspace_access.generic import (
     WorkspaceObjectInfo,
     experiments_listing,
     feature_store_listing,
+    feature_tables_root_page,
     models_listing,
     tokens_and_passwords,
 )
@@ -868,3 +869,51 @@ def test_feature_tables_listing():
     assert len(result) == 4
     assert result[0].object_id == "table1"
     assert result[0].request_type == "feature-tables"
+
+
+def test_root_page_listing():
+    ws = MagicMock()
+
+    basic_acl = [
+        iam.AccessControlResponse(
+            group_name="test",
+            all_permissions=[iam.Permission(inherited=False, permission_level=iam.PermissionLevel.CAN_EDIT_METADATA)],
+        )
+    ]
+
+    ws.permissions.get.side_effect = [
+        iam.ObjectPermissions(object_id="/root", object_type="feature-tables", access_control_list=basic_acl),
+    ]
+
+    sup = GenericPermissionsSupport(ws=ws, listings=[Listing(feature_tables_root_page, "object_id", "feature-tables")])
+    tasks = list(sup.get_crawler_tasks())
+    assert len(tasks) == 1
+    auth_items = [task() for task in tasks]
+    for item in auth_items:
+        assert item.object_id == "/root"
+        assert item.object_type == "feature-tables"
+
+
+def test_models_page_listing():
+    ws = MagicMock()
+
+    basic_acl = [
+        iam.AccessControlResponse(
+            group_name="test",
+            all_permissions=[iam.Permission(inherited=False, permission_level=iam.PermissionLevel.CAN_EDIT_METADATA)],
+        )
+    ]
+
+    ws.permissions.get.side_effect = [
+        iam.ObjectPermissions(object_id="/root", object_type="registered-models", access_control_list=basic_acl),
+    ]
+
+    sup = GenericPermissionsSupport(
+        ws=ws, listings=[Listing(feature_tables_root_page, "object_id", "registered-models")]
+    )
+    tasks = list(sup.get_crawler_tasks())
+    assert len(tasks) == 1
+    auth_items = [task() for task in tasks]
+    for item in auth_items:
+        assert item.object_id == "/root"
+        assert item.object_type == "registered-models"

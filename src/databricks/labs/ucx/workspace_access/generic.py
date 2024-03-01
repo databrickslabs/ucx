@@ -424,9 +424,18 @@ def feature_store_listing(ws: WorkspaceClient):
             if "next_page_token" not in result:
                 break
             token = result["next_page_token"]  # type: ignore[index]
+
         return feature_tables
 
     return inner
+
+
+def feature_tables_root_page():
+    return [GenericPermissionsInfo("/root", "feature-tables")]
+
+
+def models_root_page():
+    return [GenericPermissionsInfo("/root", "registered-models")]
 
 
 def tokens_and_passwords():
