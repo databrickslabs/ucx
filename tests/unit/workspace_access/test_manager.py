@@ -215,6 +215,7 @@ def test_factory(mocker):
             "entitlements",
             "roles",
             'serving-endpoints',
+            "feature-tables",
             "ANY FILE",
             "FUNCTION",
             "ANONYMOUS FUNCTION",
