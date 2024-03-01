@@ -1,6 +1,3 @@
-from collections import OrderedDict
-from json import JSONDecoder
-
 import pytest
 
 from databricks.labs.ucx.assessment.jobs import JobInfo, JobsCrawler, SubmitRunsCrawler
@@ -82,42 +79,12 @@ def test_job_crawler_with_no_owner_should_have_empty_creator_name():
             '["123"]',
             '["not supported DBR: 9.3.x-cpu-ml-scala2.12"]',
         ),
-        (
-            ['gitsource_task'],
-            ['outdated-autoscale'],
-            '["123"]',
-            '["not supported DBR: 9.3.x-cpu-ml-scala2.12"]'
-        ),
-        (
-            ['dbt_task'],
-            ['outdated-autoscale'],
-            '["123"]',
-            '["not supported DBR: 9.3.x-cpu-ml-scala2.12"]'
-        ),
-        (
-            ['jar_task'],
-            ['outdated-autoscale'],
-            '["123"]',
-            '["not supported DBR: 9.3.x-cpu-ml-scala2.12"]'
-        ),
-        (
-            ['python_wheel_task'],
-            ['outdated-autoscale'],
-            '["123"]',
-            '["not supported DBR: 9.3.x-cpu-ml-scala2.12"]'
-        ),
-        (
-            ['run_condition_task'],
-            ['outdated-autoscale'],
-            '["123"]',
-            '["not supported DBR: 9.3.x-cpu-ml-scala2.12"]'
-        ),
-        (
-            ['notebook_task_no_failure'],
-            ['simplest-autoscale'],
-            '["123"]',
-            '[]'
-        ),
+        (['gitsource_task'], ['outdated-autoscale'], '["123"]', '["not supported DBR: 9.3.x-cpu-ml-scala2.12"]'),
+        (['dbt_task'], ['outdated-autoscale'], '["123"]', '["not supported DBR: 9.3.x-cpu-ml-scala2.12"]'),
+        (['jar_task'], ['outdated-autoscale'], '["123"]', '["not supported DBR: 9.3.x-cpu-ml-scala2.12"]'),
+        (['python_wheel_task'], ['outdated-autoscale'], '["123"]', '["not supported DBR: 9.3.x-cpu-ml-scala2.12"]'),
+        (['run_condition_task'], ['outdated-autoscale'], '["123"]', '["not supported DBR: 9.3.x-cpu-ml-scala2.12"]'),
+        (['notebook_task_no_failure'], ['simplest-autoscale'], '["123"]', '[]'),
     ],
 )
 def test_job_run_crawler(jobruns_ids, cluster_ids, run_ids, failures):
