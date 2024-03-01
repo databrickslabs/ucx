@@ -289,7 +289,7 @@ class SubmitRunsCrawler(CrawlerBase[SubmitRunInfo], JobsMixin, CheckClusterMixin
     def _assess_job_runs(self, submit_runs: Iterable[BaseRun], all_clusters_by_id) -> Iterable[SubmitRunInfo]:
         """
         Assessment logic:
-        1. For each submit run, we analyze all tasks inside this run.
+        1. For eaxch submit run, we analyze all tasks inside this run.
         2. Per each task, we calculate a unique hash based on the _retrieve_hash_values_from_task function
         3. Then we coalesce all task hashes into a single hash for the submit run
         4. Coalesce all runs under the same hash into a single pseudo-job
@@ -299,7 +299,7 @@ class SubmitRunsCrawler(CrawlerBase[SubmitRunInfo], JobsMixin, CheckClusterMixin
         runs_per_hash: dict[str, list[int | None]] = {}
 
         for submit_run in submit_runs:
-            failures_per_task: dict[str, list[str]] = {}
+            failures = set()
 
             # v2.1+ API, with tasks
             if submit_run.tasks is not None:
@@ -314,13 +314,15 @@ class SubmitRunsCrawler(CrawlerBase[SubmitRunInfo], JobsMixin, CheckClusterMixin
                         _cluster_details = all_clusters_by_id.get(task.existing_cluster_id, None)
                     if _cluster_details:
                         task_failures = self._check_cluster_failures(_cluster_details, _task_key)
-                        failures_per_task[_task_key] = task_failures
+                        for failure in task_failures:
+                            failures.add(failure)
 
             # v2.0 API, without tasks
             elif submit_run.cluster_spec:
                 _cluster_details = ClusterDetails.from_dict(submit_run.cluster_spec.as_dict())
                 task_failures = self._check_cluster_failures(_cluster_details, "root_task")
-                failures_per_task["root_task"] = task_failures
+                for failure in task_failures:
+                    failures.add(failure)
 
             hashed_id = self._get_hash_from_run(submit_run)
             if hashed_id in runs_per_hash:
@@ -332,7 +334,7 @@ class SubmitRunsCrawler(CrawlerBase[SubmitRunInfo], JobsMixin, CheckClusterMixin
                 run_ids=json.dumps(runs_per_hash[hashed_id]),
                 hashed_id=hashed_id,
                 failures=json.dumps(
-                    [{"task_key": task_key, "failures": failures} for task_key, failures in failures_per_task.items()]
+                    list(failures)
                 ),
             )
 
