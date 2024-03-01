@@ -16,7 +16,7 @@ from databricks.labs.ucx.workspace_access.generic import (
     feature_store_listing,
     feature_tables_root_page,
     models_listing,
-    tokens_and_passwords,
+    tokens_and_passwords, models_root_page,
 )
 from databricks.labs.ucx.workspace_access.groups import MigratedGroup
 
@@ -513,7 +513,7 @@ def test_models_root_page(ws: WorkspaceClient, make_group):
     )
 
     generic_permissions = GenericPermissionsSupport(
-        ws, [Listing(feature_tables_root_page, "object_id", "registered-models")]
+        ws, [Listing(models_root_page, "object_id", "registered-models")]
     )
     before = generic_permissions.load_as_dict("registered-models", "/root")
     assert before[group_a.display_name] == PermissionLevel.CAN_MANAGE_PRODUCTION_VERSIONS

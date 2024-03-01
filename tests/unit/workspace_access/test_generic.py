@@ -29,7 +29,7 @@ from databricks.labs.ucx.workspace_access.generic import (
     feature_store_listing,
     feature_tables_root_page,
     models_listing,
-    tokens_and_passwords,
+    tokens_and_passwords, models_root_page,
 )
 from databricks.labs.ucx.workspace_access.groups import MigrationState
 from tests.unit.framework.mocks import MockBackend
@@ -909,7 +909,7 @@ def test_models_page_listing():
     ]
 
     sup = GenericPermissionsSupport(
-        ws=ws, listings=[Listing(feature_tables_root_page, "object_id", "registered-models")]
+        ws=ws, listings=[Listing(models_root_page, "object_id", "registered-models")]
     )
     tasks = list(sup.get_crawler_tasks())
     assert len(tasks) == 1
