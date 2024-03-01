@@ -4,7 +4,7 @@ from datetime import timedelta
 
 from databricks.sdk.errors import NotFound
 from databricks.sdk.retries import retried
-from databricks.sdk.service.jobs import BaseRun, NotebookTask, RunTask
+from databricks.sdk.service.jobs import NotebookTask, RunTask
 from databricks.sdk.service.workspace import ImportFormat
 
 from databricks.labs.ucx.assessment.jobs import JobsCrawler, SubmitRunsCrawler
@@ -36,16 +36,20 @@ def test_job_run_crawler(ws, env_or_skip, inventory_schema, sql_backend):
 # COMMAND ----------
 pass
 """
-    dir = "/tmp/ucx"
+    directory = "/tmp/ucx"
     notebook = "dummy_notebook"
-    ws.workspace.mkdirs(dir)
-    ws.workspace.upload(f"{dir}/{notebook}.py", dummy_notebook.encode("utf8"), format=ImportFormat.AUTO, overwrite=True)
-    tasks = [RunTask(task_key="123",
-                     notebook_task=NotebookTask(notebook_path=f"{dir}/{notebook}"),
-                     existing_cluster_id=cluster_id
-                     )]
-    run = ws.jobs.submit(run_name=f'ucx-test-{time.time_ns()}',
-                   tasks=tasks).result()
+    ws.workspace.mkdirs(directory)
+    ws.workspace.upload(
+        f"{directory}/{notebook}.py", dummy_notebook.encode("utf8"), format=ImportFormat.AUTO, overwrite=True
+    )
+    tasks = [
+        RunTask(
+            task_key="123",
+            notebook_task=NotebookTask(notebook_path=f"{directory}/{notebook}"),
+            existing_cluster_id=cluster_id,
+        )
+    ]
+    run = ws.jobs.submit(run_name=f'ucx-test-{time.time_ns()}', tasks=tasks).result()
     assert run
     run_id = run.run_id
 
