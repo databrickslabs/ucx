@@ -7,8 +7,7 @@ from databricks.labs.ucx.hive_metastore import ExternalLocations
 from databricks.labs.ucx.hive_metastore.locations import ExternalLocation
 
 
-
-def test_run(ws, env_or_skip, sql_backend, inventory_schema, make_random):
+def test_run(caplog, ws, sql_backend, inventory_schema):
     azurerm = AzureResources(ws)
 
     locations = [
@@ -18,22 +17,26 @@ def test_run(ws, env_or_skip, sql_backend, inventory_schema, make_random):
     sql_backend.save_table(f"{inventory_schema}.external_locations", locations, ExternalLocation)
     location_crawler = ExternalLocations(ws, sql_backend, inventory_schema)
 
-    installation = MockInstallation({
-        "azure_storage_account_info.csv": [
-            {
-                'prefix': 'abfss://uctest@ziyuanqintest.dfs.core.windows.net/',
-                'client_id': "0cb5b9c2-b5e3-4bb5-89a8-ebcef6708997",
-                'principal': "labsazurethings-access",
-                'privilege': "WRITE_FILES",
-                'type': "ManagedIdentity",
-            },
-        ]
-    })
+    installation = MockInstallation(
+        {
+            "azure_storage_account_info.csv": [
+                {
+                    'prefix': 'abfss://uctest@ziyuanqintest.dfs.core.windows.net/',
+                    'client_id': "0cb5b9c2-b5e3-4bb5-89a8-ebcef6708997",
+                    'principal': "labsazurethings-access",
+                    'privilege': "WRITE_FILES",
+                    'type': "ManagedIdentity",
+                },
+            ]
+        }
+    )
     resource_permissions = AzureResourcePermissions(installation, ws, azurerm, location_crawler)
 
     location_migration = ExternalLocationsMigration(ws, location_crawler, resource_permissions, azurerm)
 
     location_migration.run()
+
+    assert "All UC external location are created." in caplog.text
 
 
 # def test_run(ws, env_or_skip, sql_backend, inventory_schema, make_random):

@@ -59,7 +59,7 @@ class ExternalLocationsMigration:
             if credential.azure_managed_identity:
                 application_id = self._azurerm.managed_identity_client_id(
                     credential.azure_managed_identity.access_connector_id,
-                    credential.azure_managed_identity.managed_identity_id
+                    credential.azure_managed_identity.managed_identity_id,
                 )
                 if not application_id:
                     continue

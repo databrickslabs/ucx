@@ -342,7 +342,9 @@ class AzureResources:
             self._role_definitions[role_definition_id] = role_name
         return self._role_definitions.get(role_definition_id)
 
-    def managed_identity_client_id(self, access_connector_id: str, user_assigned_identity_id: str | None = None) -> str | None:
+    def managed_identity_client_id(
+        self, access_connector_id: str, user_assigned_identity_id: str | None = None
+    ) -> str | None:
         # get te client_id/application_id of the managed identity used in the access connector
         try:
             identity = self._get_resource(access_connector_id, "2023-05-01").get("identity")
@@ -353,11 +355,15 @@ class AzureResources:
         if not identity:
             return None
         if identity.get("type") == "UserAssigned":
+            if not user_assigned_identity_id:
+                return None
             identities = identity.get("userAssignedIdentities")
             if user_assigned_identity_id in identities:
                 return identities.get(user_assigned_identity_id).get("clientId")
-            if user_assigned_identity_id.replace("resourcegroups","resourceGroups") in identities:
-                return identities.get(user_assigned_identity_id.replace("resourcegroups","resourceGroups")).get("clientId")
+            if user_assigned_identity_id.replace("resourcegroups", "resourceGroups") in identities:
+                return identities.get(user_assigned_identity_id.replace("resourcegroups", "resourceGroups")).get(
+                    "clientId"
+                )
             return None
         if identity.get("type") == "SystemAssigned":
             # SystemAssigned managed identity does not have client_id in get access connector response
