@@ -25,7 +25,7 @@ def test_run(ws, env_or_skip, sql_backend, inventory_schema, make_random):
                 'client_id': "0cb5b9c2-b5e3-4bb5-89a8-ebcef6708997",
                 'principal': "labsazurethings-access",
                 'privilege': "WRITE_FILES",
-                'directory_id': "9f37a392-f0ae-4280-9796-f1864a10effc",
+                'type': "ManagedIdentity",
             },
         ]
     })
