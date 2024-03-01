@@ -1,5 +1,7 @@
+from collections import OrderedDict
+from json import JSONDecoder
+
 import pytest
-from databricks.sdk.service.jobs import BaseRun
 
 from databricks.labs.ucx.assessment.jobs import JobInfo, JobsCrawler, SubmitRunsCrawler
 
@@ -66,59 +68,60 @@ def test_job_crawler_with_no_owner_should_have_empty_creator_name():
             ['notebook_task'],
             ['outdated-autoscale'],
             '["123"]',
-            '[{"task_key": "notebook", "failures": ["not supported DBR: 9.3.x-cpu-ml-scala2.12"]}]',
+            [OrderedDict({"task_key": "notebook", "failures": ["not supported DBR: 9.3.x-cpu-ml-scala2.12"]})],
         ),
         (
             ['notebook_task', 'notebook_task_dupe'],
             ['outdated-autoscale'],
             '["123", "124"]',
-            '[{"task_key": "notebook", "failures": ["not supported DBR: 9.3.x-cpu-ml-scala2.12"]}]',
+            [OrderedDict({"task_key": "notebook", "failures": ["not supported DBR: 9.3.x-cpu-ml-scala2.12"]})],
         ),
         (
             ['sql_tasks'],
             ['outdated-autoscale'],
             '["123"]',
-            '[{"task_key": "alert", "failures": ["not supported DBR: '
-            '9.3.x-cpu-ml-scala2.12"]}, {"task_key": "dashboard", "failures": ["not '
-            'supported DBR: 9.3.x-cpu-ml-scala2.12"]}, {"task_key": "path", "failures": '
-            '["not supported DBR: 9.3.x-cpu-ml-scala2.12"]}, {"task_key": "query", '
-            '"failures": ["not supported DBR: 9.3.x-cpu-ml-scala2.12"]}]',
+            [
+                OrderedDict({"task_key": "alert", "failures": ["not supported DBR: 9.3.x-cpu-ml-scala2.12"]}),
+                OrderedDict({"task_key": "dashboard", "failures": ["not supported DBR: 9.3.x-cpu-ml-scala2.12"]}),
+                OrderedDict({"task_key": "path", "failures": ["not supported DBR: 9.3.x-cpu-ml-scala2.12"]}),
+                OrderedDict({"task_key": "query", "failures": ["not supported DBR: 9.3.x-cpu-ml-scala2.12"]}),
+            ],
         ),
         (
             ['gitsource_task'],
             ['outdated-autoscale'],
             '["123"]',
-            '[{"task_key": "git", "failures": ["not supported DBR: 9.3.x-cpu-ml-scala2.12"]}]',
+            [OrderedDict({"task_key": "git", "failures": ["not supported DBR: 9.3.x-cpu-ml-scala2.12"]})],
         ),
         (
             ['dbt_task'],
             ['outdated-autoscale'],
             '["123"]',
-            '[{"task_key": "dbt", "failures": ["not supported DBR: 9.3.x-cpu-ml-scala2.12"]}]',
+            [OrderedDict({"task_key": "dbt", "failures": ["not supported DBR: 9.3.x-cpu-ml-scala2.12"]})],
         ),
         (
             ['jar_task'],
             ['outdated-autoscale'],
             '["123"]',
-            '[{"task_key": "jar", "failures": ["not supported DBR: 9.3.x-cpu-ml-scala2.12"]}]',
+            [OrderedDict({"task_key": "jar", "failures": ["not supported DBR: 9.3.x-cpu-ml-scala2.12"]})],
         ),
         (
             ['python_wheel_task'],
             ['outdated-autoscale'],
             '["123"]',
-            '[{"task_key": "wheel", "failures": ["not supported DBR: 9.3.x-cpu-ml-scala2.12"]}]',
+            [OrderedDict({"task_key": "wheel", "failures": ["not supported DBR: 9.3.x-cpu-ml-scala2.12"]})],
         ),
         (
             ['run_condition_task'],
             ['outdated-autoscale'],
             '["123"]',
-            '[{"task_key": "run_condition", "failures": ["not supported DBR: 9.3.x-cpu-ml-scala2.12"]}]',
+            [OrderedDict({"task_key": "run_condition", "failures": ["not supported DBR: 9.3.x-cpu-ml-scala2.12"]})],
         ),
         (
             ['notebook_task_no_failure'],
             ['simplest-autoscale'],
             '["123"]',
-            '[{"task_key": "notebook", "failures": []}]',
+            [OrderedDict({"task_key": "notebook", "failures": []})],
         ),
     ],
 )
@@ -129,5 +132,5 @@ def test_job_run_crawler(jobruns_ids, cluster_ids, run_ids, failures):
     result = sql_backend.rows_written_for("hive_metastore.ucx.submit_runs", "append")
     assert len(result) == 1
     assert result[0].run_ids == run_ids
-    assert result[0].failures == failures
-    BaseRun()
+    ordered_decode = JSONDecoder(object_pairs_hook=OrderedDict)
+    assert ordered_decode.decode(result[0].failures) == failures
