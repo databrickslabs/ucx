@@ -906,6 +906,13 @@ class WorkspaceInstallation:
         run_id = latest_job_run.run_id
         return job_id, run_id
 
+    def map_cluster_to_uc(self, cluster_id, data_security_mode):
+        try:
+            spark_version = self._ws.clusters.select_spark_version(latest=True)
+            self._ws.clusters.edit(cluster_id=cluster_id, spark_version=spark_version, data_security_mode=data_security_mode)
+        except InvalidParameterValue as e:
+            logger.warning(f"skipping cluster remapping: {e}")
+
     def uninstall(self):
         if self._prompts and not self._prompts.confirm(
             "Do you want to uninstall ucx from the workspace too, this would "

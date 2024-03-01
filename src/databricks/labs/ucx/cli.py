@@ -329,7 +329,8 @@ def cluster_remap(w: WorkspaceClient, cluster_id):
     """Re-mapping the cluster to UC"""
     if not cluster_id:
         raise KeyError("You did not specify --cluster_id")
-    print(cluster_id)
+    installation = WorkspaceInstallation.current(w)
+    installation.map_cluster_to_uc(cluster_id)
     #Need to create function to re-map the cluster
 
 
