@@ -421,10 +421,9 @@ def feature_store_listing(ws: WorkspaceClient):
             for table in result["feature_tables"]:  # type: ignore[index]
                 feature_tables.append(GenericPermissionsInfo(table["id"], "feature-tables"))
 
-            if "next_page_token" in result:
-                token = result["next_page_token"]  # type: ignore[index]
-            else:
+            if "next_page_token" not in result:
                 break
+            token = result["next_page_token"]  # type: ignore[index]
         return feature_tables
 
     return inner
