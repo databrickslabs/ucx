@@ -909,8 +909,12 @@ class WorkspaceInstallation:
     def map_cluster_to_uc(self, cluster_id):
         try:
             spark_version = self._ws.clusters.select_spark_version(latest=True)
-            security_modes = {"Single User": "SINGLE_USER", "Shared": "SHARED"}
-            data_security_mode = self._prompts.choice_from_dict("Select cluster access mode", security_modes)
+            security_modes = {"Single User": "SINGLE_USER", "Shared": "USER_ISOLATION"}
+            access_mode = self._prompts.choice_from_dict("Select cluster access mode", security_modes)
+            if access_mode == 'SINGLE_USER':
+                data_security_mode = compute.DataSecurityMode.SINGLE_USER
+            else:
+                data_security_mode = compute.DataSecurityMode.USER_ISOLATION
             self._ws.clusters.edit(
                 cluster_id=cluster_id, spark_version=spark_version, data_security_mode=data_security_mode
             )
