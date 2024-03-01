@@ -1,11 +1,7 @@
 import pytest
 from databricks.sdk.service.jobs import BaseRun
 
-from databricks.labs.ucx.assessment.jobs import (
-    JobInfo,
-    JobsCrawler,
-    SubmitRunsCrawler,
-)
+from databricks.labs.ucx.assessment.jobs import JobInfo, JobsCrawler, SubmitRunsCrawler
 
 from ..framework.mocks import MockBackend
 from . import workspace_client_mock
