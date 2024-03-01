@@ -42,6 +42,10 @@ class WorkspaceObjectInfo:
     object_id: str | None = None
     language: str | None = None
 
+@dataclass
+class FeatureTableInfo:
+    object_id: str
+    request_type: str
 
 class Listing:
     def __init__(self, func: Callable[..., Iterable], id_attribute: str, object_type: str):
@@ -408,6 +412,24 @@ def experiments_listing(ws: WorkspaceClient):
             yield experiment
 
     return inner
+
+def feature_store_listing(ws:WorkspaceClient):
+    def inner() -> list[FeatureTableInfo]:
+        feature_tables = []
+        token = None
+        while True:
+            result = ws.api_client.do("GET", "/api/2.0/feature-store/feature-tables/search",
+                                        query={"page_token": token, "max_results": 200})
+            for table in result["feature_tables"]:
+                feature_tables.append(FeatureTableInfo(table["id"], "feature-tables"))
+
+            if "next_page_token" in result:
+                token = result["next_page_token"]
+            else:
+                break
+        return feature_tables
+
+    return inner()
 
 
 def tokens_and_passwords():
