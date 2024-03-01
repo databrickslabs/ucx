@@ -906,10 +906,14 @@ class WorkspaceInstallation:
         run_id = latest_job_run.run_id
         return job_id, run_id
 
-    def map_cluster_to_uc(self, cluster_id, data_security_mode):
+    def map_cluster_to_uc(self, cluster_id):
         try:
             spark_version = self._ws.clusters.select_spark_version(latest=True)
-            self._ws.clusters.edit(cluster_id=cluster_id, spark_version=spark_version, data_security_mode=data_security_mode)
+            security_modes = {"Single User": "SINGLE_USER", "Shared": "SHARED"}
+            data_security_mode = self._prompts.choice_from_dict("Select cluster access mode", security_modes)
+            self._ws.clusters.edit(
+                cluster_id=cluster_id, spark_version=spark_version, data_security_mode=data_security_mode
+            )
         except InvalidParameterValue as e:
             logger.warning(f"skipping cluster remapping: {e}")
 
