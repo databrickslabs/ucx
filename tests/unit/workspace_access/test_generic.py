@@ -26,6 +26,7 @@ from databricks.labs.ucx.workspace_access.generic import (
     WorkspaceListing,
     WorkspaceObjectInfo,
     experiments_listing,
+    feature_store_listing,
     models_listing,
     tokens_and_passwords,
 )
@@ -849,3 +850,21 @@ def test_verify_task_should_fail_if_acls_missing():
 
     with pytest.raises(ValueError):
         sup.get_verify_task(item)
+
+
+def test_feature_tables_listing():
+    ws = MagicMock()
+
+    def do_api_side_effect(*_, query):
+        if not query["page_token"]:
+            return {"feature_tables": [{"id": "table1"}, {"id": "table2"}], "next_page_token": "token"}
+        return {"feature_tables": [{"id": "table3"}, {"id": "table4"}]}
+
+    ws.api_client.do.side_effect = do_api_side_effect
+
+    wrapped = Listing(feature_store_listing(ws), id_attribute="object_id", object_type="feature-tables")
+    result = list(wrapped)
+
+    assert len(result) == 4
+    assert result[0].object_id == "table1"
+    assert result[0].request_type == "feature-tables"

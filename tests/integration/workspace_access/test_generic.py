@@ -13,6 +13,7 @@ from databricks.labs.ucx.workspace_access.generic import (
     Listing,
     WorkspaceListing,
     experiments_listing,
+    feature_store_listing,
     models_listing,
     tokens_and_passwords,
 )
@@ -413,6 +414,7 @@ def test_verify_permissions(ws, make_group, make_job, make_job_permissions):
 
     assert result
 
+
 @retried(on=[NotFound], timeout=timedelta(minutes=3))
 def test_endpoints(
     ws, make_group, make_serving_endpoint, make_serving_endpoint_permissions
@@ -441,5 +443,28 @@ def test_endpoints(
     assert after[group_b.display_name] == PermissionLevel.CAN_MANAGE
 
 
-def test_feature_tables(ws:WorkspaceClient):
-    pass
+def test_feature_tables(ws: WorkspaceClient, make_feature_table, make_group, make_feature_table_permissions):
+    group_a = make_group()
+    group_b = make_group()
+    feature_table = make_feature_table()
+    make_feature_table_permissions(
+        object_id=feature_table["id"],
+        permission_level=PermissionLevel.CAN_EDIT_METADATA,
+        group_name=group_a.display_name,
+    )
+
+    generic_permissions = GenericPermissionsSupport(
+        ws, [Listing(feature_store_listing(ws), "object_id", "feature-tables")]
+    )
+    before = generic_permissions.load_as_dict("feature-tables", feature_table["id"])
+    assert before[group_a.display_name] == PermissionLevel.CAN_EDIT_METADATA
+
+    apply_tasks(
+        generic_permissions,
+        [
+            MigratedGroup.partial_info(group_a, group_b),
+        ],
+    )
+
+    after = generic_permissions.load_as_dict("feature-tables", feature_table["id"])
+    assert after[group_b.display_name] == PermissionLevel.CAN_EDIT_METADATA

@@ -42,10 +42,6 @@ class WorkspaceObjectInfo:
     object_id: str | None = None
     language: str | None = None
 
-@dataclass
-class FeatureTableInfo:
-    object_id: str
-    request_type: str
 
 class Listing:
     def __init__(self, func: Callable[..., Iterable], id_attribute: str, object_type: str):
@@ -413,23 +409,25 @@ def experiments_listing(ws: WorkspaceClient):
 
     return inner
 
-def feature_store_listing(ws:WorkspaceClient):
-    def inner() -> list[FeatureTableInfo]:
+
+def feature_store_listing(ws: WorkspaceClient):
+    def inner() -> list[GenericPermissionsInfo]:
         feature_tables = []
         token = None
         while True:
-            result = ws.api_client.do("GET", "/api/2.0/feature-store/feature-tables/search",
-                                        query={"page_token": token, "max_results": 200})
-            for table in result["feature_tables"]:
-                feature_tables.append(FeatureTableInfo(table["id"], "feature-tables"))
+            result = ws.api_client.do(
+                "GET", "/api/2.0/feature-store/feature-tables/search", query={"page_token": token, "max_results": 200}
+            )
+            for table in result["feature_tables"]:  # type: ignore[index]
+                feature_tables.append(GenericPermissionsInfo(table["id"], "feature-tables"))
 
             if "next_page_token" in result:
-                token = result["next_page_token"]
+                token = result["next_page_token"]  # type: ignore[index]
             else:
                 break
         return feature_tables
 
-    return inner()
+    return inner
 
 
 def tokens_and_passwords():
