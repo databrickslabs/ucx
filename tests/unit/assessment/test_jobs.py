@@ -1,6 +1,11 @@
 import pytest
+from databricks.sdk.service.jobs import BaseRun
 
-from databricks.labs.ucx.assessment.jobs import JobInfo, JobsCrawler
+from databricks.labs.ucx.assessment.jobs import (
+    JobInfo,
+    JobsCrawler,
+    SubmitRunsCrawler,
+)
 
 from ..framework.mocks import MockBackend
 from . import workspace_client_mock
@@ -56,3 +61,77 @@ def test_job_crawler_with_no_owner_should_have_empty_creator_name():
     JobsCrawler(ws, sql_backend, "ucx").snapshot()
     result = sql_backend.rows_written_for("hive_metastore.ucx.jobs", "append")
     assert result == [JobInfo(job_id="9001", job_name="No Tasks", creator=None, success=1, failures="[]")]
+
+
+@pytest.mark.parametrize(
+    "jobruns_ids,cluster_ids,run_ids,failures",
+    [
+        (
+            ['notebook_task'],
+            ['outdated-autoscale'],
+            '["123"]',
+            '[{"task_key": "notebook", "failures": ["not supported DBR: 9.3.x-cpu-ml-scala2.12"]}]',
+        ),
+        (
+            ['notebook_task', 'notebook_task_dupe'],
+            ['outdated-autoscale'],
+            '["123", "124"]',
+            '[{"task_key": "notebook", "failures": ["not supported DBR: 9.3.x-cpu-ml-scala2.12"]}]',
+        ),
+        (
+            ['sql_tasks'],
+            ['outdated-autoscale'],
+            '["123"]',
+            '[{"task_key": "alert", "failures": ["not supported DBR: '
+            '9.3.x-cpu-ml-scala2.12"]}, {"task_key": "dashboard", "failures": ["not '
+            'supported DBR: 9.3.x-cpu-ml-scala2.12"]}, {"task_key": "path", "failures": '
+            '["not supported DBR: 9.3.x-cpu-ml-scala2.12"]}, {"task_key": "query", '
+            '"failures": ["not supported DBR: 9.3.x-cpu-ml-scala2.12"]}]',
+        ),
+        (
+            ['gitsource_task'],
+            ['outdated-autoscale'],
+            '["123"]',
+            '[{"task_key": "git", "failures": ["not supported DBR: 9.3.x-cpu-ml-scala2.12"]}]',
+        ),
+        (
+            ['dbt_task'],
+            ['outdated-autoscale'],
+            '["123"]',
+            '[{"task_key": "dbt", "failures": ["not supported DBR: 9.3.x-cpu-ml-scala2.12"]}]',
+        ),
+        (
+            ['jar_task'],
+            ['outdated-autoscale'],
+            '["123"]',
+            '[{"task_key": "jar", "failures": ["not supported DBR: 9.3.x-cpu-ml-scala2.12"]}]',
+        ),
+        (
+            ['python_wheel_task'],
+            ['outdated-autoscale'],
+            '["123"]',
+            '[{"task_key": "wheel", "failures": ["not supported DBR: 9.3.x-cpu-ml-scala2.12"]}]',
+        ),
+        (
+            ['run_condition_task'],
+            ['outdated-autoscale'],
+            '["123"]',
+            '[{"task_key": "run_condition", "failures": ["not supported DBR: 9.3.x-cpu-ml-scala2.12"]}]',
+        ),
+        (
+            ['notebook_task_no_failure'],
+            ['simplest-autoscale'],
+            '["123"]',
+            '[{"task_key": "notebook", "failures": []}]',
+        ),
+    ],
+)
+def test_job_run_crawler(jobruns_ids, cluster_ids, run_ids, failures):
+    ws = workspace_client_mock(jobruns_ids=jobruns_ids, cluster_ids=cluster_ids)
+    sql_backend = MockBackend()
+    SubmitRunsCrawler(ws, sql_backend, "ucx", 10).snapshot()
+    result = sql_backend.rows_written_for("hive_metastore.ucx.submit_runs", "append")
+    assert len(result) == 1
+    assert result[0].run_ids == run_ids
+    assert result[0].failures == failures
+    BaseRun()

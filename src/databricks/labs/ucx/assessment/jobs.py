@@ -218,36 +218,28 @@ class SubmitRunsCrawler(CrawlerBase[SubmitRunInfo], JobsMixin, CheckClusterMixin
 
     @classmethod
     def _sql_task_values(cls, task: SqlTask) -> list[str]:
-        hash_values = []
-        if task.file is not None:
-            hash_values.append(task.file.path)
-        if task.alert is not None and task.alert.alert_id is not None:
-            hash_values.append(task.alert.alert_id)
-        if task.dashboard is not None and task.dashboard.dashboard_id is not None:
-            hash_values.append(task.dashboard.dashboard_id)
-        if task.query is not None and task.query.query_id is not None:
-            hash_values.append(task.query.query_id)
+        hash_values = [
+            task.file.path if task.file else None,
+            task.alert.alert_id if task.alert else None,
+            task.dashboard.dashboard_id if task.dashboard else None,
+            task.query.query_id if task.query else None,
+        ]
         return [str(value) for value in hash_values if value is not None]
 
     @classmethod
     def _git_source_values(cls, source: GitSource) -> list[str]:
-        hash_values = []
-        if source.git_url is not None:
-            hash_values.append(source.git_url)
+        hash_values = [source.git_url]
         return [str(value) for value in hash_values if value is not None]
 
     @classmethod
     def _dbt_task_values(cls, dbt_task: DbtTask) -> list[str]:
-        hash_values = []
-        if dbt_task.schema is not None:
-            hash_values.append(dbt_task.schema)
-        if dbt_task.catalog is not None:
-            hash_values.append(dbt_task.catalog)
-        if dbt_task.warehouse_id is not None:
-            hash_values.append(dbt_task.warehouse_id)
-        if dbt_task.project_directory is not None:
-            hash_values.append(dbt_task.project_directory)
-        hash_values.append(",".join(sorted(dbt_task.commands)))
+        hash_values = [
+            dbt_task.schema,
+            dbt_task.catalog,
+            dbt_task.warehouse_id,
+            dbt_task.project_directory,
+            ",".join(sorted(dbt_task.commands)),
+        ]
         return [str(value) for value in hash_values if value is not None]
 
     @classmethod
@@ -262,7 +254,7 @@ class SubmitRunsCrawler(CrawlerBase[SubmitRunInfo], JobsMixin, CheckClusterMixin
 
     @classmethod
     def _run_condition_task_values(cls, c_task: RunConditionTask) -> list[str]:
-        hash_values = [c_task.op.value, c_task.right, c_task.left, c_task.outcome]
+        hash_values = [c_task.op.value if c_task.op else None, c_task.right, c_task.left, c_task.outcome]
         return [str(value) for value in hash_values if value is not None]
 
     @classmethod
