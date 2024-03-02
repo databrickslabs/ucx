@@ -24,7 +24,7 @@ from databricks.labs.ucx.install import (
     WorkspaceInstallation,
     WorkspaceInstaller,
 )
-from databricks.labs.ucx.mixins.fixtures import make_random
+from databricks.labs.ucx.mixins.fixtures import make_random, ws
 from databricks.labs.ucx.workspace_access import redash
 from databricks.labs.ucx.workspace_access.generic import (
     GenericPermissionsSupport,
@@ -42,15 +42,25 @@ def new_installation(ws, sql_backend, env_or_skip, inventory_schema, make_random
     cleanup = []
 
     def factory(
-        config_transform: Callable[[WorkspaceConfig], WorkspaceConfig] | None = None, single_user_install: bool = False,
-            existing_installation_prefix_as_product: str = 'ucx'
+            config_transform: Callable[[WorkspaceConfig], WorkspaceConfig] | None = None,
+            single_user_install: bool = False,
+            fresh_install: bool = True,
+            existing_installation_prefix_as_product: str = '',
     ):
         prefix = make_random(4)
-        renamed_group_prefix = f"rename-{prefix}-"
+        PRODUCT_INFO.product_name = MagicMock()
+        PRODUCT_INFO.product_name.return_value = prefix
         if single_user_install:
+            ucx_install_path = f"/Users/{ws.current_user.me().user_name}/.{prefix}"
             single_user_prompt_response = "yes"
         else:
+            ucx_install_path = f"/Applications/{prefix}"
             single_user_prompt_response = "no"
+
+        if not fresh_install:
+            PRODUCT_INFO.product_name.return_value = existing_installation_prefix_as_product
+
+        renamed_group_prefix = f"rename-{prefix}-"
 
         prompts = MockPrompts(
             {
@@ -67,10 +77,7 @@ def new_installation(ws, sql_backend, env_or_skip, inventory_schema, make_random
             }
         )
         workspace_start_path = f"/Users/{ws.current_user.me().user_name}/.{prefix}"
-        if single_user_install:
-            ucx_install_path = f"/Users/{ws.current_user.me().user_name}/.{prefix}"
-        else:
-            ucx_install_path = f"/Applications/{prefix}"
+
         default_cluster_id = env_or_skip("TEST_DEFAULT_CLUSTER_ID")
         tacl_cluster_id = env_or_skip("TEST_LEGACY_TABLE_ACL_CLUSTER_ID")
         Threads.strict(
@@ -82,12 +89,16 @@ def new_installation(ws, sql_backend, env_or_skip, inventory_schema, make_random
         )
         installation = Installation(ws, prefix, install_folder=ucx_install_path)
         installer = WorkspaceInstaller(prompts, installation, ws)
-        PRODUCT_INFO.product_name = MagicMock()
-        PRODUCT_INFO.product_name.return_value = existing_installation_prefix_as_product
         workspace_config = installer.configure()
+
+        if not fresh_install:
+            installation = Installation.current(ws, existing_installation_prefix_as_product)
+
         overrides = {"main": default_cluster_id, "tacl": tacl_cluster_id}
         workspace_config.override_clusters = overrides
-        workspace_config.workspace_start_path = workspace_start_path
+
+        if workspace_config.workspace_start_path == '/':
+            workspace_config.workspace_start_path = workspace_start_path
         if config_transform:
             workspace_config = config_transform(workspace_config)
 
@@ -352,17 +363,33 @@ def test_single_user_installation(new_installation):
     single_user_installation.uninstall()
 
 
-def test_workspace_root_installation_on_existing_root_install(ws, new_installation, existing_installation):
-    existing_global_installation = existing_installation("global")
-    mock_product_value = existing_global_installation.product()
-    reinstall_workspace_root = new_installation(single_user_install=False, existing_installation_prefix_as_product=mock_product_value)
-    reinstall_workspace_root.uninstall()
-#
-#
-# @retried(on=[NotFound], timeout=timedelta(minutes=5))
-# def test_single_user_installation_on_existing_root_install(ws, new_installation):
-#     existing_installation = Installation(ws, "ucx", install_folder='/Applications/ucx')
-#     ws_config = ws.config
-#     existing_installation.save(ws_config)
-#     reinstall_single_user = new_installation(single_user_install=True)
-#     reinstall_single_user.uninstall()
+def test_global_installation_on_existing_global_install(ws, new_installation):
+    # TODO: Finish up the initial install and then pass the prefix
+    existing_global_installation = new_installation(single_user_install=False)
+    mock_product_value = existing_global_installation.folder[-4:]
+    reinstall_global = new_installation(single_user_install=False,
+                                        fresh_install=False,
+                                        existing_installation_prefix_as_product=mock_product_value)
+    reinstall_global.uninstall()
+
+
+def test_user_installation_on_existing_global_install(ws, new_installation):
+    # TODO: Finish up the initial install and then pass the prefix
+    existing_global_installation = new_installation(single_user_install=False)
+    mock_product_value = existing_global_installation.folder[-4:]
+    reinstall_user = new_installation(single_user_install=False,
+                                        fresh_install=False,
+                                        existing_installation_prefix_as_product=mock_product_value)
+    reinstall_user.uninstall()
+    existing_global_installation.uninstall()
+
+
+def test_global_installation_on_existing_user_install(ws, new_installation):
+    # TODO: Finish up the initial install and then pass the prefix
+    existing_global_installation = new_installation(single_user_install=True)
+    mock_product_value = existing_global_installation.folder[-4:]
+    reinstall_global = new_installation(single_user_install=False,
+                                      fresh_install=False,
+                                      existing_installation_prefix_as_product=mock_product_value)
+    reinstall_global.uninstall()
+

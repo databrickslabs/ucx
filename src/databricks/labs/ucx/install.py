@@ -235,8 +235,6 @@ class WorkspaceInstaller:
     def _configure_new_installation(self) -> WorkspaceConfig:
         logger.info("Please answer a couple of questions to configure Unity Catalog migration")
         HiveMetastoreLineageEnabler(self._ws).apply(self._prompts)
-        me = self._ws.current_user.me()
-        product = PRODUCT_INFO.product_name()
 
         inventory_database = self._prompts.question(
             "Inventory Database stored in hive_metastore", default="ucx", valid_regex=r"^\w+$"
@@ -245,6 +243,13 @@ class WorkspaceInstaller:
         warehouse_id = self._configure_warehouse()
         if inventory_database in self._existing_database_names:
             raise RuntimeWarning(f"Inventory database with name {inventory_database} already exists")
+
+
+        # If there is a previous installation, return corresponding WorkspaceConfig
+        # Else configure will create WorkspaceConfig for a fresh install
+        if self._is_global() or self._is_user():
+            # no global or user installation then default install location is global
+            return self._get_existing_installation()
 
         def warehouse_type(_):
             return _.warehouse_type.value if not _.enable_serverless_compute else "SERVERLESS"
@@ -990,6 +995,6 @@ if __name__ == "__main__":
     logger.setLevel("INFO")
 
     workspace_client = WorkspaceClient(product="ucx", product_version=__version__)
-    current = Installation(workspace_client, PRODUCT_INFO.product_name())
+    current = Installation(workspace_client, PRODUCT_INFO.product_name(), install_folder='/Applications/ucx')
     installer = WorkspaceInstaller(Prompts(), current, workspace_client)
     installer.run()
