@@ -325,7 +325,7 @@ def migrate_credentials(w: WorkspaceClient):
 
 
 @ucx.command
-def create_master_principal(w: WorkspaceClient, subscription_id: str):
+def create_uber_principal(w: WorkspaceClient, subscription_id: str):
     """For azure cloud, creates a service principal and gives STORAGE BLOB READER access on all the storage account
     used by tables in the workspace and stores the spn info in the UCX cluster policy."""
     if not w.config.is_azure:
@@ -339,7 +339,7 @@ def create_master_principal(w: WorkspaceClient, subscription_id: str):
         return
     include_subscriptions = [subscription_id] if subscription_id else None
     azure_resource_permissions = AzureResourcePermissions.for_cli(w, include_subscriptions=include_subscriptions)
-    azure_resource_permissions.create_global_spn()
+    azure_resource_permissions.create_uber_principal()
     return
 
 

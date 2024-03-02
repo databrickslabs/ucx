@@ -93,7 +93,9 @@ class AzureResourcePermissions:
             )
             return None
         storage_account_infos = []
-        for storage in used_storage_accounts:
+        for storage in self._azurerm.storage_accounts():
+            if storage.storage_account not in used_storage_accounts:
+                continue
             for mapping in self._map_storage(storage):
                 storage_account_infos.append(mapping)
         if len(storage_account_infos) == 0:
@@ -147,7 +149,7 @@ class AzureResourcePermissions:
             msg = f"cluster policy {policy_id} not found, please run UCX installation to create UCX cluster policy"
             raise NotFound(msg) from None
 
-    def create_global_spn(self):
+    def create_uber_principal(self):
         config = self._installation.load(WorkspaceConfig)
         policy_id = config.policy_id
         if policy_id is None:
@@ -165,6 +167,10 @@ class AzureResourcePermissions:
                 "Please check if assessment job is run"
             )
             return
+        storage_account_info = []
+        for storage in self._azurerm.storage_accounts():
+            if storage.storage_account in used_storage_accounts:
+                storage_account_info.append(storage)
         logger.info("Creating service principal")
         global_principal = self._azurerm.create_service_principal()
         config = self._installation.load(WorkspaceConfig)
@@ -172,23 +178,22 @@ class AzureResourcePermissions:
         self._installation.save(config)
         logger.info(f"Created service principal of client_id {global_principal.client_id}")
         logger.info("Applying permission on storage accounts")
-        for storage in used_storage_accounts:
+        for storage in storage_account_info:
             self._azurerm.apply_storage_permission(global_principal.object_id, storage, "STORAGE_BLOB_READER")
             logger.debug(
                 f"Storage Data Blob Reader permission applied for spn {global_principal.client_id} "
                 f"to storage account {storage.storage_account}"
             )
-        self._update_cluster_policy_with_spn(policy_id, used_storage_accounts, global_principal)
+        self._update_cluster_policy_with_spn(policy_id, storage_account_info, global_principal)
 
         logger.info(f"Update UCX cluster policy {policy_id} with spn connection details for storage accounts")
 
     def load(self):
         return self._installation.load(list[StoragePermissionMapping], filename=self._filename)
 
-    def _get_storage_accounts(self) -> list[AzureResource]:
+    def _get_storage_accounts(self) -> list[str]:
         external_locations = self._locations.snapshot()
         storage_accounts = []
-        azure_storage = []
         for location in external_locations:
             if location.location.startswith("abfss://"):
                 start = location.location.index("@")
@@ -196,7 +201,4 @@ class AzureResourcePermissions:
                 storage_acct = location.location[start + 1 : end]
                 if storage_acct not in storage_accounts:
                     storage_accounts.append(storage_acct)
-        for storage in self._azurerm.storage_accounts():
-            if storage.storage_account in storage_accounts:
-                azure_storage.append(storage)
-        return azure_storage
+        return storage_accounts

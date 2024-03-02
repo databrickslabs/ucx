@@ -115,7 +115,7 @@ def test_create_global_spn_no_policy():
     installation.load.return_value = WorkspaceConfig(inventory_database='ucx')
     azure_resources = create_autospec(AzureResources)
     azure_resource_permission = AzureResourcePermissions(installation, w, azure_resources, location)
-    assert not azure_resource_permission.create_global_spn()
+    assert not azure_resource_permission.create_uber_principal()
 
 
 def test_create_global_spn_spn_present():
@@ -129,7 +129,7 @@ def test_create_global_spn_spn_present():
     )
     azure_resources = create_autospec(AzureResources)
     azure_resource_permission = AzureResourcePermissions(installation, w, azure_resources, location)
-    assert not azure_resource_permission.create_global_spn()
+    assert not azure_resource_permission.create_uber_principal()
 
 
 def test_create_global_spn_no_storage():
@@ -141,7 +141,7 @@ def test_create_global_spn_no_storage():
     installation.load.return_value = WorkspaceConfig(inventory_database='ucx')
     azure_resources = create_autospec(AzureResources)
     azure_resource_permission = AzureResourcePermissions(installation, w, azure_resources, location)
-    assert not azure_resource_permission.create_global_spn()
+    assert not azure_resource_permission.create_uber_principal()
 
 
 def test_create_global_spn_cluster_policy_not_found(mocker):
@@ -156,7 +156,7 @@ def test_create_global_spn_cluster_policy_not_found(mocker):
     azure_resources = AzureResources(api_client, api_client, include_subscriptions="002")
     azure_resource_permission = AzureResourcePermissions(installation, w, azure_resources, location)
     with pytest.raises(NotFound):
-        azure_resource_permission.create_global_spn()
+        azure_resource_permission.create_uber_principal()
 
 
 def test_create_global_spn(mocker):
@@ -173,7 +173,7 @@ def test_create_global_spn(mocker):
     api_client = azure_api_client(mocker)
     azure_resources = AzureResources(api_client, api_client, include_subscriptions="002")
     azure_resource_permission = AzureResourcePermissions(installation, w, azure_resources, location)
-    azure_resource_permission.create_global_spn()
+    azure_resource_permission.create_uber_principal()
     call_1 = call(
         WorkspaceConfig(
             inventory_database='ucx',

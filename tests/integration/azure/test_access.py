@@ -80,7 +80,7 @@ def test_create_global_spn(ws, sql_backend, inventory_schema, make_random, make_
         azure_mgmt_client, graph_client, include_subscriptions="3f2e4d32-8e8d-46d6-82bc-5bb8d962328b"
     )
     az_res_perm = AzureResourcePermissions(installation, ws, azure_resources, location)
-    az_res_perm.create_global_spn()
+    az_res_perm.create_uber_principal()
     config = installation.load(WorkspaceConfig)
     assert config.global_spn_id is not None
     resource_id = "/subscriptions/3f2e4d32-8e8d-46d6-82bc-5bb8d962328b/resourceGroups/HSRG/providers/Microsoft.Storage/storageAccounts/hsucxstorage"
