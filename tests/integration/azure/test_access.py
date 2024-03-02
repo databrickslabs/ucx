@@ -25,9 +25,13 @@ def test_azure_storage_accounts(ws, sql_backend, inventory_schema, make_random):
     sql_backend.save_table(f"{inventory_schema}.external_locations", tables, ExternalLocation)
     location = ExternalLocations(ws, sql_backend, inventory_schema)
     installation = Installation(ws, make_random(4))
-    api_client = AzureAPIClient(ws)
+    azure_mgmt_client = AzureAPIClient(
+        ws.config.arm_environment.resource_manager_endpoint,
+        ws.config.arm_environment.service_management_endpoint,
+    )
+    graph_client = AzureAPIClient("https://graph.microsoft.com", "https://graph.microsoft.com")
     azure_resources = AzureResources(
-        include_subscriptions="3f2e4d32-8e8d-46d6-82bc-5bb8d962328b", api_client=api_client
+        azure_mgmt_client, graph_client, include_subscriptions="3f2e4d32-8e8d-46d6-82bc-5bb8d962328b"
     )
     az_res_perm = AzureResourcePermissions(installation, ws, azure_resources, location)
     az_res_perm.save_spn_permissions()
@@ -45,9 +49,13 @@ def test_save_spn_permissions_local(ws, sql_backend, inventory_schema, make_rand
     sql_backend.save_table(f"{inventory_schema}.external_locations", tables, ExternalLocation)
     location = ExternalLocations(ws, sql_backend, inventory_schema)
     installation = Installation(ws, make_random(4))
-    api_client = AzureAPIClient(ws)
+    azure_mgmt_client = AzureAPIClient(
+        ws.config.arm_environment.resource_manager_endpoint,
+        ws.config.arm_environment.service_management_endpoint,
+    )
+    graph_client = AzureAPIClient("https://graph.microsoft.com", "https://graph.microsoft.com")
     azure_resources = AzureResources(
-        include_subscriptions="3f2e4d32-8e8d-46d6-82bc-5bb8d962328b", api_client=api_client
+        azure_mgmt_client, graph_client, include_subscriptions="3f2e4d32-8e8d-46d6-82bc-5bb8d962328b"
     )
     az_res_perm = AzureResourcePermissions(installation, ws, azure_resources, location)
     path = az_res_perm.save_spn_permissions()
@@ -63,9 +71,13 @@ def test_create_global_spn(ws, sql_backend, inventory_schema, make_random, make_
     installation = Installation(ws, make_random(4))
     policy = make_cluster_policy()
     installation.save(WorkspaceConfig(inventory_database='ucx', policy_id=policy.policy_id))
-    api_client = AzureAPIClient(ws)
+    azure_mgmt_client = AzureAPIClient(
+        ws.config.arm_environment.resource_manager_endpoint,
+        ws.config.arm_environment.service_management_endpoint,
+    )
+    graph_client = AzureAPIClient("https://graph.microsoft.com", "https://graph.microsoft.com")
     azure_resources = AzureResources(
-        include_subscriptions="3f2e4d32-8e8d-46d6-82bc-5bb8d962328b", api_client=api_client
+        azure_mgmt_client, graph_client, include_subscriptions="3f2e4d32-8e8d-46d6-82bc-5bb8d962328b"
     )
     az_res_perm = AzureResourcePermissions(installation, ws, azure_resources, location)
     az_res_perm.create_global_spn()
@@ -86,9 +98,13 @@ def test_create_global_spn(ws, sql_backend, inventory_schema, make_random, make_
 
 def test_role_assignment(ws, sql_backend, inventory_schema, make_random, make_cluster_policy):
 
-    api_client = AzureAPIClient(ws)
+    azure_mgmt_client = AzureAPIClient(
+        ws.config.arm_environment.resource_manager_endpoint,
+        ws.config.arm_environment.service_management_endpoint,
+    )
+    graph_client = AzureAPIClient("https://graph.microsoft.com", "https://graph.microsoft.com")
     azure_resources = AzureResources(
-        include_subscriptions="3f2e4d32-8e8d-46d6-82bc-5bb8d962328b", api_client=api_client
+        azure_mgmt_client, graph_client, include_subscriptions="3f2e4d32-8e8d-46d6-82bc-5bb8d962328b"
     )
     azure_r = AzureResource(
         "/subscriptions/3f2e4d32-8e8d-46d6-82bc-5bb8d962328b/resourceGroups/HSRG/providers/Microsoft.Storage/storageAccounts/hsucxstorage"

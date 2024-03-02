@@ -418,7 +418,7 @@ def feature_store_listing(ws: WorkspaceClient):
             result = ws.api_client.do(
                 "GET", "/api/2.0/feature-store/feature-tables/search", query={"page_token": token, "max_results": 200}
             )
-            for table in result.get("feature_tables", []):
+            for table in result.get("feature_tables", []):  # type: ignore
                 feature_tables.append(GenericPermissionsInfo(table["id"], "feature-tables"))
 
             if "next_page_token" not in result:

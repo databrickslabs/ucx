@@ -53,8 +53,12 @@ class AzureResourcePermissions:
         installation = Installation.current(ws, product)
         config = installation.load(WorkspaceConfig)
         sql_backend = StatementExecutionBackend(ws, config.warehouse_id)
-        api_client = AzureAPIClient(ws)
-        azurerm = AzureResources(include_subscriptions=include_subscriptions, api_client=api_client)
+        azure_mgmt_client = AzureAPIClient(
+            ws.config.arm_environment.resource_manager_endpoint,
+            ws.config.arm_environment.service_management_endpoint,
+        )
+        graph_client = AzureAPIClient("https://graph.microsoft.com", "https://graph.microsoft.com")
+        azurerm = AzureResources(azure_mgmt_client, graph_client, include_subscriptions)
         locations = ExternalLocations(ws, sql_backend, config.inventory_database)
         return cls(installation, ws, azurerm, locations)
 
@@ -169,7 +173,7 @@ class AzureResourcePermissions:
         logger.info(f"Created service principal of client_id {global_principal.client_id}")
         logger.info("Applying permission on storage accounts")
         for storage in used_storage_accounts:
-#            self._azurerm.apply_storage_permission(global_principal.object_id, storage, "STORAGE_BLOB_READER")
+            self._azurerm.apply_storage_permission(global_principal.object_id, storage, "STORAGE_BLOB_READER")
             logger.debug(
                 f"Storage Data Blob Reader permission applied for spn {global_principal.client_id} "
                 f"to storage account {storage.storage_account}"

@@ -183,7 +183,8 @@
       "appId": "appIduser1",
       "displayName": "disNameuser1",
       "id": "Iduser1",
-      "appOwnerOrganizationId": "dir1"
+      "appOwnerOrganizationId": "dir1",
+      "servicePrincipalType": "Application"
     },
     "/v1.0/servicePrincipals(appId='appIduser1')/addPassword": {
       "secretText": "mypwd"
@@ -191,7 +192,7 @@
     "/resourceid1/providers/Microsoft.Authorization/roleAssignments/2a2b9908-6ea1-4ae2-8e65-a410df84e7d1?api-version=2022-04-01": {
       "foo": "bar"
     },
-    "/subscriptions/002/resourceGroups/rg1/storageAccounts/sto2/providers/Microsoft.Authorization/roleAssignments/2a2b9908-6ea1-4ae2-8e65-a410df84e7d1?api-version=2022-04-01": {
+    "subscriptions/002/resourceGroups/rg1/storageAccounts/sto2/providers/Microsoft.Authorization/roleAssignments/e97fa67e-cf3a-49f4-987b-2fc8a3be88a1": {
       "foo": "bar"
     },
     "/v1.0/applications": {

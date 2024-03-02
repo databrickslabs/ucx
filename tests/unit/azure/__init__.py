@@ -4,7 +4,6 @@ import pathlib
 from unittest import mock
 from unittest.mock import create_autospec
 
-from databricks.sdk import WorkspaceClient
 from databricks.sdk.oauth import Token
 
 from databricks.labs.ucx.azure.resources import AzureAPIClient
@@ -32,8 +31,7 @@ def azure_api_client(mocker):
 
     tok = Token(access_token=f"header.{str_token}.sig")
     mocker.patch("databricks.sdk.oauth.Refreshable.token", return_value=tok)
-    w = create_autospec(WorkspaceClient)
-    api_client = create_autospec(AzureAPIClient(w))
+    api_client = create_autospec(AzureAPIClient("foo", "bar"))
     type(api_client).token = mock.PropertyMock(return_value=tok)
     api_client.get.side_effect = get_az_api_mapping
     api_client.put.side_effect = get_az_api_mapping

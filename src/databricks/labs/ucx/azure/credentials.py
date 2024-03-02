@@ -171,7 +171,12 @@ class ServicePrincipalMigration(SecretsMixin):
 
         config = installation.load(WorkspaceConfig)
         sql_backend = StatementExecutionBackend(ws, config.warehouse_id)
-        azurerm = AzureResources(api_client=AzureAPIClient(ws))
+        azure_mgmt_client = AzureAPIClient(
+            ws.config.arm_environment.resource_manager_endpoint,
+            ws.config.arm_environment.service_management_endpoint,
+        )
+        graph_client = AzureAPIClient("https://graph.microsoft.com", "https://graph.microsoft.com")
+        azurerm = AzureResources(azure_mgmt_client, graph_client)
         locations = ExternalLocations(ws, sql_backend, config.inventory_database)
 
         resource_permissions = AzureResourcePermissions(installation, ws, azurerm, locations)

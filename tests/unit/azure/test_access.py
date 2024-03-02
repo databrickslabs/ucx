@@ -9,7 +9,6 @@ from databricks.sdk.service.compute import Policy
 
 from databricks.labs.ucx.azure.access import AzureResourcePermissions
 from databricks.labs.ucx.azure.resources import (
-    AzureAPIClient,
     AzureResource,
     AzureResources,
     AzureRoleAssignment,
@@ -28,8 +27,7 @@ def test_save_spn_permissions_no_external_table(caplog):
     backend = MockBackend(rows=rows)
     location = ExternalLocations(w, backend, "ucx")
     installation = MockInstallation()
-    api_client = AzureAPIClient(w)
-    azure_resources = create_autospec(AzureResources(api_client=api_client))
+    azure_resources = create_autospec(AzureResources)
     azure_resource_permission = AzureResourcePermissions(installation, w, azure_resources, location)
     azure_resources.storage_accounts.return_value = []
     azure_resource_permission.save_spn_permissions()
@@ -43,8 +41,7 @@ def test_save_spn_permissions_no_azure_storage_account():
     backend = MockBackend(rows=rows)
     location = ExternalLocations(w, backend, "ucx")
     installation = MockInstallation()
-    api_client = AzureAPIClient(w)
-    azure_resources = create_autospec(AzureResources(api_client=api_client))
+    azure_resources = create_autospec(AzureResources)
     azure_resource_permission = AzureResourcePermissions(installation, w, azure_resources, location)
     azure_resources.storage_accounts.return_value = []
     assert not azure_resource_permission.save_spn_permissions()
@@ -116,7 +113,7 @@ def test_create_global_spn_no_policy():
     location = ExternalLocations(w, MockBackend, "ucx")
     installation = create_autospec(Installation)
     installation.load.return_value = WorkspaceConfig(inventory_database='ucx')
-    azure_resources = create_autospec(AzureResources(api_client=AzureAPIClient(w)))
+    azure_resources = create_autospec(AzureResources)
     azure_resource_permission = AzureResourcePermissions(installation, w, azure_resources, location)
     assert not azure_resource_permission.create_global_spn()
 
@@ -130,7 +127,7 @@ def test_create_global_spn_spn_present():
         policy_id="foo1",
         global_spn_id="123",
     )
-    azure_resources = create_autospec(AzureResources(api_client=AzureAPIClient(w)))
+    azure_resources = create_autospec(AzureResources)
     azure_resource_permission = AzureResourcePermissions(installation, w, azure_resources, location)
     assert not azure_resource_permission.create_global_spn()
 
@@ -142,7 +139,7 @@ def test_create_global_spn_no_storage():
     location = ExternalLocations(w, backend, "ucx")
     installation = create_autospec(Installation)
     installation.load.return_value = WorkspaceConfig(inventory_database='ucx')
-    azure_resources = create_autospec(AzureResources(api_client=AzureAPIClient(w)))
+    azure_resources = create_autospec(AzureResources)
     azure_resource_permission = AzureResourcePermissions(installation, w, azure_resources, location)
     assert not azure_resource_permission.create_global_spn()
 
@@ -156,7 +153,7 @@ def test_create_global_spn_cluster_policy_not_found(mocker):
     installation = create_autospec(Installation)
     installation.load.return_value = WorkspaceConfig(inventory_database='ucx', policy_id="foo1")
     api_client = azure_api_client(mocker)
-    azure_resources = AzureResources(include_subscriptions="002", api_client=api_client)
+    azure_resources = AzureResources(api_client, api_client, include_subscriptions="002")
     azure_resource_permission = AzureResourcePermissions(installation, w, azure_resources, location)
     with pytest.raises(NotFound):
         azure_resource_permission.create_global_spn()
@@ -174,7 +171,7 @@ def test_create_global_spn(mocker):
     installation = create_autospec(Installation)
     installation.load.return_value = WorkspaceConfig(inventory_database='ucx', policy_id="foo1")
     api_client = azure_api_client(mocker)
-    azure_resources = AzureResources(include_subscriptions="002", api_client=api_client)
+    azure_resources = AzureResources(api_client, api_client, include_subscriptions="002")
     azure_resource_permission = AzureResourcePermissions(installation, w, azure_resources, location)
     azure_resource_permission.create_global_spn()
     call_1 = call(
@@ -184,7 +181,7 @@ def test_create_global_spn(mocker):
             global_spn_id="appIduser1",
         )
     )
-    call_2 = call(cluster_policy.as_dict(), filename='policy-backup.json')
+    # call_2 = call(cluster_policy.as_dict(), filename='policy-backup.json')
     installation.save.assert_has_calls([call_1])
     path = "subscriptions/002/resourceGroups/rg1/storageAccounts/sto2/providers/Microsoft.Authorization/roleAssignments/e97fa67e-cf3a-49f4-987b-2fc8a3be88a1"
     body = {
@@ -194,8 +191,11 @@ def test_create_global_spn(mocker):
             'roleDefinitionId': '/subscriptions/002/providers/Microsoft.Authorization/roleDefinitions/2a2b9908-6ea1-4ae2-8e65-a410df84e7d1',
         }
     }
-
-    api_client.put.assert_called_with(path, "azure_mgmt", body)
+    call_1 = call("/v1.0/applications", {"displayName": "UCXServicePrincipal"})
+    call_2 = call("/v1.0/servicePrincipals", {"appId": "appIduser1"})
+    call_3 = call("/v1.0/servicePrincipals(appId='appIduser1')/addPassword")
+    call_4 = call(path, body)
+    api_client.put.assert_has_calls([call_1, call_2, call_3, call_4], any_order=True)
     definition = {
         "foo": "bar",
         "spark_conf.fs.azure.account.oauth2.client.id.sto2.dfs.core.windows.net": {

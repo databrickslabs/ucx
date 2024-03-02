@@ -11,8 +11,8 @@ from databricks.sdk.service import iam, sql
 
 from databricks.labs.ucx.cli import (
     alias,
-    create_master_principal,
     create_account_groups,
+    create_master_principal,
     create_table_mapping,
     ensure_assessment_run,
     installations,

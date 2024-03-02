@@ -60,7 +60,12 @@ def run_migration(ws, sql_backend):
     def inner(
         test_info: MigrationTestInfo, credentials: set[str], read_only=False
     ) -> list[StorageCredentialValidationResult]:
-        azurerm = AzureResources(api_client=AzureAPIClient(ws))
+        azure_mgmt_client = AzureAPIClient(
+            ws.config.arm_environment.resource_manager_endpoint,
+            ws.config.arm_environment.service_management_endpoint,
+        )
+        graph_client = AzureAPIClient("https://graph.microsoft.com", "https://graph.microsoft.com")
+        azurerm = AzureResources(azure_mgmt_client, graph_client)
         locations = ExternalLocations(ws, sql_backend, "dont_need_a_schema")
 
         installation = MockInstallation(
