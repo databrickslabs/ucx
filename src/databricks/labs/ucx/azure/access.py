@@ -138,7 +138,8 @@ class AzureResourcePermissions:
         try:
             policy_definition = ""
             cluster_policy = self._ws.cluster_policies.get(policy_id)
-            self._installation.save(cluster_policy, filename="policy-backup.json")
+            # to be updated after doing changes in blueprint
+            # self._installation.save(cluster_policy.as_dict(), filename="policy-backup.json")
             if cluster_policy.definition is not None:
                 policy_definition = self._update_cluster_policy_definition(
                     cluster_policy.definition, storage_accounts, global_principal
