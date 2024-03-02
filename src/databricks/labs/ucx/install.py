@@ -43,7 +43,7 @@ from databricks.sdk.errors import (  # pylint: disable=redefined-builtin
 )
 from databricks.sdk.retries import retried
 from databricks.sdk.service import compute, jobs
-from databricks.sdk.service.jobs import RunLifeCycleState, RunResultState, SubmitRun
+from databricks.sdk.service.jobs import RunLifeCycleState, RunResultState
 from databricks.sdk.service.sql import (
     CreateWarehouseRequestWarehouseType,
     EndpointInfoWarehouseType,
@@ -54,7 +54,7 @@ from databricks.labs.ucx.__about__ import __version__
 from databricks.labs.ucx.assessment.azure import AzureServicePrincipalInfo
 from databricks.labs.ucx.assessment.clusters import ClusterInfo
 from databricks.labs.ucx.assessment.init_scripts import GlobalInitScriptInfo
-from databricks.labs.ucx.assessment.jobs import JobInfo
+from databricks.labs.ucx.assessment.jobs import JobInfo, SubmitRunInfo
 from databricks.labs.ucx.assessment.pipelines import PipelineInfo
 from databricks.labs.ucx.config import WorkspaceConfig
 from databricks.labs.ucx.configure import ConfigureClusterOverrides
@@ -160,7 +160,7 @@ def deploy_schema(sql_backend: SqlBackend, inventory_schema: str):
             functools.partial(table, "table_failures", TableError),
             functools.partial(table, "workspace_objects", WorkspaceObjectInfo),
             functools.partial(table, "permissions", Permissions),
-            functools.partial(table, "submit_runs", SubmitRun),
+            functools.partial(table, "submit_runs", SubmitRunInfo),
         ],
     )
     deployer.deploy_view("objects", "queries/views/objects.sql")
