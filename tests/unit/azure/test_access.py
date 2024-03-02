@@ -76,13 +76,13 @@ def test_save_spn_permissions_valid_azure_storage_account():
         AzureRoleAssignment(
             resource=AzureResource(f'{containers}/container1'),
             scope=AzureResource(f'{containers}/container1'),
-            principal=Principal('a', 'b', 'c', '0000-0000'),
+            principal=Principal('a', 'b', 'c', 'Application', '0000-0000'),
             role_name='Storage Blob Data Contributor',
         ),
         AzureRoleAssignment(
             resource=AzureResource(f'{storage_accounts}/storage1'),
             scope=AzureResource(f'{storage_accounts}/storage1'),
-            principal=Principal('d', 'e', 'f', '0000-0000'),
+            principal=Principal('d', 'e', 'f', 'Application', '0000-0000'),
             role_name='Button Clicker',
         ),
     ]
@@ -96,6 +96,7 @@ def test_save_spn_permissions_valid_azure_storage_account():
                 'prefix': 'abfss://container1@storage1.dfs.core.windows.net/',
                 'principal': 'b',
                 'privilege': 'WRITE_FILES',
+                'type': 'Application',
                 'directory_id': '0000-0000',
             },
             {
@@ -103,6 +104,7 @@ def test_save_spn_permissions_valid_azure_storage_account():
                 'prefix': 'abfss://container2@storage1.dfs.core.windows.net/',
                 'principal': 'b',
                 'privilege': 'WRITE_FILES',
+                'type': 'Application',
                 'directory_id': '0000-0000',
             },
         ],

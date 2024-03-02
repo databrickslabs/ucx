@@ -18,6 +18,7 @@ from databricks.sdk.core import DatabricksError
 from databricks.sdk.errors import NotFound, ResourceConflict
 from databricks.sdk.retries import retried
 from databricks.sdk.service import compute, iam, jobs, pipelines, sql, workspace
+from databricks.sdk.service._internal import Wait
 from databricks.sdk.service.catalog import (
     AzureServicePrincipal,
     CatalogInfo,
@@ -27,6 +28,12 @@ from databricks.sdk.service.catalog import (
     StorageCredentialInfo,
     TableInfo,
     TableType,
+)
+from databricks.sdk.service.serving import (
+    EndpointCoreConfigInput,
+    ServedModelInput,
+    ServedModelInputWorkloadSize,
+    ServingEndpointDetailed,
 )
 from databricks.sdk.service.sql import (
     CreateWarehouseRequestWarehouseType,
@@ -274,6 +281,12 @@ def _permissions_mapping():
             "serving_endpoint",
             "serving-endpoints",
             [PermissionLevel.CAN_VIEW, PermissionLevel.CAN_MANAGE],
+            _simple,
+        ),
+        (
+            "feature_table",
+            "feature-tables",
+            [PermissionLevel.CAN_VIEW_METADATA, PermissionLevel.CAN_EDIT_METADATA, PermissionLevel.CAN_MANAGE],
             _simple,
         ),
     ]
@@ -1095,3 +1108,47 @@ def make_storage_credential_spn(ws):
         ws.storage_credentials.delete(storage_credential.name, force=True)
 
     yield from factory("storage_credential_from_spn", create, remove)
+
+
+@pytest.fixture
+def make_serving_endpoint(ws, make_random, make_model):
+    def create() -> Wait[ServingEndpointDetailed]:
+        endpoint_name = make_random(4)
+        model = make_model()
+        endpoint = ws.serving_endpoints.create(
+            endpoint_name,
+            EndpointCoreConfigInput(
+                served_models=[
+                    ServedModelInput(model.name, "1", ServedModelInputWorkloadSize.SMALL, scale_to_zero_enabled=True)
+                ]
+            ),
+        )
+        return endpoint
+
+    def remove(endpoint_name: str):
+        try:
+            ws.serving_endpoints.delete(endpoint_name)
+        except RuntimeError as e:
+            logger.info(f"Can't remove endpoint {e}")
+
+    yield from factory("Serving endpoint", create, remove)
+
+
+@pytest.fixture
+def make_feature_table(ws, make_random):
+    def create():
+        feature_table_name = make_random(6) + "." + make_random(6)
+        table = ws.api_client.do(
+            "POST",
+            "/api/2.0/feature-store/feature-tables/create",
+            body={"name": feature_table_name, "primary_keys": [{"name": "pk", "data_type": "string"}]},
+        )
+        return table['feature_table']
+
+    def remove(table: dict):
+        try:
+            ws.api_client.do("DELETE", "/api/2.0/feature-store/feature-tables/delete", body={"name": table["name"]})
+        except RuntimeError as e:
+            logger.info(f"Can't remove feature table {e}")
+
+    yield from factory("Feature table", create, remove)

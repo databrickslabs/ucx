@@ -9,13 +9,14 @@
       "appId": "appIduser2",
       "displayName": "disNameuser2",
       "id": "Iduser2",
+      "servicePrincipalType": "Application",
       "appOwnerOrganizationId": "0000-0000"
     },
     "/v1.0/directoryObjects/user3": {
       "appId": "appIduser3",
       "displayName": "disNameuser3",
       "id": "Iduser3",
-      "appOwnerOrganizationId": "0000-0000"
+      "servicePrincipalType": "ManagedIdentity"
     },
     "/subscriptions": {
       "value": [

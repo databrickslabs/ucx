@@ -90,6 +90,25 @@ def sync_workspace_info(a: AccountClient):
     workspaces.sync_workspace_info()
 
 
+@ucx.command(is_account=True)
+def create_account_groups(a: AccountClient, workspace_ids: list[int] | None = None):
+    """
+    Crawl all workspaces configured in workspace_ids, then creates account level groups if a WS local group is not present
+    in the account.
+    If workspace_ids is not specified, it will create account groups for all workspaces configured in the account.
+
+    The following scenarios are supported, if a group X:
+    - Exist in workspaces A,B,C and it has same members in there, it will be created in the account
+    - Exist in workspaces A,B but not in C, it will be created in the account
+    - Exist in workspaces A,B,C. It has same members in A,B, but not in C. Then, X and C_X will be created in the
+    account
+    """
+    logger.info(f"Account ID: {a.config.account_id}")
+    prompts = Prompts()
+    workspaces = AccountWorkspaces(a)
+    workspaces.create_account_level_groups(prompts, workspace_ids)
+
+
 @ucx.command
 def manual_workspace_info(w: WorkspaceClient):
     """only supposed to be run if cannot get admins to run `databricks labs ucx sync-workspace-info`"""

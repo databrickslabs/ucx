@@ -116,11 +116,20 @@ commands:
         description: Subscription to scan storage account in
 
   - name: validate-groups-membership
-    description: Validate the groups to see if the groups at account level and workspace level have different membership
+    description: Validate groups to check if the groups at account level and workspace level have different memberships
     table_template: |-
-      Workspace Group Name\tMembers Count\tAccount Group Name\tMembers Count
-      {{range .}}{{.wf_group_name}}\t{{.wf_group_members_count}}\t{{.acc_group_name}}\t{{.acc_group_members_count}}
+      Workspace Group Name\tMembers Count\tAccount Group Name\tMembers Count\tDifference
+      {{range .}}{{.wf_group_name}}\t{{.wf_group_members_count}}\t{{.acc_group_name}}\t{{.acc_group_members_count}}\t{{.group_members_difference}}
       {{end}}
 
   - name: migrate_credentials
     description: Migrate credentials for storage access to UC storage credential
+
+  - name: create-account-groups
+    is_account_level: true
+    description: |
+      Creates account level groups for all groups in workspaces provided in workspace_ids.
+      If workspace_ids is not provided, it will use all workspaces present in the account.
+    flags:
+      - name: workspace_ids
+        description: List of workspace IDs to create account groups from.
