@@ -418,6 +418,7 @@ def feature_store_listing(ws: WorkspaceClient):
             result = ws.api_client.do(
                 "GET", "/api/2.0/feature-store/feature-tables/search", query={"page_token": token, "max_results": 200}
             )
+            assert isinstance(result, dict)
             for table in result.get("feature_tables", []):
                 feature_tables.append(GenericPermissionsInfo(table["id"], "feature-tables"))
 
