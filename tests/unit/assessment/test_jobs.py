@@ -85,7 +85,12 @@ def test_job_crawler_with_no_owner_should_have_empty_creator_name():
         (['python_wheel_task'], ['outdated-autoscale'], '["123"]', '["not supported DBR: 9.3.x-cpu-ml-scala2.12"]'),
         (['run_condition_task'], ['outdated-autoscale'], '["123"]', '["not supported DBR: 9.3.x-cpu-ml-scala2.12"]'),
         (['notebook_no_failure_task'], ['simplest-autoscale'], '["123"]', '[]'),
-        (['notebook_no_sec_no_comp_task'], ['simplest-autoscale'], '["123"]', '[]'),
+        (
+            ['notebook_no_sec_no_comp_task'],
+            ['simplest-autoscale'],
+            '["123"]',
+            '["not supported DBR: 9.3.x-cpu-ml-scala2.12"]',
+        ),
         (['notebook_no_sec_comp_task'], ['simplest-autoscale'], '["123"]', '["no data security mode specified"]'),
     ],
 )
