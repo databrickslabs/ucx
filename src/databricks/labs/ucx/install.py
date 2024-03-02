@@ -43,7 +43,7 @@ from databricks.sdk.errors import (  # pylint: disable=redefined-builtin
 )
 from databricks.sdk.retries import retried
 from databricks.sdk.service import compute, jobs
-from databricks.sdk.service.jobs import RunLifeCycleState, RunResultState
+from databricks.sdk.service.jobs import RunLifeCycleState, RunResultState, SubmitRun
 from databricks.sdk.service.sql import (
     CreateWarehouseRequestWarehouseType,
     EndpointInfoWarehouseType,
@@ -160,6 +160,7 @@ def deploy_schema(sql_backend: SqlBackend, inventory_schema: str):
             functools.partial(table, "table_failures", TableError),
             functools.partial(table, "workspace_objects", WorkspaceObjectInfo),
             functools.partial(table, "permissions", Permissions),
+            functools.partial(table, "submit_runs", SubmitRun),
         ],
     )
     deployer.deploy_view("objects", "queries/views/objects.sql")
