@@ -177,8 +177,10 @@ class AzureResourcePermissions:
         config = self._installation.load(WorkspaceConfig)
         config.global_spn_id = global_principal.client_id
         self._installation.save(config)
-        logger.info(f"Created service principal of client_id {global_principal.client_id}")
-        logger.info("Applying permission on storage accounts")
+        logger.info(
+            f"Created service principal of client_id {global_principal.client_id}. "
+            f"Applying permission on storage accounts"
+        )
         for storage in storage_account_info:
             self._azurerm.apply_storage_permission(global_principal.object_id, storage, "STORAGE_BLOB_READER")
             logger.debug(
