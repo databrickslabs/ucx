@@ -306,8 +306,10 @@ class SubmitRunsCrawler(CrawlerBase[SubmitRunInfo], JobsMixin, CheckClusterMixin
                 for task in sorted(all_tasks, key=lambda x: x.task_key if x.task_key is not None else ""):
                     _task_key = task.task_key if task.task_key is not None else ""
                     _cluster_details = None
-                    if task.new_cluster and self._needs_compatibility_check(task.new_cluster):
+                    if task.new_cluster:
                         _cluster_details = ClusterDetails.from_dict(task.new_cluster.as_dict())
+                        if self._needs_compatibility_check(task.new_cluster):
+                            task_failures.append("no data security mode specified")
                     if task.existing_cluster_id:
                         _cluster_details = all_clusters_by_id.get(task.existing_cluster_id, None)
                     if _cluster_details:
