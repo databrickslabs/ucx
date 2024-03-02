@@ -12,7 +12,7 @@ from databricks.labs.blueprint.installer import InstallState
 from databricks.labs.blueprint.parallel import Threads
 from databricks.labs.blueprint.tui import MockPrompts
 from databricks.labs.blueprint.wheels import WheelsV2
-from databricks.sdk.errors import InvalidParameterValue, NotFound, Unknown
+from databricks.sdk.errors import InvalidParameterValue, NotFound
 from databricks.sdk.retries import retried
 from databricks.sdk.service import compute, sql
 from databricks.sdk.service.iam import PermissionLevel
