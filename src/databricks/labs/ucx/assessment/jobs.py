@@ -200,7 +200,7 @@ class SubmitRunsCrawler(CrawlerBase[SubmitRunInfo], JobsMixin, CheckClusterMixin
         # 1. cluster is not configured with data security mode
         # 2. cluster's DBR version is greater than 11.3
         """
-        if spec.data_security_mode is None:
+        if not spec.data_security_mode:
             compatibility = spark_version_compatibility(spec.spark_version)
             return compatibility == "supported"
         return False

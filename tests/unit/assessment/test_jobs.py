@@ -92,6 +92,12 @@ def test_job_crawler_with_no_owner_should_have_empty_creator_name():
             '["not supported DBR: 9.3.x-cpu-ml-scala2.12"]',
         ),
         (['notebook_no_sec_comp_task'], ['simplest-autoscale'], '["123"]', '["no data security mode specified"]'),
+        (
+            ['notebook_spark_conf_task'],
+            ['simplest-autoscale'],
+            '["123"]',
+            '["unsupported config: spark.databricks.passthrough.enabled"]',
+        ),
     ],
 )
 def test_job_run_crawler(jobruns_ids, cluster_ids, run_ids, failures):
