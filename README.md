@@ -1,3 +1,5 @@
+Databricks Labs UCX
+---
 ![UCX by Databricks Labs](docs/logo-no-background.png)
 
 Your best companion for upgrading to Unity Catalog. It helps you to upgrade all Databricks workspace assets:
@@ -68,6 +70,8 @@ You will need an account, unity catalog, and workspace administrative authority 
 
 For questions, troubleshooting or bug fixes, please see your Databricks account team or submit an issue to the [Databricks UCX GitHub repo](https://github.com/databrickslabs/ucx)
 
+[[back to top](#databricks-labs-ucx)]
+
 ## Installation
 
 1. Get trained on UC [[free instructor-led training 2x week]](https://customer-academy.databricks.com/learn/course/1683/data-governance-with-unity-catalog?generated_by=302876&hash=4eab6668f83636ba44d109880002b293e8dda6dd) [[full training schedule]](https://files.training.databricks.com/static/ilt-sessions/half-day-workshops/index.html)
@@ -133,6 +137,8 @@ The `_remove_policies` method removes the cluster policy.
 The `validate_step` method validates if a given step is successful or not. 
 The `validate_and_run` method validates if a given step is successful, and if not, runs the workflow for that step.
 
+[[back to top](#databricks-labs-ucx)]
+
 ### Download Databricks Command Line interface
 
 We only support installations and upgrades through [Databricks CLI](https://docs.databricks.com/en/dev-tools/cli/index.html), as UCX requires an installation script run to make sure all the necessary and correct configurations are in place. Install Databricks CLI on macOS:
@@ -141,6 +147,7 @@ We only support installations and upgrades through [Databricks CLI](https://docs
 Install Databricks CLI on Windows:
 ![windows_install_databricks.png](docs/windows_install_databricks.png)
 
+[[back to top](#databricks-labs-ucx)]
 
 ### Install UCX - `databricks labs install ucx` 
 Install UCX via Databricks CLI:
@@ -166,6 +173,8 @@ You can also install a specific version by specifying it like `@v0.13.2` - `data
 
 ![macos_install_ucx](docs/macos_2_databrickslabsmac_installucx.gif)
 
+[[back to top](#databricks-labs-ucx)]
+
 ### Upgrade UCX - `databricks labs upgrade ucx`
 Verify that UCX is installed
 ```text
@@ -182,6 +191,8 @@ The prompts will be similar to [Installation](#install-ucx)
 
 ![macos_upgrade_ucx](docs/macos_3_databrickslabsmac_upgradeucx.gif)
 
+[[back to top](#databricks-labs-ucx)]
+
 ### Uninstall UCX
 Uninstall UCX via Databricks CLI:
 ```commandline
@@ -194,9 +205,13 @@ Databricks CLI will confirm a few options:
 
 ![macos_uninstall_ucx](docs/macos_4_databrickslabsmac_uninstallucx.gif)
 
+[[back to top](#databricks-labs-ucx)]
+
 # Workflows
 
 Part of this application is deployed as Databricks Workflows
+
+[[back to top](#databricks-labs-ucx)]
 
 ## Assessment workflow
 
@@ -222,6 +237,8 @@ The assessment workflow is designed to assess the compatibility of various entit
 After UCX assessment workflow is executed, the assessment dashboard will be populated with findings and common recommendations.
 [This guide](docs/assessment.md) talks about them in more details.
 
+[[back to top](#databricks-labs-ucx)]
+
 # Group migration workflow
 
 The group migration workflow is designed to migrate workspace-local groups to account-level groups in the Unity Catalog (UC) environment. It ensures that all the necessary groups are available in the workspace with the correct permissions, and removes any unnecessary groups and permissions. The tasks in the group migration workflow depend on the output of the assessment workflow and can be executed in sequence to ensure a successful migration. The output of each task is stored in Delta tables in the `$inventory_database` schema, which can be used for further analysis and decision-making. The group migration workflow can be executed multiple times to ensure that all the groups are migrated successfully and that all the necessary permissions are assigned.
@@ -233,11 +250,14 @@ The group migration workflow is designed to migrate workspace-local groups to ac
 5. `validate_groups_permissions`: This task validates that all the crawled permissions are applied correctly to the destination groups.
 6. `delete_backup_groups`: This task removes all workspace-level backup groups, along with their permissions. This should only be executed after confirming that the workspace-local migration worked successfully for all the groups involved. This step is necessary to clean up the workspace and remove any unnecessary groups and permissions.
 
+[[back to top](#databricks-labs-ucx)]
 
 # Using UCX command-line interface - `databricks labs ucx ...`
 
 After installation, a number of UCX workflows will be available in the workspace. `<installation_path>/README` contains further instructions and explanations of these workflows.
 UCX also provides a number of command line utilities accessible via `databricks labs ucx`.
+
+[[back to top](#databricks-labs-ucx)]
 
 ## Utility commands
 
@@ -248,11 +268,15 @@ and validates the assessment job using the `WorkspaceInstallation` class. This c
 administrators who want to ensure that the assessment job has been run on a workspace. It can also be used to debug 
 issues related to the assessment job.
 
+[[back to top](#databricks-labs-ucx)]
+
 ### `repair-run` command
 
 This command repairs a failed job. It takes a `WorkspaceClient` object and a `step` parameter as parameters and repairs 
 the specified step using the `WorkspaceInstallation` class. This command is useful for developers and administrators who 
 want to repair a failed job. It can also be used to debug issues related to job failures.
+
+[[back to top](#databricks-labs-ucx)]
 
 ### `open-remote-config` command
 
@@ -281,12 +305,16 @@ access the configuration file from the command line. Here's the description of c
   * `override_clusters`: An optional dictionary mapping job cluster names to existing cluster IDs.
   * `policy_id`: An optional string representing the ID of the cluster policy.
 
+[[back to top](#databricks-labs-ucx)]
+
 ### `workflows` command
 
 This command displays the deployed workflows and their state in the current workspace. It fetches the latest job status from 
 the workspace and prints it in JSON format. This command is useful for developers and administrators who want to check the status 
 of their workflows and ensure that they are running as expected. It can also be used for debugging purposes when a workflow 
 is not behaving as expected.
+
+[[back to top](#databricks-labs-ucx)]
 
 ### `installations` command
 
@@ -295,12 +323,16 @@ the `ucx` package is installed and prints their details in JSON format. This com
 want to see which users have installed `ucx` and where. It can also be used to debug issues related to multiple 
 installations of `ucx` on the same workspace.
 
+[[back to top](#databricks-labs-ucx)]
+
 ### `validate-groups-membership` command
 
 This command validates the groups to see if the groups at the account level and workspace level have different membership. 
 It takes a `WorkspaceClient` object as a parameter and validates the group membership using the `GroupManager` class. 
 This command is useful for administrators who want to ensure that the groups have the correct membership. It can also be
 used to debug issues related to group membership.
+
+[[back to top](#databricks-labs-ucx)]
 
 ## Table migration commands
 
@@ -311,12 +343,16 @@ the table mapping using the `TableMapping` and `TablesCrawler` classes. This com
 administrators who want to review the table mapping before it is used in the assessment process. It can also be used to 
 debug issues related to table mapping.
 
+[[back to top](#databricks-labs-ucx)]
+
 ### `skip` command
 
 This command creates a skip comment on a schema or a table. It allows users to skip certain schemas or tables during 
 the assessment process. The command takes `schema` and `table` parameters to specify the schema and table to skip. 
 This command is useful for developers and administrators who want to exclude certain schemas or tables from 
 the assessment process. It can also be used to temporarily disable assessment on a particular schema or table.
+
+[[back to top](#databricks-labs-ucx)]
 
 ### `revert-migrated-tables` command
 
@@ -325,6 +361,8 @@ a parameter and removes the notation using the `TablesMigrate` and `TableMove` c
 This command is useful for developers and administrators who want to revert the migration of a table. It can also be used 
 to debug issues related to table migration.
 
+[[back to top](#databricks-labs-ucx)]
+
 ### `move` command
 
 This command moves a UC table/tables from one schema to another schema in the same or different catalog. 
@@ -332,12 +370,16 @@ It takes a `WorkspaceClient` object and `from` and `to` parameters as parameters
 the `TableMove` class. This command is useful for developers and administrators who want to move tables between schemas. 
 It can also be used to debug issues related to table movement.
 
+[[back to top](#databricks-labs-ucx)]
+
 ### `alias` command
 
 This command aliases a UC table/tables from one schema to another schema in the same or different catalog. 
 It takes a `WorkspaceClient` object and `from` and `to` parameters as parameters and aliases the tables using 
 the `TableMove` class. This command is useful for developers and administrators who want to create an alias for a table. 
 It can also be used to debug issues related to table aliasing.
+
+[[back to top](#databricks-labs-ucx)]
 
 ## Multi-workspace commands
 
@@ -348,12 +390,16 @@ It takes an `AccountClient` object as a parameter and syncs the workspace info u
 This command is useful for administrators who want to ensure that all workspaces in the account have the same configuration. 
 It can also be used to update the configuration on all workspaces after making changes to the configuration file.
 
+[[back to top](#databricks-labs-ucx)]
+
 ### `manual-workspace-info` command
 
 This command is only supposed to be run if the `sync-workspace-info` command cannot be run. It prompts the user to enter 
 the required information manually and creates the workspace info. This command is useful for developers and administrators 
 who are unable to use the `sync-workspace-info` command for some reason. It can also be used to manually create 
 the workspace info in a new workspace.
+
+[[back to top](#databricks-labs-ucx)]
 
 ### `create-account-groups` command
 
@@ -362,6 +408,8 @@ It takes an `AccountClient` object as a parameter and creates the account groups
 the `create_account_level_groups()` method. This command is useful for administrators who want to manage access to 
 resources at the account level. It can also be used to ensure that all workspaces in the account have the same groups 
 and permissions.
+
+[[back to top](#databricks-labs-ucx)]
 
 ## Getting information from AWS or Azure
 
@@ -373,6 +421,8 @@ the permissions using the `AzureResourcePermissions` and `AWSResourcePermissions
 developers and administrators who want to ensure that their storage accounts have the correct permissions. It can also 
 be used to debug issues related to storage account permissions.
 
+[[back to top](#databricks-labs-ucx)]
+
 ### `migrate-credentials` command
 
 This command migrates Azure Service Principals, which have `Storage Blob Data Contributor`, `Storage Blob Data Reader`, 
@@ -381,12 +431,16 @@ It takes a `WorkspaceClient` object as a parameter and migrates the credentials 
 This command is useful for developers and administrators who want to migrate their Azure Service Principal credentials 
 to UC storage credentials. It can also be used to debug issues related to Azure Service Principal credentials.
 
+[[back to top](#databricks-labs-ucx)]
+
 ### `validate-external-locations` command
 
 This command validates and provides mapping to external tables to external locations and shared generation TF scripts. 
 It takes a `WorkspaceClient` object as a parameter and validates the external locations using the `ExternalLocations` 
 and `TablesCrawler` classes. This command is useful for developers and administrators who want to ensure that their 
 external locations are correctly mapped and accessible. It can also be used to debug issues related to external locations.
+
+[[back to top](#databricks-labs-ucx)]
 
 ### Scanning for legacy credentials and mapping access
 #### AWS
@@ -398,6 +452,8 @@ This requires `awscli` to be installed and configured.
 databricks labs ucx principal-prefix-access --aws-profile test-profile
 ```
 
+[[back to top](#databricks-labs-ucx)]
+
 #### Azure
 Use to identify all storage account used by tables, identify the relevant Azure service principals and their permissions on each storage account.
 This requires `azure-cli` to be installed and configured. 
@@ -406,6 +462,8 @@ This requires `azure-cli` to be installed and configured.
 databricks labs ucx principal-prefix-access --subscription-id test-subscription-id
 ```
 
+[[back to top](#databricks-labs-ucx)]
+
 ### Producing table mapping
 Use to create a table mapping CSV file, which provides the target mapping for all `hive_metastore` tables identified by the assessment workflow.
 This file can be reviewed offline and later will be used for table migration.
@@ -413,6 +471,8 @@ This file can be reviewed offline and later will be used for table migration.
 ```commandline
 databricks labs ucx table-mapping 
 ```
+
+[[back to top](#databricks-labs-ucx)]
 
 ### Managing cross-workspace installation
 When installing UCX across multiple workspaces, users needs to keep UCX configurations in sync. The below commands address that.
@@ -431,12 +491,16 @@ UCX will ask to confirm the current workspace name, and the ID & name of the tar
 databricks labs ucx manual-workspace-info
 ```
 
+[[back to top](#databricks-labs-ucx)]
+
 ### Validating group membership
 Use to validate workspace-level & account-level groups to identify any discrepancies in membership after migration.
 
 ```commandline
 databricks labs ucx validate-groups-membership
 ```
+
+[[back to top](#databricks-labs-ucx)]
 
 ### Creating account groups
 Crawl all workspaces configured in workspace_ids, then creates account level groups if a WS local group is not present 
@@ -453,9 +517,13 @@ account
 databricks labs ucx create-account-groups --workspace_ids <comma separated list of workspace id>
 ```
 
+[[back to top](#databricks-labs-ucx)]
+
 ## Star History
 
 [![Star History Chart](https://api.star-history.com/svg?repos=databrickslabs/ucx&type=Date)](https://star-history.com/#databrickslabs/ucx)
+
+[[back to top](#databricks-labs-ucx)]
 
 ## Project Support
 Please note that all projects in the databrickslabs GitHub account are provided for your exploration only, and are not formally supported by Databricks with Service Level Agreements (SLAs).  They are provided AS-IS, and we do not make any guarantees of any kind.  Please do not submit a support ticket relating to any issues arising from the use of these projects.
