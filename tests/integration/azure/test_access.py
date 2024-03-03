@@ -2,7 +2,6 @@ import json
 import logging
 
 import pytest
-
 from databricks.labs.blueprint.installation import Installation
 
 from databricks.labs.ucx.azure.access import AzureResourcePermissions
@@ -53,6 +52,7 @@ def test_save_spn_permissions_local(ws, sql_backend, inventory_schema, make_rand
     az_res_perm = AzureResourcePermissions(installation, ws, azure_resources, location)
     path = az_res_perm.save_spn_permissions()
     assert ws.workspace.get_status(path)
+
 
 @pytest.mark.skip
 def test_create_global_spn(ws, sql_backend, inventory_schema, make_random, make_cluster_policy):
