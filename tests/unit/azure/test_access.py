@@ -35,9 +35,23 @@ def test_save_spn_permissions_no_external_table(caplog):
     assert [rec.message for rec in caplog.records if msg in rec.message]
 
 
-def test_save_spn_permissions_no_azure_storage_account():
+def test_save_spn_permissions_no_external_tables():
     w = create_autospec(WorkspaceClient)
     rows = {"SELECT \\* FROM ucx.external_locations": [["s3://bucket1/folder1", "0"]]}
+    backend = MockBackend(rows=rows)
+    location = ExternalLocations(w, backend, "ucx")
+    installation = MockInstallation()
+    azure_resources = create_autospec(AzureResources)
+    azure_resource_permission = AzureResourcePermissions(installation, w, azure_resources, location)
+    azure_resources.storage_accounts.return_value = []
+    assert not azure_resource_permission.save_spn_permissions()
+
+
+def test_save_spn_permissions_no_azure_storage_account():
+    w = create_autospec(WorkspaceClient)
+    rows = {
+        "SELECT \\* FROM ucx.external_locations": [["abfss://container1@storage1.dfs.core.windows.net/folder1", "1"]]
+    }
     backend = MockBackend(rows=rows)
     location = ExternalLocations(w, backend, "ucx")
     installation = MockInstallation()
@@ -138,7 +152,7 @@ def test_create_global_spn_no_storage():
     backend = MockBackend(rows=rows)
     location = ExternalLocations(w, backend, "ucx")
     installation = create_autospec(Installation)
-    installation.load.return_value = WorkspaceConfig(inventory_database='ucx')
+    installation.load.return_value = WorkspaceConfig(inventory_database='ucx', policy_id="foo1")
     azure_resources = create_autospec(AzureResources)
     azure_resource_permission = AzureResourcePermissions(installation, w, azure_resources, location)
     assert not azure_resource_permission.create_uber_principal()

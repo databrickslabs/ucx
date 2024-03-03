@@ -126,17 +126,15 @@ class AzureAPIClient:
             query = {"api-version": api_version}
         return self._api_client.do("GET", path, query, headers)
 
-    def put(self, path: str, body: dict | None = None, api_version: str | None = None):
+    def put(self, path: str, body: dict | None = None):
         headers = {"Content-Type": "application/json"}
-        query = {}
-        if api_version is not None:
-            query = {"api-version": api_version}
+        query: dict[str, str] = {}
         if body is not None:
             return self._api_client.do("PUT", path, query, headers, body)
         return self._api_client.do("PUT", path, query, headers)
 
     @property
-    def token(self):
+    def _token(self):
         return self._token_source.token()
 
 
