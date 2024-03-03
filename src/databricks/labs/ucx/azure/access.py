@@ -154,10 +154,9 @@ class AzureResourcePermissions:
         config = self._installation.load(WorkspaceConfig)
         policy_id = config.policy_id
         if policy_id is None:
-            logger.error(
-                "UCX cluster policy not found in config. Please run latest UCX installation to set cluster policy"
-            )
-            return
+            msg = "UCX cluster policy not found in config. Please run latest UCX installation to set cluster policy"
+            logger.error(msg)
+            raise ValueError(msg) from None
         if config.global_spn_id is not None:
             logger.error("Global service principal already created for this workspace.")
             return

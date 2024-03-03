@@ -354,5 +354,5 @@ def test_create_master_principal_no_subscription(ws):
 def test_create_master_principal(ws):
     ws.config.auth_type = "azure-cli"
     ws.config.is_azure = True
-    create_uber_principal(ws, subscription_id="12")
-    ws.workspace.get_status.assert_called()
+    with pytest.raises(ValueError):
+        create_uber_principal(ws, subscription_id="12")

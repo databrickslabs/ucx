@@ -129,7 +129,8 @@ def test_create_global_spn_no_policy():
     installation.load.return_value = WorkspaceConfig(inventory_database='ucx')
     azure_resources = create_autospec(AzureResources)
     azure_resource_permission = AzureResourcePermissions(installation, w, azure_resources, location)
-    assert not azure_resource_permission.create_uber_principal()
+    with pytest.raises(ValueError):
+        azure_resource_permission.create_uber_principal()
 
 
 def test_create_global_spn_spn_present():
