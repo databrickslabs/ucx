@@ -4,6 +4,8 @@ SELECT "clusters" AS object_type, cluster_id AS object_id, failures FROM $invent
 UNION ALL
 SELECT "global init scripts" AS object_type, script_id AS object_id, failures FROM $inventory.global_init_scripts
 UNION ALL
+SELECT "submit_runs" AS object_type, hashed_id AS object_id, failures FROM $inventory.submit_runs
+UNION ALL
 SELECT "pipelines" AS object_type, pipeline_id AS object_id, failures FROM $inventory.pipelines
 UNION ALL
 SELECT object_type, object_id, failures FROM (
