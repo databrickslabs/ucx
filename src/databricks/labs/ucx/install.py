@@ -187,7 +187,6 @@ class WorkspaceInstaller:
         wheel_builder_factory: Callable[[], WheelsV2] | None = None,
     ):
         logger.info(f"Installing UCX v{PRODUCT_INFO.version()}")
-        self._get_existing_database_names()
         config = self.configure()
         if not sql_backend_factory:
             sql_backend_factory = self._new_sql_backend
@@ -244,6 +243,8 @@ class WorkspaceInstaller:
         if inventory_database in self._existing_database_names:
             raise RuntimeWarning(f"Inventory database with name {inventory_database} already exists")
 
+        if self._check_inventory_database_exists(inventory_database):
+            raise RuntimeWarning(f"Inventory database with name {inventory_database} already exists")
 
         # If there is a previous installation, return corresponding WorkspaceConfig
         # Else configure will create WorkspaceConfig for a fresh install
