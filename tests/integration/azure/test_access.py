@@ -32,7 +32,6 @@ def test_azure_storage_accounts(ws, sql_backend, inventory_schema, make_random):
     azure_resources = AzureResources(azure_mgmt_client, graph_client)
     az_res_perm = AzureResourcePermissions(installation, ws, azure_resources, location)
     az_res_perm.save_spn_permissions()
-
     mapping = az_res_perm.load()
     assert mapping[0].prefix == "abfss://things@labsazurethings.dfs.core.windows.net/"
 
