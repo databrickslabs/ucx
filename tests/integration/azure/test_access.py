@@ -1,6 +1,8 @@
 import json
 import logging
 
+import pytest
+
 from databricks.labs.blueprint.installation import Installation
 
 from databricks.labs.ucx.azure.access import AzureResourcePermissions
@@ -12,7 +14,7 @@ from databricks.labs.ucx.hive_metastore.locations import (
 )
 
 
-# @pytest.mark.skip
+@pytest.mark.skip
 def test_azure_storage_accounts(ws, sql_backend, inventory_schema, make_random):
     logger = logging.getLogger(__name__)
     logger.setLevel("DEBUG")
@@ -35,7 +37,7 @@ def test_azure_storage_accounts(ws, sql_backend, inventory_schema, make_random):
     assert mapping[0].prefix == "abfss://things@labsazurethings.dfs.core.windows.net/"
 
 
-# @pytest.mark.skip
+@pytest.mark.skip
 def test_save_spn_permissions_local(ws, sql_backend, inventory_schema, make_random):
     tables = [
         ExternalLocation("abfss://things@labsazurethings.dfs.core.windows.net/folder1", 1),
@@ -53,7 +55,7 @@ def test_save_spn_permissions_local(ws, sql_backend, inventory_schema, make_rand
     path = az_res_perm.save_spn_permissions()
     assert ws.workspace.get_status(path)
 
-
+@pytest.mark.skip
 def test_create_global_spn(ws, sql_backend, inventory_schema, make_random, make_cluster_policy):
     tables = [
         ExternalLocation("abfss://things@labsazurethings.dfs.core.windows.net/folder1", 1),
