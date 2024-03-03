@@ -197,7 +197,7 @@ def test_create_global_spn(mocker):
     )
     # call_2 = call(cluster_policy.as_dict(), filename='policy-backup.json')
     installation.save.assert_has_calls([call_1])
-    path = "subscriptions/002/resourceGroups/rg1/storageAccounts/sto2/providers/Microsoft.Authorization/roleAssignments/e97fa67e-cf3a-49f4-987b-2fc8a3be88a1"
+    path = "subscriptions/002/resourceGroups/rg1/storageAccounts/sto2/providers/Microsoft.Authorization/roleAssignments/12345"
     body = {
         'properties': {
             'principalId': 'Iduser1',
@@ -207,9 +207,10 @@ def test_create_global_spn(mocker):
     }
     call_1 = call("/v1.0/applications", {"displayName": "UCXServicePrincipal"})
     call_2 = call("/v1.0/servicePrincipals", {"appId": "appIduser1"})
-    call_3 = call("/v1.0/servicePrincipals(appId='appIduser1')/addPassword")
-    call_4 = call(path, body)
-    api_client.put.assert_has_calls([call_1, call_2, call_3, call_4], any_order=True)
+    call_3 = call("/v1.0/servicePrincipals/Iduser1/addPassword")
+    call_4 = call(path, "2022-04-01", body)
+    api_client.post.assert_has_calls([call_1, call_2, call_3], any_order=True)
+    api_client.put.assert_has_calls([call_4], any_order=True)
     definition = {
         "foo": "bar",
         "spark_conf.fs.azure.account.oauth2.client.id.sto2.dfs.core.windows.net": {

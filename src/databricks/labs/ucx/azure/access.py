@@ -182,7 +182,7 @@ class AzureResourcePermissions:
             f"Applying permission on storage accounts"
         )
         for storage in storage_account_info:
-            self._azurerm.apply_storage_permission(global_principal.object_id, storage, "STORAGE_BLOB_READER")
+            self._azurerm.apply_storage_permission(global_principal.object_id, storage, "STORAGE_BLOB_DATA_READER")
             logger.debug(
                 f"Storage Data Blob Reader permission applied for spn {global_principal.client_id} "
                 f"to storage account {storage.storage_account}"

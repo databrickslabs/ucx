@@ -1,5 +1,5 @@
 import pytest
-from databricks.sdk.errors import PermissionDenied
+from databricks.sdk.errors import PermissionDenied, ResourceConflict
 
 from databricks.labs.ucx.azure.resources import (
     AzureAPIClient,
@@ -96,7 +96,7 @@ def test_create_service_principal(mocker):
 
 def test_create_service_principal_no_access(mocker):
     api_client = azure_api_client(mocker)
-    api_client.put.side_effect = PermissionDenied()
+    api_client.post.side_effect = PermissionDenied()
     azure_resource = AzureResources(api_client, api_client)
     with pytest.raises(PermissionDenied):
         azure_resource.create_service_principal()
@@ -106,8 +106,8 @@ def test_apply_storage_permission(mocker):
     api_client = azure_api_client(mocker)
     azure_resource = AzureResources(api_client, api_client)
     azure_storage = AzureResource("subscriptions/002/resourceGroups/rg1/storageAccounts/sto2")
-    azure_resource.apply_storage_permission("test", azure_storage, "STORAGE_BLOB_READER")
-    path = "subscriptions/002/resourceGroups/rg1/storageAccounts/sto2/providers/Microsoft.Authorization/roleAssignments/e97fa67e-cf3a-49f4-987b-2fc8a3be88a1"
+    azure_resource.apply_storage_permission("test", azure_storage, "STORAGE_BLOB_DATA_READER")
+    path = "subscriptions/002/resourceGroups/rg1/storageAccounts/sto2/providers/Microsoft.Authorization/roleAssignments/12345"
     body = {
         'properties': {
             'principalId': 'test',
@@ -116,7 +116,7 @@ def test_apply_storage_permission(mocker):
         }
     }
 
-    api_client.put.assert_called_with(path, body)
+    api_client.put.assert_called_with(path, "2022-04-01", body)
 
 
 def test_apply_storage_permission_no_access(mocker):
@@ -125,20 +125,37 @@ def test_apply_storage_permission_no_access(mocker):
     azure_storage = AzureResource("subscriptions/002/resourceGroups/rg1/storageAccounts/sto2")
     azure_resource = AzureResources(api_client, api_client)
     with pytest.raises(PermissionDenied):
-        azure_resource.apply_storage_permission("test", azure_storage, "STORAGE_BLOB_READER")
+        azure_resource.apply_storage_permission("test", azure_storage, "STORAGE_BLOB_DATA_READER")
+
+
+def test_apply_storage_permission_assignment_present(mocker):
+    api_client = azure_api_client(mocker)
+    api_client.put.side_effect = ResourceConflict()
+    azure_storage = AzureResource("subscriptions/002/resourceGroups/rg1/storageAccounts/sto2")
+    azure_resource = AzureResources(api_client, api_client)
+    azure_resource.apply_storage_permission("test", azure_storage, "STORAGE_BLOB_DATA_READER")
+    path = "subscriptions/002/resourceGroups/rg1/storageAccounts/sto2/providers/Microsoft.Authorization/roleAssignments/12345"
+    body = {
+        'properties': {
+            'principalId': 'test',
+            'principalType': 'ServicePrincipal',
+            'roleDefinitionId': '/subscriptions/002/providers/Microsoft.Authorization/roleDefinitions/2a2b9908-6ea1-4ae2-8e65-a410df84e7d1',
+        }
+    }
+    api_client.put.assert_called_with(path, "2022-04-01", body)
 
 
 def test_azure_client_api_put_graph(mocker):
     mocker.patch("databricks.sdk.core.ApiClient.do", side_effect=get_az_api_mapping)
     api_client = AzureAPIClient("foo", "bar")
-    result = api_client.put("/v1.0/servicePrincipals", {"foo": "bar"})
+    result = api_client.post("/v1.0/servicePrincipals", {"foo": "bar"})
     assert result.get("appId") == "appIduser1"
 
 
 def test_azure_client_api_put_mgmt(mocker):
     mocker.patch("databricks.sdk.core.ApiClient.do", side_effect=get_az_api_mapping)
     api_client = AzureAPIClient("foo", "bar")
-    result = api_client.put("id001", {"foo": "bar"})
+    result = api_client.put("id001", "2022-04-01", {"foo": "bar"})
     assert result.get("id") == "role1"
 
 
@@ -154,3 +171,9 @@ def test_azure_client_api_get_graph(mocker):
     api_client = AzureAPIClient("foo", "bar")
     principal = api_client.get("/v1.0/directoryObjects/user1", "2022-02-01")
     assert principal.get("appId") == "appIduser1"
+
+
+def test_azure_client_api_delete_spn(mocker):
+    mocker.patch("databricks.sdk.core.ApiClient.do", side_effect=get_az_api_mapping)
+    api_client = AzureAPIClient("foo", "bar")
+    api_client.delete("/applications/1234")

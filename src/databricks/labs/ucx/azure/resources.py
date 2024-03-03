@@ -1,3 +1,4 @@
+import uuid
 from collections.abc import Iterable
 from dataclasses import dataclass
 
@@ -7,17 +8,12 @@ from databricks.sdk.core import (
     Config,
     credentials_provider,
 )
-from databricks.sdk.errors import NotFound, PermissionDenied
+from databricks.sdk.errors import NotFound, PermissionDenied, ResourceConflict
 
 from databricks.labs.ucx.assessment.crawlers import logger
 
 # https://learn.microsoft.com/en-us/azure/role-based-access-control/built-in-roles
-_ROLES = {
-    "STORAGE_BLOB_READER": {
-        "name": "e97fa67e-cf3a-49f4-987b-2fc8a3be88a1",
-        "id": "2a2b9908-6ea1-4ae2-8e65-a410df84e7d1",
-    }
-}
+_ROLES = {"STORAGE_BLOB_DATA_READER": "2a2b9908-6ea1-4ae2-8e65-a410df84e7d1"}
 
 
 @dataclass
@@ -126,15 +122,30 @@ class AzureAPIClient:
             query = {"api-version": api_version}
         return self._api_client.do("GET", path, query, headers)
 
-    def put(self, path: str, body: dict | None = None):
+    def put(self, path: str, api_version: str | None = None, body: dict | None = None):
+        headers = {"Content-Type": "application/json"}
+        query: dict[str, str] = {}
+        if api_version is not None:
+            query = {"api-version": api_version}
+        if body is not None:
+            return self._api_client.do("PUT", path, query, headers, body)
+        return None
+
+    def post(self, path: str, body: dict | None = None):
         headers = {"Content-Type": "application/json"}
         query: dict[str, str] = {}
         if body is not None:
-            return self._api_client.do("PUT", path, query, headers, body)
-        return self._api_client.do("PUT", path, query, headers)
+            return self._api_client.do("POST", path, query, headers, body)
+        return self._api_client.do("POST", path, query, headers)
+
+    def delete(self, path: str):
+        # this method is added only to be used in int test to delete the application once tests pass
+        headers = {"Content-Type": "application/json"}
+        query: dict[str, str] = {}
+        return self._api_client.do("DELETE", path, query, headers)
 
     @property
-    def _token(self):
+    def token(self):
         return self._token_source.token()
 
 
@@ -158,16 +169,19 @@ class AzureResources:
 
     def create_service_principal(self) -> Principal:
         try:
-            application_info: dict[str, str] = self._azure_graph.put(
+            application_info: dict[str, str] = self._azure_graph.post(
                 "/v1.0/applications", {"displayName": "UCXServicePrincipal"}
             )
             app_id = application_info.get("appId")
             assert app_id is not None
-            service_principal_info: dict[str, str] = self._azure_graph.put("/v1.0/servicePrincipals", {"appId": app_id})
-            client_id = service_principal_info.get("appId")
-            assert client_id is not None
-            secret_info: dict[str, str] = self._azure_graph.put(
-                f"/v1.0/servicePrincipals(appId='{client_id}')/addPassword"
+            service_principal_info: dict[str, str] = self._azure_graph.post(
+                "/v1.0/servicePrincipals", {"appId": app_id}
+            )
+            object_id = service_principal_info.get("id")
+            assert object_id is not None
+            secret_info: dict[str, str] = self._azure_graph.post(
+                # f"/v1.0/servicePrincipals(appId='{client_id}')/addPassword"
+                f"/v1.0/servicePrincipals/{object_id}/addPassword"
             )
 
         except PermissionDenied:
@@ -179,7 +193,7 @@ class AzureResources:
             raise PermissionDenied(msg) from None
         secret = secret_info.get("secretText")
         display_name = service_principal_info.get("displayName")
-        object_id = service_principal_info.get("id")
+        client_id = service_principal_info.get("appId")
         principal_type = service_principal_info.get("servicePrincipalType")
         directory_id = service_principal_info.get("appOwnerOrganizationId")
         assert client_id is not None
@@ -194,8 +208,8 @@ class AzureResources:
 
     def apply_storage_permission(self, principal_id: str, resource: AzureResource, role: str):
         try:
-            role_name = _ROLES[role]["name"]
-            role_id = _ROLES[role]["id"]
+            role_name = str(uuid.uuid4())
+            role_id = _ROLES[role]
             path = f"{str(resource)}/providers/Microsoft.Authorization/roleAssignments/{role_name}"
             body = {
                 "properties": {
@@ -205,7 +219,12 @@ class AzureResources:
                     "principalType": "ServicePrincipal",
                 }
             }
-            self._azure_mgmt.put(path, body)
+            self._azure_mgmt.put(path, "2022-04-01", body)
+        except ResourceConflict:
+            logger.warning(
+                f"Role assignment already exists for role {role_name} on storage {resource.storage_account}"
+                f" for spn {principal_id}."
+            )
         except PermissionDenied:
             msg = (
                 "Permission denied. Please run this cmd under the identity of a user who has "

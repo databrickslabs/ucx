@@ -1,13 +1,10 @@
+import json
 import logging
 
 from databricks.labs.blueprint.installation import Installation
 
 from databricks.labs.ucx.azure.access import AzureResourcePermissions
-from databricks.labs.ucx.azure.resources import (
-    AzureAPIClient,
-    AzureResource,
-    AzureResources,
-)
+from databricks.labs.ucx.azure.resources import AzureAPIClient, AzureResources
 from databricks.labs.ucx.config import WorkspaceConfig
 from databricks.labs.ucx.hive_metastore.locations import (
     ExternalLocation,
@@ -20,7 +17,7 @@ def test_azure_storage_accounts(ws, sql_backend, inventory_schema, make_random):
     logger = logging.getLogger(__name__)
     logger.setLevel("DEBUG")
     tables = [
-        ExternalLocation("abfss://data@hsucxstorage.dfs.core.windows.net/folder1", 1),
+        ExternalLocation("abfss://things@labsazurethings.dfs.core.windows.net/folder1", 1),
     ]
     sql_backend.save_table(f"{inventory_schema}.external_locations", tables, ExternalLocation)
     location = ExternalLocations(ws, sql_backend, inventory_schema)
@@ -30,21 +27,18 @@ def test_azure_storage_accounts(ws, sql_backend, inventory_schema, make_random):
         ws.config.arm_environment.service_management_endpoint,
     )
     graph_client = AzureAPIClient("https://graph.microsoft.com", "https://graph.microsoft.com")
-    azure_resources = AzureResources(
-        azure_mgmt_client, graph_client, include_subscriptions="3f2e4d32-8e8d-46d6-82bc-5bb8d962328b"
-    )
+    azure_resources = AzureResources(azure_mgmt_client, graph_client)
     az_res_perm = AzureResourcePermissions(installation, ws, azure_resources, location)
     az_res_perm.save_spn_permissions()
 
     mapping = az_res_perm.load()
-    # assert len(mapping) == 1
-    assert mapping[0].prefix == "hsucxstorage"
+    assert mapping[0].prefix == "abfss://things@labsazurethings.dfs.core.windows.net/"
 
 
 # @pytest.mark.skip
 def test_save_spn_permissions_local(ws, sql_backend, inventory_schema, make_random):
     tables = [
-        ExternalLocation("abfss://data@hsucxstorage.dfs.core.windows.net/folder1", 1),
+        ExternalLocation("abfss://things@labsazurethings.dfs.core.windows.net/folder1", 1),
     ]
     sql_backend.save_table(f"{inventory_schema}.external_locations", tables, ExternalLocation)
     location = ExternalLocations(ws, sql_backend, inventory_schema)
@@ -54,9 +48,7 @@ def test_save_spn_permissions_local(ws, sql_backend, inventory_schema, make_rand
         ws.config.arm_environment.service_management_endpoint,
     )
     graph_client = AzureAPIClient("https://graph.microsoft.com", "https://graph.microsoft.com")
-    azure_resources = AzureResources(
-        azure_mgmt_client, graph_client, include_subscriptions="3f2e4d32-8e8d-46d6-82bc-5bb8d962328b"
-    )
+    azure_resources = AzureResources(azure_mgmt_client, graph_client)
     az_res_perm = AzureResourcePermissions(installation, ws, azure_resources, location)
     path = az_res_perm.save_spn_permissions()
     assert ws.workspace.get_status(path)
@@ -64,7 +56,7 @@ def test_save_spn_permissions_local(ws, sql_backend, inventory_schema, make_rand
 
 def test_create_global_spn(ws, sql_backend, inventory_schema, make_random, make_cluster_policy):
     tables = [
-        ExternalLocation("abfss://data@hsucxstorage.dfs.core.windows.net/folder1", 1),
+        ExternalLocation("abfss://things@labsazurethings.dfs.core.windows.net/folder1", 1),
     ]
     sql_backend.save_table(f"{inventory_schema}.external_locations", tables, ExternalLocation)
     location = ExternalLocations(ws, sql_backend, inventory_schema)
@@ -76,14 +68,13 @@ def test_create_global_spn(ws, sql_backend, inventory_schema, make_random, make_
         ws.config.arm_environment.service_management_endpoint,
     )
     graph_client = AzureAPIClient("https://graph.microsoft.com", "https://graph.microsoft.com")
-    azure_resources = AzureResources(
-        azure_mgmt_client, graph_client, include_subscriptions="3f2e4d32-8e8d-46d6-82bc-5bb8d962328b"
-    )
+    azure_resources = AzureResources(azure_mgmt_client, graph_client)
     az_res_perm = AzureResourcePermissions(installation, ws, azure_resources, location)
     az_res_perm.create_uber_principal()
     config = installation.load(WorkspaceConfig)
     assert config.global_spn_id is not None
-    resource_id = "/subscriptions/3f2e4d32-8e8d-46d6-82bc-5bb8d962328b/resourceGroups/HSRG/providers/Microsoft.Storage/storageAccounts/hsucxstorage"
+    policy_definition = json.loads(ws.cluster_policies.get(policy_id=policy.policy_id).definition)
+    resource_id = "/subscriptions/bf472657-510a-4fad-a050-87cfb4e1a2ce/resourceGroups/HSRG/providers/Microsoft.Storage/storageAccounts/labsazurethings"
     role_assignments = azure_resources.role_assignments(resource_id)
     global_spn_assignment = None
     for assignment in role_assignments:
@@ -92,21 +83,16 @@ def test_create_global_spn(ws, sql_backend, inventory_schema, make_random, make_
             break
     assert global_spn_assignment
     assert global_spn_assignment.principal.client_id == config.global_spn_id
-    assert global_spn_assignment.role_name == "READ_FILES"
-    assert global_spn_assignment.scope == resource_id
-
-
-def test_role_assignment(ws, sql_backend, inventory_schema, make_random, make_cluster_policy):
-
-    azure_mgmt_client = AzureAPIClient(
-        ws.config.arm_environment.resource_manager_endpoint,
-        ws.config.arm_environment.service_management_endpoint,
+    assert global_spn_assignment.role_name == "Storage Blob Data Reader"
+    assert str(global_spn_assignment.scope) == resource_id
+    assert (
+        policy_definition["spark_conf.fs.azure.account.oauth2.client.id.labsazurethings.dfs.core.windows.net"]["value"]
+        == config.global_spn_id
     )
-    graph_client = AzureAPIClient("https://graph.microsoft.com", "https://graph.microsoft.com")
-    azure_resources = AzureResources(
-        azure_mgmt_client, graph_client, include_subscriptions="3f2e4d32-8e8d-46d6-82bc-5bb8d962328b"
+    assert (
+        policy_definition["spark_conf.fs.azure.account.oauth2.client.endpoint.labsazurethings.dfs.core.windows.net"][
+            "value"
+        ]
+        == "https://login.microsoftonline.com/9f37a392-f0ae-4280-9796-f1864a10effc/oauth2/token"
     )
-    azure_r = AzureResource(
-        "/subscriptions/3f2e4d32-8e8d-46d6-82bc-5bb8d962328b/resourceGroups/HSRG/providers/Microsoft.Storage/storageAccounts/hsucxstorage"
-    )
-    azure_resources.apply_storage_permission("99a5f8b1-8402-4968-b6da-35cb3192a729", azure_r, "STORAGE_BLOB_READER")
+    graph_client.delete(f"/v1.0/applications(appId='{config.global_spn_id}')")
