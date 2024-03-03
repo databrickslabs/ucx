@@ -1148,7 +1148,7 @@ def test_get_existing_installation(ws, mocker, mock_installation):
         return Installation(ws, 'ucx', install_folder="/Applications/ucx")
 
     Installation.load = Mock()
-    ws.config = WorkspaceConfig(inventory_database='ucx')
+    ws.config = WorkspaceConfig(inventory_database='ucx_global')
     ws.workspace.get_status = Mock()
 
     # test configure on existing global install
@@ -1157,7 +1157,7 @@ def test_get_existing_installation(ws, mocker, mock_installation):
     installation = Installation(ws, "ucx", install_folder="/Applications/ucx")
     install = WorkspaceInstaller(prompts, installation, ws)
     workspace_config = install.configure()
-    assert workspace_config.inventory_database == 'ucx'
+    assert workspace_config.inventory_database == 'ucx_global'
 
     # test for force user install variable without prompts
     os.environ["UCX_FORCE_INSTALL"] = 'user'
@@ -1178,16 +1178,17 @@ def test_get_existing_installation(ws, mocker, mock_installation):
     )
     install = WorkspaceInstaller(prompts, installation, ws)
     workspace_config = install.configure()
-    assert workspace_config.inventory_database == 'ucx'
+    assert workspace_config.inventory_database == 'ucx_global'
     os.environ.pop('UCX_FORCE_INSTALL', None)
 
     # test configure on existing user install
+    ws.config = WorkspaceConfig(inventory_database='ucx_user')
     ws.workspace.get_status.side_effect = get_status_mock_user
     Installation.load.return_value = ws.config
     installation = Installation(ws, "ucx", install_folder=f"/Users/{ws.current_user.me()}")
     install = WorkspaceInstaller(prompts, installation, ws)
     workspace_config = install.configure()
-    assert workspace_config.inventory_database == 'ucx'
+    assert workspace_config.inventory_database == 'ucx_user'
 
     # test for force global install variable without prompts
     # resetting prompts to remove confirmation
@@ -1224,3 +1225,28 @@ def test_get_existing_installation(ws, mocker, mock_installation):
         "Existing user install and global installation override. " "Need to uninstall and re-install here now"
     )
     os.environ.pop('UCX_FORCE_INSTALL', None)
+
+
+def test_check_inventory_database_exists(ws, mocker, mock_installation):
+    prompts = MockPrompts(
+        {
+            r".*PRO or SERVERLESS SQL warehouse.*": "1",
+            r"Choose how to map the workspace groups.*": "2",
+            r".*workspace group names.*": "g1, g2, g99",
+            r"Open config file in.*": "yes",
+            r"Inventory Database stored in hive_metastore": "ucx_exists",
+            r".*": "",
+        }
+    )
+
+    Installation.load = Mock()
+    ws.config = WorkspaceConfig(inventory_database='ucx_exists')
+
+    # test configure on existing global install
+    Installation.load.return_value = ws.config
+    installation = Installation(ws, "ucx", install_folder="/Applications/ucx")
+    install = WorkspaceInstaller(prompts, installation, ws)
+
+    with pytest.raises(RuntimeWarning) as err:
+        install.configure()
+    assert err.value.args[0] == 'Inventory database with name ucx_exists already exists'
