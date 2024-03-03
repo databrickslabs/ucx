@@ -1,6 +1,7 @@
 import json
+import os
 from datetime import datetime, timedelta
-from unittest.mock import MagicMock, create_autospec, patch
+from unittest.mock import MagicMock, Mock, create_autospec, patch
 
 import pytest
 from databricks.labs.blueprint.installation import Installation, MockInstallation
@@ -1124,3 +1125,102 @@ def test_runs_upgrades_on_more_recent_version(ws, any_prompt):
 
     existing_installation.assert_file_uploaded('logs/README.md')
 
+
+def test_get_existing_installation(ws, mocker, mock_installation):
+    prompts = MockPrompts(
+        {
+            r".*PRO or SERVERLESS SQL warehouse.*": "1",
+            r"Choose how to map the workspace groups.*": "2",
+            r".*workspace group names.*": "g1, g2, g99",
+            r"Open config file in.*": "yes",
+            r".*": "",
+        }
+    )
+
+    def get_status_mock_global(*args):
+        if args[0].startswith("/Users"):
+            raise NotFound
+        return Installation(ws, 'ucx', install_folder="/Applications/ucx")
+
+    def get_status_mock_user(*args):
+        if args[0].startswith("/Applications"):
+            raise NotFound
+        return Installation(ws, 'ucx', install_folder="/Applications/ucx")
+
+    Installation.load = Mock()
+    ws.config = WorkspaceConfig(inventory_database='ucx')
+    ws.workspace.get_status = Mock()
+
+    # test configure on existing global install
+    ws.workspace.get_status.side_effect = get_status_mock_global
+    Installation.load.return_value = ws.config
+    installation = Installation(ws, "ucx", install_folder="/Applications/ucx")
+    install = WorkspaceInstaller(prompts, installation, ws)
+    workspace_config = install.configure()
+    assert workspace_config.inventory_database == 'ucx'
+
+    # test for force user install variable without prompts
+    os.environ["UCX_FORCE_INSTALL"] = 'user'
+    with pytest.raises(RuntimeWarning) as err:
+        install.configure()
+    assert err.value.args[0] == 'Existing global install and user installation override, but no confirmation'
+
+    # test for force user install variable with prompts
+    prompts = MockPrompts(
+        {
+            r".*PRO or SERVERLESS SQL warehouse.*": "1",
+            r"Choose how to map the workspace groups.*": "2",
+            r".*workspace group names.*": "g1, g2, g99",
+            r"Open config file in.*": "yes",
+            r".*UCX is already installed on this workspace.*": "yes",
+            r".*": "",
+        }
+    )
+    install = WorkspaceInstaller(prompts, installation, ws)
+    workspace_config = install.configure()
+    assert workspace_config.inventory_database == 'ucx'
+    os.environ.pop('UCX_FORCE_INSTALL', None)
+
+    # test configure on existing user install
+    ws.workspace.get_status.side_effect = get_status_mock_user
+    Installation.load.return_value = ws.config
+    installation = Installation(ws, "ucx", install_folder=f"/Users/{ws.current_user.me()}")
+    install = WorkspaceInstaller(prompts, installation, ws)
+    workspace_config = install.configure()
+    assert workspace_config.inventory_database == 'ucx'
+
+    # test for force global install variable without prompts
+    # resetting prompts to remove confirmation
+    prompts = MockPrompts(
+        {
+            r".*PRO or SERVERLESS SQL warehouse.*": "1",
+            r"Choose how to map the workspace groups.*": "2",
+            r".*workspace group names.*": "g1, g2, g99",
+            r"Open config file in.*": "yes",
+            r".*": "",
+        }
+    )
+    install = WorkspaceInstaller(prompts, installation, ws)
+    os.environ["UCX_FORCE_INSTALL"] = 'global'
+    with pytest.raises(RuntimeWarning) as err:
+        install.configure()
+    assert err.value.args[0] == "Existing user install and global installation override, but no confirmation"
+
+    # test for force global install variable with prompts
+    prompts = MockPrompts(
+        {
+            r".*PRO or SERVERLESS SQL warehouse.*": "1",
+            r"Choose how to map the workspace groups.*": "2",
+            r".*workspace group names.*": "g1, g2, g99",
+            r"Open config file in.*": "yes",
+            r".*UCX is already installed on this workspace.*": "yes",
+            r".*": "",
+        }
+    )
+    install = WorkspaceInstaller(prompts, installation, ws)
+    with pytest.raises(RuntimeWarning) as err:
+        install.configure()
+    assert err.value.args[0] == (
+        "Existing user install and global installation override. " "Need to uninstall and re-install here now"
+    )
+    os.environ.pop('UCX_FORCE_INSTALL', None)
