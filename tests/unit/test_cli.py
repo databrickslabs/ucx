@@ -345,7 +345,7 @@ def test_create_master_principal_no_azure_cli(ws):
 
 
 def test_create_master_principal_no_subscription(ws):
-    ws.config.auth_type = "azure_clis"
+    ws.config.auth_type = "azure-cli"
     ws.config.is_azure = True
     create_uber_principal(ws, subscription_id="")
     ws.workspace.get_status.assert_not_called()
