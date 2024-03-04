@@ -48,8 +48,14 @@ def new_installation(ws, sql_backend, env_or_skip, inventory_schema, make_random
         force_prompt_confirmation='no',
     ):
         prefix = make_random(4)
-        ProductInfo = MagicMock()  # pylint: disable=invalid-name
-        ProductInfo.product_name.return_value = prefix
+
+        # hack to mock the product info
+        # pylint: disable=import-outside-toplevel
+        from databricks.labs.ucx import install
+
+        install.PRODUCT_INFO = MagicMock()
+        install.PRODUCT_INFO.product_name.return_value = prefix
+
         if single_user_install:
             ucx_install_path = f"/Users/{ws.current_user.me().user_name}/.{prefix}"
             single_user_prompt_response = "yes"
@@ -58,7 +64,7 @@ def new_installation(ws, sql_backend, env_or_skip, inventory_schema, make_random
             single_user_prompt_response = "no"
 
         if not fresh_install and force_prompt_confirmation == "no":
-            ProductInfo.product_name.return_value = existing_installation_prefix
+            install.PRODUCT_INFO.product_name.return_value = existing_installation_prefix
 
         renamed_group_prefix = f"rename-{prefix}-"
 
@@ -70,7 +76,7 @@ def new_installation(ws, sql_backend, env_or_skip, inventory_schema, make_random
                 r".*PRO or SERVERLESS SQL warehouse.*": "1",
                 r"Choose how to map the workspace groups.*": "1",
                 r".*connect to the external metastore?.*": "yes",
-                r".*Inventory Database.*": inventory_schema,
+                r".*Inventory Database.*": f"{inventory_schema}_{prefix}",
                 r".*Backup prefix*": renamed_group_prefix,
                 r"Do you want to install for a single user?": single_user_prompt_response,
                 r".*UCX is already installed on this workspace.*": force_prompt_confirmation,
@@ -364,7 +370,7 @@ def test_single_user_installation(new_installation):
     single_user_installation.uninstall()
 
 
-def test_global_installation_on_existing_global_install(ws, new_installation):
+def test_global_installation_on_existing_global_install(new_installation):
     # TODO: Finish up the initial install and then pass the prefix
     existing_global_installation = new_installation(single_user_install=False)
     mock_product_value = existing_global_installation.folder[-4:]
@@ -374,7 +380,7 @@ def test_global_installation_on_existing_global_install(ws, new_installation):
     reinstall_global.uninstall()
 
 
-def test_user_installation_on_existing_global_install(ws, new_installation):
+def test_user_installation_on_existing_global_install(new_installation):
     # existing install at global level
     existing_global_installation = new_installation(single_user_install=False)
     mock_product_value = existing_global_installation.folder[-4:]
@@ -407,7 +413,7 @@ def test_user_installation_on_existing_global_install(ws, new_installation):
     existing_global_installation.uninstall()
 
 
-def test_global_installation_on_existing_user_install(ws, new_installation):
+def test_global_installation_on_existing_user_install(new_installation):
     # existing installation at user level
     existing_user_installation = new_installation(single_user_install=True)
     mock_product_value = existing_user_installation.folder[-4:]
