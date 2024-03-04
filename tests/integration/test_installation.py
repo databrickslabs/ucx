@@ -336,10 +336,8 @@ def test_partitioned_tables(ws, sql_backend, new_installation, inventory_schema,
 
     tables = TablesCrawler(sql_backend, inventory_schema)
 
-    # table is_partitioned = False before the snapshot (checked on the tables)
     all_tables = {}
     for table in tables.snapshot():
-        # table now is_partitioned is True ????
         all_tables[table.key] = table
 
     assert len(all_tables) >= 2
