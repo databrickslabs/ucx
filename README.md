@@ -16,7 +16,7 @@ See [contributing instructions](CONTRIBUTING.md) to help improve this project.
 <!-- TOC -->
 * [Databricks Labs UCX](#databricks-labs-ucx)
 * [Installation](#installation)
-  * [Download and configure Databricks Command Line Interface](#download-and-configure-databricks-command-line-interface)
+  * [Authenticate Databricks CLI](#authenticate-databricks-cli)
   * [Install UCX](#install-ucx)
   * [Upgrading UCX for newer versions](#upgrading-ucx-for-newer-versions)
   * [Uninstall UCX](#uninstall-ucx)
@@ -39,10 +39,10 @@ See [contributing instructions](CONTRIBUTING.md) to help improve this project.
   * [`migrate-credentials` command](#migrate-credentials-command)
   * [`validate-external-locations` command](#validate-external-locations-command)
   * [`create-table-mapping` command](#create-table-mapping-command)
-    * [`skip` command](#skip-command)
-    * [`revert-migrated-tables` command](#revert-migrated-tables-command)
-    * [`move` command](#move-command)
-    * [`alias` command](#alias-command)
+  * [`skip` command](#skip-command)
+  * [`revert-migrated-tables` command](#revert-migrated-tables-command)
+  * [`move` command](#move-command)
+  * [`alias` command](#alias-command)
 * [Cross-workspace installations](#cross-workspace-installations)
   * [`sync-workspace-info` command](#sync-workspace-info-command)
   * [`manual-workspace-info` command](#manual-workspace-info-command)
@@ -54,7 +54,7 @@ See [contributing instructions](CONTRIBUTING.md) to help improve this project.
 
 # Installation
 
-- Databricks CLI v0.213 or later. See [instructions](#download-and-configure-databricks-command-line-interface). 
+- Databricks CLI v0.213 or later. See [instructions](#authenticate-databricks-cli). 
 - Python 3.10 or later. See [Windows](https://www.python.org/downloads/windows/) instructions.
 - Network access to your Databricks Workspace used for the [installation process](#install-ucx).
 - Network access to the Internet for [pypi.org](https://pypi.org) and [github.com](https://github.com) from machine running the installation.
@@ -67,7 +67,7 @@ See [contributing instructions](CONTRIBUTING.md) to help improve this project.
 
 [[back to top](#databricks-labs-ucx)]
 
-## Download and configure Databricks Command Line Interface
+## Authenticate Databricks CLI
 
 We only support installations and upgrades through [Databricks CLI](https://docs.databricks.com/en/dev-tools/cli/index.html), as UCX requires an installation script run 
 to make sure all the necessary and correct configurations are in place. Install Databricks CLI on macOS:
@@ -251,7 +251,7 @@ Every workflow run stores debug logs in the `logs` folder of the [installation](
 For tasks shorter than 10 minutes, they appear after task finish, whereas longer-running tasks 
 flush the logs every 10 minutes.
 
-To enable debug logs of [command-line interface](#download-and-configure-databricks-command-line-interface), 
+To enable debug logs of [command-line interface](#authenticate-databricks-cli), 
 simply add `--debug` flag to any command.
 
 [[back to top](#databricks-labs-ucx)]
@@ -494,7 +494,11 @@ to move tables between schemas. It can also be used to debug issues related to t
 
 [[back to top](#databricks-labs-ucx)]
 
-### `alias` command
+## `alias` command
+
+```text
+databricks labs ucx alias --from-catalog A --from-schema B --from-table C --to-catalog D --to-schema E  
+```
 
 This command aliases a UC table/tables from one schema to another schema in the same or different catalog. 
 It takes a `WorkspaceClient` object and `from` and `to` parameters as parameters and aliases the tables using 
