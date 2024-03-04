@@ -1332,5 +1332,6 @@ def test_save_config_should_include_databases(ws, mock_installation):
             'renamed_group_prefix': 'db-temp-',
             'warehouse_id': 'abc',
             'workspace_start_path': '/',
+            'num_days_submit_runs_history': 30,
         },
     )
