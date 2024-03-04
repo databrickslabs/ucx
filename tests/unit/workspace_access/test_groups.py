@@ -866,6 +866,7 @@ def test_validate_group_diff_membership():
             "wf_group_members_count": 2,
             "acc_group_name": "ac_test_1234",
             "acc_group_members_count": 1,
+            "group_members_difference": 1,
         }
     ]
 

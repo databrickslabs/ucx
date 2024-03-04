@@ -60,6 +60,7 @@ def installation():
                     'client_id': 'app_secret1',
                     'principal': 'principal_1',
                     'privilege': 'WRITE_FILES',
+                    'type': 'Application',
                     'directory_id': 'directory_id_1',
                 },
                 {
@@ -67,6 +68,7 @@ def installation():
                     'client_id': 'app_secret2',
                     'principal': 'principal_read',
                     'privilege': 'READ_FILES',
+                    'type': 'Application',
                     'directory_id': 'directory_id_1',
                 },
                 {
@@ -74,6 +76,7 @@ def installation():
                     'client_id': 'app_secret3',
                     'principal': 'principal_write',
                     'privilege': 'WRITE_FILES',
+                    'type': 'Application',
                     'directory_id': 'directory_id_2',
                 },
                 {
@@ -81,7 +84,15 @@ def installation():
                     'client_id': 'app_secret4',
                     'principal': 'principal_overlap',
                     'privilege': 'WRITE_FILES',
+                    'type': 'Application',
                     'directory_id': 'directory_id_2',
+                },
+                {
+                    'prefix': 'prefix5',
+                    'client_id': 'app_secret4',
+                    'principal': 'managed_identity',
+                    'privilege': 'WRITE_FILES',
+                    'type': 'ManagedIdentity',
                 },
             ],
         }
@@ -160,6 +171,7 @@ def test_create_storage_credentials(credential_manager):
             "app_secret1",
             "principal_write",
             "WRITE_FILES",
+            "Application",
             "directory_id_1",
         ),
         "test",
@@ -170,6 +182,7 @@ def test_create_storage_credentials(credential_manager):
             "app_secret2",
             "principal_read",
             "READ_FILES",
+            "Application",
             "directory_id_1",
         ),
         "test",
@@ -185,7 +198,9 @@ def test_create_storage_credentials(credential_manager):
 
 
 def test_validate_storage_credentials(credential_manager):
-    permission_mapping = StoragePermissionMapping("prefix", "client_id", "principal_1", "WRITE_FILES", "directory_id")
+    permission_mapping = StoragePermissionMapping(
+        "prefix", "client_id", "principal_1", "WRITE_FILES", "Application", "directory_id"
+    )
 
     # validate normal storage credential
     validation = credential_manager.validate(permission_mapping)
@@ -196,7 +211,7 @@ def test_validate_storage_credentials(credential_manager):
 
 def test_validate_read_only_storage_credentials(credential_manager):
     permission_mapping = StoragePermissionMapping(
-        "prefix", "client_id", "principal_read", "READ_FILES", "directory_id_1"
+        "prefix", "client_id", "principal_read", "READ_FILES", "Application", "directory_id_1"
     )
 
     # validate read-only storage credential
@@ -207,7 +222,9 @@ def test_validate_read_only_storage_credentials(credential_manager):
 
 
 def test_validate_storage_credentials_overlap_location(credential_manager):
-    permission_mapping = StoragePermissionMapping("prefix", "client_id", "overlap", "WRITE_FILES", "directory_id_2")
+    permission_mapping = StoragePermissionMapping(
+        "prefix", "client_id", "overlap", "WRITE_FILES", "Application", "directory_id_2"
+    )
 
     # prefix used for validation overlaps with existing external location will raise InvalidParameterValue
     # assert InvalidParameterValue is handled
@@ -218,14 +235,18 @@ def test_validate_storage_credentials_overlap_location(credential_manager):
 
 
 def test_validate_storage_credentials_non_response(credential_manager):
-    permission_mapping = StoragePermissionMapping("prefix", "client_id", "none", "WRITE_FILES", "directory_id")
+    permission_mapping = StoragePermissionMapping(
+        "prefix", "client_id", "none", "WRITE_FILES", "Application", "directory_id"
+    )
 
     validation = credential_manager.validate(permission_mapping)
     assert validation.failures == ["Validation returned none results."]
 
 
 def test_validate_storage_credentials_failed_operation(credential_manager):
-    permission_mapping = StoragePermissionMapping("prefix", "client_id", "fail", "WRITE_FILES", "directory_id_2")
+    permission_mapping = StoragePermissionMapping(
+        "prefix", "client_id", "fail", "WRITE_FILES", "Application", "directory_id_2"
+    )
 
     validation = credential_manager.validate(permission_mapping)
     assert validation.failures == ["LIST validation failed with message: fail"]

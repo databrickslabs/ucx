@@ -35,6 +35,7 @@ class WorkspaceConfig:  # pylint: disable=too-many-instance-attributes
 
     override_clusters: dict[str, str] | None = None
     policy_id: str | None = None
+    num_days_submit_runs_history: int = 30
 
     # Whether the assessment should capture a specific list of databases, if not specified, it will list all databases.
     include_databases: list[str] | None = None
