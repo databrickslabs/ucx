@@ -429,3 +429,37 @@ def test_udf_grants_returning_error_when_describing():
             anonymous_function=False,
         )
     ]
+
+
+def test_crawler_should_filter_databases():
+    sql_backend = MockBackend(
+        rows={
+            "SHOW TABLES FROM hive_metastore.database_one": [
+                ("database_one", "table_one", "true"),
+                ("database_one", "table_two", "true"),
+            ],
+            "SELECT * FROM hive_metastore.schema.tables": [
+                make_row(("foo", "bar", "test_table", "type", "DELTA", "/foo/bar/test", None), SELECT_COLS),
+                make_row(("foo", "bar", "test_view", "type", "VIEW", None, "SELECT * FROM table"), SELECT_COLS),
+                make_row(("foo", None, None, "type", "CATALOG", None, None), SELECT_COLS),
+            ],
+            "DESCRIBE TABLE EXTENDED hive_metastore.database_one.*": [
+                make_row(("Catalog", "foo", "ignored"), DESCRIBE_COLS),
+                make_row(("Type", "TABLE", "ignored"), DESCRIBE_COLS),
+                make_row(("Provider", "", "ignored"), DESCRIBE_COLS),
+                make_row(("Location", "/foo/bar/test", "ignored"), DESCRIBE_COLS),
+                make_row(("View Text", "SELECT * FROM table", "ignored"), DESCRIBE_COLS),
+            ],
+            "SHOW GRANTS ON .*": [
+                make_row(("princ1", "SELECT", "TABLE", "ignored"), SHOW_COLS),
+                make_row(("princ1", "SELECT", "VIEW", "ignored"), SHOW_COLS),
+                make_row(("princ1", "USE", "CATALOG$", "ignored"), SHOW_COLS),
+            ],
+        }
+    )
+    table = TablesCrawler(sql_backend, "schema", include_databases=["database_one"])
+    udf = UdfsCrawler(sql_backend, "schema", include_databases=["database_one"])
+    crawler = GrantsCrawler(table, udf, include_databases=["database_one"])
+    grants = crawler.snapshot()
+    assert len(grants) == 3
+    assert 'SHOW TABLES FROM hive_metastore.database_one' in sql_backend.queries

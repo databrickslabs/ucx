@@ -84,14 +84,14 @@ def getInventoryDatabase(configObj:java.util.Map[String, Any]): String ={
   return configObj.get("inventory_database").toString()
 }
 
-def getDatabasesToFilter(configObj:java.util.Map[String, Any]): List[String] ={
+def getIncludeDatabases(configObj:java.util.Map[String, Any]): List[String] ={
   return JavaConverters.asScalaBuffer(config.get("include_databases").asInstanceOf[java.util.ArrayList[String]]).toList
 }
 
 val config = getConfig()
 val inventoryDatabase = getInventoryDatabase(config)
-val databasesToFilter = getDatabasesToFilter(config)
-var df = metadataForAllTables(spark.sharedState.externalCatalog.listDatabases().filter(databasesToFilter.contains(_)), failures)
+val includeDatabases = getIncludeDatabases(config)
+var df = metadataForAllTables(spark.sharedState.externalCatalog.listDatabases().filter(includeDatabases.contains(_)), failures)
 var columnsToMapLower = Array("catalog","database","name","upgraded_to","storage_properties")
 columnsToMapLower.map(column => {
   df = df.withColumn(column, lower(col(column)))

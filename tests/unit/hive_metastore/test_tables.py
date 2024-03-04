@@ -225,8 +225,15 @@ def test_table_what(table, what):
 def test_tables_crawler_should_filter_by_database():
     rows = {
         "SHOW TABLES FROM hive_metastore.database": [("", "table1", ""), ("", "table2", "")],
+        "SHOW TABLES FROM hive_metastore.database_2": [("", "table1", "")],
     }
     backend = MockBackend(rows=rows)
     tables_crawler = TablesCrawler(backend, "default", ["database"])
     results = tables_crawler.snapshot()
     assert len(results) == 2
+    assert backend.queries == [
+        'SELECT * FROM hive_metastore.default.tables',
+        'SHOW TABLES FROM hive_metastore.database',
+        'DESCRIBE TABLE EXTENDED hive_metastore.database.table1',
+        'DESCRIBE TABLE EXTENDED hive_metastore.database.table2',
+    ]

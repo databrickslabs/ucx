@@ -40,7 +40,7 @@ def test_describe_all_tables_in_databases(ws, sql_backend, inventory_schema, mak
     for table in tables.snapshot():
         all_tables[table.key] = table
 
-    assert len(all_tables) >= 5
+    assert len(all_tables) == 5
     assert all_tables[non_delta.full_name].table_format == "JSON"
     assert all_tables[non_delta.full_name].what == What.DB_DATASET
     assert all_tables[managed_table.full_name].object_type == "MANAGED"

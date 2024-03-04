@@ -192,7 +192,7 @@ class WorkspaceInstaller:
         )
         workspace_installation.run()
 
-    def configure(self) -> WorkspaceConfig:  # pylint: disable=too-many-locals
+    def configure(self) -> WorkspaceConfig:
         try:
             return self._installation.load(WorkspaceConfig)
         except NotFound as err:
@@ -226,14 +226,7 @@ class WorkspaceInstaller:
 
         configure_groups = ConfigureGroups(self._prompts)
         configure_groups.run()
-        selected_databases = self._prompts.question(
-            "Comma-separated list of databases to migrate. If not specified, we'll use all "
-            "databases in hive_metastore",
-            default="<ALL>",
-        )
-        include_databases = None
-        if selected_databases != "<ALL>":
-            include_databases = [x.strip() for x in selected_databases.split(",")]
+        include_databases = self.select_databases()
 
         log_level = self._prompts.question("Log level", default="INFO").upper()
         num_threads = int(self._prompts.question("Number of threads", default="8", valid_number=True))
@@ -274,6 +267,17 @@ class WorkspaceInstaller:
         if self._prompts.confirm(f"Open config file in the browser and continue installing? {ws_file_url}"):
             webbrowser.open(ws_file_url)
         return config
+
+    def select_databases(self):
+        selected_databases = self._prompts.question(
+            "Comma-separated list of databases to migrate. If not specified, we'll use all "
+            "databases in hive_metastore",
+            default="<ALL>",
+        )
+        include_databases = None
+        if selected_databases != "<ALL>":
+            include_databases = [x.strip() for x in selected_databases.split(",")]
+        return include_databases
 
     @staticmethod
     def _policy_config(value: str):
