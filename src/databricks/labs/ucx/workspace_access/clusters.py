@@ -5,6 +5,7 @@ from databricks.labs.blueprint.tui import Prompts
 from databricks.sdk import WorkspaceClient
 from databricks.sdk.errors import InvalidParameterValue
 from databricks.sdk.service.compute import DataSecurityMode
+
 logger = logging.getLogger(__name__)
 
 
@@ -21,8 +22,11 @@ class ClusterAccess:
         prompts = Prompts()
         return ClusterAccess(prompts, ws)
 
-    def map_cluster_to_uc(self, cluster_id):
+    def map_cluster_to_uc(self, cluster_id: str | None = None):
         try:
+            if cluster_id is None:
+                msg = "Cluster Id is not Provided. Please provide the cluster id"
+                raise InvalidParameterValue(msg)
             spark_version = self._ws.clusters.select_spark_version(latest=True)
             security_modes = {"Single User": DataSecurityMode.SINGLE_USER, "Shared": DataSecurityMode.USER_ISOLATION}
             access_mode = self._prompts.choice_from_dict("Select cluster access mode", security_modes)
@@ -48,7 +52,7 @@ class ClusterAccess:
                 cluster_source=cluster_details.cluster_source,
                 instance_pool_id=cluster_details.instance_pool_id,
                 enable_local_disk_encryption=cluster_details.enable_local_disk_encryption,
-                driver_instance_pool_id=cluster_details.driver_instance_pool_id
+                driver_instance_pool_id=cluster_details.driver_instance_pool_id,
             )
         except InvalidParameterValue as e:
             logger.warning(f"skipping cluster remapping: {e}")

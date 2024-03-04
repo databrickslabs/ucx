@@ -20,8 +20,8 @@ from databricks.labs.ucx.hive_metastore import ExternalLocations, TablesCrawler
 from databricks.labs.ucx.hive_metastore.mapping import TableMapping
 from databricks.labs.ucx.hive_metastore.table_migrate import TableMove, TablesMigrate
 from databricks.labs.ucx.install import WorkspaceInstallation
-from databricks.labs.ucx.workspace_access.groups import GroupManager
 from databricks.labs.ucx.workspace_access.clusters import ClusterAccess
+from databricks.labs.ucx.workspace_access.groups import GroupManager
 
 ucx = App(__file__)
 logger = get_logger(__file__)
@@ -330,6 +330,7 @@ def cluster_remap(w: WorkspaceClient, cluster_id):
     """Re-mapping the cluster to UC"""
     if not cluster_id:
         raise KeyError("You did not specify --cluster_id")
+    logger.info(f"Remapping the Cluster: {cluster_id} to UC")
     cluster = ClusterAccess.current(w)
     cluster.map_cluster_to_uc(cluster_id)
 

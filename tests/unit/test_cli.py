@@ -11,6 +11,7 @@ from databricks.sdk.service import iam, sql
 
 from databricks.labs.ucx.cli import (
     alias,
+    cluster_remap,
     create_account_groups,
     create_table_mapping,
     ensure_assessment_run,
@@ -328,3 +329,12 @@ def test_migrate_credentials_azure(ws):
     with patch("databricks.labs.blueprint.tui.Prompts.confirm", return_value=True):
         migrate_credentials(ws)
         ws.storage_credentials.list.assert_called()
+
+
+def test_cluster_remap(ws, caplog):
+    with patch("databricks.labs.blueprint.tui.Prompts.choice_from_dict", return_value="1"):
+        cluster_remap(ws, "test_id")
+        assert "Remapping the Cluster: test_id to UC" in caplog.messages
+    with patch("databricks.labs.blueprint.tui.Prompts.choice_from_dict", return_value="1"):
+        with pytest.raises(KeyError):
+            cluster_remap(ws, None)
