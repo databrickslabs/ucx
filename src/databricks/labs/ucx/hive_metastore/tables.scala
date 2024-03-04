@@ -58,7 +58,6 @@ def metadataForAllTables(databases: Seq[String], queue: ConcurrentLinkedQueue[Ta
                 s"$key=$value"
           }.mkString("[", ", ", "]")
 
-          // Note: sharedState.externalCatalog does not expose accurate partition metadata, so it forced us to use sessionState.catalog instead
           val partitionColumnNames = try {
             spark.sessionState.catalog.getTableMetadata(TableIdentifier(tableName, Some(databaseName))).partitionColumnNames
           } catch {

@@ -141,8 +141,7 @@ class Table:
 
     def sql_migrate_view(self, target_table_key):
         return f"CREATE VIEW IF NOT EXISTS {escape_sql_identifier(target_table_key)} AS {self.view_text};"
-
-
+    
 @dataclass
 class TableError:
     catalog: str
