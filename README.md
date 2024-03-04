@@ -51,7 +51,7 @@ See [contributing instructions](CONTRIBUTING.md) to help improve this project.
   * [Project Support](#project-support)
 <!-- TOC -->
 
-## Introduction
+# Introduction
 UCX will guide you, the Databricks customer, through the process of upgrading your account, groups, workspaces, jobs etc. to Unity Catalog.
 
 1. The upgrade process will first install code, libraries, and workflows into your workspace.
@@ -61,113 +61,76 @@ UCX leverages Databricks Lakehouse platform to upgrade itself. The upgrade proce
 
 By running the installation you install the assessment job and several upgrade jobs. The assessment and upgrade jobs are outlined in the custom-generated README.py that is created by the installer.
 
-The custom-generated `README.py`, `config.yaml`, and other assets are placed into your Databricks workspace home folder, into a sub-folder named `.ucx`. See [interactive tutorial](https://app.getreprise.com/launch/zXPxBZX/).
+The custom-generated `README.py`, `config.yaml`, and other assets are placed into your Databricks workspace home folder, into a sub-folder named `.ucx`.
 
-Once the custom Databricks jobs are installed, begin by triggering the assessment job. The assessment job can be found under your workflows or via the active link in the README.py. Once the assessment job is complete, you can review the results in the custom-generated Databricks dashboard (linked to by the custom README.py found in the workspace folder created for you).
+Once the custom Databricks jobs are installed, begin by triggering [the assessment job](#assessment-workflow). The assessment job can be found under your workflows or via the active link in the README.py. Once the assessment job is complete, you can review the results in the custom-generated Databricks dashboard (linked to by the custom README.py found in the workspace folder created for you).
 
 You will need an account, unity catalog, and workspace administrative authority to complete the upgrade process. To run the installer, you will need to set up `databricks-cli` and a credential, [following these instructions.](https://docs.databricks.com/en/dev-tools/cli/databricks-cli.html) Additionally, the interim metadata and config data being processed by UCX will be stored into a Hive Metastore database schema generated at install time.
 
-
-For questions, troubleshooting or bug fixes, please see your Databricks account team or submit an issue to the [Databricks UCX GitHub repo](https://github.com/databrickslabs/ucx)
-
-[[back to top](#databricks-labs-ucx)]
-
-## Installation
-
-1. Get trained on UC [[free instructor-led training 2x week]](https://customer-academy.databricks.com/learn/course/1683/data-governance-with-unity-catalog?generated_by=302876&hash=4eab6668f83636ba44d109880002b293e8dda6dd) [[full training schedule]](https://files.training.databricks.com/static/ilt-sessions/half-day-workshops/index.html)
-2. You will need a desktop computer, running Windows, macOS, or Linux; This computer is used to install the UCX toolkit onto the Databricks workspace, the computer will also need:
-    -  Network access to your Databricks Workspace
-    -  Network access to the Internet to retrieve additional Python packages (e.g. PyYAML, databricks-sdk,...) and access https://github.com
-    -  Python 3.10 or later - [Windows instructions](https://www.python.org/downloads/)
-    -  Databricks CLI with a workspace [configuration profile](https://docs.databricks.com/en/dev-tools/auth.html#databricks-client-unified-authentication) for workspace - [instructions](https://docs.databricks.com/en/dev-tools/cli/install.html)
-    -  Your Windows computer will need a shell environment (GitBash or ([WSL](https://learn.microsoft.com/en-us/windows/wsl/about))
-3. Within the Databricks Workspace you will need:
-    - Workspace administrator access permissions
-    - The ability for the installer to upload Python Wheel files to DBFS and Workspace FileSystem
-    - A PRO or Serverless SQL Warehouse
-    - The Assessment workflow will create a legacy "No Isolation Shared" and a legacy "Table ACL" jobs clusters needed to inventory Hive Metastore Table ACLS
-    - If your Databricks Workspace relies on an external Hive Metastore (such as AWS Glue), make sure to read the [External HMS Document](docs/external_hms_glue.md).
-4. A number of commands also require Databricks account administrator access permissions, e.g. `sync-workspace-info`
-5. [[AWS]](https://docs.databricks.com/en/administration-guide/users-groups/best-practices.html) [[Azure]](https://learn.microsoft.com/en-us/azure/databricks/administration-guide/users-groups/best-practices)] [[GCP]](https://docs.gcp.databricks.com/administration-guide/users-groups/best-practices.html) Account level Identity Setup
-6. [[AWS]](https://docs.databricks.com/en/data-governance/unity-catalog/create-metastore.html) [[Azure]](https://learn.microsoft.com/en-us/azure/databricks/data-governance/unity-catalog/create-metastore) [[GCP]](https://docs.gcp.databricks.com/data-governance/unity-catalog/create-metastore.html) Unity Catalog Metastore Created (per region)
-
-
- The `WorkspaceInstaller` class is used to create a new configuration for Unity Catalog (UCX) migration in a Databricks workspace. 
- It guides the user through a series of prompts to gather necessary information, such as selecting an inventory database, choosing 
- a PRO or SERVERLESS SQL warehouse, specifying a log level and number of threads, and setting up an external Hive Metastore if necessary. 
- Based on user input, the class creates a new cluster policy with the specified configuration. The user can review and confirm the configuration, 
- which is saved to the workspace and can be opened in a web browser. The class handles the installation of UCX, including configuring the workspace, 
- installing necessary libraries, and verifying the installation, making it easier for users to migrate their workspaces to UCX.
-
-
-The `WorkspaceInstallation` is used to manage the installation and uninstallation of UCX in a workspace. It has various methods to 
-initialize the installation, get the configuration, create and run jobs, upload wheels, and handle exceptions. 
-
-The `run` method installs the product by creating dashboards, database, and jobs. It also handles exceptions that may occur during
-the installation process. The `config_file_link` method returns the link to the configuration file. The `_create_database` method 
-creates a database with the given configuration. The `_create_dashboards` method creates dashboards in the workspace. 
-The `run_workflow` method runs a workflow with a given step. The `_infer_error_from_job_run` method infers the error from a job run. 
-The `_infer_task_exception` method infers the exception from a task run. 
-The `_warehouse_id` method gets the warehouse ID from the configuration or lists the available warehouses and selects the first one. 
-The `_my_username` method gets the username of the current user. The `_short_name` method gets the short name of the user. 
-The `_config_file` method gets the path to the configuration file. The `_name` method creates a name with a prefix. 
-The `_upload_wheel` method uploads the wheel to DBFS and WSFS. The `_upload_cluster_policy` method uploads the cluster policy to the workspace. 
-The `create_jobs` method creates jobs from tasks and handles exceptions. 
-The `_deploy_workflow` method deploys a workflow with a given name and settings. 
-The `_sorted_tasks` method returns a list of tasks sorted by their task ID. The `_step_list` method returns a list of steps. 
-The `_create_readme` method creates a README markdown file with the job and dashboard links. 
-The `_replace_inventory_variable` method replaces a variable in a text. 
-The `_create_debug` method creates a debug notebook in the workspace. 
-The `_job_settings` method creates job settings for a given step. 
-The `_upload_wheel_runner` method uploads a wheel runner notebook to the workspace. 
-The `_apply_cluster_overrides` method applies cluster overrides to the job settings. 
-The `_job_task` method creates a job task for a given task. 
-The `_job_dashboard_task` method creates a job dashboard task for a given task. 
-The `_job_notebook_task` method creates a job notebook task for a given task. 
-The `_job_wheel_task` method creates a job wheel task for a given task. 
-The `_job_clusters` method creates job clusters for a given list of names. 
-The `_readable_timedelta` method converts a timedelta object to a human-readable string. 
-The `latest_job_status` method gets the latest job status for all steps. 
-The `repair_run` method repairs a failed run for a given workflow. 
-The `uninstall` method uninstalls the product from the workspace. 
-The `_remove_database` method removes the inventory database. 
-The `_remove_jobs` method removes all jobs. 
-The `_remove_warehouse` method removes the warehouse. 
-The `_remove_policies` method removes the cluster policy. 
-The `validate_step` method validates if a given step is successful or not. 
-The `validate_and_run` method validates if a given step is successful, and if not, runs the workflow for that step.
+For questions, troubleshooting or bug fixes, please see your Databricks account team or submit [an issue](https://github.com/databrickslabs/ucx/issues)
 
 [[back to top](#databricks-labs-ucx)]
 
-### Download Databricks Command Line interface
+# Installation
 
-We only support installations and upgrades through [Databricks CLI](https://docs.databricks.com/en/dev-tools/cli/index.html), as UCX requires an installation script run to make sure all the necessary and correct configurations are in place. Install Databricks CLI on macOS:
+- Databricks CLI v0.213 or later. See [instructions](#download-and-configure-databricks-command-line-interface). 
+- Python 3.10 or later. See [Windows](https://www.python.org/downloads/windows/) instructions.
+- Network access to your Databricks Workspace used for the [installation process](#install-ucx).
+- Network access to the Internet for [pypi.org](https://pypi.org) and [github.com](https://github.com) from machine running the installation.
+- Databricks Workspace Administrator privileges for the user, that runs the installation.
+- Account level Identity Setup. See instructions for [AWS](https://docs.databricks.com/en/administration-guide/users-groups/best-practices.html), [Azure](https://learn.microsoft.com/en-us/azure/databricks/administration-guide/users-groups/best-practices), and [GCP](https://docs.gcp.databricks.com/administration-guide/users-groups/best-practices.html).
+- Unity Catalog Metastore Created (per region). See instructions for [AWS](https://docs.databricks.com/en/data-governance/unity-catalog/create-metastore.html), [Azure](https://learn.microsoft.com/en-us/azure/databricks/data-governance/unity-catalog/create-metastore), and [GCP](https://docs.gcp.databricks.com/data-governance/unity-catalog/create-metastore.html).
+- If your Databricks Workspace relies on an external Hive Metastore (such as AWS Glue), make sure to read the [this guide](docs/external_hms_glue.md).
+- Databricks Workspace has to have network access to [pypi.org](https://pypi.org) to download `databricks-sdk` and `pyyaml` packages.
+- A PRO or Serverless SQL Warehouse to render the [report](docs/assessment.md) for the [assessment workflow](#assessment-workflow).
+
+[[back to top](#databricks-labs-ucx)]
+
+## Download and configure Databricks Command Line Interface
+
+We only support installations and upgrades through [Databricks CLI](https://docs.databricks.com/en/dev-tools/cli/index.html), as UCX requires an installation script run 
+to make sure all the necessary and correct configurations are in place. Install Databricks CLI on macOS:
 ![macos_install_databricks](docs/macos_1_databrickslabsmac_installdatabricks.gif)
 
 Install Databricks CLI on Windows:
 ![windows_install_databricks.png](docs/windows_install_databricks.png)
 
+Once you install Databricks CLI, authenticate your current machine to a Databricks Workspace:
+
+```commandline
+databricks auth login --host WORKSPACE_HOST
+```
+
 [[back to top](#databricks-labs-ucx)]
 
-### Install UCX - `databricks labs install ucx` 
+## Install UCX
+
 Install UCX via Databricks CLI:
+
 ```commandline
 databricks labs install ucx
 ```
 
-This will start an interactive installer with a number of configuration questions:
-- Select a workspace profile that has been defined in `~/.databrickscfg`
-- Provide the name of the inventory database where UCX will store the assessment results. This will be in the workspace `hive_metastore`. Defaults to `ucx`
-- Create a new or select an existing SQL warehouse to run assessment dashboards on. The existing warehouse must be Pro or Serverless.
-- Configurations for workspace local groups migration:
-  - Provide a backup prefix. This is used to rename workspace local groups after they have been migrated. Defaults to `db-temp-`
-  - Select a workspace local groups migration strategy. UCX offers matching by name or external ID, using a prefix/suffix, or using regex. See [this](docs/group_name_conflict.md) for more details
-  - Provide a specific list of workspace local groups (or all groups) to be migrated.
-- Select a Python log level, e.g. `DEBUG`, `INFO`. Defaults to `INFO`
-- Provide the level of parallelism, which limit the number of concurrent operation as UCX scans the workspace. Defaults to 8.
-- Select whether UCX should connect to the external HMS, if a cluster policy with external HMS is detected. Defaults to no.
+You'll be prompted to select a [configuration profile](https://docs.databricks.com/en/dev-tools/auth.html#databricks-client-unified-authentication) 
+created by `databricks auth login` command.
 
-After this, UCX will be installed locally and a number of assets will be deployed in the selected workspace. These assets are available under the installation folder, i.e. `/Users/<your user>/.ucx/`
+The `WorkspaceInstaller` class is used to create a new configuration for Unity Catalog migration in a Databricks workspace. 
+It guides the user through a series of prompts to gather necessary information, such as selecting an inventory database, choosing 
+a PRO or SERVERLESS SQL warehouse, specifying a log level and number of threads, and setting up an external Hive Metastore if necessary. 
+Upon the first installation, you're prompted for a workspace local [group migration strategy](docs/group_name_conflict.md). 
+Based on user input, the class creates a new cluster policy with the specified configuration. The user can review and confirm the configuration, 
+which is saved to the workspace and can be opened in a web browser.
+
+The [`WorkspaceInstallation`](src/databricks/labs/ucx/install.py) manages the installation and uninstallation of UCX in a workspace. It handles 
+the configuration and exception management during the installation process. The installation process creates dashboards, databases, and jobs. 
+It also includes the creation of a database with given configuration and the deployment of workflows with specific settings. The installation 
+process can handle exceptions and infer errors from job runs and task runs. The workspace installation uploads wheels, creates cluster policies, 
+and wheel runners to the workspace. It can also handle the creation of job tasks for a given task, such as job dashboard tasks, job notebook tasks, 
+and job wheel tasks. The class handles the installation of UCX, including configuring the workspace, installing necessary libraries, and verifying 
+the installation, making it easier for users to migrate their workspaces to UCX.
+
+After this, UCX will be installed locally and a number of assets will be deployed in the selected workspace. 
+These assets are available under the installation folder, i.e. `/Users/<your user>/.ucx/`
 
 You can also install a specific version by specifying it like `@v0.13.2` - `databricks labs install ucx@v0.13.2`.
 
@@ -175,26 +138,33 @@ You can also install a specific version by specifying it like `@v0.13.2` - `data
 
 [[back to top](#databricks-labs-ucx)]
 
-### Upgrade UCX - `databricks labs upgrade ucx`
+## Upgrading UCX for newer versions
+
 Verify that UCX is installed
-```text
+
+```commandline
 databricks labs installed
 
 Name  Description                            Version
 ucx   Unity Catalog Migration Toolkit (UCX)  <version>
 ```
+
 Upgrade UCX via Databricks CLI:
+
 ```commandline
 databricks labs upgrade ucx
 ```
+
 The prompts will be similar to [Installation](#install-ucx)
 
 ![macos_upgrade_ucx](docs/macos_3_databrickslabsmac_upgradeucx.gif)
 
 [[back to top](#databricks-labs-ucx)]
 
-### Uninstall UCX
+## Uninstall UCX
+
 Uninstall UCX via Databricks CLI:
+
 ```commandline
 databricks labs uninstall ucx
 ```
@@ -209,19 +179,27 @@ Databricks CLI will confirm a few options:
 
 # Workflows
 
-Part of this application is deployed as Databricks Workflows
+Part of this application is deployed as [Databricks Workflows](https://docs.databricks.com/en/workflows/index.html).
 
 [[back to top](#databricks-labs-ucx)]
 
 ## Assessment workflow
 
 The assessment workflow can be triggered using the Databricks UI, or via the command line. 
+
 ```commandline
 databricks labs ucx ensure-assessment-run
 ```
+
 ![ucx_assessment_workflow](docs/ucx_assessment_workflow.png)
 
-The assessment workflow is designed to assess the compatibility of various entities in the current workspace with Unity Catalog (UC). It identifies incompatible entities and provides information necessary for planning the migration to UC. The tasks in the assessment workflow can be executed in parallel or sequentially, depending on the dependencies specified in the `@task` decorators. The output of each task is stored in Delta tables in the `$inventory_database` schema, which can be used for further analysis and decision-making. The assessment workflow can be executed multiple times to ensure that all incompatible entities are identified and accounted for before starting the migration process.
+The assessment workflow is designed to assess the compatibility of various entities in the current workspace with Unity Catalog. 
+It identifies incompatible entities and provides information necessary for planning the migration to UC. The tasks in 
+the assessment workflow can be executed in parallel or sequentially, depending on the dependencies specified in the `@task` decorators.
+The output of each task is stored in Delta tables in the `$inventory_database` schema, that you specify during [installation](#install-ucx), 
+which can be used for further analysis and decision-making through the [assessment report](docs/assessment.md). 
+The assessment workflow can be executed multiple times to ensure that all incompatible entities are identified and accounted 
+for before starting the migration process.
 
 1. `crawl_tables`: This task scans all tables in the Hive Metastore of the current workspace and persists their metadata in a Delta table named `$inventory_database.tables`. This metadata includes information such as the database name, table name, table type, and table location. This task is used for assessing which tables cannot be easily migrated to Unity Catalog.
 2. `crawl_grants`: This task scans the Delta table named `$inventory_database.tables` and issues a `SHOW GRANTS` statement for every object to retrieve the permissions assigned to it. The permissions include information such as the principal, action type, and the table it applies to. This task persists the permissions in the Delta table `$inventory_database.grants`.
@@ -234,8 +212,9 @@ The assessment workflow is designed to assess the compatibility of various entit
 9. `assess_azure_service_principals`: This task scans through all the clusters configurations, cluster policies, job cluster configurations, Pipeline configurations, and Warehouse configuration and identifies all the Azure Service Principals who have been given access to the Azure storage accounts via spark configurations referred in those entities. The list of all the Azure Service Principals referred in those configurations is saved in the `$inventory.azure_service_principals` table.
 10. `assess_global_init_scripts`: This task scans through all the global init scripts and identifies if there is an Azure Service Principal who has been given access to the Azure storage accounts via spark configurations referred in those scripts.
 
-After UCX assessment workflow is executed, the assessment dashboard will be populated with findings and common recommendations.
-[This guide](docs/assessment.md) talks about them in more details.
+![report](docs/assessment-report.png)
+
+After UCX assessment workflow is executed, the assessment dashboard will be populated with findings and common recommendations. See [this guide](docs/assessment.md) for more details.
 
 [[back to top](#databricks-labs-ucx)]
 
