@@ -90,10 +90,10 @@ class ExternalLocationsMigration:
 
     def _create_location_name(self, location_url: str) -> str:
         # generate the UC external location name
-        container_name = location_url[8 : location_url.index("@")]
+        before_at, sep, after_at = location_url.partition('@')
+        container_name = before_at.removeprefix("abfss://")
         res_name = (
-            location_url[location_url.index("@") + 1 :]
-            .replace(".dfs.core.windows.net", "")
+            after_at.replace(".dfs.core.windows.net", "")
             .rstrip("/")
             .replace("/", "_")
         )
