@@ -38,7 +38,7 @@ class Table:
     upgraded_to: str | None = None
 
     storage_properties: str | None = None
-    is_partitioned: bool | None = None
+    is_partitioned: bool = False
 
     DBFS_ROOT_PREFIXES: typing.ClassVar[list[str]] = [
         "/dbfs/",
@@ -141,8 +141,7 @@ class Table:
 
     def sql_migrate_view(self, target_table_key):
         return f"CREATE VIEW IF NOT EXISTS {escape_sql_identifier(target_table_key)} AS {self.view_text};"
-
-
+    
 @dataclass
 class TableError:
     catalog: str
