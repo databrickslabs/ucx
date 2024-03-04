@@ -2,7 +2,11 @@ Databricks Labs UCX
 ---
 ![UCX by Databricks Labs](docs/logo-no-background.png)
 
-The companion for upgrading to Unity Catalog. After [installation](#install-ucx), ensure to [trigger](#ensure-assessment-run-command) the [assessment workflow](#assessment-workflow), so that you'll be able to [scope the migration](docs/assessment.md) and execute the [group migration workflow](#group-migration-workflow). More workflows, like migrating tables and notebook code is coming in the future releases.
+The companion for upgrading to Unity Catalog. After [installation](#install-ucx), ensure to [trigger](#ensure-assessment-run-command) the [assessment workflow](#assessment-workflow), 
+so that you'll be able to [scope the migration](docs/assessment.md) and execute the [group migration workflow](#group-migration-workflow). 
+[`<installation_path>/README`](#readme-notebook) contains further instructions and explanations of these workflows.
+More workflows, like [migrating tables](docs/table_upgrade.md) and notebook code is coming in the future releases. 
+UCX exposes a number of command line utilities accessible via `databricks labs ucx`.
 
 For questions, troubleshooting or bug fixes, please see your Databricks account team or submit [an issue](https://github.com/databrickslabs/ucx/issues). See [contributing instructions](CONTRIBUTING.md) to help improve this project.
 
@@ -110,7 +114,7 @@ and job wheel tasks. The class handles the installation of UCX, including config
 the installation, making it easier for users to migrate their workspaces to UCX.
 
 After this, UCX will be installed locally and a number of assets will be deployed in the selected workspace. 
-These assets are available under the installation folder, i.e. `/Users/<your user>/.ucx/`
+These assets are available under the installation folder, i.e. `/Users/<your user>/.ucx/`.
 
 You can also install a specific version by specifying it like `@v0.13.2` - `databricks labs install ucx@v0.13.2`.
 
@@ -163,6 +167,15 @@ Part of this application is deployed as [Databricks Workflows](https://docs.data
 
 [[back to top](#databricks-labs-ucx)]
 
+## Readme notebook
+
+![readme](docs/readme-notebook.png)
+
+Every installation creates a `README` notebook with a detailed description of all deployed workflows and their tasks,
+providing quick links to the relevant workflows and dashboards.
+
+[[back to top](#databricks-labs-ucx)]
+
 ## Assessment workflow
 
 The assessment workflow can be triggered using the Databricks UI, or via the command line. 
@@ -200,7 +213,7 @@ After UCX assessment workflow is executed, the assessment dashboard will be popu
 
 ## Group migration workflow
 
-It helps you to upgrade all Databricks workspace assets:
+See the [detailed design](docs/local-group-migration.md) of this workflow. It helps you to upgrade all Databricks workspace assets:
 Legacy Table ACLs, Entitlements, AWS instance profiles, Clusters, Cluster policies, Instance Pools, 
 Databricks SQL warehouses, Delta Live Tables, Jobs, MLflow experiments, MLflow registry, SQL Dashboards & Queries,
 SQL Alerts, Token and Password usage permissions that are set on the workspace level, Secret scopes, Notebooks,
@@ -217,9 +230,19 @@ The group migration workflow is designed to migrate workspace-local groups to ac
 
 [[back to top](#databricks-labs-ucx)]
 
+## Debug notebook
+
+![debug](docs/debug-notebook.png)
+
+Every [installation](#installation) creates a debug notebook, that initializes UCX as a library,
+so that you can implement missing features and 
+
+[[back to top](#databricks-labs-ucx)]
+
 # Using UCX command-line interface - `databricks labs ucx ...`
 
-After installation, a number of UCX workflows will be available in the workspace. `<installation_path>/README` contains further instructions and explanations of these workflows.
+After installation, a number of [UCX workflows](#workflows) will be available in the workspace. 
+[`<installation_path>/README`](#readme-notebook) contains further instructions and explanations of these workflows.
 UCX also provides a number of command line utilities accessible via `databricks labs ucx`.
 
 [[back to top](#databricks-labs-ucx)]

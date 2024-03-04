@@ -171,6 +171,8 @@ object ID, and `Grant` object from the `Permissions` object.
 
 # Troubleshooting
 
+Use [`DEBUG` notebook](../README.md#debug-notebook) to troubleshoot anything.
+
 Below are some useful code snippets that can be useful for troubleshooting.
 Make sure to install [databricks-sdk](https://docs.databricks.com/en/dev-tools/sdk-python.html) on the cluster to run
 it.

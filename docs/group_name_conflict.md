@@ -12,12 +12,14 @@ During the installation process we pose the following question: `Do you need to 
 If the answer is "Yes" a follow-up question will be:
 
 ```text
-Choose How to rename the workspace groups:
- [1] Apply a Prefix
- [2] Apply a Suffix
- [3] Use Regular Expression Substitution
- [4] User Regular Expression to extract a value from the account and the workspace
- [5] Map using External Group ID
+Choose how to map the workspace groups:
+[0] Match by Name
+[1] Apply a Prefix
+[2] Apply a Suffix
+[3] Match by External ID
+[4] Regex Substitution
+[5] Regex Matching
+Enter a number between 0 and 5: 
 ```
 
 The user then input the Prefix/Suffix/Regular Expression.
