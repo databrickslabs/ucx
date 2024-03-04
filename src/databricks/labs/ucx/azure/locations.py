@@ -3,6 +3,7 @@ from urllib.parse import urlparse
 
 from databricks.labs.blueprint.installation import Installation
 from databricks.sdk import WorkspaceClient
+from databricks.sdk.errors.platform import PermissionDenied
 
 from databricks.labs.ucx.azure.access import AzureResourcePermissions
 from databricks.labs.ucx.azure.resources import AzureResources
@@ -115,13 +116,28 @@ class ExternalLocationsMigration:
             return location_url
         # if no matched write privilege credential, try to create read-only external location
         if container_url in prefix_mapping_read:
-            self._ws.external_locations.create(
-                location_name,
-                location_url,
-                prefix_mapping_read[container_url],
-                comment="Created by UCX",
-                read_only=True,
-            )
+            try:
+                self._ws.external_locations.create(
+                    location_name,
+                    location_url,
+                    prefix_mapping_read[container_url],
+                    comment="Created by UCX",
+                    read_only=True,
+                )
+            except PermissionDenied as denied:
+                if "No file available under the location to read" in str(denied):
+                    # Empty location will cause failed READ permission check with read-only credential
+                    # Skip skip_validation in this case
+                    self._ws.external_locations.create(
+                        location_name,
+                        location_url,
+                        prefix_mapping_read[container_url],
+                        comment="Created by UCX",
+                        read_only=True,
+                        skip_validation=True,
+                    )
+                    return location_url
+                raise denied
             return location_url
         # if no credential found
         return None
