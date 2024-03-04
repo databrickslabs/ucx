@@ -1,5 +1,5 @@
 Databricks Labs UCX
----
+===
 ![UCX by Databricks Labs](docs/logo-no-background.png)
 
 The companion for upgrading to Unity Catalog. After [installation](#install-ucx), ensure to [trigger](#ensure-assessment-run-command) the [assessment workflow](#assessment-workflow), 
@@ -8,12 +8,13 @@ so that you'll be able to [scope the migration](docs/assessment.md) and execute 
 More workflows, like [migrating tables](docs/table_upgrade.md) and notebook code is coming in the future releases. 
 UCX exposes a number of command line utilities accessible via `databricks labs ucx`.
 
-For questions, troubleshooting or bug fixes, please see your Databricks account team or submit [an issue](https://github.com/databrickslabs/ucx/issues). See [contributing instructions](CONTRIBUTING.md) to help improve this project.
+For questions, troubleshooting or bug fixes, please see your Databricks account team or submit [an issue](https://github.com/databrickslabs/ucx/issues). 
+See [contributing instructions](CONTRIBUTING.md) to help improve this project.
 
 [![build](https://github.com/databrickslabs/ucx/actions/workflows/push.yml/badge.svg)](https://github.com/databrickslabs/ucx/actions/workflows/push.yml) [![codecov](https://codecov.io/github/databrickslabs/ucx/graph/badge.svg?token=p0WKAfW5HQ)](https://codecov.io/github/databrickslabs/ucx)  [![lines of code](https://tokei.rs/b1/github/databrickslabs/ucx)]([https://codecov.io/github/databrickslabs/ucx](https://github.com/databrickslabs/ucx))
 
 <!-- TOC -->
-  * [Databricks Labs UCX](#databricks-labs-ucx)
+* [Databricks Labs UCX](#databricks-labs-ucx)
 * [Installation](#installation)
   * [Download and configure Databricks Command Line Interface](#download-and-configure-databricks-command-line-interface)
   * [Install UCX](#install-ucx)
@@ -24,37 +25,31 @@ For questions, troubleshooting or bug fixes, please see your Databricks account 
   * [Assessment workflow](#assessment-workflow)
   * [Group migration workflow](#group-migration-workflow)
   * [Debug notebook](#debug-notebook)
-* [Using UCX command-line interface - `databricks labs ucx ...`](#using-ucx-command-line-interface---databricks-labs-ucx-)
-  * [Utility commands](#utility-commands)
-    * [`ensure-assessment-run` command](#ensure-assessment-run-command)
-    * [`repair-run` command](#repair-run-command)
-    * [`open-remote-config` command](#open-remote-config-command)
-    * [`workflows` command](#workflows-command)
-    * [`installations` command](#installations-command)
-    * [`validate-groups-membership` command](#validate-groups-membership-command)
-  * [Table migration commands](#table-migration-commands)
-    * [`create-table-mapping` command](#create-table-mapping-command)
+  * [Debug logs](#debug-logs)
+* [Utility commands](#utility-commands)
+  * [`ensure-assessment-run` command](#ensure-assessment-run-command)
+  * [`repair-run` command](#repair-run-command)
+  * [`workflows` command](#workflows-command)
+  * [`open-remote-config` command](#open-remote-config-command)
+  * [`installations` command](#installations-command)
+* [Table migration commands](#table-migration-commands)
+  * [`principal-prefix-access` command](#principal-prefix-access-command)
+    * [Access for AWS S3 Buckets](#access-for-aws-s3-buckets)
+    * [Access for Azure Storage Accounts](#access-for-azure-storage-accounts)
+  * [`migrate-credentials` command](#migrate-credentials-command)
+  * [`validate-external-locations` command](#validate-external-locations-command)
+  * [`create-table-mapping` command](#create-table-mapping-command)
     * [`skip` command](#skip-command)
     * [`revert-migrated-tables` command](#revert-migrated-tables-command)
     * [`move` command](#move-command)
     * [`alias` command](#alias-command)
-  * [Multi-workspace commands](#multi-workspace-commands)
-    * [`sync-workspace-info` command](#sync-workspace-info-command)
-    * [`manual-workspace-info` command](#manual-workspace-info-command)
-    * [`create-account-groups` command](#create-account-groups-command)
-  * [Getting information from AWS or Azure](#getting-information-from-aws-or-azure)
-    * [`principal-prefix-access` command](#principal-prefix-access-command)
-    * [`migrate-credentials` command](#migrate-credentials-command)
-    * [`validate-external-locations` command](#validate-external-locations-command)
-    * [Scanning for legacy credentials and mapping access](#scanning-for-legacy-credentials-and-mapping-access)
-      * [AWS](#aws)
-      * [Azure](#azure)
-    * [Producing table mapping](#producing-table-mapping)
-    * [Managing cross-workspace installation](#managing-cross-workspace-installation)
-    * [Validating group membership](#validating-group-membership)
-    * [Creating account groups](#creating-account-groups)
-  * [Star History](#star-history)
-  * [Project Support](#project-support)
+* [Cross-workspace installations](#cross-workspace-installations)
+  * [`sync-workspace-info` command](#sync-workspace-info-command)
+  * [`manual-workspace-info` command](#manual-workspace-info-command)
+  * [`create-account-groups` command](#create-account-groups-command)
+  * [`validate-groups-membership` command](#validate-groups-membership-command)
+* [Star History](#star-history)
+* [Project Support](#project-support)
 <!-- TOC -->
 
 # Installation
@@ -225,6 +220,9 @@ Databricks SQL warehouses, Delta Live Tables, Jobs, MLflow experiments, MLflow r
 SQL Alerts, Token and Password usage permissions that are set on the workspace level, Secret scopes, Notebooks,
 Directories, Repos, and Files. 
 
+Use [`validate-groups-membership` command](#validate-groups-membership-command) for extra confidence.
+If you don't have matching account groups, please run [`create-account-groups` command](#create-account-groups-command).
+
 The group migration workflow is designed to migrate workspace-local groups to account-level groups in the Unity Catalog (UC) environment. It ensures that all the necessary groups are available in the workspace with the correct permissions, and removes any unnecessary groups and permissions. The tasks in the group migration workflow depend on the output of the assessment workflow and can be executed in sequence to ensure a successful migration. The output of each task is stored in Delta tables in the `$inventory_database` schema, which can be used for further analysis and decision-making. The group migration workflow can be executed multiple times to ensure that all the groups are migrated successfully and that all the necessary permissions are assigned.
 
 1. `crawl_groups`: This task scans all groups for the local group migration scope.
@@ -286,6 +284,26 @@ status can be listed with the [`workflows` command](#workflows-command).
 
 [[back to top](#databricks-labs-ucx)]
 
+## `workflows` command
+
+```text
+$ databricks labs ucx workflows
+Step                                  State    Started
+assessment                            RUNNING  1 hour 2 minutes ago
+099-destroy-schema                    UNKNOWN  <never run>
+migrate-groups                        UNKNOWN  <never run>
+remove-workspace-local-backup-groups  UNKNOWN  <never run>
+validate-groups-permissions           UNKNOWN  <never run>
+```
+
+This command displays the [deployed workflows](#workflows) and their state in the current workspace. It fetches the latest 
+job status from the workspace and prints it in a table format. This command is useful for developers and administrators 
+who want to check the status of UCX workflows and ensure that they have been executed as expected. It can also be used 
+for debugging purposes when a workflow is not behaving as expected. Failed workflows can be fixed with 
+the [`repair-run` command](#repair-run-command).
+
+[[back to top](#databricks-labs-ucx)]
+
 ## `open-remote-config` command
 
 ```commandline
@@ -319,26 +337,6 @@ access the configuration file from the command line. Here's the description of c
 
 [[back to top](#databricks-labs-ucx)]
 
-## `workflows` command
-
-```text
-$ databricks labs ucx workflows
-Step                                  State    Started
-assessment                            RUNNING  1 hour 2 minutes ago
-099-destroy-schema                    UNKNOWN  <never run>
-migrate-groups                        UNKNOWN  <never run>
-remove-workspace-local-backup-groups  UNKNOWN  <never run>
-validate-groups-permissions           UNKNOWN  <never run>
-```
-
-This command displays the [deployed workflows](#workflows) and their state in the current workspace. It fetches the latest 
-job status from the workspace and prints it in a table format. This command is useful for developers and administrators 
-who want to check the status of UCX workflows and ensure that they have been executed as expected. It can also be used 
-for debugging purposes when a workflow is not behaving as expected. Failed workflows can be fixed with 
-the [`repair-run` command](#repair-run-command).
-
-[[back to top](#databricks-labs-ucx)]
-
 ## `installations` command
 
 ```text
@@ -362,50 +360,137 @@ related to multiple installations of `ucx` on the same workspace.
 
 [[back to top](#databricks-labs-ucx)]
 
-### `validate-groups-membership` command
+# Table migration commands
 
-This command validates the groups to see if the groups at the account level and workspace level have different membership. 
-It takes a `WorkspaceClient` object as a parameter and validates the group membership using the `GroupManager` class. 
-This command is useful for administrators who want to ensure that the groups have the correct membership. It can also be
-used to debug issues related to group membership.
+These commands are vital part of [table migration](docs/table_upgrade.md) process.
 
 [[back to top](#databricks-labs-ucx)]
 
-## Table migration commands
+## `principal-prefix-access` command
 
-### `create-table-mapping` command
+```text
+databricks labs ucx principal-prefix-access [--subscription-id <Azure Subscription ID>] [--aws-profile <AWS CLI profile>]
+```
 
-This command creates initial table mapping for review. It takes a `WorkspaceClient` object as a parameter and creates 
-the table mapping using the `TableMapping` and `TablesCrawler` classes. This command is useful for developers and 
-administrators who want to review the table mapping before it is used in the assessment process. It can also be used to 
-debug issues related to table mapping.
-
-[[back to top](#databricks-labs-ucx)]
-
-### `skip` command
-
-This command creates a skip comment on a schema or a table. It allows users to skip certain schemas or tables during 
-the assessment process. The command takes `schema` and `table` parameters to specify the schema and table to skip. 
-This command is useful for developers and administrators who want to exclude certain schemas or tables from 
-the assessment process. It can also be used to temporarily disable assessment on a particular schema or table.
+This command depends on results from the [assessment workflow](#assessment-workflow) and requires AWS CLI or Azure CLI
+to be installed and authenticated for the given machine. This command identifies all the storage accounts used by tables 
+in the workspace and their permissions on each storage account. Required to be run before 
+the [`migrate-credentials` command](#migrate-credentials-command).
 
 [[back to top](#databricks-labs-ucx)]
 
-### `revert-migrated-tables` command
+### Access for AWS S3 Buckets
 
-This command removes the notation on a migrated table for re-migration.  It takes a `WorkspaceClient` object as 
-a parameter and removes the notation using the `TablesMigrate` and `TableMove` classes. 
+```commandline
+databricks labs ucx principal-prefix-access --aws-profile test-profile
+```
+
+Use to identify all instance profiles in the workspace, and map their access to S3 buckets. 
+Also captures the IAM roles which has UC arn listed, and map their access to S3 buckets 
+This requires `aws` CLI to be installed and configured.
+
+[[back to top](#databricks-labs-ucx)]
+
+### Access for Azure Storage Accounts
+
+```commandline
+databricks labs ucx principal-prefix-access --subscription-id test-subscription-id
+```
+
+Use to identify all storage account used by tables, identify the relevant Azure service principals and their permissions 
+on each storage account. This requires Azure CLI to be installed and configured via `az login`. 
+
+[[back to top](#databricks-labs-ucx)]
+
+## `migrate-credentials` command
+
+```commandline
+databricks labs ucx migrate-credentials
+```
+
+For Azure, this command migrate Azure Service Principals, which have `Storage Blob Data Contributor`,
+`Storage Blob Data Reader`, `Storage Blob Data Owner` roles on ADLS Gen2 locations that are being used in
+Databricks, to UC storage credentials. The Azure Service Principals to location mapping are listed 
+in `/Users/{user_name}/.ucx/azure_storage_account_info.csv` which is generated 
+by [`principal-prefix-access` command](#principal-prefix-access-command). 
+Please review the file and delete the Service Principals you do not want to be migrated.
+The command will only migrate the Service Principals that have client secret stored in Databricks Secret.
+
+Run [`validate-external-locations` command](#validate-external-locations-command) after this one.
+
+[[back to top](#databricks-labs-ucx)]
+
+## `validate-external-locations` command
+
+```text
+databricks labs ucx validate-external-locations 
+```
+
+Once the [`assessment` workflow](#assessment-workflow) finished successfully, [storage credentials](#migrate-credentials-command) are configured, 
+run this command to ensure the relevant Unity Catalog external locations are created if they are missing. 
+
+This command validates and provides mapping to external tables to external locations, also as Terraform configurations.
+
+[[back to top](#databricks-labs-ucx)]
+
+## `create-table-mapping` command
+
+```text
+databricks labs ucx create-table-mapping 
+```
+
+Once the [`assessment` workflow](#assessment-workflow) finished successfully 
+[workspace info is synchronized](#sync-workspace-info-command), run this command to create the initial 
+table mapping for review in CSV format in the Databricks Workspace:
+
+```text
+workspace_name,catalog_name,src_schema,dst_schema,src_table,dst_table
+labs-azure,labs_azure,default,default,ucx_tybzs,ucx_tybzs
+```
+
+You are supposed to review this mapping and adjust it if necessary. This file is in CSV format, so that you can edit it 
+easier in your favorite spreadsheet application.
+
+[[back to top](#databricks-labs-ucx)]
+
+## `skip` command
+
+```text
+databricks labs ucx skip --schema X [--table Y]  
+```
+
+Anywhere after [`create-table-mapping` command](#create-table-mapping-command) is executed, you can run this command.
+
+This command allows users to skip certain schemas or tables during the [table migration](docs/table_upgrade.md) process.
+The command takes `--schema` and optionally `--table` flags to specify the schema and table to skip. If no `--table` flag 
+is provided, all tables in the specified HMS database are skipped.
+This command is useful to temporarily disable migration on a particular schema or table.
+
+[[back to top](#databricks-labs-ucx)]
+
+## `revert-migrated-tables` command
+
+```text
+databricks labs ucx revert-migrated-tables --schema X --table Y [--delete-managed]  
+```
+
+Anywhere after [`create-table-mapping` command](#create-table-mapping-command) is executed, you can run this command.
+
+This command removes the `upgraded_from` property on a migrated table for re-migration in the [table upgrade](docs/table_upgrade.md) process. 
 This command is useful for developers and administrators who want to revert the migration of a table. It can also be used 
 to debug issues related to table migration.
 
 [[back to top](#databricks-labs-ucx)]
 
-### `move` command
+## `move` command
 
-This command moves a UC table/tables from one schema to another schema in the same or different catalog. 
-It takes a `WorkspaceClient` object and `from` and `to` parameters as parameters and moves the tables using 
-the `TableMove` class. This command is useful for developers and administrators who want to move tables between schemas. 
-It can also be used to debug issues related to table movement.
+```text
+databricks labs ucx move --from-catalog A --from-schema B --from-table C --to-catalog D --to-schema E  
+```
+
+This command moves a UC table/tables from one schema to another schema in the same or different catalog during
+the [table upgrade](docs/table_upgrade.md) process. This command is useful for developers and administrators who want 
+to move tables between schemas. It can also be used to debug issues related to table movement.
 
 [[back to top](#databricks-labs-ucx)]
 
@@ -418,151 +503,107 @@ It can also be used to debug issues related to table aliasing.
 
 [[back to top](#databricks-labs-ucx)]
 
-## Multi-workspace commands
+# Cross-workspace installations
 
-### `sync-workspace-info` command
+When installing UCX across multiple workspaces, administrators need to keep UCX configurations in sync.
+UCX will prompt you to select an account profile that has been defined in `~/.databrickscfg`. If you don't have one,
+authenticate your machine with:
 
-This command uploads the workspace config to all workspaces in the account where `ucx` is installed. 
-It takes an `AccountClient` object as a parameter and syncs the workspace info using the `sync_workspace_info()` method. 
-This command is useful for administrators who want to ensure that all workspaces in the account have the same configuration. 
-It can also be used to update the configuration on all workspaces after making changes to the configuration file.
+* `databricks auth login --host https://accounts.cloud.databricks.com/` (AWS)
+* `databricks auth login --host https://accounts.azuredatabricks.net/` (Azure)
 
-[[back to top](#databricks-labs-ucx)]
+## `sync-workspace-info` command
 
-### `manual-workspace-info` command
-
-This command is only supposed to be run if the `sync-workspace-info` command cannot be run. It prompts the user to enter 
-the required information manually and creates the workspace info. This command is useful for developers and administrators 
-who are unable to use the `sync-workspace-info` command for some reason. It can also be used to manually create 
-the workspace info in a new workspace.
-
-[[back to top](#databricks-labs-ucx)]
-
-### `create-account-groups` command
-
-This command creates account-level groups if a workspace local group is not present in the account. 
-It takes an `AccountClient` object as a parameter and creates the account groups using 
-the `create_account_level_groups()` method. This command is useful for administrators who want to manage access to 
-resources at the account level. It can also be used to ensure that all workspaces in the account have the same groups 
-and permissions.
-
-[[back to top](#databricks-labs-ucx)]
-
-## Getting information from AWS or Azure
-
-### `principal-prefix-access` command
-
-This command identifies all the storage accounts used by tables in the workspace and their permissions on each storage 
-account. It takes a `WorkspaceClient` object, `subscription_id`, and `aws_profile` as parameters and identifies 
-the permissions using the `AzureResourcePermissions` and `AWSResourcePermissions` classes. This command is useful for 
-developers and administrators who want to ensure that their storage accounts have the correct permissions. It can also 
-be used to debug issues related to storage account permissions.
-
-[[back to top](#databricks-labs-ucx)]
-
-### `migrate-credentials` command
-
-This command migrates Azure Service Principals, which have `Storage Blob Data Contributor`, `Storage Blob Data Reader`, 
-`Storage Blob Data Owner` roles on ADLS Gen2 locations that are being used in Databricks, to UC storage credentials. 
-It takes a `WorkspaceClient` object as a parameter and migrates the credentials using the `ServicePrincipalMigration` class.
-This command is useful for developers and administrators who want to migrate their Azure Service Principal credentials 
-to UC storage credentials. It can also be used to debug issues related to Azure Service Principal credentials.
-
-[[back to top](#databricks-labs-ucx)]
-
-### `validate-external-locations` command
-
-This command validates and provides mapping to external tables to external locations and shared generation TF scripts. 
-It takes a `WorkspaceClient` object as a parameter and validates the external locations using the `ExternalLocations` 
-and `TablesCrawler` classes. This command is useful for developers and administrators who want to ensure that their 
-external locations are correctly mapped and accessible. It can also be used to debug issues related to external locations.
-
-[[back to top](#databricks-labs-ucx)]
-
-### Scanning for legacy credentials and mapping access
-#### AWS
-Use to identify all instance profiles in the workspace, and map their access to S3 buckets. 
-Also captures the IAM roles which has UC arn listed, and map their access to S3 buckets 
-This requires `awscli` to be installed and configured.
-
-```commandline
-databricks labs ucx principal-prefix-access --aws-profile test-profile
+```text
+databricks labs ucx sync-workspace-info 
+14:07:07  INFO [databricks.sdk] Using Azure CLI authentication with AAD tokens
+14:07:07  INFO [d.labs.ucx] Account ID: ...
+14:07:10  INFO [d.l.blueprint.parallel][finding_ucx_installations_16] finding ucx installations 10/88, rps: 16.415/sec
+14:07:10  INFO [d.l.blueprint.parallel][finding_ucx_installations_0] finding ucx installations 20/88, rps: 32.110/sec
+14:07:11  INFO [d.l.blueprint.parallel][finding_ucx_installations_18] finding ucx installations 30/88, rps: 39.786/sec
+...
 ```
 
-[[back to top](#databricks-labs-ucx)]
+**Requires Databricks Account Administrator privileges.** This command uploads the workspace config to all workspaces 
+in the account where `ucx` is installed. This command is necessary to create an immutable default catalog mapping for
+[table migration](docs/table_upgrade.md) process and is the prerequisite 
+for [`create-table-mapping` command](#create-table-mapping-command).
 
-#### Azure
-Use to identify all storage account used by tables, identify the relevant Azure service principals and their permissions on each storage account.
-This requires `azure-cli` to be installed and configured. 
-
-```commandline
-databricks labs ucx principal-prefix-access --subscription-id test-subscription-id
-```
-
-[[back to top](#databricks-labs-ucx)]
-
-### Producing table mapping
-Use to create a table mapping CSV file, which provides the target mapping for all `hive_metastore` tables identified by the assessment workflow.
-This file can be reviewed offline and later will be used for table migration.
-
-```commandline
-databricks labs ucx table-mapping 
-```
+If you cannot get account administrator privileges in reasonable time, you can take the risk and 
+run [`manual-workspace-info` command](#manual-workspace-info-command) to enter Databricks Workspace IDs and Databricks 
+Workspace names. 
 
 [[back to top](#databricks-labs-ucx)]
 
-### Managing cross-workspace installation
-When installing UCX across multiple workspaces, users needs to keep UCX configurations in sync. The below commands address that.
+## `manual-workspace-info` command
 
-**Recommended:** An account administrator executes `sync-workspace-info` to upload the current UCX workspace configurations to all workspaces in the account where UCX is installed. 
-UCX will prompt you to select an account profile that has been defined in `~/.databrickscfg`.
-
-```commandline
-databricks labs ucx sync-workspace-info
+```text
+$ databricks labs ucx manual-workspace-info
+14:20:36  WARN [d.l.ucx.account] You are strongly recommended to run "databricks labs ucx sync-workspace-info" by account admin,
+ ... otherwise there is a significant risk of inconsistencies between different workspaces. This command will overwrite all UCX 
+ ... installations on this given workspace. Result may be consistent only within https://adb-987654321.10.azuredatabricks.net
+Workspace name for 987654321 (default: workspace-987654321): labs-workspace
+Next workspace id (default: stop): 12345
+Workspace name for 12345 (default: workspace-12345): other-workspace
+Next workspace id (default: stop): 
+14:21:19  INFO [d.l.blueprint.parallel][finding_ucx_installations_11] finding ucx installations 10/89, rps: 24.577/sec
+14:21:19  INFO [d.l.blueprint.parallel][finding_ucx_installations_15] finding ucx installations 20/89, rps: 48.305/sec
+...
+14:21:20  INFO [d.l.ucx.account] Synchronised workspace id mapping for installations on current workspace
 ```
 
-**Not recommended:** If an account admin is not available to execute `sync-workspace-info`, workspace admins can manually upload the current ucx workspace config to specific target workspaces.
-UCX will ask to confirm the current workspace name, and the ID & name of the target workspaces
-
-```commandline
-databricks labs ucx manual-workspace-info
-```
+This command is only supposed to be run if the [`sync-workspace-info` command](#sync-workspace-info-command) cannot be 
+run. It prompts the user to enter the required information manually and creates the workspace info. This command is 
+useful for workspace administrators who are unable to use the `sync-workspace-info` command, because they are not 
+Databricks Account Administrators. It can also be used to manually create the workspace info in a new workspace.
 
 [[back to top](#databricks-labs-ucx)]
 
-### Validating group membership
-Use to validate workspace-level & account-level groups to identify any discrepancies in membership after migration.
+## `create-account-groups` command
 
-```commandline
-databricks labs ucx validate-groups-membership
+```text
+$ databricks labs ucx create-account-groups [--workspace-ids 123,456,789]
 ```
 
-[[back to top](#databricks-labs-ucx)]
-
-### Creating account groups
-Crawl all workspaces configured in workspace_ids, then creates account level groups if a WS local group is not present 
-    in the account.
-If workspace_ids is not specified, it will create account groups for all workspaces configured in the account.
+**Requires Databricks Account Administrator privileges.** This command creates account-level groups if a workspace local 
+group is not present in the account. It crawls all workspaces configured in `--workspace-ids` flag, then creates 
+account level groups if a WS local group is not present in the account. If `--workspace-ids` flag is not specified, UCX 
+will create account groups for all workspaces configured in the account.
 
 The following scenarios are supported, if a group X:
-- Exist in workspaces A,B,C and it has same members in there, it will be created in the account
+- Exist in workspaces A,B,C, and it has same members in there, it will be created in the account
 - Exist in workspaces A,B but not in C, it will be created in the account
-- Exist in workspaces A,B,C. It has same members in A,B, but not in C. Then, X and C_X will be created in the
-account
+- Exist in workspaces A,B,C. It has same members in A,B, but not in C. Then, X and C_X will be created in the account
 
-```commandline
-databricks labs ucx create-account-groups --workspace_ids <comma separated list of workspace id>
-```
+This command is useful for the setups, that don't have SCIM provisioning in place.
 
 [[back to top](#databricks-labs-ucx)]
 
-## Star History
+## `validate-groups-membership` command
+
+```text
+$ databricks labs ucx validate-groups-membership
+...
+14:30:36  INFO [d.l.u.workspace_access.groups] Found 483 account groups
+14:30:36  INFO [d.l.u.workspace_access.groups] No group listing provided, all matching groups will be migrated
+14:30:36  INFO [d.l.u.workspace_access.groups] There are no groups with different membership between account and workspace
+Workspace Group Name  Members Count  Account Group Name  Members Count  Difference
+```
+
+This command validates the groups to see if the groups at the account level and workspace level have different membership.
+This command is useful for administrators who want to ensure that the groups have the correct membership. It can also be
+used to debug issues related to group membership. See [group migration](docs/local-group-migration.md) and 
+[group migration](#group-migration-workflow) for more details.
+
+[[back to top](#databricks-labs-ucx)]
+
+# Star History
 
 [![Star History Chart](https://api.star-history.com/svg?repos=databrickslabs/ucx&type=Date)](https://star-history.com/#databrickslabs/ucx)
 
 [[back to top](#databricks-labs-ucx)]
 
-## Project Support
+# Project Support
 Please note that all projects in the databrickslabs GitHub account are provided for your exploration only, and are not formally supported by Databricks with Service Level Agreements (SLAs).  They are provided AS-IS, and we do not make any guarantees of any kind.  Please do not submit a support ticket relating to any issues arising from the use of these projects.
 
 Any issues discovered through the use of this project should be filed as GitHub Issues on the Repo.  They will be reviewed as time permits, but there are no formal SLAs for support.
