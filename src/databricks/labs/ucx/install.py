@@ -274,10 +274,9 @@ class WorkspaceInstaller:
             "databases in hive_metastore",
             default="<ALL>",
         )
-        include_databases = None
         if selected_databases != "<ALL>":
-            include_databases = [x.strip() for x in selected_databases.split(",")]
-        return include_databases
+            return [x.strip() for x in selected_databases.split(",")]
+        return None
 
     @staticmethod
     def _policy_config(value: str):
