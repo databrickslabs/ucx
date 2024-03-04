@@ -11,8 +11,6 @@ import org.apache.spark.sql.DataFrame
 import org.apache.spark.sql.functions.{col,lower,upper}
 import org.apache.spark.sql.catalyst.TableIdentifier
 
-
-
 // must follow the same structure as databricks.labs.ucx.hive_metastore.tables.Table
 case class TableDetails(catalog: String, database: String, name: String, object_type: String,
                         table_format: String, location: String, view_text: String, upgraded_to: String, storage_properties: String, is_partitioned: Boolean)
@@ -60,15 +58,12 @@ def metadataForAllTables(databases: Seq[String], queue: ConcurrentLinkedQueue[Ta
                 s"$key=$value"
           }.mkString("[", ", ", "]")
 
-          // Note: sharedState.externalCatalog does not expose accurate partition metadata, so it forced us to use sessionState.catalog instead
           val partitionColumnNames = try {
             spark.sessionState.catalog.getTableMetadata(TableIdentifier(tableName, Some(databaseName))).partitionColumnNames
-          }
-          catch {
+          } catch {
             case e: Exception => null
           }
           val isPartitioned = if (partitionColumnNames != null && !partitionColumnNames.isEmpty) true else false
-
 
           Some(TableDetails("hive_metastore", databaseName, tableName, table.tableType.name, table.provider.orNull,
             table.storage.locationUri.map(_.toString).orNull, table.viewText.orNull,
