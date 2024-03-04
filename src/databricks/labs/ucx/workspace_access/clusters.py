@@ -1,5 +1,4 @@
 import logging
-import os
 
 from databricks.labs.blueprint.tui import Prompts
 from databricks.sdk import WorkspaceClient
