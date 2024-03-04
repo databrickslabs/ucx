@@ -7,6 +7,7 @@ from databricks.labs.blueprint.tui import MockPrompts
 from databricks.sdk import WorkspaceClient
 from databricks.sdk.errors import NotFound
 from databricks.sdk.service.compute import Policy
+from databricks.sdk.service.workspace import GetSecretResponse
 
 from databricks.labs.ucx.azure.access import AzureResourcePermissions
 from databricks.labs.ucx.azure.resources import (
@@ -220,6 +221,7 @@ def test_create_global_spn(mocker):
         policy_id="foo", name="Unity Catalog Migration (ucx) (me@example.com)", definition=json.dumps({"foo": "bar"})
     )
     w.cluster_policies.get.return_value = cluster_policy
+    w.secrets.get_secret.return_value = GetSecretResponse("uber_principal_secret", "mypwd")
     rows = {"SELECT \\* FROM ucx.external_locations": [["abfss://container1@sto2.dfs.core.windows.net/folder1", "1"]]}
     backend = MockBackend(rows=rows)
     location = ExternalLocations(w, backend, "ucx")
@@ -240,10 +242,10 @@ def test_create_global_spn(mocker):
     azure_resources = AzureResources(api_client, api_client, include_subscriptions="002")
     azure_resource_permission = AzureResourcePermissions(installation, w, azure_resources, location)
     azure_resource_permission.create_uber_principal(prompts)
-    installation.assert_file_written(
-        'policy-backup.json',
-        {'definition': '{"foo": "bar"}', 'name': 'Unity Catalog Migration (ucx) (me@example.com)', 'policy_id': 'foo'},
-    )
+    # installation.assert_file_written(
+    #    'policy-backup.json',
+    #    {'definition': '{"foo": "bar"}', 'name': 'Unity Catalog Migration (ucx) (me@example.com)', 'policy_id': 'foo'},
+    # )
     call_1 = call("/v1.0/applications", {"displayName": "UCXServicePrincipal"})
     call_2 = call("/v1.0/servicePrincipals", {"appId": "appIduser1"})
     call_3 = call("/v1.0/servicePrincipals/Iduser1/addPassword")
@@ -266,9 +268,11 @@ def test_create_global_spn(mocker):
         "spark_conf.fs.azure.account.auth.type.sto2.dfs.core.windows.net": {"type": "fixed", "value": "OAuth"},
         "spark_conf.fs.azure.account.oauth2.client.secret.sto2.dfs.core.windows.net": {
             "type": "fixed",
-            "value": "mypwd",
+            "value": "{secrets/ucx/uber_principal_secret}",
         },
     }
     w.cluster_policies.edit.assert_called_with(
         'foo1', 'Unity Catalog Migration (ucx) (me@example.com)', definition=json.dumps(definition)
     )
+    w.secrets.create_scope.assert_called_with("ucx")
+    w.secrets.put_secret.assert_called_with("ucx", "uber_principal_secret", string_value="mypwd")
