@@ -337,9 +337,10 @@ def create_uber_principal(w: WorkspaceClient, subscription_id: str):
     if not subscription_id:
         logger.error("Please enter subscription id to scan storage account in.")
         return
+    prompts = Prompts()
     include_subscriptions = [subscription_id] if subscription_id else None
     azure_resource_permissions = AzureResourcePermissions.for_cli(w, include_subscriptions=include_subscriptions)
-    azure_resource_permissions.create_uber_principal()
+    azure_resource_permissions.create_uber_principal(prompts)
     return
 
 

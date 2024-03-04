@@ -2,7 +2,8 @@ import json
 from unittest.mock import call, create_autospec
 
 import pytest
-from databricks.labs.blueprint.installation import Installation, MockInstallation
+from databricks.labs.blueprint.installation import MockInstallation
+from databricks.labs.blueprint.tui import MockPrompts
 from databricks.sdk import WorkspaceClient
 from databricks.sdk.errors import NotFound
 from databricks.sdk.service.compute import Policy
@@ -14,7 +15,6 @@ from databricks.labs.ucx.azure.resources import (
     AzureRoleAssignment,
     Principal,
 )
-from databricks.labs.ucx.config import WorkspaceConfig
 from databricks.labs.ucx.hive_metastore import ExternalLocations
 
 from ..framework.mocks import MockBackend
@@ -124,39 +124,68 @@ def test_save_spn_permissions_valid_azure_storage_account():
 
 def test_create_global_spn_no_policy():
     w = create_autospec(WorkspaceClient)
-    location = ExternalLocations(w, MockBackend, "ucx")
-    installation = create_autospec(Installation)
-    installation.load.return_value = WorkspaceConfig(inventory_database='ucx')
+    location = ExternalLocations(w, MockBackend(), "ucx")
+    installation = MockInstallation(
+        {
+            'config.yml': {
+                'inventory_database': 'ucx',
+                'connect': {
+                    'host': 'foo',
+                    'token': 'bar',
+                },
+            }
+        }
+    )
     azure_resources = create_autospec(AzureResources)
     azure_resource_permission = AzureResourcePermissions(installation, w, azure_resources, location)
+    prompts = MockPrompts({"Enter a name for the uber service principal to be created*": "UCXServicePrincipal"})
     with pytest.raises(ValueError):
-        azure_resource_permission.create_uber_principal()
+        azure_resource_permission.create_uber_principal(prompts)
 
 
 def test_create_global_spn_spn_present():
     w = create_autospec(WorkspaceClient)
-    location = ExternalLocations(w, MockBackend, "ucx")
-    installation = create_autospec(Installation)
-    installation.load.return_value = WorkspaceConfig(
-        inventory_database='ucx',
-        policy_id="foo1",
-        uber_spn_id="123",
+    location = ExternalLocations(w, MockBackend(), "ucx")
+    installation = MockInstallation(
+        {
+            'config.yml': {
+                'inventory_database': 'ucx',
+                'policy_id': 'foo1',
+                'uber_spn_id': '123',
+                'connect': {
+                    'host': 'foo',
+                    'token': 'bar',
+                },
+            }
+        }
     )
     azure_resources = create_autospec(AzureResources)
+    prompts = MockPrompts({"Enter a name for the uber service principal to be created*": "UCXServicePrincipal"})
     azure_resource_permission = AzureResourcePermissions(installation, w, azure_resources, location)
-    assert not azure_resource_permission.create_uber_principal()
+    assert not azure_resource_permission.create_uber_principal(prompts)
 
 
 def test_create_global_spn_no_storage():
     w = create_autospec(WorkspaceClient)
     rows = {"SELECT \\* FROM ucx.external_locations": [["s3://bucket1/folder1", "0"]]}
     backend = MockBackend(rows=rows)
+    installation = MockInstallation(
+        {
+            'config.yml': {
+                'inventory_database': 'ucx',
+                'policy_id': 'foo1',
+                'connect': {
+                    'host': 'foo',
+                    'token': 'bar',
+                },
+            }
+        }
+    )
     location = ExternalLocations(w, backend, "ucx")
-    installation = create_autospec(Installation)
-    installation.load.return_value = WorkspaceConfig(inventory_database='ucx', policy_id="foo1")
+    prompts = MockPrompts({"Enter a name for the uber service principal to be created*": "UCXServicePrincipal"})
     azure_resources = create_autospec(AzureResources)
     azure_resource_permission = AzureResourcePermissions(installation, w, azure_resources, location)
-    assert not azure_resource_permission.create_uber_principal()
+    assert not azure_resource_permission.create_uber_principal(prompts)
 
 
 def test_create_global_spn_cluster_policy_not_found(mocker):
@@ -165,13 +194,24 @@ def test_create_global_spn_cluster_policy_not_found(mocker):
     rows = {"SELECT \\* FROM ucx.external_locations": [["abfss://container1@sto2.dfs.core.windows.net/folder1", "1"]]}
     backend = MockBackend(rows=rows)
     location = ExternalLocations(w, backend, "ucx")
-    installation = create_autospec(Installation)
-    installation.load.return_value = WorkspaceConfig(inventory_database='ucx', policy_id="foo1")
+    installation = MockInstallation(
+        {
+            'config.yml': {
+                'inventory_database': 'ucx',
+                'policy_id': 'foo1',
+                'connect': {
+                    'host': 'foo',
+                    'token': 'bar',
+                },
+            }
+        }
+    )
     api_client = azure_api_client()
+    prompts = MockPrompts({"Enter a name for the uber service principal to be created*": "UCXServicePrincipal"})
     azure_resources = AzureResources(api_client, api_client, include_subscriptions="002")
     azure_resource_permission = AzureResourcePermissions(installation, w, azure_resources, location)
     with pytest.raises(NotFound):
-        azure_resource_permission.create_uber_principal()
+        azure_resource_permission.create_uber_principal(prompts)
 
 
 def test_create_global_spn(mocker):
@@ -183,21 +223,27 @@ def test_create_global_spn(mocker):
     rows = {"SELECT \\* FROM ucx.external_locations": [["abfss://container1@sto2.dfs.core.windows.net/folder1", "1"]]}
     backend = MockBackend(rows=rows)
     location = ExternalLocations(w, backend, "ucx")
-    installation = create_autospec(Installation)
-    installation.load.return_value = WorkspaceConfig(inventory_database='ucx', policy_id="foo1")
+    installation = MockInstallation(
+        {
+            'config.yml': {
+                'inventory_database': 'ucx',
+                'policy_id': 'foo1',
+                'connect': {
+                    'host': 'foo',
+                    'token': 'bar',
+                },
+            }
+        }
+    )
     api_client = azure_api_client()
+    prompts = MockPrompts({"Enter a name for the uber service principal to be created*": "UCXServicePrincipal"})
     azure_resources = AzureResources(api_client, api_client, include_subscriptions="002")
     azure_resource_permission = AzureResourcePermissions(installation, w, azure_resources, location)
-    azure_resource_permission.create_uber_principal()
-    call_1 = call(
-        WorkspaceConfig(
-            inventory_database='ucx',
-            policy_id="foo1",
-            uber_spn_id="appIduser1",
-        )
+    azure_resource_permission.create_uber_principal(prompts)
+    installation.assert_file_written(
+        'policy-backup.json',
+        {'definition': '{"foo": "bar"}', 'name': 'Unity Catalog Migration (ucx) (me@example.com)', 'policy_id': 'foo'},
     )
-    call_2 = call(cluster_policy.as_dict(), filename='policy-backup.json')
-    installation.save.assert_has_calls([call_1, call_2])
     call_1 = call("/v1.0/applications", {"displayName": "UCXServicePrincipal"})
     call_2 = call("/v1.0/servicePrincipals", {"appId": "appIduser1"})
     call_3 = call("/v1.0/servicePrincipals/Iduser1/addPassword")

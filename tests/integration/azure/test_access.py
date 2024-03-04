@@ -3,6 +3,7 @@ import logging
 
 import pytest
 from databricks.labs.blueprint.installation import Installation
+from databricks.labs.blueprint.tui import MockPrompts
 
 from databricks.labs.ucx.azure.access import AzureResourcePermissions
 from databricks.labs.ucx.azure.resources import AzureAPIClient, AzureResources
@@ -55,7 +56,7 @@ def test_save_spn_permissions_local(ws, sql_backend, inventory_schema, make_rand
 
 
 @pytest.mark.skip
-def test_create_global_spn(ws, sql_backend, inventory_schema, make_random, make_cluster_policy):
+def test_create_global_spn(ws, sql_backend, inventory_schema, make_random, make_cluster_policy, env_or_skip):
     tables = [
         ExternalLocation("abfss://things@labsazurethings.dfs.core.windows.net/folder1", 1),
     ]
@@ -71,11 +72,14 @@ def test_create_global_spn(ws, sql_backend, inventory_schema, make_random, make_
     graph_client = AzureAPIClient("https://graph.microsoft.com", "https://graph.microsoft.com")
     azure_resources = AzureResources(azure_mgmt_client, graph_client)
     az_res_perm = AzureResourcePermissions(installation, ws, azure_resources, location)
-    az_res_perm.create_uber_principal()
+    az_res_perm.create_uber_principal(
+        MockPrompts({"Enter a name for the uber service principal to be created*": "UCXServicePrincipal"})
+    )
     config = installation.load(WorkspaceConfig)
     assert config.global_spn_id is not None
     policy_definition = json.loads(ws.cluster_policies.get(policy_id=policy.policy_id).definition)
-    resource_id = "/subscriptions/bf472657-510a-4fad-a050-87cfb4e1a2ce/resourceGroups/HSRG/providers/Microsoft.Storage/storageAccounts/labsazurethings"
+    #resource_id = "/subscriptions/bf472657-510a-4fad-a050-87cfb4e1a2ce/resourceGroups/HSRG/providers/Microsoft.Storage/storageAccounts/labsazurethings"
+    resource_id = env_or_skip("TEST_STORAGE_RESOURCE")
     role_assignments = azure_resources.role_assignments(resource_id)
     global_spn_assignment = None
     for assignment in role_assignments:

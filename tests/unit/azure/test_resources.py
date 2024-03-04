@@ -86,11 +86,11 @@ def test_role_assignments_container(mocker):
 def test_create_service_principal(mocker):
     api_client = azure_api_client()
     azure_resource = AzureResources(api_client, api_client)
-    global_spn = azure_resource.create_service_principal()
-    assert global_spn.client_id == "appIduser1"
-    assert global_spn.object_id == "Iduser1"
-    assert global_spn.display_name == "disNameuser1"
-    assert global_spn.directory_id == "dir1"
+    global_spn = azure_resource.create_service_principal("disNameuser1")
+    assert global_spn.client.client_id == "appIduser1"
+    assert global_spn.client.object_id == "Iduser1"
+    assert global_spn.client.display_name == "disNameuser1"
+    assert global_spn.client.directory_id == "dir1"
     assert global_spn.secret == "mypwd"
 
 
@@ -99,7 +99,7 @@ def test_create_service_principal_no_access(mocker):
     api_client.post.side_effect = PermissionDenied()
     azure_resource = AzureResources(api_client, api_client)
     with pytest.raises(PermissionDenied):
-        azure_resource.create_service_principal()
+        azure_resource.create_service_principal("disNameuser1")
 
 
 def test_apply_storage_permission(mocker):

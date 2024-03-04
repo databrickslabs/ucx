@@ -354,5 +354,6 @@ def test_create_master_principal_no_subscription(ws):
 def test_create_master_principal(ws):
     ws.config.auth_type = "azure-cli"
     ws.config.is_azure = True
-    with pytest.raises(ValueError):
-        create_uber_principal(ws, subscription_id="12")
+    with patch("databricks.labs.blueprint.tui.Prompts.question", return_value=True):
+        with pytest.raises(ValueError):
+            create_uber_principal(ws, subscription_id="12")

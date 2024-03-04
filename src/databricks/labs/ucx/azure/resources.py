@@ -78,7 +78,12 @@ class Principal:
     # Need this directory_id/tenant_id when create UC storage credentials using service principal
     # it will be None if type is managed identity
     directory_id: str | None = None
-    secret: str | None = None
+
+
+@dataclass
+class PrincipalSecret:
+    client: Principal
+    secret: str
 
 
 @dataclass
@@ -164,10 +169,10 @@ class AzureResources:
                 tenant_id=subscription["tenantId"],
             )
 
-    def create_service_principal(self) -> Principal:
+    def create_service_principal(self, display_name: str) -> PrincipalSecret:
         try:
             application_info: dict[str, str] = self._azure_graph.post(
-                "/v1.0/applications", {"displayName": "UCXServicePrincipal"}
+                "/v1.0/applications", {"displayName": display_name}
             )
             app_id = application_info.get("appId")
             assert app_id is not None
@@ -186,19 +191,17 @@ class AzureResources:
             logger.error(msg)
             raise PermissionDenied(msg) from None
         secret = secret_info.get("secretText")
-        display_name = service_principal_info.get("displayName")
         client_id = service_principal_info.get("appId")
         principal_type = service_principal_info.get("servicePrincipalType")
         directory_id = service_principal_info.get("appOwnerOrganizationId")
         assert client_id is not None
-        assert display_name is not None
         assert object_id is not None
         assert principal_type is not None
         if principal_type == "Application":
             # service principal must have directory_id
             assert directory_id is not None
         assert secret is not None
-        return Principal(client_id, display_name, object_id, principal_type, directory_id, secret)
+        return PrincipalSecret(Principal(client_id, display_name, object_id, principal_type, directory_id), secret)
 
     def apply_storage_permission(self, principal_id: str, resource: AzureResource, role_name: str, role_guid: str):
         try:
