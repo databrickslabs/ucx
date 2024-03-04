@@ -26,8 +26,8 @@ classifiers = [
     "Programming Language :: Python :: 3.11",
     "Programming Language :: Python :: Implementation :: CPython",
 ]
-dependencies = ["databricks-sdk~=0.19.0",
-                "databricks-labs-blueprint~=0.2.4",
+dependencies = ["databricks-sdk~=0.20.0",
+                "databricks-labs-blueprint~=0.3.0",
                 "PyYAML>=6.0.0,<7.0.0"]
 
 [project.entry-points.databricks]
@@ -97,6 +97,8 @@ skip-string-normalization = true
 cache-dir = ".venv/ruff-cache"
 target-version = "py310"
 line-length = 120
+
+[tool.ruff.lint]
 ignore = [
     # Allow boolean positional values in function calls, like `dict.get(... True)`
     "FBT003",
@@ -112,13 +114,13 @@ ignore = [
     "EM102",
 ]
 
-[tool.ruff.isort]
+[tool.ruff.lint.isort]
 known-first-party = ["databricks.labs.ucx"]
 
-[tool.ruff.flake8-tidy-imports]
+[tool.ruff.lint.flake8-tidy-imports]
 ban-relative-imports = "all"
 
-[tool.ruff.per-file-ignores]
+[tool.ruff.lint.per-file-ignores]
 
 "src/databricks/labs/ucx/mixins/*" = ["S311"]
 

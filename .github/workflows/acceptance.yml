@@ -2,7 +2,7 @@ name: acceptance
 
 on:
   pull_request:
-    types: [opened, synchronize]
+    types: [ opened, synchronize, ready_for_review ]
 
 permissions:
   id-token: write
@@ -11,7 +11,7 @@ permissions:
 
 jobs:
   integration:
-    if: github.event_name == 'pull_request'
+    if: github.event_name == 'pull_request' && github.event.pull_request.draft == false
     environment: account-admin
     runs-on: larger
     steps:
@@ -31,20 +31,11 @@ jobs:
       - name: Install hatch
         run: pip install hatch==1.7.0
 
-      - uses: azure/login@v1
-        with:
-          client-id: ${{ secrets.ARM_CLIENT_ID }}
-          tenant-id: ${{ secrets.ARM_TENANT_ID }}
-          allow-no-subscriptions: true
-
       - name: Run integration tests
-        run: hatch run integration
+        uses: databrickslabs/sandbox/acceptance@acceptance/v0.1.0
+        with:
+          vault_uri: ${{ secrets.VAULT_URI }}
         env:
-          CLOUD_ENV: "${{ vars.CLOUD_ENV }}"
-          DATABRICKS_HOST: "${{ secrets.DATABRICKS_HOST }}"
-          DATABRICKS_ACCOUNT_ID: "${{ secrets.DATABRICKS_ACCOUNT_ID }}"
-          DATABRICKS_CLUSTER_ID: "${{ vars.DATABRICKS_CLUSTER_ID }}"
-          TEST_DEFAULT_CLUSTER_ID: "${{ vars.TEST_DEFAULT_CLUSTER_ID }}"
-          TEST_DEFAULT_WAREHOUSE_ID: "${{ vars.TEST_DEFAULT_WAREHOUSE_ID }}"
-          TEST_INSTANCE_POOL_ID: "${{ vars.TEST_INSTANCE_POOL_ID }}"
-          TEST_LEGACY_TABLE_ACL_CLUSTER_ID: "${{ vars.TEST_LEGACY_TABLE_ACL_CLUSTER_ID }}"
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          ARM_CLIENT_ID: ${{ secrets.ARM_CLIENT_ID }}
+          ARM_TENANT_ID: ${{ secrets.ARM_TENANT_ID }}

@@ -14,7 +14,7 @@ SELECT CONCAT(tables.`database`, '.', tables.name) AS name,
            WHEN STARTSWITH(location, "adl") THEN "UNSUPPORTED"
            ELSE "EXTERNAL"
        END AS storage,
-       IF(format = "DELTA", "Yes", "No") AS is_delta,
+       IF(table_format = "DELTA", "Yes", "No") AS is_delta,
        location,
        CASE
             WHEN size_in_bytes IS null THEN "Non DBFS Root"

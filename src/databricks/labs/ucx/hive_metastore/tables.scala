@@ -4,6 +4,8 @@ import scala.collection.JavaConverters
 import org.apache.hadoop.fs._
 import org.yaml.snakeyaml.Yaml
 import org.apache.spark.sql.catalyst.analysis.NoSuchDatabaseException
+import org.apache.hadoop.hive.metastore.api.NoSuchObjectException
+import org.apache.spark.sql.AnalysisException
 import org.apache.spark.sql.catalyst.catalog.{CatalogTable, CatalogTableType}
 import org.apache.spark.sql.DataFrame
 import org.apache.spark.sql.functions.{col,lower,upper}
@@ -28,6 +30,9 @@ def metadataForAllTables(databases: Seq[String], queue: ConcurrentLinkedQueue[Ta
     } catch {
       case err: NoSuchDatabaseException =>
         failures.add(TableError("hive_metastore", databaseName, null, s"ignoring database because of ${err}"))
+        null
+      case err: AnalysisException =>
+        failures.add(TableError("hive_metastore", databaseName, null, s"ignoring object because of ${err}"))
         null
     }
     if (tables == null) {

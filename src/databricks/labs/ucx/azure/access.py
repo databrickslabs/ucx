@@ -17,6 +17,9 @@ class StoragePermissionMapping:
     client_id: str
     principal: str
     privilege: str
+    type: str
+    # Need this directory_id/tenant_id when create UC storage credentials using service principal
+    directory_id: str | None = None
 
 
 class AzureResourcePermissions:
@@ -63,6 +66,8 @@ class AzureResourcePermissions:
                         client_id=role_assignment.principal.client_id,
                         principal=role_assignment.principal.display_name,
                         privilege=privilege,
+                        type=role_assignment.principal.type,
+                        directory_id=role_assignment.principal.directory_id,
                     )
                 )
         return out
@@ -87,7 +92,7 @@ class AzureResourcePermissions:
         return self._installation.save(storage_account_infos, filename=self._filename)
 
     def load(self):
-        return self._installation.save(list[StoragePermissionMapping], filename=self._filename)
+        return self._installation.load(list[StoragePermissionMapping], filename=self._filename)
 
     def _get_storage_accounts(self) -> list[str]:
         external_locations = self._locations.snapshot()

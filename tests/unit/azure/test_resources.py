@@ -61,7 +61,9 @@ def test_role_assignments_storage(mocker, az_token):
     assert len(role_assignments) == 1
     for role_assignment in role_assignments:
         assert role_assignment.role_name == "Contributor"
-        assert role_assignment.principal == Principal("appIduser2", "disNameuser2", "Iduser2")
+        assert role_assignment.principal == Principal(
+            "appIduser2", "disNameuser2", "Iduser2", "Application", "0000-0000"
+        )
         assert str(role_assignment.scope) == resource_id
         assert role_assignment.resource == AzureResource(resource_id)
 
@@ -75,6 +77,8 @@ def test_role_assignments_container(mocker, az_token):
     assert len(role_assignments) == 1
     for role_assignment in role_assignments:
         assert role_assignment.role_name == "Contributor"
-        assert role_assignment.principal == Principal("appIduser2", "disNameuser2", "Iduser2")
+        assert role_assignment.principal == Principal(
+            "appIduser2", "disNameuser2", "Iduser2", "Application", "0000-0000"
+        )
         assert str(role_assignment.scope) == resource_id
         assert role_assignment.resource == AzureResource(resource_id)

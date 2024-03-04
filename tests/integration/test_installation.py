@@ -13,7 +13,7 @@ from databricks.labs.blueprint.installer import InstallState
 from databricks.labs.blueprint.parallel import Threads
 from databricks.labs.blueprint.tui import MockPrompts
 from databricks.labs.blueprint.wheels import WheelsV2
-from databricks.sdk.errors import InvalidParameterValue, NotFound, Unknown
+from databricks.sdk.errors import InvalidParameterValue, NotFound
 from databricks.sdk.retries import retried
 from databricks.sdk.service import compute, sql
 from databricks.sdk.service.iam import PermissionLevel
@@ -37,7 +37,7 @@ logger = logging.getLogger(__name__)
 
 
 @pytest.fixture
-def new_installation(ws, sql_backend, env_or_skip, inventory_schema, make_random, make_cluster_policy):
+def new_installation(ws, sql_backend, env_or_skip, inventory_schema, make_random):
     cleanup = []
 
     def factory(config_transform: Callable[[WorkspaceConfig], WorkspaceConfig] | None = None):
@@ -99,7 +99,7 @@ def new_installation(ws, sql_backend, env_or_skip, inventory_schema, make_random
         pending.uninstall()
 
 
-@retried(on=[NotFound, Unknown, TimeoutError], timeout=timedelta(minutes=5))
+@retried(on=[NotFound, TimeoutError], timeout=timedelta(minutes=5))
 def test_job_failure_propagates_correct_error_message_and_logs(ws, sql_backend, new_installation):
     install = new_installation()
 
@@ -114,23 +114,28 @@ def test_job_failure_propagates_correct_error_message_and_logs(ws, sql_backend, 
     assert len(workflow_run_logs) == 1
 
 
-@retried(on=[NotFound, Unknown, InvalidParameterValue], timeout=timedelta(minutes=18))
+@retried(on=[NotFound, InvalidParameterValue], timeout=timedelta(minutes=3))
 def test_job_cluster_policy(ws, new_installation):
     install = new_installation(lambda wc: replace(wc, override_clusters=None))
+    user_name = ws.current_user.me().user_name
     cluster_policy = ws.cluster_policies.get(policy_id=install.config.policy_id)
     policy_definition = json.loads(cluster_policy.definition)
 
-    assert cluster_policy.name == f"Unity Catalog Migration ({install.config.inventory_database})"
+    assert cluster_policy.name == f"Unity Catalog Migration ({install.config.inventory_database}) ({user_name})"
 
     assert policy_definition["spark_version"]["value"] == ws.clusters.select_spark_version(latest=True)
     assert policy_definition["node_type_id"]["value"] == ws.clusters.select_node_type(local_disk=True)
-    assert (
-        policy_definition["azure_attributes.availability"]["value"] == compute.AzureAvailability.ON_DEMAND_AZURE.value
-    )
+    if ws.config.is_azure:
+        assert (
+            policy_definition["azure_attributes.availability"]["value"]
+            == compute.AzureAvailability.ON_DEMAND_AZURE.value
+        )
+    if ws.config.is_aws:
+        assert policy_definition["aws_attributes.availability"]["value"] == compute.AwsAvailability.ON_DEMAND.value
 
 
 @pytest.mark.skip
-@retried(on=[NotFound, TimeoutError], timeout=timedelta(minutes=15))
+@retried(on=[NotFound, TimeoutError], timeout=timedelta(minutes=5))
 def test_new_job_cluster_with_policy_assessment(
     ws, new_installation, make_ucx_group, make_cluster_policy, make_cluster_policy_permissions
 ):
@@ -150,7 +155,7 @@ def test_new_job_cluster_with_policy_assessment(
     assert before[ws_group_a.display_name] == PermissionLevel.CAN_USE
 
 
-@retried(on=[NotFound, Unknown, InvalidParameterValue], timeout=timedelta(minutes=20))
+@retried(on=[NotFound, InvalidParameterValue], timeout=timedelta(minutes=10))
 def test_running_real_assessment_job(
     ws, new_installation, make_ucx_group, make_cluster_policy, make_cluster_policy_permissions
 ):
@@ -171,7 +176,7 @@ def test_running_real_assessment_job(
     assert before[ws_group_a.display_name] == PermissionLevel.CAN_USE
 
 
-@retried(on=[NotFound, Unknown, InvalidParameterValue], timeout=timedelta(minutes=5))
+@retried(on=[NotFound, InvalidParameterValue], timeout=timedelta(minutes=5))
 def test_running_real_migrate_groups_job(
     ws, sql_backend, new_installation, make_ucx_group, make_cluster_policy, make_cluster_policy_permissions
 ):
@@ -204,7 +209,7 @@ def test_running_real_migrate_groups_job(
     assert found[f"{install.config.renamed_group_prefix}{ws_group_a.display_name}"] == PermissionLevel.CAN_USE
 
 
-@retried(on=[NotFound, Unknown, InvalidParameterValue], timeout=timedelta(minutes=5))
+@retried(on=[NotFound, InvalidParameterValue], timeout=timedelta(minutes=5))
 def test_running_real_validate_groups_permissions_job(
     ws, sql_backend, new_installation, make_group, make_query, make_query_permissions
 ):
@@ -260,7 +265,7 @@ def test_running_real_validate_groups_permissions_job_fails(
         request_object_type="cluster-policies", request_object_id=cluster_policy.policy_id, access_control_list=[]
     )
 
-    with pytest.raises(Unknown, match=r"Detected \d+ failures: ValueError"):
+    with pytest.raises(ValueError):
         install.run_workflow("validate-groups-permissions")
 
 
