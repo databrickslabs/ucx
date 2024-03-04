@@ -16,6 +16,11 @@ class ClusterAccess:
         self._ws = ws
         self._prompts = prompts
 
+    @classmethod
+    def current(cls, ws: WorkspaceClient):
+        prompts = Prompts()
+        return ClusterAccess(prompts, ws)
+
     def map_cluster_to_uc(self, cluster_id):
         try:
             spark_version = self._ws.clusters.select_spark_version(latest=True)
