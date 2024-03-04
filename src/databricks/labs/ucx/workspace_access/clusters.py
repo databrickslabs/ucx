@@ -11,9 +11,6 @@ logger = logging.getLogger(__name__)
 
 class ClusterAccess:
     def __init__(self, prompts: Prompts, ws: WorkspaceClient):
-        if "DATABRICKS_RUNTIME_VERSION" in os.environ:
-            msg = "WorkspaceInstaller is not supposed to be executed in Databricks Runtime"
-            raise SystemExit(msg)
         self._ws = ws
         self._prompts = prompts
 
