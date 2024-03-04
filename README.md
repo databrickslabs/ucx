@@ -2,21 +2,23 @@ Databricks Labs UCX
 ---
 ![UCX by Databricks Labs](docs/logo-no-background.png)
 
-Your best companion for upgrading to Unity Catalog. It helps you to upgrade all Databricks workspace assets:
-Legacy Table ACLs, Entitlements, AWS instance profiles, Clusters, Cluster policies, Instance Pools, Databricks SQL warehouses, Delta Live Tables, Jobs, MLflow experiments, MLflow registry, SQL Dashboards & Queries, SQL Alerts, Token and Password usage permissions that are set on the workspace level, Secret scopes, Notebooks, Directories, Repos, Files.
+The companion for upgrading to Unity Catalog. After [installation](#install-ucx), ensure to [trigger](#ensure-assessment-run-command) the [assessment workflow](#assessment-workflow), so that you'll be able to [scope the migration](docs/assessment.md) and execute the [group migration workflow](#group-migration-workflow). More workflows, like migrating tables and notebook code is coming in the future releases.
+
+For questions, troubleshooting or bug fixes, please see your Databricks account team or submit [an issue](https://github.com/databrickslabs/ucx/issues). See [contributing instructions](CONTRIBUTING.md) to help improve this project.
 
 [![build](https://github.com/databrickslabs/ucx/actions/workflows/push.yml/badge.svg)](https://github.com/databrickslabs/ucx/actions/workflows/push.yml) [![codecov](https://codecov.io/github/databrickslabs/ucx/graph/badge.svg?token=p0WKAfW5HQ)](https://codecov.io/github/databrickslabs/ucx)  [![lines of code](https://tokei.rs/b1/github/databrickslabs/ucx)]([https://codecov.io/github/databrickslabs/ucx](https://github.com/databrickslabs/ucx))
 
-See [contributing instructions](CONTRIBUTING.md) to help improve this project.
-
 <!-- TOC -->
-  * [Introduction](#introduction)
-  * [Installation](#installation)
-    * [Download Databricks Command Line interface](#download-databricks-command-line-interface)
-    * [Install UCX - `databricks labs install ucx`](#install-ucx---databricks-labs-install-ucx-)
-    * [Upgrade UCX - `databricks labs upgrade ucx`](#upgrade-ucx---databricks-labs-upgrade-ucx)
-    * [Uninstall UCX](#uninstall-ucx)
-  * [Using UCX command-line interface - `databricks labs ucx ...`](#using-ucx-command-line-interface---databricks-labs-ucx-)
+  * [Databricks Labs UCX](#databricks-labs-ucx)
+* [Installation](#installation)
+  * [Download and configure Databricks Command Line Interface](#download-and-configure-databricks-command-line-interface)
+  * [Install UCX](#install-ucx)
+  * [Upgrading UCX for newer versions](#upgrading-ucx-for-newer-versions)
+  * [Uninstall UCX](#uninstall-ucx)
+* [Workflows](#workflows)
+  * [Assessment workflow](#assessment-workflow)
+  * [Group migration workflow](#group-migration-workflow)
+* [Using UCX command-line interface - `databricks labs ucx ...`](#using-ucx-command-line-interface---databricks-labs-ucx-)
   * [Utility commands](#utility-commands)
     * [`ensure-assessment-run` command](#ensure-assessment-run-command)
     * [`repair-run` command](#repair-run-command)
@@ -38,8 +40,6 @@ See [contributing instructions](CONTRIBUTING.md) to help improve this project.
     * [`principal-prefix-access` command](#principal-prefix-access-command)
     * [`migrate-credentials` command](#migrate-credentials-command)
     * [`validate-external-locations` command](#validate-external-locations-command)
-    * [Executing assessment job](#executing-assessment-job)
-    * [Understanding assessment report](#understanding-assessment-report)
     * [Scanning for legacy credentials and mapping access](#scanning-for-legacy-credentials-and-mapping-access)
       * [AWS](#aws)
       * [Azure](#azure)
@@ -50,26 +50,6 @@ See [contributing instructions](CONTRIBUTING.md) to help improve this project.
   * [Star History](#star-history)
   * [Project Support](#project-support)
 <!-- TOC -->
-
-# Introduction
-UCX will guide you, the Databricks customer, through the process of upgrading your account, groups, workspaces, jobs etc. to Unity Catalog.
-
-1. The upgrade process will first install code, libraries, and workflows into your workspace.
-2. After installation, you will run a series of workflows and examine the output.
-
-UCX leverages Databricks Lakehouse platform to upgrade itself. The upgrade process includes creating jobs, notebooks, and deploying code and configuration files. 
-
-By running the installation you install the assessment job and several upgrade jobs. The assessment and upgrade jobs are outlined in the custom-generated README.py that is created by the installer.
-
-The custom-generated `README.py`, `config.yaml`, and other assets are placed into your Databricks workspace home folder, into a sub-folder named `.ucx`.
-
-Once the custom Databricks jobs are installed, begin by triggering [the assessment job](#assessment-workflow). The assessment job can be found under your workflows or via the active link in the README.py. Once the assessment job is complete, you can review the results in the custom-generated Databricks dashboard (linked to by the custom README.py found in the workspace folder created for you).
-
-You will need an account, unity catalog, and workspace administrative authority to complete the upgrade process. To run the installer, you will need to set up `databricks-cli` and a credential, [following these instructions.](https://docs.databricks.com/en/dev-tools/cli/databricks-cli.html) Additionally, the interim metadata and config data being processed by UCX will be stored into a Hive Metastore database schema generated at install time.
-
-For questions, troubleshooting or bug fixes, please see your Databricks account team or submit [an issue](https://github.com/databrickslabs/ucx/issues)
-
-[[back to top](#databricks-labs-ucx)]
 
 # Installation
 
@@ -218,7 +198,13 @@ After UCX assessment workflow is executed, the assessment dashboard will be popu
 
 [[back to top](#databricks-labs-ucx)]
 
-# Group migration workflow
+## Group migration workflow
+
+It helps you to upgrade all Databricks workspace assets:
+Legacy Table ACLs, Entitlements, AWS instance profiles, Clusters, Cluster policies, Instance Pools, 
+Databricks SQL warehouses, Delta Live Tables, Jobs, MLflow experiments, MLflow registry, SQL Dashboards & Queries,
+SQL Alerts, Token and Password usage permissions that are set on the workspace level, Secret scopes, Notebooks,
+Directories, Repos, and Files. 
 
 The group migration workflow is designed to migrate workspace-local groups to account-level groups in the Unity Catalog (UC) environment. It ensures that all the necessary groups are available in the workspace with the correct permissions, and removes any unnecessary groups and permissions. The tasks in the group migration workflow depend on the output of the assessment workflow and can be executed in sequence to ensure a successful migration. The output of each task is stored in Delta tables in the `$inventory_database` schema, which can be used for further analysis and decision-making. The group migration workflow can be executed multiple times to ensure that all the groups are migrated successfully and that all the necessary permissions are assigned.
 
