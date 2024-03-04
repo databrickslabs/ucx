@@ -7,6 +7,7 @@ from databricks.labs.blueprint.installation import Installation, MockInstallatio
 from databricks.labs.blueprint.tui import MockPrompts
 from databricks.sdk import AccountClient, WorkspaceClient
 from databricks.sdk.config import Config
+from databricks.sdk.errors import NotFound, ResourceConflict
 from databricks.sdk.service import iam
 from databricks.sdk.service.iam import ComplexValue, Group, ResourceMeta, User
 from databricks.sdk.service.provisioning import Workspace
@@ -481,3 +482,61 @@ def test_create_acc_groups_should_create_acc_group_if_exist_in_other_workspaces_
 
     acc_client.groups.create.assert_any_call(display_name="de")
     acc_client.groups.create.assert_any_call(display_name="ws2_de")
+
+
+def test_acc_ws_get_should_not_throw():
+    acc_client = create_autospec(AccountClient)
+    acc_client.config = Config(host="https://accounts.cloud.databricks.com", account_id="123", token="123")
+
+    group = Group(
+        id="12",
+        display_name="de",
+        members=[ComplexValue(display="test-user-1", value="20"), ComplexValue(display="test-user-2", value="21")],
+    )
+    group_2 = Group(display_name="de_invalid")
+    acc_client.groups.list.return_value = [group, group_2]
+    acc_client.groups.get.side_effect = NotFound
+    acc_client.workspaces.list.return_value = [
+        Workspace(workspace_name="foo", workspace_id=123, workspace_status_message="Running", deployment_name="abc")
+    ]
+
+    ws = create_autospec(WorkspaceClient)
+
+    def workspace_client() -> WorkspaceClient:
+        return ws
+
+    ws.groups.list.return_value = [group]
+    ws.groups.get.side_effect = NotFound
+    acc_client.get_workspace_client.return_value = ws
+    account_workspaces = AccountWorkspaces(acc_client, workspace_client)
+    account_workspaces.create_account_level_groups(MockPrompts({}), [123])
+
+    acc_client.groups.create.assert_not_called()
+
+
+def test_create_acc_groups_should_not_throw_if_acc_grp_exists():
+    acc_client = create_autospec(AccountClient)
+    acc_client.config = Config(host="https://accounts.cloud.databricks.com", account_id="123", token="123")
+
+    acc_client.workspaces.list.return_value = [
+        Workspace(workspace_name="foo", workspace_id=123, workspace_status_message="Running", deployment_name="abc")
+    ]
+
+    ws = create_autospec(WorkspaceClient)
+
+    def workspace_client() -> WorkspaceClient:
+        return ws
+
+    account_workspaces = AccountWorkspaces(acc_client, workspace_client)
+
+    group = Group(id="12", display_name="de", members=[ComplexValue(display="test-user-1", value="1")])
+
+    ws.groups.list.return_value = [group]
+    ws.groups.get.return_value = group
+    acc_client.get_workspace_client.return_value = ws
+    acc_client.groups.create.side_effect = ResourceConflict
+
+    account_workspaces.create_account_level_groups(MockPrompts({}), [123])
+
+    acc_client.groups.create.assert_called_with(display_name="de")
+    acc_client.groups.patch.assert_not_called()
