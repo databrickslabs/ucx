@@ -283,6 +283,12 @@ def _permissions_mapping():
             [PermissionLevel.CAN_VIEW, PermissionLevel.CAN_MANAGE],
             _simple,
         ),
+        (
+            "feature_table",
+            "feature-tables",
+            [PermissionLevel.CAN_VIEW_METADATA, PermissionLevel.CAN_EDIT_METADATA, PermissionLevel.CAN_MANAGE],
+            _simple,
+        ),
     ]
 
 
@@ -1126,3 +1132,23 @@ def make_serving_endpoint(ws, make_random, make_model):
             logger.info(f"Can't remove endpoint {e}")
 
     yield from factory("Serving endpoint", create, remove)
+
+
+@pytest.fixture
+def make_feature_table(ws, make_random):
+    def create():
+        feature_table_name = make_random(6) + "." + make_random(6)
+        table = ws.api_client.do(
+            "POST",
+            "/api/2.0/feature-store/feature-tables/create",
+            body={"name": feature_table_name, "primary_keys": [{"name": "pk", "data_type": "string"}]},
+        )
+        return table['feature_table']
+
+    def remove(table: dict):
+        try:
+            ws.api_client.do("DELETE", "/api/2.0/feature-store/feature-tables/delete", body={"name": table["name"]})
+        except RuntimeError as e:
+            logger.info(f"Can't remove feature table {e}")
+
+    yield from factory("Feature table", create, remove)

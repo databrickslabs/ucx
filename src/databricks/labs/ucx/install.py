@@ -23,7 +23,6 @@ from databricks.sdk.errors import (  # pylint: disable=redefined-builtin
     AlreadyExists,
     BadRequest,
     Cancelled,
-    DatabricksError,
     DataLoss,
     DeadlineExceeded,
     InternalError,
@@ -55,7 +54,7 @@ from databricks.labs.ucx.__about__ import __version__
 from databricks.labs.ucx.assessment.azure import AzureServicePrincipalInfo
 from databricks.labs.ucx.assessment.clusters import ClusterInfo
 from databricks.labs.ucx.assessment.init_scripts import GlobalInitScriptInfo
-from databricks.labs.ucx.assessment.jobs import JobInfo
+from databricks.labs.ucx.assessment.jobs import JobInfo, SubmitRunInfo
 from databricks.labs.ucx.assessment.pipelines import PipelineInfo
 from databricks.labs.ucx.config import WorkspaceConfig
 from databricks.labs.ucx.configure import ConfigureClusterOverrides
@@ -161,6 +160,7 @@ def deploy_schema(sql_backend: SqlBackend, inventory_schema: str):
             functools.partial(table, "table_failures", TableError),
             functools.partial(table, "workspace_objects", WorkspaceObjectInfo),
             functools.partial(table, "permissions", Permissions),
+            functools.partial(table, "submit_runs", SubmitRunInfo),
         ],
     )
     deployer.deploy_view("objects", "queries/views/objects.sql")
@@ -436,28 +436,20 @@ class WorkspaceInstallation:
         except OperationFailed as err:
             # currently we don't have any good message from API, so we have to work around it.
             job_run = self._ws.jobs.get_run(job_run_waiter.run_id)
-            raise self._infer_nested_error(job_run) from err
+            raise self._infer_error_from_job_run(job_run) from err
 
-    def _infer_nested_error(self, job_run) -> Exception:
-        errors: list[DatabricksError] = []
+    def _infer_error_from_job_run(self, job_run) -> Exception:
+        errors: list[Exception] = []
         timeouts: list[DeadlineExceeded] = []
         assert job_run.tasks is not None
         for run_task in job_run.tasks:
-            if not run_task.state:
+            error = self._infer_error_from_task_run(run_task)
+            if not error:
                 continue
-            if run_task.state.result_state == jobs.RunResultState.TIMEDOUT:
-                msg = f"{run_task.task_key}: The run was stopped after reaching the timeout"
-                timeouts.append(DeadlineExceeded(msg))
+            if isinstance(error, DeadlineExceeded):
+                timeouts.append(error)
                 continue
-            if run_task.state.result_state != jobs.RunResultState.FAILED:
-                continue
-            assert run_task.run_id is not None
-            run_output = self._ws.jobs.get_run_output(run_task.run_id)
-            if logger.isEnabledFor(logging.DEBUG):
-                if run_output and run_output.error_trace:
-                    sys.stderr.write(run_output.error_trace)
-            if run_output and run_output.error:
-                errors.append(self._infer_task_exception(f"{run_task.task_key}: {run_output.error}"))
+            errors.append(error)
         assert job_run.state is not None
         assert job_run.state.state_message is not None
         if len(errors) == 1:
@@ -467,8 +459,29 @@ class WorkspaceInstallation:
             return Unknown(job_run.state.state_message)
         return ManyError(all_errors)
 
+    def _infer_error_from_task_run(self, run_task: jobs.RunTask) -> Exception | None:
+        if not run_task.state:
+            return None
+        if run_task.state.result_state == jobs.RunResultState.TIMEDOUT:
+            msg = f"{run_task.task_key}: The run was stopped after reaching the timeout"
+            return DeadlineExceeded(msg)
+        if run_task.state.result_state != jobs.RunResultState.FAILED:
+            return None
+        assert run_task.run_id is not None
+        run_output = self._ws.jobs.get_run_output(run_task.run_id)
+        if not run_output:
+            msg = f'No run output. {run_task.state.state_message}'
+            return InternalError(msg)
+        if logger.isEnabledFor(logging.DEBUG):
+            if run_output.error_trace:
+                sys.stderr.write(run_output.error_trace)
+        if not run_output.error:
+            msg = f'No error in run output. {run_task.state.state_message}'
+            return InternalError(msg)
+        return self._infer_task_exception(f"{run_task.task_key}: {run_output.error}")
+
     @staticmethod
-    def _infer_task_exception(haystack: str) -> DatabricksError:
+    def _infer_task_exception(haystack: str) -> Exception:
         needles = [
             BadRequest,
             Unauthenticated,
@@ -490,8 +503,10 @@ class WorkspaceInstallation:
             RequestLimitExceeded,
             Unknown,
             DataLoss,
+            ValueError,
+            KeyError,
         ]
-        constructors: dict[re.Pattern, type[DatabricksError]] = {
+        constructors: dict[re.Pattern, type[Exception]] = {
             re.compile(r".*\[TABLE_OR_VIEW_NOT_FOUND] (.*)"): NotFound,
             re.compile(r".*\[SCHEMA_NOT_FOUND] (.*)"): NotFound,
         }
