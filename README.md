@@ -20,8 +20,10 @@ For questions, troubleshooting or bug fixes, please see your Databricks account 
   * [Upgrading UCX for newer versions](#upgrading-ucx-for-newer-versions)
   * [Uninstall UCX](#uninstall-ucx)
 * [Workflows](#workflows)
+  * [Readme notebook](#readme-notebook)
   * [Assessment workflow](#assessment-workflow)
   * [Group migration workflow](#group-migration-workflow)
+  * [Debug notebook](#debug-notebook)
 * [Using UCX command-line interface - `databricks labs ucx ...`](#using-ucx-command-line-interface---databricks-labs-ucx-)
   * [Utility commands](#utility-commands)
     * [`ensure-assessment-run` command](#ensure-assessment-run-command)
@@ -84,6 +86,8 @@ Once you install Databricks CLI, authenticate your current machine to a Databric
 ```commandline
 databricks auth login --host WORKSPACE_HOST
 ```
+
+To enable debug logs, simply add `--debug` flag to any command.
 
 [[back to top](#databricks-labs-ucx)]
 
@@ -163,7 +167,9 @@ Databricks CLI will confirm a few options:
 
 # Workflows
 
-Part of this application is deployed as [Databricks Workflows](https://docs.databricks.com/en/workflows/index.html).
+Part of this application is deployed as [Databricks Workflows](https://docs.databricks.com/en/workflows/index.html). 
+You can view the status of deployed workflows via the [`workflows` command](#workflows-command).
+Failed workflows can be fixed with the [`repair-run` command](#repair-run-command).
 
 [[back to top](#databricks-labs-ucx)]
 
@@ -178,7 +184,7 @@ providing quick links to the relevant workflows and dashboards.
 
 ## Assessment workflow
 
-The assessment workflow can be triggered using the Databricks UI, or via the command line. 
+The assessment workflow can be triggered using the Databricks UI, or via the [command line](#ensure-assessment-run-command). 
 
 ```commandline
 databricks labs ucx ensure-assessment-run
@@ -239,34 +245,52 @@ so that you can implement missing features and
 
 [[back to top](#databricks-labs-ucx)]
 
-# Using UCX command-line interface - `databricks labs ucx ...`
+## Debug logs
 
-After installation, a number of [UCX workflows](#workflows) will be available in the workspace. 
-[`<installation_path>/README`](#readme-notebook) contains further instructions and explanations of these workflows.
-UCX also provides a number of command line utilities accessible via `databricks labs ucx`.
+![debug](docs/debug-logs.png)
 
-[[back to top](#databricks-labs-ucx)]
+Every workflow run stores debug logs in the `logs` folder of the [installation](#installation). 
+For tasks shorter than 10 minutes, they appear after task finish, whereas longer-running tasks 
+flush the logs every 10 minutes.
 
-## Utility commands
-
-### `ensure-assessment-run` command
-
-This command ensures that the assessment job was run on a workspace. It takes a `WorkspaceClient` object as a parameter 
-and validates the assessment job using the `WorkspaceInstallation` class. This command is useful for developers and 
-administrators who want to ensure that the assessment job has been run on a workspace. It can also be used to debug 
-issues related to the assessment job.
+To enable debug logs of [command-line interface](#download-and-configure-databricks-command-line-interface), 
+simply add `--debug` flag to any command.
 
 [[back to top](#databricks-labs-ucx)]
 
-### `repair-run` command
+# Utility commands
 
-This command repairs a failed job. It takes a `WorkspaceClient` object and a `step` parameter as parameters and repairs 
-the specified step using the `WorkspaceInstallation` class. This command is useful for developers and administrators who 
-want to repair a failed job. It can also be used to debug issues related to job failures.
+## `ensure-assessment-run` command
+
+```commandline
+databricks labs ucx ensure-assessment-run
+```
+
+This command ensures that the [assessment workflow](#assessment-workflow) was run on a workspace. 
+This command will block until job finishes.
+Failed workflows can be fixed with the [`repair-run` command](#repair-run-command). Workflows and their status can be 
+listed with the [`workflows` command](#workflows-command).
 
 [[back to top](#databricks-labs-ucx)]
 
-### `open-remote-config` command
+## `repair-run` command
+
+```commandline
+databricks labs ucx repair-run --step WORKFLOW_NAME
+```
+
+This command repairs a failed [UCX Workflow](#workflows). This command is useful for developers and administrators who 
+want to repair a failed job. It can also be used to debug issues related to job failures. This operation can also be 
+done via [user interface](https://docs.databricks.com/en/workflows/jobs/repair-job-failures.html). Workflows and their 
+status can be listed with the [`workflows` command](#workflows-command).
+
+[[back to top](#databricks-labs-ucx)]
+
+## `open-remote-config` command
+
+```commandline
+databricks labs ucx open-remote-config
+```
 
 This command opens the remote configuration file in the default web browser. It generates a link to the configuration file 
 and opens it using the `webbrowser.open()` method. This command is useful for developers and administrators who want to view or 
@@ -295,21 +319,46 @@ access the configuration file from the command line. Here's the description of c
 
 [[back to top](#databricks-labs-ucx)]
 
-### `workflows` command
+## `workflows` command
 
-This command displays the deployed workflows and their state in the current workspace. It fetches the latest job status from 
-the workspace and prints it in JSON format. This command is useful for developers and administrators who want to check the status 
-of their workflows and ensure that they are running as expected. It can also be used for debugging purposes when a workflow 
-is not behaving as expected.
+```text
+$ databricks labs ucx workflows
+Step                                  State    Started
+assessment                            RUNNING  1 hour 2 minutes ago
+099-destroy-schema                    UNKNOWN  <never run>
+migrate-groups                        UNKNOWN  <never run>
+remove-workspace-local-backup-groups  UNKNOWN  <never run>
+validate-groups-permissions           UNKNOWN  <never run>
+```
+
+This command displays the [deployed workflows](#workflows) and their state in the current workspace. It fetches the latest 
+job status from the workspace and prints it in a table format. This command is useful for developers and administrators 
+who want to check the status of UCX workflows and ensure that they have been executed as expected. It can also be used 
+for debugging purposes when a workflow is not behaving as expected. Failed workflows can be fixed with 
+the [`repair-run` command](#repair-run-command).
 
 [[back to top](#databricks-labs-ucx)]
 
-### `installations` command
+## `installations` command
 
-This command displays the installations by different users on the same workspace. It fetches all the installations where 
-the `ucx` package is installed and prints their details in JSON format. This command is useful for administrators who 
-want to see which users have installed `ucx` and where. It can also be used to debug issues related to multiple 
-installations of `ucx` on the same workspace.
+```text
+$ databricks labs ucx installations 
+...
+13:49:16  INFO [d.labs.ucx] Fetching installations...
+13:49:17  INFO [d.l.blueprint.parallel][finding_ucx_installations_5] finding ucx installations 10/88, rps: 22.838/sec
+13:49:17  INFO [d.l.blueprint.parallel][finding_ucx_installations_9] finding ucx installations 20/88, rps: 35.002/sec
+13:49:17  INFO [d.l.blueprint.parallel][finding_ucx_installations_2] finding ucx installations 30/88, rps: 51.556/sec
+13:49:18  INFO [d.l.blueprint.parallel][finding_ucx_installations_9] finding ucx installations 40/88, rps: 56.272/sec
+13:49:18  INFO [d.l.blueprint.parallel][finding_ucx_installations_19] finding ucx installations 50/88, rps: 67.382/sec
+...
+Path                                      Database  Warehouse
+/Users/serge.smertin@databricks.com/.ucx  ucx       675eaf1ff976aa98
+```
+
+This command displays the [installations](#installation) by different users on the same workspace. It fetches all 
+the installations where the `ucx` package is installed and prints their details in JSON format. This command is useful 
+for administrators who want to see which users have installed `ucx` and where. It can also be used to debug issues 
+related to multiple installations of `ucx` on the same workspace.
 
 [[back to top](#databricks-labs-ucx)]
 
