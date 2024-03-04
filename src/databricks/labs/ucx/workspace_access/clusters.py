@@ -31,6 +31,7 @@ class ClusterAccess:
                 cluster_id=cluster_id,
                 cluster_name=cluster_details.cluster_name,
                 spark_version=spark_version,
+                num_workers=cluster_details.num_workers,
                 spark_conf=cluster_details.spark_conf,
                 spark_env_vars=cluster_details.spark_env_vars,
                 data_security_mode=access_mode,
