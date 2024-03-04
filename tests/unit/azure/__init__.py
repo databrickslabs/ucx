@@ -1,7 +1,6 @@
 import base64
 import json
 import pathlib
-from unittest import mock
 from unittest.mock import create_autospec
 
 from databricks.sdk.oauth import Token
@@ -30,7 +29,7 @@ def azure_api_client():
     str_token = base64.b64encode(token).decode("utf-8").replace("=", "")
     tok = Token(access_token=f"header.{str_token}.sig")
     api_client = create_autospec(AzureAPIClient)
-    type(api_client).token = mock.PropertyMock(return_value=tok)
+    api_client.token.return_value = tok
     api_client.get.side_effect = get_az_api_mapping
     api_client.put.side_effect = get_az_api_mapping
     api_client.post.side_effect = get_az_api_mapping

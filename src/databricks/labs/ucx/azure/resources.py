@@ -146,7 +146,6 @@ class AzureAPIClient:
         query: dict[str, str] = {}
         return self.api_client.do("DELETE", path, query, headers)
 
-    @property
     def token(self):
         return self._token_source.token()
 
@@ -230,7 +229,7 @@ class AzureResources:
             raise PermissionDenied(msg) from None
 
     def tenant_id(self):
-        token = self._azure_mgmt.token
+        token = self._azure_mgmt.token()
         return token.jwt_claims().get("tid")
 
     def subscriptions(self):

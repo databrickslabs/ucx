@@ -242,10 +242,10 @@ def test_create_global_spn(mocker):
     azure_resources = AzureResources(api_client, api_client, include_subscriptions="002")
     azure_resource_permission = AzureResourcePermissions(installation, w, azure_resources, location)
     azure_resource_permission.create_uber_principal(prompts)
-    # installation.assert_file_written(
-    #    'policy-backup.json',
-    #    {'definition': '{"foo": "bar"}', 'name': 'Unity Catalog Migration (ucx) (me@example.com)', 'policy_id': 'foo'},
-    # )
+    installation.assert_file_written(
+        'policy-backup.json',
+        {'definition': '{"foo": "bar"}', 'name': 'Unity Catalog Migration (ucx) (me@example.com)', 'policy_id': 'foo'},
+    )
     call_1 = call("/v1.0/applications", {"displayName": "UCXServicePrincipal"})
     call_2 = call("/v1.0/servicePrincipals", {"appId": "appIduser1"})
     call_3 = call("/v1.0/servicePrincipals/Iduser1/addPassword")

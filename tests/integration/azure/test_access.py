@@ -81,8 +81,7 @@ def test_create_global_spn(ws, sql_backend, inventory_schema, make_random, make_
     config = installation.load(WorkspaceConfig)
     assert config.uber_spn_id is not None
     policy_definition = json.loads(ws.cluster_policies.get(policy_id=policy.policy_id).definition)
-    resource_id = "/subscriptions/3f2e4d32-8e8d-46d6-82bc-5bb8d962328b/resourceGroups/HSRG/providers/Microsoft.Storage/storageAccounts/hsucxstorage"
-    # resource_id = env_or_skip("TEST_STORAGE_RESOURCE")
+    resource_id = env_or_skip("TEST_STORAGE_RESOURCE")
     role_assignments = azure_resources.role_assignments(resource_id)
     global_spn_assignment = None
     for assignment in role_assignments:

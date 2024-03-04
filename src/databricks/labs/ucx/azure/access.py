@@ -148,7 +148,7 @@ class AzureResourcePermissions:
             policy_definition = ""
             cluster_policy = self._ws.cluster_policies.get(policy_id)
 
-            # self._installation.save(cluster_policy, filename="policy-backup.json")
+            self._installation.save(cluster_policy, filename="policy-backup.json")
 
             if cluster_policy.definition is not None:
                 policy_definition = self._update_cluster_policy_definition(
