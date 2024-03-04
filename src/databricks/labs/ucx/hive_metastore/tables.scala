@@ -84,14 +84,19 @@ def getInventoryDatabase(configObj:java.util.Map[String, Any]): String ={
   return configObj.get("inventory_database").toString()
 }
 
-def getIncludeDatabases(configObj:java.util.Map[String, Any]): List[String] ={
-  return JavaConverters.asScalaBuffer(config.get("include_databases").asInstanceOf[java.util.ArrayList[String]]).toList
+def getIncludeDatabases(configObj:java.util.Map[String, Any], inventoryDatabase:String): Seq[String] ={
+  val includeDatabases = JavaConverters.asScalaBuffer(configObj.getOrDefault("include_databases",new java.util.ArrayList[String]()).asInstanceOf[java.util.ArrayList[String]]).toList
+
+  if (includeDatabases.isEmpty) {
+    return spark.sharedState.externalCatalog.listDatabases().filter(_ != s"$inventoryDatabase")
+  }
+  return spark.sharedState.externalCatalog.listDatabases().filter(includeDatabases.contains(_))
 }
 
 val config = getConfig()
 val inventoryDatabase = getInventoryDatabase(config)
-val includeDatabases = getIncludeDatabases(config)
-var df = metadataForAllTables(spark.sharedState.externalCatalog.listDatabases().filter(includeDatabases.contains(_)), failures)
+val includeDatabases = getIncludeDatabases(config, inventoryDatabase)
+var df = metadataForAllTables(includeDatabases, failures)
 var columnsToMapLower = Array("catalog","database","name","upgraded_to","storage_properties")
 columnsToMapLower.map(column => {
   df = df.withColumn(column, lower(col(column)))
