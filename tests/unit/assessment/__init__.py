@@ -6,7 +6,7 @@ from unittest.mock import create_autospec
 from databricks.sdk import WorkspaceClient
 from databricks.sdk.errors import NotFound
 from databricks.sdk.service.compute import ClusterDetails, Policy
-from databricks.sdk.service.jobs import BaseJob
+from databricks.sdk.service.jobs import BaseJob, BaseRun
 from databricks.sdk.service.pipelines import GetPipelineResponse, PipelineStateInfo
 from databricks.sdk.service.sql import EndpointConfPair
 from databricks.sdk.service.workspace import ExportResponse, GetSecretResponse
@@ -37,6 +37,7 @@ def _load_fixture(filename: str):
 
 _FOLDERS = {
     BaseJob: '../assessment/jobs',
+    BaseRun: '../assessment/jobruns',
     ClusterDetails: '../assessment/clusters',
     PipelineStateInfo: '../assessment/pipelines',
 }
@@ -75,6 +76,7 @@ def workspace_client_mock(
     cluster_ids: list[str] | None = None,
     pipeline_ids: list[str] | None = None,
     job_ids: list[str] | None = None,
+    jobruns_ids: list[str] | None = None,
     warehouse_config="single-config.json",
     secret_exists=True,
 ):
@@ -84,6 +86,7 @@ def workspace_client_mock(
     ws.pipelines.list_pipelines.return_value = _id_list(PipelineStateInfo, pipeline_ids)
     ws.pipelines.get = _pipeline
     ws.jobs.list.return_value = _id_list(BaseJob, job_ids)
+    ws.jobs.list_runs.return_value = _id_list(BaseRun, jobruns_ids)
     ws.warehouses.get_workspace_warehouse_config().data_access_config = _load_list(
         EndpointConfPair, f"../assessment/warehouses/{warehouse_config}"
     )

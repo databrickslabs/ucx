@@ -26,7 +26,10 @@ from databricks.labs.ucx.workspace_access.generic import (
     WorkspaceListing,
     WorkspaceObjectInfo,
     experiments_listing,
+    feature_store_listing,
+    feature_tables_root_page,
     models_listing,
+    models_root_page,
     tokens_and_passwords,
 )
 from databricks.labs.ucx.workspace_access.groups import MigrationState
@@ -849,3 +852,67 @@ def test_verify_task_should_fail_if_acls_missing():
 
     with pytest.raises(ValueError):
         sup.get_verify_task(item)
+
+
+def test_feature_tables_listing():
+    ws = MagicMock()
+
+    def do_api_side_effect(*_, query):
+        if not query["page_token"]:
+            return {"feature_tables": [{"id": "table1"}, {"id": "table2"}], "next_page_token": "token"}
+        return {"feature_tables": [{"id": "table3"}, {"id": "table4"}]}
+
+    ws.api_client.do.side_effect = do_api_side_effect
+
+    wrapped = Listing(feature_store_listing(ws), id_attribute="object_id", object_type="feature-tables")
+    result = list(wrapped)
+
+    assert len(result) == 4
+    assert result[0].object_id == "table1"
+    assert result[0].request_type == "feature-tables"
+
+
+def test_root_page_listing():
+    ws = MagicMock()
+
+    basic_acl = [
+        iam.AccessControlResponse(
+            group_name="test",
+            all_permissions=[iam.Permission(inherited=False, permission_level=iam.PermissionLevel.CAN_EDIT_METADATA)],
+        )
+    ]
+
+    ws.permissions.get.side_effect = [
+        iam.ObjectPermissions(object_id="/root", object_type="feature-tables", access_control_list=basic_acl),
+    ]
+
+    sup = GenericPermissionsSupport(ws=ws, listings=[Listing(feature_tables_root_page, "object_id", "feature-tables")])
+    tasks = list(sup.get_crawler_tasks())
+    assert len(tasks) == 1
+    auth_items = [task() for task in tasks]
+    for item in auth_items:
+        assert item.object_id == "/root"
+        assert item.object_type == "feature-tables"
+
+
+def test_models_page_listing():
+    ws = MagicMock()
+
+    basic_acl = [
+        iam.AccessControlResponse(
+            group_name="test",
+            all_permissions=[iam.Permission(inherited=False, permission_level=iam.PermissionLevel.CAN_EDIT_METADATA)],
+        )
+    ]
+
+    ws.permissions.get.side_effect = [
+        iam.ObjectPermissions(object_id="/root", object_type="registered-models", access_control_list=basic_acl),
+    ]
+
+    sup = GenericPermissionsSupport(ws=ws, listings=[Listing(models_root_page, "object_id", "registered-models")])
+    tasks = list(sup.get_crawler_tasks())
+    assert len(tasks) == 1
+    auth_items = [task() for task in tasks]
+    for item in auth_items:
+        assert item.object_id == "/root"
+        assert item.object_type == "registered-models"

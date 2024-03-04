@@ -1,0 +1,15 @@
+{
+  "run_name": "notebook task run",
+  "run_id": "123",
+  "start_time": 1704085200000,
+  "timeout_seconds": 86400,
+  "tasks": [
+    {
+      "task_key": "notebook",
+      "existing_cluster_id": "simplest-autoscale",
+      "notebook_task": {
+        "notebook_path": "/Users/foo.bar@databricks.com/Customers/Example/Test/Load"
+      }
+    }
+  ]
+}
