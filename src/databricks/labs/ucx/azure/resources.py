@@ -1,4 +1,3 @@
-import uuid
 from collections.abc import Iterable
 from dataclasses import dataclass
 
@@ -90,11 +89,9 @@ class AzureRoleAssignment:
     role_name: str
 
 
-# rm_host = ws.config.arm_environment.resource_manager_endpoint
-# "https://graph.microsoft.com"
 class AzureAPIClient:
     def __init__(self, host_endpoint: str, service_endpoint: str):
-        self._api_client = ApiClient(
+        self.api_client = ApiClient(
             Config(
                 host=host_endpoint,
                 credentials_provider=self._provider_for(service_endpoint),
@@ -120,7 +117,7 @@ class AzureAPIClient:
         query = {}
         if api_version is not None:
             query = {"api-version": api_version}
-        return self._api_client.do("GET", path, query, headers)
+        return self.api_client.do("GET", path, query, headers)
 
     def put(self, path: str, api_version: str | None = None, body: dict | None = None):
         headers = {"Content-Type": "application/json"}
@@ -128,21 +125,21 @@ class AzureAPIClient:
         if api_version is not None:
             query = {"api-version": api_version}
         if body is not None:
-            return self._api_client.do("PUT", path, query, headers, body)
+            return self.api_client.do("PUT", path, query, headers, body)
         return None
 
     def post(self, path: str, body: dict | None = None):
         headers = {"Content-Type": "application/json"}
         query: dict[str, str] = {}
         if body is not None:
-            return self._api_client.do("POST", path, query, headers, body)
-        return self._api_client.do("POST", path, query, headers)
+            return self.api_client.do("POST", path, query, headers, body)
+        return self.api_client.do("POST", path, query, headers)
 
     def delete(self, path: str):
         # this method is added only to be used in int test to delete the application once tests pass
         headers = {"Content-Type": "application/json"}
         query: dict[str, str] = {}
-        return self._api_client.do("DELETE", path, query, headers)
+        return self.api_client.do("DELETE", path, query, headers)
 
     @property
     def token(self):
@@ -179,10 +176,7 @@ class AzureResources:
             )
             object_id = service_principal_info.get("id")
             assert object_id is not None
-            secret_info: dict[str, str] = self._azure_graph.post(
-                # f"/v1.0/servicePrincipals(appId='{client_id}')/addPassword"
-                f"/v1.0/servicePrincipals/{object_id}/addPassword"
-            )
+            secret_info: dict[str, str] = self._azure_graph.post(f"/v1.0/servicePrincipals/{object_id}/addPassword")
 
         except PermissionDenied:
             msg = (
@@ -206,11 +200,10 @@ class AzureResources:
         assert secret is not None
         return Principal(client_id, display_name, object_id, principal_type, directory_id, secret)
 
-    def apply_storage_permission(self, principal_id: str, resource: AzureResource, role: str):
+    def apply_storage_permission(self, principal_id: str, resource: AzureResource, role_name: str, role_guid: str):
         try:
-            role_name = str(uuid.uuid4())
-            role_id = _ROLES[role]
-            path = f"{str(resource)}/providers/Microsoft.Authorization/roleAssignments/{role_name}"
+            role_id = _ROLES[role_name]
+            path = f"{str(resource)}/providers/Microsoft.Authorization/roleAssignments/{role_guid}"
             body = {
                 "properties": {
                     "roleDefinitionId": f"/subscriptions/{resource.subscription_id}/providers/Microsoft.Authorization/roleDefinitions/"
@@ -222,7 +215,7 @@ class AzureResources:
             self._azure_mgmt.put(path, "2022-04-01", body)
         except ResourceConflict:
             logger.warning(
-                f"Role assignment already exists for role {role_name} on storage {resource.storage_account}"
+                f"Role assignment already exists for role {role_guid} on storage {resource.storage_account}"
                 f" for spn {principal_id}."
             )
         except PermissionDenied:

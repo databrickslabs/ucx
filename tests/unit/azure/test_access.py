@@ -140,7 +140,7 @@ def test_create_global_spn_spn_present():
     installation.load.return_value = WorkspaceConfig(
         inventory_database='ucx',
         policy_id="foo1",
-        global_spn_id="123",
+        uber_spn_id="123",
     )
     azure_resources = create_autospec(AzureResources)
     azure_resource_permission = AzureResourcePermissions(installation, w, azure_resources, location)
@@ -167,7 +167,7 @@ def test_create_global_spn_cluster_policy_not_found(mocker):
     location = ExternalLocations(w, backend, "ucx")
     installation = create_autospec(Installation)
     installation.load.return_value = WorkspaceConfig(inventory_database='ucx', policy_id="foo1")
-    api_client = azure_api_client(mocker)
+    api_client = azure_api_client()
     azure_resources = AzureResources(api_client, api_client, include_subscriptions="002")
     azure_resource_permission = AzureResourcePermissions(installation, w, azure_resources, location)
     with pytest.raises(NotFound):
@@ -185,7 +185,7 @@ def test_create_global_spn(mocker):
     location = ExternalLocations(w, backend, "ucx")
     installation = create_autospec(Installation)
     installation.load.return_value = WorkspaceConfig(inventory_database='ucx', policy_id="foo1")
-    api_client = azure_api_client(mocker)
+    api_client = azure_api_client()
     azure_resources = AzureResources(api_client, api_client, include_subscriptions="002")
     azure_resource_permission = AzureResourcePermissions(installation, w, azure_resources, location)
     azure_resource_permission.create_uber_principal()
@@ -193,25 +193,16 @@ def test_create_global_spn(mocker):
         WorkspaceConfig(
             inventory_database='ucx',
             policy_id="foo1",
-            global_spn_id="appIduser1",
+            uber_spn_id="appIduser1",
         )
     )
-    # call_2 = call(cluster_policy.as_dict(), filename='policy-backup.json')
-    installation.save.assert_has_calls([call_1])
-    path = "subscriptions/002/resourceGroups/rg1/storageAccounts/sto2/providers/Microsoft.Authorization/roleAssignments/12345"
-    body = {
-        'properties': {
-            'principalId': 'Iduser1',
-            'principalType': 'ServicePrincipal',
-            'roleDefinitionId': '/subscriptions/002/providers/Microsoft.Authorization/roleDefinitions/2a2b9908-6ea1-4ae2-8e65-a410df84e7d1',
-        }
-    }
+    call_2 = call(cluster_policy.as_dict(), filename='policy-backup.json')
+    installation.save.assert_has_calls([call_1, call_2])
     call_1 = call("/v1.0/applications", {"displayName": "UCXServicePrincipal"})
     call_2 = call("/v1.0/servicePrincipals", {"appId": "appIduser1"})
     call_3 = call("/v1.0/servicePrincipals/Iduser1/addPassword")
-    call_4 = call(path, "2022-04-01", body)
     api_client.post.assert_has_calls([call_1, call_2, call_3], any_order=True)
-    api_client.put.assert_has_calls([call_4], any_order=True)
+    api_client.put.assert_called_once()
     definition = {
         "foo": "bar",
         "spark_conf.fs.azure.account.oauth2.client.id.sto2.dfs.core.windows.net": {

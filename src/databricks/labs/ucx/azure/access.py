@@ -1,4 +1,5 @@
 import json
+import uuid
 from dataclasses import dataclass
 
 from databricks.labs.blueprint.installation import Installation
@@ -104,7 +105,7 @@ class AzureResourcePermissions:
         return self._installation.save(storage_account_infos, filename=self._filename)
 
     def _update_cluster_policy_definition(
-        self, policy_definition: str, storage_accounts: list[AzureResource], global_principal: Principal
+        self, policy_definition: str, storage_accounts: list[AzureResource], uber_principal: Principal
     ) -> str:
         policy_dict = json.loads(policy_definition)
         tenant_id = self._azurerm.tenant_id()
@@ -112,7 +113,7 @@ class AzureResourcePermissions:
         for storage in storage_accounts:
             policy_dict[
                 f"spark_conf.fs.azure.account.oauth2.client.id.{storage.storage_account}.dfs.core.windows.net"
-            ] = self._policy_config(global_principal.client_id)
+            ] = self._policy_config(uber_principal.client_id)
             policy_dict[
                 f"spark_conf.fs.azure.account.oauth.provider.type.{storage.storage_account}.dfs.core.windows.net"
             ] = self._policy_config("org.apache.hadoop.fs.azurebfs.oauth2.ClientCredsTokenProvider")
@@ -122,10 +123,10 @@ class AzureResourcePermissions:
             policy_dict[f"spark_conf.fs.azure.account.auth.type.{storage.storage_account}.dfs.core.windows.net"] = (
                 self._policy_config("OAuth")
             )
-            if global_principal.secret is not None:
+            if uber_principal.secret is not None:
                 policy_dict[
                     f"spark_conf.fs.azure.account.oauth2.client.secret.{storage.storage_account}.dfs.core.windows.net"
-                ] = self._policy_config(global_principal.secret)
+                ] = self._policy_config(uber_principal.secret)
         return json.dumps(policy_dict)
 
     @staticmethod
@@ -133,16 +134,15 @@ class AzureResourcePermissions:
         return {"type": "fixed", "value": value}
 
     def _update_cluster_policy_with_spn(
-        self, policy_id: str, storage_accounts: list[AzureResource], global_principal: Principal
+        self, policy_id: str, storage_accounts: list[AzureResource], uber_principal: Principal
     ):
         try:
             policy_definition = ""
             cluster_policy = self._ws.cluster_policies.get(policy_id)
-            # to be updated after doing changes in blueprint
-            # self._installation.save(cluster_policy.as_dict(), filename="policy-backup.json")
+            self._installation.save(cluster_policy.as_dict(), filename="policy-backup.json")
             if cluster_policy.definition is not None:
                 policy_definition = self._update_cluster_policy_definition(
-                    cluster_policy.definition, storage_accounts, global_principal
+                    cluster_policy.definition, storage_accounts, uber_principal
                 )
             if cluster_policy.name is not None:
                 self._ws.cluster_policies.edit(policy_id, cluster_policy.name, definition=policy_definition)
@@ -157,8 +157,8 @@ class AzureResourcePermissions:
             msg = "UCX cluster policy not found in config. Please run latest UCX installation to set cluster policy"
             logger.error(msg)
             raise ValueError(msg) from None
-        if config.global_spn_id is not None:
-            logger.error("Global service principal already created for this workspace.")
+        if config.uber_spn_id is not None:
+            logger.error("Uber service principal already created for this workspace.")
             return
         used_storage_accounts = self._get_storage_accounts()
         if len(used_storage_accounts) == 0:
@@ -172,21 +172,24 @@ class AzureResourcePermissions:
             if storage.storage_account in used_storage_accounts:
                 storage_account_info.append(storage)
         logger.info("Creating service principal")
-        global_principal = self._azurerm.create_service_principal()
+        uber_principal = self._azurerm.create_service_principal()
         config = self._installation.load(WorkspaceConfig)
-        config.global_spn_id = global_principal.client_id
+        config.uber_spn_id = uber_principal.client_id
         self._installation.save(config)
         logger.info(
-            f"Created service principal of client_id {global_principal.client_id}. "
+            f"Created service principal of client_id {uber_principal.client_id}. "
             f"Applying permission on storage accounts"
         )
         for storage in storage_account_info:
-            self._azurerm.apply_storage_permission(global_principal.object_id, storage, "STORAGE_BLOB_DATA_READER")
+            role_name = str(uuid.uuid4())
+            self._azurerm.apply_storage_permission(
+                uber_principal.object_id, storage, "STORAGE_BLOB_DATA_READER", role_name
+            )
             logger.debug(
-                f"Storage Data Blob Reader permission applied for spn {global_principal.client_id} "
+                f"Storage Data Blob Reader permission applied for spn {uber_principal.client_id} "
                 f"to storage account {storage.storage_account}"
             )
-        self._update_cluster_policy_with_spn(policy_id, storage_account_info, global_principal)
+        self._update_cluster_policy_with_spn(policy_id, storage_account_info, uber_principal)
 
         logger.info(f"Update UCX cluster policy {policy_id} with spn connection details for storage accounts")
 

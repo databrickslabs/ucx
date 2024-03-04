@@ -25,14 +25,11 @@ def get_az_api_mapping(*args, **_):
     return {}
 
 
-def azure_api_client(mocker):
+def azure_api_client():
     token = json.dumps({"aud": "foo", "tid": "bar"}).encode("utf-8")
     str_token = base64.b64encode(token).decode("utf-8").replace("=", "")
-
     tok = Token(access_token=f"header.{str_token}.sig")
-    mocker.patch("databricks.sdk.oauth.Refreshable.token", return_value=tok)
-    mocker.patch("uuid.uuid4", return_value="12345")
-    api_client = create_autospec(AzureAPIClient("foo", "bar"))
+    api_client = create_autospec(AzureAPIClient)
     type(api_client).token = mock.PropertyMock(return_value=tok)
     api_client.get.side_effect = get_az_api_mapping
     api_client.put.side_effect = get_az_api_mapping
