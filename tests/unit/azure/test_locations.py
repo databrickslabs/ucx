@@ -189,7 +189,7 @@ def test_run_managed_identity(ws, mocker):
 
 
 def create_side_effect(location_name, *args, **kwargs):  # pylint: disable=unused-argument
-    # if not external_locations.create is called without skip_validation=True, raise PermissionDenied
+    # if external_locations.create is called without skip_validation=True, raise PermissionDenied
     if not kwargs.get('skip_validation'):
         if "empty" in location_name:
             raise PermissionDenied("No file available under the location to read")
