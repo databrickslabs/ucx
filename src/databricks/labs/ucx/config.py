@@ -37,6 +37,9 @@ class WorkspaceConfig:  # pylint: disable=too-many-instance-attributes
     policy_id: str | None = None
     num_days_submit_runs_history: int = 30
 
+    # Flag to see if terraform has been used for deploying certain entities
+    is_terraform_used: bool = False
+
     def replace_inventory_variable(self, text: str) -> str:
         return text.replace("$inventory", f"hive_metastore.{self.inventory_database}")
 
