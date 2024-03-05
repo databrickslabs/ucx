@@ -246,7 +246,7 @@ class WorkspaceInstaller:
         policy_id = self._create_cluster_policy(inventory_database, spark_conf_dict, instance_profile)
 
         # Check if terraform is being used
-        is_terraform_used = self._prompts.confirm("is terraform used?")
+        is_terraform_used = self._prompts.confirm("Do you use Terraform to deploy your infrastructure?")
         config = WorkspaceConfig(
             inventory_database=inventory_database,
             workspace_group_regex=configure_groups.workspace_group_regex,
