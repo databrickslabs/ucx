@@ -17,6 +17,7 @@ from databricks.sdk.service.catalog import Privilege
 
 from databricks.labs.ucx.framework.crawlers import StatementExecutionBackend
 from databricks.labs.ucx.hive_metastore import ExternalLocations
+from databricks.labs.ucx.hive_metastore.locations import ExternalLocation
 
 logger = logging.getLogger(__name__)
 
@@ -466,15 +467,15 @@ class AWSResourcePermissions:
             return None
         return self._installation.save(instance_profile_access, filename=self.INSTANCE_PROFILES_FILE_NAMES)
 
-    def _identify_missing_external_locations(self) -> set[(str, str)]:
+    def _identify_missing_external_locations(self,
+                                             external_locations: Iterable[ExternalLocation],
+                                             existing_paths: list[str],
+                                             compatible_roles: list[AWSRoleAction]
+                                             ) -> set[(str, str)]:
         # Get recommended external locations
         # Get existing external locations
         # Get list of paths from get_uc_compatible_roles
         # Identify recommended external location paths that don't have an external location and return them
-        external_locations = ExternalLocations(self._ws, self._backend, self._schema).snapshot()
-        existing_paths = [external_location.url for
-                          external_location in self._ws.external_locations.list()]
-        compatible_roles = self.get_uc_compatible_roles()
         missing_paths = set()
         for external_location in external_locations:
             existing = False
@@ -507,12 +508,23 @@ class AWSResourcePermissions:
         # Find out the credential that is pointing to this path
         # Create external location for the path using the credential identified
         credential_dict = self._get_existing_credentials_dict()
-        missing_paths = self._identify_missing_external_locations()
+        external_locations = ExternalLocations(self._ws, self._backend, self._schema).snapshot()
+        existing_external_locations = self._ws.external_locations.list()
+        existing_paths = [external_location.url for
+                          external_location in existing_external_locations]
+        compatible_roles = self.get_uc_compatible_roles()
+        missing_paths = self._identify_missing_external_locations(external_locations, existing_paths, compatible_roles)
+        external_location_names = [external_location.name for external_location in existing_external_locations]
         external_location_num = 1
         for path, role_arn in missing_paths:
             if role_arn in credential_dict:
+                while True:
+                    external_location_name = f"{external_location_name}_{external_location_num}"
+                    if external_location_name not in external_location_names:
+                        break
+                    external_location_num += 1
                 self._ws.external_locations.create(
-                    f"{external_location_name}_{external_location_num}",
+                    external_location_name,
                     path,
                     credential_dict[role_arn]
                 )
