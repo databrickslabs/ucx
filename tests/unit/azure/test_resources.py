@@ -128,6 +128,21 @@ def test_apply_storage_permission_no_access(mocker):
         azure_resource.apply_storage_permission("test", azure_storage, "STORAGE_BLOB_DATA_READER", "12345")
 
 
+def test_delete_service_principal_no_access(mocker):
+    api_client = azure_api_client()
+    api_client.delete.side_effect = PermissionDenied()
+    azure_resource = AzureResources(api_client, api_client)
+    with pytest.raises(PermissionDenied):
+        azure_resource.delete_service_principal("test")
+
+
+def test_delete_service_principal(mocker):
+    api_client = azure_api_client()
+    azure_resource = AzureResources(api_client, api_client)
+    azure_resource.delete_service_principal("test")
+    api_client.delete.assert_called_with("/v1.0/applications(appId='test')")
+
+
 def test_apply_storage_permission_assignment_present(mocker):
     api_client = azure_api_client()
     api_client.put.side_effect = ResourceConflict()

@@ -173,7 +173,7 @@ class AzureResourcePermissions:
             logger.error(msg)
             raise ValueError(msg) from None
         if config.uber_spn_id is not None:
-            logger.error("Uber service principal already created for this workspace.")
+            logger.warning("Uber service principal already created for this workspace.")
             return
         used_storage_accounts = self._get_storage_accounts()
         if len(used_storage_accounts) == 0:
@@ -188,31 +188,37 @@ class AzureResourcePermissions:
                 storage_account_info.append(storage)
         logger.info("Creating service principal")
         uber_principal = self._azurerm.create_service_principal(uber_principal_name)
-        config = self._installation.load(WorkspaceConfig)
+        self._create_scope(uber_principal, inventory_database)
         config.uber_spn_id = uber_principal.client.client_id
-        self._installation.save(config)
-        logger.info(f"Creating secret scope {inventory_database}.")
-        try:
-            self._ws.secrets.create_scope(inventory_database)
-        except ResourceAlreadyExists:
-            logger.warning(f"Secret scope {inventory_database} already exists, using the same")
-        self._ws.secrets.put_secret(inventory_database, "uber_principal_secret", string_value=uber_principal.secret)
         logger.info(
             f"Created service principal of client_id {config.uber_spn_id}. " f"Applying permission on storage accounts"
         )
+        try:
+            self._apply_storage_permission(storage_account_info, uber_principal)
+            self._installation.save(config)
+            self._update_cluster_policy_with_spn(policy_id, storage_account_info, uber_principal, inventory_database)
+        except PermissionError:
+            self._azurerm.delete_service_principal(uber_principal.client.object_id)
+        logger.info(f"Update UCX cluster policy {policy_id} with spn connection details for storage accounts")
+
+    def _apply_storage_permission(self, storage_account_info: list[AzureResource], uber_principal: PrincipalSecret):
         for storage in storage_account_info:
             role_name = str(uuid.uuid4())
             self._azurerm.apply_storage_permission(
                 uber_principal.client.object_id, storage, "STORAGE_BLOB_DATA_READER", role_name
             )
             logger.debug(
-                f"Storage Data Blob Reader permission applied for spn {config.uber_spn_id} "
+                f"Storage Data Blob Reader permission applied for spn {uber_principal.client.client_id} "
                 f"to storage account {storage.storage_account}"
             )
 
-        self._update_cluster_policy_with_spn(policy_id, storage_account_info, uber_principal, inventory_database)
-
-        logger.info(f"Update UCX cluster policy {policy_id} with spn connection details for storage accounts")
+    def _create_scope(self, uber_principal: PrincipalSecret, inventory_database: str):
+        logger.info(f"Creating secret scope {inventory_database}.")
+        try:
+            self._ws.secrets.create_scope(inventory_database)
+        except ResourceAlreadyExists:
+            logger.warning(f"Secret scope {inventory_database} already exists, using the same")
+        self._ws.secrets.put_secret(inventory_database, "uber_principal_secret", string_value=uber_principal.secret)
 
     def load(self):
         return self._installation.load(list[StoragePermissionMapping], filename=self._filename)

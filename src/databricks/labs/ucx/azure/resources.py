@@ -154,14 +154,14 @@ class AzureResources:
     def __init__(self, azure_mgmt: AzureAPIClient, azure_graph: AzureAPIClient, include_subscriptions=None):
         if not include_subscriptions:
             include_subscriptions = []
-        self._azure_mgmt = azure_mgmt
-        self._azure_graph = azure_graph
+        self._mgmt = azure_mgmt
+        self._graph = azure_graph
         self._include_subscriptions = include_subscriptions
         self._role_definitions = {}  # type: dict[str, str]
         self._principals: dict[str, Principal | None] = {}
 
     def _get_subscriptions(self) -> Iterable[AzureSubscription]:
-        for subscription in self._azure_mgmt.get("/subscriptions", "2022-12-01").get("value", []):
+        for subscription in self._mgmt.get("/subscriptions", "2022-12-01").get("value", []):
             yield AzureSubscription(
                 name=subscription["displayName"],
                 subscription_id=subscription["subscriptionId"],
@@ -170,17 +170,13 @@ class AzureResources:
 
     def create_service_principal(self, display_name: str) -> PrincipalSecret:
         try:
-            application_info: dict[str, str] = self._azure_graph.post(
-                "/v1.0/applications", {"displayName": display_name}
-            )
+            application_info: dict[str, str] = self._graph.post("/v1.0/applications", {"displayName": display_name})
             app_id = application_info.get("appId")
             assert app_id is not None
-            service_principal_info: dict[str, str] = self._azure_graph.post(
-                "/v1.0/servicePrincipals", {"appId": app_id}
-            )
+            service_principal_info: dict[str, str] = self._graph.post("/v1.0/servicePrincipals", {"appId": app_id})
             object_id = service_principal_info.get("id")
             assert object_id is not None
-            secret_info: dict[str, str] = self._azure_graph.post(f"/v1.0/servicePrincipals/{object_id}/addPassword")
+            secret_info: dict[str, str] = self._graph.post(f"/v1.0/servicePrincipals/{object_id}/addPassword")
 
         except PermissionDenied:
             msg = (
@@ -196,25 +192,33 @@ class AzureResources:
         assert client_id is not None
         assert object_id is not None
         assert principal_type is not None
-        if principal_type == "Application":
-            # service principal must have directory_id
-            assert directory_id is not None
+        assert directory_id is not None
         assert secret is not None
         return PrincipalSecret(Principal(client_id, display_name, object_id, principal_type, directory_id), secret)
+
+    def delete_service_principal(self, principal_id: str):
+        try:
+            self._graph.delete(f"/v1.0/applications(appId='{principal_id}')")
+        except PermissionDenied:
+            msg = f"User doesnt have permission to delete application {principal_id}"
+            logger.error(msg)
+            raise PermissionDenied(msg) from None
 
     def apply_storage_permission(self, principal_id: str, resource: AzureResource, role_name: str, role_guid: str):
         try:
             role_id = _ROLES[role_name]
             path = f"{str(resource)}/providers/Microsoft.Authorization/roleAssignments/{role_guid}"
+            role_definition_id = (
+                f"/subscriptions/{resource.subscription_id}/providers/Microsoft.Authorization/roleDefinitions/{role_id}"
+            )
             body = {
                 "properties": {
-                    "roleDefinitionId": f"/subscriptions/{resource.subscription_id}/providers/Microsoft.Authorization/roleDefinitions/"
-                    f"{role_id}",
+                    "roleDefinitionId": role_definition_id,
                     "principalId": principal_id,
                     "principalType": "ServicePrincipal",
                 }
             }
-            self._azure_mgmt.put(path, "2022-04-01", body)
+            self._mgmt.put(path, "2022-04-01", body)
         except ResourceConflict:
             logger.warning(
                 f"Role assignment already exists for role {role_guid} on storage {resource.storage_account}"
@@ -229,7 +233,7 @@ class AzureResources:
             raise PermissionDenied(msg) from None
 
     def tenant_id(self):
-        token = self._azure_mgmt.token()
+        token = self._mgmt.token()
         return token.jwt_claims().get("tid")
 
     def subscriptions(self):
@@ -245,14 +249,14 @@ class AzureResources:
         for subscription in self.subscriptions():
             logger.info(f"Checking in subscription {subscription.name} for storage accounts")
             path = f"/subscriptions/{subscription.subscription_id}/providers/Microsoft.Storage/storageAccounts"
-            for storage in self._azure_mgmt.get(path, "2023-01-01").get("value", []):
+            for storage in self._mgmt.get(path, "2023-01-01").get("value", []):
                 resource_id = storage.get("id")
                 if not resource_id:
                     continue
                 yield AzureResource(resource_id)
 
     def containers(self, storage: AzureResource):
-        for raw in self._azure_mgmt.get(f"{storage}/blobServices/default/containers", "2023-01-01").get("value", []):
+        for raw in self._mgmt.get(f"{storage}/blobServices/default/containers", "2023-01-01").get("value", []):
             resource_id = raw.get("id")
             if not resource_id:
                 continue
@@ -263,7 +267,7 @@ class AzureResources:
             return self._principals[principal_id]
         try:
             path = f"/v1.0/directoryObjects/{principal_id}"
-            raw: dict[str, str] = self._azure_graph.get(path)  # type: ignore[assignment]
+            raw: dict[str, str] = self._graph.get(path)  # type: ignore[assignment]
         except NotFound:
             # don't load principals from external directories twice
             self._principals[principal_id] = None
@@ -291,7 +295,7 @@ class AzureResources:
         """See https://learn.microsoft.com/en-us/rest/api/authorization/role-assignments/list-for-resource"""
         if not principal_types:
             principal_types = ["ServicePrincipal"]
-        result = self._azure_mgmt.get(f"{resource_id}/providers/Microsoft.Authorization/roleAssignments", "2022-04-01")
+        result = self._mgmt.get(f"{resource_id}/providers/Microsoft.Authorization/roleAssignments", "2022-04-01")
         for role_assignment in result.get("value", []):
             assignment = self._role_assignment(role_assignment, resource_id, principal_types)
             if not assignment:
@@ -330,7 +334,7 @@ class AzureResources:
 
     def _role_name(self, role_definition_id) -> str | None:
         if role_definition_id not in self._role_definitions:
-            role_definition = self._azure_mgmt.get(role_definition_id, "2022-04-01")
+            role_definition = self._mgmt.get(role_definition_id, "2022-04-01")
             definition_properties = role_definition.get("properties", {})
             role_name: str = definition_properties.get("roleName")
             if not role_name:
