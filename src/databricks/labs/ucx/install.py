@@ -449,11 +449,8 @@ class WorkspaceInstallation:
 
     def trigger_workflow(self, step: str):
         job_id = int(self._state.jobs[step])
-        if not job_id:
-            raise InvalidParameterValue("job does not exists hence skipping the workflow run")
         logger.debug(f"triggering {step} job: {self._ws.config.host}#job/{job_id}")
         self._ws.jobs.run_now(job_id)
-
 
     def _infer_error_from_job_run(self, job_run) -> Exception:
         errors: list[Exception] = []
@@ -937,7 +934,6 @@ class WorkspaceInstallation:
             raise InvalidParameterValue("job is not in FAILED state hence skipping repair")
         run_id = latest_job_run.run_id
         return job_id, run_id
-
 
     def uninstall(self):
         if self._prompts and not self._prompts.confirm(

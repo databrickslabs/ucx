@@ -1304,3 +1304,24 @@ def test_open_config(ws, mocker, mock_installation):
     install.configure()
 
     webbrowser_open.assert_called_with('https://localhost/#workspace~/mock/config.yml')
+
+
+def test_triggering_assessment_wf(ws, mocker, mock_installation):
+    ws.jobs.run_now = mocker.Mock()
+    sql_backend = MockBackend()
+    prompts = MockPrompts(
+        {
+            r".*Do you want to run assessment workflow after the installation*": "yes",
+            r".*": "",
+        }
+    )
+    workspace_installation = WorkspaceInstallation(
+        WorkspaceConfig(inventory_database="ucx", policy_id='123'),
+        mock_installation,
+        sql_backend,
+        create_autospec(WheelsV2),
+        ws,
+        prompts,
+        verify_timeout=timedelta(seconds=1),
+    )
+    workspace_installation.run()
