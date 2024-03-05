@@ -58,7 +58,7 @@ def test_save_spn_permissions_local(ws, sql_backend, inventory_schema, make_rand
 @pytest.mark.skip
 def test_create_global_spn(ws, sql_backend, inventory_schema, make_random, make_cluster_policy, env_or_skip):
     tables = [
-        ExternalLocation("abfss://data@hsucxstorage.dfs.core.windows.net/folder1", 1),
+        ExternalLocation("abfss://things@labsazurethings.dfs.core.windows.net/folder1", 1),
     ]
     sql_backend.save_table(f"{inventory_schema}.external_locations", tables, ExternalLocation)
     installation = Installation(ws, make_random(4))
@@ -70,7 +70,7 @@ def test_create_global_spn(ws, sql_backend, inventory_schema, make_random, make_
     )
     graph_client = AzureAPIClient("https://graph.microsoft.com", "https://graph.microsoft.com")
     azure_resources = AzureResources(
-        azure_mgmt_client, graph_client, include_subscriptions="3f2e4d32-8e8d-46d6-82bc-5bb8d962328b"
+        azure_mgmt_client, graph_client
     )
     az_res_perm = AzureResourcePermissions(
         installation, ws, azure_resources, ExternalLocations(ws, sql_backend, inventory_schema)
@@ -93,11 +93,11 @@ def test_create_global_spn(ws, sql_backend, inventory_schema, make_random, make_
     assert global_spn_assignment.role_name == "Storage Blob Data Reader"
     assert str(global_spn_assignment.scope) == resource_id
     assert (
-        policy_definition["spark_conf.fs.azure.account.oauth2.client.id.hsucxstorage.dfs.core.windows.net"]["value"]
+        policy_definition["spark_conf.fs.azure.account.oauth2.client.id.labsazurethings.dfs.core.windows.net"]["value"]
         == config.uber_spn_id
     )
     assert (
-        policy_definition["spark_conf.fs.azure.account.oauth2.client.endpoint.hsucxstorage.dfs.core.windows.net"][
+        policy_definition["spark_conf.fs.azure.account.oauth2.client.endpoint.labsazurethings.dfs.core.windows.net"][
             "value"
         ]
         == "https://login.microsoftonline.com/9f37a392-f0ae-4280-9796-f1864a10effc/oauth2/token"
