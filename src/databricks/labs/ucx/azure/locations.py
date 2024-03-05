@@ -46,29 +46,32 @@ class ExternalLocationsMigration:
         app_id_mapping_read = {}
         all_credentials = self._ws.storage_credentials.list(max_results=0)
         for credential in all_credentials:
+            name = credential.name
             # cannot have none credential name, it's required for external location
-            if not credential.name:
+            if not name:
                 continue
-            # if service principal based credential, use service principal's application_id directly
-            if credential.azure_service_principal:
-                if not credential.read_only:
-                    app_id_mapping_write[credential.azure_service_principal.application_id] = credential.name
-                    continue
-                if credential.read_only:
-                    app_id_mapping_read[credential.azure_service_principal.application_id] = credential.name
-            # if managed identity based credential, fetch the application_id of the managed identity
-            if credential.azure_managed_identity:
+
+            read_only = credential.read_only
+            service_principal = credential.azure_service_principal
+            managed_identity = credential.azure_managed_identity
+
+            application_id = None
+            if service_principal:
+                # if service principal based credential, use service principal's application_id directly
+                application_id = service_principal.application_id
+            if managed_identity:
+                # if managed identity based credential, fetch the application_id of the managed identity
                 application_id = self._azurerm.managed_identity_client_id(
-                    credential.azure_managed_identity.access_connector_id,
-                    credential.azure_managed_identity.managed_identity_id,
+                    managed_identity.access_connector_id,
+                    managed_identity.managed_identity_id,
                 )
-                if not application_id:
-                    continue
-                if not credential.read_only:
-                    app_id_mapping_write[application_id] = credential.name
-                    continue
-                if credential.read_only:
-                    app_id_mapping_read[application_id] = credential.name
+            if not application_id:
+                continue
+
+            if read_only:
+                app_id_mapping_read[application_id] = name
+                continue
+            app_id_mapping_write[application_id] = name
 
         return app_id_mapping_write, app_id_mapping_read
 
