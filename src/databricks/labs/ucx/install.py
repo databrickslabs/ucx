@@ -248,8 +248,6 @@ class WorkspaceInstaller:
         # Check if terraform is being used
         is_terraform_used = self._prompts.confirm("Do you use Terraform to deploy your infrastructure?")
 
-        run_assessment_workflow = self._prompts.confirm("Do you want to run assessment workflow after the installation?")
-
         config = WorkspaceConfig(
             inventory_database=inventory_database,
             workspace_group_regex=configure_groups.workspace_group_regex,
@@ -265,7 +263,6 @@ class WorkspaceInstaller:
             spark_conf=spark_conf_dict,
             policy_id=policy_id,
             is_terraform_used=is_terraform_used,
-            run_assessment_workflow=run_assessment_workflow,
         )
         self._installation.save(config)
         ws_file_url = self._installation.workspace_link(config.__file__)
@@ -400,9 +397,9 @@ class WorkspaceInstallation:
                 self.create_jobs,
             ],
         )
-        if self._config.run_assessment_workflow:
-            logger.info("Running the assessment workflow")
-            self.run_workflow("assessment")
+        if self._prompts.confirm("Do you want to run assessment workflow after the installation?"):
+            logger.info("Triggering the assessment workflow")
+            self.trigger_workflow("assessment")
 
         readme_url = self._create_readme()
         logger.info(f"Installation completed successfully! Please refer to the {readme_url} for the next steps.")
@@ -449,6 +446,14 @@ class WorkspaceInstallation:
             # currently we don't have any good message from API, so we have to work around it.
             job_run = self._ws.jobs.get_run(job_run_waiter.run_id)
             raise self._infer_error_from_job_run(job_run) from err
+
+    def trigger_workflow(self, step: str):
+        job_id = int(self._state.jobs[step])
+        if not job_id:
+            raise InvalidParameterValue("job does not exists hence skipping the workflow run")
+        logger.debug(f"triggering {step} job: {self._ws.config.host}#job/{job_id}")
+        self._ws.jobs.run_now(job_id)
+
 
     def _infer_error_from_job_run(self, job_run) -> Exception:
         errors: list[Exception] = []
