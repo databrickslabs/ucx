@@ -247,6 +247,9 @@ class WorkspaceInstaller:
 
         # Check if terraform is being used
         is_terraform_used = self._prompts.confirm("Do you use Terraform to deploy your infrastructure?")
+
+        run_assessment_workflow = self._prompts.confirm("Do you want to run assessment workflow after the installation?")
+
         config = WorkspaceConfig(
             inventory_database=inventory_database,
             workspace_group_regex=configure_groups.workspace_group_regex,
@@ -262,6 +265,7 @@ class WorkspaceInstaller:
             spark_conf=spark_conf_dict,
             policy_id=policy_id,
             is_terraform_used=is_terraform_used,
+            run_assessment_workflow=run_assessment_workflow,
         )
         self._installation.save(config)
         ws_file_url = self._installation.workspace_link(config.__file__)
@@ -396,6 +400,10 @@ class WorkspaceInstallation:
                 self.create_jobs,
             ],
         )
+        if self._config.run_assessment_workflow:
+            logger.info("Running the assessment workflow")
+            self.run_workflow("assessment")
+
         readme_url = self._create_readme()
         logger.info(f"Installation completed successfully! Please refer to the {readme_url} for the next steps.")
 
@@ -924,6 +932,7 @@ class WorkspaceInstallation:
             raise InvalidParameterValue("job is not in FAILED state hence skipping repair")
         run_id = latest_job_run.run_id
         return job_id, run_id
+
 
     def uninstall(self):
         if self._prompts and not self._prompts.confirm(
