@@ -340,6 +340,10 @@ def test_for_cli(ws):
             "config.yml": {
                 'version': 2,
                 'inventory_database': 'test',
+                'connect': {
+                    'host': 'test',
+                    'token': 'test',
+                },
             },
             "azure_storage_account_info.csv": [
                 {
