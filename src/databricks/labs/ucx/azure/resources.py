@@ -360,7 +360,8 @@ class AzureResources:
             identities = identity.get("userAssignedIdentities")
             if user_assigned_identity_id in identities:
                 return identities.get(user_assigned_identity_id).get("clientId")
-            # sometimes we see "resourceGroups" instead of "resourcegroups" in the response from the API
+            # sometimes we see "resourceGroups" instead of "resourcegroups" in the response from Azure RM API
+            # but "resourcegroups" in response from storage credential's managed_identity_id
             if user_assigned_identity_id.replace("resourcegroups", "resourceGroups") in identities:
                 return identities.get(user_assigned_identity_id.replace("resourcegroups", "resourceGroups")).get(
                     "clientId"
