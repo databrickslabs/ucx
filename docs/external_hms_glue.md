@@ -1,22 +1,27 @@
-# External HMS and Glue Integration
+External Hive Metastore Integration
+===
 
-### TL;DR
+<!-- TOC -->
+* [External Hive Metastore Integration](#external-hive-metastore-integration)
+* [Current External HMS Integration](#current-external-hms-integration)
+* [Manual Setup/Override](#manual-setupoverride)
+* [Challenges and Gotchas](#challenges-and-gotchas)
+<!-- TOC -->
 
 The UCX toolkit by default relies on the internal workspace HMS as a source for tables and views.
-<br/>The UCX is set up to run and introspect a single HMS.
-<br/>The installer is looking for evidence of an external Metastore (Glue and Others)
-<br/>If we find an external metastore we allow the user to use this configuration for UCX.
+- is set up to run and introspect a single HMS.
+- The installer is looking for evidence of an external Metastore (Glue and Others)
+- If we find an external metastore we allow the user to use this configuration for UCX.
 
-### Current External HMS Integration
+# Current External HMS Integration
 
-To integrate with an External Metastore we need to configure the job clusters we generate.
-<br/> The setup process follows the following steps
+To integrate with an External Metastore we need to configure the job clusters we generate. The setup process follows the following steps
 
 - We are list the existing cluster policies and look for an evidence of External Metastore
   -- Spark config `spark.databricks.hive.metastore.glueCatalog.enabled=true`
   -- Spark config containing `spark.sql.hive.metastore`
-- If we find evidence of external metastore we prompt the user with the following message:<br/>
-  _We have identified one or more cluster policies set up for an external metastore. <br/>
+- If we find evidence of external metastore we prompt the user with the following message:
+  _We have identified one or more cluster policies set up for an external metastore.
   Would you like to set UCX to connect to the external metastore._
 - Selecting **Yes** will display a list of the matching policies and allow the user to select the proper one.
 - We copy the Instance Profile and the spark configuration parameters from the cluster policy and apply these to the job
@@ -25,7 +30,9 @@ To integrate with an External Metastore we need to configure the job clusters we
   Metastore, the Dashboard will fail.
 - DBSQL Warehouse settings are global to the workspace and cannot be set individually on a single warehouse.
 
-### Manual Setup/Override
+[[back to top](#external-hive-metastore-integration)]
+
+# Manual Setup/Override
 
 If the workspace doesn't have a cluster policy that is set up for External Metastore, there are two options to set UCX
 with External Metastore:
@@ -52,10 +59,14 @@ with External Metastore:
   Clusters before running the workflows.
 - Set up the DBSQL warehouses for the External Metastore
 
-### Challenges and Gotchas
+[[back to top](#external-hive-metastore-integration)]
+
+# Challenges and Gotchas
 
 - UCX is currently designed to run on a single workspace at a time.
 - If you run UCX on multiple workspace leveraging the same metastore, follow the following guidelines:
   -- Use a different inventory database name for each of the workspaces. Otherwise, they will override one another.
   -- Migrate the table once. Running table migration (when it will become available) from multiple workspaces is
   redundant.
+
+[[back to top](#external-hive-metastore-integration)]

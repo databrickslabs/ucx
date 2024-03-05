@@ -1,10 +1,13 @@
 import base64
 import re
 from dataclasses import dataclass
+from datetime import timedelta
 
 import pytest
 from databricks.labs.blueprint.installation import MockInstallation
 from databricks.labs.blueprint.tui import MockPrompts
+from databricks.sdk.errors import InternalError, NotFound
+from databricks.sdk.retries import retried
 
 from databricks.labs.ucx.assessment.azure import AzureServicePrincipalInfo
 from databricks.labs.ucx.azure.access import AzureResourcePermissions
@@ -68,6 +71,7 @@ def run_migration(ws, sql_backend):
                         'client_id': test_info.application_id,
                         'principal': test_info.credential_name,
                         'privilege': "READ_FILES" if read_only else "WRITE_FILES",
+                        'type': "Application",
                         'directory_id': test_info.directory_id,
                     },
                 ]
@@ -97,6 +101,7 @@ def run_migration(ws, sql_backend):
     return inner
 
 
+@retried(on=[InternalError], timeout=timedelta(minutes=2))
 def test_spn_migration_existed_storage_credential(extract_test_info, make_storage_credential_spn, run_migration):
     # create a storage credential for this test
     make_storage_credential_spn(
@@ -113,13 +118,24 @@ def test_spn_migration_existed_storage_credential(extract_test_info, make_storag
     assert not migration_result
 
 
+def save_delete_credential(ws, name):
+    try:
+        ws.storage_credentials.delete(name, force=True)
+    except NotFound:
+        # If test failed with exception threw before storage credential is created,
+        # don't fail the test with storage credential cannot be deleted error,
+        # instead let the original exception be reported.
+        pass
+
+
+@retried(on=[InternalError], timeout=timedelta(minutes=2))
 @pytest.mark.parametrize("read_only", [False, True])
 def test_spn_migration(ws, extract_test_info, run_migration, read_only):
     try:
         migration_results = run_migration(extract_test_info, {"lets_migrate_the_spn"}, read_only)
         storage_credential = ws.storage_credentials.get(extract_test_info.credential_name)
     finally:
-        ws.storage_credentials.delete(extract_test_info.credential_name, force=True)
+        save_delete_credential(ws, extract_test_info.credential_name)
 
     assert storage_credential is not None
     assert storage_credential.read_only is read_only

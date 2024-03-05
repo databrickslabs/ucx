@@ -95,7 +95,7 @@ class CheckClusterMixin(CheckInitScriptMixin):
             failures.extend(self.check_init_script(init_script_data, source))
         return failures
 
-    def check_spark_conf(self, conf: dict[str, str], source: str) -> list[str]:
+    def _check_spark_conf(self, conf: dict[str, str], source: str) -> list[str]:
         failures: list[str] = []
         for k in INCOMPATIBLE_SPARK_CONFIG_KEYS:
             if k in conf:
@@ -108,7 +108,7 @@ class CheckClusterMixin(CheckInitScriptMixin):
             failures.append(f"{AZURE_SP_CONF_FAILURE_MSG} {source}.")
         return failures
 
-    def check_cluster_failures(self, cluster: ClusterDetails, source: str) -> list[str]:
+    def _check_cluster_failures(self, cluster: ClusterDetails, source: str) -> list[str]:
         failures: list[str] = []
 
         unsupported_cluster_types = [
@@ -120,7 +120,7 @@ class CheckClusterMixin(CheckInitScriptMixin):
         if support_status != "supported":
             failures.append(f"not supported DBR: {cluster.spark_version}")
         if cluster.spark_conf is not None:
-            failures.extend(self.check_spark_conf(cluster.spark_conf, source))
+            failures.extend(self._check_spark_conf(cluster.spark_conf, source))
         # Checking if Azure cluster config is present in cluster policies
         if cluster.policy_id is not None:
             failures.extend(self._check_cluster_policy(cluster.policy_id, source))
@@ -159,7 +159,7 @@ class ClustersCrawler(CrawlerBase[ClusterInfo], CheckClusterMixin):
                 success=1,
                 failures="[]",
             )
-            failures = self.check_cluster_failures(cluster, "cluster")
+            failures = self._check_cluster_failures(cluster, "cluster")
             if len(failures) > 0:
                 cluster_info.success = 0
                 cluster_info.failures = json.dumps(failures)
