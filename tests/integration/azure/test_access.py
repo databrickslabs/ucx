@@ -69,9 +69,7 @@ def test_create_global_spn(ws, sql_backend, inventory_schema, make_random, make_
         ws.config.arm_environment.service_management_endpoint,
     )
     graph_client = AzureAPIClient("https://graph.microsoft.com", "https://graph.microsoft.com")
-    azure_resources = AzureResources(
-        azure_mgmt_client, graph_client
-    )
+    azure_resources = AzureResources(azure_mgmt_client, graph_client)
     az_res_perm = AzureResourcePermissions(
         installation, ws, azure_resources, ExternalLocations(ws, sql_backend, inventory_schema)
     )
