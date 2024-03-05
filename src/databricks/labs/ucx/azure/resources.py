@@ -351,9 +351,9 @@ class AzureResources:
         except NotFound:
             logger.warning(f"Access connector {access_connector_id} no longer exists")
             return None
-
         if not identity:
             return None
+
         if identity.get("type") == "UserAssigned":
             if not user_assigned_identity_id:
                 return None
@@ -361,11 +361,10 @@ class AzureResources:
             if user_assigned_identity_id in identities:
                 return identities.get(user_assigned_identity_id).get("clientId")
             # sometimes we see "resourceGroups" instead of "resourcegroups" in the response from Azure RM API
-            # but "resourcegroups" in response from storage credential's managed_identity_id
-            if user_assigned_identity_id.replace("resourcegroups", "resourceGroups") in identities:
-                return identities.get(user_assigned_identity_id.replace("resourcegroups", "resourceGroups")).get(
-                    "clientId"
-                )
+            # but "resourcegroups" is in response from storage credential's managed_identity_id
+            alternative_identity_id = user_assigned_identity_id.replace("resourcegroups", "resourceGroups")
+            if alternative_identity_id in identities:
+                return identities.get(alternative_identity_id).get("clientId")
             return None
         if identity.get("type") == "SystemAssigned":
             # SystemAssigned managed identity does not have client_id in get access connector response

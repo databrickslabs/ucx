@@ -167,7 +167,7 @@ class ExternalLocationsMigration:
             )
             for loc_url in leftover_loc:
                 logger.info(f"Not created external location: {loc_url}")
-        else:
-            logger.info("All UC external location are created.")
+            return leftover_loc
 
+        logger.info("All UC external location are created.")
         return leftover_loc
