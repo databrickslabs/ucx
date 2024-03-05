@@ -8,7 +8,6 @@ from datetime import timedelta
 
 import pytest
 from databricks.labs.blueprint.installation import Installation
-from databricks.labs.ucx.hive_metastore import TablesCrawler
 from databricks.labs.blueprint.installer import InstallState
 from databricks.labs.blueprint.parallel import Threads
 from databricks.labs.blueprint.tui import MockPrompts
@@ -19,6 +18,7 @@ from databricks.sdk.service import compute, sql
 from databricks.sdk.service.iam import PermissionLevel
 
 from databricks.labs.ucx.config import WorkspaceConfig
+from databricks.labs.ucx.hive_metastore import TablesCrawler
 from databricks.labs.ucx.install import (
     PRODUCT_INFO,
     WorkspaceInstallation,
@@ -325,13 +325,17 @@ def test_uninstallation(ws, sql_backend, new_installation):
         sql_backend.execute(f"show tables from hive_metastore.{install.config.inventory_database}")
 
 
-@retried(on=[NotFound, Unknown, TimeoutError], timeout=timedelta(minutes=5))
+@retried(on=[NotFound, TimeoutError], timeout=timedelta(minutes=5))
 def test_partitioned_tables(ws, sql_backend, new_installation, inventory_schema, make_schema, make_table):
     install = new_installation()
 
     schema = make_schema(catalog_name="hive_metastore")
-    sql_backend.execute(f"CREATE TABLE IF NOT EXISTS {schema.full_name}.partitioned_table (column1 string, column2 STRING) PARTITIONED BY (column1)") # True
-    sql_backend.execute(f"CREATE TABLE IF NOT EXISTS {schema.full_name}.non_partitioned_table (column1 string, column2 STRING)") # False
+    sql_backend.execute(
+        f"CREATE TABLE IF NOT EXISTS {schema.full_name}.partitioned_table (column1 string, column2 STRING) PARTITIONED BY (column1)"
+    )
+    sql_backend.execute(
+        f"CREATE TABLE IF NOT EXISTS {schema.full_name}.non_partitioned_table (column1 string, column2 STRING)"
+    )
     install.run_workflow("assessment")
 
     tables = TablesCrawler(sql_backend, inventory_schema)
