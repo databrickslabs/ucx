@@ -261,7 +261,7 @@ class WorkspaceInstaller:
             instance_profile=instance_profile,
             spark_conf=spark_conf_dict,
             policy_id=policy_id,
-            is_terraform_used=is_terraform_used
+            is_terraform_used=is_terraform_used,
         )
         self._installation.save(config)
         ws_file_url = self._installation.workspace_link(config.__file__)
