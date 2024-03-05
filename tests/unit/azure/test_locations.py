@@ -33,7 +33,7 @@ def test_run_service_principal(ws):
     row_factory = type("Row", (Row,), {"__columns__": ["location", "table_count"]})
     mock_backend = MockBackend(
         rows={
-            "SELECT \* FROM location_test.external_locations": [
+            r"SELECT \* FROM location_test.external_locations": [
                 row_factory(["abfss://container1@test.dfs.core.windows.net/one/", 1]),
                 row_factory(["abfss://container2@test.dfs.core.windows.net/", 2]),
             ]
@@ -113,7 +113,7 @@ def test_run_managed_identity(ws, mocker):
     row_factory = type("Row", (Row,), {"__columns__": ["location", "table_count"]})
     mock_backend = MockBackend(
         rows={
-            "SELECT \* FROM location_test.external_locations": [
+            r"SELECT \* FROM location_test.external_locations": [
                 row_factory(["abfss://container4@test.dfs.core.windows.net/", 4]),
                 row_factory(["abfss://container5@test.dfs.core.windows.net/a/b/", 5]),
             ]
@@ -188,7 +188,7 @@ def test_run_managed_identity(ws, mocker):
     )
 
 
-def create_side_effect(location_name, *args, **kwargs):
+def create_side_effect(location_name, *args, **kwargs):  # pylint: disable=unused-argument
     # if not external_locations.create is called without skip_validation=True, raise PermissionDenied
     if not kwargs.get('skip_validation'):
         if "empty" in location_name:
@@ -204,7 +204,7 @@ def test_location_failed_to_read(ws):
     row_factory = type("Row", (Row,), {"__columns__": ["location", "table_count"]})
     mock_backend = MockBackend(
         rows={
-            "SELECT \* FROM location_test.external_locations": [
+            r"SELECT \* FROM location_test.external_locations": [
                 row_factory(["abfss://empty@test.dfs.core.windows.net/", 1]),
                 row_factory(["abfss://exception@test.dfs.core.windows.net/", 2]),
             ]
@@ -277,7 +277,7 @@ def test_corner_cases_with_missing_fields(ws, caplog, mocker):
     row_factory = type("Row", (Row,), {"__columns__": ["location", "table_count"]})
     mock_backend = MockBackend(
         rows={
-            "SELECT \* FROM location_test.external_locations": [
+            r"SELECT \* FROM location_test.external_locations": [
                 row_factory(["abfss://container1@test.dfs.core.windows.net/", 1]),
                 row_factory(["abfss://container2@test.dfs.core.windows.net/", 2]),
             ]
@@ -339,11 +339,7 @@ def test_for_cli(ws):
         {
             "config.yml": {
                 'version': 2,
-                'inventory_database': 'ucx',
-                'connect': {
-                    'host': 'foo',
-                    'token': 'bar',
-                },
+                'inventory_database': 'test',
             },
             "azure_storage_account_info.csv": [
                 {
