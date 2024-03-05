@@ -46,7 +46,7 @@ class ExternalLocationsMigration:
         app_id_mapping_read = {}
         all_credentials = self._ws.storage_credentials.list(max_results=0)
         for credential in all_credentials:
-            # cannot have none credential name, it required for external location
+            # cannot have none credential name, it's required for external location
             if not credential.name:
                 continue
             # if service principal based credential, use service principal's application_id directly
@@ -92,11 +92,7 @@ class ExternalLocationsMigration:
         # generate the UC external location name
         before_at, sep, after_at = location_url.partition('@')
         container_name = before_at.removeprefix("abfss://")
-        res_name = (
-            after_at.replace(".dfs.core.windows.net", "")
-            .rstrip("/")
-            .replace("/", "_")
-        )
+        res_name = after_at.replace(".dfs.core.windows.net", "").rstrip("/").replace("/", "_")
         return f"{container_name}_{res_name}"
 
     def _create_external_location(

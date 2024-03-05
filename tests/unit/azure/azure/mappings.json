@@ -197,6 +197,29 @@
     },
     "/v1.0/applications": {
       "appId": "appIduser1"
+    },
+    "/subscriptions/123/resourcegroups/abc/providers/Microsoft.Databricks/accessConnectors/credential_system_assigned_mi": {
+      "identity": {
+        "principalId": "principal_id_system_assigned_mi-123",
+        "type": "SystemAssigned"
+      }
+    },
+    "/subscriptions/123/resourcegroups/abc/providers/Microsoft.ManagedIdentity/accessConnectors/credential_user_assigned_mi": {
+      "identity": {
+        "userAssignedIdentities": {
+          "/subscriptions/123/resourceGroups/abc/providers/Microsoft.ManagedIdentity/userAssignedIdentities/credential_user_assigned_mi": {
+            "principalId": "principal_id_user_assigned_mi-123",
+            "clientId": "application_id_user_assigned_mi-123"
+          }
+        },
+        "type": "UserAssigned"
+      }
+    },
+    "/v1.0/directoryObjects/principal_id_system_assigned_mi-123": {
+      "appId": "application_id_system_assigned_mi-123",
+      "displayName": "credential_system_assigned_mi",
+      "id": "id_system_assigned_mi-123",
+      "servicePrincipalType": "ManagedIdentity"
     }
   }
 ]
