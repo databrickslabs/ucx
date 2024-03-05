@@ -91,6 +91,12 @@ def test_cluster_file_init_script():
         assert len(init_crawler) == 1
 
 
+def test_cluster_no_match_file_init_script():
+    ws = workspace_client_mock(cluster_ids=['init-scripts-no-match'])
+    init_crawler = ClustersCrawler(ws, MockBackend(), "ucx").snapshot()
+    assert len(init_crawler) == 1
+
+
 def test_cluster_init_script_check_dbfs():
     ws = workspace_client_mock(cluster_ids=['init-scripts-dbfs'])
     ws.dbfs.read().data = "JXNoCmVjaG8gIj0="
