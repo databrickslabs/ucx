@@ -952,6 +952,7 @@ class WorkspaceInstallation:
         self._remove_jobs()
         self._remove_warehouse()
         self._remove_policies()
+        self._remove_secret_scope()
         self._installation.remove()
         logger.info("UnInstalling UCX complete")
 
@@ -970,6 +971,14 @@ class WorkspaceInstallation:
             self._ws.cluster_policies.delete(policy_id=self.config.policy_id)
         except NotFound:
             logger.error("UCX Policy already deleted")
+
+    def _remove_secret_scope(self):
+        logger.info("Deleting secret scope")
+        try:
+            if self.config.uber_spn_id is not None:
+                self._ws.secrets.delete_scope(self.config.inventory_database)
+        except NotFound:
+            logger.error("Secret scope already deleted")
 
     def _remove_jobs(self):
         logger.info("Deleting jobs")
