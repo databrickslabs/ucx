@@ -245,13 +245,7 @@ class WorkspaceInstaller:
 
         policy_id = self._create_cluster_policy(inventory_database, spark_conf_dict, instance_profile)
 
-        # Check if terraform is being used
-        is_terraform_used = self._prompts.confirm("Do you use Terraform to deploy your infrastructure?")
-
-        # Flag to check if the assessment workflow has to be run after installation
-        run_assessment_workflow = self._prompts.confirm(
-            "Do you want to run assessment workflow after the installation?"
-        )
+        other_config = self._other_workspace_config()
 
         config = WorkspaceConfig(
             inventory_database=inventory_database,
@@ -267,14 +261,24 @@ class WorkspaceInstaller:
             instance_profile=instance_profile,
             spark_conf=spark_conf_dict,
             policy_id=policy_id,
-            is_terraform_used=is_terraform_used,
-            run_assessment_workflow=run_assessment_workflow,
+            is_terraform_used=other_config["is_terraform_used"],
+            run_assessment_workflow=other_config["run_assessment_workflow"],
         )
         self._installation.save(config)
         ws_file_url = self._installation.workspace_link(config.__file__)
         if self._prompts.confirm(f"Open config file in the browser and continue installing? {ws_file_url}"):
             webbrowser.open(ws_file_url)
         return config
+
+    def _other_workspace_config(self):
+        # Check if terraform is being used
+        is_terraform_used = self._prompts.confirm("Do you use Terraform to deploy your infrastructure?")
+
+        # Flag to check if the assessment workflow has to be run after installation
+        run_assessment_workflow = self._prompts.confirm(
+            "Do you want to run assessment workflow after the installation?"
+        )
+        return {"is_terraform_used": is_terraform_used, "run_assessment_workflow": run_assessment_workflow}
 
     @staticmethod
     def _policy_config(value: str):
