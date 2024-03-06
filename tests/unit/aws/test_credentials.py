@@ -17,7 +17,7 @@ from databricks.sdk.service.catalog import (
 from databricks.labs.ucx.assessment.aws import AWSResourcePermissions, AWSRoleAction
 from databricks.labs.ucx.aws.credentials import (
     AWSStorageCredentialManager,
-    InstanceProfileMigration,
+    IamRoleMigration,
 )
 from tests.unit import DEFAULT_CONFIG
 from tests.unit.azure.test_credentials import side_effect_validate_storage_credential
@@ -96,7 +96,7 @@ def instance_profile_migration(ws, installation, credential_manager):
             for i in range(num_instance_profiles)
         ]
 
-        return InstanceProfileMigration(installation, ws, arp, credential_manager)
+        return IamRoleMigration(installation, ws, arp, credential_manager)
 
     return generate_instance_profiles
 
@@ -104,7 +104,7 @@ def instance_profile_migration(ws, installation, credential_manager):
 def test_for_cli_not_aws(caplog, ws, installation):
     ws.config.is_aws = False
     with pytest.raises(SystemExit):
-        InstanceProfileMigration.for_cli(ws, installation, "", MagicMock())
+        IamRoleMigration.for_cli(ws, installation, "", MagicMock())
     assert "Workspace is not on AWS, please run this command on a Databricks on AWS workspaces." in caplog.text
 
 
@@ -113,11 +113,11 @@ def test_for_cli_not_prompts(ws, installation):
     prompts = MockPrompts(
         {
             f"Have you reviewed the {AWSResourcePermissions.UC_ROLES_FILE_NAMES} "
-            "and confirm listed instance profiles to be migrated migration*": "No"
+            "and confirm listed IAM roles to be migrated*": "No"
         }
     )
     with pytest.raises(SystemExit):
-        InstanceProfileMigration.for_cli(ws, installation, "", prompts)
+        IamRoleMigration.for_cli(ws, installation, "", prompts)
 
 
 def test_for_cli(ws, installation):
@@ -125,17 +125,17 @@ def test_for_cli(ws, installation):
     prompts = MockPrompts(
         {
             f"Have you reviewed the {AWSResourcePermissions.UC_ROLES_FILE_NAMES} "
-            "and confirm listed instance profiles to be migrated migration*": "Yes"
+            "and confirm listed IAM roles to be migrated*": "Yes"
         }
     )
 
-    assert isinstance(InstanceProfileMigration.for_cli(ws, installation, "", prompts), InstanceProfileMigration)
+    assert isinstance(IamRoleMigration.for_cli(ws, installation, "", prompts), IamRoleMigration)
 
 
 def test_print_action_plan(caplog, ws, instance_profile_migration):
     caplog.set_level(logging.INFO)
 
-    prompts = MockPrompts({"Above Instance Profiles will be migrated to UC storage credentials*": "Yes"})
+    prompts = MockPrompts({"Above IAM roles will be migrated to UC storage credentials*": "Yes"})
 
     instance_profile_migration(10).run(prompts)
 
@@ -150,7 +150,7 @@ def test_print_action_plan(caplog, ws, instance_profile_migration):
 def test_run_without_confirmation(ws, instance_profile_migration):
     prompts = MockPrompts(
         {
-            "Above Instance Profiles will be migrated to UC storage credentials*": "No",
+            "Above IAM roles will be migrated to UC storage credentials*": "No",
         }
     )
 
@@ -159,7 +159,7 @@ def test_run_without_confirmation(ws, instance_profile_migration):
 
 @pytest.mark.parametrize("num_instance_profiles", [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10])
 def test_run(ws, instance_profile_migration, num_instance_profiles: int):
-    prompts = MockPrompts({"Above Instance Profiles will be migrated to UC storage credentials*": "Yes"})
+    prompts = MockPrompts({"Above IAM roles will be migrated to UC storage credentials*": "Yes"})
     migration = instance_profile_migration(num_instance_profiles)
     results = migration.run(prompts)
     assert len(results) == num_instance_profiles

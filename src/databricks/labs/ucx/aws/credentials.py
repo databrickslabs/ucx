@@ -61,7 +61,7 @@ class AWSStorageCredentialManager:
         return self._ws.storage_credentials.create(
             role_action.role_name,
             aws_iam_role=AwsIamRole(role_action.role_arn),
-            comment=f"Created by UCX during migration to UC using AWS instance profile: {role_action.role_name}",
+            comment=f"Created by UCX during migration to UC using AWS IAM Role: {role_action.role_name}",
         )
 
     def validate(self, role_action: AWSRoleAction) -> AWSStorageCredentialValidationResult:
@@ -74,7 +74,7 @@ class AWSStorageCredentialManager:
         except InvalidParameterValue:
             logger.warning(
                 "There is an existing external location overlaps with the prefix that is mapped to "
-                "the instance profile and used for validating the migrated storage credential. "
+                "the IAM Role and used for validating the migrated storage credential. "
                 "Skip the validation"
             )
             return AWSStorageCredentialValidationResult(
@@ -112,7 +112,7 @@ class AWSStorageCredentialManager:
         )
 
 
-class InstanceProfileMigration:
+class IamRoleMigration:
 
     def __init__(
         self,
@@ -121,7 +121,7 @@ class InstanceProfileMigration:
         resource_permissions: AWSResourcePermissions,
         storage_credential_manager: AWSStorageCredentialManager,
     ):
-        self._output_file = "aws_instance_profile_migration_result.csv"
+        self._output_file = "aws_iam_role_migration_result.csv"
         self._installation = installation
         self._ws = ws
         self._resource_permissions = resource_permissions
@@ -135,7 +135,7 @@ class InstanceProfileMigration:
 
         msg = (
             f"Have you reviewed the {AWSResourcePermissions.UC_ROLES_FILE_NAMES} "
-            "and confirm listed instance profiles to be migrated migration?"
+            "and confirm listed IAM roles to be migrated?"
         )
         if not prompts.confirm(msg):
             raise SystemExit()
@@ -162,7 +162,7 @@ class InstanceProfileMigration:
         """
         Create the list of IAM roles that need to be migrated, output an action plan as a csv file for users to confirm
         """
-        # load instance profile list from aws_instance_profile_info.csv
+        # load IAM role list
         iam_list = self._resource_permissions.load_uc_compatible_roles()
         # list existing storage credentials
         sc_set = self._storage_credential_manager.list(include_names)
@@ -184,22 +184,30 @@ class InstanceProfileMigration:
         iam_list = self._generate_migration_list(include_names)
 
         plan_confirmed = prompts.confirm(
-            "Above Instance Profiles will be migrated to UC storage credentials, please review and confirm."
+            "Above IAM roles will be migrated to UC storage credentials, please review and confirm."
         )
         if plan_confirmed is not True:
             return []
 
         execution_result = []
         for iam in iam_list:
-            self._storage_credential_manager.create(iam)
+            storage_credential = self._storage_credential_manager.create(iam)
+            if storage_credential.aws_iam_role is None:
+                logger.error(f"Failed to create storage credential for IAM role: {iam.role_arn}")
+                continue
+
+            self._resource_permissions.update_uc_role_trust_policy(
+                iam.role_arn, storage_credential.aws_iam_role.external_id
+            )
+
             execution_result.append(self._storage_credential_manager.validate(iam))
 
         if execution_result:
             results_file = self.save(execution_result)
             logger.info(
-                f"Completed migration from Instance Profile to UC Storage credentials"
+                f"Completed migration from IAM Role to UC Storage credentials"
                 f"Please check {results_file} for validation results"
             )
         else:
-            logger.info("No Instance Profile migrated to UC Storage credentials")
+            logger.info("No IAM Role migrated to UC Storage credentials")
         return execution_result

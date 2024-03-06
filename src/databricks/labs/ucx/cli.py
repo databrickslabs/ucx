@@ -12,7 +12,7 @@ from databricks.sdk.errors import NotFound
 
 from databricks.labs.ucx.account import AccountWorkspaces, WorkspaceInfo
 from databricks.labs.ucx.assessment.aws import AWSResourcePermissions
-from databricks.labs.ucx.aws.credentials import InstanceProfileMigration
+from databricks.labs.ucx.aws.credentials import IamRoleMigration
 from databricks.labs.ucx.azure.access import AzureResourcePermissions
 from databricks.labs.ucx.azure.credentials import ServicePrincipalMigration
 from databricks.labs.ucx.config import WorkspaceConfig
@@ -335,35 +335,31 @@ def migrate_credentials(w: WorkspaceClient, aws_profile: str | None = None):
             )
             return
         logger.info("Running migrate_credentials for AWS")
-        instance_profile_migration = InstanceProfileMigration.for_cli(w, installation, aws_profile, prompts)
+        instance_profile_migration = IamRoleMigration.for_cli(w, installation, aws_profile, prompts)
         instance_profile_migration.run(prompts)
         return
     if w.config.is_gcp:
         logger.error("migrate_credentials is not yet supported in GCP")
 
 
-def _aws_migration(w: WorkspaceClient, aws_profile: str):
-    logger.info("Migrating instance profiles to UC storage credentials")
-    prompts = Prompts()
-    instance_profile_migration = InstanceProfileMigration.for_cli(w, aws_profile, prompts)
-    instance_profile_migration.run(prompts)
-
-
 @ucx.command
-def migrate_credentials(w: WorkspaceClient, aws_profile: str | None = None):
-    """lorem ipsum"""
-    if w.config.is_aws:
-        if not aws_profile:
-            aws_profile = os.getenv("AWS_DEFAULT_PROFILE")
-        if not aws_profile:
-            logger.error(
-                "AWS Profile is not specified. Use the environment variable [AWS_DEFAULT_PROFILE] "
-                "or use the '--aws-profile=[profile-name]' parameter."
-            )
-            return None
-        return _aws_migration(w, aws_profile)
-    logger.error("This cmd is only supported for azure and aws workspaces")
-    return None
+def create_uber_principal(w: WorkspaceClient, subscription_id: str):
+    """For azure cloud, creates a service principal and gives STORAGE BLOB READER access on all the storage account
+    used by tables in the workspace and stores the spn info in the UCX cluster policy."""
+    if not w.config.is_azure:
+        logger.error("This command is only supported on azure workspaces.")
+        return
+    if w.config.auth_type != "azure-cli":
+        logger.error("In order to obtain AAD token, Please run azure cli to authenticate.")
+        return
+    if not subscription_id:
+        logger.error("Please enter subscription id to scan storage account in.")
+        return
+    prompts = Prompts()
+    include_subscriptions = [subscription_id] if subscription_id else None
+    azure_resource_permissions = AzureResourcePermissions.for_cli(w, include_subscriptions=include_subscriptions)
+    azure_resource_permissions.create_uber_principal(prompts)
+    return
 
 
 if __name__ == "__main__":

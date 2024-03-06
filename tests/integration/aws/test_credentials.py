@@ -8,7 +8,7 @@ from databricks.labs.ucx.assessment.aws import AWSResourcePermissions
 from databricks.labs.ucx.aws.credentials import (
     AWSStorageCredentialManager,
     AWSStorageCredentialValidationResult,
-    InstanceProfileMigration,
+    IamRoleMigration,
 )
 
 
@@ -31,7 +31,7 @@ def run_migration(ws, sql_backend, env_or_skip):
         profile = env_or_skip("AWS_DEFAULT_PROFILE")
         resource_permissions = AWSResourcePermissions.for_cli(ws, sql_backend, profile, "dont_need_a_schema")
 
-        instance_profile_migration = InstanceProfileMigration(
+        instance_profile_migration = IamRoleMigration(
             installation, ws, resource_permissions, AWSStorageCredentialManager(ws)
         )
 
@@ -58,7 +58,7 @@ def test_instance_profile_migration_existed_credential(
 
 
 @pytest.mark.parametrize("read_only", [False, True])
-def test_instance_profile_migration(ws, env_or_skip, make_storage_credential, make_random, run_migration, read_only):
+def test_instance_profile_migration(ws, env_or_skip, make_random, run_migration, read_only):
 
     random = make_random(6).lower()
     credential_name = f"testinfra_cred_{random}"

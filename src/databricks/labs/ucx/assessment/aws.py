@@ -223,8 +223,8 @@ class AWSResources:
             s3_actions = [actions]
         return s3_actions
 
-    def add_uc_role(self, role_name):
-        aws_role_trust_doc = {
+    def _aws_role_trust_doc(self, external_id="0000"):
+        return {
             "Version": "2012-10-17",
             "Statement": [
                 {
@@ -233,17 +233,30 @@ class AWSResources:
                         "AWS": "arn:aws:iam::414351767826:role/unity-catalog-prod-UCMasterRole-14S5ZJVKOTYTL"
                     },
                     "Action": "sts:AssumeRole",
-                    "Condition": {"StringEquals": {"sts:ExternalId": "0000"}},
+                    "Condition": {"StringEquals": {"sts:ExternalId": external_id}},
                 }
             ],
         }
+
+    def add_uc_role(self, role_name):
         # the AssumeRole condition will be modified with the external ID captured from the UC credential.
         # https://docs.databricks.com/en/connect/unity-catalog/storage-credentials.html
-        assume_role_json = self._get_json_for_cli(aws_role_trust_doc)
+        assume_role_json = self._get_json_for_cli(self._aws_role_trust_doc())
         add_role = self._run_json_command(
             f"iam create-role --role-name {role_name} --assume-role-policy-document {assume_role_json}"
         )
         if not add_role:
+            return False
+        return True
+
+    def update_uc_trust_role(self, role_name, external_id="0000"):
+        # Modify the AssumeRole condition with the external ID captured from the UC credential.
+        # https://docs.databricks.com/en/connect/unity-catalog/storage-credentials.html
+        assume_role_json = self._get_json_for_cli(self._aws_role_trust_doc(external_id))
+        update_role = self._run_json_command(
+            f"iam update-assume-role-policy --role-name {role_name} --policy-document {assume_role_json}"
+        )
+        if not update_role:
             return False
         return True
 
@@ -373,6 +386,9 @@ class AWSResourcePermissions:
                         self._kms_key,
                     )
                 role_id += 1
+
+    def update_uc_role_trust_policy(self, role_name, external_id="0000"):
+        return self._aws_resources.update_uc_trust_role(role_name, external_id)
 
     def save_uc_compatible_roles(self):
         uc_role_access = list(self._get_role_access())
