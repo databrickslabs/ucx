@@ -6,7 +6,7 @@ from databricks.sdk import WorkspaceClient
 from databricks.sdk.errors.platform import InvalidParameterValue, PermissionDenied
 
 from databricks.labs.ucx.azure.access import AzureResourcePermissions
-from databricks.labs.ucx.azure.resources import AzureResources
+from databricks.labs.ucx.azure.resources import AzureAPIClient, AzureResources
 from databricks.labs.ucx.config import WorkspaceConfig
 from databricks.labs.ucx.framework.crawlers import StatementExecutionBackend
 from databricks.labs.ucx.hive_metastore import ExternalLocations
@@ -32,7 +32,14 @@ class ExternalLocationsMigration:
         config = installation.load(WorkspaceConfig)
         sql_backend = StatementExecutionBackend(ws, config.warehouse_id)
         hms_locations = ExternalLocations(ws, sql_backend, config.inventory_database)
-        azurerm = AzureResources(ws)
+
+        azure_mgmt_client = AzureAPIClient(
+            ws.config.arm_environment.resource_manager_endpoint,
+            ws.config.arm_environment.service_management_endpoint,
+        )
+        graph_client = AzureAPIClient("https://graph.microsoft.com", "https://graph.microsoft.com")
+        azurerm = AzureResources(azure_mgmt_client, graph_client)
+
         resource_permissions = AzureResourcePermissions(installation, ws, azurerm, hms_locations)
 
         return cls(ws, hms_locations, resource_permissions, azurerm)

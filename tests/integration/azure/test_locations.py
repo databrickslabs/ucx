@@ -4,7 +4,7 @@ from databricks.sdk.errors.platform import NotFound
 
 from databricks.labs.ucx.azure.access import AzureResourcePermissions
 from databricks.labs.ucx.azure.locations import ExternalLocationsMigration
-from databricks.labs.ucx.azure.resources import AzureResources
+from databricks.labs.ucx.azure.resources import AzureAPIClient, AzureResources
 from databricks.labs.ucx.hive_metastore import ExternalLocations
 from databricks.labs.ucx.hive_metastore.locations import ExternalLocation
 
@@ -49,7 +49,13 @@ def test_run(caplog, ws, sql_backend, inventory_schema):
             ]
         }
     )
-    azurerm = AzureResources(ws)
+
+    azure_mgmt_client = AzureAPIClient(
+        ws.config.arm_environment.resource_manager_endpoint,
+        ws.config.arm_environment.service_management_endpoint,
+    )
+    graph_client = AzureAPIClient("https://graph.microsoft.com", "https://graph.microsoft.com")
+    azurerm = AzureResources(azure_mgmt_client, graph_client)
 
     location_migration = ExternalLocationsMigration(
         ws, location_crawler, AzureResourcePermissions(installation, ws, azurerm, location_crawler), azurerm
@@ -85,7 +91,13 @@ def test_read_only_location(caplog, ws, sql_backend, inventory_schema):
             ]
         }
     )
-    azurerm = AzureResources(ws)
+
+    azure_mgmt_client = AzureAPIClient(
+        ws.config.arm_environment.resource_manager_endpoint,
+        ws.config.arm_environment.service_management_endpoint,
+    )
+    graph_client = AzureAPIClient("https://graph.microsoft.com", "https://graph.microsoft.com")
+    azurerm = AzureResources(azure_mgmt_client, graph_client)
 
     location_migration = ExternalLocationsMigration(
         ws, location_crawler, AzureResourcePermissions(installation, ws, azurerm, location_crawler), azurerm
@@ -120,7 +132,13 @@ def test_missing_credential(caplog, ws, sql_backend, inventory_schema):
             ]
         }
     )
-    azurerm = AzureResources(ws)
+
+    azure_mgmt_client = AzureAPIClient(
+        ws.config.arm_environment.resource_manager_endpoint,
+        ws.config.arm_environment.service_management_endpoint,
+    )
+    graph_client = AzureAPIClient("https://graph.microsoft.com", "https://graph.microsoft.com")
+    azurerm = AzureResources(azure_mgmt_client, graph_client)
 
     location_migration = ExternalLocationsMigration(
         ws, location_crawler, AzureResourcePermissions(installation, ws, azurerm, location_crawler), azurerm
@@ -158,7 +176,13 @@ def test_overlapping_location(caplog, ws, sql_backend, inventory_schema):
             ]
         }
     )
-    azurerm = AzureResources(ws)
+
+    azure_mgmt_client = AzureAPIClient(
+        ws.config.arm_environment.resource_manager_endpoint,
+        ws.config.arm_environment.service_management_endpoint,
+    )
+    graph_client = AzureAPIClient("https://graph.microsoft.com", "https://graph.microsoft.com")
+    azurerm = AzureResources(azure_mgmt_client, graph_client)
 
     location_migration = ExternalLocationsMigration(
         ws, location_crawler, AzureResourcePermissions(installation, ws, azurerm, location_crawler), azurerm

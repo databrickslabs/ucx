@@ -347,7 +347,7 @@ class AzureResources:
     ) -> str | None:
         # get te client_id/application_id of the managed identity used in the access connector
         try:
-            identity = self._get_resource(access_connector_id, "2023-05-01").get("identity")
+            identity = self._mgmt.get(access_connector_id, "2023-05-01").get("identity")
         except NotFound:
             logger.warning(f"Access connector {access_connector_id} no longer exists")
             return None

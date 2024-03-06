@@ -1,9 +1,7 @@
-import pytest
-
 from unittest.mock import create_autospec
 
-from databricks.sdk import WorkspaceClient
-from databricks.sdk.errors import PermissionDenied, ResourceConflict, NotFound
+import pytest
+from databricks.sdk.errors import NotFound, PermissionDenied, ResourceConflict
 
 from databricks.labs.ucx.azure.resources import (
     AzureAPIClient,
@@ -11,7 +9,6 @@ from databricks.labs.ucx.azure.resources import (
     AzureResources,
     Principal,
 )
-
 
 from . import azure_api_client, get_az_api_mapping
 
@@ -199,10 +196,10 @@ def test_azure_client_api_delete_spn(mocker):
     api_client.delete("/applications/1234")
 
 
-def test_managed_identity_client_id(mocker):
-    w = create_autospec(WorkspaceClient)
-    mocker.patch("databricks.sdk.core.ApiClient.do", side_effect=get_az_api_mapping)
-    azure_resource = AzureResources(w)
+def test_managed_identity_client_id():
+    api_client = azure_api_client()
+    azure_resource = AzureResources(api_client, api_client)
+
     assert (
         azure_resource.managed_identity_client_id(
             "/subscriptions/123/resourcegroups/abc/providers/Microsoft.Databricks/accessConnectors/credential_system_assigned_mi"
@@ -218,53 +215,47 @@ def test_managed_identity_client_id(mocker):
     )
 
 
-def test_access_connector_not_found(mocker):
-    w = create_autospec(WorkspaceClient)
-    mocker.patch("databricks.sdk.core.ApiClient.do", side_effect=NotFound())
-    azure_resource = AzureResources(w)
+def test_access_connector_not_found(caplog):
+    api_client = create_autospec(AzureAPIClient)
+    azure_resource = AzureResources(api_client, api_client)
+    api_client.get.side_effect = NotFound()
     assert azure_resource.managed_identity_client_id("test") is None
+    assert "no longer exists" in caplog.text
 
 
-def test_non_app_id_access_connector(mocker):
-    w = create_autospec(WorkspaceClient)
-    azure_resource = AzureResources(w)
+def test_non_app_id_access_connector():
+    api_client = create_autospec(AzureAPIClient)
+    azure_resource = AzureResources(api_client, api_client)
 
-    mocker.patch(
-        "databricks.sdk.core.ApiClient.do",
-        return_value={
-            "identity": {
-                "userAssignedIdentities": {
-                    "test_mi_id": {"principalId": "test_principal_id", "clientId": "test_client_id"}
-                },
-                "type": "UserAssigned",
-            }
-        },
-    )
+    api_client.get.return_value = {
+        "identity": {
+            "userAssignedIdentities": {
+                "test_mi_id": {"principalId": "test_principal_id", "clientId": "test_client_id"}
+            },
+            "type": "UserAssigned",
+        }
+    }
     # test managed_identity_client_id is called without providing user_assigned_identity_id when userAssignedIdentity is encountered
     assert azure_resource.managed_identity_client_id("no_user_assigned_identity_id_provided") is None
     # test no application_id of the user assigned managed identity is found
     assert azure_resource.managed_identity_client_id("no_such_access_connector", "no_such_identity") is None
 
     # test if identity type is not UserAssigned nor SystemAssigned
-    mocker.patch(
-        "databricks.sdk.core.ApiClient.do",
-        return_value={"identity": {"principalId": "test_principal_id", "type": "Other"}},
-    )
+    api_client.get.return_value = {"identity": {"principalId": "test_principal_id", "type": "Other"}}
     assert azure_resource.managed_identity_client_id("other_type") is None
 
 
 def azure_api_side_effect(*args, **kwargs):
-    if "/v1.0/directoryObjects/" in args[1]:
+    if "/v1.0/directoryObjects/" in args[0]:
         raise NotFound()
     return get_az_api_mapping(*args, **kwargs)
 
 
-def test_managed_identity_not_found(mocker):
-    w = create_autospec(WorkspaceClient)
-    azure_resource = AzureResources(w)
+def test_managed_identity_not_found():
+    api_client = azure_api_client()
+    api_client.get.side_effect = azure_api_side_effect
+    azure_resource = AzureResources(api_client, api_client)
 
-    # test if identity type is not UserAssigned nor SystemAssigned#
-    mocker.patch("databricks.sdk.core.ApiClient.do", side_effect=azure_api_side_effect)
     assert (
         azure_resource.managed_identity_client_id(
             "/subscriptions/123/resourcegroups/abc/providers/Microsoft.Databricks/accessConnectors/credential_system_assigned_mi"

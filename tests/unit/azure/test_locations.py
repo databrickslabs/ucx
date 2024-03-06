@@ -14,7 +14,7 @@ from databricks.sdk.service.catalog import (
 
 from databricks.labs.ucx.azure.access import AzureResourcePermissions
 from databricks.labs.ucx.azure.locations import ExternalLocationsMigration
-from databricks.labs.ucx.azure.resources import AzureResources
+from databricks.labs.ucx.azure.resources import AzureAPIClient, AzureResources
 from databricks.labs.ucx.hive_metastore import ExternalLocations
 from databricks.labs.ucx.mixins.sql import Row
 from tests.unit.azure import get_az_api_mapping
@@ -24,6 +24,21 @@ from tests.unit.framework.mocks import MockBackend
 @pytest.fixture
 def ws():
     return create_autospec(WorkspaceClient)
+
+
+def location_migration_for_test(ws, mock_backend, mock_installation):
+    azure_mgmt_client = AzureAPIClient(
+        ws.config.arm_environment.resource_manager_endpoint,
+        ws.config.arm_environment.service_management_endpoint,
+    )
+    graph_client = AzureAPIClient("https://graph.microsoft.com", "https://graph.microsoft.com")
+    azurerm = AzureResources(azure_mgmt_client, graph_client)
+
+    location_crawler = ExternalLocations(ws, mock_backend, "location_test")
+
+    return ExternalLocationsMigration(
+        ws, location_crawler, AzureResourcePermissions(mock_installation, ws, azurerm, location_crawler), azurerm
+    )
 
 
 def test_run_service_principal(ws):
@@ -84,13 +99,9 @@ def test_run_service_principal(ws):
         }
     )
 
-    location_crawler = ExternalLocations(ws, mock_backend, "location_test")
-    azurerm = AzureResources(ws)
-    location_migration = ExternalLocationsMigration(
-        ws, location_crawler, AzureResourcePermissions(mock_installation, ws, azurerm, location_crawler), azurerm
-    )
-
+    location_migration = location_migration_for_test(ws, mock_backend, mock_installation)
     location_migration.run()
+
     ws.external_locations.create.assert_any_call(
         "container1_test_one",
         "abfss://container1@test.dfs.core.windows.net/one/",
@@ -169,11 +180,7 @@ def test_run_managed_identity(ws, mocker):
     # mock Azure resource manager and graph API calls for getting application_id of managed identity
     mocker.patch("databricks.sdk.core.ApiClient.do", side_effect=get_az_api_mapping)
 
-    location_crawler = ExternalLocations(ws, mock_backend, "location_test")
-    azurerm = AzureResources(ws)
-    location_migration = ExternalLocationsMigration(
-        ws, location_crawler, AzureResourcePermissions(mock_installation, ws, azurerm, location_crawler), azurerm
-    )
+    location_migration = location_migration_for_test(ws, mock_backend, mock_installation)
     location_migration.run()
 
     ws.external_locations.create.assert_any_call(
@@ -255,14 +262,10 @@ def test_location_failed_to_read(ws):
         }
     )
 
-    # make external_locations.create to raise PermissionDenied when first called.
+    # make external_locations.create to raise PermissionDenied when first called to create read-only external location.
     ws.external_locations.create.side_effect = create_side_effect
 
-    location_crawler = ExternalLocations(ws, mock_backend, "location_test")
-    azurerm = AzureResources(ws)
-    location_migration = ExternalLocationsMigration(
-        ws, location_crawler, AzureResourcePermissions(mock_installation, ws, azurerm, location_crawler), azurerm
-    )
+    location_migration = location_migration_for_test(ws, mock_backend, mock_installation)
 
     # assert PermissionDenied got re-threw if the exception
     with pytest.raises(PermissionDenied):
@@ -334,11 +337,7 @@ def test_overlapping_locations(ws, caplog):
 
     ws.external_locations.create.side_effect = create_side_effect
 
-    location_crawler = ExternalLocations(ws, mock_backend, "location_test")
-    azurerm = AzureResources(ws)
-    location_migration = ExternalLocationsMigration(
-        ws, location_crawler, AzureResourcePermissions(mock_installation, ws, azurerm, location_crawler), azurerm
-    )
+    location_migration = location_migration_for_test(ws, mock_backend, mock_installation)
 
     # assert InvalidParameterValue got re-threw if it's not caused by overlapping location
     with pytest.raises(InvalidParameterValue):
@@ -401,13 +400,9 @@ def test_corner_cases_with_missing_fields(ws, caplog, mocker):
     # return None when getting application_id of managed identity
     mocker.patch("databricks.sdk.core.ApiClient.do", return_value={"dummy": "dummy"})
 
-    location_crawler = ExternalLocations(ws, mock_backend, "location_test")
-    azurerm = AzureResources(ws)
-    location_migration = ExternalLocationsMigration(
-        ws, location_crawler, AzureResourcePermissions(mock_installation, ws, azurerm, location_crawler), azurerm
-    )
-
+    location_migration = location_migration_for_test(ws, mock_backend, mock_installation)
     location_migration.run()
+
     ws.external_locations.create.assert_not_called()
     assert "External locations below are not created in UC." in caplog.text
 
