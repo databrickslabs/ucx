@@ -3,7 +3,6 @@ import json
 import logging
 import random
 import time
-from ast import literal_eval
 from collections.abc import Iterator
 from datetime import timedelta
 from typing import Any
