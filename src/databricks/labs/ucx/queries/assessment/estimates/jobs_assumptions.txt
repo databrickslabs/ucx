@@ -1,3 +1,4 @@
+-- widget title=Jobs estimates, row=2, col=0, size_x=2, size_y=8
 Assumptions for a single Job upgrade estimates:
 
 - Code in the Workflow works as-is when upgrading to a UC compatible DBR version

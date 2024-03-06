@@ -1,3 +1,4 @@
+-- widget title=Table estimates, row=1, col=0, size_x=2, size_y=8
 Assumptions for a single table upgrade estimates:
 
 - UC Data model has been defined

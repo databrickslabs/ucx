@@ -1,3 +1,4 @@
+-- widget title=Cluster estimates, row=3, col=0, size_x=2, size_y=8
 Assumptions for a single cluster upgrade estimates:
 
 - Efforts to adapt code that are submitted to the cluster are out of scope

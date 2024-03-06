@@ -1,3 +1,4 @@
+-- widget title=Dlt estimates, row=4, col=0, size_x=2, size_y=8
 Assumptions for a single DLT upgrade estimate:
 
 - If the cluster authenticates to a service principal, objects and grants has been set to the target user(s) to access the data.
