@@ -5,7 +5,7 @@ import requests
 from databricks.labs.blueprint.installation import Installation
 from databricks.labs.blueprint.tui import Prompts
 from databricks.sdk import AccountClient, WorkspaceClient
-from databricks.sdk.errors import NotFound
+from databricks.sdk.errors import NotFound, ResourceConflict
 from databricks.sdk.service.iam import ComplexValue, Group, Patch, PatchOp, PatchSchema
 from databricks.sdk.service.provisioning import Workspace
 
@@ -68,17 +68,25 @@ class AccountWorkspaces:
         all_valid_workspace_groups = self._get_valid_workspaces_groups(prompts, workspace_ids)
 
         for group_name, valid_group in all_valid_workspace_groups.items():
-            if group_name in acc_groups:
-                logger.info(f"Group {group_name} already exist in the account, ignoring")
-                continue
+            acc_group = self._try_create_account_groups(group_name, acc_groups)
 
-            acc_group = self._ac.groups.create(display_name=group_name)
-
-            if not valid_group.members or not acc_group.id:
+            if not acc_group or not valid_group.members or not acc_group.id:
                 continue
             if len(valid_group.members) > 0:
                 self._add_members_to_acc_group(self._ac, acc_group.id, group_name, valid_group)
             logger.info(f"Group {group_name} created in the account")
+
+    def _try_create_account_groups(
+        self, group_name: str, acc_groups: dict[str | None, list[ComplexValue] | None]
+    ) -> Group | None:
+        try:
+            if group_name in acc_groups:
+                logger.info(f"Group {group_name} already exist in the account, ignoring")
+                return None
+            return self._ac.groups.create(display_name=group_name)
+        except ResourceConflict:
+            logger.info(f"Group {group_name} already exist in the account, ignoring")
+            return None
 
     def _get_valid_workspaces_ids(self, workspace_ids: list[int] | None = None) -> list[int]:
         if not workspace_ids:
@@ -128,10 +136,9 @@ class AccountWorkspaces:
 
             ws_group_ids = client.groups.list(attributes="id")
             for group_id in ws_group_ids:
-                if not group_id.id:
+                full_workspace_group = self._safe_groups_get(client, group_id.id)
+                if not full_workspace_group:
                     continue
-
-                full_workspace_group = client.groups.get(group_id.id)
                 group_name = full_workspace_group.display_name
 
                 if self._is_group_out_of_scope(full_workspace_group):
@@ -183,12 +190,23 @@ class AccountWorkspaces:
         for acc_grp_id in self._ac.groups.list(attributes="id"):
             if not acc_grp_id.id:
                 continue
-            full_account_group = self._ac.groups.get(acc_grp_id.id)
-            logger.debug(f"Found account group {acc_grp_id.display_name}")
+            full_account_group = self._safe_groups_get(self._ac, acc_grp_id.id)
+            if not full_account_group:
+                continue
+            logger.debug(f"Found account group {full_account_group.display_name}")
             acc_groups[full_account_group.display_name] = full_account_group.members
 
         logger.info(f"{len(acc_groups)} account groups found")
         return acc_groups
+
+    def _safe_groups_get(self, interface, group_id) -> Group | None:
+        try:
+            if not group_id:
+                return None
+            return interface.groups.get(group_id)
+        except NotFound:
+            logger.info(f"Group {group_id} has been deleted")
+            return None
 
 
 class WorkspaceInfo:

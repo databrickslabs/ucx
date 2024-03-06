@@ -246,6 +246,9 @@ class WorkspaceInstaller:
                 instance_profile, spark_conf_dict = self._get_ext_hms_conf_from_policy(cluster_policy)
 
         policy_id = self._create_cluster_policy(inventory_database, spark_conf_dict, instance_profile)
+
+        # Check if terraform is being used
+        is_terraform_used = self._prompts.confirm("Do you use Terraform to deploy your infrastructure?")
         config = WorkspaceConfig(
             inventory_database=inventory_database,
             workspace_group_regex=configure_groups.workspace_group_regex,
@@ -260,6 +263,7 @@ class WorkspaceInstaller:
             instance_profile=instance_profile,
             spark_conf=spark_conf_dict,
             policy_id=policy_id,
+            is_terraform_used=is_terraform_used,
         )
         self._installation.save(config)
         ws_file_url = self._installation.workspace_link(config.__file__)
@@ -940,6 +944,7 @@ class WorkspaceInstallation:
         self._remove_jobs()
         self._remove_warehouse()
         self._remove_policies()
+        self._remove_secret_scope()
         self._installation.remove()
         logger.info("UnInstalling UCX complete")
 
@@ -958,6 +963,14 @@ class WorkspaceInstallation:
             self._ws.cluster_policies.delete(policy_id=self.config.policy_id)
         except NotFound:
             logger.error("UCX Policy already deleted")
+
+    def _remove_secret_scope(self):
+        logger.info("Deleting secret scope")
+        try:
+            if self.config.uber_spn_id is not None:
+                self._ws.secrets.delete_scope(self.config.inventory_database)
+        except NotFound:
+            logger.error("Secret scope already deleted")
 
     def _remove_jobs(self):
         logger.info("Deleting jobs")

@@ -108,6 +108,13 @@ commands:
       - name: aws-profile
         description: AWS Profile to use for authentication
 
+  - name: create-uber-principal
+    description: For azure cloud, creates a service principal and gives STORAGE BLOB READER access on all the storage account 
+      used by tables in the workspace and stores the spn info in the UCX cluster policy.
+    flags:
+      - name: subscription-id
+        description: Subscription to scan storage account in
+
   - name: validate-groups-membership
     description: Validate groups to check if the groups at account level and workspace level have different memberships
     table_template: |-

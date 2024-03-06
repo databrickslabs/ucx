@@ -942,6 +942,41 @@ def test_not_remove_warehouse_with_a_different_prefix(ws):
     ws.warehouses.delete.assert_not_called()
 
 
+def test_remove_secret_scope(ws, caplog):
+    wheels = create_autospec(WheelsV2)
+    prompts = MockPrompts(
+        {
+            r'Do you want to uninstall ucx.*': 'yes',
+            'Do you want to delete the inventory database ucx too?': 'no',
+        }
+    )
+    installation = MockInstallation()
+    config = WorkspaceConfig(inventory_database='ucx', uber_spn_id="123")
+    timeout = timedelta(seconds=1)
+    # ws.secrets.delete_scope.side_effect = NotFound()
+    workspace_installation = WorkspaceInstallation(config, installation, MockBackend(), wheels, ws, prompts, timeout)
+    workspace_installation.uninstall()
+    ws.secrets.delete_scope.assert_called_with('ucx')
+
+
+def test_remove_secret_scope_no_scope(ws, caplog):
+    wheels = create_autospec(WheelsV2)
+    prompts = MockPrompts(
+        {
+            r'Do you want to uninstall ucx.*': 'yes',
+            'Do you want to delete the inventory database ucx too?': 'no',
+        }
+    )
+    installation = MockInstallation()
+    config = WorkspaceConfig(inventory_database='ucx', uber_spn_id="123")
+    timeout = timedelta(seconds=1)
+    ws.secrets.delete_scope.side_effect = NotFound()
+    workspace_installation = WorkspaceInstallation(config, installation, MockBackend(), wheels, ws, prompts, timeout)
+    with caplog.at_level('ERROR'):
+        workspace_installation.uninstall()
+        assert 'Secret scope already deleted' in caplog.messages
+
+
 def test_remove_cluster_policy_not_exists(ws, caplog):
     sql_backend = MockBackend()
     wheels = create_autospec(WheelsV2)
