@@ -1,3 +1,4 @@
+import base64
 import logging
 import re
 from unittest.mock import create_autospec
@@ -254,7 +255,9 @@ def test_validate_storage_credentials_failed_operation(credential_manager):
 
 @pytest.fixture
 def sp_migration(ws, installation, credential_manager):
-    ws.secrets.get_secret.return_value = GetSecretResponse(value="aGVsbG8gd29ybGQ=")
+    ws.secrets.get_secret.return_value = GetSecretResponse(
+        value=base64.b64encode("hello world".encode("utf-8")).decode("utf-8")
+    )
 
     arp = AzureResourcePermissions(
         installation, ws, create_autospec(AzureResources), create_autospec(ExternalLocations)
@@ -288,7 +291,10 @@ def test_for_cli(ws, installation):
 
 @pytest.mark.parametrize(
     "secret_bytes_value, num_migrated",
-    [(GetSecretResponse(value="aGVsbG8gd29ybGQ="), 1), (GetSecretResponse(value="T2zhLCBNdW5kbyE="), 0)],
+    [
+        (GetSecretResponse(value=base64.b64encode("hello world".encode("utf-8")).decode("utf-8")), 1),
+        (GetSecretResponse(value=base64.b64encode("Olá, Mundo".encode("iso-8859-1")).decode("iso-8859-1")), 0),
+    ],
 )
 def test_read_secret_value_decode(ws, sp_migration, secret_bytes_value, num_migrated):
     ws.secrets.get_secret.return_value = secret_bytes_value
@@ -316,7 +322,9 @@ def test_read_secret_read_exception(caplog, ws, sp_migration):
 
 def test_print_action_plan(caplog, ws, sp_migration):
     caplog.set_level(logging.INFO)
-    ws.secrets.get_secret.return_value = GetSecretResponse(value="aGVsbG8gd29ybGQ=")
+    ws.secrets.get_secret.return_value = GetSecretResponse(
+        value=base64.b64encode("hello world".encode("utf-8")).decode("utf-8")
+    )
 
     prompts = MockPrompts({"Above Azure Service Principals will be migrated to UC storage credentials*": "Yes"})
 
@@ -331,7 +339,9 @@ def test_print_action_plan(caplog, ws, sp_migration):
 
 
 def test_run_without_confirmation(ws, sp_migration):
-    ws.secrets.get_secret.return_value = GetSecretResponse(value="aGVsbG8gd29ybGQ=")
+    ws.secrets.get_secret.return_value = GetSecretResponse(
+        value=base64.b64encode("hello world".encode("utf-8")).decode("utf-8")
+    )
     prompts = MockPrompts(
         {
             "Above Azure Service Principals will be migrated to UC storage credentials*": "No",

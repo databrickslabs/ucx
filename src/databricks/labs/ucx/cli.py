@@ -324,5 +324,25 @@ def migrate_credentials(w: WorkspaceClient):
         logger.error("migrate_credentials is not yet supported in GCP")
 
 
+@ucx.command
+def create_uber_principal(w: WorkspaceClient, subscription_id: str):
+    """For azure cloud, creates a service principal and gives STORAGE BLOB READER access on all the storage account
+    used by tables in the workspace and stores the spn info in the UCX cluster policy."""
+    if not w.config.is_azure:
+        logger.error("This command is only supported on azure workspaces.")
+        return
+    if w.config.auth_type != "azure-cli":
+        logger.error("In order to obtain AAD token, Please run azure cli to authenticate.")
+        return
+    if not subscription_id:
+        logger.error("Please enter subscription id to scan storage account in.")
+        return
+    prompts = Prompts()
+    include_subscriptions = [subscription_id] if subscription_id else None
+    azure_resource_permissions = AzureResourcePermissions.for_cli(w, include_subscriptions=include_subscriptions)
+    azure_resource_permissions.create_uber_principal(prompts)
+    return
+
+
 if __name__ == "__main__":
     ucx()
