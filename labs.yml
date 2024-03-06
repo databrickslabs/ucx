@@ -122,7 +122,7 @@ commands:
       {{range .}}{{.wf_group_name}}\t{{.wf_group_members_count}}\t{{.acc_group_name}}\t{{.acc_group_members_count}}\t{{.group_members_difference}}
       {{end}}
 
-  - name: migrate_credentials
+  - name: migrate-credentials
     description: Migrate credentials for storage access to UC storage credential
 
   - name: create-account-groups
