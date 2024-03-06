@@ -143,21 +143,23 @@ class ExternalLocationsMigration:
 
     def run(self):
         # list missing external locations in UC
-        missing_locs = [loc.location for loc in self._hms_locations.match_table_external_locations()[1]]
+        _, missing_locations = self._hms_locations.match_table_external_locations()
+        # Extract the location URLs from the missing locations
+        missing_loc_urls = [loc.location for loc in missing_locations]
 
         # get prefix to storage credential name mapping
         prefix_mapping_write, prefix_mapping_read = self._prefix_credential_name_mapping()
 
         # if missing external location is in prefix to storage credential name mapping
         # create a UC external location with mapped storage credential name
-        migrated_locs = []
-        for location in missing_locs:
-            migrated_loc = self._create_external_location(location, prefix_mapping_write, prefix_mapping_read)
-            if migrated_loc:
-                migrated_locs.append(migrated_loc)
+        migrated_loc_urls = []
+        for location_url in missing_loc_urls:
+            migrated_loc_url = self._create_external_location(location_url, prefix_mapping_write, prefix_mapping_read)
+            if migrated_loc_url:
+                migrated_loc_urls.append(migrated_loc_url)
 
-        leftover_loc = [loc for loc in missing_locs if loc not in migrated_locs]
-        if leftover_loc:
+        leftover_loc_urls = [url for url in missing_loc_urls if url not in migrated_loc_urls]
+        if leftover_loc_urls:
             logger.info(
                 "External locations below are not created in UC. You may check following cases and rerun this command:"
                 "1. Please check the output of 'migrate_credentials' command for storage credentials migration failure."
@@ -165,9 +167,9 @@ class ExternalLocationsMigration:
                 "in your code directly for storage access, UCX cannot automatically migrate them to storage credential."
                 "Please manually create those storage credentials first."
             )
-            for loc_url in leftover_loc:
+            for loc_url in leftover_loc_urls:
                 logger.info(f"Not created external location: {loc_url}")
-            return leftover_loc
+            return leftover_loc_urls
 
         logger.info("All UC external location are created.")
-        return leftover_loc
+        return leftover_loc_urls
