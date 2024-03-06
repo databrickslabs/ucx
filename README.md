@@ -20,6 +20,7 @@ See [contributing instructions](CONTRIBUTING.md) to help improve this project.
   * [Install UCX](#install-ucx)
   * [Upgrading UCX for newer versions](#upgrading-ucx-for-newer-versions)
   * [Uninstall UCX](#uninstall-ucx)
+* [Migration process](#migration-process)
 * [Workflows](#workflows)
   * [Readme notebook](#readme-notebook)
   * [Assessment workflow](#assessment-workflow)
@@ -36,6 +37,7 @@ See [contributing instructions](CONTRIBUTING.md) to help improve this project.
   * [`principal-prefix-access` command](#principal-prefix-access-command)
     * [Access for AWS S3 Buckets](#access-for-aws-s3-buckets)
     * [Access for Azure Storage Accounts](#access-for-azure-storage-accounts)
+  * [`create-uber-principal` command](#create-uber-principal-command)
   * [`migrate-credentials` command](#migrate-credentials-command)
   * [`validate-external-locations` command](#validate-external-locations-command)
   * [`create-table-mapping` command](#create-table-mapping-command)
@@ -157,6 +159,41 @@ Databricks CLI will confirm a few options:
 - Whether you want to delete the inventory database in `hive_metastore`. Defaults to no.
 
 ![macos_uninstall_ucx](docs/macos_4_databrickslabsmac_uninstallucx.gif)
+
+[[back to top](#databricks-labs-ucx)]
+
+# Migration process
+
+On the high level, the steps in migration process can be described as:
+
+```mermaid
+flowchart TD
+    subgraph workspace-admin
+        assessment --> group-migration
+        group-migration --> table-migration
+        table-migration --> code-migration
+        assessment --> create-table-mapping
+        create-table-mapping --> table-migration
+        create-table-mapping --> code-migration
+        validate-external-locations --> table-migration
+        table-migration --> revert-migrated-tables
+        revert-migrated-tables --> table-migration
+    end
+    subgraph account-admin
+        create-account-groups --> group-migration
+        sync-workspace-info --> create-table-mapping
+        group-migration --> validate-groups-membership
+    end
+    subgraph iam-admin
+        setup-account-scim --> create-account-groups
+        assessment --> create-uber-principal
+        create-uber-principal --> table-migration
+        assessment --> principal-prefix-access
+        principal-prefix-access --> migrate-credentials
+        migrate-credentials --> validate-external-locations
+        setup-account-scim    
+    end
+```
 
 [[back to top](#databricks-labs-ucx)]
 
@@ -401,6 +438,18 @@ Use to identify all storage account used by tables, identify the relevant Azure 
 on each storage account. This requires Azure CLI to be installed and configured via `az login`. 
 
 [[back to top](#databricks-labs-ucx)]
+
+## `create-uber-principal` command
+
+```text
+databricks labs ucx create-uber-principal [--subscription-id X]
+```
+
+**Requires Cloud IAM admin privileges.** Once the [`assessment` workflow](#assessment-workflow) complete, you should run 
+this command to creates a service principal with the _**read-only access to all storage**_ used by tables in this 
+workspace and configure the [UCX Cluster Policy](#installation) with the details of it. Once migration is complete, this
+service principal should be unprovisioned. On Azure, it creates a principal with `Storage Blob Data Reader` role 
+assignment on every storage account using Azure Resource Manager APIs.
 
 ## `migrate-credentials` command
 
