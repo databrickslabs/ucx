@@ -160,21 +160,30 @@ class ExternalLocations(CrawlerBase[ExternalLocation]):
             cnt += 1
         return tf_script
 
-    def match_table_external_locations(self) -> tuple[list[list], list[ExternalLocation]]:
-        external_locations = list(self._ws.external_locations.list())
-        location_path = [_.url.lower() for _ in external_locations]
+    def match_table_external_locations(self) -> tuple[dict[str, int], list[ExternalLocation]]:
+        uc_external_locations = list(self._ws.external_locations.list())
         table_locations = self.snapshot()
-        matching_locations = []
+        matching_locations = {}
         missing_locations = []
-        for loc in table_locations:
+        for table_loc in table_locations:
             # external_location.list returns url without trailing "/" but ExternalLocation.snapshot
             # does so removing the trailing slash before comparing
-            if loc.location.rstrip("/").lower() in location_path:
-                # identify the index of the matching external_locations
-                iloc = location_path.index(loc.location.rstrip("/"))
-                matching_locations.append([external_locations[iloc].name, loc.table_count])
-                continue
-            missing_locations.append(loc)
+            matched = False
+            for uc_loc in uc_external_locations:
+                if not uc_loc.url:
+                    continue
+                if not uc_loc.name:
+                    continue
+                uc_loc_path = uc_loc.url.lower()
+                if uc_loc_path in table_loc.location.rstrip("/").lower():
+                    if uc_loc.name not in matching_locations:
+                        matching_locations[uc_loc.name] = table_loc.table_count
+                    else:
+                        matching_locations[uc_loc.name] = matching_locations[uc_loc.name] + table_loc.table_count
+                    matched = True
+                    break
+            if not matched:
+                missing_locations.append(table_loc)
         return matching_locations, missing_locations
 
     def save_as_terraform_definitions_on_workspace(self, installation: Installation):
@@ -182,8 +191,8 @@ class ExternalLocations(CrawlerBase[ExternalLocation]):
         if len(matching_locations) > 0:
             logger.info("following external locations are already configured.")
             logger.info("sharing details of # tables that can be migrated for each location")
-            for _ in matching_locations:
-                logger.info(f"{_[1]} tables can be migrated using external location {_[0]}.")
+            for location, table_count in matching_locations.items():
+                logger.info(f"{table_count} tables can be migrated using UC external location: {location}.")
         if len(missing_locations) > 0:
             logger.info("following external location need to be created.")
             for _ in missing_locations:
