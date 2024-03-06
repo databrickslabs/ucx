@@ -1340,6 +1340,7 @@ def test_open_config(ws, mocker, mock_installation):
 
     webbrowser_open.assert_called_with('https://localhost/#workspace~/mock/config.yml')
 
+
 def test_save_config_should_include_databases(ws, mock_installation):
     prompts = MockPrompts(
         {
@@ -1369,6 +1370,7 @@ def test_save_config_should_include_databases(ws, mock_installation):
             'num_days_submit_runs_history': 30,
         },
     )
+
 
 def test_runs_upgrades_on_too_old_version(ws, any_prompt):
     existing_installation = MockInstallation(
