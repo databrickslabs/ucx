@@ -38,27 +38,34 @@ class JobInfo:
 
 
 class JobsMixin:
-    @staticmethod
-    def _get_cluster_configs_from_all_jobs(all_jobs, all_clusters_by_id):  # pylint: disable=too-complex
-        for j in all_jobs:
-            if j.settings is None:
+    @classmethod
+    def _get_cluster_configs_from_all_jobs(cls, all_jobs, all_clusters_by_id):
+        for job in all_jobs:
+            if job.settings is None:
                 continue
-            if j.settings.job_clusters is not None:
-                for job_cluster in j.settings.job_clusters:
-                    if job_cluster.new_cluster is None:
-                        continue
-                    yield j, job_cluster.new_cluster
-            if j.settings.tasks is None:
+            if job.settings.job_clusters is not None:
+                yield from cls._job_clusters(job)
+            if job.settings.tasks is None:
                 continue
-            for task in j.settings.tasks:
-                if task.existing_cluster_id is not None:
-                    interactive_cluster = all_clusters_by_id.get(task.existing_cluster_id, None)
-                    if interactive_cluster is None:
-                        continue
-                    yield j, interactive_cluster
+            yield from cls._task_clusters(job, all_clusters_by_id)
 
-                elif task.new_cluster is not None:
-                    yield j, task.new_cluster
+    @classmethod
+    def _task_clusters(cls, job, all_clusters_by_id):
+        for task in job.settings.tasks:
+            if task.existing_cluster_id is not None:
+                interactive_cluster = all_clusters_by_id.get(task.existing_cluster_id, None)
+                if interactive_cluster is None:
+                    continue
+                yield job, interactive_cluster
+            elif task.new_cluster is not None:
+                yield job, task.new_cluster
+
+    @staticmethod
+    def _job_clusters(job):
+        for job_cluster in job.settings.job_clusters:
+            if job_cluster.new_cluster is None:
+                continue
+            yield job, job_cluster.new_cluster
 
 
 class JobsCrawler(CrawlerBase[JobInfo], JobsMixin, CheckClusterMixin):

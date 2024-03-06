@@ -7,6 +7,7 @@ from typing import ClassVar
 
 from databricks.labs.blueprint.installation import Installation
 from databricks.sdk import WorkspaceClient
+from databricks.sdk.service.catalog import ExternalLocationInfo
 
 from databricks.labs.ucx.framework.crawlers import CrawlerBase, SqlBackend
 from databricks.labs.ucx.framework.utils import escape_sql_identifier
@@ -42,10 +43,7 @@ class ExternalLocations(CrawlerBase[ExternalLocation]):
             if not location:
                 continue
             if location.startswith("dbfs:/mnt"):
-                for mount in mounts:
-                    if location[5:].startswith(mount.name.lower()):
-                        location = location[5:].replace(mount.name, mount.source)
-                        break
+                location = self._resolve_mount(location, mounts)
             if (
                 not location.startswith("dbfs")
                 and (self._prefix_size[0] < location.find(":/") < self._prefix_size[1])
@@ -55,6 +53,13 @@ class ExternalLocations(CrawlerBase[ExternalLocation]):
             if location.startswith("jdbc"):
                 self._add_jdbc_location(external_locations, location, table)
         return external_locations
+
+    def _resolve_mount(self, location, mounts):
+        for mount in mounts:
+            if location[5:].startswith(mount.name.lower()):
+                location = location[5:].replace(mount.name, mount.source)
+                break
+        return location
 
     @staticmethod
     def _dbfs_locations(external_locations, location, min_slash):
@@ -161,30 +166,32 @@ class ExternalLocations(CrawlerBase[ExternalLocation]):
         return tf_script
 
     def match_table_external_locations(self) -> tuple[dict[str, int], list[ExternalLocation]]:
-        uc_external_locations = list(self._ws.external_locations.list())
+        existing_locations = list(self._ws.external_locations.list())
         table_locations = self.snapshot()
-        matching_locations = {}
+        matching_locations: dict[str, int] = {}
         missing_locations = []
         for table_loc in table_locations:
             # external_location.list returns url without trailing "/" but ExternalLocation.snapshot
             # does so removing the trailing slash before comparing
-            matched = False
-            for uc_loc in uc_external_locations:
-                if not uc_loc.url:
-                    continue
-                if not uc_loc.name:
-                    continue
-                uc_loc_path = uc_loc.url.lower()
-                if uc_loc_path in table_loc.location.rstrip("/").lower():
-                    if uc_loc.name not in matching_locations:
-                        matching_locations[uc_loc.name] = table_loc.table_count
-                    else:
-                        matching_locations[uc_loc.name] = matching_locations[uc_loc.name] + table_loc.table_count
-                    matched = True
-                    break
-            if not matched:
+            if not self._match_existing(table_loc, matching_locations, existing_locations):
                 missing_locations.append(table_loc)
         return matching_locations, missing_locations
+
+    @staticmethod
+    def _match_existing(table_loc, matching_locations: dict[str, int], existing_locations: list[ExternalLocationInfo]):
+        for uc_loc in existing_locations:
+            if not uc_loc.url:
+                continue
+            if not uc_loc.name:
+                continue
+            uc_loc_path = uc_loc.url.lower()
+            if uc_loc_path in table_loc.location.rstrip("/").lower():
+                if uc_loc.name not in matching_locations:
+                    matching_locations[uc_loc.name] = table_loc.table_count
+                else:
+                    matching_locations[uc_loc.name] = matching_locations[uc_loc.name] + table_loc.table_count
+                return True
+        return False
 
     def save_as_terraform_definitions_on_workspace(self, installation: Installation):
         matching_locations, missing_locations = self.match_table_external_locations()
