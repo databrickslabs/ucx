@@ -3,7 +3,6 @@ import json
 import logging
 import random
 import time
-from ast import literal_eval
 from collections.abc import Iterator
 from datetime import timedelta
 from typing import Any
@@ -78,7 +77,7 @@ class StatementExecutionExt:
         self.type_converters = {
             ColumnInfoTypeName.ARRAY: json.loads,
             # ColumnInfoTypeName.BINARY: not_supported(ColumnInfoTypeName.BINARY),
-            ColumnInfoTypeName.BOOLEAN: lambda value: eval(value.capitalize()),
+            ColumnInfoTypeName.BOOLEAN: lambda value: value.lower() == "true",
             # ColumnInfoTypeName.BYTE: not_supported(ColumnInfoTypeName.BYTE),
             ColumnInfoTypeName.CHAR: str,
             # ColumnInfoTypeName.DATE: not_supported(ColumnInfoTypeName.DATE),
