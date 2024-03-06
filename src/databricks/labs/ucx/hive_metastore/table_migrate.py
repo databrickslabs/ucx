@@ -93,12 +93,18 @@ class TablesMigrate:
         self._backend.execute(src_table.sql_alter_from(rule.as_uc_table_key, self._ws.get_workspace_id()))
         return True
 
-    def _init_seen_tables(self):
+    def _iter_schemas(self):
         for catalog in self._ws.catalogs.list():
-            for schema in self._ws.schemas.list(catalog_name=catalog.name):
-                for table in self._ws.tables.list(catalog_name=catalog.name, schema_name=schema.name):
-                    if table.properties is not None and "upgraded_from" in table.properties:
-                        self._seen_tables[table.full_name.lower()] = table.properties["upgraded_from"].lower()
+            yield from self._ws.schemas.list(catalog_name=catalog.name)
+
+    def _init_seen_tables(self):
+        for schema in self._iter_schemas():
+            for table in self._ws.tables.list(catalog_name=schema.catalog_name, schema_name=schema.name):
+                if table.properties is None:
+                    continue
+                if "upgraded_from" not in table.properties:
+                    continue
+                self._seen_tables[table.full_name.lower()] = table.properties["upgraded_from"].lower()
 
     def _table_already_upgraded(self, target) -> bool:
         return target in self._seen_tables
@@ -391,23 +397,24 @@ class TableMove:
         except NotFound:
             logger.warning(f"removed on the backend {from_table_name}")
             return
-        if grants.privilege_assignments is not None:
-            logger.info(f"Applying grants on table {to_table_name}")
-            grants_changes = []
-            for permission in grants.privilege_assignments:
-                if not permission.privileges:
-                    continue
-                if not target_view:
-                    grants_changes.append(PermissionsChange(list(permission.privileges), permission.principal))
-                    continue
-                privileges = set()
-                for privilege in permission.privileges:
-                    if privilege != Privilege.MODIFY:
-                        privileges.add(privilege)
-                if privileges:
-                    grants_changes.append(PermissionsChange(list(privileges), permission.principal))
+        if not grants.privilege_assignments:
+            return
+        logger.info(f"Applying grants on table {to_table_name}")
+        grants_changes = []
+        for permission in grants.privilege_assignments:
+            if not permission.privileges:
+                continue
+            if not target_view:
+                grants_changes.append(PermissionsChange(list(permission.privileges), permission.principal))
+                continue
+            privileges = set()
+            for privilege in permission.privileges:
+                if privilege != Privilege.MODIFY:
+                    privileges.add(privilege)
+            if privileges:
+                grants_changes.append(PermissionsChange(list(privileges), permission.principal))
 
-            self._ws.grants.update(SecurableType.TABLE, to_table_name, changes=grants_changes)
+        self._ws.grants.update(SecurableType.TABLE, to_table_name, changes=grants_changes)
 
     def _recreate_table(self, from_table_name, to_table_name):
         create_sql = str(next(self._backend.fetch(f"SHOW CREATE TABLE {from_table_name}"))[0])

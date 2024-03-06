@@ -15,6 +15,7 @@ from databricks.labs.ucx.assessment.aws import AWSResourcePermissions
 from databricks.labs.ucx.aws.credentials import IamRoleMigration
 from databricks.labs.ucx.azure.access import AzureResourcePermissions
 from databricks.labs.ucx.azure.credentials import ServicePrincipalMigration
+from databricks.labs.ucx.azure.locations import ExternalLocationsMigration
 from databricks.labs.ucx.config import WorkspaceConfig
 from databricks.labs.ucx.framework.crawlers import StatementExecutionBackend
 from databricks.labs.ucx.hive_metastore import ExternalLocations, TablesCrawler
@@ -360,6 +361,31 @@ def create_uber_principal(w: WorkspaceClient, subscription_id: str):
     azure_resource_permissions = AzureResourcePermissions.for_cli(w, include_subscriptions=include_subscriptions)
     azure_resource_permissions.create_uber_principal(prompts)
     return
+
+
+@ucx.command
+def migrate_locations(w: WorkspaceClient, aws_profile: str | None = None):
+    """This command creates UC external locations. The candidate locations to be created are extracted from guess_external_locations
+    task in the assessment job. You can run validate_external_locations command to check the candidate locations. Please make sure
+    the credentials haven migrated before running this command. The command will only create the locations that have corresponded UC Storage Credentials.
+    """
+    if w.config.is_azure:
+        logger.info("Running migrate_locations for Azure")
+        installation = Installation.current(w, 'ucx')
+        service_principal_migration = ExternalLocationsMigration.for_cli(w, installation)
+        service_principal_migration.run()
+    if w.config.is_aws:
+        logger.error("Migrate_locations for AWS")
+        if not shutil.which("aws"):
+            logger.error("Couldn't find AWS CLI in path. Please install the CLI from https://aws.amazon.com/cli/")
+            return
+        installation = Installation.current(w, 'ucx')
+        config = installation.load(WorkspaceConfig)
+        sql_backend = StatementExecutionBackend(w, config.warehouse_id)
+        aws_permissions = AWSResourcePermissions.for_cli(w, sql_backend, aws_profile, config.inventory_database)
+        aws_permissions.create_external_locations()
+    if w.config.is_gcp:
+        logger.error("migrate_locations is not yet supported in GCP")
 
 
 if __name__ == "__main__":
