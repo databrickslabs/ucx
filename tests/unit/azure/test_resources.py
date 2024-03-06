@@ -1,5 +1,7 @@
+from unittest.mock import create_autospec
+
 import pytest
-from databricks.sdk.errors import PermissionDenied, ResourceConflict
+from databricks.sdk.errors import NotFound, PermissionDenied, ResourceConflict
 
 from databricks.labs.ucx.azure.resources import (
     AzureAPIClient,
@@ -192,3 +194,71 @@ def test_azure_client_api_delete_spn(mocker):
     api_client = AzureAPIClient("foo", "bar")
     api_client.api_client.do = get_az_api_mapping
     api_client.delete("/applications/1234")
+
+
+def test_managed_identity_client_id():
+    api_client = azure_api_client()
+    azure_resource = AzureResources(api_client, api_client)
+
+    assert (
+        azure_resource.managed_identity_client_id(
+            "/subscriptions/123/resourcegroups/abc/providers/Microsoft.Databricks/accessConnectors/credential_system_assigned_mi"
+        )
+        == "application_id_system_assigned_mi-123"
+    )
+    assert (
+        azure_resource.managed_identity_client_id(
+            "/subscriptions/123/resourcegroups/abc/providers/Microsoft.ManagedIdentity/accessConnectors/credential_user_assigned_mi",
+            "/subscriptions/123/resourcegroups/abc/providers/Microsoft.ManagedIdentity/userAssignedIdentities/credential_user_assigned_mi",
+        )
+        == "application_id_user_assigned_mi-123"
+    )
+
+
+def test_access_connector_not_found(caplog):
+    api_client = create_autospec(AzureAPIClient)
+    azure_resource = AzureResources(api_client, api_client)
+    api_client.get.side_effect = NotFound()
+    assert azure_resource.managed_identity_client_id("test") is None
+    assert "no longer exists" in caplog.text
+
+
+def test_non_app_id_access_connector():
+    api_client = create_autospec(AzureAPIClient)
+    azure_resource = AzureResources(api_client, api_client)
+
+    api_client.get.return_value = {
+        "identity": {
+            "userAssignedIdentities": {
+                "test_mi_id": {"principalId": "test_principal_id", "clientId": "test_client_id"}
+            },
+            "type": "UserAssigned",
+        }
+    }
+    # test managed_identity_client_id is called without providing user_assigned_identity_id when userAssignedIdentity is encountered
+    assert azure_resource.managed_identity_client_id("no_user_assigned_identity_id_provided") is None
+    # test no application_id of the user assigned managed identity is found
+    assert azure_resource.managed_identity_client_id("no_such_access_connector", "no_such_identity") is None
+
+    # test if identity type is not UserAssigned nor SystemAssigned
+    api_client.get.return_value = {"identity": {"principalId": "test_principal_id", "type": "Other"}}
+    assert azure_resource.managed_identity_client_id("other_type") is None
+
+
+def azure_api_side_effect(*args, **kwargs):
+    if "/v1.0/directoryObjects/" in args[0]:
+        raise NotFound()
+    return get_az_api_mapping(*args, **kwargs)
+
+
+def test_managed_identity_not_found():
+    api_client = azure_api_client()
+    api_client.get.side_effect = azure_api_side_effect
+    azure_resource = AzureResources(api_client, api_client)
+
+    assert (
+        azure_resource.managed_identity_client_id(
+            "/subscriptions/123/resourcegroups/abc/providers/Microsoft.Databricks/accessConnectors/credential_system_assigned_mi"
+        )
+        is None
+    )

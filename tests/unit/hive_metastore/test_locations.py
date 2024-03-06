@@ -1,10 +1,12 @@
 from unittest.mock import MagicMock, Mock, create_autospec
 
 from databricks.labs.blueprint.installation import Installation
+from databricks.sdk import WorkspaceClient
 from databricks.sdk.dbutils import MountInfo
 from databricks.sdk.service.catalog import ExternalLocationInfo
 
 from databricks.labs.ucx.hive_metastore.locations import (
+    ExternalLocation,
     ExternalLocations,
     Mount,
     Mounts,
@@ -199,3 +201,25 @@ def test_save_external_location_mapping_no_missing_location():
     ws.external_locations.list.return_value = [ExternalLocationInfo(name="loc1", url="s3://test_location/test1")]
     location_crawler.save_as_terraform_definitions_on_workspace("~/.ucx")
     ws.workspace.upload.assert_not_called()
+
+
+def test_match_table_external_locations():
+    ws = create_autospec(WorkspaceClient)
+    sbe = MockBackend(
+        rows={
+            "SELECT location, storage_properties FROM test.tables WHERE location IS NOT NULL": [
+                make_row(("s3://test_location/a/b/c/table1", ""), ["location", "storage_properties"]),
+                make_row(("s3://test_location/a/b/table1", ""), ["location", "storage_properties"]),
+                make_row(("gcs://test_location2/a/b/table2", ""), ["location", "storage_properties"]),
+                make_row(("abfss://cont1@storagetest1/a/table3", ""), ["location", "storage_properties"]),
+                make_row(("abfss://cont1@storagetest1/a/table4", ""), ["location", "storage_properties"]),
+            ],
+        }
+    )
+    location_crawler = ExternalLocations(ws, sbe, "test")
+    ws.external_locations.list.return_value = [ExternalLocationInfo(name="loc1", url="s3://test_location/a")]
+
+    matching_locations, missing_locations = location_crawler.match_table_external_locations()
+    assert len(matching_locations) == 1
+    assert ExternalLocation("gcs://test_location2/a/b/", 1) in missing_locations
+    assert ExternalLocation("abfss://cont1@storagetest1/a/", 2) in missing_locations
