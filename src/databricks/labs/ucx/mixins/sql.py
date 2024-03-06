@@ -266,7 +266,7 @@ class StatementExecutionExt:
             if not type_name:
                 type_name = ColumnInfoTypeName.NULL
             if type_name == ColumnInfoTypeName.BOOLEAN:
-                conv = self._convert_boolean_type
+                conv = self._get_convert_boolean_type_function
             else:
                 conv = self.type_converters.get(type_name, None)
             if conv is None:
@@ -277,5 +277,5 @@ class StatementExecutionExt:
         return col_conv, row_factory
 
     @staticmethod
-    def _convert_boolean_type(value):
+    def _get_convert_boolean_type_function(value):
         return literal_eval(value.capitalize())
