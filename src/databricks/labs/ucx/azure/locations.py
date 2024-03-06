@@ -3,7 +3,7 @@ from urllib.parse import urlparse
 
 from databricks.labs.blueprint.installation import Installation
 from databricks.sdk import WorkspaceClient
-from databricks.sdk.errors.platform import PermissionDenied
+from databricks.sdk.errors.platform import InvalidParameterValue, PermissionDenied
 
 from databricks.labs.ucx.azure.access import AzureResourcePermissions
 from databricks.labs.ucx.azure.resources import AzureResources
@@ -98,6 +98,20 @@ class ExternalLocationsMigration:
         res_name = after_at.replace(".dfs.core.windows.net", "").rstrip("/").replace("/", "_")
         return f"{container_name}_{res_name}"
 
+    def _create_external_location_helper(
+        self, name, url, credential, comment="Created by UCX", read_only=False, skip_validation=False
+    ) -> str | None:
+        try:
+            self._ws.external_locations.create(
+                name, url, credential, comment=comment, read_only=read_only, skip_validation=skip_validation
+            )
+            return url
+        except InvalidParameterValue as invalid:
+            if "overlaps with an existing external location" in str(invalid):
+                logger.warning(f"Skip creating external location, see details: {str(invalid)}")
+                return None
+            raise invalid
+
     def _create_external_location(
         self, location_url: str, prefix_mapping_write: dict[str, str], prefix_mapping_read: dict[str, str]
     ) -> str | None:
@@ -109,25 +123,26 @@ class ExternalLocationsMigration:
 
         # try to create external location with write privilege first
         if container_url in prefix_mapping_write:
-            self._ws.external_locations.create(
+            url = self._create_external_location_helper(
                 location_name, location_url, prefix_mapping_write[container_url], comment="Created by UCX"
             )
-            return location_url
+            return url
         # if no matched write privilege credential, try to create read-only external location
         if container_url in prefix_mapping_read:
             try:
-                self._ws.external_locations.create(
+                url = self._create_external_location_helper(
                     location_name,
                     location_url,
                     prefix_mapping_read[container_url],
                     comment="Created by UCX",
                     read_only=True,
                 )
+                return url
             except PermissionDenied as denied:
                 if "No file available under the location to read" in str(denied):
                     # Empty location will cause failed READ permission check with read-only credential
                     # Skip skip_validation in this case
-                    self._ws.external_locations.create(
+                    url = self._create_external_location_helper(
                         location_name,
                         location_url,
                         prefix_mapping_read[container_url],
@@ -135,9 +150,8 @@ class ExternalLocationsMigration:
                         read_only=True,
                         skip_validation=True,
                     )
-                    return location_url
+                    return url
                 raise denied
-            return location_url
         # if no credential found
         return None
 
@@ -166,6 +180,7 @@ class ExternalLocationsMigration:
                 "2. If you use service principal in extra_config when create dbfs mount or use service principal "
                 "in your code directly for storage access, UCX cannot automatically migrate them to storage credential."
                 "Please manually create those storage credentials first."
+                "3. You may have overlapping external location already in UC."
             )
             for loc_url in leftover_loc_urls:
                 logger.info(f"Not created external location: {loc_url}")

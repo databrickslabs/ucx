@@ -4,7 +4,7 @@ from unittest.mock import create_autospec
 import pytest
 from databricks.labs.blueprint.installation import MockInstallation
 from databricks.sdk import WorkspaceClient
-from databricks.sdk.errors.platform import PermissionDenied
+from databricks.sdk.errors.platform import InvalidParameterValue, PermissionDenied
 from databricks.sdk.service.catalog import (
     AzureManagedIdentity,
     AzureServicePrincipal,
@@ -96,6 +96,8 @@ def test_run_service_principal(ws):
         "abfss://container1@test.dfs.core.windows.net/one/",
         "credential_sp1",
         comment="Created by UCX",
+        read_only=False,
+        skip_validation=False,
     )
     ws.external_locations.create.assert_any_call(
         "container2_test",
@@ -103,6 +105,7 @@ def test_run_service_principal(ws):
         "credential_sp2",
         comment="Created by UCX",
         read_only=True,
+        skip_validation=False,
     )
 
 
@@ -178,6 +181,8 @@ def test_run_managed_identity(ws, mocker):
         "abfss://container4@test.dfs.core.windows.net/",
         "credential_system_assigned_mi",
         comment="Created by UCX",
+        read_only=False,
+        skip_validation=False,
     )
     ws.external_locations.create.assert_any_call(
         "container5_test_a_b",
@@ -185,6 +190,7 @@ def test_run_managed_identity(ws, mocker):
         "credential_user_assigned_mi",
         comment="Created by UCX",
         read_only=True,
+        skip_validation=False,
     )
 
 
@@ -193,8 +199,12 @@ def create_side_effect(location_name, *args, **kwargs):  # pylint: disable=unuse
     if not kwargs.get('skip_validation'):
         if "empty" in location_name:
             raise PermissionDenied("No file available under the location to read")
-        if "exception" in location_name:
+        if "other_permission_denied" in location_name:
             raise PermissionDenied("Other PermissionDenied exception")
+        if "overlap_location" in location_name:
+            raise InvalidParameterValue("overlaps with an existing external location")
+        if "other_invalid_parameter" in location_name:
+            raise InvalidParameterValue("Other InvalidParameterValue exception")
 
 
 def test_location_failed_to_read(ws):
@@ -206,7 +216,7 @@ def test_location_failed_to_read(ws):
         rows={
             r"SELECT \* FROM location_test.external_locations": [
                 row_factory(["abfss://empty@test.dfs.core.windows.net/", 1]),
-                row_factory(["abfss://exception@test.dfs.core.windows.net/", 2]),
+                row_factory(["abfss://other_permission_denied@test.dfs.core.windows.net/", 2]),
             ]
         }
     )
@@ -234,7 +244,7 @@ def test_location_failed_to_read(ws):
                     'directory_id': 'directory_id_1',
                 },
                 {
-                    'prefix': 'abfss://exception@test.dfs.core.windows.net/',
+                    'prefix': 'abfss://other_permission_denied@test.dfs.core.windows.net/',
                     'client_id': 'application_id_2',
                     'principal': 'credential_sp2',
                     'privilege': 'READ_FILES',
@@ -267,6 +277,74 @@ def test_location_failed_to_read(ws):
         read_only=True,
         skip_validation=True,
     )
+
+
+def test_overlapping_locations(ws, caplog):
+    caplog.set_level(logging.INFO)
+
+    # mock crawled HMS external locations
+    row_factory = type("Row", (Row,), {"__columns__": ["location", "table_count"]})
+    mock_backend = MockBackend(
+        rows={
+            r"SELECT \* FROM location_test.external_locations": [
+                row_factory(["abfss://overlap_location@test.dfs.core.windows.net/a/", 1]),
+                row_factory(["abfss://other_invalid_parameter@test.dfs.core.windows.net/a/", 1]),
+            ]
+        }
+    )
+
+    # mock listing storage credentials
+    ws.storage_credentials.list.return_value = [
+        StorageCredentialInfo(
+            name="credential_sp1",
+            azure_service_principal=AzureServicePrincipal(
+                "directory_id_1",
+                "application_id_1",
+                "test_secret",
+            ),
+        )
+    ]
+
+    # mock listing UC external locations, a location that is sub path of prefix is already created
+    ws.external_locations.list.return_value = [ExternalLocationInfo(name="none", url="none")]
+
+    # mock installation with permission mapping
+    mock_installation = MockInstallation(
+        {
+            "azure_storage_account_info.csv": [
+                {
+                    'prefix': 'abfss://overlap_location@test.dfs.core.windows.net/',
+                    'client_id': 'application_id_1',
+                    'principal': 'credential_sp1',
+                    'privilege': 'WRITE_FILES',
+                    'type': 'Application',
+                    'directory_id': 'directory_id_1',
+                },
+                {
+                    'prefix': 'abfss://other_invalid_parameter@test.dfs.core.windows.net/',
+                    'client_id': 'application_id_1',
+                    'principal': 'credential_sp1',
+                    'privilege': 'WRITE_FILES',
+                    'type': 'Application',
+                    'directory_id': 'directory_id_1',
+                },
+            ],
+        }
+    )
+
+    ws.external_locations.create.side_effect = create_side_effect
+
+    location_crawler = ExternalLocations(ws, mock_backend, "location_test")
+    azurerm = AzureResources(ws)
+    location_migration = ExternalLocationsMigration(
+        ws, location_crawler, AzureResourcePermissions(mock_installation, ws, azurerm, location_crawler), azurerm
+    )
+
+    # assert InvalidParameterValue got re-threw if it's not caused by overlapping location
+    with pytest.raises(InvalidParameterValue):
+        location_migration.run()
+    # assert the InvalidParameterValue due to overlapping location is handled.
+    assert "overlaps with an existing external location" in caplog.text
 
 
 def test_corner_cases_with_missing_fields(ws, caplog, mocker):

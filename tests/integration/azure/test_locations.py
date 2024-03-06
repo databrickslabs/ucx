@@ -129,3 +129,43 @@ def test_missing_credential(caplog, ws, sql_backend, inventory_schema):
 
     assert "External locations below are not created in UC" in caplog.text
     assert len(leftover_loc) == 2
+
+
+@pytest.mark.skip
+def test_overlapping_location(caplog, ws, sql_backend, inventory_schema):
+    """Customer may already create external location with url that is a sub path of the table prefix hive_metastore/locations.py extracted.
+    This test case is to verify the overlapping location will be detected and reported.
+    """
+    # create an external location first so the overlapping conflict will be triggered latter
+    ws.external_locations.create(
+        "uctest_ziyuanqintest_overlap", "abfss://uctest@ziyuanqintest.dfs.core.windows.net/a", "oneenv-adls"
+    )
+
+    locations = [ExternalLocation("abfss://uctest@ziyuanqintest.dfs.core.windows.net/", 1)]
+    sql_backend.save_table(f"{inventory_schema}.external_locations", locations, ExternalLocation)
+    location_crawler = ExternalLocations(ws, sql_backend, inventory_schema)
+
+    installation = MockInstallation(
+        {
+            "azure_storage_account_info.csv": [
+                {
+                    'prefix': 'abfss://uctest@ziyuanqintest.dfs.core.windows.net/',
+                    'client_id': "redacted-for-github-929e765443eb",
+                    'principal': "oneenv-adls",
+                    'privilege': "WRITE_FILES",
+                    'type': "Application",
+                }
+            ]
+        }
+    )
+    azurerm = AzureResources(ws)
+
+    location_migration = ExternalLocationsMigration(
+        ws, location_crawler, AzureResourcePermissions(installation, ws, azurerm, location_crawler), azurerm
+    )
+    try:
+        leftover_loc_urls = location_migration.run()
+        assert "abfss://uctest@ziyuanqintest.dfs.core.windows.net/" in leftover_loc_urls
+        assert "overlaps with an existing external location" in caplog.text
+    finally:
+        save_delete_location(ws, "uctest_ziyuanqintest_overlap")
