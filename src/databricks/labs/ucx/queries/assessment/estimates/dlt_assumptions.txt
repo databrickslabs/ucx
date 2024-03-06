@@ -1,0 +1,10 @@
+Assumptions for a single DLT upgrade estimate:
+
+- If the cluster authenticates to a service principal, objects and grants has been set to the target user(s) to access the data.
+- Historical data in Hive Metastore has been copied to the target UC destination in Managed Tables (see Table upgrade).
+- GRANTS has been set on appropriate tables to the identity that will run the pipeline.
+
+Scope of the upgrade estimate:
+
+- Recreate the DLT pipeline to use a UC Target Schema
+- Removes any references to a service principal

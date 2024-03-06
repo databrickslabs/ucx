@@ -1,0 +1,12 @@
+Assumptions for a single Job upgrade estimates:
+
+- Code in the Workflow works as-is when upgrading to a UC compatible DBR version
+- Input and output data has been migrated to UC
+- GRANTS has been set on appropriate tables to the identity that will run the pipeline.
+
+Scope of the upgrade estimate:
+
+- CI/CD changes
+- Job cluster update to UC (see cluster upgrade)
+- Migration of input and output references in the code
+- Verification of the pipeline post migration

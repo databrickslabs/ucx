@@ -1,0 +1,11 @@
+Assumptions for a single cluster upgrade estimates:
+
+- Efforts to adapt code that are submitted to the cluster are out of scope
+- GRANTS has been set-up on appropriate groups to target UC objects
+
+Scope of the upgrade estimate:
+
+- Choosing appropriate target DBR version
+- Recreate the cluster to a supported type
+- Removing unsupported configurations
+- Rewriting cluster policy (if any)
