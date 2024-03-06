@@ -18,6 +18,7 @@ from databricks.labs.ucx.cli import (
     installations,
     manual_workspace_info,
     migrate_credentials,
+    migrate_locations,
     move,
     open_remote_config,
     principal_prefix_access,
@@ -357,3 +358,10 @@ def test_create_master_principal(ws):
     with patch("databricks.labs.blueprint.tui.Prompts.question", return_value=True):
         with pytest.raises(ValueError):
             create_uber_principal(ws, subscription_id="12")
+
+
+def test_migrate_locations_azure(ws):
+    ws.config.is_azure = True
+    ws.workspace.upload.return_value = "test"
+    migrate_locations(ws)
+    ws.external_locations.list.assert_called()
