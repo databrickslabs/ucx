@@ -212,7 +212,11 @@ class DashboardFromFiles:
             assert dashboard.widgets is not None
             for widget in dashboard.widgets:
                 assert widget.id is not None
-                self._ws.dashboard_widgets.delete(widget.id)
+                try:
+                    self._ws.dashboard_widgets.delete(widget.id)
+                except TypeError:
+                    logger.warning("Type error in SDK API response, ES-1061370")
+                    # Tracking bug in ES-1061370
             return
         dashboard = self._ws.dashboards.create(dashboard_name, run_as_role=RunAsRole.VIEWER, parent=parent_folder_id)
         assert dashboard.id is not None

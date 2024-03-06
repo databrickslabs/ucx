@@ -341,3 +341,36 @@ class AzureResources:
                 return None
             self._role_definitions[role_definition_id] = role_name
         return self._role_definitions.get(role_definition_id)
+
+    def managed_identity_client_id(
+        self, access_connector_id: str, user_assigned_identity_id: str | None = None
+    ) -> str | None:
+        # get te client_id/application_id of the managed identity used in the access connector
+        try:
+            identity = self._mgmt.get(access_connector_id, "2023-05-01").get("identity")
+        except NotFound:
+            logger.warning(f"Access connector {access_connector_id} no longer exists")
+            return None
+        if not identity:
+            return None
+
+        if identity.get("type") == "UserAssigned":
+            if not user_assigned_identity_id:
+                return None
+            identities = identity.get("userAssignedIdentities")
+            if user_assigned_identity_id in identities:
+                return identities.get(user_assigned_identity_id).get("clientId")
+            # sometimes we see "resourceGroups" instead of "resourcegroups" in the response from Azure RM API
+            # but "resourcegroups" is in response from storage credential's managed_identity_id
+            alternative_identity_id = user_assigned_identity_id.replace("resourcegroups", "resourceGroups")
+            if alternative_identity_id in identities:
+                return identities.get(alternative_identity_id).get("clientId")
+            return None
+        if identity.get("type") == "SystemAssigned":
+            # SystemAssigned managed identity does not have client_id in get access connector response
+            # need to call graph api directoryObjects to fetch the client_id
+            principal = self._get_principal(identity.get("principalId"))
+            if not principal:
+                return None
+            return principal.client_id
+        return None
