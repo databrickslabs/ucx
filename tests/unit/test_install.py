@@ -1311,12 +1311,11 @@ def test_triggering_assessment_wf(ws, mocker, mock_installation):
     sql_backend = MockBackend()
     prompts = MockPrompts(
         {
-            r".*Do you want to run assessment workflow after the installation*": "yes",
             r".*": "",
         }
     )
     workspace_installation = WorkspaceInstallation(
-        WorkspaceConfig(inventory_database="ucx", policy_id='123'),
+        WorkspaceConfig(inventory_database="ucx", policy_id='123', run_assessment_workflow=True),
         mock_installation,
         sql_backend,
         create_autospec(WheelsV2),
