@@ -77,7 +77,7 @@ class StatementExecutionExt:
         self.type_converters = {
             ColumnInfoTypeName.ARRAY: json.loads,
             # ColumnInfoTypeName.BINARY: not_supported(ColumnInfoTypeName.BINARY),
-            ColumnInfoTypeName.BOOLEAN: lambda x: eval(x.capitalize()),
+            ColumnInfoTypeName.BOOLEAN: lambda value: eval(value.capitalize()),
             # ColumnInfoTypeName.BYTE: not_supported(ColumnInfoTypeName.BYTE),
             ColumnInfoTypeName.CHAR: str,
             # ColumnInfoTypeName.DATE: not_supported(ColumnInfoTypeName.DATE),
