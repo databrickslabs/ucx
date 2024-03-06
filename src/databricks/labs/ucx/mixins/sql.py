@@ -3,7 +3,6 @@ import json
 import logging
 import random
 import time
-from ast import literal_eval
 from collections.abc import Iterator
 from datetime import timedelta
 from typing import Any
@@ -78,7 +77,7 @@ class StatementExecutionExt:
         self.type_converters = {
             ColumnInfoTypeName.ARRAY: json.loads,
             # ColumnInfoTypeName.BINARY: not_supported(ColumnInfoTypeName.BINARY),
-            ColumnInfoTypeName.BOOLEAN: bool,
+            ColumnInfoTypeName.BOOLEAN: lambda x: eval(x.capitalize()),
             # ColumnInfoTypeName.BYTE: not_supported(ColumnInfoTypeName.BYTE),
             ColumnInfoTypeName.CHAR: str,
             # ColumnInfoTypeName.DATE: not_supported(ColumnInfoTypeName.DATE),
@@ -265,17 +264,10 @@ class StatementExecutionExt:
             type_name = col.type_name
             if not type_name:
                 type_name = ColumnInfoTypeName.NULL
-            if type_name == ColumnInfoTypeName.BOOLEAN:
-                conv = self._get_convert_boolean_type_function
-            else:
-                conv = self.type_converters.get(type_name, None)
+            conv = self.type_converters.get(type_name, None)
             if conv is None:
                 msg = f"{col.name} has no {type_name.value} converter"
                 raise ValueError(msg)
             col_conv.append(conv)
         row_factory = type("Row", (Row,), {"__columns__": col_names})
         return col_conv, row_factory
-
-    @staticmethod
-    def _get_convert_boolean_type_function(value):
-        return literal_eval(value.capitalize())
