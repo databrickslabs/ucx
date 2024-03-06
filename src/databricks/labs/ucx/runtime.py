@@ -54,7 +54,7 @@ def crawl_grants(cfg: WorkspaceConfig, _: WorkspaceClient, sql_backend: SqlBacke
     ACLs enabled and available for retrieval."""
     tables = TablesCrawler(sql_backend, cfg.inventory_database, cfg.include_databases)
     udfs = UdfsCrawler(sql_backend, cfg.inventory_database, cfg.include_databases)
-    grants = GrantsCrawler(tables, udfs)
+    grants = GrantsCrawler(tables, udfs, cfg.include_databases)
     grants.snapshot()
 
 

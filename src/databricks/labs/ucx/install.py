@@ -226,7 +226,6 @@ class WorkspaceInstaller:
 
         configure_groups = ConfigureGroups(self._prompts)
         configure_groups.run()
-        include_databases = self.select_databases()
 
         log_level = self._prompts.question("Log level", default="INFO").upper()
         num_threads = int(self._prompts.question("Number of threads", default="8", valid_number=True))
@@ -264,7 +263,7 @@ class WorkspaceInstaller:
             spark_conf=spark_conf_dict,
             policy_id=policy_id,
             is_terraform_used=is_terraform_used,
-            include_databases=include_databases
+            include_databases=self.select_databases(),
         )
         self._installation.save(config)
         ws_file_url = self._installation.workspace_link(config.__file__)
