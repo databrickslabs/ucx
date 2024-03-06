@@ -385,6 +385,7 @@ def test_missing_aws_cli(ws, caplog, mocker):
     migrate_locations(ws, aws_profile="profile")
     assert "Couldn't find AWS CLI in path. Please install the CLI from https://aws.amazon.com/cli/" in caplog.messages
 
+
 def test_migrate_locations_gcp(ws, caplog):
     ws.config.is_azure = False
     ws.config.is_aws = False
