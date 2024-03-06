@@ -126,3 +126,10 @@ commands:
     flags:
       - name: workspace_ids
         description: List of workspace IDs to create account groups from.
+
+  - name: get-cluster-policy
+    description: Get Cluster Policy
+    table_template: |-
+      Policy Name\tDBR Version
+      {{range .}}{{.policy_name}}\t{{.dbr_version}}
+      {{end}}
