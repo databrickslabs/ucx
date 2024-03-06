@@ -155,6 +155,21 @@ class ClustersCrawler(CrawlerBase[ClusterInfo], CheckClusterMixin):
                 cluster_info.failures = json.dumps(failures)
             yield cluster_info
 
+    def get_cluster_policy(self, all_clusters):
+        for cluster in all_clusters:
+            if cluster.cluster_source == ClusterSource.JOB:
+                continue
+            if not cluster.creator_user_name:
+                logger.warning(
+                    f"Cluster {cluster.cluster_id} have Unknown creator, it means that the original creator "
+                    f"has been deleted and should be re-created"
+                )
+            list_policies = self._ws.cluster_policies.list()
+            print(list_policies)
+
+            # self._safe_get_cluster_policy(cluster.policy_id)
+
+
     def snapshot(self) -> Iterable[ClusterInfo]:
         return self._snapshot(self._try_fetch, self._crawl)
 
