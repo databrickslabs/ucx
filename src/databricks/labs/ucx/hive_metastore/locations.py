@@ -39,21 +39,21 @@ class ExternalLocations(CrawlerBase[ExternalLocation]):
         external_locations: list[ExternalLocation] = []
         for table in tables:
             location = table.location
-            if location is not None and len(location) > 0:
-                if location.startswith("dbfs:/mnt"):
-                    for mount in mounts:
-                        if location[5:].startswith(mount.name.lower()):
-                            location = location[5:].replace(mount.name, mount.source)
-                            break
-                if (
-                    not location.startswith("dbfs")
-                    and (self._prefix_size[0] < location.find(":/") < self._prefix_size[1])
-                    and not location.startswith("jdbc")
-                ):
-                    self._dbfs_locations(external_locations, location, min_slash)
-                if location.startswith("jdbc"):
-                    self._add_jdbc_location(external_locations, location, table)
-
+            if not location:
+                continue
+            if location.startswith("dbfs:/mnt"):
+                for mount in mounts:
+                    if location[5:].startswith(mount.name.lower()):
+                        location = location[5:].replace(mount.name, mount.source)
+                        break
+            if (
+                not location.startswith("dbfs")
+                and (self._prefix_size[0] < location.find(":/") < self._prefix_size[1])
+                and not location.startswith("jdbc")
+            ):
+                self._dbfs_locations(external_locations, location, min_slash)
+            if location.startswith("jdbc"):
+                self._add_jdbc_location(external_locations, location, table)
         return external_locations
 
     @staticmethod
