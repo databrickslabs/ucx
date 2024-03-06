@@ -501,10 +501,10 @@ class AWSResourcePermissions:
         credentials = self._ws.storage_credentials.list()
         credentials_dict = {}
         for credential in credentials:
-            credentials_dict[credential.aws_iam_role] = credential.name
+            credentials_dict[credential.aws_iam_role.role_arn] = credential.name
         return credentials_dict
 
-    def create_external_locations(self, external_location_name="UCX_location"):
+    def create_external_locations(self, location_init="UCX_location"):
         # For each path find out the role that has access to it
         # Find out the credential that is pointing to this path
         # Create external location for the path using the credential identified
@@ -519,7 +519,7 @@ class AWSResourcePermissions:
         for path, role_arn in missing_paths:
             if role_arn in credential_dict:
                 while True:
-                    external_location_name = f"{external_location_name}_{external_location_num}"
+                    external_location_name = f"{location_init}_{external_location_num}"
                     if external_location_name not in external_location_names:
                         break
                     external_location_num += 1
