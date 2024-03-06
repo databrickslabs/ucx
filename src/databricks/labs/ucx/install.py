@@ -248,6 +248,9 @@ class WorkspaceInstaller:
                 instance_profile, spark_conf_dict = self._get_ext_hms_conf_from_policy(cluster_policy)
 
         policy_id = self._create_cluster_policy(inventory_database, spark_conf_dict, instance_profile)
+
+        # Check if terraform is being used
+        is_terraform_used = self._prompts.confirm("Do you use Terraform to deploy your infrastructure?")
         config = WorkspaceConfig(
             inventory_database=inventory_database,
             workspace_group_regex=configure_groups.workspace_group_regex,
@@ -262,6 +265,7 @@ class WorkspaceInstaller:
             instance_profile=instance_profile,
             spark_conf=spark_conf_dict,
             policy_id=policy_id,
+            is_terraform_used=is_terraform_used,
         )
         self._installation.save(config)
         ws_file_url = self._installation.workspace_link(config.__file__)
