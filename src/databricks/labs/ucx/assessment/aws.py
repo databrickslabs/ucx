@@ -278,7 +278,7 @@ class AWSResources:
 
         policy_document_json = self._get_json_for_cli(policy_document)
         if not self._run_command(
-                f"iam put-role-policy --role-name {role_name} --policy-name {policy_name} --policy-document {policy_document_json}"
+            f"iam put-role-policy --role-name {role_name} --policy-name {policy_name} --policy-document {policy_document_json}"
         ):
             return False
         return True
@@ -309,14 +309,14 @@ class AWSResourcePermissions:
     INSTANCE_PROFILES_FILE_NAMES: typing.ClassVar[str] = "aws_instance_profile_info.csv"
 
     def __init__(
-            self,
-            installation: Installation,
-            ws: WorkspaceClient,
-            backend: StatementExecutionBackend,
-            aws_resources: AWSResources,
-            schema: str,
-            aws_account_id=None,
-            kms_key=None,
+        self,
+        installation: Installation,
+        ws: WorkspaceClient,
+        backend: StatementExecutionBackend,
+        aws_resources: AWSResources,
+        schema: str,
+        aws_account_id=None,
+        kms_key=None,
     ):
         self._installation = installation
         self._aws_resources = aws_resources
@@ -467,11 +467,12 @@ class AWSResourcePermissions:
             return None
         return self._installation.save(instance_profile_access, filename=self.INSTANCE_PROFILES_FILE_NAMES)
 
-    def _identify_missing_external_locations(self,
-                                             external_locations: Iterable[ExternalLocation],
-                                             existing_paths: list[str],
-                                             compatible_roles: list[AWSRoleAction]
-                                             ) -> set[(str, str)]:
+    def _identify_missing_external_locations(
+        self,
+        external_locations: Iterable[ExternalLocation],
+        existing_paths: list[str],
+        compatible_roles: list[AWSRoleAction],
+    ) -> set[tuple[str, str]]:
         # Get recommended external locations
         # Get existing external locations
         # Get list of paths from get_uc_compatible_roles
@@ -510,8 +511,7 @@ class AWSResourcePermissions:
         credential_dict = self._get_existing_credentials_dict()
         external_locations = ExternalLocations(self._ws, self._backend, self._schema).snapshot()
         existing_external_locations = self._ws.external_locations.list()
-        existing_paths = [external_location.url for
-                          external_location in existing_external_locations]
+        existing_paths = [external_location.url for external_location in existing_external_locations]
         compatible_roles = self.get_uc_compatible_roles()
         missing_paths = self._identify_missing_external_locations(external_locations, existing_paths, compatible_roles)
         external_location_names = [external_location.name for external_location in existing_external_locations]
@@ -523,11 +523,7 @@ class AWSResourcePermissions:
                     if external_location_name not in external_location_names:
                         break
                     external_location_num += 1
-                self._ws.external_locations.create(
-                    external_location_name,
-                    path,
-                    credential_dict[role_arn]
-                )
+                self._ws.external_locations.create(external_location_name, path, credential_dict[role_arn])
                 external_location_num += 1
             else:
                 logger.error(f"Missing credential for role {role_arn} for path {path}")
