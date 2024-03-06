@@ -6,6 +6,7 @@ import re
 import sys
 import time
 import webbrowser
+from collections.abc import Callable
 from dataclasses import replace
 from datetime import datetime, timedelta
 from pathlib import Path
@@ -16,6 +17,7 @@ from databricks.labs.blueprint.installation import Installation
 from databricks.labs.blueprint.installer import InstallState
 from databricks.labs.blueprint.parallel import ManyError, Threads
 from databricks.labs.blueprint.tui import Prompts
+from databricks.labs.blueprint.upgrades import Upgrades
 from databricks.labs.blueprint.wheels import ProductInfo, WheelsV2, find_project_root
 from databricks.sdk import WorkspaceClient
 from databricks.sdk.errors import (  # pylint: disable=redefined-builtin
@@ -176,54 +178,65 @@ class WorkspaceInstaller:
         self._installation = installation
         self._prompts = prompts
 
-    def run(self):
+    def run(
+        self,
+        verify_timeout=timedelta(minutes=2),
+        sql_backend_factory: Callable[[WorkspaceConfig], SqlBackend] | None = None,
+        wheel_builder_factory: Callable[[], WheelsV2] | None = None,
+    ):
         logger.info(f"Installing UCX v{PRODUCT_INFO.version()}")
         config = self.configure()
-        sql_backend = StatementExecutionBackend(self._ws, config.warehouse_id)
-        wheels = WheelsV2(self._installation, PRODUCT_INFO)
+        if not sql_backend_factory:
+            sql_backend_factory = self._new_sql_backend
+        if not wheel_builder_factory:
+            wheel_builder_factory = self._new_wheel_builder
         workspace_installation = WorkspaceInstallation(
             config,
             self._installation,
-            sql_backend,
-            wheels,
+            sql_backend_factory(config),
+            wheel_builder_factory(),
             self._ws,
             self._prompts,
-            verify_timeout=timedelta(minutes=2),
+            verify_timeout=verify_timeout,
         )
-        workspace_installation.run()
+        try:
+            workspace_installation.run()
+        except ManyError as err:
+            if len(err.errs) == 1:
+                raise err.errs[0] from None
+            raise err
+
+    def _new_wheel_builder(self):
+        return WheelsV2(self._installation, PRODUCT_INFO)
+
+    def _new_sql_backend(self, config: WorkspaceConfig) -> SqlBackend:
+        return StatementExecutionBackend(self._ws, config.warehouse_id)
 
     def configure(self) -> WorkspaceConfig:
         try:
-            return self._installation.load(WorkspaceConfig)
+            config = self._installation.load(WorkspaceConfig)
+            self._apply_upgrades()
+            return config
         except NotFound as err:
             logger.debug(f"Cannot find previous installation: {err}")
+        return self._configure_new_installation()
+
+    def _apply_upgrades(self):
+        try:
+            upgrades = Upgrades(PRODUCT_INFO, self._installation)
+            upgrades.apply(self._ws)
+        except NotFound as err:
+            logger.warning(f"Installed version is too old: {err}")
+            return
+
+    def _configure_new_installation(self) -> WorkspaceConfig:
         logger.info("Please answer a couple of questions to configure Unity Catalog migration")
         HiveMetastoreLineageEnabler(self._ws).apply(self._prompts)
         inventory_database = self._prompts.question(
             "Inventory Database stored in hive_metastore", default="ucx", valid_regex=r"^\w+$"
         )
 
-        def warehouse_type(_):
-            return _.warehouse_type.value if not _.enable_serverless_compute else "SERVERLESS"
-
-        pro_warehouses = {"[Create new PRO SQL warehouse]": "create_new"} | {
-            f"{_.name} ({_.id}, {warehouse_type(_)}, {_.state.value})": _.id
-            for _ in self._ws.warehouses.list()
-            if _.warehouse_type == EndpointInfoWarehouseType.PRO
-        }
-        warehouse_id = self._prompts.choice_from_dict(
-            "Select PRO or SERVERLESS SQL warehouse to run assessment dashboards on", pro_warehouses
-        )
-        if warehouse_id == "create_new":
-            new_warehouse = self._ws.warehouses.create(
-                name=f"{WAREHOUSE_PREFIX} {time.time_ns()}",
-                spot_instance_policy=SpotInstancePolicy.COST_OPTIMIZED,
-                warehouse_type=CreateWarehouseRequestWarehouseType.PRO,
-                cluster_size="Small",
-                max_num_clusters=1,
-            )
-            warehouse_id = new_warehouse.id
-
+        warehouse_id = self._configure_warehouse()
         configure_groups = ConfigureGroups(self._prompts)
         configure_groups.run()
 
@@ -263,7 +276,7 @@ class WorkspaceInstaller:
             spark_conf=spark_conf_dict,
             policy_id=policy_id,
             is_terraform_used=is_terraform_used,
-            include_databases=self.select_databases(),
+            include_databases=self._select_databases(),
         )
         self._installation.save(config)
         ws_file_url = self._installation.workspace_link(config.__file__)
@@ -271,7 +284,7 @@ class WorkspaceInstaller:
             webbrowser.open(ws_file_url)
         return config
 
-    def select_databases(self):
+    def _select_databases(self):
         selected_databases = self._prompts.question(
             "Comma-separated list of databases to migrate. If not specified, we'll use all "
             "databases in hive_metastore",
@@ -280,6 +293,29 @@ class WorkspaceInstaller:
         if selected_databases != "<ALL>":
             return [x.strip() for x in selected_databases.split(",")]
         return None
+
+    def _configure_warehouse(self):
+        def warehouse_type(_):
+            return _.warehouse_type.value if not _.enable_serverless_compute else "SERVERLESS"
+
+        pro_warehouses = {"[Create new PRO SQL warehouse]": "create_new"} | {
+            f"{_.name} ({_.id}, {warehouse_type(_)}, {_.state.value})": _.id
+            for _ in self._ws.warehouses.list()
+            if _.warehouse_type == EndpointInfoWarehouseType.PRO
+        }
+        warehouse_id = self._prompts.choice_from_dict(
+            "Select PRO or SERVERLESS SQL warehouse to run assessment dashboards on", pro_warehouses
+        )
+        if warehouse_id == "create_new":
+            new_warehouse = self._ws.warehouses.create(
+                name=f"{WAREHOUSE_PREFIX} {time.time_ns()}",
+                spot_instance_policy=SpotInstancePolicy.COST_OPTIMIZED,
+                warehouse_type=CreateWarehouseRequestWarehouseType.PRO,
+                cluster_size="Small",
+                max_num_clusters=1,
+            )
+            warehouse_id = new_warehouse.id
+        return warehouse_id
 
     @staticmethod
     def _policy_config(value: str):
@@ -382,7 +418,7 @@ class WorkspaceInstallation:
 
     @classmethod
     def current(cls, ws: WorkspaceClient):
-        installation = Installation.current(ws, PRODUCT_INFO.product_name())
+        installation = PRODUCT_INFO.current_installation(ws)
         config = installation.load(WorkspaceConfig)
         sql_backend = StatementExecutionBackend(ws, config.warehouse_id)
         wheels = WheelsV2(installation, PRODUCT_INFO)
