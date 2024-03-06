@@ -373,7 +373,7 @@ def test_migrate_locations_aws(ws, caplog, mocker):
     ws.config.is_azure = False
     ws.config.is_aws = True
     ws.config.is_gcp = False
-    with pytest.raises(FileNotFoundError):
+    with pytest.raises(ResourceWarning):
         migrate_locations(ws, aws_profile="profile")
 
 
