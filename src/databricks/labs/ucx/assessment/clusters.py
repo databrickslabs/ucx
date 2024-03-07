@@ -34,6 +34,8 @@ class ClusterInfo:
     cluster_id: str
     success: int
     failures: str
+    spark_version: str
+    policy_id: str | None = None
     cluster_name: str | None = None
     creator: str | None = None
 
@@ -145,6 +147,8 @@ class ClustersCrawler(CrawlerBase[ClusterInfo], CheckClusterMixin):
             cluster_info = ClusterInfo(
                 cluster_id=cluster.cluster_id if cluster.cluster_id else "",
                 cluster_name=cluster.cluster_name,
+                policy_id=cluster.policy_id,
+                spark_version=cluster.spark_version,
                 creator=cluster.creator_user_name,
                 success=1,
                 failures="[]",
@@ -166,8 +170,7 @@ class ClustersCrawler(CrawlerBase[ClusterInfo], CheckClusterMixin):
 @dataclass
 class PolicyInfo:
     policy_id: str
-    cluster_id: str
-    dbr_version: str
+    policy_description: str | None = None
     policy_name: str | None = None
     creator: str | None = None
 
@@ -178,28 +181,19 @@ class PoliciesCrawler(CrawlerBase[PolicyInfo], CheckClusterMixin):
         self._ws = ws
 
     def _crawl(self) -> Iterable[PolicyInfo]:
-        all_clusters = list(self._ws.clusters.list())
-        return list(self._assess_policies(all_clusters))
+        all_policices = list(self._ws.cluster_policies.list())
+        return list(self._assess_policies(all_policices))
 
-    def _assess_policies(self, all_clusters):
-        for cluster in all_clusters:
-            if cluster.cluster_source == ClusterSource.JOB:
+    def _assess_policies(self, all_policices):
+        for policy in all_policices:
+            if policy.policy_id is None:
                 continue
-            if not cluster.creator_user_name:
-                logger.warning(
-                    f"Cluster {cluster.cluster_id} have Unknown creator, it means that the original creator "
-                    f"has been deleted and should be re-created"
-                )
-            if cluster.policy_id is None:
-                continue
-            policy_details = self._ws.cluster_policies.get(policy_id=cluster.policy_id)
-            policy_name = policy_details.name
-            creator_name = policy_details.creator_user_name
+            policy_name = policy.name
+            creator_name = policy.creator_user_name
             policy_info = PolicyInfo(
-                policy_id=cluster.policy_id,
-                cluster_id=cluster.cluster_id,
+                policy_id=policy.policy_id,
+                policy_description=policy.description,
                 policy_name=policy_name,
-                dbr_version=cluster.spark_version,
                 creator=creator_name,
             )
             yield policy_info
