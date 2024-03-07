@@ -240,6 +240,7 @@ class WorkspaceInstaller:
         warehouse_id = self._configure_warehouse()
         configure_groups = ConfigureGroups(self._prompts)
         configure_groups.run()
+
         log_level = self._prompts.question("Log level", default="INFO").upper()
         num_threads = int(self._prompts.question("Number of threads", default="8", valid_number=True))
 
@@ -262,12 +263,23 @@ class WorkspaceInstaller:
             spark_conf=spark_conf_dict,
             policy_id=policy_id,
             is_terraform_used=is_terraform_used,
+            include_databases=self._select_databases(),
         )
         self._installation.save(config)
         ws_file_url = self._installation.workspace_link(config.__file__)
         if self._prompts.confirm(f"Open config file in the browser and continue installing? {ws_file_url}"):
             webbrowser.open(ws_file_url)
         return config
+
+    def _select_databases(self):
+        selected_databases = self._prompts.question(
+            "Comma-separated list of databases to migrate. If not specified, we'll use all "
+            "databases in hive_metastore",
+            default="<ALL>",
+        )
+        if selected_databases != "<ALL>":
+            return [x.strip() for x in selected_databases.split(",")]
+        return None
 
     def _configure_warehouse(self):
         def warehouse_type(_):

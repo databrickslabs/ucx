@@ -372,6 +372,7 @@ access the configuration file from the command line. Here's the description of c
   * `spark_conf`: An optional dictionary of Spark configuration properties.
   * `override_clusters`: An optional dictionary mapping job cluster names to existing cluster IDs.
   * `policy_id`: An optional string representing the ID of the cluster policy.
+  * `include_databases`: An optional list of strings representing the names of databases to include for migration.
 
 [[back to top](#databricks-labs-ucx)]
 
@@ -554,6 +555,7 @@ databricks labs ucx move --from-catalog A --from-schema B --from-table C --to-ca
 This command moves a UC table/tables from one schema to another schema in the same or different catalog during
 the [table upgrade](docs/table_upgrade.md) process. This command is useful for developers and administrators who want 
 to move tables between schemas. It can also be used to debug issues related to table movement.
+This command also keeps permissions of the source tables when moved to a new schema or catalog.
 
 [[back to top](#databricks-labs-ucx)]
 
