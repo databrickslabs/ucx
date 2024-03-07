@@ -492,7 +492,7 @@ class AWSResourcePermissions:
             new_path = PurePath(external_location.location)
             matching_role = None
             for role in compatible_roles:
-                if new_path.match(role.resource_path):
+                if new_path.match(role.resource_path + "/*"):
                     matching_role = role.role_arn
                     continue
             if matching_role:
@@ -528,5 +528,7 @@ class AWSResourcePermissions:
                 if external_location_name not in external_location_names:
                     break
                 external_location_num += 1
-            self._ws.external_locations.create(external_location_name, path, credential_dict[role_arn])
+            self._ws.external_locations.create(
+                external_location_name, path, credential_dict[role_arn], skip_validation=True
+            )
             external_location_num += 1

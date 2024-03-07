@@ -789,7 +789,7 @@ def test_create_uc_role_policy_no_kms(mocker):
         return 0, '{"VALID":"JSON"}', ""
 
     aws = AWSResources("Fake_Profile", command_call)
-    s3_prefixes = {"BUCKET1/FOLDER1", "BUCKET1/FOLDER1/*", "BUCKET2/FOLDER2", "BUCKET2/FOLDER2/*"}
+    s3_prefixes = {"BUCKET1/FOLDER1", "BUCKET2/FOLDER2"}
     aws.add_uc_role_policy("test_role", "test_policy", s3_prefixes, "1234")
     assert (
         '/path/aws iam put-role-policy --role-name test_role '
@@ -811,7 +811,7 @@ def test_create_uc_role_kms(mocker):
         return 0, '{"VALID":"JSON"}', ""
 
     aws = AWSResources("Fake_Profile", command_call)
-    s3_prefixes = {"BUCKET1/FOLDER1", "BUCKET1/FOLDER1/*", "BUCKET2/FOLDER2", "BUCKET2/FOLDER2/*"}
+    s3_prefixes = {"BUCKET1/FOLDER1", "BUCKET2/FOLDER2"}
     aws.add_uc_role_policy("test_role", "test_policy", s3_prefixes, "1234", "KMSKEY")
     assert (
         '/path/aws iam put-role-policy --role-name test_role '
@@ -987,9 +987,9 @@ def test_create_external_locations():
     installation = MockInstallation()
     installation.load = MagicMock()
     installation.load.return_value = [
-        AWSRoleAction("arn:aws:iam::12345:role/uc-role1", "s3", "WRITE_FILES", "s3://BUCKET1/*"),
-        AWSRoleAction("arn:aws:iam::12345:role/uc-role1", "s3", "WRITE_FILES", "s3://BUCKET2/*"),
-        AWSRoleAction("arn:aws:iam::12345:role/uc-rolex", "s3", "WRITE_FILES", "s3://BUCKETX/FOLDERX"),
+        AWSRoleAction("arn:aws:iam::12345:role/uc-role1", "s3", "WRITE_FILES", "s3://BUCKET1"),
+        AWSRoleAction("arn:aws:iam::12345:role/uc-role1", "s3", "WRITE_FILES", "s3://BUCKET2"),
+        AWSRoleAction("arn:aws:iam::12345:role/uc-rolex", "s3", "WRITE_FILES", "s3://BUCKETX"),
     ]
     rows = {
         "external_locations": [["s3://BUCKET1/FOLDER1", 1], ["s3://BUCKET2/FOLDER2", 1], ["s3://BUCKETX/FOLDERX", 1]]
@@ -1011,9 +1011,9 @@ def test_create_external_locations():
     aws_resource_permissions = AWSResourcePermissions(installation, ws, backend, aws, "ucx")
     aws_resource_permissions.create_external_locations()
     calls = [
-        call(mock.ANY, 's3://BUCKET1/FOLDER1', 'cred1'),
-        call(mock.ANY, 's3://BUCKET2/FOLDER2', 'cred1'),
-        call(mock.ANY, 's3://BUCKETX/FOLDERX', 'credx'),
+        call(mock.ANY, 's3://BUCKET1/FOLDER1', 'cred1', skip_validation=True),
+        call(mock.ANY, 's3://BUCKET2/FOLDER2', 'cred1', skip_validation=True),
+        call(mock.ANY, 's3://BUCKETX/FOLDERX', 'credx', skip_validation=True),
     ]
     ws.external_locations.create.assert_has_calls(calls, any_order=True)
 
@@ -1024,8 +1024,8 @@ def test_create_external_locations_skip_existing():
     installation = MockInstallation()
     installation.load = MagicMock()
     installation.load.return_value = [
-        AWSRoleAction("arn:aws:iam::12345:role/uc-role1", "s3", "WRITE_FILES", "s3://BUCKET1/*"),
-        AWSRoleAction("arn:aws:iam::12345:role/uc-rolex", "s3", "WRITE_FILES", "s3://BUCKETX/FOLDERX"),
+        AWSRoleAction("arn:aws:iam::12345:role/uc-role1", "s3", "WRITE_FILES", "s3://BUCKET1"),
+        AWSRoleAction("arn:aws:iam::12345:role/uc-rolex", "s3", "WRITE_FILES", "s3://BUCKETX"),
     ]
     rows = {"external_locations": [["s3://BUCKET1/FOLDER1", 1], ["s3://BUCKETX/FOLDERX", 1]]}
     ws.storage_credentials.list.return_value = [
@@ -1049,6 +1049,6 @@ def test_create_external_locations_skip_existing():
     aws_resource_permissions = AWSResourcePermissions(installation, ws, backend, aws, "ucx")
     aws_resource_permissions.create_external_locations(location_init="UCX_FOO")
     calls = [
-        call("UCX_FOO_2", 's3://BUCKET1/FOLDER1', 'cred1'),
+        call("UCX_FOO_2", 's3://BUCKET1/FOLDER1', 'cred1', skip_validation=True),
     ]
     ws.external_locations.create.assert_has_calls(calls, any_order=True)
