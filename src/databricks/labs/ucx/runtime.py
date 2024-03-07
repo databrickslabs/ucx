@@ -141,14 +141,15 @@ def assess_pipelines(cfg: WorkspaceConfig, ws: WorkspaceClient, sql_backend: Sql
 
 @task("assessment")
 def assess_incompatible_submit_runs(cfg: WorkspaceConfig, ws: WorkspaceClient, sql_backend: SqlBackend):
-    """This module scans through all the cluster policies.
+    """This module scans through all the Submit Runs and identifies those runs which may become incompatible after
+    the workspace attachment.
 
     It looks for:
       - All submit runs with DBR >=11.3 and data_security_mode:None
 
     It also combines several submit runs under a single pseudo_id based on hash of the submit run configuration.
     Subsequently, a list of all the incompatible runs with failures are stored in the
-    `$inventory.policies` table."""
+    `$inventory.submit_runs` table."""
     crawler = SubmitRunsCrawler(ws, sql_backend, cfg.inventory_database, cfg.num_days_submit_runs_history)
     crawler.snapshot()
 
