@@ -94,11 +94,11 @@ var columnsToMapUpper = Array("object_type","table_format")
 columnsToMapUpper.map(column => {
   df = df.withColumn(column, upper(col(column)))
 })
-df.write.mode("overwrite").option("overwriteSchema", "true").saveAsTable(s"$inventoryDatabase.tables")
+df.write.mode("overwrite").option("overwriteSchema", "true").saveAsTable(s"hive_metastore.$inventoryDatabase.tables")
 var dfTableFailures = JavaConverters.asScalaIteratorConverter(failures.iterator).asScala.toList.toDF
 columnsToMapLower = Array("catalog","database","name")
 columnsToMapLower.map(column => {
   dfTableFailures = dfTableFailures.withColumn(column, lower(col(column)))
 })
 
-dfTableFailures.write.mode("overwrite").option("overwriteSchema", "true").saveAsTable(s"$inventoryDatabase.table_failures")
+dfTableFailures.write.mode("overwrite").option("overwriteSchema", "true").saveAsTable(s"hive_metastore.$inventoryDatabase.table_failures")
