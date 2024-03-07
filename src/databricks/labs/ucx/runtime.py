@@ -5,7 +5,7 @@ import sys
 from databricks.sdk import WorkspaceClient
 
 from databricks.labs.ucx.assessment.azure import AzureServicePrincipalCrawler
-from databricks.labs.ucx.assessment.clusters import ClustersCrawler
+from databricks.labs.ucx.assessment.clusters import ClustersCrawler, PoliciesCrawler
 from databricks.labs.ucx.assessment.init_scripts import GlobalInitScriptCrawler
 from databricks.labs.ucx.assessment.jobs import JobsCrawler, SubmitRunsCrawler
 from databricks.labs.ucx.assessment.pipelines import PipelinesCrawler
@@ -141,16 +141,29 @@ def assess_pipelines(cfg: WorkspaceConfig, ws: WorkspaceClient, sql_backend: Sql
 
 @task("assessment")
 def assess_incompatible_submit_runs(cfg: WorkspaceConfig, ws: WorkspaceClient, sql_backend: SqlBackend):
-    """This module scans through all the Submit Runs and identifies those runs which may become incompatible after
-    the workspace attachment.
+    """This module scans through all the cluster policies.
 
     It looks for:
       - All submit runs with DBR >=11.3 and data_security_mode:None
 
     It also combines several submit runs under a single pseudo_id based on hash of the submit run configuration.
     Subsequently, a list of all the incompatible runs with failures are stored in the
-    `$inventory.submit_runs` table."""
+    `$inventory.policies` table."""
     crawler = SubmitRunsCrawler(ws, sql_backend, cfg.inventory_database, cfg.num_days_submit_runs_history)
+    crawler.snapshot()
+
+
+@task("assessment")
+def assess_cluster_policies(cfg: WorkspaceConfig, ws: WorkspaceClient, sql_backend: SqlBackend):
+    """This module scans through all the Submit Runs and identifies those runs which may become incompatible after
+    the workspace attachment.
+
+    It looks for:
+      - Clusters Policies with Databricks Runtime (DBR) version earlier than 11.3
+
+      Subsequently, a list of all the policies with matching configurations are stored in the
+    `$inventory.policices` table."""
+    crawler = PoliciesCrawler(ws, sql_backend, cfg.inventory_database, cfg.num_days_submit_runs_history)
     crawler.snapshot()
 
 
@@ -237,6 +250,7 @@ def crawl_groups(cfg: WorkspaceConfig, ws: WorkspaceClient, sql_backend: SqlBack
         assess_jobs,
         assess_incompatible_submit_runs,
         assess_clusters,
+        assess_cluster_policies,
         assess_azure_service_principals,
         assess_pipelines,
         assess_global_init_scripts,

@@ -362,13 +362,5 @@ def migrate_locations(w: WorkspaceClient):
         logger.error("migrate_locations is not yet supported in GCP")
 
 
-@ucx.command
-def get_cluster_policy(w: WorkspaceClient):
-    """Getting the Cluster Details"""
-    installation = WorkspaceInstallation.current(w)
-    cluster_details = installation.get_cluster_policy()
-    print(json.dumps(cluster_details))
-
-
 if __name__ == "__main__":
     ucx()

@@ -161,3 +161,53 @@ class ClustersCrawler(CrawlerBase[ClusterInfo], CheckClusterMixin):
     def _try_fetch(self) -> Iterable[ClusterInfo]:
         for row in self._fetch(f"SELECT * FROM {self._schema}.{self._table}"):
             yield ClusterInfo(*row)
+
+
+@dataclass
+class PolicyInfo:
+    policy_id: str
+    cluster_id: str
+    dbr_version: str
+    policy_name: str | None = None
+    creator: str | None = None
+
+
+class PoliciesCrawler(CrawlerBase[PolicyInfo], CheckClusterMixin):
+    def __init__(self, ws: WorkspaceClient, sbe: SqlBackend, schema):
+        super().__init__(sbe, "hive_metastore", schema, "policies", PolicyInfo)
+        self._ws = ws
+
+    def _crawl(self) -> Iterable[PolicyInfo]:
+        all_clusters = list(self._ws.clusters.list())
+        return list(self._assess_policies(all_clusters))
+
+    def _assess_policies(self, all_clusters):
+        for cluster in all_clusters:
+            if cluster.cluster_source == ClusterSource.JOB:
+                continue
+            if not cluster.creator_user_name:
+                logger.warning(
+                    f"Cluster {cluster.cluster_id} have Unknown creator, it means that the original creator "
+                    f"has been deleted and should be re-created"
+                )
+            policy_details = self._ws.cluster_policies.get(cluster.policy_id)
+            policy_name = policy_details.name
+            creator_name = policy_details.creator_user_name
+            policy_info = PolicyInfo(
+                policy_id=cluster.policy_id,
+                cluster_id=cluster.cluster_id,
+                policy_name=policy_name,
+                dbr_version=cluster.spark_version,
+                creator=creator_name,
+
+            )
+            yield policy_info
+
+    def snapshot(self) -> Iterable[PolicyInfo]:
+        return self._snapshot(self._try_fetch, self._crawl)
+
+    def _try_fetch(self) -> Iterable[PolicyInfo]:
+        for row in self._fetch(f"SELECT * FROM {self._schema}.{self._table}"):
+            yield PolicyInfo(*row)
+
+

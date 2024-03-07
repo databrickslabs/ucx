@@ -54,7 +54,7 @@ from databricks.sdk.service.sql import (
 
 from databricks.labs.ucx.__about__ import __version__
 from databricks.labs.ucx.assessment.azure import AzureServicePrincipalInfo
-from databricks.labs.ucx.assessment.clusters import ClusterInfo
+from databricks.labs.ucx.assessment.clusters import ClusterInfo, PolicyInfo
 from databricks.labs.ucx.assessment.init_scripts import GlobalInitScriptInfo
 from databricks.labs.ucx.assessment.jobs import JobInfo, SubmitRunInfo
 from databricks.labs.ucx.assessment.pipelines import PipelineInfo
@@ -163,6 +163,7 @@ def deploy_schema(sql_backend: SqlBackend, inventory_schema: str):
             functools.partial(table, "workspace_objects", WorkspaceObjectInfo),
             functools.partial(table, "permissions", Permissions),
             functools.partial(table, "submit_runs", SubmitRunInfo),
+            functools.partial(table, "policies", PolicyInfo),
         ],
     )
     deployer.deploy_view("objects", "queries/views/objects.sql")
@@ -629,16 +630,6 @@ class WorkspaceInstallation:
                 definition=policy.definition,
                 libraries=[compute.Library(whl=f"dbfs:{remote_wheel}")],
             )
-
-    def get_cluster_policy(self):
-        all_clusters = list(self._ws.clusters.list())
-        policy_details = []
-        for clusters in all_clusters:
-            if clusters.policy_id is None:
-                continue
-            policy_name = self._ws.cluster_policies.get(clusters.policy_id).name
-            policy_details.append({"policy_name": policy_name, "dbr_version": clusters.spark_version})
-        return policy_details
 
     def create_jobs(self):
         logger.debug(f"Creating jobs from tasks in {main.__name__}")

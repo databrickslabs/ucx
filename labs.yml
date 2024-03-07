@@ -136,9 +136,3 @@ commands:
 
   - name: migrate-locations
     description: Create UC external locations based on the output of guess_external_locations assessment task.
-  - name: get-cluster-policy
-    description: Get Cluster Policy
-    table_template: |-
-      Policy Name\tDBR Version
-      {{range .}}{{.policy_name}}\t{{.dbr_version}}
-      {{end}}
