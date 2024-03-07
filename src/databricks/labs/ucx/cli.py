@@ -14,6 +14,7 @@ from databricks.labs.ucx.account import AccountWorkspaces, WorkspaceInfo
 from databricks.labs.ucx.assessment.aws import AWSResourcePermissions
 from databricks.labs.ucx.azure.access import AzureResourcePermissions
 from databricks.labs.ucx.azure.credentials import ServicePrincipalMigration
+from databricks.labs.ucx.azure.locations import ExternalLocationsMigration
 from databricks.labs.ucx.config import WorkspaceConfig
 from databricks.labs.ucx.framework.crawlers import StatementExecutionBackend
 from databricks.labs.ucx.hive_metastore import ExternalLocations, TablesCrawler
@@ -342,6 +343,23 @@ def create_uber_principal(w: WorkspaceClient, subscription_id: str):
     azure_resource_permissions = AzureResourcePermissions.for_cli(w, include_subscriptions=include_subscriptions)
     azure_resource_permissions.create_uber_principal(prompts)
     return
+
+
+@ucx.command
+def migrate_locations(w: WorkspaceClient):
+    """This command creates UC external locations. The candidate locations to be created are extracted from guess_external_locations
+    task in the assessment job. You can run validate_external_locations command to check the candidate locations. Please make sure
+    the credentials haven migrated before running this command. The command will only create the locations that have corresponded UC Storage Credentials.
+    """
+    if w.config.is_azure:
+        logger.info("Running migrate_locations for Azure")
+        installation = Installation.current(w, 'ucx')
+        service_principal_migration = ExternalLocationsMigration.for_cli(w, installation)
+        service_principal_migration.run()
+    if w.config.is_aws:
+        logger.error("migrate_locations is not yet supported in AWS")
+    if w.config.is_gcp:
+        logger.error("migrate_locations is not yet supported in GCP")
 
 
 @ucx.command

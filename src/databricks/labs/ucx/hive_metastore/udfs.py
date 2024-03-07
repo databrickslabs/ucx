@@ -67,20 +67,25 @@ class UdfsCrawler(CrawlerBase):
         # "target schema <database> is not in the current catalog"
         self._exec(f"USE CATALOG {escape_sql_identifier(catalog)};")
         for (database,) in self._all_databases():
-            try:
-                logger.debug(f"[{catalog}.{database}] listing udfs")
-                for (udf,) in self._fetch(
-                    f"SHOW USER FUNCTIONS FROM {escape_sql_identifier(catalog)}.{escape_sql_identifier(database)};"
-                ):
-                    if udf.startswith(f"{catalog}.{database}"):
-                        udf_name = udf[udf.rfind(".") + 1 :]  # remove catalog and database info from the name
-                        tasks.append(partial(self._describe, catalog, database, udf_name))
-            except Unknown as err:
-                logger.error(f"Problem with {database}: {err}")
+            for task in self._collect_tasks(catalog, database):
+                tasks.append(task)
         catalog_tables, errors = Threads.gather(f"listing udfs in {catalog}", tasks)
         if len(errors) > 0:
             logger.error(f"Detected {len(errors)} while scanning udfs in {catalog}")
         return catalog_tables
+
+    def _collect_tasks(self, catalog, database) -> Iterable[partial[Udf | None]]:
+        try:
+            logger.debug(f"[{catalog}.{database}] listing udfs")
+            for (udf,) in self._fetch(
+                f"SHOW USER FUNCTIONS FROM {escape_sql_identifier(catalog)}.{escape_sql_identifier(database)};"
+            ):
+                if not udf.startswith(f"{catalog}.{database}"):
+                    continue
+                udf_name = udf[udf.rfind(".") + 1 :]  # remove catalog and database info from the name
+                yield partial(self._describe, catalog, database, udf_name)
+        except Unknown as err:
+            logger.error(f"Problem with {database}: {err}")
 
     def _describe(self, catalog: str, database: str, udf: str) -> Udf | None:
         """Fetches metadata like udf type, input, returns, data access and body
