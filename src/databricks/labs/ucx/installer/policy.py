@@ -2,45 +2,56 @@ import json
 import logging
 
 from databricks.labs.blueprint.installation import Installation
+from databricks.labs.blueprint.installer import InstallState
+from databricks.labs.blueprint.tui import Prompts
 from databricks.sdk import WorkspaceClient
+from databricks.sdk.errors import NotFound
 from databricks.sdk.service import compute
 
 logger = logging.getLogger(__name__)
 
 
 class ClusterPolicyInstaller:
-    def __init__(self, installation: Installation, ws: WorkspaceClient):
+    def __init__(self, installation: Installation, ws: WorkspaceClient, prompts: Prompts):
         self._ws = ws
         self._installation = installation
-        self._policy_id = ""
+        self._prompts = prompts
 
     @staticmethod
     def _policy_config(value: str):
         return {"type": "fixed", "value": value}
 
-    def create_cluster_policy(
-        self, inventory_database: str, spark_conf: dict, instance_profile: str | None
-    ) -> str | None:
+    def create(self, inventory_database: str) -> tuple[str | None, str | None, dict | None]:
+        instance_profile = None
+        spark_conf_dict = {}
+        policies_with_external_hms = list(self._get_cluster_policies_with_external_hive_metastores())
+        if len(policies_with_external_hms) > 0 and self._prompts.confirm(
+            "We have identified one or more cluster policies set up for an external metastore"
+            "Would you like to set UCX to connect to the external metastore?"
+        ):
+            logger.info("Setting up an external metastore")
+            cluster_policies = {conf.name: conf.definition for conf in policies_with_external_hms}
+            if len(cluster_policies) >= 1:
+                cluster_policy = json.loads(self._prompts.choice_from_dict("Choose a cluster policy", cluster_policies))
+                instance_profile, spark_conf_dict = self._extract_external_hive_metastore_conf(cluster_policy)
         policy_name = f"Unity Catalog Migration ({inventory_database}) ({self._ws.current_user.me().user_name})"
         policies = self._ws.cluster_policies.list()
-        policy_id = None
         for policy in policies:
             if policy.name == policy_name:
-                policy_id = policy.policy_id
                 logger.info(f"Cluster policy {policy_name} already present, reusing the same.")
-                break
-        if not policy_id:
-            logger.info("Creating UCX cluster policy.")
-            policy_id = self._ws.cluster_policies.create(
+                return policy.policy_id, instance_profile, spark_conf_dict
+        logger.info("Creating UCX cluster policy.")
+        return (
+            self._ws.cluster_policies.create(
                 name=policy_name,
-                definition=self._cluster_policy_definition(conf=spark_conf, instance_profile=instance_profile),
+                definition=self._definition(conf=spark_conf_dict, instance_profile=instance_profile),
                 description="Custom cluster policy for Unity Catalog Migration (UCX)",
-            ).policy_id
-        assert policy_id is not None
-        self._policy_id = policy_id
-        return self._policy_id
+            ).policy_id,
+            instance_profile,
+            spark_conf_dict,
+        )
 
-    def _cluster_policy_definition(self, conf: dict, instance_profile: str | None) -> str:
+    def _definition(self, conf: dict, instance_profile: str | None) -> str:
         policy_definition = {
             "spark_version": self._policy_config(self._ws.clusters.select_spark_version(latest=True)),
             "node_type_id": self._policy_config(self._ws.clusters.select_node_type(local_disk=True)),
@@ -65,7 +76,7 @@ class ClusterPolicyInstaller:
         return json.dumps(policy_definition)
 
     @staticmethod
-    def get_ext_hms_conf_from_policy(cluster_policy):
+    def _extract_external_hive_metastore_conf(cluster_policy):
         spark_conf_dict = {}
         instance_profile = None
         if cluster_policy.get("aws_attributes.instance_profile_arn") is not None:
@@ -81,7 +92,7 @@ class ClusterPolicyInstaller:
                 spark_conf_dict[key[11:]] = cluster_policy[key]["value"]
         return instance_profile, spark_conf_dict
 
-    def get_cluster_policies_with_external_hive_metastores(self):
+    def _get_cluster_policies_with_external_hive_metastores(self):
         for policy in self._ws.cluster_policies.list():
             def_json = json.loads(policy.definition)
             glue_node = def_json.get("spark_conf.spark.databricks.hive.metastore.glueCatalog.enabled")
@@ -92,3 +103,29 @@ class ClusterPolicyInstaller:
                 if key.startswith("spark_conf.spark.sql.hive.metastore"):
                     yield policy
                     break
+
+    def update_job_policy(self, states: InstallState, policy_id: str):
+        if not states.jobs:
+            logger.error("No jobs found in states")
+            return
+        for job_id in states.jobs.items():
+            try:
+                job = self._ws.jobs.get(job_id)
+                job_settings = job.settings
+                assert job.job_id is not None
+                assert job_settings is not None
+                assert job_settings.job_clusters is not None
+            except NotFound:
+                logger.error(f"Job id {job_id} not found. Please check if the job is present in the workspace")
+                continue
+            try:
+                job_clusters = []
+                for cluster in job_settings.job_clusters:
+                    assert cluster.new_cluster is not None
+                    cluster.new_cluster.policy_id = policy_id
+                    job_clusters.append(cluster)
+                job_settings.job_clusters = job_clusters
+                self._ws.jobs.update(job.job_id, new_settings=job_settings)
+            except NotFound:
+                logger.error(f"Job id {job_id} not found.")
+                continue

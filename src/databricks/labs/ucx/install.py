@@ -1,5 +1,4 @@
 import functools
-import json
 import logging
 import os
 import re
@@ -178,7 +177,7 @@ class WorkspaceInstaller:
         self._ws = ws
         self._installation = installation
         self._prompts = prompts
-        self._policy_installer = ClusterPolicyInstaller(installation, ws)
+        self._policy_installer = ClusterPolicyInstaller(installation, ws, prompts)
 
     def run(
         self,
@@ -244,21 +243,7 @@ class WorkspaceInstaller:
         log_level = self._prompts.question("Log level", default="INFO").upper()
         num_threads = int(self._prompts.question("Number of threads", default="8", valid_number=True))
 
-        # Checking for external HMS
-        instance_profile = None
-        spark_conf_dict = {}
-        policies_with_external_hms = list(self._policy_installer.get_cluster_policies_with_external_hive_metastores())
-        if len(policies_with_external_hms) > 0 and self._prompts.confirm(
-            "We have identified one or more cluster policies set up for an external metastore"
-            "Would you like to set UCX to connect to the external metastore?"
-        ):
-            logger.info("Setting up an external metastore")
-            cluster_policies = {conf.name: conf.definition for conf in policies_with_external_hms}
-            if len(cluster_policies) >= 1:
-                cluster_policy = json.loads(self._prompts.choice_from_dict("Choose a cluster policy", cluster_policies))
-                instance_profile, spark_conf_dict = self._policy_installer.get_ext_hms_conf_from_policy(cluster_policy)
-
-        policy_id = self._policy_installer.create_cluster_policy(inventory_database, spark_conf_dict, instance_profile)
+        policy_id, instance_profile, spark_conf_dict = self._policy_installer.create(inventory_database)
 
         # Check if terraform is being used
         is_terraform_used = self._prompts.confirm("Do you use Terraform to deploy your infrastructure?")
