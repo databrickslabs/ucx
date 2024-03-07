@@ -127,16 +127,19 @@ class DashboardFromFiles:
             dashboard_folders = [f for f in step_folder.glob("*") if f.is_dir()]
             # Create separate dashboards per step, represented as second-level folders
             for dashboard_folder in dashboard_folders:
-                dashboard_ref = f"{step_folder.stem}_{dashboard_folder.stem}".lower()
-                for query in self._desired_queries(dashboard_folder, dashboard_ref):
-                    if query.text:
-                        continue
-                    try:
-                        self._get_viz_options(query)
-                        self._get_widget_options(query)
-                    except Exception as err:
-                        msg = f"Error in {query.name}: {err}"
-                        raise AssertionError(msg) from err
+                self._validate_folder(dashboard_folder, step_folder)
+
+    def _validate_folder(self, dashboard_folder, step_folder):
+        dashboard_ref = f"{step_folder.stem}_{dashboard_folder.stem}".lower()
+        for query in self._desired_queries(dashboard_folder, dashboard_ref):
+            if query.text:
+                continue
+            try:
+                self._get_viz_options(query)
+                self._get_widget_options(query)
+            except Exception as err:
+                msg = f"Error in {query.name}: {err}"
+                raise AssertionError(msg) from err
 
     def _install_widget(self, query: SimpleQuery, dashboard_ref: str):
         dashboard_id = self._state.dashboards[dashboard_ref]

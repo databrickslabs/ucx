@@ -1340,3 +1340,56 @@ def test_open_config(ws, mocker, mock_installation):
     install.configure()
 
     webbrowser_open.assert_called_with('https://localhost/#workspace~/mock/config.yml')
+
+
+def test_runs_upgrades_on_too_old_version(ws, any_prompt):
+    existing_installation = MockInstallation(
+        {
+            'state.json': {'resources': {'dashboards': {'assessment_main': 'abc'}}},
+            'config.yml': {
+                'inventory_database': 'x',
+                'warehouse_id': 'abc',
+                'connect': {'host': '...', 'token': '...'},
+            },
+        }
+    )
+    install = WorkspaceInstaller(any_prompt, existing_installation, ws)
+
+    sql_backend = MockBackend()
+    wheels = create_autospec(WheelsV2)
+
+    # TODO: (HariGS-DB) remove this, once added the policy upgrade
+    # TODO: fix along https://github.com/databrickslabs/ucx/issues/1012
+    with pytest.raises(InvalidParameterValue):
+        install.run(
+            verify_timeout=timedelta(seconds=1),
+            sql_backend_factory=lambda _: sql_backend,
+            wheel_builder_factory=lambda: wheels,
+        )
+
+
+def test_runs_upgrades_on_more_recent_version(ws, any_prompt):
+    existing_installation = MockInstallation(
+        {
+            'version.json': {'version': '0.3.0', 'wheel': '...', 'date': '...'},
+            'state.json': {'resources': {'dashboards': {'assessment_main': 'abc'}}},
+            'config.yml': {
+                'inventory_database': 'x',
+                'warehouse_id': 'abc',
+                'policy_id': 'abc',  # TODO: (HariGS-DB) remove this, once added the policy upgrade
+                'connect': {'host': '...', 'token': '...'},
+            },
+        }
+    )
+    install = WorkspaceInstaller(any_prompt, existing_installation, ws)
+
+    sql_backend = MockBackend()
+    wheels = create_autospec(WheelsV2)
+
+    install.run(
+        verify_timeout=timedelta(seconds=1),
+        sql_backend_factory=lambda _: sql_backend,
+        wheel_builder_factory=lambda: wheels,
+    )
+
+    existing_installation.assert_file_uploaded('logs/README.md')

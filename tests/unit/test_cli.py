@@ -18,6 +18,7 @@ from databricks.labs.ucx.cli import (
     installations,
     manual_workspace_info,
     migrate_credentials,
+    migrate_locations,
     move,
     open_remote_config,
     principal_prefix_access,
@@ -357,3 +358,37 @@ def test_create_master_principal(ws):
     with patch("databricks.labs.blueprint.tui.Prompts.question", return_value=True):
         with pytest.raises(ValueError):
             create_uber_principal(ws, subscription_id="12")
+
+
+def test_migrate_locations_azure(ws):
+    ws.config.is_azure = True
+    ws.config.is_aws = False
+    ws.config.is_gcp = False
+    migrate_locations(ws)
+    ws.external_locations.list.assert_called()
+
+
+def test_migrate_locations_aws(ws, caplog, mocker):
+    mocker.patch("shutil.which", return_value="/path/aws")
+    ws.config.is_azure = False
+    ws.config.is_aws = True
+    ws.config.is_gcp = False
+    with pytest.raises(ResourceWarning):
+        migrate_locations(ws, aws_profile="profile")
+
+
+def test_missing_aws_cli(ws, caplog, mocker):
+    mocker.patch("shutil.which", return_value=None)
+    ws.config.is_azure = False
+    ws.config.is_aws = True
+    ws.config.is_gcp = False
+    migrate_locations(ws, aws_profile="profile")
+    assert "Couldn't find AWS CLI in path. Please install the CLI from https://aws.amazon.com/cli/" in caplog.messages
+
+
+def test_migrate_locations_gcp(ws, caplog):
+    ws.config.is_azure = False
+    ws.config.is_aws = False
+    ws.config.is_gcp = True
+    migrate_locations(ws)
+    assert "migrate_locations is not yet supported in GCP" in caplog.messages

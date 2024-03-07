@@ -50,21 +50,23 @@ class PipelinesCrawler(CrawlerBase[PipelineInfo], CheckClusterMixin):
             pipeline_config = pipeline_response.spec.configuration
             if pipeline_config:
                 failures.extend(self._check_spark_conf(pipeline_config, "pipeline"))
-            pipeline_cluster = pipeline_response.spec.clusters
-            if pipeline_cluster:
-                for cluster in pipeline_cluster:
-                    if cluster.spark_conf:
-                        failures.extend(self._check_spark_conf(cluster.spark_conf, "pipeline cluster"))
-                    # Checking if cluster config is present in cluster policies
-                    if cluster.policy_id:
-                        failures.extend(self._check_cluster_policy(cluster.policy_id, "pipeline cluster"))
-                    if cluster.init_scripts:
-                        failures.extend(self._check_cluster_init_script(cluster.init_scripts, "pipeline cluster"))
-
+            clusters = pipeline_response.spec.clusters
+            if clusters:
+                self._pipeline_clusters(clusters, failures)
             pipeline_info.failures = json.dumps(failures)
             if len(failures) > 0:
                 pipeline_info.success = 0
             yield pipeline_info
+
+    def _pipeline_clusters(self, clusters, failures):
+        for cluster in clusters:
+            if cluster.spark_conf:
+                failures.extend(self._check_spark_conf(cluster.spark_conf, "pipeline cluster"))
+            # Checking if cluster config is present in cluster policies
+            if cluster.policy_id:
+                failures.extend(self._check_cluster_policy(cluster.policy_id, "pipeline cluster"))
+            if cluster.init_scripts:
+                failures.extend(self._check_cluster_init_script(cluster.init_scripts, "pipeline cluster"))
 
     def snapshot(self) -> Iterable[PipelineInfo]:
         return self._snapshot(self._try_fetch, self._crawl)
