@@ -13,7 +13,6 @@ import org.apache.spark.sql.functions.{col,lower,upper}
 // must follow the same structure as databricks.labs.ucx.hive_metastore.tables.Table
 case class TableDetails(catalog: String, database: String, name: String, object_type: String,
                         table_format: String, location: String, view_text: String, upgraded_to: String, storage_properties: String)
-
 // recording error log in the database
 case class TableError(catalog: String, database: String, name: String, error: String)
 
@@ -72,20 +71,32 @@ def metadataForAllTables(databases: Seq[String], queue: ConcurrentLinkedQueue[Ta
   }).toList.toDF
 }
 
-def getInventoryDatabase(): String={
+def getConfig(): java.util.Map[String, Any] = {
   dbutils.widgets.text("config", "./config.yml")
   val configFile = dbutils.widgets.get("config")
   val fs = FileSystem.get(new java.net.URI("file:/Workspace"), sc.hadoopConfiguration)
   val file = fs.open(new Path(configFile))
   val configContents = org.apache.commons.io.IOUtils.toString(file, java.nio.charset.StandardCharsets.UTF_8)
-  val configObj = new Yaml().load(configContents).asInstanceOf[java.util.Map[String, Any]]
-  val inventoryDatabase = configObj.get("inventory_database").toString()
-  return inventoryDatabase
-
+  return new Yaml().load(configContents).asInstanceOf[java.util.Map[String, Any]]
 }
 
-val inventoryDatabase = getInventoryDatabase()
-var df = metadataForAllTables(spark.sharedState.externalCatalog.listDatabases().filter(_ != s"$inventoryDatabase"), failures)
+def getInventoryDatabase(configObj:java.util.Map[String, Any]): String ={
+  return configObj.get("inventory_database").toString()
+}
+
+def getIncludeDatabases(configObj:java.util.Map[String, Any], inventoryDatabase:String): Seq[String] ={
+  val includeDatabases = JavaConverters.asScalaBuffer(configObj.getOrDefault("include_databases",new java.util.ArrayList[String]()).asInstanceOf[java.util.ArrayList[String]]).toList
+
+  if (includeDatabases.isEmpty) {
+    return spark.sharedState.externalCatalog.listDatabases().filter(_ != s"$inventoryDatabase")
+  }
+  return spark.sharedState.externalCatalog.listDatabases().filter(includeDatabases.contains(_))
+}
+
+val config = getConfig()
+val inventoryDatabase = getInventoryDatabase(config)
+val includeDatabases = getIncludeDatabases(config, inventoryDatabase)
+var df = metadataForAllTables(includeDatabases, failures)
 var columnsToMapLower = Array("catalog","database","name","upgraded_to","storage_properties")
 columnsToMapLower.map(column => {
   df = df.withColumn(column, lower(col(column)))

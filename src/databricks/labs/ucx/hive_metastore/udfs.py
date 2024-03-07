@@ -1,5 +1,5 @@
 import logging
-from collections.abc import Iterable, Iterator
+from collections.abc import Iterable
 from dataclasses import dataclass
 from functools import partial
 
@@ -8,7 +8,6 @@ from databricks.sdk.errors import Unknown
 
 from databricks.labs.ucx.framework.crawlers import CrawlerBase, SqlBackend
 from databricks.labs.ucx.framework.utils import escape_sql_identifier
-from databricks.labs.ucx.mixins.sql import Row
 
 logger = logging.getLogger(__name__)
 
@@ -32,7 +31,7 @@ class Udf:
 
 
 class UdfsCrawler(CrawlerBase):
-    def __init__(self, backend: SqlBackend, schema):
+    def __init__(self, backend: SqlBackend, schema: str, include_databases: list[str] | None = None):
         """
         Initializes a UdfsCrawler instance.
 
@@ -41,9 +40,12 @@ class UdfsCrawler(CrawlerBase):
             schema: The schema name for the inventory persistence.
         """
         super().__init__(backend, "hive_metastore", schema, "udfs", Udf)
+        self._include_database = include_databases
 
-    def _all_databases(self) -> Iterator[Row]:
-        yield from self._fetch("SHOW DATABASES")
+    def _all_databases(self) -> list[str]:
+        if not self._include_database:
+            return [row[0] for row in self._fetch("SHOW DATABASES")]
+        return self._include_database
 
     def snapshot(self) -> list[Udf]:
         """
@@ -66,7 +68,7 @@ class UdfsCrawler(CrawlerBase):
         # need to set the current catalog otherwise "SHOW USER FUNCTIONS FROM" is raising error:
         # "target schema <database> is not in the current catalog"
         self._exec(f"USE CATALOG {escape_sql_identifier(catalog)};")
-        for (database,) in self._all_databases():
+        for database in self._all_databases():
             for task in self._collect_tasks(catalog, database):
                 tasks.append(task)
         catalog_tables, errors = Threads.gather(f"listing udfs in {catalog}", tasks)
