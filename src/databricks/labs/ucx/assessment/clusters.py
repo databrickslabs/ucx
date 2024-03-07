@@ -201,7 +201,6 @@ class PoliciesCrawler(CrawlerBase[PolicyInfo], CheckClusterMixin):
                 policy_name=policy_name,
                 dbr_version=cluster.spark_version,
                 creator=creator_name,
-
             )
             yield policy_info
 
@@ -211,5 +210,3 @@ class PoliciesCrawler(CrawlerBase[PolicyInfo], CheckClusterMixin):
     def _try_fetch(self) -> Iterable[PolicyInfo]:
         for row in self._fetch(f"SELECT * FROM {self._schema}.{self._table}"):
             yield PolicyInfo(*row)
-
-
