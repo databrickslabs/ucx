@@ -108,6 +108,13 @@ commands:
       - name: aws-profile
         description: AWS Profile to use for authentication
 
+  - name: create-uber-principal
+    description: For azure cloud, creates a service principal and gives STORAGE BLOB READER access on all the storage account 
+      used by tables in the workspace and stores the spn info in the UCX cluster policy.
+    flags:
+      - name: subscription-id
+        description: Subscription to scan storage account in
+
   - name: validate-groups-membership
     description: Validate groups to check if the groups at account level and workspace level have different memberships
     table_template: |-
@@ -115,7 +122,7 @@ commands:
       {{range .}}{{.wf_group_name}}\t{{.wf_group_members_count}}\t{{.acc_group_name}}\t{{.acc_group_members_count}}\t{{.group_members_difference}}
       {{end}}
 
-  - name: migrate_credentials
+  - name: migrate-credentials
     description: Migrate credentials for storage access to UC storage credential
 
   - name: create-account-groups
@@ -126,3 +133,6 @@ commands:
     flags:
       - name: workspace_ids
         description: List of workspace IDs to create account groups from.
+
+  - name: migrate-locations
+    description: Create UC external locations based on the output of guess_external_locations assessment task.

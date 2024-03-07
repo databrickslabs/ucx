@@ -1,6 +1,6 @@
 #!/bin/bash
 
-# This script will eventually be replaced with `databricks labs install ucx` command.
+echo -e "\033[0;31m\033[1m!!!!!!!!!!!!!!!\n!!! DEPRECATED: This script is going to be removed soon. See https://github.com/databrickslabs/ucx#installation\n!!!!!!!!!!!!!!!\033[0m"
 
 # Initialize an empty array to store Python binary paths
 python_binaries=()

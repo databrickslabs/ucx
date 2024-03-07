@@ -82,28 +82,25 @@ class WorkspaceListing:
             logger.warning(f"removed on the backend {start_path}")
             return self.results
         self.results.append(root_object)
-
         with ThreadPoolExecutor(self._num_threads) as executor:
             initial_future = executor.submit(self._list_and_analyze, root_object)
             initial_future.add_done_callback(self._progress_report)
             futures_to_objects = {initial_future: root_object}
             while futures_to_objects:
                 futures_done, _ = wait(futures_to_objects, return_when=FIRST_COMPLETED)
-
                 for future in futures_done:
                     futures_to_objects.pop(future)
                     directories, others = future.result()
                     self.results.extend(directories)
                     self.results.extend(others)
-
-                    if directories:
-                        new_futures = {}
-                        for directory in directories:
-                            new_future = executor.submit(self._list_and_analyze, directory)
-                            new_future.add_done_callback(self._progress_report)
-                            new_futures[new_future] = directory
-                        futures_to_objects.update(new_futures)
-
+                    if not directories:
+                        continue
+                    new_futures = {}
+                    for directory in directories:
+                        new_future = executor.submit(self._list_and_analyze, directory)
+                        new_future.add_done_callback(self._progress_report)
+                        new_futures[new_future] = directory
+                    futures_to_objects.update(new_futures)
             logger.info(
                 f"Recursive WorkspaceFS listing finished at {dt.datetime.now()}. "
                 f"Total time taken for workspace listing: {dt.datetime.now() - self.start_time}"
