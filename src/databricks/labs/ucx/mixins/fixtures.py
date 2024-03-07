@@ -20,8 +20,8 @@ from databricks.sdk.retries import retried
 from databricks.sdk.service import compute, iam, jobs, pipelines, sql, workspace
 from databricks.sdk.service._internal import Wait
 from databricks.sdk.service.catalog import (
-    AzureServicePrincipal,
     AwsIamRole,
+    AzureServicePrincipal,
     CatalogInfo,
     DataSourceFormat,
     FunctionInfo,
@@ -1093,10 +1093,13 @@ def make_query(ws, make_table, make_random):
 @pytest.fixture
 def make_storage_credential(ws):
     def create(
-        *, credential_name: str,
-            application_id: str = "", client_secret: str = "", directory_id: str = "",
-            aws_iam_role_arn: str = "",
-            read_only=False
+        *,
+        credential_name: str,
+        application_id: str = "",
+        client_secret: str = "",
+        directory_id: str = "",
+        aws_iam_role_arn: str = "",
+        read_only=False,
     ) -> StorageCredentialInfo:
         if aws_iam_role_arn != "":
             storage_credential = ws.storage_credentials.create(
