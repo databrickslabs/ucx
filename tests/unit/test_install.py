@@ -1126,33 +1126,58 @@ def test_runs_upgrades_on_more_recent_version(ws, any_prompt):
     existing_installation.assert_file_uploaded('logs/README.md')
 
 
-def test_get_existing_installation(ws, mocker, mock_installation):
+def test_fresh_install(ws, mock_installation):
     prompts = MockPrompts(
         {
             r".*PRO or SERVERLESS SQL warehouse.*": "1",
             r"Choose how to map the workspace groups.*": "2",
-            r".*workspace group names.*": "g1, g2, g99",
-            r"Open config file in.*": "yes",
+            r"Open config file in.*": "no",
+            r".*": "",
+        }
+    )
+    ws.workspace.get_status = not_found
+
+    install = WorkspaceInstaller(prompts, mock_installation, ws)
+    install.configure()
+
+    mock_installation.assert_file_written(
+        'config.yml',
+        {
+            'version': 2,
+            'default_catalog': 'ucx_default',
+            'inventory_database': 'ucx',
+            'log_level': 'INFO',
+            'num_days_submit_runs_history': 30,
+            'num_threads': 8,
+            'policy_id': 'foo',
+            'renamed_group_prefix': 'db-temp-',
+            'warehouse_id': 'abc',
+            'workspace_start_path': '/',
+        },
+    )
+
+
+def test_get_existing_installation_global(ws, mock_installation):
+    prompts = MockPrompts(
+        {
+            r".*PRO or SERVERLESS SQL warehouse.*": "1",
+            r"Choose how to map the workspace groups.*": "2",
+            r"Open config file in.*": "no",
+            r"Inventory Database stored in hive_metastore.*": "ucx_global",
             r".*": "",
         }
     )
 
-    def get_status_mock_global(*args):
-        if args[0].startswith("/Users"):
+    def get_status_mock_global(path):
+        if path.startswith("/Users"):
             raise NotFound
         return Installation(ws, 'ucx', install_folder="/Applications/ucx")
 
-    def get_status_mock_user(*args):
-        if args[0].startswith("/Applications"):
-            raise NotFound
-        return Installation(ws, 'ucx', install_folder="/Applications/ucx")
-
-    Installation.load = Mock()
-    ws.config = WorkspaceConfig(inventory_database='ucx_global')
-    ws.workspace.get_status = Mock()
+    ws.workspace.get_status = MagicMock(side_effect=get_status_mock_global)
+    ws.config.inventory_database = 'ucx_global'
 
     # test configure on existing global install
-    ws.workspace.get_status.side_effect = get_status_mock_global
+    Installation.load = Mock()
     Installation.load.return_value = ws.config
     installation = Installation(ws, "ucx", install_folder="/Applications/ucx")
     install = WorkspaceInstaller(prompts, installation, ws)
@@ -1173,18 +1198,39 @@ def test_get_existing_installation(ws, mocker, mock_installation):
             r".*workspace group names.*": "g1, g2, g99",
             r"Open config file in.*": "yes",
             r".*UCX is already installed on this workspace.*": "yes",
+            r"Inventory Database stored in hive_metastore.*": "ucx_global_new",
             r".*": "",
         }
     )
     install = WorkspaceInstaller(prompts, installation, ws)
     workspace_config = install.configure()
-    assert workspace_config.inventory_database == 'ucx_global'
+    assert workspace_config.inventory_database == 'ucx_global_new'
     os.environ.pop('UCX_FORCE_INSTALL', None)
 
+
+def test_existing_installation_user(ws, mock_installation):
+    def get_status_mock_user(path):
+        if path.startswith("/Applications"):
+            raise NotFound
+        return Installation(ws, 'ucx', install_folder="/Applications/ucx")
+
     # test configure on existing user install
-    ws.config = WorkspaceConfig(inventory_database='ucx_user')
-    ws.workspace.get_status.side_effect = get_status_mock_user
+    prompts = MockPrompts(
+        {
+            r".*PRO or SERVERLESS SQL warehouse.*": "1",
+            r"Choose how to map the workspace groups.*": "2",
+            r".*workspace group names.*": "g1, g2, g99",
+            r"Open config file in.*": "yes",
+            r".*UCX is already installed on this workspace.*": "yes",
+            r"Inventory Database stored in hive_metastore.*": "ucx_user",
+            r".*": "",
+        }
+    )
+    ws.workspace.get_status = MagicMock(side_effect=get_status_mock_user)
+    ws.config.inventory_database = 'ucx_user'
+    Installation.load = Mock()
     Installation.load.return_value = ws.config
+
     installation = Installation(ws, "ucx", install_folder=f"/Users/{ws.current_user.me()}")
     install = WorkspaceInstaller(prompts, installation, ws)
     workspace_config = install.configure()
@@ -1215,6 +1261,7 @@ def test_get_existing_installation(ws, mocker, mock_installation):
             r".*workspace group names.*": "g1, g2, g99",
             r"Open config file in.*": "yes",
             r".*UCX is already installed on this workspace.*": "yes",
+            r"Inventory Database stored in hive_metastore.*": "ucx_user_new",
             r".*": "",
         }
     )
@@ -1227,7 +1274,7 @@ def test_get_existing_installation(ws, mocker, mock_installation):
     os.environ.pop('UCX_FORCE_INSTALL', None)
 
 
-def test_check_inventory_database_exists(ws, mocker, mock_installation):
+def test_check_inventory_database_exists(ws, mock_installation):
     prompts = MockPrompts(
         {
             r".*PRO or SERVERLESS SQL warehouse.*": "1",
@@ -1240,11 +1287,14 @@ def test_check_inventory_database_exists(ws, mocker, mock_installation):
     )
 
     Installation.load = Mock()
-    ws.config = WorkspaceConfig(inventory_database='ucx_exists')
+    Installation.existing = Mock()
+    ws.config.inventory_database = 'ucx_exists'
+    ws.workspace.get_status = not_found
 
     # test configure on existing global install
-    Installation.load.return_value = ws.config
     installation = Installation(ws, "ucx", install_folder="/Applications/ucx")
+    Installation.load.return_value = ws.config
+    Installation.existing.return_value = [installation]
     install = WorkspaceInstaller(prompts, installation, ws)
 
     with pytest.raises(RuntimeWarning) as err:

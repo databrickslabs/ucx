@@ -360,7 +360,7 @@ def test_uninstallation(ws, sql_backend, new_installation):
         sql_backend.execute(f"show tables from hive_metastore.{install.config.inventory_database}")
 
 
-def test_fresh_global_installation(ws, new_installation):
+def test_fresh_global_installation(new_installation):
     global_installation = new_installation(single_user_install=False)
     global_installation.uninstall()
 
@@ -394,12 +394,13 @@ def test_user_installation_on_existing_global_install(new_installation):
     os.environ['UCX_FORCE_INSTALL'] = "user"
 
     # warning to be thrown by installer if override environment variable present but no confirmation
-    with pytest.raises(RuntimeWarning):
+    with pytest.raises(RuntimeWarning) as err:
         new_installation(
             single_user_install=True,
             fresh_install=False,
             existing_installation_prefix=mock_product_value,
         )
+    assert err.value.args[0] == "Existing global install and user installation override, but no confirmation"
 
     # successful override with confirmation
     reinstall_user_force = new_installation(
@@ -427,12 +428,13 @@ def test_global_installation_on_existing_user_install(new_installation):
     os.environ['UCX_FORCE_INSTALL'] = "global"
 
     # warning to be thrown by installer if override environment variable present but no confirmation
-    with pytest.raises(RuntimeWarning):
+    with pytest.raises(RuntimeWarning) as err:
         new_installation(
             single_user_install=False,
             fresh_install=False,
             existing_installation_prefix=mock_product_value,
         )
+    assert err.value.args[0] == "Existing user install and global installation override, but no confirmation"
 
     # successful override with confirmation
     reinstall_global_force = new_installation(
