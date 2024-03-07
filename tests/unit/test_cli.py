@@ -49,8 +49,7 @@ def ws():
         '/Users/foo/.ucx/state.json': json.dumps({'resources': {'jobs': {'assessment': '123'}}}),
         "/Users/foo/.ucx/uc_roles_access.csv": "role_arn,resource_type,privilege,resource_path\n"
         "arn:aws:iam::123456789012:role/role_name,s3,READ_FILES,s3://labsawsbucket/",
-        "/Users/foo/.ucx/azure_storage_account_info.csv": "prefix,client_id,principal,privilege,directory_id\n"
-        "test,test,test,test,test",
+        "/Users/foo/.ucx/azure_storage_account_info.csv": "prefix,client_id,principal,privilege,type,directory_id\ntest,test,test,test,Application,test",
     }
 
     def download(path: str) -> io.StringIO | io.BytesIO:
@@ -327,15 +326,28 @@ def test_save_storage_and_principal_gcp(ws, caplog):
     assert "This cmd is only supported for azure and aws workspaces" in caplog.messages
 
 
-def test_migrate_aws_instance_profiles(ws, mocker):
-    mocker.patch("shutil.which", return_value=True)
+def test_migrate_credentials_azure(ws):
     ws.config.is_azure = True
+    ws.workspace.upload.return_value = "test"
     with patch("databricks.labs.blueprint.tui.Prompts.confirm", return_value=True):
-        migrate_credentials(ws, aws_profile="profile")
+        migrate_credentials(ws)
         ws.storage_credentials.list.assert_called()
 
 
-def test_migrate_aws_instance_profiles_no_profile(ws, caplog, mocker):
+def test_migrate_credentials_aws(ws, mocker):
+    mocker.patch("shutil.which", return_value=True)
+    ws.config.is_azure = False
+    ws.config.is_aws = True
+    uc_trust_policy = mocker.patch(
+        "databricks.labs.ucx.assessment.aws.AWSResourcePermissions.update_uc_role_trust_policy"
+    )
+    with patch("databricks.labs.blueprint.tui.Prompts.confirm", return_value=True):
+        migrate_credentials(ws, aws_profile="profile")
+        ws.storage_credentials.list.assert_called()
+        uc_trust_policy.assert_called_once()
+
+
+def test_migrate_credentials_aws_no_profile(ws, caplog, mocker):
     mocker.patch("shutil.which", return_value="/path/aws")
     ws.config.is_azure = False
     ws.config.is_aws = True
