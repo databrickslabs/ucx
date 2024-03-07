@@ -76,7 +76,7 @@ def run_command(command):
 class AWSResources:
     S3_ACTIONS: typing.ClassVar[set[str]] = {"s3:PutObject", "s3:GetObject", "s3:DeleteObject", "s3:PutObjectAcl"}
     S3_READONLY: typing.ClassVar[str] = "s3:GetObject"
-    S3_REGEX: typing.ClassVar[str] = r"arn:aws:s3:::([a-zA-Z0-9+=,.@_-]*)\/\*$"
+    S3_REGEX: typing.ClassVar[str] = r"arn:aws:s3:::([a-zA-Z0-9\/+=,.@_-]*)\/\*$"
     S3_PREFIX: typing.ClassVar[str] = "arn:aws:s3:::"
     S3_PATH_REGEX: typing.ClassVar[str] = r"((s3:\/\/)|(s3a:\/\/))(.*)"
     UC_MASTER_ROLES_ARN: typing.ClassVar[list[str]] = [
@@ -244,7 +244,10 @@ class AWSResources:
         return True
 
     def add_uc_role_policy(self, role_name, policy_name, s3_prefixes: set[str], account_id: str, kms_key=None):
-        s3_prefixes_enriched = sorted([self.S3_PREFIX + s3_prefix for s3_prefix in s3_prefixes])
+        s3_prefixes_enriched = sorted(
+            [f"{self.S3_PREFIX}{s3_prefix}" for s3_prefix in s3_prefixes]
+            + [f"{self.S3_PREFIX}{s3_prefix}/*" for s3_prefix in s3_prefixes]
+        )
         statement = [
             {
                 "Action": [
@@ -510,7 +513,7 @@ class AWSResourcePermissions:
         # Create external location for the path using the credential identified
         credential_dict = self._get_existing_credentials_dict()
         external_locations = ExternalLocations(self._ws, self._backend, self._schema).snapshot()
-        existing_external_locations = self._ws.external_locations.list()
+        existing_external_locations = list(self._ws.external_locations.list())
         existing_paths = [external_location.url for external_location in existing_external_locations]
         compatible_roles = self.get_uc_compatible_roles()
         missing_paths = self._identify_missing_external_locations(external_locations, existing_paths, compatible_roles)
