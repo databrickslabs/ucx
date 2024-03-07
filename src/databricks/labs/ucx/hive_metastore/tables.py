@@ -89,14 +89,15 @@ class Table:
         if not self.location:
             return False
         for prefix in self.DBFS_ROOT_PREFIXES:
-            if self.location.startswith(prefix):
-                for exception in self.DBFS_ROOT_PREFIX_EXCEPTIONS:
-                    if self.location.startswith(exception):
-                        return False
-                for db_datasets in self.DBFS_DATABRICKS_DATASETS:
-                    if self.location.startswith(db_datasets):
-                        return False
-                return True
+            if not self.location.startswith(prefix):
+                continue
+            for exception in self.DBFS_ROOT_PREFIX_EXCEPTIONS:
+                if self.location.startswith(exception):
+                    return False
+            for db_datasets in self.DBFS_DATABRICKS_DATASETS:
+                if self.location.startswith(db_datasets):
+                    return False
+            return True
         return False
 
     @property

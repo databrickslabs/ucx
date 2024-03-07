@@ -133,3 +133,6 @@ commands:
     flags:
       - name: workspace_ids
         description: List of workspace IDs to create account groups from.
+
+  - name: migrate-locations
+    description: Create UC external locations based on the output of guess_external_locations assessment task.
