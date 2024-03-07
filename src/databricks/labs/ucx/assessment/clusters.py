@@ -190,7 +190,7 @@ class PoliciesCrawler(CrawlerBase[PolicyInfo], CheckClusterMixin):
                     f"Cluster {cluster.cluster_id} have Unknown creator, it means that the original creator "
                     f"has been deleted and should be re-created"
                 )
-            policy_details = self._ws.cluster_policies.get(cluster.policy_id)
+            policy_details = self._ws.cluster_policies.get(policy_id=cluster.policy_id)
             policy_name = policy_details.name
             creator_name = policy_details.creator_user_name
             policy_info = PolicyInfo(
