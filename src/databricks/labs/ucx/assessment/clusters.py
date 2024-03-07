@@ -170,8 +170,8 @@ class ClustersCrawler(CrawlerBase[ClusterInfo], CheckClusterMixin):
 @dataclass
 class PolicyInfo:
     policy_id: str
+    policy_name: str
     policy_description: str | None = None
-    policy_name: str | None = None
     creator: str | None = None
 
 
