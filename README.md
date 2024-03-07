@@ -554,6 +554,7 @@ databricks labs ucx move --from-catalog A --from-schema B --from-table C --to-ca
 This command moves a UC table/tables from one schema to another schema in the same or different catalog during
 the [table upgrade](docs/table_upgrade.md) process. This command is useful for developers and administrators who want 
 to move tables between schemas. It can also be used to debug issues related to table movement.
+This command also keeps permissions of the source tables when moved to a new schema or catalog.
 
 [[back to top](#databricks-labs-ucx)]
 
