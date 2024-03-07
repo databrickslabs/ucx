@@ -41,9 +41,6 @@ class WorkspaceConfig:  # pylint: disable=too-many-instance-attributes
     # Flag to see if terraform has been used for deploying certain entities
     is_terraform_used: bool = False
 
-    # Flag to see if terraform has been used for deploying certain entities
-    is_terraform_used: bool = False
-
     def replace_inventory_variable(self, text: str) -> str:
         return text.replace("$inventory", f"hive_metastore.{self.inventory_database}")
 

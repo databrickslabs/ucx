@@ -17,6 +17,7 @@ from databricks.sdk.service.catalog import Privilege
 
 from databricks.labs.ucx.framework.crawlers import StatementExecutionBackend
 from databricks.labs.ucx.hive_metastore import ExternalLocations
+from databricks.labs.ucx.hive_metastore.locations import ExternalLocation
 
 logger = logging.getLogger(__name__)
 
@@ -363,6 +364,11 @@ class AWSResourcePermissions:
         )
 
     def create_uc_roles_cli(self, *, single_role=True, role_name="UC_ROLE", policy_name="UC_POLICY"):
+        # Get the missing paths
+        # Identify the S3 prefixes
+        # Create the roles and policies for the missing S3 prefixes
+        # If single_role is True, create a single role and policy for all the missing S3 prefixes
+        # If single_role is False, create a role and policy for each missing S3 prefix
         missing_paths = self._identify_missing_paths()
         s3_prefixes = set()
         for missing_path in missing_paths:

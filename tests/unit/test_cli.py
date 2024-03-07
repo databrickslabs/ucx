@@ -13,10 +13,12 @@ from databricks.labs.ucx.cli import (
     alias,
     create_account_groups,
     create_table_mapping,
+    create_uber_principal,
     ensure_assessment_run,
     installations,
     manual_workspace_info,
     migrate_credentials,
+    migrate_locations,
     move,
     open_remote_config,
     principal_prefix_access,
@@ -339,3 +341,65 @@ def test_migrate_aws_instance_profiles_no_profile(ws, caplog, mocker):
     ws.config.is_aws = True
     migrate_credentials(ws)
     assert any({"AWS Profile is not specified." in message for message in caplog.messages})
+
+
+def test_create_master_principal_not_azure(ws):
+    ws.config.is_azure = False
+    create_uber_principal(ws, subscription_id="")
+    ws.workspace.get_status.assert_not_called()
+
+
+def test_create_master_principal_no_azure_cli(ws):
+    ws.config.auth_type = "azure_clis"
+    ws.config.is_azure = True
+    create_uber_principal(ws, subscription_id="")
+    ws.workspace.get_status.assert_not_called()
+
+
+def test_create_master_principal_no_subscription(ws):
+    ws.config.auth_type = "azure-cli"
+    ws.config.is_azure = True
+    create_uber_principal(ws, subscription_id="")
+    ws.workspace.get_status.assert_not_called()
+
+
+def test_create_master_principal(ws):
+    ws.config.auth_type = "azure-cli"
+    ws.config.is_azure = True
+    with patch("databricks.labs.blueprint.tui.Prompts.question", return_value=True):
+        with pytest.raises(ValueError):
+            create_uber_principal(ws, subscription_id="12")
+
+
+def test_migrate_locations_azure(ws):
+    ws.config.is_azure = True
+    ws.config.is_aws = False
+    ws.config.is_gcp = False
+    migrate_locations(ws)
+    ws.external_locations.list.assert_called()
+
+
+def test_migrate_locations_aws(ws, caplog, mocker):
+    mocker.patch("shutil.which", return_value="/path/aws")
+    ws.config.is_azure = False
+    ws.config.is_aws = True
+    ws.config.is_gcp = False
+    with pytest.raises(ResourceWarning):
+        migrate_locations(ws, aws_profile="profile")
+
+
+def test_missing_aws_cli(ws, caplog, mocker):
+    mocker.patch("shutil.which", return_value=None)
+    ws.config.is_azure = False
+    ws.config.is_aws = True
+    ws.config.is_gcp = False
+    migrate_locations(ws, aws_profile="profile")
+    assert "Couldn't find AWS CLI in path. Please install the CLI from https://aws.amazon.com/cli/" in caplog.messages
+
+
+def test_migrate_locations_gcp(ws, caplog):
+    ws.config.is_azure = False
+    ws.config.is_aws = False
+    ws.config.is_gcp = True
+    migrate_locations(ws)
+    assert "migrate_locations is not yet supported in GCP" in caplog.messages
