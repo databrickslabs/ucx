@@ -40,6 +40,7 @@ See [contributing instructions](CONTRIBUTING.md) to help improve this project.
   * [`create-uber-principal` command](#create-uber-principal-command)
   * [`migrate-credentials` command](#migrate-credentials-command)
   * [`validate-external-locations` command](#validate-external-locations-command)
+  * [`migrate-locations` command](#migrate-locations-command)
   * [`create-table-mapping` command](#create-table-mapping-command)
   * [`skip` command](#skip-command)
   * [`revert-migrated-tables` command](#revert-migrated-tables-command)
@@ -476,9 +477,22 @@ databricks labs ucx validate-external-locations
 ```
 
 Once the [`assessment` workflow](#assessment-workflow) finished successfully, [storage credentials](#migrate-credentials-command) are configured, 
-run this command to ensure the relevant Unity Catalog external locations are created if they are missing. 
+run this command to validate and report the missing Unity Catalog external locations to be created. 
 
 This command validates and provides mapping to external tables to external locations, also as Terraform configurations.
+
+[[back to top](#databricks-labs-ucx)]
+
+
+## `migrate-locations` command
+
+```text
+databricks labs ucx migrate-locations 
+```
+
+Once the [`assessment` workflow](#assessment-workflow) finished successfully, and [storage credentials](#migrate-credentials-command) are configured,
+run this command to have Unity Catalog external locations created. The candidate locations to be created are extracted from guess_external_locations
+task in the assessment job. You can run [validate_external_locations](#validate-external-locations-command) command to check the candidate locations.
 
 [[back to top](#databricks-labs-ucx)]
 

@@ -222,7 +222,7 @@ class StatementExecutionExt:
         result_data = execute_response.result
         if result_data is None:
             return
-        while True:
+        while True:  # pylint: disable=too-many-nested-blocks
             data_array = result_data.data_array
             if not data_array:
                 data_array = []
