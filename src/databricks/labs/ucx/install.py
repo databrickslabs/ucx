@@ -214,10 +214,21 @@ class WorkspaceInstaller:
     def _new_sql_backend(self, config: WorkspaceConfig) -> SqlBackend:
         return StatementExecutionBackend(self._ws, config.warehouse_id)
 
+    def _confirm_force_install(self):
+        if os.environ.get('UCX_FORCE_INSTALL'):
+            msg = "[ADVANCED] UCX is already installed on this workspace. Do you want to create a new installation?"
+            if self._prompts.confirm(msg):
+                # TODO:
+                # Add logic for forced global over user install
+                # and forced user install over global install
+                raise RuntimeWarning("UCX is already installed and confirmation but needs migration")
+            raise RuntimeWarning("UCX is already installed, but no confirmation")
+
     def configure(self) -> WorkspaceConfig:
         try:
             config = self._installation.load(WorkspaceConfig)
             self._apply_upgrades()
+            self._confirm_force_install()
             return config
         except NotFound as err:
             logger.debug(f"Cannot find previous installation: {err}")
@@ -235,51 +246,11 @@ class WorkspaceInstaller:
         logger.info("Please answer a couple of questions to configure Unity Catalog migration")
         HiveMetastoreLineageEnabler(self._ws).apply(self._prompts)
 
-        # TODO adjust this to the new installation logic
-        # # If there is a previous installation, return corresponding WorkspaceConfig
-        # # Else configure will create WorkspaceConfig for a fresh install
-        # type_of_installation = "new"
-        #
-        # if self._is_global() or self._is_user():
-        #     # no global or user installation then default install location is global
-        #     self._installation, type_of_installation = self._get_existing_installation()
-        #
-        # if type_of_installation != "new":
-        #     return self._installation.load(WorkspaceConfig)
-
         inventory_database = self._prompts.question(
             "Inventory Database stored in hive_metastore", default="ucx", valid_regex=r"^\w+$"
         )
-        #
-        # if self._check_inventory_database_exists(inventory_database):
-        #     raise RuntimeWarning(f"Inventory database with name {inventory_database} already exists")
 
         warehouse_id = self._configure_warehouse()
-
-        logger.info("Please answer a couple of questions to configure Unity Catalog migration")
-        HiveMetastoreLineageEnabler(self._ws).apply(self._prompts)
-
-        def warehouse_type(_):
-            return _.warehouse_type.value if not _.enable_serverless_compute else "SERVERLESS"
-
-        pro_warehouses = {"[Create new PRO SQL warehouse]": "create_new"} | {
-            f"{_.name} ({_.id}, {warehouse_type(_)}, {_.state.value})": _.id
-            for _ in self._ws.warehouses.list()
-            if _.warehouse_type == EndpointInfoWarehouseType.PRO
-        }
-        warehouse_id = self._prompts.choice_from_dict(
-            "Select PRO or SERVERLESS SQL warehouse to run assessment dashboards on", pro_warehouses
-        )
-        if warehouse_id == "create_new":
-            new_warehouse = self._ws.warehouses.create(
-                name=f"{WAREHOUSE_PREFIX} {time.time_ns()}",
-                spot_instance_policy=SpotInstancePolicy.COST_OPTIMIZED,
-                warehouse_type=CreateWarehouseRequestWarehouseType.PRO,
-                cluster_size="Small",
-                max_num_clusters=1,
-            )
-            warehouse_id = new_warehouse.id
-
         configure_groups = ConfigureGroups(self._prompts)
         configure_groups.run()
 

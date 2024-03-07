@@ -8,6 +8,7 @@ from databricks.labs.blueprint.installation import Installation, MockInstallatio
 from databricks.labs.blueprint.installer import InstallState
 from databricks.labs.blueprint.parallel import ManyError
 from databricks.labs.blueprint.tui import MockPrompts
+from databricks.labs.blueprint.upgrades import Upgrades
 from databricks.labs.blueprint.wheels import Wheels, WheelsV2, find_project_root
 from databricks.sdk import WorkspaceClient
 from databricks.sdk.errors import (
@@ -1175,11 +1176,13 @@ def test_get_existing_installation_global(ws, mock_installation):
 
     ws.workspace.get_status = MagicMock(side_effect=get_status_mock_global)
     ws.config.inventory_database = 'ucx_global'
+    Upgrades.apply = MagicMock()
 
     # test configure on existing global install
     Installation.load = Mock()
     Installation.load.return_value = ws.config
     installation = Installation(ws, "ucx", install_folder="/Applications/ucx")
+
     install = WorkspaceInstaller(prompts, installation, ws)
     workspace_config = install.configure()
     assert workspace_config.inventory_database == 'ucx_global'
@@ -1188,7 +1191,7 @@ def test_get_existing_installation_global(ws, mock_installation):
     os.environ["UCX_FORCE_INSTALL"] = 'user'
     with pytest.raises(RuntimeWarning) as err:
         install.configure()
-    assert err.value.args[0] == 'Existing global install and user installation override, but no confirmation'
+    assert err.value.args[0] == 'UCX is already installed, but no confirmation'
 
     # test for force user install variable with prompts
     prompts = MockPrompts(
@@ -1203,8 +1206,9 @@ def test_get_existing_installation_global(ws, mock_installation):
         }
     )
     install = WorkspaceInstaller(prompts, installation, ws)
-    workspace_config = install.configure()
-    assert workspace_config.inventory_database == 'ucx_global_new'
+    with pytest.raises(RuntimeWarning) as err:
+        install.configure()
+    assert err.value.args[0] == ("UCX is already installed and confirmation but needs migration")
     os.environ.pop('UCX_FORCE_INSTALL', None)
 
 
@@ -1228,6 +1232,8 @@ def test_existing_installation_user(ws, mock_installation):
     )
     ws.workspace.get_status = MagicMock(side_effect=get_status_mock_user)
     ws.config.inventory_database = 'ucx_user'
+    Upgrades.apply = MagicMock()
+
     Installation.load = Mock()
     Installation.load.return_value = ws.config
 
@@ -1251,7 +1257,7 @@ def test_existing_installation_user(ws, mock_installation):
     os.environ["UCX_FORCE_INSTALL"] = 'global'
     with pytest.raises(RuntimeWarning) as err:
         install.configure()
-    assert err.value.args[0] == "Existing user install and global installation override, but no confirmation"
+    assert err.value.args[0] == 'UCX is already installed, but no confirmation'
 
     # test for force global install variable with prompts
     prompts = MockPrompts(
@@ -1268,35 +1274,5 @@ def test_existing_installation_user(ws, mock_installation):
     install = WorkspaceInstaller(prompts, installation, ws)
     with pytest.raises(RuntimeWarning) as err:
         install.configure()
-    assert err.value.args[0] == (
-        "Existing user install and global installation override. " "Need to uninstall and re-install here now"
-    )
+    assert err.value.args[0] == ("UCX is already installed and confirmation but needs migration")
     os.environ.pop('UCX_FORCE_INSTALL', None)
-
-
-def test_check_inventory_database_exists(ws, mock_installation):
-    prompts = MockPrompts(
-        {
-            r".*PRO or SERVERLESS SQL warehouse.*": "1",
-            r"Choose how to map the workspace groups.*": "2",
-            r".*workspace group names.*": "g1, g2, g99",
-            r"Open config file in.*": "yes",
-            r"Inventory Database stored in hive_metastore": "ucx_exists",
-            r".*": "",
-        }
-    )
-
-    Installation.load = Mock()
-    Installation.existing = Mock()
-    ws.config.inventory_database = 'ucx_exists'
-    ws.workspace.get_status = not_found
-
-    # test configure on existing global install
-    installation = Installation(ws, "ucx", install_folder="/Applications/ucx")
-    Installation.load.return_value = ws.config
-    Installation.existing.return_value = [installation]
-    install = WorkspaceInstaller(prompts, installation, ws)
-
-    with pytest.raises(RuntimeWarning) as err:
-        install.configure()
-    assert err.value.args[0] == 'Inventory database with name ucx_exists already exists'
