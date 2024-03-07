@@ -131,41 +131,37 @@ class AccountWorkspaces:
         for workspace in self._workspaces():
             if workspace.workspace_id not in workspace_ids:
                 continue
-            client = self.client_for(workspace)
-            logger.info(f"Crawling groups in workspace {client.config.host}")
-
-            ws_group_ids = client.groups.list(attributes="id")
-            for group_id in ws_group_ids:
-                full_workspace_group = self._safe_groups_get(client, group_id.id)
-                if not full_workspace_group:
-                    continue
-                group_name = full_workspace_group.display_name
-
-                if self._is_group_out_of_scope(full_workspace_group):
-                    continue
-
-                if group_name in all_workspaces_groups:
-                    if self._has_same_members(all_workspaces_groups[group_name], full_workspace_group):
-                        logger.info(f"Workspace group {group_name} already found, ignoring")
-                        continue
-
-                    if prompts.confirm(
-                        f"Group {group_name} does not have the same amount of members "
-                        f"in workspace {client.config.host} than previous workspaces which contains the same group name,"
-                        f"it will be created at the account with name : {workspace.workspace_name}_{group_name}"
-                    ):
-                        all_workspaces_groups[f"{workspace.workspace_name}_{group_name}"] = full_workspace_group
-                        continue
-
-                if not group_name:
-                    continue
-
-                logger.info(f"Found new group {group_name}")
-                all_workspaces_groups[group_name] = full_workspace_group
-
-            logger.info(f"Found a total of {len(all_workspaces_groups)} groups to migrate to the account")
+            self._load_workspace_groups(prompts, workspace, all_workspaces_groups)
 
         return all_workspaces_groups
+
+    def _load_workspace_groups(self, prompts, workspace, all_workspaces_groups):
+        client = self.client_for(workspace)
+        logger.info(f"Crawling groups in workspace {client.config.host}")
+        ws_group_ids = client.groups.list(attributes="id")
+        for group_id in ws_group_ids:
+            full_workspace_group = self._safe_groups_get(client, group_id.id)
+            if not full_workspace_group:
+                continue
+            group_name = full_workspace_group.display_name
+            if self._is_group_out_of_scope(full_workspace_group):
+                continue
+            if not group_name:
+                continue
+            if group_name in all_workspaces_groups:
+                if self._has_same_members(all_workspaces_groups[group_name], full_workspace_group):
+                    logger.info(f"Workspace group {group_name} already found, ignoring")
+                    continue
+                if prompts.confirm(
+                    f"Group {group_name} does not have the same amount of members "
+                    f"in workspace {client.config.host} than previous workspaces which contains the same group name,"
+                    f"it will be created at the account with name : {workspace.workspace_name}_{group_name}"
+                ):
+                    all_workspaces_groups[f"{workspace.workspace_name}_{group_name}"] = full_workspace_group
+                    continue
+            logger.info(f"Found new group {group_name}")
+            all_workspaces_groups[group_name] = full_workspace_group
+        logger.info(f"Found a total of {len(all_workspaces_groups)} groups to migrate to the account")
 
     def _is_group_out_of_scope(self, group: Group) -> bool:
         if group.display_name in {"users", "admins", "account users"}:

@@ -38,27 +38,34 @@ class JobInfo:
 
 
 class JobsMixin:
-    @staticmethod
-    def _get_cluster_configs_from_all_jobs(all_jobs, all_clusters_by_id):  # pylint: disable=too-complex
-        for j in all_jobs:
-            if j.settings is None:
+    @classmethod
+    def _get_cluster_configs_from_all_jobs(cls, all_jobs, all_clusters_by_id):
+        for job in all_jobs:
+            if job.settings is None:
                 continue
-            if j.settings.job_clusters is not None:
-                for job_cluster in j.settings.job_clusters:
-                    if job_cluster.new_cluster is None:
-                        continue
-                    yield j, job_cluster.new_cluster
-            if j.settings.tasks is None:
+            if job.settings.job_clusters is not None:
+                yield from cls._job_clusters(job)
+            if job.settings.tasks is None:
                 continue
-            for task in j.settings.tasks:
-                if task.existing_cluster_id is not None:
-                    interactive_cluster = all_clusters_by_id.get(task.existing_cluster_id, None)
-                    if interactive_cluster is None:
-                        continue
-                    yield j, interactive_cluster
+            yield from cls._task_clusters(job, all_clusters_by_id)
 
-                elif task.new_cluster is not None:
-                    yield j, task.new_cluster
+    @classmethod
+    def _task_clusters(cls, job, all_clusters_by_id):
+        for task in job.settings.tasks:
+            if task.existing_cluster_id is not None:
+                interactive_cluster = all_clusters_by_id.get(task.existing_cluster_id, None)
+                if interactive_cluster is None:
+                    continue
+                yield job, interactive_cluster
+            elif task.new_cluster is not None:
+                yield job, task.new_cluster
+
+    @staticmethod
+    def _job_clusters(job):
+        for job_cluster in job.settings.job_clusters:
+            if job_cluster.new_cluster is None:
+                continue
+            yield job, job_cluster.new_cluster
 
 
 class JobsCrawler(CrawlerBase[JobInfo], JobsMixin, CheckClusterMixin):
@@ -299,22 +306,10 @@ class SubmitRunsCrawler(CrawlerBase[SubmitRunInfo], JobsMixin, CheckClusterMixin
         runs_per_hash: dict[str, list[int | None]] = {}
 
         for submit_run in submit_runs:
-            task_failures = []
+            task_failures: list[str] = []
             # v2.1+ API, with tasks
             if submit_run.tasks:
-                all_tasks: list[RunTask] = submit_run.tasks
-                for task in sorted(all_tasks, key=lambda x: x.task_key if x.task_key is not None else ""):
-                    _task_key = task.task_key if task.task_key is not None else ""
-                    _cluster_details = None
-                    if task.new_cluster:
-                        _cluster_details = ClusterDetails.from_dict(task.new_cluster.as_dict())
-                        if self._needs_compatibility_check(task.new_cluster):
-                            task_failures.append("no data security mode specified")
-                    if task.existing_cluster_id:
-                        _cluster_details = all_clusters_by_id.get(task.existing_cluster_id, None)
-                    if _cluster_details:
-                        task_failures.extend(self._check_cluster_failures(_cluster_details, _task_key))
-
+                self._check_run_task(submit_run.tasks, all_clusters_by_id, task_failures)
             # v2.0 API, without tasks
             elif submit_run.cluster_spec:
                 _cluster_details = ClusterDetails.from_dict(submit_run.cluster_spec.as_dict())
@@ -324,7 +319,6 @@ class SubmitRunsCrawler(CrawlerBase[SubmitRunInfo], JobsMixin, CheckClusterMixin
                 runs_per_hash[hashed_id].append(submit_run.run_id)
             else:
                 runs_per_hash[hashed_id] = [submit_run.run_id]
-
             result[hashed_id] = SubmitRunInfo(
                 run_ids=json.dumps(runs_per_hash[hashed_id]),
                 hashed_id=hashed_id,
@@ -332,3 +326,16 @@ class SubmitRunsCrawler(CrawlerBase[SubmitRunInfo], JobsMixin, CheckClusterMixin
             )
 
         return list(result.values())
+
+    def _check_run_task(self, all_tasks: list[RunTask], clusters: dict[str, ClusterDetails], task_failures: list[str]):
+        for task in sorted(all_tasks, key=lambda x: x.task_key if x.task_key is not None else ""):
+            _task_key = task.task_key if task.task_key is not None else ""
+            cluster_details = None
+            if task.new_cluster:
+                cluster_details = ClusterDetails.from_dict(task.new_cluster.as_dict())
+                if self._needs_compatibility_check(task.new_cluster):
+                    task_failures.append("no data security mode specified")
+            if task.existing_cluster_id:
+                cluster_details = clusters.get(task.existing_cluster_id, None)
+            if cluster_details:
+                task_failures.extend(self._check_cluster_failures(cluster_details, _task_key))

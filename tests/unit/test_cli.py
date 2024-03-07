@@ -13,10 +13,12 @@ from databricks.labs.ucx.cli import (
     alias,
     create_account_groups,
     create_table_mapping,
+    create_uber_principal,
     ensure_assessment_run,
     installations,
     manual_workspace_info,
     migrate_credentials,
+    migrate_locations,
     move,
     open_remote_config,
     principal_prefix_access,
@@ -328,3 +330,55 @@ def test_migrate_credentials_azure(ws):
     with patch("databricks.labs.blueprint.tui.Prompts.confirm", return_value=True):
         migrate_credentials(ws)
         ws.storage_credentials.list.assert_called()
+
+
+def test_create_master_principal_not_azure(ws):
+    ws.config.is_azure = False
+    create_uber_principal(ws, subscription_id="")
+    ws.workspace.get_status.assert_not_called()
+
+
+def test_create_master_principal_no_azure_cli(ws):
+    ws.config.auth_type = "azure_clis"
+    ws.config.is_azure = True
+    create_uber_principal(ws, subscription_id="")
+    ws.workspace.get_status.assert_not_called()
+
+
+def test_create_master_principal_no_subscription(ws):
+    ws.config.auth_type = "azure-cli"
+    ws.config.is_azure = True
+    create_uber_principal(ws, subscription_id="")
+    ws.workspace.get_status.assert_not_called()
+
+
+def test_create_master_principal(ws):
+    ws.config.auth_type = "azure-cli"
+    ws.config.is_azure = True
+    with patch("databricks.labs.blueprint.tui.Prompts.question", return_value=True):
+        with pytest.raises(ValueError):
+            create_uber_principal(ws, subscription_id="12")
+
+
+def test_migrate_locations_azure(ws):
+    ws.config.is_azure = True
+    ws.config.is_aws = False
+    ws.config.is_gcp = False
+    migrate_locations(ws)
+    ws.external_locations.list.assert_called()
+
+
+def test_migrate_locations_aws(ws, caplog):
+    ws.config.is_azure = False
+    ws.config.is_aws = True
+    ws.config.is_gcp = False
+    migrate_locations(ws)
+    assert "migrate_locations is not yet supported in AWS" in caplog.messages
+
+
+def test_migrate_locations_gcp(ws, caplog):
+    ws.config.is_azure = False
+    ws.config.is_aws = False
+    ws.config.is_gcp = True
+    migrate_locations(ws)
+    assert "migrate_locations is not yet supported in GCP" in caplog.messages

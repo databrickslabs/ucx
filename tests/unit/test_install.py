@@ -941,6 +941,41 @@ def test_not_remove_warehouse_with_a_different_prefix(ws):
     ws.warehouses.delete.assert_not_called()
 
 
+def test_remove_secret_scope(ws, caplog):
+    wheels = create_autospec(WheelsV2)
+    prompts = MockPrompts(
+        {
+            r'Do you want to uninstall ucx.*': 'yes',
+            'Do you want to delete the inventory database ucx too?': 'no',
+        }
+    )
+    installation = MockInstallation()
+    config = WorkspaceConfig(inventory_database='ucx', uber_spn_id="123")
+    timeout = timedelta(seconds=1)
+    # ws.secrets.delete_scope.side_effect = NotFound()
+    workspace_installation = WorkspaceInstallation(config, installation, MockBackend(), wheels, ws, prompts, timeout)
+    workspace_installation.uninstall()
+    ws.secrets.delete_scope.assert_called_with('ucx')
+
+
+def test_remove_secret_scope_no_scope(ws, caplog):
+    wheels = create_autospec(WheelsV2)
+    prompts = MockPrompts(
+        {
+            r'Do you want to uninstall ucx.*': 'yes',
+            'Do you want to delete the inventory database ucx too?': 'no',
+        }
+    )
+    installation = MockInstallation()
+    config = WorkspaceConfig(inventory_database='ucx', uber_spn_id="123")
+    timeout = timedelta(seconds=1)
+    ws.secrets.delete_scope.side_effect = NotFound()
+    workspace_installation = WorkspaceInstallation(config, installation, MockBackend(), wheels, ws, prompts, timeout)
+    with caplog.at_level('ERROR'):
+        workspace_installation.uninstall()
+        assert 'Secret scope already deleted' in caplog.messages
+
+
 def test_remove_cluster_policy_not_exists(ws, caplog):
     sql_backend = MockBackend()
     wheels = create_autospec(WheelsV2)
@@ -1324,3 +1359,56 @@ def test_triggering_assessment_wf(ws, mocker, mock_installation):
         verify_timeout=timedelta(seconds=1),
     )
     workspace_installation.run()
+
+
+def test_runs_upgrades_on_too_old_version(ws, any_prompt):
+    existing_installation = MockInstallation(
+        {
+            'state.json': {'resources': {'dashboards': {'assessment_main': 'abc'}}},
+            'config.yml': {
+                'inventory_database': 'x',
+                'warehouse_id': 'abc',
+                'connect': {'host': '...', 'token': '...'},
+            },
+        }
+    )
+    install = WorkspaceInstaller(any_prompt, existing_installation, ws)
+
+    sql_backend = MockBackend()
+    wheels = create_autospec(WheelsV2)
+
+    # TODO: (HariGS-DB) remove this, once added the policy upgrade
+    # TODO: fix along https://github.com/databrickslabs/ucx/issues/1012
+    with pytest.raises(InvalidParameterValue):
+        install.run(
+            verify_timeout=timedelta(seconds=1),
+            sql_backend_factory=lambda _: sql_backend,
+            wheel_builder_factory=lambda: wheels,
+        )
+
+
+def test_runs_upgrades_on_more_recent_version(ws, any_prompt):
+    existing_installation = MockInstallation(
+        {
+            'version.json': {'version': '0.3.0', 'wheel': '...', 'date': '...'},
+            'state.json': {'resources': {'dashboards': {'assessment_main': 'abc'}}},
+            'config.yml': {
+                'inventory_database': 'x',
+                'warehouse_id': 'abc',
+                'policy_id': 'abc',  # TODO: (HariGS-DB) remove this, once added the policy upgrade
+                'connect': {'host': '...', 'token': '...'},
+            },
+        }
+    )
+    install = WorkspaceInstaller(any_prompt, existing_installation, ws)
+
+    sql_backend = MockBackend()
+    wheels = create_autospec(WheelsV2)
+
+    install.run(
+        verify_timeout=timedelta(seconds=1),
+        sql_backend_factory=lambda _: sql_backend,
+        wheel_builder_factory=lambda: wheels,
+    )
+
+    existing_installation.assert_file_uploaded('logs/README.md')

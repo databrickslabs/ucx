@@ -126,14 +126,17 @@ class DashboardFromFiles:
             dashboard_folders = [f for f in step_folder.glob("*") if f.is_dir()]
             # Create separate dashboards per step, represented as second-level folders
             for dashboard_folder in dashboard_folders:
-                dashboard_ref = f"{step_folder.stem}_{dashboard_folder.stem}".lower()
-                for query in self._desired_queries(dashboard_folder, dashboard_ref):
-                    try:
-                        self._get_viz_options(query)
-                        self._get_widget_options(query)
-                    except Exception as err:
-                        msg = f"Error in {query.name}: {err}"
-                        raise AssertionError(msg) from err
+                self._validate_folder(dashboard_folder, step_folder)
+
+    def _validate_folder(self, dashboard_folder, step_folder):
+        dashboard_ref = f"{step_folder.stem}_{dashboard_folder.stem}".lower()
+        for query in self._desired_queries(dashboard_folder, dashboard_ref):
+            try:
+                self._get_viz_options(query)
+                self._get_widget_options(query)
+            except Exception as err:
+                msg = f"Error in {query.name}: {err}"
+                raise AssertionError(msg) from err
 
     def _install_widget(self, query: SimpleQuery, dashboard_ref: str):
         dashboard_id = self._state.dashboards[dashboard_ref]
@@ -212,7 +215,11 @@ class DashboardFromFiles:
             assert dashboard.widgets is not None
             for widget in dashboard.widgets:
                 assert widget.id is not None
-                self._ws.dashboard_widgets.delete(widget.id)
+                try:
+                    self._ws.dashboard_widgets.delete(widget.id)
+                except TypeError:
+                    logger.warning("Type error in SDK API response, ES-1061370")
+                    # Tracking bug in ES-1061370
             return
         dashboard = self._ws.dashboards.create(dashboard_name, run_as_role=RunAsRole.VIEWER, parent=parent_folder_id)
         assert dashboard.id is not None
