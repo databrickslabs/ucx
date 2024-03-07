@@ -162,8 +162,8 @@ def assess_cluster_policies(cfg: WorkspaceConfig, ws: WorkspaceClient, sql_backe
       - Clusters Policies with Databricks Runtime (DBR) version earlier than 11.3
 
       Subsequently, a list of all the policies with matching configurations are stored in the
-    `$inventory.policices` table."""
-    crawler = PoliciesCrawler(ws, sql_backend, cfg.inventory_database, cfg.num_days_submit_runs_history)
+    `$inventory.policies` table."""
+    crawler = PoliciesCrawler(ws, sql_backend, cfg.inventory_database)
     crawler.snapshot()
 
 
