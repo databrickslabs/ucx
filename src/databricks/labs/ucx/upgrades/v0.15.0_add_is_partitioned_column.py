@@ -2,7 +2,7 @@ from databricks.labs.blueprint.installation import Installation
 from databricks.sdk import WorkspaceClient
 
 from databricks.labs.ucx.config import WorkspaceConfig
-from src.databricks.labs.ucx.framework.crawlers import StatementExecutionBackend
+from databricks.labs.ucx.framework.crawlers import StatementExecutionBackend
 
 
 def upgrade(installation: Installation, ws: WorkspaceClient):
