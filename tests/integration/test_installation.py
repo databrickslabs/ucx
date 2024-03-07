@@ -18,6 +18,7 @@ from databricks.sdk.service import compute, sql
 from databricks.sdk.service.iam import PermissionLevel
 
 from databricks.labs.ucx.config import WorkspaceConfig
+from databricks.labs.ucx.hive_metastore import TablesCrawler
 from databricks.labs.ucx.install import (
     PRODUCT_INFO,
     WorkspaceInstallation,
@@ -322,3 +323,27 @@ def test_uninstallation(ws, sql_backend, new_installation):
         ws.jobs.get(job_id=assessment_job_id)
     with pytest.raises(NotFound):
         sql_backend.execute(f"show tables from hive_metastore.{install.config.inventory_database}")
+
+
+@retried(on=[NotFound, TimeoutError], timeout=timedelta(minutes=5))
+def test_partitioned_tables(ws, sql_backend, new_installation, inventory_schema, make_schema, make_table):
+    install = new_installation()
+
+    schema = make_schema(catalog_name="hive_metastore")
+    sql_backend.execute(
+        f"CREATE TABLE IF NOT EXISTS {schema.full_name}.partitioned_table (column1 string, column2 STRING) PARTITIONED BY (column1)"
+    )
+    sql_backend.execute(
+        f"CREATE TABLE IF NOT EXISTS {schema.full_name}.non_partitioned_table (column1 string, column2 STRING)"
+    )
+    install.run_workflow("assessment")
+
+    tables = TablesCrawler(sql_backend, inventory_schema)
+
+    all_tables = {}
+    for table in tables.snapshot():
+        all_tables[table.key] = table
+
+    assert len(all_tables) >= 2
+    assert all_tables[f"{schema.full_name}.partitioned_table"].is_partitioned is True
+    assert all_tables[f"{schema.full_name}.non_partitioned_table"].is_partitioned is False
