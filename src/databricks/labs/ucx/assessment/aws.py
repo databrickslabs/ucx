@@ -517,13 +517,13 @@ class AWSResourcePermissions:
         external_location_names = [external_location.name for external_location in existing_external_locations]
         external_location_num = 1
         for path, role_arn in missing_paths:
-            if role_arn in credential_dict:
-                while True:
-                    external_location_name = f"{location_init}_{external_location_num}"
-                    if external_location_name not in external_location_names:
-                        break
-                    external_location_num += 1
-                self._ws.external_locations.create(external_location_name, path, credential_dict[role_arn])
-                external_location_num += 1
-            else:
+            if role_arn not in credential_dict:
                 logger.error(f"Missing credential for role {role_arn} for path {path}")
+                continue
+            while True:
+                external_location_name = f"{location_init}_{external_location_num}"
+                if external_location_name not in external_location_names:
+                    break
+                external_location_num += 1
+            self._ws.external_locations.create(external_location_name, path, credential_dict[role_arn])
+            external_location_num += 1
