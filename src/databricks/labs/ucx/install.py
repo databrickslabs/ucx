@@ -171,7 +171,13 @@ def deploy_schema(sql_backend: SqlBackend, inventory_schema: str):
 
 
 class WorkspaceInstaller:
-    def __init__(self, prompts: Prompts, installation: Installation, ws: WorkspaceClient):
+    def __init__(
+        self,
+        prompts: Prompts,
+        installation: Installation,
+        ws: WorkspaceClient,
+        product_info: str = PRODUCT_INFO.product_name(),
+    ):
         if "DATABRICKS_RUNTIME_VERSION" in os.environ:
             msg = "WorkspaceInstaller is not supposed to be executed in Databricks Runtime"
             raise SystemExit(msg)
@@ -328,6 +334,7 @@ class WorkspaceInstallation:
         ws: WorkspaceClient,
         prompts: Prompts,
         verify_timeout: timedelta,
+        product_info: str = PRODUCT_INFO.product_name(),
     ):
         self._config = config
         self._installation = installation
@@ -338,6 +345,7 @@ class WorkspaceInstallation:
         self._verify_timeout = verify_timeout
         self._state = InstallState.from_installation(installation)
         self._this_file = Path(__file__)
+        self._product_info = product_info
 
     @classmethod
     def current(cls, ws: WorkspaceClient):
@@ -347,7 +355,8 @@ class WorkspaceInstallation:
         wheels = WheelsV2(installation, PRODUCT_INFO)
         prompts = Prompts()
         timeout = timedelta(minutes=2)
-        return WorkspaceInstallation(config, installation, sql_backend, wheels, ws, prompts, timeout)
+        product_info = ProductInfo(__file__).product_name()
+        return WorkspaceInstallation(config, installation, sql_backend, wheels, ws, prompts, timeout, product_info)
 
     @property
     def config(self):
