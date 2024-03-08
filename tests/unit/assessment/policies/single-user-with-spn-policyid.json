@@ -1,0 +1,4 @@
+{
+  "policy_id": "123",
+  "definition": "{\"spark_version\": {\"type\": \"unlimited\",\"defaultValue\": \"auto:latest-ml\"}}"
+}

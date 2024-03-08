@@ -34,7 +34,7 @@ class ClusterInfo:
     cluster_id: str
     success: int
     failures: str
-    spark_version: str
+    spark_version: str | None = None
     policy_id: str | None = None
     cluster_name: str | None = None
     creator: str | None = None

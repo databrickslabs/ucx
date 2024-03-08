@@ -1,0 +1,4 @@
+{
+  "policy_id": "123",
+  "definition": "{\"azure_attributes.availability\": {\"type\": \"fixed\", \"value\": \"ON_DEMAND_AZURE\", \"hidden\": true}}"
+}
