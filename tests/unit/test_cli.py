@@ -378,6 +378,7 @@ def test_migrate_locations_aws(ws, caplog, mocker):
 
 
 def test_missing_aws_cli(ws, caplog, mocker):
+    # test with no aws cli
     mocker.patch("shutil.which", return_value=None)
     ws.config.is_azure = False
     ws.config.is_aws = True
