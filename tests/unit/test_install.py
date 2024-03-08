@@ -118,13 +118,22 @@ def created_job_tasks(workspace_client: MagicMock, name: str) -> dict[str, jobs.
 
 @pytest.fixture
 def mock_installation():
-    return MockInstallation({'state.json': {'resources': {'dashboards': {'assessment_main': 'abc'}}}})
+    return MockInstallation(
+        {'state.json': {'resources': {'dashboards': {'assessment_main': 'abc', 'assessment_estimates': 'def'}}}}
+    )
 
 
 @pytest.fixture
 def mock_installation_with_jobs():
     return MockInstallation(
-        {'state.json': {'resources': {'jobs': {"assessment": "123"}, 'dashboards': {'assessment_main': 'abc'}}}}
+        {
+            'state.json': {
+                'resources': {
+                    'jobs': {"assessment": "123"},
+                    'dashboards': {'assessment_main': 'abc', 'assessment_estimates': 'def'},
+                }
+            }
+        }
     )
 
 
@@ -172,6 +181,7 @@ def test_install_cluster_override_jobs(ws, mock_installation, any_prompt):
     tasks = created_job_tasks(ws, '[MOCK] assessment')
     assert tasks['assess_jobs'].existing_cluster_id == 'one'
     assert tasks['crawl_grants'].existing_cluster_id == 'two'
+    assert tasks['estimates_report'].sql_task.dashboard.dashboard_id == 'def'
 
 
 def test_write_protected_dbfs(ws, tmp_path, mock_installation):
