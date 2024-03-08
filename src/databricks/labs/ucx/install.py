@@ -167,7 +167,6 @@ def deploy_schema(sql_backend: SqlBackend, inventory_schema: str):
     )
     deployer.deploy_view("objects", "queries/views/objects.sql")
     deployer.deploy_view("grant_detail", "queries/views/grant_detail.sql")
-    deployer.deploy_view("object_estimates", "queries/views/object_estimates.sql")
     deployer.deploy_view("table_estimates", "queries/views/table_estimates.sql")
 
 

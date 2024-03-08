@@ -254,7 +254,9 @@ class DashboardFromFiles:
                     widget=self._parse_magic_comment(f, "-- widget ", text),
                 )
             )
-        for f in local_folder.glob("*.txt"):
+        for f in local_folder.glob("*.md"):
+            if f.name == "README.md":
+                continue
             text = f.read_text("utf8")
             desired_queries.append(
                 SimpleQuery(
