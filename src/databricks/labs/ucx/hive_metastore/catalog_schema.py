@@ -6,17 +6,14 @@ from databricks.sdk import WorkspaceClient
 
 from databricks.labs.ucx.config import WorkspaceConfig
 from databricks.labs.ucx.framework.crawlers import StatementExecutionBackend
-from databricks.labs.ucx.hive_metastore import TablesCrawler
 from databricks.labs.ucx.hive_metastore.mapping import TableMapping
 
 logger = logging.getLogger(__name__)
 
+
 class CatalogSchema:
-    def __init__(
-        self, ws: WorkspaceClient, tables_crawler: TablesCrawler, table_mapping: TableMapping, prompts: Prompts
-    ):
+    def __init__(self, ws: WorkspaceClient, table_mapping: TableMapping, prompts: Prompts):
         self._ws = ws
-        self._tables_crawler = tables_crawler
         self._table_mapping = table_mapping
         self._prompts = prompts
 
@@ -24,9 +21,8 @@ class CatalogSchema:
     def for_cli(cls, ws: WorkspaceClient, installation: Installation, prompts: Prompts):
         config = installation.load(WorkspaceConfig)
         sql_backend = StatementExecutionBackend(ws, config.warehouse_id)
-        table_crawler = TablesCrawler(sql_backend, config.inventory_database)
         table_mapping = TableMapping(installation, ws, sql_backend)
-        return cls(ws, table_crawler, table_mapping, prompts)
+        return cls(ws, table_mapping, prompts)
 
     def _list_existing(self) -> tuple[set[str], dict[str, set[str]]]:
         """generate a list of existing UC catalogs and schema."""
