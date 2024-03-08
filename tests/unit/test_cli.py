@@ -341,8 +341,9 @@ def test_migrate_credentials_aws(ws, mocker):
     ws.config.is_azure = False
     ws.config.is_aws = True
     ws.config.is_gcp = False
-    mocker.patch("databricks.labs.ucx.assessment.aws.AWSResources.validate_connection",
-                 return_value={"Account": "123456789012"})
+    mocker.patch(
+        "databricks.labs.ucx.assessment.aws.AWSResources.validate_connection", return_value={"Account": "123456789012"}
+    )
     uc_trust_policy = mocker.patch(
         "databricks.labs.ucx.assessment.aws.AWSResourcePermissions.update_uc_role_trust_policy"
     )

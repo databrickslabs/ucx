@@ -28,6 +28,6 @@ def test_create_uc_role(env_or_skip, make_random):
     account_id = aws.validate_connection().get("Account")
     s3_prefixes = {"s3://BUCKET1/FOLDER1", "s3://BUCKET1/FOLDER1/*", "s3://BUCKET2/FOLDER2", "s3://BUCKET2/FOLDER2/*"}
     aws.add_uc_role(role_name)
-    aws.add_uc_role_policy(role_name, policy_name, s3_prefixes, account_id)
+    aws.put_role_policy(role_name, policy_name, s3_prefixes, account_id)
     uc_roles = aws.list_all_uc_roles()
     assert role_name in [role.role_name for role in uc_roles]

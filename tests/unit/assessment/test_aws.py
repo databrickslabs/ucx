@@ -831,7 +831,7 @@ def test_create_uc_role_policy_no_kms(mocker):
 
     aws = AWSResources("Fake_Profile", command_call)
     s3_prefixes = {"s3://BUCKET1/FOLDER1", "s3://BUCKET1/FOLDER1/*", "s3://BUCKET2/FOLDER2", "s3://BUCKET2/FOLDER2/*"}
-    aws.add_uc_role_policy("test_role", "test_policy", s3_prefixes, "1234")
+    aws.put_role_policy("test_role", "test_policy", s3_prefixes, "1234")
     assert (
         '/path/aws iam put-role-policy --role-name test_role '
         '--policy-name test_policy --policy-document '
@@ -853,7 +853,7 @@ def test_create_uc_role_kms(mocker):
 
     aws = AWSResources("Fake_Profile", command_call)
     s3_prefixes = {"s3://BUCKET1/FOLDER1", "s3://BUCKET1/FOLDER1/*", "s3://BUCKET2/FOLDER2", "s3://BUCKET2/FOLDER2/*"}
-    aws.add_uc_role_policy("test_role", "test_policy", s3_prefixes, "1234", "key_arn")
+    aws.put_role_policy("test_role", "test_policy", s3_prefixes, "1234", "key_arn")
     assert (
         '/path/aws iam put-role-policy --role-name test_role '
         '--policy-name test_policy '
@@ -874,7 +874,7 @@ def test_create_uc_role_single(mock_ws, mock_installation, mock_aws, backend, lo
     aws_resource_permissions.create_uc_roles_cli()
     assert mock_aws.add_uc_role.assert_called_with('UC_ROLE') is None
     assert (
-        mock_aws.add_uc_role_policy.assert_called_with(
+        mock_aws.put_role_policy.assert_called_with(
             'UC_ROLE', 'UC_POLICY', {'s3://BUCKET1/FOLDER1', 's3://BUCKET2/FOLDER2'}, None, None
         )
         is None
@@ -891,11 +891,11 @@ def test_create_uc_role_multiple(mock_ws, mock_installation, mock_aws, backend, 
     assert call('UC_ROLE-2') in mock_aws.add_uc_role.call_args_list
     assert (
         call('UC_ROLE-1', 'UC_POLICY-1', {'s3://BUCKET1/FOLDER1'}, None, None)
-        in mock_aws.add_uc_role_policy.call_args_list
+        in mock_aws.put_role_policy.call_args_list
     )
     assert (
         call('UC_ROLE-2', 'UC_POLICY-2', {'s3://BUCKET2/FOLDER2'}, None, None)
-        in mock_aws.add_uc_role_policy.call_args_list
+        in mock_aws.put_role_policy.call_args_list
     )
 
 

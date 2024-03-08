@@ -314,7 +314,7 @@ class AWSResources:
             return None
         return update_role["Role"]["Arn"]
 
-    def add_uc_role_policy(
+    def put_role_policy(
         self, role_name: str, policy_name: str, s3_prefixes: set[str], account_id: str, kms_key=None
     ) -> bool:
         if not self._run_command(
@@ -360,17 +360,6 @@ class AWSResources:
         self._run_command(
             f"iam add-role-to-instance-profile --instance-profile-name {instance_profile_name} --role-name {role_name}"
         )
-
-    def add_or_update_migration_policy(
-        self, role_name: str, policy_name: str, s3_prefixes: set[str], account_id: str, kms_key=None
-    ):
-        if not self._run_command(
-            f"iam put-role-policy "
-            f"--role-name {role_name} --policy-name {policy_name} "
-            f"--policy-document {self._aws_s3_policy(s3_prefixes, account_id, role_name, kms_key)}"
-        ):
-            return False
-        return True
 
     def is_role_exists(self, role_name: str) -> bool:
         """
@@ -461,14 +450,14 @@ class AWSResourcePermissions:
                 s3_prefixes.add(missing_path)
         if single_role:
             if self._aws_resources.add_uc_role(role_name):
-                self._aws_resources.add_uc_role_policy(
+                self._aws_resources.put_role_policy(
                     role_name, policy_name, s3_prefixes, self._aws_account_id, self._kms_key
                 )
         else:
             role_id = 1
             for s3_prefix in sorted(list(s3_prefixes)):
                 if self._aws_resources.add_uc_role(f"{role_name}-{role_id}"):
-                    self._aws_resources.add_uc_role_policy(
+                    self._aws_resources.put_role_policy(
                         f"{role_name}-{role_id}",
                         f"{policy_name}-{role_id}",
                         {s3_prefix},
@@ -703,7 +692,7 @@ class AWSResourcePermissions:
                 f"Do you want to update the role's migration policy?"
             ):
                 return
-            self._aws_resources.add_or_update_migration_policy(
+            self._aws_resources.put_role_policy(
                 iam_role_name_in_cluster_policy, iam_policy_name, s3_paths, self._aws_account_id, self._kms_key
             )
             logger.info(f"Cluster policy \"{cluster_policy.name}\" updated successfully")
@@ -717,7 +706,7 @@ class AWSResourcePermissions:
                 f"and add the role to UCX migration cluster policy \"{cluster_policy.name}\"?"
             ):
                 return
-            self._aws_resources.add_or_update_migration_policy(
+            self._aws_resources.put_role_policy(
                 iam_role_name, iam_policy_name, s3_paths, self._aws_account_id, self._kms_key
             )
         else:
