@@ -8,7 +8,7 @@ from datetime import timedelta
 from unittest.mock import patch
 
 import databricks.sdk.errors
-import pytest
+import pytest  # pylint: disable=wrong-import-order
 from databricks.labs.blueprint.installation import Installation
 from databricks.labs.blueprint.installer import InstallState
 from databricks.labs.blueprint.parallel import Threads
