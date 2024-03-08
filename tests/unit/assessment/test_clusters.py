@@ -6,7 +6,7 @@ from databricks.sdk.errors import DatabricksError, InternalError, NotFound
 from databricks.sdk.service.compute import AutoScale, ClusterDetails, ClusterSource
 
 from databricks.labs.ucx.assessment.azure import AzureServicePrincipalCrawler
-from databricks.labs.ucx.assessment.clusters import ClusterInfo, ClustersCrawler
+from databricks.labs.ucx.assessment.clusters import ClusterInfo, ClustersCrawler, PoliciesCrawler, PolicyInfo
 
 from ..framework.mocks import MockBackend
 from . import workspace_client_mock
@@ -156,3 +156,15 @@ def test_unsupported_clusters():
     result_set = list(crawler.snapshot())
     assert len(result_set) == 1
     assert result_set[0].failures == '["cluster type not supported : LEGACY_PASSTHROUGH"]'
+
+
+def test_policy_crawler():
+    ws = workspace_client_mock(
+        cluster_ids=['policy-single-user-with-spn', 'policy-azure-oauth'],
+    )
+    crawler = ClustersCrawler(ws, MockBackend(), "ucx")
+    result_set = list(crawler.snapshot())
+
+    assert len(result_set) == 2
+    assert result_set[0].success == 1
+    assert result_set[1].success == 0

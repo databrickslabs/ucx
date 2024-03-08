@@ -171,6 +171,7 @@ class ClustersCrawler(CrawlerBase[ClusterInfo], CheckClusterMixin):
 class PolicyInfo:
     policy_id: str
     policy_name: str
+    spark_version: str | None = None
     policy_description: str | None = None
     creator: str | None = None
 
@@ -188,12 +189,18 @@ class PoliciesCrawler(CrawlerBase[PolicyInfo], CheckClusterMixin):
         for policy in all_policices:
             if policy.policy_id is None:
                 continue
+            if "spark_version" not in json.loads(policy.definition):
+                spark_version = None
+            else:
+                spark_version = json.loads(policy.definition)["spark_version"]
             policy_name = policy.name
             creator_name = policy.creator_user_name
+
             policy_info = PolicyInfo(
                 policy_id=policy.policy_id,
                 policy_description=policy.description,
                 policy_name=policy_name,
+                spark_version=spark_version,
                 creator=creator_name,
             )
             yield policy_info
