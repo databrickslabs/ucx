@@ -15,10 +15,7 @@ from databricks.sdk.service.catalog import (
 )
 
 from databricks.labs.ucx.assessment.aws import AWSResourcePermissions, AWSRoleAction
-from databricks.labs.ucx.aws.credentials import (
-    AWSStorageCredentialManager,
-    IamRoleMigration,
-)
+from databricks.labs.ucx.aws.credentials import CredentialManager, IamRoleMigration
 from tests.unit import DEFAULT_CONFIG
 from tests.unit.azure.test_credentials import side_effect_validate_storage_credential
 
@@ -51,7 +48,7 @@ def credential_manager(ws):
     ws.storage_credentials.create.side_effect = side_effect_create_aws_storage_credential
     ws.storage_credentials.validate.side_effect = side_effect_validate_storage_credential
 
-    return AWSStorageCredentialManager(ws)
+    return CredentialManager(ws)
 
 
 def test_list_storage_credentials(credential_manager):

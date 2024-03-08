@@ -1106,11 +1106,7 @@ def make_storage_credential(ws):
                 credential_name, aws_iam_role=AwsIamRole(role_arn=aws_iam_role_arn), read_only=read_only
             )
         else:
-            azure_service_principal = AzureServicePrincipal(
-                directory_id,
-                application_id,
-                client_secret,
-            )
+            azure_service_principal = AzureServicePrincipal(directory_id, application_id, client_secret)
             storage_credential = ws.storage_credentials.create(
                 credential_name, azure_service_principal=azure_service_principal, read_only=read_only
             )

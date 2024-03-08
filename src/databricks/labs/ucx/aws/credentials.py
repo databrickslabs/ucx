@@ -24,7 +24,7 @@ logger = logging.getLogger(__name__)
 
 
 @dataclass
-class AWSStorageCredentialValidationResult:
+class CredentialValidationResult:
     name: str
     role_arn: str
     validated_on: str
@@ -32,7 +32,7 @@ class AWSStorageCredentialValidationResult:
     failures: list[str] | None = None
 
 
-class AWSStorageCredentialManager:
+class CredentialManager:
     def __init__(self, ws: WorkspaceClient):
         self._ws = ws
 
@@ -62,9 +62,10 @@ class AWSStorageCredentialManager:
             role_action.role_name,
             aws_iam_role=AwsIamRole(role_action.role_arn),
             comment=f"Created by UCX during migration to UC using AWS IAM Role: {role_action.role_name}",
+            read_only=role_action.privilege == Privilege.READ_FILES.value,
         )
 
-    def validate(self, role_action: AWSRoleAction) -> AWSStorageCredentialValidationResult:
+    def validate(self, role_action: AWSRoleAction) -> CredentialValidationResult:
         try:
             validation = self._ws.storage_credentials.validate(
                 storage_credential_name=role_action.role_name,
@@ -77,7 +78,7 @@ class AWSStorageCredentialManager:
                 "the IAM Role and used for validating the migrated storage credential. "
                 "Skip the validation"
             )
-            return AWSStorageCredentialValidationResult(
+            return CredentialValidationResult(
                 role_action.role_name,
                 role_action.role_arn,
                 role_action.resource_path,
@@ -89,7 +90,7 @@ class AWSStorageCredentialManager:
             )
 
         if not validation.results:
-            return AWSStorageCredentialValidationResult(
+            return CredentialValidationResult(
                 role_action.role_name,
                 role_action.role_arn,
                 role_action.resource_path,
@@ -103,7 +104,7 @@ class AWSStorageCredentialManager:
                 continue
             if result.result == ValidationResultResult.FAIL:
                 failures.append(f"{result.operation.value} validation failed with message: {result.message}")
-        return AWSStorageCredentialValidationResult(
+        return CredentialValidationResult(
             role_action.role_name,
             role_action.role_arn,
             role_action.resource_path,
@@ -119,7 +120,7 @@ class IamRoleMigration:
         installation: Installation,
         ws: WorkspaceClient,
         resource_permissions: AWSResourcePermissions,
-        storage_credential_manager: AWSStorageCredentialManager,
+        storage_credential_manager: CredentialManager,
     ):
         self._output_file = "aws_iam_role_migration_result.csv"
         self._installation = installation
@@ -128,7 +129,7 @@ class IamRoleMigration:
         self._storage_credential_manager = storage_credential_manager
 
     @classmethod
-    def for_cli(cls, ws: WorkspaceClient, installation: Installation, aws_profile: str, prompts: Prompts):
+    def for_cli(cls, ws: WorkspaceClient, installation: Installation, aws: AWSResources, prompts: Prompts):
         if not ws.config.is_aws:
             logger.error("Workspace is not on AWS, please run this command on a Databricks on AWS workspaces.")
             raise SystemExit()
@@ -142,11 +143,10 @@ class IamRoleMigration:
 
         config = installation.load(WorkspaceConfig)
         sql_backend = StatementExecutionBackend(ws, config.warehouse_id)
-        aws = AWSResources(aws_profile)
 
         resource_permissions = AWSResourcePermissions(installation, ws, sql_backend, aws, config.inventory_database)
 
-        storage_credential_manager = AWSStorageCredentialManager(ws)
+        storage_credential_manager = CredentialManager(ws)
 
         return cls(installation, ws, resource_permissions, storage_credential_manager)
 
@@ -154,9 +154,7 @@ class IamRoleMigration:
     def _print_action_plan(iam_list: list[AWSRoleAction]):
         # print action plan to console for customer to review.
         for iam in iam_list:
-            logger.info(
-                f"IAM Role ARN: {iam.role_arn} : " f"privilege {iam.privilege} " f"on location {iam.resource_path}"
-            )
+            logger.info(f"{iam.role_arn}: {iam.privilege} on {iam.resource_path}")
 
     def _generate_migration_list(self, include_names: set[str] | None = None) -> list[AWSRoleAction]:
         """
@@ -174,12 +172,10 @@ class IamRoleMigration:
 
         return filtered_iam_list
 
-    def save(self, migration_results: list[AWSStorageCredentialValidationResult]) -> str:
+    def save(self, migration_results: list[CredentialValidationResult]) -> str:
         return self._installation.save(migration_results, filename=self._output_file)
 
-    def run(
-        self, prompts: Prompts, include_names: set[str] | None = None
-    ) -> list[AWSStorageCredentialValidationResult]:
+    def run(self, prompts: Prompts, include_names: set[str] | None = None) -> list[CredentialValidationResult]:
 
         iam_list = self._generate_migration_list(include_names)
 

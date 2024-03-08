@@ -11,7 +11,7 @@ from databricks.sdk import AccountClient, WorkspaceClient
 from databricks.sdk.errors import NotFound
 
 from databricks.labs.ucx.account import AccountWorkspaces, WorkspaceInfo
-from databricks.labs.ucx.assessment.aws import AWSResourcePermissions
+from databricks.labs.ucx.assessment.aws import AWSResourcePermissions, AWSResources
 from databricks.labs.ucx.aws.credentials import IamRoleMigration
 from databricks.labs.ucx.azure.access import AzureResourcePermissions
 from databricks.labs.ucx.azure.credentials import ServicePrincipalMigration
@@ -336,7 +336,8 @@ def migrate_credentials(w: WorkspaceClient, aws_profile: str | None = None):
             )
             return
         logger.info("Running migrate_credentials for AWS")
-        instance_profile_migration = IamRoleMigration.for_cli(w, installation, aws_profile, prompts)
+        aws = AWSResources(aws_profile)
+        instance_profile_migration = IamRoleMigration.for_cli(w, installation, aws, prompts)
         instance_profile_migration.run(prompts)
         return
     if w.config.is_gcp:

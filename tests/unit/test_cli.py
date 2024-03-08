@@ -338,6 +338,7 @@ def test_migrate_credentials_aws(ws, mocker):
     mocker.patch("shutil.which", return_value=True)
     ws.config.is_azure = False
     ws.config.is_aws = True
+    ws.config.is_gcp = False
     uc_trust_policy = mocker.patch(
         "databricks.labs.ucx.assessment.aws.AWSResourcePermissions.update_uc_role_trust_policy"
     )
@@ -352,7 +353,10 @@ def test_migrate_credentials_aws_no_profile(ws, caplog, mocker):
     ws.config.is_azure = False
     ws.config.is_aws = True
     migrate_credentials(ws)
-    assert any({"AWS Profile is not specified." in message for message in caplog.messages})
+    assert (
+        "AWS Profile is not specified. Use the environment variable [AWS_DEFAULT_PROFILE] or use the "
+        "'--aws-profile=[profile-name]' parameter." in caplog.messages
+    )
 
 
 def test_create_master_principal_not_azure(ws):

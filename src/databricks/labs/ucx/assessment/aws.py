@@ -239,9 +239,12 @@ class AWSResources:
             ],
         }
 
-    def add_uc_role(self, role_name):
-        # the AssumeRole condition will be modified with the external ID captured from the UC credential.
-        # https://docs.databricks.com/en/connect/unity-catalog/storage-credentials.html
+    def add_uc_role(self, role_name: str) -> bool:
+        """
+        Create an IAM role for Unity Catalog to access the S3 buckets.
+        the AssumeRole condition will be modified later with the external ID captured from the UC credential.
+        https://docs.databricks.com/en/connect/unity-catalog/storage-credentials.html
+        """
         assume_role_json = self._get_json_for_cli(self._aws_role_trust_doc())
         add_role = self._run_json_command(
             f"iam create-role --role-name {role_name} --assume-role-policy-document {assume_role_json}"
@@ -250,9 +253,12 @@ class AWSResources:
             return False
         return True
 
-    def update_uc_trust_role(self, role_name, external_id="0000"):
-        # Modify the AssumeRole condition with the external ID captured from the UC credential.
-        # https://docs.databricks.com/en/connect/unity-catalog/storage-credentials.html
+    def update_uc_trust_role(self, role_name: str, external_id: str = "0000") -> bool:
+        """
+        Modify an existing IAM role for Unity Catalog to access the S3 buckets with the external ID
+        captured from the UC credential.
+        https://docs.databricks.com/en/connect/unity-catalog/storage-credentials.html
+        """
         assume_role_json = self._get_json_for_cli(self._aws_role_trust_doc(external_id))
         update_role = self._run_json_command(
             f"iam update-assume-role-policy --role-name {role_name} --policy-document {assume_role_json}"
@@ -261,7 +267,9 @@ class AWSResources:
             return False
         return True
 
-    def add_uc_role_policy(self, role_name, policy_name, s3_prefixes: set[str], account_id: str, kms_key=None):
+    def add_uc_role_policy(
+        self, role_name: str, policy_name: str, s3_prefixes: set[str], account_id: str, kms_key=None
+    ) -> bool:
         s3_prefixes_enriched = sorted([self.S3_PREFIX + s3_prefix for s3_prefix in s3_prefixes])
         statement = [
             {
