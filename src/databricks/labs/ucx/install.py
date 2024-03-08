@@ -799,6 +799,7 @@ class WorkspaceInstallation:
     def _job_task(self, task: Task) -> jobs.Task:
         jobs_task = jobs.Task(
             task_key=task.name,
+            max_retries=task.max_retries,
             job_cluster_key=task.job_cluster,
             depends_on=[jobs.TaskDependency(task_key=d) for d in _TASKS[task.name].dependencies()],
         )
