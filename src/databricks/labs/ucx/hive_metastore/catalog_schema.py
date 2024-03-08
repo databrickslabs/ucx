@@ -1,3 +1,5 @@
+import logging
+
 from databricks.labs.blueprint.installation import Installation
 from databricks.labs.blueprint.tui import Prompts
 from databricks.sdk import WorkspaceClient
@@ -7,6 +9,7 @@ from databricks.labs.ucx.framework.crawlers import StatementExecutionBackend
 from databricks.labs.ucx.hive_metastore import TablesCrawler
 from databricks.labs.ucx.hive_metastore.mapping import TableMapping
 
+logger = logging.getLogger(__name__)
 
 class CatalogSchema:
     def __init__(
@@ -26,7 +29,8 @@ class CatalogSchema:
         return cls(ws, table_crawler, table_mapping, prompts)
 
     def _list_existing(self) -> tuple[set[str], dict[str, set[str]]]:
-        """list existing catalogs and schemas"""
+        """generate a list of existing UC catalogs and schema."""
+        logger.info("Listing existing UC catalogs and schemas")
         existing_catalogs: set[str] = set()
         for catalog_info in self._ws.catalogs.list():
             if catalog_info.name:
@@ -60,6 +64,8 @@ class CatalogSchema:
         """prepare a list of catalogs and schema to be created"""
         existing_catalogs, existing_schemas = self._list_existing()
         target_catalogs, target_schemas = self._list_target()
+
+        logger.info("Preparing a list of UC catalogs and schema to be created")
         # filter out existing catalogs and schemas from target catalogs and schemas to be created.
         for existing_catalog in existing_catalogs:
             if existing_catalog in target_catalogs:
@@ -71,6 +77,7 @@ class CatalogSchema:
         return target_catalogs, target_schemas
 
     def _create(self, catalogs, schemas):
+        logger.info("Creating UC catalogs and schemas.")
         # create catalogs
         for catalog_name in catalogs:
             catalog_storage = self._prompts.question(
