@@ -144,13 +144,14 @@ class Grant:
 
 
 class GrantsCrawler(CrawlerBase[Grant]):
-    def __init__(self, tc: TablesCrawler, udf: UdfsCrawler):
+    def __init__(self, tc: TablesCrawler, udf: UdfsCrawler, include_databases: list[str] | None = None):
         assert tc._backend == udf._backend
         assert tc._catalog == udf._catalog
         assert tc._schema == udf._schema
         super().__init__(tc._backend, tc._catalog, tc._schema, "grants", Grant)
         self._tc = tc
         self._udf = udf
+        self._include_databases = include_databases
 
     def snapshot(self) -> Iterable[Grant]:
         return self._snapshot(partial(self._try_load), partial(self._crawl))
@@ -189,9 +190,13 @@ class GrantsCrawler(CrawlerBase[Grant]):
         # Scanning ANY FILE and ANONYMOUS FUNCTION grants
         tasks.append(partial(self.grants, catalog=catalog, any_file=True))
         tasks.append(partial(self.grants, catalog=catalog, anonymous_function=True))
-        # scan all databases, even empty ones
-        for row in self._fetch(f"SHOW DATABASES FROM {escape_sql_identifier(catalog)}"):
-            tasks.append(partial(self.grants, catalog=catalog, database=row.databaseName))
+        if not self._include_databases:
+            # scan all databases, even empty ones
+            for row in self._fetch(f"SHOW DATABASES FROM {escape_sql_identifier(catalog)}"):
+                tasks.append(partial(self.grants, catalog=catalog, database=row.databaseName))
+        else:
+            for database in self._include_databases:
+                tasks.append(partial(self.grants, catalog=catalog, database=database))
         for table in self._tc.snapshot():
             fn = partial(self.grants, catalog=catalog, database=table.database)
             # views are recognized as tables

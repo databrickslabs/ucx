@@ -1,4 +1,5 @@
 import logging
+from unittest import mock
 from unittest.mock import MagicMock, call, create_autospec
 
 import pytest
@@ -6,6 +7,11 @@ from databricks.labs.blueprint.installation import MockInstallation
 from databricks.sdk import WorkspaceClient
 from databricks.sdk.errors import ResourceDoesNotExist
 from databricks.sdk.service import iam
+from databricks.sdk.service.catalog import (
+    AwsIamRole,
+    ExternalLocationInfo,
+    StorageCredentialInfo,
+)
 from databricks.sdk.service.compute import InstanceProfile
 
 from databricks.labs.ucx.assessment.aws import (
@@ -731,7 +737,7 @@ def test_instance_profiles_empty_mapping(caplog):
     installation = MockInstallation()
     aws_resource_permissions = AWSResourcePermissions(installation, ws, MockBackend(), aws, "ucx")
     aws_resource_permissions.save_instance_profile_permissions()
-    assert 'No Mapping Was Generated.' in caplog.messages
+    assert 'No mapping was generated.' in caplog.messages
 
 
 def test_uc_roles_empty_mapping(caplog):
@@ -744,7 +750,7 @@ def test_uc_roles_empty_mapping(caplog):
     installation = MockInstallation()
     aws_resource_permissions = AWSResourcePermissions(installation, ws, MockBackend(), aws, "ucx")
     aws_resource_permissions.save_uc_compatible_roles()
-    assert 'No Mapping Was Generated.' in caplog.messages
+    assert 'No mapping was generated.' in caplog.messages
 
 
 def test_command(caplog):
@@ -771,6 +777,25 @@ def test_create_uc_role(mocker):
         '{"Version":"2012-10-17","Statement":[{"Effect":"Allow","Principal":'
         '{"AWS":"arn:aws:iam::414351767826:role/unity-catalog-prod-UCMasterRole-14S5ZJVKOTYTL"}'
         ',"Action":"sts:AssumeRole","Condition":{"StringEquals":{"sts:ExternalId":"0000"}}}]} --output json'
+    ) in command_calls
+
+
+def test_update_uc_trust_role(mocker):
+    command_calls = []
+    mocker.patch("shutil.which", return_value="/path/aws")
+
+    def command_call(cmd: str):
+        command_calls.append(cmd)
+        return 0, '{"VALID":"JSON"}', ""
+
+    aws = AWSResources("Fake_Profile", command_call)
+    aws.update_uc_trust_role("test_role", "1234")
+    assert (
+        '/path/aws iam update-assume-role-policy --role-name test_role '
+        '--policy-document '
+        '{"Version":"2012-10-17","Statement":[{"Effect":"Allow","Principal":'
+        '{"AWS":"arn:aws:iam::414351767826:role/unity-catalog-prod-UCMasterRole-14S5ZJVKOTYTL"}'
+        ',"Action":"sts:AssumeRole","Condition":{"StringEquals":{"sts:ExternalId":"1234"}}}]} --output json'
     ) in command_calls
 
 
@@ -860,14 +885,8 @@ def test_create_uc_role_multiple():
     aws_resource_permissions.create_uc_roles_cli(single_role=False)
     assert call('UC_ROLE-1') in aws.add_uc_role.call_args_list
     assert call('UC_ROLE-2') in aws.add_uc_role.call_args_list
-    assert (
-        call('UC_ROLE-1', 'UC_POLICY-1', {'BUCKET1/FOLDER1'}, account_id=None, kms_key=None)
-        in aws.add_uc_role_policy.call_args_list
-    )
-    assert (
-        call('UC_ROLE-2', 'UC_POLICY-2', {'BUCKET2/FOLDER2'}, account_id=None, kms_key=None)
-        in aws.add_uc_role_policy.call_args_list
-    )
+    assert call('UC_ROLE-1', 'UC_POLICY-1', {'BUCKET1/FOLDER1'}, None, None) in aws.add_uc_role_policy.call_args_list
+    assert call('UC_ROLE-2', 'UC_POLICY-2', {'BUCKET2/FOLDER2'}, None, None) in aws.add_uc_role_policy.call_args_list
 
 
 def test_get_uc_compatible_roles():
@@ -931,7 +950,7 @@ def test_get_uc_compatible_roles():
         ResourceDoesNotExist(),
         [AWSRoleAction("arn:aws:iam::12345:role/uc-role1", "s3", "WRITE_FILES", "s3://BUCKETX/*")],
     ]
-    aws_resource_permissions.get_uc_compatible_roles()
+    aws_resource_permissions.load_uc_compatible_roles()
     installation.assert_file_written(
         'uc_roles_access.csv',
         [
@@ -973,3 +992,76 @@ def test_get_uc_compatible_roles():
             },
         ],
     )
+
+
+def test_create_external_locations():
+    ws = create_autospec(WorkspaceClient)
+    aws = create_autospec(AWSResources)
+    installation = MockInstallation()
+    installation.load = MagicMock()
+    installation.load.return_value = [
+        AWSRoleAction("arn:aws:iam::12345:role/uc-role1", "s3", "WRITE_FILES", "s3://BUCKET1/*"),
+        AWSRoleAction("arn:aws:iam::12345:role/uc-role1", "s3", "WRITE_FILES", "s3://BUCKET2/*"),
+        AWSRoleAction("arn:aws:iam::12345:role/uc-rolex", "s3", "WRITE_FILES", "s3://BUCKETX/FOLDERX"),
+    ]
+    rows = {
+        "external_locations": [["s3://BUCKET1/FOLDER1", 1], ["s3://BUCKET2/FOLDER2", 1], ["s3://BUCKETX/FOLDERX", 1]]
+    }
+    ws.storage_credentials.list.return_value = [
+        StorageCredentialInfo(
+            id="1",
+            name="cred1",
+            aws_iam_role=AwsIamRole("arn:aws:iam::12345:role/uc-role1"),
+        ),
+        StorageCredentialInfo(
+            id="2",
+            name="credx",
+            aws_iam_role=AwsIamRole("arn:aws:iam::12345:role/uc-rolex"),
+        ),
+    ]
+    errors = {}
+    backend = MockBackend(rows=rows, fails_on_first=errors)
+    aws_resource_permissions = AWSResourcePermissions(installation, ws, backend, aws, "ucx")
+    aws_resource_permissions.create_external_locations()
+    calls = [
+        call(mock.ANY, 's3://BUCKET1/FOLDER1', 'cred1'),
+        call(mock.ANY, 's3://BUCKET2/FOLDER2', 'cred1'),
+        call(mock.ANY, 's3://BUCKETX/FOLDERX', 'credx'),
+    ]
+    ws.external_locations.create.assert_has_calls(calls, any_order=True)
+
+
+def test_create_external_locations_skip_existing():
+    ws = create_autospec(WorkspaceClient)
+    aws = create_autospec(AWSResources)
+    installation = MockInstallation()
+    installation.load = MagicMock()
+    installation.load.return_value = [
+        AWSRoleAction("arn:aws:iam::12345:role/uc-role1", "s3", "WRITE_FILES", "s3://BUCKET1/*"),
+        AWSRoleAction("arn:aws:iam::12345:role/uc-rolex", "s3", "WRITE_FILES", "s3://BUCKETX/FOLDERX"),
+    ]
+    rows = {"external_locations": [["s3://BUCKET1/FOLDER1", 1], ["s3://BUCKETX/FOLDERX", 1]]}
+    ws.storage_credentials.list.return_value = [
+        StorageCredentialInfo(
+            id="1",
+            name="cred1",
+            aws_iam_role=AwsIamRole("arn:aws:iam::12345:role/uc-role1"),
+        ),
+        StorageCredentialInfo(
+            id="2",
+            name="credx",
+            aws_iam_role=AwsIamRole("arn:aws:iam::12345:role/uc-rolex"),
+        ),
+    ]
+    ws.external_locations.list.return_value = [
+        ExternalLocationInfo(name="UCX_FOO_1", url="s3://BUCKETX/FOLDERX", credential_name="credx"),
+    ]
+
+    errors = {}
+    backend = MockBackend(rows=rows, fails_on_first=errors)
+    aws_resource_permissions = AWSResourcePermissions(installation, ws, backend, aws, "ucx")
+    aws_resource_permissions.create_external_locations(location_init="UCX_FOO")
+    calls = [
+        call("UCX_FOO_2", 's3://BUCKET1/FOLDER1', 'cred1'),
+    ]
+    ws.external_locations.create.assert_has_calls(calls, any_order=True)

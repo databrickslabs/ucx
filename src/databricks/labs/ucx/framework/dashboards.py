@@ -26,9 +26,10 @@ logger = logging.getLogger(__name__)
 class SimpleQuery:
     dashboard_ref: str
     name: str
-    query: str
-    viz: dict[str, str]
     widget: dict[str, str]
+    viz: dict[str, str]
+    query: str | None = None
+    text: str | None = None
 
     @property
     def key(self):
@@ -126,22 +127,33 @@ class DashboardFromFiles:
             dashboard_folders = [f for f in step_folder.glob("*") if f.is_dir()]
             # Create separate dashboards per step, represented as second-level folders
             for dashboard_folder in dashboard_folders:
-                dashboard_ref = f"{step_folder.stem}_{dashboard_folder.stem}".lower()
-                for query in self._desired_queries(dashboard_folder, dashboard_ref):
-                    try:
-                        self._get_viz_options(query)
-                        self._get_widget_options(query)
-                    except Exception as err:
-                        msg = f"Error in {query.name}: {err}"
-                        raise AssertionError(msg) from err
+                self._validate_folder(dashboard_folder, step_folder)
+
+    def _validate_folder(self, dashboard_folder, step_folder):
+        dashboard_ref = f"{step_folder.stem}_{dashboard_folder.stem}".lower()
+        for query in self._desired_queries(dashboard_folder, dashboard_ref):
+            if query.text:
+                continue
+            try:
+                self._get_viz_options(query)
+                self._get_widget_options(query)
+            except Exception as err:
+                msg = f"Error in {query.name}: {err}"
+                raise AssertionError(msg) from err
 
     def _install_widget(self, query: SimpleQuery, dashboard_ref: str):
         dashboard_id = self._state.dashboards[dashboard_ref]
         widget_options = self._get_widget_options(query)
         # widgets are cleaned up every dashboard redeploy
-        widget = self._ws.dashboard_widgets.create(
-            dashboard_id, widget_options, 1, visualization_id=self._state.viz[query.key]
-        )
+        if query.query:
+            widget = self._ws.dashboard_widgets.create(
+                dashboard_id, widget_options, 1, visualization_id=self._state.viz[query.key]
+            )
+        elif query.text:
+            text = query.text[query.text.index("\n") + 1 :]
+            widget = self._ws.dashboard_widgets.create(dashboard_id, widget_options, 1, text=text)
+        else:
+            raise ValueError("Query or Text should be set")
         assert widget.id is not None
         self._state.widgets[query.key] = widget.id
 
@@ -212,7 +224,11 @@ class DashboardFromFiles:
             assert dashboard.widgets is not None
             for widget in dashboard.widgets:
                 assert widget.id is not None
-                self._ws.dashboard_widgets.delete(widget.id)
+                try:
+                    self._ws.dashboard_widgets.delete(widget.id)
+                except TypeError:
+                    logger.warning("Type error in SDK API response, ES-1061370")
+                    # Tracking bug in ES-1061370
             return
         dashboard = self._ws.dashboards.create(dashboard_name, run_as_role=RunAsRole.VIEWER, parent=parent_folder_id)
         assert dashboard.id is not None
@@ -238,9 +254,25 @@ class DashboardFromFiles:
                     widget=self._parse_magic_comment(f, "-- widget ", text),
                 )
             )
+        for f in local_folder.glob("*.md"):
+            if f.name == "README.md":
+                continue
+            text = f.read_text("utf8")
+            desired_queries.append(
+                SimpleQuery(
+                    dashboard_ref=dashboard_ref,
+                    name=f.name,
+                    text=text,
+                    widget=self._parse_magic_comment(f, "-- widget ", text),
+                    viz={},
+                )
+            )
         return desired_queries
 
     def _install_viz(self, query: SimpleQuery):
+        if query.text:
+            logger.debug(f"Skipping viz {query.name} because it's a text widget")
+            return None
         viz_args = self._get_viz_options(query)
         if query.key in self._state.viz:
             return self._ws.query_visualizations.update(self._state.viz[query.key], **viz_args)
@@ -258,6 +290,9 @@ class DashboardFromFiles:
         return viz_args
 
     def _install_query(self, query: SimpleQuery, dashboard_name: str, data_source_id: str, parent: str):
+        if query.text:
+            logger.debug(f"Skipping query {query.name} because it's a text widget")
+            return None
         query_meta = {
             "data_source_id": data_source_id,
             "name": f"{dashboard_name} - {query.name}",

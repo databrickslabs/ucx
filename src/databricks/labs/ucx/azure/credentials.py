@@ -18,7 +18,7 @@ from databricks.labs.ucx.azure.access import (
     AzureResourcePermissions,
     StoragePermissionMapping,
 )
-from databricks.labs.ucx.azure.resources import AzureResources
+from databricks.labs.ucx.azure.resources import AzureAPIClient, AzureResources
 from databricks.labs.ucx.config import WorkspaceConfig
 from databricks.labs.ucx.framework.crawlers import StatementExecutionBackend
 from databricks.labs.ucx.hive_metastore.locations import ExternalLocations
@@ -131,7 +131,7 @@ class StorageCredentialManager:
 
         if not validation.results:
             return StorageCredentialValidationResult.from_validation(
-                permission_mapping, ["Validation returned none results."]
+                permission_mapping, ["Validation returned no results."]
             )
 
         failures = []
@@ -171,7 +171,12 @@ class ServicePrincipalMigration(SecretsMixin):
 
         config = installation.load(WorkspaceConfig)
         sql_backend = StatementExecutionBackend(ws, config.warehouse_id)
-        azurerm = AzureResources(ws)
+        azure_mgmt_client = AzureAPIClient(
+            ws.config.arm_environment.resource_manager_endpoint,
+            ws.config.arm_environment.service_management_endpoint,
+        )
+        graph_client = AzureAPIClient("https://graph.microsoft.com", "https://graph.microsoft.com")
+        azurerm = AzureResources(azure_mgmt_client, graph_client)
         locations = ExternalLocations(ws, sql_backend, config.inventory_database)
 
         resource_permissions = AzureResourcePermissions(installation, ws, azurerm, locations)

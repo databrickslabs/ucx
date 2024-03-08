@@ -26,8 +26,8 @@ classifiers = [
     "Programming Language :: Python :: 3.11",
     "Programming Language :: Python :: Implementation :: CPython",
 ]
-dependencies = ["databricks-sdk~=0.20.0",
-                "databricks-labs-blueprint~=0.2.4",
+dependencies = ["databricks-sdk~=0.21.0",
+                "databricks-labs-blueprint~=0.3.1",
                 "PyYAML>=6.0.0,<7.0.0"]
 
 [project.entry-points.databricks]
@@ -598,7 +598,7 @@ default-docstring-type = "default"
 
 [tool.pylint.refactoring]
 # Maximum number of nested blocks for function / method body
-max-nested-blocks = 5
+max-nested-blocks = 3
 
 # Complete name of functions that never returns. When checking for inconsistent-
 # return-statements if a never returning function is called then it will be

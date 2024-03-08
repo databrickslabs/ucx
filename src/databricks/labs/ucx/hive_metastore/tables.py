@@ -1,7 +1,7 @@
 import logging
 import re
 import typing
-from collections.abc import Iterable, Iterator
+from collections.abc import Iterable
 from dataclasses import dataclass
 from enum import Enum, auto
 from functools import partial
@@ -10,7 +10,6 @@ from databricks.labs.blueprint.parallel import Threads
 
 from databricks.labs.ucx.framework.crawlers import CrawlerBase, SqlBackend
 from databricks.labs.ucx.framework.utils import escape_sql_identifier
-from databricks.labs.ucx.mixins.sql import Row
 
 logger = logging.getLogger(__name__)
 
@@ -88,14 +87,15 @@ class Table:
         if not self.location:
             return False
         for prefix in self.DBFS_ROOT_PREFIXES:
-            if self.location.startswith(prefix):
-                for exception in self.DBFS_ROOT_PREFIX_EXCEPTIONS:
-                    if self.location.startswith(exception):
-                        return False
-                for db_datasets in self.DBFS_DATABRICKS_DATASETS:
-                    if self.location.startswith(db_datasets):
-                        return False
-                return True
+            if not self.location.startswith(prefix):
+                continue
+            for exception in self.DBFS_ROOT_PREFIX_EXCEPTIONS:
+                if self.location.startswith(exception):
+                    return False
+            for db_datasets in self.DBFS_DATABRICKS_DATASETS:
+                if self.location.startswith(db_datasets):
+                    return False
+            return True
         return False
 
     @property
@@ -157,7 +157,7 @@ class MigrationCount:
 
 
 class TablesCrawler(CrawlerBase):
-    def __init__(self, backend: SqlBackend, schema):
+    def __init__(self, backend: SqlBackend, schema, include_databases: list[str] | None = None):
         """
         Initializes a TablesCrawler instance.
 
@@ -166,9 +166,12 @@ class TablesCrawler(CrawlerBase):
             schema: The schema name for the inventory persistence.
         """
         super().__init__(backend, "hive_metastore", schema, "tables", Table)
+        self._include_database = include_databases
 
-    def _all_databases(self) -> Iterator[Row]:
-        yield from self._fetch("SHOW DATABASES")
+    def _all_databases(self) -> list[str]:
+        if not self._include_database:
+            return [row[0] for row in self._fetch("SHOW DATABASES")]
+        return self._include_database
 
     def snapshot(self) -> list[Table]:
         """
@@ -214,7 +217,7 @@ class TablesCrawler(CrawlerBase):
         """
         tasks = []
         catalog = "hive_metastore"
-        for (database,) in self._all_databases():
+        for database in self._all_databases():
             logger.debug(f"[{catalog}.{database}] listing tables")
             for _, table, _is_tmp in self._fetch(
                 f"SHOW TABLES FROM {escape_sql_identifier(catalog)}.{escape_sql_identifier(database)}"

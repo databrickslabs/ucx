@@ -1,205 +1,177 @@
-# Permissions migration logic and data structures
+Workspace Group Migration
+===
 
-During the UC adoption, it's critical to move the groups from the workspace to account level.
+<!-- TOC -->
+* [Workspace Group Migration](#workspace-group-migration)
+* [Design](#design)
+  * [Group Manager](#group-manager)
+  * [Permission Manager](#permission-manager)
+  * [ACL Support](#acl-support)
+    * [Generic Permissions](#generic-permissions)
+    * [Dashboard Permissions](#dashboard-permissions)
+    * [Entitlements and Roles](#entitlements-and-roles)
+    * [Secret Scope Permissions](#secret-scope-permissions)
+    * [Legacy Table Access Controls](#legacy-table-access-controls)
+* [Troubleshooting](#troubleshooting)
+<!-- TOC -->
 
-To deliver this migration, the following steps are performed:
+This feature introduces the ability to migrate groups from workspace level to account level in 
+the [group migration workflow](../README.md#group-migration-workflow). It helps you to upgrade all Databricks workspace assets:
+Legacy Table ACLs, Entitlements, AWS instance profiles, Clusters, Cluster policies, Instance Pools, 
+Databricks SQL warehouses, Delta Live Tables, Jobs, MLflow experiments, MLflow registry, SQL Dashboards & Queries,
+SQL Alerts, Token and Password usage permissions that are set on the workspace level, Secret scopes, Notebooks,
+Directories, Repos, and Files. 
 
-| Step description                                                                                                                                                                                                                                                                                       | Relevant API method                                      |
-|--------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|----------------------------------------------------------|
-| A set of groups to be migrated is identified (either via `groups.selected` config property, or automatically).<br/>Group existence is verified against the account level.<br/>**If there is no group on the account level, an error is thrown.**<br/>Backup groups are created on the workspace level. | `toolkit.prepare_groups_in_environment()`                |
-| Inventory table is cleaned up.                                                                                                                                                                                                                                                                         | `toolkit.cleanup_inventory_table()`                      |
-| Workspace local group permissions are inventorized and saved into a Delta Table.                                                                                                                                                                                                                       | `toolkit.inventorize_permissions()`                      |
-| Backup groups are entitled with permissions from the inventory table.                                                                                                                                                                                                                                  | `toolkit.apply_permissions_to_backup_groups()`           |
-| Workspace-level groups are deleted.  Account-level groups are granted with access to the workspace.<br/>Workspace-level entitlements are synced from backup groups to newly added account-level groups.                                                                                                | `toolkit.replace_workspace_groups_with_account_groups()` |
-| Account-level groups are entitled with workspace-level permissions from the inventory table.                                                                                                                                                                                                           | `toolkit.apply_permissions_to_account_groups()`          |
-| Backup groups are deleted                                                                                                                                                                                                                                                                              | `toolkit.delete_backup_groups()`                         |
-| Inventory table is cleaned up. This step is optional.                                                                                                                                                                                                                                                  | `toolkit.cleanup_inventory_table()`                      |
+It ensures that all the necessary groups are available in the workspace with the correct permissions, and removes any unnecessary groups and permissions. 
+The tasks in the group migration workflow depend on the output of the assessment workflow and can be executed in sequence to ensure a successful migration. 
+The output of each task is stored in Delta tables in the `$inventory_database` schema. 
 
-> Please note that inherited permissions will not be inventorized / migrated. We only cover direct permissions.
+The group migration workflow can be executed multiple times to ensure that all the groups are migrated successfully and that all the necessary permissions are assigned.
 
-On a very high-level, the permissions crawling process is split into two steps:
+1. `crawl_groups`: This task scans all groups for the local group migration scope.
+2. `rename_workspace_local_groups`: This task renames workspace local groups by adding a `ucx-renamed-` prefix. This step is taken to avoid conflicts with account-level groups that may have the same name as workspace-local groups.
+3. `reflect_account_groups_on_workspace`: This task adds matching account groups to this workspace. The matching account level group(s) must preexist(s) for this step to be successful. This step is necessary to ensure that the account-level groups are available in the workspace for assigning permissions.
+4. `apply_permissions_to_account_groups`: This task assigns the full set of permissions of the original group to the account-level one. It covers local workspace-local permissions for all entities, including Legacy Table ACLs, Entitlements, AWS instance profiles, Clusters, Cluster policies, Instance Pools, Databricks SQL warehouses, Delta Live Tables, Jobs, MLflow experiments, MLflow registry, SQL Dashboards & Queries, SQL Alerts, Token and Password usage permissions, Secret Scopes, Notebooks, Directories, Repos, Files. This step is necessary to ensure that the account-level groups have the necessary permissions to manage the entities in the workspace.
+5. `validate_groups_permissions`: This task validates that all the crawled permissions are applied correctly to the destination groups.
+6. `delete_backup_groups`: This task removes all workspace-level backup groups, along with their permissions. This should only be executed after confirming that the workspace-local migration worked successfully for all the groups involved. This step is necessary to clean up the workspace and remove any unnecessary groups and permissions.
 
-1. collect all existing permissions into a persistent storage - see `workspace_access.AclSupport.get_crawler_tasks`.
-2. apply the collected permissions to the target resources - see `workspace_access.AclSupport.get_apply_task`.
+[[back to top](#workspace-group-migration)]
 
-We implement `workspace_access.AclSupport` for each supported resource type.
+# Design
 
-## Logical objects and relevant APIs
+`MigratedGroup` class represents a group that has been migrated from one name to another and stores information about 
+the original and new names, as well as the group's members, external ID, and roles. The `MigrationState` class holds 
+the state of the migration process and provides methods for getting the target principal and temporary name for a given 
+group name.
 
-### Group level properties (uses SCIM API)
+[[back to top](#workspace-group-migration)]
 
-- [x] Entitlements (One
-  of `workspace-access`, `databricks-sql-access`, `allow-cluster-create`, `allow-instance-pool-create`)
-- [x] Roles (AWS only)
+## Group Manager
 
-These are workspace-level properties that are not associated with any specific resource.
+The `GroupManager` class is a `CrawlerBase` subclass that manages groups in a Databricks workspace. It provides methods 
+for renaming groups, reflecting account groups on the workspace, deleting original workspace groups, and validating 
+group membership. The class also provides methods for listing workspace and account groups, getting group details, and 
+deleting groups.
 
-Additional info:
+The `GroupMigrationStrategy` abstract base class defines the interface for a strategy that generates a list 
+of `MigratedGroup` objects based on a mapping between workspace and account groups. 
+The `MatchingNamesStrategy`, `MatchByExternalIdStrategy`, `RegexSubStrategy`, and `RegexMatchStrategy` classes are 
+concrete implementations of this interface. See [group name conflicts](group_name_conflict.md) for more details.
 
-- object ID: `group_id`
-- listing method: `ws.groups.list`
-- get method: `ws.groups.get(group_id)`
-- put method: `ws.groups.patch(group_id)`
+The `ConfigureGroups` class provides a command-line interface for configuring the group migration process during [installation](../README.md#installation). 
+It prompts the user to enter information about the group migration strategy, such as the renamed group prefix, regular expressions 
+for matching and substitution, and a list of groups to migrate. The class also provides methods for validating user input 
+and setting class variables based on the user's responses.
 
-### Compute infrastructure (uses Permissions API)
+[[back to top](#workspace-group-migration)]
 
-- [x] Clusters
-- [x] Cluster policies
-- [x] Instance pools
-- [x] SQL warehouses
+## Permission Manager
 
-These are compute infrastructure resources that are associated with a specific workspace.
+It enables to crawl, save, and apply permissions for [clusters](#generic-permissions), 
+[tables and UDFs (User-Defined Functions)](#legacy-table-access-controls), [secret scopes](#secret-scope-permissions), 
+[entitlements](#entitlements-and-roles), and [dashboards](#dashboard-permissions).
 
-Additional info:
+To use the module, you can create a `PermissionManager` instance by calling the `factory` method, which sets up 
+the necessary [`AclSupport` objects](#acl-support) for different types of objects in the workspace. Once the instance 
+is created, you can call the `inventorize_permissions` method to crawl and save the permissions for all objects to 
+the inventory database in the `permissions` table.
 
-- object ID: `cluster_id`, `policy_id`, `instance_pool_id`, `id` (SQL warehouses)
-- listing method: `ws.clusters.list`, `ws.cluster_policies.list`, `ws.instance_pools.list`, `ws.warehouses.list`
-- get method: `ws.permissions.get(object_id, object_type)`
-- put method: `ws.permissions.update(object_id, object_type)`
-- get response object type: `databricks.sdk.service.iam.ObjectPermissions`
+The `apply_group_permissions` method allows you to apply the permissions to a list of account groups, while 
+the [`verify_group_permissions` method](../README.md#validate-groups-membership-command) verifies that the permissions are valid. 
 
-### Workflows (uses Permissions API)
+[[back to top](#workspace-group-migration)]
 
-- [x] Jobs
-- [x] Delta Live Tables
+## ACL Support
 
-These are workflow resources that are associated with a specific workspace.
+The `AclSupport` objects define how to crawl, save, and apply permissions for specific types of objects in the workspace:
 
-Additional info:
+* `get_crawler_tasks`: A method that returns a list of callables that crawl and return permissions for the objects supported by the `AclSupport` instance. This method should be implemented to provide the necessary logic for crawling permissions for the specific type of object supported.
+* `get_apply_task`: A method that returns a callable that applies the permissions for a given `Permissions` object to a destination group, based on the group's migration state. The callable should not have any shared mutable state, ensuring thread safety and reducing the risk of bugs.
+* `get_verify_task`: A method that returns a callable that verifies that the permissions for a given `Permissions` object are applied correctly to the destination group. This method can be used to ensure that permissions are applied as expected, helping to improve the reliability and security of your Databricks workspace.
+* `object_types`: An abstract method that returns a set of strings representing the object types that the `AclSupport` instance supports. This method should be implemented to provide the necessary information about the object types supported by the `AclSupport` class.
 
-- object ID: `job_id`, `pipeline_id`
-- listing method: `ws.jobs.list`, `ws.pipelines.list`
-- get method: `ws.permissions.get(object_id, object_type)`
-- put method: `ws.permissions.update(object_id, object_type)`
-- get response object type: `databricks.sdk.service.iam.ObjectPermissions`
+The `Permissions` dataclass is used to represent the permissions for a specific object type and ID. The dataclass includes a `raw` attribute 
+that contains the raw permission data as a string, providing a convenient way to work with the underlying permission data.
 
-### ML (uses Permissions API)
+[[back to top](#workspace-group-migration)]
 
-- [x] MLflow experiments
-- [x] MLflow models
+### Generic Permissions
 
-These are ML resources that are associated with a specific workspace.
+The `GenericPermissionsSupport` class is a concrete implementation of the [`AclSupport` interface](#acl-support) for 
+migrating permissions on various objects in a Databricks workspace. It is designed to be flexible and support almost any 
+object type in the workspace:
 
-Additional info:
+- clusters
+- cluster policies
+- instance pools
+- sql warehouses
+- jobs
+- pipelines
+- serving endpoints
+- experiments
+- registered models
+- token usage
+- password usage
+- feature tables
+- notebooks
+- workspace folders
 
-- object ID: `experiment_id`, `id` (models)
-- listing method: custom listing
-- get method: `ws.permissions.get(object_id, object_type)`
-- put method: `ws.permissions.update(object_id, object_type)`
-- get response object type: `databricks.sdk.service.iam.ObjectPermissions`
+It takes in an instance of the `WorkspaceClient` class, a list of `Listing` objects, and a `verify_timeout` parameter in 
+its constructor. The `Listing` objects are responsible for listing the objects in the workspace, and 
+the `GenericPermissionsSupport` class uses these listings to crawl the ACL permissions for each object.
 
-### SQL (uses SQL Permissions API)
+The `_apply_grant` method applies the ACL permission to the target principal in the database, and the `_verify` method 
+checks if the ACL permission in the `Grant` object matches the ACL permission for that object and principal in the database. 
+If the ACL permission does not match, the method raises a `ValueError` with an error message. The `get_verify_task` method 
+takes in a `Permissions` object and returns a callable object that calls the `_verify` method with the object type, 
+object ID, and `Grant` object from the `Permissions` object.
 
-- [x] Alerts
-- [x] Dashboards
-- [x] Queries
+he `_safe_get_permissions` and `_safe_updatepermissions` methods are used to safely get and update the permissions for 
+a given object type and ID, respectively. These methods handle exceptions that may occur during the API calls and log 
+appropriate warning messages.
 
-These are SQL resources that are associated with a specific workspace.
+[[back to top](#workspace-group-migration)]
 
-Additional info:
+### Dashboard Permissions
 
-- object ID: `id`
-- listing method: `ws.alerts.list`, `ws.dashboards.list`, `ws.queries.list`
-- get method: `ws.dbsql_permissions.get`
-- put method: `ws.dbsql_permissions.set`
-- get response object type: `databricks.sdk.service.sql.GetResponse`
-- Note that API has no support for UPDATE operation, only PUT (overwrite) is supported.
+Reflected in [RedashPermissionsSupport](../src/databricks/labs/ucx/workspace_access/redash.py). See [examples](../tests/integration/workspace_access/test_redash.py) for more details on how to use it as a library.
 
-### Security (uses Permissions API)
+[[back to top](#workspace-group-migration)]
 
-- [x] Tokens
-- [x] Passwords
+### Entitlements and Roles
 
-These are security resources that are associated with a specific workspace.
+The `ScimSupport` is [`AclSupport`](#acl-support) that creates a snapshot of all the groups in the workspace, including their display name, id, meta, roles, and entitlements. 
+The `_is_item_relevant` method checks if a permission item is relevant to the current migration state. The `get_crawler_tasks` method returns an iterator of partial functions 
+for crawling the permissions of each group in the snapshot. It checks if the group has any roles or entitlements and returns a partial function to crawl the corresponding property.
 
-Additional info:
+See [examples](../tests/integration/workspace_access/test_scim.py) for more details on how to use it as a library.
 
-- object ID: `tokens` (static value), `passwords` (static value)
-- listing method: N/A
-- get method: `ws.permissions.get(object_id, object_type)`
-- put method: `ws.permissions.update(object_id, object_type)`
-- get response object type: `databricks.sdk.service.iam.ObjectPermissions`
+[[back to top](#workspace-group-migration)]
 
-### Workspace (uses Permissions API)
+### Secret Scope Permissions
 
-- [x] Notebooks
-- [x] Directories
-- [x] Repos
-- [x] Files
+`SecretScopesSupport` is a concrete implementation of the [`AclSupport` interface](#acl-support) for crawling ACLs of 
+all secret scopes, applying and verifying ACLs, and checking if a `Permissions` object is relevant to the current 
+migration state. It simplifies the process of managing permissions on secret scopes by checking if the ACLs have been 
+applied correctly, and if not, automatically reapplying them.
 
-These are workspace resources that are associated with a specific workspace.
+[[back to top](#workspace-group-migration)]
 
-Additional info:
+### Legacy Table Access Controls
 
-- object ID: `object_id`
-- listing method: custom listing
-- get method: `ws.permissions.get(object_id, object_type)`
-- put method: `ws.permissions.update(object_id, object_type)`
-- get response object type: `databricks.sdk.service.iam.ObjectPermissions`
+The `TableAclSupport` class is initialized with an instance of `GrantsCrawler` and `SqlBackend` classes, along with a `verify_timeout` parameter.
+The class offers methods for crawling table ACL permissions, applying and verifying ACL permissions, and checking if a `Permissions` object is relevant to the current migration state. 
+The `get_crawler_tasks` method returns an iterator of callable objects, each of which returns a `Permissions` object for a specific table ACL permission. 
+The `_from_reduced` method creates a `Grant` object for each set of folded actions, and the `get_apply_task` method applies the ACL permission in the `Permissions` object to the target principal in the `MigrationState` object.
+Furthermore, the `_apply_grant` method applies the ACL permission to the target principal in the database, while the `_verify` method checks if the ACL permission in 
+the `Grant` object matches the ACL permission for that object and principal in the database. The `get_verify_task` method calls the `_verify` method with the object type, 
+object ID, and `Grant` object from the `Permissions` object.
 
-#### Known issues
+[[back to top](#workspace-group-migration)]
 
-- Folder names with forward-slash (`/`) in directory name will be skipped by the inventory. Databricks UI no longer
-  allows creating folders with a forward slash. See [this issue](https://github.com/databrickslabs/ucx/issues/230) for
-  more details.
+# Troubleshooting
 
-### Secrets (uses Secrets API)
-
-- [x] Secrets
-
-These are secrets resources that are associated with a specific workspace.
-
-Additional info:
-
-- object ID: `scope_name`
-- listing method: `ws.secrets.list_scopes()`
-- get method: `ws.secrets.list_acls(scope_name)`
-- put method: `ws.secrets.put_acl`
-
-## AclSupport and serialization logic
-
-Crawlers are expected to return a list of callable functions that will be later used to get the permissions.
-Each of these functions shall return a `workspace_access.Permissions` that should be serializable into a Delta Table.
-The permission payload differs between different crawlers, therefore each crawler should implement a serialization
-method.
-
-## Applier and deserialization logic
-
-Appliers are expected to accept a list of `workspace_access.Permissions` and generate a list of callables that will
-apply the
-given permissions.
-Each applier should implement a deserialization method that will convert the raw payload into a typed one.
-Each permission item should have a crawler type associated with it, so that the applier can use the correct
-deserialization method.
-
-## Relevance identification
-
-Since we save all objects into the permission table, we need to filter out the objects that are not relevant to the
-current migration.
-We do this inside the `applier`, by returning a `noop` callable if the object is not relevant to the current migration.
-
-## Crawling the permissions
-
-To crawl the permissions, we use the following logic:
-
-1. Go through the list of all crawlers.
-2. Get the list of all objects of the given type.
-3. For each object, generate a callable that will return a `workspace_access.Permissions`.
-4. Execute the callables in parallel
-5. Collect the results into a list of `workspace_access.Permissions`.
-6. Save the list of `workspace_access.Permissions` into a Delta Table.
-
-## Applying the permissions
-
-To apply the permissions, we use the following logic:
-
-1. Read the Delta Table with raw permissions.
-2. Map the items to the relevant `support` object. If no relevant `support` object is found, an exception is raised.
-3. Deserialize the items using the relevant applier.
-4. Generate a list of callables that will apply the permissions.
-5. Execute the callables in parallel.
-
-## Troubleshooting
+Use [`DEBUG` notebook](../README.md#debug-notebook) to troubleshoot anything.
 
 Below are some useful code snippets that can be useful for troubleshooting.
 Make sure to install [databricks-sdk](https://docs.databricks.com/en/dev-tools/sdk-python.html) on the cluster to run
@@ -296,7 +268,7 @@ databricks_logger.setLevel(logging.DEBUG)
 ucx_logger = logging.getLogger("databricks.labs.ucx")
 ucx_logger.setLevel(logging.DEBUG)
 
-log_file = "/Workspace/Users/jaf2bh@bosch.com/recovery.log"
+log_file = "/Workspace/Users/jaf2bh@example.com/recovery.log"
 
 # files are available in the workspace only once their handlers are closed,
 # so we rotate files log every 10 minutes.
@@ -318,3 +290,5 @@ finally:
     # IMPORTANT!!!!
     file_handler.close()
 ```
+
+[[back to top](#workspace-group-migration)]

@@ -2,16 +2,19 @@ name: acceptance
 
 on:
   pull_request:
-    types: [opened, synchronize]
+    types: [ opened, synchronize, ready_for_review ]
 
 permissions:
   id-token: write
   contents: read
   pull-requests: write
 
+concurrency:
+  group: single-acceptance-job-per-repo
+
 jobs:
   integration:
-    if: github.event_name == 'pull_request'
+    if: github.event_name == 'pull_request' && github.event.pull_request.draft == false
     environment: account-admin
     runs-on: larger
     steps:

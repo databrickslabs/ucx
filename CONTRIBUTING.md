@@ -214,46 +214,36 @@ To begin, run `make dev` to install [Hatch](https://github.com/pypa/hatch), crea
 make dev
 ```
 
+Configure your IDE to use `.venv/bin/python` from the virtual environment when developing the project:
+![IDE Setup](docs/hatch-intellij.gif)
+
+
 Verify installation with 
 ```shell
 make test
 ```
 
-To ensure your integrated development environment (IDE) uses the newly created virtual environment, you can retrieve the Python path with this command:
-```shell
-hatch run python -c "import sys; print(sys.executable)"
-```
 
-Configure your IDE to use this Python path so that you work within the virtual environment when developing the project:
-![IDE Setup](docs/hatch-intellij.gif)
-
-Before every commit, apply the consistent formatting of the code, as we want our codebase look consistent:
+Before every commit, apply the consistent styleguide and formatting of the code, as we want our codebase to look consistent. Consult the [Google Python Style Guide](https://google.github.io/styleguide/pyguide.html) if you have any doubts. Make sure to run the tests.
 ```shell
-make fmt
-```
-
-Before every commit, run automated bug detector (`make lint`) and unit tests (`make test`) to ensure that automated
-pull request checks do pass, before your code is reviewed by others: 
-```shell
-make lint test
+make fmt test
 ```
 
 ## First contribution
 
 Here are the example steps to submit your first contribution:
 
-1. Make a Fork from ucx repo (if you really want to contribute)
+1. [Make a Fork](https://docs.github.com/en/pull-requests/collaborating-with-pull-requests/working-with-forks/fork-a-repo) from the repo
 2. `git clone`
 3. `git checkout main` (or `gcm` if you're using [ohmyzsh](https://ohmyz.sh/)).
 4. `git pull` (or `gl` if you're using [ohmyzsh](https://ohmyz.sh/)).
 5. `git checkout -b FEATURENAME` (or `gcb FEATURENAME` if you're using [ohmyzsh](https://ohmyz.sh/)).
 6. .. do the work
 7. `make fmt`
-8. `make lint`
 9. .. fix if any
 10. `make test`
 11. .. fix if any
-12. `git commit -a`. Make sure to enter meaningful commit message title.
+12. `git commit -a`. Make sure to enter a meaningful commit message title.
 13. `git push origin FEATURENAME`
 14. Go to GitHub UI and create PR. Alternatively, `gh pr create` (if you have [GitHub CLI](https://cli.github.com/) installed). 
     Use a meaningful pull request title because it'll appear in the release notes. Use `Resolves #NUMBER` in pull
@@ -270,7 +260,7 @@ If you encounter any package dependency errors after `git pull`, run `make clean
 Sometimes, when dependencies are updated via `dependabot` for example, the environment may report the following error:
 
 ```sh
-$ hatch run unit:test-cov-report
+...
 ERROR: Cannot install databricks-labs-ucx[test]==0.0.3 and databricks-sdk~=0.8.0 because these package versions have conflicting dependencies.
 ERROR: ResolutionImpossible: for help visit https://pip.pypa.io/en/latest/topics/dependency-resolution/#dealing-with-dependency-conflicts
 ```
@@ -298,8 +288,7 @@ $ hatch env show
 │             │         │ ruff>=0.0.243                  │                 │
 └─────────────┴─────────┴────────────────────────────────┴─────────────────┘
 
-$ hatch env remove unit
-$ hatch run unit:test-cov-report
+$ make clean dev test
 ========================================================================================== test session starts ===========================================================================================
 platform darwin -- Python 3.11.4, pytest-7.4.1, pluggy-1.3.0 -- /Users/lars.george/Library/Application Support/hatch/env/virtual/databricks-labs-ucx/H6b8Oom-/unit/bin/python
 cachedir: .pytest_cache

@@ -6,6 +6,7 @@ import re
 import sys
 import time
 import webbrowser
+from collections.abc import Callable
 from dataclasses import replace
 from datetime import datetime, timedelta
 from pathlib import Path
@@ -16,6 +17,7 @@ from databricks.labs.blueprint.installation import Installation
 from databricks.labs.blueprint.installer import InstallState
 from databricks.labs.blueprint.parallel import ManyError, Threads
 from databricks.labs.blueprint.tui import Prompts
+from databricks.labs.blueprint.upgrades import Upgrades
 from databricks.labs.blueprint.wheels import ProductInfo, WheelsV2, find_project_root
 from databricks.sdk import WorkspaceClient
 from databricks.sdk.errors import (  # pylint: disable=redefined-builtin
@@ -165,6 +167,7 @@ def deploy_schema(sql_backend: SqlBackend, inventory_schema: str):
     )
     deployer.deploy_view("objects", "queries/views/objects.sql")
     deployer.deploy_view("grant_detail", "queries/views/grant_detail.sql")
+    deployer.deploy_view("table_estimates", "queries/views/table_estimates.sql")
 
 
 class WorkspaceInstaller:
@@ -176,33 +179,123 @@ class WorkspaceInstaller:
         self._installation = installation
         self._prompts = prompts
 
-    def run(self):
+    def run(
+        self,
+        verify_timeout=timedelta(minutes=2),
+        sql_backend_factory: Callable[[WorkspaceConfig], SqlBackend] | None = None,
+        wheel_builder_factory: Callable[[], WheelsV2] | None = None,
+    ):
         logger.info(f"Installing UCX v{PRODUCT_INFO.version()}")
         config = self.configure()
-        sql_backend = StatementExecutionBackend(self._ws, config.warehouse_id)
-        wheels = WheelsV2(self._installation, PRODUCT_INFO)
+        if not sql_backend_factory:
+            sql_backend_factory = self._new_sql_backend
+        if not wheel_builder_factory:
+            wheel_builder_factory = self._new_wheel_builder
         workspace_installation = WorkspaceInstallation(
             config,
             self._installation,
-            sql_backend,
-            wheels,
+            sql_backend_factory(config),
+            wheel_builder_factory(),
             self._ws,
             self._prompts,
-            verify_timeout=timedelta(minutes=2),
+            verify_timeout=verify_timeout,
         )
-        workspace_installation.run()
+        try:
+            workspace_installation.run()
+        except ManyError as err:
+            if len(err.errs) == 1:
+                raise err.errs[0] from None
+            raise err
+
+    def _new_wheel_builder(self):
+        return WheelsV2(self._installation, PRODUCT_INFO)
+
+    def _new_sql_backend(self, config: WorkspaceConfig) -> SqlBackend:
+        return StatementExecutionBackend(self._ws, config.warehouse_id)
 
     def configure(self) -> WorkspaceConfig:
         try:
-            return self._installation.load(WorkspaceConfig)
+            config = self._installation.load(WorkspaceConfig)
+            self._apply_upgrades()
+            return config
         except NotFound as err:
             logger.debug(f"Cannot find previous installation: {err}")
+        return self._configure_new_installation()
+
+    def _apply_upgrades(self):
+        try:
+            upgrades = Upgrades(PRODUCT_INFO, self._installation)
+            upgrades.apply(self._ws)
+        except NotFound as err:
+            logger.warning(f"Installed version is too old: {err}")
+            return
+
+    def _configure_new_installation(self) -> WorkspaceConfig:
         logger.info("Please answer a couple of questions to configure Unity Catalog migration")
         HiveMetastoreLineageEnabler(self._ws).apply(self._prompts)
         inventory_database = self._prompts.question(
             "Inventory Database stored in hive_metastore", default="ucx", valid_regex=r"^\w+$"
         )
 
+        warehouse_id = self._configure_warehouse()
+        configure_groups = ConfigureGroups(self._prompts)
+        configure_groups.run()
+
+        log_level = self._prompts.question("Log level", default="INFO").upper()
+        num_threads = int(self._prompts.question("Number of threads", default="8", valid_number=True))
+
+        # Checking for external HMS
+        instance_profile = None
+        spark_conf_dict = {}
+        policies_with_external_hms = list(self._get_cluster_policies_with_external_hive_metastores())
+        if len(policies_with_external_hms) > 0 and self._prompts.confirm(
+            "We have identified one or more cluster policies set up for an external metastore"
+            "Would you like to set UCX to connect to the external metastore?"
+        ):
+            logger.info("Setting up an external metastore")
+            cluster_policies = {conf.name: conf.definition for conf in policies_with_external_hms}
+            if len(cluster_policies) >= 1:
+                cluster_policy = json.loads(self._prompts.choice_from_dict("Choose a cluster policy", cluster_policies))
+                instance_profile, spark_conf_dict = self._get_ext_hms_conf_from_policy(cluster_policy)
+
+        policy_id = self._create_cluster_policy(inventory_database, spark_conf_dict, instance_profile)
+
+        # Check if terraform is being used
+        is_terraform_used = self._prompts.confirm("Do you use Terraform to deploy your infrastructure?")
+        config = WorkspaceConfig(
+            inventory_database=inventory_database,
+            workspace_group_regex=configure_groups.workspace_group_regex,
+            workspace_group_replace=configure_groups.workspace_group_replace,
+            account_group_regex=configure_groups.account_group_regex,
+            group_match_by_external_id=configure_groups.group_match_by_external_id,  # type: ignore[arg-type]
+            include_group_names=configure_groups.include_group_names,
+            renamed_group_prefix=configure_groups.renamed_group_prefix,
+            warehouse_id=warehouse_id,
+            log_level=log_level,
+            num_threads=num_threads,
+            instance_profile=instance_profile,
+            spark_conf=spark_conf_dict,
+            policy_id=policy_id,
+            is_terraform_used=is_terraform_used,
+            include_databases=self._select_databases(),
+        )
+        self._installation.save(config)
+        ws_file_url = self._installation.workspace_link(config.__file__)
+        if self._prompts.confirm(f"Open config file in the browser and continue installing? {ws_file_url}"):
+            webbrowser.open(ws_file_url)
+        return config
+
+    def _select_databases(self):
+        selected_databases = self._prompts.question(
+            "Comma-separated list of databases to migrate. If not specified, we'll use all "
+            "databases in hive_metastore",
+            default="<ALL>",
+        )
+        if selected_databases != "<ALL>":
+            return [x.strip() for x in selected_databases.split(",")]
+        return None
+
+    def _configure_warehouse(self):
         def warehouse_type(_):
             return _.warehouse_type.value if not _.enable_serverless_compute else "SERVERLESS"
 
@@ -223,47 +316,7 @@ class WorkspaceInstaller:
                 max_num_clusters=1,
             )
             warehouse_id = new_warehouse.id
-
-        configure_groups = ConfigureGroups(self._prompts)
-        configure_groups.run()
-        log_level = self._prompts.question("Log level", default="INFO").upper()
-        num_threads = int(self._prompts.question("Number of threads", default="8", valid_number=True))
-
-        # Checking for external HMS
-        instance_profile = None
-        spark_conf_dict = {}
-        policies_with_external_hms = list(self._get_cluster_policies_with_external_hive_metastores())
-        if len(policies_with_external_hms) > 0 and self._prompts.confirm(
-            "We have identified one or more cluster policies set up for an external metastore"
-            "Would you like to set UCX to connect to the external metastore?"
-        ):
-            logger.info("Setting up an external metastore")
-            cluster_policies = {conf.name: conf.definition for conf in policies_with_external_hms}
-            if len(cluster_policies) >= 1:
-                cluster_policy = json.loads(self._prompts.choice_from_dict("Choose a cluster policy", cluster_policies))
-                instance_profile, spark_conf_dict = self._get_ext_hms_conf_from_policy(cluster_policy)
-
-        policy_id = self._create_cluster_policy(inventory_database, spark_conf_dict, instance_profile)
-        config = WorkspaceConfig(
-            inventory_database=inventory_database,
-            workspace_group_regex=configure_groups.workspace_group_regex,
-            workspace_group_replace=configure_groups.workspace_group_replace,
-            account_group_regex=configure_groups.account_group_regex,
-            group_match_by_external_id=configure_groups.group_match_by_external_id,  # type: ignore[arg-type]
-            include_group_names=configure_groups.include_group_names,
-            renamed_group_prefix=configure_groups.renamed_group_prefix,
-            warehouse_id=warehouse_id,
-            log_level=log_level,
-            num_threads=num_threads,
-            instance_profile=instance_profile,
-            spark_conf=spark_conf_dict,
-            policy_id=policy_id,
-        )
-        self._installation.save(config)
-        ws_file_url = self._installation.workspace_link(config.__file__)
-        if self._prompts.confirm(f"Open config file in the browser and continue installing? {ws_file_url}"):
-            webbrowser.open(ws_file_url)
-        return config
+        return warehouse_id
 
     @staticmethod
     def _policy_config(value: str):
@@ -366,7 +419,7 @@ class WorkspaceInstallation:
 
     @classmethod
     def current(cls, ws: WorkspaceClient):
-        installation = Installation.current(ws, PRODUCT_INFO.product_name())
+        installation = PRODUCT_INFO.current_installation(ws)
         config = installation.load(WorkspaceConfig)
         sql_backend = StatementExecutionBackend(ws, config.warehouse_id)
         wheels = WheelsV2(installation, PRODUCT_INFO)
@@ -938,6 +991,7 @@ class WorkspaceInstallation:
         self._remove_jobs()
         self._remove_warehouse()
         self._remove_policies()
+        self._remove_secret_scope()
         self._installation.remove()
         logger.info("UnInstalling UCX complete")
 
@@ -956,6 +1010,14 @@ class WorkspaceInstallation:
             self._ws.cluster_policies.delete(policy_id=self.config.policy_id)
         except NotFound:
             logger.error("UCX Policy already deleted")
+
+    def _remove_secret_scope(self):
+        logger.info("Deleting secret scope")
+        try:
+            if self.config.uber_spn_id is not None:
+                self._ws.secrets.delete_scope(self.config.inventory_database)
+        except NotFound:
+            logger.error("Secret scope already deleted")
 
     def _remove_jobs(self):
         logger.info("Deleting jobs")
