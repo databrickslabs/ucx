@@ -14,7 +14,7 @@ def test_aws_validate(env_or_skip):
 def test_get_uc_compatible_roles(ws, sql_backend, env_or_skip, inventory_schema):
     profile = env_or_skip("AWS_DEFAULT_PROFILE")
     awsrp = AWSResourcePermissions.for_cli(ws, sql_backend, profile, inventory_schema)
-    compat_roles = awsrp.get_uc_compatible_roles()
+    compat_roles = awsrp.load_uc_compatible_roles()
     print(compat_roles)
     assert compat_roles
 

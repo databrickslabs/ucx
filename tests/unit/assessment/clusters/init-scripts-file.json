@@ -1,0 +1,27 @@
+{
+  "autoscale": {
+    "max_workers": 6,
+    "min_workers": 1
+  },
+  "cluster_id": "01234-11223344-1122334455",
+  "cluster_name": "UCX Cluster",
+  "policy_id": "single-user-with-spn",
+  "spark_version": "13.3.x-cpu-ml-scala2.12",
+  "init_scripts": [
+    {
+      "file": {
+        "destination": "file:/users/init_scripts/test.sh"
+      }
+    },
+    {
+      "file": {
+        "destination": "file"
+      }
+    },
+    {
+      "workspace": {
+        "destination": "init.sh"
+      }
+    }
+  ]
+}
