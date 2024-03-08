@@ -137,11 +137,20 @@ If there is an existing global installation of UCX, you can force a user install
 
 At this moment there is no global override over a user installation of UCX. As this requires migration and can break existing installations.
 
-Example:
-```commandline
-export UCX_FORCE_INSTALL="user"
-databricks labs install ucx 
-```
+
+| global | user | expected install location | install_folder | mode |
+| --- | --- | --- | --- |--- |
+| no | no | default | `/Applications/ucx` | install |
+| yes | no | default | `/Applications/ucx` | upgrade |
+| no | yes | default | `/Users/X/.ucx` | upgrade (existing installations must not break) |
+| yes | yes | default | `/Users/X/.ucx` | upgrade |
+| yes | no | **USER** | `/Users/X/.ucx` | install (show prompt) |
+| no | yes | **GLOBAL** | ...  | migrate |
+
+
+* `UCX_FORCE_INSTALL=user databricks labs install ucx` - will force the installation to be for user only
+* `UCX_FORCE_INSTALL=global databricks labs install ucx` - will force the installation to be for root only
+
 
 [[back to top](#databricks-labs-ucx)]
 

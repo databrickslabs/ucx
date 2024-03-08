@@ -177,7 +177,7 @@ class WorkspaceInstaller:
         prompts: Prompts,
         installation: Installation,
         ws: WorkspaceClient,
-        product: str = PRODUCT_INFO.product_name(),
+        product_info: ProductInfo = PRODUCT_INFO,
     ):
         if "DATABRICKS_RUNTIME_VERSION" in os.environ:
             msg = "WorkspaceInstaller is not supposed to be executed in Databricks Runtime"
@@ -225,19 +225,19 @@ class WorkspaceInstaller:
         if not self._force_install:
             return False
         msg = "[ADVANCED] UCX is already installed on this workspace. Do you want to create a new installation?"
-        if self._prompts.confirm(msg):
-            if not self._installation.is_global() and self._force_install == "global":
-                # TODO:
-                # Logic for forced global over user install
-                # Migration logic will go here
-
-                # verify complains without full path, asks to raise NotImplementedError builtin
-                raise databricks.sdk.errors.NotImplemented("Migration needed. Not implemented yet.")
-            if self._installation.is_global() and self._force_install == "user":
-                # Logic for forced user install over global install
-                self._installation = Installation.assume_user_home(self._ws, self._product)
-                return True
-        raise RuntimeWarning("UCX is already installed, but no confirmation")
+        if not self._prompts.confirm(msg):
+            raise RuntimeWarning("UCX is already installed, but no confirmation")
+        if not self._installation.is_global() and self._force_install == "global":
+            # TODO:
+            # Logic for forced global over user install
+            # Migration logic will go here
+            # verify complains without full path, asks to raise NotImplementedError builtin
+            raise databricks.sdk.errors.NotImplemented("Migration needed. Not implemented yet.")
+        if self._installation.is_global() and self._force_install == "user":
+            # Logic for forced user install over global install
+            self._installation = Installation.assume_user_home(self._ws, self._product_info.product_name())
+            return True
+        return False
 
     def configure(self) -> WorkspaceConfig:
         try:
@@ -993,5 +993,5 @@ if __name__ == "__main__":
     logger.setLevel("INFO")
     workspace_client = WorkspaceClient(product="ucx", product_version=__version__)
     current = PRODUCT_INFO.current_installation(workspace_client)
-    installer = WorkspaceInstaller(Prompts(), current, workspace_client)
+    installer = WorkspaceInstaller(Prompts(), current, workspace_client, PRODUCT_INFO)
     installer.run()
