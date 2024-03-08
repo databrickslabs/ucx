@@ -18,6 +18,7 @@ See [contributing instructions](CONTRIBUTING.md) to help improve this project.
 * [Installation](#installation)
   * [Authenticate Databricks CLI](#authenticate-databricks-cli)
   * [Install UCX](#install-ucx)
+  * [[ADVANCED] Force install over existing UCX](#advanced-force-install-over-existing-ucx)
   * [Upgrading UCX for newer versions](#upgrading-ucx-for-newer-versions)
   * [Uninstall UCX](#uninstall-ucx)
 * [Migration process](#migration-process)
@@ -143,8 +144,6 @@ databricks labs install ucx
 ```
 
 [[back to top](#databricks-labs-ucx)]
-
-
 
 ## Upgrading UCX for newer versions
 
