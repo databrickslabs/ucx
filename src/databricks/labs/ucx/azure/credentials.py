@@ -131,7 +131,7 @@ class StorageCredentialManager:
 
         if not validation.results:
             return StorageCredentialValidationResult.from_validation(
-                permission_mapping, ["Validation returned none results."]
+                permission_mapping, ["Validation returned no results."]
             )
 
         failures = []
