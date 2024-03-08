@@ -155,7 +155,7 @@ def assess_incompatible_submit_runs(cfg: WorkspaceConfig, ws: WorkspaceClient, s
 
 
 @task("assessment")
-def assess_cluster_policies(cfg: WorkspaceConfig, ws: WorkspaceClient, sql_backend: SqlBackend):
+def crawl_cluster_policies(cfg: WorkspaceConfig, ws: WorkspaceClient, sql_backend: SqlBackend):
     """This module scans through all the Cluster Policies and get the necessary information
 
     It looks for:
@@ -250,7 +250,7 @@ def crawl_groups(cfg: WorkspaceConfig, ws: WorkspaceClient, sql_backend: SqlBack
         assess_jobs,
         assess_incompatible_submit_runs,
         assess_clusters,
-        assess_cluster_policies,
+        crawl_cluster_policies,
         assess_azure_service_principals,
         assess_pipelines,
         assess_global_init_scripts,
