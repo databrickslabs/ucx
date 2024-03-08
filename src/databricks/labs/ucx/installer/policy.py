@@ -21,8 +21,8 @@ class ClusterPolicyInstaller:
     def _policy_config(value: str):
         return {"type": "fixed", "value": value}
 
-    def create(self, inventory_database: str) -> tuple[str | None, str | None, dict | None]:
-        instance_profile = None
+    def create(self, inventory_database: str) -> tuple[str, str, dict]:
+        instance_profile = ""
         spark_conf_dict = {}
         policies_with_external_hms = list(self._get_cluster_policies_with_external_hive_metastores())
         if len(policies_with_external_hms) > 0 and self._prompts.confirm(
@@ -39,14 +39,18 @@ class ClusterPolicyInstaller:
         for policy in policies:
             if policy.name == policy_name:
                 logger.info(f"Cluster policy {policy_name} already present, reusing the same.")
-                return policy.policy_id, instance_profile, spark_conf_dict
+                policy_id = policy.policy_id
+                assert policy_id is not None
+                return policy_id, instance_profile, spark_conf_dict
         logger.info("Creating UCX cluster policy.")
+        policy_id = self._ws.cluster_policies.create(
+            name=policy_name,
+            definition=self._definition(spark_conf_dict, instance_profile),
+            description="Custom cluster policy for Unity Catalog Migration (UCX)",
+        ).policy_id
+        assert policy_id is not None
         return (
-            self._ws.cluster_policies.create(
-                name=policy_name,
-                definition=self._definition(conf=spark_conf_dict, instance_profile=instance_profile),
-                description="Custom cluster policy for Unity Catalog Migration (UCX)",
-            ).policy_id,
+            policy_id,
             instance_profile,
             spark_conf_dict,
         )
@@ -56,9 +60,8 @@ class ClusterPolicyInstaller:
             "spark_version": self._policy_config(self._ws.clusters.select_spark_version(latest=True)),
             "node_type_id": self._policy_config(self._ws.clusters.select_node_type(local_disk=True)),
         }
-        if conf:
-            for key, value in conf.items():
-                policy_definition[f"spark_conf.{key}"] = self._policy_config(value)
+        for key, value in conf.items():
+            policy_definition[f"spark_conf.{key}"] = self._policy_config(value)
         if self._ws.config.is_aws:
             policy_definition["aws_attributes.availability"] = self._policy_config(
                 compute.AwsAvailability.ON_DEMAND.value
@@ -104,17 +107,19 @@ class ClusterPolicyInstaller:
                     yield policy
                     break
 
-    def update_job_policy(self, states: InstallState, policy_id: str):
-        if not states.jobs:
+    def update_job_policy(self, state: InstallState, policy_id: str):
+        if not state.jobs:
             logger.error("No jobs found in states")
             return
-        for job_id in states.jobs.items():
+        for job_id in state.jobs.items():
             try:
                 job = self._ws.jobs.get(job_id)
                 job_settings = job.settings
                 assert job.job_id is not None
                 assert job_settings is not None
-                assert job_settings.job_clusters is not None
+                if job_settings.job_clusters is None:
+                    # if job_clusters is None, it means override cluster is being set and hence policy should not be applied
+                    return
             except NotFound:
                 logger.error(f"Job id {job_id} not found. Please check if the job is present in the workspace")
                 continue

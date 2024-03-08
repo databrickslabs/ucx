@@ -133,7 +133,7 @@ def test_job_cluster_policy(ws, new_installation):
         assert policy_definition["aws_attributes.availability"]["value"] == compute.AwsAvailability.ON_DEMAND.value
 
 
-@pytest.mark.skip
+#@pytest.mark.skip
 @retried(on=[NotFound, TimeoutError], timeout=timedelta(minutes=5))
 def test_new_job_cluster_with_policy_assessment(
     ws, new_installation, make_ucx_group, make_cluster_policy, make_cluster_policy_permissions
