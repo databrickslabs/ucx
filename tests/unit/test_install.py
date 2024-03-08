@@ -1341,6 +1341,37 @@ def test_open_config(ws, mocker, mock_installation):
     webbrowser_open.assert_called_with('https://localhost/#workspace~/mock/config.yml')
 
 
+def test_save_config_should_include_databases(ws, mock_installation):
+    prompts = MockPrompts(
+        {
+            r".*PRO or SERVERLESS SQL warehouse.*": "1",
+            r"Choose how to map the workspace groups.*": "2",  # specify names
+            r"Comma-separated list of databases to migrate.*": "db1,db2",
+            r".*": "",
+        }
+    )
+
+    install = WorkspaceInstaller(prompts, mock_installation, ws)
+    install.configure()
+
+    mock_installation.assert_file_written(
+        'config.yml',
+        {
+            'version': 2,
+            'default_catalog': 'ucx_default',
+            'include_databases': ['db1', 'db2'],
+            'inventory_database': 'ucx',
+            'log_level': 'INFO',
+            'num_threads': 8,
+            'policy_id': 'foo',
+            'renamed_group_prefix': 'db-temp-',
+            'warehouse_id': 'abc',
+            'workspace_start_path': '/',
+            'num_days_submit_runs_history': 30,
+        },
+    )
+
+
 def test_runs_upgrades_on_too_old_version(ws, any_prompt):
     existing_installation = MockInstallation(
         {

@@ -52,9 +52,9 @@ def crawl_grants(cfg: WorkspaceConfig, _: WorkspaceClient, sql_backend: SqlBacke
 
     Note: This job runs on a separate cluster (named `tacl`) as it requires the proper configuration to have the Table
     ACLs enabled and available for retrieval."""
-    tables = TablesCrawler(sql_backend, cfg.inventory_database)
-    udfs = UdfsCrawler(sql_backend, cfg.inventory_database)
-    grants = GrantsCrawler(tables, udfs)
+    tables = TablesCrawler(sql_backend, cfg.inventory_database, cfg.include_databases)
+    udfs = UdfsCrawler(sql_backend, cfg.inventory_database, cfg.include_databases)
+    grants = GrantsCrawler(tables, udfs, cfg.include_databases)
     grants.snapshot()
 
 

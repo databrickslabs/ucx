@@ -18,6 +18,7 @@ from databricks.labs.ucx.azure.locations import ExternalLocationsMigration
 from databricks.labs.ucx.config import WorkspaceConfig
 from databricks.labs.ucx.framework.crawlers import StatementExecutionBackend
 from databricks.labs.ucx.hive_metastore import ExternalLocations, TablesCrawler
+from databricks.labs.ucx.hive_metastore.catalog_schema import CatalogSchema
 from databricks.labs.ucx.hive_metastore.mapping import TableMapping
 from databricks.labs.ucx.hive_metastore.table_migrate import TableMove, TablesMigrate
 from databricks.labs.ucx.install import WorkspaceInstallation
@@ -346,7 +347,7 @@ def create_uber_principal(w: WorkspaceClient, subscription_id: str):
 
 
 @ucx.command
-def migrate_locations(w: WorkspaceClient):
+def migrate_locations(w: WorkspaceClient, aws_profile: str | None = None):
     """This command creates UC external locations. The candidate locations to be created are extracted from guess_external_locations
     task in the assessment job. You can run validate_external_locations command to check the candidate locations. Please make sure
     the credentials haven migrated before running this command. The command will only create the locations that have corresponded UC Storage Credentials.
@@ -357,9 +358,26 @@ def migrate_locations(w: WorkspaceClient):
         service_principal_migration = ExternalLocationsMigration.for_cli(w, installation)
         service_principal_migration.run()
     if w.config.is_aws:
-        logger.error("migrate_locations is not yet supported in AWS")
+        logger.error("Migrate_locations for AWS")
+        if not shutil.which("aws"):
+            logger.error("Couldn't find AWS CLI in path. Please install the CLI from https://aws.amazon.com/cli/")
+            return
+        installation = Installation.current(w, 'ucx')
+        config = installation.load(WorkspaceConfig)
+        sql_backend = StatementExecutionBackend(w, config.warehouse_id)
+        aws_permissions = AWSResourcePermissions.for_cli(w, sql_backend, aws_profile, config.inventory_database)
+        aws_permissions.create_external_locations()
     if w.config.is_gcp:
         logger.error("migrate_locations is not yet supported in GCP")
+
+
+@ucx.command
+def create_catalogs_schemas(w: WorkspaceClient):
+    """Create UC catalogs and schemas based on the destinations created from create_table_mapping command."""
+    prompts = Prompts()
+    installation = Installation.current(w, 'ucx')
+    catalog_schema = CatalogSchema.for_cli(w, installation, prompts)
+    catalog_schema.create_catalog_schema()
 
 
 if __name__ == "__main__":

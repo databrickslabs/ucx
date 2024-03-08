@@ -10,7 +10,7 @@ from databricks.labs.ucx.framework.tasks import (  # pylint: disable=import-priv
     _TASKS,
     Task,
 )
-from databricks.labs.ucx.runtime import assess_azure_service_principals
+from databricks.labs.ucx.runtime import assess_azure_service_principals, crawl_grants
 
 from .framework.mocks import MockBackend
 
@@ -60,3 +60,16 @@ def test_assessment_tasks():
     assert len(_TASKS) >= 19
     azure = [v for k, v in _TASKS.items() if v.cloud == "azure"]
     assert len(azure) >= 1
+
+
+def test_runtime_grants(mocker):
+    with patch.dict(os.environ, {"DATABRICKS_RUNTIME_VERSION": "14.0"}):
+        pyspark_sql_session = mocker.Mock()
+        sys.modules["pyspark.sql.session"] = pyspark_sql_session
+        cfg = azure_mock_config()
+        ws = create_autospec(WorkspaceClient)
+        sql_backend = MockBackend()
+        crawl_grants(cfg, ws, sql_backend)
+
+        assert "SHOW DATABASES FROM hive_metastore" in sql_backend.queries
+        assert "SHOW DATABASES" in sql_backend.queries
