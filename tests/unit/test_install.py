@@ -1189,6 +1189,7 @@ def test_get_existing_installation_global(ws, mock_installation):
 
     # test for force user install variable without prompts
     with patch.dict('os.environ', {'UCX_FORCE_INSTALL': 'user'}):
+        install = WorkspaceInstaller(prompts, installation, ws)
         with pytest.raises(RuntimeWarning) as err:
             install.configure()
         assert err.value.args[0] == 'UCX is already installed, but no confirmation'
@@ -1205,8 +1206,8 @@ def test_get_existing_installation_global(ws, mock_installation):
             r".*": "",
         }
     )
-    install = WorkspaceInstaller(prompts, installation, ws)
     with patch.dict('os.environ', {'UCX_FORCE_INSTALL': 'user'}):
+        install = WorkspaceInstaller(prompts, installation, ws)
         workspace_config = install.configure()
         assert workspace_config.inventory_database == 'ucx_user'
 
@@ -1252,8 +1253,8 @@ def test_existing_installation_user(ws, mock_installation):
             r".*": "",
         }
     )
-    install = WorkspaceInstaller(prompts, installation, ws)
     with patch.dict('os.environ', {'UCX_FORCE_INSTALL': 'global'}):
+        install = WorkspaceInstaller(prompts, installation, ws)
         with pytest.raises(RuntimeWarning) as err:
             install.configure()
         assert err.value.args[0] == 'UCX is already installed, but no confirmation'
@@ -1270,8 +1271,9 @@ def test_existing_installation_user(ws, mock_installation):
             r".*": "",
         }
     )
-    install = WorkspaceInstaller(prompts, installation, ws)
+
     with patch.dict('os.environ', {'UCX_FORCE_INSTALL': 'global'}):
+        install = WorkspaceInstaller(prompts, installation, ws)
         with pytest.raises(NotImplemented) as err:
             install.configure()
         assert err.value.args[0] == "Migration needed. Not implemented yet."

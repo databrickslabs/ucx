@@ -177,7 +177,7 @@ class WorkspaceInstaller:
         prompts: Prompts,
         installation: Installation,
         ws: WorkspaceClient,
-        product_info: str = PRODUCT_INFO.product_name(),
+        product: str = PRODUCT_INFO.product_name(),
     ):
         if "DATABRICKS_RUNTIME_VERSION" in os.environ:
             msg = "WorkspaceInstaller is not supposed to be executed in Databricks Runtime"
@@ -222,29 +222,29 @@ class WorkspaceInstaller:
         return StatementExecutionBackend(self._ws, config.warehouse_id)
 
     def _confirm_force_install(self) -> bool:
-        if os.environ.get('UCX_FORCE_INSTALL'):
-            msg = "[ADVANCED] UCX is already installed on this workspace. Do you want to create a new installation?"
-            if self._prompts.confirm(msg):
-                if self._is_user() and os.environ.get('UCX_FORCE_INSTALL') == "global":
-                    # TODO:
-                    # Logic for forced global over user install
-                    # Migration logic will go here
+        if not self._force_install:
+            return False
+        msg = "[ADVANCED] UCX is already installed on this workspace. Do you want to create a new installation?"
+        if self._prompts.confirm(msg):
+            if not self._installation.is_global() and self._force_install == "global":
+                # TODO:
+                # Logic for forced global over user install
+                # Migration logic will go here
 
-                    # verify complains without full path, asks to raise NotImplementedError builtin
-                    raise databricks.sdk.errors.NotImplemented("Migration needed. Not implemented yet.")
-                if self._is_global() and os.environ.get('UCX_FORCE_INSTALL') == "user":
-                    # Logic for forced user install over global install
-                    self._installation = Installation.assume_user_home(self._ws, self._product_info)
-                    return True
-            raise RuntimeWarning("UCX is already installed, but no confirmation")
-        return False
+                # verify complains without full path, asks to raise NotImplementedError builtin
+                raise databricks.sdk.errors.NotImplemented("Migration needed. Not implemented yet.")
+            if self._installation.is_global() and self._force_install == "user":
+                # Logic for forced user install over global install
+                self._installation = Installation.assume_user_home(self._ws, self._product)
+                return True
+        raise RuntimeWarning("UCX is already installed, but no confirmation")
 
     def configure(self) -> WorkspaceConfig:
         try:
             config = self._installation.load(WorkspaceConfig)
-            self._apply_upgrades()
             if self._confirm_force_install():
                 return self._configure_new_installation()
+            self._apply_upgrades()
             return config
         except NotFound as err:
             logger.debug(f"Cannot find previous installation: {err}")
@@ -344,7 +344,7 @@ class WorkspaceInstallation:
         ws: WorkspaceClient,
         prompts: Prompts,
         verify_timeout: timedelta,
-        product_info: str = PRODUCT_INFO.product_name(),
+        product: str = PRODUCT_INFO.product_name(),
     ):
         self._config = config
         self._installation = installation
@@ -355,7 +355,7 @@ class WorkspaceInstallation:
         self._verify_timeout = verify_timeout
         self._state = InstallState.from_installation(installation)
         self._this_file = Path(__file__)
-        self._product_info = product_info
+        self._product = product
 
     @classmethod
     def current(cls, ws: WorkspaceClient):
@@ -992,6 +992,6 @@ if __name__ == "__main__":
     logger = get_logger(__file__)
     logger.setLevel("INFO")
     workspace_client = WorkspaceClient(product="ucx", product_version=__version__)
-    current = Installation(workspace_client, PRODUCT_INFO.product_name(), install_folder='/Applications/ucx')
+    current = PRODUCT_INFO.current_installation(workspace_client)
     installer = WorkspaceInstaller(Prompts(), current, workspace_client)
     installer.run()

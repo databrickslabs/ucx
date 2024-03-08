@@ -41,27 +41,26 @@ logger = logging.getLogger(__name__)
 def new_installation(ws, sql_backend, env_or_skip, inventory_schema, make_random):
     cleanup = []
 
-    def factory(  # pylint: disable=too-many-locals
+    def factory(
         config_transform: Callable[[WorkspaceConfig], WorkspaceConfig] | None = None,
         single_user_install: bool = False,
         fresh_install: bool = True,
         existing_installation_prefix: str = '',
         force_prompt_confirmation='no',
     ):
-        prefix = make_random(4)
-        product_info = prefix
+        product = make_random(4)
 
         if not fresh_install:
-            product_info = existing_installation_prefix
+            product = existing_installation_prefix
 
         if single_user_install:
-            ucx_install_path = f"/Users/{ws.current_user.me().user_name}/.{prefix}"
+            ucx_install_path = f"/Users/{ws.current_user.me().user_name}/.{product}"
             single_user_prompt_response = "yes"
         else:
-            ucx_install_path = f"/Applications/{prefix}"
+            ucx_install_path = f"/Applications/{product}"
             single_user_prompt_response = "no"
 
-        renamed_group_prefix = f"rename-{prefix}-"
+        renamed_group_prefix = f"rename-{product}-"
 
         prompts = MockPrompts(
             {
@@ -71,14 +70,14 @@ def new_installation(ws, sql_backend, env_or_skip, inventory_schema, make_random
                 r".*PRO or SERVERLESS SQL warehouse.*": "1",
                 r"Choose how to map the workspace groups.*": "1",
                 r".*connect to the external metastore?.*": "yes",
-                r".*Inventory Database.*": f"{inventory_schema}_{prefix}",
+                r".*Inventory Database.*": f"{inventory_schema}_{product}",
                 r".*Backup prefix*": renamed_group_prefix,
                 r"Do you want to install for a single user?": single_user_prompt_response,
                 r".*UCX is already installed on this workspace.*": force_prompt_confirmation,
                 r".*": "",
             }
         )
-        workspace_start_path = f"/Users/{ws.current_user.me().user_name}/.{prefix}"
+        workspace_start_path = f"/Users/{ws.current_user.me().user_name}/.{product}"
 
         default_cluster_id = env_or_skip("TEST_DEFAULT_CLUSTER_ID")
         tacl_cluster_id = env_or_skip("TEST_LEGACY_TABLE_ACL_CLUSTER_ID")
@@ -90,14 +89,14 @@ def new_installation(ws, sql_backend, env_or_skip, inventory_schema, make_random
             ],
         )
         if fresh_install:
-            installation = Installation(ws, product_info, install_folder=ucx_install_path)
+            installation = Installation(ws, product, install_folder=ucx_install_path)
         else:
             installation = Installation.current(ws, existing_installation_prefix)
 
-        installer = WorkspaceInstaller(prompts, installation, ws, product_info)
+        installer = WorkspaceInstaller(prompts, installation, ws, product)
         workspace_config = installer.configure()
 
-        installation = Installation.current(ws, product_info)
+        installation = Installation.current(ws, product)
 
         overrides = {"main": default_cluster_id, "tacl": tacl_cluster_id}
         workspace_config.override_clusters = overrides
@@ -120,7 +119,7 @@ def new_installation(ws, sql_backend, env_or_skip, inventory_schema, make_random
             wheels,
             ws,
             prompts,
-            product_info=product_info,
+            product=product,
             verify_timeout=timedelta(minutes=2),
         )
         workspace_installation.run()
