@@ -11,6 +11,7 @@ from datetime import datetime, timedelta
 from pathlib import Path
 from typing import Any
 
+import databricks.sdk.errors
 from databricks.labs.blueprint.entrypoint import get_logger
 from databricks.labs.blueprint.installation import Installation, NotInstalled
 from databricks.labs.blueprint.installer import InstallState
@@ -220,21 +221,30 @@ class WorkspaceInstaller:
     def _new_sql_backend(self, config: WorkspaceConfig) -> SqlBackend:
         return StatementExecutionBackend(self._ws, config.warehouse_id)
 
-    def _confirm_force_install(self):
+    def _confirm_force_install(self) -> bool:
         if os.environ.get('UCX_FORCE_INSTALL'):
             msg = "[ADVANCED] UCX is already installed on this workspace. Do you want to create a new installation?"
             if self._prompts.confirm(msg):
-                # TODO:
-                # Add logic for forced global over user install
-                # and forced user install over global install
-                raise RuntimeWarning("UCX is already installed and confirmation but needs migration")
+                if self._is_user() and os.environ.get('UCX_FORCE_INSTALL') == "global":
+                    # TODO:
+                    # Logic for forced global over user install
+                    # Migration logic will go here
+
+                    # verify complains without full path, asks to raise NotImplementedError builtin
+                    raise databricks.sdk.errors.NotImplemented("Migration needed. Not implemented yet.")
+                if self._is_global() and os.environ.get('UCX_FORCE_INSTALL') == "user":
+                    # Logic for forced user install over global install
+                    self._installation = Installation.assume_user_home(self._ws, self._product_info)
+                    return True
             raise RuntimeWarning("UCX is already installed, but no confirmation")
+        return False
 
     def configure(self) -> WorkspaceConfig:
         try:
             config = self._installation.load(WorkspaceConfig)
             self._apply_upgrades()
-            self._confirm_force_install()
+            if self._confirm_force_install():
+                return self._configure_new_installation()
             return config
         except NotFound as err:
             logger.debug(f"Cannot find previous installation: {err}")
@@ -981,7 +991,6 @@ class WorkspaceInstallation:
 if __name__ == "__main__":
     logger = get_logger(__file__)
     logger.setLevel("INFO")
-
     workspace_client = WorkspaceClient(product="ucx", product_version=__version__)
     current = Installation(workspace_client, PRODUCT_INFO.product_name(), install_folder='/Applications/ucx')
     installer = WorkspaceInstaller(Prompts(), current, workspace_client)
