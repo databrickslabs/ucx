@@ -144,7 +144,9 @@ class IamRoleMigration:
         config = installation.load(WorkspaceConfig)
         sql_backend = StatementExecutionBackend(ws, config.warehouse_id)
 
-        resource_permissions = AWSResourcePermissions(installation, ws, sql_backend, aws, config.inventory_database)
+        resource_permissions = AWSResourcePermissions.for_cli(
+            ws, installation, sql_backend, aws, config.inventory_database
+        )
 
         storage_credential_manager = CredentialManager(ws)
 

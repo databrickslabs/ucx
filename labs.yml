@@ -98,13 +98,23 @@ commands:
         description: target schema to migrate tables to
 
   - name: principal-prefix-access
-    description: For azure cloud, identifies all storage accounts used by tables in the workspace, identify spn and its 
+    description: For azure cloud, identifies all storage account used by tables in the workspace, identify spn and its 
       permission on each storage accounts. For aws, identifies all the Instance Profiles configured in the workspace and 
       its access to all the S3 buckets, along with AWS roles that are set with UC access and its access to S3 buckets. 
       The output is stored in the workspace install folder.
     flags:
       - name: subscription-id
-        description: Subscription to scan storage accounts in
+        description: Subscription to scan storage account in
+      - name: aws-profile
+        description: AWS Profile to use for authentication
+
+  - name: create-uber-principal
+    description: For azure cloud, creates a service principal and gives STORAGE BLOB READER access on all the storage account 
+      used by tables in the workspace and stores the spn info in the UCX cluster policy. For aws,
+      it identifies all s3 buckets used by the Instance Profiles configured in the workspace.
+    flags:
+      - name: subscription-id
+        description: Subscription to scan storage account in
       - name: aws-profile
         description: AWS Profile to use for authentication
 
@@ -133,13 +143,3 @@ commands:
   - name: create-catalogs-schemas
     description: Create UC external catalogs and schemas based on the destinations created from create_table_mapping command.
       This command is supposed to be run before migrating tables to UC.
-
-  - name: setup-migration-principal
-    description: Update UCX cluster policy with the instance profile that gives access to perform tables migration.
-      For azure cloud, it identifies all storage accounts used by tables in the workspace. For aws,
-      it identifies all s3 buckets used by the Instance Profiles configured in the workspace.
-    flags:
-      - name: subscription-id
-        description: Subscription to scan storage account in
-      - name: aws-profile
-        description: AWS Profile to use for authentication

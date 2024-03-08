@@ -11,10 +11,13 @@ from pathlib import PurePath
 
 from databricks.labs.blueprint.installation import Installation
 from databricks.labs.blueprint.parallel import Threads
+from databricks.labs.blueprint.tui import Prompts
 from databricks.sdk import WorkspaceClient
-from databricks.sdk.errors import ResourceDoesNotExist
+from databricks.sdk.errors import NotFound, ResourceDoesNotExist
 from databricks.sdk.service.catalog import Privilege
+from databricks.sdk.service.compute import Policy
 
+from databricks.labs.ucx.config import WorkspaceConfig
 from databricks.labs.ucx.framework.crawlers import StatementExecutionBackend
 from databricks.labs.ucx.hive_metastore import ExternalLocations
 from databricks.labs.ucx.hive_metastore.locations import ExternalLocation
@@ -53,12 +56,12 @@ class AWSRoleAction:
 @dataclass
 class AWSInstanceProfile:
     instance_profile_arn: str
-    iam_role_arn: str
+    iam_role_arn: str | None = None
 
     ROLE_NAME_REGEX = r"arn:aws:iam::[0-9]+:(?:instance-profile|role)\/([a-zA-Z0-9+=,.@_-]*)$"
 
     @property
-    def role_name(self):
+    def role_name(self) -> str | None:
         if self.iam_role_arn:
             arn = self.iam_role_arn
         else:
@@ -120,9 +123,9 @@ class AWSResources:
             attached_policies.append(policy.get("PolicyArn"))
         return attached_policies
 
-    def list_all_uc_roles(self):
+    def list_all_uc_roles(self) -> list[AWSRole]:
         roles = self._run_json_command(f"iam list-roles --profile {self._profile}")
-        uc_roles = []
+        uc_roles: list[AWSRole] = []
         roles = roles.get("Roles")
         if not roles:
             logger.warning("list-roles couldn't find any roles")
@@ -225,61 +228,36 @@ class AWSResources:
         return s3_actions
 
     def _aws_role_trust_doc(self, external_id="0000"):
-        return {
-            "Version": "2012-10-17",
-            "Statement": [
-                {
-                    "Effect": "Allow",
-                    "Principal": {
-                        "AWS": "arn:aws:iam::414351767826:role/unity-catalog-prod-UCMasterRole-14S5ZJVKOTYTL"
-                    },
-                    "Action": "sts:AssumeRole",
-                    "Condition": {"StringEquals": {"sts:ExternalId": external_id}},
-                }
-            ],
-        }
-
-    def add_uc_role(self, role_name: str) -> bool:
-        """
-        Create an IAM role for Unity Catalog to access the S3 buckets.
-        the AssumeRole condition will be modified later with the external ID captured from the UC credential.
-        https://docs.databricks.com/en/connect/unity-catalog/storage-credentials.html
-        """
-        assume_role_json = self._get_json_for_cli(self._aws_role_trust_doc())
-        add_role = self._run_json_command(
-            f"iam create-role --role-name {role_name} --assume-role-policy-document {assume_role_json}"
+        return self._get_json_for_cli(
+            {
+                "Version": "2012-10-17",
+                "Statement": [
+                    {
+                        "Effect": "Allow",
+                        "Principal": {
+                            "AWS": "arn:aws:iam::414351767826:role/unity-catalog-prod-UCMasterRole-14S5ZJVKOTYTL"
+                        },
+                        "Action": "sts:AssumeRole",
+                        "Condition": {"StringEquals": {"sts:ExternalId": external_id}},
+                    }
+                ],
+            }
         )
-        if not add_role:
-            return False
-        return True
 
-    def update_uc_trust_role(self, role_name: str, external_id: str = "0000") -> bool:
+    def _aws_s3_policy(self, s3_prefixes, account_id, role_name, kms_key=None):
         """
-        Modify an existing IAM role for Unity Catalog to access the S3 buckets with the external ID
-        captured from the UC credential.
-        https://docs.databricks.com/en/connect/unity-catalog/storage-credentials.html
+        Create the UC IAM policy for the given S3 prefixes, account ID, role name, and KMS key.
         """
-        assume_role_json = self._get_json_for_cli(self._aws_role_trust_doc(external_id))
-        update_role = self._run_json_command(
-            f"iam update-assume-role-policy --role-name {role_name} --policy-document {assume_role_json}"
-        )
-        if not update_role:
-            return False
-        return True
+        s3_prefixes_strip = set()
+        for path in s3_prefixes:
+            match = re.match(AWSResources.S3_PATH_REGEX, path)
+            if match:
+                s3_prefixes_strip.add(match.group(4))
 
-    def add_uc_role_policy(
-        self, role_name: str, policy_name: str, s3_prefixes: set[str], account_id: str, kms_key=None
-    ) -> bool:
-        s3_prefixes_enriched = sorted([self.S3_PREFIX + s3_prefix for s3_prefix in s3_prefixes])
+        s3_prefixes_enriched = sorted([self.S3_PREFIX + s3_prefix for s3_prefix in s3_prefixes_strip])
         statement = [
             {
-                "Action": [
-                    "s3:GetObject",
-                    "s3:PutObject",
-                    "s3:DeleteObject",
-                    "s3:ListBucket",
-                    "s3:GetBucketLocation",
-                ],
+                "Action": ["s3:GetObject", "s3:PutObject", "s3:DeleteObject", "s3:ListBucket", "s3:GetBucketLocation"],
                 "Resource": s3_prefixes_enriched,
                 "Effect": "Allow",
             },
@@ -297,15 +275,52 @@ class AWSResources:
                     "Effect": "Allow",
                 }
             )
-        policy_document = {
-            "Version": "2012-10-17",
-            "Statement": statement,
-        }
+        return self._get_json_for_cli(
+            {
+                "Version": "2012-10-17",
+                "Statement": statement,
+            }
+        )
 
-        policy_document_json = self._get_json_for_cli(policy_document)
+    def _add_role(self, role_name: str, assume_role_json: str) -> str | None:
+        """
+        Create an AWS role with the given name and assume role policy document.
+        """
+        add_role = self._run_json_command(
+            f"iam create-role --role-name {role_name} --assume-role-policy-document {assume_role_json}"
+        )
+        if not add_role:
+            return None
+        return add_role["Role"]["Arn"]
+
+    def add_uc_role(self, role_name: str) -> str | None:
+        """
+        Create an IAM role for Unity Catalog to access the S3 buckets.
+        the AssumeRole condition will be modified later with the external ID captured from the UC credential.
+        https://docs.databricks.com/en/connect/unity-catalog/storage-credentials.html
+        """
+        return self._add_role(role_name, self._aws_role_trust_doc())
+
+    def update_uc_trust_role(self, role_name: str, external_id: str = "0000") -> str | None:
+        """
+        Modify an existing IAM role for Unity Catalog to access the S3 buckets with the external ID
+        captured from the UC credential.
+        https://docs.databricks.com/en/connect/unity-catalog/storage-credentials.html
+        """
+        update_role = self._run_json_command(
+            f"iam update-assume-role-policy --role-name {role_name} --policy-document {self._aws_role_trust_doc(external_id)}"
+        )
+        if not update_role:
+            return None
+        return update_role["Role"]["Arn"]
+
+    def add_uc_role_policy(
+        self, role_name: str, policy_name: str, s3_prefixes: set[str], account_id: str, kms_key=None
+    ) -> bool:
         if not self._run_command(
             f"iam put-role-policy --role-name {role_name} "
-            f"--policy-name {policy_name} --policy-document {policy_document_json}"
+            f"--policy-name {policy_name} "
+            f"--policy-document {self._aws_s3_policy(s3_prefixes, account_id, role_name, kms_key)}"
         ):
             return False
         return True
@@ -318,13 +333,7 @@ class AWSResources:
             ],
         }
         assume_role_json = self._get_json_for_cli(aws_role_trust_doc)
-        role = self._run_json_command(
-            f"iam create-role --role-name {role_name} --assume-role-policy-document {assume_role_json}"
-        )
-        if not role:
-            return None
-
-        return role["Role"]['Arn']
+        return self._add_role(role_name, assume_role_json)
 
     def get_instance_profile(self, instance_profile_name: str) -> str | None:
         instance_profile = self._run_json_command(
@@ -355,51 +364,18 @@ class AWSResources:
     def add_or_update_migration_policy(
         self, role_name: str, policy_name: str, s3_prefixes: set[str], account_id: str, kms_key=None
     ):
-        s3_prefixes_strip = set()
-        for path in s3_prefixes:
-            match = re.match(AWSResources.S3_PATH_REGEX, path)
-            if match:
-                s3_prefixes_strip.add(match.group(4))
-
-        s3_prefixes_enriched = sorted([self.S3_PREFIX + s3_prefix for s3_prefix in s3_prefixes_strip])
-        statement = [
-            {
-                "Action": [
-                    "s3:GetObject",
-                    "s3:ListBucket",
-                    "s3:GetBucketLocation",
-                ],
-                "Resource": s3_prefixes_enriched,
-                "Effect": "Allow",
-            },
-            {
-                "Action": ["sts:AssumeRole"],
-                "Resource": [f"arn:aws:iam::{account_id}:role/{role_name}"],
-                "Effect": "Allow",
-            },
-        ]
-        if kms_key:
-            statement.append(
-                {
-                    "Action": ["kms:Decrypt", "kms:Encrypt", "kms:GenerateDataKey*"],
-                    "Resource": [f"arn:aws:kms:{kms_key}"],
-                    "Effect": "Allow",
-                }
-            )
-        policy_document = {
-            "Version": "2012-10-17",
-            "Statement": statement,
-        }
-
-        policy_document_json = self._get_json_for_cli(policy_document)
         if not self._run_command(
             f"iam put-role-policy "
-            f"--role-name {role_name} --policy-name {policy_name} --policy-document {policy_document_json}"
+            f"--role-name {role_name} --policy-name {policy_name} "
+            f"--policy-document {self._aws_s3_policy(s3_prefixes, account_id, role_name, kms_key)}"
         ):
             return False
         return True
 
     def is_role_exists(self, role_name: str) -> bool:
+        """
+        Check if the given role exists in the AWS account.
+        """
         result = self._run_json_command(f"iam list-roles --profile {self._profile}")
         roles = result.get("Roles", [])
         for role in roles:
@@ -438,6 +414,7 @@ class AWSResourcePermissions:
         ws: WorkspaceClient,
         backend: StatementExecutionBackend,
         aws_resources: AWSResources,
+        external_locations: ExternalLocations,
         schema: str,
         aws_account_id=None,
         kms_key=None,
@@ -446,16 +423,17 @@ class AWSResourcePermissions:
         self._aws_resources = aws_resources
         self._backend = backend
         self._ws = ws
+        self._locations = external_locations
         self._schema = schema
         self._aws_account_id = aws_account_id
         self._kms_key = kms_key
         self._filename = self.INSTANCE_PROFILES_FILE_NAMES
 
     @classmethod
-    def for_cli(cls, ws: WorkspaceClient, backend, aws_profile, schema, kms_key=None, product='ucx'):
-        installation = Installation.current(ws, product)
-        aws = AWSResources(aws_profile)
+    def for_cli(cls, ws: WorkspaceClient, installation, backend, aws, schema, kms_key=None):
+        config = installation.load(WorkspaceConfig)
         caller_identity = aws.validate_connection()
+        locations = ExternalLocations(ws, backend, config.inventory_database)
         if not caller_identity:
             raise ResourceWarning("AWS CLI is not configured properly.")
         return cls(
@@ -463,6 +441,7 @@ class AWSResourcePermissions:
             ws,
             backend,
             aws,
+            locations,
             schema,
             caller_identity.get("Account"),
             kms_key,
@@ -479,7 +458,7 @@ class AWSResourcePermissions:
         for missing_path in missing_paths:
             match = re.match(AWSResources.S3_PATH_REGEX, missing_path)
             if match:
-                s3_prefixes.add(match.group(4))
+                s3_prefixes.add(missing_path)
         if single_role:
             if self._aws_resources.add_uc_role(role_name):
                 self._aws_resources.add_uc_role_policy(
@@ -587,7 +566,7 @@ class AWSResourcePermissions:
         return policy_actions
 
     def _identify_missing_paths(self):
-        external_locations = ExternalLocations(self._ws, self._backend, self._schema).snapshot()
+        external_locations = self._locations.snapshot()
         compatible_roles = self.load_uc_compatible_roles()
         missing_paths = set()
         for external_location in external_locations:
@@ -639,12 +618,43 @@ class AWSResourcePermissions:
             credentials_dict[credential.aws_iam_role.role_arn] = credential.name
         return credentials_dict
 
+    def _get_cluster_policy(self, policy_id: str | None) -> Policy:
+        if not policy_id:
+            msg = "Cluster policy not found in UCX config"
+            logger.error(msg)
+            raise NotFound(msg) from None
+        try:
+            return self._ws.cluster_policies.get(policy_id=policy_id)
+        except NotFound as err:
+            msg = f"UCX Policy {policy_id} not found, please reinstall UCX"
+            logger.error(msg)
+            raise NotFound(msg) from err
+
+    def _get_iam_role_from_cluster_policy(self, cluster_policy_definition: str) -> str | None:
+        definition_dict = json.loads(cluster_policy_definition)
+        if definition_dict.get("aws_attributes.instance_profile_arn") is not None:
+            instance_profile_arn = definition_dict.get("aws_attributes.instance_profile_arn").get("value")
+            logger.info(f"Migration instance profile is set to {instance_profile_arn}")
+
+            return AWSInstanceProfile(instance_profile_arn).role_name
+
+        return None
+
+    def _update_cluster_policy_with_instance_profile(self, policy: Policy, iam_instance_profile: AWSInstanceProfile):
+        definition_dict = json.loads(str(policy.definition))
+        definition_dict["aws_attributes.instance_profile_arn"] = {
+            "type": "fixed",
+            "value": iam_instance_profile.instance_profile_arn,
+        }
+
+        self._ws.cluster_policies.edit(str(policy.policy_id), str(policy.name), definition=json.dumps(definition_dict))
+
     def create_external_locations(self, location_init="UCX_location"):
         # For each path find out the role that has access to it
         # Find out the credential that is pointing to this path
         # Create external location for the path using the credential identified
         credential_dict = self._get_existing_credentials_dict()
-        external_locations = ExternalLocations(self._ws, self._backend, self._schema).snapshot()
+        external_locations = self._locations.snapshot()
         existing_external_locations = self._ws.external_locations.list()
         existing_paths = [external_location.url for external_location in existing_external_locations]
         compatible_roles = self.load_uc_compatible_roles()
@@ -663,11 +673,6 @@ class AWSResourcePermissions:
             self._ws.external_locations.create(external_location_name, path, credential_dict[role_arn])
             external_location_num += 1
 
-    def add_or_update_migration_policy(self, role_name: str, policy_name: str, s3_prefixes: set[str]):
-        return self._aws_resources.add_or_update_migration_policy(
-            role_name, policy_name, s3_prefixes, self._aws_account_id, self._kms_key
-        )
-
     def get_instance_profile(self, instance_profile_name: str) -> AWSInstanceProfile | None:
         instance_profile_arn = self._aws_resources.get_instance_profile(instance_profile_name)
 
@@ -676,27 +681,63 @@ class AWSResourcePermissions:
 
         return AWSInstanceProfile(instance_profile_arn)
 
-    def create_migration_instance_profile(
-        self, role_name: str, policy_name: str, s3_prefixes: set[str]
-    ) -> AWSInstanceProfile | None:
-        role_arn = self._aws_resources.add_migration_role(role_name)
+    def create_uber_principal(self, prompts: Prompts):
 
-        if not role_arn:
-            return None
+        config = self._installation.load(WorkspaceConfig)
 
-        self._aws_resources.add_or_update_migration_policy(
-            role_name=role_name,
-            policy_name=policy_name,
-            s3_prefixes=s3_prefixes,
-            account_id=self._aws_account_id,
-            kms_key=self._kms_key,
-        )
+        external_locations = self._locations.snapshot()
+        s3_paths = {loc.location for loc in external_locations}
 
-        instance_profile_name = role_name
-        instance_profile_arn = self._aws_resources.create_instance_profile(instance_profile_name)
-        if not instance_profile_arn:
-            return None
+        if len(s3_paths) == 0:
+            logger.info("No S3 paths to migrate found")
+            return
 
-        self._aws_resources.add_role_to_instance_profile(instance_profile_name, role_name)
+        cluster_policy = self._get_cluster_policy(config.policy_id)
+        iam_role_name_in_cluster_policy = self._get_iam_role_from_cluster_policy(str(cluster_policy.definition))
 
-        return AWSInstanceProfile(instance_profile_arn, role_arn)
+        iam_policy_name = f"UCX_MIGRATION_POLICY_{config.inventory_database}"
+        if iam_role_name_in_cluster_policy and self.is_role_exists(iam_role_name_in_cluster_policy):
+            if not prompts.confirm(
+                f"We have identified existing UCX migration role \"{iam_role_name_in_cluster_policy}\" "
+                f"in cluster policy \"{cluster_policy.name}\". "
+                f"Do you want to update the role's migration policy?"
+            ):
+                return
+            self._aws_resources.add_or_update_migration_policy(
+                iam_role_name_in_cluster_policy, iam_policy_name, s3_paths, self._aws_account_id, self._kms_key
+            )
+            logger.info(f"Cluster policy \"{cluster_policy.name}\" updated successfully")
+            return
+
+        iam_role_name = f"UCX_MIGRATION_ROLE_{config.inventory_database}"
+        if self.is_role_exists(iam_role_name):
+            if not prompts.confirm(
+                f"We have identified existing UCX migration role \"{iam_role_name}\". "
+                f"Do you want to update the role's migration iam policy "
+                f"and add the role to UCX migration cluster policy \"{cluster_policy.name}\"?"
+            ):
+                return
+            self._aws_resources.add_or_update_migration_policy(
+                iam_role_name, iam_policy_name, s3_paths, self._aws_account_id, self._kms_key
+            )
+        else:
+            if not prompts.confirm(
+                f"Do you want to create new migration role \"{iam_role_name}\" and "
+                f"add the role to UCX migration cluster policy \"{cluster_policy.name}\"?"
+            ):
+                return
+            role_arn = self._aws_resources.add_migration_role(iam_role_name)
+            if not role_arn:
+                logger.error("Could not create new IAM role")
+                return
+            instance_profile_arn = self._aws_resources.create_instance_profile(iam_role_name)
+            if not instance_profile_arn:
+                logger.error("Could not create instance profile")
+                return
+            # Add role to instance profile - they have the same name
+            self._aws_resources.add_role_to_instance_profile(iam_role_name, iam_role_name)
+        iam_instance_profile = self.get_instance_profile(iam_role_name)
+
+        if iam_instance_profile:
+            self._update_cluster_policy_with_instance_profile(cluster_policy, iam_instance_profile)
+            logger.info(f"Cluster policy \"{cluster_policy.name}\" updated successfully")

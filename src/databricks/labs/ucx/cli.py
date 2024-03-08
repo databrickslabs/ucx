@@ -10,15 +10,10 @@ from databricks.labs.blueprint.installation import Installation, SerdeError
 from databricks.labs.blueprint.tui import Prompts
 from databricks.sdk import AccountClient, WorkspaceClient
 from databricks.sdk.errors import NotFound
-from databricks.sdk.service.compute import Policy
 
 from databricks.labs.ucx.account import AccountWorkspaces, WorkspaceInfo
 from databricks.labs.ucx.assessment.aws import AWSResourcePermissions, AWSResources
 from databricks.labs.ucx.aws.credentials import IamRoleMigration
-from databricks.labs.ucx.assessment.aws import (
-    AWSInstanceProfile,
-    AWSResourcePermissions,
-)
 from databricks.labs.ucx.azure.access import AzureResourcePermissions
 from databricks.labs.ucx.azure.credentials import ServicePrincipalMigration
 from databricks.labs.ucx.azure.locations import ExternalLocationsMigration
@@ -256,29 +251,6 @@ def alias(
     tables.alias_tables(from_catalog, from_schema, from_table, to_catalog, to_schema)
 
 
-@ucx.command
-def principal_prefix_access(w: WorkspaceClient, subscription_id: str | None = None, aws_profile: str | None = None):
-    """For azure cloud, identifies all storage accounts used by tables in the workspace, identify spn and its
-    permission on each storage accounts. For aws, identifies all the Instance Profiles configured in the workspace and
-    its access to all the S3 buckets, along with AWS roles that are set with UC access and its access to S3 buckets.
-    The output is stored in the workspace install folder.
-    Pass subscription_id for azure and aws_profile for aws."""
-    return _execute_for_cloud(
-        w, _azure_principal_prefix_access, _aws_principal_prefix_access, subscription_id, aws_profile
-    )
-
-
-@ucx.command
-def setup_migration_principal(w: WorkspaceClient, subscription_id: str | None = None, aws_profile: str | None = None):
-    """Update UCX cluster policy with the instance profile that gives access to perform tables migration.
-    For azure cloud, it identifies all storage accounts used by tables in the workspace. For aws,
-    it identifies all s3 buckets used by the Instance Profiles configured in the workspace.
-    Pass subscription_id for azure and aws_profile for aws."""
-    return _execute_for_cloud(
-        w, _azure_setup_migration_principal, _aws_setup_migration_principal, subscription_id, aws_profile
-    )
-
-
 def _execute_for_cloud(
     w: WorkspaceClient,
     func_azure: Callable,
@@ -287,11 +259,17 @@ def _execute_for_cloud(
     aws_profile: str | None = None,
 ):
     if w.config.is_azure:
+        if w.config.auth_type != "azure-cli":
+            logger.error("In order to obtain AAD token, Please run azure cli to authenticate.")
+            return None
         if not subscription_id:
             logger.error("Please enter subscription id to scan storage accounts in.")
             return None
         return func_azure(w, subscription_id)
     if w.config.is_aws:
+        if not shutil.which("aws"):
+            logger.error("Couldn't find AWS CLI in path. Please install the CLI from https://aws.amazon.com/cli/")
+            return None
         if not aws_profile:
             aws_profile = os.getenv("AWS_DEFAULT_PROFILE")
         if not aws_profile:
@@ -305,104 +283,43 @@ def _execute_for_cloud(
     return None
 
 
-def _azure_setup_migration_principal(w: WorkspaceClient, subscription_id: str):
-    # issue: https://github.com/databrickslabs/ucx/issues/881
-    raise NotImplementedError
+@ucx.command
+def create_uber_principal(w: WorkspaceClient, subscription_id: str | None = None, aws_profile: str | None = None):
+    """For azure cloud, creates a service principal and gives STORAGE BLOB READER access on all the storage account
+    used by tables in the workspace and stores the spn info in the UCX cluster policy. For aws,
+    it identifies all s3 buckets used by the Instance Profiles configured in the workspace.
+    Pass subscription_id for azure and aws_profile for aws."""
+    return _execute_for_cloud(w, _azure_setup_uber_principal, _aws_setup_uber_principal, subscription_id, aws_profile)
 
 
-def _aws_setup_migration_principal(w: WorkspaceClient, aws_profile: str):
-    if not shutil.which("aws"):
-        logger.error("Couldn't find AWS CLI in path. Please install the CLI from https://aws.amazon.com/cli/")
-        return
+def _azure_setup_uber_principal(w: WorkspaceClient, subscription_id: str):
+    prompts = Prompts()
+    include_subscriptions = [subscription_id] if subscription_id else None
+    azure_resource_permissions = AzureResourcePermissions.for_cli(w, include_subscriptions=include_subscriptions)
+    azure_resource_permissions.create_uber_principal(prompts)
 
+
+def _aws_setup_uber_principal(w: WorkspaceClient, aws_profile: str):
+    prompts = Prompts()
     installation = Installation.current(w, 'ucx')
     config = installation.load(WorkspaceConfig)
-
-    if not config.policy_id:
-        msg = "Cluster policy not found in UCX config"
-        logger.error(msg)
-        return
-
     sql_backend = StatementExecutionBackend(w, config.warehouse_id)
-    location_crawler = ExternalLocations(w, sql_backend, config.inventory_database)
-    external_locations = location_crawler.snapshot()
-    s3_paths = {loc.location for loc in external_locations}
-
-    if len(s3_paths) == 0:
-        logger.info("No S3 paths to migrate found")
-        return
-
-    aws_permissions = AWSResourcePermissions.for_cli(w, sql_backend, aws_profile, config.inventory_database)
-    cluster_policy = _get_cluster_policy(w, config.policy_id)
-    iam_role_name_in_cluster_policy = _get_iam_role_from_cluster_policy(str(cluster_policy.definition))
-
-    iam_policy_name = f"UCX_MIGRATION_POLICY_{config.inventory_database}"
-    prompts = Prompts()
-    if iam_role_name_in_cluster_policy and aws_permissions.is_role_exists(iam_role_name_in_cluster_policy):
-        if prompts.confirm(
-            f"We have identified existing UCX migration role \"{iam_role_name_in_cluster_policy}\" "
-            f"in cluster policy \"{cluster_policy.name}\". "
-            f"Do you want to update the role's migration policy?"
-        ):
-            aws_permissions.add_or_update_migration_policy(iam_role_name_in_cluster_policy, iam_policy_name, s3_paths)
-        return
-
-    iam_role_name = f"UCX_MIGRATION_ROLE_{config.inventory_database}"
-    if aws_permissions.is_role_exists(iam_role_name):
-        if not prompts.confirm(
-            f"We have identified existing UCX migration role \"{iam_role_name}\". "
-            f"Do you want to update the role's migration iam policy "
-            f"and add the role to UCX migration cluster policy \"{cluster_policy.name}\"?"
-        ):
-            return
-        aws_permissions.add_or_update_migration_policy(iam_role_name, iam_policy_name, s3_paths)
-        iam_instance_profile = aws_permissions.get_instance_profile(iam_role_name)
-    else:
-        if not prompts.confirm(
-            f"Do you want to create new migration role \"{iam_role_name}\" and "
-            f"add the role to UCX migration cluster policy \"{cluster_policy.name}\"?"
-        ):
-            return
-        iam_instance_profile = aws_permissions.create_migration_instance_profile(
-            iam_role_name, iam_policy_name, s3_paths
-        )
-
-    if iam_instance_profile:
-        _update_cluster_policy_with_aws_instance_profile(w, cluster_policy, iam_instance_profile)
-        logger.info(f"Cluster policy \"{cluster_policy.name}\" updated successfully")
+    aws = AWSResources(aws_profile)
+    aws_resource_permissions = AWSResourcePermissions.for_cli(
+        w, installation, sql_backend, aws, config.inventory_database
+    )
+    aws_resource_permissions.create_uber_principal(prompts)
 
 
-def _get_cluster_policy(w: WorkspaceClient, policy_id: str) -> Policy:
-    try:
-        return w.cluster_policies.get(policy_id=policy_id)
-    except NotFound as err:
-        msg = f"UCX Policy {policy_id} not found, please reinstall UCX"
-        logger.error(msg)
-        raise NotFound(msg) from err
-
-
-def _get_iam_role_from_cluster_policy(cluster_policy_definition: str) -> AWSInstanceProfile | None:
-    definition_dict = json.loads(cluster_policy_definition)
-    if definition_dict.get("aws_attributes.instance_profile_arn") is not None:
-        instance_profile_arn = definition_dict.get("aws_attributes.instance_profile_arn").get("value")
-        logger.info(f"Migration instance profile is set to {instance_profile_arn}")
-
-        return AWSInstanceProfile(instance_profile_arn).role_name
-
-    return None
-
-
-def _update_cluster_policy_with_aws_instance_profile(
-    w: WorkspaceClient, cluster_policy: Policy, iam_instance_profile: AWSInstanceProfile
-):
-    definition_dict = json.loads(str(cluster_policy.definition))
-    definition_dict["aws_attributes.instance_profile_arn"] = {
-        "type": "fixed",
-        "value": iam_instance_profile.instance_profile_arn,
-    }
-
-    w.cluster_policies.edit(
-        str(cluster_policy.policy_id), str(cluster_policy.name), definition=json.dumps(definition_dict)
+@ucx.command
+def principal_prefix_access(w: WorkspaceClient, subscription_id: str | None = None, aws_profile: str | None = None):
+    """For azure cloud, identifies all storage accounts used by tables in the workspace, identify spn and its
+    permission on each storage accounts. For aws, identifies all the Instance Profiles configured in the workspace and
+    its access to all the S3 buckets, along with AWS roles that are set with UC access and its access to S3 buckets.
+    The output is stored in the workspace install folder.
+    Pass subscription_id for azure and aws_profile for aws."""
+    return _execute_for_cloud(
+        w, _azure_principal_prefix_access, _aws_principal_prefix_access, subscription_id, aws_profile
     )
 
 
@@ -427,7 +344,8 @@ def _aws_principal_prefix_access(w: WorkspaceClient, aws_profile: str):
     installation = Installation.current(w, 'ucx')
     config = installation.load(WorkspaceConfig)
     sql_backend = StatementExecutionBackend(w, config.warehouse_id)
-    aws_permissions = AWSResourcePermissions.for_cli(w, sql_backend, aws_profile, config.inventory_database)
+    aws = AWSResources(aws_profile)
+    aws_permissions = AWSResourcePermissions.for_cli(w, installation, sql_backend, aws, config.inventory_database)
     instance_role_path = aws_permissions.save_instance_profile_permissions()
     logger.info(f"Instance profile and bucket info saved {instance_role_path}")
     logger.info("Generating UC roles and bucket permission info")
@@ -476,30 +394,11 @@ def migrate_credentials(w: WorkspaceClient, aws_profile: str | None = None):
 
 
 @ucx.command
-def create_uber_principal(w: WorkspaceClient, subscription_id: str):
-    """For azure cloud, creates a service principal and gives STORAGE BLOB READER access on all the storage account
-    used by tables in the workspace and stores the spn info in the UCX cluster policy."""
-    if not w.config.is_azure:
-        logger.error("This command is only supported on azure workspaces.")
-        return
-    if w.config.auth_type != "azure-cli":
-        logger.error("In order to obtain AAD token, Please run azure cli to authenticate.")
-        return
-    if not subscription_id:
-        logger.error("Please enter subscription id to scan storage account in.")
-        return
-    prompts = Prompts()
-    include_subscriptions = [subscription_id] if subscription_id else None
-    azure_resource_permissions = AzureResourcePermissions.for_cli(w, include_subscriptions=include_subscriptions)
-    azure_resource_permissions.create_uber_principal(prompts)
-    return
-
-
-@ucx.command
 def migrate_locations(w: WorkspaceClient, aws_profile: str | None = None):
-    """This command creates UC external locations. The candidate locations to be created are extracted from guess_external_locations
-    task in the assessment job. You can run validate_external_locations command to check the candidate locations. Please make sure
-    the credentials haven migrated before running this command. The command will only create the locations that have corresponded UC Storage Credentials.
+    """This command creates UC external locations. The candidate locations to be created are extracted from
+    guess_external_locations task in the assessment job. You can run validate_external_locations command to check
+    the candidate locations. Please make sure the credentials haven migrated before running this command. The command
+    will only create the locations that have corresponded UC Storage Credentials.
     """
     if w.config.is_azure:
         logger.info("Running migrate_locations for Azure")
@@ -511,10 +410,20 @@ def migrate_locations(w: WorkspaceClient, aws_profile: str | None = None):
         if not shutil.which("aws"):
             logger.error("Couldn't find AWS CLI in path. Please install the CLI from https://aws.amazon.com/cli/")
             return
+        if not aws_profile:
+            aws_profile = os.getenv("AWS_DEFAULT_PROFILE")
+        if not aws_profile:
+            logger.error(
+                "AWS Profile is not specified. Use the environment variable [AWS_DEFAULT_PROFILE] "
+                "or use the '--aws-profile=[profile-name]' parameter."
+            )
+            return
         installation = Installation.current(w, 'ucx')
         config = installation.load(WorkspaceConfig)
         sql_backend = StatementExecutionBackend(w, config.warehouse_id)
-        aws_permissions = AWSResourcePermissions.for_cli(w, sql_backend, aws_profile, config.inventory_database)
+        aws = AWSResources(aws_profile)
+        location = ExternalLocations(w, sql_backend, config.inventory_database)
+        aws_permissions = AWSResourcePermissions.for_cli(w, sql_backend, aws, location, config.inventory_database)
         aws_permissions.create_external_locations()
     if w.config.is_gcp:
         logger.error("migrate_locations is not yet supported in GCP")

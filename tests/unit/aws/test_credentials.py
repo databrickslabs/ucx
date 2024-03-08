@@ -14,7 +14,11 @@ from databricks.sdk.service.catalog import (
     StorageCredentialInfo,
 )
 
-from databricks.labs.ucx.assessment.aws import AWSResourcePermissions, AWSRoleAction
+from databricks.labs.ucx.assessment.aws import (
+    AWSResourcePermissions,
+    AWSResources,
+    AWSRoleAction,
+)
 from databricks.labs.ucx.aws.credentials import CredentialManager, IamRoleMigration
 from tests.unit import DEFAULT_CONFIG
 from tests.unit.azure.test_credentials import side_effect_validate_storage_credential
@@ -101,7 +105,7 @@ def instance_profile_migration(ws, installation, credential_manager):
 def test_for_cli_not_aws(caplog, ws, installation):
     ws.config.is_aws = False
     with pytest.raises(SystemExit):
-        IamRoleMigration.for_cli(ws, installation, "", MagicMock())
+        IamRoleMigration.for_cli(ws, installation, MagicMock(), MockPrompts({}))
     assert "Workspace is not on AWS, please run this command on a Databricks on AWS workspaces." in caplog.text
 
 
@@ -114,7 +118,7 @@ def test_for_cli_not_prompts(ws, installation):
         }
     )
     with pytest.raises(SystemExit):
-        IamRoleMigration.for_cli(ws, installation, "", prompts)
+        IamRoleMigration.for_cli(ws, installation, MagicMock(), prompts)
 
 
 def test_for_cli(ws, installation):
@@ -125,8 +129,10 @@ def test_for_cli(ws, installation):
             "and confirm listed IAM roles to be migrated*": "Yes"
         }
     )
+    aws = create_autospec(AWSResources)
+    aws.validate_connection.return_value = {"Account": "123456789012"}
 
-    assert isinstance(IamRoleMigration.for_cli(ws, installation, "", prompts), IamRoleMigration)
+    assert isinstance(IamRoleMigration.for_cli(ws, installation, aws, prompts), IamRoleMigration)
 
 
 def test_print_action_plan(caplog, ws, instance_profile_migration):
