@@ -1,4 +1,3 @@
-
 import pytest
 from databricks.labs.blueprint.installation import MockInstallation
 from databricks.labs.blueprint.tui import MockPrompts

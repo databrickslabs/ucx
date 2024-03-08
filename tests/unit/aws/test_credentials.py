@@ -30,8 +30,8 @@ def ws():
     return create_autospec(WorkspaceClient)
 
 
-def side_effect_create_aws_storage_credential(name, aws_iam_role, comment):
-    return StorageCredentialInfo(name=name, aws_iam_role=aws_iam_role, comment=comment)
+def side_effect_create_aws_storage_credential(name, aws_iam_role, comment, read_only):
+    return StorageCredentialInfo(name=name, aws_iam_role=aws_iam_role, comment=comment, read_only=read_only)
 
 
 @pytest.fixture
@@ -136,7 +136,7 @@ def test_print_action_plan(caplog, ws, instance_profile_migration):
 
     instance_profile_migration(10).run(prompts)
 
-    log_pattern = r"IAM Role ARN: .* privilege .*"
+    log_pattern = r"arn:aws:iam:.* on s3:.*"
     for msg in caplog.messages:
         if re.search(log_pattern, msg):
             assert True
