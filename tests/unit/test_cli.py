@@ -48,6 +48,8 @@ def ws():
             }
         ),
         '/Users/foo/.ucx/state.json': json.dumps({'resources': {'jobs': {'assessment': '123'}}}),
+        "/Users/foo/.ucx/uc_roles_access.csv": "role_arn,resource_type,privilege,resource_path\n"
+        "arn:aws:iam::123456789012:role/role_name,s3,READ_FILES,s3://labsawsbucket/",
         "/Users/foo/.ucx/azure_storage_account_info.csv": "prefix,client_id,principal,privilege,type,directory_id\ntest,test,test,test,Application,test",
         "/Users/foo/.ucx/mapping.csv": "workspace_name,catalog_name,src_schema,dst_schema,src_table,dst_table\ntest,test,test,test,test,test",
     }
@@ -332,6 +334,31 @@ def test_migrate_credentials_azure(ws):
     with patch("databricks.labs.blueprint.tui.Prompts.confirm", return_value=True):
         migrate_credentials(ws)
         ws.storage_credentials.list.assert_called()
+
+
+def test_migrate_credentials_aws(ws, mocker):
+    mocker.patch("shutil.which", return_value=True)
+    ws.config.is_azure = False
+    ws.config.is_aws = True
+    ws.config.is_gcp = False
+    uc_trust_policy = mocker.patch(
+        "databricks.labs.ucx.assessment.aws.AWSResourcePermissions.update_uc_role_trust_policy"
+    )
+    with patch("databricks.labs.blueprint.tui.Prompts.confirm", return_value=True):
+        migrate_credentials(ws, aws_profile="profile")
+        ws.storage_credentials.list.assert_called()
+        uc_trust_policy.assert_called_once()
+
+
+def test_migrate_credentials_aws_no_profile(ws, caplog, mocker):
+    mocker.patch("shutil.which", return_value="/path/aws")
+    ws.config.is_azure = False
+    ws.config.is_aws = True
+    migrate_credentials(ws)
+    assert (
+        "AWS Profile is not specified. Use the environment variable [AWS_DEFAULT_PROFILE] or use the "
+        "'--aws-profile=[profile-name]' parameter." in caplog.messages
+    )
 
 
 def test_create_master_principal_not_azure(ws):

@@ -123,7 +123,7 @@ class SqlBackend(ABC):
 
 
 class StatementExecutionBackend(SqlBackend):
-    def __init__(self, ws: WorkspaceClient, warehouse_id, *, max_records_per_batch: int = 1000):
+    def __init__(self, ws: WorkspaceClient, warehouse_id, *, max_records_per_batch: int = 500):
         self._sql = StatementExecutionExt(ws)
         self._warehouse_id = warehouse_id
         self._max_records_per_batch = max_records_per_batch
