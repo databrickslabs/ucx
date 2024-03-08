@@ -18,6 +18,7 @@ from databricks.labs.ucx.azure.locations import ExternalLocationsMigration
 from databricks.labs.ucx.config import WorkspaceConfig
 from databricks.labs.ucx.framework.crawlers import StatementExecutionBackend
 from databricks.labs.ucx.hive_metastore import ExternalLocations, TablesCrawler
+from databricks.labs.ucx.hive_metastore.catalog_schema import CatalogSchema
 from databricks.labs.ucx.hive_metastore.mapping import TableMapping
 from databricks.labs.ucx.hive_metastore.table_migrate import TableMove, TablesMigrate
 from databricks.labs.ucx.install import WorkspaceInstallation
@@ -368,6 +369,15 @@ def migrate_locations(w: WorkspaceClient, aws_profile: str | None = None):
         aws_permissions.create_external_locations()
     if w.config.is_gcp:
         logger.error("migrate_locations is not yet supported in GCP")
+
+
+@ucx.command
+def create_catalogs_schemas(w: WorkspaceClient):
+    """Create UC catalogs and schemas based on the destinations created from create_table_mapping command."""
+    prompts = Prompts()
+    installation = Installation.current(w, 'ucx')
+    catalog_schema = CatalogSchema.for_cli(w, installation, prompts)
+    catalog_schema.create_catalog_schema()
 
 
 if __name__ == "__main__":

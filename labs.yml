@@ -136,3 +136,7 @@ commands:
 
   - name: migrate-locations
     description: Create UC external locations based on the output of guess_external_locations assessment task.
+
+  - name: create-catalogs-schemas
+    description: Create UC external catalogs and schemas based on the destinations created from create_table_mapping command.
+      This command is supposed to be run before migrating tables to UC.

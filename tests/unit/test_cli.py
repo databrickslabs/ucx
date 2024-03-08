@@ -12,6 +12,7 @@ from databricks.sdk.service import iam, sql
 from databricks.labs.ucx.cli import (
     alias,
     create_account_groups,
+    create_catalogs_schemas,
     create_table_mapping,
     create_uber_principal,
     ensure_assessment_run,
@@ -48,6 +49,7 @@ def ws():
         ),
         '/Users/foo/.ucx/state.json': json.dumps({'resources': {'jobs': {'assessment': '123'}}}),
         "/Users/foo/.ucx/azure_storage_account_info.csv": "prefix,client_id,principal,privilege,type,directory_id\ntest,test,test,test,Application,test",
+        "/Users/foo/.ucx/mapping.csv": "workspace_name,catalog_name,src_schema,dst_schema,src_table,dst_table\ntest,test,test,test,test,test",
     }
 
     def download(path: str) -> io.StringIO | io.BytesIO:
@@ -393,3 +395,9 @@ def test_migrate_locations_gcp(ws, caplog):
     ws.config.is_gcp = True
     migrate_locations(ws)
     assert "migrate_locations is not yet supported in GCP" in caplog.messages
+
+
+def test_create_catalogs_schemas(ws):
+    with patch("databricks.labs.blueprint.tui.Prompts.question", return_value="s3://test"):
+        create_catalogs_schemas(ws)
+        ws.catalogs.list.assert_called_once()

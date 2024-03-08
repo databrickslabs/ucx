@@ -44,6 +44,7 @@ See [contributing instructions](CONTRIBUTING.md) to help improve this project.
   * [`create-table-mapping` command](#create-table-mapping-command)
   * [`skip` command](#skip-command)
   * [`revert-migrated-tables` command](#revert-migrated-tables-command)
+  * [`create-catalogs-schemas` command](#create-catalogs-schemas-command)
   * [`move` command](#move-command)
   * [`alias` command](#alias-command)
 * [Cross-workspace installations](#cross-workspace-installations)
@@ -543,6 +544,16 @@ Anywhere after [`create-table-mapping` command](#create-table-mapping-command) i
 This command removes the `upgraded_from` property on a migrated table for re-migration in the [table upgrade](docs/table_upgrade.md) process. 
 This command is useful for developers and administrators who want to revert the migration of a table. It can also be used 
 to debug issues related to table migration.
+
+[[back to top](#databricks-labs-ucx)]
+
+## `create-catalogs-schemas` command
+
+```text
+databricks labs ucx create-catalogs-schemas
+```
+After [`create-table-mapping` command](#create-table-mapping-command) is executed, you can run this command to have the required UC catalogs and schemas created.
+This command is supposed to be run before migrating tables to UC.
 
 [[back to top](#databricks-labs-ucx)]
 
