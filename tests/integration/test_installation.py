@@ -5,8 +5,9 @@ import os.path
 from collections.abc import Callable
 from dataclasses import replace
 from datetime import timedelta
-from unittest.mock import MagicMock
+from unittest.mock import patch
 
+import databricks.sdk.errors
 import pytest
 from databricks.labs.blueprint.installation import Installation
 from databricks.labs.blueprint.installer import InstallState
@@ -48,13 +49,10 @@ def new_installation(ws, sql_backend, env_or_skip, inventory_schema, make_random
         force_prompt_confirmation='no',
     ):
         prefix = make_random(4)
+        product_info = prefix
 
-        # hack to mock the product info
-        # pylint: disable=import-outside-toplevel
-        from databricks.labs.ucx import install
-
-        install.PRODUCT_INFO = MagicMock()
-        install.PRODUCT_INFO.product_name.return_value = prefix
+        if not fresh_install:
+            product_info = existing_installation_prefix
 
         if single_user_install:
             ucx_install_path = f"/Users/{ws.current_user.me().user_name}/.{prefix}"
@@ -62,9 +60,6 @@ def new_installation(ws, sql_backend, env_or_skip, inventory_schema, make_random
         else:
             ucx_install_path = f"/Applications/{prefix}"
             single_user_prompt_response = "no"
-
-        if not fresh_install and force_prompt_confirmation == "no":
-            install.PRODUCT_INFO.product_name.return_value = existing_installation_prefix
 
         renamed_group_prefix = f"rename-{prefix}-"
 
@@ -94,12 +89,15 @@ def new_installation(ws, sql_backend, env_or_skip, inventory_schema, make_random
                 functools.partial(ws.clusters.ensure_cluster_is_running, tacl_cluster_id),
             ],
         )
-        installation = Installation(ws, prefix, install_folder=ucx_install_path)
-        installer = WorkspaceInstaller(prompts, installation, ws)
+        if fresh_install:
+            installation = Installation(ws, product_info, install_folder=ucx_install_path)
+        else:
+            installation = Installation.current(ws, existing_installation_prefix)
+
+        installer = WorkspaceInstaller(prompts, installation, ws, product_info)
         workspace_config = installer.configure()
 
-        if not fresh_install and force_prompt_confirmation == 'no':
-            installation = Installation.current(ws, existing_installation_prefix)
+        installation = Installation.current(ws, product_info)
 
         overrides = {"main": default_cluster_id, "tacl": tacl_cluster_id}
         workspace_config.override_clusters = overrides
@@ -122,6 +120,7 @@ def new_installation(ws, sql_backend, env_or_skip, inventory_schema, make_random
             wheels,
             ws,
             prompts,
+            product_info=product_info,
             verify_timeout=timedelta(minutes=2),
         )
         workspace_installation.run()
@@ -360,57 +359,56 @@ def test_uninstallation(ws, sql_backend, new_installation):
         sql_backend.execute(f"show tables from hive_metastore.{install.config.inventory_database}")
 
 
-def test_fresh_global_installation(new_installation):
+def test_fresh_global_installation(ws, new_installation):
     global_installation = new_installation(single_user_install=False)
+    mock_product_value = global_installation.folder[-4:]
+    assert global_installation.folder == f"/Applications/{mock_product_value}"
     global_installation.uninstall()
 
 
-def test_single_user_installation(new_installation):
+def test_single_user_installation(ws, new_installation):
     single_user_installation = new_installation(single_user_install=True)
+    mock_product_value = single_user_installation.folder[-4:]
+    assert single_user_installation.folder == f"/Users/{ws.current_user.me().user_name}/.{mock_product_value}"
     single_user_installation.uninstall()
 
 
 def test_global_installation_on_existing_global_install(new_installation):
-    # TODO: Finish up the initial install and then pass the prefix
     existing_global_installation = new_installation(single_user_install=False)
     mock_product_value = existing_global_installation.folder[-4:]
+    assert existing_global_installation.folder == f"/Applications/{mock_product_value}"
     reinstall_global = new_installation(
         single_user_install=False, fresh_install=False, existing_installation_prefix=mock_product_value
     )
+    assert reinstall_global.folder == f"/Applications/{mock_product_value}"
     reinstall_global.uninstall()
 
 
-def test_user_installation_on_existing_global_install(new_installation):
+def test_user_installation_on_existing_global_install(ws, new_installation):
     # existing install at global level
     existing_global_installation = new_installation(single_user_install=False)
     mock_product_value = existing_global_installation.folder[-4:]
 
-    # reinstall at user level should update global install
-    reinstall_user = new_installation(
-        single_user_install=True, fresh_install=False, existing_installation_prefix=mock_product_value
-    )
-
-    # environment variable to force user install
-    os.environ['UCX_FORCE_INSTALL'] = "user"
-
     # warning to be thrown by installer if override environment variable present but no confirmation
-    with pytest.raises(RuntimeWarning) as err:
-        new_installation(
+    with patch.dict('os.environ', {'UCX_FORCE_INSTALL': 'user'}):
+        with pytest.raises(RuntimeWarning) as err:
+            new_installation(
+                single_user_install=True,
+                fresh_install=False,
+                existing_installation_prefix=mock_product_value,
+            )
+        assert err.value.args[0] == "UCX is already installed, but no confirmation"
+
+    # successful override with confirmation
+    with patch.dict('os.environ', {'UCX_FORCE_INSTALL': 'user'}):
+        reinstall_user_force = new_installation(
             single_user_install=True,
             fresh_install=False,
             existing_installation_prefix=mock_product_value,
+            force_prompt_confirmation='yes',
         )
-    assert err.value.args[0] == "Existing global install and user installation override, but no confirmation"
-
-    # successful override with confirmation
-    reinstall_user_force = new_installation(
-        single_user_install=True,
-        fresh_install=False,
-        existing_installation_prefix=mock_product_value,
-        force_prompt_confirmation='yes',
-    )
-    reinstall_user.uninstall()
-    reinstall_user_force.uninstall()
+        assert reinstall_user_force.folder == f"/Users/{ws.current_user.me().user_name}/.{mock_product_value}"
+        reinstall_user_force.uninstall()
     existing_global_installation.uninstall()
 
 
@@ -419,30 +417,24 @@ def test_global_installation_on_existing_user_install(new_installation):
     existing_user_installation = new_installation(single_user_install=True)
     mock_product_value = existing_user_installation.folder[-4:]
 
-    # reinstall at global level should update user install without override
-    reinstall_global = new_installation(
-        single_user_install=False, fresh_install=False, existing_installation_prefix=mock_product_value
-    )
-
-    # environment variable to force user install
-    os.environ['UCX_FORCE_INSTALL'] = "global"
-
     # warning to be thrown by installer if override environment variable present but no confirmation
-    with pytest.raises(RuntimeWarning) as err:
-        new_installation(
-            single_user_install=False,
-            fresh_install=False,
-            existing_installation_prefix=mock_product_value,
-        )
-    assert err.value.args[0] == "Existing user install and global installation override, but no confirmation"
+    with patch.dict('os.environ', {'UCX_FORCE_INSTALL': 'global'}):
+        with pytest.raises(RuntimeWarning) as err:
+            new_installation(
+                single_user_install=False,
+                fresh_install=False,
+                existing_installation_prefix=mock_product_value,
+            )
+        assert err.value.args[0] == "UCX is already installed, but no confirmation"
 
-    # successful override with confirmation
-    reinstall_global_force = new_installation(
-        single_user_install=False,
-        fresh_install=False,
-        existing_installation_prefix=mock_product_value,
-        force_prompt_confirmation='yes',
-    )
-    reinstall_global.uninstall()
-    reinstall_global_force.uninstall()
+    # not implemented error with confirmation
+    with patch.dict('os.environ', {'UCX_FORCE_INSTALL': 'global'}):
+        with pytest.raises(databricks.sdk.errors.NotImplemented) as err:
+            new_installation(
+                single_user_install=False,
+                fresh_install=False,
+                existing_installation_prefix=mock_product_value,
+                force_prompt_confirmation='yes',
+            )
+        assert err.value.args[0] == "Migration needed. Not implemented yet."
     existing_user_installation.uninstall()
