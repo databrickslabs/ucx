@@ -1275,3 +1275,17 @@ def test_existing_installation_user(ws, mock_installation):
         with pytest.raises(NotImplemented) as err:
             install.configure()
         assert err.value.args[0] == "Migration needed. Not implemented yet."
+
+
+def test_databricks_runtime_version_set(ws, mock_installation):
+    prompts = MockPrompts(
+        {
+            r".*": "",
+        }
+    )
+    product_info = "mock"
+
+    with patch.dict('os.environ', {'DATABRICKS_RUNTIME_VERSION': "13.3"}):
+        with pytest.raises(SystemExit) as err:
+            WorkspaceInstaller(prompts, mock_installation, ws, product_info)
+        assert err.value.args[0] == "WorkspaceInstaller is not supposed to be executed in Databricks Runtime"
