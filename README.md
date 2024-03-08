@@ -125,6 +125,27 @@ You can also install a specific version by specifying it like `@v0.13.2` - `data
 
 [[back to top](#databricks-labs-ucx)]
 
+## [ADVANCED] Force install over existing UCX
+Using an environment variable `UCX_FORCE_INSTALL` you can force the installation of UCX over an existing installation.
+The values for the environment variable are 'global' and 'user'.
+
+Global Install: When UCX is installed at '/Applications/ucx'
+User Install: When UCX is installed at '/Users/<user>/.ucx'
+
+If there is an existing global installation of UCX, you can force a user installation of UCX over the existing installation by setting the environment variable `UCX_FORCE_INSTALL` to 'global'.
+
+At this moment there is no global override over a user installation of UCX. As this requires migration and can break existing installations.
+
+Example:
+```commandline
+export UCX_FORCE_INSTALL="user"
+databricks labs install ucx 
+```
+
+[[back to top](#databricks-labs-ucx)]
+
+
+
 ## Upgrading UCX for newer versions
 
 Verify that UCX is installed
