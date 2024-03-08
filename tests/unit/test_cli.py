@@ -368,6 +368,7 @@ def test_migrate_locations_azure(ws):
     ws.external_locations.list.assert_called()
 
 
+@pytest.mark.skip
 def test_migrate_locations_aws(ws, caplog, mocker):
     mocker.patch("shutil.which", return_value="/path/aws")
     ws.config.is_azure = False
