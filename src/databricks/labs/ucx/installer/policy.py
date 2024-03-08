@@ -111,7 +111,7 @@ class ClusterPolicyInstaller:
         if not state.jobs:
             logger.error("No jobs found in states")
             return
-        for job_id in state.jobs.items():
+        for _, job_id in state.jobs.items():
             try:
                 job = self._ws.jobs.get(job_id)
                 job_settings = job.settings
