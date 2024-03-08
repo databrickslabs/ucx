@@ -5,7 +5,7 @@ import os.path
 from collections.abc import Callable
 from dataclasses import replace
 from datetime import timedelta
-from unittest.mock import patch
+from unittest.mock import MagicMock, patch
 
 import databricks.sdk.errors
 import pytest  # pylint: disable=wrong-import-order
@@ -40,6 +40,7 @@ logger = logging.getLogger(__name__)
 @pytest.fixture
 def new_installation(ws, sql_backend, env_or_skip, inventory_schema, make_random):
     cleanup = []
+    ProductInfo = MagicMock()  # pylint: disable=invalid-name
 
     def factory(
         config_transform: Callable[[WorkspaceConfig], WorkspaceConfig] | None = None,
@@ -49,7 +50,7 @@ def new_installation(ws, sql_backend, env_or_skip, inventory_schema, make_random
         force_prompt_confirmation='no',
     ):
         product = make_random(4)
-
+        ProductInfo.product_name.return_value = product
         if not fresh_install:
             product = existing_installation_prefix
 
