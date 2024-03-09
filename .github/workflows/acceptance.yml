@@ -9,6 +9,9 @@ permissions:
   contents: read
   pull-requests: write
 
+concurrency:
+  group: single-acceptance-job-per-repo
+
 jobs:
   integration:
     if: github.event_name == 'pull_request' && github.event.pull_request.draft == false
@@ -35,6 +38,7 @@ jobs:
         uses: databrickslabs/sandbox/acceptance@acceptance/v0.1.0
         with:
           vault_uri: ${{ secrets.VAULT_URI }}
+          timeout: 45m
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           ARM_CLIENT_ID: ${{ secrets.ARM_CLIENT_ID }}

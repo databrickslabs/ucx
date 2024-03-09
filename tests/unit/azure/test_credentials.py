@@ -36,6 +36,7 @@ from databricks.labs.ucx.azure.credentials import (
 )
 from databricks.labs.ucx.azure.resources import AzureResources
 from databricks.labs.ucx.hive_metastore import ExternalLocations
+from tests.unit import DEFAULT_CONFIG
 
 
 @pytest.fixture
@@ -46,15 +47,8 @@ def ws():
 @pytest.fixture
 def installation():
     return MockInstallation(
-        {
-            "config.yml": {
-                'version': 2,
-                'inventory_database': 'ucx',
-                'connect': {
-                    'host': 'foo',
-                    'token': 'bar',
-                },
-            },
+        DEFAULT_CONFIG
+        | {
             "azure_storage_account_info.csv": [
                 {
                     'prefix': 'prefix1',
@@ -241,7 +235,7 @@ def test_validate_storage_credentials_non_response(credential_manager):
     )
 
     validation = credential_manager.validate(permission_mapping)
-    assert validation.failures == ["Validation returned none results."]
+    assert validation.failures == ["Validation returned no results."]
 
 
 def test_validate_storage_credentials_failed_operation(credential_manager):
