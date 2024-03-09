@@ -188,9 +188,8 @@ def validate_groups_membership(w: WorkspaceClient):
 
 
 @ucx.command
-def revert_migrated_tables(w: WorkspaceClient, schema: str, table: str, *, delete_managed: bool = False):
+def revert_migrated_tables(w: WorkspaceClient, prompts: Prompts, schema: str, table: str, *, delete_managed: bool = False):
     """remove notation on a migrated table for re-migration"""
-    prompts = Prompts()
     if not schema and not table:
         question = "You haven't specified a schema or a table. All migrated tables will be reverted. Continue?"
         if not prompts.confirm(question, max_attempts=2):

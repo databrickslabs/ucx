@@ -8,6 +8,7 @@ import yaml
 from databricks.sdk import AccountClient, WorkspaceClient
 from databricks.sdk.errors import NotFound
 from databricks.sdk.service import iam, sql
+from databricks.labs.blueprint.tui import MockPrompts
 
 from databricks.labs.ucx.assessment.aws import AWSResources
 from databricks.labs.ucx.aws.access import AWSResourcePermissions
@@ -190,12 +191,13 @@ def test_no_step_in_repair_run(ws):
 
 def test_revert_migrated_tables(ws, caplog):
     # test with no schema and no table, user confirm to not retry
-    with patch("databricks.labs.blueprint.tui.Prompts.confirm", return_value=False):
-        assert revert_migrated_tables(ws, schema=None, table=None) is None
+    prompts = MockPrompts({'.*': 'no'})
+    assert revert_migrated_tables(ws, prompts, schema=None, table=None) is None
+
     # test with no schema and no table, user confirm to retry, but no ucx installation found
-    with patch("databricks.labs.blueprint.tui.Prompts.confirm", return_value=True):
-        assert revert_migrated_tables(ws, schema=None, table=None) is None
-        assert 'No migrated tables were found.' in caplog.messages
+    prompts = MockPrompts({'.*': 'yes'})
+    assert revert_migrated_tables(ws, prompts, schema=None, table=None) is None
+    assert 'No migrated tables were found.' in caplog.messages
 
 
 def test_move_no_catalog(ws, caplog):
