@@ -136,8 +136,6 @@ main(f'--config=/Workspace{config_file}',
 
 logger = logging.getLogger(__name__)
 
-PRODUCT_INFO = ProductInfo(__file__)
-
 
 def deploy_schema(sql_backend: SqlBackend, inventory_schema: str):
     # we need to import it like this because we expect a module instance
@@ -177,15 +175,19 @@ class WorkspaceInstaller:
         prompts: Prompts,
         installation: Installation,
         ws: WorkspaceClient,
-        product_info: ProductInfo = PRODUCT_INFO,
+        product_info: ProductInfo,
+        environ: dict[str, str] | None = None,
     ):
-        if "DATABRICKS_RUNTIME_VERSION" in os.environ:
+        if not environ:
+            environ = dict(os.environ.items())
+        if "DATABRICKS_RUNTIME_VERSION" in environ:
             msg = "WorkspaceInstaller is not supposed to be executed in Databricks Runtime"
             raise SystemExit(msg)
         self._ws = ws
         self._installation = installation
         self._prompts = prompts
         self._policy_installer = ClusterPolicyInstaller(installation, ws, prompts)
+        self._product_info = product_info
 
     def run(
         self,
@@ -193,7 +195,7 @@ class WorkspaceInstaller:
         sql_backend_factory: Callable[[WorkspaceConfig], SqlBackend] | None = None,
         wheel_builder_factory: Callable[[], WheelsV2] | None = None,
     ):
-        logger.info(f"Installing UCX v{PRODUCT_INFO.version()}")
+        logger.info(f"Installing UCX v{self._product_info.version()}")
         config = self.configure()
         if not sql_backend_factory:
             sql_backend_factory = self._new_sql_backend
@@ -206,7 +208,8 @@ class WorkspaceInstaller:
             wheel_builder_factory(),
             self._ws,
             self._prompts,
-            verify_timeout=verify_timeout,
+            verify_timeout,
+            self._product_info,
         )
         try:
             workspace_installation.run()
@@ -216,7 +219,7 @@ class WorkspaceInstaller:
             raise err
 
     def _new_wheel_builder(self):
-        return WheelsV2(self._installation, PRODUCT_INFO)
+        return WheelsV2(self._installation, self._product_info)
 
     def _new_sql_backend(self, config: WorkspaceConfig) -> SqlBackend:
         return StatementExecutionBackend(self._ws, config.warehouse_id)
@@ -252,7 +255,7 @@ class WorkspaceInstaller:
 
     def _apply_upgrades(self):
         try:
-            upgrades = Upgrades(PRODUCT_INFO, self._installation)
+            upgrades = Upgrades(self._product_info, self._installation)
             upgrades.apply(self._ws)
         except NotFound as err:
             logger.warning(f"Installed version is too old: {err}")
@@ -341,7 +344,7 @@ class WorkspaceInstallation:
         ws: WorkspaceClient,
         prompts: Prompts,
         verify_timeout: timedelta,
-        product: str = PRODUCT_INFO.product_name(),
+        product_info: ProductInfo,
     ):
         self._config = config
         self._installation = installation
@@ -352,17 +355,17 @@ class WorkspaceInstallation:
         self._verify_timeout = verify_timeout
         self._state = InstallState.from_installation(installation)
         self._this_file = Path(__file__)
-        self._product = product
+        self._product_info = product_info
 
     @classmethod
     def current(cls, ws: WorkspaceClient):
-        installation = PRODUCT_INFO.current_installation(ws)
+        product_info = ProductInfo.from_class(WorkspaceConfig)
+        installation = product_info.current_installation(ws)
         config = installation.load(WorkspaceConfig)
         sql_backend = StatementExecutionBackend(ws, config.warehouse_id)
-        wheels = WheelsV2(installation, PRODUCT_INFO)
+        wheels = product_info.wheels(ws)
         prompts = Prompts()
         timeout = timedelta(minutes=2)
-        product_info = ProductInfo(__file__).product_name()
         return WorkspaceInstallation(config, installation, sql_backend, wheels, ws, prompts, timeout, product_info)
 
     @property
@@ -374,7 +377,7 @@ class WorkspaceInstallation:
         return self._installation.install_folder()
 
     def run(self):
-        logger.info(f"Installing UCX v{PRODUCT_INFO.version()}")
+        logger.info(f"Installing UCX v{self._product_info.version()}")
         Threads.strict(
             "installing components",
             [
@@ -684,7 +687,7 @@ class WorkspaceInstallation:
             [t for t in _TASKS.values() if t.workflow == step_name],
             key=lambda _: _.name,
         )
-        version = PRODUCT_INFO.version()
+        version = self._product_info.version()
         version = version if not self._ws.config.is_gcp else version.replace("+", "-")
         return {
             "name": self._name(step_name),
@@ -697,7 +700,7 @@ class WorkspaceInstallation:
     def _upload_wheel_runner(self, remote_wheel: str):
         # TODO: we have to be doing this workaround until ES-897453 is solved in the platform
         code = TEST_RUNNER_NOTEBOOK.format(remote_wheel=remote_wheel, config_file=self._config_file).encode("utf8")
-        return self._installation.upload(f"wheels/wheel-test-runner-{PRODUCT_INFO.version()}.py", code)
+        return self._installation.upload(f"wheels/wheel-test-runner-{self._product_info.version()}.py", code)
 
     @staticmethod
     def _apply_cluster_overrides(settings: dict[str, Any], overrides: dict[str, str], wheel_runner: str) -> dict:
@@ -901,7 +904,7 @@ class WorkspaceInstallation:
         ):
             return
         # TODO: this is incorrect, fetch the remote version (that appeared only in Feb 2024)
-        logger.info(f"Deleting UCX v{PRODUCT_INFO.version()} from {self._ws.config.host}")
+        logger.info(f"Deleting UCX v{self._product_info.version()} from {self._ws.config.host}")
         try:
             self._installation.files()
         except NotFound:
@@ -988,7 +991,8 @@ class WorkspaceInstallation:
 if __name__ == "__main__":
     logger = get_logger(__file__)
     logger.setLevel("INFO")
+    app = ProductInfo.from_class(WorkspaceConfig)
     workspace_client = WorkspaceClient(product="ucx", product_version=__version__)
-    current = PRODUCT_INFO.current_installation(workspace_client)
-    installer = WorkspaceInstaller(Prompts(), current, workspace_client, PRODUCT_INFO)
+    current = app.current_installation(workspace_client)
+    installer = WorkspaceInstaller(Prompts(), current, workspace_client, app)
     installer.run()
