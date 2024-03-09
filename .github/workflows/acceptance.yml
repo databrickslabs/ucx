@@ -38,6 +38,7 @@ jobs:
         uses: databrickslabs/sandbox/acceptance@acceptance/v0.1.0
         with:
           vault_uri: ${{ secrets.VAULT_URI }}
+          timeout: 45m
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           ARM_CLIENT_ID: ${{ secrets.ARM_CLIENT_ID }}
