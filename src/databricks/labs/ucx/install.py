@@ -188,6 +188,7 @@ class WorkspaceInstaller:
         self._prompts = prompts
         self._policy_installer = ClusterPolicyInstaller(installation, ws, prompts)
         self._product_info = product_info
+        self._force_install = environ.get("UCX_FORCE_INSTALL")
 
     def run(
         self,
