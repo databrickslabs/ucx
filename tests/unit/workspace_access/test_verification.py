@@ -38,9 +38,9 @@ def test_validate_metastore_exists():
     assert verify_metastore_obj.workspace_id == 1234567890
 
 
-def test_validate_no_metastore_exists(mocker):
+def test_validate_no_metastore_exists():
     ws = create_autospec(WorkspaceClient)
-    ws.metastores.current.return_value = METASTORE_ASSIGNMENT
+    ws.metastores.current.return_value = None
 
     verify_metastore_obj = VerifyHasMetastore(ws)
 
