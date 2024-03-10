@@ -178,6 +178,8 @@ def test_run_managed_identity(ws, mocker):
     )
 
     # mock Azure resource manager and graph API calls for getting application_id of managed identity
+    # TODO: (qziyuan) use a better way to mock the API calls
+    # pylint: disable-next=prohibited-patch
     mocker.patch("databricks.sdk.core.ApiClient.do", side_effect=get_az_api_mapping)
 
     location_migration = location_migration_for_test(ws, mock_backend, mock_installation)
@@ -398,6 +400,8 @@ def test_corner_cases_with_missing_fields(ws, caplog, mocker):
         }
     )
     # return None when getting application_id of managed identity
+    # TODO: (qziyuan) use a better way to mock the API calls
+    # pylint: disable-next=prohibited-patch
     mocker.patch("databricks.sdk.core.ApiClient.do", return_value={"dummy": "dummy"})
 
     location_migration = location_migration_for_test(ws, mock_backend, mock_installation)

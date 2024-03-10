@@ -24,7 +24,7 @@ class TestingChecker(BaseChecker):
     def visit_call(self, node: nodes.Call) -> None:
         if not node.args:
             return
-        if node.func.as_string() == 'patch':
+        if node.func.as_string() in ('mocker.patch', 'patch'):
             argument_value = node.args[0].as_string()
             no_quotes = argument_value.strip("'\"")
             if no_quotes.startswith("databricks."):

@@ -21,13 +21,14 @@ from databricks.labs.ucx.workspace_access.verification import (
     VerifyHasMetastore,
 )
 
+METASTORE_ASSIGNMENT = MetastoreAssignment(
+    metastore_id="21fwef-b2345-sdas-2343-sddsvv332", workspace_id=1234567890, default_catalog_name="hive_metastore"
+)
 
-def test_validate_metastore_exists(mocker):
-    ws = mocker.patch("databricks.sdk.WorkspaceClient.__init__")
-    ws.metastores = mocker.patch("databricks.sdk.WorkspaceClient.metastores")
-    ws.metastores.current = lambda: MetastoreAssignment(
-        metastore_id="21fwef-b2345-sdas-2343-sddsvv332", workspace_id=1234567890, default_catalog_name="hive_metastore"
-    )
+
+def test_validate_metastore_exists():
+    ws = create_autospec(WorkspaceClient)
+    ws.metastores.current.return_value = METASTORE_ASSIGNMENT
     verify_metastore_obj = VerifyHasMetastore(ws)
 
     assert verify_metastore_obj.verify_metastore() is True
@@ -38,13 +39,8 @@ def test_validate_metastore_exists(mocker):
 
 
 def test_validate_no_metastore_exists(mocker):
-    ws = mocker.patch("databricks.sdk.WorkspaceClient.__init__")
-    ws.metastores = mocker.patch("databricks.sdk.WorkspaceClient.metastores")
-    ws.metastores.current = mocker.patch(
-        "databricks.sdk.service.catalog.MetastoreAssignment.__init__", return_value=None
-    )
-    ws.metastores.current.return_value = None
-    ws.return_value = None
+    ws = create_autospec(WorkspaceClient)
+    ws.metastores.current.return_value = METASTORE_ASSIGNMENT
 
     verify_metastore_obj = VerifyHasMetastore(ws)
 

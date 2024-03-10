@@ -47,11 +47,10 @@ def test_move_tables_invalid_to_schema(caplog):
     assert len([rec.message for rec in caplog.records if "schema TgtS not found in TgtC" in rec.message]) == 1
 
 
-def test_move_tables_not_found_table_error(mocker, caplog):
+def test_move_tables_not_found_table_error(caplog):
     client = create_autospec(WorkspaceClient)
     client.schemas.get.side_effect = [SchemaInfo(), NotFound()]
-    backend = create_autospec(SqlBackend)
-    backend.execute.side_effect = NotFound("[TABLE_OR_VIEW_NOT_FOUND]")
+    backend = MockBackend(fails_on_first={"SHOW CREATE TABLE SrcC.SrcS.table1": '[TABLE_OR_VIEW_NOT_FOUND]'})
 
     client.tables.list.return_value = [
         TableInfo(

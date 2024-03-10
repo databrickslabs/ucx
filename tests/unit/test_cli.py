@@ -268,7 +268,7 @@ def test_save_storage_and_principal_azure_no_subscription_id(ws, caplog):
     assert "Please enter subscription id to scan storage accounts in." in caplog.messages
 
 
-def test_save_storage_and_principal_azure(ws, caplog, mocker):
+def test_save_storage_and_principal_azure(ws, caplog):
     ws.config.auth_type = "azure-cli"
     ws.config.is_azure = True
     azure_resource_permissions = create_autospec(AzureResourcePermissions)
@@ -342,6 +342,8 @@ def test_migrate_credentials_aws(ws, mocker):
     ws.config.is_azure = False
     ws.config.is_aws = True
     ws.config.is_gcp = False
+    # TODO: (Vuong) refactor this asap
+    # pylint: disable-next=prohibited-patch
     uc_trust_policy = mocker.patch(
         "databricks.labs.ucx.assessment.aws.AWSResourcePermissions.update_uc_role_trust_policy"
     )

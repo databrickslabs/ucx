@@ -39,7 +39,7 @@ def test_sync_workspace_info(mocker):
 
 
 def test_current_workspace_name(mocker):
-    ws = mocker.patch("databricks.sdk.WorkspaceClient.__init__")
+    ws = create_autospec(WorkspaceClient)
     ws.config.host = "localhost"
     ws.config.user_agent = "ucx"
     ws.config.authenticate.return_value = {"Foo": "bar"}
@@ -54,7 +54,7 @@ def test_current_workspace_name(mocker):
 
 
 def test_manual_workspace_info(mocker):
-    ws = mocker.patch("databricks.sdk.WorkspaceClient.__init__")
+    ws = create_autospec(WorkspaceClient)
     ws.config.host = "localhost"
     ws.users.list.return_value = [User(user_name="foo")]
     ws.config.host = "localhost"
