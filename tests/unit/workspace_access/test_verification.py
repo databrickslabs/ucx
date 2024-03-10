@@ -205,7 +205,7 @@ def test_verify_applied_permissions_fails():
         ]
     )
 
-    ws.permissions.get = MagicMock(side_effect=lambda x, _: mock_permission_data)
+    ws.permissions.get.side_effect = lambda x, _: mock_permission_data
 
     with pytest.raises(AssertionError, match="Target permissions were not applied correctly for ot1/oid1"):
         manager.verify_applied_permissions("ot1", "oid1", state, "backup")
