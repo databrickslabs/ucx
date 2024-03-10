@@ -96,7 +96,9 @@ def sync_workspace_info(a: AccountClient):
 
 
 @ucx.command(is_account=True)
-def create_account_groups(a: AccountClient, workspace_ids: list[int] | None = None):
+def create_account_groups(
+    a: AccountClient, prompts: Prompts, workspace_ids: list[int] | None = None, new_workspace_client=WorkspaceClient
+):
     """
     Crawl all workspaces configured in workspace_ids, then creates account level groups if a WS local group is not present
     in the account.
@@ -109,15 +111,13 @@ def create_account_groups(a: AccountClient, workspace_ids: list[int] | None = No
     account
     """
     logger.info(f"Account ID: {a.config.account_id}")
-    prompts = Prompts()
-    workspaces = AccountWorkspaces(a)
+    workspaces = AccountWorkspaces(a, new_workspace_client)
     workspaces.create_account_level_groups(prompts, workspace_ids)
 
 
 @ucx.command
-def manual_workspace_info(w: WorkspaceClient):
+def manual_workspace_info(w: WorkspaceClient, prompts: Prompts):
     """only supposed to be run if cannot get admins to run `databricks labs ucx sync-workspace-info`"""
-    prompts = Prompts()
     installation = Installation.current(w, 'ucx')
     workspace_info = WorkspaceInfo(installation, w)
     workspace_info.manual_workspace_info(prompts)
@@ -188,7 +188,9 @@ def validate_groups_membership(w: WorkspaceClient):
 
 
 @ucx.command
-def revert_migrated_tables(w: WorkspaceClient, prompts: Prompts, schema: str, table: str, *, delete_managed: bool = False):
+def revert_migrated_tables(
+    w: WorkspaceClient, prompts: Prompts, schema: str, table: str, *, delete_managed: bool = False
+):
     """remove notation on a migrated table for re-migration"""
     if not schema and not table:
         question = "You haven't specified a schema or a table. All migrated tables will be reverted. Continue?"
@@ -203,6 +205,7 @@ def revert_migrated_tables(w: WorkspaceClient, prompts: Prompts, schema: str, ta
 @ucx.command
 def move(
     w: WorkspaceClient,
+    prompts: Prompts,
     from_catalog: str,
     from_schema: str,
     from_table: str,
@@ -211,7 +214,6 @@ def move(
 ):
     """move a uc table/tables from one schema to another schema in same or different catalog"""
     logger.info("Running move command")
-    prompts = Prompts()
     if from_catalog == "" or to_catalog == "":
         logger.error("Please enter from_catalog and to_catalog details")
         return
@@ -396,7 +398,7 @@ def _aws_principal_prefix_access(
 
 
 @ucx.command
-def migrate_credentials(w: WorkspaceClient, aws_profile: str | None = None, aws_resources: AWSResources | None = None):
+def migrate_credentials(w: WorkspaceClient, prompts: Prompts, aws_profile: str | None = None, aws_resources: AWSResources | None = None):
     """For Azure, this command migrates Azure Service Principals, which have Storage Blob Data Contributor,
     Storage Blob Data Reader, Storage Blob Data Owner roles on ADLS Gen2 locations that are being used in
     Databricks, to UC storage credentials.
@@ -410,7 +412,6 @@ def migrate_credentials(w: WorkspaceClient, aws_profile: str | None = None, aws_
     Please review the file and delete the Instance Profiles you do not want to be migrated.
     Pass aws_profile for aws.
     """
-    prompts = Prompts()
     installation = Installation.current(w, 'ucx')
     if w.config.is_azure:
         logger.info("Running migrate_credentials for Azure")
@@ -473,9 +474,8 @@ def migrate_locations(w: WorkspaceClient, aws_profile: str | None = None):
 
 
 @ucx.command
-def create_catalogs_schemas(w: WorkspaceClient):
+def create_catalogs_schemas(w: WorkspaceClient, prompts: Prompts):
     """Create UC catalogs and schemas based on the destinations created from create_table_mapping command."""
-    prompts = Prompts()
     installation = Installation.current(w, 'ucx')
     catalog_schema = CatalogSchema.for_cli(w, installation, prompts)
     catalog_schema.create_catalog_schema()
