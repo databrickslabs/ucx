@@ -5,7 +5,6 @@ import os.path
 from collections.abc import Callable
 from dataclasses import replace
 from datetime import timedelta
-from unittest.mock import patch
 
 import databricks.sdk.errors
 import pytest  # pylint: disable=wrong-import-order
@@ -78,11 +77,16 @@ def new_installation(ws, sql_backend, env_or_skip, inventory_schema):
 
         if not fresh_install:
             installation = product_info.current_installation(ws)
+        elif single_user_install:
+            installation = Installation(
+                ws,
+                product_info.product_name(),
+                install_folder=f"/Users/{ws.current_user.me().user_name}/.{product_info.product_name()}",
+            )
         else:
-            if single_user_install:
-                installation = Installation(ws, product_info.product_name(), install_folder=f"/Users/{ws.current_user.me().user_name}/.{product_info.product_name()}")
-            else:
-                installation = Installation(ws, product_info.product_name(), install_folder=f"/Applications/{product_info.product_name()}")
+            installation = Installation(
+                ws, product_info.product_name(), install_folder=f"/Applications/{product_info.product_name()}"
+            )
 
         installer = WorkspaceInstaller(prompts, installation, ws, product_info, environ)
         workspace_config = installer.configure()
@@ -357,9 +361,7 @@ def test_fresh_global_installation(new_installation):
 
 def test_fresh_user_installation(ws, new_installation):
     product_info = ProductInfo.for_testing(WorkspaceConfig)
-    user_installation = new_installation(
-        product_info=product_info,
-        single_user_install=True)
+    user_installation = new_installation(product_info=product_info, single_user_install=True)
     assert user_installation.folder == f"/Users/{ws.current_user.me().user_name}/.{product_info.product_name()}"
     user_installation.uninstall()
 
@@ -414,10 +416,10 @@ def test_user_installation_on_existing_global_install(ws, new_installation):
 def test_global_installation_on_existing_user_install(ws, new_installation):
     # existing installation at user level
     product_info = ProductInfo.for_testing(WorkspaceConfig)
-    existing_user_installation = new_installation(
-        product_info=product_info,
-        single_user_install=True)
-    assert existing_user_installation.folder == f"/Users/{ws.current_user.me().user_name}/.{product_info.product_name()}"
+    existing_user_installation = new_installation(product_info=product_info, single_user_install=True)
+    assert (
+        existing_user_installation.folder == f"/Users/{ws.current_user.me().user_name}/.{product_info.product_name()}"
+    )
 
     # warning to be thrown by installer if override environment variable present but no confirmation
     with pytest.raises(RuntimeWarning) as err:
