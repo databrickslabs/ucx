@@ -32,6 +32,7 @@ class TestingChecker(BaseChecker):
     }
 
     def visit_call(self, node: nodes.Call) -> None:
+        # this also means that rare cases, like MagicMock(side_effect=...) are fine
         if node.as_string() == 'MagicMock()':
             # here we can go and figure out the expected type of the object being mocked based on the arguments
             # where it is being assigned to, but that is a bit too much for this check. Other people can add this later.
